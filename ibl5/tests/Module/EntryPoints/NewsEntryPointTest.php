@@ -107,7 +107,7 @@ class NewsEntryPointTest extends ModuleEntryPointTestCase
             extraGlobals: ['storyhome' => 10, 'multilingual' => 0, 'user_news' => 0, 'articlecomm' => 0],
         );
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // bodytext='body' → fullcount > 0 → Read More link is built
         $this->assertStringContainsString('news-article__link', $output);
     }
@@ -142,6 +142,6 @@ class NewsEntryPointTest extends ModuleEntryPointTestCase
             extraGlobals: ['storyhome' => 10, 'multilingual' => 0, 'user_news' => 0, 'articlecomm' => 0],
         );
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

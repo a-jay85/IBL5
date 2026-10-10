@@ -27,7 +27,7 @@ class TransactionHistoryRepositoryTest extends DatabaseTestCase
     {
         $years = $this->repo->getAvailableYears();
 
-        self::assertNotEmpty($years);
+        self::assertNotSame([], $years);
         // Seed has entries from 2024 and 2023
         self::assertContains(2024, $years);
         self::assertContains(2023, $years);
@@ -39,7 +39,7 @@ class TransactionHistoryRepositoryTest extends DatabaseTestCase
     {
         $transactions = $this->repo->getTransactions(null, null, null);
 
-        self::assertNotEmpty($transactions);
+        self::assertNotSame([], $transactions);
         self::assertArrayHasKey('sid', $transactions[0]);
         self::assertArrayHasKey('catid', $transactions[0]);
         self::assertArrayHasKey('title', $transactions[0]);
@@ -50,7 +50,7 @@ class TransactionHistoryRepositoryTest extends DatabaseTestCase
     {
         $transactions = $this->repo->getTransactions(1, null, null);
 
-        self::assertNotEmpty($transactions);
+        self::assertNotSame([], $transactions);
         foreach ($transactions as $row) {
             // catid is returned as a string by PHPStan's mysqli result typing but as
             // an int at runtime (native types) — cast so the assertion is correct both
@@ -63,7 +63,7 @@ class TransactionHistoryRepositoryTest extends DatabaseTestCase
     {
         $transactions = $this->repo->getTransactions(null, 2024, null);
 
-        self::assertNotEmpty($transactions);
+        self::assertNotSame([], $transactions);
         foreach ($transactions as $row) {
             self::assertStringStartsWith('2024-', $row['time']);
         }
@@ -73,7 +73,7 @@ class TransactionHistoryRepositoryTest extends DatabaseTestCase
     {
         $transactions = $this->repo->getTransactions(null, 2024, 3);
 
-        self::assertNotEmpty($transactions);
+        self::assertNotSame([], $transactions);
         foreach ($transactions as $row) {
             self::assertStringStartsWith('2024-03-', $row['time']);
         }

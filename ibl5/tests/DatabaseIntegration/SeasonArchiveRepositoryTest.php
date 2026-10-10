@@ -23,7 +23,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllSeasonYears();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // Should be sorted ascending
         $sorted = $result;
         sort($sorted);
@@ -41,7 +41,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getAwardsByYear(2098);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('award', $first);
         self::assertArrayHasKey('name', $first);
@@ -63,7 +63,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getPlayoffResultsByYear(9098);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('winner', $first);
         self::assertArrayHasKey('loser', $first);
@@ -81,7 +81,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getTeamAwardsByYear(2098, 2097);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('name', $first);
         self::assertArrayHasKey('award', $first);
@@ -137,7 +137,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getAllGmAwardsWithTeams();
 
         // Production DB has GM awards data
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('gm_display_name', $first);
         self::assertArrayHasKey('team_name', $first);
@@ -149,7 +149,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllGmTenuresWithTeams();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('gm_display_name', $first);
         self::assertArrayHasKey('team_name', $first);
@@ -311,7 +311,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getHeatWinLossByYear(2098);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('currentname', $first);
         self::assertArrayHasKey('wins', $first);
@@ -323,7 +323,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getTeamColors();
 
         // Should contain all real teams (1-28)
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // Verify structure of first entry
         $firstTeam = array_values($result)[0];
         self::assertArrayHasKey('color1', $firstTeam);
@@ -353,7 +353,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getTeamConferences();
 
         // Should have entries from standings table
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // All values should be conference names
         foreach ($result as $conference) {
             self::assertContains($conference, ['Eastern', 'Western']);

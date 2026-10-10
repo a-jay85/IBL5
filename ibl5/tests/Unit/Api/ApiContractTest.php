@@ -678,7 +678,7 @@ class ApiContractTest extends TestCase
         $json = ob_get_clean();
 
         self::assertNotFalse($json);
-        self::assertNotEmpty($json);
+        self::assertNotSame('', $json);
 
         $decoded = json_decode($json, true);
         self::assertIsArray($decoded);

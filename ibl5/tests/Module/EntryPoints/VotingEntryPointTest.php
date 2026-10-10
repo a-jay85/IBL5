@@ -36,7 +36,7 @@ class VotingEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]));
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_team_info');
     }
 
@@ -69,7 +69,7 @@ class VotingEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]));
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringNotContainsString('ShowAndHideResults', $output);
         $this->assertStringNotContainsString('Voting Results', $output);
     }

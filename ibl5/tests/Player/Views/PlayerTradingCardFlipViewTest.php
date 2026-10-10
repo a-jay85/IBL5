@@ -139,7 +139,7 @@ class PlayerTradingCardFlipViewTest extends TestCase
     {
         $result = PlayerTradingCardFlipView::getFlipStyles();
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame('', $result);
     }
 
     public function testRenderContainsBothFacesSnapshot(): void

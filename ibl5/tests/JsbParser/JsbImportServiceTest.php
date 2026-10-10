@@ -558,7 +558,7 @@ class JsbImportServiceTest extends TestCase
         $result = $service->processRcbData($emptyRcb, 2026, 'test-source');
 
         $this->assertSame(0, $result->errors);
-        $this->assertNotEmpty($result->messages);
+        $this->assertNotSame([], $result->messages);
         $this->assertStringContainsString('alltime section empty', $result->messages[0]);
     }
 

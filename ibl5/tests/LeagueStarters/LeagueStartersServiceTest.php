@@ -56,11 +56,11 @@ class LeagueStartersServiceTest extends TestCase
 
         $result = $service->getAllStartersByPosition();
 
-        $this->assertEmpty($result['PG']);
-        $this->assertEmpty($result['SG']);
-        $this->assertEmpty($result['SF']);
-        $this->assertEmpty($result['PF']);
-        $this->assertEmpty($result['C']);
+        $this->assertSame([], $result['PG']);
+        $this->assertSame([], $result['SG']);
+        $this->assertSame([], $result['SF']);
+        $this->assertSame([], $result['PF']);
+        $this->assertSame([], $result['C']);
     }
 
     // ============================================

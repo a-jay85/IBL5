@@ -63,6 +63,7 @@ new_env() {
     ORIG_PATH="${ORIG_PATH:-$PATH}"
     ORIG_HOME="${ORIG_HOME:-$HOME}"
     export HOME="$ORIG_HOME"
+    unset IBL5_USAGE_GATE_TEST_MODE
 }
 
 # seed_home <account_uuid|"">: isolate HOME; seed ~/.claude.json with the account id.
@@ -1017,6 +1018,26 @@ test_decide_run_sid_drain_holder_allows() {
     assert_eq run_sid_holder:no-marker 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
 }
 
+# A runner copy in a temp dir (a test harness) must not park a marker in the real
+# state dir. With IBL5_USAGE_GATE_STATE_DIR set, the same resume bin is accepted.
+test_marker_temp_bin_needs_own_state_dir() {
+    new_env
+    local h d rc tbin="$T/automouse/run"
+    mkdir -p "$T/automouse"; printf '#!/bin/sh\n' > "$tbin"; chmod +x "$tbin"
+    h=$(mktemp -d "$TMPROOT/home.XXXXXX")
+    d="$h/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
+    env -u IBL5_USAGE_GATE_STATE_DIR HOME="$h" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_marker_write $SID_A automouse '$tbin' usage-pause drain 95 seven_day 1790625600"; rc=$?
+    assert_eq temp_bin:default-dir-rejected 1 "$rc"
+    assert_no_file temp_bin:default-dir-no-marker "$d/markers/$SID_A.json"
+    assert_contains temp_bin:log "$(cat "$d/usage-gate.log")" "marker-rejected reason=temp-resume-bin"
+    env -u IBL5_USAGE_GATE_STATE_DIR HOME="$h" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_marker_write $SID_B automouse /bin/sh usage-pause drain 95 seven_day 1790625600"; rc=$?
+    assert_eq temp_bin:default-dir-real-bin-ok 0 "$rc"
+    assert_file temp_bin:default-dir-real-bin-marker "$d/markers/$SID_B.json"
+    gate_run "usage_marker_write $SID_A automouse '$tbin' usage-pause drain 95 seven_day 1790625600"; rc=$?
+    assert_eq temp_bin:own-dir-ok 0 "$rc"
+    assert_file temp_bin:own-dir-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
 # ---------------------------------------------------------------- Phase 4
 
 # coord_setup <pct>: env with a fresh cache at <pct>, failing curl stub, a DM stub
@@ -1175,7 +1196,7 @@ test_coord_limit_hit_backoff() {
 test_coord_runaway_stuck() {
     coord_setup 50
     coord_marker $SID_A plan-now
-    patch_marker $SID_A '.resume_count = 5'
+    patch_marker $SID_A ".resume_count = 5 | .resets_at = $(( $(date +%s) + 3600 ))"
     run_coord --once >/dev/null 2>&1
     sleep 0.3
     assert_no_file coord_runaway:not-launched "$T/launched.$SID_A"
@@ -1183,6 +1204,78 @@ test_coord_runaway_stuck() {
     assert_eq coord_runaway:one-dm 1 "$(dm_calls)"
     run_coord --once >/dev/null 2>&1
     assert_eq coord_runaway:no-second-dm 1 "$(dm_calls)"
+}
+
+# A marker left stuck in an earlier usage window gets a fresh count once that
+# window resets, and the coordinator resumes it without a manual --resume-paused.
+test_coord_runaway_window_reset() {
+    coord_setup 50
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\" | .resets_at = $(( $(date +%s) - 60 ))"
+    local out
+    out=$(run_coord --dry-run --once 2>/dev/null)
+    assert_contains coord_window_reset:dry-action "$out" "ACTION unstick $SID_A window-reset"
+    assert_eq coord_window_reset:dry-keeps-stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_file coord_window_reset:launched "$T/launched.$SID_A"
+    assert_eq coord_window_reset:unstuck false "$(jq -r '.stuck // false' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_eq coord_window_reset:count-restarted 1 "$(jq -r .resume_count "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_contains coord_window_reset:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "runaway-reset sid=$SID_A reason=window-reset"
+    assert_contains coord_window_reset:dm "$(cat "$T/dm.txt")" "usage window reset"
+}
+
+# A marker left stuck under one account gets a fresh count after a login switch,
+# because the new account has its own limits. Its window has not reset yet.
+test_coord_runaway_account_switch() {
+    coord_setup 50
+    seed_home uuid-A
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\" | .resets_at = $(( $(date +%s) + 86400 ))"
+    assert_eq coord_acct_switch:marker-acct "$(acct_hash uuid-A)" "$(jq -r .acct_fp "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    seed_home uuid-B
+    local out
+    out=$(run_coord --dry-run --once 2>/dev/null)
+    assert_contains coord_acct_switch:dry-action "$out" "ACTION unstick $SID_A account-switch"
+    assert_eq coord_acct_switch:dry-keeps-stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_file coord_acct_switch:launched "$T/launched.$SID_A"
+    assert_eq coord_acct_switch:unstuck false "$(jq -r '.stuck // false' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_eq coord_acct_switch:count-restarted 1 "$(jq -r .resume_count "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_contains coord_acct_switch:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "runaway-reset sid=$SID_A reason=account-switch"
+    assert_contains coord_acct_switch:dm "$(cat "$T/dm.txt")" "login switch detected"
+    assert_eq coord_acct_switch:reset-acct "$(acct_hash uuid-B)" "$(jq -r .reset_acct "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    # The resumed run exits without pausing; after 5 more tries it stays stuck.
+    rm -f "$T/launched.$SID_A"
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\""
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_acct_switch:no-second-reset "$T/launched.$SID_A"
+    assert_eq coord_acct_switch:stuck-again true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
+# Same account, window not reset: the stuck marker stays stuck.
+test_coord_runaway_same_account_stays_stuck() {
+    coord_setup 50
+    seed_home uuid-A
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\" | .resets_at = $(( $(date +%s) + 86400 ))"
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_same_acct:not-launched "$T/launched.$SID_A"
+    assert_eq coord_same_acct:still-stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
+# A marker whose resets_at is unknown stays stuck: there is no window to wait out.
+test_coord_runaway_no_resets_stays_stuck() {
+    coord_setup 50
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A '.resume_count = 5 | .stuck = true | .stuck_reason = "paused-5-times" | .resets_at = null'
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_no_resets:not-launched "$T/launched.$SID_A"
+    assert_eq coord_no_resets:still-stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
 }
 
 # A resume binary removed after the pause (worktree reaped once its PR merged) gets
@@ -1997,8 +2090,9 @@ test_coord_switch_respects_runaway_and_hold() {
     sw_signal 30 - 1 account
     run_coord --once >/dev/null 2>&1
     sleep 1
-    assert_eq switch_runaway:stuck true "$(jq -r '.stuck' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
-    assert_no_file switch_runaway:no-launch "$T/launched.$SID_A"
+    # A known account switch clears the old account's pause count, so A resumes.
+    assert_eq switch_runaway:unstuck false "$(jq -r '.stuck // false' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_file switch_runaway:launched "$T/launched.$SID_A"
     assert_no_file switch_hold:limit-hit-waits "$T/launched.$SID_B"
 }
 
@@ -2186,6 +2280,132 @@ test_switch_never_stores_secrets() {
     run_coord --once >/dev/null 2>&1
     wait_file "$T/launched.$SID_A"
     assert_eq never_secrets:state "" "$(grep -rl -e tokB -e uuid-B -e uuid-A "$IBL5_USAGE_GATE_STATE_DIR" 2>/dev/null)"
+}
+
+# ---------------------------------------------------------------- test-mode seam
+
+# stub_security_recorder <stubdir>: `security` shim that counts calls in <stubdir>/security.calls.
+stub_security_recorder() {
+    mkdir -p "$1"
+    printf '#!/bin/sh\necho call >> "%s/security.calls"\necho '"'"'{"claudeAiOauth":{"accessToken":"tok"}}'"'"'\n' "$1" > "$1/security"
+    chmod +x "$1/security"
+}
+
+security_calls() {  # <stubdir>
+    if [ -f "$1/security.calls" ]; then wc -l < "$1/security.calls" | tr -d ' '; else echo 0; fi
+}
+
+# real_default_dir: the default state dir for the current (fake) HOME.
+real_default_dir() {
+    printf '%s\n' "$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
+}
+
+test_testmode_unset_is_legacy() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local out rc
+    out=$(unset IBL5_USAGE_GATE_TEST_MODE; PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_unset:rc 0 "$rc"
+    assert_eq testmode_unset:body 77.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_unset:curl 1 "$(curl_calls "$STUB")"
+    [ "$(security_calls "$STUB")" -ge 1 ] && pass testmode_unset:security || fail testmode_unset:security "no keychain read"
+}
+
+test_testmode_empty_is_legacy() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE='' PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_empty:rc 0 "$rc"
+    assert_eq testmode_empty:body 77.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_empty:curl 1 "$(curl_calls "$STUB")"
+}
+
+test_testmode_stale_cache_no_live_fetch() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local before out rc
+    before=$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_stale:rc 2 "$rc"
+    assert_eq testmode_stale:body 41.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_stale:curl 0 "$(curl_calls "$STUB")"
+    assert_eq testmode_stale:security 0 "$(security_calls "$STUB")"
+    assert_contains testmode_stale:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log" 2>/dev/null)" "fetch-skipped reason=test-mode"
+    assert_eq testmode_stale:cache-unchanged "$before" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")"
+}
+
+test_testmode_no_cache_fail_open() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_nocache:rc 1 "$rc"
+    assert_eq testmode_nocache:stdout "" "$out"
+    assert_eq testmode_nocache:curl 0 "$(curl_calls "$STUB")"
+    assert_eq testmode_nocache:security 0 "$(security_calls "$STUB")"
+}
+
+test_testmode_fresh_cache_served() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(date +%s)" "$BODY_A"
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_fresh:rc 0 "$rc"
+    assert_eq testmode_fresh:body 41.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_fresh:curl 0 "$(curl_calls "$STUB")"
+    assert_eq testmode_fresh:security 0 "$(security_calls "$STUB")"
+}
+
+test_testmode_explicit_dir_works() {
+    new_env
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir"); rc=$?
+    assert_eq testmode_explicit:rc 0 "$rc"
+    assert_eq testmode_explicit:out "$IBL5_USAGE_GATE_STATE_DIR" "$out"
+    assert_file testmode_explicit:markers "$IBL5_USAGE_GATE_STATE_DIR/markers"
+}
+
+test_testmode_refuses_unset_dir() {
+    new_env
+    seed_home ""
+    unset IBL5_USAGE_GATE_STATE_DIR
+    local real; real=$(real_default_dir)
+    mkdir -p "$real"
+    printf '%s' "$(usage_json 95 0)" | jq --argjson t "$(date +%s)" '. + {fetched_at:$t}' > "$real/cache.json"
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    local err rc
+    err=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_prestart_gate automouse $SID_A /x/run" 2>&1 >/dev/null); rc=$?
+    assert_eq testmode_refuse_unset:rc 0 "$rc"
+    assert_contains testmode_refuse_unset:stderr "$err" "USAGE-GATE-TEST: refusing the real state dir"
+    assert_eq testmode_refuse_unset:files "$real/cache.json" "$(find "$real" -type f)"
+    assert_eq testmode_refuse_unset:markers "" "$(ls -A "$real/markers" 2>/dev/null)"
+}
+
+test_testmode_refuses_explicit_real_dir() {
+    new_env
+    seed_home ""
+    local real; real=$(real_default_dir)
+    local out rc
+    out=$(IBL5_USAGE_GATE_STATE_DIR="$real/" IBL5_USAGE_GATE_TEST_MODE=1 bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir" 2>/dev/null); rc=$?
+    assert_eq testmode_refuse_explicit:rc 1 "$rc"
+    assert_eq testmode_refuse_explicit:out /dev/null/usage-gate-refused "$out"
+    assert_no_file testmode_refuse_explicit:no-dir "$real"
+}
+
+test_prod_unset_dir_uses_default() {
+    new_env
+    seed_home ""
+    unset IBL5_USAGE_GATE_STATE_DIR IBL5_USAGE_GATE_TEST_MODE
+    local out rc
+    out=$(bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir"); rc=$?
+    assert_eq prod_default:rc 0 "$rc"
+    assert_eq prod_default:out "$(real_default_dir)" "$out"
+    assert_file prod_default:markers "$(real_default_dir)/markers"
 }
 
 # ---------------------------------------------------------------- runner

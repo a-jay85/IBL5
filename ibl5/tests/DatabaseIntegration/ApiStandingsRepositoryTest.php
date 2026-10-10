@@ -29,7 +29,7 @@ class ApiStandingsRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getStandings();
 
         // CI seed has 28 teams with standings
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         self::assertCount(28, $result);
     }
 
@@ -37,7 +37,7 @@ class ApiStandingsRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getStandings();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $row = $result[0];
 
         self::assertArrayHasKey('teamid', $row);
@@ -63,7 +63,7 @@ class ApiStandingsRepositoryTest extends DatabaseTestCase
             self::assertIsString($conf);
             $filtered = $this->repo->getStandings($conf);
 
-            self::assertNotEmpty($filtered);
+            self::assertNotSame([], $filtered);
             self::assertLessThan(count($allStandings), count($filtered));
 
             // Every row should match the requested conference

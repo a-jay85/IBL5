@@ -10,6 +10,7 @@ from dataclasses import dataclass, field, replace as _dc_replace
 from pathlib import Path
 from typing import Optional
 
+from .. import netretry
 from ..state import SUBPROCESS_TIMEOUT, HarnessError
 from ..conflict import classify, parse_unmerged
 from .llm import run_bounded
@@ -17,17 +18,6 @@ from .llm import run_bounded
 COMMIT_HOOK_TIMEOUT = 300   # seconds for `git commit` incl. bin/pre-commit-hook
 FETCH_LOCK_RETRIES = 3      # fetch_base retries after a concurrent-fetch ref-lock race
 FETCH_LOCK_BACKOFF = 1.0    # seconds; attempt n sleeps n * this
-# One retry after a short pause for a network blip on the fetch. Only stderr text
-# that names a timeout or reset counts. "Could not read from remote repository" and
-# "Could not resolve host" alone are auth/config/DNS failures and are never retried.
-FETCH_TRANSIENT_RETRIES = 1
-FETCH_TRANSIENT_DELAY = 3.0
-FETCH_TRANSIENT_MARKERS = (
-    "kex_exchange_identification",
-    "Operation timed out",
-    "Connection timed out",
-    "Connection reset by peer",
-)
 
 # Local gate denials (bin/pre-commit-hook, bin/pre-push-adr-hook) are deterministic:
 # re-running the FULL /post-plan skill hits the identical hook and cannot clear it
@@ -425,27 +415,24 @@ class LiveGit:
         # expected Y". The winner already moved the ref, so a retry succeeds. The
         # usage-gate coordinator resumes paused runs in one wave, which hit this
         # (hot-files-base-ref-validate, 2026-10-09).
-        # A network blip (ssh kex timeout, connection reset) gets its own single retry
-        # after a short pause (fix-and-prevent-skill, 2026-07-26). Real ssh failures
-        # also print "fatal: Could not read from remote repository." after the kex
-        # line, so any transient marker in the detail qualifies the retry.
+        # Network blips (ssh kex timeout, connection reset) go through netretry.call:
+        # three retries after 5, 20 and 60 s. The lock-race loop keeps its own budget.
         lock_attempt = 0
-        transient_left = FETCH_TRANSIENT_RETRIES
-        while True:
-            try:
-                self._run("fetch", remote, ref)
-                return
-            except HarnessError as e:
-                detail = e.detail or ""
-                if "cannot lock ref" in detail and lock_attempt < FETCH_LOCK_RETRIES:
-                    time.sleep(FETCH_LOCK_BACKOFF * (lock_attempt + 1))
-                    lock_attempt += 1
-                    continue
-                if transient_left and any(m in detail for m in FETCH_TRANSIENT_MARKERS):
-                    transient_left -= 1
-                    time.sleep(FETCH_TRANSIENT_DELAY)
-                    continue
-                raise
+
+        def _fetch() -> None:
+            nonlocal lock_attempt
+            while True:
+                try:
+                    self._run("fetch", remote, ref)
+                    return
+                except HarnessError as e:
+                    if "cannot lock ref" in (e.detail or "") and lock_attempt < FETCH_LOCK_RETRIES:
+                        time.sleep(FETCH_LOCK_BACKOFF * (lock_attempt + 1))
+                        lock_attempt += 1
+                        continue
+                    raise
+
+        netretry.call(_fetch, label=f"git fetch {remote} {ref}")
 
     def branch_base(self, branch: str | None = None) -> str | None:
         """Stacked-branch parent tip SHA, recorded by bin/wt-new as

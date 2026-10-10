@@ -29,6 +29,7 @@ PLATFORM="${AUTOMOUSE_SINGLE_UNAME:-$(uname)}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT="$(mktemp -d)"
 trap 'rm -rf "$ROOT"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$ROOT/usage"
 
 NDIR="$ROOT/automouse"
 PDIR="$ROOT/plans"

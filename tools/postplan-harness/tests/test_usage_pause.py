@@ -1110,3 +1110,156 @@ def test_reconcile_head_moved_fails_closed(rec_gate, tmp_path):
     assert ei.value.kind == "usage-pause-dirty"
     assert "head-moved" in ei.value.detail
     assert (repo / "b.txt").read_text() == "half\n"
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 6
+# End to end: two real run() launches under one S against a real git repo.
+
+E2E_SLUG = "feat/pause-e2e"
+E2E_SPEC = {"kind": "usage-pause", "edit": {"path": "partial.txt", "content": "half"}}
+
+
+def _e2e_repo(tmp_path):
+    """Base on master with an origin/master ref, plus committed branch work (kept.txt)."""
+    repo = _git_repo(tmp_path / "e2e-wt")
+    _sh(repo, "update-ref", "refs/remotes/origin/master", "HEAD")
+    _sh(repo, "checkout", "-q", "-b", E2E_SLUG)
+    (repo / "kept.txt").write_text("keep")
+    _sh(repo, "add", "kept.txt")
+    _sh(repo, "commit", "-qm", "kept")
+    return repo
+
+
+def _launch(repo, tmp_path, monkeypatch, tag, state_dir, spec=None):
+    """One runner.run() launch; returns (res, rc, audit_text).
+
+    spec -> the launch pauses mid-edit at a ci-fix call made right before classify
+    (scaffolding). No spec -> the launch stops right after the classify log line,
+    before any LLM or gh work."""
+    out = tmp_path / f"out-{tag}"
+    plans = tmp_path / "plans-empty"
+    plans.mkdir(exist_ok=True)
+    llm = runner.FixtureLlm(UsageLedger(), {"ci-fix": spec or {}})
+    real_classify = runner.classify
+
+    def paused_classify(*a, **k):
+        llm.call_tooled("ci-fix", "opus", "p", cwd=str(repo), allowed_tools=("Read", "Edit"))
+        return real_classify(*a, **k)
+
+    def stop(*a, **k):
+        raise HarnessError("e2e-stop", "stopped after classify")
+
+    with monkeypatch.context() as mp:
+        if spec is not None:
+            mp.setattr(runner, "classify", paused_classify)
+        else:
+            mp.setattr(runner, "_early_hold_repeat", stop)
+        mp.setattr(runner, "_install_sigterm_handler", lambda: None)
+        res = runner.run(None, str(out), llm, mode="isolated", worktree=str(repo),
+                         state_dir=str(state_dir), plans_dir=str(plans))
+    rc = runner._settle_pause_marker(res, runner.exit_code_for(res))
+    if rc != runner.PAUSE_EXIT:
+        usage_pause.ledger_clear()
+    return res, rc, (out / "audit.log").read_text()
+
+
+@pytest.fixture()
+def e2e(gate, tmp_path, monkeypatch):
+    gate_state = tmp_path / "gate-state"
+    monkeypatch.setenv("FAKE_STATE_DIR", str(gate_state))
+    state_dir = tmp_path / "harness-state"
+    repo = _e2e_repo(tmp_path)
+    record = gate_state / "runs" / f"{S}.pause.json"
+    state_file = state_dir / (runner.statefile.safe_slug(E2E_SLUG) + ".json")
+    return repo, state_dir, record, state_file
+
+
+def _sid(state_file):
+    return json.loads(state_file.read_text()).get("pause_edit_sid")
+
+
+def _pause_first(e2e, tmp_path, monkeypatch, spec=None):
+    repo, state_dir, record, state_file = e2e
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    res, rc, _ = _launch(repo, tmp_path, monkeypatch, "1", state_dir, spec or E2E_SPEC)
+    return res, rc
+
+
+def test_e2e_pause_mid_edit_then_resume_continues(e2e, gate, tmp_path, monkeypatch):
+    repo, state_dir, record, state_file = e2e
+    _res, rc = _pause_first(e2e, tmp_path, monkeypatch)
+    assert rc == 75
+    assert record.exists()
+    assert _sid(state_file) == S
+    assert (repo / "partial.txt").exists()
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "1")
+    _res2, _rc2, audit = _launch(repo, tmp_path, monkeypatch, "2", state_dir)
+    assert "resume: discarded interrupted edit" in audit
+    assert "phase3 classify" in audit
+    assert not (repo / "partial.txt").exists()
+    assert "half" not in _sh(repo, "diff", "--cached")
+    log_p = _sh(repo, "log", "-p")
+    assert "half" not in log_p and "keep" in log_p
+    assert not record.exists()
+    assert _sid(state_file) is None
+
+
+def test_e2e_unrelated_dirt_then_resume_exits_3(e2e, gate, tmp_path, monkeypatch):
+    repo, state_dir, record, state_file = e2e
+    _res, rc = _pause_first(e2e, tmp_path, monkeypatch)
+    assert rc == 75 and record.exists()
+    (repo / "stranger.txt").write_text("stranger")
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    res2, rc2, _ = _launch(repo, tmp_path, monkeypatch, "2", state_dir)
+    assert rc2 == 3
+    assert res2.error_kind == "usage-pause-dirty"
+    assert (repo / "partial.txt").read_bytes() == b"half"
+    assert (repo / "stranger.txt").read_bytes() == b"stranger"
+    assert "half" not in _sh(repo, "log", "-p", "--all")
+    assert f"clear {S}" in gate.read_text()
+
+
+def test_e2e_witness_without_record_exits_3(e2e, gate, tmp_path, monkeypatch):
+    repo, state_dir, record, state_file = e2e
+    _res, rc = _pause_first(e2e, tmp_path, monkeypatch)
+    assert rc == 75 and record.exists()
+    record.unlink()
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "1")
+    res2, rc2, _ = _launch(repo, tmp_path, monkeypatch, "2", state_dir)
+    assert rc2 == 3
+    assert "pause record missing" in res2.error
+    assert (repo / "partial.txt").exists()
+
+
+def test_e2e_witness_other_session_exits_3(e2e, gate, tmp_path, monkeypatch):
+    repo, state_dir, record, state_file = e2e
+    _res, rc = _pause_first(e2e, tmp_path, monkeypatch)
+    assert rc == 75 and record.exists()
+    monkeypatch.setenv("IBL5_USAGE_GATE_SESSION_ID", "6b6b6b6b-1111-4222-8333-444444444444")
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "1")
+    res2, rc2, _ = _launch(repo, tmp_path, monkeypatch, "2", state_dir)
+    assert rc2 == 3
+    assert f"--resume-paused {S}" in res2.error
+    assert _sid(state_file) == S
+    assert (repo / "partial.txt").exists()
+
+
+def test_e2e_conflict_resolve_pause_exits_3(e2e, gate, tmp_path, monkeypatch):
+    """Negative row for conflict.py:202: an in-progress merge is never recorded."""
+    repo, state_dir, record, state_file = e2e
+    res, rc = _pause_first(e2e, tmp_path, monkeypatch, dict(E2E_SPEC, merge_head=True))
+    assert rc == 3
+    assert res.error_kind == "usage-pause-dirty"
+    assert not record.exists()
+    assert f"clear {S}" in gate.read_text()
+
+
+def test_e2e_bash_site_commit_pause_exits_3(e2e, gate, tmp_path, monkeypatch):
+    """Negative row for ci-fix, fidelity remediation and thread ingestion: a moved HEAD
+    is never recorded."""
+    repo, state_dir, record, state_file = e2e
+    res, rc = _pause_first(e2e, tmp_path, monkeypatch, dict(E2E_SPEC, move_head=True))
+    assert rc == 3
+    assert res.error_kind == "usage-pause-dirty"
+    assert not record.exists()
+    assert f"clear {S}" in gate.read_text()

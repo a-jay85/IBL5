@@ -302,4 +302,23 @@ class SlotAssignmentResolverTest extends TestCase
         $this->assertNotNull($result);
         $this->assertSame(301, $result['pg']);
     }
+
+    public function testPartiallyNumericPidFieldDoesNotMatchPlayer(): void
+    {
+        // pid1 is "12abc" for a player whose pid is 12. toInt('12abc') is 0, so the
+        // pid match fails and the resolver falls back to the name on slot 3.
+        // Mutant using sanitizeInt() → '12abc' becomes 12 → slot 1 by pid → 101.
+        $post = ['pid1' => '12abc', 'Name3' => 'Alice']
+            + $this->slotFields(1, 100)
+            + $this->slotFields(3, 300);
+
+        $result = $this->resolver->resolveSlotSettings(
+            ['pid' => 12, 'name' => 'Alice'],
+            $post,
+            5
+        );
+
+        $this->assertNotNull($result);
+        $this->assertSame(301, $result['pg']);
+    }
 }

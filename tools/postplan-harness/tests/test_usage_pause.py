@@ -143,8 +143,8 @@ def _call(cli):
     return cli.call("p", "haiku", "prompt", lambda d: None, max_retries=0)
 
 
-def _call_tooled(cli, cwd):
-    return cli.call_tooled("t", "sonnet", "prompt", cwd=str(cwd), allowed_tools=("Read",),
+def _call_tooled(cli, cwd, tools=("Read",)):
+    return cli.call_tooled("t", "sonnet", "prompt", cwd=str(cwd), allowed_tools=tools,
                            max_retries=0)
 
 
@@ -395,7 +395,7 @@ def test_tooled_hook_pause_dirty_tree(shim, gate, tmp_path, monkeypatch):
     monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
     monkeypatch.setenv("CLAUDE_SHIM_TOUCH", str(repo / "half-edit.txt"))
     with pytest.raises(UsagePause) as ei:
-        _call_tooled(_cli(tmp_path), repo)
+        _call_tooled(_cli(tmp_path), repo, ("Read", "Edit"))
     assert ei.value.dirty is True
 
 
@@ -779,3 +779,59 @@ def test_edit_since_merge_head_is_edit(tmp_path):
     pre = usage_pause.capture_prespawn(str(repo))
     (repo / ".git" / "MERGE_HEAD").write_text(_sh(repo, "rev-parse", "HEAD") + "\n")
     assert usage_pause.edit_since(str(repo), pre) is True
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 2
+
+READ_ONLY = ("Read", "Grep", "Glob")
+
+
+def test_readonly_tooled_pause_fp_none_not_dirty(shim, gate, tmp_path, monkeypatch):
+    """The nested-repo false dirty: git fails, yet a read-only call is never dirty."""
+    repo = _git_repo(tmp_path / "wt")
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    monkeypatch.setattr(usage_pause, "capture_prespawn", lambda cwd: None)
+    monkeypatch.setattr(usage_pause, "worktree_fingerprint", lambda cwd: None)
+    with pytest.raises(UsagePause) as ei:
+        _call_tooled(_cli(tmp_path), repo, READ_ONLY)
+    assert ei.value.dirty is False
+    assert ei.value.prespawn is None
+
+
+def test_readonly_tooled_pause_with_touch_not_dirty(shim, gate, tmp_path, monkeypatch):
+    """A concurrent writer cannot make a read-only review pause dirty."""
+    repo = _git_repo(tmp_path / "wt")
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    monkeypatch.setenv("CLAUDE_SHIM_TOUCH", str(repo / "stray.txt"))
+    with pytest.raises(UsagePause) as ei:
+        _call_tooled(_cli(tmp_path), repo, READ_ONLY)
+    assert ei.value.dirty is False
+
+
+def test_tooled_hook_pause_carries_prespawn(shim, gate, tmp_path, monkeypatch):
+    repo = _git_repo(tmp_path / "wt")
+    head = _sh(repo, "rev-parse", "HEAD")
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    monkeypatch.setenv("CLAUDE_SHIM_TOUCH", str(repo / "half-edit.txt"))
+    with pytest.raises(UsagePause) as ei:
+        _call_tooled(_cli(tmp_path), repo, ("Read", "Edit", "Write"))
+    assert ei.value.dirty is True
+    assert ei.value.prespawn is not None
+    assert ei.value.prespawn.head == head
+    assert ei.value.cwd == str(repo)
+
+
+def test_write_overlap_flag_set_on_concurrent_calls(shim, tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDE_SHIM_SLEEP", "1")
+    repo = _git_repo(tmp_path / "wt")
+
+    def both(tools_a, tools_b):
+        cli = _cli(tmp_path)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            futs = [ex.submit(_call_tooled, cli, repo, t) for t in (tools_a, tools_b)]
+            for f in futs:
+                f.result()
+        return cli.write_overlap
+
+    assert both(("Read", "Edit"), ("Read", "Edit")) is True
+    assert both(("Read",), ("Read", "Edit")) is False

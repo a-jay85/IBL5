@@ -55,6 +55,7 @@ new_repo() {
     cp "$SCRIPT_DIR/lib/branch-base.sh" "$REPO/bin/lib/branch-base.sh"
     cp "$SCRIPT_DIR/pre-commit-hook" "$REPO/bin/pre-commit-hook"
     cp "$SCRIPT_DIR/lib/shell-scripts.sh" "$REPO/bin/lib/shell-scripts.sh"
+    cp "$SCRIPT_DIR/lib/gate-common.php" "$REPO/bin/lib/gate-common.php"
     chmod +x "$REPO/bin/adr-check" "$REPO/bin/pre-push-adr-hook" \
              "$REPO/bin/pre-commit-hook" "$REPO/bin/lib/shell-scripts.sh"
     h_git_repo "$REPO" --no-commit

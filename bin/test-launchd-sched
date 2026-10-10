@@ -130,7 +130,7 @@ if [ "$MODE" = "regen" ]; then
   mkdir -p "$FIXTURES"
   while IFS='|' read -r name script args extra; do
     [ -n "$name" ] || continue
-    run_case "$script" "$args" "$extra" > "$FIXTURES/$name"
+    run_case "$script" "$args" "$extra" > "$FIXTURES/$name.golden"
     echo "regen $name (exit=$RC)"
   done <<< "$CASES"
   while IFS='|' read -r name script; do
@@ -145,7 +145,7 @@ fi
 while IFS='|' read -r name script args extra; do
   [ -n "$name" ] || continue
   run_case "$script" "$args" "$extra" > "$TMP/actual.$name"
-  if compare_fixture "$name" "$FIXTURES/$name" "$TMP/actual.$name"; then
+  if compare_fixture "$name" "$FIXTURES/$name.golden" "$TMP/actual.$name"; then
     pass "$name"
   else
     fail "$name"
@@ -165,7 +165,7 @@ done <<< "$CLI_SCRIPTS"
 
 # ── Built-in negative cases ──────────────────────────────────────────────────
 # Tamper: a one-byte change to a fixture copy must be reported as a mismatch.
-cp "$FIXTURES/wt-gc.plist" "$TMP/tampered.plist"
+cp "$FIXTURES/wt-gc.plist.golden" "$TMP/tampered.plist"
 printf 'X' >> "$TMP/tampered.plist"
 run_case bin/wt-gc-cron-setup --print-schedule "" > "$TMP/tamper.actual"
 if compare_fixture tamper "$TMP/tampered.plist" "$TMP/tamper.actual" 2>/dev/null; then
@@ -200,8 +200,8 @@ else
 fi
 
 # Secret: sim-recap's password is masked in print mode.
-if grep -qF '<string>***</string>' "$FIXTURES/sim-recap.plist" 2>/dev/null \
-   && ! grep -qF 'golden-secret' "$FIXTURES/sim-recap.plist" 2>/dev/null; then
+if grep -qF '<string>***</string>' "$FIXTURES/sim-recap.plist.golden" 2>/dev/null \
+   && ! grep -qF 'golden-secret' "$FIXTURES/sim-recap.plist.golden" 2>/dev/null; then
   pass "sim-recap-secret-masked"
 else
   fail "sim-recap-secret-masked"
@@ -392,7 +392,7 @@ DBPLIST="$IHOME/Library/LaunchAgents/com.ibl5.db-sync-nightly.plist"
 rm -f "$DBPLIST"
 run_install bin/db-sync-cron-setup --install-schedule DB_SYNC_CRON_ENV_FILE="$TMP/db.env"
 norm_file "$DBPLIST" > "$TMP/db.installed" 2>/dev/null
-if [ "$IRC" = "0" ] && log_order_ok && cmp -s "$TMP/db.installed" "$FIXTURES/db-sync.plist"; then
+if [ "$IRC" = "0" ] && log_order_ok && cmp -s "$TMP/db.installed" "$FIXTURES/db-sync.plist.golden"; then
   pass "install-db-sync-golden"
 else
   echo "  rc=$IRC err=$IERR" >&2
@@ -465,7 +465,7 @@ DOCKEREOF
 chmod +x "$ISTUB/docker"
 run_install bin/backups-sync-setup --install-schedule
 norm_file "$BSPLIST" > "$TMP/bs.installed" 2>/dev/null
-if [ "$IRC" = "0" ] && log_order_ok && [ ! -e "$TMP/docker-called" ] && cmp -s "$TMP/bs.installed" "$FIXTURES/backups-sync.plist"; then
+if [ "$IRC" = "0" ] && log_order_ok && [ ! -e "$TMP/docker-called" ] && cmp -s "$TMP/bs.installed" "$FIXTURES/backups-sync.plist.golden"; then
   pass "install-backups-sync-golden"
 else
   echo "  rc=$IRC err=$IERR" >&2
@@ -512,7 +512,7 @@ fi
 extract_labels() {
   awk '/<key>Label<\/key>/ {getline; sub(/^[[:space:]]*<string>/, ""); sub(/<\/string>[[:space:]]*$/, ""); print}' "$@" | sort -u
 }
-installed_labels() { extract_labels "$FIXTURES"/*.plist; }
+installed_labels() { extract_labels "$FIXTURES"/*.plist.golden; }
 INSTALLED="$(installed_labels)"
 
 # lej_parity_check <lej_lib_path> — prints "PARITY: <label> ..." lines and

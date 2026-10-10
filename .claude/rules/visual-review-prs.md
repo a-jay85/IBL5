@@ -1,5 +1,5 @@
 ---
-description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section. A daily and on-demand refresh workflow republishes stale galleries, and retention cleanup keeps every gallery dir an open PR links to.
+description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section. A refresh workflow republishes stale galleries; cleanup keeps every dir an open PR links to.
 paths:
   - ".github/workflows/e2e-tests.yml"
   - ".github/workflows/pages-deploy.yml"
@@ -14,7 +14,10 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-10-08
+  - ".github/workflows/vr-pr-screens.yml"
+  - "bin/vr-pages-publish"
+  - "ibl5/tests/e2e/vr-pr-screens.ts"
+last_verified: 2026-10-09
 ---
 
 # Visual-review PRs
@@ -43,10 +46,10 @@ They are skipped only during baseline regen (the `update-baselines` label).
    each row, and writes the static side-by-side `index.html` (with `<title>` anchors) + per-SHA
    artifacts into `ibl5/vr-gallery`, plus the pre-classified `gallery.json`
    (`changedCells`/`newCells`/`flakeCells`).
-3. **Deploy gallery to per-SHA Pages** — pushes `ibl5/vr-gallery` to the `gh-pages` branch under
-   `<sha>/visual-review/` (multiple open PRs/SHAs coexist). The Playwright HTML report (traces) is
-   preserved under `<sha>/visual-review/playwright-report/`. The `gh-pages` branch is only the
-   durable accumulator; the site is **served** by `.github/workflows/pages-deploy.yml` (Pages
+3. **Deploy gallery to PR-keyed Pages**. `bin/vr-pages-publish` writes `ibl5/vr-gallery` to the
+   `gh-pages` branch under `pr/<N>/visual-review/`. It retries a rejected push 3 times, then fails. The
+   Playwright report (traces) lands under `pr/<N>/visual-review/playwright-report/`. The `gh-pages`
+   branch is only the durable accumulator; the site is **served** by `.github/workflows/pages-deploy.yml` (Pages
    source = GitHub Actions, no Jekyll), which is dispatched by the deploy step below once the
    gh-pages push lands (one deploy per real content change, not one per E2E run) and re-publishes the
    whole tree. That dispatch is **debounced**: it is skipped when a `pages-deploy` run exists that has
@@ -59,31 +62,31 @@ They are skipped only during baseline regen (the `update-baselines` label).
    master push → multiple open-PR updates → N gh-pages pushes) from producing N deploys that the `pages`
    concurrency group would mostly cancel. It collapses to roughly **two** deploys (one in-flight
    plus one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
-   collide on the ref lock. The deploy runs **one attempt plus two retries** (each re-clones
-   `gh-pages`, so a retry sees the ref that beat it). An **assert step** fails the job if all three
-   fail. The retries absorb contention and never soften the gate.
+   collide on the ref lock; `bin/vr-pages-publish` absorbs that contention (see step 3 above).
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
    the sticky markdown.
 5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
 
 A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) prunes
-per-SHA gallery dirs whose newest commit is older than 7 days. Its `gh-pages` push carries the same
-rebase-and-retry loop for the same ref contention. A prune reaches the served site when
-`pages-deploy.yml` next re-publishes the tree (the cleanup job dispatches `pages-deploy.yml` itself once its prune push lands).
-It keeps every dir an open PR still links to. See [Refreshing stale galleries](#refreshing-stale-galleries).
+per-SHA gallery dirs whose newest commit is older than 7 days, with the same `gh-pages` push
+rebase-and-retry loop. A prune reaches the served site when `pages-deploy.yml` next re-publishes the
+tree (cleanup dispatches it). `vr-pr-screens.yml` deletes a closed PR's `pr/<N>/`. The master-push job
+also sweeps any `pr/<N>/` whose PR is not open, and deletes nothing if the open-PR list is
+unreadable, truncated or empty. It keeps every dir an open PR still links to. See
+[Refreshing stale galleries](#refreshing-stale-galleries).
 
 ## Refreshing stale galleries
 
-`.github/workflows/vr-refresh.yml` republishes the gallery, both sticky comments, and the PR-body block for open visual PRs whose screenshots went stale. It calls the `Visual Regression` job of `e2e-tests.yml` through its `workflow_call` inputs.
+`.github/workflows/vr-refresh.yml` republishes the gallery, both sticky comments, and the PR-body block for open visual PRs whose screenshots went stale. It calls `e2e-tests.yml`'s `Visual Regression` job via its `workflow_call` inputs.
 
 - **Daily schedule.** Refreshes each open visual PR whose linked gallery dir is older than 7 days. At most 10 PRs per sweep, 2 at a time.
-- **Manual dispatch.** `gh workflow run vr-refresh.yml -f pr=<N>` refreshes one PR. A blank `pr` refreshes every open visual PR, with the same cap. Add `-f dry_run=true` to list what would refresh and what cleanup would keep.
-- **Visual PR.** A PR whose `visual-review` sticky comment links a gallery, as `<sha>/visual-review` or `pr/<N>/visual-review`. The first link wins. The banner-only comment links none and is never refreshed.
-- **Age.** The `gh-pages` commit time of the dir that comment links to (`<sha>` or `pr/<N>/visual-review`). Every publish writes `refreshed-at.txt` into the dir, so a refresh always moves the age forward.
-- **Skipped PRs.** Forks, PRs labeled `update-baselines`, drafts (unless named by `pr`), PRs whose base is not `master`, and PRs behind `master`. A push republishes a behind PR anyway (ADR-0182 gives the reason).
+- **Manual dispatch.** `gh workflow run vr-refresh.yml -f pr=<N>` refreshes one PR. A blank `pr` refreshes every open visual PR, with the same cap. `-f dry_run=true` lists what would refresh and what cleanup would keep.
+- **Visual PR.** A PR whose `visual-review` sticky comment links a gallery, as `<sha>/visual-review` or `pr/<N>/visual-review`. The first link wins. A banner-only comment links none and never refreshes.
+- **Age.** The `gh-pages` commit time of the dir that comment links to (`<sha>` or `pr/<N>/visual-review`). Each publish writes `refreshed-at.txt` there, so a refresh always resets the age.
+- **Skipped PRs.** Forks, PRs labeled `update-baselines`, drafts (unless named by `pr`), PRs whose base is not `master`, and PRs behind `master`. A push republishes a behind PR anyway (ADR-0182).
 - **Publish key.** A refresh publishes under the PR head SHA and rewrites the links to it. A push to the PR still publishes under the test-merge SHA.
 - **Never a gate.** Every write runs on a master-ref event, so a refresh adds no check run to a PR head and a failed refresh leaves required checks alone. One sweep dispatches `pages-deploy.yml` once.
-- **Retention.** `vr-pages-cleanup` keeps every per-SHA dir that any open PR's comments or body link to, plus each open PR's head SHA, through both the 7-day age pass and the 300-dir cap. When the keep-list cannot be computed, that run prunes nothing. The keep-list holds 40-hex SHAs only, since `bin/prune-vr-galleries` never prunes `pr/<N>/` dirs.
+- **Retention.** `vr-pages-cleanup` keeps every per-SHA dir that any open PR's comments or body link to, plus each open PR's head SHA, through both the 7-day age pass and the 300-dir cap. If the keep-list can't be computed, that run prunes nothing. The keep-list is 40-hex SHAs only; `bin/prune-vr-galleries` never prunes `pr/<N>/`.
 - **Pull-request dry-run.** A PR that edits the refresh workflow, `bin/vr-refresh-targets`, `ibl5/tests/e2e/vr-refresh.ts`, or `bin/prune-vr-galleries` runs the read-only `VR refresh select` job, which prints both lists.
 
 ## Reading the comment
@@ -101,7 +104,7 @@ It keeps every dir an open PR still links to. See [Refreshing stale galleries](#
   "changed view(s)" count so a first-render never reads as a regression. The NEW-vs-CHANGED split
   (ADR-0069) is computed in `bin/vr-build-gallery` from master's committed baseline set, not from
   disk.
-- The per-SHA Pages URL shape is `https://a-jay85.github.io/IBL5/<sha>/visual-review/`.
+- The Pages URL shape is `https://a-jay85.github.io/IBL5/pr/<N>/visual-review/`; legacy `<sha>/` dirs age out under the 7-day prune.
 - A **"⚠️ Changed but NOT covered by the VR manifest"** section lists changed website paths
   that match no manifest row — review those by hand or add a `vr-manifest.ts` row. A
   **global-change banner** appears as a standalone coverage heads-up whenever a shared
@@ -129,13 +132,13 @@ Each cell is captured twice — render A (`.a.png`) and a reload render B (`.b.p
 whose reload `.b.png` is missing is likewise demoted to infra. See ADR-0073 for the
 infra-vs-pixel-diff labeling this reuses.
 
-A second, review-only strict pass (ADR-0180) runs after this triage. It uses per-pixel threshold `STRICT_PIXEL_THRESHOLD` (0.05) and an absolute floor `STRICT_MIN_CHANGED_PIXELS` (25), both in `ibl5/tests/e2e/vr-gallery.ts`. It can only upgrade an `unchanged` cell to `changed`, and only when the reload render exists and A and B agree under the strict threshold. It never creates a flake cell and never touches the VR check, whose 0.2 threshold and 0.005 ratio are unchanged. Rows that set `extraMaxDiffPixelRatio` skip it.
+A second, review-only strict pass (ADR-0180) runs after this triage. It uses per-pixel threshold `STRICT_PIXEL_THRESHOLD` (0.05) and an absolute floor `STRICT_MIN_CHANGED_PIXELS` (25), both in `ibl5/tests/e2e/vr-gallery.ts`. It can only upgrade an `unchanged` cell to `changed`, and only when the reload render exists and A and B agree under the strict threshold. It never creates a flake cell or changes the VR check's 0.2 threshold and 0.005 ratio. Rows that set `extraMaxDiffPixelRatio` skip it.
 
 ## New screens in the PR body
 
 In addition to the sticky comment, brand-new views (`gallery.newCells`) are published inline at the
 top of the PR body itself (ADR-0076) — no click required to see a first render. Two extra workflow
-steps run after "Deploy gallery to per-SHA Pages" and "Post sticky comment":
+steps run after "Deploy VR gallery to the PR-keyed GitHub Pages path" and "Post sticky comment":
 
 - **Copy new-screen renders** — `bin/vr-review-comment --copy-new-screens=DEST` copies each new
   cell's first-render PNG into a `new-screens/` subdirectory of the Pages deploy tree.
@@ -160,10 +163,9 @@ comment markup lives in `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). 
 unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `ibl5/tests/ts-unit/vr-coverage-map.test.ts`,
 `ibl5/tests/ts-unit/vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). Per-row
 source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing this selection logic is
-a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body new-screens
-publishing surface (`--copy-new-screens`/`--update-pr-body` on `bin/vr-review-comment`,
-`ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is likewise a
-mechanical-enforcement surface, covered by **ADR-0076**.
+a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180). The
+PR-body new-screens surface (`--copy-new-screens`/`--update-pr-body`, `vr-pr-body.ts` and its test)
+is likewise one, covered by **ADR-0076**.
 
 ## Manual-row screenshots
 
@@ -182,25 +184,29 @@ answers **400**, so a typo surfaces in the PR comment as a failed row instead of
 screenshot. Clauses are `;`-separated because `|` would break the matrix table. A row that
 cannot be shot (print CSS, an email render) uses `no-vr: <reason ≥ 15 chars>` instead.
 
-The pipeline is a **review aid**. Every step below is `continue-on-error: true` and
-runs in its own config so a bad `vr:` cell can never turn the baseline-diff step red:
+The pipeline is a review aid. Screenshot content never fails a PR; only a gh-pages push failing 3
+times reddens `Screens publish`. It runs in `.github/workflows/vr-pr-screens.yml` (ADR-0179),
+apart from the baseline diff, so a bad `vr:` cell never reddens that diff:
 
 | Stage | Where |
 |---|---|
-| Parse the PR body's `## Manual Testing` bullets | `bin/vr-review-comment --manual-rows-from-pr=N --out-json=ibl5/vr-manual-rows.json` |
-| Capture one PNG per row | `ibl5/playwright.manual-rows.config.ts` + `ibl5/tests/e2e/manual-rows.spec.ts` → `ibl5/vr-manual-shots/<label>.png` |
-| Publish | copied into the gallery deploy tree, served at `<pages-url>manual-rows/<label>.png` |
-| Post | `bin/vr-review-comment --manual-gallery=…` under sticky header `manual-row-screenshots` |
+| Parse | `bin/vr-review-comment --manual-rows-from-pr=N` in the `plan` job |
+| Plan | `--screens-plan` decides which sides to render, and when nothing changed |
+| Capture | `manual-rows.spec.ts` at `phone` 375 / `desktop` 1280, both sides, in the `render` job |
+| Publish | `bin/vr-pages-publish` to `pr/<N>/manual/<side>/<label>.<viewport>.png` |
+| Post | `--splice-screens=N` splices the `vr-screens` body block |
 
-Capture runs **after** the baseline diff has shot its actuals, so a `setup=` mutation cannot
-invalidate a baseline; the pure grammar/markup helpers live in `ibl5/tests/e2e/vr-manual-rows.ts`
-(unit-tested in `ibl5/tests/ts-unit/vr-manual-rows.test.ts`). Both output paths are gitignored.
+The block sits just before `## Manual Testing`. Image URLs carry `?sha=<head>&r=<token>`, so each
+push shows the current head. A failed capture shows as a failed cell. A body edit
+that drops the block re-plans and splices it back. Pure helpers: `ibl5/tests/e2e/vr-manual-rows.ts`
+(grammar) and `vr-pr-screens.ts` (plan, token, block), tested under `ibl5/tests/ts-unit/`. Both
+output paths are gitignored.
 
 ## One-time deployment prerequisite
 
 GitHub Pages must be set to source = **GitHub Actions** (`build_type: workflow`) — a one-time
 owner action. The gallery is served by `.github/workflows/pages-deploy.yml`, which uploads the
-whole `gh-pages` tree as the Pages artifact; the `gh-pages` branch stays the durable per-SHA
+whole `gh-pages` tree as the Pages artifact; the `gh-pages` branch stays the durable PR-keyed
 accumulator. Repo Settings → Pages → Build and deployment → Source → GitHub Actions, or:
 
 ```bash

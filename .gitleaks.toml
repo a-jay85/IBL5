@@ -47,6 +47,12 @@ regexes = [
   # fragment, not a credential; the VKEY name trips generic-api-key).
   '''VKEY="cond14-fixture"''',
 
+  # Cache-bust token fixture in ibl5/tests/ts-unit/vr-pr-screens.test.ts (the
+  # ?r= query value on gallery image URLs, not a credential; the TOKEN name
+  # trips generic-api-key).
+  '''TOKEN = .abcdef012345.''',
+  '''token: .0123456789ab.''',
+
   # Sequential placeholder Discord snowflake IDs in test fixtures
   # (tests/Discord/*, tests/Team/TeamViewTest.php).
   '''123456789012345678''',

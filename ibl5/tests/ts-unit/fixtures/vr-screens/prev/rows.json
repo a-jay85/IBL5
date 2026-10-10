@@ -1,0 +1,17 @@
+{
+  "cells": [
+    "team-page-header"
+  ],
+  "before": {
+    "team-page-header": {
+      "phone": "ok",
+      "desktop": "ok"
+    }
+  },
+  "after": {
+    "team-page-header": {
+      "phone": "ok",
+      "desktop": "ok"
+    }
+  }
+}

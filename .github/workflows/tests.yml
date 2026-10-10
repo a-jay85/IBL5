@@ -994,6 +994,7 @@ jobs:
             bin/test-automouse-disarm \
             bin/test-bun-audit-triage \
             bin/test-prune-eligibility \
+            bin/test-vr-pages-publish \
             bin/test-scrub-log-credentials \
             bin/test-db-query-routing \
             bin/test-db-sync-prod-argv \

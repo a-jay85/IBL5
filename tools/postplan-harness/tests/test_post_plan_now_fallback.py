@@ -402,6 +402,13 @@ def _gate_args(gate):
     return m.group(1), m.group(2)
 
 
+def _gate_fix_root(gate):
+    """The main-checkout root the generated gate hands to blocked_ship_block as its 5th arg."""
+    m = re.search(r'blocked_ship_block "[^"]+" "[^"]+" "[^"]+" "[^"]+" "([^"]+)"', gate)
+    assert m, "gate does not pass a 5th (main-root) arg to blocked_ship_block"
+    return m.group(1)
+
+
 def _marker_section(stdout):
     """Text between the two marker lines bin/post-plan-now prints around the block."""
     m = re.search(r"^=== post-plan blocked ship ===\n(.*?)\n=== end blocked ship ===$",
@@ -558,13 +565,15 @@ def test_exit3_prints_plain_block_when_no_block_file(tmp_path, block, log_text):
         gate, fixture = _rc3_gate(tmp_path, log_text, block=block)
     r = _run_gate(gate)
     assert r.returncode == 0, r.stderr
-    _slug, root = _gate_args(gate)
+    slug, root = _gate_args(gate)
     section = _marker_section(r.stdout)
     assert "did not ship. No PR opened." in section
     assert "Why: the ship step stopped and the log has the reason." in section
     assert f"  1. cd {root}" in section
     assert "  3. bin/post-plan-now" in section
-    assert section.endswith(f"Log: {fixture}")
+    assert section.endswith(f"Log: {fixture}\nOr paste this to have Claude fix it:\n"
+                            f"{_gate_fix_root(gate)}/bin/postplan-fix {slug}")
+    assert "Or open Claude in that folder" not in section
     for word in ("harness", "sentinel", "fallback", "terminal", "rc="):
         assert word not in section.lower(), word
     assert "RAN-" not in r.stdout
@@ -595,7 +604,7 @@ def test_exit3_dm_keeps_log_line_under_discord_cap(tmp_path):
     long_log = "l" * 120
     fn = subprocess.run(
         ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; blocked_ship_block "{tmp_path}/none" '
-                       f'"{slug}" "{root}" "{long_log}"'],
+                       f'"{slug}" "{root}" "{long_log}" "{root}"'],
         capture_output=True, text=True).stdout.rstrip("\n")
     assert len(prefix) + len(fn) < 1900
     assert f"Log: {long_log}" in (prefix + fn)[:1900]

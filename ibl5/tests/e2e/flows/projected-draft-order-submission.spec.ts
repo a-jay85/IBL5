@@ -284,7 +284,7 @@ test.describe('save_order: legacy 307 keeps POST', () => {
       readBack: async () => {
         await page.goto('modules.php?name=DraftInfo&tab=order');
         const table = page
-          .locator('.projected-draft-order-table, .ibl-data-table')
+          .locator('.projected-draft-order-table')
           .first();
         await expect(table).toBeVisible();
       },

@@ -194,7 +194,7 @@ test.describe('browser back/forward after HTMX year switch', () => {
       trigger: () =>
         page.locator('#draft-year-select').selectOption(yearValue),
       apiUrlPattern: (url) => url.includes('name=DraftInfo') && url.includes('op=api'),
-      expectedUrl: new RegExp('year=' + yearValue),
+      expectedUrl: new RegExp('tab=history&year=' + yearValue),
       contentSelector: '#draft-history-content',
     });
 

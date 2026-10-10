@@ -92,7 +92,7 @@ final class RequestEventLoggingBootstrapDbTest extends DatabaseTestCase
         self::assertNotNull($row);
         self::assertNull($row['username']);
         self::assertNull($row['team_id']);
-        self::assertNotEmpty($row['request_uri']);  // pageview still recorded
+        self::assertNotSame('', (string) $row['request_uri']);  // pageview still recorded
     }
 
     // ── Matrix row: team resolver known-GM vs anon/FA ───────────────────────

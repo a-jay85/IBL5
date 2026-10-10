@@ -17,7 +17,7 @@ class SeasonLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('SeasonLeaderboards', [], [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Season Leaders', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
@@ -31,7 +31,7 @@ class SeasonLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'limit' => '50',
         ], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
 
@@ -44,7 +44,7 @@ class SeasonLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'limit' => '50',
         ], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
 
@@ -56,7 +56,7 @@ class SeasonLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'limit' => '25',
         ], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Season Leaders', $output);
     }
 }

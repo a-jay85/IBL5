@@ -31,7 +31,7 @@ class ContractListRepositoryTest extends DatabaseTestCase
 
         $contracts = $this->repo->getActivePlayerContracts();
 
-        self::assertNotEmpty($contracts);
+        self::assertNotSame([], $contracts);
     }
 
     public function testGetActivePlayerContractsIncludesContractFields(): void
@@ -40,7 +40,7 @@ class ContractListRepositoryTest extends DatabaseTestCase
 
         $contracts = $this->repo->getActivePlayerContracts();
 
-        self::assertNotEmpty($contracts);
+        self::assertNotSame([], $contracts);
         $first = $contracts[0];
         self::assertArrayHasKey('pid', $first);
         self::assertArrayHasKey('name', $first);

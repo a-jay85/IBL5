@@ -40,7 +40,6 @@ class MobileNavView implements MobileNavViewInterface
      */
     public function render(array $menus, ?array $myTeamMenu, array $accountMenu): string
     {
-        $index = 2;
 
         // When the My Team accordion is present, fold Logout into its footer
         // section and suppress the standalone Account accordion. Guests and
@@ -80,7 +79,6 @@ class MobileNavView implements MobileNavViewInterface
                     <?= HtmlSanitizer::trusted($this->renderDropdown(
                         'My Team',
                         $myTeamMenu,
-                        $index++,
                         false,
                         false,
                         $mergeAccountIntoMyTeam
@@ -97,7 +95,6 @@ class MobileNavView implements MobileNavViewInterface
                     <?= HtmlSanitizer::trusted($this->renderDropdown(
                         $title,
                         $menu,
-                        $index++,
                         false,
                         $title === 'Season'
                     )) ?>
@@ -111,7 +108,6 @@ class MobileNavView implements MobileNavViewInterface
                             'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
                             'links' => $accountMenu,
                         ],
-                        $index++,
                         !$this->config->isLoggedIn
                     )) ?>
                 <?php endif; ?>
@@ -126,7 +122,7 @@ class MobileNavView implements MobileNavViewInterface
      *
      * @param NavMenuData $data
      */
-    private function renderDropdown(string $title, array $data, int $index, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false, bool $includeLogoutFooter = false): string
+    private function renderDropdown(string $title, array $data, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false, bool $includeLogoutFooter = false): string
     {
         $links = $data['links'];
         $icon = $data['icon'] ?? '';

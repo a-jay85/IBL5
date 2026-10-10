@@ -337,7 +337,7 @@ class ScheduleUpdaterTest extends TestCase
 
         $queries = $this->mockDb->getExecutedQueries();
         $matched = array_filter($queries, static fn (string $q): bool => str_contains($q, 'BETWEEN 1 AND'));
-        $this->assertNotEmpty($matched);
+        $this->assertNotSame([], $matched);
     }
 
     // -------------------------------------------------------------------------

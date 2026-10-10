@@ -45,7 +45,7 @@ class WaiversEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testDisplayParameterSelectsRequestedTab(): void
@@ -114,8 +114,8 @@ class WaiversEntryPointTest extends ModuleEntryPointTestCase
 
         $second = $this->runModule('Waivers', ['display' => 'total_s'], [], ['user' => $GLOBALS['user']]);
 
-        $this->assertNotEmpty($first);
-        $this->assertNotEmpty($second);
+        $this->assertNotSame('', $first);
+        $this->assertNotSame('', $second);
         $this->assertNotSame($first, $second, 'display parameter must reach rendered output through the injected request');
     }
 }

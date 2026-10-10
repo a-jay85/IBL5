@@ -202,7 +202,7 @@ class DepthChartWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertFalse($validation->isValid());
         $errors = $validation->getErrors();
-        $this->assertNotEmpty($errors);
+        $this->assertNotSame([], $errors);
         $this->assertSame('active_players_min', $errors[0]->type);
         $this->assertStringContainsString('at least 12 active players', $errors[0]->message);
         $this->assertStringContainsString('you have 10', $errors[0]->message);
@@ -225,7 +225,7 @@ class DepthChartWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertFalse($validation->isValid());
         $errors = $validation->getErrors();
-        $this->assertNotEmpty($errors);
+        $this->assertNotSame([], $errors);
         $this->assertSame('active_players_max', $errors[0]->type);
         $this->assertStringContainsString('more than 12', $errors[0]->message);
     }
@@ -247,7 +247,7 @@ class DepthChartWideUnitTest extends WideUnitTestCase
         // Assert - Position depth validation catches insufficient PG depth
         $this->assertFalse($validation->isValid());
         $errors = $validation->getErrors();
-        $this->assertNotEmpty($errors);
+        $this->assertNotSame([], $errors);
         $this->assertSame('position_depth', $errors[0]->type);
         $this->assertStringContainsString('PG', $errors[0]->message);
     }
@@ -269,10 +269,10 @@ class DepthChartWideUnitTest extends WideUnitTestCase
         // Assert - Multiple-starter validation catches the issue
         $this->assertFalse($validation->isValid());
         $errors = $validation->getErrors();
-        $this->assertNotEmpty($errors);
+        $this->assertNotSame([], $errors);
         // Find the multiple_starting_positions error
         $multiStarterErrors = array_filter($errors, static fn (ValidationError $e): bool => $e->type === 'multiple_starting_positions');
-        $this->assertNotEmpty($multiStarterErrors, 'Should have a multiple_starting_positions error');
+        $this->assertNotSame([], $multiStarterErrors, 'Should have a multiple_starting_positions error');
         $this->assertTrue($result['hasStarterAtMultiplePositions']);
         $this->assertSame('Multi Starter', $result['nameOfProblemStarter']);
     }
@@ -428,7 +428,6 @@ class DepthChartWideUnitTest extends WideUnitTestCase
     public function testUpdatePlayerDepthChartUpdatesAllFields(): void
     {
         // Arrange
-        $playerName = 'Test Player';
         $depthChartValues = [
             'pg' => 1, 'sg' => 2, 'sf' => 3, 'pf' => 4, 'c' => 5,
             'canPlayInGame' => 1, 'min' => 35,
@@ -468,7 +467,6 @@ class DepthChartWideUnitTest extends WideUnitTestCase
     public function testUpdateSucceedsEvenWhenNoRowsAffected(): void
     {
         // Arrange - Simulates updating with same values (MySQL returns 0 affected)
-        $playerName = 'Unchanged Player';
         $depthChartValues = [
             'pg' => 0, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,
             'canPlayInGame' => 1, 'min' => 0,
@@ -623,7 +621,7 @@ class DepthChartWideUnitTest extends WideUnitTestCase
         $errors = $validation->getErrors();
 
         // Should have active_players_min + position_depth errors for positions below 3
-        $this->assertNotEmpty($errors);
+        $this->assertNotSame([], $errors);
         $this->assertSame('active_players_min', $errors[0]->type);
         // Additional position_depth errors may follow depending on depth distribution
     }
@@ -639,7 +637,7 @@ class DepthChartWideUnitTest extends WideUnitTestCase
         $invalidData = $this->createPostDataWithActiveCount(5);
         $result1 = $this->processor->processSubmission($invalidData, 15);
         $firstValidation = $this->validator->validate($result1, 'Regular Season');
-        $this->assertNotEmpty($firstValidation->getErrors());
+        $this->assertNotSame([], $firstValidation->getErrors());
 
         // Arrange - Second valid
         $validData = $this->createValidRegularSeasonPostData();

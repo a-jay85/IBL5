@@ -154,7 +154,7 @@ final class AwardHistoryRepositoryTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertSame(0, $result['count']);
-        $this->assertEmpty($result['results']);
+        $this->assertSame([], $result['results']);
     }
 
     #[DataProvider('validSortByProvider')]

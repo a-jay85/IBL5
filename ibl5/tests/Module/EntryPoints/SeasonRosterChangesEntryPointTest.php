@@ -26,7 +26,7 @@ class SeasonRosterChangesEntryPointTest extends ModuleEntryPointTestCase
         ]);
         $output = $this->runModule('SeasonRosterChanges');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
 
@@ -35,7 +35,7 @@ class SeasonRosterChangesEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('SeasonRosterChanges');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
 }

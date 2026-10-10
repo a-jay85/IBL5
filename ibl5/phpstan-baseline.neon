@@ -499,7 +499,7 @@ parameters:
 		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
-			count: 3
+			count: 2
 			path: classes/Topics/News/NewsController.php
 
 		-
@@ -547,7 +547,7 @@ parameters:
 		-
 			rawMessage: 'Loose comparison via "==" between int and int is not allowed.'
 			identifier: equal.notAllowed
-			count: 5
+			count: 4
 			path: classes/Topics/News/NewsController.php
 
 		-
@@ -721,7 +721,7 @@ parameters:
 		-
 			rawMessage: 'intval() is banned. Use (int) cast instead. PHPStan can narrow types through casts but not through these functions, and intval(''08'') silently returns 0 (octal radix surprise).'
 			identifier: ibl.castFunction
-			count: 8
+			count: 7
 			path: classes/Topics/News/NewsController.php
 
 		-
@@ -1031,6 +1031,12 @@ parameters:
 			path: modules/DepthChartEntry/index.php
 
 		-
+			rawMessage: 'Parameter #1 $db of class DepthChartSnapshot\DepthChartSnapshotApiHandler constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
 			rawMessage: 'Parameter #1 $db of class DepthChart\DepthChartApiHandler constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -1062,12 +1068,6 @@ parameters:
 
 		-
 			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DepthChartSnapshot\DepthChartSnapshotApiHandler constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
@@ -1118,12 +1118,6 @@ parameters:
 			rawMessage: 'Parameter #2 $commonRepo of class DepthChart\DepthChartSubmissionHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
 			identifier: argument.type
 			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepo of class DepthChartSnapshot\DepthChartSnapshotApiHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
@@ -1211,12 +1205,6 @@ parameters:
 			path: modules/Draft/index.php
 
 		-
-			rawMessage: Cannot access property $name on mixed.
-			identifier: property.nonObject
-			count: 2
-			path: modules/DraftHistory/index.php
-
-		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
 			count: 2
@@ -1238,30 +1226,6 @@ parameters:
 			rawMessage: 'Parameter #1 $db of static method Team\Team::initialize() expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $team of method DraftHistory\DraftHistoryView::renderTeamHistory() expects Team\Team, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $teamName of method DraftHistory\DraftHistoryRepository::getDraftPicksByTeam() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Part $team->name (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: Variable $team might not be defined.
-			identifier: variable.undefined
-			count: 3
 			path: modules/DraftHistory/index.php
 
 		-
@@ -1621,7 +1585,7 @@ parameters:
 		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
-			count: 2
+			count: 1
 			path: modules/News/categories.php
 
 		-
@@ -1994,18 +1958,6 @@ parameters:
 			path: modules/PlayerSearch/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class SeasonRosterChanges\SeasonRosterChangesRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonRosterChanges/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonRosterChanges/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class Auth\AuthRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 2
@@ -2274,6 +2226,18 @@ parameters:
 			identifier: variable.undefined
 			count: 2
 			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SeasonRosterChanges\SeasonRosterChangesRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonRosterChanges/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonRosterChanges/index.php
 
 		-
 			rawMessage: 'Cannot call method isOlympics() on mixed.'
@@ -3746,6 +3710,12 @@ parameters:
 			path: themes/IBL/theme.php
 
 		-
+			rawMessage: 'Function themearticle() has an unused parameter $topicname.'
+			identifier: function.unusedParameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
 			rawMessage: 'Function themearticle() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -3820,6 +3790,12 @@ parameters:
 		-
 			rawMessage: 'Function themeheader() has no return type specified.'
 			identifier: missingType.return
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has an unused parameter $topicname.'
+			identifier: function.unusedParameter
 			count: 1
 			path: themes/IBL/theme.php
 

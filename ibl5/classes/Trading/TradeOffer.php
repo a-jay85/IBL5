@@ -314,7 +314,6 @@ class TradeOffer implements TradeOfferInterface
             $approvalTeamName
         );
 
-        $tradeText = "";
         if ($itemType === TradeItemType::DraftPick) {
             $tradeText = $this->getPickTradeText($itemId, $offeringTeamName, $listeningTeamName);
         } else {

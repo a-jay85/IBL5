@@ -65,7 +65,7 @@ final class OneOnOneGameEngineTest extends TestCase
 
         $result = $this->engine->simulateGame($player1Data, $player2Data, 'TestOwner');
 
-        $this->assertNotEmpty($result->playByPlay);
+        $this->assertNotSame('', $result->playByPlay);
         $this->assertStringContainsString('SCORE:', $result->playByPlay);
         $this->assertStringContainsString('FINAL SCORE:', $result->playByPlay);
     }

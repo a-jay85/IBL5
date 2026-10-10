@@ -90,7 +90,7 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
             $queries,
             static fn (string $q): bool => str_contains(strtolower($q), 'update') && str_contains(strtolower($q), 'magic_number') && !str_contains(strtolower($q), 'null'),
         );
-        $this->assertEmpty($magicNumberUpdateQueries, 'Olympics should not compute magic numbers');
+        $this->assertSame([], $magicNumberUpdateQueries, 'Olympics should not compute magic numbers');
     }
 
     public function testNoClinchCheckQueriesIssued(): void
@@ -110,7 +110,7 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
             $queries,
             static fn (string $q): bool => str_contains(strtolower($q), 'update') && str_contains(strtolower($q), 'clinched') && !str_contains(strtolower($q), 'null'),
         );
-        $this->assertEmpty($clinchQueries, 'Olympics should not compute clinch flags');
+        $this->assertSame([], $clinchQueries, 'Olympics should not compute clinch flags');
     }
 
     public function testGamesUnplayedUsesDynamicScheduledCount(): void

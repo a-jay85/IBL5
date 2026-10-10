@@ -85,9 +85,7 @@ class NewsController implements NewsControllerInterface
 
         $newsService = new \Topics\News\NewsService($mysqli_db);
 
-        if ($new_topic == 0) {
-            $home_msg = "";
-        } else {
+        if ($new_topic !== 0) {
             $topicText = $newsService->getTopicText($new_topic);
             OpenTable();
             if ($topicText === null) {
@@ -116,7 +114,6 @@ class NewsController implements NewsControllerInterface
             $catid = intval($row['catid']);
             $aid = $row['aid'];
             $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title']);
-            $time = $row['time'];
             $hometext = $row['hometext'];
             $bodytext = $row['bodytext'];
             $comments = intval($row['comments']);
@@ -126,13 +123,11 @@ class NewsController implements NewsControllerInterface
             $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes']);
             $acomm = intval($row['acomm']);
             $topicRow = $newsService->getTopicForStory($s_sid);
-            $topicid = (int) ($topicRow['topicid'] ?? 0);
             $topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
             $topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
             $topictext = \Security\HtmlSanitizer::e($topicRow['topictext'] ?? '');
             $time = $newsService->normalizeStoryTime($row['time']);
             $counts = $newsService->computeByteCounts((string) ($hometext ?? ''), (string) ($bodytext ?? ''));
-            $introcount = $counts['intro'];
             $fullcount = $counts['full'];
             $totalcount = $counts['total'];
             $c_count = $comments;
@@ -157,7 +152,6 @@ class NewsController implements NewsControllerInterface
                     $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">$c_count " . _COMMENTS . "</a>";
                 }
             }
-            $sid = intval($s_sid);
             if ($catid != 0) {
                 $catTitle = $newsService->getCategoryTitle($catid);
                 $title1 = \Security\HtmlSanitizer::safeHtmlOutput($catTitle ?? '');

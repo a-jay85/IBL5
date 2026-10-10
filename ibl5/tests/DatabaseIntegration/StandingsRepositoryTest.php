@@ -582,6 +582,29 @@ class StandingsRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $row['cnt']);
     }
 
+    public function testGetStandingsByRegionBreaksFullTiesByTeamidAscending(): void
+    {
+        $tie = $this->db->query(
+            "UPDATE `ibl_standings` SET conf_gb = 5.0, wins = 40, clinched_league = 0, clinched_conference = 0,"
+            . " clinched_division = 0, clinched_playoffs = 0 WHERE conference = 'Eastern'"
+        );
+        self::assertNotFalse($tie);
+
+        $easternTeamids = array_column($this->teamsByTeamidAscending(true), 'teamid');
+        $leaderTeamid = max($easternTeamids);
+        $lead = $this->db->query("UPDATE `ibl_standings` SET conf_gb = 0.0 WHERE teamid = " . $leaderTeamid);
+        self::assertNotFalse($lead);
+
+        $rows = $this->repo->getStandingsByRegion('Eastern');
+
+        // Lowest GB leads; every other team is fully tied, so teamid ascending decides.
+        $expected = array_merge(
+            [$leaderTeamid],
+            array_values(array_filter($easternTeamids, static fn (int $id): bool => $id !== $leaderTeamid)),
+        );
+        self::assertSame($expected, array_column($rows, 'teamid'));
+    }
+
     /**
      * @return list<array{teamid: int, team_name: string}>
      */

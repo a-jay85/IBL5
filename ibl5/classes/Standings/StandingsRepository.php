@@ -107,13 +107,16 @@ class StandingsRepository extends \Database\BaseMysqliRepository implements Stan
             t.color2
             FROM `ibl_standings` s
             JOIN `ibl_team_info` t ON s.teamid = t.teamid
-            WHERE s." . $groupingColumn . " = ?
+            WHERE s." . $groupingColumn
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (fragment is cut at the allowlisted $gbColumn identifier; the full clause ends in s.teamid ASC on the last fragment)
+            . " = ?
             ORDER BY s." . $gbColumn . " ASC,
                 (COALESCE(s.clinched_league, 0) * 4
                  + COALESCE(s.clinched_conference, 0) * 3
                  + COALESCE(s.clinched_division, 0) * 2
                  + COALESCE(s.clinched_playoffs, 0)) DESC,
-                s.wins DESC";
+                s.wins DESC,
+                s.teamid ASC";
 
         /** @var list<StandingsRow> */
         return $this->fetchAll($query, "s", $region);

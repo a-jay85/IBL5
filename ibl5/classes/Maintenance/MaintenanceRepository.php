@@ -51,6 +51,7 @@ class MaintenanceRepository extends \Database\BaseMysqliRepository implements Ma
     {
         /** @var array<int, array{year: int, wins: int, losses: int}> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (ibl_team_win_loss is a view grouped per team and year, so year is unique for one currentname)
             "SELECT year, wins, losses FROM `ibl_team_win_loss`
              WHERE currentname = ? AND year <= ?
              ORDER BY year DESC

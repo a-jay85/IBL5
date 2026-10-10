@@ -99,11 +99,11 @@ SQL;
 
         if ($filterTid !== null) {
             $sql .= ' AND p.teamid = ?';
-            $sql .= ' ORDER BY p.name';
+            $sql .= ' ORDER BY p.name, p.pid';
             return array_values($this->fetchAll($sql, 'isi', $baselineYear, $baselinePhase, $filterTid));
         }
 
-        $sql .= ' ORDER BY p.name';
+        $sql .= ' ORDER BY p.name, p.pid';
         return array_values($this->fetchAll($sql, 'is', $baselineYear, $baselinePhase));
     }
 }

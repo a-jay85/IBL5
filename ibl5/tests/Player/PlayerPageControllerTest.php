@@ -46,11 +46,11 @@ class PlayerPageControllerTest extends WideUnitTestCase
         );
     }
 
-    private function seedInvariantQueries(): void
+    private function seedInvariantQueries(int $playerTeamid = 5): void
     {
         $playerRow = [
             'pid' => 1, 'ordinal' => 1, 'name' => 'Test Player', 'nickname' => null,
-            'age' => 25, 'teamid' => 5, 'pos' => 'PG',
+            'age' => 25, 'teamid' => $playerTeamid, 'pos' => 'PG',
             'r_fga' => 70, 'r_fgp' => 50, 'r_fta' => 60, 'r_ftp' => 80,
             'r_3ga' => 40, 'r_3gp' => 35, 'r_orb' => 30, 'r_drb' => 50,
             'r_ast' => 60, 'r_stl' => 50, 'r_tvr' => 40, 'r_blk' => 30,
@@ -143,6 +143,21 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
         $this->assertStringContainsString('Test Player', $html);
         $this->assertStringContainsString('card-flip-container', $html);
+    }
+
+    public function testRenderPageFreeAgentKeepsGoldTradingCardAndTeamZeroPageColors(): void
+    {
+        $this->seedInvariantQueries(0);
+        $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
+        $this->stubRepo->method('getTeamColorRow')->willReturn(['color1' => '888888', 'color2' => 'cccccc']);
+
+        $html = $this->buildController()->renderPage(1, null, 'nobody');
+
+        // Menu and stats cards use the unguarded team-0 row (gray); the trading card stays gold.
+        $this->assertStringContainsStringIgnoringCase('888888', $html);
+        $card = substr($html, (int) strpos($html, 'card-flip-container'), 600);
+        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $card);
     }
 
     public function testRenderPageOverviewForRetiredPlayer(): void

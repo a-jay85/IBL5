@@ -1,6 +1,6 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 292,
+        "argument.type": 253,
         "binaryOp.invalid": 18,
         "booleanAnd.leftNotBoolean": 1,
         "booleanNot.alwaysTrue": 1,
@@ -31,10 +31,10 @@
         "ibl.unknownCliOption": 2,
         "identical.alwaysFalse": 1,
         "if.condNotBoolean": 5,
-        "method.nonObject": 33,
+        "method.nonObject": 30,
         "missingType.iterableValue": 1,
-        "missingType.parameter": 26,
-        "missingType.return": 15,
+        "missingType.parameter": 22,
+        "missingType.return": 9,
         "new.deprecatedClass": 1,
         "notEqual.notAllowed": 9,
         "nullCoalesce.offset": 1,
@@ -47,7 +47,7 @@
         "varTag.misplaced": 2,
         "varTag.nativeType": 1,
         "varTag.type": 1,
-        "variable.undefined": 39
+        "variable.undefined": 37
     },
     "phpstan-tests-baseline.neon": {
         "argument.type": 1,

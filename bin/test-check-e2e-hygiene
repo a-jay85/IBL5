@@ -5,7 +5,8 @@
 #
 # Pins every verdict the gate emits: each blocking pattern, the with-else and
 # inline-allow suppressions, the file-level allowlist, the comma-fallback
-# advisory, the full vs --pr file set, and the argument handling (unknown arg,
+# locator ban and its [attr,...] exclusion, the full vs --pr file set, and the
+# argument handling (unknown arg,
 # --help, --help outside git). The --pr base-ref seam (unset / empty / base /
 # head / bogus) is covered by bin/test-check-phpunit-hygiene and not repeated.
 #
@@ -189,15 +190,21 @@ run_allowlist allowlist-glob-skips-file 0 'PASS: all files in scope are allowlis
 run_allowlist allowlist-nonmatching-glob-still-flags 1 'test-skip' \
     'ibl5/tests/e2e/other/*'
 
-# --- Advisory ---
-run_case comma-fallback-advisory 0 '=== Advisory \(non-blocking\) ===' "$SPEC" \
+# --- Comma-fallback locator (blocking) ---
+run_case comma-fallback-blocks 1 '\[comma-fallback-locator\] ibl5/tests/e2e/x\.spec\.ts:1:' "$SPEC" \
     "await page.locator('.a, .b').click();"
-run_case comma-fallback-advisory-count 0 'Advisory: 1 comma-fallback locator hits' "$SPEC" \
+run_case comma-fallback-footer 1 "$HIT_FOOTER" "$SPEC" \
     "await page.locator('.a, .b').click();"
-run_case comma-fallback-advisory-still-passes 0 'PASS: 0 blocking hits' "$SPEC" \
+run_case comma-fallback-double-quoted-blocks 1 '\[comma-fallback-locator\]' "$SPEC" \
+    'await page.locator(".a, .b").click();'
+run_absent comma-fallback-no-advisory-report 1 'Advisory' "$SPEC" \
     "await page.locator('.a, .b').click();"
-run_absent comma-in-attribute-selector-excluded 0 'Advisory' "$SPEC" \
+run_case comma-fallback-inline-allow-passes 0 'PASS: 0 blocking hits' "$SPEC" \
+    "await page.locator('.a, .b').click(); // e2e-hygiene-allow: page renders either wrapper by design"
+run_absent comma-in-attribute-selector-excluded 0 'comma-fallback-locator' "$SPEC" \
     "await page.locator('[data-x=a,b]').click();"
+run_case single-selector-locator-passes 0 'PASS: 0 blocking hits' "$SPEC" \
+    "await page.locator('.a').click();"
 
 # --- No files ---
 d="$(mk_repo)"

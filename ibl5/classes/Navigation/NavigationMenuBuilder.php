@@ -18,12 +18,11 @@ use Security\HtmlSanitizer;
 class NavigationMenuBuilder implements NavigationMenuBuilderInterface
 {
     private const OLYMPICS_HIDDEN_NAV_MODULES = [
-        'CapSpace',
+        'Contracts',
         'ProjectedDraftOrder',
         'DraftPickLocator',
         'TrainingCampRatingsDiff',
         'FreeAgencyPreview',
-        'ContractList',
         'SeasonRosterChanges',
         'FranchiseHistory',
         'DraftHistory',
@@ -65,7 +64,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Injuries', 'url' => 'modules.php?name=Injuries'],
                     ['label' => 'Player Database', 'url' => 'modules.php?name=PlayerSearch'],
                     ['label' => 'Player Export', 'url' => 'modules.php?name=ApiKeys'],
-                    ['label' => 'Cap Space', 'url' => 'modules.php?name=CapSpace'],
+                    ['label' => 'Contracts', 'url' => 'modules.php?name=Contracts'],
                     $this->config->isDraftOrderFinalized
                         ? ($this->config->seasonPhase === 'Draft'
                             ? ['label' => 'Draft Order', 'url' => 'modules.php?name=ProjectedDraftOrder', 'badge' => 'FINAL']
@@ -74,7 +73,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Draft Pick Locator', 'url' => 'modules.php?name=DraftPickLocator'],
                     ['label' => 'Training Camp Ratings Diff', 'url' => 'modules.php?name=TrainingCampRatingsDiff'],
                     ['label' => 'Free Agency Preview', 'url' => 'modules.php?name=FreeAgencyPreview'],
-                    ['label' => 'Contract List', 'url' => 'modules.php?name=ContractList'],
                     ['label' => 'Player Movement', 'url' => 'modules.php?name=SeasonRosterChanges'],
                     ['label' => 'JSB Export', 'url' => 'ibl/IBL', 'external' => true],
                 ],

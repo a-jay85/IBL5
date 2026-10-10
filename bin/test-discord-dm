@@ -28,6 +28,7 @@ fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
 # with too few X's, so the BSD spelling would fail on the Linux CI runner.
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-discord-dm.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 # Shim osascript so the fallback path does not fire a macOS notification banner
 # on every local run. A PATH shim is not enough: discord-dm prepends /usr/bin to
@@ -839,7 +840,7 @@ G6_WANT=$(printf '%s\n' bin/db-backups-pull bin/launchd-health-check bin/lib/dm.
 DMLIB="$ROOT/bin/lib/dm.sh"
 dmlib() {   # dmlib '<snippet>' [VAR=val ...]
     local snip="$1"; shift
-    env -i PATH=/usr/bin:/bin "$@" bash -c 'set -euo pipefail; . "$1"; '"$snip" _ "$DMLIB"
+    env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH=/usr/bin:/bin "$@" bash -c 'set -euo pipefail; . "$1"; '"$snip" _ "$DMLIB"
 }
 DM_REC="$TMP/dm-rec"
 cat > "$DM_REC" <<REC_EOF
@@ -888,7 +889,7 @@ rm -f "$TMP/dm-rec.argv"
 out=$(dmlib 'dm_ping m || echo "rc=$?"' 2>"$TMP/g7j.err")
 [ "$out" = "rc=2" ] && grep -qF 'DM_CMD is not set' "$TMP/g7j.err" && [ ! -e "$TMP/dm-rec.argv" ] \
     && ok "G7j unset DM_CMD returns 2 without calling the recorder" || fail "G7j (out=$out)"
-out=$(env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; a=$(set +o); . "$1"; b=$(set +o); [ "$a" = "$b" ] && echo same' _ "$DMLIB")
+out=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH=/usr/bin:/bin bash -c 'set -euo pipefail; a=$(set +o); . "$1"; b=$(set +o); [ "$a" = "$b" ] && echo same' _ "$DMLIB")
 [ "$out" = "same" ] && ok "G7k sourcing leaves shell options unchanged" || fail "G7k (out=$out)"
 
 # ── Summary ───────────────────────────────────────────────────────────────────

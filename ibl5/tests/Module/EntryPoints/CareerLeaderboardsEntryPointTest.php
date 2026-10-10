@@ -17,7 +17,7 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('CareerLeaderboards', [], [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Career Leaderboards', $output);
         $this->assertQueryNotExecuted('ibl_hist');
     }
@@ -32,7 +32,7 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'display' => '50',
         ], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
 
@@ -46,7 +46,7 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'display' => '50',
         ], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
 
@@ -60,7 +60,7 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'display' => '50',
         ], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Career Leaderboards', $output);
     }
 }

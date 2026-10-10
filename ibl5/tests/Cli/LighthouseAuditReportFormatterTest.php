@@ -31,7 +31,7 @@ final class LighthouseAuditReportFormatterTest extends TestCase
         $lines = explode("\n", $result['body']);
         $dataRows = array_values(array_filter($lines, static fn(string $l): bool => str_starts_with($l, '| `')));
 
-        self::assertNotEmpty($dataRows);
+        self::assertNotSame([], $dataRows);
         self::assertStringContainsString('Player', $dataRows[0]);
     }
 

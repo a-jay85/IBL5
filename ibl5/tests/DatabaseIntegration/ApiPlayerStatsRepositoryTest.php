@@ -135,7 +135,7 @@ class ApiPlayerStatsRepositoryTest extends DatabaseTestCase
 
         $history = $this->repo->getSeasonHistory('batch7-hist-team-00000088');
 
-        self::assertNotEmpty($history);
+        self::assertNotSame([], $history);
         $row = $history[0];
 
         self::assertArrayHasKey('player_uuid', $row);

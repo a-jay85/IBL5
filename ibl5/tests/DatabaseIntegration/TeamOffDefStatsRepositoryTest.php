@@ -62,7 +62,7 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
         // Season 9999 has no boxscore data
         $stats = $this->repo->getAllTeamStats(9999);
 
-        self::assertNotEmpty($stats);
+        self::assertNotSame([], $stats);
         // The first row should have null offense/defense columns
         $first = $stats[0];
         self::assertNull($first['offense_games']);

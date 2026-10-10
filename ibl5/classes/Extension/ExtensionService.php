@@ -372,7 +372,7 @@ class ExtensionService implements ExtensionProcessorInterface
         $playerID = $extensionData['playerID'] ?? null;
         if ($playerID !== null) {
             try {
-                return Player::withPlayerID($this->db, (int) $playerID);
+                return Player::withPlayerID($this->db, $playerID);
             } catch (\Exception $e) {
                 $this->dbLogger->error('getPlayerObject failed', [
                     'exception' => $e,

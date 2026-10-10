@@ -1,0 +1,30 @@
+# Paths allowed to carry non-current Claude model ids, one per line with a '# reason'.
+# A trailing '/' marks a directory prefix (fixture directories only). Read by
+# bin/check-model-pins; current ids live in bin/lib/current-models.
+bin/lib/plan-model-tier              # legacy-accept: maps old impl_model ids
+bin/lib/plan-impl-model              # legacy-accept: maps old impl_model ids
+bin/lib/plan-model-consistency       # legacy-accept: maps old impl_model ids
+bin/automouse/queue                  # legacy-accept: old plan input still accepted
+bin/automouse/run                    # legacy-accept: old plan input still accepted
+.claude/skills/plan/SKILL.md         # documents accepted legacy impl_model ids
+.claude/rules/automouse-workflow.md  # documents accepted legacy impl_model ids
+bin/measure-delegate-cost            # historical measurement note
+ibl5/docs/decisions/0085-just-in-time-opus-escalation-on-final-automouse-retry.md  # immutable ADR
+ibl5/docs/decisions/0096-headless-plan-autofire.md                                 # immutable ADR
+ibl5/docs/decisions/0135-harness-adr-draft-on-denial.md                            # immutable ADR
+ibl5/docs/decisions/0138-adr-draft-at-commit-site.md                               # immutable ADR
+tools/postplan-harness/bench/results.json                 # historical bench data
+tools/postplan-harness/bench/compilation_cost.json        # historical bench data
+tools/postplan-harness/tests/fixtures/pr-bodies-corpus.json  # recorded PR bodies
+tools/postplan-harness/tests/test_llm_tooled.py           # negative assertions name retired ids
+tools/postplan-harness/tests/test_model_pins.py           # parser fixture names a retired id
+bin/fixtures/automouse-cost/         # recorded transcripts and reports
+bin/fixtures/retro-mine/             # recorded transcripts
+bin/test-automouse-cost-rows         # historical ids in fixtures
+bin/test-automouse-escalation        # historical ids in fixtures
+bin/test-automouse-impl-model        # legacy impl_model inputs
+bin/test-automouse-measure-delegate-cost  # historical ids in fixtures
+bin/test-automouse-morning-digest    # historical ids in fixtures
+bin/test-automouse-single            # historical ids in fixtures
+bin/test-check-plan                  # legacy impl_model inputs
+bin/test-plan-now                    # historical ids in fixtures

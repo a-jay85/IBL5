@@ -70,6 +70,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0179](0179-vr-pr-keyed-screens.md) | PR-keyed visual-review storage and phone-readable manual-row screens | Accepted | Galleries and manual-row screens live at gh-pages pr/<N>/, overwritten each push and removed on close. Manual rows render at phone and desktop width, before and after, in a PR-body block. |
 | [0188](0188-workflow-run-interpolation-guard.md) | Ban env and string-input expressions inside workflow run: bodies | Accepted | `bin/check-workflow-run-interpolation` runs in `Static guards` and fails any `${{ env.* }}` or string-typed `${{ inputs.* }}` inside a `run:` body; values go through `env:` and a quoted `"$NAME"`. |
 | [0186](0186-memo-only-ci-gating.md) | Memo-only skip gating for Tests and Analysis PR jobs | Accepted | On `pull_request` the tests memo is the only skip gate for every test and analysis job; path filters remain only on `audit-php`, `audit-js` and `iblbot`, pinned by `bin/test-ci-memo` gate-topology assertion 7; the tests key is salted with `--extra gating=memo-only`. |
+| [0190](0190-db-root-credentials-env-overridable.md) | Env-overridable DB root credentials and default database name | Accepted | `bin/lib/db-helpers.sh` defines `DB_ROOT_USER`, `DB_ROOT_PASS` and `DB_DEFAULT_NAME` with env overrides and a `db_cmd` wrapper; `bin/test-db-sync-prod-argv` pins the `docker exec` argv the DB scripts send. |
 
 ## When an ADR is Required
 

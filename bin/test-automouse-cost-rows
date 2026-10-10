@@ -18,57 +18,41 @@
 # Run: bin/test-automouse-cost-rows  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-FAILED=0
 
 # assert_eq <actual> <expected> <label>
-assert_eq() {
-    if [ "$1" = "$2" ]; then
-        printf '  ok   %s (%s)\n' "$3" "$1"
-    else
-        printf '  FAIL %s: got %s, expected %s\n' "$3" "$1" "$2"
-        FAILED=1
-    fi
-}
+assert_eq() { h_eq "$3" "$2" "$1"; }
 
 # assert_near <actual> <expected> <tol> <label>
-assert_near() {
-    if awk -v a="$1" -v e="$2" -v t="$3" 'BEGIN{d=a-e; if(d<0)d=-d; exit !(d<=t)}'; then
-        printf '  ok   %s (%s)\n' "$4" "$1"
-    else
-        printf '  FAIL %s: got %s, expected %s +/- %s\n' "$4" "$1" "$2" "$3"
-        FAILED=1
-    fi
-}
+assert_near() { h_near "$4" "$1" "$2" "$3"; }
 
 # assert_not_near <actual> <forbidden> <tol> <label>
 assert_not_near() {
     if awk -v a="$1" -v e="$2" -v t="$3" 'BEGIN{d=a-e; if(d<0)d=-d; exit !(d>t)}'; then
-        printf '  ok   %s (%s not within %s of %s)\n' "$4" "$1" "$3" "$2"
+        h_pass "$4"
     else
-        printf '  FAIL %s: got %s, which must NOT be within %s of %s\n' "$4" "$1" "$3" "$2"
-        FAILED=1
+        h_fail "$4" "got $1, which must NOT be within $3 of $2"
     fi
 }
 
 # assert_gt <actual> <threshold> <label> [why]
 assert_gt() {
     if awk -v a="$1" -v t="$2" 'BEGIN{exit !(a>t)}'; then
-        printf '  ok   %s (%s > %s)\n' "$3" "$1" "$2"
+        h_pass "$3"
     else
-        printf '  FAIL %s: got %s, expected > %s%s\n' "$3" "$1" "$2" "${4:+ -- $4}"
-        FAILED=1
+        h_fail "$3" "got $1, expected > $2${4:+ -- $4}"
     fi
 }
 
 # assert_ne <actual> <forbidden> <label>
 assert_ne() {
     if [ "$1" != "$2" ]; then
-        printf '  ok   %s (%s != %s)\n' "$3" "$1" "$2"
+        h_pass "$3"
     else
-        printf '  FAIL %s: got %s, which must NOT equal %s\n' "$3" "$1" "$2"
-        FAILED=1
+        h_fail "$3" "got $1, which must NOT equal $2"
     fi
 }
 
@@ -78,8 +62,7 @@ pj() {
 }
 
 # Sandbox NIGHTLY_DIR so the real roll-up is never touched.
-TMPROOT=$(mktemp -d)
-trap 'rm -rf "$TMPROOT"' EXIT
+h_tmp TMPROOT
 mkdir -p "$TMPROOT/reports" "$TMPROOT/logs"
 
 # shellcheck disable=SC2034  # read by the append_cost_row/regenerate_* funcs sourced below
@@ -717,5 +700,4 @@ assert_near "$fable51_cost" 1.0000 0.0001 \
 assert_not_near "$fable51_cost" 4.0 0.0001 \
     "fable-5-1 is not priced as generic fable (\$1.00/M cache_read)"
 
-
-exit "$FAILED"
+h_done

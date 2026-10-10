@@ -32,16 +32,17 @@
 # Run: bin/test-automouse-impl-cap-timeout  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER="$SCRIPT_DIR/automouse/run"
 PROMPT="$SCRIPT_DIR/automouse/prompt-impl"
 QUEUE_SCRIPT="$SCRIPT_DIR/automouse/queue"
-FAILED=0
 
 for f in "$RUNNER" "$PROMPT" "$QUEUE_SCRIPT"; do
     if [ ! -f "$f" ]; then
-        echo "FAIL: cannot find $f"
+        h_fail "cannot find $f"
         exit 1
     fi
 done
@@ -65,8 +66,7 @@ source "$SCRIPT_DIR/automouse/lib-queue-order"
 for fn in impl_cap_timeout should_refund_cap_timeout cap_refunds_granted record_cap_refund claim_next_plan; do
     FN_SRC="$(extract_fn "$fn")"
     if [ -z "$FN_SRC" ]; then
-        echo "FAIL: could not extract $fn from $RUNNER"
-        FAILED=1
+        h_fail "could not extract $fn from $RUNNER"
     else
         eval "$FN_SRC"
     fi
@@ -90,10 +90,9 @@ assert_cap() {
         got="not-cap"
     fi
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — expected '$want', got '$got' (status=$st dur=$dur budget=$budget)"
-        FAILED=1
+        h_fail "$name" "expected '$want', got '$got' (status=$st dur=$dur budget=$budget)"
     else
-        echo "ok: $name ($got)"
+        h_pass "$name ($got)"
     fi
 }
 
@@ -123,10 +122,9 @@ assert_refund() {
         got="burn"
     fi
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — expected '$want', got '$got' (h=$h q=$q cap=$c granted=$g limit=$l)"
-        FAILED=1
+        h_fail "$name" "expected '$want', got '$got' (h=$h q=$q cap=$c granted=$g limit=$l)"
     else
-        echo "ok: $name ($got)"
+        h_pass "$name ($got)"
     fi
 }
 
@@ -143,18 +141,16 @@ assert_refund "r7-not-a-cap-timeout" 0 1 0 0 2 burn
 # ---------------------------------------------------------------------------
 # cap_refunds_granted <file> — reads the counter, sanitizing garbage to 0
 # ---------------------------------------------------------------------------
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+h_tmp TMP_DIR
 
 # assert_granted <name> <expect> <file>
 assert_granted() {
     name="$1"; want="$2"; file="$3"
     got="$(cap_refunds_granted "$file" 2>/dev/null)"
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — expected '$want', got '$got'"
-        FAILED=1
+        h_fail "$name" "expected '$want', got '$got'"
     else
-        echo "ok: $name ($got)"
+        h_pass "$name ($got)"
     fi
 }
 
@@ -171,10 +167,9 @@ printf '1\n' > "$TMP_DIR/k1"
 record_cap_refund "$TMP_DIR/k1" 1 2>/dev/null
 k1_got="$(cat "$TMP_DIR/k1" 2>/dev/null || echo '<unwritten>')"
 if [ "$k1_got" = "2" ]; then
-    echo "ok: k1-writes-increment (2)"
+    h_pass "k1-writes-increment (2)"
 else
-    echo "FAIL: k1-writes-increment — expected '2', got '$k1_got'"
-    FAILED=1
+    h_fail "k1-writes-increment" "expected '2', got '$k1_got'"
 fi
 
 # A `>>` typo would corrupt every later read, and cap_refunds_granted would then
@@ -185,20 +180,18 @@ record_cap_refund "$TMP_DIR/k2" 4 2>/dev/null
 k2_lines="$(wc -l < "$TMP_DIR/k2" 2>/dev/null | tr -d ' ')"
 k2_got="$(cat "$TMP_DIR/k2" 2>/dev/null || echo '<unwritten>')"
 if [ "$k2_lines" = "1" ] && [ "$k2_got" = "5" ]; then
-    echo "ok: k2-overwrites-not-appends (1 line, '5')"
+    h_pass "k2-overwrites-not-appends (1 line, '5')"
 else
-    echo "FAIL: k2-overwrites-not-appends — expected 1 line containing '5', got $k2_lines line(s) containing '$k2_got'"
-    FAILED=1
+    h_fail "k2-overwrites-not-appends" "expected 1 line containing '5', got $k2_lines line(s) containing '$k2_got'"
 fi
 
 # ---------------------------------------------------------------------------
 # Constants — pin the user-decided bound and catch a tolerance typo
 # ---------------------------------------------------------------------------
 if [ "$CAP_REFUND_LIMIT" = "2" ]; then
-    echo "ok: c1-refund-limit-is-two"
+    h_pass "c1-refund-limit-is-two"
 else
-    echo "FAIL: c1-refund-limit-is-two — expected CAP_REFUND_LIMIT=2, got '$CAP_REFUND_LIMIT'"
-    FAILED=1
+    h_fail "c1-refund-limit-is-two" "expected CAP_REFUND_LIMIT=2, got '$CAP_REFUND_LIMIT'"
 fi
 
 # A fat-fingered 3000 would classify EVERY impl as a cap-timeout — the blanket
@@ -209,10 +202,9 @@ case "$CAP_TIMEOUT_TOLERANCE_SECS" in
     *)              [ "$CAP_TIMEOUT_TOLERANCE_SECS" -le 120 ] && tol_ok=1 ;;
 esac
 if [ "$tol_ok" -eq 1 ]; then
-    echo "ok: c2-tolerance-sane ($CAP_TIMEOUT_TOLERANCE_SECS)"
+    h_pass "c2-tolerance-sane ($CAP_TIMEOUT_TOLERANCE_SECS)"
 else
-    echo "FAIL: c2-tolerance-sane — expected a positive integer <= 120, got '$CAP_TIMEOUT_TOLERANCE_SECS'"
-    FAILED=1
+    h_fail "c2-tolerance-sane" "expected a positive integer <= 120, got '$CAP_TIMEOUT_TOLERANCE_SECS'"
 fi
 
 # ---------------------------------------------------------------------------
@@ -236,11 +228,10 @@ assert_claim() {
     claim_got=""
     [ -n "$claim_out" ] && claim_got="$(basename "$claim_out")"
     if [ "$claim_got" != "$want" ] || [ "$claim_rc" != "$want_rc" ]; then
-        echo "FAIL: $name — expected '${want:-<nothing>}' rc=$want_rc, got '${claim_got:-<nothing>}' rc=$claim_rc (CAP_DEFERRED='$deferred')"
-        FAILED=1
+        h_fail "$name" "expected '${want:-<nothing>}' rc=$want_rc, got '${claim_got:-<nothing>}' rc=$claim_rc (CAP_DEFERRED='$deferred')"
         return 1
     fi
-    echo "ok: $name (${claim_got:-<nothing>}, rc=$claim_rc)"
+    h_pass "$name (${claim_got:-<nothing>}, rc=$claim_rc)"
     return 0
 }
 
@@ -261,10 +252,9 @@ assert_claim "d2-deferred-skips-to-next" " alpha.md " "beta.md" 0
 # dir neither created nor mtime-refreshed. Moving the `case` below the mkdir
 # would still pass d1-d4 and fail only here.
 if [ ! -d "$QUEUE_DIR/alpha.md.lock" ]; then
-    echo "ok: d2-deferred-plan-left-unlocked"
+    h_pass "d2-deferred-plan-left-unlocked"
 else
-    echo "FAIL: d2-deferred-plan-left-unlocked — alpha.md.lock was created for a deferred plan (the skip must run BEFORE mkdir)"
-    FAILED=1
+    h_fail "d2-deferred-plan-left-unlocked" "alpha.md.lock was created for a deferred plan (the skip must run BEFORE mkdir)"
 fi
 rm -rf "${QUEUE_DIR:?}"/*.lock
 
@@ -289,17 +279,15 @@ rm -rf "${QUEUE_DIR:?}"/*.lock
 # s1+s2: the placeholder and its substitution must be renamed together, or the
 # budget injection silently ships the raw token to the agent.
 if grep -qF '{{IMPL_BUDGET_MINUTES}}' "$PROMPT"; then
-    echo "ok: s1-placeholder-present"
+    h_pass "s1-placeholder-present"
 else
-    echo "FAIL: s1-placeholder-present — {{IMPL_BUDGET_MINUTES}} missing from $PROMPT"
-    FAILED=1
+    h_fail "s1-placeholder-present" "{{IMPL_BUDGET_MINUTES}} missing from $PROMPT"
 fi
 
 if grep -qF 'IMPL_BUDGET_MINUTES' "$RUNNER"; then
-    echo "ok: s2-substitution-present"
+    h_pass "s2-substitution-present"
 else
-    echo "FAIL: s2-substitution-present — no IMPL_BUDGET_MINUTES substitution in $RUNNER"
-    FAILED=1
+    h_fail "s2-substitution-present" "no IMPL_BUDGET_MINUTES substitution in $RUNNER"
 fi
 
 # s3: of the ATTEMPT_FILE eviction lines, EXACTLY ONE may omit CAP_REFUND_FILE —
@@ -311,11 +299,10 @@ fi
 s3_bad=$(grep -F 'rm -f "$ATTEMPT_FILE"' "$RUNNER" | grep -vF '"$CAP_REFUND_FILE"' || true)
 s3_n=$(printf '%s' "$s3_bad" | grep -c . || true)
 if [ "$s3_n" -eq 1 ]; then
-    echo "ok: s3-eviction-parity (1 permitted omission)"
+    h_pass "s3-eviction-parity (1 permitted omission)"
 else
-    echo "FAIL: s3-eviction-parity — expected exactly 1 ATTEMPT_FILE eviction without CAP_REFUND_FILE (refund_attempt's), got $s3_n:"
+    h_fail "s3-eviction-parity" "expected exactly 1 ATTEMPT_FILE eviction without CAP_REFUND_FILE (refund_attempt's), got $s3_n:"
     echo "$s3_bad"
-    FAILED=1
 fi
 
 # s4: THE unbounded-refund landmine. refund_attempt() is called FROM the
@@ -323,38 +310,29 @@ fi
 # refund and make cap-timeout refunds unlimited.
 S4_SRC="$(extract_fn refund_attempt)"
 if [ -z "$S4_SRC" ]; then
-    echo "FAIL: s4-refund-attempt-excludes-counter — could not extract refund_attempt from $RUNNER"
-    FAILED=1
+    h_fail "s4-refund-attempt-excludes-counter" "could not extract refund_attempt from $RUNNER"
 elif printf '%s\n' "$S4_SRC" | grep -qF 'CAP_REFUND_FILE'; then
-    echo "FAIL: s4-refund-attempt-excludes-counter — refund_attempt() touches CAP_REFUND_FILE, which makes cap refunds UNBOUNDED"
-    FAILED=1
+    h_fail "s4-refund-attempt-excludes-counter" "refund_attempt() touches CAP_REFUND_FILE, which makes cap refunds UNBOUNDED"
 else
-    echo "ok: s4-refund-attempt-excludes-counter"
+    h_pass "s4-refund-attempt-excludes-counter"
 fi
 
 # s5: the end-of-session orphan sweep, mirroring the .attempts/.failure sweeps.
 # shellcheck disable=SC2016  # intentional: searching source code for literal $-string
 if grep -qF '"$QUEUE_DIR"/*.cap-refunds' "$RUNNER"; then
-    echo "ok: s5-sweep-exists"
+    h_pass "s5-sweep-exists"
 else
-    echo "FAIL: s5-sweep-exists — missing end-of-session .cap-refunds orphan sweep in $RUNNER"
-    FAILED=1
+    h_fail "s5-sweep-exists" "missing end-of-session .cap-refunds orphan sweep in $RUNNER"
 fi
 
 # s6: bin/automouse/queue evicts .cap-refunds everywhere it evicts .attempts, or
 # a requeued plan silently inherits an exhausted refund budget.
 s6_bad=$(grep -F 'rm -f' "$QUEUE_SCRIPT" | grep -F '.attempts' | grep -vF '.cap-refunds' || true)
 if [ -z "$s6_bad" ]; then
-    echo "ok: s6-queue-parity"
+    h_pass "s6-queue-parity"
 else
-    echo "FAIL: s6-queue-parity — found .attempts removal without .cap-refunds in $QUEUE_SCRIPT:"
+    h_fail "s6-queue-parity" "found .attempts removal without .cap-refunds in $QUEUE_SCRIPT:"
     echo "$s6_bad"
-    FAILED=1
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

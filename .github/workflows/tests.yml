@@ -893,11 +893,14 @@ jobs:
       - name: Shell harnesses (parallel)
         run: |
           bin/run-shell-harnesses \
+            bin/test-main-checkout-root \
+            bin/test-harness-lib \
             bin/test-post-plan-fleet \
             bin/test-check-plan \
             bin/test-plan-now \
             bin/test-wt-sync-tick \
             bin/test-wt-gc-tick \
+            bin/test-tick-guards \
             bin/test-bin-help \
             bin/test-check-old-code-compat \
             bin/test-cleanup-safety \
@@ -920,6 +923,7 @@ jobs:
             bin/test-pr-review-now \
             bin/test-launchd-job \
             bin/test-check-phpunit-hygiene \
+            bin/test-check-e2e-hygiene \
             bin/test-test \
             bin/test-refactor-flag \
             bin/test-rebuild-css-if-source-changed \
@@ -992,15 +996,18 @@ jobs:
             bin/test-vr-pages-publish \
             bin/test-scrub-log-credentials \
             bin/test-db-query-routing \
+            bin/test-db-sync-prod-argv \
             bin/test-watch-run \
             bin/test-watch-automouse-plan \
             ibl5/bin/test-flake-ledger \
             ibl5/bin/test-db-sync-now \
             bin/test-architect-contract-split \
             bin/test-plan-review-seam \
+            bin/test-plans-dir \
             bin/test-check-registry-trigger-rows \
             bin/test-ci-memo \
             bin/test-db-backups-pull \
+            bin/test-wt-compose \
             bin/test-predeploy-db-snapshot
       # Exercises a real lsof port guard, so it cannot share the runner.
       - name: bin/test-bug-pipeline-e2e

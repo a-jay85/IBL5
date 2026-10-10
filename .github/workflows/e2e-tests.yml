@@ -400,8 +400,18 @@ jobs:
           # Over-suppressing costs one push a wait for the next deploy — and since every deploy
           # re-serves the WHOLE tree, that self-heals on the next PR. Under-suppressing just breaks
           # the debounce, invisibly.
-          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
-            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          #
+          # A not-started run older than an hour is stuck, so it is cancelled and left out of the count.
+          # On 2026-10-01 a run sat in `waiting` for a week: this debounce counted it as queued, every
+          # later push skipped its dispatch, and no gallery was served. A real wait is under ~20 min.
+          runs_url="repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20"
+          not_started='.workflow_runs[] | select(.status != "completed" and .status != "in_progress")'
+          for id in $(gh api "$runs_url" --jq "$not_started | select(now - (.created_at | fromdateiso8601) > 3600) | .id" 2>/dev/null); do
+            echo "Cancelling stuck pages-deploy run ${id}."
+            gh run cancel "$id" --repo "${{ github.repository }}" || true
+          done
+          queued=$(gh api "$runs_url" \
+            --jq "[$not_started | select(now - (.created_at | fromdateiso8601) <= 3600)] | length" 2>/dev/null || echo "")
           if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
             echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
             exit 0
@@ -458,11 +468,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PAGES_URL: https://a-jay85.github.io/IBL5/pr/${{ env.VRCTX_PR }}/visual-review/
+          PR_NUMBER: ${{ env.VRCTX_PR }}
         run: |
           bin/vr-review-comment \
             --gallery=ibl5/vr-gallery.json \
             --pages-url="$PAGES_URL" \
-            --update-pr-body=${{ env.VRCTX_PR }}
+            --update-pr-body="$PR_NUMBER"
 
       # --- Auto-update baselines when label is present ---
       - name: Regenerate visual regression baselines
@@ -1161,8 +1172,18 @@ jobs:
           # Over-suppressing costs one push a wait for the next deploy — and since every deploy
           # re-serves the WHOLE tree, that self-heals on the next PR. Under-suppressing just breaks
           # the debounce, invisibly.
-          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
-            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          #
+          # A not-started run older than an hour is stuck, so it is cancelled and left out of the count.
+          # On 2026-10-01 a run sat in `waiting` for a week: this debounce counted it as queued, every
+          # later push skipped its dispatch, and no gallery was served. A real wait is under ~20 min.
+          runs_url="repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20"
+          not_started='.workflow_runs[] | select(.status != "completed" and .status != "in_progress")'
+          for id in $(gh api "$runs_url" --jq "$not_started | select(now - (.created_at | fromdateiso8601) > 3600) | .id" 2>/dev/null); do
+            echo "Cancelling stuck pages-deploy run ${id}."
+            gh run cancel "$id" --repo "${{ github.repository }}" || true
+          done
+          queued=$(gh api "$runs_url" \
+            --jq "[$not_started | select(now - (.created_at | fromdateiso8601) <= 3600)] | length" 2>/dev/null || echo "")
           if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
             echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
             exit 0

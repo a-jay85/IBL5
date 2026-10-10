@@ -1,0 +1,47 @@
+#!/bin/bash
+# bin/next-number — print the next free ADR or migration number (ADR-0110).
+# Implementation behind the bin/next-adr and bin/next-migration wrappers; the
+# grammar lives in bin/lib/numbering.sh, shared with bin/check-numbering.
+
+usage() {
+    cat <<'EOF'
+Usage: bin/next-number <adr|migration>
+
+Print the next free number: 4 digits for adr, 3 digits for migration.
+Scans the current worktree, the canonical main repo, every origin ref and
+every sibling worktree, all offline. Must not be run from the main checkout.
+Creates no files. bin/next-adr and bin/next-migration wrap this script.
+
+Exit codes:
+  0  number printed to stdout
+  1  run from the main checkout, or no migrations found (migration only)
+  2  usage error (missing or unknown kind, or extra arguments)
+EOF
+}
+
+case "${1:-}" in
+    --help|-h) usage; exit 0 ;;
+esac
+
+set -euo pipefail
+
+if [ $# -ne 1 ]; then
+    usage >&2
+    exit 2
+fi
+case "$1" in
+    adr|migration) KIND="$1" ;;
+    *) usage >&2; exit 2 ;;
+esac
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$BIN_DIR/.." && pwd)"
+source "$BIN_DIR/lib/git-helpers.sh"
+source "$BIN_DIR/lib/numbering.sh"
+
+if is_main_checkout "$REPO_ROOT"; then
+    numbering_refuse_main "$KIND"
+    exit 1
+fi
+
+numbering_next "$KIND" "$REPO_ROOT"

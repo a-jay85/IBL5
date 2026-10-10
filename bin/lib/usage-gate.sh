@@ -187,7 +187,11 @@ usage_marker_write() {
     fi
     case "$pct" in ''|*[!0-9.]*) pct=0 ;; esac
     case "$resets" in ''|*[!0-9]*) resets="" ;; esac
-    if jq -n --arg sid "$sid" --arg runner "$runner" --argjson prio "$prio" \
+    local fp
+    fp=$(_usage_cred_fp)
+    local acct
+    acct=$(_usage_acct_fp)
+    if jq -n --arg fp "$fp" --arg acct "$acct" --arg sid "$sid" --arg runner "$runner" --argjson prio "$prio" \
         --arg rbin "$rbin" --arg cwd "$cwd" --arg reason "$reason" --arg zone "$zone" \
         --argjson pct "$pct" --arg window "$window" --arg resets "$resets" \
         --argjson now "$(date +%s)" --argjson rc "$prev_count" \
@@ -195,7 +199,9 @@ usage_marker_write() {
           resume_argv:[$rbin, "--resume-paused", $sid], resume_cwd:$cwd,
           reason:$reason, zone:$zone, pct:$pct, window:$window,
           resets_at:(if $resets == "" then null else ($resets|tonumber) end),
-          paused_at:$now, resume_count:$rc}' 2>/dev/null > "$tmp" \
+          paused_at:$now, resume_count:$rc,
+          acct_fp:(if $acct == "" then null else $acct end),
+          cred_fp:(if $fp == "" then null else $fp end)}' 2>/dev/null > "$tmp" \
         && mv "$tmp" "$file"; then
         return 0
     fi
@@ -312,6 +318,19 @@ usage_marker_bump_resume() {  # <sid>
     return 1
 }
 
+# usage_marker_cred_switched <sid>: 0 only when the marker and the current login both have a fingerprint and they differ.
+usage_marker_cred_switched() {
+    local sid="${1:-}" f marker_fp cur_fp
+    usage_valid_sid "$sid" || return 1
+    f="$(usage_markers_dir)/$sid.json"
+    [ -s "$f" ] || return 1
+    marker_fp=$(jq -r '.cred_fp // empty' "$f" 2>/dev/null)
+    [ -n "$marker_fp" ] || return 1
+    cur_fp=$(_usage_cred_fp)
+    [ -n "$cur_fp" ] || return 1
+    [ "$marker_fp" != "$cur_fp" ]
+}
+
 # usage_marker_eligible <sid> <now>: 0 when the coordinator may resume this marker.
 # Not eligible when: stuck; a limit-hit pause younger than 600 s (backoff, so a
 # transient 429 does not hot-loop); or a resume is already in flight (live pid).
@@ -324,8 +343,14 @@ usage_marker_eligible() {
     [ "$stuck" = "true" ] && return 1
     reason=$(jq -r '.reason // ""' "$f" 2>/dev/null)
     paused_at=$(jq -r '.paused_at // 0' "$f" 2>/dev/null)
+    # The 600 s hold is per-account backoff. After a /login switch the new account
+    # has its own budget, so the hold is skipped; the zone check still gates resume.
     if [ "$reason" = "limit-hit" ] && [ $(( now - paused_at )) -lt 600 ]; then
-        return 1
+        if usage_marker_cred_switched "$sid"; then
+            usage_log "limit-hit-hold-skipped reason=cred-switch sid=$sid"
+        else
+            return 1
+        fi
     fi
     rpid=$(jq -r '.resuming_pid // empty' "$f" 2>/dev/null)
     if [ -n "$rpid" ] && kill -0 "$rpid" 2>/dev/null; then
@@ -343,6 +368,22 @@ usage_marker_set_resuming() {
     [ -s "$f" ] || return 1
     if jq --argjson p "${2:-0}" --argjson n "$(date +%s)" \
         '.resuming_pid = $p | .resuming_at = $n' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
+# usage_marker_set_switch_resumed <sid> <key>: records that this marker took its one
+# fast resume for login switch <key>. usage_marker_write rebuilds the marker on
+# re-pause, so the stamp never carries over to a new pause.
+usage_marker_set_switch_resumed() {
+    usage_valid_sid "${1:-}" || return 1
+    local f tmp
+    f="$(usage_markers_dir)/$1.json"
+    tmp="$f.tmp.$$"
+    [ -s "$f" ] || return 1
+    if jq --arg k "${2:-}" '.switch_resumed_for = $k' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
         return 0
     fi
     rm -f "$tmp"

@@ -49,13 +49,11 @@ CLAUDE_BIN="${PR_REVIEW_NOW_CLAUDE:-$(command -v claude || true)}"
 # --git-common-dir points at the main .git even from a linked worktree, where
 # --show-toplevel would return the worktree instead.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-GIT_COMMON="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-if [[ -z "$GIT_COMMON" ]]; then
-    # git < 2.31 has no --path-format; fall back to resolving the relative answer by hand.
-    GIT_COMMON="$(cd "$SCRIPT_DIR" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"
-fi
-ROOT="$(dirname "$GIT_COMMON")"
+. "$SCRIPT_DIR/lib/git-helpers.sh"
+ROOT="$(main_checkout_root "$SCRIPT_DIR")" || ROOT=""
 . "$SCRIPT_DIR/lib/launchd-job.sh"
+# shellcheck source=bin/lib/dm.sh
+. "$SCRIPT_DIR/lib/dm.sh"
 
 # .git is a DIRECTORY in the main checkout and a FILE in a linked worktree, so -d
 # structurally rejects a worktree even if the pin above somehow returned one.
@@ -231,7 +229,7 @@ fire_pr() {
         printf 'MODEL=%q\n'      "$MODEL"
         printf 'EFFORT=%q\n'     "$EFFORT"
         printf 'CLAUDE_BIN=%q\n' "$CLAUDE_BIN"
-        printf 'DISCORD_DM=%q\n' "${PR_REVIEW_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+        printf 'DISCORD_DM=%q\n' "$(dm_bin "$ROOT/bin" PR_REVIEW_NOW_DISCORD_DM)"
         printf 'GH_BIN=%q\n'   "${PR_REVIEW_NOW_GH:-gh}"
         printf 'NOTIFY=1\n'
         declare -f ljob_dm_ready ljob_dm_send

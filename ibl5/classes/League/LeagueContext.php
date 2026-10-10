@@ -52,6 +52,13 @@ class LeagueContext
      */
     private ?string $currentLeague = null;
 
+    private \Clock\ClockInterface $clock;
+
+    public function __construct(?\Clock\ClockInterface $clock = null)
+    {
+        $this->clock = $clock ?? new \Clock\SystemClock();
+    }
+
     /**
      * Get the current active league
      *
@@ -122,7 +129,7 @@ class LeagueContext
         // Set cookie with 30-day expiry (skip in CLI/test mode to avoid header errors)
         // SECURITY: Use secure cookie options
         if (php_sapi_name() !== 'cli' && !headers_sent()) {
-            $expiry = time() + (30 * 24 * 60 * 60);
+            $expiry = $this->getCookieExpiry();
             $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
                 || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
             setcookie(self::COOKIE_NAME, $league, [
@@ -133,6 +140,14 @@ class LeagueContext
                 'samesite' => 'Lax',  // Lax for league switching via links
             ]);
         }
+    }
+
+    /**
+     * Unix timestamp at which the league cookie expires (30 days from now).
+     */
+    public function getCookieExpiry(): int
+    {
+        return $this->clock->now() + (30 * 24 * 60 * 60);
     }
 
     /**

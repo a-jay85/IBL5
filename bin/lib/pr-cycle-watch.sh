@@ -137,6 +137,15 @@ pcw_pending_has() {
     done
     return 1
 }
+# pcw_stacked_on <baseRefName> <open-heads-tsv>: the TSV is "<headRefName>\t<number>"
+# lines for every open PR in the list (drafts included). Prints the parent PR number and
+# returns 0 when <baseRefName> is another open PR's head branch, else returns 1. The base
+# "master" and an empty base are never stacked. Pure: the caller fetches, this decides.
+pcw_stacked_on() {
+    local base="$1" heads="$2"
+    [[ -n "$base" && "$base" != "master" ]] || return 1
+    awk -F'\t' -v b="$base" '$1 == b { print $2; f = 1; exit } END { exit !f }' <<< "$heads"
+}
 _pcw_write() {   # atomic: temp file then rename, so a killed tick never leaves half a SHA
     mkdir -p "$(dirname "$1")" && printf '%s\n' "$2" > "$1.tmp.$$" && mv -f "$1.tmp.$$" "$1"
 }

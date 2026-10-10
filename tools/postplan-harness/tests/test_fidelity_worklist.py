@@ -132,3 +132,15 @@ def test_work_list_excludes_missing_phase_items(tmp_path):
     assert any(t.startswith("MISSING:") for t in texts)
     assert any(t.startswith("MISSING-FILE:") for t in texts)
     assert not any(t.startswith("MISSING-PHASE") for t in texts)
+
+
+def test_marked_verdict_keeps_work_item_shape(tmp_path):
+    """Catches a marker-aware extractor changing the build_work_list item shape.
+
+    Guards test_fidelity_worklist.py consumers: items stay {"hold", "text"} dicts.
+    """
+    path = _verdict(tmp_path, "NOT READY",
+                    body="- [BLOCKING] real gap\n  - detail\n- [NOTE] cosmetic\n")
+    assert fidelity.build_work_list(path, [], [], []) == [
+        {"hold": "12", "text": "- [BLOCKING] real gap\n- detail"},
+    ]

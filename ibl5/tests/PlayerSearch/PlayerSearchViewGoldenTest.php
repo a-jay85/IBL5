@@ -17,12 +17,12 @@ use PlayerSearch\PlayerSearchView;
 final class PlayerSearchViewGoldenTest extends TestCase
 {
     /**
-     * @return array<string, array{array<string, mixed>}>
+     * @return array<string, array{array<string, mixed>, string}>
      */
     public static function formCases(): array
     {
         return [
-            'default' => [[]],
+            'default' => [[], 'default'],
             'populated' => [[
                 'search_name' => 'Smith',
                 'pos' => 'PG',
@@ -59,7 +59,7 @@ final class PlayerSearchViewGoldenTest extends TestCase
                 'dd' => '36',
                 'pd' => '37',
                 'td' => '38',
-            ]],
+            ], 'populated'],
             'hostile' => [[
                 'search_name' => '"><script>alert(1)</script>',
                 'college' => "' onfocus='alert(2)",
@@ -69,7 +69,7 @@ final class PlayerSearchViewGoldenTest extends TestCase
                 'active' => '1',
                 'age' => ['x'],
                 'exp' => 1.5,
-            ]],
+            ], 'hostile'],
         ];
     }
 
@@ -77,11 +77,11 @@ final class PlayerSearchViewGoldenTest extends TestCase
      * @param array<string, mixed> $params
      */
     #[DataProvider('formCases')]
-    public function testRenderSearchFormMatchesGolden(array $params): void
+    public function testRenderSearchFormMatchesGolden(array $params, string $case): void
     {
         $html = (new PlayerSearchView())->renderSearchForm($params);
 
-        $goldenPath = __DIR__ . '/fixtures/search-form-' . $this->dataName() . '.golden.html';
+        $goldenPath = __DIR__ . '/fixtures/search-form-' . $case . '.golden.html';
 
         $this->assertStringEqualsFile($goldenPath, $html);
     }

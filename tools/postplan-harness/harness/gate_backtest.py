@@ -546,9 +546,9 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
 
 
 def upsert_gate_backtest(body: str, block: str) -> str:
-    """Insert or replace the gate-backtest block in a PR body (same contract as
-    classify.upsert_tests_changed): both markers in order replace BEGIN..END inclusive,
-    otherwise append a fresh block and leave any orphan marker."""
+    """Insert or replace the gate-backtest block in a PR body. Both markers in
+    order replace BEGIN..END inclusive, otherwise append a fresh block and leave any
+    orphan marker."""
     body = body or ""
     if not body.strip():
         return block

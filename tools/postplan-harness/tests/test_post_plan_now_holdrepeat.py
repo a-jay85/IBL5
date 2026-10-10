@@ -58,7 +58,10 @@ def _decline(root, plans_dir, state, slug, *, harness=HARNESS, force=None, state
         prefix += f"STATE_CHANGED={state_changed}; "
     script = (f'. "{PPN}"; {prefix}'
               f'postplan_holdrepeat_decline "{harness}" "{slug}" "{plan}" "{root}"; echo "rc=$?"')
-    return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env)
+    # cwd=root: `python3 -m harness.holdrepeat` puts the cwd on sys.path. Run from the
+    # harness dir, it imports the real package and a fake-harness case never fails open.
+    return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env,
+                          cwd=str(root))
 
 
 def test_declines_when_dm_sent_and_inputs_unchanged(tmp_path):

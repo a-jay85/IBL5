@@ -5,6 +5,8 @@ import os
 import shutil
 import subprocess
 import sys
+import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -65,8 +67,11 @@ def _git_repo(path):
 
 @pytest.fixture
 def sleeps(monkeypatch):
+    """Record netretry's sleeps only. Patching the global time.sleep would also
+    catch subprocess.run's own wait loop, which sleeps when a shim is slow."""
     recorded = []
-    monkeypatch.setattr(netretry.time, "sleep", recorded.append)
+    monkeypatch.setattr(netretry, "time", SimpleNamespace(sleep=recorded.append,
+                                                          monotonic=time.monotonic))
     return recorded
 
 

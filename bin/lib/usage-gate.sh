@@ -559,12 +559,17 @@ usage_delta_log() {
 
 USAGE_LIMIT_HIT_RE='hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*429|rate_limit_error'
 USAGE_ENV_ERROR_RE='hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error'
+# Claude Code resume safety check refusing a worktree-bound session. Anchored
+# to line start: the CLI prints it as a bare stderr line, while agent stream
+# output that merely quotes it is a JSON event line starting with `{`.
+USAGE_WT_RESUME_REFUSED_RE='^error: cannot resume into worktree '
 
 usage_log_matches() {  # $1=regex $2=file $3=after_line (0 = whole file)
     tail -n +"$(( ${3:-0} + 1 ))" "$2" 2>/dev/null | grep -qiE "$1"
 }
 usage_is_limit_hit() { usage_log_matches "$USAGE_LIMIT_HIT_RE" "$@"; }
 usage_is_env_error() { usage_log_matches "$USAGE_ENV_ERROR_RE" "$@"; }
+usage_is_wt_resume_refused() { usage_log_matches "$USAGE_WT_RESUME_REFUSED_RE" "$@"; }
 
 # ------------------------------------------------------------ 6a runner helpers
 

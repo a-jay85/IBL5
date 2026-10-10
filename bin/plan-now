@@ -254,11 +254,13 @@ if [ -n "$RESUME_ID" ]; then
     case "$LAST_VERDICT" in
         "plan-now: RESULT failed"*) ;;
         "plan-now: RESULT paused"*) ;;
-        "")  resume_refuse "log $OLD_LOG carries no RESULT verdict; only a failed or paused run is resumable." ;;
-        *)   resume_refuse "log $OLD_LOG ends in '$LAST_VERDICT'; only a failed or paused run is resumable." ;;
+        "plan-now: RESULT parked"*) ;;
+        "")  resume_refuse "log $OLD_LOG carries no RESULT verdict; only a failed, paused, or parked run is resumable." ;;
+        *)   resume_refuse "log $OLD_LOG ends in '$LAST_VERDICT'; only a failed, paused, or parked run is resumable." ;;
     esac
     case "$LAST_VERDICT" in
         "plan-now: RESULT paused"*) usage_session_started "$RESUME_SESSION" || RESUME_FRESH=1 ;;
+        "plan-now: RESULT parked"*) RESUME_FRESH=1 ;;
     esac
     usage_marker_clear "$RESUME_SESSION"
 
@@ -521,11 +523,20 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     # detection + check-plan + notify half of the runner (same shape as
     # bug-pipeline-tick's $CLAUDE_BIN). All three are unset in real use — and the
     # queue seam is what lets bin/test-plan-now reach the queued-vs-not fork at all.
+    # AUTOMOUSE_LOGIN_PROBE_CMD and LOGIN_PROBE_* stub the login probe the same way.
     printf 'AUTOMOUSE_QUEUE=%q\n' "${PLAN_NOW_AUTOMOUSE_QUEUE:-$ROOT/bin/automouse/queue}"
     printf 'DISCORD_DM=%q\n' "$(dm_bin "$ROOT/bin" PLAN_NOW_DISCORD_DM)"
     printf 'CLAUDE_BIN=%q\n' "${PLAN_NOW_CLAUDE:-claude}"
     printf 'PLAN_SLUG_RE=%q\n' "$PLAN_SLUG_RE"
     printf 'USAGE_GATE_LIB=%q\n' "$PLAN_NOW_LIB_DIR/usage-gate.sh"
+    printf 'LOGIN_PREFLIGHT_LIB=%q\n' "$PLAN_NOW_LIB_DIR/login-preflight.sh"
+    printf 'LOGIN_NIGHTLY_DIR=%q\n' "${NIGHTLY_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
+    # Probe seams, baked so a test's stub survives launchd's empty env. Empty bakes
+    # as empty, which login_probe treats exactly like unset.
+    for _lp_var in AUTOMOUSE_LOGIN_PROBE_CMD LOGIN_PROBE_CLAUDE_BIN LOGIN_PROBE_SECURITY_BIN \
+            LOGIN_PROBE_PERL_BIN LOGIN_PROBE_TIMEOUT_S; do
+        printf '%s=%q\n' "$_lp_var" "${!_lp_var:-}"
+    done
     printf 'RESUME_BIN=%q\n' "$ROOT/bin/plan-now"
     printf 'RESUME_FRESH=%q\n' "$RESUME_FRESH"
     printf 'REVIEW_ROUTE=%q\n' "${PLAN_NOW_REVIEW_ROUTE:-$REVIEW_ROUTE_DEFAULT}"
@@ -536,6 +547,8 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/A
 cd "$ROOT" || exit 1
 # shellcheck source=/dev/null
 . "$USAGE_GATE_LIB"
+# shellcheck source=/dev/null
+. "$LOGIN_PREFLIGHT_LIB"
 # A coordinator-granted drain token names the launcher's pid, which exited after the
 # bootstrap. Re-record this runner's pid so usage_token_reclaim_dead keeps the token.
 if [ "$(usage_token_holder)" = "$SESSION_ID" ]; then
@@ -692,7 +705,14 @@ fi
 # Usage gate (ADR-0143): in the drain/stop zone a run without the token pauses before
 # the call; a limit-hit or hook pause after it is classified before any verdict.
 PAUSED=0
-if ! usage_prestart_gate plan-now "$SESSION_ID" "$RESUME_BIN"; then
+LOGIN_PARKED=0
+# Login probe before the claude spawn: park (no spawn) only on a definite logged-out verdict.
+# unknown:* returns 0 here, so an inconclusive probe never blocks the run.
+if ! login_preflight "$LOGIN_NIGHTLY_DIR" "$LOG" "$DISCORD_DM" plan-now "bin/plan-now --resume $TS"; then
+    LOGIN_PARKED=1
+    rc=0
+    : > "$OUT"
+elif ! usage_prestart_gate plan-now "$SESSION_ID" "$RESUME_BIN"; then
     PAUSED=1
     rc=0
     : > "$OUT"
@@ -753,7 +773,13 @@ newfiles=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep 
 echo "----------------------------------------------------------------"
 echo "plan-now: claude exited $rc after ${elapsed}s"
 
-if [ "$PAUSED" = 1 ]; then
+if [ "$LOGIN_PARKED" = 1 ]; then
+    echo "plan-now: RESULT parked — Claude login expired; no model call was made."
+    echo "plan-now: run 'claude auth login' on the Mac, then: bin/plan-now --resume $TS"
+    DM_ICON="🔑"; DM_VERDICT="parked — Claude login expired"
+    DM_NEXT="run 'claude auth login', then resume"
+    DM_RESUME="bin/plan-now --resume $TS"
+elif [ "$PAUSED" = 1 ]; then
     echo "plan-now: RESULT paused — usage gate; auto-resumes after reset."
     DM_ICON="⏸️"; DM_VERDICT="paused — usage gate"; DM_NEXT="auto-resumes after reset"
 elif [ "$rc" -ne 0 ]; then

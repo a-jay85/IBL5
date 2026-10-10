@@ -1244,6 +1244,14 @@ test_coord_runaway_account_switch() {
     assert_eq coord_acct_switch:count-restarted 1 "$(jq -r .resume_count "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
     assert_contains coord_acct_switch:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "runaway-reset sid=$SID_A reason=account-switch"
     assert_contains coord_acct_switch:dm "$(cat "$T/dm.txt")" "login switch detected"
+    assert_eq coord_acct_switch:reset-acct "$(acct_hash uuid-B)" "$(jq -r .reset_acct "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    # The resumed run exits without pausing; after 5 more tries it stays stuck.
+    rm -f "$T/launched.$SID_A"
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\""
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_acct_switch:no-second-reset "$T/launched.$SID_A"
+    assert_eq coord_acct_switch:stuck-again true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
 }
 
 # Same account, window not reset: the stuck marker stays stuck.

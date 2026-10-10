@@ -120,7 +120,7 @@ retire_missing_bin() {
 # A marker whose resume binary is gone is retired instead (retire_missing_bin).
 # Returns 0 when the marker is stuck or retired and must be skipped.
 check_runaway() {
-    local sid="$1" stuck count resets runner cwd argv bin macct
+    local sid="$1" stuck count resets runner cwd argv bin macct racct
     bin=$(marker_field "$sid" '.resume_argv[0] // empty')
     if [ -n "$bin" ] && [ ! -x "$bin" ]; then
         retire_missing_bin "$sid" "$bin"
@@ -145,16 +145,18 @@ check_runaway() {
         return 1
     fi
     # A login switch is a new account with its own limits, so the old account's
-    # pauses no longer count. The marker's acct_fp is rewritten on its next pause,
-    # so this fires once per switch away from the pausing account.
+    # pauses no longer count. The reset records the current account as reset_acct, so
+    # it fires once per switch even if the resumed run exits without pausing.
     macct=$(marker_field "$sid" '.acct_fp // empty')
+    racct=$(marker_field "$sid" '.reset_acct // empty')
     if [ -n "$macct" ] && [ -n "$CUR_ACCT" ] && [ "$macct" != "$CUR_ACCT" ] \
+        && [ "$racct" != "$CUR_ACCT" ] \
         && { [ "$count" -ge 5 ] || [ "$stuck" = "true" ]; }; then
         if [ "$DRY" -eq 1 ]; then
             printf 'ACTION unstick %s account-switch\n' "$sid"
             return 1
         fi
-        usage_marker_reset_runaway "$sid" || return 0
+        usage_marker_reset_runaway "$sid" "$CUR_ACCT" || return 0
         usage_log "runaway-reset sid=$sid reason=account-switch"
         send_dm "usage-gate: session $sid ($(marker_field "$sid" '.runner')) was stuck under another account; login switch detected, pause count cleared, it resumes on its own."
         return 1

@@ -222,6 +222,12 @@ mkdir -p "$E2_GATE"
 E2_PROJECTS="$E2_ROOT/projects"
 mkdir -p "$E2_PROJECTS/default"
 export IBL5_USAGE_CLAUDE_PROJECTS="$E2_PROJECTS"
+# Never consult live master CI, gh auth or main.localhost from the runner's
+# between-plans canary. A red master or a stopped main Docker stack would
+# otherwise break the loop after W1's first pass and drop its deferred line
+# (IBL5-backlog#1375). Exported once so run_e2 and the direct P4/P4b/P5
+# launches all inherit it. The W1 canary-skipped check fails if it is removed.
+export AUTOMOUSE_SKIP_CANARY=1
 printf '#!/bin/sh\nexit 1\n' > "$E2_STUB/security"
 chmod +x "$E2_STUB/security"
 E2_ARGS="$E2_ROOT/stub-args"
@@ -364,6 +370,12 @@ want           "W1: log has deferred drain message"      "$W1_LOG" \
                "Deferred to the next run (cap-refunded or wt-new failure): wtfail.md"
 assert_eq      "W1: exactly one impl trace line"         \
                "$(grep -c 'wtfail.md impl' "$E2_TRACE" 2>/dev/null || echo 0)" "1"
+# Hermeticity tripwire: W1 always leaves wtfail.md queued, so the canary
+# dispatch always fires here. Its skip line exists only when
+# AUTOMOUSE_SKIP_CANARY is set, so dropping the export fails this even when
+# the live canary would pass.
+want           "W1: canary skipped via AUTOMOUSE_SKIP_CANARY (hermetic)" "$W1_LOG" \
+               "canary: skipped (AUTOMOUSE_SKIP_CANARY=1)"
 
 # ── W2: control — fast exit with no sentinel still env-stops ─────────────────
 echo ""

@@ -23,12 +23,14 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SUT="$ROOT/bin/post-plan-fail-dm"
 
-FAILS=0
-ok()   { printf '  ok   %s\n' "$1"; }
-fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-post-plan-fail-dm.XXXXXX")
 STUBS=""
@@ -213,8 +215,4 @@ FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
     || fail '15 empty FAILDM_DM_CMD falls back to $ROOT/bin/discord-dm'
 rm -rf "${WT:?}/bin" "$TMP/default-dm.argv"
 
-if [ "$FAILS" -gt 0 ]; then
-    echo "test-post-plan-fail-dm: $FAILS case(s) failed"
-    exit 1
-fi
-echo "test-post-plan-fail-dm: all cases passed"
+h_done

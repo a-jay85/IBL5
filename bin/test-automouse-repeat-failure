@@ -13,10 +13,12 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 SIG="$REPO/bin/lib/automouse-failure-signature"
 
-FAILED=0
 TMPS=()
 cleanup() { [ "${#TMPS[@]}" -gt 0 ] && rm -rf "${TMPS[@]}"; return 0; }
 trap cleanup EXIT
@@ -30,8 +32,8 @@ rec() {
 }
 
 # check <name> <command-that-succeeds-on-pass...>
-pass() { echo "ok: $1"; }
-fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 # --- n1: SHAs, timestamps, worktree paths, line numbers, durations normalize equal
 rec "$WORK/a" Bash 'cd /Users/a/IBL5-worktrees/x/ibl5 && vendor/bin/phpunit' \
@@ -192,9 +194,4 @@ else
     fail "r6-repeat-report-carries-signature" "report missing or incomplete: $REPORT"
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

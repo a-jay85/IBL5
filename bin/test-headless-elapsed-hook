@@ -8,23 +8,17 @@
 # Run: bin/test-headless-elapsed-hook  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOOK="$SCRIPT_DIR/lib/headless-elapsed-hook.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-FAILED=0
-
-ok()        { echo "ok: $1"; }
-fail()      { echo "FAIL: $1"; FAILED=1; }
-assert_eq() { local d="$1" g="$2" e="$3"
-              if [ "$g" = "$e" ]; then ok "$d"
-              else fail "$d — expected [$e], got [$g]"; fi; }
-want()      { local d="$1" h="$2" n="$3"
-              case "$h" in *"$n"*) ok "$d" ;;
-              *) fail "$d — missing token [$n]"; esac; }
-want_absent(){ local d="$1" h="$2" n="$3"
-               case "$h" in *"$n"*) fail "$d — unexpected token [$n]" ;;
-               *) ok "$d"; esac; }
+ok()        { h_pass "$1"; }
+fail()      { h_fail "$@"; }
+assert_eq() { h_eq "$1" "$3" "$2"; }
+want()      { h_contains "$1" "$2" "$3"; }
+want_absent(){ h_not_contains "$1" "$2" "$3"; }
 
 if [ ! -f "$HOOK" ]; then
     echo "FAIL: cannot find $HOOK"
@@ -133,11 +127,4 @@ else
     fi
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo ""
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo ""
-echo "RESULT: all passed"
-exit 0
+h_done

@@ -14,21 +14,18 @@
 # Run: bin/test-playwright-version  (exit 0 = all pass, 1 = a case failed)
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TAG="$SCRIPT_DIR/playwright-image-tag"
 GUARD="$SCRIPT_DIR/check-playwright-pinning"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
-FAILED=0
-
-expect_eq() { # name want got
-    if [ "$3" = "$2" ]; then echo "ok: $1"
-    else echo "FAIL: $1 — expected [$2], got [$3]"; FAILED=1; fi
-}
+expect_eq() { h_eq "$1" "$2" "$3"; } # name want got
 expect_exit() { # name want-code got-code
-    if [ "$3" -eq "$2" ]; then echo "ok: $1 (exit $3)"
-    else echo "FAIL: $1 — expected exit $2, got $3"; FAILED=1; fi
+    if [ "$3" -eq "$2" ]; then h_pass "$1 (exit $3)"
+    else h_fail "$1" "expected exit $2, got $3"; fi
 }
 
 # 1. bumped version derives bumped tag (fallback: no node_modules present)
@@ -56,8 +53,8 @@ REAL="$(cd "$SCRIPT_DIR/.." && pwd)/ibl5/package.json"
 got="$("$TAG" "$REAL")"
 case "$got" in
     mcr.microsoft.com/playwright:v[0-9]*.[0-9]*.[0-9]*-jammy)
-        echo "ok: real package.json derives well-formed tag ($got)" ;;
-    *)  echo "FAIL: real package.json derived malformed tag: [$got]"; FAILED=1 ;;
+        h_pass "real package.json derives well-formed tag ($got)" ;;
+    *)  h_fail "real package.json derived malformed tag" "[$got]" ;;
 esac
 
 # 4. missing @playwright/test → non-zero exit
@@ -75,5 +72,4 @@ printf 'docker pull "$PW_IMAGE"\n' > "$TMP/good.yml"
 "$GUARD" "$TMP/good.yml" >/dev/null 2>&1
 expect_exit "guard passes derived form" 0 "$?"
 
-if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; exit 0; fi
-echo "SOME FAILED"; exit 1
+h_done

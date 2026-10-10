@@ -7,6 +7,8 @@
 # health predicate (all three ALERT branches + every silent one).
 # Run: bin/test-docfix-run  (exit 0 = all pass).
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REAL_DOCFIX="$REPO_ROOT/bin/docfix-run"
@@ -15,9 +17,8 @@ WORKFLOW="$REPO_ROOT/.github/workflows/doc-freshness-audit.yml"
 NOTIFY_WORKFLOW="$REPO_ROOT/.github/workflows/docs-refreshed-notify.yml"
 HEALTH_WORKFLOW="$REPO_ROOT/.github/workflows/docfix-health.yml"
 REAL_VERONLY="${REAL_VERONLY:-$REPO_ROOT/bin/docfix-check-veronly}"
-FAILED=0
-ok()   { echo "ok: $1"; }
-bad()  { echo "FAIL: $1"; FAILED=1; }
+ok()   { h_pass "$1"; }
+bad()  { h_fail "$@"; }
 
 # build_sandbox -> prints sandbox path with fake-repo + shims wired.
 # Shim convention: every SHIM_* variable holds POST-jq output — the shims ignore
@@ -722,10 +723,7 @@ build_veronly_repo() {
     SLUG="docs-stale-refresh-veronly-test"
     PLAN_DIR="$SB2/home/claude-plans"
     mkdir -p "$R" "$PLAN_DIR"
-    git -C "$R" init -b master >/dev/null 2>&1
-    git -C "$R" config user.email "test@example.com"
-    git -C "$R" config user.name "Test"
-    git -C "$R" config commit.gpgsign false
+    h_git_repo "$R" --no-commit
     mkdir -p "$R/ibl5/docs"
     printf 'last_verified: 2026-01-01\n' > "$R/ibl5/docs/x.md"
     git -C "$R" add ibl5/docs/x.md
@@ -2062,5 +2060,4 @@ cp "$PLAN_V" "$SB2/after1.md"
   && ok "(81) veronly: arming strips 'Held for human merge', second run is a no-op" \
   || bad "(81) veronly: stale 'Held for human merge' sentence"
 
-if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
-exit "$FAILED"
+h_done

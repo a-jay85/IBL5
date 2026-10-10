@@ -152,6 +152,14 @@ Options:
                      changed file is also run through the full-scan checks
                      (future-date, staleness, dead-ref). Pure base-vs-head
                      value comparison — never date-equality-to-today.
+  --exclude-from=<file>
+                     Requires --since=<ref>. Drops every path listed in
+                     <file> (one repo-relative path per line, as git diff
+                     --name-only prints it; blank lines ignored) from the
+                     changed set, so it gets neither the bump nor the
+                     staleness check. Equals form only; an unreadable <file>
+                     exits 2. bin/pre-commit-hook passes the paths a merge
+                     commit stages byte-identical to origin/master.
   --no-staleness     Full-scan only: suppress the 60-day staleness rule while
                      still failing on frontmatter, future-date, dead-ref, and
                      ADR-transition issues. Used by the PR/push gate so an
@@ -938,7 +946,28 @@ function changedDocPaths(string $base, string $escapedRoot, string $escapedBase)
         }
     }
 
+    // --exclude-from: drop the listed paths after the union and before any check.
+    $excluded = excludedDocPaths();
+    $union = array_filter($union, static fn (string $rel): bool => !isset($excluded[$rel]));
+
     return array_values(array_unique($union));
+}
+
+/**
+ * Paths named by --exclude-from (--since mode only), as a set. Set once from main;
+ * changedDocPaths() drops them, so an excluded doc gets neither the bump check nor
+ * the staleness check.
+ *
+ * @param array<string, true>|null $set
+ * @return array<string, true>
+ */
+function excludedDocPaths(?array $set = null): array
+{
+    static $excluded = [];
+    if ($set !== null) {
+        $excluded = $set;
+    }
+    return $excluded;
 }
 
 /**
@@ -1930,7 +1959,7 @@ function checkSkillDraftPlaceholder(string $repoRoot): array
 
 // --- main ---
 
-$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false];
+$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false, 'exclude_from' => null];
 foreach (array_slice($argv, 1) as $arg) {
     if (str_starts_with($arg, '--since=')) {
         $opts['since'] = substr($arg, strlen('--since='));
@@ -1939,6 +1968,10 @@ foreach (array_slice($argv, 1) as $arg) {
             fwrite(STDERR, usage());
             exit(2);
         }
+        continue;
+    }
+    if (str_starts_with($arg, '--exclude-from=')) {
+        $opts['exclude_from'] = substr($arg, strlen('--exclude-from='));
         continue;
     }
     switch ($arg) {
@@ -1979,6 +2012,30 @@ foreach (array_slice($argv, 1) as $arg) {
             fwrite(STDERR, usage());
             exit(2);
     }
+}
+
+if ($opts['exclude_from'] !== null) {
+    // The full scan has no changed set to filter, so the flag is meaningless there.
+    if ($opts['since'] === null) {
+        fwrite(STDERR, "check-docs: --exclude-from requires --since=<ref>\n");
+        exit(2);
+    }
+    $excludeFrom = $opts['exclude_from'];
+    $excludeLines = ($excludeFrom !== '' && !is_dir($excludeFrom) && is_readable($excludeFrom))
+        ? @file($excludeFrom, FILE_IGNORE_NEW_LINES)
+        : false;
+    if ($excludeLines === false) {
+        fwrite(STDERR, "check-docs: cannot read --exclude-from file: {$excludeFrom}\n");
+        exit(2);
+    }
+    $excludeSet = [];
+    foreach ($excludeLines as $line) {
+        $line = trim($line);
+        if ($line !== '') {
+            $excludeSet[$line] = true;
+        }
+    }
+    excludedDocPaths($excludeSet);
 }
 
 $root = repoRoot();

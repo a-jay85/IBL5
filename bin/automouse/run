@@ -29,7 +29,7 @@ Subcommands:
   plan <slug>                 Execute exactly one named plan and stop.
   schedule "[YYYY-MM-DD] HH:MM [TZ]"
                               Schedule a one-shot run at the given time
-                              (no date = today, no TZ = local).
+                              (no date = today, or tomorrow if that time has passed; no TZ = local).
   disarm-tonight              Skip tonight's run; auto re-enables afterward.
   disarm-until "[YYYY-MM-DD] HH:MM [TZ]"
                               Pause until the given time.
@@ -64,12 +64,32 @@ epoch_fmt() {
     date -r "$1" "+$2" 2>/dev/null || date -d "@$1" "+$2"
 }
 
+# Resolve a `schedule` or `disarm-until` time against NOW. A bare "HH:MM [TZ]" that has
+# already passed today means tomorrow at that time. A dated time is taken as
+# given, so a past date still fails the caller's past-time check.
+schedule_epoch() {
+    local when="$1" now="$2" epoch midday tomorrow
+    if [[ "$when" =~ ^[0-9]{1,2}:[0-9]{2}([[:space:]]|$) ]]; then
+        epoch=$(parse_when_epoch "$(epoch_fmt "$now" '%Y-%m-%d') $when") || return 1
+        if [ "$epoch" -le "$now" ]; then
+            # Use a midday anchor to find tomorrow's date — raw +86400 skips a day on
+            # DST spring-forward eve when the day is only 23 hours long.
+            midday=$(parse_when_epoch "$(epoch_fmt "$now" '%Y-%m-%d') 12:00") || return 1
+            tomorrow=$(epoch_fmt "$((midday + 86400))" '%Y-%m-%d')
+            epoch=$(parse_when_epoch "$tomorrow $when") || return 1
+        fi
+    else
+        epoch=$(parse_when_epoch "$when") || return 1
+    fi
+    printf '%s\n' "$epoch"
+}
+
 # --- One-shot scheduler subcommand ----------------------------------------
 # Usage: bin/automouse/run schedule "[YYYY-MM-DD] HH:MM [TZ]"
 # Creates a self-cleaning launchd agent that fires bin/automouse/run once at the
 # given time, then removes its own plist and boots itself out. The date is
-# optional and defaults to today; the timezone abbreviation is optional and
-# defaults to the system's local zone.
+# optional and defaults to today, or tomorrow if that time has already passed;
+# the timezone abbreviation is optional and defaults to the system's local zone.
 # Example: bin/automouse/run schedule "2026-05-28 20:00 PDT"
 if [ "${1:-}" = "schedule" ]; then
     WHEN="${2:-}"
@@ -79,9 +99,9 @@ if [ "${1:-}" = "schedule" ]; then
         exit 1
     fi
 
-    if ! EPOCH=$(parse_when_epoch "$WHEN"); then
+    if ! EPOCH=$(schedule_epoch "$WHEN" "$(date +%s)"); then
         echo "error: could not parse time '$WHEN'" >&2
-        echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT, or 20:00 for today)" >&2
+        echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT, or 20:00 for the next 20:00)" >&2
         exit 1
     fi
 
@@ -185,11 +205,12 @@ daily_fire_hhmm() {
 # Re-parses tomorrow's calendar date instead of adding 86400 so a DST transition
 # doesn't slide the fire time by an hour.
 next_daily_epoch() {
-    local hour="$1" min="$2" now="$3" day cand
+    local hour="$1" min="$2" now="$3" day midday cand
     day=$(epoch_fmt "$now" '%Y-%m-%d')
     cand=$(parse_when_epoch "$(printf '%s %02d:%02d' "$day" "$hour" "$min")") || return 1
     if [ "$cand" -le "$now" ]; then
-        day=$(epoch_fmt "$((now + 86400))" '%Y-%m-%d')
+        midday=$(parse_when_epoch "$day 12:00") || return 1
+        day=$(epoch_fmt "$((midday + 86400))" '%Y-%m-%d')
         cand=$(parse_when_epoch "$(printf '%s %02d:%02d' "$day" "$hour" "$min")") || return 1
     fi
     printf '%s\n' "$cand"
@@ -359,12 +380,12 @@ if [ "${1:-}" = "disarm-tonight" ] || [ "${1:-}" = "disarm-until" ]; then
         WHEN="${2:-}"
         if [ -z "$WHEN" ]; then
             echo "usage: bin/automouse/run disarm-until \"[YYYY-MM-DD] HH:MM [TZ]\"" >&2
-            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\" (or \"20:00\" for today)" >&2
+            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\" (or \"20:00\" for the next 20:00)" >&2
             exit 1
         fi
-        if ! REARM_EPOCH=$(parse_when_epoch "$WHEN"); then
+        if ! REARM_EPOCH=$(schedule_epoch "$WHEN" "$NOW"); then
             echo "error: could not parse time '$WHEN'" >&2
-            echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT, or 20:00 for today)" >&2
+            echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT, or 20:00 for the next 20:00)" >&2
             exit 1
         fi
     fi
@@ -627,7 +648,142 @@ CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
 COST_LOCK_HELD=0  # set to 1 while append_cost_row holds the cost-report mutex
 CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded or wt-new-failed this run; claim_next_plan skips them
 DEPENDS_HELD=" "  # space-wrapped basenames dependency-held this run; claim_next_plan skips them
+# Stop-file writer: records why this runner stopped, for bin/fleet-status.
+# Called only from cleanup_watcher, the EXIT trap. A clean finish already leaves
+# its own trace (a stop line plus the session-complete line in $LOG), so it writes
+# nothing then. One line, "<epoch>\t<cause>", written to a temp file and renamed
+# so a reader never sees half a line. SIGKILL skips every trap; bin/fleet-status
+# derives that case from a dead pid whose log has no trace. Never fails: it runs
+# inside the EXIT trap under set -e.
+write_stop_file() {
+    local rc=$1 cause dir base tmp
+    [ -n "${LOG:-}" ] || return 0
+    case "$rc" in
+        0)
+            if [ -n "${STOP_CAUSE:-}" ]; then
+                cause="$STOP_CAUSE"
+            elif [ "${STOP_CLEAN:-0}" = 1 ]; then
+                return 0
+            else
+                cause="exited 0 without the session-complete line"
+            fi ;;
+        129) cause="hung up by SIGHUP (exit 129)" ;;
+        130) cause="interrupted by SIGINT (exit 130)" ;;
+        143) cause="terminated by SIGTERM (exit 143)" ;;
+        *)   cause="aborted with exit $rc (a failed command under set -e, or an error exit)" ;;
+    esac
+    dir="$NIGHTLY_DIR/stops"
+    base="$(basename "${LOG%.log}")"
+    mkdir -p "$dir" 2>/dev/null || return 0
+    tmp="$dir/.$base.stop.tmp.$$"
+    if { printf '%s\t%s\n' "$(date +%s)" "$cause" > "$tmp"; } 2>/dev/null \
+        && mv -f "$tmp" "$dir/$base.stop" 2>/dev/null; then
+        return 0
+    fi
+    rm -f "$tmp" 2>/dev/null || true
+    return 0
+}
+# End stop-file writer.
+
+# Stop-reason printer: tells whoever started the run, in plain English, why it did
+# not finish cleanly. note_failure collects one line per problem the loop handled
+# without crashing (an env stop, a failed plan); print_stop_reason runs last in
+# cleanup_watcher and reads those notes plus FAIL_LINE / FAIL_CMD from the ERR
+# trap. Stderr only, never $LOG: day_exit_lines and the digests grep $LOG. A clean
+# run with no notes prints nothing. Never fails: a closed stderr (SIGHUP, a dead
+# pipe) must not abort the EXIT trap.
+note_failure() {
+    FAIL_NOTES="${FAIL_NOTES:-}  - $1
+"
+}
+# note_stop: a loop break site that ends the run early. Same FAIL_NOTES line as
+# note_failure "$1 $2", plus the cause and the next step for the one stop DM that
+# cleanup_watcher sends. First call wins: the loop breaks right after, so a
+# second call can only come from a future edit, and the first cause is the real one.
+# Call it ONLY next to a `break`. Non-stopping problems keep note_failure.
+note_stop() {
+    note_failure "$1 $2"
+    if [ -z "${STOP_DM_CAUSE:-}" ]; then
+        STOP_DM_CAUSE="$1"
+        STOP_DM_NEXT="$2"
+    fi
+}
+
+print_stop_reason() {
+    local rc=$1 why="" detail=""
+    case "$rc" in
+        0)
+            if [ "${STOP_CLEAN:-0}" = 1 ]; then
+                [ -n "${FAIL_NOTES:-}" ] || return 0
+            else
+                why="The script quit partway through without an error code, so it never reached its normal ending."
+            fi ;;
+        129) why="The terminal window that started the run was closed, so the run stopped." ;;
+        130) why="Someone pressed Ctrl-C, so the run stopped." ;;
+        143) why="Another program told the run to quit (SIGTERM), so it stopped." ;;
+        *)
+            why="A command in the script failed with exit code $rc, so the script stopped right there."
+            if [ -n "${FAIL_CMD:-}" ]; then
+                detail="The command that failed (line ${FAIL_LINE:-?}): ${FAIL_CMD}"
+            fi ;;
+    esac
+    trap '' PIPE 2>/dev/null || true
+    {
+        if [ -n "$why" ]; then
+            printf '\nautomouse: the run did not finish.\n'
+            printf '  Why: %s\n' "$why"
+            [ -z "$detail" ] || printf '  %s\n' "$detail"
+            [ -z "${FAIL_NOTES:-}" ] || printf '  Problems before that:\n'
+        else
+            printf '\nautomouse: the run finished, but these things went wrong:\n'
+        fi
+        printf '%s' "${FAIL_NOTES:-}"
+        [ -z "${LOG:-}" ] || printf '  Full log: %s\n' "$LOG"
+    } >&2 2>/dev/null || true
+    return 0
+}
+# End stop-reason printer.
+
+# Stop-DM sender: one Discord DM, one line, when an armed run ended early: a
+# signal, a crash, a partway quit, or a note_stop break site. Runs once, from
+# cleanup_watcher, after print_stop_reason. Silent for a clean finish, the login
+# break (login_preflight already DMs once per outage), the post-plan hold
+# (notify_postplan_hold already DMs) and the single-plan designed stop. Never
+# fails: DM output and errors go to $LOG, and an undeliverable DM is spooled by
+# discord-dm itself.
+send_stop_dm() {
+    local rc=$1 cause next log="${LOG:-/dev/null}"
+    [ "${STOP_DM_ARMED:-0}" = 1 ] || return 0
+    case "$rc" in
+        129) cause="It was stopped by a hangup signal (SIGHUP), usually a closed terminal or a logout."
+             next="Rerun bin/automouse/run if the stop was not intended. The plan it was on stays in queue/." ;;
+        130) cause="It was interrupted (SIGINT, Ctrl-C)."
+             next="Rerun bin/automouse/run if the stop was not intended. The plan it was on stays in queue/." ;;
+        143) cause="It was stopped by SIGTERM (a kill, a launchd unload, or a shutdown)."
+             next="Rerun bin/automouse/run if the stop was not intended. The plan it was on stays in queue/." ;;
+        0)
+            if [ "${STOP_CLEAN:-0}" != 1 ]; then
+                cause="It quit partway with exit code 0 before finishing the loop."
+                next="Read $log, then rerun bin/automouse/run."
+            elif [ -n "${STOP_DM_CAUSE:-}" ]; then
+                cause="$STOP_DM_CAUSE"
+                next="${STOP_DM_NEXT:-Read $log.}"
+            else
+                return 0
+            fi ;;
+        *)  cause="It crashed with exit code $rc${FAIL_LINE:+ at line $FAIL_LINE}."
+            next="Read $log, then rerun bin/automouse/run." ;;
+    esac
+    printf 'Automouse run %s ended early: %s Next: %s\n' "$$" "$cause" "$next" \
+        | "$SELF_DIR/../discord-dm" - --attempts 2 --quiet >> "$log" 2>&1 \
+        || { echo "Stop DM undeliverable (spooled)." >> "$log"; } 2>/dev/null \
+        || true
+    return 0
+}
+# End stop-DM sender.
+
 cleanup_watcher() {
+    local stop_rc=$?
     if [ -n "$WATCHER_PID" ]; then
         kill "$WATCHER_PID" 2>/dev/null || true
         wait "$WATCHER_PID" 2>/dev/null || true
@@ -645,8 +801,33 @@ cleanup_watcher() {
         COST_LOCK_HELD=0
         release_cost_lock
     fi
+    write_stop_file "$stop_rc"
+    print_stop_reason "$stop_rc"
+    send_stop_dm "$stop_rc"
 }
+STOP_DM_ARMED=0
 trap cleanup_watcher EXIT
+# Record the last failing command so print_stop_reason can name it after a set -e
+# abort. -E makes functions and subshells inherit the trap. Assignments only.
+set -E
+trap 'FAIL_LINE=$LINENO; FAIL_CMD=$BASH_COMMAND' ERR
+
+# macOS /bin/bash (3.2) leaves $? at 0 inside the EXIT trap when a signal kills the
+# script, so write_stop_file could not tell a SIGTERM from a clean exit. Catch the
+# three signals and exit with the conventional 128+n status, which the EXIT trap
+# then sees. The impl pipeline runs in the background (see IMPL_BG_PID below) so
+# `wait "$IMPL_BG_PID"` is interruptible — the signal fires the trap immediately.
+# `pkill -TERM -P $$` terminates the background impl subshell (a direct child of
+# this process); claude is a grandchild and cannot be reached here, but the subshell
+# exits and the runner does not hang. The postplan `timeout` shim uses `wait`
+# internally and is also interruptible.
+exit_on_signal() {
+    pkill -TERM -P $$ 2>/dev/null || true
+    exit "$1"
+}
+trap 'exit_on_signal 143' TERM
+trap 'exit_on_signal 130' INT
+trap 'exit_on_signal 129' HUP
 
 run_heartbeat_watcher() {
     local hb_file=$1 log_file=$2 label=$3 pid_file=$4 slug=$5
@@ -1198,6 +1379,13 @@ automouse_pr_state() {
     return 1
 }
 
+# claim_pr_terminal <plan_name> <pr_state>: rc 0 when a branch PR in <pr_state> ends
+# the plan at claim time. Without a handoff any OPEN or MERGED PR does. With one,
+# only MERGED does: an OPEN PR may still need post-plan to finish.
+claim_pr_terminal() {
+    [ ! -f "$HANDOFF_DIR/$1.json" ] || [ "$2" = MERGED ]
+}
+
 # Resolve the git branch for a plan. Prefers the handoff JSON's "branch" field
 # (exact, written by the impl agent); falls back to the plan slug when the handoff
 # is absent, unreadable, malformed, or carries no branch. A wrong guess is safe:
@@ -1722,8 +1910,14 @@ CAFFEINATE_PID=$!
 
 START=$(date +%s)
 PLANS_RUN=0
+STOP_CAUSE=""
+STOP_CLEAN=0
+FAIL_NOTES=""
+STOP_DM_CAUSE=""
+STOP_DM_NEXT=""
 
 echo "=== Automouse session starting at $(date) ===" >> "$LOG"
+STOP_DM_ARMED=1
 
 # Freshen the reference checkout's master so the self-heal staleness guard below
 # sees origin's latest — a re-created file or a widened guard only exists locally
@@ -1786,10 +1980,11 @@ while true; do
         break
     fi
 
-    # Time guard: don't start a new plan if >4h elapsed
+    # Time guard: don't start a new plan if >4h45m elapsed
     ELAPSED=$(( $(date +%s) - START ))
     if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
         echo "Time guard: ${ELAPSED}s elapsed (max ${MAX_ELAPSED}s), stopping." >> "$LOG"
+        note_stop "The time limit (about 4h45m) was reached, so no more plans were started." "Plans still in queue/ will run next time."
         break
     fi
 
@@ -1797,6 +1992,7 @@ while true; do
     # when the Claude login has expired. One Discord DM per outage.
     if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
         echo "Login preflight: login expired, parking; queue left intact." >> "$LOG"
+        note_failure "Your Claude login has expired, so no plan was started. Run claude, sign in again, then rerun. The queue was not touched."
         break
     fi
 
@@ -1808,10 +2004,19 @@ while true; do
             echo "Plan ${SINGLE_PLAN%.md} is being processed by another runner — nothing to do." >> "$LOG"
         elif [ "$CAP_DEFERRED" != " " ]; then
             echo "No claimable plan left. Deferred to the next run (cap-refunded or wt-new failure):${CAP_DEFERRED% } — stopping." >> "$LOG"
+            if [ "$PLANS_RUN" -eq 0 ]; then
+                note_stop "No plan was started: every queued plan was deferred to the next run (${CAP_DEFERRED% })." "They retry on the next scheduled run. Read $LOG for why each was deferred."
+            fi
         elif [ "$DEPENDS_HELD" != " " ]; then
             echo "No claimable plan left. Dependency-held this run:${DEPENDS_HELD% } — stopping." >> "$LOG"
+            if [ "$PLANS_RUN" -eq 0 ]; then
+                note_stop "No plan was started: every queued plan is waiting on a dependency (${DEPENDS_HELD% })." "Merge or fix the named dependencies, then rerun."
+            fi
         else
             echo "All queued plans are claimed by a concurrent runner — nothing to do." >> "$LOG"
+            if [ "$PLANS_RUN" -eq 0 ]; then
+                note_stop "No plan was started: another automouse runner has claimed every queued plan." "Nothing to do. Check bin/fleet-status if no other run should be active."
+            fi
         fi
         break
     fi
@@ -1843,6 +2048,7 @@ while true; do
             tail -30 "$LOG"
             printf '\n```\n'
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        note_failure "Plan $SLUG failed $ATTEMPTS times, so it was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""
         continue
@@ -1869,8 +2075,9 @@ while true; do
         {
             printf 'Plan "%s" skipped: unusable `impl_model:` frontmatter. Needs human review.\n\n' "$SLUG"
             printf '%s\n\n' "$BASE_MODEL"
-            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-5-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
+            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-5-5, claude-sonnet-4-6, claude-haiku-5-5, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        note_failure "Plan $SLUG names a model automouse does not know (impl_model:), so it was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""
         continue
@@ -1900,6 +2107,7 @@ while true; do
             printf 'unmet:%s\n' "$DEP" > "$DEPENDS_HOLD_FILE"
             echo "[depends-hold] $PLAN_NAME: waiting on $DEP" >> "$LOG"
             DEPENDS_HELD="$DEPENDS_HELD$PLAN_NAME "
+            note_failure "Plan ${PLAN_NAME%.md} is waiting for $DEP to merge before it can run."
             rm -rf "$CURRENT_LOCK" 2>/dev/null || true
             CURRENT_LOCK=""
             continue
@@ -1911,25 +2119,29 @@ while true; do
             printf '%s\n' "$DEP_STATUS" > "$DEPENDS_HOLD_FILE"
             echo "[depends-unresolvable] $PLAN_NAME: $DEP — $DEP_REASON" >> "$LOG"
             DEPENDS_HELD="$DEPENDS_HELD$PLAN_NAME "
+            note_failure "Plan ${PLAN_NAME%.md} has a dependency ($DEP) that cannot be resolved automatically ($DEP_REASON). A human needs to fix this before the plan can run."
             rm -rf "$CURRENT_LOCK" 2>/dev/null || true
             CURRENT_LOCK=""
             continue
             ;;
     esac
 
-    # Terminal-disposition guard: no handoff to resume, but the branch already has an
-    # OPEN or MERGED PR ⇒ this plan's work has shipped. Dispose to done/ without
-    # spending a single claude -p invocation. Fail-closed: any gh error, no PR, or a
-    # CLOSED-only match falls through to the normal attempt below.
-    if [ ! -f "$HANDOFF_DIR/${PLAN_NAME}.json" ]; then
-        CLAIM_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
-        if CLAIM_PR=$(automouse_pr_state "$CLAIM_BRANCH"); then
-            dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
-                "${CLAIM_PR%% *}" "${CLAIM_PR#* }" claim-time
-            rm -rf "$CURRENT_LOCK" 2>/dev/null || true
-            CURRENT_LOCK=""
-            continue
-        fi
+    # Terminal-disposition guard: the branch already has an OPEN or MERGED PR ⇒ this
+    # plan's work has shipped. Dispose to done/ without spending a single claude -p
+    # invocation. A handoff means post-plan still has work, so an OPEN PR with a
+    # handoff falls through to resume it. A MERGED PR is terminal even with a handoff:
+    # a paused post-plan that resumed and merged under post-plan-now leaves both the
+    # handoff and the claim lock behind, and resuming it would rerun post-plan on a
+    # merged PR. Fail-closed: any gh error, no PR, or a CLOSED-only match falls
+    # through to the normal attempt below.
+    CLAIM_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
+    if CLAIM_PR=$(automouse_pr_state "$CLAIM_BRANCH") \
+       && claim_pr_terminal "$PLAN_NAME" "${CLAIM_PR%% *}"; then
+        dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
+            "${CLAIM_PR%% *}" "${CLAIM_PR#* }" claim-time
+        rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+        CURRENT_LOCK=""
+        continue
     fi
 
     # A sentinel left by a crashed earlier run must not classify THIS attempt.
@@ -2000,6 +2212,7 @@ while true; do
                             "$SLUG" "$WT_VERDICT"
                         printf 'Resolve conflicts in %s, then requeue.\n' "$IMPL_WT"
                     } > "$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+                    note_failure "The worktree for $SLUG has merge conflicts or unsaved changes ($WT_VERDICT), so it was skipped. Fix $IMPL_WT, then requeue it."
                     rm -rf "$CURRENT_LOCK" 2>/dev/null || true
                     CURRENT_LOCK=""
                     continue ;;
@@ -2083,6 +2296,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # The impl agent has no clock — bin/lib/headless-elapsed-hook.sh reads
         # these two vars and appends an elapsed-clock line after every tool call
         # so the agent can track the 90% deadline and write a handoff in time.
+        # Run the impl pipeline in the background so `wait` below is signal-
+        # interruptible. A foreground pipeline defers the TERM trap until the
+        # pipeline completes; backgrounding it lets a kill fire the trap at once.
+        (
         IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=automouse IBL5_USAGE_GATE_MODEL="$IMPL_MODEL" \
         IBL5_USAGE_GATE_RESUME_BIN="$AUTOMOUSE_BIN" \
         CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
@@ -2100,7 +2317,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 --name "automouse-impl-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
             | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl "$FAILSIG_FILE" \
-            >> "$LOG" || IMPL_STATUS=$?
+            >> "$LOG"
+        ) &
+        IMPL_BG_PID=$!
+        wait "$IMPL_BG_PID" || IMPL_STATUS=$?
         fi
 
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -2150,6 +2370,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 || usage_postrun_pause automouse "$IMPL_SID" "$AUTOMOUSE_BIN" any "$LOG" "$IMPL_LOG_BEFORE"; }; then
             printf '%s\n' "$IMPL_SID" > "$CURRENT_LOCK/paused-held"
             echo "Impl paused (usage gate) — session $IMPL_SID; coordinator resumes it. Refunding attempt, stopping loop." >> "$LOG"
+            note_stop "You hit your Claude usage limit while building ${PLAN_NAME%.md}." "It is paused and resumes on its own when the limit resets. The try was not counted."
             refund_attempt
             CURRENT_LOCK=""
             break
@@ -2167,6 +2388,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 REASON="$REASON (impl exited in ${IMPL_DUR}s)"
             fi
             echo "Environmental failure during impl — $REASON. Refunding attempt, stopping loop." >> "$LOG"
+            note_stop "Building ${PLAN_NAME%.md} hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
             refund_attempt
             write_env_stop_report "$PLAN_NAME" impl "$REASON" "$IMPL_LOG_BEFORE"
             break
@@ -2208,6 +2430,9 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             echo 1 > "$ATTEMPT_FILE"
         elif [ ! -e "$NEXT_PLAN" ]; then
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
+            if [ -e "$NIGHTLY_DIR/skipped/$PLAN_NAME" ]; then
+                note_failure "The agent chose to skip ${PLAN_NAME%.md} and moved it to skipped/. Look in $NIGHTLY_DIR/reports/ for today's report on it."
+            fi
         elif [ "$IMPL_WT_FAIL" -eq 1 ]; then
             # bin/wt-new failed at prompt-impl Step 5 (e.g. git lock contention
             # with a concurrent run). The plan stayed in queue/ and the incremented
@@ -2219,6 +2444,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             echo "WT-NEW FAILURE — bin/wt-new failed for $PLAN_NAME; plan kept in queue/, attempt counted ($(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS), deferred to the next run." >> "$LOG"
             rm -f "$WT_FAIL_FILE"
             CAP_DEFERRED="$CAP_DEFERRED$PLAN_NAME "
+            note_failure "Could not create a worktree for ${PLAN_NAME%.md} (bin/wt-new failed). It stays queued and tries again next run."
         elif [ "$IMPL_CAP_REFUNDED" -eq 0 ]; then
             # Genuine (non-environmental) failure: handoff absent, plan STILL in
             # queue/, the env-stop guard did NOT fire (it breaks above), and the
@@ -2234,6 +2460,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             rm -f "$FAILSIG_FILE" 2>/dev/null || true
             write_failure_report "$PLAN_NAME" "$IMPL_LOG_BEFORE" "$IMPL_MODEL" "$(( ATTEMPTS + 1 ))" "$NEW_FAILSIG"
             echo "Genuine impl failure — wrote $FAILURE_FILE (attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS)." >> "$LOG"
+            note_failure "Building ${PLAN_NAME%.md} failed (try $(( ATTEMPTS + 1 )) of $MAX_ATTEMPTS). It stays queued for another try. Read $FAILURE_FILE"
             if [ -n "$NEW_FAILSIG" ]; then
                 echo "failsig: recorded (${#NEW_FAILSIG} chars)" >> "$LOG"
             else
@@ -2245,6 +2472,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
                 touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
                 write_repeat_failure_report "$PLAN_NAME" "$NEW_FAILSIG" "${PREV_FAILATTEMPT:-?}" "$(( ATTEMPTS + 1 ))"
+                note_failure "${PLAN_NAME%.md} failed the same way twice in a row, so it was moved to skipped/ instead of trying again."
                 rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
             fi
         fi
@@ -2256,6 +2484,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         ELAPSED=$(( $(date +%s) - START ))
         if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
             echo "Time guard between phases — will resume postplan next run." >> "$LOG"
+            note_failure "The time limit was reached before shipping ${PLAN_NAME%.md}. Post-plan will run next time."
             break
         fi
 
@@ -2341,6 +2570,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         if [ "$PP_STATUS" -eq 3 ]; then
             PP_TERMINAL=1
             dispose_plan_postplan_blocked "$PLAN_NAME" "$PLAN_SLUG" "$PP_LOG_BEFORE"
+            note_failure "Shipping $PLAN_SLUG was blocked, so no PR was opened. It was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$PLAN_SLUG.md"
         fi
         # postplan-no-worktree-merged: begin
         # A no-worktree postplan exit (pre-call resolver miss, or post-plan-now rc=7)
@@ -2361,6 +2591,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 write_env_stop_report "$PLAN_NAME" postplan \
                     "post-plan-now exited 7 (no worktree) and the branch PR is not MERGED" \
                     "$PP_LOG_BEFORE"
+                note_stop "Shipping $PLAN_SLUG could not find its worktree, and its PR has not merged. The run stopped and the try was not counted." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
                 rm -f "$PP_START_MARKER"
                 break
             fi
@@ -2375,6 +2606,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 CURRENT_LOCK=""
             fi
             echo "Post-plan paused (usage gate); post-plan-now owns the resume. Refunding attempt, stopping loop." >> "$LOG"
+            note_stop "You hit your Claude usage limit while shipping $PLAN_SLUG." "It is paused and resumes on its own when the limit resets. The try was not counted."
             refund_attempt
             break
         fi
@@ -2394,6 +2626,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 REASON="$REASON (postplan exited in ${PP_DUR}s)"
             fi
             echo "Environmental failure during postplan — $REASON. Refunding attempt, stopping loop." >> "$LOG"
+            note_stop "Shipping $PLAN_SLUG hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
             refund_attempt
             write_env_stop_report "$PLAN_NAME" postplan "$REASON" "$PP_LOG_BEFORE"
             break
@@ -2406,6 +2639,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # held-open PR is post-plan's normal terminal state, not a failure. The
         # loop dispositions it rather than re-claiming the plan next iteration.
         # Fail-closed: gh error, no PR, or CLOSED-only ⇒ today's behaviour.
+        PP_PR_URL=""
         if [ -e "$NEXT_PLAN" ]; then
             PP_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
             if PP_PR=$(automouse_pr_state "$PP_BRANCH"); then
@@ -2436,11 +2670,16 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 if should_hold_postplan_disposal "$PP_CAP" "$PP_PR_STATE" "$PP_VERDICT_FRESH"; then
                     notify_postplan_hold "$PLAN_NAME" "$PLAN_SLUG" "$PP_PR_URL" \
                         "$PP_DUR" "$REMAINING_SECS" "$PP_STATUS"
+                    note_failure "Shipping $PLAN_SLUG ran out of time before its review finished. Its PR ($PP_PR_URL) is open but unreviewed, and the plan stays queued."
                 else
                     dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
                         "$PP_PR_STATE" "$PP_PR_URL" post-postplan
                 fi
             fi
+        fi
+        if [ "$PP_STATUS" -ne 0 ] && [ "$PP_TERMINAL" -eq 0 ] && [ -e "$NEXT_PLAN" ] \
+           && [ -z "$PP_PR_URL" ]; then
+            note_failure "Shipping $PLAN_SLUG stopped with exit code $PP_STATUS and opened no PR. It stays queued for another try. The full log has the details."
         fi
         rm -f "$PP_START_MARKER"
         # (Known, accepted: this line is not reached when the environmental-breaker arm is
@@ -2463,7 +2702,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
 
     # Single-plan mode: exactly one attempt, then stop — predictable for a
     # watched one-off. A genuine failure does NOT retry to MAX_ATTEMPTS.
-    [ -n "${SINGLE_PLAN:-}" ] && break
+    if [ -n "${SINGLE_PLAN:-}" ]; then
+        STOP_CAUSE="single-plan mode: one attempt of ${SINGLE_PLAN%.md} finished"
+        break
+    fi
 
     # --- Between-plans master health canary dispatch ---
     # Bottom of the loop body on purpose: it never fires before the first plan
@@ -2480,12 +2722,15 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                    "$(date +%H:%M:%S)" >> "$LOG" ;;
             1) printf '[%s] canary: ci-red — parking, queue left intact\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_canary_park_report "ci-red" "$CANARY_DETAIL"
+               note_stop "The tests on master are failing (CI is red), so no more plans were started. The queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
                break ;;
             3) printf '[%s] canary: smoke-red — parking, queue left intact\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_canary_park_report "smoke-red" "$CANARY_DETAIL"
+               note_stop "The quick health check on master failed, so no more plans were started. The queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
                break ;;
             2) printf '[%s] canary: ci-auth-error — env stop\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_env_stop_report "canary" "canary" "CI auth error: $CANARY_DETAIL" "$CANARY_LOG_BEFORE"
+               note_stop "Could not check master's CI because GitHub refused the login. The run stopped and the queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-canary.md"
                break ;;
         esac
     fi
@@ -2541,3 +2786,4 @@ for lock in "$QUEUE_DIR"/*.md.lock; do
 done
 
 echo "=== Automouse session complete at $(date) — $PLANS_RUN plan(s) run ===" >> "$LOG"
+STOP_CLEAN=1

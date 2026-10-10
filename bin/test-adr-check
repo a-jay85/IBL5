@@ -9,6 +9,9 @@
 #      range built in a throwaway repo.
 #   2. bin/pre-push-adr-hook driving that composition end-to-end, including the
 #      origin/master-absent degrade-open path.
+#   3. adr-check --exclude-from=<file>, and bin/pre-commit-hook's merge-commit
+#      exclusion (new_merge_repo): paths staged byte-identical to origin/master
+#      under MERGE_HEAD skip the doc, destructive-migration, and ADR gates.
 #
 # Each case builds a temp git repo with a fake origin/master ref (no real remote
 # needed: `git update-ref refs/remotes/origin/master <base>`). The repo's bin/
@@ -588,6 +591,212 @@ run_pre_commit_hook; expect "hook-no-origin-master-degrades-open" 0 $?
 # no trigger staged → hook passes
 new_repo 1; stage_no_trigger
 run_pre_commit_hook; expect "hook-no-trigger-passes" 0 $?
+
+# --- --exclude-from cases (adr-check flag, then the pre-commit hook's merge exclusion) ---
+
+# want <name> <haystack> <needle> — the haystack contains the needle.
+want() {
+    if grep -qF -- "$3" <<< "$2"; then echo "ok: $1"; else echo "FAIL: $1 — missing '$3'"; FAILED=1; fi
+}
+
+# want_not <name> <haystack> <needle> — the haystack does not contain the needle.
+want_not() {
+    if grep -qF -- "$3" <<< "$2"; then echo "FAIL: $1 — unexpected '$3'"; FAILED=1; else echo "ok: $1"; fi
+}
+
+# write_tool <repo-relative path> — a 60-line shebang script (the new-tool-script trigger).
+write_tool() {
+    printf '#!/usr/bin/env bash\n' > "$REPO/$1"
+    i=1
+    while [ "$i" -le 60 ]; do
+        echo "# line $i" >> "$REPO/$1"
+        i=$((i + 1))
+    done
+}
+
+# merge_exclude_file — absolute path of the hook's merge-exclusion list in $REPO.
+merge_exclude_file() {
+    printf '%s/%s\n' "$REPO" "$(cd "$REPO" && git rev-parse --git-path pre-commit-merge-exclude)"
+}
+
+# new_merge_repo [stacked|delete] — new_repo 1 plus the doc and destructive-migration
+# gates, a branch `feat`, and a master that moved on with a body-edited doc (date not
+# bumped), an unmarked DROP TABLE migration, and a 60-line bin/ tool. Ends on `feat`
+# mid `git merge --no-commit --no-ff origin/master`: MERGE_HEAD exists and master's
+# three files sit in the index byte-identical to origin/master.
+#   stacked: stop on `feat` before master moves and before any merge.
+#   delete:  the base also tracks src/old.txt, feat edits it, master deletes it, and
+#            the modify/delete conflict is resolved by keeping feat's version.
+new_merge_repo() {
+    new_repo 1
+    cp -p "$SCRIPT_DIR/check-docs" "$REPO/bin/check-docs"
+    cp -p "$SCRIPT_DIR/check-destructive-migrations" "$REPO/bin/check-destructive-migrations"
+    cp -p "$SCRIPT_DIR/lib/destructive-migration-scan.py" "$REPO/bin/lib/destructive-migration-scan.py"
+    git -C "$REPO" branch -M master
+    # last_verified three days back: fresh for the 60-day staleness rule, older than
+    # every commit here, so an unbumped body edit trips only the on-touch bump.
+    MERGE_LV=$(php -r 'echo gmdate("Y-m-d", time() - 3 * 86400);')
+    mkdir -p "$REPO/ibl5/docs" "$REPO/ibl5/migrations" "$REPO/src"
+    printf -- '---\ndescription: g\nlast_verified: %s\n---\nA1\n' "$MERGE_LV" > "$REPO/ibl5/docs/guide.md"
+    printf -- '---\ndescription: r\nlast_verified: %s\n---\nbase\n' "$MERGE_LV" > "$REPO/README.md"
+    : > "$REPO/ibl5/migrations/.gitkeep"
+    echo old > "$REPO/src/old.txt"
+    git -C "$REPO" add README.md ibl5/docs/guide.md ibl5/migrations/.gitkeep
+    [ "${1:-}" = delete ] && git -C "$REPO" add src/old.txt
+    git -C "$REPO" commit -qm "guide and migrations dir"
+    git -C "$REPO" update-ref refs/remotes/origin/master "$(git -C "$REPO" rev-parse HEAD)"
+    [ "${1:-}" = delete ] || rm -f "$REPO/src/old.txt"
+    # The full-scan doc check reads the copied bin/ scripts' comments; give every repo
+    # path they cite an untracked placeholder (a directory, or a valid doc for *.md)
+    # so the scratch repo passes it and only the gates under test can fail.
+    (cd "$REPO" && ./bin/check-docs --no-staleness 2>/dev/null) \
+        | sed -n 's/.*dead reference in comment: `\([^`]*\)`.*/\1/p' | sort -u \
+        | while IFS= read -r ref; do
+            case "$ref" in
+                *.md) mkdir -p "$REPO/$(dirname "$ref")"
+                      printf -- '---\ndescription: p\nlast_verified: %s\n---\np\n' "$MERGE_LV" > "$REPO/$ref" ;;
+                *) mkdir -p "$REPO/$ref" ;;
+            esac
+        done
+    git -C "$REPO" checkout -qb feat
+    echo x > "$REPO/src/x.txt"
+    git -C "$REPO" add src/x.txt
+    [ "${1:-}" = delete ] && { echo branch-edit >> "$REPO/src/old.txt"; git -C "$REPO" add src/old.txt; }
+    git -C "$REPO" commit -qm "feat work"
+    [ "${1:-}" = stacked ] && return 0
+    git -C "$REPO" checkout -q master
+    echo A2 >> "$REPO/ibl5/docs/guide.md"
+    printf 'DROP TABLE foo;\n' > "$REPO/ibl5/migrations/900_master_drop.sql"
+    write_tool bin/master-tool
+    git -C "$REPO" add ibl5/docs/guide.md ibl5/migrations/900_master_drop.sql bin/master-tool
+    [ "${1:-}" = delete ] && git -C "$REPO" rm -q src/old.txt
+    git -C "$REPO" commit -qm "master moves"
+    git -C "$REPO" update-ref refs/remotes/origin/master "$(git -C "$REPO" rev-parse HEAD)"
+    git -C "$REPO" checkout -q feat
+    git -C "$REPO" merge --no-commit --no-ff origin/master >/dev/null 2>&1
+    if [ "${1:-}" = delete ]; then
+        git -C "$REPO" checkout -q feat -- src/old.txt
+        git -C "$REPO" add src/old.txt
+    fi
+    git -C "$REPO" rev-parse -q --verify MERGE_HEAD >/dev/null \
+        || { echo "FAIL: new_merge_repo left no MERGE_HEAD"; FAILED=1; }
+}
+
+# adr-check --commit --exclude-from=<file> (equals form only)
+new_repo 1; write_tool bin/new-tool; git -C "$REPO" add bin/new-tool
+printf 'bin/new-tool\n' > "$REPO/.excl"
+_xo=$(cd "$REPO" && ./bin/adr-check --commit --exclude-from="$REPO/.excl" </dev/null 2>&1)
+expect "adr-exclude-from-listed-trigger-skipped" 0 $?
+want "adr-exclude-from-listed-trigger-skipped: reports no trigger" "$_xo" "No decision-trigger surfaces touched"
+_xo=$(cd "$REPO" && ./bin/adr-check --commit </dev/null 2>&1)
+expect "adr-exclude-from-absent-trigger-fires" 1 $?
+want "adr-exclude-from-absent-trigger-fires: names bin/new-tool" "$_xo" "bin/new-tool"
+printf 'bin/other-tool\n\n' > "$REPO/.excl-other"
+_xo=$(cd "$REPO" && ./bin/adr-check --commit --exclude-from="$REPO/.excl-other" </dev/null 2>&1)
+expect "adr-exclude-from-unlisted-trigger-fires" 1 $?
+want "adr-exclude-from-unlisted-trigger-fires: names bin/new-tool" "$_xo" "[new-tool-script] bin/new-tool"
+_xo=$(cd "$REPO" && ./bin/adr-check --commit --exclude-from="$REPO/missing" </dev/null 2>&1)
+expect "adr-exclude-from-missing-file-exits-2" 2 $?
+want "adr-exclude-from-missing-file-exits-2: cannot read --exclude-from file" "$_xo" "cannot read --exclude-from file"
+want "adr-exclude-from-missing-file-exits-2: names the path" "$_xo" "$REPO/missing"
+_xo=$(cd "$REPO" && ./bin/adr-check --commit --exclude-from "$REPO/.excl" </dev/null 2>&1)
+expect "adr-exclude-from-space-form-exits-2" 2 $?
+want "adr-exclude-from-space-form-exits-2: unknown flag" "$_xo" "unknown flag: --exclude-from"
+
+# merge: master-identical doc, migration and tool pass
+new_merge_repo
+run_pre_commit_hook; expect "merge: master-identical doc, migration and tool pass" 0 $?
+_ho=$(cat "$REPO/.hookout")
+want_not "merge: master-identical pass: no Bump last_verified" "$_ho" "Bump last_verified"
+want_not "merge: master-identical pass: no Add a tagged marker" "$_ho" "Add a tagged marker"
+want_not "merge: master-identical pass: no pre-commit-adr-gate" "$_ho" "pre-commit-adr-gate"
+_xl=$(cat "$(merge_exclude_file)" 2>/dev/null)
+want "merge: master-identical pass: list has the doc" "$_xl" "ibl5/docs/guide.md"
+want "merge: master-identical pass: list has the migration" "$_xl" "ibl5/migrations/900_master_drop.sql"
+want "merge: master-identical pass: list has the tool" "$_xl" "bin/master-tool"
+
+# merge: branch-authored doc edit without bump still fails
+new_merge_repo
+echo B1 >> "$REPO/ibl5/docs/guide.md"; git -C "$REPO" add ibl5/docs/guide.md
+run_pre_commit_hook; expect "merge: branch-authored doc edit without bump still fails" 1 $?
+_ho=$(cat "$REPO/.hookout")
+want "merge: branch-authored doc edit: Bump last_verified" "$_ho" "Bump last_verified"
+want "merge: branch-authored doc edit: names the doc as not bumped" "$_ho" "ibl5/docs/guide.md: body changed but last_verified not bumped"
+
+# merge: branch-authored destructive migration still fails
+new_merge_repo
+printf 'DROP TABLE bar;\n' > "$REPO/ibl5/migrations/901_branch_drop.sql"
+git -C "$REPO" add ibl5/migrations/901_branch_drop.sql
+run_pre_commit_hook; expect "merge: branch-authored destructive migration still fails" 1 $?
+_ho=$(cat "$REPO/.hookout")
+want "merge: branch-authored destructive migration: Add a tagged marker" "$_ho" "Add a tagged marker"
+want "merge: branch-authored destructive migration: names 901_branch_drop.sql" "$_ho" "901_branch_drop.sql"
+want_not "merge: branch-authored destructive migration: master's 900_master_drop.sql not named" "$_ho" "900_master_drop.sql"
+
+# merge: branch-authored bin trigger still needs an ADR
+new_merge_repo
+write_tool bin/branch-tool; git -C "$REPO" add bin/branch-tool
+run_pre_commit_hook; expect "merge: branch-authored bin trigger still needs an ADR" 1 $?
+_ho=$(cat "$REPO/.hookout")
+want "merge: branch-authored bin trigger: pre-commit-adr-gate" "$_ho" "pre-commit-adr-gate"
+want "merge: branch-authored bin trigger: names bin/branch-tool" "$_ho" "bin/branch-tool"
+want_not "merge: branch-authored bin trigger: master's bin/master-tool not named" "$_ho" "bin/master-tool"
+
+# no merge: exclusion file is ignored. The staged doc is byte-identical to
+# origin/master, so honouring the stale list (or dropping the MERGE_HEAD guard)
+# would exclude it and pass.
+new_merge_repo
+git -C "$REPO" merge --abort
+echo A2 >> "$REPO/ibl5/docs/guide.md"; git -C "$REPO" add ibl5/docs/guide.md
+printf 'ibl5/docs/guide.md\n' > "$(merge_exclude_file)"
+run_pre_commit_hook; expect "no merge: exclusion file is ignored" 1 $?
+_ho=$(cat "$REPO/.hookout")
+want "no merge: exclusion file is ignored: Bump last_verified" "$_ho" "Bump last_verified"
+want "no merge: exclusion file is ignored: names the doc" "$_ho" "ibl5/docs/guide.md: body changed"
+
+# merge: path master deleted is not excluded
+new_merge_repo delete
+run_pre_commit_hook
+_xf=$(merge_exclude_file)
+if [ -f "$_xf" ]; then _rc=0; else _rc=1; fi
+ok_check "merge: path master deleted: exclusion list written" "$_rc"
+_xl=$(cat "$_xf" 2>/dev/null)
+want "merge: path master deleted: list still has master's doc" "$_xl" "ibl5/docs/guide.md"
+! grep -qxF src/old.txt "$_xf"; ok_check "merge: path master deleted is not excluded" $?
+
+# stacked: a branch on an unmerged parent, no MERGE_HEAD — doc_base and adr_base
+# still derive from merge-base HEAD origin/master, the exclusion list stays empty,
+# and the parent's unbumped doc edit is gated as before.
+new_merge_repo stacked
+git -C "$REPO" checkout -qb parent
+echo P1 >> "$REPO/ibl5/docs/guide.md"; git -C "$REPO" add ibl5/docs/guide.md
+git -C "$REPO" commit -qm "parent doc edit"
+git -C "$REPO" checkout -qb child
+printf -- '---\ndescription: c\nlast_verified: %s\n---\nC1\n' "$MERGE_LV" > "$REPO/ibl5/docs/child.md"
+git -C "$REPO" add ibl5/docs/child.md
+run_pre_commit_hook; expect "stacked: no MERGE_HEAD, parent's doc edit still gated" 1 $?
+_ho=$(cat "$REPO/.hookout")
+want "stacked: parent's doc edit: Bump last_verified" "$_ho" "Bump last_verified"
+want "stacked: parent's doc edit: names the doc" "$_ho" "ibl5/docs/guide.md: body changed"
+_sb=$(git -C "$REPO" merge-base HEAD origin/master)
+want "stacked: doc_base is merge-base HEAD origin/master" "$_ho" "--since=$_sb"
+if [ -s "$(merge_exclude_file)" ]; then _rc=1; else _rc=0; fi
+ok_check "stacked: exclusion list stays empty" "$_rc"
+
+# stacked, ADR side: the parent's committed 60-line bin/ tool is still in adr_base's
+# window (merge-base HEAD origin/master) while the child stages a non-doc file.
+new_merge_repo stacked
+git -C "$REPO" checkout -qb parent
+write_tool bin/parent-tool; git -C "$REPO" add bin/parent-tool
+git -C "$REPO" commit -qm "parent tool"
+git -C "$REPO" checkout -qb child
+echo c > "$REPO/src/child.txt"; git -C "$REPO" add src/child.txt
+run_pre_commit_hook; expect "stacked: no MERGE_HEAD, parent's bin tool still needs an ADR" 1 $?
+_ho=$(cat "$REPO/.hookout")
+want "stacked: parent's bin tool: pre-commit-adr-gate" "$_ho" "pre-commit-adr-gate"
+want "stacked: parent's bin tool: names bin/parent-tool" "$_ho" "bin/parent-tool"
+if [ -s "$(merge_exclude_file)" ]; then _rc=1; else _rc=0; fi
+ok_check "stacked: parent's bin tool: exclusion list stays empty" "$_rc"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

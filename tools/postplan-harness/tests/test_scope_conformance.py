@@ -6,13 +6,16 @@ helper reads the plan from disk.
 import json
 import os
 import re
+import time
 from pathlib import Path
 
-from harness import conformance
+import pytest
+
+from harness import conformance, scope_conformance
 from harness.classify import (SCOPE_NOTES_BEGIN, SCOPE_NOTES_END, render_scope_notes,
                               upsert_scope_notes)
 from harness.scope_conformance import _added_paths, scope_notes
-from harness.state import PlanInfo
+from harness.state import HarnessError, PlanInfo
 
 FIXTURES = Path(__file__).parent / "fixtures"
 SCOPE_1996 = FIXTURES / "scope-1996"
@@ -82,6 +85,35 @@ def test_scope_notes_unavailable_on_usage_exit(tmp_path):
     assert notes[0].startswith("scope check unavailable (exit 2")
 
 
+def test_scope_notes_timeout_fails_closed_and_reaps(tmp_path, monkeypatch):
+    """A hung scope helper is an anomaly: it raises subprocess-timeout (not the advisory
+    note) and the process group, grandchild included, is reaped.
+
+    Mutation caught: bare subprocess.run blocks 300s (elapsed assertion); folding the
+    timeout into the "scope check unavailable" note makes pytest.raises fail.
+    """
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    script = tmp_path / "hang"
+    script.write_text(f"#!/bin/bash\nsleep 300 &\necho $! > {tmp_path}/grandchild.pid\nsleep 300\n")
+    os.chmod(script, 0o755)
+    monkeypatch.setattr(scope_conformance, "SCOPE_CHECK_TIMEOUT", 1)
+    start = time.monotonic()
+    with pytest.raises(HarnessError) as ei:
+        scope_notes(plan, ["ibl5/a.php"], "", "", script=str(script))
+    assert time.monotonic() - start < 15
+    assert ei.value.kind == "subprocess-timeout"
+    assert "scope-check" in ei.value.detail
+    grandchild = int((tmp_path / "grandchild.pid").read_text().strip())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(grandchild, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.1)
+    pytest.fail("grandchild survived the process-group reap")
+
+
 def test_scope_notes_unavailable_on_missing_script(tmp_path):
     plan = _plan(tmp_path, ["ibl5/a.php"])
     notes = scope_notes(plan, ["ibl5/a.php"], "", "", script=str(tmp_path / "absent"))
@@ -102,6 +134,39 @@ def test_scope_notes_exempts_added_test_via_diff_body(tmp_path):
     modified = scope_notes(plan, changed, _diff(["ibl5/a.php", test_path], []), "")
     assert len(_unplanned(modified)) == 1
     assert test_path in _unplanned(modified)[0]
+
+
+def test_scope_notes_glob_entry_covers_matching_paths(tmp_path):
+    plan = _plan(tmp_path, ["bin/test-automouse-*"])
+    notes = scope_notes(plan, ["bin/test-automouse-queue", "bin/test-automouse-disarm",
+                               "bin/test-wt-pool"], "", "")
+    assert len(_unplanned(notes)) == 1
+    assert _unplanned(notes)[0].startswith("unplanned bin/test-wt-pool (")
+    assert _gaps(notes) == []
+
+
+def test_scope_notes_glob_entry_gap_when_nothing_matches(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php", "bin/test-automouse-*"])
+    notes = scope_notes(plan, ["ibl5/a.php"], "", "")
+    assert len(_gaps(notes)) == 1
+    assert _gaps(notes)[0].startswith("gap bin/test-automouse-* (")
+
+
+def test_scope_notes_glob_never_covers_claude_path(tmp_path):
+    plan = _plan(tmp_path, [".claude/rules/*"])
+    notes = scope_notes(plan, [".claude/rules/new.md"], "", "")
+    assert len(notes) == 1
+    assert notes[0].startswith("unplanned .claude/rules/new.md (")
+
+
+def test_scope_notes_plan_without_critical_files_skips_notes(tmp_path):
+    path = tmp_path / "hold.md"
+    path.write_text("---\nauto_merge: false\n---\n\n# Hold plan\n\n## Automouse Hold Justification\n\nx\n")
+    plan = PlanInfo(found=True, path=str(path))
+    assert scope_notes(plan, ["ibl5/docs/a.md", "ibl5/classes/X/README.md"], "", "") == []
+    claude = scope_notes(plan, [".claude/rules/new.md"], "", "")
+    assert len(claude) == 1
+    assert claude[0].startswith("unplanned .claude/rules/new.md (")
 
 
 def test_check_emits_no_scope_items(tmp_path):
@@ -143,7 +208,8 @@ def test_corpus_generated_block_never_declares(tmp_path):
     assert len(corpus) == 50
     heading = re.compile(r"^##[ \t]+Declared scope[ \t]*$", re.M)
     assert sum(1 for e in corpus if heading.search(e["body"] or "")) == 0
-    plan = _plan(tmp_path, [])
+    # One unrelated entry: a plan naming no file at all skips every note.
+    plan = _plan(tmp_path, ["ibl5/unrelated-anchor.php"])
     checked = 0
     for entry in corpus:
         body = entry["body"] or ""

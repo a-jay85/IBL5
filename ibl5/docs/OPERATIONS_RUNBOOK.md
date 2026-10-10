@@ -468,7 +468,7 @@ Run `gh workflow run sim-recap.yml` for a claim-next drain. Add `-f sim=<N>` to 
 
 ### Uninstalling the Mac poller later
 
-Once a few sims have recapped from Actions, remove the Mac backup with `bin/sim-recap-cron-setup --uninstall-schedule`. Until then, an outage can send one onset ping and one recovery ping from each host. After uninstalling, remove the `com.ibl5.sim-recap-poll` entry from `bin/lib/launchd-expected-jobs.sh` in a follow-up PR. Until that follow-up lands, `bin/launchd-health-check` reports the job as missing.
+Once a few sims have recapped from Actions, remove the Mac backup with `bin/sim-recap-cron-setup --uninstall-schedule`. Until then, an outage can send one onset ping and one recovery ping from each host. The `com.ibl5.sim-recap-poll` entry is already gone from `bin/lib/launchd-expected-jobs.sh`, so `bin/launchd-health-check` no longer expects the job.
 
 ### Mac poller (backup)
 

@@ -25,11 +25,11 @@ import tempfile
 import threading
 
 from .. import usage_pause
-from ..state import HarnessError, LlmCallRecord, UsageLedger
+from ..state import SUBPROCESS_TIMEOUT, HarnessError, LlmCallRecord, UsageLedger
 from ..usage_pause import UsagePause
 
 MAX_PROMPT_BYTES = 120_000        # hard cap on any single call's input packet
-DEFAULT_TIMEOUT = 1500            # sonnet 4.6 thinks long on large diffs; observed >600s
+DEFAULT_TIMEOUT = 1500            # sonnet thinks long on large diffs; observed >600s
 TOOLED_TIMEOUT = 2400             # a repo-reading reviewer needs many turns of tool I/O
 TOOLED_MAX_TURNS = 60             # NEVER 1: a tool-enabled call must be able to iterate
 ENVELOPE_ERROR_TEXT_CAP = 600     # bound result text in error details for diagnosis
@@ -47,8 +47,8 @@ _USAGE_LIMIT_RE = re.compile(
 )
 
 MODEL_MAP = {
-    "haiku": "claude-haiku-4-5-20251001",
-    "sonnet": "claude-sonnet-4-6",     # matches the historical review-agent tier
+    "haiku": "claude-haiku-5-5",
+    "sonnet": "claude-sonnet-5-5",
     "opus": "claude-opus-5-5",
 }
 
@@ -83,7 +83,7 @@ def _extractor_for(purpose: str):
     return extract_json
 
 
-def _run_reaped(argv, stdin_text, timeout, cwd, env):
+def _run_reaped(argv, stdin_text, timeout, cwd, env, errors=None):
     """Run argv with its own process group, always reaping the group on exit.
 
     `claude -p` spawns children that a plain subprocess timeout never touches, so the
@@ -92,7 +92,7 @@ def _run_reaped(argv, stdin_text, timeout, cwd, env):
     """
     proc = subprocess.Popen(
         argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, cwd=cwd, env=env, start_new_session=True,
+        text=True, cwd=cwd, env=env, start_new_session=True, errors=errors,
     )
     try:
         out, err = proc.communicate(stdin_text, timeout=timeout)
@@ -104,6 +104,26 @@ def _run_reaped(argv, stdin_text, timeout, cwd, env):
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
             pass
+
+
+def run_bounded(argv, *, step, timeout, cwd=None, stdin_text=None, env=None, errors=None):
+    """_run_reaped plus the typed timeout contract for deterministic phase-2 steps.
+
+    Returns the CompletedProcess unchanged (a nonzero rc is the caller's business).
+    A hang past `timeout` reaps the whole process group (via _run_reaped's finally)
+    and raises HarnessError(SUBPROCESS_TIMEOUT) naming the step, so runner.run exits 3.
+    OSError (missing binary) propagates unchanged; callers keep their own handling.
+    """
+    try:
+        return _run_reaped(list(argv), stdin_text, timeout, cwd, env, errors)
+    except subprocess.TimeoutExpired as e:
+        partial = e.output if isinstance(e.output, str) else ""
+        raise HarnessError(
+            SUBPROCESS_TIMEOUT,
+            f"step '{step}' timed out after {timeout}s",
+            cmd=" ".join(str(a) for a in argv),
+            output=partial,
+        ) from None
 
 
 # Tools that let a session persist a file. A tooled call granted none of them cannot

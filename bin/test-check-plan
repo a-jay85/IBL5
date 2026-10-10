@@ -527,6 +527,98 @@ assert_viol "gateHb-no-hold-section-not-checked" 0 "[H]" "$FM$M"'
 A human must confirm every class reference resolves under the new namespace.
 '
 
+# ---------------------------------------------------------------------------
+# Gate H(c): the Decision paragraph is the only hold text the PR body shows, so
+# it is checked as reader-facing prose (check-prose tells, empty body, 40-word
+# total cap, legacy `The human accepts ...` opener).
+# ---------------------------------------------------------------------------
+FM_HOLD_DOC='---
+auto_merge: false
+impl_model: sonnet
+---'
+# _hc_words <n> — n filler words, so a case hits an exact word count.
+_hc_words() { local i out=""; for ((i = 0; i < $1; i++)); do out="$out held"; done; printf '%s' "${out# }"; }
+HC_W35=$(_hc_words 35)
+HC_W36=$(_hc_words 36)
+HC_W20=$(_hc_words 20)
+
+assert_viol "gateHc-clean-decision-passes" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Category:** intrinsic taste hold, the seamless leveraging of a robust paradigm.
+
+**Decision:** Merge if you'"'"'re OK with about 7% more PRs being held until their body declares scope.
+
+**Discharged by matrix rows:** 3, 4.
+
+Rows 3 and 4 cover the observable part, and the remaining judgment is taste.
+'
+
+assert_viol "gateHc-prose-tell-fails" 1 "[H] Decision line has a prose tell" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if the seamless rollout is worth about 7% more held PRs.
+'
+
+assert_viol "gateHc-over-cap-fails" 1 "[H] Decision line is 41 words" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W36"'
+'
+
+assert_viol "gateHc-exactly-40-words-passes" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W35"'
+'
+
+# The label is not counted: label + 40 body words must still pass.
+assert_viol "gateHc-label-not-counted" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W35"'
+'
+
+assert_viol "gateHc-legacy-opener-fails" 1 "[H] Decision line opens with the legacy" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** The human accepts that about 7% more PRs are held.
+'
+
+assert_viol "gateHc-legacy-opener-reviewer-fails" 1 "[H] Decision line opens with the legacy" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** The reviewer accepts a slower merge queue for safety.
+'
+
+assert_viol "gateHc-accepts-mid-sentence-passes" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you accept that about 7% more PRs are held.
+'
+
+assert_viol "gateHc-empty-decision-fails" 1 "[H] Decision line is empty" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:**
+'
+
+assert_viol "gateHc-two-blocks-total-over-cap-fails" 1 "[H] Decision line is 50 words" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W20"'
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W20"'
+'
+
+assert_viol "gateHc-missing-decision-unchanged" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Category:** taste
+
+The copy tone is a taste call that no test can settle.
+'
+
 # Gate H FP-guard: a plan that merely DOCUMENTS the `auto_merge: false` syntax in
 # its body (not in line-1 frontmatter) must NOT flag (exit 0).
 assert "gateH-body-mentions-syntax-only" 0 "$FM$M"'
@@ -799,6 +891,23 @@ else
     echo "FAIL: gate13-haiku45-manual — expected 'Truly-manual row forbids impl_model: claude-haiku-4-5'"; FAILED=1
 fi
 
+# (h2) Full-id claude-haiku-5-5 with a Truly-manual row is forbidden (exit 1).
+_f="$TMP/gate13-haiku55-manual.md"
+printf '%s\n' '---
+impl_model: claude-haiku-5-5
+---'"$M_MANUAL" > "$_f"
+"$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
+if [ "$_ec" -eq 0 ]; then
+    echo "FAIL: gate13-haiku55-manual — expected nonzero exit, got 0"; FAILED=1
+else
+    echo "ok: gate13-haiku55-manual (exit $_ec)"
+fi
+if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row forbids impl_model: claude-haiku-5-5'; then
+    echo "ok: gate13-haiku55-manual (substring confirmed)"
+else
+    echo "FAIL: gate13-haiku55-manual — expected 'Truly-manual row forbids impl_model: claude-haiku-5-5'"; FAILED=1
+fi
+
 # (i) Full-id claude-opus-5-5 with a Truly-manual row passes (exit 0) — mirrors (f).
 assert "gate13-opus5-manual-ok" 0 '---
 impl_model: claude-opus-5-5
@@ -1011,7 +1120,7 @@ _gT_body='
 
 Do the mechanical thing.
 '
-for _gT_pair in "opus:claude-opus-5-5" "sonnet:claude-sonnet-5-5" "haiku:claude-haiku-4-5"; do
+for _gT_pair in "opus:claude-opus-5-5" "sonnet:claude-sonnet-5-5" "haiku:claude-haiku-5-5" "haiku:claude-haiku-4-5"; do
     _gT_bare="${_gT_pair%%:*}"; _gT_full="${_gT_pair##*:}"
     _fb="$TMP/gateT-alias-${_gT_bare}.md"
     _ff="$TMP/gateT-alias-${_gT_full}.md"
@@ -2481,6 +2590,56 @@ assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate [Z] fixtures (8 cases)
+# ---------------------------------------------------------------------------
+# Untagged row whose command runs only an out-of-repo scratch script.
+assert_viol "gateZ-untagged-scratch-script-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+'"$YROW"'
+'
+# The same row with a well-formed tag: released.
+assert_viol "gateZ-tagged-scratch-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` (one-time-check: asserts an out-of-repo scratch script the diff cannot carry) | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# A repo script run over out-of-repo inputs is in-repo evidence: exempt.
+assert_viol "gateZ-mixed-repo-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `UNREALISED-ASSERTION` | CLI-executable | post-impl | `MATRIX_ASSERT_ROOT=/tmp/r bin/lib/plan-matrix-assertions ~/claude-plans/x.md -` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# /tmp/ and $HOME/ both open the out-of-repo signal; both rows fire.
+assert_viol "gateZ-tmp-and-home-fire" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `TRACE-OK` | CLI-executable | post-impl | `bash /tmp/negproof/run.sh` |
+| 5 | prints `HOOK-OK` | CLI-executable | post-impl | `bash "$HOME/.claude/hooks/x.sh"` |
+'"$YROW"'
+'
+# A post-PR CI query can never be realised by the diff.
+assert_viol "gateZ-gh-run-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | latest run concludes success; prints `PR-RUN-DONE` | CLI-executable | post-impl | `gh run list --workflow sim-recap.yml --limit 1 && echo PR-RUN-DONE` |
+'"$YROW"'
+'
+# A token-free row is never checked by the helper: silent.
+assert_viol "gateZ-no-token-row-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | the scratch run exits 0 | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/x.sh` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# curl exercises the worktree stack and only writes its output under /tmp: exempt.
+assert_viol "gateZ-curl-tmp-output-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | page holds `Roster` | CLI-executable | post-impl | `curl -s -o /tmp/page.html http://slug.localhost/ibl5/modules.php?name=Team && grep -q Roster /tmp/page.html` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# Not CLI-executable: the tag remedy does not apply, so gate Z never fires.
+assert_viol "gateZ-phpunit-row-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | `pinned_thing` works | PHPUnit | post-impl | `~/scratch/tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+
+# ---------------------------------------------------------------------------
 # Gate [ND] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Marker with a 15+ character reason inside a phase body: the honored shape.
@@ -2786,16 +2945,17 @@ _corpus_guard_ok() {
 # conference-champions-playoff-semantics, bug-pipeline-survive-db-sync,
 # bug-pipeline-test-env, sim-recap-boxid-resolution (gate [A]: migration literals);
 # bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
-# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags).
-# authz-verdict-refactor-trading-backlog (gate [Z]: bold-markup residue token).
+# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags);
+# narrow-headless-marker-contract-paths, jsb-j7-param-recovery,
+# plan-gate-skill-inline (gate [Z]: untagged out-of-repo rows).
 _n_corpus_pass=1
 for _n_slug in \
     plan-architect-phase-drift-guard \
     automouse-cost-accounting-fix redact-credentials-from-error-logs \
     session-registry-dotclaude-freshness architect-explore-fanout \
-    narrow-headless-marker-contract-paths agent-tiering-detail-trim \
-    postplan-findings-schema-degrade jsb-j7-param-recovery wt-rebase-merge-not-rebase \
-    plan-gate-skill-inline sim-recap-floor-and-cold-open \
+    agent-tiering-detail-trim \
+    postplan-findings-schema-degrade wt-rebase-merge-not-rebase \
+    sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
     authz-verdict-refactor-1e-trading-accept-shim \
@@ -3444,6 +3604,81 @@ if [ "$_parity_failed" -eq 0 ]; then
     echo "ok: gateHb-pattern-file-parity (bash pos=$BASH_POS exc=$BASH_EXC, Python='$PY')"
 fi
 
+# hold_decision_paragraphs — prints only the `**Decision:**` block(s) of the hold
+# section. Each case writes a throwaway plan and compares exact stdout.
+# shellcheck source=lib/hold-check.sh
+. "$SCRIPT_DIR/lib/hold-check.sh"
+# _hdp_case <name> <plan-text> <expected-stdout>
+_hdp_case() {
+    local name="$1" text="$2" expected="$3" f out rc
+    f="$TMP/hdp-$name.md"
+    printf '%s' "$text" > "$f"
+    out="$(hold_decision_paragraphs "$f")"; rc=$?
+    if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then
+        echo "ok: hold_decision_paragraphs-$name"
+    else
+        echo "FAIL: hold_decision_paragraphs-$name — rc=$rc, got: [$out]"
+        FAILED=1
+    fi
+}
+_hdp_case "four-part-skeleton" '# T
+
+## Automouse Hold Justification
+
+**Category:** taste
+
+**Decision:** Merge if you are OK with the new copy.
+
+**Discharged by matrix rows:** 3, 4
+
+Why-line prose.
+' '**Decision:** Merge if you are OK with the new copy.'
+_hdp_case "no-decision" '## Automouse Hold Justification
+
+**Category:** taste
+
+Prose only.
+' ''
+_hdp_case "two-blocks" '## Automouse Hold Justification
+
+**Decision:** D1
+
+middle
+
+**Decision:** D2
+' '**Decision:** D1
+
+**Decision:** D2'
+_hdp_case "two-line-decision" '## Automouse Hold Justification
+
+**Decision:** first
+continued
+
+after
+' '**Decision:** first
+continued'
+_hdp_case "fenced-decision" '## Automouse Hold Justification
+
+```
+**Decision:** hidden
+```
+' ''
+_hdp_case "outside-section" '## Before
+
+**Decision:** early
+
+## Automouse Hold Justification
+
+prose
+
+## After
+
+**Decision:** late
+' ''
+_hdp_case "no-trailing-newline" '## Automouse Hold Justification
+
+**Decision:** last line' '**Decision:** last line'
+
 # regex_canon_divergence — the three call sites must stay byte-identical.
 # Canon lives in bin/check-plan gate [D]; SKILL.md and _architect-contract.md
 # restate it. Any divergence (notably \s for [[:space:]]) fails here.
@@ -3582,103 +3817,6 @@ assert_viol "gate-U-prose-hash-line" 1 "[U]" "$FM$_U_BASE"'
 
 Closes a-jay85/IBL5-backlog#12
 '
-
-# ---------------------------------------------------------------------------
-# Gate [Z]: leading-star backticked token in a matrix "What to verify" cell
-# ---------------------------------------------------------------------------
-_Z_BT3='```'
-_Z_TL3='~~~'
-_Z_HEAD='
-| # | What to verify | Test type | Timing | Test file / location |
-|---|---------------|-----------|--------|---------------------|
-'
-_Z_LOC=' | E2E | post-impl | `tests/e2e/trade.spec.ts` |'
-_Z_BASE="$_Z_HEAD"'| 1 | reaches `parse_args` on a bad flag'"$_Z_LOC"
-
-# Positives: each token the checker can never realise fires [Z].
-assert_viol "gate-Z-catch-all-arm" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | the `*)` arm prints usage'"$_Z_LOC"
-assert_viol "gate-Z-json-glob" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | every `*.json` report parses'"$_Z_LOC"
-assert_viol "gate-Z-suffix-glob" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | each `*_only` flag is honored'"$_Z_LOC"
-assert_viol "gate-Z-infix-glob" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | rows matching `*50001*` are dropped'"$_Z_LOC"
-assert_viol "gate-Z-md-glob" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | denylist covers `*.md` files'"$_Z_LOC"
-assert_viol "gate-Z-scenario-name-star" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | scenario `*.json=present` passes'"$_Z_LOC"
-assert_viol "gate-Z-one-time-check-tag-still-fires" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | the `*.json` reader runs (one-time-check: corpus replay only)'"$_Z_LOC"
-assert_viol "gate-Z-escaped-pipe-cell" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | a \| b then the `*)` arm'"$_Z_LOC"
-
-# Negatives: none of these can trip [Z].
-assert_viol "gate-Z-prefixed-glob-clean" 0 "[Z]" "$FM$_Z_HEAD"'| 1 | builds `engine/*.go` and writes `out/*/audit.log`'"$_Z_LOC"
-assert_viol "gate-Z-no-star-clean" 0 "[Z]" "$FM$_Z_BASE"
-assert_viol "gate-Z-unbackticked-clean" 0 "[Z]" "$FM$_Z_HEAD"'| 1 | every *.json report parses'"$_Z_LOC"
-assert_viol "gate-Z-placeholder-clean" 0 "[Z]" "$FM$_Z_HEAD"'| 1 | writes `*<slug>.md` and `*...json`'"$_Z_LOC"
-assert_viol "gate-Z-scenario-value-star-clean" 0 "[Z]" "$FM$_Z_HEAD"'| 1 | scenario `mode=*.json` passes'"$_Z_LOC"
-assert_viol "gate-Z-fenced-clean" 0 "[Z]" "$FM$_Z_BASE
-$_Z_BT3$_Z_HEAD"'| 2 | the `*)` arm prints usage'"$_Z_LOC
-$_Z_BT3"
-assert_viol "gate-Z-tilde-fenced-clean" 0 "[Z]" "$FM$_Z_BASE
-$_Z_TL3$_Z_HEAD"'| 2 | the `*)` arm prints usage'"$_Z_LOC
-$_Z_TL3"
-assert_viol "gate-Z-non-matrix-table-clean" 0 "[Z]" "$FM$_Z_BASE"'
-
-Denylist:
-
-| Glob | Why |
-|------|-----|
-| `*.md` | docs are tooling |
-| `*.neon` | phpstan config is tooling |
-'
-assert_viol "gate-Z-duplicate-row-id-clean" 0 "[Z]" "$FM$_Z_BASE"'
-
-Second matrix:
-'"$_Z_HEAD"'| 1 | the `*)` arm prints usage'"$_Z_LOC"
-
-# Parity: run the REAL checker and gate [Z] on one fixture and require they
-# agree. A fire case feeds a diff that CONTAINS the token text, so the only
-# way the checker reports the row is its empty-glob-prefix arm. A silent case
-# proves the checker accepts (or never extracts) what [Z] lets through.
-_z_parity() {
-    name="$1"; want="$2"; body="$3"; diffbody="$4"
-    p="$TMP/$name.md"; d="$TMP/$name.diff"
-    printf '%s\n' "$body" > "$p"
-    printf '%s\n' "$diffbody" > "$d"
-    chk_out="$(MATRIX_ASSERT_ROOT='' "$SCRIPT_DIR/lib/plan-matrix-assertions" "$p" "$d" 2>&1)"
-    lint_out="$("$GUARD" "$p" 2>&1)"
-    if printf '%s' "$chk_out" | grep -qF 'UNREALISED-ASSERTION: row'; then chk=fire; else chk=silent; fi
-    if printf '%s' "$lint_out" | grep -qF '[Z]'; then lint=fire; else lint=silent; fi
-    if [ "$chk" != "$want" ] || [ "$lint" != "$want" ]; then
-        echo "FAIL: $name — want $want, checker $chk, gate [Z] $lint"; FAILED=1
-    else
-        echo "ok: $name (checker and [Z] both $want)"
-    fi
-}
-_Z_PDIFF_HDR='--- a/f
-+++ b/f
-@@ -0,0 +1 @@'
-_z_parity "gate-Z-parity-catch-all-arm" fire "$FM$_Z_HEAD"'| 1 | the `*)` arm prints usage'"$_Z_LOC" "$_Z_PDIFF_HDR"'
-+    *) usage ;;'
-_z_parity "gate-Z-parity-json-glob" fire "$FM$_Z_HEAD"'| 1 | every `*.json` report parses'"$_Z_LOC" "$_Z_PDIFF_HDR"'
-+for f in *.json; do jq . "$f"; done'
-_z_parity "gate-Z-parity-suffix-glob" fire "$FM$_Z_HEAD"'| 1 | each `*_only` flag is honored'"$_Z_LOC" "$_Z_PDIFF_HDR"'
-+case "$flag" in *_only) on=1 ;; esac'
-_z_parity "gate-Z-parity-infix-glob" fire "$FM$_Z_HEAD"'| 1 | rows matching `*50001*` are dropped'"$_Z_LOC" "$_Z_PDIFF_HDR"'
-+ls *50001*'
-_z_parity "gate-Z-parity-md-glob" fire "$FM$_Z_HEAD"'| 1 | denylist covers `*.md` files'"$_Z_LOC" "$_Z_PDIFF_HDR"'
-+  - *.md'
-_z_parity "gate-Z-parity-escaped-pipe-cell" fire "$FM$_Z_HEAD"'| 1 | a \| b then the `*)` arm'"$_Z_LOC" "$_Z_PDIFF_HDR"'
-+    *) usage ;;'
-_z_parity "gate-Z-parity-prefixed-glob" silent "$FM$_Z_HEAD"'| 1 | builds `engine/*.go`'"$_Z_LOC" "$_Z_PDIFF_HDR"'
-+engine/main.go'
-_z_parity "gate-Z-parity-placeholder" silent "$FM$_Z_HEAD"'| 1 | writes `*<slug>.md`'"$_Z_LOC" "$_Z_PDIFF_HDR"'
-+unrelated'
-_z_parity "gate-Z-parity-fenced" silent "$FM$_Z_HEAD"'| 1 | plain row'"$_Z_LOC
-$_Z_BT3$_Z_HEAD"'| 2 | the `*)` arm prints usage'"$_Z_LOC
-$_Z_BT3" "$_Z_PDIFF_HDR"'
-+unrelated'
-_z_parity "gate-Z-parity-non-matrix-table" silent "$FM$_Z_HEAD"'| 1 | plain row'"$_Z_LOC"'
-
-| Glob | Why |
-|------|-----|
-| `*.md` | docs are tooling |' "$_Z_PDIFF_HDR"'
-+unrelated'
 
 # ---------------------------------------------------------------------------
 # Gate [L] checks A/B/C (backlog#933): literal-check citations, pid/tid/teamid

@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 import tempfile
 from pathlib import PurePosixPath
 
+from .adapters.llm import run_bounded
 from .state import PlanInfo
 
 _SCOPE_SCRIPT = str(
     PurePosixPath(os.path.abspath(__file__)).parents[3] / "bin" / "lib" / "plan-scope-conformance")
+SCOPE_CHECK_TIMEOUT = 120   # seconds; a hang fails closed (subprocess-timeout, exit 3)
 _DIFF_HEADER = re.compile(r"^diff --git a/.+ b/(?P<path>.+)$")
 _NOTE_PREFIX = "SCOPE-NOTE: "
 _UNPLANNED_PREFIX = "UNPLANNED-FILE: "
@@ -73,9 +74,9 @@ def scope_notes(plan: PlanInfo, changed_files: list[str], diff_body: str, pr_bod
         with open(body_path, "w") as fh:
             fh.write(pr_body or "")
         try:
-            proc = subprocess.run(
+            proc = run_bounded(
                 [script, plan.path, changed_path, body_path, added_path],
-                capture_output=True, text=True, check=False)
+                step="scope-check", timeout=SCOPE_CHECK_TIMEOUT)
         except OSError as e:
             return [f"scope check unavailable ({e.__class__.__name__})"]
     if proc.returncode >= 2 or proc.returncode < 0:

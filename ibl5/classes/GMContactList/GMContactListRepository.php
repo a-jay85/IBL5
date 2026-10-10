@@ -26,7 +26,7 @@ class GMContactListRepository extends \Database\BaseMysqliRepository implements 
                          ti.owner_name, ti.discord_id
             FROM `ibl_team_info` ti
             WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            ORDER BY ti.team_city ASC";
+            ORDER BY ti.team_city ASC, ti.teamid ASC";
 
         /** @var array<int, array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, discord_id: int|null}> */
         return $this->fetchAll($query);

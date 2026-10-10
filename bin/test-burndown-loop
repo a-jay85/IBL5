@@ -59,6 +59,7 @@ new_env() {
     export HOME="$T/home"
     export IBL5_USAGE_GATE_STATE_DIR="$T/ug"
     export IBL5_BURNDOWN_DISCORD_DM="$T/dm"
+    export IBL5_BURNDOWN_BACKLOG="$STUB/backlog"
     mkdir -p "$HOME/claude-plans/_reports" "$IBL5_USAGE_GATE_STATE_DIR/markers" "$STUB"
     unset IBL5_BURNDOWN_RESERVE_PCT IBL5_BURNDOWN_MAX_FAILS IBL5_BURNDOWN_BATCH_TIMEOUT_MIN \
         IBL5_BURNDOWN_EMPTY_SLEEP_MIN
@@ -78,6 +79,8 @@ make_stubs() {
     # caffeinate -s <cmd...>: run the command directly so the exit status is the stub's own.
     printf '#!/bin/sh\nshift\nexec "$@"\n' > "$STUB/caffeinate"
     printf '#!/bin/sh\n{ cat; echo ---; } >> "%s/dm.calls"\n' "$T" > "$T/dm"
+    # backlog stub: logs its args, prints held.txt when present, exits with backlog.rc (default 0).
+    printf '#!/bin/sh\necho "$*" >> "%s/backlog.calls"\n[ -f "%s/held.txt" ] && cat "%s/held.txt"\nexit "$(cat "%s/backlog.rc" 2>/dev/null || echo 0)"\n' "$T" "$T" "$T" "$T" > "$STUB/backlog"
     cat > "$STUB/claude" <<'CLAUDE_EOF'
 #!/usr/bin/env bash
 T="@T@"
@@ -99,9 +102,16 @@ write_ledger() {
     printf '{"items":[{"issue_num":1,"status":"dispatched","route":"ad-hoc"}],"budget":5%s}\n' "$1" \
         > "$HOME/claude-plans/_reports/burndown-batch-stub-$n.json"
 }
+write_items() {
+    printf '{"items":[%s],"budget":5,"units_used":2}\n' "$1" \
+        > "$HOME/claude-plans/_reports/burndown-batch-stub-$n.json"
+}
 case "$act" in
     ledger) write_ledger ',"units_used":5' ;;
     ledger-nounits) write_ledger '' ;;
+    ledger-skipped) write_items '{"issue_num":1,"status":"skipped"},{"issue_num":2,"status":"skipped"}' ;;
+    ledger-mixed) write_items '{"issue_num":1,"status":"skipped"},{"issue_num":2,"status":"queued"}' ;;
+    ledger-noitems) write_items '' ;;
     ledger-exit3) write_ledger ',"units_used":5'; echo "BURNDOWN-LOOP: abort-exit-3" ;;
     none) sentinel; echo "BURNDOWN-LOOP: none-selected" ;;
     none-unconfirmed) echo "BURNDOWN-LOOP: none-selected" ;;
@@ -732,6 +742,81 @@ test_dm_suppressed() {
     assert_no_file dm_paused:no-dm "$T/dm.calls"
 }
 
+test_finish_dm_lists_held() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger drain
+    printf '%s\n%s\n' 'HELD #300 /wt/held-300 (dirty, 0 ahead, no PR)' \
+        'HELD-UNKNOWN #306 /wt/probe-306 (gh failed)' > "$T/held.txt"
+    run_loop run
+    assert_eq held_dm:rc 0 "$RC"
+    assert_contains held_dm:header "$(cat "$T/dm.calls" 2>/dev/null)" "held (ad-hoc worktrees with unshipped work, no PR):"
+    assert_contains held_dm:held "$(cat "$T/dm.calls" 2>/dev/null)" "HELD #300 /wt/held-300 (dirty, 0 ahead, no PR)"
+    assert_contains held_dm:unknown "$(cat "$T/dm.calls" 2>/dev/null)" "HELD-UNKNOWN #306 /wt/probe-306 (gh failed)"
+    assert_contains held_dm:called "$(cat "$T/backlog.calls" 2>/dev/null)" "burndown-held"
+}
+
+test_finish_dm_unchanged_when_no_held() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger drain
+    run_loop run
+    assert_eq no_held:rc 0 "$RC"
+    assert_not_contains no_held:no-header "$(cat "$T/dm.calls" 2>/dev/null)" "held ("
+    assert_contains no_held:finished "$(cat "$T/dm.calls" 2>/dev/null)" "finished (stopped)"
+    assert_contains no_held:log-line "$(cat "$T/dm.calls" 2>/dev/null)" "log: "
+}
+
+test_finish_held_failure_is_best_effort() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger drain
+    printf '%s\n' 'HELD #300 /wt/held-300 (dirty, 0 ahead, no PR)' > "$T/held.txt"
+    printf '3\n' > "$T/backlog.rc"
+    run_loop run
+    assert_eq held_fail:rc 0 "$RC"
+    assert_contains held_fail:finished "$(cat "$T/dm.calls" 2>/dev/null)" "finished (stopped)"
+    assert_not_contains held_fail:no-held "$(cat "$T/dm.calls" 2>/dev/null)" "HELD #300"
+    assert_contains held_fail:log "$OUT" "held scan failed rc=3"
+}
+
+test_finish_held_skipped_under_once() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger drain
+    printf '%s\n' 'HELD #300 /wt/held-300 (dirty, 0 ahead, no PR)' > "$T/held.txt"
+    run_loop run --once
+    assert_no_file held_once:no-backlog-call "$T/backlog.calls"
+}
+
+test_finish_held_backlog_unset_and_empty() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger drain
+    unset IBL5_BURNDOWN_BACKLOG
+    run_loop run
+    assert_eq held_unset:rc 0 "$RC"
+    assert_contains held_unset:log "$OUT" "held scan via $REPO_ROOT/bin/backlog"
+    assert_contains held_unset:dm "$(cat "$T/dm.calls" 2>/dev/null)" "finished (stopped)"
+    new_env
+    seed_usage 5 0 1
+    queue ledger drain
+    IBL5_BURNDOWN_BACKLOG='' run_loop run
+    assert_eq held_empty:rc 0 "$RC"
+    assert_contains held_empty:log "$OUT" "held scan via $REPO_ROOT/bin/backlog"
+    assert_contains held_empty:dm "$(cat "$T/dm.calls" 2>/dev/null)" "finished (stopped)"
+}
+
+test_finish_held_missing_binary() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger drain
+    IBL5_BURNDOWN_BACKLOG="$T/nope" run_loop run
+    assert_eq held_missing:rc 0 "$RC"
+    assert_contains held_missing:log "$OUT" "held scan skipped: no executable backlog at $T/nope"
+    assert_contains held_missing:dm "$(cat "$T/dm.calls" 2>/dev/null)" "finished (stopped)"
+}
+
 test_dm_env_empty_default() {
     new_env
     seed_usage 5 0 1
@@ -1046,6 +1131,49 @@ test_empty_streak_survives_reexec() {
     assert_eq test_empty_streak_survives_reexec:blank-rc 1 "$RC"
     assert_contains test_empty_streak_survives_reexec:blank-fails "$OUT" "fails=3/3"
     assert_no_file test_empty_streak_survives_reexec:blank-env-unset "$T/claude.reexec-env"
+}
+
+test_all_skipped_sleeps() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger-skipped
+    stop_on_sleep
+    run_loop run
+    assert_eq test_all_skipped_sleeps:rc 0 "$RC"
+    assert_contains test_all_skipped_sleeps:ran "$OUT" "batch ran ledgers=1 items=2"
+    assert_contains test_all_skipped_sleeps:line "$OUT" "every picked item skipped; re-check in 240m"
+    assert_contains test_all_skipped_sleeps:sleep "$OUT" "sleep 14400s reason=all-skipped"
+    assert_eq test_all_skipped_sleeps:one-batch 1 "$(calls "$T/claude.calls")"
+}
+
+test_mixed_status_no_backoff() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger-mixed
+    run_loop run
+    assert_eq test_mixed_status_no_backoff:rc 0 "$RC"
+    assert_not_contains test_mixed_status_no_backoff:no-line "$OUT" "every picked item skipped"
+    # The mixed batch, then the drain batch, with no backoff sleep between them.
+    assert_eq test_mixed_status_no_backoff:two-batches 2 "$(calls "$T/claude.calls")"
+}
+
+test_no_items_no_backoff() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger-noitems
+    run_loop run
+    assert_eq test_no_items_no_backoff:rc 0 "$RC"
+    assert_not_contains test_no_items_no_backoff:no-line "$OUT" "every picked item skipped"
+}
+
+test_all_skipped_once_no_sleep() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger-skipped
+    run_loop run --once
+    assert_eq test_all_skipped_once_no_sleep:rc 0 "$RC"
+    assert_contains test_all_skipped_once_no_sleep:line "$OUT" "every picked item skipped"
+    assert_not_contains test_all_skipped_once_no_sleep:no-sleep "$OUT" "reason=all-skipped"
 }
 
 # ---------------------------------------------------------------- runner

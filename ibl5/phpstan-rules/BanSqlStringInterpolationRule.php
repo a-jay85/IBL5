@@ -49,7 +49,10 @@ final class BanSqlStringInterpolationRule implements Rule
     {
         $file = $scope->getFile();
 
-        if (!str_contains($file, DIRECTORY_SEPARATOR . 'classes' . DIRECTORY_SEPARATOR)) {
+        if (
+            !str_contains($file, DIRECTORY_SEPARATOR . 'classes' . DIRECTORY_SEPARATOR)
+            && !str_contains($file, DIRECTORY_SEPARATOR . 'blocks' . DIRECTORY_SEPARATOR)
+        ) {
             return [];
         }
 

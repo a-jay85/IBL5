@@ -44,7 +44,7 @@ class PlayerTradingCardBackView
      * @param int $threePointContests Number of Three-Point Contests
      * @param int $dunkContests Number of Slam Dunk Competitions
      * @param int $rookieSophChallenges Number of Rookie-Sophomore Challenges
-     * @param \mysqli|null $db Optional database connection for team colors
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Prebuilt team color scheme (null = default gold scheme)
      * @return string HTML for trading card back
      */
     public static function render(
@@ -55,10 +55,10 @@ class PlayerTradingCardBackView
         int $threePointContests = 0,
         int $dunkContests = 0,
         int $rookieSophChallenges = 0,
-        ?\mysqli $db = null
+        ?array $colorScheme = null
     ): string {
         // Get color scheme and prepare player data using shared helpers
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->getTeamid() ?? 0);
+        $colorScheme ??= TeamColorHelper::getDefaultColorScheme();
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
 
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);

@@ -20,6 +20,8 @@ use Updater\StepResult;
  */
 final class RefreshTeamSeasonRecordsStep implements PipelineStepInterface
 {
+    use MysqliExecTrait;
+
     public function __construct(
         private readonly \mysqli $db,
     ) {
@@ -48,23 +50,6 @@ final class RefreshTeamSeasonRecordsStep implements PipelineStepInterface
             $this->getLabel(),
             sprintf('%d regular + %d HEAT rows', $regularRows, $heatRows),
         );
-    }
-
-    /** Prepare and execute a zero-parameter DML statement; returns affected rows. */
-    private function dbExec(string $sql): int
-    {
-        $stmt = $this->db->prepare($sql);
-        if ($stmt === false) {
-            throw new \RuntimeException('Prepare failed: ' . $this->db->error);
-        }
-        if (!$stmt->execute()) {
-            $err = $stmt->error;
-            $stmt->close();
-            throw new \RuntimeException('Execute failed: ' . $err);
-        }
-        $affected = (int) $stmt->affected_rows;
-        $stmt->close();
-        return $affected;
     }
 
     /**

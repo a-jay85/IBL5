@@ -22,6 +22,10 @@ def test_local_gate_denial_exits_3():
     """A pre-commit/pre-push hook denial is deterministic — no ~1M skill fallback."""
     assert runner.exit_code_for(_res(TerminalState.FAILED, "local-gate")) == 3
 
+def test_subprocess_timeout_exits_3():
+    """A hung phase-2 subprocess would hang again on a skill re-run — fail closed."""
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "subprocess-timeout")) == 3
+
 def test_usage_limit_exits_3():
     """A Claude usage/rate limit is environmental — re-running the skill immediately
     would hit the same wall, so the harness stops for a human to retry later."""
@@ -34,14 +38,16 @@ def test_other_typed_failure_exits_1():          # negative path: not everything
 _EXIT_CODE_TABLE = (
     [(TerminalState.FAILED, k, 3) for k in (
         "rebase-conflict", "local-gate", "remote-head-diverged",
-        "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty")]
+        "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty",
+        "subprocess-timeout")]
     + [(TerminalState.FAILED, "usage-pause", 75)]
     + [(TerminalState.FAILED, k, 1) for k in (
         "push-disabled", "push-failed", "push-retry-cap",
         "lostwork-unproved", "git", None)]
     + [(t, None, 0) for t in (
         TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
-        TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED)]
+        TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED,
+        TerminalState.HOLD_REPEAT_DECLINED)]
 )
 
 
@@ -65,6 +71,15 @@ def test_success_and_nothing_to_ship_exit_0():
 
 def test_degraded_exits_zero():                 # no /post-plan skill fallback on a shipped+held PR
     assert runner.exit_code_for(_res(TerminalState.DEGRADED)) == 0
+
+def test_hold_repeat_declined_exits_zero():
+    assert runner.exit_code_for(_res(TerminalState.HOLD_REPEAT_DECLINED)) == 0
+
+
+def test_hold_repeat_declined_is_not_failed():
+    assert TerminalState.HOLD_REPEAT_DECLINED != TerminalState.FAILED
+    assert TerminalState.HOLD_REPEAT_DECLINED.value == "hold-repeat-declined"
+
 
 def test_degraded_does_not_shadow_rebase_sentinel():   # negative: ordering, not a duplicate
     assert runner.exit_code_for(_res(TerminalState.FAILED, "rebase-conflict")) == 3

@@ -7,6 +7,7 @@ namespace Tests\BasketballStats;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use BasketballStats\TeamStatsCalculator;
+use League\LeagueContext;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
@@ -21,6 +22,53 @@ class TeamStatsCalculatorTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         $this->calculator = new TeamStatsCalculator($this->mockDb);
+    }
+
+    /**
+     * MockDatabase subclass that records the SQL handed to fetchAll()/fetchOne().
+     * The calculator duck-types on method_exists($db, 'fetchAll'|'fetchOne').
+     */
+    private function createRecordingDb(): MockDatabase
+    {
+        return new class extends MockDatabase {
+            /** @var list<string> */
+            public array $recordedSql = [];
+
+            /** @return list<array<string, mixed>> */
+            public function fetchAll(string $query, string $types = '', mixed ...$params): array
+            {
+                $this->recordedSql[] = $query;
+                return [];
+            }
+
+            public function fetchOne(string $query, string $types = '', mixed ...$params): null
+            {
+                $this->recordedSql[] = $query;
+                return null;
+            }
+        };
+    }
+
+    /**
+     * Run the preload path (fetchAll) and the per-team path (fetchOne), return both SQL strings.
+     *
+     * @return list<string>
+     */
+    private function captureStandingsSql(?LeagueContext $context): array
+    {
+        $db = $this->createRecordingDb();
+
+        $preloading = new TeamStatsCalculator($db, $context);
+        $preloading->preloadTeamRecords();
+
+        // Fresh calculator, no preload: calculate() falls back to the per-team fetchOne lookup.
+        $perTeam = new TeamStatsCalculator($db, $context);
+        $perTeam->calculate([
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+        ], 1);
+
+        /** @var list<string> */
+        return $db->recordedSql;
     }
 
     public function testCalculateInitializesCorrectlyWithEmptyGames(): void
@@ -582,5 +630,42 @@ class TeamStatsCalculatorTest extends TestCase
             'perfect season' => [82, 0, 41.0],
             'winless season' => [0, 82, -41.0],
         ];
+    }
+
+    public function testStandingsQueriesTargetIblStandingsWithoutLeagueContext(): void
+    {
+        $sql = $this->captureStandingsSql(null);
+
+        $this->assertCount(2, $sql);
+        foreach ($sql as $query) {
+            $this->assertMatchesRegularExpression('/FROM ibl_standings(\s|$)/', $query);
+            $this->assertStringNotContainsString('ibl_olympics_standings', $query);
+        }
+    }
+
+    public function testStandingsQueriesTargetOlympicsStandingsInOlympicsContext(): void
+    {
+        $context = self::createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+        $context->method('getTableName')->willReturnCallback(
+            static fn (string $t): string => LeagueContext::TABLE_MAP[$t] ?? $t
+        );
+
+        $sql = $this->captureStandingsSql($context);
+
+        $this->assertCount(2, $sql);
+        foreach ($sql as $query) {
+            $this->assertMatchesRegularExpression('/FROM ibl_olympics_standings(\s|$)/', $query);
+        }
+    }
+
+    public function testStandingsTablesMatchLeagueContextTableMap(): void
+    {
+        $value = (new \ReflectionClassConstant(TeamStatsCalculator::class, 'STANDINGS_TABLES'))->getValue();
+
+        $this->assertSame(
+            ['ibl' => 'ibl_standings', 'olympics' => LeagueContext::TABLE_MAP['ibl_standings']],
+            $value
+        );
     }
 }

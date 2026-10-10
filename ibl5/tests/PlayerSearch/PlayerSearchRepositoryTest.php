@@ -38,7 +38,7 @@ final class PlayerSearchRepositoryTest extends TestCase
                 return strpos($q, 'SELECT ibl_plr.*') !== false
                     && strpos($q, 'LEFT JOIN ibl_team_info') !== false
                     && strpos($q, 'WHERE ibl_plr.pid > 0') !== false
-                    && strpos($q, 'ORDER BY ibl_plr.retired ASC, ibl_plr.ordinal ASC') !== false;
+                    && strpos($q, 'ORDER BY ibl_plr.retired ASC, ibl_plr.ordinal ASC, ibl_plr.pid ASC') !== false;
             }))
             ->willReturn($mockStmt);
 

@@ -42,6 +42,22 @@
 #  21  queue rows carry MODEL / MERGE from the plan's frontmatter, with
 #      bin/automouse/queue's defaults (opus / true) when there is none, and the
 #      plan's title on its own indented line under the row
+#  22  characterization: the AUTOMOUSE QUEUE section sits between its header and
+#      UNACCOUNTED HEADLESS SESSIONS, still counts the 2 stale heartbeats, never
+#      prints a reused-pid log's raw text, and never lists a LIVE runner as stopped
+#  23  every runner stop line renders as its own exact "stopped" row, and each
+#      fixture line is checked against the runner source so a reword fails here
+#  24  a stop file outranks the log's stop line, and its epoch sets the time
+#  25  a report is cited only when it is certain: login-expired, canary-park,
+#      or exactly one env-stop report that day; two env-stop reports -> the log
+#  26  trailer only -> the session-complete text; started with no trace ->
+#      "ended without a clean finish (killed or crashed)"
+#  27  no session-starting line, or an unreadable log -> "unknown" + log path
+#  28  an unreadable or malformed stop file falls back to the log, and the rest
+#      of the page (UNACCOUNTED HEADLESS SESSIONS) still renders, exit 0
+#  29  four ended runners -> exactly three rows, newest first, oldest absent;
+#      no ended runner -> no "last stops" header at all
+#  30  a reused pid (alive, not automouse) is ended and reads "unknown"
 #
 # Case 13 points FLEET_STATUS_AUTOMOUSE_PLIST at a fixture. Left defaulted it
 # would read the real plist on macOS and take the missing-file branch on CI —
@@ -175,6 +191,13 @@ NIGHTLY_PID=$!
 disown "$NIGHTLY_PID" 2>/dev/null
 SPAWNED_PIDS="$SPAWNED_PIDS $NIGHTLY_PID"
 
+# A queued plan's runner in its post-plan phase. Like the real one, it leaves a
+# cmdpid file and no heartbeat, so its details must still print under its row.
+"$STUBBIN/automouse/run" plan pp-plan.md >/dev/null 2>&1 &
+PP_PID=$!
+disown "$PP_PID" 2>/dev/null
+SPAWNED_PIDS="$SPAWNED_PIDS $PP_PID"
+
 # An ORPHAN: a `claude -p` with no job above it. Spawned by this script, so its
 # ancestry never reaches a PID fleet-status printed — which is exactly the state
 # of a headless run whose supervisor died, and the only thing case 10's section
@@ -215,7 +238,14 @@ printf '%s\n' "$NOW"        > "$AM/.heartbeat-$LIVE_AUTOMOUSE_PID-impl"
 printf '%s\n' "$NOW"        > "$AM/.heartbeat-$UNRELATED_PID-impl"
 printf '%s\n' "$(( NOW - 200000 ))" > "$AM/.heartbeat-$DEAD_PID-postplan"
 printf '%s\n' "$NOW"        > "$AM/.heartbeat-$NODOTMD_PID-impl"
-printf '%s\n' "$NOW"        > "$AM/.heartbeat-$NIGHTLY_PID-postplan"
+# The real runner writes a cmdpid file beside every phase. An impl phase has a
+# heartbeat too; a post-plan phase never does (bin/automouse/run says why).
+# The dead run's cmdpid must not join the stale-heartbeat count.
+printf '1\n' > "$AM/.cmdpid-$LIVE_AUTOMOUSE_PID-impl"
+printf '1\n' > "$AM/.cmdpid-$NODOTMD_PID-impl"
+printf '1\n' > "$AM/.cmdpid-$NIGHTLY_PID-postplan"
+printf '1\n' > "$AM/.cmdpid-$PP_PID-postplan"
+printf '1\n' > "$AM/.cmdpid-$DEAD_PID-postplan"
 
 # Queue: one plain plan, one held by a mkdir-style lock DIRECTORY, two more for
 # the new invocation-form fixtures. Each lock directory contains a `pid` file so
@@ -259,6 +289,49 @@ printf '1\n' > "$AM/queue/nodotmd-plan.md.attempts"
 mkdir -p "$AM/queue/nightly-plan.md.lock"
 printf '%s\n' "$NIGHTLY_PID" > "$AM/queue/nightly-plan.md.lock/pid"
 printf '3\n' > "$AM/queue/nightly-plan.md.attempts"
+printf '# Post-plan phase plan\n' > "$AM/queue/pp-plan.md"
+mkdir -p "$AM/queue/pp-plan.md.lock"
+printf '%s\n' "$PP_PID" > "$AM/queue/pp-plan.md.lock/pid"
+# Three locks whose runner is gone. A usage-gate pause keeps its lock on purpose
+# and names the session in paused-held; the marker file says the pause is still
+# waiting. Without the marker the post-plan resume owns it. Without paused-held
+# the lock is a SIGKILL leftover. None of them may read "in progress".
+USAGE_DIR="$TMP/usage-gate"; mkdir -p "$USAGE_DIR/markers"
+PAUSED_SID='aaaaaaaa-1111-2222-3333-444444444444'
+RESUMED_SID='bbbbbbbb-1111-2222-3333-444444444444'
+for p in paused-plan resumed-plan resumed-gone-plan stale-lock-plan merged-plan; do
+    printf '# %s\n' "$p" > "$AM/queue/$p.md"
+    mkdir -p "$AM/queue/$p.md.lock"
+    printf '%s\n' "$DEAD_PID" > "$AM/queue/$p.md.lock/pid"
+done
+printf '%s\n' "$PAUSED_SID" > "$AM/queue/paused-plan.md.lock/paused-held"
+printf '{"session_id":"%s"}\n' "$PAUSED_SID" > "$USAGE_DIR/markers/$PAUSED_SID.json"
+printf '%s\n' "$RESUMED_SID" > "$AM/queue/resumed-plan.md.lock/paused-held"
+printf '%s\n' "$RESUMED_SID" > "$AM/queue/resumed-gone-plan.md.lock/paused-held"
+# resumed-plan's post-plan run is alive. Its handoff names a branch that differs
+# from the plan slug, as real ones can, and the run's command line carries the
+# POSTPLAN_LABEL post-plan-now exports. resumed-gone-plan has no such run: its PR
+# merged and only the lock is left.
+mkdir -p "$AM/handoff"
+printf '{"branch":"resumed-branch"}\n' > "$AM/handoff/resumed-plan.md.json"
+# merged-plan is resumed-gone-plan whose PR the gh stub reports merged. Its
+# handoff branch differs from the slug, so the lookup must read the handoff.
+printf '%s\n' "$RESUMED_SID" > "$AM/queue/merged-plan.md.lock/paused-held"
+printf '{"branch":"merged-branch"}\n' > "$AM/handoff/merged-plan.md.json"
+cat > "$STUBBIN/gh" <<'GH'
+#!/bin/bash
+# `gh pr list --head <branch> ...`: one merged PR for merged-branch only.
+while [ $# -gt 0 ]; do
+    [ "$1" = --head ] && { [ "$2" = merged-branch ] && echo 1 || echo 0; exit 0; }
+    shift
+done
+exit 1
+GH
+chmod +x "$STUBBIN/gh"
+sh -c "sleep 120; : POSTPLAN_LABEL='com.ibl5.postplan-now-resumed-branch-20260910-120000-1'" >/dev/null 2>&1 &
+RESUMED_RUN_PID=$!
+disown "$RESUMED_RUN_PID" 2>/dev/null
+SPAWNED_PIDS="$SPAWNED_PIDS $RESUMED_RUN_PID"
 
 # Runner progress. Impl lines come from each runner's own per-pid log, filtered
 # to that runner's slug and phase. Per-pid logs isolate runners from each other,
@@ -287,6 +360,10 @@ mkdir -p "$OUT/live-nightly-plan-20260910-140000-99"
 cat > "$OUT/live-nightly-plan-20260910-140000-99/audit.log" <<'AUDIT'
 [14:00:01] phase2: committing the tree
 outputs: /nightly/trailer/not/progress
+AUDIT
+mkdir -p "$OUT/live-pp-plan-20260910-150000-98"
+cat > "$OUT/live-pp-plan-20260910-150000-98/audit.log" <<'AUDIT'
+[15:00:01] phase5.5 fidelity: review: full
 AUDIT
 
 # Harness output for the "shown" launchd job. The trailing `outputs:` line is the
@@ -348,6 +425,8 @@ cat <<'ROWS'
 99999	0	com.apple.something.unrelated
 ROWS
 [ -n "\${STUB_NO_AUTOMOUSE:-}" ] || printf -- '-\t0\tcom.ibl5.automouse\n'
+# Case 26: a live burndown-loop, shown only when asked for.
+[ -z "\${STUB_BURNDOWN:-}" ] || printf -- '7007\t0\tcom.ibl5.burndown-loop\n'
 # Case 19: space-separated epochs, one loaded-but-idle one-shot label each.
 for e in \${STUB_ONESHOT_EPOCHS:-}; do
     printf -- '-\t0\tcom.ibl5.automouse-oneshot-%s\n' "\$e"
@@ -507,6 +586,7 @@ run_fleet() {
         FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
         FLEET_STATUS_REORDER_APP_DIR="$TMP/apps" \
         FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+        IBL5_USAGE_GATE_STATE_DIR="$USAGE_DIR" \
         "${_extra[@]+"${_extra[@]}"}" "$FLEET" 2>&1
 }
 
@@ -609,6 +689,191 @@ assert_lacks "automouse: dead-pid heartbeat hidden" "$OUTPUT" "pid $DEAD_PID "
 assert_lacks "automouse: reused-pid heartbeat hidden (PID reuse guard)" \
     "$OUTPUT" "pid $UNRELATED_PID "
 
+# 22 — characterization of the queue section's bounds and its negative guards.
+# The "stopped .*pid <live>" pattern matches the Phase 4 line shape, so it is
+# trivially green today and becomes the live-runner exclusion guard afterwards.
+QUEUE_BLOCK="$(sed -n '/AUTOMOUSE QUEUE/,/UNACCOUNTED HEADLESS SESSIONS/p' <<< "$OUTPUT")"
+assert_has   "queue block: bounded by the next section header" \
+    "$QUEUE_BLOCK" 'UNACCOUNTED HEADLESS SESSIONS'
+assert_has   "queue block: stale heartbeats still counted inside it" \
+    "$QUEUE_BLOCK" '2 stale heartbeat file\(s\) from dead runs'
+assert_lacks "queue block: a reused-pid log's raw text is never printed" \
+    "$QUEUE_BLOCK" 'DECOY-OTHER-RUNNER'
+assert_lacks "queue block: live runner not listed as stopped" \
+    "$QUEUE_BLOCK" "stopped .*pid $LIVE_AUTOMOUSE_PID "
+assert_lacks "queue block: live nodotmd runner not listed as stopped" \
+    "$QUEUE_BLOCK" "stopped .*pid $NODOTMD_PID "
+if [ "$RC" -eq 0 ]; then pass "page: exit 0"; else fail "page: exit 0 (got $RC)"; fi
+
+# ── 23–30: why each ended runner stopped ──────────────────────────────────────
+
+RUNNER_SRC="$SCRIPT_DIR/automouse/run"
+strip_sgr() { sed $'s/\033\\[[0-9;]*m//g'; }
+# stop_tree <name>: a fresh automouse dir whose logs/ is empty. Every stop
+# fixture uses $DEAD_PID, which this harness already spawned and reaped.
+stop_tree() {
+    local d="$TMP/am-stop-$1"
+    rm -rf "$d"; mkdir -p "$d/queue" "$d/logs" "$d/reports" "$d/stops"
+    printf '%s' "$d"
+}
+# stop_log <dir> <date> <stop line>: a realistic log that ends with the
+# session-complete trailer AFTER the stop line, so step 2 must beat step 3.
+stop_log() {
+    local f="$1/logs/$2-$DEAD_PID.log"
+    printf '%s\n' '=== Automouse session starting at Tue Oct  6 01:00:00 PDT 2026 ===' \
+        '[01:05:00] some-plan/impl tool: Bash (#1, turn 1)' "$3" \
+        '=== Automouse session complete at Tue Oct  6 01:40:02 PDT 2026 — 2 plan(s) run ===' > "$f"
+    touch -t "${2//-/}0140" "$f"
+    printf '%s' "$f"
+}
+queue_of() { strip_sgr | sed -n '/AUTOMOUSE QUEUE/,/UNACCOUNTED HEADLESS SESSIONS/p'; }
+ere_escape() { sed 's/[][\.*^$()+?{}|/]/\\&/g' <<< "$1"; }
+# stop_page <dir>: the queue block of a page rendered against <dir>.
+stop_page() { run_fleet FLEET_STATUS_AUTOMOUSE_DIR="$1" | queue_of; }
+
+# 23 — one row per stop path. Fields: fixture line TAB source fragment.
+N23=0
+while IFS=$'\t' read -r line frag; do
+    [ -n "$line" ] || continue
+    N23=$((N23 + 1))
+    [ -n "$frag" ] || frag="$line"
+    d="$(stop_tree "23-$N23")"
+    stop_log "$d" 2026-10-06 "$line" > /dev/null
+    cause="${line#\[01:39:00\] }"
+    page="$(stop_page "$d")"
+    label="stop row $N23: $(cut -c1-30 <<< "$cause")"
+    assert_has "$label" "$page" \
+        "^    stopped Tue 10-06 01:40  pid $DEAD_PID  $(ere_escape "$cause")  log: $(ere_escape "$d")/logs/2026-10-06-$DEAD_PID\\.log$"
+    if grep -qF -- "$frag" "$RUNNER_SRC"; then pass "$label: pinned in runner source"
+    else fail "$label: pinned in runner source"; printf '        missing from %s: %s\n' "$RUNNER_SRC" "$frag"; fi
+done <<'EOF_23'
+Queue empty — nothing to run.
+Queue drained after 2 plan(s).	Queue drained after $PLANS_RUN plan(s).
+Time guard: 14402s elapsed (max 14400s), stopping.	Time guard: ${ELAPSED}s elapsed (max ${MAX_ELAPSED}s), stopping.
+Login preflight: login expired, parking; queue left intact.
+Plan solo-plan is being processed by another runner — nothing to do.	is being processed by another runner — nothing to do.
+No claimable plan left. Deferred to the next run (cap-refunded or wt-new failure): a.md — stopping.	No claimable plan left. Deferred to the next run (cap-refunded or wt-new failure):
+No claimable plan left. Dependency-held this run: c.md — stopping.	No claimable plan left. Dependency-held this run:
+All queued plans are claimed by a concurrent runner — nothing to do.
+Impl paused (usage gate) — session abc123; coordinator resumes it. Refunding attempt, stopping loop.	Impl paused (usage gate) — session $IMPL_SID; coordinator resumes it. Refunding attempt, stopping loop.
+Environmental failure during impl — rate limited. Refunding attempt, stopping loop.	Environmental failure during impl — $REASON. Refunding attempt, stopping loop.
+Environmental failure during postplan — docker down. Refunding attempt, stopping loop.	Environmental failure during postplan — $REASON. Refunding attempt, stopping loop.
+Time guard between phases — will resume postplan next run.
+Post-plan paused (usage gate); post-plan-now owns the resume. Refunding attempt, stopping loop.
+[01:39:00] my-plan postplan terminal (rc=7) — no worktree and branch PR not MERGED — refunding, stopping loop	postplan terminal (rc=7) — no worktree and branch PR not MERGED — refunding, stopping loop
+[01:39:00] canary: ci-red — parking, queue left intact	canary: ci-red — parking, queue left intact
+[01:39:00] canary: smoke-red — parking, queue left intact	canary: smoke-red — parking, queue left intact
+[01:39:00] canary: ci-auth-error — env stop	canary: ci-auth-error — env stop
+EOF_23
+
+# 24 — the stop file outranks the log's stop line; its epoch sets the time.
+D24="$(stop_tree 24)"
+stop_log "$D24" 2026-10-06 'Queue drained after 2 plan(s).' > /dev/null
+E24="$(date -j -f '%Y%m%d%H%M' 202610060315 +%s 2>/dev/null || date -d '2026-10-06 03:15' +%s)"
+printf '%s\t%s\n' "$E24" 'terminated by SIGTERM (exit 143)' > "$D24/stops/2026-10-06-$DEAD_PID.stop"
+P24="$(stop_page "$D24")"
+assert_has   "stop file: wins and sets the time" "$P24" \
+    "^    stopped Tue 10-06 03:15  pid $DEAD_PID  terminated by SIGTERM \\(exit 143\\)  log: "
+assert_lacks "stop file: log's stop line is outranked" "$P24" 'Queue drained'
+
+# 25 — a report is cited only when it is certain.
+D25="$(stop_tree 25-login)"
+stop_log "$D25" 2026-10-06 'Login preflight: login expired, parking; queue left intact.' > /dev/null
+: > "$D25/reports/2026-10-06-login-expired.md"
+assert_has "report: login-expired cited" "$(stop_page "$D25")" \
+    "  report: $(ere_escape "$D25")/reports/2026-10-06-login-expired\\.md$"
+D25="$(stop_tree 25-canary)"
+stop_log "$D25" 2026-10-06 '[01:39:00] canary: ci-red — parking, queue left intact' > /dev/null
+: > "$D25/reports/2026-10-06-canary-park.md"
+assert_has "report: canary-park cited" "$(stop_page "$D25")" \
+    "report: .*canary-park\\.md$"
+D25="$(stop_tree 25-env1)"
+stop_log "$D25" 2026-10-06 'Environmental failure during impl — rate limited. Refunding attempt, stopping loop.' > /dev/null
+: > "$D25/reports/2026-10-06-env-stop-some-plan.md"
+assert_has "report: a single env-stop report cited" "$(stop_page "$D25")" \
+    "  report: $(ere_escape "$D25")/reports/2026-10-06-env-stop-some-plan\\.md$"
+D25="$(stop_tree 25-env2)"
+stop_log "$D25" 2026-10-06 'Environmental failure during impl — rate limited. Refunding attempt, stopping loop.' > /dev/null
+: > "$D25/reports/2026-10-06-env-stop-a.md"
+: > "$D25/reports/2026-10-06-env-stop-b.md"
+P25="$(stop_page "$D25")"
+assert_has   "report: two env-stop reports -> the log" "$P25" \
+    "  log: $(ere_escape "$D25")/logs/2026-10-06-$DEAD_PID\\.log$"
+assert_lacks "report: two env-stop reports -> no report cited" "$P25" 'report:'
+
+# 26 — trailer only, and started-with-no-trace.
+D26="$(stop_tree 26-trailer)"
+printf '%s\n' '=== Automouse session starting at Tue Oct  6 01:00:00 PDT 2026 ===' \
+    '=== Automouse session complete at Tue Oct  6 01:40:02 PDT 2026 — 2 plan(s) run ===' \
+    > "$D26/logs/2026-10-06-$DEAD_PID.log"
+assert_has "trailer only: the session-complete text" "$(stop_page "$D26")" \
+    'Automouse session complete at Tue Oct 6 01:40:02 PDT 2026 — 2 plan\(s\) run'
+D26="$(stop_tree 26-notrace)"
+printf '%s\n' '=== Automouse session starting at Tue Oct  6 01:00:00 PDT 2026 ===' \
+    '[01:05:00] some-plan/impl tool: Bash (#1, turn 1)' > "$D26/logs/2026-10-06-$DEAD_PID.log"
+assert_has "no trace: killed or crashed" "$(stop_page "$D26")" \
+    'ended without a clean finish \(killed or crashed\)  log: '
+
+# 27 — unknown.
+D27="$(stop_tree 27-garbage)"
+printf '%s\n' garbage > "$D27/logs/2026-10-06-$DEAD_PID.log"
+touch -t 202610060140 "$D27/logs/2026-10-06-$DEAD_PID.log"
+assert_has "garbage log: unknown + log path" "$(stop_page "$D27")" \
+    "^    stopped Tue 10-06 01:40  pid $DEAD_PID  unknown  log: $(ere_escape "$D27")/logs/2026-10-06-$DEAD_PID\\.log$"
+D27="$(stop_tree 27-unreadable)"
+F27="$(stop_log "$D27" 2026-10-06 'Queue drained after 2 plan(s).')"
+if [ "$(id -u)" = 0 ]; then
+    printf '  skip  unreadable log -> unknown (running as root)\n'
+else
+    chmod 000 "$F27"
+    assert_has "unreadable log: unknown + log path" "$(stop_page "$D27")" '  unknown  log: '
+    chmod 600 "$F27"
+fi
+
+# 28 — a failed or malformed stop-file read never breaks the page.
+D28="$(stop_tree 28-mode000)"
+stop_log "$D28" 2026-10-06 'Queue drained after 2 plan(s).' > /dev/null
+printf '%s\t%s\n' "$E24" 'terminated by SIGTERM (exit 143)' > "$D28/stops/2026-10-06-$DEAD_PID.stop"
+if [ "$(id -u)" = 0 ]; then
+    printf '  skip  unreadable stop file (running as root)\n'
+else
+    chmod 000 "$D28/stops/2026-10-06-$DEAD_PID.stop"
+    O28="$(run_fleet FLEET_STATUS_AUTOMOUSE_DIR="$D28")"; RC28=$?
+    assert_has "unreadable stop file: falls back to the log" "$(queue_of <<< "$O28")" 'Queue drained after 2 plan\(s\)\.'
+    assert_has "unreadable stop file: rest of the page renders" "$O28" 'UNACCOUNTED HEADLESS SESSIONS'
+    if [ "$RC28" -eq 0 ]; then pass "unreadable stop file: exit 0"; else fail "unreadable stop file: exit 0 (got $RC28)"; fi
+    chmod 600 "$D28/stops/2026-10-06-$DEAD_PID.stop"
+fi
+D28="$(stop_tree 28-malformed)"
+stop_log "$D28" 2026-10-06 'Queue drained after 2 plan(s).' > /dev/null
+printf '%s\t%s\n' notanumber x > "$D28/stops/2026-10-06-$DEAD_PID.stop"
+O28="$(run_fleet FLEET_STATUS_AUTOMOUSE_DIR="$D28")"; RC28=$?
+assert_has "malformed stop file: falls back to the log" "$(queue_of <<< "$O28")" 'Queue drained after 2 plan\(s\)\.'
+assert_has "malformed stop file: rest of the page renders" "$O28" 'UNACCOUNTED HEADLESS SESSIONS'
+if [ "$RC28" -eq 0 ]; then pass "malformed stop file: exit 0"; else fail "malformed stop file: exit 0 (got $RC28)"; fi
+
+# 29 — the cap, and the empty case. All four logs share $DEAD_PID; the date in
+# each file name keeps them distinct, and stop_log sets each mtime from its date.
+D29="$(stop_tree 29)"
+for day in 2026-10-03 2026-10-04 2026-10-05 2026-10-06; do
+    stop_log "$D29" "$day" 'Queue drained after 2 plan(s).' > /dev/null
+done
+P29="$(stop_page "$D29")"
+N29="$(grep -c '^    stopped ' <<< "$P29")"
+if [ "$N29" -eq 3 ]; then pass "cap: exactly three stopped rows"; else fail "cap: exactly three stopped rows (got $N29)"; fi
+F29="$(grep -m1 '^    stopped ' <<< "$P29")"
+assert_has   "cap: newest first" "$F29" 'stopped Tue 10-06 '
+assert_lacks "cap: oldest absent" "$P29" 'stopped .* 10-03 '
+D29="$(stop_tree 29-empty)"
+assert_lacks "empty: no last-stops header" "$(stop_page "$D29")" 'last stops'
+
+# 30 — the reused-pid decoy in the main fixture is ended and reads unknown.
+assert_has "reused pid: ended, reads unknown" "$(queue_of <<< "$OUTPUT")" \
+    'stopped .*pid 1  unknown  log: .*/automouse/logs/2026-09-10-1\.log'
+assert_lacks "reused pid: raw text still hidden" "$OUTPUT" 'DECOY-OTHER-RUNNER'
+assert_has "reused pid: log word is a link" "$OUTPUT_LINKS" \
+    'stopped .*pid 1 .*unknown.*vscode://file[^ ]*2026-09-10-1\.log'
+
 # 6 — the live runner is shown.
 assert_has "automouse: live runner shown"     "$OUTPUT" "pid $LIVE_AUTOMOUSE_PID "
 assert_has "automouse: attempts surfaced"     "$OUTPUT" 'attempt 2'
@@ -618,6 +883,19 @@ assert_has "queue: lock dir marks plan in progress" \
     "$OUTPUT" 'live-plan\.md +[^ ]+ +[^ ]+ +in progress'
 assert_has "queue: unlocked plan reads queued" \
     "$OUTPUT" 'idle-plan\.md +[^ ]+ +[^ ]+ +queued'
+# A lock with no live runner is not work in progress.
+assert_has "queue: usage-gate hold with its marker reads paused" \
+    "$OUTPUT" '‖ paused-plan\.md +[^ ]+ +[^ ]+ +paused \(usage limit\)$'
+assert_has "queue: usage-gate hold without its marker reads resumed" \
+    "$OUTPUT" '▶ resumed-plan\.md +[^ ]+ +[^ ]+ +resumed \(post-plan\)$'
+assert_has "queue: resumed hold with no live post-plan reads stale" \
+    "$OUTPUT" '× resumed-gone-plan\.md +[^ ]+ +[^ ]+ +stale lock \(post-plan gone\)$'
+assert_has "queue: lock with a dead runner and no hold reads stale" \
+    "$OUTPUT" '× stale-lock-plan\.md +[^ ]+ +[^ ]+ +stale lock \(runner gone\)$'
+assert_has "queue: dead lock on a merged PR says the runner clears it" \
+    "$OUTPUT" '× merged-plan\.md +[^ ]+ +[^ ]+ +PR merged \(runner clears it\)$'
+assert_lacks "queue: no dead-runner lock reads in progress" \
+    "$OUTPUT" '(paused|resumed|resumed-gone|stale-lock|merged)-plan\.md .*in progress'
 
 # 21 — MODEL / MERGE / TITLE. The bare plan gets bin/automouse/queue's defaults;
 # the frontmatter plan gets its own values and its H1.
@@ -751,6 +1029,19 @@ assert_has "automouse: post-plan runner links its audit.log" \
     "$OUTPUT_LINKS" '8;;vscode://file/[^ ]*live-nightly-plan-20260910-140000-99/audit\.log[^ ]*audit'
 assert_lacks "automouse: post-plan outputs trailer is not progress" \
     "$OUTPUT" 'nightly/trailer/not/progress'
+assert_has "automouse: post-plan activity age comes from its audit.log" \
+    "$NIGHTLY_BLOCK" "● postplan +pid $NIGHTLY_PID +up [^ ]+ +last activity [0-9]+s ago"
+# A queued plan in post-plan has only a cmdpid file. Its details still print
+# under its own row, phase line included.
+PP_BLOCK="$(grep -EA3 'pp-plan\.md' <<< "$OUTPUT" | tr '\n' ' ')"
+assert_has "queue: post-plan runner details follow its queued row" \
+    "$PP_BLOCK" "● postplan +pid $PP_PID .*phase5\\.5 fidelity: review: full"
+# Both of a runner's files list it once. The live impl holds a heartbeat and a
+# cmdpid; out of queue, the nodotmd runner holds both too.
+assert_has "queue: impl runner with both files prints one detail line" \
+    "$(grep -c "pid $LIVE_AUTOMOUSE_PID " <<< "$OUTPUT")" '^1$'
+assert_has "automouse: out-of-queue runner with both files gets one row" \
+    "$(grep -cE 'nodotmd-plan +- +- +running' <<< "$OUTPUT" || true)" '^1$'
 # Every runner now lives inside the queue section. The old section is gone.
 assert_lacks "automouse: no separate runners section" \
     "$OUTPUT" 'AUTOMOUSE RUNNERS'
@@ -1005,6 +1296,34 @@ else
     printf '  skip  %s\n' "watch: frame-swap clear-screen escape in first frame (no timeout/gtimeout)"
     printf '  skip  %s\n' "watch: refresh footer in first frame (no timeout/gtimeout)"
 fi
+
+# Case 26 — a sleeping burndown-loop row shows its wake time. bin/burndown-loop
+# logs "<UTC ts> burndown-loop sleep <secs>s reason=<r>" when it falls asleep, so
+# the wake time is ts + secs. A sleep that already ended, or a later log line,
+# means it is awake and no time prints. BSD `date -r` first, GNU `date -d @` second.
+bd_utc() { date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
+BD_START=$(( $(date +%s) - 60 ))
+BD_WAKE_HM="$(date -r $(( BD_START + 3600 )) +%H:%M 2>/dev/null \
+    || date -d "@$(( BD_START + 3600 ))" +%H:%M)"
+BD_ASLEEP="$TMP/bd-asleep.log"; BD_AWAKE="$TMP/bd-awake.log"; BD_PAST="$TMP/bd-past.log"
+printf '%s burndown-loop sleep 3600s reason=all-skipped\n' "$(bd_utc "$BD_START")" > "$BD_ASLEEP"
+{ cat "$BD_ASLEEP"
+  printf '%s burndown-loop decision=launch go 29.0 54.3 0\n' "$(bd_utc "$BD_START")"; } > "$BD_AWAKE"
+printf '%s burndown-loop sleep 30s reason=pace\n' "$(bd_utc "$BD_START")" > "$BD_PAST"
+OUT_BD_ASLEEP="$(run_fleet STUB_BURNDOWN=1 FLEET_STATUS_BURNDOWN_LOG="$BD_ASLEEP")"
+OUT_BD_AWAKE="$(run_fleet STUB_BURNDOWN=1 FLEET_STATUS_BURNDOWN_LOG="$BD_AWAKE")"
+OUT_BD_PAST="$(run_fleet STUB_BURNDOWN=1 FLEET_STATUS_BURNDOWN_LOG="$BD_PAST")"
+assert_has "burndown: the row is listed under its own name" \
+    "$OUT_BD_ASLEEP" '● burndown +burndown-loop'
+assert_has "burndown: asleep shows the reason and next run" \
+    "$OUT_BD_ASLEEP" "asleep \\(all-skipped\\)  ·  next run [A-Z][a-z]{2} [0-9-]{10} $BD_WAKE_HM"
+assert_lacks "burndown: a later log line means awake, no next run" \
+    "$OUT_BD_AWAKE" 'asleep \('
+assert_has "burndown: awake shows the last log line" \
+    "$OUT_BD_AWAKE" 'decision=launch go'
+assert_lacks "burndown: a sleep that already ended shows no next run" \
+    "$OUT_BD_PAST" 'asleep \('
 
 # Case 23 — unknown option: exit 2, one-line complaint on stderr, no page rendered.
 # stderr is captured apart from stdout so the message is pinned to the right stream.

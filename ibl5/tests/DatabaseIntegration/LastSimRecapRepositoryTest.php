@@ -146,6 +146,36 @@ class LastSimRecapRepositoryTest extends DatabaseTestCase
         self::assertFalse($injuries[0]['isNew']);
     }
 
+    public function testGetActiveInjuriesBreaksSameDateTiesByTransactionIdDescending(): void
+    {
+        $this->insertTestPlayer(800101, 'Tie P101', ['teamid' => 1]);
+        $this->insertTestPlayer(800102, 'Tie P102', ['teamid' => 1]);
+        $this->insertTestPlayer(800103, 'Tie P103', ['teamid' => 1]);
+
+        // Insert order matters: 800101 gets the lowest transaction id, 800103 the highest.
+        foreach ([[800101, 15], [800102, 15], [800103, 14]] as [$pid, $day]) {
+            $this->insertRow('ibl_jsb_transactions', [
+                'season_year' => 2030,
+                'transaction_month' => 1,
+                'transaction_day' => $day,
+                'transaction_type' => 1,
+                'pid' => $pid,
+                'player_name' => 'Tie P' . ($pid - 800000),
+                'from_teamid' => 1,
+                'to_teamid' => 0,
+                'injury_games_missed' => 10,
+                'injury_description' => 'Tie fixture',
+                'is_draft_pick' => 0,
+            ]);
+        }
+
+        $injuries = $this->repo->getActiveInjuriesForPlayers([800101, 800102, 800103], '2030-01-15');
+
+        // Same-day rows tie on is_new and injury_date: newest transaction first.
+        // The 01-14 row trails despite having the highest id.
+        self::assertSame([800102, 800101, 800103], array_column($injuries, 'pid'));
+    }
+
     public function testGetStarterPidsFromBoxScoresPicksTopMinutes(): void
     {
         $schedId = $this->insertScheduleRow(2030, '2030-05-01', visitorTid: 1, visitorScore: 100, homeTid: 2, homeScore: 90);

@@ -55,6 +55,9 @@
 #                            0 disables the held-unchanged skip. When 1, PRs whose last
 #                            post-plan run held for conditions {3,7} only and whose diff
 #                            matches the sticky **Reviewed diff:** are skipped.
+#                            A PR whose live bucket is DIRTY or BLOCKED-CHECK is exempt
+#                            from this skip and from the holdrepeat skip: a new conflict
+#                            or red check is a state change those fingerprints miss.
 #                            Default: 1 (enabled)
 #   PR_CYCLE_STOP_FILE       Stop file path.                  Default: $HOME/.ibl5-pr-cycle.stop
 #   PR_CYCLE_DRY_LAUNCH      With --go: emit runner + plist but skip launchctl bootstrap.
@@ -76,6 +79,14 @@
 #                            $PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness.
 #   PR_CYCLE_HOLDREPEAT_STATE_DIR
 #                            Holdrepeat state records. Default: <harness>/out/state.
+#   PR_CYCLE_RESULT_FILE     Unset or empty writes nothing. Otherwise the worker atomically
+#                            writes the `# pr-cycle-result v1` TSV (one `<pr> <status> <outcome>
+#                            <reason>` row per in-scope PR) when it finishes, even after a HALT.
+#                            Passed through the launcher env list. Read by bin/pr-cycle-tick.
+#   PR_CYCLE_SKIP_NOTES      Path to a "<pr><TAB><reason>" TSV of PRs the caller skipped.
+#                            Unset, empty, or a missing file all mean no notes. Read only;
+#                            merged with this run's own skip reasons into the your-turn DM.
+#                            Passed through the launcher env list. Written by bin/pr-cycle-tick.
 #
 #   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
 #   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
@@ -102,8 +113,10 @@
 #   * This script never polls for merges and never sleeps. .github/workflows/update-behind-prs.yml
 #     re-BEHINDs open PRs after each merge, and merge-digest-notify.yml sends the per-merge
 #     digest DM. This script's only DM is the your-turn summary at the end of a run.
-#   * Stage 1 is exactly one post-plan-fleet --pr-list call. Its exit code is the only
-#     readiness signal; no stderr text match of any kind.
+#   * Stage 1 is exactly one post-plan-fleet --pr-list call. The call carries
+#     --allow-test-only, plus --state-changed-prs=<csv> naming the fired PRs whose live
+#     bucket is DIRTY or BLOCKED-CHECK. Its exit code is the only readiness signal; no
+#     stderr text match of any kind.
 
 set -euo pipefail
 
@@ -124,25 +137,30 @@ export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/
 # --git-common-dir points at the main .git even from a linked worktree, where
 # --show-toplevel would return the worktree instead. Used only to locate sibling tools.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-GIT_COMMON="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-if [ -z "$GIT_COMMON" ]; then
-    # git < 2.31 has no --path-format; fall back to resolving the relative answer by hand.
-    GIT_COMMON="$(cd "$SCRIPT_DIR" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"
-fi
-ROOT="$(dirname "$GIT_COMMON")"
+. "$SCRIPT_DIR/lib/git-helpers.sh"
+ROOT="$(main_checkout_root "$SCRIPT_DIR")" || {
+    echo "ERROR: cannot locate main checkout from $SCRIPT_DIR" >&2
+    exit 1
+}
 . "$SCRIPT_DIR/lib/launchd-job.sh"
+. "$SCRIPT_DIR/lib/pr-cycle-watch.sh"
+# shellcheck source=bin/lib/dm.sh
+. "$SCRIPT_DIR/lib/dm.sh"
 
 # --- env seams ---------------------------------------------------------------------------
 # All :- (not -) so an EMPTY value falls back to the default exactly as an unset one does.
 PR_CYCLE_ATTACK_CMD="${PR_CYCLE_ATTACK_CMD:-$ROOT/bin/pr-attack}"
 PR_CYCLE_TRIAGE_CMD="${PR_CYCLE_TRIAGE_CMD:-$ROOT/bin/pr-triage}"
 PR_CYCLE_READY_CMD="${PR_CYCLE_READY_CMD:-$ROOT/bin/post-plan-fleet}"
-PR_CYCLE_DM_CMD="${PR_CYCLE_DM_CMD:-$ROOT/bin/discord-dm}"
+PR_CYCLE_DM_CMD="$(dm_bin "$ROOT/bin" PR_CYCLE_DM_CMD)"
 PR_CYCLE_GH_CMD="${PR_CYCLE_GH_CMD:-gh}"
 PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5}"
 PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
 PR_CYCLE_SKIP_READY_WHEN_ARMABLE="${PR_CYCLE_SKIP_READY_WHEN_ARMABLE:-1}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
+# Machine-readable per-PR result file written by the worker. Unset or empty writes nothing.
+PR_CYCLE_RESULT_FILE="${PR_CYCLE_RESULT_FILE:-}"
+PR_CYCLE_SKIP_NOTES="${PR_CYCLE_SKIP_NOTES:-}"
 PR_CYCLE_DRY_LAUNCH="${PR_CYCLE_DRY_LAUNCH:-}"
 PR_CYCLE_AUTH_PROBE_CMD="${PR_CYCLE_AUTH_PROBE_CMD:-}"
 PR_CYCLE_PATCH_ID_CMD="${PR_CYCLE_PATCH_ID_CMD:-}"
@@ -280,6 +298,7 @@ fi
 TS="${PR_CYCLE_TS:-$(date +%Y%m%d-%H%M%S)-$$}"
 RUNDIR="/tmp/pr-cycle-$TS"
 HALT=""
+STAGE1_FIRED=""
 ARMED=0
 READIED=0
 LEFT=0
@@ -482,7 +501,7 @@ _ensure_armed_state() {
     [ -f "$RUNDIR/armed-state.json" ]   && return 0
     set +e
     "$PR_CYCLE_GH_CMD" pr list --state open --limit 200 \
-        --json number,headRefName,autoMergeRequest,mergeStateStatus,headRefOid \
+        --json number,headRefName,autoMergeRequest,mergeStateStatus,headRefOid,baseRefName \
         > "$RUNDIR/armed-state.json" 2> "$RUNDIR/armed-state.err"
     _easrc=$?
     set -e
@@ -531,7 +550,7 @@ _auth_probe() {
     # Run from /tmp with no tools, settings or MCP: in a repo cwd the model picks up project
     # context and may not answer OK. --max-turns 1 is wrong here: it errors on a plain reply.
     _ap_out="$(cd /tmp && timeout 90 claude -p 'Reply with the single word OK.' \
-        --model claude-haiku-4-5-20251001 --tools "" --setting-sources "" \
+        --model claude-haiku-5-5 --tools "" --setting-sources "" \
         --strict-mcp-config --system-prompt 'You reply with exactly the word OK.' 2>/dev/null)"
     _ap_rc=$?
     set -e
@@ -832,16 +851,40 @@ _precheck_verdict() {
 }
 
 
+# _stacked_parent N — print the open PR whose head branch is PR N's base and return 0;
+# return 1 when N is not stacked. Reads the once-per-run armed-state.json (all open
+# PRs, any author). Fails open: no list or a jq error reads as not stacked, so the PR
+# fires as it did before this check existed.
+_stacked_parent() {
+    _ensure_armed_state
+    [ -f "$RUNDIR/armed-state.json" ] || return 1
+    local _sp_base _sp_heads
+    _sp_base="$(jq -r --argjson n "$1" '.[] | select(.number == $n) | .baseRefName // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null)" || return 1
+    _sp_heads="$(jq -r '.[] | [.headRefName, .number] | @tsv' \
+        "$RUNDIR/armed-state.json" 2>/dev/null)" || return 1
+    pcw_stacked_on "$_sp_base" "$_sp_heads"
+}
+
 # _stage1_list — build $RUNDIR/stage1.txt (one PR per line, final order) and
 # $RUNDIR/stage1-skipped.txt (#N — reason lines).
+# Stacked PRs (base is another open PR's head) are skipped first, as "stacked on #N".
 # Note: _pr_patch_id may fetch git refs into ROOT; call _cleanup_fetch_refs afterwards.
 _stage1_list() {
     : > "$RUNDIR/stage1.txt"
     : > "$RUNDIR/stage1-skipped.txt"
     : > "$RUNDIR/stage1-holdrepeat.txt"
+    : > "$RUNDIR/stage1-state-changed.txt"
     while IFS=$'\t' read -r _sl_n _sl_needs; do
         [ -n "$_sl_n" ] || continue
         if ! _pr_allowed "$_sl_n"; then continue; fi
+
+        # Stacked PRs are never rescued: their checks run against the parent branch.
+        # Runs before the state-change exemption, so a red stacked PR cannot bypass.
+        if _sl_par="$(_stacked_parent "$_sl_n")"; then
+            echo "#$_sl_n — stacked on #$_sl_par, skipping" >> "$RUNDIR/stage1-skipped.txt"
+            continue
+        fi
 
         # Fix 1: skip PRs already armed for auto-merge (update-behind-prs keeps them current).
         # Fails open: on any gh/jq error, _armed_skip returns 1 and we proceed normally.
@@ -861,6 +904,18 @@ _stage1_list() {
                 echo "#$_sl_n — ARMABLE but no current READY verdict, running pr-ready"
             fi
         fi
+
+        # State-change exemption: a DIRTY or BLOCKED-CHECK bucket is a new conflict or a
+        # red non-signoff check, which the held-unchanged and holdrepeat fingerprints
+        # cannot see. Neither pre-fire skip applies, and the fleet passes --state-changed
+        # to this PR's post-plan-now. A pending human sign-off is neither bucket, so a green
+        # feat PR waiting on sign-off keeps both skips.
+        case "$(_precheck_bucket "$_sl_n")" in
+            DIRTY|BLOCKED-CHECK)
+                echo "$_sl_n" >> "$RUNDIR/stage1-state-changed.txt"
+                echo "$_sl_n" >> "$RUNDIR/stage1.txt"
+                continue ;;
+        esac
 
         # Fix 4: skip PRs held for conditions {3,7} with unchanged diff — re-running would
         # produce the same hold. Seam PR_CYCLE_SKIP_HELD_UNCHANGED=0 disables this.
@@ -890,12 +945,19 @@ EOF
         while IFS= read -r _sl_dn; do
             [ -n "$_sl_dn" ] || continue
             if ! _pr_allowed "$_sl_dn"; then continue; fi
+            if _sl_par="$(_stacked_parent "$_sl_dn")"; then
+                echo "#$_sl_dn — stacked on #$_sl_par, skipping" >> "$RUNDIR/stage1-skipped.txt"
+                continue
+            fi
             if _slot_held "$_sl_dn"; then
                 echo "#$_sl_dn — post-plan-fleet slot already live" >> "$RUNDIR/stage1-skipped.txt"
                 continue
             fi
             if grep -qxF "$_sl_dn" "$RUNDIR/stage1.txt" 2>/dev/null; then continue; fi
             if grep -qxF "$_sl_dn" "$RUNDIR/stage1-holdrepeat.txt" 2>/dev/null; then continue; fi
+            case "$(_precheck_bucket "$_sl_dn")" in
+                DIRTY|BLOCKED-CHECK) echo "$_sl_dn" >> "$RUNDIR/stage1-state-changed.txt" ;;
+            esac
             echo "$_sl_dn" >> "$RUNDIR/stage1.txt"
         done <<EOF
 $(_excluded_dirty_rows)
@@ -979,6 +1041,43 @@ _stage1_result_lines() {
     fi
 }
 
+# _stage1_result_file — write $PR_CYCLE_RESULT_FILE: a "# pr-cycle-result v1" header, then one
+# "<pr><TAB><status><TAB><outcome><TAB><reason>" row per PR in scope. status is fired (outcome
+# and reason from the fleet log), holdrepeat (both "-"), or not-fired (outcome "-", reason halt
+# when HALT stopped the run before Stage 1 fired, else not-selected). A no-op when the path is
+# unset or empty. Written to a temp name and renamed, so a reader never sees a partial file.
+_stage1_result_file() {
+    [ -n "${PR_CYCLE_RESULT_FILE:-}" ] || return 0
+    local _rf_pr _rf_o _rf_r _rf_status _rf_tmp="$PR_CYCLE_RESULT_FILE.tmp.$$"
+    local _rf_scope="$RUNDIR/result-scope.txt"
+    mkdir -p "$(dirname "$PR_CYCLE_RESULT_FILE")" || return 1
+    if [ -n "$ONLY" ]; then
+        printf '%s\n' "$ONLY" | tr ',' '\n' > "$_rf_scope"
+    else
+        cat "$RUNDIR/stage1.txt" "$RUNDIR/stage1-holdrepeat.txt" 2>/dev/null > "$_rf_scope" || true
+    fi
+    {
+        echo "# pr-cycle-result v1"
+        while IFS= read -r _rf_pr; do
+            [ -n "$_rf_pr" ] || continue
+            _rf_pr="${_rf_pr#\#}"
+            if grep -qxF -- "$_rf_pr" "$RUNDIR/stage1-holdrepeat.txt" 2>/dev/null; then
+                _rf_status=holdrepeat; _rf_o="-"; _rf_r="-"
+            elif [ -n "$STAGE1_FIRED" ] && grep -qxF -- "$_rf_pr" "$RUNDIR/stage1.txt" 2>/dev/null; then
+                _rf_status=fired
+                IFS=$'\t' read -r _rf_o _rf_r <<< "$(_fleet_outcome "$_rf_pr")"
+                _rf_r="$(printf '%s' "$_rf_r" | tr '\t\n' '  ')"
+                [ -n "$_rf_r" ] || _rf_r="-"
+            else
+                _rf_status=not-fired; _rf_o="-"
+                if [ -n "$HALT" ] && [ -z "$STAGE1_FIRED" ]; then _rf_r=halt; else _rf_r=not-selected; fi
+            fi
+            printf '%s\t%s\t%s\t%s\n' "$_rf_pr" "$_rf_status" "$_rf_o" "$_rf_r"
+        done < "$_rf_scope"
+    } > "$_rf_tmp" || return 1
+    mv -f "$_rf_tmp" "$PR_CYCLE_RESULT_FILE"
+}
+
 # _stage1_fire — run post-plan-fleet with the stage1.txt list. Returns 0 on empty or
 # fleet exit 0; sets HALT and returns 1 on failure.
 _stage1_fire() {
@@ -991,10 +1090,14 @@ _stage1_fire() {
         return 1
     fi
     _csv="$(paste -sd, "$RUNDIR/stage1.txt")"
+    # Only PRs that survived the --max-ready cap; the fleet bakes --state-changed into
+    # just these runners.
+    _sc_csv="$(grep -xFf "$RUNDIR/stage1.txt" "$RUNDIR/stage1-state-changed.txt" 2>/dev/null | paste -sd, - || true)"
     set +e
     # pr-cycle's own auth probe already passed — bypass the duplicate probe in post-plan-fleet.
+    STAGE1_FIRED=1
     env POST_PLAN_FLEET_AUTH_PROBE_CMD=true \
-        "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait \
+        "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait --allow-test-only ${_sc_csv:+"--state-changed-prs=$_sc_csv"} \
         > "$RUNDIR/ready.out" 2> "$RUNDIR/ready.err"
     _rc=$?
     set -e
@@ -1071,6 +1174,68 @@ _bucket_emoji() {
     esac
 }
 
+# _build_skip_notes — merge this run's stage1-skipped.txt reasons with the tick's
+# PR_CYCLE_SKIP_NOTES file into $RUNDIR/skip-notes.tsv as "<pr>\t<rank>\t<reason>".
+# First reason per PR wins (pr-cycle's own before the tick's). PRs armed or fired this
+# run are dropped. Sorted by rank, then PR number; the rank is the DM truncation order.
+# PR_CYCLE_SKIP_NOTES unset, empty, or naming a missing file all mean "no tick notes".
+_build_skip_notes() {
+    {
+        if [ -f "$RUNDIR/stage1-skipped.txt" ]; then
+            while IFS= read -r _bs_l; do
+                case "$_bs_l" in '#'[0-9]*' — '*) ;; *) continue ;; esac
+                _bs_n="${_bs_l%% — *}"
+                _bs_r="${_bs_l#* — }"
+                printf '%s\t%s\n' "${_bs_n#\#}" "${_bs_r%, skipping}"
+            done < "$RUNDIR/stage1-skipped.txt"
+        fi
+        if [ -n "${PR_CYCLE_SKIP_NOTES:-}" ] && [ -f "$PR_CYCLE_SKIP_NOTES" ]; then
+            grep -E '^[0-9]+	' "$PR_CYCLE_SKIP_NOTES" || true
+        fi
+    } | awk -F'\t' -v armed="$RUNDIR/armed.txt" -v fired="$RUNDIR/stage1.txt" '
+        BEGIN { while ((getline l < armed) > 0) drop[l] = 1
+                while ((getline l < fired) > 0) drop[l] = 1 }
+        ($1 in drop) || ($1 in seen) { next }
+        { seen[$1] = 1; r = $2
+          rank = (r ~ /^stacked on/) ? 1 : (r ~ /^over /) ? 2 \
+               : (r ~ /holdrepeat|retry cap|no-op rescue cap|held it for/) ? 3 \
+               : (r ~ /^checks |^draft$/) ? 5 : 4
+          printf "%s\t%d\t%s\n", $1, rank, r }' \
+    | sort -t "$(printf '\t')" -k2,2n -k1,1n > "$RUNDIR/skip-notes.tsv" \
+    || : > "$RUNDIR/skip-notes.tsv"
+}
+
+# _skip_note_lines USED [EXCLUDE] — print "**Skipped (K)**" and one "- #N — reason" row
+# per skip-notes.tsv line whose PR is not listed in EXCLUDE (your-turn rows carry their
+# own reason). Shares the your-turn 1700-char budget: USED is what is already printed.
+# Prints nothing when the header alone would pass the cap.
+_skip_note_lines() {
+    local _sk_used="$1" _sk_ex="${2:-/dev/null}" _sk_rows _sk_total _sk_shown=0 _sk_line _sk_hdr
+    [ -s "$RUNDIR/skip-notes.tsv" ] || return 0
+    _sk_rows="$(awk -F'\t' -v ex="$_sk_ex" '
+        BEGIN { while ((getline l < ex) > 0) { split(l, a, "\t"); x[a[1]] = 1 } }
+        !($1 in x) { print }' "$RUNDIR/skip-notes.tsv")"
+    [ -n "$_sk_rows" ] || return 0
+    _sk_total="$(printf '%s\n' "$_sk_rows" | wc -l | tr -d ' ')"
+    _sk_hdr="**Skipped ($_sk_total)**"
+    [ "$((_sk_used + ${#_sk_hdr} + 1))" -le 1700 ] || return 0
+    echo "$_sk_hdr"
+    _sk_used=$((_sk_used + ${#_sk_hdr} + 1))
+    while IFS="$(printf '\t')" read -r _skn _skrank _skreason; do
+        [ -n "$_skn" ] || continue
+        _sk_line="- #$_skn — $_skreason"
+        if [ "$((_sk_used + ${#_sk_line} + 1))" -gt 1700 ]; then
+            echo "- …and $((_sk_total - _sk_shown)) more skipped: $RUNDIR/skip-notes.tsv"
+            return 0
+        fi
+        echo "$_sk_line"
+        _sk_used=$((_sk_used + ${#_sk_line} + 1))
+        _sk_shown=$((_sk_shown + 1))
+    done <<EOF
+$_sk_rows
+EOF
+}
+
 # _your_turn_lines — print the your-turn.txt rows under typed group headers, linked via gh pr list.
 # Groups, in order, empty ones omitted: Conflicts holds DIRTY and NOT-MERGEABLE rows, Awaiting
 # feat sign-off its namesake bucket, Failed the BLOCKED-CHECK rows, Other held everything else
@@ -1116,6 +1281,11 @@ _your_turn_lines() {
         while IFS="$(printf '\t')" read -r _yn _ybkt _yact; do
             [ -n "$_yn" ] || continue
             _yact="${_yact:-see pr-triage}"
+            _ynote="$(awk -F'\t' -v n="$_yn" '$1 == n { print $3; exit }' "$RUNDIR/skip-notes.tsv" 2>/dev/null || true)"
+            [ -n "$_ynote" ] && _yact="$_yact (skipped: $_ynote)"
+            if grep -qxF "$_yn" "$RUNDIR/stage1.txt" 2>/dev/null; then
+                _yact="$_yact (rescue: $(_fleet_outcome "$_yn" | cut -f1))"
+            fi
             _row="$(awk -F'\t' -v n="$_yn" '$1 == n { print; exit }' "$RUNDIR/prlist.tsv" 2>/dev/null || true)"
             if [ -n "$_row" ]; then
                 _yurl="$(printf '%s\n' "$_row" | cut -f2)"
@@ -1133,6 +1303,7 @@ _your_turn_lines() {
             _yt_shown=$((_yt_shown + 1))
         done < "$RUNDIR/yt-g$_yg.txt"
     done
+    _skip_note_lines "$_yt_running" "$RUNDIR/your-turn.txt"
 }
 
 # ==========================================================================================
@@ -1182,16 +1353,21 @@ _worker() {
 
     _reason="${HALT:-done}"
     _stage1_result_lines
+    _stage1_result_file || echo "pr-cycle: WARN result file write failed: $PR_CYCLE_RESULT_FILE" >&2
     _OUTCOME_SUMMARY="$(_stage1_outcome_summary)"
     _FIRED_SUMMARY="${READIED:+fired $READIED (${_OUTCOME_SUMMARY})}"
     _FIRED_SUMMARY="${_FIRED_SUMMARY:-fired 0}"
     echo "pr-cycle finished — $_FIRED_SUMMARY, armed $ARMED, your turn $LEFT — $_reason"
 
+    [ -n "$HALT" ] || _build_skip_notes
     if [ -z "$NO_DM" ]; then
         if [ -n "$HALT" ]; then
             _yt_block="Your turn: unknown — stage 2 did not run"
         elif [ "$LEFT" -eq 0 ]; then
             _yt_block="Your turn: nothing"
+            _yt_skips="$(_skip_note_lines 0)"
+            [ -z "$_yt_skips" ] || _yt_block="$_yt_block
+$_yt_skips"
         else
             _yt_block="Your turn:
 $(_your_turn_lines)"
@@ -1199,7 +1375,7 @@ $(_your_turn_lines)"
         _msg="pr-cycle finished — $_FIRED_SUMMARY, armed $ARMED, your turn $LEFT — $_reason
 log: ${PR_CYCLE_LOG:-<foreground>}
 $_yt_block"
-        "$PR_CYCLE_DM_CMD" --ping "$_msg" || true
+        DM_CMD="$PR_CYCLE_DM_CMD" dm_ping "$_msg" || true
     fi
 
     case "$_reason" in
@@ -1234,7 +1410,8 @@ _report_dry_run() {
     fi
     if [ "$_s1_cnt" -gt 0 ]; then
         _s1_csv="$(paste -sd, "$RUNDIR/stage1.txt")"
-        echo "would run: post-plan-fleet --pr-list $_s1_csv --jobs $JOBS --go --wait"
+        _s1_sc="$(grep -xFf "$RUNDIR/stage1.txt" "$RUNDIR/stage1-state-changed.txt" 2>/dev/null | paste -sd, - || true)"
+        echo "would run: post-plan-fleet --pr-list $_s1_csv --jobs $JOBS --go --wait --allow-test-only${_s1_sc:+ --state-changed-prs=$_s1_sc}"
     fi
     if [ "$PR_CYCLE_RESCUE" = "0" ]; then
         echo "DIRTY rescue: disabled (PR_CYCLE_RESCUE=0) — excluded PRs stay unreachable."
@@ -1302,7 +1479,7 @@ _launch() {
                   PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_HARNESS_OUT PR_CYCLE_FLEET_LOG_DIR \
                   PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR \
                   PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \
-                  PR_CYCLE_STOP_FILE; do
+                  PR_CYCLE_STOP_FILE PR_CYCLE_RESULT_FILE PR_CYCLE_SKIP_NOTES; do
             eval "_val=\${$_v}"
             # shellcheck disable=SC2154  # _val is assigned by the eval above
             printf 'export %s=%q\n' "$_v" "$_val"

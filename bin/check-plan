@@ -104,7 +104,10 @@
 #   C  Context budget        — a marathon-sized plan (>= 500 lines OR >= 12
 #                              numbered Step/Phase headings) predicts an
 #                              implementation session that breaches the ~150K
-#                              context dumb-zone. Measured 2026-07-07 on the
+#                              context dumb-zone (degradation unmeasured on Opus 5.5
+#                              as of 2026-10-08; method: dz-extract.py drops
+#                              isSidechain lines, dz-score.py bands the rest).
+#                              Measured 2026-07-07 on the
 #                              automouse corpus: Opus implementation runs that
 #                              exceeded 150K peak context executed plans of
 #                              median ~566 lines / ~20 phases, while the runs
@@ -223,15 +226,6 @@
 #                              characters. The post-plan harness honors it nowhere
 #                              else (planfile.parse_phases), so a short reason or a
 #                              marker outside a phase is a silent no-op.
-#   Z  Leading-star matrix token — a backticked single-word token in a matrix
-#                              "What to verify" cell that starts with '*' (the
-#                              catch-all case arm, a bare extension glob).
-#                              bin/lib/plan-matrix-assertions realises a glob
-#                              token only through its prefix before the first
-#                              '*', so an empty prefix is reported
-#                              UNREALISED-ASSERTION at post-plan Step 6.7
-#                              whatever the diff holds. Extraction mirrors the
-#                              checker; bin/test-check-plan pins the parity.
 #   VR VR snapshots marker   — a `## Critical Files` entry that
 #                              cf_parse_section_raw classifies MUST_APPEAR and
 #                              whose path contains `-snapshots` must carry the
@@ -801,6 +795,11 @@ done < <(awk '
 #   (c) patterns live in bin/lib/hold-check-patterns.txt because harness/classify.py
 #       reads the same file; the parity test in bin/test-check-plan keeps them from
 #       drifting between the two languages.
+#   (d) gate H(c): the **Decision:** paragraph is the only hold text /post-plan
+#       renders into the PR body, so it is checked as reader-facing prose:
+#       bin/check-prose tells, an empty body, more than 40 words in total, and
+#       the legacy "The human/reviewer/owner accepts ..." opener all fail. A hold
+#       section without a Decision line gets no H(c) check (unchanged).
 if [ "$FM_HOLD" -eq 1 ]; then
     if ! grep -qiE '^##[[:space:]]+Automouse Hold Justification[[:space:]]*$' "$PLAN_FILE"; then
         viol "[H] plan declares auto_merge: false but has no '## Automouse Hold Justification' section (Step 4.5 — record why the hold is reducible-confirmed or intrinsic)"
@@ -809,6 +808,29 @@ if [ "$FM_HOLD" -eq 1 ]; then
             [ -n "$hb_hit" ] || continue
             viol "[H] hold justification asks the human to run a check an agent can run (line ${hb_hit%%:*}): ${hb_hit#*:} — move the observable check into the Verification Matrix and keep only the irreducible judgment, on a '**Decision:**' line. See /plan Step 4.5 'Record the outcome'."
         done < <(hold_check_violations "$PLAN_FILE")
+        # Gate H(c): Decision paragraph is reader-facing prose (see (d) above).
+        if command -v hold_decision_paragraphs >/dev/null 2>&1; then
+            HD_TEXT=$(hold_decision_paragraphs "$PLAN_FILE")
+            if [ -n "$HD_TEXT" ]; then
+                HD_BODY=$(sed -E 's/^[ ]*\*\*Decision:\*\*[ ]*//' <<< "$HD_TEXT")
+                HD_WORDS=$(wc -w <<< "$HD_BODY" | tr -d '[:space:]')
+                if [ "$HD_WORDS" -eq 0 ]; then
+                    viol "[H] Decision line is empty — write one plain yes/no sentence for the person pressing merge, e.g. \"Merge if you're OK with about 7% more PRs being held until their body declares scope.\""
+                elif [ "$HD_WORDS" -gt 40 ]; then
+                    viol "[H] Decision line is ${HD_WORDS} words (cap 40) — the PR body shows it to the person pressing merge; cut it to one short yes/no sentence"
+                fi
+                if grep -qiE '^[[:space:]]*the[[:space:]]+(human|reviewer|owner)([[:space:]]+[[:alpha:]-]+){0,2}[[:space:]]+accepts?([[:space:]]|$)' <<< "$HD_BODY"; then
+                    viol "[H] Decision line opens with the legacy 'The human accepts ...' shape — address the person pressing merge directly, e.g. \"Merge if you're OK with ...\""
+                fi
+                if [ -x "$SCRIPT_DIR/check-prose" ]; then
+                    HD_PROSE=$("$SCRIPT_DIR/check-prose" --stdin <<< "$HD_BODY" 2>&1)
+                    HD_PROSE_RC=$?
+                    if [ "$HD_PROSE_RC" -eq 1 ]; then
+                        viol "[H] Decision line has a prose tell: $(head -n 1 <<< "$HD_PROSE") — rewrite it as one plain sentence (bin/check-prose)"
+                    fi
+                fi
+            fi
+        fi
     fi
 fi
 
@@ -1293,6 +1315,31 @@ done < "$MATRIX_FILE"
 if [ "$_y_tagged" -gt 0 ] && [ $((_y_tagged * 3)) -gt "$_y_total" ]; then
     viol "[Y] ${_y_tagged} of ${_y_total} matrix rows carry (one-time-check: ...) — more than one third of the matrix is unpinned; a one-time check is for evidence no regression test can hold, so convert rows to tests or split the plan"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate Z: an untagged CLI-executable row whose command runs only outside the repo
+# (~/, $HOME, /tmp) or against a post-PR CI run (gh run|pr|api). The diff cannot carry
+# such a row's tokens, so bin/lib/plan-matrix-assertions reports UNREALISED-ASSERTION
+# at Step 6.7 and the implementation never hands off. The (one-time-check: ...) tag is
+# the release; make the planner write it now. A row that also runs a repo path or a
+# repo-exercising command (composer, php, npx, docker, curl) is in-repo and exempt. Tag
+# shape, reason length, and type mismatches stay with gate Y above.
+# ---------------------------------------------------------------------------
+_z_b='(^|[^A-Za-z0-9_./~-])'
+_z_out="${_z_b}(~/|\\\$HOME/|\\\$\\{HOME\\}|/tmp/|/private/tmp/)"
+_z_gh="${_z_b}gh[[:space:]]+(run|pr|api)([[:space:]]|\$)"
+_z_in="${_z_b}(bin|ibl5|tools|\\.claude|\\.github|vendor|e2e|tests)/|(^|/)IBL5(-worktrees)?/|${_z_b}(composer|php|npx|docker|curl)([[:space:]]|\$)"
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    [ "$MC_TYPE" = "CLI-executable" ] || continue
+    _z_what="${MC_WHAT//$MSEN/|}"
+    grep -qE '`[^`[:space:]]+`' <<< "$_z_what" || continue
+    grep -qE "$_z_out|$_z_gh" <<< "$MC_LOC" || continue
+    grep -qE "$_z_in" <<< "$MC_LOC" && continue
+    grep -qE "$_y_shape" <<< "$_z_what" && continue
+    viol "[Z] row runs only outside the repo (~/, \$HOME, /tmp) or against a post-PR CI run (gh run|pr|api) and carries no one-time-check tag; the diff cannot carry its tokens and Step 6.7 stops on it. End the What-to-verify cell with '(one-time-check: <what was run and what it printed>)', or make the command also run a repo bin/ script or test: ${row}"
+done < "$MATRIX_FILE"
 
 # ---------------------------------------------------------------------------
 # Gate ND: a `**No diff:** <reason>` phase marker. The post-plan harness reads it only
@@ -2026,61 +2073,6 @@ if [ -n "$_u_bad" ]; then
         viol "[U] ## Backlog issues line must read '- closes|refs a-jay85/IBL5-backlog#N — <what>' (lowercase tag, full repo path, a description): \"${_u_line}\""
     done <<< "$_u_bad"
 fi
-
-# ---------------------------------------------------------------------------
-# Gate [Z]: leading-star backticked token in a matrix "What to verify" cell.
-# ---------------------------------------------------------------------------
-# >>> gate-Z-leading-star-token
-# bin/lib/plan-matrix-assertions treats a backticked single-word token holding
-# '*' as a glob and realises it only through the text BEFORE the first '*'. A
-# token that STARTS with '*' has an empty prefix, so the checker reports its
-# row UNREALISED-ASSERTION whatever the diff holds, and post-plan Step 6.7
-# fails the run. This awk mirrors the checker's row-extraction awk and its
-# placeholder filter exactly: plain ``` / ~~~ fence toggle, the What-to-verify
-# header, the \| escape, the 2nd table column, separator rows skipped, first
-# row id wins, odd backtick splits, whitespace tokens dropped, name=value cut
-# at the first '=', then tokens holding ... or <x> dropped. bin/test-check-plan
-# pins this mirror to the real checker (its "Gate [Z] parity" block). WAIVE-
-# MATRIX-ROW waivers live in the PR body, which does not exist at lint time,
-# so they are not consulted. A (one-time-check: ...) tagged row is still
-# flagged: the tag does not change how the checker globs the token.
-_z_hits=$(awk -F'|' '
-BEGIN { fence=0; inm=0; }
-/^[[:space:]]*(```|~~~)/ { fence = !fence; inm = 0; next; }
-fence { next; }
-/\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
-inm && /^[[:space:]]*\|/ {
-    line = $0;
-    gsub(/\\\|/, "\001", line);
-    n = split(line, f, "|");
-    if (n < 3) { next; }
-    id = f[2]; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id);
-    cell = f[3]; gsub(/\001/, "|", cell); gsub(/\t/, " ", cell);
-    gsub(/^[[:space:]]+|[[:space:]]+$/, "", cell);
-    if (cell ~ /^[[:space:]:-]*$/) next;
-    if (seen[id]) next;
-    seen[id] = 1;
-    n2 = split(cell, parts, "`");
-    for (i = 2; i < n2; i += 2) {
-        t = parts[i];
-        if (t == "") continue;
-        if (t ~ /[[:space:]]/) continue;
-        sub(/=.*/, "", t);
-        if (t == "") continue;
-        if (index(t, "...") > 0) continue;
-        if (t ~ /<.*>/) continue;
-        if (substr(t, 1, 1) == "*") print id "\t" t;
-    }
-    next;
-}
-inm && !/^[[:space:]]*\|/ { inm=0; }
-' "$PLAN_FILE")
-if [ -n "$_z_hits" ]; then
-    while IFS=$'\t' read -r _z_id _z_tok; do
-        viol "[Z] matrix row ${_z_id}: backticked token '${_z_tok}' starts with '*'. bin/lib/plan-matrix-assertions globs on the text before the first '*', so an empty prefix is never realised and post-plan Step 6.7 reports this row UNREALISED-ASSERTION whatever the diff holds. Drop the backticks or reword the token in prose (e.g. the token '*)' becomes \"the catch-all case arm\")"
-    done <<< "$_z_hits"
-fi
-# <<< gate-Z-leading-star-token
 
 # ---------------------------------------------------------------------------
 # Report.

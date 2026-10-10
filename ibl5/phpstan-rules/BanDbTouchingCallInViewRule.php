@@ -19,7 +19,6 @@ final class BanDbTouchingCallInViewRule implements Rule
     /** @var array<string, list<string>> */
     private const BANNED_STATIC_CALLS = [
         'Player\Player' => ['withPlrRow', 'withPlayerID'],
-        'Player\Views\TeamColorHelper' => ['getTeamColors'],
     ];
 
     public function getNodeType(): string

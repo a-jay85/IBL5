@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import re
 
-from .adapters.probe import _validate as _probe_validate
 from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
@@ -24,6 +23,8 @@ MANUAL_CONFIRMATION_BEGIN = "<!-- manual-confirmation:begin -->"
 MANUAL_CONFIRMATION_END = "<!-- manual-confirmation:end -->"
 REVIEWER_VERIFICATION_BEGIN = "<!-- reviewer-verification:begin -->"
 REVIEWER_VERIFICATION_END = "<!-- reviewer-verification:end -->"
+GATE_FIX_BEGIN = "<!-- gate-fix:begin -->"
+GATE_FIX_END = "<!-- gate-fix:end -->"
 
 STRIP_RE = re.compile(r"(migrations/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__/|\.snap$)")
 _PHP = re.compile(r"\.php$")
@@ -475,6 +476,62 @@ def upsert_scope_notes(body: str, block: str) -> str:
     return body.rstrip() + "\n\n" + block + "\n"
 
 
+def render_gate_fix(rec: dict) -> str:
+    """The `## Local gate auto-fix` block for a PR body, or "" unless a fix shipped.
+
+    Rendered only for a `fixed` outcome whose retry passed. Any other record stays in
+    result.json and audit.log.
+    """
+    if not rec or rec.get("status") != "fixed" or rec.get("retry") != "passed":
+        return ""
+    cost = rec.get("cost_usd")
+    shown = "unknown" if cost is None else f"${cost:.2f}"
+    files = ", ".join(f"`{f}`" for f in rec.get("files") or [])
+    excerpt = (rec.get("gate_excerpt") or "").replace("~~~~", "~ ~ ~ ~")
+    return "\n".join([
+        GATE_FIX_BEGIN,
+        "## Local gate auto-fix",
+        "",
+        f"A local `{rec.get('failed_cmd', '')}` gate denied this branch. The harness ran "
+        "one headless fixer and the retry passed.",
+        "",
+        f"- Model: `{rec.get('model_id', '')}`, cost: {shown}",
+        f"- Gate class: `{rec.get('gate_class', '')}`",
+        f"- Files touched: {files}",
+        "",
+        "<details><summary>Gate output</summary>",
+        "",
+        "~~~~text",
+        excerpt,
+        "~~~~",
+        "</details>",
+        GATE_FIX_END,
+    ])
+
+
+def upsert_gate_fix(body: str, block: str) -> str:
+    """Insert, replace, or remove the gate-fix block in a PR body.
+
+    Same contract as upsert_scope_notes with the GATE_FIX markers.
+    """
+    body = body or ""
+    begin_idx = body.find(GATE_FIX_BEGIN)
+    end_idx = body.find(GATE_FIX_END)
+    well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
+    if well_formed:
+        after_end = end_idx + len(GATE_FIX_END)
+        if not block:
+            head = body[:begin_idx].rstrip("\n")
+            tail = body[after_end:].lstrip("\n")
+            return head + ("\n\n" + tail if tail else "\n") if head else tail
+        return body[:begin_idx] + block + body[after_end:]
+    if not block:
+        return body
+    if not body.strip():
+        return block
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
 def _neutralize_headings(text: str) -> list[str]:
     """Blockquote every line so no line of plan prose can present as a heading.
 
@@ -495,16 +552,51 @@ def render_manual_confirmation(justification: str) -> str:
     Empty/whitespace-only input returns "" — never an empty heading. Every line
     of the justification is emitted as a blockquote so no line of plan prose can
     present as a markdown heading in the PR body (see _neutralize_headings).
+    The block carries one heading and no bold header line.
     """
     text = (justification or "").strip()
     if not text:
         return ""
-    header = ("**Manual confirmation needed** (from the plan's "
-              "`## Automouse Hold Justification` — auto-merge is held):")
-    parts = [MANUAL_CONFIRMATION_BEGIN, "## Manual confirmation needed", "", header, ""]
+    parts = [MANUAL_CONFIRMATION_BEGIN, "## Manual confirmation needed", ""]
     parts.extend(_neutralize_headings(text))
     parts.append(MANUAL_CONFIRMATION_END)
     return "\n".join(parts)
+
+
+def decision_paragraphs(justification: str) -> str:
+    """Raw `**Decision:**` paragraph(s) of a hold justification body.
+
+    Byte-identical to `bin/lib/hold-check.sh::hold_decision_paragraphs` run on
+    the same plan (pinned by tests/test_decision_render_parity.py): blocks
+    joined by one empty line, no trailing newline, "" when there is none.
+    """
+    # Local import: keeps classify.py free of a module-level planfile import.
+    from harness.planfile import split_hold_justification
+    decision_block, _ = split_hold_justification(justification or "")
+    return decision_block.rstrip("\n")
+
+
+def manual_confirmation_text(justification: str) -> str:
+    """What the merger reads: the Decision paragraph(s), else the full text.
+
+    Category, `Discharged by matrix rows`, and the why-line are plan-gate
+    bookkeeping and never reach the PR body. A section with no Decision line
+    falls back to the whole justification so a held PR never loses its notice.
+    """
+    decision = decision_paragraphs(justification)
+    return decision if decision.strip() else (justification or "")
+
+
+def upsert_hold_notice(body: str, justification: str) -> str:
+    """Phase 6 hold-notice composition, one call for the runner.
+
+    Upserts the Decision-only manual-confirmation block (positioned before
+    `## Manual Testing` by upsert_manual_confirmation), then clears any
+    `## Reviewer verification` block an earlier run left behind.
+    """
+    body = upsert_manual_confirmation(
+        body, render_manual_confirmation(manual_confirmation_text(justification)))
+    return upsert_reviewer_verification(body, "")
 
 
 def upsert_manual_confirmation(body: str, block: str) -> str:
@@ -552,54 +644,6 @@ def _neutralize_checkboxes(text: str) -> str:
     def _replace(m: re.Match) -> str:
         return "- ( )" if m.group(1) == " " else "- (x)"
     return _CB_RE.sub(_replace, text)
-
-
-def render_reviewer_verification(discharged: list) -> str:
-    """Marker-delimited `## Reviewer verification` block, or "" when empty.
-
-    Each discharged entry is a dict with keys `text`, `category`, and
-    optionally `probe` (list[str]) and `rationale` (str).  For cli-executable
-    entries the probe is included in the bullet only when it passes the probe
-    allowlist; an invalid probe is silently omitted rather than rendered.
-
-    No emitted line starts with `#` (headings are not injected by this block),
-    and source text containing `- [ ]` or `- [x]` is rewritten to `- ( )` /
-    `- (x)` so clearance scanners cannot be confused.
-    """
-    if not discharged:
-        return ""
-    parts = [REVIEWER_VERIFICATION_BEGIN, "## Reviewer verification", ""]
-    parts.append("These claims came from the plan's hold justification and are settleable without you.")
-    parts.append("Each names its instrument; nothing here needs a human at the merge button.")
-    parts.append("")
-    for entry in discharged:
-        cat = entry.get("category", "unknown")
-        raw_text = _neutralize_checkboxes(entry.get("text", ""))
-        # Arming-gate defense: neutralize any line in the text that starts with
-        # '#' so no emitted line can be misread as a markdown heading by the
-        # clearance scanners.
-        text = "\n".join(
-            ("> " + ln) if ln.startswith("#") else ln
-            for ln in raw_text.splitlines()
-        )
-        probe = entry.get("probe")
-        rationale = entry.get("rationale", "")
-        if cat == "cli-executable" and probe:
-            rejection = _probe_validate(probe)
-            if rejection is None:
-                probe_str = " ".join(probe)
-                bullet = f'- "{text}" — `{cat}`: `{probe_str}`'
-            elif rationale:
-                bullet = f'- "{text}" — `{cat}`: {rationale}'
-            else:
-                bullet = f'- "{text}" — `{cat}`'
-        elif rationale:
-            bullet = f'- "{text}" — `{cat}`: {rationale}'
-        else:
-            bullet = f'- "{text}" — `{cat}`'
-        parts.append(bullet)
-    parts.append(REVIEWER_VERIFICATION_END)
-    return "\n".join(parts)
 
 
 def upsert_reviewer_verification(body: str, block: str) -> str:
@@ -813,6 +857,15 @@ MANUAL_TESTING_SENTINEL = (
 MANUAL_TESTING_SENTINEL_STATIC = (
     "No manual testing needed — verification is static; "
     "the plan's Verification Matrix has no executable rows.")
+
+# Written by manual_testing.run() after Phase 6.7 confirms every `- [ ]` row in the
+# gate window is ticked. Same `No manual testing needed` prefix, so armable.SENTINEL_RE,
+# bin/lib/pr-armable.sh and bin/check-pr-manual-testing all read it as CLEARED; the
+# tail names no e2e/playwright/unit/phpunit/integration class, so armable.TAIL_TYPE_RULES
+# demands no matching changed file. "covered by", never "verified by" (#2489).
+MANUAL_TESTING_SENTINEL_TICKED = (
+    "No manual testing needed — every row below was ticked by the harness in "
+    "Phase 6.7; each is covered by an automated check that passed.")
 
 
 def _manual_testing_span(body: str) -> tuple[int, int] | None:

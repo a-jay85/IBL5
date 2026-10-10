@@ -191,9 +191,23 @@ class PlayerStats implements PlayerStatsInterface
     protected function loadByID(int $playerID): void
     {
         $plrRow = $this->repository->getPlayerStats($playerID);
-        if ($plrRow !== null) {
-            $this->fill($plrRow);
+        if ($plrRow === null) {
+            // Unknown pid (e.g. the LeagueStarters empty-slot placeholder 4040404):
+            // fill zeros so every typed stat property is initialized.
+            /** @var PlayerStatsRow $plrRow */
+            $plrRow = self::emptyRow($playerID);
         }
+        $this->fill($plrRow);
+    }
+
+    /**
+     * Identity-only row; fill() defaults every missing stat column to zero.
+     *
+     * @return array<string, mixed>
+     */
+    private static function emptyRow(int $playerID): array
+    {
+        return ['pid' => $playerID, 'name' => '', 'pos' => '', 'retired' => 0];
     }
 
     /**

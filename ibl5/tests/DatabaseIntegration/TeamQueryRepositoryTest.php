@@ -220,6 +220,55 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
         self::assertSame(200090107, $result);
     }
 
+    /**
+     * @return list<array{string}>
+     */
+    public static function jsbPositionProvider(): array
+    {
+        return array_map(
+            static fn (string $pos): array => [$pos],
+            \League\JsbConstants::PLAYER_POSITIONS
+        );
+    }
+
+    #[DataProvider('jsbPositionProvider')]
+    public function testStarterLookupsResolveEveryJsbPosition(string $pos): void
+    {
+        $pid = 200090310;
+        $col = strtolower($pos) . '_depth';
+        $this->insertTestPlayer($pid, $pos . ' Every Position Starter', [
+            $col => 1,
+            'dc_' . $col => 1,
+            'pos' => $pos,
+        ]);
+        // Clear other starters for this position so only the seeded row matches
+        $this->db->query("UPDATE ibl_plr SET {$col} = 0 WHERE teamid = " . self::TEST_TID . " AND pid != {$pid} AND {$col} = 1");
+        $this->db->query("UPDATE ibl_plr SET dc_{$col} = 0 WHERE teamid = " . self::TEST_TID . " AND pid != {$pid} AND dc_{$col} = 1");
+
+        self::assertSame($pid, $this->repo->getLastSimStarterPlayerIDForPosition(self::TEST_TID, $pos));
+        self::assertSame($pid, $this->repo->getCurrentlySetStarterPlayerIDForPosition(self::TEST_TID, $pos));
+    }
+
+    public function testStarterLookupsAcceptLowercasePosition(): void
+    {
+        $pid = 200090311;
+        $this->insertTestPlayer($pid, 'Lowercase Position Starter', [
+            'pg_depth' => 1,
+            'dc_pg_depth' => 1,
+            'pos' => 'PG',
+        ]);
+        $this->db->query("UPDATE ibl_plr SET pg_depth = 0 WHERE teamid = " . self::TEST_TID . " AND pid != {$pid} AND pg_depth = 1");
+        $this->db->query("UPDATE ibl_plr SET dc_pg_depth = 0 WHERE teamid = " . self::TEST_TID . " AND pid != {$pid} AND dc_pg_depth = 1");
+
+        $upperLastSim = $this->repo->getLastSimStarterPlayerIDForPosition(self::TEST_TID, 'PG');
+        $upperCurrent = $this->repo->getCurrentlySetStarterPlayerIDForPosition(self::TEST_TID, 'PG');
+
+        self::assertSame($pid, $upperLastSim);
+        self::assertSame($pid, $upperCurrent);
+        self::assertSame($upperLastSim, $this->repo->getLastSimStarterPlayerIDForPosition(self::TEST_TID, 'pg'));
+        self::assertSame($upperCurrent, $this->repo->getCurrentlySetStarterPlayerIDForPosition(self::TEST_TID, 'pg'));
+    }
+
     public function testGetCurrentlySetStarterPlayerIDForPosition(): void
     {
         $this->insertTestPlayer(200090108, 'DC PG Starter', [
@@ -412,5 +461,188 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
         $sorted = $ordinals;
         sort($sorted);
         self::assertSame($sorted, $ordinals);
+    }
+
+    // --- ORDER BY tiebreakers (ADR-0083) ---
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param list<int> $pids
+     * @return list<int>
+     */
+    private function orderedPidsAmong(array $rows, array $pids): array
+    {
+        $ordered = [];
+        foreach ($rows as $row) {
+            $pid = $row['pid'] ?? null;
+            if (is_int($pid) && in_array($pid, $pids, true)) {
+                $ordered[] = $pid;
+            }
+        }
+        return $ordered;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<string>
+     */
+    private function tieNotesAmong(array $rows): array
+    {
+        $notes = [];
+        foreach ($rows as $row) {
+            $note = $row['notes'] ?? null;
+            if (is_string($note) && str_starts_with($note, 'tie-1367-')) {
+                $notes[] = $note;
+            }
+        }
+        return $notes;
+    }
+
+    private function insertTieDraftPick(int $round, string $notes): void
+    {
+        $this->insertRow('ibl_draft_picks', [
+            'ownerofpick' => 'TestPickOwner',
+            'owner_teamid' => self::TEST_TID,
+            'teampick' => 'TieTeam1367',
+            'teampick_teamid' => self::TEST_TID,
+            'year' => 2097,
+            'round' => $round,
+            'notes' => $notes,
+        ]);
+    }
+
+    private function insertTieOffer(int $pid): void
+    {
+        $this->insertRow('ibl_fa_offers', [
+            'name' => 'Tie Offer 1367',
+            'pid' => $pid,
+            'team' => 'Test Team',
+            'teamid' => self::TEST_TID,
+            'offer1' => 1000,
+            'offer2' => 1100,
+            'offer3' => 0,
+            'offer4' => 0,
+            'offer5' => 0,
+            'offer6' => 0,
+            'modifier' => 1.0,
+            'random' => 0.5,
+            'perceivedvalue' => 1000.0,
+            'mle' => 0,
+            'lle' => 0,
+            'offer_type' => 0,
+        ]);
+    }
+
+    public function testGetDraftHistoryBreaksDraftSlotTiesByPidAscending(): void
+    {
+        $slot = ['draftedby' => 'TieDraft1367', 'draftyear' => 2097, 'draftround' => 2, 'draftpickno' => 7];
+        $this->insertTestPlayer(200091302, 'Tie Name 1367 A', $slot);
+        $this->insertTestPlayer(200091301, 'Tie Name 1367 B', $slot);
+
+        $result = $this->repo->getDraftHistory('TieDraft1367');
+
+        self::assertSame([200091301, 200091302], $this->orderedPidsAmong($result, [200091301, 200091302]));
+    }
+
+    public function testGetDraftPicksBreaksSlotTiesByPickIdAscending(): void
+    {
+        $this->insertTieDraftPick(2, 'tie-1367-first');
+        $this->insertTieDraftPick(2, 'tie-1367-second');
+
+        $result = $this->repo->getDraftPicks(self::TEST_TID);
+
+        self::assertSame(['tie-1367-first', 'tie-1367-second'], $this->tieNotesAmong($result));
+
+        $pickIds = [];
+        foreach ($result as $row) {
+            $note = $row['notes'] ?? null;
+            if (is_string($note) && str_starts_with($note, 'tie-1367-')) {
+                $pickIds[] = $row['pickid'];
+            }
+        }
+        self::assertCount(2, $pickIds);
+        self::assertLessThan($pickIds[1], $pickIds[0]);
+    }
+
+    public function testGetFreeAgencyOffersBreaksNameTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200091304, 'Tie Offer 1367', ['teamid' => 0]);
+        $this->insertTestPlayer(200091303, 'Tie Offer 1367', ['teamid' => 0]);
+        $this->insertTieOffer(200091304);
+        $this->insertTieOffer(200091303);
+
+        $result = $this->repo->getFreeAgencyOffers(self::TEST_TID);
+
+        self::assertSame([200091303, 200091304], $this->orderedPidsAmong($result, [200091303, 200091304]));
+    }
+
+    public function testGetFreeAgencyRosterOrderedByNameBreaksTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200091306, 'Tie Name 1367 A');
+        $this->insertTestPlayer(200091305, 'Tie Name 1367 A');
+
+        $result = $this->repo->getFreeAgencyRosterOrderedByName(self::TEST_TID);
+
+        self::assertSame([200091305, 200091306], $this->orderedPidsAmong($result, [200091305, 200091306]));
+    }
+
+    public function testGetHealthyAndInjuredPlayersOrderedByNameBreaksTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200091308, 'Tie Name 1367 B');
+        $this->insertTestPlayer(200091307, 'Tie Name 1367 B');
+
+        $result = $this->repo->getHealthyAndInjuredPlayersOrderedByName(self::TEST_TID);
+
+        self::assertSame([200091307, 200091308], $this->orderedPidsAmong($result, [200091307, 200091308]));
+    }
+
+    public function testGetHealthyPlayersOrderedByNameBreaksTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200091310, 'Tie Name 1367 C', ['injured' => 0]);
+        $this->insertTestPlayer(200091309, 'Tie Name 1367 C', ['injured' => 0]);
+
+        $result = $this->repo->getHealthyPlayersOrderedByName(self::TEST_TID);
+
+        self::assertSame([200091309, 200091310], $this->orderedPidsAmong($result, [200091309, 200091310]));
+    }
+
+    public function testGetRosterUnderContractOrderedByNameBreaksTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200091312, 'Tie Name 1367 D');
+        $this->insertTestPlayer(200091311, 'Tie Name 1367 D');
+
+        $result = $this->repo->getRosterUnderContractOrderedByName(self::TEST_TID);
+
+        self::assertSame([200091311, 200091312], $this->orderedPidsAmong($result, [200091311, 200091312]));
+    }
+
+    public function testGetRosterUnderContractOrderedByOrdinalBreaksTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200091314, 'Tie Name 1367 E', ['ordinal' => 7]);
+        $this->insertTestPlayer(200091313, 'Tie Name 1367 F', ['ordinal' => 7]);
+
+        $result = $this->repo->getRosterUnderContractOrderedByOrdinal(self::TEST_TID);
+
+        self::assertSame([200091313, 200091314], $this->orderedPidsAmong($result, [200091313, 200091314]));
+    }
+
+    public function testGetRosterUnderContractOrderedByNameSortsByNameBeforePid(): void
+    {
+        $this->insertTestPlayer(200091315, 'Tie Name 1367 F');
+        $this->insertTestPlayer(200091316, 'Tie Name 1367 E');
+
+        $result = $this->repo->getRosterUnderContractOrderedByName(self::TEST_TID);
+
+        self::assertSame([200091316, 200091315], $this->orderedPidsAmong($result, [200091315, 200091316]));
+    }
+
+    public function testGetDraftPicksSortsByRoundBeforePickId(): void
+    {
+        $this->insertTieDraftPick(2, 'tie-1367-round2');
+        $this->insertTieDraftPick(1, 'tie-1367-round1');
+
+        $result = $this->repo->getDraftPicks(self::TEST_TID);
+
+        self::assertSame(['tie-1367-round1', 'tie-1367-round2'], $this->tieNotesAmong($result));
     }
 }

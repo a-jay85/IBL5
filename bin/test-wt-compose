@@ -1,0 +1,629 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-wt-compose — characterization harness for the docker-compose plumbing and slug rule
+# that bin/wt-up, bin/wt-down, bin/wt-new and bin/e2e-wt share.
+#
+# Runs the four REAL scripts, whole, against a throwaway repo with stub `docker`, `gh` and
+# `bunx` on PATH. It pins observable behavior: exit codes, the docker argv, the exported
+# compose variables (SLUG / WORKTREE_PATH / REPO_ROOT), and the slug each script derives.
+# The same caller cases must stay green before and after the compose helpers move into
+# bin/lib/wt-compose.sh.
+#
+# Residual gap: wt-up runs whole, but its tail (healthcheck loop, db-migrate, validate-schema)
+# runs against stubs that return 0. The real compose round trip is checked by hand on a live
+# worktree stack; this harness pins the argv contract only.
+#
+# WT_COMPOSE_LIB: path of the wt-compose.sh to copy into every caller fixture. Unset or empty
+# selects bin/lib/wt-compose.sh. It lets a mutated copy be tested without editing the tree.
+#
+# Run: bin/test-wt-compose  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TMP="$(cd "$(mktemp -d)" && pwd -P)"
+trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
+
+# Survive `env -i`: nothing below may read the caller's HOME.
+export HOME="$TMP/home"
+mkdir -p "$HOME"
+
+# Keep the wt-new fixtures off the warm pool and launchd (bin/test-wt-pool covers them).
+export WT_POOL=0 WT_POOL_KICK=none
+
+LIB_SRC="${WT_COMPOSE_LIB:-$SCRIPT_DIR/lib/wt-compose.sh}"
+
+FAILED=0
+CASE=""
+CASE_FAIL=0
+CASE_NOTES=""
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+case_begin() { CASE="$1"; CASE_FAIL=0; CASE_NOTES=""; }
+case_end() {
+    if [ "$CASE_FAIL" -eq 0 ]; then
+        pass "$CASE"
+    else
+        failcase "$CASE"
+        printf '%s' "$CASE_NOTES"
+    fi
+}
+note_fail() { CASE_FAIL=1; CASE_NOTES="$CASE_NOTES    $1"$'\n'; }
+
+# chk_eq <what> <expected> <actual>
+chk_eq() {
+    if [ "$2" != "$3" ]; then note_fail "$1: expected '$2', got '$3'"; fi
+}
+
+# chk_match <what> <regex> <haystack>
+chk_match() {
+    if ! grep -qE -- "$2" <<< "$3"; then note_fail "$1: expected to match '$2' in: $3"; fi
+}
+
+# chk_absent <what> <regex> <haystack>
+chk_absent() {
+    if grep -qE -- "$2" <<< "$3"; then note_fail "$1: expected NOT to match '$2' in: $3"; fi
+}
+
+# chk_log_line <exact line>: the docker log holds this whole line.
+chk_log_line() {
+    if ! grep -qxF -- "$1" "$DOCKER_LOG"; then
+        note_fail "docker log lacks line: $1"
+        note_fail "log was: $(tr '\n' '|' < "$DOCKER_LOG")"
+    fi
+}
+
+# chk_log_has <fixed text>: some docker log line contains this text.
+chk_log_has() {
+    if ! grep -qF -- "$1" "$DOCKER_LOG"; then note_fail "docker log lacks: $1"; fi
+}
+
+# chk_log_absent <regex>: no docker log line matches.
+chk_log_absent() {
+    if grep -qE -- "$1" "$DOCKER_LOG"; then note_fail "docker log unexpectedly matches: $1"; fi
+}
+
+# log_line_no <exact line> — first line number holding it, empty when absent.
+log_line_no() {
+    local n
+    n="$(grep -nxF -- "$1" "$DOCKER_LOG" | head -1)"
+    printf '%s' "${n%%:*}"
+}
+
+# chk_env_before <argv line> <expected ENV line>: the ENV line the docker stub wrote
+# just before that compose call.
+chk_env_before() {
+    local n actual
+    n="$(log_line_no "$1")"
+    if [ -z "$n" ] || [ "$n" -lt 2 ]; then
+        note_fail "no ENV line before: $1"
+        return
+    fi
+    actual="$(sed -n "$((n - 1))p" "$DOCKER_LOG")"
+    if [ "$actual" != "$2" ]; then note_fail "ENV line: expected '$2', got '$actual'"; fi
+}
+
+# chk_order <line> <line> ...: the lines appear in the docker log in this order.
+chk_order() {
+    local prev=0 n line
+    for line in "$@"; do
+        n="$(log_line_no "$line")"
+        if [ -z "$n" ]; then note_fail "docker log lacks line: $line"; return; fi
+        if [ "$n" -le "$prev" ]; then note_fail "out of order: $line"; return; fi
+        prev="$n"
+    done
+}
+
+git_q() { git -c user.email=t@t -c user.name=t -c init.defaultBranch=master "$@"; }
+
+# ---------------------------------------------------------------------------
+# Stubs
+# ---------------------------------------------------------------------------
+STUB="$TMP/stubbin"
+mkdir -p "$STUB"
+
+cat > "$STUB/docker" <<'EOF'
+#!/bin/bash
+# Logs every call; behaviour is driven by STUB_* env vars (see bin/test-wt-compose).
+if [ "${1:-}" = compose ]; then
+    echo "ENV SLUG=${SLUG-} WORKTREE_PATH=${WORKTREE_PATH-} REPO_ROOT=${REPO_ROOT-}" >> "$DOCKER_LOG"
+fi
+echo "ARGV $*" >> "$DOCKER_LOG"
+case "${1:-}" in
+    compose)
+        exit "${STUB_COMPOSE_RC:-0}" ;;
+    network)
+        if [ "${2:-}" = ls ] && [ -n "${STUB_NETWORKS-}" ]; then printf '%s\n' "$STUB_NETWORKS"; fi
+        exit 0 ;;
+    ps)
+        if [ -n "${STUB_PS_NAMES-}" ]; then printf '%s\n' "$STUB_PS_NAMES"; fi
+        exit 0 ;;
+    inspect)
+        case " $* " in
+            *" --format "*)
+                if [ "${STUB_INSPECT_FAIL-}" = 1 ]; then exit 1; fi
+                printf '%s\n' "${STUB_LABEL-}"
+                exit 0 ;;
+        esac
+        printf '%s\n' "${STUB_PS_NAMES-}" | grep -qxF -- "${2:-}"
+        exit $? ;;
+esac
+exit 0
+EOF
+
+cat > "$STUB/gh" <<'EOF'
+#!/bin/bash
+# pr_info reads: state <TAB> number <TAB> oid. Empty STUB_PR means "no PR".
+if [ -n "${STUB_PR-}" ]; then printf 'OPEN\t%s\tdeadbeef\n' "$STUB_PR"; fi
+exit 0
+EOF
+
+cat > "$STUB/bunx" <<'EOF'
+#!/bin/bash
+exit 1
+EOF
+chmod +x "$STUB/docker" "$STUB/gh" "$STUB/bunx"
+export PATH="$STUB:$PATH"
+
+# ---------------------------------------------------------------------------
+# Fixture: a throwaway repo holding copies of the four scripts and their libs
+# ---------------------------------------------------------------------------
+TEMPLATE="$TMP/template"
+mkdir -p "$TEMPLATE/bin/lib" "$TEMPLATE/docker" "$TEMPLATE/ibl5/themes/IBL/style"
+for s in wt-up wt-down wt-new e2e-wt; do
+    cp "$SCRIPT_DIR/$s" "$TEMPLATE/bin/$s"
+    chmod +x "$TEMPLATE/bin/$s"
+done
+cp "$SCRIPT_DIR"/lib/*.sh "$TEMPLATE/bin/lib/" 2>/dev/null
+# The seam: a caller fixture always runs the lib under test, never a stale glob copy.
+if [ -f "$LIB_SRC" ]; then cp "$LIB_SRC" "$TEMPLATE/bin/lib/wt-compose.sh"; fi
+printf 'services: {}\n' > "$TEMPLATE/docker/worktree-compose.yml"
+printf 'services: {}\n' > "$TEMPLATE/docker-compose.yml"
+printf '#!/bin/bash\nexit 0\n' > "$TEMPLATE/bin/db-migrate"
+chmod +x "$TEMPLATE/bin/db-migrate"
+echo 'body{}' > "$TEMPLATE/ibl5/themes/IBL/style/style.css"
+# wt-new copies these from the main checkout after it creates the worktree.
+echo '<?php $dbname = "fx";' > "$TEMPLATE/ibl5/config.php"
+echo '<?php' > "$TEMPLATE/ibl5/config.local.php"
+
+# new_fx — copy the template to <TMP>/fx.N/IBL5 as a committed git repo.
+# Sets BASE, ROOT and DOCKER_LOG, and resets every STUB_* knob.
+FX_N=0
+new_fx() {
+    FX_N=$((FX_N + 1))
+    BASE="$TMP/fx.$FX_N"
+    ROOT="$BASE/IBL5"
+    mkdir -p "$BASE/IBL5-worktrees"
+    cp -R "$TEMPLATE" "$ROOT"
+    git_q init -q "$ROOT" >/dev/null 2>&1
+    git_q -C "$ROOT" add -A >/dev/null 2>&1
+    git_q -C "$ROOT" commit -qm init >/dev/null 2>&1
+    DOCKER_LOG="$BASE/docker.log"
+    : > "$DOCKER_LOG"
+    export DOCKER_LOG
+    STUB_PS_NAMES="" STUB_LABEL="" STUB_INSPECT_FAIL="" STUB_PR="" STUB_COMPOSE_RC="" STUB_NETWORKS=""
+    export STUB_PS_NAMES STUB_LABEL STUB_INSPECT_FAIL STUB_PR STUB_COMPOSE_RC STUB_NETWORKS
+}
+
+# new_unit — a scratch REPO_ROOT (UR) holding docker/worktree-compose.yml, for the lib's
+# unit cases. Sets UR and DOCKER_LOG and resets every STUB_* knob.
+UNIT_N=0
+new_unit() {
+    UNIT_N=$((UNIT_N + 1))
+    UR="$TMP/unit.$UNIT_N"
+    mkdir -p "$UR/docker"
+    printf 'services: {}\n' > "$UR/docker/worktree-compose.yml"
+    DOCKER_LOG="$UR/docker.log"
+    : > "$DOCKER_LOG"
+    export DOCKER_LOG
+    STUB_PS_NAMES="" STUB_LABEL="" STUB_INSPECT_FAIL="" STUB_PR="" STUB_COMPOSE_RC="" STUB_NETWORKS=""
+    export STUB_PS_NAMES STUB_LABEL STUB_INSPECT_FAIL STUB_PR STUB_COMPOSE_RC STUB_NETWORKS
+}
+
+# mk_wt <name> — a worktree dir that wt-up's config safety nets skip.
+mk_wt() {
+    local wt="$BASE/IBL5-worktrees/$1"
+    mkdir -p "$wt/ibl5/themes/IBL/style"
+    echo x > "$wt/ibl5/config.php"
+    echo x > "$wt/ibl5/config.local.php"
+}
+
+mk_env() { echo 'DB_USER=u' > "$ROOT/.env"; }
+
+COMPOSE_FILE_REL="docker/worktree-compose.yml"
+
+# ---------------------------------------------------------------------------
+# (a) wt-down
+# ---------------------------------------------------------------------------
+echo "== wt-down"
+
+# run_down <name> — wt-down <name> --force from the fixture root; sets OUT and RC.
+run_down() {
+    OUT="$(cd "$ROOT" && "$ROOT/bin/wt-down" "$1" --force 2>&1)" && RC=$? || RC=$?
+}
+
+new_fx
+mk_wt alpha; echo alpha > "$BASE/IBL5-worktrees/alpha/.wt-slug"; mk_env
+STUB_LABEL=custom-proj
+run_down alpha
+case_begin "down: label + .env"
+chk_eq "exit code" 0 "$RC"
+chk_log_line "ARGV compose -f $ROOT/$COMPOSE_FILE_REL --env-file $ROOT/.env -p custom-proj down -v --rmi local"
+chk_env_before "ARGV compose -f $ROOT/$COMPOSE_FILE_REL --env-file $ROOT/.env -p custom-proj down -v --rmi local" \
+    "ENV SLUG=alpha WORKTREE_PATH=$BASE/IBL5-worktrees/alpha REPO_ROOT=$ROOT"
+case_end
+
+new_fx
+mk_wt alpha; echo alpha > "$BASE/IBL5-worktrees/alpha/.wt-slug"
+STUB_LABEL=""
+run_down alpha
+case_begin "down: empty label falls back, no .env"
+chk_eq "exit code" 0 "$RC"
+chk_log_line "ARGV compose -f $ROOT/$COMPOSE_FILE_REL -p ibl5-alpha down -v --rmi local"
+chk_log_absent '--env-file'
+case_end
+
+new_fx
+mk_wt alpha; echo alpha > "$BASE/IBL5-worktrees/alpha/.wt-slug"; mk_env
+STUB_INSPECT_FAIL=1
+run_down alpha
+case_begin "down: inspect failure falls back"
+chk_eq "exit code" 0 "$RC"
+chk_log_line "ARGV compose -f $ROOT/$COMPOSE_FILE_REL --env-file $ROOT/.env -p ibl5-alpha down -v --rmi local"
+case_end
+
+# Orphan branch: no worktree dir, containers named ibl5-php-ghost. The compose file is not
+# used here; the label read picks the project that names the network and image cleanup.
+new_fx
+STUB_PS_NAMES=ibl5-php-ghost STUB_LABEL=""
+run_down ghost
+rc_empty="$RC"
+chk_empty_log_has="$(grep -cF 'ARGV inspect ibl5-php-ghost --format' "$DOCKER_LOG")"
+chk_empty_env="$(grep -cE '^ARGV compose .*--env-file' "$DOCKER_LOG")"
+new_fx
+STUB_PS_NAMES=ibl5-php-ghost STUB_LABEL=orphan-proj
+run_down ghost
+case_begin "down: orphan branch label read"
+chk_eq "exit code, empty label" 0 "$rc_empty"
+chk_eq "exit code, label set" 0 "$RC"
+chk_eq "empty-label run read the label" 1 "$chk_empty_log_has"
+chk_eq "empty-label run made no --env-file compose call" 0 "$chk_empty_env"
+chk_log_has "ARGV inspect ibl5-php-ghost --format"
+case_end
+
+new_fx
+STUB_PS_NAMES=ibl5-php-ghost STUB_LABEL=orphan-proj
+STUB_NETWORKS=$'orphan-proj_default\nibl5-ghost_default'
+run_down ghost
+case_begin "down: orphan uses label project"
+chk_eq "exit code" 0 "$RC"
+chk_log_line "ARGV network rm orphan-proj_default"
+chk_log_absent '^ARGV network rm ibl5-ghost_default$'
+chk_log_line "ARGV image inspect orphan-proj-php"
+chk_log_line "ARGV image inspect orphan-proj-browsersync"
+case_end
+
+new_fx
+STUB_PS_NAMES=ibl5-php-ghost STUB_LABEL=""
+STUB_NETWORKS=$'orphan-proj_default\nibl5-ghost_default'
+run_down ghost
+case_begin "down: orphan empty label falls back"
+chk_eq "exit code" 0 "$RC"
+chk_log_line "ARGV network rm ibl5-ghost_default"
+chk_log_absent '^ARGV network rm orphan-proj_default$'
+chk_log_line "ARGV image inspect ibl5-ghost-php"
+chk_log_line "ARGV image inspect ibl5-ghost-browsersync"
+case_end
+
+# ---------------------------------------------------------------------------
+# (b) wt-up
+# ---------------------------------------------------------------------------
+echo "== wt-up"
+
+# run_up <name> [flags...] — wt-up <name> --no-data --force from the fixture root.
+# STUB_PS_NAMES lists the shared services so the shared-services branch is skipped.
+run_up() {
+    local name="$1"; shift
+    STUB_PS_NAMES=$'ibl5-traefik\nibl5-mailpit'
+    export STUB_PS_NAMES
+    OUT="$(cd "$ROOT" && "$ROOT/bin/wt-up" "$name" --no-data --force "$@" 2>"$BASE/up.err")" && RC=$? || RC=$?
+    ERR="$(cat "$BASE/up.err")"
+}
+
+# chk_up_sequence <slug> <env-flag-or-empty>: down, volume rm, up -d --build, in that order.
+chk_up_sequence() {
+    local slug="$1" flag="${2:+ $2}"
+    local cf="$ROOT/$COMPOSE_FILE_REL"
+    chk_order \
+        "ARGV compose -f $cf$flag -p ibl5-$slug down" \
+        "ARGV volume rm ibl5-${slug}_db-data" \
+        "ARGV compose -f $cf$flag -p ibl5-$slug up -d --build"
+}
+
+new_fx
+mk_wt alpha; mk_env
+run_up alpha
+case_begin "up: plain name"
+chk_eq "exit code" 0 "$RC"
+chk_up_sequence alpha "--env-file $ROOT/.env"
+chk_env_before "ARGV compose -f $ROOT/$COMPOSE_FILE_REL --env-file $ROOT/.env -p ibl5-alpha up -d --build" \
+    "ENV SLUG=alpha WORKTREE_PATH=$BASE/IBL5-worktrees/alpha REPO_ROOT=$ROOT"
+chk_eq ".wt-slug" alpha "$(cat "$BASE/IBL5-worktrees/alpha/.wt-slug" 2>/dev/null)"
+case_end
+
+new_fx
+mk_wt feat/x
+run_up feat/x
+case_begin "up: slash name flattens"
+chk_eq "exit code" 0 "$RC"
+chk_up_sequence feat-x ""
+chk_log_absent '--env-file'
+chk_eq ".wt-slug" feat-x "$(cat "$BASE/IBL5-worktrees/feat/x/.wt-slug" 2>/dev/null)"
+case_end
+
+new_fx
+mk_wt alpha
+STUB_PR=4242
+run_up alpha --pr
+case_begin "up: --pr slug"
+chk_eq "exit code" 0 "$RC"
+chk_up_sequence pr-4242 ""
+chk_eq ".wt-slug" pr-4242 "$(cat "$BASE/IBL5-worktrees/alpha/.wt-slug" 2>/dev/null)"
+case_end
+
+new_fx
+mk_wt alpha
+STUB_PR=""
+run_up alpha --pr
+case_begin "up: --pr with no PR exits 1"
+chk_eq "exit code" 1 "$RC"
+chk_match "stderr" "Error: No PR found for branch in worktree 'alpha'" "$ERR"
+chk_log_absent '^ARGV compose'
+case_end
+
+# ---------------------------------------------------------------------------
+# (c) e2e-wt — stops at the missing ibl5/.env.test right after slug detection
+# ---------------------------------------------------------------------------
+echo "== e2e-wt"
+
+# run_e2e <name> — sets OUT (stdout), ERR (stderr) and RC.
+run_e2e() {
+    OUT="$(cd "$ROOT" && bin/e2e-wt "$1" 2>"$BASE/e2e.err")" && RC=$? || RC=$?
+    ERR="$(cat "$BASE/e2e.err")"
+}
+
+new_fx
+mk_wt alpha
+STUB_PS_NAMES=ibl5-php-alpha
+run_e2e alpha
+case_begin "e2e: plain"
+chk_match "stdout" "Detected slug: alpha \(containers: ibl5-php-alpha, ibl5-db-alpha\)" "$OUT"
+case_end
+
+new_fx
+mk_wt feat/x
+STUB_PS_NAMES=ibl5-php-feat-x
+run_e2e feat/x
+case_begin "e2e: slash flattens"
+chk_match "stdout" "Detected slug: feat-x \(containers: ibl5-php-feat-x, ibl5-db-feat-x\)" "$OUT"
+case_end
+
+new_fx
+mk_wt alpha
+STUB_PS_NAMES=ibl5-php-pr-77 STUB_PR=77
+run_e2e alpha
+case_begin "e2e: pr fallback"
+chk_match "stdout" "Detected slug: pr-77" "$OUT"
+case_end
+
+new_fx
+mk_wt alpha
+STUB_PS_NAMES=$'ibl5-php-alpha\nibl5-php-pr-77' STUB_PR=77
+run_e2e alpha
+case_begin "e2e: sanitized wins over pr"
+chk_match "stdout" "Detected slug: alpha( |$)" "$OUT"
+chk_absent "stdout" "Detected slug: pr-77" "$OUT"
+case_end
+
+new_fx
+mk_wt alpha
+STUB_PS_NAMES=ibl5-php-other STUB_PR=""
+run_e2e alpha
+case_begin "e2e: no container exits 1"
+chk_eq "exit code" 1 "$RC"
+chk_match "stderr" "Error: No running Docker containers found for worktree 'alpha'\." "$ERR"
+chk_match "stderr" "Start them with: bin/wt-up alpha --seed" "$ERR"
+chk_absent "stdout" "Detected slug" "$OUT"
+case_end
+
+# ---------------------------------------------------------------------------
+# (d) wt-new --existing flattens a slash branch into a flat worktree dir
+# ---------------------------------------------------------------------------
+echo "== wt-new"
+
+# new_wtnew_env — <TMP>/env.N/{origin.git,IBL5,IBL5-worktrees} with branch feat/x on origin.
+NEW_N=0
+new_wtnew_env() {
+    NEW_N=$((NEW_N + 1))
+    BASE="$TMP/env.$NEW_N"
+    git_q init -q --bare "$BASE/origin.git" >/dev/null 2>&1
+    git_q clone -q "$BASE/origin.git" "$BASE/IBL5" >/dev/null 2>&1
+    cp -R "$TEMPLATE/." "$BASE/IBL5/"
+    git_q -C "$BASE/IBL5" add -A >/dev/null 2>&1
+    git_q -C "$BASE/IBL5" commit -qm C1 >/dev/null 2>&1
+    git_q -C "$BASE/IBL5" push -q -u origin master >/dev/null 2>&1
+    git_q -C "$BASE/IBL5" checkout -qb feat/x >/dev/null 2>&1
+    echo fx > "$BASE/IBL5/FX.txt"
+    git_q -C "$BASE/IBL5" add -A >/dev/null 2>&1
+    git_q -C "$BASE/IBL5" commit -qm FX >/dev/null 2>&1
+    git_q -C "$BASE/IBL5" push -q -u origin feat/x >/dev/null 2>&1
+    git_q -C "$BASE/IBL5" checkout -q master >/dev/null 2>&1
+    git_q -C "$BASE/IBL5" branch -D feat/x >/dev/null 2>&1
+    mkdir -p "$BASE/IBL5-worktrees"
+}
+
+new_wtnew_env
+OUT="$("$BASE/IBL5/bin/wt-new" --existing feat/x 2>&1)" && RC=$? || RC=$?
+case_begin "new: --existing flattens slash"
+chk_eq "exit code" 0 "$RC"
+if [ "$RC" -ne 0 ]; then note_fail "output: $OUT"; fi
+if [ ! -d "$BASE/IBL5-worktrees/feat-x" ]; then
+    note_fail "missing; output: $OUT"
+else
+    chk_eq "checked-out branch" "feat/x" \
+        "$(git -C "$BASE/IBL5-worktrees/feat-x" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+fi
+if [ -e "$BASE/IBL5-worktrees/feat/x" ]; then note_fail "nested IBL5-worktrees/feat/x must not exist"; fi
+case_end
+
+# ---------------------------------------------------------------------------
+# Unit cases for bin/lib/wt-compose.sh. Each runs in a subshell with `set -u`, REPO_ROOT
+# pointing at a scratch dir and the stub docker on PATH.
+# ---------------------------------------------------------------------------
+echo "== wt-compose.sh units"
+
+# unit_run <shell snippet> — source the lib under test, run the snippet, capture stdout in OUT.
+unit_run() {
+    # REPO_ROOT is read by the sourced lib; the lib path is chosen at run time (WT_COMPOSE_LIB).
+    # shellcheck disable=SC2034,SC1090
+    OUT="$( set -u; REPO_ROOT="$UR"; . "$LIB_SRC"; eval "$1" )"
+}
+
+# unit_slug <label> <expected> <snippet>
+unit_slug() {
+    new_unit
+    unit_run "$3"
+    case_begin "$1"
+    chk_eq "output" "$2" "$OUT"
+    case_end
+}
+
+unit_slug "unit: wt_slug plain" "alpha" 'wt_slug alpha'
+unit_slug "unit: wt_slug slash" "feat-x" 'wt_slug feat/x'
+unit_slug "unit: wt_slug multiple slashes" "a-b-c" 'wt_slug a/b/c'
+unit_slug "unit: wt_slug pr number" "pr-4242" 'wt_slug feat/x 4242'
+unit_slug "unit: wt_slug empty pr arg" "feat-x" 'wt_slug feat/x ""'
+
+new_unit
+unit_run 'wt_slug; echo "rc=$?"'
+case_begin "unit: wt_slug no args under set -u"
+chk_eq "output" $'\nrc=0' "$OUT"
+case_end
+
+new_unit
+unit_run 'wt_compose_file'
+case_begin "unit: wt_compose_file"
+chk_eq "output" "$UR/docker/worktree-compose.yml" "$OUT"
+case_end
+
+new_unit
+touch "$UR/.env"
+unit_run 'wt_compose_env_flag'
+case_begin "unit: env flag with .env"
+chk_eq "output" "--env-file $UR/.env" "$OUT"
+case_end
+
+new_unit
+unit_run 'wt_compose_env_flag; echo "rc=$?"'
+case_begin "unit: env flag without .env"
+chk_eq "output (empty, exit 0)" "rc=0" "$OUT"
+case_end
+
+new_unit
+STUB_LABEL=custom-proj
+unit_run 'wt_project_name alpha'
+case_begin "unit: project from label"
+chk_eq "output" "custom-proj" "$OUT"
+chk_log_line 'ARGV inspect ibl5-php-alpha --format {{index .Config.Labels "com.docker.compose.project"}}'
+case_end
+
+new_unit
+STUB_LABEL=""
+unit_run 'wt_project_name alpha'
+case_begin "unit: project empty label falls back"
+chk_eq "output" "ibl5-alpha" "$OUT"
+case_end
+
+new_unit
+STUB_INSPECT_FAIL=1
+unit_run 'wt_project_name alpha'
+case_begin "unit: project inspect failure falls back"
+chk_eq "output" "ibl5-alpha" "$OUT"
+case_end
+
+new_unit
+unit_run 'wt_compose_export alpha /wt/alpha; bash -c '\''printf "%s|%s|%s" "$SLUG" "$WORKTREE_PATH" "$REPO_ROOT"'\'
+case_begin "unit: export"
+chk_eq "output" "alpha|/wt/alpha|$UR" "$OUT"
+case_end
+
+new_unit
+touch "$UR/.env"
+unit_run 'wt_compose ibl5-alpha down -v'
+case_begin "unit: wt_compose with .env"
+chk_log_line "ARGV compose -f $UR/docker/worktree-compose.yml --env-file $UR/.env -p ibl5-alpha down -v"
+case_end
+
+new_unit
+unit_run 'wt_compose ibl5-alpha down -v'
+case_begin "unit: wt_compose without .env"
+chk_log_line "ARGV compose -f $UR/docker/worktree-compose.yml -p ibl5-alpha down -v"
+case_end
+
+new_unit
+STUB_COMPOSE_RC=3
+unit_run 'wt_compose ibl5-alpha up -d; echo "rc=$?"'
+case_begin "unit: wt_compose propagates exit status"
+chk_eq "output" "rc=3" "$OUT"
+case_end
+
+new_unit
+OUT="$(env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; . "$1"; echo sourced' _ "$LIB_SRC" 2>&1)" && RC=$? || RC=$?
+case_begin "unit: sourcing is side-effect free"
+chk_eq "exit code" 0 "$RC"
+chk_eq "output" "sourced" "$OUT"
+case_end
+
+# ---------------------------------------------------------------------------
+# Mutation self-checks: break the real lib in one place and prove the matching unit
+# assertion notices. Always mutates the real lib, never the WT_COMPOSE_LIB seam.
+# ---------------------------------------------------------------------------
+echo "== wt-compose.sh mutants"
+
+# mutant_lib <old> <new> <outfile>: copy the real lib to outfile with one literal edit.
+# Returns 1 when the edit changed nothing, so a stale mutant cannot pass silently.
+mutant_lib() {
+    local src real_lib="$SCRIPT_DIR/lib/wt-compose.sh"
+    src="$(cat "$real_lib")"
+    printf '%s\n' "${src/"$1"/"$2"}" > "$3"
+    ! cmp -s "$real_lib" "$3"
+}
+
+# mutant_slug <label> <old> <new> <wt_slug args> <healthy output>
+mutant_slug() {
+    local mfile got verdict
+    new_unit
+    mfile="$UR/mutant.sh"
+    case_begin "$1"
+    if ! mutant_lib "$2" "$3" "$mfile"; then
+        note_fail "mutation did not change the lib"
+    else
+        # shellcheck disable=SC2034,SC1090
+        got="$( set -u; REPO_ROOT="$UR"; . "$mfile"; eval "wt_slug $4" )"
+        verdict="same"
+        if [ "$got" != "$5" ]; then verdict="differs"; fi
+        chk_eq "mutant output differs from healthy output" "differs" "$verdict"
+    fi
+    case_end
+}
+
+# shellcheck disable=SC2016 # the mutation tokens are literal source text
+mutant_slug "mutant: wt_slug flattens one slash only" '${name//\//-}' '${name/\//-}' 'a/b/c' 'a-b-c'
+mutant_slug "mutant: wt_slug wrong pr format" 'pr-%s' 'px-%s' 'feat/x 4242' 'pr-4242'
+
+echo "----"
+if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES"; fi
+exit "$FAILED"

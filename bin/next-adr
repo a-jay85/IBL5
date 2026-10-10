@@ -27,8 +27,6 @@ fi
 
 set -euo pipefail
 
-source "$(dirname "$0")/lib/git-helpers.sh"
-
 if [ $# -ne 1 ] || [ -z "$1" ]; then
     echo "Usage: $0 \"kebab-title\"" >&2
     exit 2
@@ -45,56 +43,10 @@ fi
 
 WORKTREE_DIR="$(cd "$(dirname "$0")/.." && pwd)/ibl5/docs/decisions"
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CANONICAL_ROOT=$(resolve_canonical_root "$REPO_ROOT")
-CANONICAL_DIR="$CANONICAL_ROOT/ibl5/docs/decisions"
-
-if is_main_checkout "$REPO_ROOT"; then
-    echo "Error: refusing to run from the main checkout — bin/next-adr cp's the" >&2
-    echo "       template into THIS repo root before any content is written, which" >&2
-    echo "       strands an empty ADR on master. Create a worktree first:" >&2
-    echo "         bin/wt-new <slug>" >&2
-    exit 1
-fi
-
-# Max ADR number from a stream of BASENAMES on stdin. Split out of get_max so the
-# same grammar (NNNN- prefix, 0000 template excluded) applies to names read off a
-# directory, off a remote-tracking ref, and out of a sibling worktree.
-# `|| true` absorbs the empty-pipeline case under `set -o pipefail`.
-max_from_names() {
-    (
-        grep -oE '^[0-9]{4}-' \
-            | tr -d '-' \
-            | grep -v '^0000$' \
-            | sort -n \
-            | tail -1
-    ) || true
-}
-
-get_max() {
-    local dir="$1"
-    if [ ! -d "$dir" ]; then
-        return 0
-    fi
-    (ls "$dir"/[0-9][0-9][0-9][0-9]-*.md 2>/dev/null | sed 's/.*\///' | max_from_names) || true
-}
-
-MAX_WT=$(get_max "$WORKTREE_DIR")
-MAX_CANON=$(get_max "$CANONICAL_DIR")
-# Numbers claimed on a pushed-but-unmerged branch, and in a sibling worktree that
-# has not committed yet. Both scans are strictly local (see lib/git-helpers.sh).
-MAX_ORIGIN=$(scan_origin_refs ibl5/docs/decisions "$REPO_ROOT" | max_from_names)
-MAX_WTS=$(scan_worktrees ibl5/docs/decisions "$REPO_ROOT" | max_from_names)
-
-MAX="${MAX_WT:-0}"
-for CANDIDATE in "$MAX_CANON" "$MAX_ORIGIN" "$MAX_WTS"; do
-    if [ -n "$CANDIDATE" ] && [ "$((10#$CANDIDATE))" -gt "$((10#$MAX))" ]; then
-        MAX=$CANDIDATE
-    fi
-done
-
-NEXT=$((10#$MAX + 1))
-PADDED=$(printf "%04d" "$NEXT")
+# Number allocation (and the main-checkout refusal) live in bin/next-number.
+# Under set -e a non-zero exit there (1 = main checkout) exits this script with
+# the same status; its stderr passes straight through.
+PADDED=$("$(dirname "$0")/next-number" adr)
 
 TEMPLATE="$WORKTREE_DIR/0000-template.md"
 if [ ! -f "$TEMPLATE" ]; then

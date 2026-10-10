@@ -24,16 +24,20 @@ trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
 FAILED=0
 
 # env-var-driven gh stub.
-# STUB_PR_STATE: empty/unset => no PR (exit 1 on state queries, mirrors no-PR path).
-# Non-empty => echo the value for any --json state -q .state query.
-# STUB_PR_NUM: PR number for --json number queries (default 999).
+# Answers only pr_info's combined query (--json state,number,headRefOid); any
+# other argv exits 1, so a leftover single-field gh call fails the OPEN-PR rows.
+# STUB_PR_STATE: empty/unset => no PR (exit 1, mirrors the no-PR path).
+# Non-empty => print "<state>\t<number>\tstuboid".
+# STUB_PR_NUM: PR number in that line (default 999).
 STUBBIN="$TMP/stubbin"
 mkdir -p "$STUBBIN"
 cat > "$STUBBIN/gh" <<'GH'
 #!/bin/sh
 case "$*" in
-  *"state"*) [ -n "${STUB_PR_STATE:-}" ] && { printf '%s\n' "$STUB_PR_STATE"; exit 0; }; exit 1 ;;
-  *"number"*) printf '%s\n' "${STUB_PR_NUM:-999}"; exit 0 ;;
+  *"--json state,number,headRefOid"*)
+    [ -n "${STUB_PR_STATE:-}" ] || exit 1
+    printf '%s\t%s\t%s\n' "$STUB_PR_STATE" "${STUB_PR_NUM:-999}" stuboid
+    exit 0 ;;
   *) exit 1 ;;
 esac
 GH
@@ -200,6 +204,7 @@ fi
 # Default output shows OPEN-PR classification
 out_default="$(run_status "$e" "OPEN")"
 assert_match "open-pr-in-default-output" 'OPEN-PR.*open-pr-branch' "$out_default"
+assert_match "open-pr-names-number" 'OPEN-PR .*\(PR #999\)' "$out_default"
 
 # ----------------------------------------------------------------------------
 # Row 6: UNPUSHED — ≥1 own-commit, not on master, no push, no PR

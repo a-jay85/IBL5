@@ -1,0 +1,155 @@
+#!/usr/bin/env bun
+// bin/vr-refresh-targets — pick stale visual-review PRs to refresh, and list the
+// gh-pages gallery dirs that open PRs still link (the retention keep-list).
+//
+// Thin I/O glue over ibl5/tests/e2e/vr-refresh.ts: this file runs `gh` and `git`
+// and prints. Every decision lives in the module, which vitest covers.
+//
+// Modes (flags take the `=` form only):
+//   --mode=select --pages-dir=PATH [--pr=N | --all] [--stale-days=N] [--max-prs=N]
+//       stdout: one JSON line {"count":N,"matrix":[...],"skipped":[...]}
+//       stderr: the markdown decision table
+//   --mode=keep
+//       stdout: one 40-hex gallery SHA per line (every SHA any open PR links,
+//       plus every open PR head SHA)
+//
+// Exit codes: 0 success, 1 runtime or fail-closed failure, 2 usage error.
+// Fail closed: any gh/git error, JSON parse failure, or a PR list that may be
+// truncated at --limit 500 exits 1 with EMPTY stdout. Stdout is buffered and
+// written only after every call succeeded, so a consumer that checks the exit
+// code never sees a partial keep-list.
+//
+// Run it after oven-sh/setup-bun. Under an empty PATH, `#!/usr/bin/env bun`
+// cannot resolve bun and the shell reports exit 127.
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const modulePath = resolve(__dir, '..', 'ibl5', 'tests', 'e2e', 'vr-refresh.ts');
+const {
+  parseRefreshArgs,
+  computeKeepList,
+  selectRefreshTargets,
+  renderSelectionTable,
+  linkedGalleryDir,
+} = await import(modulePath);
+
+type OpenPr = import('../ibl5/tests/e2e/vr-refresh').OpenPr;
+
+const PR_LIST_LIMIT = 500;
+
+const USAGE =
+  'Usage: bin/vr-refresh-targets --mode=select --pages-dir=PATH [--pr=N | --all] [--stale-days=N] [--max-prs=N]\n' +
+  '   or: bin/vr-refresh-targets --mode=keep\n' +
+  'Flags take the --flag=VALUE form only.';
+
+function run(cmd: string[], cwd?: string): string {
+  const proc = Bun.spawnSync(cmd, { cwd, stdout: 'pipe', stderr: 'pipe' });
+  if (proc.exitCode !== 0) {
+    throw new Error(`${cmd.join(' ')} exited ${proc.exitCode}: ${proc.stderr.toString().trim()}`);
+  }
+  return proc.stdout.toString();
+}
+
+interface RawPr {
+  number: number;
+  headRefOid: string;
+  baseRefName: string;
+  isCrossRepository: boolean;
+  isDraft: boolean;
+  labels: { name: string }[];
+  body: string | null;
+}
+
+function listOpenPrs(): RawPr[] {
+  const out = run([
+    'gh', 'pr', 'list', '--state', 'open', '--limit', String(PR_LIST_LIMIT),
+    '--json', 'number,headRefOid,baseRefName,isCrossRepository,isDraft,labels,body',
+  ]);
+  const raw = JSON.parse(out) as RawPr[];
+  if (!Array.isArray(raw)) throw new Error('gh pr list did not return an array');
+  if (raw.length >= PR_LIST_LIMIT) {
+    throw new Error(`open PR list may be truncated at --limit ${PR_LIST_LIMIT}`);
+  }
+  return raw;
+}
+
+function fetchComments(prNumber: number): string[] {
+  const out = run(['gh', 'api', '--paginate', '--slurp', `repos/{owner}/{repo}/issues/${prNumber}/comments`]);
+  const pages = JSON.parse(out) as { body: string | null }[][];
+  return pages.flat().map((c) => c.body ?? '');
+}
+
+function fetchBehindBy(headRefOid: string): number | null {
+  try {
+    const n = parseInt(run(['gh', 'api', `repos/{owner}/{repo}/compare/master...${headRefOid}`, '--jq', '.behind_by']).trim(), 10);
+    return Number.isInteger(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function toOpenPr(raw: RawPr, comments: string[]): OpenPr {
+  return {
+    number: raw.number,
+    headRefOid: raw.headRefOid,
+    baseRefName: raw.baseRefName,
+    isCrossRepository: raw.isCrossRepository,
+    isDraft: raw.isDraft,
+    labels: raw.labels.map((l) => l.name),
+    body: raw.body ?? '',
+    comments,
+    behindBy: null,
+  };
+}
+
+const opts = parseRefreshArgs(process.argv.slice(2));
+if ('error' in opts) {
+  process.stderr.write(`vr-refresh-targets: ${opts.error}\n${USAGE}\n`);
+  process.exit(2);
+}
+if (opts.mode === 'help') {
+  process.stdout.write(`${USAGE}\n`);
+  process.exit(0);
+}
+
+let stdoutBuf = '';
+let stderrBuf = '';
+try {
+  const raws = listOpenPrs();
+
+  if (opts.mode === 'keep') {
+    const prs = raws.map((r) => toOpenPr(r, fetchComments(r.number)));
+    stdoutBuf = computeKeepList(prs).map((s: string) => `${s}\n`).join('');
+  } else {
+    const prs = raws.map((r) => toOpenPr(r, r.baseRefName === 'master' ? fetchComments(r.number) : []));
+    for (const pr of prs) {
+      const eligible =
+        pr.baseRefName === 'master' &&
+        !pr.isCrossRepository &&
+        !pr.labels.includes('update-baselines') &&
+        linkedGalleryDir(pr) !== null;
+      if (eligible) pr.behindBy = fetchBehindBy(pr.headRefOid);
+    }
+
+    const ages: Record<string, number | null> = {};
+    for (const pr of prs) {
+      // dir is `<sha>` or `pr/<N>/visual-review`, relative to the gh-pages root.
+      const dir = linkedGalleryDir(pr);
+      if (dir === null || dir in ages) continue;
+      const ct = run(['git', '-C', opts.pagesDir, 'log', '-1', '--format=%ct', '--', dir]).trim();
+      ages[dir] = ct === '' ? null : parseInt(ct, 10);
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const sel = selectRefreshTargets(prs, ages, nowSec, opts.select, opts.maxPrs);
+    stdoutBuf = `${JSON.stringify({ count: sel.targets.length, matrix: sel.targets, skipped: sel.skipped })}\n`;
+    stderrBuf = `${renderSelectionTable(sel)}\n`;
+  }
+} catch (e) {
+  process.stderr.write(`vr-refresh-targets: ${e instanceof Error ? e.message : String(e)}\n`);
+  process.exit(1);
+}
+
+if (stderrBuf !== '') process.stderr.write(stderrBuf);
+process.stdout.write(stdoutBuf);

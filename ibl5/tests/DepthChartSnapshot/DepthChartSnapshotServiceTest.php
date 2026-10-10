@@ -8,6 +8,8 @@ use DepthChartSnapshot\DepthChartSnapshotService;
 use DepthChartSnapshot\Contracts\DepthChartSnapshotRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 use Season\Season;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\MockObject\Stub;
 
 /**
  * @covers \DepthChartSnapshot\DepthChartSnapshotService
@@ -498,6 +500,200 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
 
         $this->assertStringContainsString('Current (Live)', $label);
         $this->assertStringContainsString('Sim ', $label);
+    }
+
+    // ── exact-string label characterization ─────────────────────────────
+
+    private function makeSeasonStub(): Season
+    {
+        $season = self::createStub(Season::class);
+        $season->phase = 'Regular Season';
+        $season->lastSimNumber = 4;
+        $season->lastSimStartDate = '2024-01-15';
+        $season->lastSimEndDate = '2024-01-20';
+        $season->projectedNextSimEndDate = new \DateTimeImmutable('2024-01-27');
+        $season->method('getPhaseSpecificSimNumber')->willReturn(4);
+        // Identity mapping: overall sim number == phase sim number, so expected strings stay readable.
+        $season->method('calculatePhaseSimNumber')
+            ->willReturnCallback(static fn (int $n, string $phase, int $year): int => $n);
+        return $season;
+    }
+
+    /** @return array{id:int,teamid:int,username:string,name:string|null,phase:string,season_year:int,sim_start_date:string,sim_end_date:string|null,sim_number_start:int,sim_number_end:int|null,is_active:int,created_at:string,updated_at:string} */
+    private function makeEndedDcRow(): array
+    {
+        return array_merge($this->makeActiveDcRow(7, 'Playoff Push'), [
+            'sim_end_date' => '2024-01-14',
+            'sim_number_start' => 3,
+            'sim_number_end' => 5,
+            'is_active' => 0,
+        ]);
+    }
+
+    /**
+     * Dropdown runner: no active DC, so the hide-active-DC branch never runs.
+     *
+     * @param array{id:int,teamid:int,username:string,name:string|null,phase:string,season_year:int,sim_start_date:string,sim_end_date:string|null,sim_number_start:int,sim_number_end:int|null,is_active:int,created_at:string,updated_at:string} $dc
+     */
+    private function dropdownLabelFor(array $dc, DepthChartSnapshotRepositoryInterface&Stub $repo): string
+    {
+        $repo->method('getActiveDepthChartForTeam')->willReturn(null);
+        $repo->method('getSavedDepthChartsForTeam')->willReturn([$dc]);
+
+        $service = new DepthChartSnapshotService($this->mockDb, $repo);
+        $options = $service->getDropdownOptions(1, $this->makeSeasonStub());
+        self::assertCount(1, $options);
+        return $options[0]['label'];
+    }
+
+    public function testDropdownLabelExactStringForNamedEndedDc(): void
+    {
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
+        $repo->method('getWinLossRecord')->willReturn(['wins' => 5, 'losses' => 2]);
+
+        $this->assertSame(
+            'Playoff Push | Sims 3-5 | Jan 1 - Jan 14 | (5-2)',
+            $this->dropdownLabelFor($this->makeEndedDcRow(), $repo)
+        );
+    }
+
+    public function testDropdownLabelOmitsNullName(): void
+    {
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
+        $repo->method('getWinLossRecord')->willReturn(['wins' => 5, 'losses' => 2]);
+
+        $dc = array_merge($this->makeEndedDcRow(), ['name' => null]);
+
+        $this->assertSame('Sims 3-5 | Jan 1 - Jan 14 | (5-2)', $this->dropdownLabelFor($dc, $repo));
+    }
+
+    public function testDropdownLabelOmitsEmptyName(): void
+    {
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
+        $repo->method('getWinLossRecord')->willReturn(['wins' => 5, 'losses' => 2]);
+
+        $dc = array_merge($this->makeEndedDcRow(), ['name' => '']);
+
+        $this->assertSame('Sims 3-5 | Jan 1 - Jan 14 | (5-2)', $this->dropdownLabelFor($dc, $repo));
+    }
+
+    public function testDropdownLabelUsesSingularSimWhenRangeCollapses(): void
+    {
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
+        $repo->method('getWinLossRecord')->willReturn(['wins' => 5, 'losses' => 2]);
+
+        $dc = array_merge($this->makeEndedDcRow(), ['sim_number_start' => 3, 'sim_number_end' => 3]);
+
+        $this->assertSame('Playoff Push | Sim 3 | Jan 1 - Jan 14 | (5-2)', $this->dropdownLabelFor($dc, $repo));
+    }
+
+    public function testDropdownLabelForOpenDcShowsQuestionMarkAndQueriesThroughLastSim(): void
+    {
+        $repo = $this->createMock(DepthChartSnapshotRepositoryInterface::class);
+        $repo->expects(self::once())
+            ->method('getWinLossRecord')
+            ->with(1, '2024-01-01', '2024-01-20')
+            ->willReturn(['wins' => 5, 'losses' => 2]);
+
+        $dc = array_merge($this->makeEndedDcRow(), ['sim_end_date' => null, 'sim_number_end' => null]);
+
+        $this->assertSame('Playoff Push | Sim 3 | Jan 1 - ? | (5-2)', $this->dropdownLabelFor($dc, $repo));
+    }
+
+    public function testDropdownLabelForEndedDcQueriesThroughSimEndDate(): void
+    {
+        $repo = $this->createMock(DepthChartSnapshotRepositoryInterface::class);
+        $repo->expects(self::once())
+            ->method('getWinLossRecord')
+            ->with(1, '2024-01-01', '2024-01-14')
+            ->willReturn(['wins' => 5, 'losses' => 2]);
+
+        $this->assertSame(
+            'Playoff Push | Sims 3-5 | Jan 1 - Jan 14 | (5-2)',
+            $this->dropdownLabelFor($this->makeEndedDcRow(), $repo)
+        );
+    }
+
+    public function testLiveLabelExactStringForNamedActiveDc(): void
+    {
+        $repo = $this->createMock(DepthChartSnapshotRepositoryInterface::class);
+        $repo->method('getActiveDepthChartForTeam')
+            ->willReturn(array_merge($this->makeActiveDcRow(42, 'Championship DC'), ['sim_number_start' => 1]));
+        $repo->expects(self::once())
+            ->method('getWinLossRecord')
+            ->with(1, '2024-01-01', '2024-01-20')
+            ->willReturn(['wins' => 3, 'losses' => 1]);
+
+        $service = new DepthChartSnapshotService($this->mockDb, $repo);
+
+        $this->assertSame(
+            'Championship DC (Live) ∙ Sims 1-4 ∙ Jan 1 - Jan 20 ∙ (3-1)',
+            $service->buildCurrentLiveLabel(1, $this->makeSeasonStub())
+        );
+    }
+
+    #[DataProvider('unnamedActiveDcNameProvider')]
+    public function testLiveLabelFallsBackToCurrentWhenActiveDcUnnamed(?string $name): void
+    {
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
+        $repo->method('getActiveDepthChartForTeam')
+            ->willReturn(array_merge($this->makeActiveDcRow(42), ['name' => $name, 'sim_number_start' => 1]));
+        $repo->method('getWinLossRecord')->willReturn(['wins' => 3, 'losses' => 1]);
+
+        $service = new DepthChartSnapshotService($this->mockDb, $repo);
+
+        $this->assertSame(
+            'Current (Live) ∙ Sims 1-4 ∙ Jan 1 - Jan 20 ∙ (3-1)',
+            $service->buildCurrentLiveLabel(1, $this->makeSeasonStub())
+        );
+    }
+
+    /** @return array<string, array{string|null}> */
+    public static function unnamedActiveDcNameProvider(): array
+    {
+        return [
+            'null name' => [null],
+            'empty name' => [''],
+        ];
+    }
+
+    #[DataProvider('liveEndDateBranchProvider')]
+    public function testLiveLabelEndDateBranchOnActiveDcStart(string $simStartDate, string $expected): void
+    {
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
+        $repo->method('getActiveDepthChartForTeam')->willReturn(array_merge(
+            $this->makeActiveDcRow(42, 'Next Up'),
+            ['sim_start_date' => $simStartDate, 'sim_number_start' => 4]
+        ));
+        $repo->method('getWinLossRecord')->willReturn(['wins' => 0, 'losses' => 0]);
+
+        $service = new DepthChartSnapshotService($this->mockDb, $repo);
+
+        $this->assertSame($expected, $service->buildCurrentLiveLabel(1, $this->makeSeasonStub()));
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function liveEndDateBranchProvider(): array
+    {
+        return [
+            'starts after last sim end: projected end' => ['2024-01-21', 'Next Up (Live) ∙ Sim 4 ∙ Jan 21 - Jan 27 ∙ (0-0)'],
+            'starts on last sim end: boundary keeps last sim end' => ['2024-01-20', 'Next Up (Live) ∙ Sim 4 ∙ Jan 20 - Jan 20 ∙ (0-0)'],
+        ];
+    }
+
+    public function testLiveLabelWithoutActiveDcHasNoRecordPart(): void
+    {
+        $repo = $this->createMock(DepthChartSnapshotRepositoryInterface::class);
+        $repo->method('getActiveDepthChartForTeam')->willReturn(null);
+        // expects(never()): with no active DC there is no record span to query.
+        $repo->expects(self::never())->method('getWinLossRecord');
+
+        $service = new DepthChartSnapshotService($this->mockDb, $repo);
+
+        $this->assertSame(
+            'Current (Live) ∙ Sim 4 ∙ Jan 15 - Jan 20',
+            $service->buildCurrentLiveLabel(1, $this->makeSeasonStub())
+        );
     }
 
     // ── memoization + injected-interface seam (Phase 3) ─────────────────────

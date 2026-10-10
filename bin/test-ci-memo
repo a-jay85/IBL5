@@ -45,9 +45,45 @@ vr_if_shape() {
     awk '
         /^  e2e:/{in_job=1; next}
         /^  [a-zA-Z]/ && in_job { in_job=0 }
-        in_job && /^    if: \(needs\.changes\.outputs\.src == .true. && needs\.ci-memo-check\.outputs\.hit != .true.\) \|\| needs\.changes\.outputs\.baseline == .true.$/ { found=1; exit }
+        in_job && /^    if: (inputs\.refresh_pr \|\| )?\(needs\.changes\.outputs\.src == .true. && needs\.ci-memo-check\.outputs\.hit != .true.\) \|\| needs\.changes\.outputs\.baseline == .true.$/ { found=1; exit }
         END { exit !found }
     ' "$1"
+}
+
+# Assertion 7 (ADR-0186): on pull_request the memo is the only skip gate for
+# the test and analysis jobs. Path-filter outputs may gate only this allowlist.
+CHANGES_ALLOWLIST="audit-js,audit-php,iblbot"
+MEMO_ONLY_JOBS="test harness-tests db-integration phpstan shellcheck ibl5-ts-unit"
+UNCONDITIONAL_JOBS="phpunit-hygiene host-mariadb-guard automouse-impl-model-test actionlint"
+filter_free_topology() {
+    local wf="$1" got bad=0 j
+    got=$(awk '
+        /^  [a-zA-Z][a-zA-Z0-9_-]*:/ { j=substr($0,3); sub(/:.*$/,"",j) }
+        /needs\.changes\.outputs\./ { print j }
+    ' "$wf" | sort -u | paste -sd, -)
+    if [[ "$got" != "$CHANGES_ALLOWLIST" ]]; then
+        echo "changes-output readers '$got' != allowlist '$CHANGES_ALLOWLIST'"; bad=1
+    fi
+    for j in $MEMO_ONLY_JOBS; do
+        awk -v job="$j" \
+            -v want_needs="    needs: [ci-memo-check]" \
+            -v want_if="    if: needs.ci-memo-check.outputs.hit != 'true'" '
+            $0 == "  " job ":" { in_job=1; seen=1; next }
+            /^  [a-zA-Z]/ && in_job { in_job=0 }
+            in_job && /^    needs:/ { needs=$0 }
+            in_job && /^    if:/    { iff=$0 }
+            END { exit !(seen && needs == want_needs && iff == want_if) }
+        ' "$wf" || { echo "$j: needs/if not exactly [ci-memo-check] + memo clause"; bad=1; }
+    done
+    for j in $UNCONDITIONAL_JOBS; do
+        awk -v job="$j" '
+            $0 == "  " job ":" { in_job=1; seen=1; next }
+            /^  [a-zA-Z]/ && in_job { in_job=0 }
+            in_job && /^    (needs|if):/ { cond=1 }
+            END { exit !(seen && !cond) }
+        ' "$wf" || { echo "$j: must exist with no job-level needs:/if:"; bad=1; }
+    done
+    return "$bad"
 }
 
 # ---- temp git repo helper -----------------------------------------------
@@ -71,12 +107,12 @@ mk_repo() {
 
 # Run bin/ci-memo key and capture hash= / key= into globals MEMO_HASH MEMO_KEY
 # Returns the exit code of ci-memo.
-run_key() {  # <repo> <manifest_dir> <scope>
+run_key() {  # <repo> <manifest_dir> <scope> [ci-memo args...]
     local repo="$1" mdir="$2" scope="$3"
     local out rc=0
     out=$(CI_MEMO_REPO="$repo" CI_MEMO_MANIFEST_DIR="$mdir" \
           GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
-          "$MEMO" key "$scope" 2>/dev/null) || rc=$?
+          "$MEMO" key "$scope" "${@:4}" 2>/dev/null) || rc=$?
     MEMO_HASH=$(printf '%s' "$out" | grep '^hash=' | sed 's/^hash=//')
     MEMO_KEY=$(printf '%s'  "$out" | grep '^key='  | sed 's/^key=//')
     return "$rc"
@@ -289,36 +325,6 @@ if should_run digest-unavailable-miss; then
 fi
 
 # =========================================================================
-# Case: lighthouse-scope-fold
-if should_run lighthouse-scope-fold; then
-    r="$TMP/lh-repo"; mk_repo "$r"
-    lh_env=(CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="")
-    k_lh_unavail=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD=false \
-        "$MEMO" key lighthouse --manifest "$r/ci-memo/e2e.paths" 2>/dev/null | grep '^key=' | sed 's/^key=//')
-    k_lh_stub=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD='echo stub-manifest' \
-        "$MEMO" key lighthouse --manifest "$r/ci-memo/e2e.paths" 2>/dev/null | grep '^hash=')
-    k_e2e_stub=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD='echo stub-manifest' \
-        "$MEMO" key e2e 2>/dev/null | grep '^hash=')
-    k_tests=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD=false \
-        "$MEMO" key tests 2>/dev/null | grep '^key=' | sed 's/^key=//')
-    p_lh=$(env "${lh_env[@]}" "$MEMO" paths lighthouse --manifest "$r/ci-memo/e2e.paths" 2>/dev/null)
-    p_e2e=$(env "${lh_env[@]}" "$MEMO" paths e2e 2>/dev/null)
-    if [[ -n "$k_lh_unavail" ]]; then
-        fail "lighthouse-scope-fold: unreadable manifest must yield empty key, got '$k_lh_unavail'"
-    elif [[ -z "$k_lh_stub" || -z "$k_e2e_stub" ]]; then
-        fail "lighthouse-scope-fold: stub-digest hash is empty (lh='$k_lh_stub' e2e='$k_e2e_stub')"
-    elif [[ "$k_lh_stub" == "$k_e2e_stub" ]]; then
-        fail "lighthouse-scope-fold: lighthouse and e2e keys collide on the same tree"
-    elif [[ -z "$k_tests" ]]; then
-        fail "lighthouse-scope-fold: tests scope must NOT fold the image digest (key went empty)"
-    elif [[ "$p_lh" != "$p_e2e" ]]; then
-        fail "lighthouse-scope-fold: --manifest e2e.paths must list the same pathspecs as scope e2e"
-    else
-        pass "lighthouse-scope-fold"
-    fi
-fi
-
-# =========================================================================
 # Case: manifest-coverage
 # Asserts: every path literal in the memoized dorny filter blocks of each
 # real workflow is covered by the matching scope's manifest.
@@ -408,7 +414,8 @@ if should_run manifest-coverage; then
         fi
     }
 
-    check_coverage tests "$WF_TESTS" "both|src|shell|ibl5ts|iblbot|jsdeps"
+    # ADR-0186 retired the both|shell|ibl5ts filter blocks; listing them here fails extraction.
+    check_coverage tests "$WF_TESTS" "src|iblbot|jsdeps"
     check_coverage e2e   "$WF_E2E"   "runtime"
 
     # check_literal_refs <scope> <mset-file> <path>...: each path must be a
@@ -604,6 +611,13 @@ if should_run gate-topology; then
     if vr_if_shape "$WF_E2E"; then pass "gate-topology[6]: e2e-tests.yml VR if gates only the src arm"
     else fail "gate-topology[6]: e2e-tests.yml VR if is not '(src && !hit) || baseline'"; gt_fail=1; fi
 
+    # --- Assertion 7: path filters gate only the allowlisted jobs (tests.yml) ---
+    if ft_out=$(filter_free_topology "$WF_TESTS"); then
+        pass "gate-topology[7]: tests.yml memo is the only skip gate outside the allowlist"
+    else
+        fail "gate-topology[7]: tests.yml — $ft_out"; gt_fail=1
+    fi
+
     [[ $gt_fail -eq 0 ]] || true  # individual pass/fail already recorded
 fi
 
@@ -616,15 +630,52 @@ if should_run gate-topology-mutants; then
     sed "s|(needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true') || needs.changes.outputs.baseline == 'true'|(needs.changes.outputs.src == 'true' || needs.changes.outputs.baseline == 'true') \&\& needs.ci-memo-check.outputs.hit != 'true'|" "$WF_E2E" > "$m/e2e-6a.yml"
     # 6b: memo clause deleted entirely
     sed "s| \&\& needs.ci-memo-check.outputs.hit != 'true')|)|" "$WF_E2E" > "$m/e2e-6b.yml"
+    # 7a: PHPUnit job re-gated on the src filter
+    sed "/^  test:/,/^    if:/ s|^    if: needs.ci-memo-check.outputs.hit != 'true'\$|    if: needs.changes.outputs.src == 'true' \&\& needs.ci-memo-check.outputs.hit != 'true'|" "$WF_TESTS" > "$m/tests-7a.yml"
+    # 7b: harness job re-adds changes to needs
+    sed "/^  harness-tests:/,/^    needs:/ s|^    needs: \[ci-memo-check\]\$|    needs: [changes, ci-memo-check]|" "$WF_TESTS" > "$m/tests-7b.yml"
+    # 7c: an unconditional job regains a job-level needs:
+    awk '/^  actionlint:/{a=1} a && /^    runs-on:/{print "    needs: [changes]"; a=0} {print}' "$WF_TESTS" > "$m/tests-7c.yml"
+    # 7d: iblbot loses its filter, so the allowlist no longer matches exactly
+    sed "/^  iblbot:/,/^    if:/ s|^    if: needs.changes.outputs.iblbot == 'true' \&\& |    if: |" "$WF_TESTS" > "$m/tests-7d.yml"
     mt_check() {
         if "$2" "$3"; then fail "gate-topology-mutants[$1]: assertion passed on mutant"; else pass "gate-topology-mutants[$1]"; fi
     }
-    for f in e2e-6a e2e-6b; do
-        src="$WF_E2E"
+    for f in e2e-6a e2e-6b tests-7a tests-7b tests-7c tests-7d; do
+        case "$f" in e2e-*) src="$WF_E2E" ;; *) src="$WF_TESTS" ;; esac
         cmp -s "$m/$f.yml" "$src" && fail "gate-topology-mutants[$f]: mutant identical to source (anchor missed)"
     done
     mt_check 6a vr_if_shape  "$m/e2e-6a.yml"
     mt_check 6b vr_if_shape  "$m/e2e-6b.yml"
+    mt_check 7a filter_free_topology "$m/tests-7a.yml"
+    mt_check 7b filter_free_topology "$m/tests-7b.yml"
+    mt_check 7c filter_free_topology "$m/tests-7c.yml"
+    mt_check 7d filter_free_topology "$m/tests-7d.yml"
+fi
+
+# =========================================================================
+# Case: memo-only-salt (ADR-0186)
+# =========================================================================
+if should_run memo-only-salt; then
+    salt_repo="$TMP/salt-repo"; mk_repo "$salt_repo"
+    plain=""; s1=""; s2=""
+    run_key "$salt_repo" "$salt_repo/ci-memo" tests && plain="$MEMO_KEY"
+    run_key "$salt_repo" "$salt_repo/ci-memo" tests --extra gating=memo-only && s1="$MEMO_KEY"
+    run_key "$salt_repo" "$salt_repo/ci-memo" tests --extra gating=memo-only && s2="$MEMO_KEY"
+    if [[ -z "$plain" || -z "$s1" || -z "$s2" ]]; then
+        fail "memo-only-salt: key computation failed"
+    elif [[ "$s1" != "$s2" ]]; then
+        fail "memo-only-salt: salted key unstable on one tree ($s1 != $s2)"
+    elif [[ "$s1" == "$plain" ]]; then
+        fail "memo-only-salt: --extra gating=memo-only left the key unchanged"
+    else
+        pass "memo-only-salt: salted key stable on re-push and distinct from unsalted"
+    fi
+    if grep -qxF '        run: bin/ci-memo key tests --extra gating=memo-only' "$WF_TESTS"; then
+        pass "memo-only-salt: tests.yml salts the tests key"
+    else
+        fail "memo-only-salt: tests.yml Compute memo key lacks --extra gating=memo-only"
+    fi
 fi
 
 # =========================================================================

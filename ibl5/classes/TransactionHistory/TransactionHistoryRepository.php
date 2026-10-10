@@ -24,6 +24,7 @@ class TransactionHistoryRepository extends \Database\BaseMysqliRepository implem
     public function getAvailableYears(): array
     {
         $rows = $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (DISTINCT YEAR(time) AS year is the whole select list, so year alone is a total order)
             "SELECT DISTINCT YEAR(time) AS year FROM nuke_stories WHERE catid IN (" . self::CATEGORY_IDS . ") ORDER BY year DESC",
             ""
         );

@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-HELPER="$(cd "$(dirname "$0")/.." && pwd)/bin/lib/plan-matrix-assertions"
+HELPER="${HELPER:-$(cd "$(dirname "$0")/.." && pwd)/bin/lib/plan-matrix-assertions}"
 MATRIX_ASSERTIONS_SCRIPT="$HELPER"
 
 # Scratch-repo commits need an identity; CI runners have none configured.
@@ -40,6 +40,20 @@ plan_fixture() {
     printf '| # | What to verify | Test type | Timing | Test file / location |\n'
     printf '|---|---------------|-----------|--------|---------------------|\n'
     printf '%s\n' "$@"
+}
+
+# deleted_diff_fixture <path> [<path>...]
+# Prints one git deletion header per path, exactly as `git diff` renders a removed
+# binary: diff --git, deleted file mode, index, Binary files ... differ. No `+` lines,
+# so the only evidence of the path is the header itself.
+deleted_diff_fixture() {
+    local p
+    for p in "$@"; do
+        printf 'diff --git a/%s b/%s\n' "$p" "$p"
+        printf 'deleted file mode 100644\n'
+        printf 'index 3b18e51..0000000\n'
+        printf 'Binary files a/%s and /dev/null differ\n' "$p"
+    done
 }
 
 # replay_2578_fixture <dir> [tagged]
@@ -149,6 +163,81 @@ EOF_DIFF
     printf -- '--self-test\n.claude/rules/prose-style.md\n' > "$dir/tree.txt"
     git -C "$dir" add tree.txt
     git -C "$dir" commit -q -m "tree tokens"
+}
+
+# replay_calibration_fixture <dir>
+# Writes seven Verification Matrix rows to <dir>/plan.md, copied verbatim from the
+# calibration plans (rows 1-3 and 12 from tables-css-module-split-201, rows 4 and 6
+# from hof-photos-offload-207, row 15 from planfile-test-type-cell-match) with the
+# trailing (one-time-check: ...) tag stripped, since a tagged row is skipped whole
+# and would prove nothing. The diff is a three-file deletion plus one unrelated
+# line, and carries `+` lines for the plain tokens the real PR diffs realised: row
+# 12 needs CSS_TABLE_MAP.md and tables/depth-chart.css; row 15 needs added,
+# typed_loss, dropped>, _TEST_TYPE_LABEL, added>0. Rows 1, 2, 3 stay unrealised
+# (true-positive controls).
+replay_calibration_fixture() {
+    local dir="$1"
+    cat > "$dir/plan.md" <<'EOF_CAL'
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | Each of the five cut anchors occurs exactly once in `tables.css` before any edit; an upstream reflow (for example [#2512](https://github.com/a-jay85/IBL5/pull/2512) merging first) that duplicates or rewrites an anchor prints a count other than 1 and stops the run. Printed five `1` lines on master `1af82a975` | CLI-executable | pre-impl (characterization) | `for a in '/* Drafted/disabled row */' '/* Expiring-contract row (Team page' '    /* Drafted row sticky backgrounds - consolidated */' '/* Drafted row sticky backgrounds */' "/* Mobile: a wide table's caption and title row span"; do grep -cF -- "$a" ibl5/design/components/tables.css; done` |
+| 2 | On the clean tree the harness parses the full stylesheet and reports `before == after`, `order-flips-sharing-a-property=0`, `flags=0`, `RESULT PASS`; a parser that dropped rules or a dirty `ibl5/design/` would show unequal counts or nonzero flips. Printed `rules before=2171 after=2171 order-flips-sharing-a-property=0 flags=0` at plan time | CLI-executable | pre-impl (characterization) | `bash ~/claude-plans/_scripts/tables-css-201/cascade-check.sh` |
+| 3 | The four emitter facts behind `CLOSED` / `NEVER_WITH` still hold: `drafted`, `fa-table__title`, `player-fa-expiring-row` are sole classes; `fa-table` tables use only the closed class set; expiring-row tables are never `.sticky-table`; no `ibl5/jslib/` script touches these classes. Mutation: give `DraftView.php`'s row `class="drafted foo"` ⇒ the first test fails and no `FACTS-OK` prints | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+| 4 | After the deletion, nothing tracked still points at the removed path. A diff that adds an `images/hof` reference anywhere makes `git grep` match, so this fails. | CLI-executable | post-impl | `! git grep -n 'images/hof' -- ':!ibl5/images/hof'` |
+| 6 | Environment 1 returns 404 for `jordan.jpg` after the change, while the logo control still returns 200. Leaving the file on disk returns 200 for the target, and a down stack returns 000 for the control, so either fails this row. | CLI-executable | post-impl | `test "$(curl -s -o /dev/null -w '%{http_code}' http://hof-photos-offload-207.localhost/ibl5/images/hof/jordan.jpg)" = 404 && test "$(curl -s -o /dev/null -w '%{http_code}' http://hof-photos-offload-207.localhost/ibl5/images/logo/1.jpg)" = 200` |
+| 12 | Every `tables/*.css` path cited in `CSS_TABLE_MAP.md` exists and the new partial is listed. Mutation: keep the `tables/depth-chart.css` row ⇒ `MISSING tables/depth-chart.css` and exit 1 | CLI-executable | post-impl | `! for f in $(grep -oE 'tables/[a-z-]+\.css' ibl5/design/CSS_TABLE_MAP.md \| sort -u); do test -f "ibl5/design/components/$f" \|\| echo "MISSING $f"; done \| grep MISSING && grep -qF 'tables/player-row-states.css' ibl5/design/CSS_TABLE_MAP.md` |
+| 15 | Corpus pass bar (local): old-vs-new over recursive `~/claude-plans/**/*.md` reports `added=0`, `typed_loss=0`, `dropped>=1`, exit 0. Mutation: widen `_TEST_TYPE_LABEL` to accept a trailing space plus any word ⇒ a plan whose description cell is `E2E failures …`-shaped plans a new path ⇒ `added>0` ⇒ exit 1 | CLI-executable | post-impl | `POSTPLAN_CORPUS_DIFF=1 python3 -m pytest tools/postplan-harness/tests/test_planned_paths_corpus_diff.py -q -rs` |
+EOF_CAL
+    {
+        deleted_diff_fixture ibl5/images/hof/jordan.jpg ibl5/images/hof/bird.jpg ibl5/images/hof/magic.jpg
+        printf '+unrelated fixture line\n'
+        printf '+CSS_TABLE_MAP.md tables/depth-chart.css\n'
+        printf '+added typed_loss dropped> _TEST_TYPE_LABEL added>0\n'
+    } > "$dir/diff.txt"
+}
+
+# replay_false_stop_fixture <dir>
+# Writes the matrix rows from the 2026-10 Step 6.7 false-stop reports (png baselines
+# cited by basename, tracked .php paths, and Mutation-clause tokens), untagged, to
+# <dir>/plan.md. Tracked paths are staged so `git ls-files` sees them; every file holds
+# the single byte `x` except tree.txt, which carries the two tokens arm 3 realises.
+# diff.txt holds modified-binary headers for player.png and player-mobile.png only.
+replay_false_stop_fixture() {
+    local dir="$1" snap="ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots" f
+    cat > "$dir/plan.md" <<'EOF_FS'
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 4 | The captioned team and trading tables render byte-identically to their committed baselines (`team.png`, `team-mobile.png`, `team-contracts.png`, `trading.png`, `trading-mobile.png`). A caption overflow change that altered the tab strip's corners or clipping would produce a pixel diff and fail. | Visual-regression | post-impl | `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots` |
+| 12 | Player page baselines change only for the card table restructure: `player.png` and `player-mobile.png` regenerate through the `update-baselines` label | Visual-regression | post-impl | `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots # (one-shot)` |
+| 15 | Scope: the diff against `origin/master` touches only the two test files; `ibl5/blocks/block-Chunk_Leaders.php`, `ibl5/classes/League/League.php`, and `ibl5/classes/Player/Stats/PlayerStatsRepository.php` are untouched | CLI-executable | post-impl | `git diff --stat origin/master` |
+| 17 | A fabricated scores row with no raw file is rejected. Mutation: drop the `STRAY`/`ORPHAN` checks ⇒ exit 0. | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/negproof-ab-trace.sh` |
+| 29 | Verdict-selected memory text is present, the other branch's text is absent, and the five unrelated memories are byte-identical. Mutation: edit `feedback_task_framing_not_member_data.md` ⇒ exit 1. | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/negproof-ab-check-memory.sh` |
+| 5 | A table-separator line is skipped by the scanner. Mutation: drop `tail.strip().startswith("\|")` ⇒ the separator row is scanned | CLI-executable | post-impl | `bin/check-prose --self-test` |
+EOF_FS
+    for f in team team-mobile team-contracts trading trading-mobile player player-mobile; do
+        mkdir -p "$dir/$snap"
+        printf 'x\n' > "$dir/$snap/$f.png"
+    done
+    mkdir -p "$dir/ibl5/blocks" "$dir/ibl5/classes/League" "$dir/ibl5/classes/Player/Stats"
+    printf 'x\n' > "$dir/ibl5/blocks/block-Chunk_Leaders.php"
+    printf 'x\n' > "$dir/ibl5/classes/League/League.php"
+    printf 'x\n' > "$dir/ibl5/classes/Player/Stats/PlayerStatsRepository.php"
+    printf 'origin/master\nupdate-baselines\n' > "$dir/tree.txt"
+    # Stage only the tracked tree: plan.md stays untracked so `git grep` (arm 3) never
+    # finds a row's own token inside the plan.
+    git -C "$dir" add ibl5 tree.txt
+    {
+        for f in player player-mobile; do
+            printf 'diff --git a/%s/%s.png b/%s/%s.png\n' "$snap" "$f" "$snap" "$f"
+            printf 'index 3b18e51..9a0b1c2 100644\n'
+            printf 'Binary files a/%s/%s.png and b/%s/%s.png differ\n' "$snap" "$f" "$snap" "$f"
+        done
+        printf '+unrelated line\n'
+    } > "$dir/diff.txt"
 }
 
 extract_step67_block() {
@@ -732,33 +821,208 @@ shell-var-default-mutation)
     fi
     ;;
 
-glob-prefix)
+# Mutation: restoring the prefix-glob arm flags this row.
+glob-token-skipped)
     plan_fixture '| 1 | glob match: `test_digest_xyzzy_*` present | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
         > "$root/plan.md"
-    printf 'test_digest_xyzzy_something\n' > "$root/fixture.txt"
-    git -C "$root" add fixture.txt
     out=$(printf '+some unrelated added line\n' \
         | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
     rc=$?
     if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
-        ok "glob-prefix"
+        ok "glob-token-skipped"
     else
-        fail "glob-prefix (rc=$rc, out=$out)"
+        fail "glob-token-skipped (rc=$rc, out=$out)"
     fi
     ;;
 
-glob-prefix-mutation)
-    plan_fixture '| 1 | glob match: `test_xyzzy_missing_*` present | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+glob-token-skipped-shapes)
+    plan_fixture '| 1 | css glob: `tables/*.css` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        '| 2 | home-dir glob: `~/claude-plans/**/*.md` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        '| 3 | catch-all arm: `*)` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
         > "$root/plan.md"
-    printf 'test_digest_xyzzy_something\n' > "$root/fixture.txt"
-    git -C "$root" add fixture.txt
     out=$(printf '+some unrelated added line\n' \
         | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
     rc=$?
-    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1'; then
-        ok "glob-prefix-mutation"
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "glob-token-skipped-shapes"
     else
-        fail "glob-prefix-mutation (rc=$rc, out=$out)"
+        fail "glob-token-skipped-shapes (rc=$rc, out=$out)"
+    fi
+    ;;
+
+glob-row-plain-token-still-flags)
+    plan_fixture '| 1 | glob `tables/*.css` with `fixture_absent_xyzzy_tok` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    out=$(printf '+some unrelated added line\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>"$root/err.txt")
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 1' <<< "$out" \
+        && grep -qF 'fixture_absent_xyzzy_tok' "$root/err.txt" \
+        && ! grep -qF 'tables/' "$root/err.txt"; then
+        ok "glob-row-plain-token-still-flags"
+    else
+        fail "glob-row-plain-token-still-flags (rc=$rc, out=$out)"
+    fi
+    ;;
+
+deleted-file-exact-path)
+    plan_fixture '| 1 | offloaded `ibl5/images/hof/jordan.jpg` file | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    deleted_diff_fixture ibl5/images/hof/jordan.jpg > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "deleted-file-exact-path"
+    else
+        fail "deleted-file-exact-path (rc=$rc, out=$out)"
+    fi
+    ;;
+
+deleted-file-basename)
+    plan_fixture '| 1 | offloaded `jordan.jpg` file | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    deleted_diff_fixture ibl5/images/hof/jordan.jpg > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "deleted-file-basename"
+    else
+        fail "deleted-file-basename (rc=$rc, out=$out)"
+    fi
+    ;;
+
+# Mutation: a leading-prefix-only match (token must start the path) flags this row.
+deleted-file-dir-component)
+    plan_fixture '| 1 | offloaded `images/hof` photos | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    deleted_diff_fixture ibl5/images/hof/jordan.jpg > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "deleted-file-dir-component"
+    else
+        fail "deleted-file-dir-component (rc=$rc, out=$out)"
+    fi
+    ;;
+
+deleted-file-leading-dir)
+    plan_fixture '| 1 | offloaded `ibl5/images` tree | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    deleted_diff_fixture ibl5/images/hof/jordan.jpg > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "deleted-file-leading-dir"
+    else
+        fail "deleted-file-leading-dir (rc=$rc, out=$out)"
+    fi
+    ;;
+
+deleted-file-trailing-slash)
+    plan_fixture '| 1 | offloaded `ibl5/images/hof/` directory | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    deleted_diff_fixture ibl5/images/hof/jordan.jpg > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "deleted-file-trailing-slash"
+    else
+        fail "deleted-file-trailing-slash (rc=$rc, out=$out)"
+    fi
+    ;;
+
+# Mutation: a plain substring match clears these rows.
+deleted-file-substring-not-aligned)
+    plan_fixture '| 1 | partial `ages/hof` name | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        '| 2 | partial `jordan` name | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        '| 3 | partial `hof/jordan.jp` name | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    deleted_diff_fixture ibl5/images/hof/jordan.jpg > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 1' <<< "$out" && grep -qF 'UNREALISED-ASSERTION: row 2' <<< "$out" && grep -qF 'UNREALISED-ASSERTION: row 3' <<< "$out"; then
+        ok "deleted-file-substring-not-aligned"
+    else
+        fail "deleted-file-substring-not-aligned (rc=$rc, out=$out)"
+    fi
+    ;;
+
+deleted-file-not-deleted)
+    # Directory token: arm 2c realises a modified file's own path (by design), so the
+    # modification-is-not-a-deletion check cites the directory, which only arm 2b's
+    # prefix form could realise.
+    plan_fixture '| 1 | offloaded `ibl5/images/hof/` directory | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    p=ibl5/images/hof/jordan.jpg
+    {
+        printf 'diff --git a/%s b/%s\n' "$p" "$p"
+        printf 'index 3b18e51..9a1f2c3 100644\n'
+        printf -- '--- a/%s\n' "$p"
+        printf '+++ b/%s\n' "$p"
+        printf '@@ -1 +1 @@\n-old\n+new\n'
+    } > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 1' <<< "$out"; then
+        ok "deleted-file-not-deleted"
+    else
+        fail "deleted-file-not-deleted (rc=$rc, out=$out)"
+    fi
+    ;;
+
+deleted-file-space-path)
+    plan_fixture '| 1 | offloaded `images/hof` photos | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    deleted_diff_fixture "ibl5/images/hof/michael jordan.jpg" > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "deleted-file-space-path"
+    else
+        fail "deleted-file-space-path (rc=$rc, out=$out)"
+    fi
+    ;;
+
+deleted-file-quoted-path-skipped)
+    plan_fixture '| 1 | offloaded `images/hof` photos | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    {
+        printf 'diff --git "a/ibl5/images/hof/j\\303\\266rdan.jpg" "b/ibl5/images/hof/j\\303\\266rdan.jpg"\n'
+        printf 'deleted file mode 100644\n'
+    } > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 1' <<< "$out"; then
+        ok "deleted-file-quoted-path-skipped"
+    else
+        fail "deleted-file-quoted-path-skipped (rc=$rc, out=$out)"
+    fi
+    ;;
+
+# Canary: a deletion set that swallows unrelated tokens clears this row.
+plain-missing-canary)
+    plan_fixture '| 1 | offloaded `fixture_absent_xyzzy_tok` file | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    deleted_diff_fixture ibl5/images/hof/jordan.jpg > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 1' <<< "$out"; then
+        ok "plain-missing-canary"
+    else
+        fail "plain-missing-canary (rc=$rc, out=$out)"
+    fi
+    ;;
+
+glob-only-row-silent)
+    plan_fixture '| 1 | only `tables/*.css` and `*.md` here | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    out=$(printf '+some unrelated added line\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>"$root/err.txt")
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ] && [ "$(wc -l < "$root/err.txt")" -eq 0 ]; then
+        ok "glob-only-row-silent"
+    else
+        fail "glob-only-row-silent (rc=$rc, out=$out)"
     fi
     ;;
 
@@ -922,9 +1186,375 @@ replay-2578-untagged)
     fi
     ;;
 
+replay-calibration-fp)
+    # The four calibration false positives (#2900 row 15, #2896 row 12, #2894 rows 4 and 6)
+    # are silent; rows 1, 2, 3 (true-positive controls) stay flagged.
+    replay_calibration_fixture "$root"
+    if grep -qF 'one-time-check' "$root/plan.md"; then
+        fail "replay-calibration-fp (fixture still carries a one-time-check tag)"
+    else
+        out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>"$root/err.txt")
+        rc=$?
+        total=$(printf '%s\n' "$out" | grep -c '^UNREALISED-ASSERTION:' || true)
+        flagged_ok=1
+        for r in 1 2 3; do
+            c=$(printf '%s\n' "$out" | grep -c "^UNREALISED-ASSERTION: row $r " || true)
+            if [ "$c" -ne 1 ]; then flagged_ok=0; fi
+        done
+        silent_ok=1
+        for r in 4 6 12 15; do
+            c=$(printf '%s\n' "$out" | grep -c "^UNREALISED-ASSERTION: row $r " || true)
+            if [ "$c" -ne 0 ]; then silent_ok=0; fi
+        done
+        star_ok=1
+        if grep -qE '^  missing:.*\*' "$root/err.txt"; then star_ok=0; fi
+        if [ "$rc" -eq 0 ] && [ "$total" -eq 3 ] && [ "$flagged_ok" -eq 1 ] \
+            && [ "$silent_ok" -eq 1 ] && [ "$star_ok" -eq 1 ]; then
+            ok "replay-calibration-fp"
+        else
+            fail "replay-calibration-fp (rc=$rc, total=$total, flagged_ok=$flagged_ok, silent_ok=$silent_ok, star_ok=$star_ok, out=$out)"
+        fi
+    fi
+    ;;
+
+removed-line-token)
+    # Token appears only on a removed (-) line; root lacks it. Removed lines count as pre-existing.
+    # Calibration 2026-10-07 (10 merged plan-driven PRs, rows classified in verdicts.tsv): 0 FP,
+    # 3 arm-2-only rescues, all absence assertions whose token sat only on removed lines.
+    # The knockout canary below proves the `grep -vE '^[ -]'` instrument that calibration used:
+    # stripping context and removed lines turns the arm-2 rescue into an UNREALISED report.
+    plan_fixture '| 13 | `FIXTURE_RM_SYMBOL` is checked | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '%s\n' '-FIXTURE_RM_SYMBOL=old' '+replacement' > "$root/diff.txt"
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    plan_fixture '| 1 | `gone_token_zz` removed | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/canary-plan.md"
+    printf '%s\n' '-gone_token_zz' '+other' > "$root/canary-diff.txt"
+    grep -vE '^[ -]' "$root/canary-diff.txt" > "$root/canary-noctx.txt" || true
+    canary_full=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/canary-plan.md" "$root/canary-diff.txt" 2>/dev/null)
+    canary_noctx=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/canary-plan.md" "$root/canary-noctx.txt" 2>/dev/null)
+    if [ "$rc" -eq 0 ] && [ -z "$out" ] && [ -z "$err" ] \
+        && [ -z "$canary_full" ] \
+        && grep -qF -- 'UNREALISED-ASSERTION: row 1' <<< "$canary_noctx"; then
+        ok "removed-line-token"
+    else
+        fail "removed-line-token (rc=$rc, out=$out, err=$err, canary_full=$canary_full, canary_noctx=$canary_noctx)"
+    fi
+    ;;
+
+diff-header-not-context)
+    # A `--- a/<path>` header is never a context line, even though it starts with `-`.
+    plan_fixture '| 14 | `FIXTURE_HDR_SYMBOL` is checked | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '%s\n' '--- a/FIXTURE_HDR_SYMBOL' '+++ b/other' '+unrelated' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF -- 'UNREALISED-ASSERTION: row 14' <<< "$out"; then
+        ok "diff-header-not-context"
+    else
+        fail "diff-header-not-context (rc=$rc, out=$out)"
+    fi
+    ;;
+
+plus-header-not-realised)
+    # A `+++ b/<path>` header is never an added line.
+    plan_fixture '| 15 | `FIXTURE_PLUSHDR_SYMBOL` is checked | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '%s\n' '--- a/other' '+++ b/FIXTURE_PLUSHDR_SYMBOL' '+unrelated' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF -- 'UNREALISED-ASSERTION: row 15' <<< "$out"; then
+        ok "plus-header-not-realised"
+    else
+        fail "plus-header-not-realised (rc=$rc, out=$out)"
+    fi
+    ;;
+
+ctx-mixed-row)
+    # One token on a context line, one absent: row fires, stderr names only the absent one.
+    plan_fixture '| 16 | `FIXTURE_CTX_KEEP` and `FIXTURE_ABSENT_ONE` | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '%s\n' ' FIXTURE_CTX_KEEP=1' '+unrelated' > "$root/diff.txt"
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF -- 'UNREALISED-ASSERTION: row 16' <<< "$out" \
+        && grep -qF -- 'FIXTURE_ABSENT_ONE' <<< "$err" \
+        && ! grep -qF -- 'FIXTURE_CTX_KEEP' <<< "$err"; then
+        ok "ctx-mixed-row"
+    else
+        fail "ctx-mixed-row (rc=$rc, out=$out, err=$err)"
+    fi
+    ;;
+
+path-token-tracked-exact)
+    # A tracked file cited by its full path: arm 2c realises it from the index.
+    mkdir -p "$root/ibl5/blocks"
+    printf 'x\n' > "$root/ibl5/blocks/block-Chunk_Leaders.php"
+    git -C "$root" add ibl5/blocks/block-Chunk_Leaders.php
+    plan_fixture '| 1 | `ibl5/blocks/block-Chunk_Leaders.php` untouched | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "path-token-tracked-exact"
+    else
+        fail "path-token-tracked-exact (rc=$rc, out=$out)"
+    fi
+    ;;
+
+path-token-tracked-suffix)
+    # A bare basename cited for a tracked baseline: `/`-aligned suffix of an index path.
+    snap="ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots"
+    mkdir -p "$root/$snap"
+    printf 'x\n' > "$root/$snap/team-mobile.png"
+    git -C "$root" add "$snap/team-mobile.png"
+    plan_fixture '| 1 | baseline `team-mobile.png` unchanged | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "path-token-tracked-suffix"
+    else
+        fail "path-token-tracked-suffix (rc=$rc, out=$out)"
+    fi
+    ;;
+
+path-token-diff-header-binary)
+    # A modified binary leaves only a `diff --git` header: no `+`, no `deleted file mode`.
+    snap="ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/team.png"
+    plan_fixture '| 1 | baseline `team.png` regenerated | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    {
+        printf 'diff --git a/%s b/%s\n' "$snap" "$snap"
+        printf 'index 3b18e51..9a0b1c2 100644\n'
+        printf 'Binary files a/%s and b/%s differ\n' "$snap" "$snap"
+    } > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "path-token-diff-header-binary"
+    else
+        fail "path-token-diff-header-binary (rc=$rc, out=$out)"
+    fi
+    ;;
+
+path-token-absent-still-flags)
+    # A path in neither the diff headers nor the index still reports missing.
+    mkdir -p "$root/ibl5/blocks"
+    printf 'x\n' > "$root/ibl5/blocks/block-Chunk_Leaders.php"
+    git -C "$root" add ibl5/blocks/block-Chunk_Leaders.php
+    plan_fixture '| 1 | `ibl5/blocks/block-Nope.php` untouched | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1' \
+        && grep -qF 'ibl5/blocks/block-Nope.php' <<< "$err"; then
+        ok "path-token-absent-still-flags"
+    else
+        fail "path-token-absent-still-flags (out=$out, err=$err)"
+    fi
+    ;;
+
+path-token-not-aligned-still-flags)
+    # A substring that is not on a `/` boundary does not match the tracked path.
+    mkdir -p "$root/ibl5/blocks"
+    printf 'x\n' > "$root/ibl5/blocks/block-Chunk_Leaders.php"
+    git -C "$root" add ibl5/blocks/block-Chunk_Leaders.php
+    plan_fixture '| 1 | `Chunk_Leaders.php` and `lock-Chunk_Leaders.php` untouched | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1' \
+        && grep -qF 'Chunk_Leaders.php' <<< "$err" \
+        && grep -qF 'lock-Chunk_Leaders.php' <<< "$err"; then
+        ok "path-token-not-aligned-still-flags"
+    else
+        fail "path-token-not-aligned-still-flags (out=$out, err=$err)"
+    fi
+    ;;
+
+path-token-bare-word-not-path-shaped)
+    # A bare word never enters arm 2c, even when a tracked file has that exact name.
+    mkdir -p "$root/dir"
+    printf 'x\n' > "$root/dir/STRAYFILE"
+    git -C "$root" add dir/STRAYFILE
+    plan_fixture '| 1 | `STRAYFILE` is gone | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1' \
+        && grep -qF 'STRAYFILE' <<< "$err"; then
+        ok "path-token-bare-word-not-path-shaped"
+    else
+        fail "path-token-bare-word-not-path-shaped (out=$out, err=$err)"
+    fi
+    ;;
+
+path-token-deletion-row-passes-if-tracked)
+    # Known arm-2c limitation: a row asserting a file was deleted passes when the file
+    # is still tracked, because arm 2c realises any ls-files entry. The
+    # deleted-file-not-deleted case uses a directory token to stay unrealised; this
+    # fixture pins the current behaviour so future changes know it is expected.
+    mkdir -p "$root/ibl5/images/hof"
+    printf 'x\n' > "$root/ibl5/images/hof/jordan.jpg"
+    git -C "$root" add ibl5/images/hof/jordan.jpg
+    plan_fixture '| 1 | offloaded `ibl5/images/hof/jordan.jpg` file | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "path-token-deletion-row-passes-if-tracked"
+    else
+        fail "path-token-deletion-row-passes-if-tracked (rc=$rc, out=$out)"
+    fi
+    ;;
+
+mutation-clause-token-excluded)
+    # Tokens named only inside the Mutation clause are never checked.
+    plan_fixture '| 17 | A fabricated row is rejected. Mutation: drop the `FIXTURE_STRAY_CHECK`/`FIXTURE_ORPHAN_CHECK` checks ⇒ exit 0. | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "mutation-clause-token-excluded"
+    else
+        fail "mutation-clause-token-excluded (rc=$rc, out=$out)"
+    fi
+    ;;
+
+mutation-clause-no-arrow-sentence-end)
+    # No arrow: the clause ends at the sentence-ending period; the next sentence is checked.
+    plan_fixture '| 17 | Verdict text present. Mutation: edit `fixture_memory_note.md` makes the run exit 1. Then `FIXTURE_OUTSIDE_TOK` prints | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 17' <<< "$out" \
+        && grep -qF 'FIXTURE_OUTSIDE_TOK' <<< "$err" \
+        && ! grep -qF 'fixture_memory_note.md' <<< "$err"; then
+        ok "mutation-clause-no-arrow-sentence-end"
+    else
+        fail "mutation-clause-no-arrow-sentence-end (out=$out, err=$err)"
+    fi
+    ;;
+
+mutation-clause-token-both-sides-checked)
+    # A token present outside the clause as well as inside it is still checked.
+    plan_fixture '| 17 | `FIXTURE_BOTH_TOK` is printed. Mutation: drop `FIXTURE_BOTH_TOK` ⇒ exit 0 | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 17' <<< "$out" \
+        && grep -qF 'FIXTURE_BOTH_TOK' <<< "$err"; then
+        ok "mutation-clause-token-both-sides-checked"
+    else
+        fail "mutation-clause-token-both-sides-checked (out=$out, err=$err)"
+    fi
+    ;;
+
+mutation-clause-after-arrow-checked)
+    # The consequence after the arrow is outside the clause and stays checked.
+    plan_fixture '| 17 | Row rejected. Mutation: drop the check ⇒ `FIXTURE_AFTER_ARROW` never prints | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 17' <<< "$out" \
+        && grep -qF 'FIXTURE_AFTER_ARROW' <<< "$err"; then
+        ok "mutation-clause-after-arrow-checked"
+    else
+        fail "mutation-clause-after-arrow-checked (out=$out, err=$err)"
+    fi
+    ;;
+
+mutation-clause-label-variants)
+    # `**Mutation:**` and a lower-case `mutation:` after another word both open a clause;
+    # `=>` and `->` both close one.
+    plan_fixture '| 17 | **Mutation:** drop `FIXTURE_BOLD_TOK` => x. Negative mutation: remove `FIXTURE_LC_TOK` -> exit 1 | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "mutation-clause-label-variants"
+    else
+        fail "mutation-clause-label-variants (rc=$rc, out=$out)"
+    fi
+    ;;
+
+mutation-clause-dot-inside-backticks)
+    # A `.` inside a code span never closes the clause (backtick parity is tracked).
+    plan_fixture '| 17 | Marker scope holds. Mutation: edit `tail.strip().startswith("\|")` ⇒ exit 1 | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "mutation-clause-dot-inside-backticks"
+    else
+        fail "mutation-clause-dot-inside-backticks (rc=$rc, out=$out)"
+    fi
+    ;;
+
+mutation-clause-plain-token-still-flags)
+    # A plain token outside the clause still reports; the clause token stays unreported.
+    plan_fixture '| 17 | `FIXTURE_PLAIN_MISSING` holds. Mutation: delete `fixture_wrong.php` ⇒ fails | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 17' <<< "$out" \
+        && grep -qF 'FIXTURE_PLAIN_MISSING' <<< "$err" \
+        && ! grep -qF 'fixture_wrong.php' <<< "$err"; then
+        ok "mutation-clause-plain-token-still-flags"
+    else
+        fail "mutation-clause-plain-token-still-flags (out=$out, err=$err)"
+    fi
+    ;;
+
+replay-false-stop-reports)
+    # The reported false-stop rows replay clean: arm 2c clears rows 4, 12, 15 and the
+    # Mutation-clause exclusion clears rows 17, 29, 5.
+    replay_false_stop_fixture "$root"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    unreal=$(printf '%s\n' "$out" | grep -c '^UNREALISED-ASSERTION:' || true)
+    if [ "$rc" -eq 0 ] && [ "$unreal" -eq 0 ]; then
+        ok "replay-false-stop-reports"
+    else
+        fail "replay-false-stop-reports (rc=$rc, unreal=$unreal, out=$out)"
+    fi
+    ;;
+
+replay-false-stop-canary)
+    # Same fixture plus an arbitrary missing token: only that row reports.
+    replay_false_stop_fixture "$root"
+    printf '%s\n' '| 99 | `FIXTURE_REPLAY_CANARY` prints | CLI-executable | post-impl | `bin/x` |' >> "$root/plan.md"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    unreal=$(printf '%s\n' "$out" | grep -c '^UNREALISED-ASSERTION:' || true)
+    if [ "$unreal" -eq 1 ] && grep -qF 'UNREALISED-ASSERTION: row 99' <<< "$out" \
+        && grep -qF 'missing: FIXTURE_REPLAY_CANARY' <<< "$err"; then
+        ok "replay-false-stop-canary"
+    else
+        fail "replay-false-stop-canary (unreal=$unreal, out=$out, err=$err)"
+    fi
+    ;;
+
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 replay-2578-untagged tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped path-token-deletion-row-passes-if-tracked mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags replay-false-stop-reports replay-false-stop-canary step67 prefire all\n' >&2
     exit 2
     ;;
 esac
@@ -936,7 +1566,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 replay-2578-untagged tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped path-token-deletion-row-passes-if-tracked mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags replay-false-stop-reports replay-false-stop-canary"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-10-06
+last_verified: 2026-10-08
 ---
 
 The `plan-architect` Reads this file when Step 3 of `plan/SKILL.md` points to it, so this contract lands in the architect's own sub-context and never enters the orchestrator's. Mirrors the on-demand convention of the `.claude/review-shared/_*.md` reference files.
@@ -25,7 +25,7 @@ For the codebase, the orchestrator's findings are authoritative, confirmations c
 - **DB literals cite a column type.** Each one in a recipe carries `literal-check: <literal-or-range> -> <table>.<column> <sqltype> (per ibl5/docs/schema/current-schema.sql)` on its line. The literal must fit `<sqltype>` from the dump; gate `[L]` checks it. `_architect-contract-detail.md` § Column-bound literal citations. <!-- slop-ok -->
 - For every behavior-changing step, at least one **negative-path, boundary, or failure-case** matrix row, such as "rejects over-cap trade", "returns null for unknown player", or "empty roster". Happy-path-only coverage is insufficient.
 - **The mutation statement extends to the whole matrix, not just the negative-path rows above:** every behavioral row names the production-code mutation that makes it fail (e.g. "delete the `--model` arm ⇒ this assertion fails"), as a clause in its **How** cell. `_architect-contract-detail.md` § Why negative-path rows name the mutation they catch. `_architect-contract-detail.md` § Mutation-statement counter-examples. <!-- slop-ok -->
-- **One-time-check rows.** A `CLI-executable` row may end its "What to verify" cell with `(one-time-check: <reason>)` only when the check is inherently a single plan-time run: a manual corpus diff over local transcripts, a counterfactual mutation of the working tree, or one command's printed output. Never for behavior a regression test could pin, or a row the diff should realise. The cell still names what was run and what it printed. `bin/check-plan` gate `[Y]` caps tagged rows at one third; past that, write tests. `_architect-contract-detail.md` § One-time-check tag shape. <!-- slop-ok -->
+- **One-time-check rows.** A `CLI-executable` row may end its "What to verify" cell with `(one-time-check: <reason>)` only for an inherently single plan-time run: a manual corpus diff over local transcripts, a counterfactual mutation of the working tree, or one command's printed output. Never for behavior a regression test could pin. The cell still names what was run and what it printed. Gate `[Y]` caps tagged rows at one third. A row running only `~/` or `/tmp` paths, or `gh` on the PR, must carry the tag (gate `[Z]`). `_architect-contract-detail.md` § One-time-check tag shape. <!-- slop-ok -->
 - In `## Critical Files`, **mark every entry that will NOT be changed** with a reference marker, e.g. `` `path` (reference) ``. Post-plan Phase 5.0 (`bin/lib/critical-files.sh`) treats each entry as a **must-appear** change target and blocks auto-merge if it misses the diff, **only** exempting an annotation with a **parenthesized** group holding a canonical token (case-insensitive). Canonical markers: `(reference)`, `(read-only)`, `(read-only reference)`, `(verify)`, `(verification)`, `(template)`, `(no-edit)`, `(no-change)`, `(unchanged)`, `(context)`, `(conditional)`. All tokens match as **whole words**. Use `(conditional)` for entries that *may or may not* appear in the diff; `conditional` must open the parenthesized group, followed immediately by `)` or a separator. Use **list form** (`- \`path\` (annotation)`); gate `[F]` rejects a table. Mark a VR `-snapshots` entry `(conditional — only if VR baselines change)`, or `(vr-baseline-change: <what changes>)` when the plan deliberately regenerates or deletes baselines; gate `[VR]` rejects the unmarked form. `_architect-contract-detail.md` § Critical Files parsing — counter-examples. <!-- slop-ok -->
 - **Existing tests the spec forces to edit.** When a phase changes a signature, return shape, state field, log string, or fixture that an existing test asserts on, that test file lands in the diff whether you planned it or not. Grep the test tree for each symbol your phases change. List every existing test file you expect to edit in `## Critical Files`, and run it in a Verification Matrix row. Post-plan's scope check (`bin/lib/plan-scope-conformance`) exempts an added test path but flags an undeclared edit to an existing one by design, and the fidelity review reports it as scope creep. Mark the entry `(conditional)` when the spec leaves it open whether the test changes.
 - **Non-diff phases.** A phase changing nothing in the tree (e.g. closing an issue) carries the body line `**No diff:** <reason>` (≥ 15 chars, line start, outside fences and code spans); gate `[ND]` rejects others. Phases citing only non-repo tokens (`~/...`, a URL) need none. `_architect-contract-detail.md` § Non-diff phase marker shape.
@@ -89,16 +89,16 @@ Conditionally — include a section **only when it applies**; never emit an empt
 
   **Category:** intrinsic — <which Step 4.5 intrinsic bullet, or `reducible-confirmed` + which gate-14/15 trigger>.
 
-  **Decision:** <ONE sentence. The irreducible judgment the human renders at the merge button —
-  phrased as a judgment they accept or refuse, never as an instruction to go run something.>
+  **Decision:** <ONE plain yes/no sentence, at most 40 words, for the person pressing merge.
+  Example: "Merge if you're OK with about 7% more PRs being held.">
 
-  **Discharged by matrix rows:** <row numbers> — the observable claims a reader might otherwise
-  expect the human to re-run are asserted there, not here.
+  **Discharged by matrix rows:** <row numbers asserting the observable claims>
 
   <One line of why the judgment is irreducible (intrinsic) or why no mechanical check is
   buildable (reducible-confirmed).>
   ```
-  Gate `[H]` fails an ask-shaped sentence outside the `**Decision:**` block (exempt from that line to the next blank line). `**Category:**` and `**Discharged by matrix rows:**` are contract the gate does not check; emit them anyway. The gate is a narrow pattern check over `bin/lib/hold-check-patterns.txt` that stays silent on taste prose, so passing it is only the floor.
+  Gate `[H]` fails an ask-shaped sentence outside the `**Decision:**` block (exempt from that line to the next blank line). `**Category:**` and `**Discharged by matrix rows:**` are contract the gate does not check; emit them anyway. Passing its narrow pattern check over `bin/lib/hold-check-patterns.txt` is only the floor.
+  **Decision wording.** Only the Decision reaches the PR body. Do not open it with "The human accepts that ...". Gate `[H]` runs it through `bin/check-prose`, caps it at 40 words, and fails that opener.
 
 ## Self-apply the Automouse Hold Challenge
 
@@ -114,10 +114,11 @@ Mid-design exploration is governed by your agent def; budget arithmetic, the adv
 
 Apply this guidance verbatim when tiering phases:
 
-> **In Plans.** Explicitly label which implementation phases go to Sonnet / Haiku / self. The tiering decision belongs in the plan, not deferred to execution time. A **below-run-model** tier (below `impl_model`) must be declared on a single parseable **canonical `**Tier:**` line** — the same field the `### Delegate` packet uses — and resolved per the Binding rule above (either a `### Delegate` packet, or an `(inline — <reason>)` marker on that `**Tier:**` line). Same- or above-run-model phases may write `**Tier:** self` or omit the line entirely. This is the exact form `bin/check-plan` gate `[T]` keys on. The gate ranks the **first** model name after `**Tier:**` on the line, so lead with the tier token; a reason clause may then name other tiers freely (`**Tier:** self — too entangled for Sonnet` reads as self, not Sonnet).
+> **In Plans.** Explicitly label which implementation phases go to Sonnet / Haiku / self. A **below-run-model** tier (below `impl_model`) must be declared on a single parseable **canonical `**Tier:**` line** — the same field the `### Delegate` packet uses — and resolved per the Binding rule above (either a `### Delegate` packet, or an `(inline — <reason>)` marker on that `**Tier:**` line). Same- or above-run-model phases may write `**Tier:** self` or omit the line entirely. This is the exact form `bin/check-plan` gate `[T]` keys on. The gate ranks the **first** model name after `**Tier:**` on the line, so lead with the tier token; a reason clause may then name other tiers freely (`**Tier:** self — too entangled for Sonnet` reads as self, not Sonnet).
 >
-> **Mechanical recipe agents.** When a plan phase writes out every action as literal commands (`git mv`, explicit find/replace mappings, `git rm`, config line swaps), the executing agent is Haiku. The prompt already contains the recipe — the agent executes it. Sonnet is only needed when the prompt asks the agent to decide *what* to do, not just *how* to do it.
+> **Mechanical recipe agents.** When a plan phase writes out every action as literal commands (`git mv`, explicit find/replace mappings, `git rm`, config line swaps), the executing agent is Haiku. Sonnet is only needed when the prompt asks the agent to decide *what* to do, not just *how* to do it.
 > - **Haiku:** `git mv` file renames with explicit source→target, namespace find/replace from a provided mapping, `git rm` + config updates, multi-step recipe execution
+> - **Haiku context cap:** a packet reading >~100K tokens per request goes to Sonnet (Haiku's 5x price cliff, `agent-tiering-detail.md`).
 > - **Sonnet:** call-site sweeps where the agent must judge whether a match is a column vs. table name, test-writing, code authoring, debugging failures
 >
 > **Bulk-sweep pattern.**

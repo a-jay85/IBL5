@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import re
 import subprocess
 import time
@@ -93,6 +94,10 @@ HOLD_LABELS = {
     "2": "review finding scored >= 80",
 }
 _FINDING_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
+# Output contract item 2a (.claude/agents/pr-ready-phase6.md): exactly `[BLOCKING]` or
+# `[NOTE]`, upper case, right after the bullet prefix. Anything else is unmarked, and an
+# unmarked bullet is blocking (fail-closed).
+_FINDING_MARKER_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\[(BLOCKING|NOTE)\](?=\s|$)")
 _WORK_LIST_OPEN = "=== WORK LIST (each item names the arming hold it clears) ==="
 _WORK_LIST_CLOSE = "=== END WORK LIST ==="
 
@@ -118,6 +123,38 @@ def denied_gate_edits(paths) -> list[str]:
             if any(str(p).startswith(prefix) for prefix in GATE_OWNING_PREFIXES)]
 
 
+# Local-gate fixer (harness/gatefix.py) deny list. A superset of GATE_OWNING_PREFIXES:
+# the fixer runs at a pre-commit/pre-push denial, so the hook bodies, their installer,
+# their config, the Phase 6.5 arming files, and the whole harness are gate paths too.
+LOCAL_GATE_PATH_PREFIXES = GATE_OWNING_PREFIXES + (
+    ".githooks/",                        # absent today; listed defensively
+    ".claude/hooks/",                    # project-scoped hooks, absent today
+    ".claude/settings",                  # settings.json, settings.local.json
+    ".claude/skills/post-plan/",         # includes _phase-6.5-arm-auto-merge.md
+    "bin/pre-commit-hook",
+    "bin/pre-push-adr-hook",
+    "bin/run-meta-checks-local",
+    "bin/install-git-hooks",
+    "bin/adr-check",
+    "bin/lib/",                          # includes bin/lib/pr-armable.sh
+    "bin/test-postplan-arm-conditions",
+    "bin/post-plan-",                    # post-plan-now, post-plan-fail-dm launchers
+    "tools/postplan-harness/",           # runner.py and every harness module
+)
+
+
+def _norm_repo_path(p) -> str:
+    s = posixpath.normpath(str(p).replace("\\", "/"))
+    return s[2:] if s.startswith("./") else s
+
+
+def denied_local_gate_edits(paths) -> list[str]:
+    """The subset of `paths` (as given) that normalizes under a local-gate prefix."""
+    return [p for p in (paths or [])
+            if any(_norm_repo_path(p).startswith(prefix)
+                   for prefix in LOCAL_GATE_PATH_PREFIXES)]
+
+
 def _findings_section(lines: list[str]) -> list[str] | None:
     """Lines under every `## FINDINGS` heading, or None when the heading is absent.
 
@@ -141,8 +178,41 @@ def _findings_section(lines: list[str]) -> list[str] | None:
     return section
 
 
+def _group_findings(scope: list[str]) -> list[tuple[str | None, str]]:
+    """Bullet lines of `scope` as (marker, text) items, marker None when unmarked.
+
+    A marked bullet opens a group: every later bullet line indented strictly deeper
+    than it joins the group's text after a newline, stripped, until a bullet at the
+    same or a shallower indent. Bullets nested under an UNMARKED bullet stay separate
+    unmarked items and their own markers are ignored, so a scope with no marker yields
+    exactly the legacy one-item-per-bullet list. Non-bullet lines are skipped.
+    """
+    items: list[tuple[str | None, str]] = []
+    group_indent: int | None = None
+    unmarked_indent: int | None = None
+    for ln in scope:
+        if not _FINDING_BULLET_RE.match(ln):
+            continue
+        indent = len(ln) - len(ln.lstrip())
+        if group_indent is not None and indent > group_indent:
+            marker, text = items[-1]
+            items[-1] = (marker, text + "\n" + ln.strip())
+            continue
+        if unmarked_indent is not None and indent > unmarked_indent:
+            items.append((None, ln.strip()))
+            continue
+        m = _FINDING_MARKER_RE.match(ln)
+        if m:
+            group_indent, unmarked_indent = indent, None
+            items.append((m.group(1), ln.strip()))
+        else:
+            group_indent, unmarked_indent = None, indent
+            items.append((None, ln.strip()))
+    return items
+
+
 def _verdict_findings(verdict_path: str) -> list[str]:
-    """Hold (12): the blocking findings under a NOT READY verdict, one per bullet.
+    """Hold (12): the blocking findings under a NOT READY verdict, one per finding.
 
     A verdict that is not NOT READY, or a missing verdict file, contributes nothing --
     the loop only ever fixes a verdict it is still held on.
@@ -157,6 +227,11 @@ def _verdict_findings(verdict_path: str) -> list[str]:
     Does not fire) never reach the fixer. With no heading, every bullet in the body
     counts (the legacy shape). When the chosen scope has no bullets, the whole body is
     one item, so a finding written as prose is never silently dropped.
+
+    Severity markers (item 2a of .claude/agents/pr-ready-phase6.md): a `[BLOCKING]` or
+    `[NOTE]` bullet carries its nested bullet lines as one item (see `_group_findings`).
+    `[NOTE]` items are dropped; `[BLOCKING]` and unmarked bullets are kept. When every
+    item is `[NOTE]`, all of them are returned so a held verdict never yields no work.
     """
     if parse_verdict(verdict_path) != "NOT READY":
         return []
@@ -169,9 +244,12 @@ def _verdict_findings(verdict_path: str) -> list[str]:
     body = [ln for ln in lines if not VERDICT_RE.match(ln)]
     section = _findings_section(body)
     scope = body if section is None else section
-    bullets = [ln.strip() for ln in scope if _FINDING_BULLET_RE.match(ln)]
-    if bullets:
-        return bullets
+    grouped = _group_findings(scope)
+    if grouped:
+        kept = [text for marker, text in grouped if marker != "NOTE"]
+        # An all-[NOTE] NOT READY verdict breaks the item-2a agreement rule. Hand the
+        # fixer every group rather than an empty list, so the held verdict still gets work.
+        return kept or [text for _, text in grouped]
     whole = "\n".join(body).strip()
     return [whole] if whole else []
 
@@ -1076,7 +1154,7 @@ def carry_forward_predicate(sticky_body, diff_id: str,
 # Status lines the runner builds on every clean run. The composer prints only a line that
 # deviates from these, so a clean sticky carries no REBASE= or CI: line at all.
 _EXPECTED_REBASE = ("REBASE=clean (HEAD already contains origin/master)",
-                    "REBASE=rebased onto origin/master")
+                    "REBASE=merged origin/master")
 _EXPECTED_CI_RE = re.compile(
     r"^CI: local verification pass; GitHub checks are watched after this comment"
     r"(; remediation commit [0-9a-f]+ is inside that watch)?$")

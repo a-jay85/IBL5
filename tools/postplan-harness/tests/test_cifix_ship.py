@@ -78,7 +78,16 @@ class CiFixGh:
         self.body_edits: list[tuple] = []
         self.disarmed: list = []
         self.checks: list[dict] = []
+        # Baseline-guard reads: a probe that reaches the guard sees no label and no e2e run.
+        self.fresh_labels: list[str] = []
+        self.e2e_runs: list[dict] = []
+        self.label_calls: list[tuple] = []
 
+    def pr_has_label_fresh(self, pr, label): return label in self.fresh_labels
+    def e2e_runs_for_sha(self, sha): return list(self.e2e_runs)
+    def pr_comments_text(self, pr): return ""
+    def pr_label_remove(self, pr, label): self.label_calls.append(("remove", label)); return True
+    def pr_label_add_checked(self, pr, label): self.label_calls.append(("add", label)); return True
     def post_review_summary(self, pr, title, body): self.comments.append((pr, title, body))
     def pr_edit_body(self, pr, body): self.body_edits.append((pr, body))
     def pr_checks_json(self, pr):
@@ -195,6 +204,59 @@ def test_char_successful_push_sets_ci_head_and_rewatches_new_sha(monkeypatch, tm
     assert r.res.ci_head == "b" * 40
     assert r.watched == ["b" * 40]
     assert _has(r.lines, "outcome=fixed")
+
+
+class RerunGh(CiFixGh):
+    """CiFixGh that records which failed runs the rerun probe re-ran."""
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.reruns: list = []
+
+    def run_rerun_failed(self, run_id): self.reruns.append(run_id)
+
+
+def test_char_probe_reruns_failed_run_on_no_change(monkeypatch, tmp_path):
+    """Characterization: a no-change attempt reruns the failed run, then logs the probe
+    outcome. Catches deleting the `gh.run_rerun_failed(run_id)` call."""
+    gh = RerunGh()
+    gh.checks = [{"name": "PHPUnit", "state": "FAILURE",
+                  "link": "https://github.com/a/b/actions/runs/777/job/7779"}]
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, ScriptedLlm(), failed=["PHPUnit"],
+             commit=("",))
+    assert gh.reruns == ["777"]
+    assert _has(r.lines, "phase7 ci-fix rerun probe: outcome=")
+
+
+# The probe-guard tests below run with the rest of tools/postplan-harness/tests/test_cifix_ship.py
+# and tests/test_cifix.py: pytest -q tests/test_cifix_ship.py tests/test_cifix.py
+def test_cifix_probe_skipped_with_update_baselines_label(monkeypatch, tmp_path):
+    """The label still on the PR with no e2e run means no regen reached its removal step.
+    Rerunning the failed jobs would fight the label, so the probe stands down."""
+    gh = RerunGh()
+    gh.fresh_labels = ["update-baselines"]
+    gh.checks = [{"name": "PHPUnit", "state": "FAILURE",
+                  "link": "https://github.com/a/b/actions/runs/777/job/7779"}]
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, llm, failed=["PHPUnit"], commit=("",))
+    assert gh.reruns == []
+    assert _has(r.lines, "rerun probe skipped: reason=update-baselines-label")
+    assert not _has(r.lines, "phase7 ci-fix rerun probe: outcome=")
+    assert len(llm.calls) == 1, "the skip must not fall through to another fix attempt"
+    assert gh.label_calls == [], "no regen run exists, so the guard must not touch the label"
+
+
+def test_cifix_probe_skipped_when_e2e_run_active(monkeypatch, tmp_path):
+    gh = RerunGh()
+    gh.e2e_runs = [{"databaseId": 5, "status": "in_progress", "conclusion": None,
+                    "event": "pull_request", "createdAt": "2026-10-08T00:00:00Z"}]
+    gh.checks = [{"name": "PHPUnit", "state": "FAILURE",
+                  "link": "https://github.com/a/b/actions/runs/777/job/7779"}]
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, llm, failed=["PHPUnit"], commit=("",))
+    assert gh.reruns == []
+    assert _has(r.lines, "rerun probe skipped: reason=e2e-run-active")
+    assert len(llm.calls) == 1
 
 
 # ---------------------------------------------------------------------------

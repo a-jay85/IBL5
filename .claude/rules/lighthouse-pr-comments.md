@@ -3,7 +3,7 @@ description: Lighthouse CI runs after merge only (master-push baseline plus week
 paths:
   - ".github/workflows/lighthouse*"
   - "ibl5/.lighthouserc.json"
-last_verified: 2026-09-29
+last_verified: 2026-10-06
 ---
 
 # Lighthouse CI (post-merge)
@@ -23,8 +23,7 @@ The PR workflow was removed on 2026-09-29 to free runner slots for the four requ
 
 - The module to sub-page map is `LighthouseUrls::SUB_PAGES` in the shared
   `Cli\LighthouseUrls` class, listed in full by `bin/lighthouse-audit-urls`.
-  `bin/lighthouse-pr-urls` served only the retired PR run and stays until a
-  follow-up removes it. `LighthouseUrls::REPRESENTATIVE_PATHS` was the PR fallback
+  `LighthouseUrls::REPRESENTATIVE_PATHS` was the PR fallback
   set and still pins the static `collect.url` default (see below).
 - A module that **hard-requires query params** (its bare `?name=<Module>` URL 404s)
   needs BOTH a `SUB_PAGES` entry and a `LighthouseUrls::PARAM_REQUIRED_MODULES` entry —

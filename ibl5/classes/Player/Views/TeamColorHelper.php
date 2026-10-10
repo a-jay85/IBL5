@@ -8,7 +8,7 @@ namespace Player\Views;
  * TeamColorHelper - Utility for fetching and applying team colors to card designs
  * 
  * Provides methods to:
- * - Fetch team colors from database
+ * - Apply the fallback to team color rows
  * - Calculate proper contrast ratios for readability (WCAG AA compliance)
  * - Generate dynamic CSS color schemes with guaranteed accessibility
  * 
@@ -24,36 +24,20 @@ namespace Player\Views;
 class TeamColorHelper
 {
     /**
-     * Fetch team colors from the database
-     * 
-     * @param \mysqli $db Database connection
-     * @param int $teamid The team's ID
+     * Apply the presentation fallback to a raw ibl_team_info color row.
+     *
+     * @param array{color1: string|null, color2: string|null}|null $row Null when no row exists
      * @return array{color1: string, color2: string} Team colors (hex without #)
      */
-    public static function getTeamColors(\mysqli $db, int $teamid): array
+    public static function resolveTeamColors(?array $row): array
     {
-        $stmt = $db->prepare('SELECT color1, color2 FROM `ibl_team_info` WHERE teamid = ?');
-        if ($stmt === false) {
-            return ['color1' => 'D4AF37', 'color2' => '1e3a5f'];
-        }
-        $stmt->bind_param('i', $teamid);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result === false) {
-            $stmt->close();
-            return ['color1' => 'D4AF37', 'color2' => '1e3a5f'];
-        }
-        $row = $result->fetch_assoc();
-        $stmt->close();
-
-        if ($row === null || $row === false) {
-            // Default to gold if team not found
+        if ($row === null) {
             return ['color1' => 'D4AF37', 'color2' => '1e3a5f'];
         }
 
         return [
-            'color1' => $row['color1'] !== null && $row['color1'] !== '' ? (string) $row['color1'] : 'D4AF37',
-            'color2' => $row['color2'] !== null && $row['color2'] !== '' ? (string) $row['color2'] : '1e3a5f'
+            'color1' => $row['color1'] !== null && $row['color1'] !== '' ? $row['color1'] : 'D4AF37',
+            'color2' => $row['color2'] !== null && $row['color2'] !== '' ? $row['color2'] : '1e3a5f',
         ];
     }
 

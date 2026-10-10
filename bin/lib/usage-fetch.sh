@@ -2,9 +2,10 @@
 # Shared plan-usage fetcher with a persistent cache. Sourced by the usage-gate hook,
 # the coordinator, every runner, and the interactive UserPromptSubmit hook.
 #
-# The cache lives under the project state dir (not /tmp) so the launchd coordinator,
-# which has no keychain access, can read usage an interactive or headless session
-# fetched. Freshness comes from the fetched_at field, never file mtime, because
+# The cache lives under the project state dir (not /tmp) so the launchd coordinator
+# can read usage an interactive or headless session fetched, even when its own keychain
+# read fails (the --probe-keychain check in usage-gate-cron-setup is one-shot only).
+# Freshness comes from the fetched_at field, never file mtime, because
 # `stat -f %m` (BSD) breaks on the Linux CI runner. No `date -d` / `date -v`.
 #
 # A shared 429 backoff file and a mkdir fetch lock in the state dir keep concurrent
@@ -22,6 +23,12 @@ USAGE_FETCH_BACKOFF_BASE=30
 USAGE_FETCH_BACKOFF_CAP=480
 USAGE_FETCH_RETRY_AFTER_CAP=900
 USAGE_FETCH_SKIPLOG_EVERY=30
+# Account-switch fast path: the switch signal stays active for USAGE_SWITCH_WINDOW;
+# within it, at most USAGE_SWITCH_RETRY_MAX 429s under the new fingerprint back off
+# for min(retry_after, USAGE_SWITCH_RETRY_CAP) instead of the normal arm.
+USAGE_SWITCH_WINDOW=1800
+USAGE_SWITCH_RETRY_CAP=45
+USAGE_SWITCH_RETRY_MAX=3
 
 # usage_state_dir
 # Echoes the state dir (creating it and markers/). Honors IBL5_USAGE_GATE_STATE_DIR;
@@ -43,6 +50,90 @@ usage_log() {
 
 usage_cache_path() {
     printf '%s/cache.json\n' "$(usage_state_dir)"
+}
+
+# _usage_cred_fp
+# Echoes a short sha256 of the keychain OAuth access token, or nothing when the
+# keychain is unreadable (possible under launchd). Never the token itself. A token
+# refresh changes it too, so switch detection pairs it with _usage_acct_fp.
+_usage_cred_fp() {
+    local tok
+    tok=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
+        | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+    [ -n "$tok" ] || return 0
+    printf '%s' "$tok" | shasum -a 256 2>/dev/null | cut -c1-16
+}
+
+# _usage_acct_fp: short sha256 of ~/.claude.json .oauthAccount.accountUuid, or nothing.
+# The account id survives a token refresh and changes on /login to another account.
+# Plain file, so no keychain needed. Never logged or stored raw.
+_usage_acct_fp() {
+    local u
+    [ -n "${HOME:-}" ] || return 0
+    u=$(jq -r '.oauthAccount.accountUuid // empty' "$HOME/.claude.json" 2>/dev/null)
+    [ -n "$u" ] || return 0
+    printf '%s' "$u" | shasum -a 256 2>/dev/null | cut -c1-16
+}
+
+# _usage_switch_signal <state_dir> <fp|-> <kind>: records a detected login switch.
+_usage_switch_signal() {
+    local f="$1/cred-switch"
+    { printf '%s %s 0 %s\n' "$(date +%s)" "${2:--}" "$3" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; } 2>/dev/null \
+        || rm -f "$f.tmp.$$"
+    usage_log "cred-switch signal kind=$3"
+}
+
+# usage_switch_active [now]: echoes the switch epoch while a cred-switch signal younger
+# than USAGE_SWITCH_WINDOW exists; echoes nothing otherwise.
+usage_switch_active() {
+    local f at rest now
+    f="$(usage_state_dir)/cred-switch"
+    [ -f "$f" ] || return 0
+    now="${1:-$(date +%s)}"
+    read -r at rest < "$f" 2>/dev/null
+    case "$at" in ''|*[!0-9]*) return 0 ;; esac
+    if [ "$now" -ge "$at" ] && [ $((now - at)) -lt "$USAGE_SWITCH_WINDOW" ]; then
+        printf '%s\n' "$at"
+    fi
+    return 0
+}
+
+# _usage_switch_short_retry <state_dir> <fp> <retry_after|"">: on a 429 inside an active
+# switch window, under the switch's fingerprint (or "-"), with short retries left, bumps
+# the count and echoes "<capped_retry_after> <count>". Returns 1 for the normal arm.
+_usage_switch_short_retry() {
+    local f="$1/cred-switch" fp="$2" ra="$3" at sfp n kind now
+    [ -f "$f" ] || return 1
+    read -r at sfp n kind < "$f" 2>/dev/null
+    case "$at" in ''|*[!0-9]*) return 1 ;; esac
+    case "$n" in ''|*[!0-9]*) n=0 ;; esac
+    now=$(date +%s)
+    [ "$now" -ge "$at" ] && [ $((now - at)) -lt "$USAGE_SWITCH_WINDOW" ] || return 1
+    [ "$sfp" = "-" ] || [ "$sfp" = "$fp" ] || return 1
+    [ "$n" -lt "$USAGE_SWITCH_RETRY_MAX" ] || return 1
+    case "$ra" in ''|*[!0-9]*) ra=0 ;; esac
+    if [ "$ra" -eq 0 ] || [ "$ra" -gt "$USAGE_SWITCH_RETRY_CAP" ]; then ra=$USAGE_SWITCH_RETRY_CAP; fi
+    n=$((n + 1))
+    { printf '%s %s %s %s\n' "$at" "$sfp" "$n" "${kind:--}" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; } 2>/dev/null \
+        || rm -f "$f.tmp.$$"
+    printf '%s %s\n' "$ra" "$n"
+}
+
+# usage_account_switch_check: keychain-free detection for the coordinator. When the
+# cached reading was fetched under another account than ~/.claude.json now names,
+# drop the cache and backoff (both belong to the old account) and signal the switch.
+# An unknown account on either side does nothing.
+usage_account_switch_check() {
+    local d old="" new
+    d=$(usage_state_dir)
+    [ -s "$d/cache.json" ] || return 0
+    [ -f "$d/acct-last" ] && read -r old < "$d/acct-last" 2>/dev/null
+    [ -n "$old" ] || return 0
+    new=$(_usage_acct_fp)
+    [ -n "$new" ] && [ "$new" != "$old" ] || return 0
+    rm -f "$d/cache.json" "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.*
+    usage_log "account-switch cache-dropped"
+    _usage_switch_signal "$d" "-" account
 }
 
 # usage_cache_age
@@ -146,7 +237,7 @@ _usage_fetch_lock_release() {
 # _usage_fetch_serve_stale <age> <cache>: rc 2 with the cached body, or rc 1 when there is none.
 _usage_fetch_serve_stale() {
     if [ "$1" -ge 0 ] && [ -s "$2" ]; then
-        jq 'del(.fetched_at)' "$2" 2>/dev/null
+        jq 'del(.fetched_at, .cred_fp)' "$2" 2>/dev/null
         return 2
     fi
     return 1
@@ -167,11 +258,35 @@ usage_fetch() {
             ;;
     esac
 
-    local cache age
+    local cache age fp cfp
     cache=$(usage_cache_path)
     age=$(usage_cache_age)
+    # A login switch (`/login` to another account) changes the token. The cached
+    # reading and any 429 backoff belong to the old account, so drop both. A cache
+    # with no cred_fp, or a caller that cannot read the keychain, keeps today's path.
+    fp=$(_usage_cred_fp)
+    if [ -n "$fp" ] && [ "$age" -ge 0 ]; then
+        cfp=$(jq -r '.cred_fp // empty' "$cache" 2>/dev/null)
+        if [ -n "$cfp" ] && [ "$cfp" != "$fp" ]; then
+            local sd
+            sd=$(usage_state_dir)
+            rm -f "$cache" "$sd/fetch-backoff" "$sd/fetch-backoff.logged" "$sd"/fetch-backoff.logged.*
+            usage_log "cred-switch cache-dropped"
+            local aold="" anew
+            [ -f "$sd/acct-last" ] && read -r aold < "$sd/acct-last" 2>/dev/null
+            anew=$(_usage_acct_fp)
+            if [ -n "$aold" ] && [ "$aold" = "$anew" ]; then
+                usage_log "cred-switch same-account"
+            elif [ -n "$aold" ] && [ -n "$anew" ]; then
+                _usage_switch_signal "$sd" "$fp" account
+            else
+                _usage_switch_signal "$sd" "$fp" token
+            fi
+            age=-1
+        fi
+    fi
     if [ "$age" -ge 0 ] && [ "$age" -lt "$max_age" ]; then
-        jq 'del(.fetched_at)' "$cache" 2>/dev/null && return 0
+        jq 'del(.fetched_at, .cred_fp)' "$cache" 2>/dev/null && return 0
     fi
 
     local d now bo bo_until
@@ -193,7 +308,7 @@ usage_fetch() {
     age=$(usage_cache_age)
     if [ "$age" -ge 0 ] && [ "$age" -lt "$max_age" ]; then
         _usage_fetch_lock_release "$d"
-        jq 'del(.fetched_at)' "$cache" 2>/dev/null
+        jq 'del(.fetched_at, .cred_fp)' "$cache" 2>/dev/null
         return 0
     fi
     bo=$(_usage_fetch_backoff_read "$d/fetch-backoff"); bo_until=${bo% *}
@@ -228,11 +343,14 @@ usage_fetch() {
 
     if [ -z "$reason" ]; then
         local tmp="$cache.tmp.$$"
-        if printf '%s' "$body" | jq --argjson t "$(date +%s)" '. + {fetched_at:$t}' > "$tmp" 2>/dev/null \
+        if printf '%s' "$body" | jq --argjson t "$(date +%s)" --arg fp "$fp" '. + {fetched_at:$t, cred_fp:$fp}' > "$tmp" 2>/dev/null \
             && mv "$tmp" "$cache"; then
             rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.*
+            local acct
+            acct=$(_usage_acct_fp)
+            if [ -n "$acct" ]; then printf '%s\n' "$acct" > "$d/acct-last" 2>/dev/null; else rm -f "$d/acct-last"; fi
             _usage_fetch_lock_release "$d"
-            printf '%s' "$body" | jq 'del(.fetched_at)'
+            printf '%s' "$body" | jq 'del(.fetched_at, .cred_fp)'
             return 0
         fi
         rm -f "$tmp"
@@ -240,9 +358,14 @@ usage_fetch() {
     fi
 
     if [ "$reason" = "rate-limited" ]; then
-        local delay
-        delay=$(_usage_fetch_backoff_arm "$d" "$ra")
-        usage_log "fetch-failed reason=rate-limited retry_after=${ra:-none} backoff=$delay"
+        local delay sr
+        if sr=$(_usage_switch_short_retry "$d" "$fp" "$ra"); then
+            delay=$(_usage_fetch_backoff_arm "$d" "${sr% *}")
+            usage_log "fetch-failed reason=rate-limited retry_after=${ra:-none} backoff=$delay switch-retry=${sr#* }/$USAGE_SWITCH_RETRY_MAX"
+        else
+            delay=$(_usage_fetch_backoff_arm "$d" "$ra")
+            usage_log "fetch-failed reason=rate-limited retry_after=${ra:-none} backoff=$delay"
+        fi
     else
         usage_log "fetch-failed reason=$reason"
     fi

@@ -145,7 +145,9 @@ run_docfix() {
         SHIM_PR_UNARMED="${SHIM_PR_UNARMED:-}" \
         SHIM_GH_FAIL="${SHIM_GH_FAIL:-}" \
         "$REAL_DOCFIX" "$4" "$5" >/dev/null 2>&1
-    echo "rc=$?"
+    local RC=$?
+    runner_of "$SB" >/dev/null 2>&1 || true   # register the runner for exit-time cleanup
+    echo "rc=$RC"
 }
 
 # run_poll: drives the REAL bin/docfix-poll (poll path) with IBL5_MAIN=$SB.
@@ -172,18 +174,73 @@ run_health() {
 }
 
 plist_of() { ls "$1/home/Library/LaunchAgents/"*.plist 2>/dev/null | head -1; }
+# runner_of "$SB" -> path of the runner script the plist execs (ProgramArguments[2] = "exec <path>").
+# Runner files land in real /tmp (LOG is /tmp/...), so every path handed out is logged
+# and removed at exit.
+RUNNERS_SEEN="$(mktemp)"
+trap 'xargs rm -f < "$RUNNERS_SEEN" 2>/dev/null; rm -f "$RUNNERS_SEEN"' EXIT
+runner_of() {
+    local P R
+    P="$(plist_of "$1")"; [ -n "$P" ] || return 1
+    R=$(python3 -I -c 'import plistlib,sys
+a=plistlib.load(open(sys.argv[1],"rb"))["ProgramArguments"]
+assert a[:2]==["/bin/bash","-lc"] and a[2].startswith("exec "), a
+print(a[2][5:])' "$P") || return 1
+    printf '%s\n' "$R" >> "$RUNNERS_SEEN"
+    printf '%s\n' "$R"
+}
 plan_of()  { ls "$1/home/claude-plans/docs-stale-refresh-"*.md 2>/dev/null | head -1; }
 
 # --- Cases 1-5: bin/docfix-run launcher ----------------------------------------
 SB="$(build_sandbox)"
 run_docfix "$SB" "" "" "4242" "ibl5/docs/foo.md,README.md" >/dev/null
-P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"
-{ [ -n "$P" ] && grep -q 'cd "'"$SB"'/wts/docs-stale-refresh-[^/]*"' "$P" \
-    && grep -q 'Closes #4242' "$P" \
-    && grep -q 'ibl5/docs/foo.md,README.md' "$P" \
-    && grep -q 'claude-sonnet-5-5' "$P"; } \
-  && ok "(1) plist carries cd-to-worktree + doc-fix prompt + SIG + Closes #N" \
-  || bad "(1) plist composition"
+P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"; R="$(runner_of "$SB")"
+{ [ -n "$R" ] && grep -q "cd '$SB/wts/docs-stale-refresh-[^/']*' && CLAUDE_HEADLESS=1" "$R" \
+    && grep -q 'Closes #4242' "$R" \
+    && grep -q 'ibl5/docs/foo.md,README.md' "$R" \
+    && grep -q 'claude-sonnet-5-5' "$R"; } \
+  && ok "(1) runner carries cd-to-worktree + doc-fix prompt + SIG + Closes #N" \
+  || bad "(1) runner composition"
+# (1b) the plist is the helper's layout and only execs the runner.
+PLIST_REPORT="$(python3 -I - "$P" "$R" <<'PLIST_PY'
+import os
+import plistlib
+import re
+import sys
+
+plist_path, runner = sys.argv[1:3]
+with open(plist_path, "rb") as fh:
+    d = plistlib.load(fh)
+
+
+def strings(v):
+    if isinstance(v, str):
+        yield v
+    elif isinstance(v, list):
+        for x in v:
+            yield from strings(x)
+    elif isinstance(v, dict):
+        for x in v.values():
+            yield from strings(x)
+
+
+vals = list(strings(d))
+path_dirs = d.get("EnvironmentVariables", {}).get("PATH", "").split(":")
+checks = [
+    d.get("ProgramArguments") == ["/bin/bash", "-lc", "exec " + runner],
+    d.get("KeepAlive") is False,
+    all(p in path_dirs for p in ("/usr/bin", "/bin", "/opt/homebrew/bin")),
+    not any("$" in v for v in vals),
+    all(v != "" for v in vals),
+    re.fullmatch(r"/tmp/docfix-run-[^\s]+\.sh", runner) is not None,
+    os.access(runner, os.X_OK),
+]
+print("ok" if all(checks) else "bad " + repr(checks))
+PLIST_PY
+)"
+{ [ "$PLIST_REPORT" = "ok" ] && [ "$(grep -c '<string></string>' "$P")" = "0" ]; } \
+  && ok "(1b) plist execs the runner: KeepAlive false, PATH set, no \$ or empty values, runner path clean" \
+  || bad "(1b) plist shape: $PLIST_REPORT"
 { [ -n "$PLAN" ] && head -1 "$PLAN" | grep -q '^---$' \
     && grep -q '^auto_merge: false$' "$PLAN" \
     && grep -q '## Automouse Hold Justification' "$PLAN"; } \
@@ -572,10 +629,8 @@ SB="$(build_sandbox)"
 run_docfix "$SB" "" "" "9999" "probe.md" >/dev/null
 PLIST_F20="$(plist_of "$SB")"
 if [ -n "$PLIST_F20" ]; then
-    # Extract the <string> element bearing the bash command; XML-unescape (&amp; LAST
-    # to avoid double-unescaping e.g. &amp;lt; → <).
-    CMD_LINE20=$(grep 'claude -p' "$PLIST_F20" \
-        | sed 's/&lt;/</g; s/&gt;/>/g; s/&amp;/\&/g')
+    # The claude -p line lives in the runner script the plist execs; no XML layer.
+    CMD_LINE20=$(grep 'claude -p' "$(runner_of "$SB")")
     # Pull the claude -p token (single-quoted after fix; double-quoted in old script).
     PROMPT_TOKEN20=$(printf '%s' "$CMD_LINE20" \
         | sed -n 's/.*claude -p \(.*\) --dangerously.*/\1/p')
@@ -591,15 +646,16 @@ if [ -n "$PLIST_F20" ]; then
             && printf '%s' "$ROUND_TRIP20" | grep -qF '`bin/check-docs --staleness-report`'; } \
           && ok "(20) prompt-fidelity: backticks survive bash second-parse (no stderr; literal text present)" \
           || bad "(20) prompt-fidelity: backticks corrupted at bash second parse"
-        # Sub-check 20.1: --session-id appears in the raw plist as a bare (unquoted,
-        # unescaped) UUID — [0-9a-f-] only so shq() must NOT wrap it in single-quotes.
-        grep -qE -- '--session-id [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$PLIST_F20" \
-          && ok "(20.1) session-id: uuid is bare and unescaped in the plist" \
-          || bad "(20.1) session-id: --session-id missing or UUID is quoted/XML-escaped in plist"
+        # Sub-check 20.1: --session-id appears in the runner as a bare (unquoted)
+        # UUID — [0-9a-f-] only so shq() must NOT wrap it in single-quotes.
+        grep -qE -- '--session-id [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$(runner_of "$SB")" \
+          && ok "(20.1) session-id: uuid is bare and unquoted in the runner" \
+          || bad "(20.1) session-id: --session-id missing or UUID is quoted in the runner"
         # Sub-check 20.1 sidecar: docfix-run writes a .session sidecar whose content
         # equals the UUID embedded in the plist command line.
         UUID20=$(printf '%s' "$CMD_LINE20" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
-        LOG20=$(grep -A1 'StandardOutPath' "$PLIST_F20" | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+        LOG20=$(python3 -I -c 'import plistlib,sys
+print(plistlib.load(open(sys.argv[1],"rb"))["StandardOutPath"])' "$PLIST_F20")
         SIDECAR20="${LOG20%.log}.session"
         { [ -n "$UUID20" ] && [ -f "$SIDECAR20" ] && [ "$(cat "$SIDECAR20")" = "$UUID20" ]; } \
           && ok "(20.1) session-id: sidecar exists and uuid matches plist" \
@@ -1168,11 +1224,11 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
 SB="$(build_sandbox)"
 SIG13='ibl5/docs/foo.md,$(touch /tmp/pr13-pwned-backtick)'
 run_docfix "$SB" "" "" "13p" "$SIG13" >/dev/null
-P_INJ="$(plist_of "$SB")"
+R_INJ="$(runner_of "$SB")"
 { [ ! -f /tmp/pr13-pwned-backtick ] \
-    && [ -n "$P_INJ" ] \
-    && grep -qF '$(touch /tmp/pr13-pwned-backtick)' "$P_INJ"; } \
-  && ok "(20a/plan13) injection chars in SIG written literally to plist, not executed" \
+    && [ -n "$R_INJ" ] \
+    && grep -qF '$(touch /tmp/pr13-pwned-backtick)' "$R_INJ"; } \
+  && ok "(20a/plan13) injection chars in SIG written literally to runner, not executed" \
   || bad "(20a/plan13) prompt injection guard"
 
 # Case 20b (plan #14): malicious $SIG — not executed during plist construction.
@@ -1195,6 +1251,12 @@ PLIST22="$(plist_of "$SB")"
 { [ -n "$PLIST22" ] && python3 -c "import xml.etree.ElementTree as ET; ET.parse('$PLIST22')" >/dev/null 2>&1; } \
   && ok "(22/plan15) SIG with & and < yields a python3-ET-parse-clean plist" \
   || bad "(22/plan15) XML metacharacters broke plist"
+# The prompt never crosses the XML layer now, so the runner holds & raw.
+R22="$(runner_of "$SB")"
+{ [ -n "$R22" ] && grep -qF 'foo.md &amp; <tag>' "$R22" && ! grep -qF '&amp;amp;' "$R22" \
+    && ! grep -qF '&lt;tag' "$R22"; } \
+  && ok "(22/plan15) runner holds SIG's & and < raw (no XML escaping)" \
+  || bad "(22/plan15) runner prompt was XML-escaped"
 
 # Case 23: gh API failure → fail-closed guard (upstream guard from PR #1861, bin/docfix-run:50-55).
 # That guard emits "could not query open PRs (gh failed) — skipping this cycle (fail-closed)."
@@ -1245,8 +1307,8 @@ VERIF_CLOSE='instead of reporting the fix as done.'
 # emitted_prompt_of "$SB" -> prints the prompt text claude -p receives (Case 20 recipe).
 emitted_prompt_of() {
     local P CMD TOKEN RT RC=0
-    P="$(plist_of "$1")"; [ -n "$P" ] || return 1
-    CMD=$(grep 'claude -p' "$P" | sed 's/&lt;/</g; s/&gt;/>/g; s/&amp;/\&/g')
+    P="$(runner_of "$1")"; [ -n "$P" ] || return 1
+    CMD=$(grep 'claude -p' "$P")
     TOKEN=$(printf '%s' "$CMD" | sed -n 's/.*claude -p \(.*\) --dangerously.*/\1/p')
     [ -n "$TOKEN" ] || return 1
     RT="$(mktemp -d)"
@@ -1280,6 +1342,67 @@ prompt_check_contract() {
     done
     return 0
 }
+
+# plist_field <plist> <key> -> prints one top-level string value of the plist.
+plist_field() { python3 -I -c 'import plistlib,sys
+print(plistlib.load(open(sys.argv[1],"rb"))[sys.argv[2]])' "$1" "$2"; }
+
+# exec_runner <runner> <outdir> -> runs the generated runner under exported-function stubs.
+# Functions win over every PATH lookup; the runner prepends /usr/local/bin and
+# /opt/homebrew/bin, so a PATH stub could lose to a real `claude` and launch a live session.
+exec_runner() {
+    (
+        OUT="$2"; mkdir -p "$OUT"; export OUT
+        claude()     { pwd -P > "$OUT/cwd"; printf '%s' "$2" > "$OUT/prompt"
+                       printf '%s\n' "$@" > "$OUT/args"; printf '%s' "${CLAUDE_HEADLESS:-}" > "$OUT/headless"; }
+        caffeinate() { [ "$1" = "-s" ] && shift; "$@"; }
+        launchctl()  { printf '%s\n' "$*" >> "$OUT/launchctl"; }
+        export -f claude caffeinate launchctl
+        HOME="$SB/home" bash "$1" >/dev/null 2>&1
+    )
+}
+
+# Case 20c: the generated runner, executed under stubs, delivers the prompt byte-for-byte,
+# runs from the worktree, boots the job out, and removes the plist and itself.
+SB="$(build_sandbox)"
+SIG20C='ibl5/docs/foo.md,$(touch /tmp/pr20c-pwned) `touch /tmp/pr20c-pwned-bt`'
+run_docfix "$SB" "" "" "20c" "$SIG20C" >/dev/null
+P20C="$(plist_of "$SB")"; R20C="$(runner_of "$SB")"
+WD20C="$(plist_field "$P20C" WorkingDirectory)"; LABEL20C="$(plist_field "$P20C" Label)"
+mkdir -p "$WD20C"
+EXPECT20C="$SB/expect20c"; emitted_prompt_of "$SB" > "$EXPECT20C"
+exec_runner "$R20C" "$SB/run20c"
+{ cmp -s "$EXPECT20C" "$SB/run20c/prompt" \
+    && prompt_check_contract "$(cat "$SB/run20c/prompt")" \
+    && grep -qF '$(touch /tmp/pr20c-pwned)' "$SB/run20c/prompt" \
+    && [ ! -e /tmp/pr20c-pwned ] && [ ! -e /tmp/pr20c-pwned-bt ]; } \
+  && ok "(20c) runner execution: claude receives the emitted prompt byte-identical, injection inert" \
+  || bad "(20c) runner execution: prompt delivery"
+{ [ "$(cat "$SB/run20c/cwd" 2>/dev/null)" = "$(cd "$WD20C" && pwd -P)" ] \
+    && [ "$(cat "$SB/run20c/headless" 2>/dev/null)" = "1" ] \
+    && grep -qxF -- '--model' "$SB/run20c/args" && grep -qxF 'claude-sonnet-5-5' "$SB/run20c/args" \
+    && grep -qxF -- '--session-id' "$SB/run20c/args" \
+    && grep -qxF -- '--name' "$SB/run20c/args" && grep -qxF "$LABEL20C" "$SB/run20c/args"; } \
+  && ok "(20c) runner execution: cwd = worktree, CLAUDE_HEADLESS=1, model/session-id/name flags" \
+  || bad "(20c) runner execution: cwd or flags"
+{ grep -qxF "bootout gui/$(id -u)/$LABEL20C" "$SB/run20c/launchctl" 2>/dev/null \
+    && [ ! -e "$P20C" ] && [ ! -e "$R20C" ]; } \
+  && ok "(20c) runner execution: launchctl bootout fired; plist and runner removed" \
+  || bad "(20c) runner execution: cleanup"
+
+# Case 20d (negative): a missing worktree dir means claude never runs, but the job still
+# boots itself out and removes the plist and runner.
+SB="$(build_sandbox)"
+run_docfix "$SB" "" "" "20d" "probe.md" >/dev/null
+P20D="$(plist_of "$SB")"; R20D="$(runner_of "$SB")"
+LABEL20D="$(plist_field "$P20D" Label)"
+rm -rf "$(plist_field "$P20D" WorkingDirectory)"
+exec_runner "$R20D" "$SB/run20d"
+{ [ ! -e "$SB/run20d/prompt" ] \
+    && grep -qxF "bootout gui/$(id -u)/$LABEL20D" "$SB/run20d/launchctl" 2>/dev/null \
+    && [ ! -e "$P20D" ] && [ ! -e "$R20D" ]; } \
+  && ok "(20d) failed cd skips claude but the job still boots out and cleans up" \
+  || bad "(20d) failed cd: claude ran or cleanup skipped"
 
 # Case 48d: the real emitted prompt satisfies the contract.
 SB="$(build_sandbox)"

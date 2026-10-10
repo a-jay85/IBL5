@@ -91,6 +91,9 @@
         <testsuite name="Boxscore Module Tests">
             <directory>tests/Boxscore</directory>
         </testsuite>
+        <testsuite name="Database Module Tests">
+            <directory>tests/Database</directory>
+        </testsuite>
         <testsuite name="Root Tests">
             <file>tests/ContractRulesTest.php</file>
             <file>tests/GameTest.php</file>

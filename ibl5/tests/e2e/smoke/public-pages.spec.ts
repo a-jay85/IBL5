@@ -30,7 +30,7 @@ const PAGES: PageRow[] = [
     anchor: 'form[name="CareerLeaderboards"]' },
   { name: 'draft history', url: 'modules.php?name=DraftHistory', anchor: '.ibl-data-table',
     rowCount: { selector: '.ibl-data-table tbody tr', minimum: 1 } },
-  { name: 'cap space', url: 'modules.php?name=CapSpace', anchor: 'tr[data-team-id]',
+  { name: 'contracts teams', url: 'modules.php?name=Contracts&tab=teams', anchor: 'tr[data-team-id]',
     rowCount: { selector: 'tr[data-team-id]', minimum: 28 } },
   { name: 'topics', url: 'modules.php?name=Topics', anchor: '.topics-page' },
 
@@ -43,7 +43,7 @@ const PAGES: PageRow[] = [
     rowCount: { selector: '.ibl-data-table tbody tr', minimum: 1 } },
   { name: 'draft pick locator', url: 'modules.php?name=DraftPickLocator', anchor: '.draft-pick-locator-container' },
   { name: 'free agency preview', url: 'modules.php?name=FreeAgencyPreview', anchor: 'th.fa-preview-pos-col' },
-  { name: 'contract list', url: 'modules.php?name=ContractList', anchor: '.totals-row' },
+  { name: 'contracts players', url: 'modules.php?name=Contracts&tab=players', anchor: '.totals-row' },
   { name: 'player movement', url: 'modules.php?name=SeasonRosterChanges', anchor: '.ibl-data-table',
     rowCount: { selector: '.ibl-data-table tbody tr', minimum: 1 } },
   { name: 'league starters', url: 'modules.php?name=LeagueStarters', anchor: '#league-starters-tables' },

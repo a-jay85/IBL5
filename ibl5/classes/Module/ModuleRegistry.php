@@ -16,6 +16,7 @@ final class ModuleRegistry
         'CareerLeaderboards',
         'ComparePlayers',
         'ContractList',
+        'Contracts',
         'DebugMenu',
         'DepthChartEntry',
         'Draft',

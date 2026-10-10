@@ -17,14 +17,14 @@ const PAGES = [
   { name: 'season leaderboards', url: 'modules.php?name=SeasonLeaderboards', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'career leaderboards', url: 'modules.php?name=CareerLeaderboards', selector: 'form[name="CareerLeaderboards"]', hasWideTables: false },
   { name: 'draft history', url: 'modules.php?name=DraftHistory', selector: '.ibl-data-table', hasWideTables: false },
-  { name: 'cap space', url: 'modules.php?name=CapSpace', selector: '.ibl-data-table', hasWideTables: false },
+  { name: 'contracts teams', url: 'modules.php?name=Contracts&tab=teams', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'schedule', url: 'modules.php?name=Schedule', selector: '.schedule-header', hasWideTables: false },
   { name: 'injuries', url: 'modules.php?name=Injuries', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'player database', url: 'modules.php?name=PlayerSearch', selector: 'form[action*="PlayerSearch"]', hasWideTables: false },
   { name: 'projected draft order', url: 'modules.php?name=ProjectedDraftOrder', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'draft pick locator', url: 'modules.php?name=DraftPickLocator', selector: '.draft-pick-locator-container', hasWideTables: false },
   { name: 'free agency preview', url: 'modules.php?name=FreeAgencyPreview', selector: 'th.fa-preview-pos-col', hasWideTables: false },
-  { name: 'contract list', url: 'modules.php?name=ContractList', selector: '.totals-row', hasWideTables: true },
+  { name: 'contracts players', url: 'modules.php?name=Contracts&tab=players', selector: '.totals-row', hasWideTables: true },
   { name: 'player movement', url: 'modules.php?name=SeasonRosterChanges', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'league starters', url: 'modules.php?name=LeagueStarters', selector: '#league-starters-tables', hasWideTables: true },
   { name: 'compare players', url: 'modules.php?name=ComparePlayers', selector: 'form[action*="ComparePlayers"]', hasWideTables: false },
@@ -155,8 +155,8 @@ test.describe('Responsive scroll container tests', () => {
 
   test('contract list — scroll container is scrollable on mobile', async ({ page }) => {
     test.setTimeout(60_000);
-    await gotoWithRetry(page, 'modules.php?name=ContractList');
-    await assertNoPhpErrors(page, 'on modules.php?name=ContractList (mobile)');
+    await gotoWithRetry(page, 'modules.php?name=Contracts&tab=players');
+    await assertNoPhpErrors(page, 'on modules.php?name=Contracts&tab=players (mobile)');
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertScrollContainerIsScrollable(page, page.locator('.table-scroll-container').first(), 'on contract list');
   });

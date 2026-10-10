@@ -8,6 +8,16 @@ import { gotoWithRetry } from '../helpers/navigation';
  * Seed-free: each test injects a probe element carrying the production class
  * name into the logged-out homepage (which only supplies the compiled
  * stylesheet), then drives it with the keyboard.
+ *
+ * CSS sources each probe pins (file:line as of this spec):
+ * - .ibl-tooltip: only a tint on master, tables.css:1158-1162
+ * - .plr-nav__mobile-select: border-color change only, navigation.css:610-613
+ * - .nav-select navigation.css:815-819, .nav-login-input navigation.css:885-889
+ * - .last-sim-recap__tab last-sim-recap.css:117, .all-star-rename__input sco-parser.css:130-134
+ * - .ibl-view-select team-splits.css:55-59, variables from tokens/tokens.css:201-205
+ * - .ibl-input transition via --transition-fast, tokens/tokens.css:166
+ * - .updater-step__spinner runs updater-spin, updater.css:133
+ * - compiled bundle is built in CI by main.yml:42 (css:build)
  */
 
 async function injectProbe(page: Page, markup: string): Promise<Locator> {

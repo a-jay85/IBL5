@@ -72,7 +72,7 @@ require_once __DIR__ . '/../db/db.php';
 
 /** @var \mysqli $mysqli_db */
 
-$apply = in_array('--apply', $argv, true);
+$apply = in_array('--apply', $argv ?? [], true);
 
 const ATTENDANCE = 5244;
 const CAPACITY = 20000;
@@ -171,14 +171,21 @@ $nameFor = static function (int $pid) use ($mysqli_db): string {
         return 'Drazen Dalipagic';
     }
     $stmt = $mysqli_db->prepare('SELECT name FROM ibl_plr WHERE pid = ? LIMIT 1');
+    if ($stmt === false) {
+        throw new RuntimeException("Cannot prepare ibl_plr name lookup for pid {$pid}");
+    }
     $stmt->bind_param('i', $pid);
     $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
+    $result = $stmt->get_result();
+    if ($result === false) {
+        throw new RuntimeException("Cannot read ibl_plr name lookup result for pid {$pid}");
+    }
+    $row = $result->fetch_assoc();
     $stmt->close();
     if ($row === null) {
         throw new RuntimeException("pid {$pid} not found in ibl_plr");
     }
-    return mb_substr((string) $row['name'], 0, 16);
+    return mb_substr((string) ($row['name'] ?? ''), 0, 16);
 };
 
 echo $apply ? "APPLYING backfill...\n\n" : "DRY RUN (pass --apply to write)\n\n";

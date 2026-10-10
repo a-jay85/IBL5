@@ -13,6 +13,8 @@ const IBL_ONLY_MODULES = [
   'Waivers',
   'Voting',
   'CapSpace',
+  'ContractList',
+  'Contracts',
   'FranchiseHistory',
   'AwardHistory',
   'FranchiseRecordBook',

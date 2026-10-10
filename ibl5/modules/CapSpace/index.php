@@ -3,47 +3,16 @@
 declare(strict_types=1);
 
 /**
- * CapSpace Module - Salary cap information display
+ * CapSpace Module (retired)
  *
- * Displays salary cap availability and roster slots for all teams.
- *
- * Refactored to use the interface-driven architecture pattern.
- *
- * @see CapSpace\CapSpaceService For business logic
- * @see CapSpace\CapSpaceRepository For database operations
- * @see CapSpace\CapSpaceView For HTML rendering
+ * Cap space now lives on the Contracts page's Teams tab
+ * (modules.php?name=Contracts&tab=teams). This stub keeps old links and
+ * bookmarks working. The CapSpace\ classes stay in use by the Contracts module.
  */
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use CapSpace\CapSpaceRepository;
-use CapSpace\CapSpaceService;
-use CapSpace\CapSpaceView;
-
-global $mysqli_db;
-
-$season = new \Season\Season($mysqli_db);
-
-$module_name = basename(dirname(__FILE__));
-
-PageLayout\PageLayout::header();
-
-// Initialize services
-$repository = new CapSpaceRepository($mysqli_db);
-$service = new CapSpaceService($repository, $mysqli_db);
-$view = new CapSpaceView();
-
-// Get data
-$teamsData = $service->getTeamsCapData($season);
-$displayYears = $service->getDisplayYears($season);
-
-// Render output
-echo $view->render(
-    $teamsData,
-    $displayYears['beginningYear'],
-    $displayYears['endingYear']
-);
-
-PageLayout\PageLayout::footer();
+\Module\ModuleRedirect::sendWithPassthrough('modules.php?name=Contracts&tab=teams', [], $_GET + $_POST);
+return;

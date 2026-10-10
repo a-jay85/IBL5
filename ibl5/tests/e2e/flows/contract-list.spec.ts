@@ -7,7 +7,7 @@ test.use({ storageState: publicStorageState() });
 
 test.describe('Contract List flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=ContractList');
+    await page.goto('modules.php?name=Contracts&tab=players');
   });
 
   test('page loads with title', async ({ page }) => {
@@ -56,5 +56,12 @@ test.describe('Contract List flow', () => {
 
   test('no PHP errors', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Contract List page');
+  });
+
+  test('legacy ContractList URL redirects to Contracts players tab', async ({ page }) => {
+    await page.goto('modules.php?name=ContractList');
+    await expect(page).toHaveURL(/name=Contracts&tab=players/);
+    await expect(page.locator('.ibl-tab--active')).toHaveText('Players');
+    await expect(page.locator('.totals-row').first()).toBeVisible();
   });
 });

@@ -233,6 +233,37 @@ class LeagueContextTest extends TestCase
     }
 
     /**
+     * Test isModuleEnabled returns false for Contracts in Olympics
+     */
+    public function testIsModuleEnabledOlympicsDisablesContracts(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('Contracts'));
+    }
+
+    /**
+     * Test isModuleEnabled returns false for ContractList in Olympics
+     */
+    public function testIsModuleEnabledOlympicsDisablesContractList(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('ContractList'));
+    }
+
+    /**
+     * Test isModuleEnabled returns true for Contracts and ContractList in IBL
+     */
+    public function testIsModuleEnabledIblEnablesContracts(): void
+    {
+        $_SESSION['current_league'] = 'ibl';
+
+        $this->assertTrue($this->leagueContext->isModuleEnabled('Contracts'));
+        $this->assertTrue($this->leagueContext->isModuleEnabled('ContractList'));
+    }
+
+    /**
      * Test isModuleEnabled returns false for FranchiseHistory in Olympics
      */
     public function testIsModuleEnabledOlympicsDisablesFranchiseHistory(): void

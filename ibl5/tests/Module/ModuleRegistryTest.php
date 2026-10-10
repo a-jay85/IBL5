@@ -16,6 +16,13 @@ final class ModuleRegistryTest extends TestCase
         self::assertTrue(ModuleRegistry::isValid('YourAccount'));
     }
 
+    public function testContractsAndLegacyStubsAreValid(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('Contracts'));
+        self::assertTrue(ModuleRegistry::isValid('CapSpace'));
+        self::assertTrue(ModuleRegistry::isValid('ContractList'));
+    }
+
     public function testLeagueControlPanelIsRegistered(): void
     {
         self::assertTrue(ModuleRegistry::isValid('LeagueControlPanel'));

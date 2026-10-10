@@ -21,6 +21,9 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
@@ -34,13 +37,12 @@ export WT_POOL=0 WT_POOL_KICK=none
 
 LIB_SRC="${WT_COMPOSE_LIB:-$SCRIPT_DIR/lib/wt-compose.sh}"
 
-FAILED=0
 CASE=""
 CASE_FAIL=0
 CASE_NOTES=""
 
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 case_begin() { CASE="$1"; CASE_FAIL=0; CASE_NOTES=""; }
 case_end() {
@@ -625,5 +627,4 @@ mutant_slug "mutant: wt_slug flattens one slash only" '${name//\//-}' '${name/\/
 mutant_slug "mutant: wt_slug wrong pr format" 'pr-%s' 'px-%s' 'feat/x 4242' 'pr-4242'
 
 echo "----"
-if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES"; fi
-exit "$FAILED"
+h_done

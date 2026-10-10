@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GATE="$SCRIPT_DIR/check-registry-trigger-rows"
@@ -7,11 +9,8 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 REAL_REGISTRY="$REPO_ROOT/ibl5/docs/retrospective-class-registry.md"
 REAL_VERIFICATION="$REPO_ROOT/.claude/review-shared/_plan-verification.md"
 
-PASS=0
-FAIL=0
-
-pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
-fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 check() {
     local case_num="$1"
@@ -27,8 +26,7 @@ check() {
     fi
 }
 
-TMPDIR_FIXTURES="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR_FIXTURES"' EXIT
+h_tmp TMPDIR_FIXTURES
 
 make_verification() {
     local path="$1"
@@ -306,9 +304,4 @@ echo "| 2026-09-18 | #9999 | class: synthetic | routed to: Rung 3 (section: Forc
 check 20 "mutation proof: synthetic unsatisfied claim exits 1" 1 \
     --registry "$TMPDIR_FIXTURES/r20.md" --verification "$REAL_VERIFICATION"
 
-echo ""
-echo "Results: $PASS passed, $FAIL failed"
-if [[ "$FAIL" -gt 0 ]]; then
-    exit 1
-fi
-exit 0
+h_done

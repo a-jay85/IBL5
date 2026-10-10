@@ -12,6 +12,8 @@
 # Exit:  0 all cases pass, 1 any assertion failed.
 
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 case "${1:-}" in
     -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
@@ -26,12 +28,10 @@ TARGET="$(cd "$(dirname "$TARGET")" && pwd)/$(basename "$TARGET")"
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
-FAILS=0
-pass() { printf 'ok   %s\n' "$1"; }
-fail() { printf 'FAIL %s\n' "$1"; FAILS=$((FAILS + 1)); }
+pass() { h_pass "$1"; }
+fail() { h_fail "$1"; }
 want()  { if grep -qF -- "$3" "$2"; then pass "$1"; else fail "$1 (missing: $3)"; fi; }
 deny()  { if grep -qF -- "$3" "$2"; then fail "$1 (unexpected: $3)"; else pass "$1"; fi; }
 wantx() { if grep -qxF -- "$3" "$2"; then pass "$1"; else fail "$1 (missing line: $3)"; fi; }
@@ -187,6 +187,4 @@ want  "c8 fresh: skip logged" "$LOG" "css fresh, skip"
 empty "c8 fresh: zero docker/bunx calls" "$CALLS"
 deny  "c8 fresh: no rebuild started" "$LOG" "rebuilding"
 
-echo
-if [ "$FAILS" -gt 0 ]; then echo "test-rebuild-css-if-source-changed: $FAILS failure(s)"; exit 1; fi
-echo "test-rebuild-css-if-source-changed: all cases passed"
+h_done

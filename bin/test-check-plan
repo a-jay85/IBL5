@@ -15,13 +15,15 @@
 # intentional so the fixture text reaches check-plan verbatim.
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$SCRIPT_DIR/check-plan"
 TMP="$(mktemp -d)"
 trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
 
-FAILED=0
+# Inline checks further below still set FAILED=1 directly; h_done reads it.
 
 # assert <name> <expected-exit> <plan-body>
 assert() {
@@ -31,10 +33,9 @@ assert() {
     "$GUARD" "$f" >/dev/null 2>&1
     got=$?
     if [ "$got" -ne "$want" ]; then
-        echo "FAIL: $name — expected exit $want, got $got"
-        FAILED=1
+        h_fail "$name" "expected exit $want, got $got"
     else
-        echo "ok: $name (exit $got)"
+        h_pass "$name (exit $got)"
     fi
 }
 
@@ -47,15 +48,15 @@ assert_msg() {
     out="$("$GUARD" "$f" 2>&1)"; got=$?
     ok=1
     if [ "$got" -ne "$want_exit" ]; then
-        echo "FAIL: $name — expected exit $want_exit, got $got"; ok=0
+        h_fail "$name" "expected exit $want_exit, got $got"; ok=0
     fi
     if [ -n "$msg_inc" ] && ! grep -qF "$msg_inc" <<< "$out"; then
-        echo "FAIL: $name — '$msg_inc' not in output"; ok=0
+        h_fail "$name" "'$msg_inc' not in output"; ok=0
     fi
     if [ -n "$msg_exc" ] && grep -qF "$msg_exc" <<< "$out"; then
-        echo "FAIL: $name — '$msg_exc' unexpectedly in output"; ok=0
+        h_fail "$name" "'$msg_exc' unexpectedly in output"; ok=0
     fi
-    if [ "$ok" -eq 1 ]; then echo "ok: $name (exit $got)"; else FAILED=1; fi
+    if [ "$ok" -eq 1 ]; then h_pass "$name (exit $got)"; fi
 }
 
 # assert_cf <name> <plan-body> <expected --print-critical-files output>
@@ -67,12 +68,11 @@ assert_cf() {
     printf '%s\n' "$body" > "$f"
     got="$("$GUARD" --print-critical-files "$f" 2>/dev/null)"
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — classification mismatch"
+        h_fail "$name" "classification mismatch"
         echo "  want: $(printf '%s' "$want" | tr '\n' ' ')"
         echo "  got:  $(printf '%s' "$got" | tr '\n' ' ')"
-        FAILED=1
     else
-        echo "ok: $name"
+        h_pass "$name"
     fi
 }
 
@@ -90,13 +90,13 @@ assert_viol() {
     printf '%s\n' "$body" > "$f"
     out="$("$GUARD" "$f" 2>&1)"; got=$?
     if [ "$got" -ne "$want" ]; then
-        echo "FAIL: $name — expected exit $want, got $got"; FAILED=1
+        h_fail "$name" "expected exit $want, got $got"
     elif [ "$want" -eq 1 ] && ! printf '%s' "$out" | grep -qF "$tag"; then
-        echo "FAIL: $name — exit 1 but no $tag violation (wrong gate fired)"; FAILED=1
+        h_fail "$name" "exit 1 but no $tag violation (wrong gate fired)"
     elif [ "$want" -eq 0 ] && printf '%s' "$out" | grep -qF "$tag"; then
-        echo "FAIL: $name — clean fixture wrongly fired $tag"; FAILED=1
+        h_fail "$name" "clean fixture wrongly fired $tag"
     else
-        echo "ok: $name (exit $got)"
+        h_pass "$name (exit $got)"
     fi
 }
 
@@ -109,10 +109,9 @@ assert_draft() {
     "$GUARD" --draft "$f" >/dev/null 2>&1
     got=$?
     if [ "$got" -ne "$want" ]; then
-        echo "FAIL: $name — expected exit $want, got $got"
-        FAILED=1
+        h_fail "$name" "expected exit $want, got $got"
     else
-        echo "ok: $name (exit $got)"
+        h_pass "$name (exit $got)"
     fi
 }
 
@@ -3965,9 +3964,4 @@ for L_CASE in overflow verbatim; do
     fi
 done
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

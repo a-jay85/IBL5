@@ -67,6 +67,8 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     // Seeded empirically — see plan a11y-1-ratchet-best-practice
     // Auth pages
     'your account',
+    'api keys', // Added 2026-10-10 (axe-spec-missing-pages): html (no <h1>). See a-jay85/IBL5-backlog (label: a11y).
+    'game boxscore', // Added 2026-10-10 (axe-spec-missing-pages): html (no <h1>). See a-jay85/IBL5-backlog (label: a11y).
   ]),
 
   // Heading-level skip (h4 after h2, no h3). See a-jay85/IBL5-backlog (label: a11y).
@@ -138,6 +140,9 @@ function getA11yOptions(
 
 // --- Public pages ---
 
+// Not listed on purpose: TransactionHistory and VotingResults are retired redirect
+// stubs. TransactionHistory lands on 'search transactions preset' below, and
+// VotingResults lands on Voting, covered by 'voting ASG ballot' / 'voting EOY ballot'.
 const publicPages: Array<{ name: string; url: string }> = [
   { name: 'homepage', url: 'index.php' },
   { name: 'standings', url: 'modules.php?name=Standings' },
@@ -174,6 +179,7 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'news categories', url: 'modules.php?name=News&file=categories&op=newindex&catid=15' },
   { name: 'news article', url: 'modules.php?name=News&file=article&sid=1' },
   { name: 'team schedule', url: 'modules.php?name=Schedule&teamid=1' },
+  { name: 'game boxscore', url: 'modules.php?name=GameBoxscore&date=2026-02-20&game=1' },
 ];
 
 publicTest.describe('Public page accessibility', () => {
@@ -220,6 +226,7 @@ const authPages: Array<{
     state: { 'Current Season Phase': 'Free Agency', 'EOY Voting': 'Yes' },
   },
   { name: 'training camp ratings diff', url: 'modules.php?name=TrainingCampRatingsDiff' },
+  { name: 'api keys', url: 'modules.php?name=ApiKeys' },
   {
     name: 'league control panel',
     url: 'modules.php?name=LeagueControlPanel',

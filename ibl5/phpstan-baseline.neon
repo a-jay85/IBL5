@@ -2593,71 +2593,16 @@ parameters:
 			count: 1
 			path: scripts/allStarRename.php
 
-		-
-			rawMessage: Cannot access property $affected_rows on mixed.
-			identifier: property.nonObject
-			count: 2
-			path: scripts/archive/importBoxscoresFromHtml.php
 
-		-
-			rawMessage: 'Cannot call method bind_param() on mixed.'
-			identifier: method.nonObject
-			count: 2
-			path: scripts/archive/importBoxscoresFromHtml.php
 
-		-
-			rawMessage: 'Cannot call method close() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: scripts/archive/importBoxscoresFromHtml.php
 
-		-
-			rawMessage: 'Cannot call method execute() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: scripts/archive/importBoxscoresFromHtml.php
 
-		-
-			rawMessage: 'Cannot call method fetch_assoc() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
 
-		-
-			rawMessage: 'Cannot call method get_result() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
 
-		-
-			rawMessage: 'Cannot call method prepare() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: scripts/archive/importBoxscoresFromHtml.php
 
-		-
-			rawMessage: Negated boolean expression is always true.
-			identifier: booleanNot.alwaysTrue
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
 
-		-
-			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
 
-		-
-			rawMessage: 'Part $playerRowsAffected (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
 
-		-
-			rawMessage: 'Part $teamRowsAffected (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
 
 		-
 			rawMessage: 'Function parseBxsHeader() has parameter $teamNameToId with no value type specified in iterable type array.'
@@ -2827,59 +2772,14 @@ parameters:
 			count: 3
 			path: scripts/bulkJsbImport.php
 
-		-
-			rawMessage: Casting to string something that's already string.
-			identifier: cast.useless
-			count: 1
-			path: scripts/engParser.php
 
-		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: scripts/engParser.php
 
-		-
-			rawMessage: 'Only booleans are allowed in an if condition, int|false given.'
-			identifier: if.condNotBoolean
-			count: 1
-			path: scripts/engParser.php
 
-		-
-			rawMessage: 'Parameter #1 $db of class Maintenance\MaintenanceRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/engParser.php
 
-		-
-			rawMessage: 'Parameter #1 $haystack of function strpos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/engParser.php
 
-		-
-			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/engParser.php
 
-		-
-			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/engParser.php
 
-		-
-			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/engParser.php
 
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/engParser.php
 
 		-
 			rawMessage: Variable $argc might not be defined.
@@ -2911,83 +2811,18 @@ parameters:
 			count: 2
 			path: scripts/jsbExport.php
 
-		-
-			rawMessage: Binary operation "-" between mixed and mixed results in an error.
-			identifier: binaryOp.invalid
-			count: 9
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: 'Cannot access offset ''name'' on array<string, float|int|string|null>|false.'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: 'Cannot call method bind_param() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: 'Cannot call method close() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: 'Cannot call method execute() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: 'Cannot call method fetch_assoc() on mysqli_result|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: 'Cannot call method get_result() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: Cannot use array destructuring on mixed.
-			identifier: offsetAccess.nonArray
-			count: 3
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: 'Parameter #1 $pid of closure expects int, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: 'Parameter #1 $players of closure expects array, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: 'Parameter #1 $risingStars of static method JsbParser\ScoFileWriter::buildAllStarHeaderBlock() expects array{visitor_name: string, home_name: string, visitor_q: list<int>, home_q: list<int>, visitor_teamid: int, home_teamid: int, attendance: int, capacity: int, ...}, array{visitor_name: mixed, home_name: mixed, visitor_q: mixed, home_q: mixed, visitor_teamid: mixed, home_teamid: mixed, attendance: 5244, capacity: 20000, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: 'Parameter #2 $allStar of static method JsbParser\ScoFileWriter::buildAllStarHeaderBlock() expects array{visitor_name: string, home_name: string, visitor_q: list<int>, home_q: list<int>, visitor_teamid: int, home_teamid: int, attendance: int, capacity: int, ...}, array{visitor_name: mixed, home_name: mixed, visitor_q: mixed, home_q: mixed, visitor_teamid: mixed, home_teamid: mixed, attendance: 5244, capacity: 20000, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
 		-
 			rawMessage: 'Loose comparison via "!=" between int and int is not allowed.'
@@ -3205,47 +3040,12 @@ parameters:
 			count: 1
 			path: scripts/reconstructPlr.php
 
-		-
-			rawMessage: 'Cannot access offset ''name'' on array<string, float|int|string|null>|false.'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
 
-		-
-			rawMessage: 'Cannot call method bind_param() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
 
-		-
-			rawMessage: 'Cannot call method close() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
 
-		-
-			rawMessage: 'Cannot call method execute() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
 
-		-
-			rawMessage: 'Cannot call method fetch_assoc() on mysqli_result|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
 
-		-
-			rawMessage: 'Cannot call method get_result() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
 
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
 
 		-
 			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'

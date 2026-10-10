@@ -1224,6 +1224,40 @@ test_coord_runaway_window_reset() {
     assert_contains coord_window_reset:dm "$(cat "$T/dm.txt")" "usage window reset"
 }
 
+# A marker left stuck under one account gets a fresh count after a login switch,
+# because the new account has its own limits. Its window has not reset yet.
+test_coord_runaway_account_switch() {
+    coord_setup 50
+    seed_home uuid-A
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\" | .resets_at = $(( $(date +%s) + 86400 ))"
+    assert_eq coord_acct_switch:marker-acct "$(acct_hash uuid-A)" "$(jq -r .acct_fp "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    seed_home uuid-B
+    local out
+    out=$(run_coord --dry-run --once 2>/dev/null)
+    assert_contains coord_acct_switch:dry-action "$out" "ACTION unstick $SID_A account-switch"
+    assert_eq coord_acct_switch:dry-keeps-stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_file coord_acct_switch:launched "$T/launched.$SID_A"
+    assert_eq coord_acct_switch:unstuck false "$(jq -r '.stuck // false' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_eq coord_acct_switch:count-restarted 1 "$(jq -r .resume_count "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_contains coord_acct_switch:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "runaway-reset sid=$SID_A reason=account-switch"
+    assert_contains coord_acct_switch:dm "$(cat "$T/dm.txt")" "login switch detected"
+}
+
+# Same account, window not reset: the stuck marker stays stuck.
+test_coord_runaway_same_account_stays_stuck() {
+    coord_setup 50
+    seed_home uuid-A
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\" | .resets_at = $(( $(date +%s) + 86400 ))"
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_same_acct:not-launched "$T/launched.$SID_A"
+    assert_eq coord_same_acct:still-stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
 # A marker whose resets_at is unknown stays stuck: there is no window to wait out.
 test_coord_runaway_no_resets_stays_stuck() {
     coord_setup 50
@@ -2047,8 +2081,9 @@ test_coord_switch_respects_runaway_and_hold() {
     sw_signal 30 - 1 account
     run_coord --once >/dev/null 2>&1
     sleep 1
-    assert_eq switch_runaway:stuck true "$(jq -r '.stuck' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
-    assert_no_file switch_runaway:no-launch "$T/launched.$SID_A"
+    # A known account switch clears the old account's pause count, so A resumes.
+    assert_eq switch_runaway:unstuck false "$(jq -r '.stuck // false' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_file switch_runaway:launched "$T/launched.$SID_A"
     assert_no_file switch_hold:limit-hit-waits "$T/launched.$SID_B"
 }
 

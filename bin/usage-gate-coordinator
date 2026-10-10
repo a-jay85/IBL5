@@ -120,7 +120,7 @@ retire_missing_bin() {
 # A marker whose resume binary is gone is retired instead (retire_missing_bin).
 # Returns 0 when the marker is stuck or retired and must be skipped.
 check_runaway() {
-    local sid="$1" stuck count resets runner cwd argv bin
+    local sid="$1" stuck count resets runner cwd argv bin macct
     bin=$(marker_field "$sid" '.resume_argv[0] // empty')
     if [ -n "$bin" ] && [ ! -x "$bin" ]; then
         retire_missing_bin "$sid" "$bin"
@@ -142,6 +142,21 @@ check_runaway() {
         usage_marker_reset_runaway "$sid" || return 0
         usage_log "runaway-reset sid=$sid reason=window-reset resets_at=$resets"
         send_dm "usage-gate: session $sid ($(marker_field "$sid" '.runner')) usage window reset; pause count cleared, it resumes on its own."
+        return 1
+    fi
+    # A login switch is a new account with its own limits, so the old account's
+    # pauses no longer count. The marker's acct_fp is rewritten on its next pause,
+    # so this fires once per switch away from the pausing account.
+    macct=$(marker_field "$sid" '.acct_fp // empty')
+    if [ -n "$macct" ] && [ -n "$CUR_ACCT" ] && [ "$macct" != "$CUR_ACCT" ] \
+        && { [ "$count" -ge 5 ] || [ "$stuck" = "true" ]; }; then
+        if [ "$DRY" -eq 1 ]; then
+            printf 'ACTION unstick %s account-switch\n' "$sid"
+            return 1
+        fi
+        usage_marker_reset_runaway "$sid" || return 0
+        usage_log "runaway-reset sid=$sid reason=account-switch"
+        send_dm "usage-gate: session $sid ($(marker_field "$sid" '.runner')) was stuck under another account; login switch detected, pause count cleared, it resumes on its own."
         return 1
     fi
     [ "$stuck" = "true" ] && return 0
@@ -251,6 +266,7 @@ fi
 # ~/.claude.json and needs no keychain. usage_fetch signals a switch it sees at its
 # cred-switch drop site, in this process or in any earlier caller.
 if [ "$DRY" -ne 1 ]; then usage_account_switch_check; fi
+CUR_ACCT=$(_usage_acct_fp)
 body=$(usage_fetch 60); rc=$?
 SWITCH_AT=$(usage_switch_active "$NOW")
 age=$(usage_cache_age)
@@ -264,7 +280,6 @@ fi
 if [ "$stale" -eq 1 ]; then
     if [ "$DRY" -eq 1 ]; then printf 'ZONE unknown PCT 0 CACHE_AGE %s\n' "$age"; fi
     usage_log "coordinator-stale-usage age=$age"
-    CUR_ACCT=$(_usage_acct_fp)
     CUR_FP=""
     [ -n "$SWITCH_AT" ] && CUR_FP=$(_usage_cred_fp)
     FAST=0

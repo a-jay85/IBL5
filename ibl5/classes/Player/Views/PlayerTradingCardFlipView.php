@@ -6,7 +6,6 @@ namespace Player\Views;
 
 use Player\Player;
 use Player\Stats\PlayerStats;
-use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * PlayerTradingCardFlipView - Wrapper for flippable trading card
@@ -45,7 +44,7 @@ class PlayerTradingCardFlipView
      * @param int $threePointContests Number of Three-Point Contests
      * @param int $dunkContests Number of Slam Dunk Competitions
      * @param int $rookieSophChallenges Number of Rookie-Sophomore Challenges
-     * @param TeamIdentityRepositoryInterface|null $teamRepo Optional team lookup for team colors
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Prebuilt team color scheme (null = default gold scheme)
      * @return string HTML for flippable trading card
      */
     public static function render(
@@ -57,13 +56,13 @@ class PlayerTradingCardFlipView
         int $threePointContests = 0,
         int $dunkContests = 0,
         int $rookieSophChallenges = 0,
-        ?TeamIdentityRepositoryInterface $teamRepo = null
+        ?array $colorScheme = null
     ): string {
         $flipIcon = CardFlipStyles::getFlipIcon();
-        $frontHtml = PlayerTradingCardFrontView::render($player, $playerID, $contractDisplay, $teamRepo);
+        $frontHtml = PlayerTradingCardFrontView::render($player, $playerID, $contractDisplay, $colorScheme);
         $backHtml = PlayerTradingCardBackView::render(
             $player, $playerStats, $playerID,
-            $allStarGames, $threePointContests, $dunkContests, $rookieSophChallenges, $teamRepo
+            $allStarGames, $threePointContests, $dunkContests, $rookieSophChallenges, $colorScheme
         );
 
         return '<div class="card-flip-container">'

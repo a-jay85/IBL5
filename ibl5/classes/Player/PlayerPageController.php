@@ -13,7 +13,6 @@ use Player\Views\PlayerTradingCardFlipView;
 use Player\Views\PlayerStatsCardView;
 use Player\Views\PlayerStatsFlipCardView;
 use Player\Views\PlayerViewFactory;
-use Player\Views\TeamColorHelper;
 use Http\HttpRequest;
 use Player\Contracts\PlayerPageServiceInterface;
 use Player\Contracts\PlayerRepositoryInterface;
@@ -130,8 +129,9 @@ class PlayerPageController
         }
 
         // Generate team color scheme
-        $teamColors = TeamColorHelper::resolveTeamColors($this->commonRepo->getTeamColorRow($player->getTeamid() ?? 0));
-        $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
+        $playerTeamid = $player->getTeamid() ?? 0;
+        $colorScheme = TeamColorSchemeResolver::forTeam($this->commonRepo, $playerTeamid);
+        $tradingCardScheme = TeamColorSchemeResolver::forTradingCard($this->commonRepo, $playerTeamid);
 
         // Trading card
         $playerRepository = new PlayerRepository($this->mysqliDb);
@@ -155,7 +155,7 @@ class PlayerPageController
             $threepointcontests,
             $dunkcontests,
             $rooksoph,
-            $this->commonRepo
+            $tradingCardScheme
         );
         $html .= '</td></tr>';
 

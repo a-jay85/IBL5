@@ -425,12 +425,13 @@ for line in block:
 PYEOF
 )
 
-# Extract filter names from the runner: third arg to run_filtered_step, and
-# literal args to _fmap (excludes the $filter variable call in the function body).
+# Extract filter names from the runner: third arg to run_filtered_step, second
+# arg to run_pr_bypass_gate, and literal args to _fmap (excludes the $filter variable call in the function body).
 RUNNER_FILTERS=$(
     {
         grep -E '^[[:space:]]+run_filtered_step' "$RUNNER" | awk '{gsub(/"/, "", $4); print $4}' || true
         grep -oE '\$\(_fmap [a-z][a-z0-9-]+\)' "$RUNNER" | sed 's/\$(_fmap //; s/)//' || true
+        grep -E '^[[:space:]]+run_pr_bypass_gate "' "$RUNNER" | awk '{print $3}' || true
     } | sort -u
 )
 

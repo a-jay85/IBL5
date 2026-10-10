@@ -116,6 +116,7 @@ HARNESS_OUT="${FLEET_STATUS_HARNESS_OUT:-$MAIN_CHECKOUT/tools/postplan-harness/o
 LOG_DIR="${FLEET_STATUS_LOG_DIR:-/tmp}"
 TRANSCRIPT_ROOT="${FLEET_STATUS_TRANSCRIPT_ROOT:-$HOME/.claude/projects}"
 JQ_BIN="${FLEET_STATUS_JQ:-jq}"
+GH_BIN="${FLEET_STATUS_GH:-gh}"
 BURNDOWN_LOG="${FLEET_STATUS_BURNDOWN_LOG:-$HOME/.claude/burndown-loop/loop.log}"
 AUTOMOUSE_PLIST="${FLEET_STATUS_AUTOMOUSE_PLIST:-$HOME/Library/LaunchAgents/com.ibl5.automouse.plist}"
 REORDER_APP_DIR="${FLEET_STATUS_REORDER_APP_DIR:-$HOME/Library/Caches/ibl5}"
@@ -699,6 +700,15 @@ postplan_live_for() {
     pgrep -f -- "POSTPLAN_LABEL='com\.ibl5\.postplan-now-${safe}-[0-9]{8}-[0-9]{6}-" >/dev/null 2>&1
 }
 
+# True when <branch> has a MERGED PR. Only stale lock rows ask, so the page's one
+# network call stays off the common path. Any gh failure reads as not merged.
+pr_merged_for() {
+    local hit
+    hit="$(GH_PROMPT_DISABLED=1 "$GH_BIN" pr list --head "$1" --state merged \
+        --limit 1 --json number --jq 'length' 2>/dev/null)" || return 1
+    [ "$hit" = 1 ]
+}
+
 # impl_model, auto_merge and title of a queued plan, tab-separated. The awk is
 # bin/automouse/queue's show_queue() verbatim, defaults included, so the two
 # queue views can never disagree about a plan.
@@ -1217,6 +1227,10 @@ EOF_Q
                     mark="$DIM  ‖$R"; state="$DIM"'paused (usage limit)'"$R"
                 elif [ -n "$sid" ] && postplan_live_for "$(plan_branch "$base")"; then
                     state="$YEL"'resumed (post-plan)'"$R"
+                elif pr_merged_for "$(plan_branch "$base")"; then
+                    # bin/automouse/run disposes a merged plan when it next
+                    # claims it, so this lock needs no hand cleanup.
+                    mark="$DIM  ×$R"; state="$DIM"'PR merged (runner clears it)'"$R"
                 elif [ -n "$sid" ]; then
                     mark="$DIM  ×$R"; state="$DIM"'stale lock (post-plan gone)'"$R"
                 else

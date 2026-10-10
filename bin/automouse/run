@@ -1379,6 +1379,13 @@ automouse_pr_state() {
     return 1
 }
 
+# claim_pr_terminal <plan_name> <pr_state>: rc 0 when a branch PR in <pr_state> ends
+# the plan at claim time. Without a handoff any OPEN or MERGED PR does. With one,
+# only MERGED does: an OPEN PR may still need post-plan to finish.
+claim_pr_terminal() {
+    [ ! -f "$HANDOFF_DIR/$1.json" ] || [ "$2" = MERGED ]
+}
+
 # Resolve the git branch for a plan. Prefers the handoff JSON's "branch" field
 # (exact, written by the impl agent); falls back to the plan slug when the handoff
 # is absent, unreadable, malformed, or carries no branch. A wrong guess is safe:
@@ -2119,19 +2126,22 @@ while true; do
             ;;
     esac
 
-    # Terminal-disposition guard: no handoff to resume, but the branch already has an
-    # OPEN or MERGED PR ⇒ this plan's work has shipped. Dispose to done/ without
-    # spending a single claude -p invocation. Fail-closed: any gh error, no PR, or a
-    # CLOSED-only match falls through to the normal attempt below.
-    if [ ! -f "$HANDOFF_DIR/${PLAN_NAME}.json" ]; then
-        CLAIM_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
-        if CLAIM_PR=$(automouse_pr_state "$CLAIM_BRANCH"); then
-            dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
-                "${CLAIM_PR%% *}" "${CLAIM_PR#* }" claim-time
-            rm -rf "$CURRENT_LOCK" 2>/dev/null || true
-            CURRENT_LOCK=""
-            continue
-        fi
+    # Terminal-disposition guard: the branch already has an OPEN or MERGED PR ⇒ this
+    # plan's work has shipped. Dispose to done/ without spending a single claude -p
+    # invocation. A handoff means post-plan still has work, so an OPEN PR with a
+    # handoff falls through to resume it. A MERGED PR is terminal even with a handoff:
+    # a paused post-plan that resumed and merged under post-plan-now leaves both the
+    # handoff and the claim lock behind, and resuming it would rerun post-plan on a
+    # merged PR. Fail-closed: any gh error, no PR, or a CLOSED-only match falls
+    # through to the normal attempt below.
+    CLAIM_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
+    if CLAIM_PR=$(automouse_pr_state "$CLAIM_BRANCH") \
+       && claim_pr_terminal "$PLAN_NAME" "${CLAIM_PR%% *}"; then
+        dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
+            "${CLAIM_PR%% *}" "${CLAIM_PR#* }" claim-time
+        rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+        CURRENT_LOCK=""
+        continue
     fi
 
     # A sentinel left by a crashed earlier run must not classify THIS attempt.

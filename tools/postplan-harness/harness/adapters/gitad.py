@@ -1119,6 +1119,16 @@ class LiveGit:
         ok = "TREE-EQUIVALENT" in proc.stdout and proc.returncode == 0
         return ok, (proc.stdout + proc.stderr).strip()[:400]
 
+    def _remote_tip_is_head(self, remote: str, branch: str) -> tuple[bool, None]:
+        """netretry landed check for push: True when refs/heads/<branch> on the
+        remote already equals local HEAD. A failed read raises, so netretry stops
+        and re-raises the push's original error."""
+        rc, out = self._run_out("ls-remote", remote, f"refs/heads/{branch}")
+        if rc != 0:
+            raise HarnessError("push-failed", f"landed check: ls-remote failed: {out[:200]}")
+        tip = out.split()[0] if out.strip() else ""
+        return (bool(tip) and tip == self.head(), None)
+
     def push(self) -> None:
         if not self.push_remote:
             raise HarnessError("push-disabled",
@@ -1130,26 +1140,35 @@ class LiveGit:
         lease = self._run("rev-parse", "--verify", "--quiet",
                           f"refs/remotes/{remote}/{branch}", check=False).strip()
         if not lease:
-            rc, out = self._run_out("ls-remote", remote, f"refs/heads/{branch}")
-            if rc != 0:
-                raise HarnessError("push-failed",
-                                   f"lease read failed for {remote}/{branch}: {out[:400]}")
+            def _lease_read() -> str:
+                rc, out = self._run_out("ls-remote", remote, f"refs/heads/{branch}")
+                if rc != 0:
+                    raise HarnessError("push-failed",
+                                       f"lease read failed for {remote}/{branch}: {out[:400]}",
+                                       output=out)
+                return out
+            out = netretry.call(_lease_read, label=f"git ls-remote {remote} (lease)")
             if out.strip():
                 sha = out.strip().split()[0]
                 raise HarnessError("push-failed",
                                    f"stale-lease: {remote} holds refs/heads/{branch} ({sha}) "
                                    f"but this worktree has no refs/remotes/{remote}/{branch}")
             lease = _ZERO_SHA
-        rc, out = self._run_out("push", f"--force-with-lease={branch}:{lease}",
-                                remote, f"HEAD:refs/heads/{branch}")
-        if rc != 0:
-            if any(m in out for m in _LOCAL_GATE_MARKERS):
-                raise HarnessError("local-gate", f"git push: {out[:600]}",
+
+        def _push_once() -> None:
+            rc, out = self._run_out("push", f"--force-with-lease={branch}:{lease}",
+                                    remote, f"HEAD:refs/heads/{branch}")
+            if rc != 0:
+                if any(m in out for m in _LOCAL_GATE_MARKERS):
+                    raise HarnessError("local-gate", f"git push: {out[:600]}",
+                                       cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
+                                       output=out)
+                raise HarnessError("push-failed", out[:600],
                                    cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
                                    output=out)
-            raise HarnessError("push-failed", out[:600],
-                               cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
-                               output=out)
+
+        netretry.call(_push_once, label=f"git push {remote} {branch}",
+                      landed=lambda: self._remote_tip_is_head(remote, branch))
 
     def push_ff(self) -> str:
         if not self.push_remote:
@@ -1159,13 +1178,18 @@ class LiveGit:
         if branch == "HEAD":
             raise HarnessError("push-failed", "detached HEAD: refusing to push without a branch name")
         remote = self.push_remote
-        rc, out = self._run_out("push", remote, f"HEAD:refs/heads/{branch}")
-        if rc != 0:
-            if any(m in out for m in _LOCAL_GATE_MARKERS):
-                raise HarnessError("local-gate", f"git push: {out[:600]}",
+
+        def _push_once() -> None:
+            rc, out = self._run_out("push", remote, f"HEAD:refs/heads/{branch}")
+            if rc != 0:
+                if any(m in out for m in _LOCAL_GATE_MARKERS):
+                    raise HarnessError("local-gate", f"git push: {out[:600]}",
+                                       cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
+                raise HarnessError("push-failed", out[:600],
                                    cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
-            raise HarnessError("push-failed", out[:600],
-                               cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
+
+        netretry.call(_push_once, label=f"git push {remote} {branch} (ff)",
+                      landed=lambda: self._remote_tip_is_head(remote, branch))
         return self.head()
 
 

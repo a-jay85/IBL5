@@ -77,7 +77,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ?>
 <div class="league-switcher-admin">
     <label>Current League:</label>
-    <span class="league-badge <?= HtmlSanitizer::e($badgeClass) ?>"><?= HtmlSanitizer::e(strtoupper($leagueConfig['short_name'])) ?></span>
+    <span class="ibl-chip league-badge <?= HtmlSanitizer::e($badgeClass) ?>"><?= HtmlSanitizer::e(strtoupper($leagueConfig['short_name'])) ?></span>
     <label>Switch to:</label>
     <select onchange="window.location.href=this.value" aria-label="Switch league" class="ibl-select ibl-select--auto">
         <option value="modules.php?name=LeagueControlPanel&amp;league=ibl"<?= $currentLeague === 'ibl' ? ' selected' : '' ?>>IBL</option>

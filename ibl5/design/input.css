@@ -127,6 +127,7 @@
 
 @import './tokens/tokens.css';
 @import './base.css';
+@import './components/primitives.css';
 @import './components/leaders.css';
 @import './components/news.css';
 @import './components/titles-and-grids.css';

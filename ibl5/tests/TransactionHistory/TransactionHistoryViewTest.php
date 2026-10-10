@@ -73,6 +73,17 @@ class TransactionHistoryViewTest extends TestCase
         $this->assertStringContainsString('Test Trade', $html);
     }
 
+    public function testCategoryBadgeKeepsNumberedModifier(): void
+    {
+        $data = self::createRenderData([
+            'transactions' => [self::createTransactionRow(['catid' => '2'])],
+        ]);
+
+        $html = $this->view->render($data);
+
+        $this->assertStringContainsString('class="ibl-chip txn-badge txn-badge--2"', $html);
+    }
+
     /**
      * @param array<string, mixed> $overrides
      * @return array{transactions: array<int, array{sid: string, catid: string, title: string, time: string}>, categories: array<int, string>, availableYears: array<int, int>, monthNames: array<int, string>, selectedCategory: int, selectedYear: int, selectedMonth: int}

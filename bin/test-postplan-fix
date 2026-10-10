@@ -12,7 +12,7 @@
 #   5. Unknown slug exits 1.
 #   6. A prefix of a real branch exits 1 (the worktree match is exact).
 #   7. PR path: claude gets cwd = the branch worktree, one argv element, and the newest
-#      run's blocked-ship text.
+#      run's blocked-ship text and the newest /tmp/post-plan-now-… log path.
 #   8. Slug path: result.json under the worktree's own out dir; gh is not called.
 #   9. Worktree with no run dir still launches.
 #  10. A 5000-byte failure text is capped at 1500 bytes.

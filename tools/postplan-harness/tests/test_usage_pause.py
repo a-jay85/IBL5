@@ -949,3 +949,164 @@ def test_ledger_clear_removes_pause_record(rec_gate, tmp_path):
     usage_pause.ledger_clear()
     assert not path.exists()
     assert not effects.exists()
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 4
+
+class _StubLlm:
+    write_overlap = False
+
+
+def _classify(p, llm=None):
+    res = RunResult(terminal=TerminalState.FAILED, slug="x")
+    logs = []
+    kind = runner._classify_pause(p, llm or _StubLlm(), res, logs.append)
+    return kind, res, logs
+
+
+def _dirty_pause(repo, pre):
+    return UsagePause("gate-fix", dirty=True, prespawn=pre, cwd=str(repo))
+
+
+def test_classify_pause_records_edit(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    kind, res, logs = _classify(_dirty_pause(repo, pre))
+    assert kind == "usage-pause"
+    assert res.pause_edit_sid == S
+    assert path.exists()
+    assert any("partial edit recorded (2 paths)" in ln for ln in logs)
+
+
+def test_classify_pause_site_restored_is_clean(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    (repo / "c.txt").write_text("new\n")
+    (repo / "c.txt").unlink()
+    kind, res, logs = _classify(_dirty_pause(repo, pre))
+    assert kind == "usage-pause"
+    assert res.pause_edit_sid is None
+    assert not path.exists()
+    assert any("site cleanup already restored" in ln for ln in logs)
+
+
+def test_classify_pause_overlap_stays_dirty(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    llm = _StubLlm()
+    llm.write_overlap = True
+    kind, res, _ = _classify(_dirty_pause(repo, pre), llm)
+    assert kind == "usage-pause-dirty"
+    assert res.pause_edit_sid is None
+    assert not path.exists()
+
+
+def test_classify_pause_no_prespawn_stays_dirty(rec_gate):
+    kind, res, _ = _classify(UsagePause("x", dirty=True))
+    assert kind == "usage-pause-dirty"
+    assert res.pause_edit_sid is None
+
+
+def test_classify_pause_head_move_stays_dirty(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    _sh(repo, "commit", "-q", "--allow-empty", "-m", "moved")
+    kind, res, logs = _classify(_dirty_pause(repo, pre))
+    assert kind == "usage-pause-dirty"
+    assert res.pause_edit_sid is None
+    assert not path.exists()
+    assert any("not recordable (head-moved)" in ln for ln in logs)
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 5
+
+class _StubState:
+    def __init__(self, previous):
+        self.previous = previous
+
+
+def _reconcile(repo, previous):
+    res = RunResult(terminal=TerminalState.FAILED, slug="x")
+    logs = []
+    runner._reconcile_paused_edit(_StubState(previous), res, str(repo), logs.append)
+    return res, logs
+
+
+def test_reconcile_no_witness_is_noop(rec_gate, tmp_path):
+    repo = _edit_repo(tmp_path)
+    _partial_edit(repo)
+    before = {n: (repo / n).read_bytes() for n in ("a.txt", "b.txt", "c.txt")}
+    res, _ = _reconcile(repo, {})
+    assert res.pause_edit_sid is None
+    assert {n: (repo / n).read_bytes() for n in before} == before
+
+
+def test_reconcile_restores_and_clears(rec_gate, tmp_path):
+    _ctx, repo, rec = _recorded(rec_gate, tmp_path)
+    _, path = rec_gate
+    res, logs = _reconcile(repo, {"pause_edit_sid": S})
+    assert usage_pause.capture_prespawn(str(repo)).tree == rec["pre_tree"]
+    assert (repo / "b.txt").read_text() == "b\n"
+    assert not (repo / "c.txt").exists()
+    assert not path.exists()
+    assert res.pause_edit_sid is None
+    assert any("discarded interrupted edit from gate-fix (2 paths)" in ln for ln in logs)
+
+
+def test_reconcile_missing_record_fails_closed(rec_gate, tmp_path):
+    repo = _edit_repo(tmp_path)
+    _partial_edit(repo)
+    with pytest.raises(HarnessError) as ei:
+        _reconcile(repo, {"pause_edit_sid": S})
+    assert ei.value.kind == "usage-pause-dirty"
+    assert "pause record missing" in ei.value.detail
+    assert (repo / "b.txt").read_text() == "half\n"
+    assert (repo / "c.txt").exists()
+
+
+OLD_S = "7c7c7c7c-1111-4222-8333-444444444444"
+
+
+def test_reconcile_session_mismatch_keeps_witness(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    old = path.parent / f"{OLD_S}.pause.json"
+    old.parent.mkdir(parents=True)
+    old.write_text("{}")
+    repo = _edit_repo(tmp_path)
+    _partial_edit(repo)
+    res = RunResult(terminal=TerminalState.FAILED, slug="x")
+    with pytest.raises(HarnessError) as ei:
+        runner._reconcile_paused_edit(_StubState({"pause_edit_sid": OLD_S}), res,
+                                      str(repo), lambda m: None)
+    assert ei.value.kind == "usage-pause-dirty"
+    assert f"--resume-paused {OLD_S}" in ei.value.detail
+    assert res.pause_edit_sid == OLD_S
+    assert (repo / "b.txt").read_text() == "half\n"
+
+
+def test_reconcile_session_mismatch_record_gone_drops_witness(rec_gate, tmp_path):
+    repo = _edit_repo(tmp_path)
+    _partial_edit(repo)
+    res = RunResult(terminal=TerminalState.FAILED, slug="x")
+    with pytest.raises(HarnessError) as ei:
+        runner._reconcile_paused_edit(_StubState({"pause_edit_sid": OLD_S}), res,
+                                      str(repo), lambda m: None)
+    assert ei.value.kind == "usage-pause-dirty"
+    assert res.pause_edit_sid is None
+
+
+def test_reconcile_head_moved_fails_closed(rec_gate, tmp_path):
+    _ctx, repo, _rec = _recorded(rec_gate, tmp_path)
+    _sh(repo, "commit", "-q", "--allow-empty", "-m", "moved")
+    with pytest.raises(HarnessError) as ei:
+        _reconcile(repo, {"pause_edit_sid": S})
+    assert ei.value.kind == "usage-pause-dirty"
+    assert "head-moved" in ei.value.detail
+    assert (repo / "b.txt").read_text() == "half\n"

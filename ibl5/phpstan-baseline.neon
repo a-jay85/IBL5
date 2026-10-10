@@ -439,7 +439,7 @@ parameters:
 		-
 			rawMessage: Cannot cast mixed to string.
 			identifier: cast.string
-			count: 2
+			count: 1
 			path: classes/Topics/News/NewsController.php
 
 		-
@@ -473,6 +473,18 @@ parameters:
 			path: classes/Topics/News/NewsController.php
 
 		-
+			rawMessage: 'Parameter #1 $time of method Topics\News\Contracts\NewsServiceInterface::normalizeStoryTime() expects int|string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Parameter #1 $username of method Repositories\Contracts\TeamIdentityRepositoryInterface::getTeamnameFromUsername() expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
 			rawMessage: 'Parameter #1 $value of function intval expects array|bool|float|GMP|int|resource|SimpleXMLElement|string|null, mixed given.'
 			identifier: argument.type
 			count: 7
@@ -488,18 +500,6 @@ parameters:
 			rawMessage: 'intval() is banned. Use (int) cast instead. PHPStan can narrow types through casts but not through these functions, and intval(''08'') silently returns 0 (octal radix surprise).'
 			identifier: ibl.castFunction
 			count: 7
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $time of method Topics\News\Contracts\NewsServiceInterface::normalizeStoryTime() expects int|string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $username of method Repositories\Contracts\TeamIdentityRepositoryInterface::getTeamnameFromUsername() expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
 			path: classes/Topics/News/NewsController.php
 
 		-
@@ -695,24 +695,6 @@ parameters:
 			path: modules/DebugMenu/index.php
 
 		-
-			rawMessage: 'Cannot call method getTeamnameFromUsername() on mixed.'
-			identifier: method.nonObject
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Cannot call method getTidFromTeamname() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Cannot call method getUsername() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: modules/DepthChartEntry/index.php
-
-		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 3
@@ -731,206 +713,8 @@ parameters:
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Function api() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function api() has parameter $user with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function main() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function main() has parameter $user with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function nextSimApi() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function submit() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function submit() has parameter $user with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function tabApi() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function userinfo() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function userinfo() has parameter $username with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
 			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
 			identifier: booleanNot.exprNotBoolean
-			count: 3
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $action of method DepthChartSnapshot\DepthChartSnapshotApiHandler::handle() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DepthChartSnapshot\DepthChartSnapshotApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DepthChart\DepthChartApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DepthChart\DepthChartController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DepthChart\DepthChartRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DepthChart\DepthChartSubmissionHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class NextSim\NextSimTabApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamTableService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $leagueContext of class DepthChart\DepthChartView constructor expects League\LeagueContext, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $postData of method DepthChart\DepthChartController::handleSubmit() expects array<string, mixed>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $username of method DepthChart\DepthChartController::displayForm() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepo of class DepthChart\DepthChartApiHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepo of class DepthChart\DepthChartSubmissionHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepository of class DepthChart\DepthChartController constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $sessionUsername of method DepthChart\DepthChartController::handleSubmit() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $teamid of method DepthChartSnapshot\DepthChartSnapshotApiHandler::handle() expects int, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #3 $leagueContext of class DepthChart\DepthChartApiHandler constructor expects League\LeagueContext, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #3 $username of method DepthChartSnapshot\DepthChartSnapshotApiHandler::handle() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #4 $params of method DepthChartSnapshot\DepthChartSnapshotApiHandler::handle() expects array<string, mixed>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: Variable $user might not be defined.
-			identifier: variable.undefined
 			count: 3
 			path: modules/DepthChartEntry/index.php
 
@@ -1363,7 +1147,7 @@ parameters:
 		-
 			rawMessage: Cannot cast mixed to string.
 			identifier: cast.string
-			count: 2
+			count: 1
 			path: modules/News/categories.php
 
 		-
@@ -2172,114 +1956,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\SalaryCapRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeAssetRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeCashRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeFormRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeOffer constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeOfferRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeProcessor constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeValidator constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #4 $mysqli_db of class Trading\TradingService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #7 $db of class Trading\TradingController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: Variable $user might not be defined.
-			identifier: variable.undefined
-			count: 4
-			path: modules/Trading/index.php
 
 		-
 			rawMessage: 'Parameter #2 $post of method Trading\TradingController::submitTradeOffer() expects array<string, mixed>, array<mixed> given.'
@@ -3368,12 +3044,6 @@ parameters:
 			path: scripts/updateAllTheThings.php
 
 		-
-			rawMessage: Binary operation "." between "</div>\n        …" and mixed results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
 			rawMessage: 'Binary operation "." between ''<div class="news…'' and mixed results in an error.'
 			identifier: binaryOp.invalid
 			count: 1
@@ -3394,25 +3064,7 @@ parameters:
 		-
 			rawMessage: Binary operation "." between non-falsy-string and mixed results in an error.
 			identifier: binaryOp.invalid
-			count: 3
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Cannot call method getCurrentLeague() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Cannot call method getUsername() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 5
+			count: 2
 			path: themes/IBL/theme.php
 
 		-
@@ -3464,188 +3116,14 @@ parameters:
 			path: themes/IBL/theme.php
 
 		-
-			rawMessage: 'Function CloseTable() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function OpenTable() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function OpenTable2() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
 			rawMessage: 'Function themearticle() has an unused parameter $topicname.'
 			identifier: function.unusedParameter
 			count: 1
 			path: themes/IBL/theme.php
 
 		-
-			rawMessage: 'Function themearticle() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $aid with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $datetime with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $informant with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $thetext with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $title with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $topic with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $topicimage with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $topicname with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $topictext with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themecenterbox() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themefooter() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeheader() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
 			rawMessage: 'Function themeindex() has an unused parameter $topicname.'
 			identifier: function.unusedParameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $aid with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $counter with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $informant with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $morelink with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $notes with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $thetext with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $time with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $title with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $topic with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $topicimage with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $topicname with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $topictext with no type specified.'
-			identifier: missingType.parameter
 			count: 1
 			path: themes/IBL/theme.php
 
@@ -3662,129 +3140,9 @@ parameters:
 			path: themes/IBL/theme.php
 
 		-
-			rawMessage: 'Only booleans are allowed in &&, int given on the left side.'
-			identifier: booleanAnd.leftNotBoolean
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
 			rawMessage: 'Only booleans are allowed in a ternary operator condition, int|null given.'
 			identifier: ternary.condNotBoolean
 			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Only booleans are allowed in an if condition, int given.'
-			identifier: if.condNotBoolean
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Navigation\NavigationRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ProjectedDraftOrder\ProjectedDraftOrderRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 4
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $timestamp of method Utilities\NukeCompat::formatLocalTime() expects int|string, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $username of class Debug\DebugSession constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $username of method Navigation\NavigationRepository::resolveTeamId() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 (mixed) of echo cannot be converted to string.'
-			identifier: echo.nonString
-			count: 2
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class Season\Season constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Debug\DebugSession constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #3 $cookieValue of class Debug\DebugSession constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #3 $subject of function str_replace expects array<string>|string, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter $currentLeague of class Navigation\NavigationConfig constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter $isLoggedIn of class Navigation\NavigationConfig constructor expects bool, int given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter $requestUri of class Navigation\NavigationConfig constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter $serverName of class Navigation\NavigationConfig constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter $username of class Navigation\NavigationConfig constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Part $aid (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 2
 			path: themes/IBL/theme.php
 
 		-
@@ -3800,20 +3158,8 @@ parameters:
 			path: themes/IBL/theme.php
 
 		-
-			rawMessage: 'Part $informant (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 2
-			path: themes/IBL/theme.php
-
-		-
 			rawMessage: 'Part $tipath (mixed) of encapsed string cannot be cast to string.'
 			identifier: encapsedStringPart.nonString
 			count: 2
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Part $topicimage (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 6
 			path: themes/IBL/theme.php
 

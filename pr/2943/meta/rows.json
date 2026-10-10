@@ -4,14 +4,14 @@
   ],
   "before": {
     "team-page-header": {
-      "phone": "failed",
-      "desktop": "failed"
+      "phone": "ok",
+      "desktop": "ok"
     }
   },
   "after": {
     "team-page-header": {
-      "phone": "failed",
-      "desktop": "failed"
+      "phone": "ok",
+      "desktop": "ok"
     }
   }
 }

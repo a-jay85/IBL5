@@ -183,8 +183,10 @@ printf '/plan Do a thing.\nbranch slug `demo-slug`\n' > "$TMP/plan-prompt.md"
 plan_now_dry() {   # HOME_DIR [extra env assignments...] -> prints runner path
     local home_dir="$1"; shift
     mkdir -p "$home_dir"
+    mkdir -p "$TMP/runlog"
     ( cd "$ROOT" && env -i PATH="$TMP/shim:$PATH" HOME="$home_dir" NIGHTLY_DIR="$TMP/n" \
-        IBL5_USAGE_GATE_STATE_DIR="$TMP/gate" PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$TMP/stub" \
+        IBL5_USAGE_GATE_STATE_DIR="$TMP/gate" PLAN_NOW_LOG_DIR="$TMP/runlog" \
+        PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$TMP/stub" \
         PLAN_NOW_DISCORD_DM="$TMP/stub" PLAN_NOW_AUTOMOUSE_QUEUE="$TMP/stub" "$@" \
         bin/plan-now --implement --no-dm "$TMP/plan-prompt.md" 2>&1 )
 }
@@ -192,6 +194,8 @@ cleanup_runner() { local r="$1"; [ -n "$r" ] && rm -f "${r%.sh}".*; }
 dry="$(plan_now_dry "$TMP/home18a" PLAN_NOW_PLANS_DIR="$TMP/pn" PLANS_DIR="$TMP/leak")"; rc=$?
 runner="$(sed -n 's/^  runner: //p' <<<"$dry")"
 check "18a dry run rc" "0" "$rc"
+check "18a runner lands in PLAN_NOW_LOG_DIR" "1" \
+    "$([[ "$runner" == "$TMP/runlog/plan-now-"*.sh ]] && echo 1 || echo 0)"
 check "18a PLAN_NOW_PLANS_DIR created" "1" "$([ -d "$TMP/pn" ] && echo 1 || echo 0)"
 check "18a PLANS_DIR leak dir not created" "0" "$([ -e "$TMP/leak" ] && echo 1 || echo 0)"
 check "18a runner PLANS_DIR= names PLAN_NOW_PLANS_DIR" "1" \
@@ -277,5 +281,45 @@ MUT="$(sed 's/\${!_pd_name:-}/${_pd_name:-}/' <<<"$BODY")"
 check "25 mutation drops the indirection" "1" "$([ "$MUT" != "$BODY" ] && echo 1 || echo 0)"
 out="$( unset $SEAMS; eval "$MUT"; export PLANS_DIR=/tmp/over; plans_dir PLANS_DIR 2>&1 )"
 check "25 without indirection the seam value is lost" "no" "$([ "$out" = /tmp/over ] && echo yes || echo no)"
+
+# --- 26. Runner log-dir seams: production default stays /tmp, tests opt out ---
+# bin/fleet-status, bin/watch-run and bin/post-plan-fail-dm read runner logs
+# from /tmp, so the unset and empty defaults must stay /tmp byte-for-byte.
+check "26a bin/plan-now has one RUNLOG_DIR seam line" "1" \
+    "$(grep -cF 'RUNLOG_DIR="${PLAN_NOW_LOG_DIR:-/tmp}"' "$ROOT/bin/plan-now")"
+check "26a bin/plan-now hard-codes no /tmp/plan-now-\$ path" "0" \
+    "$(grep -cE '"/tmp/plan-now-\$' "$ROOT/bin/plan-now")"
+check "26a bin/post-plan-now keeps its POSTPLAN_LOG_DIR seam" "1" \
+    "$(grep -cF 'LOG="${POSTPLAN_LOG_DIR:-/tmp}/post-plan-now-' "$ROOT/bin/post-plan-now")"
+eval_runlog() {   # eval_runlog FILE PATTERN VAR MODE -> value after the real line
+    local file="$1" pat="$2" var="$3" mode="$4" line
+    line="$(grep -m1 -E "$pat" "$ROOT/$file" || true)"
+    (
+        unset PLAN_NOW_LOG_DIR POSTPLAN_LOG_DIR
+        case "$mode" in
+            set)   export PLAN_NOW_LOG_DIR=/tmp/rl POSTPLAN_LOG_DIR=/tmp/rl ;;
+            empty) export PLAN_NOW_LOG_DIR='' POSTPLAN_LOG_DIR='' ;;
+        esac
+        SAFE_SLUG=s; TS=t
+        eval "$line"
+        printf '%s\n' "${!var-}"
+    )
+}
+PN='^RUNLOG_DIR='; PP='^[[:space:]]*LOG="\$\{POSTPLAN_LOG_DIR'
+check "26b plan-now: set wins"        "/tmp/rl" "$(eval_runlog bin/plan-now "$PN" RUNLOG_DIR set)"
+check "26b plan-now: unset -> /tmp"   "/tmp"    "$(eval_runlog bin/plan-now "$PN" RUNLOG_DIR unset)"
+check "26b plan-now: empty -> /tmp"   "/tmp"    "$(eval_runlog bin/plan-now "$PN" RUNLOG_DIR empty)"
+check "26b post-plan-now: unset -> /tmp" "/tmp/post-plan-now-s-t.log" \
+    "$(eval_runlog bin/post-plan-now "$PP" LOG unset)"
+check "26b post-plan-now: empty -> /tmp" "/tmp/post-plan-now-s-t.log" \
+    "$(eval_runlog bin/post-plan-now "$PP" LOG empty)"
+check "26b post-plan-now: set wins" "/tmp/rl/post-plan-now-s-t.log" \
+    "$(eval_runlog bin/post-plan-now "$PP" LOG set)"
+# Every bin test that runs a runner opts out of the shared /tmp.
+for t in test-plan-now test-plans-dir \
+         test-post-plan-now-pr-creates-worktree test-post-plan-now-untracked-only; do
+    check "26c bin/$t sets a runner log dir" "yes" \
+        "$(grep -qE 'PLAN_NOW_LOG_DIR=|POSTPLAN_LOG_DIR=' "$ROOT/bin/$t" && echo yes || echo no)"
+done
 
 h_done

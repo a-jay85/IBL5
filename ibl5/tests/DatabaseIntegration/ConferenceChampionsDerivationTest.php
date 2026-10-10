@@ -171,7 +171,7 @@ final class ConferenceChampionsDerivationTest extends DatabaseTestCase
         $repo    = new FranchiseRecordRepository($this->db);
         $records = $repo->getMostTitlesByType('Conference');
 
-        self::assertNotEmpty($records, 'Leaderboard must be non-empty — Phase 5 UNION branch is absent if this fails');
+        self::assertNotSame([], $records, 'Leaderboard must be non-empty — Phase 5 UNION branch is absent if this fails');
         $byName = array_column($records, null, 'team_name');
         self::assertArrayHasKey('Metros',  $byName, 'Metros must appear in the leaderboard');
         self::assertArrayHasKey('Cougars', $byName, 'Cougars must appear in the leaderboard');

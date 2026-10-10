@@ -285,7 +285,7 @@ class ScheduleMembershipGuardTest extends TestCase
             ARRAY_FILTER_USE_KEY,
         );
 
-        $this->assertNotEmpty($reasonConstants);
+        $this->assertNotSame([], $reasonConstants);
         foreach ($reasonConstants as $name => $value) {
             $this->assertLessThanOrEqual(
                 32,

@@ -12,6 +12,6 @@ class DraftPickLocatorEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('DraftPickLocator');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

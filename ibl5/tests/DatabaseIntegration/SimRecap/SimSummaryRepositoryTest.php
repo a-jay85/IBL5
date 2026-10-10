@@ -237,7 +237,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
 
         $rows = $this->repo->recentThemes(5);
 
-        self::assertNotEmpty($rows, 'recentThemes must return rows even with malformed JSON');
+        self::assertNotSame([], $rows, 'recentThemes must return rows even with malformed JSON');
         $found = false;
         foreach ($rows as $row) {
             if ($row['themes_used'] === '"not-a-list"') {

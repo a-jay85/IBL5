@@ -164,8 +164,8 @@ class AswFileParserTest extends TestCase
         try {
             $result = AswFileParser::parseFile($tmpFile);
 
-            $this->assertNotEmpty($result['rosters']['allstar_1'], 'All-Star Team 1 should have players');
-            $this->assertNotEmpty($result['rosters']['allstar_2'], 'All-Star Team 2 should have players');
+            $this->assertNotSame([], $result['rosters']['allstar_1'], 'All-Star Team 1 should have players');
+            $this->assertNotSame([], $result['rosters']['allstar_2'], 'All-Star Team 2 should have players');
             $this->assertCount(12, $result['rosters']['allstar_1']);
             $this->assertCount(12, $result['rosters']['allstar_2']);
         } finally {

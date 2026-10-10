@@ -132,7 +132,7 @@ abstract class WideUnitTestCase extends TestCase
             static fn (string $q): bool => stripos($q, $querySubstring) !== false,
         );
 
-        self::assertEmpty(
+        self::assertSame([], 
             $matches,
             "Query containing '$querySubstring' was executed but should not have been.\n" .
             "Matched query: " . (count($matches) > 0 ? reset($matches) : ''),

@@ -41,7 +41,7 @@ class ApiGameRepositoryTest extends DatabaseTestCase
 
         $games = $this->repo->getGames($paginator);
 
-        self::assertNotEmpty($games);
+        self::assertNotSame([], $games);
     }
 
     public function testGetGamesRowHasExpectedStructure(): void
@@ -56,7 +56,7 @@ class ApiGameRepositoryTest extends DatabaseTestCase
 
         $games = $this->repo->getGames($paginator);
 
-        self::assertNotEmpty($games);
+        self::assertNotSame([], $games);
         $game = $games[0];
 
         self::assertArrayHasKey('game_uuid', $game);
@@ -191,7 +191,7 @@ class ApiGameRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBoxscoreTeams(1, 2, $date);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $row = $result[0];
 
         self::assertArrayHasKey('visitor_q1_points', $row);
@@ -217,7 +217,7 @@ class ApiGameRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBoxscorePlayers(1, 2, $date);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $row = $result[0];
 
         self::assertArrayHasKey('name', $row);

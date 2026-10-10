@@ -52,35 +52,35 @@ final class DraftClassImportIntegrationTest extends DatabaseTestCase
         );
         self::assertNotFalse($stmt, 'Failed to prepare INSERT: ' . $this->db->error);
 
-        // bind_param binds by reference — mutating these variables in the loop
-        // updates the bound values before each execute() call
+        // bind_param binds by reference. The stat columns carry a constant 50 for every
+        // row, so they are set once here; only name/pos/age/team change per iteration.
         $name       = '';
         $pos        = '';
         $age        = 0;
         $team       = '';
-        $fga        = 0;
-        $fgp        = 0;
-        $fta        = 0;
-        $ftp        = 0;
-        $r3ga       = 0;
-        $r3gp       = 0;
-        $orb        = 0;
-        $drb        = 0;
-        $ast        = 0;
-        $stl        = 0;
-        $tvr        = 0;
-        $blk        = 0;
-        $oo         = 0;
-        $rDriveOff  = 0;
-        $po         = 0;
-        $rTransOff  = 0;
-        $od         = 0;
-        $dd         = 0;
-        $pd         = 0;
-        $td         = 0;
-        $talent     = 0;
-        $skill      = 0;
-        $intangibles = 0;
+        $fga        = 50;
+        $fgp        = 50;
+        $fta        = 50;
+        $ftp        = 50;
+        $r3ga       = 50;
+        $r3gp       = 50;
+        $orb        = 50;
+        $drb        = 50;
+        $ast        = 50;
+        $stl        = 50;
+        $tvr        = 50;
+        $blk        = 50;
+        $oo         = 50;
+        $rDriveOff  = 50;
+        $po         = 50;
+        $rTransOff  = 50;
+        $od         = 50;
+        $dd         = 50;
+        $pd         = 50;
+        $td         = 50;
+        $talent     = 50;
+        $skill      = 50;
+        $intangibles = 50;
 
         $stmt->bind_param(
             'ssis' . str_repeat('i', 23),
@@ -107,16 +107,14 @@ final class DraftClassImportIntegrationTest extends DatabaseTestCase
 
         try {
             foreach ($rows as $rowData) {
+                // @phpstan-ignore assign.unused (bound by reference via bind_param above)
                 $name  = $rowData[0];
+                // @phpstan-ignore assign.unused (bound by reference via bind_param above)
                 $pos   = $rowData[1];
+                // @phpstan-ignore assign.unused (bound by reference via bind_param above)
                 $age   = $rowData[2];
+                // @phpstan-ignore assign.unused (bound by reference via bind_param above)
                 $team  = $rowData[3];
-                $fga   = $fgp   = $fta   = $ftp  = 50;
-                $r3ga  = $r3gp  = $orb   = $drb  = 50;
-                $ast   = $stl   = $tvr   = $blk  = 50;
-                $oo    = $rDriveOff = $po = $rTransOff = 50;
-                $od    = $dd    = $pd    = $td   = 50;
-                $talent = $skill = $intangibles   = 50;
 
                 $ok = $stmt->execute();
                 if ($ok === false) {

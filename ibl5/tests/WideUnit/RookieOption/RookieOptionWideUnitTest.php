@@ -514,7 +514,6 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
     public function testWorkflowStopsAtOwnershipFailure(): void
     {
         // Arrange
-        $playerID = 600;
         $teamName = 'Wrong Team';
 
         $mockPlayer = $this->createMockPlayerObject(
@@ -543,7 +542,6 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
     public function testWorkflowStopsAtEligibilityFailure(): void
     {
         // Arrange
-        $playerID = 601;
         $teamName = 'Miami Cyclones';
 
         $mockPlayer = $this->createMockPlayerObject(
@@ -684,13 +682,6 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
         $draftRound = 1;
         $extensionAmount = 220;
 
-        $mockPlayer = $this->createMockPlayerObject(
-            teamName: 'Miami Cyclones',
-            canRookieOption: true,
-            draftRound: $draftRound,
-            cy2Salary: 150,
-            cy3Salary: 200
-        );
 
         $this->mockDb->setAffectedRows(1);
 
@@ -717,13 +708,6 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
         $draftRound = 2;
         $extensionAmount = 165;
 
-        $mockPlayer = $this->createMockPlayerObject(
-            teamName: 'Miami Cyclones',
-            canRookieOption: true,
-            draftRound: $draftRound,
-            cy2Salary: 150,
-            cy3Salary: 0
-        );
 
         $this->mockDb->setAffectedRows(1);
 
@@ -779,13 +763,6 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
         $draftRound = 1;
         $extensionAmount = 250;
 
-        $mockPlayer = $this->createMockPlayerObject(
-            teamName: 'Denver Nuggets',
-            canRookieOption: true,
-            draftRound: $draftRound,
-            cy2Salary: 200,
-            cy3Salary: 225
-        );
 
         $this->mockDb->setAffectedRows(1);
 

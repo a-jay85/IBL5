@@ -22,7 +22,7 @@ class ComparePlayersViewTest extends TestCase
         $result = $this->view->renderSearchForm($playerNames);
 
         $this->assertIsString($result);
-        $this->assertNotEmpty($result);
+        $this->assertNotSame('', $result);
     }
 
     public function testRenderSearchFormIncludesDatalist(): void
@@ -82,7 +82,7 @@ class ComparePlayersViewTest extends TestCase
         $result = $this->view->renderComparisonResults($comparisonData);
 
         $this->assertIsString($result);
-        $this->assertNotEmpty($result);
+        $this->assertNotSame('', $result);
     }
 
     public function testRenderComparisonResultsIncludesThreeTables(): void

@@ -52,7 +52,7 @@ class ApiLeadersRepositoryTest extends DatabaseTestCase
 
         $leaders = $this->repo->getLeaders($paginator);
 
-        self::assertNotEmpty($leaders);
+        self::assertNotSame([], $leaders);
     }
 
     public function testGetLeadersRowHasExpectedStructure(): void
@@ -73,7 +73,7 @@ class ApiLeadersRepositoryTest extends DatabaseTestCase
 
         $leaders = $this->repo->getLeaders($paginator);
 
-        self::assertNotEmpty($leaders);
+        self::assertNotSame([], $leaders);
         $row = $leaders[0];
 
         self::assertArrayHasKey('player_uuid', $row);
@@ -195,7 +195,7 @@ class ApiLeadersRepositoryTest extends DatabaseTestCase
 
         $seasons = $this->repo->getAvailableSeasons();
 
-        self::assertNotEmpty($seasons);
+        self::assertNotSame([], $seasons);
         self::assertContains(2025, $seasons);
 
         // Should be ordered DESC

@@ -34,7 +34,7 @@ class GMContactListRepositoryTest extends DatabaseTestCase
     {
         $contacts = $this->repo->getAllTeamContacts();
 
-        self::assertNotEmpty($contacts);
+        self::assertNotSame([], $contacts);
         $first = $contacts[0];
         self::assertArrayHasKey('teamid', $first);
         self::assertArrayHasKey('team_city', $first);

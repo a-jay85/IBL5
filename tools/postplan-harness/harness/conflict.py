@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional, NoReturn
+from typing import Callable, Mapping, Optional, NoReturn
 
 # ── Conflict marker pattern (exact: 7-char leader + space or EOL, not >=7) ───
 import re as _re
@@ -94,6 +94,7 @@ def extract_stages(
     key: str,
     path: str,
     present: frozenset[int] = frozenset({1, 2, 3}),
+    revs: Optional[Mapping[int, str]] = None,
 ) -> dict[int, Path]:
     """Extract the present merge stages into /tmp files. Returns {stage_int: Path}.
     A modify/delete conflict passes the two stages it has; an absent stage is skipped."""
@@ -106,7 +107,8 @@ def extract_stages(
         subdir.mkdir(parents=True, exist_ok=True)
         flat = path.replace("/", "__")
         dest = subdir / flat
-        content = run("show", f":{stage}:{path}", check=False)
+        spec = f"{revs[stage]}:{path}" if revs else f":{stage}:{path}"
+        content = run("show", spec, check=False)
         if not content:
             raise ValueError(
                 f"stage {stage} empty for {path!r} — class gate should have prevented this"
@@ -143,6 +145,10 @@ def resolve_one(
     branch_stage: int = 2,
     master_sha: str = "origin/master",
     pre_sha: str = "HEAD",
+    model: str = "sonnet",
+    extra_context: str = "",
+    max_rounds: int = MAX_RESOLVE_ROUNDS,
+    stage_revs: Optional[Mapping[int, str]] = None,
 ) -> tuple[bool, str]:
     """Resolve a single conflicted path. Returns (success, reason).
 
@@ -165,7 +171,8 @@ def resolve_one(
             run("rm", "-q", "--", path)
             return True, ""
 
-    stage_paths = extract_stages(run, key, path, present=frozenset(stages))
+    stage_paths = extract_stages(run, key, path, present=frozenset(stages),
+                                 revs=stage_revs)
     base_path = stage_paths[1]
     ours_path = stage_paths.get(2, _ABSENT)
     theirs_path = stage_paths.get(3, _ABSENT)
@@ -177,7 +184,7 @@ def resolve_one(
     pre_snapshot = run("status", "--porcelain")
     last_error = ""
 
-    for _round in range(MAX_RESOLVE_ROUNDS):
+    for _round in range(max_rounds):
         prompt = (
             f"You are resolving exactly ONE conflicted file: `{path}`.\n"
             f"The three merge stages are already extracted:\n"
@@ -195,13 +202,15 @@ def resolve_one(
                 "\nOne side deleted this file. Either Write the merged result to the path "
                 "and end with RESOLVED, or end with DELETED to keep the deletion."
             )
+        if extra_context:
+            prompt += "\n\n" + extra_context
         if last_error:
             prompt += f"\n\nPrevious round failed: {last_error}"
 
         try:
             reply = llm.call_tooled(
                 f"conflict-resolve:{path}",
-                "sonnet",
+                model,
                 prompt,
                 cwd=worktree,
                 allowed_tools=("Read", "Write"),
@@ -271,6 +280,9 @@ def resolve_all(
     branch_stage: int = 2,
     master_sha: str = "origin/master",
     pre_sha: str = "HEAD",
+    model: str = "sonnet",
+    extra_context: str = "",
+    max_rounds: int = MAX_RESOLVE_ROUNDS,
 ) -> ConflictResolutionResult:
     """Attempt to resolve all conflicted files. Returns ConflictResolutionResult."""
     for path in inventory.files:
@@ -278,6 +290,7 @@ def resolve_all(
             llm, run, worktree=worktree, key=key, path=path,
             stages=inventory.stage_sets.get(path, frozenset({1, 2, 3})),
             branch_stage=branch_stage, master_sha=master_sha, pre_sha=pre_sha,
+            model=model, extra_context=extra_context, max_rounds=max_rounds,
         )
         if not success:
             return ConflictResolutionResult(False, reason)

@@ -2708,6 +2708,21 @@ _GATE_REMEDY = {
 }
 
 
+def _reported_gate_class(res: RunResult) -> str:
+    """Gate class for REPORTING (verdict_line, human_block). Never use it to branch on remediation.
+
+    `res.error` is `"local-gate: " + detail[:800]`, so a long byte-budget denial loses the
+    hook's trailing `Trim the rule(s) above` line and classifies `unknown`. `error_output_tail`
+    keeps the last 4000 chars. Upgrade ONLY `unknown` -> `byte-budget`: its _GATE_REMEDY text
+    claims no action the run took. The other remedies (doc-staleness, adr, stale-base) say
+    "Auto-remediation ran" or "the harness's one ADR draft attempt", which is false when
+    truncation hid the class from the behavior sites, so they are never upgraded here."""
+    head = classify_local_gate_denial(res.error or "")
+    if head == "unknown" and classify_local_gate_denial(res.error_output_tail or "") == "byte-budget":
+        return "byte-budget"
+    return head
+
+
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
     3 = fail-closed sentinel: bin/post-plan-now MUST NOT escalate to the /post-plan
@@ -2870,7 +2885,7 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
                           "usage-pause-unconfirmed", "usage-pause-dirty"):
         key = res.error_kind
     elif res.error_kind == "local-gate":
-        key = "gate-" + classify_local_gate_denial(res.error or "")
+        key = "gate-" + _reported_gate_class(res)
     else:
         key = "unknown"
     if key == "gate-adr" and res.adr_drafted:
@@ -3191,11 +3206,13 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             tail = " ".join(_error_tail(res.error_output_tail or res.error)) or "see gate output"
             cmd = _cmd_text(res.error_cmd)
             detail = f"Command: {cmd}. Error: {tail}" if cmd else tail
-            # Classify on the FULL res.error, never on `detail`: _flat truncates at 300
-            # chars and the hooks echo their guidance line LAST, so classifying the
-            # flattened form would silently degrade a long byte-budget denial to
-            # "unknown" and print the wrong remedy.
-            gate_class = classify_local_gate_denial(res.error or "")
+            # Never classify on `detail`: _flat truncates at 300 chars. res.error is itself
+            # only the 800-char head of the hook output (commit_all keeps detail[:800]) and
+            # the hooks echo their guidance line LAST, so a long byte-budget denial reads
+            # "unknown" there. _reported_gate_class also consults error_output_tail (the
+            # last 4000 chars) for that one class. Reporting only: the remediation branch
+            # keeps classifying res.error.
+            gate_class = _reported_gate_class(res)
             drafted = (f" The harness drafted {res.adr_path} ({res.adr_draft_model}) "
                        "and the hook still denied; the draft is committed locally on "
                        "the branch for review." if res.adr_drafted else "")

@@ -254,7 +254,9 @@ def test_near_match_with_extra_edit_stays_lost(repo):
                resolve_reply=_justification(to=_EXTRA_EDIT) + "\nRESOLVED")
     detail = _rebase_fails(d, llm)
     assert "no near-match" in detail
-    assert len(llm.calls) == 1
+    # A failed first pass now escalates through the conflict ladder (extra resolver calls);
+    # the near-match gate must still reject before any reviewer call.
+    assert "conflict-adapt-review" not in llm.purposes()
     _assert_restored(d, key, branch, pre)
 
 

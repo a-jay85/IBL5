@@ -1470,6 +1470,54 @@ dispose_plan_done() {
     echo "Loop-side disposition ($site): PR $pr_state ($pr_url) — moved $plan_name to done/." >> "$LOG"
 }
 
+# Resumed-post-plan disposal. A claim lock held for a post-plan usage-gate pause
+# (paused-held sid plus post-plan evidence: the handoff or the $lock/branch
+# breadcrumb) outlives the post-plan-now run the coordinator resumed. Once that run
+# is over and the branch has an OPEN or MERGED PR, the plan has shipped, so dispose
+# it to done/ instead of skipping it or stealing the lock and re-running it.
+# rc 0 = disposed (the CALLER removes the lock); rc 1 = untouched. Every doubt is
+# rc 1: a live marker, a clear younger than the grace window, an in-flight or
+# unreadable launchctl listing, a failed PR lookup. Prints nothing on stdout, because
+# claim_next_plan's stdout is the claimed plan path.
+dispose_resumed_postplan_lock() {
+    local plan_name=$1 lock=$2 slug sid stamp at now branch crumb listing pr
+    local _pid _status label safe
+    slug=${plan_name%.md}
+    sid=$(cat "$lock/paused-held" 2>/dev/null) || sid=""
+    usage_valid_sid "$sid" || return 1
+    # Post-plan phase evidence. An impl-paused lock has neither, so it is never disposed.
+    [ -f "$HANDOFF_DIR/${plan_name}.json" ] || [ -s "$lock/branch" ] || return 1
+    if usage_marker_exists "$sid"; then return 1; fi
+    # Grace window: covers the gap between the marker clear and the launchd job load.
+    stamp="$(usage_state_dir)/cleared/$sid"
+    if [ -e "$stamp" ]; then
+        at=$(cat "$stamp" 2>/dev/null) || at=""
+        case "$at" in ''|*[!0-9]*) return 1 ;; esac
+        now=$(date +%s)
+        [ "$(( now - at ))" -ge "${RESUMED_POSTPLAN_GRACE_SECS:-300}" ] || return 1
+    fi
+    # Branch: handoff .branch, else the breadcrumb, else the slug.
+    branch=$(automouse_branch_for_plan "$plan_name" "$slug")
+    if [ "$branch" = "$slug" ]; then
+        crumb=$(head -n 1 "$lock/branch" 2>/dev/null) || crumb=""
+        if [ -n "$crumb" ]; then branch=$crumb; fi
+    fi
+    # In-flight post-plan-now launchd job: fail-closed on an unreadable or empty listing.
+    listing=$("${LAUNCHCTL_CMD:-launchctl}" list 2>/dev/null) || return 1
+    [ -n "$listing" ] || return 1
+    while IFS=$'\t' read -r _pid _status label; do
+        for safe in "$(printf '%s' "$slug" | tr -cs 'A-Za-z0-9._-' '-')" \
+                    "$(printf '%s' "$branch" | tr -cs 'A-Za-z0-9._-' '-')"; do
+            case "$label" in
+                "com.ibl5.postplan-now-${safe}-"[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9]*)
+                    return 1 ;;
+            esac
+        done
+    done <<< "$listing"
+    pr=$(automouse_pr_state "$branch") || return 1
+    dispose_plan_done "$plan_name" "$slug" "${pr%% *}" "${pr#* }" resumed-postplan
+}
+
 # Postplan no-worktree disposition. Called when the postplan phase has no worktree
 # to run in: the pre-call resolver found none, or post-plan-now exited 7. A plan
 # whose branch PR is already MERGED has shipped, and its worktree was reaped after

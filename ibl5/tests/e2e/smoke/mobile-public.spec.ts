@@ -9,6 +9,8 @@ test.use({ viewport: { width: 375, height: 812 } });
 // hasWideTables: only true for pages whose tables are always wider than 375px regardless
 // of seed data. responsive-tables.js only wraps tables that overflow, so data-dependent
 // pages may not have scroll wrappers in CI. The overflow check still catches real issues.
+// scrollWrapper: set only for pages whose tables sit in a server-rendered .sticky-scroll-wrapper
+// (head-to-head: HeadToHeadRecordsView.php:112).
 const PAGES = [
   { name: 'homepage', url: 'index.php', selector: 'article', hasWideTables: false },
   { name: 'standings', url: 'modules.php?name=Standings', selector: '.ibl-data-table', hasWideTables: true },
@@ -29,7 +31,7 @@ const PAGES = [
   { name: 'league starters', url: 'modules.php?name=LeagueStarters', selector: '#league-starters-tables', hasWideTables: true },
   { name: 'compare players', url: 'modules.php?name=ComparePlayers', selector: 'form[action*="ComparePlayers"]', hasWideTables: false },
   { name: 'season highs', url: 'modules.php?name=Records&tab=thisseason', selector: '.ibl-data-table', hasWideTables: false },
-  { name: 'head-to-head records', url: 'modules.php?name=HeadToHeadRecords', selector: '.h2h-matrix', hasWideTables: true },
+  { name: 'head-to-head records', url: 'modules.php?name=HeadToHeadRecords', selector: '.h2h-matrix', hasWideTables: true, scrollWrapper: '.sticky-scroll-wrapper' },
   { name: 'franchise history', url: 'modules.php?name=FranchiseHistory', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'record holders', url: 'modules.php?name=Records&tab=alltime', selector: '.record-section', hasWideTables: false },
@@ -68,7 +70,11 @@ test.describe('Mobile public page smoke tests', () => {
       await assertNoHorizontalOverflow(page, `on ${pageInfo.name}`);
 
       if (pageInfo.hasWideTables) {
-        await assertScrollWrappersPresent(page, `on ${pageInfo.name}`);
+        await assertScrollWrappersPresent(
+          page,
+          `on ${pageInfo.name}`,
+          'scrollWrapper' in pageInfo ? pageInfo.scrollWrapper : undefined,
+        );
       }
     });
   }
@@ -77,7 +83,7 @@ test.describe('Mobile public page smoke tests', () => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Schedule&teamid=1');
     await assertNoPhpErrors(page, 'on modules.php?name=Schedule&teamid=1 (mobile)');
-    await expect(page.locator('.schedule-container, .schedule-game, table').first()).toBeVisible();
+    await expect(page.locator('.schedule-container').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on team schedule');
   });
 
@@ -104,7 +110,7 @@ test.describe('Mobile public page smoke tests', () => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Records&tab=byfranchise&teamid=1');
     await assertNoPhpErrors(page, 'on modules.php?name=Records&tab=byfranchise&teamid=1 (mobile)');
-    await expect(page.locator('.ibl-title, .ibl-data-table, table').first()).toBeVisible();
+    await expect(page.locator('.ibl-title').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on franchise record book team view');
   });
 

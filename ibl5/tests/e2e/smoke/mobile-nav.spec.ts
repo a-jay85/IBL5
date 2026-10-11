@@ -5,6 +5,9 @@ import { publicStorageState } from '../helpers/public-storage-state';
 test.use({ storageState: publicStorageState() });
 test.use({ viewport: { width: 375, height: 812 } });
 
+// Whole-token match: \bhidden\b would also match the overlay's lg:hidden.
+const HIDDEN_CLASS = /(^|\s)hidden(\s|$)/;
+
 // NOTE: Safari bfcache edge case (not testable here)
 // On iOS Safari, using the browser back button restores the page from bfcache,
 // which can silently drop element-level event listeners. This kills the
@@ -50,6 +53,52 @@ test.describe('Mobile nav interaction tests', () => {
     await openMobileMenu(page);
     const overflow = await page.evaluate(() => getComputedStyle(document.body).overflow);
     expect(overflow).toBe('hidden');
+  });
+
+  test('hamburger bars animate to X on open and reset on close', async ({ page }) => {
+    await openMobileMenu(page);
+    await expect(page.locator('#hamburger-top')).not.toHaveCSS('transform', 'none');
+    await expect(page.locator('#hamburger-bottom')).not.toHaveCSS('transform', 'none');
+    await expect(page.locator('#hamburger-middle')).toHaveCSS('opacity', '0');
+    await expect(page.locator('#nav-overlay')).toHaveCSS('opacity', '1');
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#hamburger-top')).toHaveCSS('transform', 'none');
+    await expect(page.locator('#hamburger-middle')).toHaveCSS('opacity', '1');
+    await expect(page.locator('#nav-overlay')).toHaveClass(HIDDEN_CLASS);
+  });
+
+  test('menu state is class-driven and leaves no inline styles', async ({ page }) => {
+    await openMobileMenu(page);
+    await expect(page.locator('body')).toHaveClass(/\bmenu-open\b/);
+    await expect(page.locator('#nav-overlay')).toHaveClass(/nav-overlay--visible/);
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#nav-overlay')).toHaveClass(HIDDEN_CLASS);
+    const state = await page.evaluate(() => ({
+      bodyInlineOverflow: document.body.style.overflow,
+      bodyMenuOpen: document.body.classList.contains('menu-open'),
+      bodyOverflow: getComputedStyle(document.body).overflow,
+      overlayInlineOpacity: (document.getElementById('nav-overlay') as HTMLElement).style.opacity,
+      barsWithStyle: ['hamburger-top', 'hamburger-middle', 'hamburger-bottom'].filter((id) =>
+        document.getElementById(id)?.hasAttribute('style'),
+      ),
+    }));
+    expect(state.bodyInlineOverflow).toBe('');
+    expect(state.bodyMenuOpen).toBe(false);
+    expect(state.bodyOverflow).not.toBe('hidden');
+    expect(state.overlayInlineOpacity).toBe('');
+    expect(state.barsWithStyle).toEqual([]);
+  });
+
+  test('reopening inside the close fade keeps the overlay visible', async ({ page }) => {
+    await openMobileMenu(page);
+    await page.keyboard.press('Escape');
+    // Programmatic click so the fading overlay cannot intercept it.
+    await page.evaluate(() => (document.getElementById('nav-hamburger') as HTMLElement).click());
+    await page.waitForTimeout(450);
+    await expect(page.locator('#nav-overlay')).not.toHaveClass(HIDDEN_CLASS);
+    await expect(page.locator('#nav-overlay')).toHaveCSS('opacity', '1');
   });
 
   test('league switcher present in mobile menu', async ({ page }) => {

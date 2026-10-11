@@ -91,7 +91,7 @@ if (is_string($requestName) && $requestName !== '') {
     if (!$isModuleAccessible && !is_admin()) {
         PageLayout\PageLayout::header();
         OpenTable();
-        echo "<center>" . _MODULENOTACTIVE . "<br><br>" . _GOBACK . "</center>";
+        echo "<div class=\"text-center\">" . _MODULENOTACTIVE . "<br><br>" . _GOBACK . "</div>";
         CloseTable();
         PageLayout\PageLayout::footer();
     } else {
@@ -126,7 +126,7 @@ if (is_string($requestName) && $requestName !== '') {
         } else {
             PageLayout\PageLayout::header();
             OpenTable();
-            echo "<br><center>Sorry, such file doesn't exist...</center><br>";
+            echo "<br><div class=\"text-center\">Sorry, such file doesn't exist...</div><br>";
             CloseTable();
             PageLayout\PageLayout::footer();
         }

@@ -128,7 +128,7 @@ if ($catid !== 0) {
     if ($catTitle !== null) {
         /** @var string $title1 */
         $title1 = \Security\HtmlSanitizer::safeHtmlOutput($catTitle);
-        $title = "<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
+        $title = "<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><span class=\"storycat\">$title1</span></a>: $title";
     }
 }
 

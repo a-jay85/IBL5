@@ -1042,6 +1042,9 @@ jobs:
       - name: bin/test-bug-pipeline-e2e
         run: bin/test-bug-pipeline-e2e
       # Needs a scrubbed environment, so it cannot share the runner.
+      - name: bin/test-gh-retry
+        run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-gh-retry'
+      # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-burndown
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown'
       # Needs a scrubbed environment, so it cannot share the runner.

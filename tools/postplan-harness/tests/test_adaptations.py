@@ -382,3 +382,18 @@ def test_pair_one_justification_cannot_cover_two_matches():
 
 def test_pair_rejects_empty_justifications():
     assert _pair_justifications((_M,), ()) == ((), _REJECT)
+
+
+@pytest.mark.parametrize("old,new", [("/tmp/", '"$RL"/'), ("run /tmp/", 'run "$RL"/')])
+def test_pair_accepts_any_rewrite_yielding_same_line(old, new):
+    from harness.adaptations import AcceptedAdaptation
+    got, reason = _pair_justifications((_M,), (_j(old, new),))
+    assert reason == ""
+    assert got == (AcceptedAdaptation(_P, _ORIG, _ADPT, old, new),)
+
+
+def test_pair_rejects_partial_occurrence_rewrite():
+    m = NearMatch(_P, "cp /tmp/a /tmp/b", 'cp "$RL"/a "$RL"/b', (_REAL,))
+    j = Justification(_P, m.original, m.adapted, "/tmp/a", '"$RL"/a')
+    assert _pair_justifications((m,), (j,)) == (
+        (), f"no resolver justification for {_P}: +cp /tmp/a /tmp/b")

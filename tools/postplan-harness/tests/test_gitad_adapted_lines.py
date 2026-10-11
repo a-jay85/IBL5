@@ -54,7 +54,7 @@ def _merged(added_line):
     return text + (added_line + "\n" if added_line is not None else "")
 
 
-def _justification(old="/tmp", new='"$RL"', to=_ADAPTED):
+def _justification(old="/tmp/", new='"$RL"/', to=_ADAPTED):
     return "ADAPTED-LINE: " + json.dumps(
         {"from": _ORIGINAL, "to": to, "old": old, "new": new})
 
@@ -179,15 +179,31 @@ def test_regression_replay_tmp_to_rl_is_accepted_and_hold_still_set(repo):
     assert len(res.adapted_lines) == 1
     a = res.adapted_lines[0]
     assert (a.path, a.original, a.adapted, a.old, a.new) == (
-        _PATH, _ORIGINAL, _ADAPTED, "/tmp", '"$RL"')
+        _PATH, _ORIGINAL, _ADAPTED, "/tmp/", '"$RL"/')
     notes = open(res.notes_path).read()
     assert "## Adapted lines" in notes
     assert _ADAPTED in notes
     verdict = open(f"/tmp/postplan-adapt-review-{key}/verdict.txt").read()
     assert verdict.splitlines()[0] == "ADAPTED-LINE-1=CONFIRMED"
+    blocks = open(f"/tmp/postplan-adapt-review-{key}/adaptations.txt").read()
+    assert '    rewrite:  /tmp -> "$RL"' in blocks.splitlines()
+    assert "/tmp/ ->" not in blocks
     assert llm.purposes() == ["conflict-resolve", "conflict-adapt-review", "conflict-review"]
     assert "adaptations.txt" in llm.calls[2]["prompt"]
     assert os.path.exists(f"/tmp/postplan-conflict-review-{key}/adaptations.txt")
+
+
+def test_stripped_form_justification_is_still_accepted(repo):
+    d, _master, _key, branch = repo()
+    llm = _Llm(d, _merged(_ADAPTED),
+               resolve_reply=_justification(old="/tmp", new='"$RL"') + "\nRESOLVED")
+    g = LiveGit(d, llm=llm)
+    g.rebase_onto("origin/master")
+
+    assert _ADAPTED in _head_file(d).splitlines()
+    assert os.path.exists(conflict_flag_path(branch))
+    a = g.last_conflict_resolution.adapted_lines[0]
+    assert (a.old, a.new) == ("/tmp", '"$RL"')
 
 
 def test_reviewer_denies_adaptation_exits_fail_closed(repo):

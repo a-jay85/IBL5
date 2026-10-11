@@ -74,7 +74,7 @@
     font-size: var(--pc-text-xl);
     font-weight: bold;
     color: var(--card-text);
-    line-height: 1.2;
+    line-height: var(--leading-tight);
     margin: 0;
 }
 
@@ -733,7 +733,7 @@
 }
 
 .flip-icon:hover {
-    background: rgba(212, 175, 55, 1);
+    background: var(--gold);
     transform: scale(1.1) rotate(180deg);
     box-shadow: 0 4px 12px rgba(212, 175, 55, 0.5);
 }

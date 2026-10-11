@@ -2,6 +2,7 @@
 # Scans PHPUnit tests for markTestSkipped(), banned by .claude/rules/phpunit-tests.md.
 # Silently-disabled tests are a hygiene anti-pattern: delete the test instead, or —
 # for a legitimate integration-availability skip — carry an inline allow marker.
+# Also flags const-restatement: a test asserting a class constant equals its own value.
 # Exits 0 (clean) or 1 (blocking violations found).
 set -euo pipefail
 
@@ -32,6 +33,10 @@ Blocking checks on PHPUnit tests:
   set-accessible     Reflection setAccessible() — a no-op since PHP 8.1 and
                      deprecated since 8.5 (fatal in PHP 9). getValue()/invoke()
                      already reach private members; delete the call.
+  const-restatement  A test that pairs an alreadyNarrowedType ignore with a
+                     class constant, or asserts a literal equals a class
+                     constant, restates the declaration. Assert the behavior
+                     that consumes the constant instead.
 
 Modes:
   (no args)  Scan all ibl5/tests/**/*.php
@@ -40,8 +45,9 @@ Modes:
   --base     <ref> base ref for --pr; overrides PHPUNIT_HYGIENE_BASE_REF
 
 Exceptions (inline allow markers, reason >= 20 chars):
-  // phpunit-hygiene-allow: <reason>             (mark-test-skipped and
-                                                 set-accessible; on the
+  // phpunit-hygiene-allow: <reason>             (mark-test-skipped,
+                                                 set-accessible and
+                                                 const-restatement; on the
                                                  matched or preceding line)
   // phpunit-hygiene-allow-no-db-group: <reason> (no-db-group; anywhere in file)
 
@@ -89,20 +95,11 @@ has_inline_allow() {
 BLOCKING_HITS=()
 BLOCKING_TOTAL=0
 
-# ONE `grep -nH` over the whole file set — never a per-file loop. A per-file
-# `< <(grep ...)` over ~1k files corrupts bash 3.2's heap on macOS
-# (nondeterministic SIGABRT/SIGBUS), and a second such pass reliably crashed it.
-# `-H` forces the filename prefix even when SCAN_FILES holds a single file (--pr),
-# so the `file:lineno:line` parse below is uniform. `--` keeps a pattern starting
-# with `-` (e.g. `->foo`) from being read as an option flag.
-run_pattern() {
+# Record `file:lineno:line` hits, skipping any carrying an inline allow marker.
+record_hits() {
   local severity="$1"
   local label="$2"
-  shift 2
-
-  local out
-  out=$(grep -nH -E -- "$@" "${SCAN_FILES[@]}" 2>/dev/null || true)
-  [ -n "$out" ] || return 0
+  local out="$3"
 
   local hit f rest line_num matched_line rel entry
   while IFS= read -r hit; do
@@ -122,6 +119,23 @@ run_pattern() {
       BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
     fi
   done <<< "$out"
+}
+
+# ONE `grep -nH` over the whole file set — never a per-file loop. A per-file
+# `< <(grep ...)` over ~1k files corrupts bash 3.2's heap on macOS
+# (nondeterministic SIGABRT/SIGBUS), and a second such pass reliably crashed it.
+# `-H` forces the filename prefix even when SCAN_FILES holds a single file (--pr),
+# so the `file:lineno:line` parse in record_hits is uniform. `--` keeps a pattern
+# starting with `-` (e.g. `->foo`) from being read as an option flag.
+run_pattern() {
+  local severity="$1"
+  local label="$2"
+  shift 2
+
+  local out
+  out=$(grep -nH -E -- "$@" "${SCAN_FILES[@]}" 2>/dev/null || true)
+  [ -n "$out" ] || return 0
+  record_hits "$severity" "$label" "$out"
 }
 
 # --- Per-file check: concrete DatabaseTestCase subclass missing #[Group('database')] ---
@@ -157,6 +171,46 @@ check_db_group() {
   rm -f "$all_db" "$abstract_db" "$covered" "$violators"
 }
 
+# --- Whole-fileset check: a test that restates a class constant ---
+# ONE awk process over the whole file set (no per-file loop; see the bash 3.2
+# heap note on run_pattern). Two shapes, at most one hit per statement:
+#   A. an `@phpstan-ignore ... (method|staticMethod).alreadyNarrowedType`
+#      directive whose statement names Class::CONST. The window runs from the
+#      directive line to the first line ending in `;` (max 5 lines after it).
+#      Reported on the directive line. Catches single-line, reversed-argument,
+#      multi-line and variable-argument forms.
+#   B. a single-line assertSame/assertEquals(<literal>, Class::CONST) with no
+#      directive. Lines inside a shape-A window are never re-reported.
+# Class::CONST = uppercase name not followed by `(`; `::class` is lowercase so
+# it never matches.
+read -r -d '' CONST_RESTATE_AWK <<'AWK' || true
+FNR == 1 { win = 0 }
+{
+  if ($0 ~ /@phpstan-ignore.*(method|staticMethod)\.alreadyNarrowedType/) {
+    win = 6; start = FNR; text = $0; found = 0
+  }
+  if (win > 0) {
+    if (!found && $0 ~ /[A-Za-z_\\][A-Za-z0-9_\\]*::[A-Z][A-Z0-9_]*([^A-Za-z0-9_(]|$)/) {
+      print FILENAME ":" start ":" text; found = 1
+    }
+    win--
+    if (FNR > start && $0 ~ /;[ \t]*(\/\/.*)?$/) win = 0
+    if (FNR == start && $0 ~ /;[ \t]*\/\/[ \t]*@phpstan-ignore/) win = 0
+    next
+  }
+  if ($0 ~ /assert(Same|Equals)[(][ \t]*(-?[0-9][0-9._]*|'[^']*'|"[^"]*"|true|false|null|[[][^]]*[]])[ \t]*,[ \t]*[A-Za-z_\\][A-Za-z0-9_\\]*::[A-Z][A-Z0-9_]*[ \t]*[,)]/) {
+    print FILENAME ":" FNR ":" $0
+  }
+}
+AWK
+
+check_const_restatement() {
+  local out
+  out=$(awk "$CONST_RESTATE_AWK" "${SCAN_FILES[@]}" 2>/dev/null || true)
+  [ -n "$out" ] || return 0
+  record_hits blocking "const-restatement" "$out"
+}
+
 # === BLOCKING patterns (exit 1 if any found) ===
 # Every check below is whole-fileset-grep based (one subprocess per pass), so
 # ordering no longer matters — see the bash 3.2 heap note on run_pattern for why
@@ -165,6 +219,7 @@ check_db_group() {
 check_db_group
 run_pattern blocking "mark-test-skipped" 'markTestSkipped\('
 run_pattern blocking "set-accessible" '->setAccessible\('
+check_const_restatement
 
 # --- Report ---
 if [ "$BLOCKING_TOTAL" -eq 0 ]; then
@@ -199,11 +254,13 @@ echo "FAIL: $BLOCKING_TOTAL blocking hits across ${#HIT_FILES[@]} files."
 has_skip=false
 has_dbgroup=false
 has_setaccessible=false
+has_constrestate=false
 for hit in "${BLOCKING_HITS[@]}"; do
   case "$hit" in
     *"[mark-test-skipped]"*) has_skip=true ;;
     *"[no-db-group]"*)       has_dbgroup=true ;;
     *"[set-accessible]"*)    has_setaccessible=true ;;
+    *"[const-restatement]"*) has_constrestate=true ;;
   esac
 done
 
@@ -225,6 +282,12 @@ if [ "$has_setaccessible" = true ]; then
   echo "[set-accessible] Reflection setAccessible() has been a no-op since PHP 8.1 and is"
   echo "DEPRECATED since 8.5 (fatal in PHP 9) — it emits a deprecation on every run."
   echo "getValue()/setValue()/invoke() already reach private members: delete the call."
+fi
+if [ "$has_constrestate" = true ]; then
+  echo ""
+  echo "[const-restatement] the assertion restates the constant's declaration; PHPStan's"
+  echo "alreadyNarrowedType reports exactly that. Delete it, or assert the behavior that"
+  echo "reads the constant. Infection makes no mutants on constant declarations: no MSI lost."
 fi
 echo ""
 echo "See .claude/rules/phpunit-tests.md."

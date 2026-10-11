@@ -42,8 +42,14 @@ from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, confor
                      manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
-                             manual_testing_clearance, meta_checks_clearance,
+                             manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
                              select_fidelity_verdict)
+
+# Directory of the pre-push meta-checks flag. Module-level so tests monkeypatch it
+# (`monkeypatch.setattr(runner, "META_CHECKS_TMP_DIR", str(tmp_path))`) and never
+# read or delete the real /tmp flag. Not an env var on purpose: nothing outside the
+# test suite should be able to redirect where condition (16) looks.
+META_CHECKS_TMP_DIR = "/tmp"
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
                               MERGE_DIGEST_BEGIN, MERGE_DIGEST_END, render_merge_digest,
                               upsert_merge_digest,
@@ -743,8 +749,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             except Exception as _e:
                 log(f"phase6.5: red-ci-check probe error — {_e}")
         # condition (16) inputs: pre-push flag and post-pr run
-        _mc_branch_slug = git.branch().replace("/", "-")
-        _mc_flag = f"/tmp/ibl5-meta-checks-prepush-{_mc_branch_slug}.failed"
+        _mc_flag = meta_checks_flag_path(git.branch(), META_CHECKS_TMP_DIR)
         if live and pr:
             _mc_argv = [os.path.join(worktree or "", "bin", "run-meta-checks-local"),
                         "--stage", "post-pr", "--pr", str(pr)]
@@ -2214,8 +2219,7 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
     argv = [runner, "--stage", "pre-push", "--base", base]
     if body_file:
         argv += ["--body-file", body_file]
-    branch_slug = git.branch().replace("/", "-")
-    flag = f"/tmp/ibl5-meta-checks-prepush-{branch_slug}.failed"
+    flag = meta_checks_flag_path(git.branch(), META_CHECKS_TMP_DIR)
     result = subprocess.run(argv, cwd=repo_root, capture_output=True, text=True)
     last_result = result
     rc = result.returncode

@@ -17,12 +17,26 @@ class PlayerImageHelper implements PlayerImageHelperInterface
      * This is a valid PNG image that can be used as a placeholder.
      */
     private const PLACEHOLDER_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg==';
-    
+
+    /**
+     * Per-request cache of photo-file existence, keyed by player ID.
+     * A PHP request is one process, so a static array lives exactly one request.
+     *
+     * @var array<int, bool>
+     */
+    private static array $photoExistsCache = [];
+
+    /**
+     * Test-only override for the photo directory (absolute path, trailing slash).
+     * Null means the real ibl5/images/player/ directory.
+     */
+    private static ?string $photoDirectoryOverride = null;
+
     /**
      * Generate a safe player image URL
      * 
      * Validates that playerID is a valid positive integer before generating the URL.
-     * Returns a data URI placeholder (1x1 transparent pixel) if playerID is missing, null, or invalid.
+     * Returns a data URI placeholder (1x1 transparent pixel) if playerID is missing, null, or invalid, or if images/player/<pid>.jpg does not exist on disk.
      * This approach prevents 404 errors entirely.
      * 
      * @param int|float|string|null $playerID The player's ID to use in the image path
@@ -50,10 +64,46 @@ class PlayerImageHelper implements PlayerImageHelperInterface
         if ($playerID <= 0) {
             return self::PLACEHOLDER_DATA_URI;
         }
-        
+
+        if (!self::photoFileExists($playerID)) {
+            return self::PLACEHOLDER_DATA_URI;
+        }
+
         return HtmlSanitizer::e($basePath . $playerID . '.jpg');
     }
-    
+
+    /**
+     * Point the existence check at another directory and clear the cache.
+     * Test seam only; pass null to restore the real directory.
+     *
+     * @param string|null $directory Absolute path ending in '/', or null
+     */
+    public static function usePhotoDirectory(?string $directory): void
+    {
+        self::$photoDirectoryOverride = $directory;
+        self::$photoExistsCache = [];
+    }
+
+    /**
+     * Whether <pid>.jpg exists in the photo directory, checked once per request.
+     * The directory is anchored to this file's location, never to $basePath,
+     * because $basePath is a URL prefix relative to the requesting page.
+     */
+    private static function photoFileExists(int $playerID): bool
+    {
+        $directory = self::$photoDirectoryOverride ?? dirname(__DIR__, 2) . '/images/player/';
+
+        return self::$photoExistsCache[$playerID] ??= is_file($directory . $playerID . '.jpg');
+    }
+
+    /**
+     * @see PlayerImageHelperInterface::isPlaceholderUrl()
+     */
+    public static function isPlaceholderUrl(string $url): bool
+    {
+        return $url === self::PLACEHOLDER_DATA_URI;
+    }
+
     /**
      * Check if a given playerID is valid
      * 

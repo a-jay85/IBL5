@@ -198,6 +198,9 @@ mv "$REPO/ibl5/x.md.new" "$REPO/ibl5/x.md"
 commit_all
 expect_since token-existing-context 0 'OK'
 
+# Boundary: FUN_12345 has five hex digits, under the {6,} floor in the gate; widening
+# the floor to {5,} would flag it. A leading-zero-x content line must not hit the
+# plus-offset form once the diff marker is stripped.
 reset_repo
 {
     echo "${F}12345"

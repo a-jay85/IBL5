@@ -50,3 +50,11 @@ def no_real_pr_review_now(monkeypatch):
     assert on the fire still set their own logging stub, which overrides this default.
     """
     monkeypatch.setenv("REVIEW_OWED_PR_REVIEW_NOW", "/usr/bin/true")
+
+
+@pytest.fixture(autouse=True)
+def _reset_netretry_latch():
+    from harness import netretry
+    netretry.reset_outage_latch()
+    yield
+    netretry.reset_outage_latch()

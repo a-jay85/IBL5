@@ -63,7 +63,7 @@ require_once __DIR__ . '/../db/db.php';
 
 /** @var \mysqli $mysqli_db */
 
-$apply = in_array('--apply', $argv, true);
+$apply = in_array('--apply', $argv ?? [], true);
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const PATCH_ATTENDANCE = 5244;
@@ -154,19 +154,28 @@ $nameFor = static function (int $pid) use ($mysqli_db): string {
         return 'Drazen Dalipagic';
     }
     $stmt = $mysqli_db->prepare('SELECT name FROM ibl_plr WHERE pid = ? LIMIT 1');
+    if ($stmt === false) {
+        throw new RuntimeException("Cannot prepare ibl_plr name lookup for pid {$pid}");
+    }
     $stmt->bind_param('i', $pid);
     $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
+    $result = $stmt->get_result();
+    if ($result === false) {
+        throw new RuntimeException("Cannot read ibl_plr name lookup result for pid {$pid}");
+    }
+    $row = $result->fetch_assoc();
     $stmt->close();
     if ($row === null) {
         throw new RuntimeException("pid {$pid} not found in ibl_plr");
     }
-    return mb_substr((string) $row['name'], 0, 16);
+    return mb_substr((string) ($row['name'] ?? ''), 0, 16);
 };
 
 // ── Build encoder-ready game arrays (apply 2gm/2ga/drb derivations) ──────────
 $buildGameArray = static function (array $g) use ($nameFor): array {
+    /** @var array{date: string, visitor_teamid: int, home_teamid: int, visitor_name: string, home_name: string, visitor_q: list<int>, home_q: list<int>, visitor_team: array{int, int, int, int, int, int, int, int, int, int, int, int, int}, home_team: array{int, int, int, int, int, int, int, int, int, int, int, int, int}, visitor_players: list<array{int, string, int, int, int, int, int, int, int, int, int, int, int, int, int, int}>, home_players: list<array{int, string, int, int, int, int, int, int, int, int, int, int, int, int, int, int}>} $g */
     $derivePlayers = static function (array $players) use ($nameFor): array {
+        /** @var list<array{int, string, int, int, int, int, int, int, int, int, int, int, int, int, int, int}> $players */
         $result = [];
         foreach ($players as $p) {
             [$pid, $pos, $min, $fgm, $fga, $ftm, $fta, $tpm, $tpa, $orb, $reb, $ast, $stl, $tov, $blk, $pf] = $p;

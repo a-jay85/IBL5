@@ -15,6 +15,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 
+from harness import netretry
 from harness.state import HarnessError
 
 log = logging.getLogger("harness.gitutil")
@@ -69,7 +70,7 @@ def content_equivalent(local_sha, remote_sha, worktree, *, run_git=None) -> bool
         return True
     _run = run_git or _default_run_git
     try:
-        fetch_r = _run(["fetch", "origin"], worktree)
+        fetch_r = netretry.call_rc(lambda: _run(["fetch", "origin"], worktree), label="git fetch origin")
         if fetch_r.returncode != 0:
             log.warning("content_equivalent: git fetch failed — treating as not equivalent")
             return False
@@ -132,7 +133,8 @@ def patch_series_equivalent(local_sha, remote_sha, worktree, *, run_git=None,
         return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else ""
 
     try:
-        if _run(["fetch", "origin"], worktree).returncode != 0:
+        if netretry.call_rc(lambda: _run(["fetch", "origin"], worktree),
+                            label="git fetch origin").returncode != 0:
             log.warning("patch_series_equivalent: git fetch failed — treating as not equivalent")
             return False
         bl = _text(_run(["merge-base", local_sha, master_ref], worktree))
@@ -186,7 +188,8 @@ def update_branch_merge_equivalent(expected_sha, remote_sha, worktree, *, run_gi
         return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else ""
 
     try:
-        if _run(["fetch", "origin"], worktree).returncode != 0:
+        if netretry.call_rc(lambda: _run(["fetch", "origin"], worktree),
+                            label="git fetch origin").returncode != 0:
             log.warning("update_branch_merge_equivalent: git fetch failed — treating as not equivalent")
             return False
         parents_line = _text(_run(["rev-list", "--parents", "-n", "1", remote_sha], worktree))
@@ -214,7 +217,7 @@ def sync_to_remote(branch, worktree, *, run_git=None) -> str:
     """Reset the worktree HEAD to origin/<branch>. Precondition: content_equivalent, patch_series_equivalent or update_branch_merge_equivalent is True."""
     _run = run_git or _default_run_git
     try:
-        _run(["fetch", "origin"], worktree)
+        netretry.call_rc(lambda: _run(["fetch", "origin"], worktree), label="git fetch origin")
         reset_r = _run(["reset", "--hard", f"origin/{branch}"], worktree)
         if reset_r.returncode != 0:
             raise HarnessError("remote-head-diverged",
@@ -255,14 +258,17 @@ def probe_remote_tip(remote, branch, worktree, *, run_git=None) -> tuple[bool, s
     the fetched FETCH_HEAD disagrees with ls-remote (the tip moved mid-probe)."""
     _run = run_git or _default_run_git
     try:
-        ls = _run(["ls-remote", remote, f"refs/heads/{branch}"], worktree)
+        ls = netretry.call_rc(lambda: _run(["ls-remote", remote, f"refs/heads/{branch}"], worktree),
+                              label="git ls-remote")
         if ls.returncode != 0:
             return False, ""
         if not ls.stdout.strip():
             return True, ""
         ls_sha = ls.stdout.strip().split()[0]
-        f = _run(["fetch", "--no-tags", "--refmap=", remote, f"refs/heads/{branch}"],
-                 worktree)
+        f = netretry.call_rc(
+            lambda: _run(["fetch", "--no-tags", "--refmap=", remote, f"refs/heads/{branch}"],
+                         worktree),
+            label="git fetch (probe)")
         if f.returncode != 0:
             return False, ""
         r = _run(["rev-parse", "--verify", "--quiet", "FETCH_HEAD^{commit}"], worktree)
@@ -359,7 +365,8 @@ def reconcile_remote_head(pr, expected_sha, local_sha, branch, worktree, *,
             _branch = ""
     if _branch:
         try:
-            ls = _run(["ls-remote", "origin", f"refs/heads/{_branch}"], worktree)
+            ls = netretry.call_rc(lambda: _run(["ls-remote", "origin", f"refs/heads/{_branch}"], worktree),
+                                  label="git ls-remote")
             if ls.returncode == 0 and ls.stdout.strip():
                 ls_sha = ls.stdout.strip().split()[0]
                 if ls_sha == expected_sha:

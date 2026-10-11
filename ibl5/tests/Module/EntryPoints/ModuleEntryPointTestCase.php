@@ -98,6 +98,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
      * @param array<string, mixed> $get Simulated $_GET parameters
      * @param array<string, mixed> $post Simulated $_POST parameters
      * @param array<string, mixed> $extraGlobals Additional $GLOBALS to set (for modules that read from $GLOBALS)
+     * @param string $file Module file to include (default index.php)
      * @return string Captured output
      */
     protected function runModule(
@@ -105,6 +106,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         array $get = [],
         array $post = [],
         array $extraGlobals = [],
+        string $file = 'index.php',
     ): string {
         // Set superglobals
         $_GET = $get;
@@ -120,7 +122,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         // Reset pagetitle for each module run
         $GLOBALS['pagetitle'] = '';
 
-        $modulePath = dirname(__DIR__, 3) . "/modules/{$moduleName}/index.php";
+        $modulePath = dirname(__DIR__, 3) . "/modules/{$moduleName}/{$file}";
 
         // Module files expect certain variables in local scope (mainfile.php extracts
         // $_REQUEST into $GLOBALS at top level where global = local scope). Since we

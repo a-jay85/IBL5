@@ -96,4 +96,47 @@ class FranchiseRecordBookRepositoryTest extends DatabaseTestCase
 
         self::assertNull($result);
     }
+
+    /**
+     * @return array{int, int}
+     */
+    private function insertCareerRankingTie(): array
+    {
+        $base = [
+            'scope' => 'league',
+            'record_type' => 'career',
+            'stat_category' => 'ppg',
+            'ranking' => 60,
+            'stat_value' => 30.5,
+            'stat_raw' => 305,
+        ];
+        $idA = $this->insertRow('ibl_rcb_alltime_records', $base + ['teamid' => 27, 'player_name' => 'Tie Career A']);
+        $idB = $this->insertRow('ibl_rcb_alltime_records', $base + ['teamid' => 28, 'player_name' => 'Tie Career B']);
+        self::assertLessThan($idB, $idA, 'alltime record ids must be strictly ascending');
+
+        return [$idA, $idB];
+    }
+
+    public function testGetLeagueCareerRecordsBreaksCrossTeamRankingTieById(): void
+    {
+        [$idA, $idB] = $this->insertCareerRankingTie();
+
+        $rows = array_values(array_filter(
+            $this->repo->getLeagueCareerRecords(60),
+            static fn (array $row): bool => $row['stat_category'] === 'ppg' && $row['ranking'] === 60,
+        ));
+
+        self::assertCount(2, $rows);
+        self::assertSame([$idA, $idB], [$rows[0]['id'], $rows[1]['id']]);
+        self::assertSame(['Tie Career A', 'Tie Career B'], [$rows[0]['player_name'], $rows[1]['player_name']]);
+    }
+
+    public function testGetLeagueCareerRecordsLimitExcludesTieRowsAboveLimit(): void
+    {
+        $this->insertCareerRankingTie();
+
+        foreach ($this->repo->getLeagueCareerRecords(59) as $row) {
+            self::assertNotSame(60, $row['ranking']);
+        }
+    }
 }

@@ -140,6 +140,9 @@ final class AwaImporterTest extends TestCase
         return $path;
     }
 
+    /**
+     * The first `catch` in `AwaImporter::import` turns an undersized AWA file into an error result.
+     */
     public function testAwaParseFailureAddsErrorAndMakesNoUpserts(): void
     {
         $result = (new AwaImporter($this->repository()))->import(str_repeat(' ', 1999), $this->twoSeasonCar());

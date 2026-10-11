@@ -81,6 +81,9 @@ final class RetImporterTest extends TestCase
         return $repo;
     }
 
+    /**
+     * Pins the unknown-player ternary in `RetImporter::import`: no name match means `pid` stays null.
+     */
     public function testUnknownPlayerUpsertsWithNullPidAndSkipsMarkPlayerRetired(): void
     {
         $repo = $this->repository([]);
@@ -97,6 +100,9 @@ final class RetImporterTest extends TestCase
         $this->assertSame(0, $result->errors);
     }
 
+    /**
+     * A known jsb_pid calls `markPlayerRetired(101)` exactly once.
+     */
     public function testKnownPlayerUpsertsWithPidAndMarksPlayerRetired(): void
     {
         $repo = $this->repository([101 => 'Known Retiree']);
@@ -138,6 +144,9 @@ final class RetImporterTest extends TestCase
         $this->assertSame(1, $result->inserted);
     }
 
+    /**
+     * Padding lines are not entries, so no `getPlayerName(0)` lookup happens.
+     */
     public function testPaddingOnlyInputMakesNoRepositoryCalls(): void
     {
         $repo = $this->repository([101 => 'Known Retiree']);

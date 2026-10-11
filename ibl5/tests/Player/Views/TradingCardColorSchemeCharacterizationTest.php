@@ -157,7 +157,7 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
             0,
             0,
             0,
-            TeamColorSchemeResolver::forTradingCard($repo, 7)
+            TeamColorSchemeResolver::forTeam($repo, 7)
         );
 
         $this->assertSnapshotMatches($html, 'TradingCardFlipView.teamColors.html');
@@ -166,10 +166,13 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
         $this->assertStringNotContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $html);
     }
 
-    public function testFlipCardForTeamZeroUsesDefaultSchemeSnapshot(): void
+    public function testFlipCardForTeamZeroUsesFreeAgentsRowSnapshot(): void
     {
         $repo = $this->createMock(TeamIdentityRepositoryInterface::class);
-        $repo->expects(self::never())->method('getTeamColorRow');
+        $repo->expects(self::once())
+            ->method('getTeamColorRow')
+            ->with(0)
+            ->willReturn(['color1' => 'DDDDDD', 'color2' => '333333']);
 
         $html = PlayerTradingCardFlipView::render(
             $this->makePlayer(0),
@@ -180,12 +183,13 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
             0,
             0,
             0,
-            TeamColorSchemeResolver::forTradingCard($repo, 0)
+            TeamColorSchemeResolver::forTeam($repo, 0)
         );
 
         $this->assertSnapshotMatches($html, 'TradingCardFlipView.teamZero.html');
-        // The seeded Free Agents row is gray (888888); the trading card must stay gold.
-        $this->assertStringNotContainsStringIgnoringCase('888888', $html);
+        // A free agent's trading card matches the gray Free Agents row, like the menu and stats card.
+        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#DDDDDD', $html);
+        $this->assertStringNotContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $html);
     }
 
     public function testFlipCardWithMissingColorRowSnapshot(): void
@@ -201,7 +205,7 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
             0,
             0,
             0,
-            TeamColorSchemeResolver::forTradingCard($repo, 7)
+            TeamColorSchemeResolver::forTeam($repo, 7)
         );
 
         $this->assertSnapshotMatches($html, 'TradingCardFlipView.missingRow.html');
@@ -213,7 +217,7 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
     {
         $repo = $this->makeRepoStub(['color1' => 'C8102E', 'color2' => '1D428A']);
 
-        $html = PlayerTradingCardFrontView::render($this->makePlayer(7), 42, 'Y3/$12M', TeamColorSchemeResolver::forTradingCard($repo, 7));
+        $html = PlayerTradingCardFrontView::render($this->makePlayer(7), 42, 'Y3/$12M', TeamColorSchemeResolver::forTeam($repo, 7));
 
         $this->assertSnapshotMatches($html, 'TradingCardFrontView.teamColors.html');
     }
@@ -230,7 +234,7 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
             1,
             1,
             1,
-            TeamColorSchemeResolver::forTradingCard($repo, 7)
+            TeamColorSchemeResolver::forTeam($repo, 7)
         );
 
         $this->assertSnapshotMatches($html, 'TradingCardBackView.teamColors.html');

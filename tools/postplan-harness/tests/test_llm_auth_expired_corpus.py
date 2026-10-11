@@ -78,6 +78,8 @@ def test_local_out_corpus_kinds(tmp_path, monkeypatch):
                 t = open(os.path.join(root, f), encoding="utf-8", errors="replace").read()
                 k = _kind_for(tmp_path, monkeypatch, t)
                 hist[(_is_auth_failure(t), k)] += 1
+    if not hist:
+        pytest.skip("no raw-*.txt replies in local out corpus (CI's out/ holds none)")
     print(dict(hist))
     assert hist.get((True, "llm-invalid-output"), 0) == 0
     assert hist.get((False, "llm-auth-expired"), 0) == 0

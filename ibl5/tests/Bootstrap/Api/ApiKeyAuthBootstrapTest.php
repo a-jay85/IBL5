@@ -27,6 +27,30 @@ final class ApiKeyAuthBootstrapTest extends TestCase
         self::assertFalse($container->has('api.key'));
     }
 
+    public function testMissingApiKeyResponseNamesHeader(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY']);
+        $_GET['key'] = '';
+
+        $mockResponder = self::createMock(JsonResponder::class);
+        $mockResponder->expects(self::once())
+            ->method('error')
+            ->with(
+                401,
+                self::anything(),
+                self::stringContains('X-API-Key'),
+            );
+
+        $container = new Container();
+        $container->set('api.responder', $mockResponder);
+        $container->set(\mysqli::class, self::createStub(\mysqli::class));
+
+        $step = new ApiKeyAuthBootstrap();
+        $step->boot($container);
+
+        self::assertTrue($container->has('app.terminated'));
+    }
+
     protected function tearDown(): void
     {
         unset($_SERVER['HTTP_X_API_KEY'], $_GET['key']);

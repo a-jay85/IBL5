@@ -48,6 +48,13 @@ RUN printf '<Directory /var/www/html>\n\
 \n\
 <Directory /var/www/html/ibl5>\n\
     RewriteEngine On\n\
+    # Access-log query-string mask; see LogFormat ibl5masked below. Only\n\
+    # IBL5_LOG_QS reaches the log, never the raw query string.\n\
+    RewriteRule ^ - [E=IBL5_LOG_QS:]\n\
+    RewriteCond %%{QUERY_STRING} ^(.+)$\n\
+    RewriteRule ^ - [E=IBL5_LOG_QS:?%%1]\n\
+    RewriteCond %%{QUERY_STRING} ^((?:[^&]*&)*?key=)(?:.*&key=)?[^&]*(.*)$ [NC]\n\
+    RewriteRule ^ - [E=IBL5_LOG_QS:?%%1REDACTED%%2]\n\
     RewriteRule ^api/v1/(.*)$ api.php?route=$1 [QSA,L]\n\
     DirectoryIndex index.php\n\
 </Directory>\n\
@@ -55,8 +62,14 @@ RUN printf '<Directory /var/www/html>\n\
 ErrorDocument 403 /ibl5/error-pages/403.html\n\
 ErrorDocument 404 /ibl5/error-pages/404.html\n\
 ErrorDocument 500 /ibl5/error-pages/500.html\n\
-ErrorDocument 503 /ibl5/error-pages/503.html\n' > /etc/apache2/conf-available/ibl5.conf \
-    && a2enconf ibl5
+ErrorDocument 503 /ibl5/error-pages/503.html\n\
+\n\
+LogFormat "%%h %%l %%u %%t \\"%%m %%U%%{IBL5_LOG_QS}e %%H\\" %%>s %%O \\"%%{Referer}i\\" \\"%%{User-Agent}i\\"" ibl5masked\n' > /etc/apache2/conf-available/ibl5.conf \
+    && a2enconf ibl5 \
+    && sed -i -E 's/^([[:space:]]*CustomLog[[:space:]]+[^[:space:]]+)[[:space:]]+combined[[:space:]]*$/\1 ibl5masked/' \
+        /etc/apache2/sites-available/000-default.conf \
+    && grep -Eq '^[[:space:]]*CustomLog[[:space:]]+[^[:space:]]+[[:space:]]+ibl5masked[[:space:]]*$' \
+        /etc/apache2/sites-available/000-default.conf
 
 RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 

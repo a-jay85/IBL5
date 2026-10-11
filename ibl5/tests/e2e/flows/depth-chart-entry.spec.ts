@@ -269,7 +269,9 @@ test.describe('Depth Chart Entry flow', () => {
     await expect(previewTable).toBeVisible();
     await installPreviewObserver(page);
 
-    const sentinel = 'data:image/png;base64,AAAA" data-injected="1';
+    // A relative URL, so the browser's load of it is a plain 404 (already
+    // allowlisted) rather than a data-URL parse error on the console.
+    const sentinel = './sentinel.png" data-injected="1';
     await page.evaluate((value) => {
       document
         .querySelectorAll<HTMLElement>('.depth-chart-table tbody tr[data-pid]')

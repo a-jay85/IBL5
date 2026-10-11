@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 ---
 
 # /burndown
@@ -119,8 +119,18 @@ bin/backlog burndown-record <ledger> <n> status=closed-fixed
 ```
 
 **Route.** Apply `.claude/rules/work-triage.md` (cite it; do not restate its bar). An
-item you cannot do gets one of three skip forms, then report why:
+item you cannot do gets one of four skip forms, then report why:
 
+- Already tracked by a different issue `<m>`: close this one with a comment that points
+  at the other issue, then record the skip. Write `<m>` as `#<m>` when it is in the
+  backlog repo, or as `a-jay85/IBL5#<m>` when it is an IBL5 issue or PR.
+
+  ```bash
+  bin/backlog close <n> "Closing as a duplicate. Already tracked by <m>."
+  bin/backlog burndown-record <ledger> <n> status=skipped why="tracked by <m>"
+  ```
+
+  The closed issue frees its unit, so backfill picks a replacement.
 - Blocked on an open IBL5 PR: `bin/backlog burndown-record <ledger> <n> status=skipped reason=blocked blocked_by=<PR>`.
   This adds the `blocked` label and posts one comment with the PR number. The label
   clears itself on a later run once that PR merges or closes.

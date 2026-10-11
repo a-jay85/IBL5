@@ -223,7 +223,7 @@ is never recovered. Instead:
 3. Drop the retry sentinel, leaving the plan symlink where it is:
    ```bash
    # Sidecars stay keyed on the bare <slug>.md name, never the NNN- entry.
-   touch "$NIGHTLY_DIR/queue/${PLAN_FILE}.wt-fail"
+   touch "$NIGHTLY_DIR/queue/$PLAN_FILE.wt-fail"
    ```
 4. STOP. The bash loop sees the sentinel, counts this as one attempt, and retries the plan on a later run. MAX_ATTEMPTS still retires a plan whose wt-new failure is permanent.
 

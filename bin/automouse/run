@@ -2395,7 +2395,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # stream, so a pause marker written mid-run names a session `--resume` can continue.
         IMPL_SESSION_ARGS=()
         IMPL_SID=""
-        if [ -n "$RESUME_SID" ] && [ "$PLAN_NAME" = "$(basename "$RESUME_PLAN")" ]; then
+        if [ -n "$RESUME_SID" ] && [ "$PLAN_NAME" = "$(entry_to_name "$RESUME_PLAN")" ]; then
             IMPL_SID="$RESUME_SID"
             if usage_session_started "$IMPL_SID"; then
                 IMPL_PROMPT="Continue the implementation from where it stopped. The previous turn was paused by the usage gate."

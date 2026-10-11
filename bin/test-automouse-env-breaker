@@ -52,6 +52,17 @@ assert_absent() { local d="$1" p="$2"
                   else ok "$d"; fi; }
 want()          { h_contains "$1" "$2" "$3"; }
 want_absent()   { h_not_contains "$1" "$2" "$3"; }
+# qentry <queue-dir> <slug> — the NNN-<slug>.md entry path. The runner's
+# normalize_queue prefixes the bare entries write_e2_plan creates, so the
+# "still queued" asserts resolve through this. No entry prints a path that
+# cannot exist.
+qentry() {
+    local f
+    for f in "$1"/[0-9][0-9][0-9]-"$2".md; do
+        if [ -e "$f" ] || [ -L "$f" ]; then printf '%s\n' "$f"; return 0; fi
+    done
+    printf '%s\n' "$1/(no entry for $2)"
+}
 
 # Extract `should_impl_env_stop() { ... }` (from its definition line to the first
 # line that is a lone `}`) and define it in this shell.
@@ -358,7 +369,7 @@ write_e2_plan "wtfail"
 run_e2 > /dev/null 2>&1
 W1_LOG="$(e2_logtxt)"
 W1_ATTEMPTS="$(cat "$E2_NDIR/queue/wtfail.md.attempts" 2>/dev/null || echo '')"
-assert_present "W1: queue/wtfail.md still in queue/"    "$E2_NDIR/queue/wtfail.md"
+assert_present "W1: queue/wtfail.md still in queue/"    "$(qentry "$E2_NDIR/queue" wtfail)"
 assert_absent  "W1: skipped/wtfail.md absent"           "$E2_NDIR/skipped/wtfail.md"
 assert_eq      "W1: attempts = 1"                        "$W1_ATTEMPTS" "1"
 assert_absent  "W1: queue/wtfail.md.wt-fail absent (cleared by 3d)" \
@@ -424,7 +435,7 @@ want           "P1: log says the impl paused"            "$P1_LOG" "Impl paused 
 want_absent    "P1: no env-stop"                         "$P1_LOG" "Environmental failure"
 assert_eq      "P1: paused-held names the impl session"  "$(cat "$E2_NDIR/queue/pausey.md.lock/paused-held" 2>/dev/null)" "$P1_SID"
 assert_absent  "P1: attempt refunded"                    "$E2_NDIR/queue/pausey.md.attempts"
-assert_present "P1: plan stays queued"                   "$E2_NDIR/queue/pausey.md"
+assert_present "P1: plan stays queued"                   "$(qentry "$E2_NDIR/queue" pausey)"
 assert_present "P1: runs/<sid>.plan exists"              "$E2_GATE/runs/$P1_SID.plan"
 assert_present "P1: marker survives for the coordinator" "$E2_GATE/markers/$P1_SID.json"
 
@@ -524,7 +535,7 @@ want_absent    "P6: no env-stop"                         "$P6_LOG" "Environmenta
 assert_eq      "P6: paused-held names the post-plan session" \
                "$(cat "$E2_NDIR/queue/ppausey.md.lock/paused-held" 2>/dev/null)" "$E2_PP_SID"
 assert_absent  "P6: attempt refunded"                    "$E2_NDIR/queue/ppausey.md.attempts"
-assert_present "P6: plan stays queued"                   "$E2_NDIR/queue/ppausey.md"
+assert_present "P6: plan stays queued"                   "$(qentry "$E2_NDIR/queue" ppausey)"
 assert_present "P6: post-plan marker survives"           "$E2_GATE/markers/$E2_PP_SID.json"
 assert_eq      "P6: lock branch breadcrumb names the handoff branch" \
                "$(cat "$E2_NDIR/queue/ppausey.md.lock/branch" 2>/dev/null)" "stub"
@@ -596,7 +607,7 @@ want_absent    "R2: no env-stop log line"                 "$R2_LOG" "Environment
 assert_eq      "R2: no env-stop report"                   "$(env_stop_count wtref2)" "0"
 assert_eq      "R2: attempt counted (attempts = 1)"       "$(cat "$E2_NDIR/queue/wtref2.md.attempts" 2>/dev/null)" "1"
 assert_present "R2: failure file written"                 "$E2_NDIR/queue/wtref2.md.failure"
-assert_present "R2: plan stays queued"                    "$E2_NDIR/queue/wtref2.md"
+assert_present "R2: plan stays queued"                    "$(qentry "$E2_NDIR/queue" wtref2)"
 assert_absent  "R2: claim lock released"                  "$E2_NDIR/queue/wtref2.md.lock"
 want           "R2: deferred for the rest of the run"     "$R2_LOG" \
                "Deferred to the next run (cap-refunded or wt-new failure): wtref2.md"

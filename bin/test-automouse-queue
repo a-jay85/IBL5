@@ -1042,7 +1042,10 @@ h_pass "row47 — literal dispose recipe lands skipped/fixture.md; second run is
 # ---------------------------------------------------------------------------
 PROMPT_IMPL="$SCRIPT_DIR/automouse/prompt-impl"
 PROMPT_PP="$SCRIPT_DIR/automouse/prompt-postplan"
-CONCAT=$(grep -n 'queue/\$PLAN_FILE' "$PROMPT_IMPL" "$PROMPT_PP" || true)
+# A slug-keyed sidecar (queue/$PLAN_FILE.wt-fail) names no queue entry, so it
+# is allowed; bin/test-automouse-env-breaker pins that exact sentinel line.
+CONCAT=$(grep -nE 'queue/\$(PLAN_FILE|\{PLAN_FILE\})([^.]|$)' \
+    "$PROMPT_IMPL" "$PROMPT_PP" || true)
 h_eq "row48 no queue/\$PLAN_FILE concatenation in either prompt" "" "$CONCAT"
 h_contains "row48 prompt-impl carries the staleness dispose command" \
     "$(cat "$PROMPT_IMPL")" 'bin/automouse/queue dispose "${PLAN_FILE%.md}" skipped --staleness'

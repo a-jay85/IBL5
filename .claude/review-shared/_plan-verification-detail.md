@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _plan-verification.md — why each forced trigger exists, the incidents behind them, the worked pre-prod exercise-path catalogue, and the non-compliant counter-examples. Read only when editing the verification rules; the plan-architect never reads it.
-last_verified: 2026-09-28
+last_verified: 2026-10-11
 ---
 
 # _plan-verification Detail
@@ -96,3 +96,19 @@ existing suite as a characterization check.
 ### One-time-check rows: tag rules
 
 A `CLI-executable` row whose evidence is a single run at plan time (a corpus diff, a counterfactual mutation, a command's printed output) ends its "What to verify" cell with `(one-time-check: <reason of 15+ characters>)`. `bin/lib/plan-matrix-assertions` then skips that row's assertion-footprint check and prints `ONE-TIME-CHECK: row N` instead of `UNREALISED-ASSERTION`. The tag sits outside backticks, holds no `(`, `)`, `|` or backtick, and is honored only as the trailing text of that cell on a row whose type cell reads exactly `CLI-executable`; a tag anywhere else is ignored fail-closed and the row is checked as untagged. `bin/check-plan` gate `[Y]` rejects a malformed tag, a tag on any other row type, and a matrix with tagged rows above one third of its rows. The cell still says what was run and what it printed. Never tag a row a regression test could pin; the allowed shapes are listed in `.claude/skills/plan/_architect-contract.md`.
+
+### Test rows that run an existing test without changing it
+
+A row that only runs a test file already on master (a smoke suite as a regression check, a characterization run) is also read as a file the diff must touch, and holds arming condition (3) with `MISSING:` after implementation (PR #2515). Mark it `(run-only)` right after the token's closing backtick:
+
+```
+| 5 | nav smoke suite still passes after the CSS split | E2E | post-impl | `ibl5/tests/e2e/smoke/navigation.spec.ts` (run-only) |
+```
+
+Harness rules (`parse_run_only_test_paths` in `tools/postplan-harness/harness/planfile.py`, honored by `conformance.check`):
+
+- Honored on any PHPUnit, API-test, E2E or Visual-regression row, and only when the file is tracked in the PR tree. A path that is new in this PR is never exempt; write the test.
+- Exempts only that row's `MISSING:` item. `MISSING-FILE:` (Critical Files) and `MISSING-METHOD:` (Required Test Methods) are unchanged. A `(run-only)` path listed bare in `## Critical Files` still needs `(reference)` there.
+- If another row plans the same token without a marker, the unmarked row wins. A Visual-regression row marked `(no-change)` on the same token is neutral, so a token whose rows carry one marker each is still exempt.
+- `bin/check-plan` gate `[RO]` fails the plan when the marker is not directly after the row's planned token, when the path is absent from the base branch, when the row also carries `(no-change)`, or when the same path is a must-appear Critical Files entry. It warns when a phase line pairs the path with an edit verb, and when an unmarked test row names a path that exists on master but no phase or Critical Files entry cites.
+- Fenced examples and a code-span `(run-only)` never count.

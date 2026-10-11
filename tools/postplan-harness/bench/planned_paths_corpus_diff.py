@@ -37,7 +37,8 @@ def _excerpt(line: str) -> str:
 
 
 def _planned(planfile, content: str) -> set[str]:
-    return set(planfile.parse_matrix(content)[0]) | set(planfile.parse_no_change_test_paths(content))
+    return (set(planfile.parse_matrix(content)[0]) | set(planfile.parse_no_change_test_paths(content))
+            | set(getattr(planfile, "parse_run_only_test_paths", lambda _c: [])(content)))
 
 
 def _old_planned(planfile, content: str) -> set[str]:

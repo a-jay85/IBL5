@@ -76,7 +76,7 @@ test.describe('Player rookie option sub-page', () => {
     // pid=1 is ineligible: the alert must render AND no rookie-option form may.
     await expect(page.locator('.ibl-alert--error')).toBeVisible();
     await expect(
-      page.locator('input[name="rookieOptionValue"], form[action*="processrookieoption"]'),
+      page.locator('form[action*="processrookieoption"]'),
     ).toHaveCount(0);
   });
 

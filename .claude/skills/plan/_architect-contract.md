@@ -3,7 +3,7 @@ description: The plan-architect's full output contract, Read on demand from Step
 last_verified: 2026-10-11
 ---
 
-The `plan-architect` Reads this file when Step 3 of `plan/SKILL.md` points to it, so this contract lands in its own sub-context, never the orchestrator's. Mirrors the on-demand convention of the `.claude/review-shared/_*.md` reference files.
+The `plan-architect` Reads this file when Step 3 of `plan/SKILL.md` points to it, so this contract loads only in its own sub-context. Mirrors the on-demand convention of the `.claude/review-shared/_*.md` reference files.
 
 ## Read budget: read this once, read nothing else
 

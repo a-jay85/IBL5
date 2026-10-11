@@ -36,6 +36,12 @@ use Team\TeamService;
 #[Group('database')]
 final class TeamServicePageDataCharacterizationTest extends DatabaseTestCase
 {
+    /**
+     * What PlayerImageHelper::getImageUrl() returns for a pid with no photo file.
+     * Golden bodies carry the `{{PHOTO_PLACEHOLDER}}` token because a nowdoc cannot interpolate it.
+     */
+    private const PHOTO_PLACEHOLDER = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg==';
+
     private const TEAM_ID = 99;
     private const TEAM_NAME = 'CharTest';
     private const TEAM_CITY = 'Testville';
@@ -132,7 +138,8 @@ final class TeamServicePageDataCharacterizationTest extends DatabaseTestCase
 
         $const = self::class . '::G_' . strtoupper($label);
         self::assertTrue(defined($const), "Missing golden constant for label '$label' ($const)");
-        self::assertSame(constant($const), $actual, "Golden mismatch for label '$label'");
+        $expected = str_replace('{{PHOTO_PLACEHOLDER}}', self::PHOTO_PLACEHOLDER, (string) constant($const));
+        self::assertSame($expected, $actual, "Golden mismatch for label '$label'");
     }
 
     // === GENERATED GOLDENS START ===
@@ -202,7 +209,7 @@ GOLDEN;
     </thead>
     <tbody>
         <tr>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="./images/player/200000001.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>PG</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>PG</td>
             <td class="sep-r-team">27</td>
             <td>0</td>
             <td class="sep-r-weak">0</td>
@@ -230,7 +237,7 @@ GOLDEN;
                         <td>0</td>
         </tr>
         <tr>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="./images/player/200000002.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>SG</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>SG</td>
             <td class="sep-r-team">27</td>
             <td>0</td>
             <td class="sep-r-weak">0</td>
@@ -381,7 +388,7 @@ GOLDEN;
     <tbody>
         <tr>
             <td>PG</td>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="./images/player/200000001.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>0</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>0</td>
             <td>0</td>
             <td class="sep-r-team">0.0</td>
             <td>0.00</td>
@@ -404,7 +411,7 @@ GOLDEN;
         </tr>
         <tr>
             <td>SG</td>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="./images/player/200000002.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>0</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>0</td>
             <td>0</td>
             <td class="sep-r-team">0.0</td>
             <td>0.00</td>
@@ -467,7 +474,7 @@ GOLDEN;
     </thead>
     <tbody>
         <tr>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="./images/player/200000001.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>PG</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>PG</td>
             <td class="sep-r-team">27</td>
             <td>0</td>
             <td class="sep-r-weak">0</td>
@@ -495,7 +502,7 @@ GOLDEN;
                         <td>0</td>
         </tr>
         <tr>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="./images/player/200000002.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>SG</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>SG</td>
             <td class="sep-r-team">27</td>
             <td>0</td>
             <td class="sep-r-weak">0</td>
@@ -590,7 +597,7 @@ GOLDEN;
     <tbody>
         <tr>
             <td>PG</td>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="./images/player/200000001.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>27</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>27</td>
             <td>5</td>
             <td class="sep-r-team">3</td>
             <td class="col-salary">1500</td>
@@ -610,7 +617,7 @@ GOLDEN;
         </tr>
         <tr>
             <td>SG</td>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="./images/player/200000002.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>27</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>27</td>
             <td>5</td>
             <td class="sep-r-team">3</td>
             <td class="col-salary">1500</td>
@@ -696,7 +703,7 @@ GOLDEN;
     </thead>
     <tbody>
         <tr>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="./images/player/200000001.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full player-expiring">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev player-expiring">A. Anchor</span></a></td>            <td></td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full player-expiring">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev player-expiring">A. Anchor</span></a></td>            <td></td>
             <td class="sep-r-team">0</td>
             <td>0</td>
             <td class="sep-r-weak">0</td>
@@ -760,7 +767,7 @@ GOLDEN;
     <tbody>
         <tr>
             <td>PG</td>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="./images/player/200000001.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>0</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>0</td>
             <td>0</td>
             <td>0.0</td>
             <td class="sep-r-team">0.0</td>
@@ -784,7 +791,7 @@ GOLDEN;
         </tr>
         <tr>
             <td>SG</td>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="./images/player/200000002.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>0</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>0</td>
             <td>0</td>
             <td>0.0</td>
             <td class="sep-r-team">0.0</td>
@@ -846,7 +853,7 @@ GOLDEN;
     </thead>
     <tbody>
         <tr>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="./images/player/200000001.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>PG</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>PG</td>
             <td class="sep-r-team">27</td>
             <td>0</td>
             <td class="sep-r-weak">0</td>
@@ -874,7 +881,7 @@ GOLDEN;
                         <td>0</td>
         </tr>
         <tr>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="./images/player/200000002.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>SG</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>SG</td>
             <td class="sep-r-team">27</td>
             <td>0</td>
             <td class="sep-r-weak">0</td>
@@ -1036,7 +1043,7 @@ GOLDEN;
     <tbody>
         <tr>
             <td>PG</td>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="./images/player/200000001.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>0</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000001"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Aaron Anchor</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">A. Anchor</span></a></td>            <td>0</td>
             <td>0</td>
             <td class="sep-r-team">0</td>
             <td>0</td>
@@ -1056,7 +1063,7 @@ GOLDEN;
         </tr>
         <tr>
             <td>SG</td>
-            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="./images/player/200000002.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>0</td>
+            <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=200000002"><img src="{{PHOTO_PLACEHOLDER}}" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Bobby Baseline</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">B. Baseline</span></a></td>            <td>0</td>
             <td>0</td>
             <td class="sep-r-team">0</td>
             <td>0</td>

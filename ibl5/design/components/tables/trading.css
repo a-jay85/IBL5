@@ -120,7 +120,7 @@
     padding: 1rem;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
-    background: white;
+    background: var(--white);
     box-shadow: var(--shadow-sm);
 }
 

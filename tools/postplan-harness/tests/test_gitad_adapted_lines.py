@@ -263,7 +263,7 @@ def test_missing_justification_fails_closed(repo):
     pre = _rev(d, "HEAD")
     llm = _Llm(d, _merged(_ADAPTED))
     detail = _rebase_fails(d, llm)
-    assert "no resolver justification" in detail or "claimed no adaptation" in detail
+    assert "claimed no adaptation" in detail
     assert "conflict-adapt-review" not in llm.purposes()
     _assert_restored(d, key, branch, pre)
 

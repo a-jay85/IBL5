@@ -12,12 +12,13 @@
 #   5. Unknown slug exits 1.
 #   6. A prefix of a real branch exits 1 (the worktree match is exact).
 #   7. PR path: claude gets cwd = the branch worktree, one argv element, and the newest
-#      run's blocked-ship text and the newest /tmp/post-plan-now-… log path.
+#      run's blocked-ship text and the newest post-plan-now-… log under POSTPLAN_LOG_DIR.
 #   8. Slug path: result.json under the worktree's own out dir; gh is not called.
 #   9. Worktree with no run dir still launches.
 #  10. A 5000-byte failure text is capped at 1500 bytes.
 #  11. Run from a linked worktree: the main checkout's out dir is still searched.
-#  12. env -i probe: no HOME, no Homebrew, bash with pipefail.
+#  12. env -i probe: no HOME, no Homebrew, bash with pipefail; POSTPLAN_LOG_DIR forwarded.
+#  13. POSTPLAN_LOG_DIR unset or empty: the private log dir is not read.
 #
 # Run: bin/test-postplan-fix  (exit 0 = all pass, 1 = a case failed)
 
@@ -34,8 +35,10 @@ fail() { h_fail "$@"; }
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-postplan-fix.XXXXXX")
 B_BLOCK="pfx$$-block"; B_JSON="pfx$$-json"; B_NORUN="pfx$$-norun"; B_BIG="pfx$$-big"
 B_PREFIX="pfx$$-bloc"
-PNLOG="/tmp/post-plan-now-$B_BLOCK-20261008-120001-9.log"
-trap 'rm -rf "$TMP"; rm -f "$PNLOG"' EXIT
+RUNLOG="$TMP/runlog"; mkdir -p "$RUNLOG"
+export POSTPLAN_LOG_DIR="$RUNLOG"   # read by bin/postplan-fix; keeps /tmp clean
+PNLOG="$RUNLOG/post-plan-now-$B_BLOCK-20261008-120001-9.log"
+trap 'rm -rf "$TMP"' EXIT
 
 has()   { case "$2" in *"$3"*) ok "$1" ;; *) fail "$1" "missing '$3'" ;; esac; }
 hasnt() { case "$2" in *"$3"*) fail "$1" "unexpected '$3'" ;; *) ok "$1" ;; esac; }
@@ -66,6 +69,12 @@ printf '{"terminal":"failed","error_kind":"gh","error":"gh: gh pr create --title
 { head -c 5000 /dev/zero | tr '\0' 'x'; printf 'TAILMARK'; } \
     > "$OUT/live-$B_BIG-20261008-120000-4/blocked-ship.txt"
 : > "$PNLOG"
+SHARED_TMP=/tmp
+if [ -e "$SHARED_TMP/$(basename "$PNLOG")" ]; then
+    fail "fixture: fake runner log leaked into the shared /tmp"
+else
+    ok "fixture: fake runner log stays under the private POSTPLAN_LOG_DIR"
+fi
 
 STUB="$TMP/stub"; mkdir -p "$STUB"
 cat > "$STUB/claude" <<STUBEOF
@@ -146,7 +155,7 @@ if [ "$GOT_CWD" = "$WANT_CWD" ]; then ok "7: claude runs in the branch worktree"
 GOT_ARGC=""; [ -f "$TMP/claude.argc" ] && GOT_ARGC=$(cat "$TMP/claude.argc")
 if [ "$GOT_ARGC" = "1" ]; then ok "7: claude gets exactly one argv element"; else fail "7: claude argc" "got '$GOT_ARGC'"; fi
 for tok in BLOCKMARK "ship blocked (exit 3)" "PR #42" "live-$B_BLOCK-20261008-120000-2" audit.log \
-    blocked-ship.txt "/tmp/post-plan-now-$B_BLOCK-" "Do not ship" "untrusted program output"; do
+    blocked-ship.txt "$RUNLOG/post-plan-now-$B_BLOCK-" "Do not ship" "untrusted program output"; do
     has "7: prompt names '$tok'" "$PROMPT" "$tok"
 done
 hasnt "7: newest run wins (no OLDRUN)" "$PROMPT" "OLDRUN"
@@ -181,11 +190,26 @@ has "11: main out dir searched" "$PROMPT" "BLOCKMARK"
 
 # 12
 rm -f "$TMP/claude.prompt"
-env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" \
+env -i POSTPLAN_LOG_DIR="$POSTPLAN_LOG_DIR" \
+    IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" \
     PATH="$STUB:/usr/bin:/bin" /bin/bash -c 'set -euo pipefail; "$1" "$2"' _ "$SUT" "$B_BLOCK" \
     >/dev/null 2>"$TMP/err"; RC=$?
 rc_is "12: env -i probe exits 0" "$RC" 0
 PROMPT=""; [ -f "$TMP/claude.prompt" ] && PROMPT=$(cat "$TMP/claude.prompt")
 has "12: env -i probe reaches claude with the text" "$PROMPT" "BLOCKMARK"
+has "12: env -i probe finds the private runner log" "$PROMPT" "$RUNLOG/post-plan-now-$B_BLOCK-"
+
+# 13
+SAVED_RUNLOG_DIR="$POSTPLAN_LOG_DIR"
+unset POSTPLAN_LOG_DIR
+run_fix "$SUT" "$B_BLOCK"
+rc_is "13: unset POSTPLAN_LOG_DIR still exits 0" "$RC" 0
+hasnt "13: unset var does not read the private log dir" "$PROMPT" "$RUNLOG"
+hasnt "13: unset var finds no shared-/tmp log for this slug" "$PROMPT" "post-plan-now log:"
+export POSTPLAN_LOG_DIR=''
+run_fix "$SUT" "$B_BLOCK"
+rc_is "13: empty POSTPLAN_LOG_DIR still exits 0" "$RC" 0
+hasnt "13: empty var does not read the private log dir" "$PROMPT" "$RUNLOG"
+export POSTPLAN_LOG_DIR="$SAVED_RUNLOG_DIR"
 
 h_done

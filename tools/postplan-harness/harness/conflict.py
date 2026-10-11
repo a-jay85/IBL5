@@ -380,8 +380,11 @@ def review_resolution(
     key: str,
     resolved_files: tuple[str, ...],
     proof_out: str,
+    adaptations: tuple = (),
 ) -> str:
-    """Run a read-only conflict review. Writes verdict and sidecar files. Returns verdict line."""
+    """Run a read-only conflict review. Writes verdict and sidecar files. Returns verdict line.
+    `adaptations` holds the AcceptedAdaptation records the tree proof let through; when
+    non-empty they are written to adaptations.txt and named in the prompt."""
     review_dir = Path(f"/tmp/postplan-conflict-review-{key}")
     review_dir.mkdir(parents=True, exist_ok=True)
 
@@ -393,6 +396,14 @@ def review_resolution(
         shutil.copy(pre_patch_src, review_dir / "pre-rebase.patch")
     (review_dir / "proof-output.txt").write_text(proof_out)
     (review_dir / "resolved-files.txt").write_text("\n".join(resolved_files) + "\n")
+    adaptations_path = review_dir / "adaptations.txt"
+    if adaptations:
+        adaptations_path.write_text("".join(
+            f"- {a.path}: +{a.original} => +{a.adapted} [{a.old} -> {a.new}]\n"
+            for a in adaptations
+        ))
+    else:
+        adaptations_path.unlink(missing_ok=True)
 
     prompt = (
         "You are reviewing an automated three-way conflict resolution.\n"
@@ -407,6 +418,12 @@ def review_resolution(
         "before it. Put your reasoning on the lines after the verdict. "
         "Write the verdict token exactly once."
     )
+    if adaptations:
+        prompt += (
+            "\nadaptations.txt lists branch-added lines the resolver rewrote to follow a "
+            "rename master made in the same file; a separate reviewer confirmed each one. "
+            "Treat any you judge wrong as FOUND-PROBLEM."
+        )
 
     reply = ""
     try:

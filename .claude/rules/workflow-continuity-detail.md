@@ -61,6 +61,17 @@ It DMs once per recorded hold. A strict subset (some files added) or a new
 missing item runs normally, and so do holds on conditions (7), (8) and (13).
 `bin/post-plan-now --force` passes `POSTPLAN_FORCE=1` to the harness and skips this check
 too; every other launch passes `POSTPLAN_FORCE=0`.
+The in-run decline also writes a held-unfixable marker through `harness/heldmarker.py`:
+`tools/postplan-harness/out/state/<slug>.held-unfixable.json` in the main checkout, which
+`.gitignore` already covers. It stores a hash of condition (3)'s missing set and the plan
+file's mtime. While both still match the live hold record, `bin/post-plan-now` exits **8**
+before launching anything, and `bin/pr-cycle` Stage 1 skips the PR so its `--max-ready`
+slot goes to the next one. The decline DM names the marker. Editing the plan makes it
+stale, and so does a later run that arms or holds on a different reason. To clear it by
+hand, delete the file. `--force` and `--state-changed` bypass it for one run, and a forced
+run that holds on the same reason keeps it. Automouse treats exit **8** as terminal, so a
+decline in its resume path never trips the postplan env-breaker. The marker only
+suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming condition.
 
 ## What `--auto` adds
 

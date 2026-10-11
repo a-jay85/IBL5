@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# bin/main-checkout-guard: alert once per new dirty state of the main checkout.
+# Usage: bin/main-checkout-guard [--dry-run] [--help]
+#   --dry-run   Print the would-be DM body; write nothing, send nothing.
+# Env: MAIN_CHECKOUT_GUARD_REPO       main checkout path (unset/empty: derived)
+#      MAIN_CHECKOUT_GUARD_STATE_DIR  state + snapshot dir (unset/empty: default)
+#      DISCORD_DM_BIN                 DM sender (unset/empty: $SCRIPT_DIR/discord-dm)
+set -euo pipefail
+export GIT_OPTIONAL_LOCKS=0
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+
+DRY_RUN=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run) DRY_RUN=1 ;;
+        --help|-h)
+            awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+            exit 0
+            ;;
+        *)
+            echo "main-checkout-guard: Unknown option: $1" >&2
+            echo "Usage: bin/main-checkout-guard [--dry-run] [--help]" >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+# 1. Repo.
+if [ -n "${MAIN_CHECKOUT_GUARD_REPO:-}" ]; then
+    REPO="$MAIN_CHECKOUT_GUARD_REPO"
+else
+    wl="$(git -C "$SCRIPT_DIR" worktree list --porcelain)"
+    first="${wl%%$'\n'*}"
+    REPO="${first#worktree }"
+fi
+if ! GIT_DIR_ABS="$(git -C "$REPO" rev-parse --absolute-git-dir 2>/dev/null)"; then
+    echo "main-checkout-guard: not a git repo: $REPO" >&2
+    exit 2
+fi
+
+# 2. State dir (outside the repo, so the guard never dirties what it watches).
+if [ -n "${MAIN_CHECKOUT_GUARD_STATE_DIR:-}" ]; then
+    STATE_DIR="$MAIN_CHECKOUT_GUARD_STATE_DIR"
+elif [ -n "${HOME:-}" ]; then
+    STATE_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/main-checkout-guard"
+else
+    echo "main-checkout-guard: no state dir (HOME unset)" >&2
+    exit 2
+fi
+STATE_FILE="$STATE_DIR/state"
+DISCORD_DM="${DISCORD_DM_BIN:-$SCRIPT_DIR/discord-dm}"
+
+# 3. A pull, merge, or commit in flight is not drift.
+if [ -e "$GIT_DIR_ABS/index.lock" ]; then
+    echo "main-checkout-guard: skipped (index.lock present)"
+    exit 0
+fi
+
+# 4. Branch state.
+if b="$(git -C "$REPO" symbolic-ref -q --short HEAD)"; then
+    if [ "$b" = "master" ]; then
+        branch_state="master"
+    else
+        branch_state="branch:$b"
+    fi
+else
+    branch_state="detached:$(git -C "$REPO" rev-parse --short HEAD)"
+fi
+
+# 5. Porcelain status (default untracked mode, never --ignored).
+porcelain="$(git --no-optional-locks -C "$REPO" status --porcelain)"
+sorted=""
+if [ -n "$porcelain" ]; then
+    sorted="$(printf '%s\n' "$porcelain" | LC_ALL=C sort)"
+fi
+
+# 6. Clean means no changes and on master.
+if [ -z "$porcelain" ] && [ "$branch_state" = "master" ]; then
+    if [ "$DRY_RUN" -eq 0 ]; then
+        rm -f "$STATE_FILE"
+    fi
+    echo "main-checkout-guard: clean"
+    exit 0
+fi
+
+# 7. Dedupe on branch state plus sorted porcelain.
+hash="$(printf 'head=%s\n%s\n' "$branch_state" "$sorted" | git hash-object --stdin)"
+if [ -f "$STATE_FILE" ] && [ "$(cat "$STATE_FILE")" = "$hash" ]; then
+    echo "main-checkout-guard: unchanged ${hash:0:12}"
+    exit 0
+fi
+
+# 8. Body.
+N=0
+if [ -n "$sorted" ]; then
+    N="$(printf '%s\n' "$sorted" | wc -l | tr -d ' ')"
+fi
+body="main checkout dirty: $REPO
+HEAD: $branch_state
+$N path(s):"
+if [ "$N" -gt 0 ]; then
+    body="$body
+$(printf '%s\n' "$sorted" | sed -n '1,30p')"
+fi
+if [ "$N" -gt 30 ]; then
+    body="$body
+... and $((N - 30)) more"
+fi
+
+# 9. Dry run.
+if [ "$DRY_RUN" -eq 1 ]; then
+    echo "main-checkout-guard: dry-run, would DM:"
+    printf '%s\n' "$body"
+    exit 0
+fi
+
+# Forensic snapshot: the box as it looks at the first tick that sees this state.
+# Every git call is a read. Each section survives a missing tool.
+snap_section() { printf '== %s ==\n' "$1"; }
+
+write_snapshot() {
+    local common idx f label stamp
+    snap_section "captured"
+    date '+%F %T %z' || echo "(failed rc=$?)"
+    snap_section "repo"
+    echo "REPO=$REPO"
+    echo "GIT_DIR=$GIT_DIR_ABS"
+    common="$(git -C "$REPO" rev-parse --path-format=absolute --git-common-dir)" || common="$GIT_DIR_ABS"
+    echo "COMMON=$common"
+    snap_section "index mtime"
+    # GNU form first: BSD rejects -c with an error, while GNU silently accepts -f %m.
+    idx="$(stat -c %Y "$GIT_DIR_ABS/index" 2>/dev/null || stat -f %m "$GIT_DIR_ABS/index")" \
+        || idx="(failed rc=$?)"
+    echo "$idx"
+    snap_section "HEAD"
+    git -C "$REPO" symbolic-ref -q HEAD || echo "(detached) $(git -C "$REPO" rev-parse HEAD)" || echo "(failed rc=$?)"
+    snap_section "main reflog tail"
+    if [ -f "$common/logs/HEAD" ]; then
+        tail -n 20 "$common/logs/HEAD" || echo "(failed rc=$?)"
+    fi
+    snap_section "reflog within 300s of index mtime"
+    for f in "$common/logs/HEAD" "$common"/worktrees/*/logs/HEAD; do
+        [ -f "$f" ] || continue
+        if [ "$f" = "$common/logs/HEAD" ]; then
+            label="main"
+        else
+            label="$(basename "$(dirname "$(dirname "$f")")")"
+        fi
+        awk -F'\t' -v idx="$idx" -v label="$label" '{
+            n = split($1, a, " ")
+            d = a[n - 1] - idx
+            if (d < 0) d = -d
+            if (d <= 300) print label ": " $0
+        }' "$f" || echo "(failed rc=$?)"
+    done
+    snap_section "markers"
+    local m found=0
+    for m in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD BISECT_LOG rebase-merge rebase-apply; do
+        if [ -e "$GIT_DIR_ABS/$m" ]; then
+            echo "present: $m"
+            found=1
+        fi
+    done
+    if [ "$found" -eq 0 ]; then
+        echo "none"
+    fi
+    git --no-optional-locks -C "$REPO" stash list || echo "(failed rc=$?)"
+    snap_section "staged diff"
+    git --no-optional-locks -C "$REPO" diff --cached --stat || echo "(failed rc=$?)"
+    snap_section "porcelain"
+    printf '%s\n' "$sorted"
+    snap_section "processes"
+    stamp="$(ps -A -o pid,ppid,etime,command)" || stamp="(failed rc=$?)"
+    printf '%s\n' "$stamp" | grep -E 'git|claude|python' || true
+    snap_section "launchd com.ibl5.*"
+    if command -v launchctl >/dev/null 2>&1; then
+        stamp="$(launchctl list)" || stamp="(failed rc=$?)"
+        printf '%s\n' "$stamp" | grep 'com\.ibl5\.' || echo "(none loaded)"
+    else
+        echo "launchctl unavailable"
+    fi
+}
+
+# 10. Snapshot (kept untouched on a retry), then DM first and state second:
+# a failed send leaves no state and the next tick retries.
+mkdir -p "$STATE_DIR"
+SNAP="$STATE_DIR/snapshot-${hash:0:12}.txt"
+if [ ! -e "$SNAP" ]; then
+    if write_snapshot >"$SNAP.tmp"; then
+        mv "$SNAP.tmp" "$SNAP"
+    else
+        rm -f "$SNAP.tmp"
+        SNAP="(capture failed)"
+    fi
+fi
+body="$body
+snapshot: $SNAP"
+if printf '%s\n' "$body" | "$DISCORD_DM" --ping --chunk -; then
+    printf '%s\n' "$hash" >"$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    echo "main-checkout-guard: alerted ${hash:0:12}"
+    exit 0
+fi
+echo "main-checkout-guard: DM failed; state not written" >&2
+exit 1

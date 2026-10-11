@@ -24,6 +24,10 @@ trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
 pass()     { h_pass "$1"; }
 failcase() { h_fail "$@"; }
 
+# Existing cases never run the real main-checkout guard (it would inspect the
+# checkout running this harness and try a real DM). New cases opt in per call.
+export WT_SYNC_MAIN_GUARD=""
+
 # assert_match <name> <ERE> <haystack>
 assert_match() {
     if printf '%s\n' "$3" | grep -qE "$2"; then
@@ -1359,6 +1363,104 @@ assert_eq    "detached: only stdout empty" "" "$ONLY_OUT"
 assert_eq    "detached: only exits 2" "2" "$ONLY_ST"
 assert_match "detached: only stderr names detached HEAD" "detached HEAD" "$(cat "$ONLY_ERR")"
 assert_eq    "detached: only HEAD unchanged" "$HEAD52_DET" "$(git -C "$WT52_DET" rev-parse HEAD)"
+
+# ── Tests 53-58: main-checkout guard call (before the presence gate) ─────────
+# Recorder stub: appends "[<args>]" to guard.calls, prints guard.say if present,
+# exits with the number in guard.rc (default 0).
+GUARD_STUB="$TMP/guard-stub"
+cat > "$GUARD_STUB" <<SH
+#!/bin/sh
+printf '[%s]\n' "\$*" >> "$TMP/guard.calls"
+[ -f "$TMP/guard.say" ] && cat "$TMP/guard.say"
+exit "\$(cat "$TMP/guard.rc" 2>/dev/null || echo 0)"
+SH
+chmod +x "$GUARD_STUB"
+reset_guard_stub() { rm -f "$TMP/guard.calls" "$TMP/guard.say" "$TMP/guard.rc"; }
+GUARD_PRESENT="HIDIdleTime = 50000000000"   # 50s: operator present
+
+# Test 53: the guard runs on an operator-present tick
+MAIN53="$(new_env)"
+LOG53="$(fresh_log t53)"; LOCKD53="$(fresh_lockd t53)"
+reset_guard_stub
+run_with_repo "$MAIN53" "$LOG53" "$LOCKD53" WT_SYNC_MAIN_GUARD="$GUARD_STUB" \
+    STUB_IOREG_LINE="$GUARD_PRESENT" --
+ST53="$ST"
+assert_eq    "guard: operator-present tick calls the guard once" "1" "$(wc -l < "$TMP/guard.calls" 2>/dev/null | tr -d ' ')"
+assert_match "guard: operator-present tick still exits at the presence gate" "operator present" "$OUT"
+assert_match "guard: operator-present tick logs the guard rc" "main-checkout-guard rc=0" "$OUT"
+
+# Test 54: a failing guard never changes the tick's exit code
+reset_guard_stub
+echo 7 > "$TMP/guard.rc"; echo boom > "$TMP/guard.say"
+run_with_repo "$MAIN53" "$LOG53" "$LOCKD53" WT_SYNC_MAIN_GUARD="$GUARD_STUB" \
+    STUB_IOREG_LINE="$GUARD_PRESENT" --
+assert_eq    "guard: failing guard leaves the tick exit code unchanged" "$ST53" "$ST"
+assert_match "guard: failing guard rc and output are logged" "main-checkout-guard rc=7: boom" "$OUT"
+
+# Test 55: the kill switch skips the guard
+reset_guard_stub
+OUT55="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" WT_SYNC_REPO_ROOT="$MAIN53" \
+             WT_SYNC_LOG="$LOG53" WT_SYNC_LOCK_DIR="$LOCKD53" WT_SYNC_ENABLED=0 \
+             WT_SYNC_MAIN_GUARD="$GUARD_STUB" "$TICK" --force 2>&1)" || true
+assert_match "guard: kill switch still exits" "WT_SYNC_ENABLED=0|exiting" "$OUT55"
+assert_eq    "guard: kill switch never calls the guard" "absent" \
+    "$([ -e "$TMP/guard.calls" ] && echo present || echo absent)"
+
+# Test 56: --dry-run passes through to the guard
+reset_guard_stub
+run_with_repo "$MAIN53" "$LOG53" "$LOCKD53" WT_SYNC_MAIN_GUARD="$GUARD_STUB" \
+    STUB_IOREG_LINE="$GUARD_PRESENT" -- --dry-run
+assert_eq    "guard: dry tick passes --dry-run" "[--dry-run]" "$(cat "$TMP/guard.calls" 2>/dev/null)"
+reset_guard_stub
+run_with_repo "$MAIN53" "$LOG53" "$LOCKD53" WT_SYNC_MAIN_GUARD="$GUARD_STUB" \
+    STUB_IOREG_LINE="$GUARD_PRESENT" --
+assert_eq    "guard: plain tick passes no flag" "[]" "$(cat "$TMP/guard.calls" 2>/dev/null)"
+
+# Test 57: seam empty skips the guard; seam unset resolves to the sibling script
+reset_guard_stub
+run_with_repo "$MAIN53" "$LOG53" "$LOCKD53" WT_SYNC_MAIN_GUARD="" \
+    STUB_IOREG_LINE="$GUARD_PRESENT" --
+assert_eq     "guard: empty seam never calls a guard" "absent" \
+    "$([ -e "$TMP/guard.calls" ] && echo present || echo absent)"
+assert_absent "guard: empty seam logs nothing about the guard" "main-checkout-guard" "$OUT"
+mkdir -p "$TMP/tickbin"
+ln -sf "$TICK" "$TMP/tickbin/wt-sync-tick"
+ln -sfn "$SCRIPT_DIR/lib" "$TMP/tickbin/lib"
+cp "$GUARD_STUB" "$TMP/tickbin/main-checkout-guard"
+reset_guard_stub
+OUT57="$(env -u WT_SYNC_MAIN_GUARD PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" \
+             WT_SYNC_REPO_ROOT="$MAIN53" WT_SYNC_LOG="$LOG53" WT_SYNC_LOCK_DIR="$LOCKD53" \
+             WT_SYNC_ENABLED=1 STUB_IOREG_LINE="$GUARD_PRESENT" \
+             "$TMP/tickbin/wt-sync-tick" 2>&1)" || true
+assert_eq     "guard: unset seam calls the sibling guard once" "1" \
+    "$(wc -l < "$TMP/guard.calls" 2>/dev/null | tr -d ' ')"
+assert_match  "guard: unset seam logs the guard rc" "main-checkout-guard rc=0" "$OUT57"
+
+# Test 58: the real guard on a dirty main checkout, with zero git writes
+MAIN58="$(new_env)"
+printf 'two\n' > "$MAIN58/second.txt"
+git -C "$MAIN58" add second.txt
+git -C "$MAIN58" commit -qm second
+printf 'dirty\n' >> "$MAIN58/README.md"
+touch -t 202001010000 "$MAIN58/second.txt"
+IDX58_BEFORE="$(cksum < "$MAIN58/.git/index")"
+REFS58_BEFORE="$(git -C "$MAIN58" for-each-ref)"
+DM58="$TMP/dm-stub58"
+cat > "$DM58" <<SH
+#!/bin/sh
+printf '[%s]\n' "\$*" >> "$TMP/dm58.calls"
+cat >> "$TMP/dm58.body"
+SH
+chmod +x "$DM58"
+LOG58="$(fresh_log t58)"; LOCKD58="$(fresh_lockd t58)"
+run_with_repo "$MAIN58" "$LOG58" "$LOCKD58" WT_SYNC_MAIN_GUARD="$SCRIPT_DIR/main-checkout-guard" \
+    MAIN_CHECKOUT_GUARD_REPO="$MAIN58" MAIN_CHECKOUT_GUARD_STATE_DIR="$TMP/mcg-state" \
+    DISCORD_DM_BIN="$DM58" STUB_IOREG_LINE="$GUARD_PRESENT" --
+assert_eq    "real guard: one DM sent" "1" "$(wc -l < "$TMP/dm58.calls" 2>/dev/null | tr -d ' ')"
+assert_match "real guard: DM names the dirty path" "README.md" "$(cat "$TMP/dm58.body" 2>/dev/null)"
+assert_match "real guard: tick logs the alert" "main-checkout-guard rc=0: main-checkout-guard: alerted" "$OUT"
+assert_eq    "real guard: index cksum unchanged" "$IDX58_BEFORE" "$(cksum < "$MAIN58/.git/index")"
+assert_eq    "real guard: refs unchanged" "$REFS58_BEFORE" "$(git -C "$MAIN58" for-each-ref)"
 
 # ── Hook wrapper tests ────────────────────────────────────────────────────────
 HOOK="$SCRIPT_DIR/hooks/wt-sync-session-start.sh"

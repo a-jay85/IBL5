@@ -37,7 +37,7 @@ final class RootHtaccessLegacyModulesRedirectGuardTest extends TestCase
         // A wrong __DIR__ depth must fail loudly instead of passing vacuously.
         self::assertStringContainsString('RewriteEngine On', $htaccess, 'Root .htaccess was not read');
 
-        $this->lines = preg_split('/\R/', $htaccess) ?: [];
+        $this->lines = explode("\n", str_replace("\r", '', $htaccess));
         $this->rules = [];
 
         foreach ($this->lines as $index => $line) {

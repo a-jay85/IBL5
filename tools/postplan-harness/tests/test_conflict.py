@@ -183,3 +183,58 @@ def test_abort_and_restore_aborts_merge_then_checks_merge_head(tmp_path):
     assert ("merge", "--abort") in run.calls
     assert run.calls.index(("merge", "--abort")) < run.calls.index(("rebase", "--abort"))
     assert not any(c[:1] == ("reset",) for c in run.calls)
+
+
+# ── Adapted lines reach audit.log (ADR-0134 addendum 2026-10-10) ──────────────
+
+@pytest.mark.parametrize("count", [2, 0])
+def test_runner_logs_one_audit_line_per_accepted_adaptation(tmp_path, monkeypatch, count):
+    """The --onto success path logs one `adapted line accepted:` line per entry plus the
+    `adapted-lines=N accepted` summary, after the unchanged TREE-EQUIVALENT line.
+    With adapted_lines=() it logs no adapted line."""
+    import runner
+    from harness.adaptations import AcceptedAdaptation
+    from harness.adapters.gitad import StackedRebaseResult
+    from test_conflict_probe import _Stop, _plain_scenario, _run_live
+
+    entries = (
+        AcceptedAdaptation("bin/a", 'x > "/tmp/a"', 'x > "$RL/a"', "/tmp", "$RL"),
+        AcceptedAdaptation("bin/b", "call(old_name)", "call(new_name)", "old_", "new_"),
+    )[:count]
+    wt = _plain_scenario(tmp_path, conflict=False, dirty=True)
+    _Orig = runner.LiveGit
+
+    class _FakeOntoGit(_Orig):
+        def rebase_onto(self, *a, **kw):
+            raise HarnessError("rebase-conflict", "plain merge conflicted")
+
+        def autoresolve_stacked_rebase(self, *a, **kw):
+            return StackedRebaseResult(
+                resolved=True, reason="", post_resolution_sha=self.head(),
+                base_sha="f" * 40, manifest_path="/tmp/m", notes_path="/tmp/n",
+                auto_resolved=True, resolved_files=("bin/a",), adapted_lines=entries)
+
+    def stop(*a, **k):
+        raise _Stop()
+
+    monkeypatch.setattr(runner, "LiveGit", _FakeOntoGit)
+    monkeypatch.setattr(runner, "_commit_with_adr_draft", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "_commit_with_gate_fix", lambda git, *a, **k: git.head())
+    monkeypatch.setattr(runner, "run_meta_checks_local", stop)
+    with pytest.raises(_Stop):
+        _run_live(tmp_path, wt, monkeypatch, lambda *a, **k: ({}, False))
+
+    lines = (tmp_path / "out" / "audit.log").read_text().splitlines()
+    proved = [l for l in lines if "TREE-EQUIVALENT proved; manifest=/tmp/m notes=/tmp/n" in l]
+    assert len(proved) == 1
+    adapted = [l for l in lines if "phase2: adapted line accepted:" in l]
+    assert len(adapted) == count
+    for line, e in zip(adapted, entries):
+        assert f"{e.path}: +{e.original} => +{e.adapted} [{e.old} -> {e.new}]" in line
+    summary = [l for l in lines if "adapted-lines=" in l]
+    if count:
+        assert len(summary) == 1 and "phase2: adapted-lines=2 accepted" in summary[0]
+        assert lines.index(proved[0]) < lines.index(adapted[0])
+    else:
+        assert summary == []
+        assert not any("adapted" in l for l in lines)

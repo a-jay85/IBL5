@@ -14,8 +14,11 @@ would cycle.
 """
 from __future__ import annotations
 
+import json
 import re
+import shutil
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Callable
 
 # A reviewer confirms each adapted line in a later phase; 50 is the most one read-only
@@ -242,3 +245,286 @@ def accept_deterministic(
         if head_lines[path].count(adapted) - master_lines[path].count(adapted) < count:
             return (), f"adapted line is not the branch's own edit in {path}: +{adapted}"
     return tuple(matches), ""
+
+
+# -- Phase 2: resolver justifications --
+ADAPTED_PREFIX = "ADAPTED-LINE: "
+
+RESOLVER_ADAPTATION_INSTRUCTIONS = (
+    "If a line the branch ADDED must change only to follow a rewrite master itself made "
+    "elsewhere in this same file (a renamed path, variable, or helper), you may adapt it. "
+    "For each adapted line add, on its own line before the final verdict line, exactly: "
+    'ADAPTED-LINE: {"from": "<branch line as added>", "to": "<line you wrote>", '
+    '"old": "<substring master replaced>", "new": "<master\'s replacement>"} '
+    "as one valid JSON object. Adapt nothing master did not rewrite in this file; any "
+    "other change to a branch-added line fails the tree proof and the whole run."
+)
+
+_JUSTIFICATION_KEYS = frozenset({"from", "to", "old", "new"})
+
+
+@dataclass(frozen=True)
+class Justification:
+    path: str
+    original: str
+    adapted: str
+    old: str
+    new: str
+
+
+def _violation(line: str, why: str) -> str:
+    return f"{why}: {line}"[:200]
+
+
+def parse_justifications(
+    reply: str, path: str
+) -> tuple[tuple[Justification, ...], str]:
+    """Parse the resolver's `ADAPTED-LINE:` JSON lines. Returns (records, reason).
+
+    The first malformed line returns `((), reason)`; no such lines returns `((), "")`."""
+    found: list[Justification] = []
+    for raw in reply.splitlines():
+        line = raw.strip()
+        if not line.startswith(ADAPTED_PREFIX):
+            continue
+        try:
+            obj = json.loads(line[len(ADAPTED_PREFIX):])
+        except ValueError as exc:
+            return (), _violation(line, f"invalid JSON ({exc})")
+        if not isinstance(obj, dict) or set(obj) != _JUSTIFICATION_KEYS:
+            return (), _violation(
+                line, "expected a JSON object with exactly the keys from, to, old, new"
+            )
+        if not all(isinstance(v, str) and v for v in obj.values()):
+            return (), _violation(line, "every value must be a non-empty string")
+        if obj["from"] == obj["to"] or obj["old"] == obj["new"]:
+            return (), _violation(line, "from must differ from to and old from new")
+        record = Justification(path, obj["from"], obj["to"], obj["old"], obj["new"])
+        if record not in found:
+            found.append(record)
+    return tuple(found), ""
+
+
+# -- Phase 3: adaptation reviewer --
+ADAPT_CONFIRMED = "CONFIRMED"
+ADAPT_DENIED = "DENIED"
+ADAPT_ABSENT = "ABSENT"
+ADAPT_TOKEN_RE = re.compile(r"^ADAPTED-LINE-(\d+)=(CONFIRMED|DENIED)$")
+
+ADAPT_REVIEW_PROMPT_HEAD = (
+    "You are reviewing adapted lines from an automated conflict resolution. "
+    "adaptations.txt numbers each line the branch added that the resolver rewrote. "
+    "For each number CONFIRM only when all three hold: (1) the adapted line equals the "
+    "original with only the named old -> new substring rewrite applied to every "
+    "occurrence and nothing else changed; (2) master-side.diff shows master itself "
+    "rewrote old to new in that same file; (3) the rewrite does not change what the "
+    "line does beyond following master's rename. Otherwise DENY. Read the worktree file "
+    "and master-side.diff before judging. Reply with one line per number that is exactly "
+    "ADAPTED-LINE-<n>=CONFIRMED or exactly ADAPTED-LINE-<n>=DENIED, one token per line, "
+    "nothing else on those lines, each number exactly once. Reasoning goes after the "
+    "tokens."
+)
+
+
+def parse_adaptation_verdicts(reply: str, n: int) -> dict[int, str]:
+    """Per-index verdicts for 1..n from exact-token reply lines.
+
+    A line counts only when its stripped text is the token in full. One distinct token
+    yields it, both tokens for one index yield DENIED, none yields ABSENT."""
+    seen: dict[int, set[str]] = {}
+    for raw in reply.splitlines():
+        m = ADAPT_TOKEN_RE.match(raw.strip())
+        if m is None:
+            continue
+        idx = int(m.group(1))
+        if 1 <= idx <= n:
+            seen.setdefault(idx, set()).add(m.group(2))
+    out: dict[int, str] = {}
+    for idx in range(1, n + 1):
+        tokens = seen.get(idx, set())
+        if len(tokens) == 1:
+            out[idx] = next(iter(tokens))
+        elif tokens:
+            out[idx] = ADAPT_DENIED
+        else:
+            out[idx] = ADAPT_ABSENT
+    return out
+
+
+def _render_adaptation_blocks(matches: tuple[NearMatch, ...]) -> str:
+    blocks: list[str] = []
+    for n, m in enumerate(matches, start=1):
+        lines = [
+            f"[{n}] file: {m.path}",
+            f"    original: {m.original}",
+            f"    adapted:  {m.adapted}",
+        ]
+        for t in m.transforms:
+            lines.append(f"    rewrite:  {t.old} -> {t.new}")
+        blocks.append("\n".join(lines) + "\n")
+    return "".join(blocks)
+
+
+def review_adaptations(
+    llm,
+    run: Callable[..., str],
+    *,
+    worktree: str,
+    key: str,
+    matches: tuple[NearMatch, ...],
+    merge_base: str,
+    master_sha: str,
+) -> tuple[bool, str, dict[int, str]]:
+    """Read-only per-line review of adapted lines. Fails closed on anything but all CONFIRMED."""
+    if not matches:
+        return False, "adaptation review: nothing to review", {}
+
+    review_dir = Path(f"/tmp/postplan-adapt-review-{key}")
+    shutil.rmtree(review_dir, ignore_errors=True)
+    review_dir.mkdir(parents=True, exist_ok=True)
+
+    blocks = _render_adaptation_blocks(matches)
+    (review_dir / "adaptations.txt").write_text(blocks)
+    diff = run(
+        "diff", "-U3", "--no-color", merge_base, master_sha, "--",
+        *sorted({m.path for m in matches}),
+    )
+    (review_dir / "master-side.diff").write_text(diff)
+    pre_patch_src = Path(f"/tmp/pr-ready-diff-pre-{key}.patch")
+    if pre_patch_src.exists():
+        shutil.copy(pre_patch_src, review_dir / "pre-rebase.patch")
+
+    prompt = ADAPT_REVIEW_PROMPT_HEAD + "\n\n" + blocks
+
+    reply = ""
+    try:
+        reply = llm.call_tooled(
+            "conflict-adapt-review",
+            "sonnet",
+            prompt,
+            cwd=worktree,
+            allowed_tools=("Read",),
+            denied_tools=("Bash", "Agent", "Write", "Edit"),
+            add_dirs=(str(review_dir),),
+        )
+    except Exception:
+        reply = ""
+    if not isinstance(reply, str):
+        reply = ""
+
+    verdicts = parse_adaptation_verdicts(reply, len(matches))
+    (review_dir / "verdict.txt").write_text(
+        "".join(f"ADAPTED-LINE-{n}={v}\n" for n, v in verdicts.items()) + "\n" + reply
+    )
+    bad = [(n, v) for n, v in verdicts.items() if v != ADAPT_CONFIRMED]
+    if not bad:
+        return True, "", verdicts
+    return (
+        False,
+        "adaptation review: " + ", ".join(f"[{n}]={v}" for n, v in bad),
+        verdicts,
+    )
+
+
+# -- Phase 4: proof acceptance and audit --
+@dataclass(frozen=True)
+class AcceptedAdaptation:
+    path: str
+    original: str
+    adapted: str
+    old: str
+    new: str
+
+
+def _pair_justifications(
+    matches: tuple[NearMatch, ...], justifications: tuple[Justification, ...]
+) -> tuple[tuple[AcceptedAdaptation, ...], str]:
+    """Pair each near-match with one unused resolver justification naming its rewrite."""
+    used: set[int] = set()
+    accepted: list[AcceptedAdaptation] = []
+    for m in matches:
+        for i, j in enumerate(justifications):
+            if (i not in used and (j.path, j.original, j.adapted) == (m.path, m.original, m.adapted)
+                    and Transform(j.old, j.new) in m.transforms):
+                used.add(i)
+                accepted.append(AcceptedAdaptation(m.path, m.original, m.adapted, j.old, j.new))
+                break
+        else:
+            return (), f"no resolver justification for {m.path}: +{m.original}"
+    return tuple(accepted), ""
+
+
+def _accept(llm, run, *, worktree, key, proof_out, rc, resolved_files, justifications,
+            merge_base, master_sha):
+    if rc != 0:
+        return False, f"adaptation not applicable: proof exited {rc}", ()
+    if llm is None:
+        return False, "adaptation not applicable: no LLM", ()
+    if not resolved_files:
+        return False, "adaptation not applicable: no model-resolved files", ()
+    if not merge_base:
+        return False, "adaptation not applicable: no merge-base", ()
+    if not justifications:
+        return False, "LOST lines present but the resolver claimed no adaptation", ()
+    lost, reason = parse_lost_lines(proof_out, tuple(resolved_files))
+    if reason:
+        return False, reason, ()
+    pre = Path(f"/tmp/pr-ready-diff-pre-{key}.patch")
+    if not pre.exists():
+        return False, f"pre-rebase patch missing: {pre}", ()
+    reason = cross_check_pre_patch(pre.read_bytes(), lost)
+    if reason:
+        return False, reason, ()
+    matches, reason = accept_deterministic(
+        run, lost=lost, merge_base=merge_base, master_sha=master_sha)
+    if reason:
+        return False, reason, ()
+    accepted, reason = _pair_justifications(matches, tuple(justifications))
+    if reason:
+        return False, reason, ()
+    ok, reason, _verdicts = review_adaptations(
+        llm, run, worktree=worktree, key=key, matches=matches,
+        merge_base=merge_base, master_sha=master_sha)
+    if not ok:
+        return False, reason, ()
+    lines = [proof_out.rstrip("\n"),
+             f"ADAPTED-LINES: {len(accepted)} accepted "
+             "(near-match + resolver justification + reviewer CONFIRMED)"]
+    lines += [f"ADAPTED: {a.path}: +{a.original} => +{a.adapted} [{a.old} -> {a.new}]"
+              for a in accepted]
+    return True, "\n".join(lines) + "\n", accepted
+
+
+def accept_adapted_proof(
+    llm,
+    run: Callable[..., str],
+    *,
+    worktree: str,
+    key: str,
+    proof_out: str,
+    rc: int,
+    resolved_files: tuple,
+    justifications: tuple,
+    merge_base: str,
+    master_sha: str,
+) -> tuple[bool, str, tuple[AcceptedAdaptation, ...]]:
+    """Accept a diverged proof only when every LOST line is a justified, confirmed adaptation.
+
+    Never appends TREE-EQUIVALENT. Any exception fails closed."""
+    try:
+        return _accept(llm, run, worktree=worktree, key=key, proof_out=proof_out, rc=rc,
+                       resolved_files=resolved_files, justifications=justifications,
+                       merge_base=merge_base, master_sha=master_sha)
+    except Exception as exc:
+        return False, f"adaptation check raised {type(exc).__name__}: {exc}"[:300], ()
+
+
+def audit_lines_for_adaptations(adapted) -> tuple[str, ...]:
+    """audit.log lines for accepted adaptations: one per entry plus a summary; () when none."""
+    if not isinstance(adapted, (tuple, list)) or not adapted:
+        return ()
+    out = [f"adapted line accepted: {a.path}: +{a.original} => +{a.adapted} "
+           f"[{a.old} -> {a.new}] (master transformation in same file; resolver justified; "
+           "reviewer CONFIRMED)" for a in adapted]
+    out.append(f"adapted-lines={len(adapted)} accepted; condition (14) hold stays set")
+    return tuple(out)

@@ -291,3 +291,40 @@ def test_accept_deterministic_rejects_edit_master_did_not_introduce():
     # With no master edit at all there is nothing to apply, so even a plausible HEAD line fails.
     matches, reason = _call(_accept_run('run "$RL"/d2\n', "", diff=""), lost[:1])
     assert matches == () and reason == "no near-match for bin/a.sh: +run /tmp/d2"
+
+
+def test_parse_justifications_rejects_missing_keys_and_non_object():
+    import json
+    from harness.adaptations import ADAPTED_PREFIX, Justification, parse_justifications
+
+    def reply(obj):
+        return f"{ADAPTED_PREFIX}{json.dumps(obj)}\nRESOLVED"
+
+    good = {"from": "run /tmp/a", "to": 'run "$RL"/a', "old": "/tmp/", "new": '"$RL"/'}
+    bad = [
+        ["from", "to", "old", "new"],
+        {k: v for k, v in good.items() if k != "new"},
+        {**good, "extra": "x"},
+        {**good, "old": ""},
+        {**good, "to": good["from"]},
+    ]
+    for obj in bad:
+        found, reason = parse_justifications(reply(obj), "bin/a.sh")
+        assert found == () and reason, obj
+    found, reason = parse_justifications(reply(good), "bin/a.sh")
+    assert reason == ""
+    assert found == (Justification("bin/a.sh", "run /tmp/a", 'run "$RL"/a', "/tmp/", '"$RL"/'),)
+    assert parse_justifications("RESOLVED", "bin/a.sh") == ((), "")
+
+
+def test_audit_lines_render_every_accepted_adaptation_and_summary():
+    from harness.adaptations import AcceptedAdaptation, audit_lines_for_adaptations
+    a = AcceptedAdaptation("bin/a", 'x > "/tmp/a"', 'x > "$RL/a"', "/tmp", "$RL")
+    b = AcceptedAdaptation("bin/b", "call(old_n)", "call(new_n)", "old_", "new_")
+    lines = audit_lines_for_adaptations((a, b))
+    assert len(lines) == 3
+    for line, e in zip(lines, (a, b)):
+        assert line.startswith("adapted line accepted: ")
+        assert f"{e.path}: +{e.original} => +{e.adapted} [{e.old} -> {e.new}]" in line
+    assert lines[2].startswith("adapted-lines=2 accepted")
+    assert audit_lines_for_adaptations(()) == ()

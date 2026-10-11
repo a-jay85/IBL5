@@ -311,7 +311,7 @@ class RunResult:
     run_id: str = ""                          # basename(out_dir); popped when empty
     reused_from: dict = field(default_factory=dict)  # arm -> producing run id; popped when empty
     review_delta: list[str] = field(default_factory=list)  # interdiff-reviewed paths; popped when empty
-    rearm: dict | None = None  # Phase 7 re-arm outcome after the fix loop; None = never ran
+    rearm: dict | None = None  # RunResult.rearm: Phase 7 re-arm outcome after the fix loop; None = never ran
     hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
     pause_edit_sid: Optional[str] = None  # S of a recorded interrupted edit (ADR-0143 addendum 2026-10-10); omitted from result.json when unset
     audit: list[str] = field(default_factory=list)

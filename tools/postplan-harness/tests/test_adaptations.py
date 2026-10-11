@@ -397,3 +397,11 @@ def test_pair_rejects_partial_occurrence_rewrite():
     j = Justification(_P, m.original, m.adapted, "/tmp/a", '"$RL"/a')
     assert _pair_justifications((m,), (j,)) == (
         (), f"no resolver justification for {_P}: +cp /tmp/a /tmp/b")
+
+
+def test_pair_keeps_single_transform_of_multi_transform_match():
+    m = NearMatch(_P, "cp /tmp/a OLDV", 'cp "$RL"/a NEWV', (_REAL, Transform("OLDV", "NEWV")))
+    j = Justification(_P, m.original, m.adapted, "/tmp", '"$RL"')
+    got, reason = _pair_justifications((m,), (j,))
+    assert reason == ""
+    assert len(got) == 1

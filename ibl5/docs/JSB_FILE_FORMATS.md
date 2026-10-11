@@ -1,6 +1,6 @@
 ---
 description: Jump Shot Basketball binary file format specifications.
-last_verified: 2026-08-11
+last_verified: 2026-10-10
 ---
 
 # Jump Shot Basketball (JSB) Engine File Format Specifications

@@ -6,7 +6,7 @@
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land). Also covers the mutation-pr.yml
-# invariants (M1-M4) and the all-checks-green.yml invariants (A1-A4), the
+# invariants (M1-M4) and the all-checks-green.yml invariants (A1-A5), the
 # step-scoped DB env invariant (D1) with a throwaway setup-php-env composite,
 # with throwaway workflow + ADR fixtures, and the read-only --protection-readback
 # mode (R0-R4, default and --context=) with generated protection JSON fixtures.
@@ -546,7 +546,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# all-checks-green invariants (A1-A4)
+# all-checks-green invariants (A1-A5)
 # ---------------------------------------------------------------------------
 
 AGG_LITERAL='All checks green'
@@ -555,6 +555,9 @@ AGG_LITERAL='All checks green'
 put_agg() {
   local on_extra="" types="[opened, reopened, synchronize, ready_for_review, edited, labeled, unlabeled]"
   local job_name="All checks green" job_if="" timeout="    timeout-minutes: 45" wait="--wait "
+  # shellcheck disable=SC2016  # literal fixture YAML and shell text
+  local base_env='        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}' base_flag='--base-ref="$BASE_REF" '
   local perms="  contents: read
   checks: read
   actions: read
@@ -573,6 +576,14 @@ put_agg() {
     a4-inject)
       # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
       wait='--wait --title="${{ github.event.pull_request.title }}" ' ;;
+    a5-no-flag) base_flag="" ;;
+    a5-no-env) base_env="" ;;
+    a5-inline)
+      # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
+      base_flag='--base-ref="${{ github.event.pull_request.base.ref }}" ' ;;
+    a5-comment)
+      # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
+      wait='--wait # ${{ github.event.pull_request.base.ref }} ' ;;
     *) echo "put_agg: unknown variant $2" >&2; return 1 ;;
   esac
   {
@@ -582,8 +593,10 @@ put_agg() {
     printf 'jobs:\n  all-checks-green:\n    name: %s\n    runs-on: ubuntu-latest\n' "$job_name"
     [ -n "$job_if" ] && printf '%s\n' "$job_if"
     [ -n "$timeout" ] && printf '%s\n' "$timeout"
-    printf '    steps:\n      - name: Wait\n        run: |\n'
-    printf "          bin/check-pr-checks-green --sha=x %s--self='All checks green' --timeout-seconds=2400\n" "$wait"
+    printf '    steps:\n      - name: Wait\n'
+    [ -n "$base_env" ] && printf '%s\n' "$base_env"
+    printf '        run: |\n'
+    printf "          bin/check-pr-checks-green --sha=x %s%s--self='All checks green' --timeout-seconds=2400\n" "$base_flag" "$wait"
   } > "$1/all-checks-green.yml"
 }
 
@@ -615,6 +628,10 @@ run_agg "agg-a4-timeout" 1 a4-timeout
 run_agg "agg-a4-wait" 1 a4-wait
 run_agg "agg-a4-write" 1 a4-write
 run_agg "agg-a4-inject" 1 a4-inject
+run_agg "agg-a5-no-flag" 1 a5-no-flag
+run_agg "agg-a5-no-env" 1 a5-no-env
+run_agg "agg-a5-inline" 1 a5-inline
+run_agg "agg-a5-comment" 1 a5-comment
 
 # agg-a2-duplicate-name: a second workflow names a job with the same context
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"

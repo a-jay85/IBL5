@@ -238,3 +238,63 @@ def test_runner_logs_one_audit_line_per_accepted_adaptation(tmp_path, monkeypatc
     else:
         assert summary == []
         assert not any("adapted" in l for l in lines)
+
+
+@pytest.mark.parametrize("mode", ["two", "none", "stale"])
+def test_runner_logs_one_audit_line_per_accepted_adaptation_on_plain_merge(
+        tmp_path, monkeypatch, mode):
+    """The plain merge path (git.rebase_onto() succeeds, no HarnessError) logs one
+    `adapted line accepted:` line per entry in git.last_conflict_resolution. A stale
+    resolution left by an earlier call is reset at the start of _rebase_onto and not
+    re-logged."""
+    import runner
+    from harness.adaptations import AcceptedAdaptation
+    from harness.adapters.gitad import StackedRebaseResult
+    from test_conflict_probe import _Stop, _plain_scenario, _run_live
+
+    entries = (
+        AcceptedAdaptation("bin/a", 'x > "/tmp/a"', 'x > "$RL/a"', "/tmp", "$RL"),
+        AcceptedAdaptation("bin/b", "call(old_name)", "call(new_name)", "old_", "new_"),
+    )
+    count = 2 if mode == "two" else 0
+    wt = _plain_scenario(tmp_path, conflict=False, dirty=True)
+    _Orig = runner.LiveGit
+
+    def _result(git, adapted):
+        return StackedRebaseResult(
+            resolved=True, reason="", post_resolution_sha=git.head(),
+            base_sha="f" * 40, manifest_path="/tmp/m", notes_path="/tmp/n",
+            auto_resolved=True, resolved_files=("bin/a",), adapted_lines=adapted)
+
+    class _PlainGit(_Orig):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            if mode == "stale":
+                self.last_conflict_resolution = _result(self, entries)
+
+        def _rebase_onto(self, base):
+            super()._rebase_onto(base)  # real clean merge; resets last_conflict_resolution
+            if mode == "two":
+                self.last_conflict_resolution = _result(self, entries)
+
+    def stop(*a, **k):
+        raise _Stop()
+
+    monkeypatch.setattr(runner, "LiveGit", _PlainGit)
+    monkeypatch.setattr(runner, "_commit_with_adr_draft", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "_commit_with_gate_fix", lambda git, *a, **k: git.head())
+    monkeypatch.setattr(runner, "run_meta_checks_local", stop)
+    with pytest.raises(_Stop):
+        _run_live(tmp_path, wt, monkeypatch, lambda *a, **k: ({}, False))
+
+    lines = (tmp_path / "out" / "audit.log").read_text().splitlines()
+    adapted = [l for l in lines if "phase2: adapted line accepted:" in l]
+    assert len(adapted) == count
+    for line, e in zip(adapted, entries):
+        assert f"{e.path}: +{e.original} => +{e.adapted} [{e.old} -> {e.new}]" in line
+    summary = [l for l in lines if "adapted-lines=" in l]
+    if count:
+        assert len(summary) == 1 and "phase2: adapted-lines=2 accepted" in summary[0]
+    else:
+        assert summary == []
+        assert not any("adapted" in l for l in lines)

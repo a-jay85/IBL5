@@ -168,6 +168,11 @@ require_once __DIR__ . '/search_test_helpers.php';
  */
 class SearchViewTest extends TestCase
 {
+    /** Hostile input: apostrophe, angle brackets, ampersand, double quotes. */
+    private const HOSTILE = 'O\'Neal <xss>&"q"';
+    /** HtmlSanitizer::safeHtmlOutput(self::HOSTILE) under ENT_QUOTES|ENT_HTML5. */
+    private const ESCAPED = 'O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;';
+
     private SearchView $view;
 
     protected function setUp(): void
@@ -427,6 +432,112 @@ EMPTY_GOLDEN;
         $html = $this->view->render($data);
 
         $this->assertSame(2, substr_count($html, '&amp;preset=transactions'));
+    }
+
+    // --- Hostile-input pins: escaped exactly once at every echo site ---
+
+    public function testHostileStoryResultFieldsEscapedExactlyOnce(): void
+    {
+        $data = self::createPageData([
+            'query' => 'Q' . self::HOSTILE,
+            'topicText' => 'X' . self::HOSTILE,
+            'results' => [
+                ['sid' => 1, 'aid' => 'A' . self::HOSTILE, 'informant' => 'I' . self::HOSTILE, 'title' => 'T' . self::HOSTILE, 'time' => 1700000000, 'comments' => 0, 'topicId' => 1, 'topicText' => 'Z' . self::HOSTILE],
+            ],
+        ]);
+
+        $html = $this->view->render($data);
+
+        foreach (['Q', 'X', 'T', 'A', 'I', 'Z'] as $prefix) {
+            $this->assertGreaterThanOrEqual(1, substr_count($html, $prefix . self::ESCAPED), $prefix);
+        }
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
+    }
+
+    public function testHostileFilterOptionsEscapedExactlyOnce(): void
+    {
+        $data = self::createPageData([
+            'topics' => [['topicId' => 1, 'topicText' => 'P' . self::HOSTILE]],
+            'categories' => [['catId' => 1, 'title' => 'C' . self::HOSTILE]],
+            'authors' => ['U' . self::HOSTILE],
+        ]);
+
+        $html = $this->view->render($data);
+
+        $this->assertGreaterThanOrEqual(1, substr_count($html, 'P' . self::ESCAPED));
+        $this->assertGreaterThanOrEqual(1, substr_count($html, 'C' . self::ESCAPED));
+        $this->assertGreaterThanOrEqual(2, substr_count($html, 'U' . self::ESCAPED));
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
+    }
+
+    public function testHostileCommentResultFieldsEscapedExactlyOnce(): void
+    {
+        $data = self::createPageData([
+            'query' => 'basketball',
+            'type' => 'comments',
+            'articleComm' => true,
+            'results' => [
+                ['teamid' => 11, 'sid' => 10, 'subject' => 'S' . self::HOSTILE, 'date' => 1700000000, 'name' => 'N' . self::HOSTILE, 'articleTitle' => 'R' . self::HOSTILE, 'replyCount' => 1],
+            ],
+        ]);
+
+        $html = $this->view->render($data);
+
+        foreach (['S', 'N', 'R'] as $prefix) {
+            $this->assertGreaterThanOrEqual(1, substr_count($html, $prefix . self::ESCAPED), $prefix);
+        }
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
+    }
+
+    public function testHostileUserResultFieldsEscapedExactlyOnce(): void
+    {
+        $data = self::createPageData([
+            'query' => 'basketball',
+            'type' => 'users',
+            'results' => [
+                ['userId' => 1, 'username' => 'W' . self::HOSTILE, 'name' => 'M' . self::HOSTILE],
+                ['userId' => 2, 'username' => 'plain', 'name' => ''],
+            ],
+        ]);
+
+        $html = $this->view->render($data);
+
+        foreach (['W', 'M'] as $prefix) {
+            $this->assertGreaterThanOrEqual(1, substr_count($html, $prefix . self::ESCAPED), $prefix);
+        }
+        $this->assertStringContainsString('<span class="search-result__subtitle">' . _NONAME . '</span>', $html);
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
+    }
+
+    public function testHostileErrorMessageEscapedExactlyOnce(): void
+    {
+        $html = $this->view->render(self::createPageData(['error' => 'E' . self::HOSTILE]));
+
+        $this->assertGreaterThanOrEqual(1, substr_count($html, 'E' . self::ESCAPED));
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
+    }
+
+    public function testHostileQueryIsUrlEncodedInPaginationLinks(): void
+    {
+        $data = self::createPageData([
+            'query' => 'a<&\'z',
+            'offset' => 10,
+            'results' => [
+                ['sid' => 1, 'aid' => 'admin', 'informant' => '', 'title' => 'Story', 'time' => 1700000000, 'comments' => 0, 'topicId' => 0, 'topicText' => ''],
+            ],
+            'hasMore' => true,
+        ]);
+
+        $html = $this->view->render($data);
+
+        $this->assertStringContainsString('&amp;query=a%3C%26%27z&amp;', $html);
+        $this->assertStringNotContainsString('%26amp%3B', $html);
+        $this->assertStringNotContainsString('query=a<', $html);
     }
 
         /**

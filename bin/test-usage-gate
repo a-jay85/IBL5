@@ -2213,6 +2213,70 @@ test_coord_switch_incident_resumes() {
     assert_contains switch_incident:log "$(fetch_log)" "switch-resume sid=$SID_A via=acct"
 }
 
+# stub_no_login: keychain item not found (security exit 44), so the login is gone.
+stub_no_login() {
+    make_stub_bin "$STUB" "" '{}'
+    printf '#!/bin/sh\nexit 44\n' > "$STUB/security"
+}
+
+# fetch_auth_dead: a missing login or a 401 marks the login dead; any other keychain
+# failure does not; a good fetch clears it.
+test_fetch_auth_dead_marks_and_clears() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    make_stub_bin "$STUB" "" "$BODY_B"
+    fetch_once 45 >/dev/null
+    assert_no_file auth_dead:unreadable-keychain-not-dead "$d/fetch-auth-dead"
+    make_stub_http "$STUB" tok 401 '{}'
+    fetch_once 45 >/dev/null
+    assert_eq auth_dead:401 http-401 "$(gate_run usage_auth_dead)"
+    stub_no_login
+    fetch_once 45 >/dev/null
+    assert_eq auth_dead:no-login no-token "$(gate_run usage_auth_dead)"
+    printf '%s no-token\n' "$(( $(date +%s) - 900 ))" > "$d/fetch-auth-dead"
+    gate_run usage_auth_dead >/dev/null
+    assert_eq auth_dead:expires 1 "$?"
+    make_stub_http "$STUB" tok 200 "$BODY_B"
+    fetch_once 45 >/dev/null
+    assert_no_file auth_dead:cleared "$d/fetch-auth-dead"
+}
+
+# 2026-10-11 incident: the switch was seen while the new login had no working token.
+# The switch resume waits for a good usage check, then the normal zone launches it.
+test_coord_switch_holds_while_auth_dead() {
+    local mode
+    for mode in no-token http-401; do
+        coord_setup 97
+        rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+        seed_home uuid-B
+        sw_marker "$SID_A" uuid-A
+        sw_signal 30 - 1 account
+        if [ "$mode" = no-token ]; then stub_no_login; else make_stub_http "$STUB" tok 401 '{}'; fi
+        assert_contains "switch_auth_dead:$mode:dry" "$(run_coord --dry-run --once 2>&1)" "ACTION hold $SID_A auth-$mode"
+        run_coord --once >/dev/null 2>&1
+        sleep 1
+        assert_no_file "switch_auth_dead:$mode:held" "$T/launched.$SID_A"
+        assert_contains "switch_auth_dead:$mode:log" "$(fetch_log)" "switch-resume-held sid=$SID_A reason=auth-$mode"
+        assert_contains "switch_auth_dead:$mode:dm" "$(cat "$T/dm.txt" 2>/dev/null)" "Run claude and sign in"
+        make_stub_http "$STUB" tok 200 "$BODY_A"
+        run_coord --once >/dev/null 2>&1
+        wait_file "$T/launched.$SID_A"; assert_eq "switch_auth_dead:$mode:resumed" 0 "$?"
+    done
+}
+
+# An unreadable keychain (locked, no UI access) says nothing about the login, so a
+# switch resume still fires.
+test_coord_switch_unreadable_keychain_resumes() {
+    coord_setup 97
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    sw_signal 30 - 1 account
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq switch_unreadable:launched 0 "$?"
+    assert_contains switch_unreadable:log "$(fetch_log)" "switch-resume sid=$SID_A via=acct"
+}
+
 test_coord_switch_resume_once() {
     sw_stale_setup
     seed_home uuid-B

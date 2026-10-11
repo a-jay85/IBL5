@@ -367,3 +367,14 @@ def vet_fidelity(fid, run_id):
         return None
     return {"run_id": run_id, "verdict": verdict, "diff_id": fid["diff_id"],
             "plan_hash": fid["plan_hash"], "remediated": False}
+
+
+def avoided_cost(sample_calls, absent_purposes) -> float:
+    """Sum of `cost_usd` over `sample_calls` whose `purpose` is in `absent_purposes`.
+
+    Prices what a cache hit skipped: `sample_calls` is a real run's ledger (dicts with
+    `purpose`, `model`, `cost_usd`) and `absent_purposes` the purposes the hit never
+    called. Carries no pricing table of its own."""
+    absent = set(absent_purposes)
+    return sum(float(c.get("cost_usd") or 0.0) for c in sample_calls
+               if c.get("purpose") in absent)

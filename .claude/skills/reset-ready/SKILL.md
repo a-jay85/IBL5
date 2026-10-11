@@ -52,6 +52,7 @@ items. Each plan-now run plus its automouse implementation costs real budget.
 Every scout reads this file so nobody proposes work that already exists.
 
 ```bash
+A=~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse
 D=/tmp/reset-ready; mkdir -p "$D"
 {
   echo "## Open PRs"
@@ -117,6 +118,7 @@ from `.claude/skills/plan-prompt/SKILL.md` Steps 3 and 4. The first line is
 Pick the tier, then check it against the hint, which reads the task line only:
 
 ```bash
+D=/tmp/reset-ready; mkdir -p "$D/prompts"
 for f in "$D"/prompts/*.md; do
   printf '%s ' "$(basename "$f" .md)"
   bin/plan-tier-hint --desc "$(head -1 "$f" | sed 's#^/plan ##')"
@@ -128,6 +130,7 @@ says `default` (a gate narrowing or a SQL rewrite the hint cannot see), plan-now
 unless you pass `--tier-ok "<reason>"`. Then fire each prompt:
 
 ```bash
+D=/tmp/reset-ready; mkdir -p "$D/prompts"
 for f in "$D"/prompts/*.md; do bin/plan-now "$f"; echo "$(basename "$f") rc=$?"; done
 ```
 

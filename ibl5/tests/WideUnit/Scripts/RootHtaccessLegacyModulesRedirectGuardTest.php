@@ -136,6 +136,19 @@ final class RootHtaccessLegacyModulesRedirectGuardTest extends TestCase
         }
     }
 
+    /**
+     * Mirrors the container boundary probes: `/modules.phpx` stays unredirected
+     * (404) and `/wp/` stays 410 Gone.
+     */
+    public function testNeighbouringRootBehaviourIsUntouched(): void
+    {
+        self::assertNull($this->firstRuleMatching('modules.phpx'), '/modules.phpx must match no root rule');
+
+        $wp = $this->firstRuleMatching('wp/');
+        self::assertNotNull($wp, '/wp/ must still match the 410 rule');
+        self::assertContains('R=410', $wp['flags']);
+    }
+
     #[DataProvider('nonMatchingPathProvider')]
     public function testRulePatternScopesToRootModulesPhpOnly(string $path): void
     {

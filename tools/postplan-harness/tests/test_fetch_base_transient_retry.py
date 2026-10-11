@@ -1,4 +1,4 @@
-"""LiveGit.fetch_base retries one transient network failure, separately from the lock race."""
+"""LiveGit.fetch_base retries transient network failures (5/20/60 s), separately from the lock race."""
 from __future__ import annotations
 
 import os
@@ -8,6 +8,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from harness import netretry
 from harness.adapters import gitad
 from harness.adapters.gitad import LiveGit
 from harness.state import HarnessError
@@ -45,23 +46,24 @@ def test_kex_timeout_then_success_retries_once(monkeypatch, sleeps):
     g, calls = _git_with(monkeypatch, [HarnessError("git", KEX_ERR)])
     g.fetch_base()
     assert len(calls) == 2
-    assert sleeps == [gitad.FETCH_TRANSIENT_DELAY]
+    assert sleeps == [netretry.RETRY_DELAYS[0]]
 
 
-@pytest.mark.parametrize("marker", gitad.FETCH_TRANSIENT_MARKERS)
+@pytest.mark.parametrize("marker", netretry.TRANSIENT_MARKERS)
 def test_each_transient_marker_retries(monkeypatch, sleeps, marker):
     g, calls = _git_with(monkeypatch, [HarnessError("git", f"git fetch origin master: {marker}")])
     g.fetch_base()
     assert len(calls) == 2
 
 
-def test_persistent_transient_failure_raises_after_two_attempts(monkeypatch, sleeps):
-    g, calls = _git_with(monkeypatch, [HarnessError("git", KEX_ERR)] * 3)
+def test_persistent_transient_failure_raises_after_four_attempts(monkeypatch, sleeps):
+    errs = [HarnessError("git", KEX_ERR) for _ in range(5)]
+    g, calls = _git_with(monkeypatch, errs)
     with pytest.raises(HarnessError) as ei:
         g.fetch_base()
-    assert ei.value.kind == "git"
-    assert len(calls) == 2
-    assert len(sleeps) == 1
+    assert ei.value is errs[0]
+    assert len(calls) == 4
+    assert sleeps == [5.0, 20.0, 60.0]
 
 
 def test_could_not_read_alone_is_not_retried(monkeypatch, sleeps):
@@ -86,4 +88,15 @@ def test_transient_and_lock_race_budgets_are_independent(monkeypatch, sleeps):
     g, calls = _git_with(monkeypatch, [HarnessError("git", KEX_ERR), HarnessError("git", LOCK_ERR)])
     g.fetch_base()
     assert len(calls) == 3
-    assert sleeps == [gitad.FETCH_TRANSIENT_DELAY, gitad.FETCH_LOCK_BACKOFF]
+    assert sleeps == [netretry.RETRY_DELAYS[0], gitad.FETCH_LOCK_BACKOFF]
+
+
+def test_lock_race_budget_spans_transient_retries(monkeypatch, sleeps):
+    g, calls = _git_with(monkeypatch, [
+        HarnessError("git", LOCK_ERR), HarnessError("git", KEX_ERR),
+        HarnessError("git", LOCK_ERR), HarnessError("git", LOCK_ERR),
+        HarnessError("git", LOCK_ERR)])
+    with pytest.raises(HarnessError) as ei:
+        g.fetch_base()
+    assert "cannot lock ref" in ei.value.detail
+    assert sleeps == [1.0, 5.0, 2.0, 3.0]

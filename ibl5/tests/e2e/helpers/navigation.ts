@@ -16,6 +16,7 @@ export async function openMobileMenu(page: Page): Promise<Locator> {
  */
 export async function gotoWithRetry(page: Page, url: string): Promise<void> {
   for (let attempt = 0; attempt < 5; attempt++) {
+    // eslint-disable-next-line playwright/no-wait-for-timeout -- deliberate retry back-off between gotoWithRetry attempts, not a page-state wait
     if (attempt > 0) await page.waitForTimeout(attempt * 1000);
     let response: Awaited<ReturnType<Page['goto']>>;
     try {

@@ -39,23 +39,25 @@ export default [
       // --- Enforced: Layer 2 hygiene gate (zero pre-existing violations) ---
       'playwright/no-element-handle': 'error',
 
+      // --- Enforced: wait hygiene gate (no unsuppressed violations) ---
+      // A new page.waitForNavigation() or page.waitForTimeout(1) fails CI. The single
+      // gotoWithRetry back-off carries an inline eslint-disable-next-line.
+      'playwright/no-wait-for-navigation': 'error',
+      'playwright/no-wait-for-timeout': 'error',
+
       // --- Burn-down: pre-existing violations tracked as warnings ---
-      // TODO: tighten playwright/no-conditional-in-test to error after burn-down (78 violations)
+      // TODO: tighten playwright/no-conditional-in-test to error after burn-down (54 violations)
       'playwright/no-conditional-in-test': 'warn',
-      // TODO: tighten playwright/no-conditional-expect to error after burn-down (21 violations)
+      // TODO: tighten playwright/no-conditional-expect to error after burn-down (10 violations)
       'playwright/no-conditional-expect': 'warn',
-      // TODO: tighten playwright/no-skipped-test to error after burn-down (5 violations in env-gated specs)
+      // TODO: tighten playwright/no-skipped-test to error after burn-down (14 violations)
       'playwright/no-skipped-test': 'warn',
-      // TODO: tighten playwright/expect-expect to error after burn-down (113 violations)
+      // TODO: tighten playwright/expect-expect to error after burn-down (119 violations)
       'playwright/expect-expect': 'warn',
-      // TODO: tighten playwright/no-wait-for-timeout to error after burn-down (7 violations)
-      'playwright/no-wait-for-timeout': 'warn',
-      // TODO: tighten playwright/prefer-web-first-assertions to error after burn-down (27 violations)
+      // TODO: tighten playwright/prefer-web-first-assertions to error after burn-down (41 violations)
       'playwright/prefer-web-first-assertions': 'warn',
-      // TODO: tighten playwright/no-networkidle to error after burn-down (22 violations)
+      // TODO: tighten playwright/no-networkidle to error after burn-down (3 violations)
       'playwright/no-networkidle': 'warn',
-      // TODO: tighten playwright/no-wait-for-navigation to error after burn-down (12 violations)
-      'playwright/no-wait-for-navigation': 'warn',
 
       // Force every test/expect import inside tests/e2e/** to go through
       // fixtures/base.ts, which overrides the `page` fixture to attach the

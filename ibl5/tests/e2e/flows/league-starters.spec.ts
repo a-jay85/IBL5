@@ -71,7 +71,7 @@ test.describe('League Starters flow', () => {
 
   test('view switcher tabs are present', async ({ page }) => {
     // LeagueStarters has tabs: Ratings, Season Totals, Season Averages, Per 36 Minutes
-    const tabs = page.locator('.ibl-tab, [role="tab"]');
+    const tabs = page.locator('.ibl-tab');
     const count = await tabs.count();
     expect(count).toBeGreaterThanOrEqual(4);
   });

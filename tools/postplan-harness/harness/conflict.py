@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional, NoReturn
 
+from .adaptations import RESOLVER_ADAPTATION_INSTRUCTIONS, parse_justifications
+
 # ── Conflict marker pattern (exact: 7-char leader + space or EOL, not >=7) ───
 import re as _re
 _CONFLICT_MARKER_PAT = _re.compile(
@@ -41,6 +43,7 @@ class ConflictResolutionResult:
     success: bool
     reason: str = ""
     resolved_files: tuple[str, ...] = ()
+    adaptations: tuple = ()  # tuple of `Justification` records from the resolver
 
 
 def parse_unmerged(text: str) -> dict[str, set[int]]:
@@ -143,8 +146,12 @@ def resolve_one(
     branch_stage: int = 2,
     master_sha: str = "origin/master",
     pre_sha: str = "HEAD",
+    adaptations: Optional[list] = None,
 ) -> tuple[bool, str]:
     """Resolve a single conflicted path. Returns (success, reason).
+
+    `adaptations` is a sink the caller passes to collect `Justification` records from the
+    RESOLVED round.
 
     `stages` is the path's unmerged stage set. `branch_stage` names the stage holding the
     branch's copy: 2 under `git merge origin/master`, 3 under a rebase. The missing stage
@@ -188,6 +195,7 @@ def resolve_one(
             f"`{worktree}/{path}` with Write.\n"
             f"Stage 2 (ours) is {ours_is}; stage 3 (theirs) is {theirs_is}.\n"
             f"Never wholesale-take one side. Touch no other file.\n"
+            f"{RESOLVER_ADAPTATION_INSTRUCTIONS}\n"
             f"End your reply with a line that is exactly `RESOLVED` or exactly `FAILED`."
         )
         if stages != {1, 2, 3}:
@@ -251,9 +259,18 @@ def resolve_one(
             last_error = f"blast-radius violation: touched {changed - {path}}"
             continue
 
+        found = ()
+        if last_line == "RESOLVED":
+            found, reason = parse_justifications(reply, path)
+            if reason:
+                last_error = f"malformed ADAPTED-LINE justification: {reason}"
+                continue
+
         run("add", "--", path)
 
         if last_line == "RESOLVED":
+            if adaptations is not None:
+                adaptations.extend(found)
             return True, ""
 
         last_error = "reply did not end with RESOLVED"
@@ -273,15 +290,17 @@ def resolve_all(
     pre_sha: str = "HEAD",
 ) -> ConflictResolutionResult:
     """Attempt to resolve all conflicted files. Returns ConflictResolutionResult."""
+    sink: list = []
     for path in inventory.files:
         success, reason = resolve_one(
             llm, run, worktree=worktree, key=key, path=path,
             stages=inventory.stage_sets.get(path, frozenset({1, 2, 3})),
             branch_stage=branch_stage, master_sha=master_sha, pre_sha=pre_sha,
+            adaptations=sink,
         )
         if not success:
             return ConflictResolutionResult(False, reason)
-    return ConflictResolutionResult(True, "", tuple(inventory.files))
+    return ConflictResolutionResult(True, "", tuple(inventory.files), tuple(sink))
 
 
 def abort_and_restore(
@@ -372,6 +391,11 @@ def parse_verdict(reply: str) -> str:
     return next(iter(found))
 
 
+def verdict_ok_path(key: str, sha: str) -> str:
+    """The conflict-review verdict file review_resolution writes for `sha`."""
+    return f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
+
+
 def review_resolution(
     llm,
     run: Callable[..., str],
@@ -380,8 +404,11 @@ def review_resolution(
     key: str,
     resolved_files: tuple[str, ...],
     proof_out: str,
+    adaptations: tuple = (),
 ) -> str:
-    """Run a read-only conflict review. Writes verdict and sidecar files. Returns verdict line."""
+    """Run a read-only conflict review. Writes verdict and sidecar files. Returns verdict line.
+    `adaptations` holds the AcceptedAdaptation records the tree proof let through; when
+    non-empty they are written to adaptations.txt and named in the prompt."""
     review_dir = Path(f"/tmp/postplan-conflict-review-{key}")
     review_dir.mkdir(parents=True, exist_ok=True)
 
@@ -393,6 +420,14 @@ def review_resolution(
         shutil.copy(pre_patch_src, review_dir / "pre-rebase.patch")
     (review_dir / "proof-output.txt").write_text(proof_out)
     (review_dir / "resolved-files.txt").write_text("\n".join(resolved_files) + "\n")
+    adaptations_path = review_dir / "adaptations.txt"
+    if adaptations:
+        adaptations_path.write_text("".join(
+            f"- {a.path}: +{a.original} => +{a.adapted} [{a.old} -> {a.new}]\n"
+            for a in adaptations
+        ))
+    else:
+        adaptations_path.unlink(missing_ok=True)
 
     prompt = (
         "You are reviewing an automated three-way conflict resolution.\n"
@@ -407,6 +442,12 @@ def review_resolution(
         "before it. Put your reasoning on the lines after the verdict. "
         "Write the verdict token exactly once."
     )
+    if adaptations:
+        prompt += (
+            "\nadaptations.txt lists branch-added lines the resolver rewrote to follow a "
+            "rename master made in the same file; a separate reviewer confirmed each one. "
+            "Treat any you judge wrong as FOUND-PROBLEM."
+        )
 
     reply = ""
     try:
@@ -425,9 +466,7 @@ def review_resolution(
     verdict_line = parse_verdict(reply)
 
     post_resolution_sha = run("rev-parse", "HEAD").strip()
-    verdict_path = Path(
-        f"/tmp/postplan-conflict-verdict-{key}-{post_resolution_sha}.ok"
-    )
+    verdict_path = Path(verdict_ok_path(key, post_resolution_sha))
     verdict_path.write_text(verdict_line + "\n" + reply)
 
     sidecar_path = Path(f"/tmp/postplan-conflict-sha-{key}.txt")

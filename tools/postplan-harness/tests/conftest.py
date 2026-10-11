@@ -58,3 +58,25 @@ def _reset_netretry_latch():
     netretry.reset_outage_latch()
     yield
     netretry.reset_outage_latch()
+
+
+@pytest.fixture(autouse=True)
+def isolate_live_reviewcache(tmp_path, monkeypatch):
+    """Keep live-shaped runs from sharing the harness's real `out/state` review cache.
+
+    A live run keys its state dir to the harness's own `out/state`, so without this a
+    record written by one test (or one local suite run) would turn the next live-shaped
+    run of the same slug into a cache hit.
+    """
+    from harness import reviewcache
+
+    real = os.path.realpath(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "out", "state"))
+    orig = reviewcache.record_path
+
+    def _path(state_dir, slug):
+        if os.path.realpath(state_dir) == real:
+            state_dir = str(tmp_path / "reviewcache-live-state")
+        return orig(state_dir, slug)
+
+    monkeypatch.setattr(reviewcache, "record_path", _path)

@@ -45,7 +45,7 @@ async function checkAnchorRow(page: Page, appState: AppStateFn, row: VrRow): Pro
       await expect(anchor.locator('tbody tr').first()).toBeVisible(timeoutOpt);
     } else if (row.anchor.startsWith('form[')) {
       await expect(
-        anchor.locator('input:not([type="hidden"]), select, textarea').first(),
+        anchor.locator('input:not([type="hidden"]), select, textarea').first(), // e2e-hygiene-allow: any visible user control proves the form anchor rendered
       ).toBeVisible(timeoutOpt);
     }
   }

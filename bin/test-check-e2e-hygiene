@@ -205,6 +205,14 @@ run_absent comma-in-attribute-selector-excluded 0 'comma-fallback-locator' "$SPE
     "await page.locator('[data-x=a,b]').click();"
 run_case single-selector-locator-passes 0 'PASS: 0 blocking hits' "$SPEC" \
     "await page.locator('.a').click();"
+run_case single-selector-with-quotes-passes 0 'PASS: 0 blocking hits' "$SPEC" \
+    "await page.locator('input[type=\"checkbox\"][name=\"x\"]').check();"
+run_case comma-outside-locator-call-passes 0 'PASS: 0 blocking hits' "$SPEC" \
+    "await page.locator('.a').click(); log('x, y');"
+run_case comma-fallback-inline-allow-prev-line-passes 0 'PASS: 0 blocking hits' "$SPEC" \
+    $'// e2e-hygiene-allow: page renders either wrapper by design\nawait page.locator(\'.a, .b\').click();'
+run_case comma-fallback-allow-two-lines-above-blocks 1 '\[comma-fallback-locator\] ibl5/tests/e2e/x\.spec\.ts:3:' "$SPEC" \
+    $'// e2e-hygiene-allow: page renders either wrapper by design\n// spacer line\nawait page.locator(\'.a, .b\').click();'
 
 # --- No files ---
 d="$(mk_repo)"

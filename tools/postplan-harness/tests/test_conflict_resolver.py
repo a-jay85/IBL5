@@ -902,3 +902,105 @@ def test_resolve_one_does_not_false_positive_on_separator_line(tmp_path):
     assert marker_lines == [], (
         f"Separator line should not be treated as conflict marker, got: {marker_lines}"
     )
+
+
+# ── Resolver per-line justification (adaptations sink) ───────────────────────
+
+def _adapted(frm, to, old="/tmp/", new='"$RL"/'):
+    import json as _json
+    return "ADAPTED-LINE: " + _json.dumps({"from": frm, "to": to, "old": old, "new": new})
+
+
+def test_resolve_one_prompt_carries_adaptation_instructions(tmp_path):
+    from harness.adaptations import RESOLVER_ADAPTATION_INSTRUCTIONS
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    llm = _StubLlm(["RESOLVED"])
+    resolve_one(llm, _StubRun(worktree), worktree=worktree, key="test-key", path=path)
+    prompt = llm.calls[0]["prompt"]
+    assert RESOLVER_ADAPTATION_INSTRUCTIONS in prompt
+    assert prompt.endswith("exactly `RESOLVED` or exactly `FAILED`.")
+
+
+def test_resolve_one_collects_well_formed_adapted_line_justifications(tmp_path):
+    from harness.adaptations import Justification
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    reply = "\n".join([
+        "Merged.",
+        _adapted("run /tmp/a", 'run "$RL"/a'),
+        _adapted("run /tmp/b", 'run "$RL"/b'),
+        "RESOLVED",
+    ])
+    sink: list = []
+    ok, reason = resolve_one(
+        _StubLlm([reply]), _StubRun(worktree),
+        worktree=worktree, key="test-key", path=path, adaptations=sink,
+    )
+    assert (ok, reason) == (True, "")
+    assert sink == [
+        Justification(path, "run /tmp/a", 'run "$RL"/a', "/tmp/", '"$RL"/'),
+        Justification(path, "run /tmp/b", 'run "$RL"/b', "/tmp/", '"$RL"/'),
+    ]
+
+
+def test_resolve_one_malformed_justification_fails_the_round(tmp_path):
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    llm = _StubLlm(['ADAPTED-LINE: {"from": "x"}\nRESOLVED', "RESOLVED"])
+    run = _StubRun(worktree)
+    sink: list = []
+    result = resolve_one(
+        llm, run, worktree=worktree, key="test-key", path=path, adaptations=sink,
+    )
+    assert result == (True, "")
+    assert len(llm.calls) == 2
+    assert "malformed ADAPTED-LINE justification" in llm.calls[1]["prompt"]
+    assert sink == []
+
+
+def test_resolve_one_ignores_justifications_on_failed_reply(tmp_path):
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    llm = _StubLlm([_adapted("run /tmp/a", 'run "$RL"/a') + "\nFAILED"])
+    sink: list = []
+    result = resolve_one(
+        llm, _StubRun(worktree), worktree=worktree, key="test-key", path=path,
+        adaptations=sink,
+    )
+    assert result == (False, f"resolver declined: {path}")
+    assert sink == []
+
+
+def test_resolve_all_returns_adaptations_across_files(tmp_path):
+    worktree = str(tmp_path)
+    _make_temp_file(worktree, "app/a.py", "resolved a\n")
+    _make_temp_file(worktree, "app/b.py", "resolved b\n")
+    inventory = ConflictInventory(files=("app/a.py", "app/b.py"))
+
+    replies = [
+        _adapted("run /tmp/a", 'run "$RL"/a') + "\nRESOLVED",
+        _adapted("run /tmp/b", 'run "$RL"/b') + "\nRESOLVED",
+    ]
+    result = resolve_all(
+        _StubLlm(replies), _StubRun(worktree),
+        worktree=worktree, key="test-key", inventory=inventory,
+    )
+    assert result.success is True
+    assert [j.path for j in result.adaptations] == ["app/a.py", "app/b.py"]
+    assert [j.original for j in result.adaptations] == ["run /tmp/a", "run /tmp/b"]
+
+    declined = resolve_all(
+        _StubLlm([replies[0], "FAILED"]), _StubRun(worktree),
+        worktree=worktree, key="test-key", inventory=inventory,
+    )
+    assert declined.success is False
+    assert declined.adaptations == ()

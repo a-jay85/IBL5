@@ -63,6 +63,7 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
 from harness.gate_backtest import upsert_gate_backtest
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
+from harness.adaptations import audit_lines_for_adaptations
 from harness.review import ReviewPhase
 from harness import baseline_guard
 from harness.state import (SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState,
@@ -382,6 +383,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             conflict_resolved = None
             try:
                 git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
+                # A plain merge the resolver settled can also carry accepted adapted lines.
+                plain_resolution = getattr(git, "last_conflict_resolution", None)
+                for line in audit_lines_for_adaptations(
+                        getattr(plain_resolution, "adapted_lines", ())):
+                    log(f"phase2: {line}")
             except HarnessError as e:
                 if e.kind != "rebase-conflict":
                     raise
@@ -414,6 +420,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     f"manifest={conflict_resolved.manifest_path} "
                     f"notes={conflict_resolved.notes_path} "
                     f"POST_RESOLUTION_SHA={conflict_resolved.post_resolution_sha}")
+                for line in audit_lines_for_adaptations(
+                        getattr(conflict_resolved, "adapted_lines", ())):
+                    log(f"phase2: {line}")
                 if conflict_resolved.collapse_warn:
                     log(f"phase2: {conflict_resolved.collapse_warn}")
             sha = git.head()

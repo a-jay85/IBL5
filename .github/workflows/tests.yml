@@ -28,12 +28,22 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  mirror-ready:
+    name: Mirror CI images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/mirror-ci-images.yml
+    with:
+      only-missing: true
+
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
@@ -365,14 +375,17 @@ jobs:
 
   db-integration:
     name: Database Integration Tests
-    needs: [ci-memo-check]
+    needs: [ci-memo-check, mirror-ready]
     if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     services:
       mariadb:
-        image: mariadb:10.11
+        image: ghcr.io/a-jay85/mirror/mariadb:10.11
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           MARIADB_ROOT_PASSWORD: root
           MARIADB_DATABASE: ibl5
@@ -818,6 +831,10 @@ jobs:
       # live in repo-root bin/ and scan repo-root .github/.
       - name: Local-action checkout ordering
         run: bin/check-workflow-checkout
+      # ci-image-registry: CI pulls Docker Hub images only through the GHCR mirror
+      # listed in .github/ci-image-mirror.txt, and mirror consumers are wired to it.
+      - name: CI image registry
+        run: bin/check-ci-image-registry
       # run-body interpolation: ${{ env.* }} / string ${{ inputs.* }} pasted into a
       # run: script is shell injection (backlog#1387). Route it through env: instead.
       - name: Run-body expression interpolation
@@ -876,15 +893,23 @@ jobs:
 
   harness-tests:
     name: Shell harness regression tests
-    needs: [ci-memo-check]
+    needs: [ci-memo-check, mirror-ready]
     if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      IBL5_TEST_MARIADB_IMAGE: ghcr.io/a-jay85/mirror/mariadb:10.11
     # Each harness builds its own throwaway git repos under mktemp, so the
     # checkout depth and a global git identity are irrelevant.
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       # Parallel run: each script logs to its own ::group:: and the step fails if any fails.
@@ -967,6 +992,8 @@ jobs:
             bin/test-merge-line-select \
             bin/test-merge-line-watch \
             bin/test-check-workflow-checkout \
+            bin/test-check-ci-image-registry \
+            bin/test-ci-image-mirror \
             bin/test-check-workflow-run-interpolation \
             bin/test-check-composite-contracts \
             bin/test-promote-master-to-production \
@@ -1029,7 +1056,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, ci-memo-check, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, regen-codebase-map, static-guards, harness-tests, pinact-check, actionlint]
+    needs: [changes, ci-memo-check, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, regen-codebase-map, static-guards, harness-tests, pinact-check, actionlint, mirror-ready]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # The memo is written only here: after a clean aggregate, on a run that was a miss.

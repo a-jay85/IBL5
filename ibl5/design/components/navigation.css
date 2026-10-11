@@ -775,7 +775,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-dropdown__card {
-    background: rgba(30, 41, 59, 0.95);
+    background: color-mix(in srgb, var(--navy-800) 95%, transparent);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     border-bottom-left-radius: 0.5rem;
@@ -883,7 +883,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-login-input::placeholder {
-    color: var(--gray-500);
+    color: var(--gray-400);
 }
 
 .nav-login-input:focus {

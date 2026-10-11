@@ -110,7 +110,7 @@ class TeamsDropdownView implements TeamsDropdownViewInterface
                     <span class="text-accent-500"><?= HtmlSanitizer::trusted($icon) ?></span>
                     <span class="font-display text-lg font-semibold">Teams</span>
                 </span>
-                <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <svg class="dropdown-arrow w-4 h-4 text-gray-400 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
 
             <div class="hidden bg-black/20">

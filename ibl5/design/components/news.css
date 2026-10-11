@@ -52,7 +52,7 @@
 
 .news-article__header .ibl-badge {
     background: rgba(255, 255, 255, 0.15);
-    color: var(--accent-400);
+    color: var(--accent-300);
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 

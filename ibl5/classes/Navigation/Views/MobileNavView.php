@@ -67,7 +67,7 @@ class MobileNavView implements MobileNavViewInterface
                                 <svg class="w-5 h-5 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                             </div>
                             <div>
-                                <div class="text-xs text-gray-500 uppercase tracking-wide">Welcome back</div>
+                                <div class="text-xs text-gray-400 uppercase tracking-wide">Welcome back</div>
                                 <div class="text-white font-semibold"><?= HtmlSanitizer::e($this->config->username) ?></div>
                             </div>
                         </div>
@@ -137,7 +137,7 @@ class MobileNavView implements MobileNavViewInterface
                     <?php endif; ?>
                     <span class="font-display text-lg font-semibold"><?= HtmlSanitizer::e($title) ?></span>
                 </span>
-                <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <svg class="dropdown-arrow w-4 h-4 text-gray-400 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
 
             <div class="hidden bg-black/20">
@@ -194,7 +194,7 @@ class MobileNavView implements MobileNavViewInterface
         ob_start();
         ?>
         <div class="px-5 py-3 border-t border-white/10 mt-1">
-            <label for="mobile-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
+            <label for="mobile-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-2">League</label>
             <div class="relative">
                 <select id="mobile-league-select" name="league" onchange="window.location.href=this.value" class="nav-select">
                     <option value="index.php?league=ibl"<?= HtmlSanitizer::e($iblSelected) ?> class="bg-navy-800 text-white">IBL</option>
@@ -219,7 +219,7 @@ class MobileNavView implements MobileNavViewInterface
         ob_start();
         ?>
         <div class="px-5 py-3 border-t border-white/10 mt-1">
-            <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2"><?= HtmlSanitizer::e($username) ?></div>
+            <div class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-2"><?= HtmlSanitizer::e($username) ?></div>
             <a href="modules.php?name=YourAccount&amp;op=logout" hx-boost="false" class="nav-logout-btn">Logout</a>
         </div>
         <?php

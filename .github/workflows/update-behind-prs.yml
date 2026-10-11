@@ -186,6 +186,8 @@ jobs:
                      fix="the required checks pass on a new head commit" ;;
               dirty) why="the branch has a merge conflict with master"
                      fix="the conflict is resolved" ;;
+              running) echo "::notice::merge line skipped #$n: post-plan run in progress (post-plan-running label)"
+                       continue ;;
               *)     echo "::warning::unknown skip reason '$reason' for #$n"; continue ;;
             esac
             body="$MARKER

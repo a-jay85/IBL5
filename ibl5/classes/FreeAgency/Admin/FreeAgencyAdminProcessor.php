@@ -22,6 +22,44 @@ use Team\Team;
  * @see FreeAgencyAdminProcessorInterface
  *
  * @phpstan-import-type OfferRow from FreeAgencyAdminRepositoryInterface
+ * @phpstan-import-type DemandRow from FreeAgencyAdminRepositoryInterface
+ * @phpstan-type DayState array{
+ *     signings: list<array{
+ *         playerName: string,
+ *         playerId: int,
+ *         teamName: string,
+ *         teamId: int,
+ *         offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int},
+ *         offerYears: int,
+ *         offerTotal: float|int,
+ *         usedMle: bool,
+ *         usedLle: bool
+ *     }>,
+ *     rejections: list<array{playerName: string, reason: string}>,
+ *     autoRejections: list<array{
+ *         playerName: string,
+ *         teamName: string,
+ *         offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int},
+ *         reason: string
+ *     }>,
+ *     allOffers: list<array{
+ *         playerName: string,
+ *         teamName: string,
+ *         offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int},
+ *         birdYears: int,
+ *         mle: int,
+ *         lle: int,
+ *         random: int,
+ *         perceivedValue: float
+ *     }>,
+ *     newsHomeText: string,
+ *     newsBodyText: string,
+ *     discordText: string,
+ *     processedPlayers: array<string, true>,
+ *     pendingHeader: string,
+ *     pendingAcceptanceLine: string,
+ *     pendingOfferLines: array<int, array{teamName: string, line: string}>
+ * }
  */
 class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
 {
@@ -59,172 +97,283 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         // Get all offers with bird years, ordered by player then perceived value
         $offers = $this->repository->getAllOffersWithBirdYears();
 
-        $signings = [];
-        $rejections = [];
-        $autoRejections = [];
-        $allOffers = [];
-        $newsHomeText = '';
-        $newsBodyText = '';
-        $discordText = '';
+        $state = self::newDayState();
 
-        $processedPlayers = [];
-        $pendingHeader = '';
-        $pendingAcceptanceLine = '';
-        /** @var array<int, array{teamName: string, line: string}> */
-        $pendingOfferLines = [];
+        $demandsMap = $this->loadDemandsForOffers($offers);
 
-        // Pre-load all demands in a single batch query to avoid N+1
+        foreach ($offers as $row) {
+            /** @var OfferRow $row */
+            $this->processOffer($row, $demandsMap, $day, $state);
+        }
+
+        return $this->finishDay($state, $day);
+    }
+
+    /**
+     * Pre-load all demands in a single batch query to avoid N+1.
+     *
+     * @param list<OfferRow> $offers
+     * @return array<int, DemandRow>
+     */
+    private function loadDemandsForOffers(array $offers): array
+    {
         $playerIds = array_values(array_unique(array_map(
             static fn (array $row): int => $row['pid'],
             $offers
         )));
-        $demandsMap = $this->repository->getPlayerDemandsBatch($playerIds);
 
-        foreach ($offers as $row) {
-            /** @var OfferRow $row */
-            $playerName = $row['name'];
-            $playerId = $row['pid'];
-            $offeringTeamName = $row['team'];
-            $perceivedValue = $row['perceivedvalue'];
+        return $this->repository->getPlayerDemandsBatch($playerIds);
+    }
 
-            $offer1 = $row['offer1'];
-            $offer2 = $row['offer2'];
-            $offer3 = $row['offer3'];
-            $offer4 = $row['offer4'];
-            $offer5 = $row['offer5'];
-            $offer6 = $row['offer6'];
+    /**
+     * @param OfferRow $row
+     * @return array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}
+     */
+    private static function offerAmounts(array $row): array
+    {
+        return [
+            'offer1' => $row['offer1'],
+            'offer2' => $row['offer2'],
+            'offer3' => $row['offer3'],
+            'offer4' => $row['offer4'],
+            'offer5' => $row['offer5'],
+            'offer6' => $row['offer6'],
+        ];
+    }
 
-            $birdYears = $row['bird'];
-            $mle = $row['mle'];
-            $lle = $row['lle'];
-            $random = $row['random'];
+    /**
+     * @return DayState
+     */
+    private static function newDayState(): array
+    {
+        return [
+            'signings' => [],
+            'rejections' => [],
+            'autoRejections' => [],
+            'allOffers' => [],
+            'newsHomeText' => '',
+            'newsBodyText' => '',
+            'discordText' => '',
+            'processedPlayers' => [],
+            'pendingHeader' => '',
+            'pendingAcceptanceLine' => '',
+            'pendingOfferLines' => [],
+        ];
+    }
 
-            // Calculate offer years and total
-            $offerYears = OfferType::calculateYears([
-                'offer1' => $offer1, 'offer2' => $offer2, 'offer3' => $offer3,
-                'offer4' => $offer4, 'offer5' => $offer5, 'offer6' => $offer6,
-            ]);
-            $offerTotal = ($offer1 + $offer2 + $offer3 + $offer4 + $offer5 + $offer6) / 100;
+    /**
+     * Record one offer: store it for display, auto-reject it, or hand it to the
+     * first-offer or extra-offer step.
+     *
+     * @param OfferRow $row
+     * @param array<int, DemandRow> $demandsMap
+     * @param DayState $state
+     * @param-out DayState $state
+     */
+    private function processOffer(array $row, array $demandsMap, int $day, array &$state): void
+    {
+        $playerName = $row['name'];
+        $playerId = $row['pid'];
+        $offeringTeamName = $row['team'];
+        $perceivedValue = $row['perceivedvalue'];
+        $amounts = self::offerAmounts($row);
 
-            // Store all offers for display
-            $allOffers[] = [
+        $offer1 = $row['offer1'];
+        $offer2 = $row['offer2'];
+        $offer3 = $row['offer3'];
+        $offer4 = $row['offer4'];
+        $offer5 = $row['offer5'];
+        $offer6 = $row['offer6'];
+
+        $birdYears = $row['bird'];
+        $mle = $row['mle'];
+        $lle = $row['lle'];
+        $random = $row['random'];
+
+        // Calculate offer years and total
+        $offerYears = OfferType::calculateYears([
+            'offer1' => $offer1, 'offer2' => $offer2, 'offer3' => $offer3,
+            'offer4' => $offer4, 'offer5' => $offer5, 'offer6' => $offer6,
+        ]);
+        $offerTotal = ($offer1 + $offer2 + $offer3 + $offer4 + $offer5 + $offer6) / 100;
+
+        // Store all offers for display
+        $state['allOffers'][] = [
+            'playerName' => $playerName,
+            'teamName' => $offeringTeamName,
+            'offers' => $amounts,
+            'birdYears' => $birdYears,
+            'mle' => $mle,
+            'lle' => $lle,
+            'random' => $random,
+            'perceivedValue' => $perceivedValue,
+        ];
+
+        // Build extended news text for all offers
+        $state['newsBodyText'] .= "The {$offeringTeamName} offered {$playerName} a {$offerYears}-year deal worth a total of {$offerTotal} million dollars.\n";
+
+        // Get demands for this player (from pre-loaded batch)
+        $demands = $this->calculateDemandValue($demandsMap[$playerId] ?? null, $day);
+
+        // Check if offer is auto-rejected (under half of demands)
+        if ($perceivedValue <= $demands / 2) {
+            $state['autoRejections'][] = [
                 'playerName' => $playerName,
                 'teamName' => $offeringTeamName,
-                'offers' => [
-                    'offer1' => $offer1,
-                    'offer2' => $offer2,
-                    'offer3' => $offer3,
-                    'offer4' => $offer4,
-                    'offer5' => $offer5,
-                    'offer6' => $offer6,
-                ],
-                'birdYears' => $birdYears,
-                'mle' => $mle,
-                'lle' => $lle,
-                'random' => $random,
-                'perceivedValue' => $perceivedValue,
+                'offers' => $amounts,
+                'reason' => 'Offer under half of player demands',
             ];
-
-            // Build extended news text for all offers
-            $newsBodyText .= "The {$offeringTeamName} offered {$playerName} a {$offerYears}-year deal worth a total of {$offerTotal} million dollars.\n";
-
-            // Get demands for this player (from pre-loaded batch)
-            $demands = $this->calculateDemandValue($demandsMap[$playerId] ?? null, $day);
-
-            // Check if offer is auto-rejected (under half of demands)
-            if ($perceivedValue <= $demands / 2) {
-                $autoRejections[] = [
-                    'playerName' => $playerName,
-                    'teamName' => $offeringTeamName,
-                    'offers' => [
-                        'offer1' => $offer1,
-                        'offer2' => $offer2,
-                        'offer3' => $offer3,
-                        'offer4' => $offer4,
-                        'offer5' => $offer5,
-                        'offer6' => $offer6,
-                    ],
-                    'reason' => 'Offer under half of player demands',
-                ];
-                continue;
-            }
-
-            // Only process first (highest value) offer per player
-            if (!isset($processedPlayers[$playerName])) {
-                // Flush previous player's buffered offer lines (sorted by team name)
-                $discordText .= $this->flushPlayerOfferLines($pendingHeader, $pendingOfferLines, $pendingAcceptanceLine);
-                $pendingOfferLines = [];
-
-                $processedPlayers[$playerName] = true;
-
-                // Get team info for IDs
-                $offeringTeam = Team::initialize($this->db, $offeringTeamName);
-                $player = Player::withPlayerID($this->db, $playerId);
-                $playerTeam = Team::initialize($this->db, $player->getTeamName() ?? '');
-
-                // Buffer Discord header
-                $pendingHeader = "**" . strtoupper("{$playerName}, {$playerTeam->city} {$player->getTeamName()}") . "** <@!{$playerTeam->discord_id}>\n";
-
-                $offeringTeamDiscordId = (string) ($offeringTeam->discord_id ?? '');
-                $pendingOfferLines[] = [
-                    'teamName' => $offeringTeamName,
-                    'line' => $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId),
-                ];
-
-                if ($perceivedValue > $demands) {
-                    // Offer accepted
-                    $signings[] = [
-                        'playerName' => $playerName,
-                        'playerId' => $playerId,
-                        'teamName' => $offeringTeamName,
-                        'teamId' => $offeringTeam->teamid,
-                        'offers' => [
-                            'offer1' => $offer1,
-                            'offer2' => $offer2,
-                            'offer3' => $offer3,
-                            'offer4' => $offer4,
-                            'offer5' => $offer5,
-                            'offer6' => $offer6,
-                        ],
-                        'offerYears' => $offerYears,
-                        'offerTotal' => $offerTotal,
-                        'usedMle' => $mle === 1,
-                        'usedLle' => $lle === 1,
-                    ];
-
-                    $outcomeText = "{$playerName} accepts the {$offeringTeamName} offer of a {$offerYears}-year deal worth a total of {$offerTotal} million dollars.";
-                    $newsHomeText .= $outcomeText . "\n";
-                    $pendingAcceptanceLine = $outcomeText . " <@!{$offeringTeamDiscordId}>\n\n";
-                } else {
-                    // Offer rejected
-                    $rejections[] = [
-                        'playerName' => $playerName,
-                        'reason' => 'Best offer did not meet player demands',
-                    ];
-                    $pendingAcceptanceLine = "**REJECTED**\n\n";
-                }
-            } else {
-                // Additional offer for already-processed player - buffer for sorting
-                $offeringTeam = Team::initialize($this->db, $offeringTeamName);
-                $offeringTeamDiscordId = (string) ($offeringTeam->discord_id ?? '');
-                $pendingOfferLines[] = [
-                    'teamName' => $offeringTeamName,
-                    'line' => $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId),
-                ];
-            }
+            return;
         }
 
-        // Flush last player's buffered offer lines
-        $discordText .= $this->flushPlayerOfferLines($pendingHeader, $pendingOfferLines, $pendingAcceptanceLine);
+        // Only process first (highest value) offer per player
+        if (!isset($state['processedPlayers'][$playerName])) {
+            $this->processFirstOfferForPlayer($row, $offerYears, $offerTotal, $demands, $state);
+        } else {
+            $this->bufferExtraOffer($row, $state);
+        }
+    }
+
+    /**
+     * Handle a player's first (highest value) offer: flush the previous player's
+     * buffered lines, then accept or reject.
+     *
+     * @param OfferRow $row
+     * @param DayState $state
+     * @param-out DayState $state
+     */
+    private function processFirstOfferForPlayer(array $row, int $offerYears, int|float $offerTotal, float $demands, array &$state): void
+    {
+        $playerName = $row['name'];
+        $playerId = $row['pid'];
+        $offeringTeamName = $row['team'];
+        $perceivedValue = $row['perceivedvalue'];
+
+        // Flush previous player's buffered offer lines (sorted by team name)
+        $state['discordText'] .= $this->flushPlayerOfferLines($state['pendingHeader'], $state['pendingOfferLines'], $state['pendingAcceptanceLine']);
+        $state['pendingOfferLines'] = [];
+
+        $state['processedPlayers'][$playerName] = true;
+
+        // Get team info for IDs
+        $offeringTeam = Team::initialize($this->db, $offeringTeamName);
+        $player = Player::withPlayerID($this->db, $playerId);
+        $playerTeam = Team::initialize($this->db, $player->getTeamName() ?? '');
+
+        // Buffer Discord header
+        $state['pendingHeader'] = "**" . strtoupper("{$playerName}, {$playerTeam->city} {$player->getTeamName()}") . "** <@!{$playerTeam->discord_id}>\n";
+
+        $offeringTeamDiscordId = (string) ($offeringTeam->discord_id ?? '');
+        $state['pendingOfferLines'][] = [
+            'teamName' => $offeringTeamName,
+            'line' => $this->buildOfferLine($offeringTeamName, $row['offer1'], $row['offer2'], $row['offer3'], $row['offer4'], $row['offer5'], $row['offer6'], $offeringTeamDiscordId),
+        ];
+
+        if ($perceivedValue > $demands) {
+            // Offer accepted
+            $state['signings'][] = [
+                'playerName' => $playerName,
+                'playerId' => $playerId,
+                'teamName' => $offeringTeamName,
+                'teamId' => $offeringTeam->teamid,
+                'offers' => self::offerAmounts($row),
+                'offerYears' => $offerYears,
+                'offerTotal' => $offerTotal,
+                'usedMle' => $row['mle'] === 1,
+                'usedLle' => $row['lle'] === 1,
+            ];
+
+            $outcomeText = "{$playerName} accepts the {$offeringTeamName} offer of a {$offerYears}-year deal worth a total of {$offerTotal} million dollars.";
+            $state['newsHomeText'] .= $outcomeText . "\n";
+            $state['pendingAcceptanceLine'] = $outcomeText . " <@!{$offeringTeamDiscordId}>\n\n";
+        } else {
+            // Offer rejected
+            $state['rejections'][] = [
+                'playerName' => $playerName,
+                'reason' => 'Best offer did not meet player demands',
+            ];
+            $state['pendingAcceptanceLine'] = "**REJECTED**\n\n";
+        }
+    }
+
+    /**
+     * Additional offer for an already-processed player: buffer it for sorting.
+     *
+     * @param OfferRow $row
+     * @param DayState $state
+     * @param-out DayState $state
+     */
+    private function bufferExtraOffer(array $row, array &$state): void
+    {
+        $offeringTeamName = $row['team'];
+
+        $offeringTeam = Team::initialize($this->db, $offeringTeamName);
+        $offeringTeamDiscordId = (string) ($offeringTeam->discord_id ?? '');
+        $state['pendingOfferLines'][] = [
+            'teamName' => $offeringTeamName,
+            'line' => $this->buildOfferLine($offeringTeamName, $row['offer1'], $row['offer2'], $row['offer3'], $row['offer4'], $row['offer5'], $row['offer6'], $offeringTeamDiscordId),
+        ];
+    }
+
+    /**
+     * Flush the last player's buffered offer lines and assemble the day result.
+     * The day-processed marker is read last, after every Team/Player lookup.
+     *
+     * @param DayState $state
+     * @return array{
+     *     signings: list<array{
+     *         playerName: string,
+     *         playerId: int,
+     *         teamName: string,
+     *         teamId: int,
+     *         offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int},
+     *         offerYears: int,
+     *         offerTotal: float,
+     *         usedMle: bool,
+     *         usedLle: bool
+     *     }>,
+     *     rejections: list<array{
+     *         playerName: string,
+     *         reason: string
+     *     }>,
+     *     autoRejections: list<array{
+     *         playerName: string,
+     *         teamName: string,
+     *         offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int},
+     *         reason: string
+     *     }>,
+     *     allOffers: list<array{
+     *         playerName: string,
+     *         teamName: string,
+     *         offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int},
+     *         birdYears: int,
+     *         mle: int,
+     *         lle: int,
+     *         random: int,
+     *         perceivedValue: float
+     *     }>,
+     *     newsHomeText: string,
+     *     newsBodyText: string,
+     *     discordText: string,
+     *     processed_at: ?string
+     * }
+     */
+    private function finishDay(array $state, int $day): array
+    {
+        $state['discordText'] .= $this->flushPlayerOfferLines(
+            $state['pendingHeader'],
+            $state['pendingOfferLines'],
+            $state['pendingAcceptanceLine']
+        );
 
         return [
-            'signings' => $signings,
-            'rejections' => $rejections,
-            'autoRejections' => $autoRejections,
-            'allOffers' => $allOffers,
-            'newsHomeText' => $newsHomeText,
-            'newsBodyText' => $newsBodyText,
-            'discordText' => $discordText,
+            'signings' => $state['signings'],
+            'rejections' => $state['rejections'],
+            'autoRejections' => $state['autoRejections'],
+            'allOffers' => $state['allOffers'],
+            'newsHomeText' => $state['newsHomeText'],
+            'newsBodyText' => $state['newsBodyText'],
+            'discordText' => $state['discordText'],
             'processed_at' => $this->repository->getDayProcessedMarker($day),
         ];
     }

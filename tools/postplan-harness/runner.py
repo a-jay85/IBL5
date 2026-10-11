@@ -36,10 +36,11 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, llm_calls,
                      manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
-                     schemas, scope_conformance, statefile, usage_pause)
+                     reviewcache, schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
@@ -480,6 +481,18 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             conf_files = git.conformance_files()
             diff = git.diff_vs_base()
             meta = gh.pr_meta() or meta
+        # Review cache key, taken after Phase 4.5 so it hashes the diff the review reads.
+        cache_dir = _state_dir(out_dir, live, state_dir)
+        cache_key, cache_files = _review_cache_context(git, worktree, _master_sha(worktree), meta, plan,
+                                                       HARNESS_ROOT, log)
+        cache_rec = reviewcache.load_record(cache_dir, slug)
+        if cache_rec is not None and not reviewcache.pr_matches(cache_rec, pr):
+            log(f"reviewcache: record belongs to PR {cache_rec.get('pr_number')}, not {pr}; ignored")
+            cache_rec = None
+        if live:
+            res.run_id = os.path.basename(os.path.normpath(out_dir))
+        log(f"reviewcache: key diff={cache_key['diff_id'][:12] or '-'} version={cache_key['version'][:12] or '-'} "
+            f"files={len(cache_files)} prior={'hit' if cache_rec and reviewcache.key_matches(cache_rec, cache_key) else 'miss'}")
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         review_future = review_pool.submit(ReviewPhase(llm, gh).run, meta, cls, plan)
         review_pool.shutdown(wait=False)
@@ -770,6 +783,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                        fid.get("verdict_2"), fid.get("reviewed_tree_2"),
                                        fid.get("rounds_completed", 0)),
                 diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
+                reused_from=res.reused_from,
                 posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
             try:
                 cid = gh.pr_sticky_verdict(pr, sticky)
@@ -2306,6 +2320,29 @@ def _master_sha(worktree: str | None) -> str:
     proc = subprocess.run(["git", "-C", worktree, "rev-parse", "origin/master"],
                           capture_output=True, text=True)
     return proc.stdout.strip() or "origin/master"
+
+
+def _review_cache_context(gitad, worktree, master_sha, meta, plan, harness_root, log):
+    """Key inputs for the review cache, taken AFTER Phase 4.5 (thread ingestion can move HEAD).
+    Returns (key, per_file_ids). Any failure yields a key whose diff_id or version is ""
+    so reviewcache.key_matches is False and every arm runs in full."""
+    diff = gitad.diff_vs_base()
+    per_file = reviewcache.per_file_patch_ids(diff)
+    diff_id = fidelity.diff_patch_id(diff)
+    try:
+        texts = [fidelity._find_procedure(worktree, master_sha, fidelity.PROCEDURE_PATHS,
+                                          "fidelity-procedure"),
+                 fidelity._find_procedure(worktree, master_sha, fidelity.REMEDIATION_PATHS,
+                                          "remediation-procedure")]
+    except HarnessError:
+        log("reviewcache: procedure unreadable, version arm empty (full review)")
+        version = ""
+    else:
+        version = reviewcache.version_hash(harness_root, texts)
+    key = reviewcache.make_key(diff_id=diff_id, plan_hash=_plan_hash(plan), version=version,
+                               pr_title=(meta or {}).get("title", "") or "",
+                               file_list=sorted(per_file))
+    return key, per_file
 
 
 def _plan_hash(plan) -> str:

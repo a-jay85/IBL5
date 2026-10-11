@@ -241,10 +241,12 @@ h_eq "unset AUTOMOUSE_ORPHAN_PPID resolves to 1" "1" "$(orphan_knob AUTOMOUSE_OR
 h_eq "empty AUTOMOUSE_ORPHAN_PPID resolves to 1" "1" \
      "$(orphan_knob AUTOMOUSE_ORPHAN_PPID AUTOMOUSE_ORPHAN_PPID=)"
 
-# Process fixtures. The fixture script lives at <hbfx>/bin/automouse/run so the
-# production-shaped regex prefix still applies; only fixture processes can match.
+# Process fixtures. The fixture script lives at <hbfx>/bin/automouse-fx/run so it
+# keeps the production shape but misses ORPHAN_ARGV_RE_DEFAULT. Other harnesses
+# (bin/test-automouse-single) run a real default sweep in parallel on CI, and a
+# default-matching fixture gets reaped mid-case. Only HB_ARGV_RE matches it.
 FXROOT="$TMP/hbfx$$"
-FXD="$FXROOT/bin/automouse"
+FXD="$FXROOT/bin/automouse-fx"
 mkdir -p "$FXD"
 cat > "$FXD/run" <<'FIXTURE_EOF'
 #!/usr/bin/env bash
@@ -254,7 +256,7 @@ case "${1:-}" in
 esac
 FIXTURE_EOF
 cp "$FXD/run" "$FXD/runner"
-HB_ARGV_RE="^[^ ]*bash [^ ]*/hbfx$$/bin/automouse/run( |\$)"
+HB_ARGV_RE="^[^ ]*bash [^ ]*/hbfx$$/bin/automouse-fx/run( |\$)"
 FX_PIDS=""
 
 alive() { kill -0 "$1" 2>/dev/null; }

@@ -181,8 +181,9 @@ the earlier slot in that order claims them.</p>
         $jsbProduction = $this->service->computeJsbProduction($player);
 
         $thumbnail = \Player\PlayerImageHelper::renderThumbnail((int) $player['pid']);
+        $photoUrl = \Player\PlayerImageHelper::getImageUrl($player['pid']);
 
-        echo '<tr data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '" data-quality-score="' . HtmlSanitizer::e($player['quality_score'] ?? 0.0) . '">'
+        echo '<tr data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '" data-quality-score="' . HtmlSanitizer::e($player['quality_score'] ?? 0.0) . '" data-photo-url="' . HtmlSanitizer::e($photoUrl) . '">'
             . '<td>' . HtmlSanitizer::e($player['pos']) . '</td>'
             . '<td class="ibl-player-cell">'
             . '<input type="hidden" name="pid' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['pid']) . '">'

@@ -185,6 +185,7 @@ def test_regression_replay_tmp_to_rl_is_accepted_and_hold_still_set(repo):
     assert _ADAPTED in notes
     verdict = open(f"/tmp/postplan-adapt-review-{key}/verdict.txt").read()
     assert verdict.splitlines()[0] == "ADAPTED-LINE-1=CONFIRMED"
+    # the reviewer sees the derived master transform, never the resolver's j.old/j.new
     blocks = open(f"/tmp/postplan-adapt-review-{key}/adaptations.txt").read()
     assert '    rewrite:  /tmp -> "$RL"' in blocks.splitlines()
     assert "/tmp/ ->" not in blocks

@@ -38,6 +38,16 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
         return (string) ob_get_clean();
     }
 
+    private function runArticlesWithRawPlayer(mixed $player): string
+    {
+        $_REQUEST['player'] = $player;
+        $GLOBALS['mysqli_db'] = $this->mockDb;
+        ob_start();
+        require __DIR__ . '/../../../modules/Player/articles.php';
+
+        return (string) ob_get_clean();
+    }
+
     private function articlesSource(): string
     {
         $source = file_get_contents(__DIR__ . '/../../../modules/Player/articles.php');
@@ -207,5 +217,55 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringNotContainsString('$player . ', $source);
         $this->assertStringNotContainsString('. $player', $source);
         $this->assertStringContainsString('\'%\' . addcslashes($player, \'\\\\%_\') . \'%\'', $source);
+    }
+
+    public function testArrayPlayerInputRendersNoticeAndRunsNoQuery(): void
+    {
+        $output = $this->runArticlesWithRawPlayer(['x']);
+
+        $this->assertStringContainsString('No player specified', $output);
+        $this->assertSame([], $this->mockDb->getPreparedQueries());
+        $this->assertSame([], $this->mockDb->getExecutedQueries());
+    }
+
+    public function testFalseResultRendersErrorNoticeWithoutRows(): void
+    {
+        $stmt = new class {
+            public function bind_param(string $types, string ...$vars): bool
+            {
+                return true;
+            }
+
+            public function execute(): bool
+            {
+                return true;
+            }
+
+            public function get_result(): false
+            {
+                return false;
+            }
+
+            public function close(): bool
+            {
+                return true;
+            }
+        };
+        $GLOBALS['mysqli_db'] = new class ($stmt) {
+            public function __construct(private object $stmt)
+            {
+            }
+
+            public function prepare(string $query): object
+            {
+                return $this->stmt;
+            }
+        };
+        $_REQUEST['player'] = 'Kobe';
+        ob_start();
+        require __DIR__ . '/../../../modules/Player/articles.php';
+        $output = (string) ob_get_clean();
+
+        $this->assertSame('<small>Error searching for articles.</small>', $output);
     }
 }

@@ -131,3 +131,50 @@ def test_char_held16_fix_green_defect_stays_held(monkeypatch, tmp_path):
     assert os.path.exists(flag)
     assert _merge_count(out) == 0
     assert res.terminal == TerminalState.SHIPPED_HELD
+
+
+# ---------------------------------------------------------------------------
+# _post_fix_meta_checks unit tests
+# ---------------------------------------------------------------------------
+
+def _post_fix(tmp_path, fixture, *, live=False, pr=7):
+    flag = tmp_path / "flag.failed"
+    flag.write_text("check-docs-since\n")
+    logged = []
+    rc = runner._post_fix_meta_checks(None, pr, str(flag), live=live,
+                                      fixture=fixture, log=logged.append)
+    return rc, str(flag), logged
+
+
+def test_post_fix_meta_checks_rc0_deletes_flag(tmp_path):
+    rc, flag, logged = _post_fix(tmp_path, {"meta_checks_post_rc_after_fix": 0})
+    assert rc == 0
+    assert not os.path.exists(flag)
+    assert any("pre-push flag deleted" in m for m in logged)
+
+
+def test_post_fix_meta_checks_rc1_keeps_flag(tmp_path):
+    rc, flag, logged = _post_fix(tmp_path, {"meta_checks_post_rc_after_fix": 1})
+    assert rc == 1
+    assert os.path.exists(flag)
+    assert any("rc=1 on current head; pre-push flag kept" in m for m in logged)
+
+
+def test_post_fix_meta_checks_rc2_keeps_flag(tmp_path):
+    rc, flag, _ = _post_fix(tmp_path, {"meta_checks_post_rc_after_fix": 2})
+    assert rc == 2
+    assert os.path.exists(flag)
+
+
+def test_post_fix_meta_checks_absent_key_is_unknown(tmp_path):
+    rc, flag, _ = _post_fix(tmp_path, {})
+    assert rc == 2
+    assert os.path.exists(flag)
+
+
+def test_post_fix_meta_checks_live_oserror_is_unknown(tmp_path):
+    import unittest.mock as mock
+    with mock.patch.object(runner.subprocess, "run", side_effect=OSError):
+        rc, flag, _ = _post_fix(tmp_path, {}, live=True, pr=7)
+    assert rc == 2
+    assert os.path.exists(flag)

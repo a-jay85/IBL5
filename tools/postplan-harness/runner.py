@@ -2200,6 +2200,35 @@ def _body_check(llm, git, gh, copy, copy_degraded, cls, log, worktree=None,
     return result, degraded
 
 
+def _post_fix_meta_checks(worktree, pr, flag, *, live, fixture, log) -> int:
+    """Phase 7: post-pr meta-checks on the head the fix loop left behind.
+
+    rc 0 is the only result that deletes the pre-push flag. rc 1 (red) and rc 2
+    (could not run / UNKNOWN) leave it in place: condition (16) clears on fresh
+    evidence only, never on a failure to gather it.
+    """
+    if live and pr:
+        argv = [os.path.join(worktree or "", "bin", "run-meta-checks-local"),
+                "--stage", "post-pr", "--pr", str(pr)]
+        try:
+            rc = subprocess.run(argv, cwd=worktree, capture_output=True, text=True).returncode
+        except OSError:
+            rc = 2
+    else:
+        # replay-only seam, the meta_checks_post_rc pattern. Absent key = 2 (UNKNOWN), so
+        # a legacy fixture that scripts a green fix loop can never clear (16) by omission.
+        rc = int((fixture or {}).get("meta_checks_post_rc_after_fix", 2))
+    if rc == 0:
+        try:
+            os.unlink(flag)
+            log("phase7 re-arm: post-pr meta-checks passed on current head; pre-push flag deleted")
+        except FileNotFoundError:
+            log("phase7 re-arm: post-pr meta-checks passed on current head; no pre-push flag present")
+    else:
+        log(f"phase7 re-arm: post-pr meta-checks rc={rc} on current head; pre-push flag kept")
+    return rc
+
+
 def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,
                          failures_out: list | None = None, llm=None) -> bool:
     if os.environ.get("PRE_PUSH_META_CHECKS_SKIP") == "1":

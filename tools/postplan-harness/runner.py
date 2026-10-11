@@ -493,8 +493,36 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.run_id = os.path.basename(os.path.normpath(out_dir))
         log(f"reviewcache: key diff={cache_key['diff_id'][:12] or '-'} version={cache_key['version'][:12] or '-'} "
             f"files={len(cache_files)} prior={'hit' if cache_rec and reviewcache.key_matches(cache_rec, cache_key) else 'miss'}")
+        conflict_only = False
+        if cache_rec is not None and not reviewcache.key_matches(cache_rec, cache_key):
+            conflict_only = _conflict_only_proof(git, cache_rec, cache_key, cache_files, log)
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        review_future = review_pool.submit(ReviewPhase(llm, gh).run, meta, cls, plan)
+        review_phase = ReviewPhase(llm, gh)
+        cur_gates = review_phase.gates(cls) if cache_rec is not None else None
+        restored = None
+        key_hit = cache_rec is not None and reviewcache.key_matches(cache_rec, cache_key)
+        if key_hit or conflict_only:
+            restored = reviewcache.restore_review(cache_rec.get("review"), cur_gates)
+        interdiff = None if (restored is not None or key_hit) else \
+            _interdiff_eligibility(cache_rec, cache_key, cache_files, cur_gates, cls)
+        if restored is not None:
+            res.reused_from["review"] = cache_rec["review"].get("run_id") or cache_rec["run_id"]
+            log(f"reviewcache: review reused from {res.reused_from['review']} "
+                + ("(conflict-only delta) " if conflict_only and not key_hit else "")
+                + f"({len(restored[0])} findings, no LLM calls, nothing posted)")
+            review_future = review_pool.submit(lambda: restored)
+        elif interdiff is not None:
+            delta, prior = interdiff
+            keep_f, keep_s = reviewcache.reusable_by_path(prior[0], prior[2], delta, set(cache_files))
+            res.reused_from["review"] = cache_rec["review"].get("run_id") or cache_rec["run_id"]
+            res.review_delta = sorted(delta)
+            review_future = review_pool.submit(_interdiff_review, review_phase, meta, cls, plan,
+                                               delta, keep_f, keep_s, log)
+        else:
+            if cache_rec is not None:
+                log("reviewcache: review miss (" + (
+                    "key changed" if not key_hit else "arm unusable") + "); full review")
+            review_future = review_pool.submit(review_phase.run, meta, cls, plan)
         review_pool.shutdown(wait=False)
         review_joined = []
 
@@ -622,7 +650,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                       reviewed_tree, live, log, res, before_remediation=_join_review,
                       unresolved_conformance=res.unresolved_conformance,
                       meta_check_failures=res.meta_check_failures,
-                      scored_findings=res.scored_findings)
+                      scored_findings=res.scored_findings,
+                      cache_rec=cache_rec, cache_version=cache_key["version"],
+                      conflict_only=conflict_only)
         _join_review()
         # A remediation loop moved the head, up to MAX_FIDELITY_ROUNDS times. Phase 7
         # must watch CI for the last commit, which is what remediation_sha aliases after
@@ -2322,6 +2352,90 @@ def _master_sha(worktree: str | None) -> str:
     return proc.stdout.strip() or "origin/master"
 
 
+def _harness_version(worktree, master_sha, harness_root, log=None) -> str:
+    """reviewcache.version_hash over the procedure CONTENT at master_sha; "" when unreadable.
+    The SHA itself never enters the hash, so a master move with identical text keeps it."""
+    try:
+        texts = [fidelity._find_procedure(worktree, master_sha, fidelity.PROCEDURE_PATHS,
+                                          "fidelity-procedure"),
+                 fidelity._find_procedure(worktree, master_sha, fidelity.REMEDIATION_PATHS,
+                                          "remediation-procedure")]
+    except HarnessError:
+        if log:
+            log("reviewcache: procedure unreadable, version arm empty (full review)")
+        return ""
+    return reviewcache.version_hash(harness_root, texts)
+
+
+def _conflict_key(branch: str) -> str:
+    return (branch or "").translate(str.maketrans("/:", "--"))
+
+
+def _conflict_only_proof(git, cache_rec, cache_key, cache_files, log) -> bool:
+    """Gather the three on-disk facts and run reviewcache.conflict_only_delta.
+    Every read failure is a False proof (the ordinary key path then decides)."""
+    from harness.adapters.gitad import lostwork_pre_path
+    from harness.conflict import verdict_ok_path
+    try:
+        key = _conflict_key(git.branch())
+        head = git.head()
+    except Exception:
+        return False
+    if not key:
+        return False
+    try:
+        with open(lostwork_pre_path(key)) as fh:
+            pre_patch_id = fidelity.diff_patch_id(fh.read())
+    except (OSError, ValueError):
+        pre_patch_id = ""
+    try:
+        with open(f"/tmp/postplan-conflict-files-{key}.txt") as fh:
+            manifest = [ln.strip() for ln in fh if ln.strip()]
+    except (OSError, ValueError):
+        manifest = []
+    try:
+        with open(verdict_ok_path(key, head)) as fh:
+            verdict_ok = fh.readline().rstrip() == "CONFLICT-REVIEW=CLEAN"
+    except (OSError, ValueError):
+        verdict_ok = False
+    why = reviewcache.conflict_only_failure(cache_rec, cache_key, cache_files, pre_patch_id,
+                                            manifest, verdict_ok)
+    if why:
+        log(f"reviewcache: conflict-only delta not proven ({why})")
+        return False
+    delta = sorted(reviewcache.file_delta(cache_rec.get("per_file_ids"), cache_files))
+    log(f"reviewcache: conflict-only delta proven ({len(delta)} file(s): {', '.join(delta)})")
+    return True
+
+
+def _interdiff_eligibility(cache_rec, cache_key, cache_files, gates, cls):
+    """(delta, restored_tuple) when the review may run on the per-file delta only, else None."""
+    if cache_rec is None:
+        return None
+    stored = cache_rec.get("key") or {}
+    for f in ("plan_hash", "version"):
+        if not cache_key.get(f) or stored.get(f) != cache_key.get(f):
+            return None
+    if not cache_key.get("diff_id") or stored.get("diff_id") == cache_key["diff_id"]:
+        return None
+    prior = reviewcache.restore_review(cache_rec.get("review"), gates)
+    if prior is None:
+        return None
+    delta = reviewcache.file_delta(cache_rec.get("per_file_ids"), cache_files)
+    if not delta or delta >= set(cache_files):
+        return None
+    if not reviewcache.subset_diff(cls.filtered_diff, delta):
+        return None   # delta lives only in filtered-out files: never send agents an empty diff
+    return delta, prior
+
+
+def _interdiff_review(review_phase, meta, cls, plan, delta, keep_findings, keep_scored, log):
+    sub = dataclasses.replace(cls, filtered_diff=reviewcache.subset_diff(cls.filtered_diff, delta))
+    findings, gates, scored, degraded = review_phase.run(meta, sub, plan, reused=keep_findings)
+    log(f"reviewcache: interdiff reviewed {len(delta)} file(s), merged {len(keep_findings)} reused finding(s)")
+    return (keep_findings + findings, gates, keep_scored + scored, degraded)
+
+
 def _review_cache_context(gitad, worktree, master_sha, meta, plan, harness_root, log):
     """Key inputs for the review cache, taken AFTER Phase 4.5 (thread ingestion can move HEAD).
     Returns (key, per_file_ids). Any failure yields a key whose diff_id or version is ""
@@ -2329,16 +2443,7 @@ def _review_cache_context(gitad, worktree, master_sha, meta, plan, harness_root,
     diff = gitad.diff_vs_base()
     per_file = reviewcache.per_file_patch_ids(diff)
     diff_id = fidelity.diff_patch_id(diff)
-    try:
-        texts = [fidelity._find_procedure(worktree, master_sha, fidelity.PROCEDURE_PATHS,
-                                          "fidelity-procedure"),
-                 fidelity._find_procedure(worktree, master_sha, fidelity.REMEDIATION_PATHS,
-                                          "remediation-procedure")]
-    except HarnessError:
-        log("reviewcache: procedure unreadable, version arm empty (full review)")
-        version = ""
-    else:
-        version = reviewcache.version_hash(harness_root, texts)
+    version = _harness_version(worktree, master_sha, harness_root, log)
     key = reviewcache.make_key(diff_id=diff_id, plan_hash=_plan_hash(plan), version=version,
                                pr_title=(meta or {}).get("title", "") or "",
                                file_list=sorted(per_file))
@@ -2364,7 +2469,8 @@ def _plan_hash(plan) -> str:
 
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                   reviewed_tree, live, log, res, before_remediation=None,
-                  unresolved_conformance=(), meta_check_failures=(), scored_findings=()):
+                  unresolved_conformance=(), meta_check_failures=(), scored_findings=(),
+                  cache_rec=None, cache_version="", conflict_only=False):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
 
     `before_remediation` runs once, before `build_packet()`, so Phase 4 results are
@@ -2404,13 +2510,35 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             prior_sticky = None
     carried, decline_reason = fidelity.carry_forward_predicate(
         prior_sticky, diff_id, plan_hash)
+    # Second necessary condition: the local review-cache record must hold a clean,
+    # un-remediated fidelity arm for this diff under the same harness/prompt version.
+    reuse_diff = diff_id
+    carry_reason = ""
+    if not carried and decline_reason == "diff-changed" and conflict_only and cache_rec:
+        # Proven conflict-only delta: the sticky and the arm were written for the
+        # pre-rebase diff, which equals the cached diff id.
+        reuse_diff = cache_rec["key"].get("diff_id", "")
+        carried, decline_reason = fidelity.carry_forward_predicate(
+            prior_sticky, reuse_diff, plan_hash)
+        carry_reason = "conflict-only-delta" if carried else ""
+    if carried:
+        reuse_run = reviewcache.fidelity_reusable(cache_rec, cache_version, reuse_diff, plan_hash)
+        if reuse_run is None:
+            carried = None
+            decline_reason = ("no-cache-record" if not cache_rec or not cache_rec.get("fidelity")
+                              else "version-changed"
+                              if (cache_rec.get("key") or {}).get("version") != cache_version
+                              or not cache_version
+                              else "cache-arm-unusable")
     # The sticky composed after a carry still quotes verdict_path(pr). If /tmp lost it,
     # carrying would overwrite the prior sticky's real excerpt and digest with
     # placeholders, so decline and let the full review regenerate the file.
     if carried and not fidelity.verdict_file_usable(fidelity.verdict_path(pr)):
         carried, decline_reason = None, "verdict-file-missing"
     if carried:
-        log(f"phase5.5 fidelity: review: carried forward (patch-id {diff_id[:12]})")
+        res.reused_from["fidelity"] = reuse_run
+        log(f"phase5.5 fidelity: review: carried forward (patch-id {diff_id[:12]})"
+            + (" (conflict-only delta)" if carry_reason else ""))
         res.fidelity = {"verdict_1": carried, "error_kind": None,
                         "reviewed_tree": reviewed_tree,
                         "verdict_path": fidelity.verdict_path(pr),
@@ -2420,7 +2548,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
                         "diff_id": diff_id, "plan_hash": plan_hash, "models": [],
-                        "carried_forward": True}
+                        "carried_forward": True,
+                        **({"carry_reason": carry_reason} if carry_reason else {})}
         return carried, ""
     log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
     # Join Phase 4 before building the fidelity packet so phase4b_ran is truthful.

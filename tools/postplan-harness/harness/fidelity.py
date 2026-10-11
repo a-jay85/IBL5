@@ -1357,8 +1357,12 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     for run_id, arms in by_run.items():
         out.append(f"**Reused from:** {run_id} ({', '.join(sorted(arms))})")
     if fid.get("carried_forward"):
-        out.append("**Carried forward:** prior review reused; branch diff (patch-id) and "
-                   "plan unchanged since the recorded verdict")
+        if fid.get("carry_reason") == "conflict-only-delta":
+            out.append("**Carried forward:** prior review reused; branch diff changed only in "
+                       "conflict-resolved files reviewed this run (conflict-only delta)")
+        else:
+            out.append("**Carried forward:** prior review reused; branch diff (patch-id) and "
+                       "plan unchanged since the recorded verdict")
     if fid.get("verdict_2") is not None:
         out.append(f"**Re-reviewed tree:** {fid.get('reviewed_tree_2') or 'unrecorded'} "
                    f"({fid.get('verdict_2')})")

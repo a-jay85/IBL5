@@ -130,6 +130,11 @@ class StackedRebaseResult:
     squash_note: str = ""
 
 
+def lostwork_pre_path(key: str) -> str:
+    """The pre-rebase PR patch capture_lostwork_pre writes (lostwork.sh reads it too)."""
+    return f"/tmp/pr-ready-diff-pre-{key}.patch"
+
+
 class LiveGit:
     def __init__(self, worktree: str, push_remote: str | None = None, llm=None):
         self.worktree = worktree
@@ -679,7 +684,7 @@ class LiveGit:
         self._pre_rebase_sha = pre_rebase_sha  # arm SIGTERM handler
         pre_patch = self._run_bytes("diff", f"{master_sha}...HEAD")
         if pre_patch.strip():
-            Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre_patch)
+            Path(lostwork_pre_path(key)).write_bytes(pre_patch)
 
         purge_verdict_artifacts(key)
 
@@ -908,7 +913,7 @@ class LiveGit:
         pre_patch = self._run_bytes("diff", f"{ibl_base}...HEAD")
         if not pre_patch.strip():
             return StackedRebaseResult(False, "pre-rebase diff vs iblBase is empty")
-        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre_patch)
+        Path(lostwork_pre_path(key)).write_bytes(pre_patch)
 
         # Pin master_sha once so a concurrent fetch cannot split the proof across two bases
         master_sha = self._run("rev-parse", "origin/master").strip()
@@ -1100,7 +1105,7 @@ class LiveGit:
         pre = self._run_bytes("diff", self._merge_base("origin/master"))
         if not pre.strip():
             return False
-        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre)
+        Path(lostwork_pre_path(key)).write_bytes(pre)
         return True
 
     def prove_lostwork(self, key: str) -> tuple[bool, str]:

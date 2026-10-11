@@ -176,3 +176,110 @@ def per_file_patch_ids(diff: str) -> dict:
             return {}
         out[path] = pid
     return out
+
+
+def restore_review(arm, gates):
+    """Rebuild ReviewPhase.run's 4-tuple from a cached `review` arm, or None (= miss)."""
+    from harness.state import Finding
+
+    if not isinstance(arm, dict) or arm.get("degraded_agents") != []:
+        return None
+    if arm.get("gates") != gates:
+        return None
+    raw, scored = arm.get("findings"), arm.get("scored_findings")
+    if not isinstance(raw, list) or not isinstance(scored, list):
+        return None
+    findings = []
+    for d in raw:
+        if not isinstance(d, dict) or not isinstance(d.get("score"), int) \
+                or isinstance(d.get("score"), bool):
+            return None
+        try:
+            findings.append(Finding(**d))
+        except TypeError:
+            return None
+    return (findings, gates, [dict(s) for s in scored], [])
+
+
+def file_delta(prior, current) -> set:
+    """Paths added, removed, or whose per-file patch-id changed."""
+    prior, current = prior or {}, current or {}
+    return {p for p in set(prior) | set(current) if prior.get(p) != current.get(p)}
+
+
+def subset_diff(diff: str, paths) -> str:
+    return "".join(s for p, s in split_diff_by_file(diff).items() if p in paths)
+
+
+def reusable_by_path(findings, scored, delta, current_files):
+    """Cached findings (and scored rows) on files that are still present and unchanged.
+
+    Path-less findings are dropped: the agents that produce them re-run on the subset
+    with the full PR metadata and regenerate them.
+    """
+    def keep(path) -> bool:
+        return isinstance(path, str) and bool(path) and path in current_files and path not in delta
+
+    return ([f for f in findings if keep(getattr(f, "path", None))],
+            [s for s in scored if isinstance(s, dict) and keep(s.get("path"))])
+
+
+FIDELITY_REUSABLE_VERDICTS = ("READY", "READY WITH NOTES")
+
+
+def fidelity_reusable(record, version, diff_id, plan_hash):
+    """The producing run id when the cached fidelity arm may stand in, else None."""
+    if not isinstance(record, dict):
+        return None
+    arm = record.get("fidelity")
+    key = record.get("key")
+    if not isinstance(arm, dict) or not isinstance(key, dict):
+        return None
+    if not version or key.get("version") != version:
+        return None
+    if not diff_id or not plan_hash:
+        return None
+    if arm.get("diff_id") != diff_id or arm.get("plan_hash") != plan_hash:
+        return None
+    if arm.get("verdict") not in FIDELITY_REUSABLE_VERDICTS or arm.get("remediated") is not False:
+        return None
+    run_id = arm.get("run_id") or record.get("run_id")
+    return run_id if isinstance(run_id, str) and run_id else None
+
+
+def conflict_only_failure(record, key, current_files, pre_patch_id, manifest_paths, verdict_ok) -> str:
+    """"" when the delta since the cached diff is proven conflict-resolution only; else
+    the first failing clause."""
+    if not isinstance(record, dict) or not isinstance(record.get("key"), dict):
+        return "no-record"
+    if not isinstance(record.get("review"), dict) or not isinstance(record.get("fidelity"), dict):
+        return "arm-missing"
+    stored = record["key"]
+    for f in KEY_FIELDS:
+        if f == "diff_id":
+            continue
+        if not stored.get(f) or stored.get(f) != (key or {}).get(f):
+            return f"{f}-changed"
+    if not key.get("diff_id") or key["diff_id"] == stored.get("diff_id"):
+        return "diff-unchanged"
+    if not isinstance(pre_patch_id, str) or len(pre_patch_id) != 40 \
+            or any(c not in "0123456789abcdef" for c in pre_patch_id):
+        return "no-pre-patch-id"
+    if pre_patch_id != stored.get("diff_id"):
+        return "pre-patch-id-mismatch"
+    manifest = set(manifest_paths or ())
+    if not manifest:
+        return "empty-manifest"
+    delta = file_delta(record.get("per_file_ids"), current_files)
+    if not delta:
+        return "empty-delta"
+    if not delta <= manifest:
+        return "delta-outside-manifest"
+    if verdict_ok is not True:
+        return "conflict-review-not-clean"
+    return ""
+
+
+def conflict_only_delta(record, key, current_files, pre_patch_id, manifest_paths, verdict_ok) -> bool:
+    return conflict_only_failure(record, key, current_files, pre_patch_id,
+                                 manifest_paths, verdict_ok) == ""

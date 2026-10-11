@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use TeamOffDefStats\TeamOffDefStatsRepository;
 use TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for TeamOffDefStatsRepository
@@ -247,6 +248,85 @@ class TeamOffDefStatsRepositoryTest extends TestCase
     public function testGameTypesForPhase(string $phase, array $expected): void
     {
         $this->assertSame($expected, TeamOffDefStatsRepository::gameTypesForPhase($phase));
+    }
+
+    private static function normalizeSql(string $sql): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', $sql));
+    }
+
+    public function testGetAllTeamStatsBindsGameTypesAsValues(): void
+    {
+        $mockDb = new MockDatabase();
+        $repository = new TeamOffDefStatsRepository($mockDb);
+
+        $repository->getAllTeamStats(2025, [1, 2]);
+
+        $prepared = self::normalizeSql($mockDb->getPreparedQueries()[0]);
+        self::assertStringContainsString('WHERE bst.game_type IN (?, ?) AND bst.season_year = ?', $prepared);
+        self::assertStringContainsString('WHERE my.game_type IN (?, ?) AND my.season_year = ?', $prepared);
+        self::assertSame([1, 2, 2025, 1, 2, 2025], $mockDb->getLastBoundParams());
+    }
+
+    public function testGetAllTeamStatsWithOneGameTypeUsesEqualityPlaceholder(): void
+    {
+        $mockDb = new MockDatabase();
+        $repository = new TeamOffDefStatsRepository($mockDb);
+
+        $repository->getAllTeamStats(2025, [3]);
+
+        $prepared = self::normalizeSql($mockDb->getPreparedQueries()[0]);
+        self::assertStringContainsString('WHERE bst.game_type = ? AND bst.season_year = ?', $prepared);
+        self::assertStringContainsString('WHERE my.game_type = ? AND my.season_year = ?', $prepared);
+        self::assertSame([3, 2025, 3, 2025], $mockDb->getLastBoundParams());
+    }
+
+    public function testGetAllTeamStatsWithNoGameTypesOmitsFilter(): void
+    {
+        $mockDb = new MockDatabase();
+        $repository = new TeamOffDefStatsRepository($mockDb);
+
+        $repository->getAllTeamStats(2025, []);
+
+        $prepared = self::normalizeSql($mockDb->getPreparedQueries()[0]);
+        self::assertStringContainsString('WHERE bst.season_year = ?', $prepared);
+        self::assertStringContainsString('WHERE my.season_year = ?', $prepared);
+        self::assertStringNotContainsString('game_type', $prepared);
+        self::assertSame([2025, 2025], $mockDb->getLastBoundParams());
+    }
+
+    public function testGetAllTeamStatsRejectsMoreThanThreeGameTypes(): void
+    {
+        $mockDb = new MockDatabase();
+        $repository = new TeamOffDefStatsRepository($mockDb);
+
+        try {
+            $repository->getAllTeamStats(2025, [1, 2, 3, 4]);
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException) {
+            self::assertSame([], $mockDb->getPreparedQueries());
+        }
+    }
+
+    public function testGetTeamBothStatsAllGameTypesOmitsGameTypeFilter(): void
+    {
+        $allTypesDb = new MockDatabase();
+        (new TeamOffDefStatsRepository($allTypesDb))->getTeamBothStats('Metros', 2025, false);
+
+        $allTypesPrepared = $allTypesDb->getPreparedQueries();
+        self::assertNotSame([], $allTypesPrepared);
+        foreach ($allTypesPrepared as $sql) {
+            self::assertStringNotContainsString('game_type', $sql);
+        }
+
+        $regularDb = new MockDatabase();
+        (new TeamOffDefStatsRepository($regularDb))->getTeamBothStats('Metros', 2025);
+
+        $regularPrepared = $regularDb->getPreparedQueries();
+        self::assertNotSame([], $regularPrepared);
+        foreach ($regularPrepared as $sql) {
+            self::assertStringContainsString('game_type = 1 AND', $sql);
+        }
     }
 
     /**

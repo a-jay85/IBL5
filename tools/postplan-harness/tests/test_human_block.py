@@ -15,6 +15,10 @@ from harness.state import RunResult, TerminalState
 
 WT = "/Users/x/IBL5-worktrees/feat-thing"
 LOG = "/tmp/post-plan-now-feat-thing.log"
+# Main-checkout bin/postplan-fix, derived from this file's own location (not from runner).
+FIX = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+    "bin", "postplan-fix")
 
 _ADR_ERR = ("pre-push-adr-hook: Decision-trigger surfaces detected:\n"
             "  - [bin-script] bin/foo — Tool script\n"
@@ -73,8 +77,10 @@ def test_block_shape_every_class(key):
     assert f"\nFix:\n  1. cd {WT}" in block
     steps = [ln for ln in lines if ln.startswith("  ") and ln.strip()[:1].isdigit()]
     assert steps[-1].endswith(". bin/post-plan-now")
-    assert lines[-2] == "Or open Claude in that folder and ask it to fix the ship block."
-    assert lines[-1] == f"Log: {LOG}"
+    assert lines[-3] == f"Log: {LOG}"
+    assert lines[-2] == "Or paste this to have Claude fix it:"
+    assert lines[-1] == f"{FIX} feat/thing"
+    assert "Or open Claude in that folder" not in block
 
 
 @pytest.mark.parametrize("key", list(_CLASSES))
@@ -174,7 +180,7 @@ def test_long_path_truncated_to_120():
 def test_worst_case_block_under_budget_keeps_fix_and_log(monkeypatch):
     paths = [f"{i:02d}" + "p" * 198 for i in range(20)]
     error = ("n" * 5000) + "\n" + "\n".join(f"Merge conflict in {p}" for p in paths)
-    branch, wt, log = "z" * 200, "w" * 500, "l" * 500
+    branch, wt, log = "z" * 150, "w" * 500, "l" * 500
     res = _res("rebase-conflict", error, slug=branch)
     # With the cap lifted the 5-path render is over budget, so the zero-path
     # re-render is what keeps the shipped block under it.
@@ -184,7 +190,9 @@ def test_worst_case_block_under_budget_keeps_fix_and_log(monkeypatch):
     assert runner._BLOCK_BUDGET <= 1845
     block = runner.human_block(res, 3, wt, log)
     assert len(block) <= 1800
-    assert block.split("\n")[-1] == f"Log: {log}"
+    lines = block.split("\n")
+    assert lines[-1].startswith(FIX)
+    assert f"Log: {log}" in lines
     for step in ("git fetch origin master", "git rebase origin/master",
                  "git add <file> && git rebase --continue", ". bin/post-plan-now"):
         assert step in block
@@ -193,7 +201,37 @@ def test_worst_case_block_under_budget_keeps_fix_and_log(monkeypatch):
 
 def test_log_line_defaults_when_log_path_empty():
     block = runner.human_block(_res("local-gate", _ADR_ERR), 3, WT, "")
-    assert block.split("\n")[-1] == "Log: (see the run log)"
+    lines = block.split("\n")
+    assert lines[-1].startswith(FIX)
+    assert "Log: (see the run log)" in lines
+
+
+def test_paste_line_uses_pr_number_when_known():
+    block = _block("gate-adr", pr_number=17)
+    assert block.split("\n")[-1] == f"{FIX} 17"
+
+
+def test_no_paste_line_without_slug_or_pr():
+    kind, error, extra = _CLASSES["gate-adr"]
+    block = runner.human_block(_res(kind, error, slug="", **extra), 3, WT, LOG)
+    assert block.split("\n")[-1] == f"Log: {LOG}"
+    assert "postplan-fix" not in block
+    assert "Or paste this" not in block
+
+
+def test_paste_line_survives_budget_shrink(monkeypatch):
+    error = "\n".join(f"Merge conflict in ibl5/classes/X{i}.php" for i in range(40))
+    res = _res("rebase-conflict", error, slug="z" * 200)
+    wt, log = "w" * 500, "l" * 500
+    with monkeypatch.context() as m:
+        m.setattr(runner, "_BLOCK_BUDGET", 10**6)
+        full = runner.human_block(res, 3, wt, log)
+    shrunk = runner.human_block(res, 3, wt, log)
+    assert len(shrunk) < len(full)
+    assert "ibl5/classes/X0.php" not in shrunk
+    lines = shrunk.split("\n")
+    assert lines[-2] == "Or paste this to have Claude fix it:"
+    assert lines[-1].startswith(FIX)
 
 
 @pytest.mark.parametrize("fn", ["_adr_trigger_paths", "_conflict_paths",

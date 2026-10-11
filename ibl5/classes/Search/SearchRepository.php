@@ -55,7 +55,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
         // The prefix is an operator-controlled config identifier spliced into table
         // names (never a bindable value). Only members of SUPPORTED_PREFIXES reach
         // query text; anything else falls back to 'nuke', the only prefix the
-        // schema defines (see docs/schema/current-schema.sql).
+        // schema defines (see ibl5/docs/schema/current-schema.sql).
         $this->prefix = in_array($prefix, self::SUPPORTED_PREFIXES, true) ? $prefix : 'nuke';
     }
 

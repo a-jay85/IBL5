@@ -141,7 +141,7 @@ def attempt_prose_fix(*, git, llm, repo: str, argv: list[str], first_stdout: str
                             denied_tools=PROSE_FIX_DENIED_TOOLS)
         except HarnessError as e:
             _reset(repo, head_before)
-            if e.kind == "llm-usage-limit":
+            if e.kind in ("llm-usage-limit", "llm-auth-expired"):
                 raise
             log(f"phase2: prose-fix attempt {n} ({model}) model error {e.kind}")
             break

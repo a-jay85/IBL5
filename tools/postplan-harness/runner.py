@@ -2926,7 +2926,8 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 # Deterministic walls a full skill re-run cannot climb — see exit_code_for. A
 # subprocess-timeout is one too: the skill re-run would hang on the same step.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
-                      "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty",
+                      "llm-usage-limit", "llm-auth-expired",
+                      "usage-pause-unconfirmed", "usage-pause-dirty",
                       SUBPROCESS_TIMEOUT)
 PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
@@ -2968,13 +2969,14 @@ def _reported_gate_class(res: RunResult) -> str:
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
     3 = fail-closed sentinel: bin/post-plan-now MUST NOT escalate to the /post-plan
-        skill session. Four kinds land here. `rebase-conflict` — a stacked-branch
+        skill session. Five kinds land here. `rebase-conflict` — a stacked-branch
         rebase a human must judge. `local-gate` — a pre-commit/pre-push hook denial
         (ADR trigger, stale doc, rules byte budget). `remote-head-diverged`: the PR
         branch was rewritten on GitHub with content the harness did not produce; a
         skill re-run would re-rebase and push over it. `llm-usage-limit`: the Claude
         CLI returned a session/rate/API limit message; a skill re-run would hit the
-        same wall immediately. All four are deterministic walls the ~1M-token skill
+        same wall immediately. `llm-auth-expired`: the Claude CLI login expired; the
+        skill re-run uses the same login. All five are deterministic walls the ~1M-token skill
         re-run cannot climb.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
     0 = shipped (armed or held), nothing to ship, degraded, or hold-repeat declined.
@@ -3131,6 +3133,7 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     wt = worktree or "(the worktree folder)"
     log = log_path or "(see the run log)"
     if res.error_kind in ("rebase-conflict", "remote-head-diverged", "llm-usage-limit",
+                          "llm-auth-expired",
                           "usage-pause-unconfirmed", "usage-pause-dirty"):
         key = res.error_kind
     elif res.error_kind == "local-gate":
@@ -3188,6 +3191,10 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     elif key in ("llm-usage-limit", "usage-pause-unconfirmed"):
         why = "The Claude usage limit was reached before the ship step finished."
         steps = ["Wait for the limit to reset (the log shows the reset time)"]
+    elif key == "llm-auth-expired":
+        why = "The Claude sign-in on this computer has expired, so the ship step could not run."
+        steps = ["In a command window, run claude and sign in again with /login",
+                 "Re-run bin/post-plan-now"]
     elif key == "usage-pause-dirty":
         why = ("The usage gate paused a model call while it was editing the worktree, "
                "so the edit may be half done.")
@@ -3476,6 +3483,12 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     f"ERROR terminal=failed kind=llm-usage-limit. "
                     + (f"{detail} " if detail else "")
                     + "Re-run bin/post-plan-now after the limit resets.")
+        if res.error_kind == "llm-auth-expired":
+            detail = _flat(res.error or "")
+            return (f"RESULT: post-plan BLOCKED — Claude CLI login expired (environmental); "
+                    f"ERROR terminal=failed kind=llm-auth-expired. "
+                    + (f"{detail} " if detail else "")
+                    + "Run `claude` and complete /login, then re-run bin/post-plan-now.")
         if res.error_kind == "usage-pause-unconfirmed":
             detail = _flat(res.error or "")
             return (f"RESULT: post-plan BLOCKED — usage gate paused but the pause marker "

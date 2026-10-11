@@ -191,3 +191,8 @@ def test_auth_reply_does_not_trigger_usage_pause(tmp_path, monkeypatch):
 def test_invalid_output_kind_stays_out_of_fail_closed_kinds():
     import runner
     assert "llm-invalid-output" not in runner._FAIL_CLOSED_KINDS
+
+
+def test_auth_expired_kind_is_fail_closed():
+    import runner
+    assert "llm-auth-expired" in runner._FAIL_CLOSED_KINDS

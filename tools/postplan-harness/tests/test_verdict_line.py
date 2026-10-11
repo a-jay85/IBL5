@@ -611,6 +611,11 @@ _RC3_CASES = [
      "RESULT: post-plan BLOCKED — Claude usage limit reached (environmental); ERROR "
      "terminal=failed kind=llm-usage-limit. Claude usage limit reached "
      "Re-run bin/post-plan-now after the limit resets."),
+    ("auth", "llm-auth-expired", "safety-verdict: auth-expired: Failed to authenticate", {},
+     "RESULT: post-plan BLOCKED — Claude CLI login expired (environmental); ERROR "
+     "terminal=failed kind=llm-auth-expired. "
+     "safety-verdict: auth-expired: Failed to authenticate "
+     "Run `claude` and complete /login, then re-run bin/post-plan-now."),
     ("diverged", "remote-head-diverged", "phase4: head moved", {},
      "RESULT: post-plan BLOCKED — remote head diverged at phase4 "
      "(the PR branch changed on GitHub); ERROR terminal=failed "

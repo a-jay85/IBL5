@@ -197,6 +197,17 @@ def test_body_check_degradation_joins_degraded_agents_and_holds_arming():
     assert res.terminal == TerminalState.DEGRADED
 
 
+def test_body_check_auth_expired_fails_closed():
+    """An expired login is not a degradable body-check failure: the run ends FAILED, exit 3."""
+    out = tempfile.mkdtemp()
+    llm = DegradingLlm(UsageLedger(), CANNED, {"body-check"}, kind="llm-auth-expired")
+    res = runner.run(_fixture(), out, llm, mode="replay")
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == "llm-auth-expired"
+    assert "body-check" not in res.degraded_agents
+    assert runner.exit_code_for(res) == 3
+
+
 def test_body_check_fixture_missing_degrades_instead_of_failing():
     """An uncanned body-check label degrades rather than raising."""
     out = tempfile.mkdtemp()

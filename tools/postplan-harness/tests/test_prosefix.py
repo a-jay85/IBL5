@@ -364,6 +364,21 @@ def test_usage_limit_propagates(prose_repo):
     assert e.git.is_dirty() is False
 
 
+def test_auth_expired_propagates(prose_repo):
+    e = prose_repo
+    head_before = e.git.head()
+
+    def boom(cwd):
+        _edit("The pool starts small.", "The pool starts tiny.")(cwd)
+        raise HarnessError("llm-auth-expired", "login")
+
+    with pytest.raises(HarnessError) as ei:
+        _run_fix(e, FakeToolLlm([boom]))
+    assert ei.value.kind == "llm-auth-expired"
+    assert e.git.head() == head_before
+    assert e.git.is_dirty() is False
+
+
 def test_other_model_error_holds(prose_repo):
     e = prose_repo
 

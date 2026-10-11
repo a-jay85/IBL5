@@ -44,6 +44,7 @@ _CLASSES = {
     "rebase-conflict": ("rebase-conflict", "predicted by merge-tree probe vs origin/master: a.php, b.php", {}),
     "remote-head-diverged": ("remote-head-diverged", "phase4: head moved", {}),
     "llm-usage-limit": ("llm-usage-limit", "Claude usage limit reached", {}),
+    "llm-auth-expired": ("llm-auth-expired", "safety-verdict: auth-expired: Failed to authenticate", {}),
     "unknown": (None, "", {}),
 }
 
@@ -145,6 +146,11 @@ def test_remote_diverged_block_gives_inspect_and_reset():
 
 def test_usage_limit_block_says_wait():
     assert "Wait for the limit to reset" in _block("llm-usage-limit")
+
+
+def test_auth_expired_block_says_sign_in():
+    assert "/login" in _block("llm-auth-expired")
+    assert "Wait for the limit" not in _block("llm-auth-expired")
 
 
 def test_unknown_block_points_at_log():

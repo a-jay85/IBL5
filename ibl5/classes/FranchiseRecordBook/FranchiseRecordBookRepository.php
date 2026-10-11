@@ -48,7 +48,7 @@ class FranchiseRecordBookRepository extends \Database\BaseMysqliRepository imple
              " . self::cleanNamePidSubquery() . "
              WHERE r.scope = 'team' AND r.teamid = ? AND r.record_type = 'single_season'
                AND r.ranking <= ?
-             ORDER BY r.stat_category, r.ranking",
+             ORDER BY r.stat_category, r.ranking, r.id ASC",
             'ii',
             $teamId,
             $limit
@@ -75,7 +75,7 @@ class FranchiseRecordBookRepository extends \Database\BaseMysqliRepository imple
              " . self::cleanNamePidSubquery() . "
              WHERE r.scope = 'league' AND r.record_type = 'career'
                AND r.ranking <= ?
-             ORDER BY r.stat_category, r.ranking",
+             ORDER BY r.stat_category, r.ranking, r.id ASC",
             'i',
             $limit
         );
@@ -101,7 +101,7 @@ class FranchiseRecordBookRepository extends \Database\BaseMysqliRepository imple
              " . self::cleanNamePidSubquery() . "
              WHERE r.scope = 'league' AND r.record_type = 'single_season'
                AND r.ranking <= ?
-             ORDER BY r.stat_category, r.ranking",
+             ORDER BY r.stat_category, r.ranking, r.id ASC",
             'i',
             $limit
         );

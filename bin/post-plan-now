@@ -53,6 +53,9 @@
 # Exit 8: declined because the last run for this slug held on the same structural
 # reasons, the repeat DM was already sent, and plan+diff+harness are unchanged
 # (harness/holdrepeat.py). Nothing was fired. --force overrides.
+# Exit 8 also covers an active held-unfixable marker (harness/heldmarker.py): an earlier
+# in-run decline wrote it, and the hold and the plan file's mtime are both unchanged.
+# Nothing was fired. Edit the plan or delete the marker to clear; --force bypasses.
 #
 # --pr <n> drives the worktree that has PR <n>'s head branch checked out, instead
 # of the current branch. When no worktree has that branch, --pr creates one via
@@ -292,6 +295,22 @@ postplan_holdrepeat_decline() {
     out=$(PYTHONPATH="$harness" python3 -m harness.holdrepeat check \
             --state-dir "${HOLDREPEAT_STATE_DIR:-$harness/out/state}" \
             --slug "$slug" --plan "$plan" --worktree "$root" 2>/dev/null) && rc=0 || rc=$?
+    [ "$rc" -eq 10 ] || return 1
+    printf '%s\n' "$out"
+    return 0
+}
+
+# Held-unfixable marker decline (harness/heldmarker.py). Returns 0 = DECLINE (prints
+# the reason), 1 = proceed. Fails open: a missing harness, python error, or any exit
+# other than 10 proceeds. --force (FORCE=1) and --state-changed (STATE_CHANGED=1)
+# both proceed, exactly like postplan_holdrepeat_decline.
+postplan_heldmarker_decline() {
+    local harness="$1" slug="$2" plan="$3" out rc
+    [ "${FORCE:-0}" -eq 0 ] || return 1
+    [ "${STATE_CHANGED:-0}" -eq 0 ] || return 1
+    out=$(PYTHONPATH="$harness" python3 -m harness.heldmarker check \
+            --state-dir "${HOLDREPEAT_STATE_DIR:-$harness/out/state}" \
+            --slug "$slug" --plan "$plan" 2>/dev/null) && rc=0 || rc=$?
     [ "$rc" -eq 10 ] || return 1
     printf '%s\n' "$out"
     return 0
@@ -606,6 +625,15 @@ if postplan_holdrepeat_decline \
      "$SLUG" "${PLAN_OVERRIDE:-}" "$ROOT"; then
   echo "RESULT: post-plan DECLINED — held twice on the same reason and nothing changed" \
        "since; no tokens spent, no PR change. Override: bin/post-plan-now --force"
+  exit 8
+fi
+# Exit 8 (marker): declined, held-unfixable marker active: same hold, plan unchanged (heldmarker.py).
+if postplan_heldmarker_decline \
+     "${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}" \
+     "$SLUG" "${PLAN_OVERRIDE:-}"; then
+  echo "RESULT: post-plan DECLINED — held-unfixable marker active (same hold, plan unchanged);" \
+       "no tokens spent, no PR change. Clear: edit the plan or delete the marker." \
+       "Override: bin/post-plan-now --force"
   exit 8
 fi
 

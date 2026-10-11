@@ -276,6 +276,26 @@ fi
 
 # ── Results ───────────────────────────────────────────────────────────────────
 
+# ── Test 9b: frozen engine/ docs are dropped from the staleness report ───────
+#
+# bin/check-engine-freeze rejects any edit under engine/, so a stale engine doc
+# can never be fixed. The report omits it; other stale docs stay listed.
+
+REPO=$(make_repo)
+write_doc "$REPO" "$STALE_DATE" "Body."
+mkdir -p "$REPO/engine/.claude/rules"
+printf -- '---\ndescription: Test fixture\nlast_verified: %s\n---\n# Doc\n\nBody.\n' \
+    "$STALE_DATE" > "$REPO/engine/.claude/rules/frozen.md"
+REPORT=$(cd "$REPO" && bin/check-docs --staleness-report 2>&1) || true
+rm -rf "$REPO"
+if printf '%s' "$REPORT" | grep -qF '"path": ".claude/rules/fixture.md"' \
+    && ! printf '%s' "$REPORT" | grep -qF 'engine/.claude/rules/frozen.md'; then
+    pass "frozen engine/ docs are omitted from the staleness report"
+else
+    fail "frozen engine/ docs are omitted from the staleness report"
+    echo "  report: $REPORT"
+fi
+
 # ── Tests 10-12: engine lint-pin drift (checkEngineLintPins) ─────────────────
 #
 # engine.yml is the source of truth; the two tracked docs restate its pins.

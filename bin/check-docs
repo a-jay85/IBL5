@@ -10,6 +10,22 @@ declare(strict_types=1);
 
 const STALENESS_DAYS = 60;
 
+// Doc trees frozen in place: bin/check-engine-freeze rejects any PR that edits
+// them, so a stale or dead-glob finding there cannot be fixed. --staleness-report
+// omits them so the nightly audit and bin/docfix-run never target a frozen file.
+// The engine cutover PR deletes this constant and the helper with engine/.
+const FROZEN_DOC_PREFIXES = ['engine/'];
+
+function isFrozenDocPath(string $rel): bool
+{
+    foreach (FROZEN_DOC_PREFIXES as $prefix) {
+        if (str_starts_with($rel, $prefix)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 const IN_SCOPE_GLOBS = [
     'CLAUDE.md',
     'README.md',
@@ -2065,7 +2081,10 @@ if ($opts['staleness_report']) {
         static fn (array $e): array => $e + ['reason' => 'stale'],
         stalenessReport($root, $today)
     );
-    $report = array_merge($stale, deadGlobReport($root));
+    $report = array_values(array_filter(
+        array_merge($stale, deadGlobReport($root)),
+        static fn (array $e): bool => !isFrozenDocPath((string) $e['path'])
+    ));
     echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";
     exit(0);
 }

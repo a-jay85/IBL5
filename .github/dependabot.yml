@@ -24,6 +24,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # engine/ is frozen (.claude/rules/engine-go.md). A bump here must restate
+      # the pin in engine/.claude/rules/engine-context.md, which the freeze gate
+      # rejects. The engine cutover PR removes this entry.
+      - dependency-name: "golangci/golangci-lint-action"
 
   - package-ecosystem: "composer"
     directory: "/ibl5"

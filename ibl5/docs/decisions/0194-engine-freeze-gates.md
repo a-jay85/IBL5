@@ -1,5 +1,5 @@
 ---
-description: ADR-0194 — engine/ is frozen and bin/check-engine-freeze gates new decompile tokens on every PR.
+description: ADR-0194, engine/ is frozen and bin/check-engine-freeze gates new decompile tokens on every PR.
 last_verified: 2026-10-10
 ---
 
@@ -18,9 +18,9 @@ The shadow-only Go engine under `engine/` (ADR-0035, ADR-0037) is scheduled for 
 
 ## Alternatives Considered
 
-- **A job in engine.yml** — a separate path-filtered job. Rejected because: it is path-filtered and not a required check, so it would not hold auto-merge.
-- **An exemption directory for the gate's own fixtures** — a place where tokens are allowed. Rejected because: it is a standing leak path. Fixtures are built at runtime instead.
-- **Removing engine docs from the check-docs scope** — stops the nightly staleness noise. Rejected because: it also silences PR-time dead-reference checks on them.
+- **A job in engine.yml**: a separate path-filtered job. Rejected because: it is path-filtered and not a required check, so it would not hold auto-merge.
+- **An exemption directory for the gate's own fixtures**: a place where tokens are allowed. Rejected because: it is a standing leak path. Fixtures are built at runtime instead.
+- **Removing engine docs from the check-docs scope**: stops the nightly staleness noise. Rejected because: it also silences PR-time dead-reference checks on them.
 
 ## Consequences
 
@@ -31,7 +31,7 @@ The shadow-only Go engine under `engine/` (ADR-0035, ADR-0037) is scheduled for 
 
 ## References
 
-- [ADR-0149](0149-required-ci-aggregator-all-checks-green.md) — the aggregator that anchors on the meta-checks job.
+- [ADR-0149](0149-required-ci-aggregator-all-checks-green.md): the aggregator that anchors on the meta-checks job.
 - `.claude/rules/engine-go.md`
 - `bin/check-engine-freeze`
 - `bin/test-check-engine-freeze`

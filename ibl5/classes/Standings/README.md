@@ -1,6 +1,6 @@
 ---
 description: Conference and division standings display with clinched-indicator badges (W-, Z-, Y-, X-) and dynamic HTML generation.
-last_verified: 2026-08-08
+last_verified: 2026-10-08
 ---
 
 # Standings Module
@@ -36,7 +36,7 @@ Standings/
 global $db;
 
 $repository = new Standings\StandingsRepository($db);
-$view = new Standings\StandingsView($repository, $season->endingYear, $seriesRecordsService);
+$view = new Standings\StandingsView($repository, $season->endingYear);
 
 echo $view->render();
 ```
@@ -45,7 +45,7 @@ echo $view->render();
 
 ```php
 $repository = new Standings\StandingsRepository($db);
-$view = new Standings\StandingsView($repository, $season->endingYear, $seriesRecordsService);
+$view = new Standings\StandingsView($repository, $season->endingYear);
 
 // Render only Eastern Conference
 echo $view->renderRegion('Eastern');
@@ -93,7 +93,7 @@ The previous implementation in `Updater\StandingsHTMLGenerator` stored pre-gener
 3. **Adds XSS protection** - All output is properly escaped
 4. **Uses interfaces** - Enables dependency injection and testing
 
-The `StandingsHTMLGenerator` class in `Updater/` is now obsolete and can be removed.
+The `StandingsHTMLGenerator` class in `Updater/` has since been removed.
 
 ## Security
 

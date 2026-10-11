@@ -163,9 +163,26 @@ When either reply says `Failed to authenticate` or `OAuth session expired`, the
 to log the Claude CLI back in; a JSON repair cannot help. The kind and the exit
 code stay the same.
 
-`LiveGit.fetch_base` (`harness/adapters/gitad.py`) retries once after
-`FETCH_TRANSIENT_DELAY` seconds when the fetch stderr names a network blip:
-`kex_exchange_identification`, `Operation timed out`, `Connection timed out`, or
-`Connection reset by peer`. `Could not read from remote repository` and
-`Could not resolve host` on their own are not retried. The separate
-`cannot lock ref` retry (`FETCH_LOCK_RETRIES`) is unchanged.
+`harness/netretry.py` retries git and gh calls that fail with a known
+network-transient error. It waits 5, 20, then 60 seconds, so a call gets four
+attempts at most. The signatures are `kex_exchange_identification`,
+`Operation timed out`, `Connection timed out`, `Connection reset by peer`,
+`TLS handshake timeout`, and the Go HTTP shape `Post "https://...": EOF` (a
+quoted URL followed by `: EOF`). Any other error fails on the first attempt with
+the same kind and detail as before. `Could not read from remote repository` and
+`Could not resolve host` on their own are not retried. When the retries run out,
+the first error is raised and every wrapped call in the same process makes a
+single attempt for the next 300 seconds. Each retry logs one warning on the
+`harness.netretry` logger.
+
+The wrapped calls are `LiveGit.fetch_base`, the lease `ls-remote`, `push` and
+`push_ff` in `harness/adapters/gitad.py`, the fetch and `ls-remote` helpers in
+`harness/gitutil.py`, and `LiveGh._gh` in `harness/adapters/ghad.py`.
+`LiveGh._gh` retries only the argv shapes in `GH_RETRY_SAFE_SUBCOMMANDS` and
+`api` GET calls. `pr create`, `pr comment` and the reviews POST retry only with a
+landed check. Before the first attempt the harness snapshots the open PRs for the
+branch, or the count of identical comments or reviews. If the failed attempt
+landed anyway, it returns that result and makes no second call. A push counts as
+landed when the remote branch tip already equals HEAD. A failed snapshot or
+landed check means one attempt, and so does every other mutation. The
+`cannot lock ref` fetch retry (`FETCH_LOCK_RETRIES`) keeps its own budget.

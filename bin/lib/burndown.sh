@@ -10,6 +10,8 @@
 
 # shellcheck disable=SC2034  # used in later phases sourced from this file
 BD_BUDGET=5
+# shellcheck source=bin/lib/gh-retry.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gh-retry.sh"
 BD_CODE_REPO="a-jay85/IBL5"
 BD_LABEL_BLOCKED="blocked"
 BD_LABEL_OUT_OF_REPO="out-of-repo"
@@ -89,8 +91,8 @@ bd_report_since() {
 # bd_fetch_issues <out-file> — fetches open backlog issues to a JSON file
 bd_fetch_issues() {
     local out="$1" raw
-    if ! raw="$("$GH" issue list --repo "$REPO" --state open --limit 1000 \
-            --json number,title,body,url,updatedAt,labels 2>/dev/null)"; then
+    if ! raw="$(gh_retry "$GH" issue list --repo "$REPO" --state open --limit 1000 \
+            --json number,title,body,url,updatedAt,labels)"; then
         bd_die 3 "gh issue list failed"
     fi
     if ! jq -e 'type=="array"' <<< "$raw" >/dev/null 2>&1; then

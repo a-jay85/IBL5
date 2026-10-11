@@ -364,7 +364,7 @@ test.describe('Depth Chart submission', () => {
     await dropdown.selectOption({ index: 1 });
 
     // Wait for AJAX to update the hidden field
-    const loadedId = page.locator('#loaded_dc_id, input[name="loaded_dc_id"]');
+    const loadedId = page.locator('#loaded_dc_id');
     await expect(loadedId.first(), 'loaded_dc_id hidden field must exist in form').toBeAttached();
     await expect(async () => {
       const val = await loadedId.first().inputValue();

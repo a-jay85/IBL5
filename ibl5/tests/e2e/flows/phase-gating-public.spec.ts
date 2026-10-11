@@ -108,10 +108,10 @@ test.describe('Waivers disabled', () => {
     // read-only view — no loginBox), so a blank PHP crash would fail here.
     await expect(page.locator('#site-content')).toBeVisible();
 
-    // Should NOT show waiver claim form elements
-    const waiverForm = page.locator('form[name="waiver_add"], .waiver-form');
-    const formVisible = await waiverForm.isVisible().catch(() => false);
-    expect(formVisible).toBe(false);
+    // Should NOT render the waiver claim form. WaiversView renders
+    // form[name="Waiver_Move"] only when moves are allowed; waivers.spec.ts
+    // asserts the same selector renders in the open state.
+    await expect(page.locator('form[name="Waiver_Move"]')).toHaveCount(0);
 
     await assertNoPhpErrors(page, 'on Waivers with moves disabled');
   });

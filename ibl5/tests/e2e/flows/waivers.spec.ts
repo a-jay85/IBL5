@@ -32,7 +32,7 @@ test.describe('Waivers flow: open', () => {
     await expect(form).toBeVisible();
     await expect(page.locator('select[name="Player_ID"]')).toBeVisible();
     await expect(
-      form.locator('button[type="submit"], input[type="submit"]').first(),
+      form.locator('button[type="submit"]').first(),
     ).toBeVisible();
   });
 

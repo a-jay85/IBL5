@@ -13,7 +13,7 @@ test.describe('GM Contact List flow', () => {
 
   test('team link navigates to team page', async ({ page }) => {
     await page.goto('modules.php?name=GMContactList');
-    const teamLink = page.locator('.ibl-data-table a[href*="name=Team"], .contact-table a[href*="name=Team"]').first();
+    const teamLink = page.locator('.contact-table a[href*="name=Team"]').first();
     const href = await teamLink.getAttribute('href');
     expect(href).toBeTruthy();
 

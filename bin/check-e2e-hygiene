@@ -138,30 +138,6 @@ run_pattern() {
   done
 }
 
-run_pattern_pipe() {
-  local severity="$1"
-  local label="$2"
-  local pattern1="$3"
-  local exclude="$4"
-  if [ "$severity" != "blocking" ]; then
-    echo "check-e2e-hygiene: unknown severity '$severity' for [$label]" >&2
-    exit 2
-  fi
-
-  for f in "${SCAN_FILES[@]}"; do
-    while IFS=: read -r line_num matched_line; do
-      [ -z "$line_num" ] && continue
-      if has_inline_allow "$matched_line" "$f" "$line_num"; then
-        continue
-      fi
-      local rel="${f#"$ROOT/"}"
-      local entry="[$label] $rel:$line_num: $matched_line"
-      BLOCKING_HITS+=("$entry")
-      BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
-    done < <(grep -nE "$pattern1" "$f" 2>/dev/null | grep -vE "$exclude" || true)
-  done
-}
-
 # --- Silent-pass: if (count > 0) with no else ---
 check_count_no_else() {
   local label="silent-pass count>0"
@@ -244,10 +220,16 @@ check_count_no_else
 check_visible_no_else
 
 # Comma-fallback locator: a selector list inside locator('...') hides which
-# element the page actually renders. Commas inside [attr=...] are excluded.
-run_pattern_pipe blocking "comma-fallback-locator" \
-  "locator\((['\"])[^'\"]*,[^'\"]*\1\)" \
-  "locator\([^)]*\[[^]]*,[^]]*\][^)]*\)"
+# element the page actually renders. The pattern walks the quoted selector
+# one token at a time: a plain character, a whole [attr=...] group, or a whole
+# (...) group (one level, so :is(a, b) and :not(a, b) stay opaque). A comma
+# reached at that top level is a fallback. One alternation per quote type and
+# no back-references, so BSD grep (macOS) and GNU grep (CI) agree. The selector
+# may hold the other quote type, and anything may follow the closing quote
+# (.filter(, .first(), and so on). A locator( call whose string sits on the
+# next line is out of reach of this line-based scan.
+run_pattern blocking "comma-fallback-locator" \
+  "locator\([[:space:]]*('([^'(,[]|\[[^]']*\]|\([^)']*\))*|\"([^\"(,[]|\[[^]\"]*\]|\([^)\"]*\))*),"
 
 # --- Report ---
 if [ "$BLOCKING_TOTAL" -eq 0 ]; then

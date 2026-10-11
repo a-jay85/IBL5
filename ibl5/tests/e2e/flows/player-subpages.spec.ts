@@ -74,9 +74,11 @@ test.describe('Player rookie option sub-page', () => {
     await assertNoPhpErrors(page, 'on Player rookie option page');
 
     // pid=1 is ineligible: the alert must render AND no rookie-option form may.
+    // RookieOptionView.php:50 renders the form action with processrookieoption,
+    // and the hidden rookieOptionValue input sits inside that form.
     await expect(page.locator('.ibl-alert--error')).toBeVisible();
     await expect(
-      page.locator('input[name="rookieOptionValue"], form[action*="processrookieoption"]'),
+      page.locator('form[action*="processrookieoption"]'),
     ).toHaveCount(0);
   });
 

@@ -115,6 +115,7 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('Big &lt;b&gt;Game&lt;/b&gt;', $output);
     }
 
+    /** Pins `empty('0')` being true: the string '0' counts as no player. */
     public function testPlayerZeroRendersNoticeAndRunsNoQuery(): void
     {
         $output = $this->runArticles('0');
@@ -219,6 +220,7 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('\'%\' . addcslashes($player, \'\\\\%_\') . \'%\'', $source);
     }
 
+    /** A `player[]=x` request value is an array; it takes the no-player path instead of a TypeError. */
     public function testArrayPlayerInputRendersNoticeAndRunsNoQuery(): void
     {
         $output = $this->runArticlesWithRawPlayer(['x']);

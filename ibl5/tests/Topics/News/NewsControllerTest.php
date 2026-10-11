@@ -554,6 +554,19 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         $this->assertDoesNotMatchRegularExpression('/^\s*global\s/m', $this->controllerSource());
     }
 
+    public function testControllerLinkIdsAreIntegerCast(): void
+    {
+        $source = $this->controllerSource();
+
+        $this->assertStringContainsString('$s_sid = (int) $row[\'sid\'];', $source);
+        $this->assertStringContainsString('$catid = (int) $row[\'catid\'];', $source);
+        $this->assertStringContainsString(
+            '$story_url = "modules.php?name=News&amp;file=article&amp;sid=$s_sid$r_options";',
+            $source,
+        );
+        $this->assertStringNotContainsString('intval(', $source);
+    }
+
     private function controllerSource(): string
     {
         $file = (new \ReflectionClass(NewsController::class))->getFileName();

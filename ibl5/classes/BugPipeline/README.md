@@ -1,6 +1,6 @@
 ---
 description: Provides the repository backing the Discord bug report ingestion pipeline.
-last_verified: 2026-08-08
+last_verified: 2026-10-08
 ---
 
 # BugPipeline

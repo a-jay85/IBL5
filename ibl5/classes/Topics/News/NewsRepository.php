@@ -103,15 +103,33 @@ class NewsRepository extends \Database\BaseMysqliRepository implements NewsRepos
         return $this->fetchAll($sql, 'ii', $topicId, $limit);
     }
 
-    /** @return array<int, array<string, mixed>> */
-    public function getStoriesByCategory(int $catId, int $limit, string $langClause = ''): array
+    /**
+     * @param string|null $language Bound to nuke_stories.alanguage; null skips the language clause.
+     * @return array<int, array<string, mixed>>
+     */
+    public function getStoriesByCategory(int $catId, int $limit, ?string $language = null): array
     {
-        // @phpstan-ignore ibl.sqlStringInterpolation ($langClause is a legacy multilingual SQL fragment, not a bindable value)
-        $sql = "SELECT sid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm
+        if ($language === null) {
+            return $this->fetchAll(
+                "SELECT sid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm
+                 FROM `nuke_stories`
+                 WHERE catid = ?
+                 ORDER BY sid DESC LIMIT ?",
+                'ii',
+                $catId,
+                $limit
+            );
+        }
+        return $this->fetchAll(
+            "SELECT sid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm
              FROM `nuke_stories`
-             WHERE catid = ? $langClause
-             ORDER BY sid DESC LIMIT ?";
-        return $this->fetchAll($sql, 'ii', $catId, $limit);
+             WHERE catid = ? AND (alanguage = ? OR alanguage = '')
+             ORDER BY sid DESC LIMIT ?",
+            'isi',
+            $catId,
+            $language,
+            $limit
+        );
     }
 
     /** @return array<string, mixed>|null */

@@ -1,6 +1,6 @@
 ---
-description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow.
-last_verified: 2026-10-04
+description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line.
+last_verified: 2026-10-10
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -182,3 +182,11 @@ Branch protection, `strict: true`, the required checks, and every arming conditi
 **Behavior from today.** At the cap the PR stays armed. The harness logs `phase7: BEHIND cap hit after 3 re-rebases — leaving auto-merge armed; .github/workflows/update-behind-prs.yml (ADR-0081) carries the PR to merge`, leaves `retry_cap` unset, and the run terminates `SHIPPED_ARMED` through the normal path. The skill fallback's ceiling takes the same exit as every other loop exit, so its `On loop exit` re-arm gate runs (prior state `armed` and the conflict flag absent or cleared) and a NOTE names this workflow. The three re-rebases are kept: each one re-watches CI on the rewritten branch.
 
 **Unchanged.** The divergence disarm paths in the harness (`_fail_closed_on_divergence` and the two `disarm=True` call sites inside `_resolve_behind`) still disarm. Phase 6.5 arming conditions are untouched. The skill path still disarms before every rewrite (loop step 2) and re-arms only through the gated `On loop exit`. `_MAX_BEHIND_RETRIES` stays at 3. `RunResult.retry_cap` keeps its `_compute_terminal` precedence as a reserved fail-closed seam with no production writer.
+
+## Addendum: arm-time update goes through the merge line (2026-10-10)
+
+The Unchanged section above says `bin/pr-triage` updates a newly armed BEHIND PR once at arm time, so it adds no per-merge fan-out. That held for a PR armed once. It broke because `bin/pr-cycle` calls `bin/pr-triage --arm` at the end of every run, and the ARMABLE bucket includes PRs that are already armed. Each run re-armed every green PR and called update-branch on every BEHIND one.
+
+**Live evidence.** On 2026-10-10 the pr-cycle runs updated 10, 13, 11, 7, 6, 8 and 12 PRs in single bursts, counted from the `updated branch on` lines in each run's `triage.txt`. The 18:05 PDT burst updated 12 PRs in under a minute. Each update started a full CI round. The head of the line, #3084, then waited behind those runs for runners.
+
+**Behavior from today.** `--arm` arms every ARMABLE PR as before. A BEHIND PR is no longer updated inside the arm loop. When the loop armed at least one BEHIND PR, `bin/pr-triage` runs `bin/merge-line-watch --once` one time after the loop. That pass updates the head of the line only, using the same selector as `.github/workflows/update-behind-prs.yml`. A failed pass exits 1 and leaves every PR armed for the workflow's next run.

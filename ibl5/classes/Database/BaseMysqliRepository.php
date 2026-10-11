@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database;
 
+use BasketballStats\StatsSanitizer;
 use League\League;
 
 /**
@@ -499,13 +500,7 @@ abstract class BaseMysqliRepository
      */
     protected static function scalarToString(mixed $value): string
     {
-        if (is_string($value)) {
-            return $value;
-        }
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-        return '';
+        return StatsSanitizer::scalarToString($value);
     }
 
     /**

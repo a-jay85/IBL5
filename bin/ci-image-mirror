@@ -1,0 +1,106 @@
+#!/bin/bash
+# bin/ci-image-mirror — copy the Docker Hub images CI pulls to ghcr.io/a-jay85/mirror/
+# so a Docker Hub timeout cannot fail a CI job. The manifest of record is
+# .github/ci-image-mirror.txt; bin/check-ci-image-registry gates new docker.io refs.
+#
+# Usage: bin/ci-image-mirror [--only-missing] [--dry-run] [--manifest=PATH]
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+MANIFEST="$ROOT/.github/ci-image-mirror.txt"
+ONLY_MISSING=0
+DRY_RUN=0
+
+usage() {
+    cat <<'EOF'
+Usage: bin/ci-image-mirror [--only-missing] [--dry-run] [--manifest=PATH]
+
+Copies each Docker Hub ref in the manifest to ghcr.io/a-jay85/mirror/<name>:<tag>
+(multi-arch preserving, 3 attempts per ref).
+
+Options:
+  --only-missing   skip a ref whose GHCR mirror already resolves
+                   (docker buildx imagetools inspect <ghcr> exits 0)
+  --dry-run        print "would copy <hub> -> <ghcr>" per ref; run no docker command
+  --manifest=PATH  default: <repo>/.github/ci-image-mirror.txt
+
+Exit codes: 0 = ok, 1 = a copy failed after 3 tries, 2 = usage error or malformed manifest
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --only-missing) ONLY_MISSING=1 ;;
+        --dry-run) DRY_RUN=1 ;;
+        --manifest=*) MANIFEST="${1#--manifest=}" ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "ci-image-mirror: unknown argument: $1" >&2; exit 2 ;;
+    esac
+    shift
+done
+
+ghcr_ref() {
+    local ref="$1"
+    ref="${ref#docker.io/}"
+    ref="${ref#library/}"
+    echo "ghcr.io/a-jay85/mirror/$ref"
+}
+
+if [ ! -r "$MANIFEST" ] || [ -d "$MANIFEST" ]; then
+    echo "ci-image-mirror: cannot read manifest: $MANIFEST" >&2
+    exit 2
+fi
+
+REFS=()
+while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [ -n "$line" ] || continue
+    name="${line#docker.io/}"
+    name="${name#library/}"
+    case "$line" in
+        *@*) echo "ci-image-mirror: $line: ref must carry an explicit tag" >&2; exit 2 ;;
+    esac
+    case "${name##*/}" in
+        *:?*) ;;
+        *) echo "ci-image-mirror: $line: ref must carry an explicit tag" >&2; exit 2 ;;
+    esac
+    REFS+=("$line")
+done < "$MANIFEST"
+
+if [ "${#REFS[@]}" -eq 0 ]; then
+    echo "ci-image-mirror: manifest has no refs: $MANIFEST" >&2
+    exit 2
+fi
+
+rc=0
+for hub in "${REFS[@]}"; do
+    ghcr=$(ghcr_ref "$hub")
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "would copy $hub -> $ghcr"
+        continue
+    fi
+    if [ "$ONLY_MISSING" -eq 1 ] && docker buildx imagetools inspect "$ghcr" >/dev/null 2>&1; then
+        echo "present $ghcr"
+        continue
+    fi
+    ok=0
+    for attempt in 1 2 3; do
+        if docker buildx imagetools create --tag "$ghcr" "$hub"; then
+            ok=1
+            break
+        fi
+        case "$attempt" in
+            1) sleep 15 ;;
+            2) sleep 45 ;;
+        esac
+    done
+    if [ "$ok" -eq 1 ]; then
+        echo "mirrored $hub -> $ghcr"
+    else
+        echo "ci-image-mirror: FAILED to mirror $hub -> $ghcr after 3 attempts" >&2
+        rc=1
+    fi
+done
+exit "$rc"

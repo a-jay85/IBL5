@@ -36,6 +36,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   # A `labeled` event for any label other than `update-baselines` gets its own group so it
@@ -48,6 +49,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mirror-ready:
+    name: Mirror CI images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/mirror-ci-images.yml
+    with:
+      only-missing: true
+
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
@@ -184,7 +194,7 @@ jobs:
 
   e2e:
     name: Visual Regression
-    needs: [changes, ci-memo-check]
+    needs: [changes, ci-memo-check, mirror-ready]
     if: inputs.refresh_pr || (needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true') || needs.changes.outputs.baseline == 'true'
     runs-on: ubuntu-latest
     # 30 min (was 20) — full-page matrix over 49 modules is ~4-6x the
@@ -198,6 +208,7 @@ jobs:
       contents: write
       pull-requests: write
       actions: write
+      packages: read
 
     # One resolved VR context for both modes. pull_request: this PR, its base SHA, and
     # the test-merge SHA as the Pages key (unchanged). Refresh: the inputs, with the PR
@@ -628,7 +639,7 @@ jobs:
 
   api-e2e:
     name: API E2E Tests (Vitest)
-    needs: [changes, ci-memo-check]
+    needs: [changes, ci-memo-check, mirror-ready]
     if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -687,7 +698,7 @@ jobs:
     # Name interpolates the matrix context so GitHub omits its auto-appended
     # "(1, 1)" suffix; the suffix only reappears (as "(N/M)") if ever re-sharded.
     name: E2E Tests${{ matrix.total-shards == 1 && '' || format(' ({0}/{1})', matrix.shard-index, matrix.total-shards) }}
-    needs: [changes, ci-memo-check]
+    needs: [changes, ci-memo-check, mirror-ready]
     if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -822,7 +833,7 @@ jobs:
 
   e2e-mutators:
     name: E2E Mutators (non-sharded, dedicated DB)
-    needs: [changes, ci-memo-check]
+    needs: [changes, ci-memo-check, mirror-ready]
     if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -1089,7 +1100,7 @@ jobs:
   gate:
     name: E2E Tests
     if: always() && !inputs.refresh_pr
-    needs: [changes, ci-memo-check, e2e, api-e2e, e2e-shards, e2e-mutators]
+    needs: [changes, ci-memo-check, mirror-ready, e2e, api-e2e, e2e-shards, e2e-mutators]
     runs-on: ubuntu-latest
     # The memo is written only here: after a clean aggregate, on a run that was a miss.
     env:

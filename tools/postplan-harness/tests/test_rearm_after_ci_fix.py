@@ -13,9 +13,11 @@ import types
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import runner
+from harness import ciwatch, heldmarker, holdrepeat
+from harness.adapters.llm import FixtureLlm
 from harness.armable import meta_checks_flag_path
-from harness.state import TerminalState
-from test_runner_replay import (_LiveShapedGit, _actions, _audit, _red_fixture,
+from harness.state import UsageLedger
+from test_runner_replay import (CANNED, _LiveShapedGit, _actions, _audit, _red_fixture,
                                 _run_live_shaped_with)
 
 
@@ -120,17 +122,140 @@ def test_char_armed_at_65_fix_green_arms_exactly_once(monkeypatch, tmp_path):
     assert _merge_count(out) == 1
 
 
-def test_char_held16_fix_green_defect_stays_held(monkeypatch, tmp_path):
-    # characterization of the defect this plan fixes; Phase 5 inverts these assertions
-    fx, flag = _held16_fixture(monkeypatch, tmp_path,
-                               ci_fix_rewatch=[{"exit": 0, "failed": []}])
+# ---------------------------------------------------------------------------
+# Re-arm scenarios
+# ---------------------------------------------------------------------------
+
+_TREE = "a" * 40
+_GREEN = [{"exit": 0, "failed": []}]
+
+
+def _run_held(monkeypatch, out, fixture, canned_extra=None, **run_kw):
+    """`_drive` plus the state_dir seam, so hold-repeat records can be asserted."""
+    from harness.adapters.probe import FixtureProbe
+    monkeypatch.setattr(runner, "ReplayGit", _LiveShapedGit)
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    canned = dict(CANNED)
+    canned.update(canned_extra or {"ci-fix": ["edits made"]})
+    llm = FixtureLlm(UsageLedger(), canned)
+    return runner.run(fixture, out, llm, mode="replay", headless=True, live=True,
+                      probe=FixtureProbe(fixture), **run_kw)
+
+
+def _scenario(monkeypatch, tmp_path, *, same_tree=True, rewatch=None, **extra):
+    extra.setdefault("ci_fix_rewatch", rewatch if rewatch is not None else _GREEN)
+    if same_tree:
+        extra.setdefault("head_trees", [_TREE])
+    fx, flag = _held16_fixture(monkeypatch, tmp_path, **extra)
     out = str(tmp_path / "out")
-    res = _drive(monkeypatch, out, fx, canned_extra={"ci-fix": ["edits made"]})
-    assert res.ci_outcome == "green"
+    state_dir = str(tmp_path / "state")
+    res = _run_held(monkeypatch, out, fx, state_dir=state_dir)
+    return res, out, fx, flag, state_dir
+
+
+def _hold_repeat_lines(out):
+    return [l for l in _audit(out).splitlines() if "phase6.5 hold-repeat:" in l]
+
+
+def test_rearm_held16_fix_green_rc0_arms_and_deletes_flag(monkeypatch, tmp_path):
+    res, out, fx, flag, state_dir = _scenario(
+        monkeypatch, tmp_path, meta_checks_post_rc_after_fix=0)
+    audit = _audit(out)
+    assert res.arm.armed is True
+    assert res.rearm["outcome"] == "armed"
+    assert not os.path.exists(flag)
+    acts = [a["action"] for a in _actions(out)]
+    assert acts.count("pr_merge_auto") == 1
+    last_sticky = max(i for i, a in enumerate(acts) if a == "pr_sticky_verdict")
+    assert last_sticky < acts.index("pr_merge_auto")
+    sticky_bodies = [a["body"] for a in _actions(out) if a["action"] == "pr_sticky_verdict"]
+    assert "arming re-evaluated" in sticky_bodies[-1]
+    assert "phase6.5: HELD — (16)" in audit
+    assert "phase7 re-arm: ARMED" in audit
+    assert res.terminal.name == "SHIPPED_ARMED"
+    assert res.hold_repeat["action"] == "cleared"
+    assert holdrepeat.load_record(state_dir, fx["slug"]) is None
+    assert not os.path.exists(heldmarker.marker_path(state_dir, fx["slug"]))
+
+
+def test_rearm_held16_post_fix_rc1_stays_held_flag_kept(monkeypatch, tmp_path):
+    res, out, fx, flag, _ = _scenario(monkeypatch, tmp_path, meta_checks_post_rc_after_fix=1)
+    assert res.arm.armed is False
+    assert res.rearm == {"outcome": "held", "post_fix_meta_rc": 1, "holds": [16]}
+    assert os.path.exists(flag)
+    assert _merge_count(out) == 0
+    assert "phase7 re-arm: HELD — (16)" in _audit(out)
+    assert len(_hold_repeat_lines(out)) == 1
+
+
+def test_rearm_held16_cleared_but_plan_auto_merge_false_holds_on_7(monkeypatch, tmp_path):
+    from test_runner_replay import _INLINE_FIXTURE
+    plan = "---\nauto_merge: false\n---\n" + _INLINE_FIXTURE["plan_content"]
+    res, out, fx, flag, state_dir = _scenario(
+        monkeypatch, tmp_path, meta_checks_post_rc_after_fix=0, plan_content=plan)
+    audit = _audit(out)
+    assert res.arm.armed is False
+    assert res.rearm["holds"] == [7]
+    assert not os.path.exists(flag)
+    assert _merge_count(out) == 0
+    assert "phase7 re-arm: HELD — (7)" in audit
+    assert "re-arm: HELD — (16)" not in audit
+    # (7) is the only structural hold on both sides, so Phase 6.5's record stands
+    # and the run never records twice.
+    assert len(_hold_repeat_lines(out)) == 1
+    rec = holdrepeat.load_record(state_dir, fx["slug"])
+    assert rec["structural_key"] == holdrepeat.structural_key(res.arm.conditions)
+
+
+def test_rearm_held16_post_fix_rc2_unknown_stays_held(monkeypatch, tmp_path):
+    res, out, fx, flag, _ = _scenario(monkeypatch, tmp_path, meta_checks_post_rc_after_fix=2)
+    assert res.arm.armed is False
+    assert res.rearm["holds"] == [16]
+    assert os.path.exists(flag)
+    assert _merge_count(out) == 0
+    assert "rc=2 on current head; pre-push flag kept" in _audit(out)
+
+
+def test_rearm_absent_after_fix_key_defaults_unknown(monkeypatch, tmp_path):
+    res, out, fx, flag, _ = _scenario(monkeypatch, tmp_path)
+    assert res.arm.armed is False
+    assert res.rearm["holds"] == [16]
+    assert res.rearm["post_fix_meta_rc"] == 2
+    assert os.path.exists(flag)
+    assert _merge_count(out) == 0
+
+
+def test_rearm_refused_when_fix_loop_moved_tree(monkeypatch, tmp_path):
+    res, out, fx, flag, _ = _scenario(
+        monkeypatch, tmp_path, same_tree=False, meta_checks_post_rc_after_fix=0)
+    acts = [a["action"] for a in _actions(out)]
+    assert res.rearm["outcome"] == "refused-tree-moved"
+    assert res.rearm["tree_65"] != res.rearm["tree_now"]
+    assert res.arm.armed is False
+    assert [c.number for c in res.arm.holds] == [16]
+    assert not os.path.exists(flag)
+    assert acts.count("pr_merge_auto") == 0
+    assert acts.count("pr_sticky_verdict") == 1
+    assert len(_hold_repeat_lines(out)) == 1
+    assert "phase7 re-arm: REFUSED" in _audit(out)
+
+
+def test_rearm_failed_check_in_green_rewatch_holds_on_15(monkeypatch, tmp_path):
+    res, out, fx, flag, _ = _scenario(
+        monkeypatch, tmp_path, meta_checks_post_rc_after_fix=0,
+        rewatch=[{"exit": 0, "failed": ["Static guards"]}])
+    assert res.arm.armed is False
+    assert 15 in res.rearm["holds"]
+    assert _merge_count(out) == 0
+
+
+def test_rearm_call_site_is_load_bearing(monkeypatch, tmp_path):
+    monkeypatch.setattr(runner, "_rearm_after_ci_fix", lambda *a, **k: a[7])
+    res, out, fx, flag, _ = _scenario(monkeypatch, tmp_path, meta_checks_post_rc_after_fix=0)
     assert res.arm.armed is False
     assert os.path.exists(flag)
     assert _merge_count(out) == 0
-    assert res.terminal == TerminalState.SHIPPED_HELD
+    assert res.rearm is None
 
 
 # ---------------------------------------------------------------------------

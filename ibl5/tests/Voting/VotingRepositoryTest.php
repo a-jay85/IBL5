@@ -33,6 +33,7 @@ class VotingRepositoryTest extends WideUnitTestCase
 
     public function testFetchAllStarTotalsResolvesPidUsingLastCommaSplit(): void
     {
+        // Pins VotingRepository::resolvePlayerIds: lookup name is the last-comma split ('Smith, Jr.').
         $this->mockDb->setVotingResultsQueue([[['name' => 'Smith, Jr., Sting', 'votes' => 3]]]);
         $this->mockDb->setMockData([['pid' => 77, 'name' => 'Smith, Jr.']]);
 

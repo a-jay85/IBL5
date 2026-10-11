@@ -150,11 +150,11 @@ class BuildRedirectUrlTest extends TestCase
 
     public function testReturnsStandalonePagePath(): void
     {
-        $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';
+        $_SESSION['redirect_after_login_path'] = 'scripts/updateAllTheThings.php';
 
         $result = buildRedirectUrl();
 
-        $this->assertSame('leagueControlPanel.php', $result);
+        $this->assertSame('scripts/updateAllTheThings.php', $result);
     }
 
     public function testReturnsStandalonePagePathWithQueryString(): void
@@ -177,11 +177,30 @@ class BuildRedirectUrlTest extends TestCase
 
     public function testClearsStandalonePathSessionAfterUse(): void
     {
-        $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';
+        $_SESSION['redirect_after_login_path'] = 'scripts/updateAllTheThings.php';
 
         buildRedirectUrl();
 
         $this->assertArrayNotHasKey('redirect_after_login_path', $_SESSION);
+    }
+
+    public function testRejectsLeagueControlPanelStandalonePathAfterModuleMove(): void
+    {
+        $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php?league=olympics';
+
+        $result = buildRedirectUrl();
+
+        $this->assertNull($result);
+        $this->assertArrayNotHasKey('redirect_after_login_path', $_SESSION);
+    }
+
+    public function testBuildsUrlForLeagueControlPanelModuleWithLeague(): void
+    {
+        $_SESSION['redirect_after_login'] = 'name=LeagueControlPanel&league=olympics';
+
+        $result = buildRedirectUrl();
+
+        $this->assertSame('modules.php?name=LeagueControlPanel&league=olympics', $result);
     }
 
     public function testReturnsIblSchedulePath(): void
@@ -204,12 +223,12 @@ class BuildRedirectUrlTest extends TestCase
 
     public function testStandalonePathTakesPriorityOverModuleRedirect(): void
     {
-        $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';
+        $_SESSION['redirect_after_login_path'] = 'scripts/updateAllTheThings.php';
         $_SESSION['redirect_after_login'] = 'name=Trading';
 
         $result = buildRedirectUrl();
 
-        $this->assertSame('leagueControlPanel.php', $result);
+        $this->assertSame('scripts/updateAllTheThings.php', $result);
         $this->assertArrayHasKey('redirect_after_login', $_SESSION);
     }
 }

@@ -13,7 +13,7 @@ use PlrParser\Contracts\PlrParserRepositoryInterface;
  * Handles upserts into `ibl_plr` and ibl_hist tables.
  * League-aware: resolves table names through LeagueContext when provided.
  */
-class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepositoryInterface
+class PlrParserRepository extends \Database\BaseMysqliRepository implements PlrParserRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
@@ -27,321 +27,36 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
      */
     public function upsertPlayer(array $data): int
     {
-        $query = "INSERT INTO `ibl_plr`
-            (`ordinal`, `name`, `age`, `pid`, `teamid`, `peak`, `pos`,
-             `oo`, `od`, `r_drive_off`, `dd`, `po`, `pd`, `r_trans_off`, `td`,
-             `clutch`, `consistency`,
-             `pg_depth`, `sg_depth`, `sf_depth`, `pf_depth`, `c_depth`, `dc_can_play_in_game`,
-             `stats_gs`, `stats_gm`, `stats_min`, `stats_fgm`, `stats_fga`,
-             `stats_ftm`, `stats_fta`, `stats_3gm`, `stats_3ga`,
-             `stats_orb`, `stats_drb`, `stats_ast`, `stats_stl`, `stats_tvr`, `stats_blk`, `stats_pf`,
-             `talent`, `skill`, `intangibles`, `coach`, `loyalty`, `playing_time`, `winner`, `tradition`, `security`,
-             `exp`, `bird`, `cy`, `cyt`,
-             `salary_yr1`, `salary_yr2`, `salary_yr3`, `salary_yr4`, `salary_yr5`, `salary_yr6`, `fa_signing_flag`,
-             `sh_pts`, `sh_reb`, `sh_ast`, `sh_stl`, `sh_blk`, `s_dd`, `s_td`,
-             `sp_pts`, `sp_reb`, `sp_ast`, `sp_stl`, `sp_blk`,
-             `ch_pts`, `ch_reb`, `ch_ast`, `ch_stl`, `ch_blk`, `c_dd`, `c_td`,
-             `cp_pts`, `cp_reb`, `cp_ast`, `cp_stl`, `cp_blk`,
-             `car_gm`, `car_min`, `car_fgm`, `car_fga`, `car_ftm`, `car_fta`,
-             `car_3gm`, `car_3ga`, `car_orb`, `car_drb`, `car_reb`,
-             `car_ast`, `car_stl`, `car_tvr`, `car_blk`, `car_pf`, `car_pts`,
-             `r_fga`, `r_fgp`, `r_fta`, `r_ftp`, `r_3ga`, `r_3gp`,
-             `r_orb`, `r_drb`, `r_ast`, `r_stl`, `r_tvr`, `r_blk`,
-             `draftround`, `draftpickno`, `injured`,
-             `htft`, `htin`, `wt`, `draftyear`, `retired`, `r_foul`)
-        VALUES
-            (?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?, ?,
-             ?, ?,
-             ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?,
-             ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?,
-             ?, ?, ?,
-             ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            `ordinal` = VALUES(`ordinal`),
-            `name` = VALUES(`name`),
-            `age` = VALUES(`age`),
-            `teamid` = VALUES(`teamid`),
-            `peak` = VALUES(`peak`),
-            `pos` = VALUES(`pos`),
-            `oo` = VALUES(`oo`),
-            `od` = VALUES(`od`),
-            `r_drive_off` = VALUES(`r_drive_off`),
-            `dd` = VALUES(`dd`),
-            `po` = VALUES(`po`),
-            `pd` = VALUES(`pd`),
-            `r_trans_off` = VALUES(`r_trans_off`),
-            `td` = VALUES(`td`),
-            `clutch` = VALUES(`clutch`),
-            `consistency` = VALUES(`consistency`),
-            `pg_depth` = VALUES(`pg_depth`),
-            `sg_depth` = VALUES(`sg_depth`),
-            `sf_depth` = VALUES(`sf_depth`),
-            `pf_depth` = VALUES(`pf_depth`),
-            `c_depth` = VALUES(`c_depth`),
-            `dc_can_play_in_game` = VALUES(`dc_can_play_in_game`),
-            `stats_gs` = VALUES(`stats_gs`),
-            `stats_gm` = VALUES(`stats_gm`),
-            `stats_min` = VALUES(`stats_min`),
-            `stats_fgm` = VALUES(`stats_fgm`),
-            `stats_fga` = VALUES(`stats_fga`),
-            `stats_ftm` = VALUES(`stats_ftm`),
-            `stats_fta` = VALUES(`stats_fta`),
-            `stats_3gm` = VALUES(`stats_3gm`),
-            `stats_3ga` = VALUES(`stats_3ga`),
-            `stats_orb` = VALUES(`stats_orb`),
-            `stats_drb` = VALUES(`stats_drb`),
-            `stats_ast` = VALUES(`stats_ast`),
-            `stats_stl` = VALUES(`stats_stl`),
-            `stats_tvr` = VALUES(`stats_tvr`),
-            `stats_blk` = VALUES(`stats_blk`),
-            `stats_pf` = VALUES(`stats_pf`),
-            `talent` = VALUES(`talent`),
-            `skill` = VALUES(`skill`),
-            `intangibles` = VALUES(`intangibles`),
-            `coach` = VALUES(`coach`),
-            `loyalty` = VALUES(`loyalty`),
-            `playing_time` = VALUES(`playing_time`),
-            `winner` = VALUES(`winner`),
-            `tradition` = VALUES(`tradition`),
-            `security` = VALUES(`security`),
-            `exp` = VALUES(`exp`),
-            `bird` = VALUES(`bird`),
-            `cy` = VALUES(`cy`),
-            `cyt` = VALUES(`cyt`),
-            `salary_yr1` = VALUES(`salary_yr1`),
-            `salary_yr2` = VALUES(`salary_yr2`),
-            `salary_yr3` = VALUES(`salary_yr3`),
-            `salary_yr4` = VALUES(`salary_yr4`),
-            `salary_yr5` = VALUES(`salary_yr5`),
-            `salary_yr6` = VALUES(`salary_yr6`),
-            `fa_signing_flag` = VALUES(`fa_signing_flag`),
-            `sh_pts` = VALUES(`sh_pts`),
-            `sh_reb` = VALUES(`sh_reb`),
-            `sh_ast` = VALUES(`sh_ast`),
-            `sh_stl` = VALUES(`sh_stl`),
-            `sh_blk` = VALUES(`sh_blk`),
-            `s_dd` = VALUES(`s_dd`),
-            `s_td` = VALUES(`s_td`),
-            `sp_pts` = VALUES(`sp_pts`),
-            `sp_reb` = VALUES(`sp_reb`),
-            `sp_ast` = VALUES(`sp_ast`),
-            `sp_stl` = VALUES(`sp_stl`),
-            `sp_blk` = VALUES(`sp_blk`),
-            `ch_pts` = VALUES(`ch_pts`),
-            `ch_reb` = VALUES(`ch_reb`),
-            `ch_ast` = VALUES(`ch_ast`),
-            `ch_stl` = VALUES(`ch_stl`),
-            `ch_blk` = VALUES(`ch_blk`),
-            `c_dd` = VALUES(`c_dd`),
-            `c_td` = VALUES(`c_td`),
-            `cp_pts` = VALUES(`cp_pts`),
-            `cp_reb` = VALUES(`cp_reb`),
-            `cp_ast` = VALUES(`cp_ast`),
-            `cp_stl` = VALUES(`cp_stl`),
-            `cp_blk` = VALUES(`cp_blk`),
-            `car_gm` = VALUES(`car_gm`),
-            `car_min` = VALUES(`car_min`),
-            `car_fgm` = VALUES(`car_fgm`),
-            `car_fga` = VALUES(`car_fga`),
-            `car_ftm` = VALUES(`car_ftm`),
-            `car_fta` = VALUES(`car_fta`),
-            `car_3gm` = VALUES(`car_3gm`),
-            `car_3ga` = VALUES(`car_3ga`),
-            `car_orb` = VALUES(`car_orb`),
-            `car_drb` = VALUES(`car_drb`),
-            `car_reb` = VALUES(`car_reb`),
-            `car_ast` = VALUES(`car_ast`),
-            `car_stl` = VALUES(`car_stl`),
-            `car_tvr` = VALUES(`car_tvr`),
-            `car_blk` = VALUES(`car_blk`),
-            `car_pf` = VALUES(`car_pf`),
-            `car_pts` = VALUES(`car_pts`),
-            `r_fga` = VALUES(`r_fga`),
-            `r_fgp` = VALUES(`r_fgp`),
-            `r_fta` = VALUES(`r_fta`),
-            `r_ftp` = VALUES(`r_ftp`),
-            `r_3ga` = VALUES(`r_3ga`),
-            `r_3gp` = VALUES(`r_3gp`),
-            `r_orb` = VALUES(`r_orb`),
-            `r_drb` = VALUES(`r_drb`),
-            `r_ast` = VALUES(`r_ast`),
-            `r_stl` = VALUES(`r_stl`),
-            `r_tvr` = VALUES(`r_tvr`),
-            `r_blk` = VALUES(`r_blk`),
-            `draftround` = VALUES(`draftround`),
-            `draftpickno` = VALUES(`draftpickno`),
-            `injured` = VALUES(`injured`),
-            `htft` = VALUES(`htft`),
-            `htin` = VALUES(`htin`),
-            `wt` = VALUES(`wt`),
-            `draftyear` = VALUES(`draftyear`),
-            `r_foul` = VALUES(`r_foul`)";
+        $updateClauses = [];
+        $types = '';
+        $values = [];
+        foreach (self::PLAYER_COLUMNS as $column => $key) {
+            if ($column !== 'pid') {
+                $updateClauses[] = '`' . $column . '` = VALUES(`' . $column . '`)';
+            }
+            if ($column === 'name' || $column === 'pos') {
+                $types .= 's';
+                $values[] = (string) $data[$key];
+            } else {
+                $types .= 'i';
+                $values[] = (int) $data[$key];
+            }
+        }
 
-        // Build types: ordinal(i) name(s) age(i) pid(i) teamid(i) peak(i) pos(s)
-        // + remaining int columns, then at the end retired(i) r_foul(i)
-        // Total: 121 params — 2 strings (name, pos) and 119 ints
-        $types = 'isiiiis'   // ordinal, name, age, pid, teamid, peak, pos
-            . 'iiiiiiii'     // oo, od, r_drive_off, dd, po, pd, r_trans_off, td
-            . 'ii'           // clutch, consistency
-            . 'iiiiii'       // pg_depth..c_depth, dc_can_play_in_game
-            . 'iiiii'        // stats_gs..stats_fga
-            . 'iiii'         // stats_ftm..stats_3ga
-            . 'iiiiiii'      // stats_orb..stats_pf
-            . 'iiiiiiiii'    // talent..security
-            . 'iiii'         // exp, bird, cy, cyt
-            . 'iiiiiii'      // salary_yr1..salary_yr6, fa_signing_flag
-            . 'iiiiiii'      // sh_pts..s_td
-            . 'iiiii'        // sp_pts..sp_blk
-            . 'iiiiiii'      // ch_pts..c_td
-            . 'iiiii'        // cp_pts..cp_blk
-            . 'iiiiii'       // car_gm..car_fta
-            . 'iiiii'        // car_3gm..car_reb
-            . 'iiiiii'       // car_ast..car_pts
-            . 'iiiiii'       // r_fga..r_3gp
-            . 'iiiiii'       // r_orb..r_blk
-            . 'iii'          // draftround, draftpickno, injured
-            . 'iiiiii';      // htft, htin, wt, draftyear, retired, r_foul
+        $colList = implode(', ', array_map(
+            static fn (string $c): string => '`' . $c . '`',
+            array_keys(self::PLAYER_COLUMNS),
+        ));
+        $placeholders = implode(', ', array_fill(0, count(self::PLAYER_COLUMNS), '?'));
 
-        return $this->execute(
-            $query,
-            $types,
-            (int) $data['ordinal'],
-            (string) $data['name'],
-            (int) $data['age'],
-            (int) $data['pid'],
-            (int) $data['teamid'],
-            (int) $data['peak'],
-            (string) $data['pos'],
-            (int) $data['ratingOO'],
-            (int) $data['ratingOD'],
-            (int) $data['ratingDO'],
-            (int) $data['ratingDD'],
-            (int) $data['ratingPO'],
-            (int) $data['ratingPD'],
-            (int) $data['ratingTO'],
-            (int) $data['ratingTD'],
-            (int) $data['clutch'],
-            (int) $data['consistency'],
-            (int) $data['PGDepth'],
-            (int) $data['SGDepth'],
-            (int) $data['SFDepth'],
-            (int) $data['PFDepth'],
-            (int) $data['CDepth'],
-            (int) $data['canPlayInGame'],
-            (int) $data['seasonGamesStarted'],
-            (int) $data['seasonGamesPlayed'],
-            (int) $data['seasonMIN'],
-            (int) $data['seasonFGM'],
-            (int) $data['seasonFGA'],
-            (int) $data['seasonFTM'],
-            (int) $data['seasonFTA'],
-            (int) $data['season3GM'],
-            (int) $data['season3GA'],
-            (int) $data['seasonORB'],
-            (int) $data['seasonDRB'],
-            (int) $data['seasonAST'],
-            (int) $data['seasonSTL'],
-            (int) $data['seasonTVR'],
-            (int) $data['seasonBLK'],
-            (int) $data['seasonPF'],
-            (int) $data['talent'],
-            (int) $data['skill'],
-            (int) $data['intangibles'],
-            (int) $data['coach'],
-            (int) $data['loyalty'],
-            (int) $data['playingTime'],
-            (int) $data['playForWinner'],
-            (int) $data['tradition'],
-            (int) $data['security'],
-            (int) $data['exp'],
-            (int) $data['bird'],
-            (int) $data['currentContractYear'],
-            (int) $data['totalContractYears'],
-            (int) $data['contractYear1'],
-            (int) $data['contractYear2'],
-            (int) $data['contractYear3'],
-            (int) $data['contractYear4'],
-            (int) $data['contractYear5'],
-            (int) $data['contractYear6'],
-            (int) $data['freeAgentSigningFlag'],
-            (int) $data['seasonHighPTS'],
-            (int) $data['seasonHighREB'],
-            (int) $data['seasonHighAST'],
-            (int) $data['seasonHighSTL'],
-            (int) $data['seasonHighBLK'],
-            (int) $data['seasonHighDoubleDoubles'],
-            (int) $data['seasonHighTripleDoubles'],
-            (int) $data['seasonPlayoffHighPTS'],
-            (int) $data['seasonPlayoffHighREB'],
-            (int) $data['seasonPlayoffHighAST'],
-            (int) $data['seasonPlayoffHighSTL'],
-            (int) $data['seasonPlayoffHighBLK'],
-            (int) $data['careerSeasonHighPTS'],
-            (int) $data['careerSeasonHighREB'],
-            (int) $data['careerSeasonHighAST'],
-            (int) $data['careerSeasonHighSTL'],
-            (int) $data['careerSeasonHighBLK'],
-            (int) $data['careerSeasonHighDoubleDoubles'],
-            (int) $data['careerSeasonHighTripleDoubles'],
-            (int) $data['careerPlayoffHighPTS'],
-            (int) $data['careerPlayoffHighREB'],
-            (int) $data['careerPlayoffHighAST'],
-            (int) $data['careerPlayoffHighSTL'],
-            (int) $data['careerPlayoffHighBLK'],
-            (int) $data['careerGP'],
-            (int) $data['careerMIN'],
-            (int) $data['careerFGM'],
-            (int) $data['careerFGA'],
-            (int) $data['careerFTM'],
-            (int) $data['careerFTA'],
-            (int) $data['career3GM'],
-            (int) $data['career3GA'],
-            (int) $data['careerORB'],
-            (int) $data['careerDRB'],
-            (int) $data['careerREB'],
-            (int) $data['careerAST'],
-            (int) $data['careerSTL'],
-            (int) $data['careerTVR'],
-            (int) $data['careerBLK'],
-            (int) $data['careerPF'],
-            (int) $data['careerPTS'],
-            (int) $data['rating2GA'],
-            (int) $data['rating2GP'],
-            (int) $data['ratingFTA'],
-            (int) $data['ratingFTP'],
-            (int) $data['rating3GA'],
-            (int) $data['rating3GP'],
-            (int) $data['ratingORB'],
-            (int) $data['ratingDRB'],
-            (int) $data['ratingAST'],
-            (int) $data['ratingSTL'],
-            (int) $data['ratingTVR'],
-            (int) $data['ratingBLK'],
-            (int) $data['draftRound'],
-            (int) $data['draftPickNumber'],
-            (int) $data['injuryDaysLeft'],
-            (int) $data['heightFT'],
-            (int) $data['heightIN'],
-            (int) $data['weight'],
-            (int) $data['draftYear'],
-            0, // retired
-            (int) $data['ratingFOUL'],
-        );
+        // $colList / $placeholders derive from the fixed PLAYER_COLUMNS constant
+        // (backticked identifiers / '?' placeholders) — concatenate, not interpolate.
+        // `retired` is inserted as 0 and left out of the update, so a re-parse never
+        // un-retires a player.
+        $query = 'INSERT INTO `ibl_plr` (' . $colList . ', `retired`) VALUES (' . $placeholders . ', 0)' // @phpstan-ignore ibl.sqlStringConcatenation (identifiers come from the PLAYER_COLUMNS constant)
+            . ' ON DUPLICATE KEY UPDATE ' . implode(', ', $updateClauses); // @phpstan-ignore ibl.sqlStringConcatenation (identifiers come from the PLAYER_COLUMNS constant)
+
+        return $this->execute($query, $types, ...$values);
     }
 
     /**
@@ -456,6 +171,71 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
 
         return $byPid;
     }
+
+    /**
+     * `ibl_plr` columns written by upsertPlayer(), mapped to their key in the parsed
+     * PLR data array. `name` and `pos` bind as strings; every other column binds as an int.
+     *
+     * @var array<string, string>
+     */
+    private const PLAYER_COLUMNS = [
+        // Identity & position
+        'ordinal' => 'ordinal', 'name' => 'name', 'age' => 'age', 'pid' => 'pid',
+        'teamid' => 'teamid', 'peak' => 'peak', 'pos' => 'pos',
+        // Ratings
+        'oo' => 'ratingOO', 'od' => 'ratingOD', 'r_drive_off' => 'ratingDO', 'dd' => 'ratingDD',
+        'po' => 'ratingPO', 'pd' => 'ratingPD', 'r_trans_off' => 'ratingTO', 'td' => 'ratingTD',
+        'clutch' => 'clutch', 'consistency' => 'consistency',
+        // Depth chart
+        'pg_depth' => 'PGDepth', 'sg_depth' => 'SGDepth', 'sf_depth' => 'SFDepth',
+        'pf_depth' => 'PFDepth', 'c_depth' => 'CDepth', 'dc_can_play_in_game' => 'canPlayInGame',
+        // Season stats
+        'stats_gs' => 'seasonGamesStarted', 'stats_gm' => 'seasonGamesPlayed',
+        'stats_min' => 'seasonMIN', 'stats_fgm' => 'seasonFGM', 'stats_fga' => 'seasonFGA',
+        'stats_ftm' => 'seasonFTM', 'stats_fta' => 'seasonFTA',
+        'stats_3gm' => 'season3GM', 'stats_3ga' => 'season3GA',
+        'stats_orb' => 'seasonORB', 'stats_drb' => 'seasonDRB', 'stats_ast' => 'seasonAST',
+        'stats_stl' => 'seasonSTL', 'stats_tvr' => 'seasonTVR', 'stats_blk' => 'seasonBLK',
+        'stats_pf' => 'seasonPF',
+        // Free-agency preferences
+        'talent' => 'talent', 'skill' => 'skill', 'intangibles' => 'intangibles', 'coach' => 'coach',
+        'loyalty' => 'loyalty', 'playing_time' => 'playingTime', 'winner' => 'playForWinner',
+        'tradition' => 'tradition', 'security' => 'security',
+        // Contract
+        'exp' => 'exp', 'bird' => 'bird', 'cy' => 'currentContractYear', 'cyt' => 'totalContractYears',
+        'salary_yr1' => 'contractYear1', 'salary_yr2' => 'contractYear2', 'salary_yr3' => 'contractYear3',
+        'salary_yr4' => 'contractYear4', 'salary_yr5' => 'contractYear5', 'salary_yr6' => 'contractYear6',
+        'fa_signing_flag' => 'freeAgentSigningFlag',
+        // Season, season-playoff, career and career-playoff highs
+        'sh_pts' => 'seasonHighPTS', 'sh_reb' => 'seasonHighREB', 'sh_ast' => 'seasonHighAST',
+        'sh_stl' => 'seasonHighSTL', 'sh_blk' => 'seasonHighBLK',
+        's_dd' => 'seasonHighDoubleDoubles', 's_td' => 'seasonHighTripleDoubles',
+        'sp_pts' => 'seasonPlayoffHighPTS', 'sp_reb' => 'seasonPlayoffHighREB',
+        'sp_ast' => 'seasonPlayoffHighAST', 'sp_stl' => 'seasonPlayoffHighSTL',
+        'sp_blk' => 'seasonPlayoffHighBLK',
+        'ch_pts' => 'careerSeasonHighPTS', 'ch_reb' => 'careerSeasonHighREB',
+        'ch_ast' => 'careerSeasonHighAST', 'ch_stl' => 'careerSeasonHighSTL',
+        'ch_blk' => 'careerSeasonHighBLK',
+        'c_dd' => 'careerSeasonHighDoubleDoubles', 'c_td' => 'careerSeasonHighTripleDoubles',
+        'cp_pts' => 'careerPlayoffHighPTS', 'cp_reb' => 'careerPlayoffHighREB',
+        'cp_ast' => 'careerPlayoffHighAST', 'cp_stl' => 'careerPlayoffHighSTL',
+        'cp_blk' => 'careerPlayoffHighBLK',
+        // Career totals
+        'car_gm' => 'careerGP', 'car_min' => 'careerMIN', 'car_fgm' => 'careerFGM', 'car_fga' => 'careerFGA',
+        'car_ftm' => 'careerFTM', 'car_fta' => 'careerFTA', 'car_3gm' => 'career3GM', 'car_3ga' => 'career3GA',
+        'car_orb' => 'careerORB', 'car_drb' => 'careerDRB', 'car_reb' => 'careerREB',
+        'car_ast' => 'careerAST', 'car_stl' => 'careerSTL', 'car_tvr' => 'careerTVR',
+        'car_blk' => 'careerBLK', 'car_pf' => 'careerPF', 'car_pts' => 'careerPTS',
+        // Shooting and stat ratings
+        'r_fga' => 'rating2GA', 'r_fgp' => 'rating2GP', 'r_fta' => 'ratingFTA', 'r_ftp' => 'ratingFTP',
+        'r_3ga' => 'rating3GA', 'r_3gp' => 'rating3GP',
+        'r_orb' => 'ratingORB', 'r_drb' => 'ratingDRB', 'r_ast' => 'ratingAST',
+        'r_stl' => 'ratingSTL', 'r_tvr' => 'ratingTVR', 'r_blk' => 'ratingBLK',
+        // Draft, injury and physical
+        'draftround' => 'draftRound', 'draftpickno' => 'draftPickNumber', 'injured' => 'injuryDaysLeft',
+        'htft' => 'heightFT', 'htin' => 'heightIN', 'wt' => 'weight', 'draftyear' => 'draftYear',
+        'r_foul' => 'ratingFOUL',
+    ];
 
     /**
      * Column names for ibl_plr_snapshots upsert, in insertion order.

@@ -151,15 +151,46 @@ def _is_test_path(tok: str) -> bool:
 _NO_CHANGE_MARKER = r"\(no-change\)"
 
 
-def _planned_token(row: str) -> str | None:
+# A WHOLE cell that is a planning Test-type label. Measured on the 1144-file
+# ~/claude-plans corpus on 2026-10-01: every real Test-type cell is the bare label
+# or the label followed by one of `(…)`, `+ / , & — –`, `-analogue`, or
+# ` DB-integration`; prose cells that merely start with the word (`E2E failures …`)
+# and CLI rows whose command or description contains `e2e` / `phpunit` do not match.
+# Header-independent on purpose: a `| Type |` header and a cell shifted by `\|\|`
+# both still carry the label as a whole cell (see tests/test_planfile_type_cell.py).
+_TEST_TYPE_LABEL = re.compile(
+    r"^(?:PHPUnit|API.?test|E2E|Visual.?regression)"
+    r"(?:$|\s*\(|\s*[+/,&—–]|-analogue|\s+DB-integration)",
+    re.IGNORECASE)
+
+
+def _norm_cell(cell: str) -> str:
+    """Cell text with surrounding whitespace, bold/code/underscore markup stripped."""
+    return cell.strip().strip("*`_").strip()
+
+
+def _has_planning_type_cell(cells: list[str]) -> bool:
+    """True when some WHOLE cell is a PHPUnit / API-test / E2E / Visual-regression label."""
+    return any(_TEST_TYPE_LABEL.match(_norm_cell(c)) for c in cells)
+
+
+def _planned_token(cells: list[str]) -> str | None:
     """The row's planned test token, or None when the row plans nothing.
 
     Single source of truth for "this matrix row plans a test": parse_matrix and
     parse_no_change_test_paths must agree on it, or a token could be exempted by
     one parser and planned by the other.
+
+    The Test type is read from a WHOLE cell (`_has_planning_type_cell`), never
+    from the joined row. The old whole-row `\\bE2E\\b` search planned
+    `/tmp/bug-pipeline-test-env.sh` from a CLI-executable row whose command ended
+    in `bin/test-bug-pipeline-e2e` (bug-pipeline-e2e-guard-tests row 10), and the
+    phantom path blocked arming via Phase 5.0 condition (3). The path itself is
+    still the first backticked `test|spec` token in the joined row.
     """
-    if not re.search(r"\b(PHPUnit|API.?test|E2E|Visual.?regression)\b", row, re.I):
+    if not _has_planning_type_cell(cells):
         return None
+    row = " | ".join(cells)
     m = re.search(r"`([^`]*(?:test|spec|Test)[^`]*)`", row)
     if m and _is_test_path(m.group(1)):
         return m.group(1)
@@ -192,7 +223,7 @@ def parse_no_change_test_paths(content: str) -> list[str]:
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         row = " | ".join(cells)
-        p = _planned_token(row)
+        p = _planned_token(cells)
         if p is None:
             continue
         has_marker = re.search(r"`" + re.escape(p) + r"`\s*" + _NO_CHANGE_MARKER, row, re.I)
@@ -209,6 +240,8 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
 
     Planned tests: rows whose Test type is PHPUnit / API-test / E2E / Visual-regression;
     path taken from the row's backticked file token.
+    The type is matched as a whole cell (see _planned_token), so a CLI-executable row
+    that merely mentions e2e or phpunit plans nothing.
     Truly-manual rows are returned as ManualRow objects (typed, with noise columns
     stripped) rather than raw pipe-delimited strings.
 
@@ -240,7 +273,7 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
         row = " | ".join(cells)
         if re.search(r"truly.?manual", row, re.I):
             manual.append(manual_rows.row_from_cells(cells, len(manual) + 1))
-        p = _planned_token(row)
+        p = _planned_token(cells)
         if p is not None and p not in planned:
             planned.append(p)
     return planned, manual
@@ -435,6 +468,8 @@ _PHASE_HEADING_RE = re.compile(r"^##\s+(?:Phase|Step)\s*(\d+)(?!\.\d)\b\s*[:.\-�
 _BOOKKEEPING_MARKER_RE = re.compile(r"\[phases:\s*S(\s*/\s*S)*\s*\]")
 _EXAMPLE_SUFFIX_RE = re.compile(r"^\s*\(example\)")
 _LINE_SUFFIX_RE = re.compile(r"(?::|#)L?\d+(?:-L?\d+)?$")
+NO_DIFF_MIN_REASON = 15
+_NO_DIFF_MARKER_RE = re.compile(r"^\s*(?:[-*]\s+)?\*\*No diff:\*\*[ \t]*(.*?)\s*$")
 
 
 def _phase_evidence_paths(body: str) -> list[str]:
@@ -458,6 +493,21 @@ def _phase_evidence_paths(body: str) -> list[str]:
     return out
 
 
+_HEADING_PREFIX_RE = re.compile(r"^(?:Phase|Step)\s*\d+\s*:?\s*", re.I)
+_HEADING_WORD_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+
+
+def _heading_words(heading: str) -> list[str]:
+    """Bare tokens of a phase heading, deduped, first-seen order. Backticks and edge
+    punctuation are stripped; a token with `/` is evidence territory, never a word."""
+    out: list[str] = []
+    for raw in _HEADING_PREFIX_RE.sub("", heading).split():
+        w = raw.strip("`").strip("()[]{}<>,:;.!?\"'*")
+        if w and "/" not in w and _HEADING_WORD_RE.match(w) and w not in out:
+            out.append(w)
+    return out
+
+
 def parse_phases(content: str) -> list[PhaseInfo]:
     """One PhaseInfo per `## Phase N:` / `## Step N:` h2 heading, in document order.
 
@@ -467,7 +517,10 @@ def parse_phases(content: str) -> list[PhaseInfo]:
     of that phase and their Scope/Recipe paths count as evidence. Fenced blocks are
     stripped first. Sub-numbered headings (`## Phase 5.5:`) and h3 headings never open a
     phase. A repeated phase number merges into the first occurrence (evidence unioned) so
-    a plan with a duplicated heading yields one entry per number.
+    a plan with a duplicated heading yields one entry per number. A body line
+    `**No diff:** <reason>` of NO_DIFF_MIN_REASON or more characters sets `no_diff_reason`;
+    a shorter reason sets `no_diff_rejected` instead. Bare heading tokens land in
+    `heading_words` (see state.PhaseInfo); they are never evidence.
     """
     lines = _strip_fenced(content)
     phases: list[PhaseInfo] = []
@@ -493,15 +546,27 @@ def parse_phases(content: str) -> list[PhaseInfo]:
             heading = line[3:].strip()
             if num in by_number:
                 current = by_number[num]
+                for w in _heading_words(heading):
+                    if w not in current.heading_words:
+                        current.heading_words.append(w)
             else:
                 current = PhaseInfo(number=num, heading=heading,
-                                    bookkeeping=bool(_BOOKKEEPING_MARKER_RE.search(heading)))
+                                    bookkeeping=bool(_BOOKKEEPING_MARKER_RE.search(heading)),
+                                    heading_words=_heading_words(heading))
                 by_number[num] = current
                 phases.append(current)
             buf = [heading]
             continue
         if current is not None:
             buf.append(line)
+            nd = _NO_DIFF_MARKER_RE.match(line)
+            if nd and not current.no_diff_reason:
+                reason = nd.group(1).strip()
+                if len(reason) >= NO_DIFF_MIN_REASON:
+                    current.no_diff_reason = reason
+                    current.no_diff_rejected = False
+                else:
+                    current.no_diff_rejected = True
     _flush()
     return phases
 
@@ -517,6 +582,14 @@ def parse_deferred_phase_numbers(content: str) -> list[int]:
     section = _section("\n".join(_strip_fenced(content)), r"Out of Scope")
     nums = {int(n) for n in re.findall(r"\b(?:Phase|Step)\s*(\d+)\b", section, re.I)}
     return sorted(nums)
+
+
+_HYPHEN_LABEL_RE = re.compile(r"^[*\-]\s+`([A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+)+)`")
+_INLINE_ITEM_RE = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)(?:\(\))?`")
+_INLINE_LIST_RE = re.compile(
+    r"^[*\-]\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*"
+    r"(`[A-Za-z_][A-Za-z0-9_]*(?:\(\))?`(?:\s*,\s*`[A-Za-z_][A-Za-z0-9_]*(?:\(\))?`)*)"
+    r"\s*[.;]?\s*$")
 
 
 def parse_required_test_methods(content: str) -> list[str]:
@@ -548,6 +621,17 @@ def parse_required_test_methods(content: str) -> list[str]:
         to be followed only by optional '()', then end-of-line, a colon ':',
         or a dash separator ' — ' / ' – ' (U+2014 / U+2013 em/en-dash).
         Plain prose words after a space are still rejected.
+
+    (c) Hyphenated labels — a backticked bash test-case label such as
+        '- `step67-skipped-no-plan`' used to yield 'step67'. The whole token is kept
+        when its closing backtick follows directly; conformance checks it by literal
+        presence in the diff (it is never a `function`/`def` declaration).
+
+    (d) Inline lists — '- New: `testA`, `testB`' used to yield 'New'. When the text
+        after the colon is a pure comma-separated list of backticked identifiers
+        (optional trailing '()' per item, optional trailing '.' or ';'), the items are
+        the methods and the label is dropped. Any prose after the colon keeps the
+        label (today's behaviour), so '- testFoo: covers `bar`' still yields 'testFoo'.
     """
     section = _section("\n".join(_strip_fenced(content)), "Required Test Methods")
     methods = []
@@ -567,10 +651,25 @@ def parse_required_test_methods(content: str) -> list[str]:
         _bt = re.match(r"^[*\-]\s+`([A-Za-z_][A-Za-z0-9_]*)", stripped)
         if _bt:
             _after = stripped[_bt.end()] if _bt.end() < len(stripped) else ""
+            if _after == "-":
+                # M1: a hyphenated bash test-case label. Take the WHOLE token when its
+                # closing backtick follows it directly; anything else is rejected
+                # outright so a prefix never masquerades as a method name.
+                _hy = _HYPHEN_LABEL_RE.match(stripped)
+                if _hy:
+                    methods.append(_hy.group(1))
+                continue
             m = _bt if _after not in ('/', ':', ' ') else None
         else:
             m = None
         if not m:
+            # M2: `Label: `a`, `b`` — the backticked names ARE the required methods.
+            # Only a pure comma-separated list of backticked identifiers qualifies;
+            # `testFoo: covers `bar`` falls through to Pass 2 unchanged.
+            _lst = _INLINE_LIST_RE.match(stripped)
+            if _lst:
+                methods.extend(_INLINE_ITEM_RE.findall(_lst.group(1)))
+                continue
             # Pass 2: bare identifier (no opening backtick).  Accept if followed
             # by optional '()' then end-of-line, ':', or a dash separator
             # (U+2014 em-dash or U+2013 en-dash).  Rejects label phrases where

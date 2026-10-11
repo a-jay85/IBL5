@@ -123,7 +123,7 @@ class MaintenanceRepositoryTest extends TestCase
     public function testGetSettingReturnsValue(): void
     {
         $this->mockDb->setMockData([
-            ['value' => 'IBL5'],
+            ['setting_value' => 'IBL5'],
         ]);
 
         $result = $this->repository->getSetting('League File Name');

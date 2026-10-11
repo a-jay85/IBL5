@@ -25,7 +25,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_rcb');
     }
 
@@ -34,7 +34,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['teamid' => '5']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // isRealFranchise(5) === true → team record book path
         $this->assertQueryExecuted('ibl_rcb');
     }
@@ -44,7 +44,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['teamid' => '0']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // isRealFranchise(0) === false → league path
         $this->assertQueryExecuted('ibl_rcb');
     }
@@ -54,7 +54,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['teamid' => '99']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // isRealFranchise(99) === false (max is 28) → league path
         $this->assertQueryExecuted('ibl_rcb');
     }
@@ -64,7 +64,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['teamid' => 'abc']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // (int)'abc' === 0, isRealFranchise(0) === false → league path
         $this->assertQueryExecuted('ibl_rcb');
     }
@@ -76,7 +76,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['teamid' => ['1', '2']]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_rcb');
     }
 
@@ -85,7 +85,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['teamid' => '-1']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // (int)'-1' === -1, isRealFranchise(-1) === false → league path
         $this->assertQueryExecuted('ibl_rcb');
     }
@@ -95,7 +95,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['teamid' => '28']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // isRealFranchise(28) === true (MAX_REAL_TEAMID = 28)
         $this->assertQueryExecuted('ibl_rcb');
     }
@@ -105,7 +105,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['teamid' => '29']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // isRealFranchise(29) === false → league path
         $this->assertQueryExecuted('ibl_rcb');
     }
@@ -115,7 +115,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['op' => 'api', 'teamid' => '5']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_rcb');
     }
 
@@ -124,7 +124,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['op' => 'api']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_rcb');
     }
 }

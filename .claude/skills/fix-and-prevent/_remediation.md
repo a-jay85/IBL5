@@ -89,6 +89,8 @@ covers the same surface, comment on it and file nothing new. Otherwise run the
 `bin/backlog new <label> "<title>" "<body>"` command from Step 3. Legacy
 markdown IDs survive as title prefixes (e.g. `E46: <title>`).
 
+In `Mode: in-PR`, file in descending severity order. `bin/backlog new` keeps each origin PR to 3 follow-up issues and folds the fourth and later into a roll-up on the third, so filing order decides which findings keep a standalone issue. The full rule is the **Order and cap** bullet in `.claude/review-shared/_phase65-remediation.md`.
+
 Filing rules. A finding whose only location is a file the PR deletes or renames
 away gets no issue. A finding with no nameable failure scenario gets no issue.
 A cosmetic-only finding (wording, formatting, comment style, naming with no

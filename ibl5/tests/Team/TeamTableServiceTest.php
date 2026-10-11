@@ -401,7 +401,7 @@ class TeamTableServiceTest extends TestCase
     /**
      * Phase 1.4 characterization: getRosterAndStarters() — the entry point used by
      * the Trading preview (TradeRosterPreviewApiHandler:98) and the Depth Chart
-     * (DepthChartEntryController:222) — must keep routing to getFreeAgencyRoster()
+     * (DepthChartController:222) — must keep routing to getFreeAgencyRoster()
      * during the offseason, i.e. to the query that carries `AND cyt != cy`, and must
      * pass its rows through untouched.
      *

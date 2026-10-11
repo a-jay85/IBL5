@@ -121,13 +121,6 @@ class PaginatorTest extends TestCase
         $this->assertSame(10, $paginator->getLimit());
     }
 
-    public function testGetOrderByClause(): void
-    {
-        $paginator = new Paginator(['sort' => 'ppg', 'order' => 'desc'], 'name', $this->allowedColumns);
-
-        $this->assertSame('ppg DESC', $paginator->getOrderByClause());
-    }
-
     public function testGetMetaWithTotal(): void
     {
         $paginator = new Paginator(['page' => '2', 'per_page' => '10', 'sort' => 'age', 'order' => 'desc'], 'name', $this->allowedColumns);

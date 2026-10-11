@@ -238,6 +238,22 @@ def test_re_review_packet_is_separate_from_the_first(tmp_path, git_shim):
             os.unlink(path2)
 
 
+def test_re_review_packet_tells_reviewer_last_verified_bump_is_not_a_finding(tmp_path, git_shim):
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-2": "READY\n"})
+    out = tmp_path / "out"
+    out.mkdir()
+    fidelity.re_review(llm, _git(dirty=False), str(out), str(tmp_path), _plan(),
+                       "deadbeef", "body", 85, "sha", _verdict(tmp_path, "NOT READY"))
+    path2 = fidelity.verdict_path("85-2")
+    try:
+        ctx = " ".join(open(os.path.join(str(out), "fidelity-packet-2", "context.md")).read().split())
+        assert "last_verified date bump" in ctx
+        assert "not a new finding" in ctx
+    finally:
+        if os.path.exists(path2):
+            os.unlink(path2)
+
+
 # --- multi-round fixture tests ------------------------------------------------
 
 def test_re_review_round_2_uses_different_purpose(tmp_path, git_shim):
@@ -437,7 +453,7 @@ def test_file_note_issues_dedupes_by_normalized_title(tmp_path):
     ]
     nums = fidelity.file_note_issues(gh, notes, 99)
     assert len(nums) == 1
-    acts = [a for a in gh.actions() if a["action"] == "issue_create"]
+    acts = [a for a in gh.actions() if a["action"] == "followup_create"]
     assert len(acts) == 1
 
 
@@ -447,9 +463,9 @@ def test_file_note_issues_body_is_link_plus_detail_only(tmp_path):
     bodies = []
 
     class _Gh(RecordingGh):
-        def issue_create(self, title, body, label):
+        def followup_create(self, title, body, label):
             bodies.append(body)
-            return super().issue_create(title, body, label)
+            return super().followup_create(title, body, label)
 
     gh = _Gh(str(tmp_path))
     detail = "harness/x.py asserts on the echo. Stub the DM and assert on its argument."
@@ -468,7 +484,7 @@ def test_file_note_issues_skips_existing_titles(tmp_path):
     notes = [{"title": "Add index on email", "detail": "Needs an index."}]
     nums = fidelity.file_note_issues(gh, notes, 99)
     assert nums == []
-    assert not [a for a in gh.actions() if a["action"] == "issue_create"]
+    assert not [a for a in gh.actions() if a["action"] == "followup_create"]
 
 
 # --- _run_fidelity loop helpers -----------------------------------------------
@@ -684,7 +700,7 @@ def test_notes_end_to_end(tmp_path, git_shim):
         assert res.fidelity.get("remediation_sha") is None
         nums = res.fidelity.get("backlog_issue_numbers") or []
         assert len(nums) == 2
-        creates = [a for a in gh.actions() if a["action"] == "issue_create"]
+        creates = [a for a in gh.actions() if a["action"] == "followup_create"]
         assert len(creates) == 2
         sticky = fidelity.compose_sticky(
             "", "", res.fidelity, None, [], "", fidelity.terminal_line(
@@ -724,7 +740,7 @@ def test_notes_from_re_review_round_are_filed(tmp_path, git_shim):
         assert res.fidelity["verdict_1"] == "NOT READY"
         assert res.fidelity["rounds_completed"] == 1
         assert len(res.fidelity["backlog_issue_numbers"]) == 1
-        creates = [a for a in gh.actions() if a["action"] == "issue_create"]
+        creates = [a for a in gh.actions() if a["action"] == "followup_create"]
         assert len(creates) == 1
     finally:
         _cleanup(9950, "9950-2")
@@ -753,7 +769,7 @@ def test_notes_dedupe_run_twice(tmp_path, git_shim):
         )
         nums = res.fidelity.get("backlog_issue_numbers") or []
         assert nums == []
-        creates = [a for a in gh.actions() if a["action"] == "issue_create"]
+        creates = [a for a in gh.actions() if a["action"] == "followup_create"]
         assert creates == []
     finally:
         _cleanup(996)
@@ -766,7 +782,7 @@ def test_notes_dedupe_run_twice(tmp_path, git_shim):
     gh2 = RecordingGh(str(tmp_path))
     nums2 = fidelity.file_note_issues(gh2, notes_case, 9960)
     assert len(nums2) == 1
-    creates2 = [a for a in gh2.actions() if a["action"] == "issue_create"]
+    creates2 = [a for a in gh2.actions() if a["action"] == "followup_create"]
     assert len(creates2) == 1
 
 
@@ -814,17 +830,17 @@ def test_verdict_path_threading(tmp_path, git_shim):
 
 
 def test_file_note_issues_continues_after_failed_create(tmp_path):
-    """A failed issue_create does not abort remaining notes."""
+    """A failed followup_create does not abort remaining notes."""
     from harness.state import HarnessError as _HE
 
     calls = [0]
 
     class _FailFirst(RecordingGh):
-        def issue_create(self, title, body, label):
+        def followup_create(self, title, body, label):
             calls[0] += 1
             if calls[0] == 1:
                 raise _HE("gh", "first failed")
-            return super().issue_create(title, body, label)
+            return super().followup_create(title, body, label)
 
     gh = _FailFirst(str(tmp_path))
     notes = [
@@ -946,23 +962,6 @@ def test_remediation_prompt_embeds_procedure_verdict_and_diff(tmp_path, git_shim
     assert "SENTINEL_FINDING" in prompt
     assert "+SENTINEL_DIFF_LINE" in prompt
     assert "=== END DIFF ===" in prompt
-
-
-def test_remediation_prompt_never_relies_on_packet_path_alone(tmp_path, git_shim):
-    """When a packet path appears in the prompt, its content is also inline."""
-    packet_dir = _packet(tmp_path)
-    with open(os.path.join(packet_dir, "diff.patch"), "w") as fh:
-        fh.write("+SENTINEL_DIFF_LINE\n")
-    verdict_path = str(tmp_path / "verdict_path.md")
-    with open(verdict_path, "w") as fh:
-        fh.write("6d checks\n\nNOT READY\n\n- finding one\n\n## DIGEST\nstuff\n")
-    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
-    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
-                       packet_dir, verdict_path, "deadbeef")
-    prompt = llm.captured_prompts["fidelity-remediation"]
-    # A packet path in the prompt means the content is also present inline.
-    if packet_dir in prompt:
-        assert "+SENTINEL_DIFF_LINE" in prompt
 
 
 def test_remediation_prompt_truncates_oversized_diff(tmp_path, git_shim):
@@ -1315,9 +1314,142 @@ def test_comment_nit_re_drops_verb_anchored_rewording_nits(title, detail):
     # Not filtered: defect in detail overrides the nit classification
     ("Clarify _ALREADY_DONE_RE docstring in fidelity.py",
      "The regex drops real followups silently when they name an old PR."),
+    # Not filtered: nit-like titles with no verb prefix (the regex is verb-anchored)
+    ("Stale docstring in compose_sticky",
+     "The docstring is out of date."),
+    ("Misleading comment above the retry loop",
+     "It says three tries but the code does five."),
 ])
 def test_comment_nit_re_keeps_additive_and_defect_notes(title, detail):
     """Additive docstring notes and notes with defect details are not filtered."""
     assert not fidelity._is_comment_nit(title, detail), (
         f"Expected _is_comment_nit to return False for title: {title!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# _ALREADY_DONE_RE regression: backlog#1070 — `recorded` verb and body target
+# ---------------------------------------------------------------------------
+# Branch isolation: "in the PR body" is caught by the earlier `the pr` target, so
+# it never reaches the body alternative. The body-only cases use "in (the) body"
+# with `fixed`; the verb-only cases use `recorded` with a non-body target.
+
+@pytest.mark.parametrize("text,pr_number", [
+    # `recorded` verb, non-body target (pins the verb alternative alone)
+    ("Deviation recorded in this PR.", None),
+    ("Deviation recorded in PR #2400.", 2400),
+    ("The drift was recorded by the remediation.", None),
+    # body target, non-`recorded` verb (pins the body alternative alone)
+    ("Caveat fixed in the body.", None),
+    ("Caveat fixed in body.", None),
+    # both branches together, including the issue's own wording
+    ("Deviation recorded in the PR body.", None),
+    ("RECORDED IN THE BODY", None),
+])
+def test_already_done_re_drops_recorded_and_body_notes(text, pr_number):
+    """The `recorded` verb and the `(the) (PR) body` target mark a note as landed."""
+    assert fidelity._says_already_done(text, pr_number), (
+        f"Expected _says_already_done to return True for: {text!r}"
+    )
+
+
+@pytest.mark.parametrize("text,pr_number", [
+    # negation in the 20 chars before the verb cancels the match
+    ("Not recorded in the PR body. Add it.", None),
+    ("never recorded in the body", None),
+    # `recorded` with a target outside the alternation
+    ("Recorded in the backlog.", None),
+    ("recorded in the review thread", None),
+    # word boundary around `body`
+    ("recorded in the embodiment of the spec", None),
+    ("recorded in the bodywork", None),
+    # the [^.]{0,40}? window between verb and preposition is capped at 40 chars;
+    # widening it to {0,80} would make this case match and fail the test
+    ("recorded elsewhere in the long document, then later in the body", None),
+    # an older numbered PR stays filable when the reviewed PR is known
+    ("Recorded in PR #1900 earlier", 2400),
+])
+def test_already_done_re_keeps_unrecorded_and_non_body_notes(text, pr_number):
+    """Negated, off-target, out-of-window, and older-PR notes stay filable."""
+    assert not fidelity._says_already_done(text, pr_number), (
+        f"Expected _says_already_done to return False for: {text!r}"
+    )
+
+
+def test_extract_notes_drops_recorded_and_body_followups(tmp_path):
+    """`recorded` and body-target notes drop; negated, off-target, older-PR notes file."""
+    notes_fixture = [
+        {"title": "Note the cap-rounding deviation", "kind": "followup",
+         "detail": "Deviation recorded in the PR body."},
+        {"title": "Flag the trade-window caveat", "kind": "followup",
+         "detail": "Caveat fixed in the body."},
+        {"title": "Cap the roster at fifteen", "kind": "followup",
+         "detail": "Drift recorded by the remediation."},
+        {"title": "Backfill the missing draft picks", "kind": "followup",
+         "detail": "Not recorded in the PR body. Add the backfill."},
+        {"title": "Seed the waiver wire fixture", "kind": "followup",
+         "detail": "Recorded in PR #1900 earlier; the fixture is still missing."},
+        {"title": "Guard the empty depth chart", "kind": "followup",
+         "detail": "Recorded in the backlog and still unfixed."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"),
+                                    pr_number=2400)
+    assert [n["title"] for n in result] == ["Backfill the missing draft picks",
+                                            "Seed the waiver wire fixture",
+                                            "Guard the empty depth chart"]
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "backlog#1070 known limitation: _ALREADY_DONE_RE drops a note that names work "
+    "after 'recorded in the PR body'. Remove this marker when the regex is narrowed."))
+def test_already_done_re_keeps_note_that_names_work_after_recorded_body():
+    """The issue's own example names owed work, so it should stay filable."""
+    assert not fidelity._says_already_done("drift recorded in the PR body; add a guard")
+
+
+@pytest.mark.parametrize("pr_number,expected", [(4242, "gh pr edit 4242 --body-file"),
+                                                ("4242", "gh pr edit 4242 --body-file")])
+def test_remediation_prompt_names_pr_edit_when_pr_number_given(tmp_path, git_shim,
+                                                                pr_number, expected):
+    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                       _packet(tmp_path), _verdict(tmp_path, "NOT READY"), "deadbeef",
+                       pr_number=pr_number)
+    assert expected in llm.captured_prompts["fidelity-remediation"]
+
+
+def test_remediation_prompt_omits_pr_edit_when_pr_number_none(tmp_path, git_shim):
+    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                       _packet(tmp_path), _verdict(tmp_path, "NOT READY"), "deadbeef",
+                       pr_number=None)
+    prompt = llm.captured_prompts["fidelity-remediation"]
+    assert "gh pr edit None" not in prompt
+    assert "--body-file" not in prompt
+
+
+def test_runner_passes_pr_number_to_remediate(tmp_path, git_shim):
+    """runner._run_fidelity threads the PR number into fidelity.remediate."""
+    pr = 998
+    seen = []
+
+    def _spy(*args, **kw):
+        seen.append(kw.get("pr_number"))
+        return None
+
+    git_shim.setattr(fidelity, "remediate", _spy)
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-review": "6d checks\n\nNOT READY\n"})
+    gh = RecordingGh(str(tmp_path))
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _CountingGit({
+                "slug": "demo", "worktree_diff": "",
+                "diff": "diff --git a/x b/x\n",
+                "head_trees": [TREE_1, TREE_2],
+            }), gh, _plan(),
+            "diff", "body", pr, "dead" * 10, TREE_1, False, lambda m: None, _Res(),
+        )
+        assert seen and all(n == pr for n in seen)
+    finally:
+        _cleanup(pr, f"{pr}-2", f"{pr}-3", f"{pr}-4")

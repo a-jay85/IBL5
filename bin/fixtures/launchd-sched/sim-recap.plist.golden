@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.sim-recap-poll</string>
+	<key>Program</key>
+	<string>@MAIN_WT@/bin/sim-recap-tick</string>
+	<!-- StartInterval: the correct launchd primitive for a repeating poll.
+	     300s is frozen by the decisions digest (D6) — do NOT change it here.
+	     Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->
+	<key>StartInterval</key>
+	<integer>300</integer>
+	<key>WorkingDirectory</key>
+	<string>@MAIN_WT@</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew; claude, ssh,
+		     mysql, git must resolve. No API-key env var — claude uses ambient CLI auth.
+		     ~/.local/bin is where the Claude Code NATIVE installer puts the claude
+		     binary — omitting it is not a cosmetic gap: the tick then dies rc=127
+		     inside timeout, which generate() reads as "no payload" and parks, burning an
+		     attempt per poll (sim 721, 2026-07-25). HOME interpolates HERE, at
+		     generation time — launchd does NOT expand variables in
+		     EnvironmentVariables, so a literal @HOME@ would bake in a dead path. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
+		<key>SIM_RECAP_SSH_HOST</key>
+		<string>golden-host</string>
+		<key>SIM_RECAP_REMOTE_ROOT</key>
+		<string>/golden/root</string>
+		<key>SIM_RECAP_DB_USER</key>
+		<string>golden_user</string>
+		<key>SIM_RECAP_DB_NAME</key>
+		<string>golden_db</string>
+		<key>SIM_RECAP_DB_PASSWORD</key>
+		<string>***</string>
+		<!-- SIM_RECAP_OPS_ALERT_THREAD_ID is deliberately ABSENT. Its absence is
+		     what makes the roster-degraded Discord alert a no-op in production:
+		     roster_health_transition() in bin/sim-recap-tick returns immediately
+		     on an empty thread ID. Adding it here is the step that ARMS the
+		     alert, so read that function first — it is edge-triggered (one ping
+		     on healthy->degraded, one on degraded->healthy, silence in between)
+		     precisely so arming it cannot turn a sustained simRecapContext.php
+		     outage into a ping per claimed sim. -->
+	</dict>
+	<key>StandardOutPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/logs/launchd-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/logs/launchd-stderr.log</string>
+</dict>
+</plist>

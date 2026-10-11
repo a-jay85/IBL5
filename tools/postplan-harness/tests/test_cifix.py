@@ -233,3 +233,55 @@ class TestSkillAndCompanionPhase7AreOpusOnly:
         assert "gh run rerun" in companion_text
         assert f"{cifix.MAX_CI_FIX_ATTEMPTS} attempts" in skill_slice
         assert "Tests and Analysis" in skill_slice
+
+
+# ---- Phase 7 gate-path deny arm (backlog #890) ----
+
+class TestCiFixGatePathDeny:
+    def test_gate_path_edit_in_fix_commit_stops_loop_without_push(self, monkeypatch, tmp_path):
+        from test_runner_replay import (_TwoShaLiveGit, _audit, _red_fixture,
+                                        _run_live_shaped_with)
+
+        events = []
+
+        class _GateEditFixGit(_TwoShaLiveGit):
+            def changed_files(self, base="origin/master"):
+                events.append(("changed_files", base))
+                if base.endswith("^"):
+                    return [".github/workflows/ci.yml", "ibl5/classes/Foo.php"]
+                return super().changed_files(base)
+
+            def push_ff(self):
+                events.append(("push_ff", None))
+                return super().push_ff()
+
+        out = str(tmp_path / "out")
+        # A rewatch entry is scripted so a (wrongly) continuing loop would consume it.
+        fx = _red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}])
+        res, _ = _run_live_shaped_with(
+            monkeypatch, out,
+            git_cls=_GateEditFixGit,
+            canned_extra={"ci-fix": ["edits made"]},
+            fixture=fx,
+        )
+
+        audit = _audit(out)
+        assert "phase7 ci-fix: gate-path edit detected in fix commit replay-sha-" in audit
+        assert "phase7 ci-fix attempt 1: model=claude-opus-5-5 outcome=error:gate-path-edit" in audit
+        # Loop stopped: no second attempt, no rewatch-driven "fixed".
+        assert "ci-fix attempt 2:" not in audit
+        assert "outcome=fixed" not in audit
+        assert res.ci_outcome == "failed"
+
+        git = _GateEditFixGit.instances[-1]
+        fix_msgs = [m for m in git.commit_messages
+                    if m.startswith("fix: address Phase 7 CI failures")]
+        assert len(fix_msgs) == 1
+
+        # changed_files was asked about the fix commit's parent, and nothing pushed after.
+        caret_calls = [i for i, e in enumerate(events)
+                       if e[0] == "changed_files" and e[1].endswith("^")]
+        assert len(caret_calls) == 1
+        new_sha = f"replay-sha-{len(git.commit_messages)}"
+        assert events[caret_calls[0]] == ("changed_files", f"{new_sha}^")
+        assert not any(e[0] == "push_ff" for e in events[caret_calls[0]:])

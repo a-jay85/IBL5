@@ -81,11 +81,11 @@ class TeamRepositoryTest extends TestCase
         $this->db->setNumRows(3);
         
         // Act
-        $result = $this->repository->getRosterUnderContract(2);
+        $this->repository->getRosterUnderContract(2);
         
         // Assert - Verify query was executed (implementation-agnostic)
         $queries = $this->db->getExecutedQueries();
-        $this->assertNotEmpty($queries, 'Should execute database query');
+        $this->assertNotSame([], $queries, 'Should execute database query');
     }
 
     public function testGetFreeAgencyRosterExecutesQuery(): void
@@ -95,11 +95,11 @@ class TeamRepositoryTest extends TestCase
         $this->db->setNumRows(0);
         
         // Act
-        $result = $this->repository->getFreeAgencyRoster(2);
+        $this->repository->getFreeAgencyRoster(2);
         
         // Assert - Verify query was executed
         $queries = $this->db->getExecutedQueries();
-        $this->assertNotEmpty($queries, 'Should execute database query');
+        $this->assertNotSame([], $queries, 'Should execute database query');
     }
 
     public function testGetHistoricalRosterExecutesQuery(): void
@@ -109,11 +109,11 @@ class TeamRepositoryTest extends TestCase
         $this->db->setNumRows(0);
         
         // Act
-        $result = $this->repository->getHistoricalRoster(2, '2023');
+        $this->repository->getHistoricalRoster(2, '2023');
 
         // Assert - Verify query was executed
         $queries = $this->db->getExecutedQueries();
-        $this->assertNotEmpty($queries, 'Should execute database query');
+        $this->assertNotSame([], $queries, 'Should execute database query');
     }
 
     // ── Season history (regular vs H.E.A.T.) ─────────────────────

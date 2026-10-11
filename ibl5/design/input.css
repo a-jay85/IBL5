@@ -140,6 +140,7 @@
 @import './components/topics.css';
 @import './components/search.css';
 @import './components/tables.css';
+@import './components/tables/player-row-states.css';
 @import './components/tables/season-highs.css';
 @import './components/tables/voting.css';
 @import './components/tables/trading.css';

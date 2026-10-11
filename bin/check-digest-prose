@@ -58,6 +58,24 @@ fi
 # Process each line through awk, which handles all four rules.
 # awk is the portable engine (shell-portability.md).
 awk '
+# Replace every period inside each match of re (an abbreviation token) with \001.
+# The leading (^|[^A-Za-z]) anchor char, when present, is left untouched.
+function protect(str, re,    out, tok, pre) {
+  out = ""
+  while (match(str, re)) {
+    tok = substr(str, RSTART, RLENGTH)
+    pre = ""
+    if (substr(tok, 1, 1) !~ /[A-Za-z]/) {
+      pre = substr(tok, 1, 1)
+      tok = substr(tok, 2)
+    }
+    gsub(/\./, "\001", tok)
+    out = out substr(str, 1, RSTART-1) pre tok
+    str = substr(str, RSTART+RLENGTH)
+  }
+  return out str
+}
+
 BEGIN {
   WORD_LIMIT = 25
   EMDASH = "\342\200\224"  # UTF-8 for U+2014 —
@@ -133,14 +151,18 @@ BEGIN {
   # Two-pass placeholder substitution for non-boundary periods, then split.
   work = stripped
 
-  # Pass 1: replace non-boundary periods with sentinel \001
-  # Non-boundary: period followed by digit
-  gsub(/\.([0-9])/, "\001\\1", work)
-  # Non-boundary: abbreviations e.g. i.e. etc. vs. (case-insensitive as whole tokens)
-  gsub(/[Ee]\.[Gg]\./, "\001g\001", work)
-  gsub(/[Ii]\.[Ee]\./, "\001e\001", work)
-  gsub(/[Ee][Tt][Cc]\./, "etc\001", work)
-  gsub(/[Vv][Ss]\./, "vs\001", work)
+  # Pass 1: replace non-boundary periods with sentinel \001 (awk gsub has no
+  # backreferences, so each match is rewritten by hand to keep surrounding text).
+  # Non-boundary: period followed by digit. Replace only the period.
+  while (match(work, /\.[0-9]/)) {
+    work = substr(work, 1, RSTART-1) "\001" substr(work, RSTART+1)
+  }
+  # Non-boundary: abbreviations e.g. i.e. etc. vs. (case-insensitive), anchored to
+  # token start: start-of-string or a non-letter before the abbreviation.
+  work = protect(work, "(^|[^A-Za-z])[Ee]\\.[Gg]\\.")
+  work = protect(work, "(^|[^A-Za-z])[Ii]\\.[Ee]\\.")
+  work = protect(work, "(^|[^A-Za-z])[Ee][Tt][Cc]\\.")
+  work = protect(work, "(^|[^A-Za-z])[Vv][Ss]\\.")
 
   # Pass 2: split on remaining boundary periods (period + space or end)
   # Split into sentences
@@ -157,7 +179,8 @@ BEGIN {
       if (words[w] != "") nonempty++
     }
     if (nonempty > WORD_LIMIT) {
-      excerpt = substr(original, 1, 60)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
+      excerpt = substr(s, 1, 60)
       print "LINE " lineno ": [SENTENCE_TOO_LONG] (" nonempty " words) " excerpt "..."
     }
   }

@@ -124,25 +124,25 @@ class ExtensionContractDemandCalculator implements ExtensionContractDemandCalcul
         $avgDemands = $adjustedScore * self::DEMANDS_FACTOR;
         $totalDemands = $avgDemands * 5;
         $baseDemands = $totalDemands / 6;
-        $maxRaise = floor($baseDemands * \ContractRules::STANDARD_RAISE_PERCENTAGE);
+        $maxRaise = floor($baseDemands * \League\ContractRules::STANDARD_RAISE_PERCENTAGE);
 
         $pfwPref = $player->getFreeAgencyPlayForWinner() ?? 1;
         $tradPref = $player->getFreeAgencyTradition() ?? 1;
         $loyPref = $player->getFreeAgencyLoyalty() ?? 1;
         $ptPref = $player->getFreeAgencyPlayingTime() ?? 1;
 
-        $pfwFactor = \ContractRules::calculateWinnerModifier(
+        $pfwFactor = \League\ContractRules::calculateWinnerModifier(
             $teamFactors['wins'] ?? 41,
             $teamFactors['losses'] ?? 41,
             $pfwPref
         );
-        $traditionFactor = \ContractRules::calculateTraditionModifier(
+        $traditionFactor = \League\ContractRules::calculateTraditionModifier(
             $teamFactors['tradition_wins'] ?? 41,
             $teamFactors['tradition_losses'] ?? 41,
             $tradPref
         );
-        $loyaltyFactor = \ContractRules::calculateLoyaltyModifier($loyPref);
-        $ptFactor = \ContractRules::calculatePlayingTimeModifier(
+        $loyaltyFactor = \League\ContractRules::calculateLoyaltyModifier($loyPref);
+        $ptFactor = \League\ContractRules::calculatePlayingTimeModifier(
             $teamFactors['money_committed_at_position'] ?? 0,
             $ptPref
         );
@@ -239,7 +239,7 @@ class ExtensionContractDemandCalculator implements ExtensionContractDemandCalcul
         $baseDemands = $totalDemands / 6;
         
         // Calculate max raise per year (standard rate without bird rights)
-        $maxRaise = floor($baseDemands * \ContractRules::STANDARD_RAISE_PERCENTAGE);
+        $maxRaise = floor($baseDemands * \League\ContractRules::STANDARD_RAISE_PERCENTAGE);
         
         // Build yearly demands with raises
         return [
@@ -315,21 +315,21 @@ class ExtensionContractDemandCalculator implements ExtensionContractDemandCalcul
      */
     private function calculateModifier(Player $player, array $teamFactors): float
     {
-        $PFWFactor = \ContractRules::calculateWinnerModifier(
+        $PFWFactor = \League\ContractRules::calculateWinnerModifier(
             $teamFactors['wins'] ?? 41,
             $teamFactors['losses'] ?? 41,
             $player->getFreeAgencyPlayForWinner() ?? 1
         );
 
-        $traditionFactor = \ContractRules::calculateTraditionModifier(
+        $traditionFactor = \League\ContractRules::calculateTraditionModifier(
             $teamFactors['tradition_wins'] ?? 41,
             $teamFactors['tradition_losses'] ?? 41,
             $player->getFreeAgencyTradition() ?? 1
         );
 
-        $loyaltyFactor = \ContractRules::calculateLoyaltyModifier($player->getFreeAgencyLoyalty() ?? 1);
+        $loyaltyFactor = \League\ContractRules::calculateLoyaltyModifier($player->getFreeAgencyLoyalty() ?? 1);
 
-        $PTFactor = \ContractRules::calculatePlayingTimeModifier(
+        $PTFactor = \League\ContractRules::calculatePlayingTimeModifier(
             $teamFactors['money_committed_at_position'] ?? 0,
             $player->getFreeAgencyPlayingTime() ?? 1
         );

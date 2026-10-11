@@ -22,6 +22,10 @@ def test_local_gate_denial_exits_3():
     """A pre-commit/pre-push hook denial is deterministic — no ~1M skill fallback."""
     assert runner.exit_code_for(_res(TerminalState.FAILED, "local-gate")) == 3
 
+def test_subprocess_timeout_exits_3():
+    """A hung phase-2 subprocess would hang again on a skill re-run — fail closed."""
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "subprocess-timeout")) == 3
+
 def test_usage_limit_exits_3():
     """A Claude usage/rate limit is environmental — re-running the skill immediately
     would hit the same wall, so the harness stops for a human to retry later."""
@@ -31,6 +35,35 @@ def test_other_typed_failure_exits_1():          # negative path: not everything
     assert runner.exit_code_for(_res(TerminalState.FAILED, "push-disabled")) == 1
     assert runner.exit_code_for(_res(TerminalState.FAILED, None)) == 1
 
+_EXIT_CODE_TABLE = (
+    [(TerminalState.FAILED, k, 3) for k in (
+        "rebase-conflict", "local-gate", "remote-head-diverged",
+        "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty",
+        "subprocess-timeout")]
+    + [(TerminalState.FAILED, "usage-pause", 75)]
+    + [(TerminalState.FAILED, k, 1) for k in (
+        "push-disabled", "push-failed", "push-retry-cap",
+        "lostwork-unproved", "git", None)]
+    + [(t, None, 0) for t in (
+        TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
+        TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED,
+        TerminalState.HOLD_REPEAT_DECLINED)]
+)
+
+
+@pytest.mark.parametrize("terminal,error_kind,expected", _EXIT_CODE_TABLE)
+def test_exit_code_table_pins_every_kind(terminal, error_kind, expected):
+    """Literal table (not _FAIL_CLOSED_KINDS) so mutating the tuple fails here."""
+    assert runner.exit_code_for(_res(terminal, error_kind)) == expected
+
+
+def test_harness_error_positional_signature_pinned():
+    """Two-argument raise sites keep their meaning when keyword-only fields are added."""
+    e = HarnessError("git", "boom")
+    assert e.kind == "git"
+    assert e.detail == "boom"
+    assert str(e) == "git: boom"
+
 def test_success_and_nothing_to_ship_exit_0():
     assert runner.exit_code_for(_res(TerminalState.SHIPPED_ARMED)) == 0
     assert runner.exit_code_for(_res(TerminalState.SHIPPED_HELD)) == 0
@@ -38,6 +71,15 @@ def test_success_and_nothing_to_ship_exit_0():
 
 def test_degraded_exits_zero():                 # no /post-plan skill fallback on a shipped+held PR
     assert runner.exit_code_for(_res(TerminalState.DEGRADED)) == 0
+
+def test_hold_repeat_declined_exits_zero():
+    assert runner.exit_code_for(_res(TerminalState.HOLD_REPEAT_DECLINED)) == 0
+
+
+def test_hold_repeat_declined_is_not_failed():
+    assert TerminalState.HOLD_REPEAT_DECLINED != TerminalState.FAILED
+    assert TerminalState.HOLD_REPEAT_DECLINED.value == "hold-repeat-declined"
+
 
 def test_degraded_does_not_shadow_rebase_sentinel():   # negative: ordering, not a duplicate
     assert runner.exit_code_for(_res(TerminalState.FAILED, "rebase-conflict")) == 3
@@ -196,7 +238,7 @@ def test_run_commits_through_the_remediation_wrapper():
                             "runner.py")).read()
     assert "_commit_with_gate_remediation(" in src
     assert "sha = git.commit_all(" not in src        # the old call site is gone
-    assert 'upsert_files_changed(copy["summary_md"]' in src   # PR body still unmutated
+    assert 'create_body = copy["summary_md"] or ""' in src   # PR body still unmutated at creation
 
 
 @pytest.mark.usefixtures("stub_ambient_git_show")
@@ -308,30 +350,14 @@ def test_emergency_abort_exists_on_live_git():
     )
 
 
-def test_every_files_changed_upsert_is_paired_with_tests_changed():
-    """Every upsert_files_changed( call site in runner.py must be followed within two lines
-    by upsert_tests_changed(, so the tests block can never be left stale.
-
-    Mutation caught: deleting any one of the three wire lines from 2b, 2c, or 2d.
-    """
-    src_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            "runner.py")
-    lines = open(src_path).readlines()
-    sites = [i for i, ln in enumerate(lines)
-             if "upsert_files_changed(" in ln and not ln.lstrip().startswith("#")]
-    assert len(sites) >= 3, f"Expected at least 3 upsert_files_changed( sites, found {len(sites)}"
-    for idx in sites:
-        window = lines[idx + 1: idx + 3]
-        assert any("upsert_tests_changed(" in ln for ln in window), (
-            f"Line {idx + 1}: upsert_files_changed( not followed by upsert_tests_changed( "
-            f"within two lines"
-        )
-
-
 # ---------------------------------------------------------------------------
 # blocked-ship.txt: main() hands the human block to bin/post-plan-now on exit 3.
 # ---------------------------------------------------------------------------
 
+# Main-checkout bin/postplan-fix, derived from this file's own location (not from runner).
+_FIX = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+    "bin", "postplan-fix")
 _ADR_DENIAL = ("pre-push-adr-hook: Decision-trigger surfaces detected:\n"
                "  - [bin-script] bin/foo — Tool script")
 
@@ -358,8 +384,73 @@ def test_main_writes_blocked_ship_on_rc3(monkeypatch, tmp_path, capsys):
     assert rc == 3
     text = (out / "blocked-ship.txt").read_text()
     assert text.startswith("feat/x did not ship.")
-    assert text.rstrip("\n").split("\n")[-1] == "Log: /tmp/x.log"
+    assert text.rstrip("\n").split("\n")[-3:] == [
+        "Log: /tmp/x.log", "Or paste this to have Claude fix it:", f"{_FIX} feat/x"]
     assert stdout.split("\n")[0].startswith("RESULT: post-plan BLOCKED")
+
+
+def test_forced_commit_failure_names_command_and_error_end_to_end(monkeypatch, tmp_path, capsys):
+    import subprocess
+    import tempfile
+    from harness.adapters.gitad import LiveGit
+
+    repo = tempfile.mkdtemp(prefix="postplan-forced-fail-")
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    subprocess.run(["git", "init", "-b", "master", repo], check=True, capture_output=True)
+    for args in (["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", repo, *args], check=True, capture_output=True)
+    with open(os.path.join(repo, "a.txt"), "w") as fh:
+        fh.write("base\n")
+    subprocess.run(["git", "-C", repo, "add", "-A"], check=True, capture_output=True, env=env)
+    subprocess.run(["git", "-C", repo, "commit", "-m", "base"], check=True,
+                   capture_output=True, env=env)
+
+    secret = "ghs_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
+    hooks = os.path.join(repo, ".git", "hooks")
+    os.makedirs(hooks, exist_ok=True)
+    hook = os.path.join(hooks, "pre-commit")
+    assert hook.startswith(tempfile.gettempdir()), f"refusing to write a hook at {hook}"
+    with open(hook, "w") as fh:
+        fh.write("#!/bin/sh\n"
+                 "i=0\n"
+                 "while [ $i -lt 120 ]; do echo \"filler $(printf '%03d' $i)\"; i=$((i+1)); done\n"
+                 f"echo 'remote: https://x-access-token:{secret}@github.com/a/b.git'\n"
+                 "echo 'GUIDANCE: hook-x refused the commit'\n"
+                 "exit 1\n")
+    os.chmod(hook, 0o755)
+
+    with open(os.path.join(repo, "b.txt"), "w") as fh:
+        fh.write("blocked\n")
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(repo).commit_all("chore: should be rejected")
+    e = ei.value
+
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.slug = "feat/x"
+    res.error = f"{e.kind}: {e.detail}"
+    res.error_kind = e.kind
+    runner._record_failure_context(res, e)
+
+    monkeypatch.setenv("POSTPLAN_LOG_PATH", "/tmp/x.log")
+    rc, stdout, out = _drive_main(monkeypatch, tmp_path, res, capsys)
+    assert rc == 3
+    first = stdout.split("\n")[0]
+    block = (out / "blocked-ship.txt").read_text()
+    assert first.startswith("RESULT: post-plan BLOCKED")
+    assert "Command: git commit." in first
+    assert "GUIDANCE: hook-x refused the commit" in first
+    assert "Command: git commit" in block
+    assert "> GUIDANCE: hook-x refused the commit" in block
+    assert block.rstrip("\n").split("\n")[-3:] == [
+        "Log: /tmp/x.log", "Or paste this to have Claude fix it:", f"{_FIX} feat/x"]
+    for text in (first, block):
+        assert secret not in text
+        assert "filler 000" not in text
+
+
+def test_run_handler_records_failure_context():
+    assert "_record_failure_context(res, e)" in inspect.getsource(runner.run)
 
 
 def test_main_writes_no_blocked_ship_on_rc1(monkeypatch, tmp_path, capsys):
@@ -373,11 +464,13 @@ def test_blocked_ship_log_line_when_env_unset_or_empty(monkeypatch, tmp_path):
     res = _res(TerminalState.FAILED, "local-gate", error=_ADR_DENIAL, slug="feat/x")
     monkeypatch.delenv("POSTPLAN_LOG_PATH", raising=False)
     runner.write_blocked_ship(str(tmp_path), res, 3, "/wt")
-    assert (tmp_path / "blocked-ship.txt").read_text().endswith("Log: (see the run log)\n")
+    assert (tmp_path / "blocked-ship.txt").read_text().endswith(
+        f"Log: (see the run log)\nOr paste this to have Claude fix it:\n{_FIX} feat/x\n")
     (tmp_path / "blocked-ship.txt").unlink()
     monkeypatch.setenv("POSTPLAN_LOG_PATH", "")
     runner.write_blocked_ship(str(tmp_path), res, 3, "/wt")
-    assert (tmp_path / "blocked-ship.txt").read_text().endswith("Log: (see the run log)\n")
+    assert (tmp_path / "blocked-ship.txt").read_text().endswith(
+        f"Log: (see the run log)\nOr paste this to have Claude fix it:\n{_FIX} feat/x\n")
 
 
 def test_blocked_ship_write_error_keeps_exit_code(tmp_path):

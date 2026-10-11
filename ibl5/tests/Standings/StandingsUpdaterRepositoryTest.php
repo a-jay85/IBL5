@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Standings;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Standings\StandingsUpdaterRepository;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -98,6 +99,126 @@ class StandingsUpdaterRepositoryTest extends WideUnitTestCase
         }
     }
 
+    /**
+     * Literal oracle: four grouping-column methods x the two allowed columns.
+     *
+     * @return array<string, array{string, string}>
+     */
+    public static function groupingMethodAndColumnProvider(): array
+    {
+        $data = [];
+        foreach (['fetchTeamsByRegion', 'fetchTopTeamsByWins', 'fetchLeastLosingTeam', 'isRegionSeasonOver'] as $method) {
+            foreach (['conference', 'division'] as $column) {
+                $data[$method . ' ' . $column] = [$method, $column];
+            }
+        }
+
+        return $data;
+    }
+
+    private function callGroupingMethod(string $method, string $column): void
+    {
+        match ($method) {
+            'fetchTeamsByRegion' => $this->repository->fetchTeamsByRegion($column, 'Eastern'),
+            'fetchTopTeamsByWins' => $this->repository->fetchTopTeamsByWins($column, 'Eastern'),
+            'fetchLeastLosingTeam' => $this->repository->fetchLeastLosingTeam('Sentinels', $column, 'Eastern'),
+            'isRegionSeasonOver' => $this->repository->isRegionSeasonOver($column, 'Eastern'),
+            default => self::fail('unknown method ' . $method),
+        };
+    }
+
+    /**
+     * Assert the raw prepared SQL (backticks intact) contains the needle.
+     */
+    private function assertPreparedSqlContains(string $needle): void
+    {
+        $found = false;
+        foreach ($this->mockDb->getPreparedQueries() as $query) {
+            if (str_contains($query, $needle)) {
+                $found = true;
+                break;
+            }
+        }
+        self::assertTrue(
+            $found,
+            "No prepared query contained '" . $needle . "'. Prepared: " . implode(' | ', $this->mockDb->getPreparedQueries())
+        );
+    }
+
+    #[DataProvider('groupingMethodAndColumnProvider')]
+    public function testEachValidGroupingColumnIsSplicedBacktickQuoted(string $method, string $column): void
+    {
+        $this->callGroupingMethod($method, $column);
+
+        $this->assertPreparedSqlContains('WHERE `' . $column . '` = ?');
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function magicNumberColumnProvider(): array
+    {
+        return [
+            'conf_magic_number' => ['conf_magic_number'],
+            'div_magic_number' => ['div_magic_number'],
+        ];
+    }
+
+    #[DataProvider('magicNumberColumnProvider')]
+    public function testEachValidMagicNumberColumnIsSplicedBacktickQuoted(string $column): void
+    {
+        $this->repository->updateMagicNumber(3, 12, $column);
+
+        $this->assertPreparedSqlContains('SET `' . $column . '` = ?');
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function clinchedColumnProvider(): array
+    {
+        return [
+            'clinched_conference' => ['clinched_conference'],
+            'clinched_division' => ['clinched_division'],
+            'clinched_playoffs' => ['clinched_playoffs'],
+            'clinched_league' => ['clinched_league'],
+        ];
+    }
+
+    #[DataProvider('clinchedColumnProvider')]
+    public function testEachValidClinchedColumnIsSplicedBacktickQuoted(string $column): void
+    {
+        $this->repository->updateClinchedFlag('Sentinels', $column);
+
+        $this->assertPreparedSqlContains('SET `' . $column . '` = 1');
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function groupingMethodProvider(): array
+    {
+        return [
+            'fetchTeamsByRegion' => ['fetchTeamsByRegion'],
+            'fetchTopTeamsByWins' => ['fetchTopTeamsByWins'],
+            'fetchLeastLosingTeam' => ['fetchLeastLosingTeam'],
+            'isRegionSeasonOver' => ['isRegionSeasonOver'],
+        ];
+    }
+
+    #[DataProvider('groupingMethodProvider')]
+    public function testGroupingColumnMethodsRejectUnknownColumn(string $method): void
+    {
+        try {
+            $this->callGroupingMethod($method, 'wins; DROP TABLE x');
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('Invalid grouping column', $e->getMessage());
+            self::assertSame([], $this->mockDb->getExecutedQueries());
+            self::assertSame([], $this->mockDb->getPreparedQueries());
+        }
+    }
+
     public function testUpsertTeamAwardWritesTeamAwardsTable(): void
     {
         $this->repository->upsertTeamAward(2026, 'Sentinels', 'Division Champions');
@@ -105,5 +226,18 @@ class StandingsUpdaterRepositoryTest extends WideUnitTestCase
         $this->assertQueryExecuted('ibl_team_awards');
         $this->assertQueryNotExecuted('ibl_standings');
         self::assertSame([2026, 'Sentinels', 'Division Champions'], $this->mockDb->getLastBoundParams());
+    }
+
+    public function testUpsertTeamAwardWritesBacktickedTeamAwardsTable(): void
+    {
+        $this->repository->upsertTeamAward(2026, 'Sentinels', 'Division Champions');
+
+        // getExecutedQueries() strips backticks, so assertQueryExecuted() covers the
+        // column list and order; the raw prepared SQL text carries the backticks.
+        $this->assertQueryExecuted('INSERT INTO ibl_team_awards (year, name, award)');
+        self::assertStringContainsString(
+            'INSERT INTO `ibl_team_awards` (year, name, award)',
+            implode("\n", $this->mockDb->getPreparedQueries())
+        );
     }
 }

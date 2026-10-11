@@ -1,6 +1,6 @@
 ---
 description: Shared code-review agent definitions used by /pr-review and /post-plan.
-last_verified: 2026-09-28
+last_verified: 2026-10-05
 ---
 
 # Code Review Agents (shared definitions)
@@ -100,7 +100,7 @@ Check whether the PR changes comply with guidance in code comments visible in th
 
 ### Output format
 
-Return findings per section, each with `file:line`, what is wrong, and the commit or code comment it conflicts with. If a section has no concerns, return a 1-sentence evidence summary for it.
+Return findings per section, each with `file:line`, what is wrong, the commit or code comment it conflicts with, and a concrete input or state that makes it fail. If you cannot name a failing input or state, say so in the finding. If a section has no concerns, return a 1-sentence evidence summary for it.
 
 ---
 

@@ -12,7 +12,7 @@ namespace GameBoxscore\Contracts;
  * for both teams. Row typing and display-default normalization are owned by
  * the Service layer, not this repository.
  *
- * @see \BaseMysqliRepository For base repository behavior
+ * @see \Database\BaseMysqliRepository For base repository behavior
  */
 interface GameBoxscoreRepositoryInterface
 {

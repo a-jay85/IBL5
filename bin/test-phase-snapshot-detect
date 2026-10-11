@@ -4,14 +4,15 @@
 # and bin/wt-up parser conversion. Run: bin/test-phase-snapshot-detect (exit 0 = all pass)
 set -euo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
-FAILED=0
-ok()   { echo "ok: $1"; }
-fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 CAPTURE="$SCRIPT_DIR/phase-snapshot-capture"
 
@@ -339,18 +340,39 @@ test_pull_dry_run_exits_zero() {
         fail "test_pull_dry_run_exits_zero" "bin/phase-snapshot-pull not found or not executable"
         return
     fi
-    local rc=0 out
-    out="$(PROD_SSH_HOST=dummy.example "$pull" --dry-run 2>&1)" || rc="$?"
+    local stubdir rc out
+    stubdir="$(mktemp -d)"
+
+    # Case A: rsync stub succeeds -> --dry-run exits 0 and rsync got --dry-run
+    cat > "$stubdir/rsync" <<'STUB'
+#!/bin/sh
+echo "STUB-RSYNC-ARGS: $*"
+exit 0
+STUB
+    chmod +x "$stubdir/rsync"
+    rc=0
+    out="$(PATH="$stubdir:$PATH" PROD_SSH_HOST=dummy.example "$pull" --dry-run 2>&1)" || rc="$?"
     if [ "$rc" -eq 0 ]; then
-        ok "test_pull_dry_run_exits_zero — exits 0"
+        ok "test_pull_dry_run_exits_zero — rsync success exits 0"
     else
         fail "test_pull_dry_run_exits_zero" "expected exit 0, got $rc; output: $out"
     fi
-    if grep -qiF 'rsync' <<< "$out"; then
-        ok "test_pull_dry_run_exits_zero — rsync command printed"
+    if grep -F 'STUB-RSYNC-ARGS:' <<< "$out" | grep -qF -- '--dry-run'; then
+        ok "test_pull_dry_run_exits_zero — rsync invoked with --dry-run"
     else
-        fail "test_pull_dry_run_exits_zero" "rsync not mentioned in output: $out"
+        fail "test_pull_dry_run_exits_zero" "--dry-run not passed to rsync: $out"
     fi
+
+    # Case B: rsync stub fails -> --dry-run must exit non-zero
+    printf '#!/bin/sh\nexit 255\n' > "$stubdir/rsync"
+    rc=0
+    out="$(PATH="$stubdir:$PATH" PROD_SSH_HOST=dummy.example "$pull" --dry-run 2>&1)" || rc="$?"
+    if [ "$rc" -ne 0 ]; then
+        ok "test_pull_dry_run_exits_zero — rsync failure exits non-zero"
+    else
+        fail "test_pull_dry_run_exits_zero" "expected non-zero exit on rsync failure, got 0; output: $out"
+    fi
+    rm -rf "$stubdir"
 }
 
 test_pull_push_delete_rejected() {
@@ -581,15 +603,17 @@ test_db_sync_prod_snapshot_load_is_offline_and_preserves_local_tables() {
     if ! docker run -d --name "$cname" \
             -e MARIADB_ROOT_PASSWORD=root \
             -e MARIADB_DATABASE=iblhoops_ibl5 \
-            mariadb:10.11 >/dev/null 2>&1; then
+            "${IBL5_TEST_MARIADB_IMAGE:-mariadb:10.11}" >/dev/null 2>&1; then
         fail "$label: throwaway container starts" "docker run failed"
         snaptest_cleanup
         return 0
     fi
 
+    # Probe over TCP against the target DB: the entrypoint's init-phase server
+    # answers on the socket before MARIADB_DATABASE exists, but never on TCP.
     local i ready=0
     for i in $(seq 1 90); do
-        if docker exec "$cname" mariadb -uroot -proot -e "SELECT 1" >/dev/null 2>&1; then
+        if docker exec "$cname" mariadb --protocol=tcp -h127.0.0.1 -uroot -proot iblhoops_ibl5 -e "SELECT 1" >/dev/null 2>&1; then
             ready=1
             break
         fi
@@ -704,9 +728,4 @@ test_wt_up_rejects_snapshot_without_value
 test_wt_up_rejects_snapshot_with_mode_flag
 test_wt_up_passthrough_single_call_site
 
-if [ "$FAILED" -eq 0 ]; then
-    echo "all cases passed"
-else
-    echo "one or more cases FAILED"
-fi
-exit "$FAILED"
+h_done

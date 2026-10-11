@@ -20,6 +20,7 @@ T="$(mktemp -d)"
 export T
 _cleanup() { rm -rf "$T"; }
 trap _cleanup EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
 
 # Verify HOME never points outside T (safety assertion enforced per case below)
 
@@ -631,7 +632,7 @@ FAILING_DM="$T/ctl/failing_dm"
 printf '#!/bin/bash\nexit 1\n' > "$FAILING_DM"
 chmod +x "$FAILING_DM"
 
-DM_OUT1="$(env -i HOME="$T/home" /bin/bash -c "
+DM_OUT1="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$T/home" /bin/bash -c "
 $(declare -f ljob_dm_ready ljob_dm_send 2>/dev/null || (. "$LIB" && declare -f ljob_dm_ready ljob_dm_send))
 NOTIFY=1
 DISCORD_DM='$FAILING_DM'
@@ -639,7 +640,7 @@ ljob_dm_ready mytool && ljob_dm_send mytool 'hello'
 " 2>&1)"
 
 # Sub-case 2: NOTIFY=0 → ljob_dm_ready returns 1 silently (no output)
-DM_OUT2="$(env -i HOME="$T/home" /bin/bash -c "
+DM_OUT2="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$T/home" /bin/bash -c "
 $(. "$LIB" && declare -f ljob_dm_ready)
 NOTIFY=0
 DISCORD_DM='$FAILING_DM'
@@ -651,7 +652,7 @@ NON_EXEC_DM="$T/ctl/non_exec_dm"
 printf 'not executable\n' > "$NON_EXEC_DM"
 # do NOT chmod +x
 
-DM_OUT3="$(env -i HOME="$T/home" /bin/bash -c "
+DM_OUT3="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$T/home" /bin/bash -c "
 $(. "$LIB" && declare -f ljob_dm_ready)
 NOTIFY=1
 DISCORD_DM='$NON_EXEC_DM'
@@ -918,6 +919,56 @@ if [[ $RI6A_GONE -eq 1 && "$RI6A_BOOTOUT" -eq 0 \
 else
     fail "reap_idle_exact_label_and_dry" \
         "6a_gone=$RI6A_GONE 6a_bootout=$RI6A_BOOTOUT 6b_kept=$RI6B_KEPT 6b_bootout=$RI6B_BOOTOUT 6b_msg=$RI6B_MSG"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: safe_slug_squeezes
+# ljob_safe_slug maps every run of chars outside [A-Za-z0-9._-] to one dash.
+# ---------------------------------------------------------------------------
+SS_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_safe_slug 'feat/x.y z'
+)"
+if [[ "$SS_OUT" == "feat-x.y-z" ]]; then
+    pass "safe_slug_squeezes"
+else
+    fail "safe_slug_squeezes" "got '$SS_OUT'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: postplan_now_live_exact_slug
+# ljob_postplan_now_live matches the exact slug between the fixed prefix and the
+# timestamp. branch-one-extra must not match branch-one, and an empty slug is rc 1.
+# ---------------------------------------------------------------------------
+PNL_SNAP="$(printf '%s\t%s\t%s\n' '-' '0' 'com.ibl5.postplan-now-branch-one-extra-20260101-120000-99')"
+PNL_SNAP_HIT="$(printf '%s\t%s\t%s\n' '4242' '0' 'com.ibl5.postplan-now-branch-one-20260101-120000-99')"
+PNL_RC="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    hit=0 miss=0 empty=0
+    ljob_postplan_now_live branch-one "$PNL_SNAP_HIT" >/dev/null && hit=1
+    ljob_postplan_now_live branch-one "$PNL_SNAP" >/dev/null || miss=1
+    ljob_postplan_now_live '' "$PNL_SNAP_HIT" >/dev/null || empty=1
+    echo "hit=$hit miss=$miss empty=$empty"
+)"
+if [[ "$PNL_RC" == "hit=1 miss=1 empty=1" ]]; then
+    pass "postplan_now_live_exact_slug"
+else
+    fail "postplan_now_live_exact_slug" "got '$PNL_RC'"
+fi
+PNL_LABEL_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_postplan_now_live branch-one "$PNL_SNAP_HIT"
+)"
+if [[ "$PNL_LABEL_OUT" == "com.ibl5.postplan-now-branch-one-20260101-120000-99" ]]; then
+    pass "postplan_now_live_exact_slug: prints label"
+else
+    fail "postplan_now_live_exact_slug: prints label" "got '$PNL_LABEL_OUT'"
 fi
 
 # ---------------------------------------------------------------------------

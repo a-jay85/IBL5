@@ -44,7 +44,7 @@ class InjuriesServiceTest extends TestCase
         $result = $service->getInjuredPlayersWithTeams();
 
         $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     // ============================================

@@ -27,7 +27,9 @@ final class LighthouseUrlsTest extends TestCase
         $expected = 1
             + count(ModuleRegistry::getAllModules())
             + count(LighthouseUrls::SUB_PAGES)
-            - count(LighthouseUrls::PARAM_REQUIRED_MODULES);
+            - count(LighthouseUrls::PARAM_REQUIRED_MODULES)
+            // Admin-only modules contribute nothing (and have no SUB_PAGES entry).
+            - count(LighthouseUrls::ADMIN_ONLY_MODULES);
 
         self::assertCount($expected, LighthouseUrls::fullSiteUrls(self::BASE));
     }
@@ -47,6 +49,23 @@ final class LighthouseUrlsTest extends TestCase
                 self::BASE . '/ibl5/modules.php?name=' . $module,
                 $fullSet,
                 "'$module' requires query params — its bare URL must not be audited"
+            );
+        }
+    }
+
+    public function testFullSiteUrlsOmitLeagueControlPanel(): void
+    {
+        foreach (LighthouseUrls::fullSiteUrls(self::BASE) as $url) {
+            self::assertStringNotContainsString('name=LeagueControlPanel', $url);
+        }
+    }
+
+    public function testEveryAdminOnlyModuleIsRegistered(): void
+    {
+        foreach (LighthouseUrls::ADMIN_ONLY_MODULES as $module) {
+            self::assertTrue(
+                ModuleRegistry::isValid($module),
+                "'$module' in ADMIN_ONLY_MODULES must be a registered module"
             );
         }
     }
@@ -109,6 +128,10 @@ final class LighthouseUrlsTest extends TestCase
         $fullSet = LighthouseUrls::fullSiteUrls(self::BASE);
 
         foreach (ModuleRegistry::getAllModules() as $module) {
+            if (in_array($module, LighthouseUrls::ADMIN_ONLY_MODULES, true)) {
+                continue;
+            }
+
             self::assertContains(
                 LighthouseUrls::moduleUrl($module, self::BASE),
                 $fullSet,

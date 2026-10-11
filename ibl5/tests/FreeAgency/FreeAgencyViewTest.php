@@ -229,6 +229,7 @@ class FreeAgencyViewTest extends TestCase
             $this->stubRepo,
             $this->stubDemandRepo,
             $this->mockDb,
+            self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class),
             $teamQueryRepo
         );
 

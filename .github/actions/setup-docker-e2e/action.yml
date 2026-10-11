@@ -62,12 +62,22 @@ runs:
       working-directory: ibl5
       run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
 
+    - name: Log in to GHCR (CI image mirror)
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
     - name: Pull or build PHP image
       if: inputs.php-image != 'build'
       shell: bash
       run: |
         docker pull ghcr.io/a-jay85/ibl5/php-apache:latest || \
-        docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
+        docker build \
+          --build-arg GO_BASE_IMAGE=ghcr.io/a-jay85/mirror/golang:1.27 \
+          --build-arg PHP_BASE_IMAGE=ghcr.io/a-jay85/mirror/php:8.5-apache \
+          -t ghcr.io/a-jay85/ibl5/php-apache:latest .
 
     - name: Set up Docker Buildx
       if: inputs.php-image == 'build'
@@ -82,6 +92,9 @@ runs:
         load: true
         tags: ghcr.io/a-jay85/ibl5/php-apache:latest
         cache-from: type=gha
+        build-args: |
+          GO_BASE_IMAGE=ghcr.io/a-jay85/mirror/golang:1.27
+          PHP_BASE_IMAGE=ghcr.io/a-jay85/mirror/php:8.5-apache
 
     - name: Start MariaDB first (schema must be ready before Apache serves)
       shell: bash

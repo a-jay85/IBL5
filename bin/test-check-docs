@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # Test harness for bin/check-docs: checkSkillDraftPlaceholder() (tests 1-4) and
-# the iterChangedDocs() local-date fallback (tests 5-6).
+# the iterChangedDocs() local-date fallback (tests 5-6), and the engine
+# lint-pin drift cases (pin A-C).
 # Follows bin/test-check-plan style.
 #
 # Each fixture is a minimal git repo so bin/check-docs can locate the root.
@@ -271,6 +272,134 @@ if [ "$AGE" = "90" ]; then
 else
     fail "UTC clock: stalenessAgeDays should report age_days 90, got $AGE"
     echo "  report: $REPORT"
+fi
+
+# ── Results ───────────────────────────────────────────────────────────────────
+
+# ── Tests 10-12: engine lint-pin drift (checkEngineLintPins) ─────────────────
+#
+# engine.yml is the source of truth; the two tracked docs restate its pins.
+
+pin_present() {   echo "$1" | grep -qF 'engine lint pin drift'; }
+pin_absent()  { ! echo "$1" | grep -qF 'engine lint pin drift'; }
+
+make_pin_fixture() {   # make_pin_fixture <repo> <binary-version>
+    local repo="$1" ver="$2"
+    mkdir -p "$repo/.github/workflows" "$repo/.claude/rules" \
+        "$repo/engine/.claude/rules"
+    printf '%s\n' 'jobs:' '  lint:' '    steps:' \
+        '      - name: Lint' \
+        '        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0' \
+        '        with:' "          version: $ver" \
+        > "$repo/.github/workflows/engine.yml"
+    local body='Action `golangci/golangci-lint-action@ba0d7d2… # v9.3.0`, binary `v2.12.2`.'
+    printf '%s%s\n' "$FM" "$body" > "$repo/.claude/rules/engine-go.md"
+    printf '%s%s\n' "$FM" "$body" > "$repo/engine/.claude/rules/engine-context.md"
+    git -C "$repo" add -A >/dev/null && git -C "$repo" commit -qm fixture
+}
+
+# Test 10: matching pins pass
+REPO=$(make_repo)
+make_pin_fixture "$REPO" v2.12.2
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if pin_absent "$OUT"; then
+    pass "pin A: matching engine.yml and docs produce no drift label"
+else
+    fail "pin A: matching pins should not report drift"
+    echo "  output: $OUT"
+fi
+
+# Test 11: bumped engine.yml, untouched docs, fails and names both docs
+REPO=$(make_repo)
+make_pin_fixture "$REPO" v2.13.0
+RC=0
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || RC=$?
+rm -rf "$REPO"
+if pin_present "$OUT" && [[ $RC -ne 0 ]] \
+    && echo "$OUT" | grep -qF '.claude/rules/engine-go.md:' \
+    && echo "$OUT" | grep -qF 'engine/.claude/rules/engine-context.md:'; then
+    pass "pin B: bumped engine.yml binary fails and names both tracked docs"
+else
+    fail "pin B: expected drift label, non-zero exit, both docs named (rc=$RC)"
+    echo "  output: $OUT"
+fi
+
+# Test 12: unparseable workflow fails loudly
+REPO=$(make_repo)
+make_pin_fixture "$REPO" latest
+RC=0
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || RC=$?
+rm -rf "$REPO"
+if pin_present "$OUT" && [[ $RC -ne 0 ]] && echo "$OUT" | grep -qF 'cannot parse'; then
+    pass "pin C: version: latest fails with 'cannot parse'"
+else
+    fail "pin C: expected drift label, non-zero exit, 'cannot parse' (rc=$RC)"
+    echo "  output: $OUT"
+fi
+
+# ── Tests 13-15: required-status claims (backlog #711) ────────────────────────
+
+claims_present() { echo "$1" | grep -qF 'FAIL required-status claims drift'; }
+claims_absent()  { ! claims_present "$1"; }
+
+READBACK="gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'"
+DOC_OK="Live list: \`${READBACK}\`. Auto-merge waits on \`All checks green\`."
+DOC_ENUM="${DOC_OK} Required: Tests and Analysis, E2E Tests, Meta checks."
+
+make_claims_fixture() {   # make_claims_fixture <repo> <ignore-csv> <doc-body>
+    local repo="$1" ignore="$2" body="$3"
+    mkdir -p "$repo/.github/workflows" "$repo/.claude/rules"
+    printf '%s\n' 'jobs:' '  aggregate:' '    steps:' '      - run: |' \
+        '          bin/check-pr-checks-green \' \
+        "            --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \\" \
+        "            --ignore='${ignore}'" \
+        > "$repo/.github/workflows/all-checks-green.yml"
+    printf '%s\n' 'jobs:' '  engine:' '    name: Go build, vet, lint, test' \
+        '  gate:' '    name: Engine' \
+        > "$repo/.github/workflows/engine.yml"
+    printf '%s%s\n' "$FM" "$body" > "$repo/.claude/rules/engine-go.md"
+    git -C "$repo" add -A >/dev/null && git -C "$repo" commit -qm fixture
+}
+
+# Test 13: pointer-style doc, Engine not ignored, passes
+REPO=$(make_repo)
+make_claims_fixture "$REPO" 'human-signoff,Infection PHP' "$DOC_OK"
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if claims_absent "$OUT"; then
+    pass "claims D: pointer doc plus gated Engine produce no claims label"
+else
+    fail "claims D: clean fixture should not report claims drift"
+    echo "  output: $OUT"
+fi
+
+# Test 14: Engine added to --ignore fails and names the check
+REPO=$(make_repo)
+make_claims_fixture "$REPO" 'human-signoff,Infection PHP,Engine' "$DOC_OK"
+RC=0
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || RC=$?
+rm -rf "$REPO"
+if claims_present "$OUT" && [[ $RC -ne 0 ]] \
+    && echo "$OUT" | grep -qF "check 'Engine' is in --ignore"; then
+    pass "claims E: Engine in --ignore fails with the check named"
+else
+    fail "claims E: expected claims label, non-zero exit, Engine named (rc=$RC)"
+    echo "  output: $OUT"
+fi
+
+# Test 15: doc enumerating contexts fails and names the doc
+REPO=$(make_repo)
+make_claims_fixture "$REPO" 'human-signoff,Infection PHP' "$DOC_ENUM"
+RC=0
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || RC=$?
+rm -rf "$REPO"
+if claims_present "$OUT" && [[ $RC -ne 0 ]] \
+    && echo "$OUT" | grep -qF '.claude/rules/engine-go.md: names 4 required-context names'; then
+    pass "claims F: enumerating doc fails with the doc and count named"
+else
+    fail "claims F: expected claims label, non-zero exit, doc named (rc=$RC)"
+    echo "  output: $OUT"
 fi
 
 # ── Results ───────────────────────────────────────────────────────────────────

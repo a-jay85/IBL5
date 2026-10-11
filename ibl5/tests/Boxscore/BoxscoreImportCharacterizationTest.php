@@ -342,7 +342,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
             $this->opDigest($db),
             static fn (string $e): bool => str_starts_with($e, 'INSERT') || str_starts_with($e, 'DELETE')
         );
-        $this->assertEmpty($insertOrDelete);
+        $this->assertSame([], $insertOrDelete);
     }
 
     public function testRegularSeasonEmptyRecordProducesNoWrites(): void
@@ -371,7 +371,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
             $this->opDigest($db),
             static fn (string $e): bool => str_starts_with($e, 'INSERT') || str_starts_with($e, 'DELETE')
         );
-        $this->assertEmpty($insertOrDelete);
+        $this->assertSame([], $insertOrDelete);
     }
 
     // ── Phase 3: All-Star import pins ──────────────────────────────────────
@@ -405,7 +405,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
             $this->opDigest($db),
             static fn (string $e): bool => str_starts_with($e, 'INSERT') || str_starts_with($e, 'DELETE')
         );
-        $this->assertEmpty($insertOrDelete);
+        $this->assertSame([], $insertOrDelete);
     }
 
     public function testAllStarOutcomeBExistsScoresDifferNamesRecoverable(): void
@@ -532,7 +532,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame('All-Star Weekend not yet reached', $result['skipped']);
-        $this->assertEmpty($this->opDigest($db));
+        $this->assertSame([], $this->opDigest($db));
     }
 
     // ── Phase 4: Rising-Stars import pins ──────────────────────────────────
@@ -610,7 +610,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
             $this->opDigest($db),
             static fn (string $e): bool => str_starts_with($e, 'INSERT') || str_starts_with($e, 'DELETE')
         );
-        $this->assertEmpty($insertOrDelete);
+        $this->assertSame([], $insertOrDelete);
     }
 
     public function testRisingStarsOneTeamTotalOnly(): void
@@ -786,7 +786,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
             $result['messages'],
             static fn (string $m): bool => str_starts_with($m, 'Schedule guard disabled:')
         ));
-        $this->assertNotEmpty($disabledMessages, 'Expected a "Schedule guard disabled:" message');
+        $this->assertNotSame([], $disabledMessages, 'Expected a "Schedule guard disabled:" message');
     }
 
     public function testSourceArchiveThreadsThroughAllPublicEntryPoints(): void

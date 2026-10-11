@@ -13,13 +13,12 @@ declare(strict_types=1);
  */
 function buildRedirectUrl(): ?string
 {
-    // Check for standalone page redirect (admin pages outside modules.php)
+    // Check for standalone page redirect (admin scripts and static pages outside modules.php)
     if (isset($_SESSION['redirect_after_login_path']) && is_string($_SESSION['redirect_after_login_path']) && $_SESSION['redirect_after_login_path'] !== '') {
         $storedPath = $_SESSION['redirect_after_login_path'];
         unset($_SESSION['redirect_after_login_path']);
 
         $allowedPaths = [
-            'leagueControlPanel.php',
             'scripts/updateAllTheThings.php',
             'ibl/IBL/Schedule.htm',
             'ibl/IBL/Standings.htm',

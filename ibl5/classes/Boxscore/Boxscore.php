@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Boxscore;
 
-use JSB;
+use League\JsbConstants;
 use Season\Season;
 
 class Boxscore
@@ -112,11 +112,9 @@ class Boxscore
     )
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
-    public static function playerInsertSql(string $table): string
+    public static function playerInsertSql(): string
     {
-        // $table is a backticked table-name literal passed by the caller (constant
-        // identifier, no user input) — concatenate, not interpolate.
-        return "INSERT INTO " . $table . " (
+        return "INSERT INTO `ibl_box_scores` (
         game_date,
         uuid,
         name,
@@ -150,11 +148,9 @@ class Boxscore
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     }
 
-    public static function teamInsertSql(string $table): string
+    public static function teamInsertSql(): string
     {
-        // $table is a backticked table-name literal passed by the caller (constant
-        // identifier, no user input) — concatenate, not interpolate.
-        return "INSERT INTO " . $table . " (
+        return "INSERT INTO `ibl_box_scores_teams` (
         game_date,
         name,
         game_of_that_day,
@@ -224,9 +220,9 @@ class Boxscore
             $this->gameYear = $seasonEndingYear;
         } else {
             $seasonStartingYear = $seasonEndingYear - 1;
-            if ((int)$this->gameMonth > 12 && (int)$this->gameMonth !== JSB::PLAYOFF_MONTH) {
+            if ((int)$this->gameMonth > 12 && (int)$this->gameMonth !== JsbConstants::PLAYOFF_MONTH) {
                 $this->gameMonth = sprintf("%02u", (int)$this->gameMonth - 12);
-            } elseif ((int)$this->gameMonth === JSB::PLAYOFF_MONTH) {
+            } elseif ((int)$this->gameMonth === JsbConstants::PLAYOFF_MONTH) {
                 $this->gameMonth = sprintf("%02u", (int)$this->gameMonth - 16); // This hacks the Playoffs to be in "June"
             } elseif ((int)$this->gameMonth > 10) {
                 $this->gameYear = $seasonStartingYear;

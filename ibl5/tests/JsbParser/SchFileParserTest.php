@@ -284,7 +284,7 @@ class SchFileParserTest extends TestCase
 
         $games = SchFileParser::parseFile($schFile);
 
-        $this->assertNotEmpty($games);
+        $this->assertNotSame([], $games);
 
         // Count played vs unplayed
         $played = 0;

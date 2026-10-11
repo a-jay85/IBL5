@@ -20,9 +20,9 @@ use League\League;
  * @phpstan-import-type HeatTotalRow from \FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface
  *
  * @see FranchiseHistoryRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class FranchiseHistoryRepository extends \BaseMysqliRepository implements FranchiseHistoryRepositoryInterface
+class FranchiseHistoryRepository extends \Database\BaseMysqliRepository implements FranchiseHistoryRepositoryInterface
 {
     /**
      * @see FranchiseHistoryRepositoryInterface::getFranchiseSummaryRows()

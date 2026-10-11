@@ -1,0 +1,104 @@
+{
+  "duration_api_ms": 20404,
+  "stop_reason": "tool_use",
+  "total_cost_usd": 0.2962802,
+  "usage": {
+    "input_tokens": 4,
+    "cache_creation_input_tokens": 31565,
+    "cache_read_input_tokens": 30021,
+    "output_tokens": 1887,
+    "output_tokens_details": {
+      "thinking_tokens": 853
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 31565,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "not_available",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 1024,
+        "cache_read_input_tokens": 30021,
+        "cache_creation_input_tokens": 1544,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1544
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "modelUsage": {
+    "claude-opus-5-5": {
+      "inputTokens": 4,
+      "outputTokens": 1887,
+      "cacheReadInputTokens": 30021,
+      "cacheCreationInputTokens": 31565,
+      "webSearchRequests": 0,
+      "costUSD": 0.2962802,
+      "contextWindow": 200000,
+      "maxOutputTokens": 128000,
+      "thinkingTokens": 853,
+      "canonicalModel": "claude-opus-5-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "fast_mode_disabled_reason": "sdk_opt_in_required",
+  "subagent_stats": {
+    "spawned": 0,
+    "requested": {
+      "background": 0,
+      "foreground": 0,
+      "unset": 0
+    },
+    "started_in_background": 0,
+    "max_depth": 0,
+    "spawned_by_subagents": 0,
+    "completed": 0,
+    "failed": 0,
+    "killed": {
+      "parent": 0,
+      "user": 0,
+      "system": 0
+    },
+    "refused": {
+      "depth_limit": 0,
+      "concurrency_limit": 0,
+      "budget": 0
+    },
+    "by_type": {}
+  },
+  "is_error": false,
+  "num_turns": 3,
+  "subtype": "success",
+  "api_error_status": null,
+  "result": "{\"kind\":\"trigger_row\",\"slug\":\"shell-decision-line-both-branches-on-ubuntu\",\"description\":\"Any plan whose shell code makes a decision (filter, guard, probe, regex, wrapper) must prove both branches fire on the Ubuntu CI runner.\",\"trigger_if\":\"adds or modifies a shell line whose result decides what runs next or what passes through: a grep/awk/sed/find filter, a guard or existence probe, an exit-status check, a timeout or cd wrapper, or a pipeline under set -o pipefail\",\"must_assert\":\"carries a CLI-executable row run on the Ubuntu CI runner (not only macOS) that drives both branches: the positive case (expected content passes, guard allows) and the negative case (excluded content is absent, guard fires, probe target unreachable aborts instead of defaulting, caller-relative path still resolves); a check that only exercises the happy path or only runs on BSD tools does not satisfy this row\",\"pr_summary\":\"Nine of the eleven shell-family defects share one shape. A shell line that makes a decision silently took the wrong branch, and nobody saw it because the check only ran the happy path or only ran on macOS. Examples: BSD-only stat/date/find -regex (#1900, #2092), pipefail plus grep -q SIGPIPE on Linux (#2174), awk filters that excluded nothing (#2039, #2208), the lsof header that always tripped a port guard (#1950), a `|| echo` probe that let DROP TABLE fire (#2220), a timeout wrapping a shell function (#1899), and a cd wrapper that broke relative paths (#2087). The registry already holds four narrow trigger rows and four narrow rule docs, one per tool. Each new tool adds a new row after it bites. This adds one umbrella forced-trigger row: any decision-making shell line must have a one-shot check, run on the Ubuntu runner, that drives both the pass and the fail branch. The narrow rows stay as worked examples. #1897 and #1963 are PHP/import-path defects that ended up in this family by mistake, and this row does not cover them.\"}",
+  "structured_output": {
+    "kind": "trigger_row",
+    "slug": "shell-decision-line-both-branches-on-ubuntu",
+    "description": "Any plan whose shell code makes a decision (filter, guard, probe, regex, wrapper) must prove both branches fire on the Ubuntu CI runner.",
+    "trigger_if": "adds or modifies a shell line whose result decides what runs next or what passes through: a grep/awk/sed/find filter, a guard or existence probe, an exit-status check, a timeout or cd wrapper, or a pipeline under set -o pipefail",
+    "must_assert": "carries a CLI-executable row run on the Ubuntu CI runner (not only macOS) that drives both branches: the positive case (expected content passes, guard allows) and the negative case (excluded content is absent, guard fires, probe target unreachable aborts instead of defaulting, caller-relative path still resolves); a check that only exercises the happy path or only runs on BSD tools does not satisfy this row",
+    "pr_summary": "Nine of the eleven shell-family defects share one shape. A shell line that makes a decision silently took the wrong branch, and nobody saw it because the check only ran the happy path or only ran on macOS. Examples: BSD-only stat/date/find -regex (#1900, #2092), pipefail plus grep -q SIGPIPE on Linux (#2174), awk filters that excluded nothing (#2039, #2208), the lsof header that always tripped a port guard (#1950), a `|| echo` probe that let DROP TABLE fire (#2220), a timeout wrapping a shell function (#1899), and a cd wrapper that broke relative paths (#2087). The registry already holds four narrow trigger rows and four narrow rule docs, one per tool. Each new tool adds a new row after it bites. This adds one umbrella forced-trigger row: any decision-making shell line must have a one-shot check, run on the Ubuntu runner, that drives both the pass and the fail branch. The narrow rows stay as worked examples. #1897 and #1963 are PHP/import-path defects that ended up in this family by mistake, and this row does not cover them."
+  },
+  "ttft_ms": 8137,
+  "type": "result",
+  "duration_ms": 21491,
+  "ttft_stream_ms": 1444,
+  "time_to_request_ms": 881,
+  "first_content_frame_ms": 1445,
+  "queued_turn_count": 0,
+  "result_index": 0
+}

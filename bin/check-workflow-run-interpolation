@@ -1,0 +1,125 @@
+#!/bin/bash
+# bin/check-workflow-run-interpolation — CI gate: a `${{ env.* }}` or string-typed
+# `${{ inputs.* }}` expression must not sit inside a `run:` body. GitHub expands
+# `${{ }}` into the script text BEFORE the shell parses it, so a caller-controlled
+# value pasted there is shell-injectable. Route it through `env:` and read it as a
+# quoted shell variable instead ("$NAME"). actionlint has no rule for this pattern.
+#
+# Boolean and number workflow inputs are exempt (read from `type:` in the same file):
+# their expansion is a fixed literal. Everything outside a `run:` body (with:, env:,
+# if:, name:, concurrency:) is out of scope, as are matrix/github/steps/needs/secrets.
+#
+# Usage: bin/check-workflow-run-interpolation [file ...]
+#   default: .github/workflows/*.yml and .github/actions/*/action.yml
+set -eu
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-workflow-run-interpolation [file ...]
+
+CI gate: no ${{ env.* }} or string-typed ${{ inputs.* }} expression inside a run: body.
+Pass the value through env: and use a quoted "$NAME" in the shell.
+
+Arguments:
+  [file ...]   workflow or action files to check
+               (default: .github/workflows/*.yml, .github/actions/*/action.yml)
+
+Exit codes: 0 = clean, 1 = violation found, 2 = bad usage
+EOF
+    exit 0
+fi
+
+for arg in "$@"; do
+    case "$arg" in
+        -*)
+            echo "check-workflow-run-interpolation: unknown option: $arg" >&2
+            exit 2
+            ;;
+    esac
+    if [ ! -f "$arg" ]; then
+        echo "check-workflow-run-interpolation: no such file: $arg" >&2
+        exit 2
+    fi
+done
+
+if [ "$#" -eq 0 ]; then
+    for f in .github/workflows/*.yml .github/actions/*/action.yml; do
+        [ -f "$f" ] && set -- "$@" "$f"
+    done
+fi
+
+[ "$#" -gt 0 ] || { echo "check-workflow-run-interpolation: no files to scan" >&2; exit 0; }
+
+# POSIX awk only: Ubuntu's awk is mawk and macOS ships BSD awk.
+read -r -d '' PROG <<'AWK_EOF' || true
+# One file per awk run, passed twice. Pass 1 collects typed inputs, pass 2 scans.
+# typed[] holds only inputs declared type: boolean or type: number.
+FNR == 1 { pass++; inrun = 0; collecting = 1; lastkey = "" }
+
+function scan(s, lineno,    e, rest, off, abs, pc, ref, name) {
+  while (match(s, /\$\{\{[^}]*\}\}/)) {
+    e = substr(s, RSTART, RLENGTH)
+    s = substr(s, RSTART + RLENGTH)
+    rest = e
+    off = 0
+    while (match(rest, /(env|inputs)\.[A-Za-z_][A-Za-z0-9_-]*/)) {
+      abs = off + RSTART
+      pc = (abs > 1) ? substr(e, abs - 1, 1) : ""
+      ref = substr(rest, RSTART, RLENGTH)
+      off += RSTART + RLENGTH - 1
+      rest = substr(rest, RSTART + RLENGTH)
+      if (pc ~ /[A-Za-z0-9_.]/) continue
+      if (ref ~ /^inputs\./) {
+        name = ref
+        sub(/^inputs\./, "", name)
+        if (typed[name]) continue
+      }
+      printf "%s:%d: ${{ %s }} interpolated into a run: body; pass it through env: and use \"$NAME\" in the shell\n", FILENAME, lineno, ref
+      fail = 1
+      return
+    }
+  }
+}
+
+pass == 1 {
+  if (!collecting) next
+  if ($0 ~ /^jobs:/) { collecting = 0; next }
+  if ($0 ~ /^[[:space:]]+[A-Za-z0-9_-]+:[[:space:]]*$/) {
+    lastkey = $0
+    gsub(/[[:space:]:]/, "", lastkey)
+  }
+  if ($0 ~ /^[[:space:]]+type:[[:space:]]*["']?(boolean|number)["']?[[:space:]]*$/ && lastkey != "") {
+    typed[lastkey] = 1
+  }
+  next
+}
+
+pass == 2 {
+  if (inrun && $0 ~ /^[[:space:]]*$/) next
+  if (inrun) {
+    match($0, /^ */)
+    if (RLENGTH > runind) { scan($0, FNR); next }
+    inrun = 0
+  }
+  if ($0 ~ /^[[:space:]]*(- )?run:/) {
+    match($0, /run:/)
+    runind = RSTART - 1
+    r = substr($0, RSTART + RLENGTH)
+    if (r ~ /^[[:space:]]*[|>][-+]?[[:space:]]*(#.*)?$/) inrun = 1
+    else scan(r, FNR)
+  }
+}
+
+END { exit (fail ? 1 : 0) }
+AWK_EOF
+
+rc=0
+for f in "$@"; do
+    awk "$PROG" "$f" "$f" || rc=1
+done
+
+if [ "$rc" -ne 0 ]; then
+    echo "check-workflow-run-interpolation: pass the value through env: and read it as a quoted shell variable — see 'Select PRs to refresh' in .github/workflows/vr-refresh.yml (env: INPUT_PR: \${{ inputs.pr }} then \"\$INPUT_PR\")." >&2
+    exit 1
+fi
+exit 0

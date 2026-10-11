@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-final class SubclassCallsBeginTransaction extends \BaseMysqliRepository
+final class SubclassCallsBeginTransaction extends \Database\BaseMysqliRepository
 {
     public function runTransaction(\mysqli $db): void
     {

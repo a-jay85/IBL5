@@ -128,16 +128,26 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
     }
 
     /**
-     * Intro-text label for the baseline snapshot phase. Every phase other than
-     * the two regular-season fallbacks is a playoffs phase (see
-     * TrainingCampRatingsDiffRepository::getBaselinePhase()).
+     * Intro-text label for the baseline snapshot phase. Every phase
+     * TrainingCampRatingsDiffRepository::getBaselinePhase() can return is mapped
+     * explicitly; an unknown phase (or null) gets a neutral hardcoded label so a
+     * new non-playoffs phase is never mislabeled as playoffs. The phase is never
+     * interpolated into the label.
      */
     private static function baselineLabel(?string $baselinePhase): string
     {
         return match ($baselinePhase) {
-            'end-of-season' => 'end-of-season ratings',
-            'mid-season'    => 'mid-season ratings',
-            default         => 'last playoffs ratings',
+            'finals',
+            'playoffs',
+            'conf-finals-gm4-7',
+            'conf-finals-gm1-3',
+            'playoffs-rd2-gm4-7',
+            'playoffs-rd2-gm1-3',
+            'playoffs-rd1-gm4-7',
+            'playoffs-rd1-gm1-3' => 'last playoffs ratings',
+            'end-of-season'      => 'end-of-season ratings',
+            'mid-season'         => 'mid-season ratings',
+            default              => 'last season ratings',
         };
     }
 

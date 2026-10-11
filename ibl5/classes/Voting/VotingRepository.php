@@ -14,7 +14,7 @@ use Voting\Contracts\VotingResultsServiceInterface;
  * @phpstan-import-type EoyBallot from VotingRepositoryInterface
  * @phpstan-import-type AsgBallot from VotingRepositoryInterface
  */
-class VotingRepository extends \BaseMysqliRepository implements VotingRepositoryInterface
+class VotingRepository extends \Database\BaseMysqliRepository implements VotingRepositoryInterface
 {
     private const ASG_TABLE = 'ibl_votes_ASG';
     private const EOY_TABLE = 'ibl_votes_EOY';
@@ -112,11 +112,12 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
      */
     public function fetchAllStarTotals(array $columns): array
     {
-        $this->validateColumns($columns);
-
         $selectStatements = [];
         foreach ($columns as $column) {
-            // $column validated against ALLOWED_COLUMNS by validateColumns() above; concatenate.
+            // Identifier: strict allowlist check in this method narrows $column to a constant string.
+            if (!in_array($column, self::ALLOWED_COLUMNS, true)) {
+                throw new \InvalidArgumentException("Invalid vote column: {$column}");
+            }
             $selectStatements[] = "SELECT " . $column . " AS name FROM " . self::ASG_TABLE;
         }
 
@@ -136,12 +137,13 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
      */
     public function fetchEndOfYearTotals(array $columnsWithWeights): array
     {
-        $this->validateColumns(array_keys($columnsWithWeights));
-
         $selectStatements = [];
         foreach ($columnsWithWeights as $column => $score) {
-            // $column validated against ALLOWED_COLUMNS by validateColumns() above;
-            // $score is an integer weight (cast defensively) — concatenate both.
+            // Identifier: strict allowlist check in this method narrows $column to a constant string.
+            // $score is an integer weight (cast defensively).
+            if (!in_array($column, self::ALLOWED_COLUMNS, true)) {
+                throw new \InvalidArgumentException("Invalid vote column: {$column}");
+            }
             $selectStatements[] = "SELECT " . $column . " AS name, " . (int) $score . " AS score FROM " . self::EOY_TABLE;
         }
 
@@ -179,20 +181,6 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
     }
 
     // ==================== Private Helpers ====================
-
-    /**
-     * Validate that all column names are in the allowlist (defense-in-depth against SQL injection)
-     *
-     * @param list<string> $columns
-     */
-    private function validateColumns(array $columns): void
-    {
-        foreach ($columns as $column) {
-            if (!in_array($column, self::ALLOWED_COLUMNS, true)) {
-                throw new \InvalidArgumentException("Invalid vote column: {$column}");
-            }
-        }
-    }
 
     /**
      * Execute a parameterless vote aggregation query and normalize results
@@ -251,7 +239,7 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
         $playerNames = [];
         foreach ($rows as $row) {
             if ($row['name'] !== self::BLANK_BALLOT_LABEL) {
-                $playerName = self::extractPlayerName($row['name']);
+                $playerName = VotingResultsService::extractPlayerName($row['name']);
                 $voteToPlayer[$row['name']] = $playerName;
                 $playerNames[$playerName] = true;
             }
@@ -269,21 +257,5 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
         }
 
         return $rows;
-    }
-
-    /**
-     * Extract player name from "LeBron James, Sting" format
-     *
-     * Strips the trailing ", TeamName" portion. If there is no comma,
-     * returns the full string (handles GM names).
-     */
-    private static function extractPlayerName(string $voteName): string
-    {
-        $lastComma = strrpos($voteName, ',');
-        if ($lastComma === false) {
-            return trim($voteName);
-        }
-
-        return trim(substr($voteName, 0, $lastComma));
     }
 }

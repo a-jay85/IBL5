@@ -40,7 +40,7 @@ class DraftPickLocatorServiceTest extends TestCase
         $result = $this->service->getAllTeamsWithPicks();
 
         $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     public function testGetAllTeamsWithPicksReturnsTeamsWithPickData(): void

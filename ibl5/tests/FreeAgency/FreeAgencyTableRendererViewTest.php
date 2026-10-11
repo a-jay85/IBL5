@@ -71,7 +71,7 @@ class FreeAgencyTableRendererViewTest extends TestCase
 
         $html = $this->makeRenderer()->renderTeamCell($player);
         $this->assertIsString($html);
-        $this->assertNotEmpty($html);
+        $this->assertNotSame('', $html);
     }
 
     // ── renderTableHeader ─────────────────────────────────────────────────────

@@ -71,6 +71,6 @@ final class NewsControllerLanguageConstantsTest extends TestCase
         restore_error_handler();
 
         $this->assertSame('sentinel', constant('_READMORE'));
-        $this->assertEmpty($warnings, 'Unexpected warnings: ' . implode(', ', $warnings));
+        $this->assertSame([], $warnings, 'Unexpected warnings: ' . implode(', ', $warnings));
     }
 }

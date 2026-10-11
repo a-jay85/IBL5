@@ -360,7 +360,7 @@ printf '%s\n' "$LINES" | grep -q '^\*\*What changed:\*\*' \
 begin_case "15 CI wiring"
 WF="$ROOT/.github/workflows/tests.yml"
 [ -f "$WF" ] || fail "no tests.yml at $WF"
-eq "wired exactly once" "$(grep -c 'run: bin/test-digest-dm-build' "$WF")" "1"
+eq "wired exactly once" "$(grep -cE '^[[:space:]]+bin/test-digest-dm-build( \\)?$' "$WF")" "1"
 
 printf '\n%s case(s) passed, %s failed\n' "$PASS" "$FAILN"
 [ "$FAILN" -eq 0 ] || exit 1

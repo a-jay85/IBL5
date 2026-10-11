@@ -75,6 +75,26 @@ test.describe('Navigation bar smoke tests (public)', () => {
     await expect(standingsLink).toBeVisible();
   });
 
+  // Repointed entries (PR #2361): pin the exact href so a revert to the old
+  // PlayerExportGuide / AllStarAppearances targets fails here, not only in PHPUnit.
+  const repointedLinks = [
+    { menu: 'Season', label: 'Player Export', href: 'modules.php?name=ApiKeys' },
+    { menu: 'History', label: 'All-Star Appearances', href: 'modules.php?name=RecordHolders&op=allstar' },
+  ];
+
+  for (const { menu, label, href } of repointedLinks) {
+    test(`${menu} dropdown "${label}" link points to ${href}`, async ({ page }) => {
+      await page.goto('index.php');
+      await assertNoPhpErrors(page, 'on index.php');
+      const nav = desktopNav(page);
+      await nav.getByRole('button', { name: menu }).click();
+
+      const link = nav.getByRole('link', { name: label, exact: true });
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute('href', href);
+    });
+  }
+
   test('league switcher is inside season dropdown', async ({ page }) => {
     await page.goto('index.php');
     await assertNoPhpErrors(page, 'on index.php');
@@ -107,7 +127,7 @@ test.describe('Shared layout landmark and favicon (public)', () => {
       await page.goto(path);
       await assertNoPhpErrors(page, `on ${path}`);
       // Not zero (landmark present) and not duplicate (duplicate also fails the audit).
-      await expect(page.locator('main, [role="main"]')).toHaveCount(1);
+      await expect(page.locator('[role="main"]')).toHaveCount(1);
     });
 
     test(`favicon link present in head on ${path}`, async ({ page }) => {

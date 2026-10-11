@@ -41,7 +41,7 @@ class ApiKeysEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]));
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testMainRendersExportGuideAfterKeyState(): void
@@ -72,7 +72,7 @@ class ApiKeysEntryPointTest extends ModuleEntryPointTestCase
         ]));
 
         // GET to generate redirects to main (header('Location: ...'); return;)
-        $this->assertEmpty($output);
+        $this->assertSame('', $output);
     }
 
     public function testRevokeOpRequiresPostMethod(): void
@@ -86,6 +86,6 @@ class ApiKeysEntryPointTest extends ModuleEntryPointTestCase
         ]));
 
         // GET to revoke redirects to main (header('Location: ...'); return;)
-        $this->assertEmpty($output);
+        $this->assertSame('', $output);
     }
 }

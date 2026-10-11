@@ -15,8 +15,7 @@ class PlayerTradingCardBackViewTest extends TestCase
     use SnapshotTestTrait;
 
     /**
-     * Build a Player stub with every getter called by CardBaseStyles::preparePlayerData()
-     * and getColorSchemeForTeam().
+     * Build a Player stub with every getter called by CardBaseStyles::preparePlayerData().
      *
      * @return Player&\PHPUnit\Framework\MockObject\Stub
      */

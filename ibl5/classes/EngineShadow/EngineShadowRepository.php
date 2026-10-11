@@ -15,7 +15,7 @@ use League\LeagueContext;
  * wraps the per-game write set in transactional() so a mid-game failure rolls the
  * shadow writes back without ever touching the canonical tables.
  */
-class EngineShadowRepository extends \BaseMysqliRepository
+class EngineShadowRepository extends \Database\BaseMysqliRepository
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

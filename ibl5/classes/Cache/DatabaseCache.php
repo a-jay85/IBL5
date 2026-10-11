@@ -13,7 +13,7 @@ use Clock\SystemClock;
  *
  * Extracted from the pattern in CachedRecordHoldersService for reuse across modules.
  */
-class DatabaseCache extends \BaseMysqliRepository implements DatabaseCacheInterface
+class DatabaseCache extends \Database\BaseMysqliRepository implements DatabaseCacheInterface
 {
     /** PSR-3 logger for cache-layer failure logging; defaults to the 'db' channel. */
     private \Psr\Log\LoggerInterface $channelLogger;

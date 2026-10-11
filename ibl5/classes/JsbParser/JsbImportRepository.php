@@ -13,7 +13,7 @@ use League\LeagueContext;
  * Preserves the JsbImportRepositoryInterface public contract while routing
  * each method to the appropriate single-responsibility repository.
  */
-class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepositoryInterface
+class JsbImportRepository extends \Database\BaseMysqliRepository implements JsbImportRepositoryInterface
 {
     private Repositories\TrnRepository $trn;
     private Repositories\HisRepository $his;

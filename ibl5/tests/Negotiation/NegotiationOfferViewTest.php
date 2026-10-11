@@ -48,7 +48,7 @@ class NegotiationOfferViewTest extends TestCase
             'modifier' => 1.0,
         ];
         $capSpace = 1000;
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -75,7 +75,7 @@ class NegotiationOfferViewTest extends TestCase
         
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -101,7 +101,7 @@ class NegotiationOfferViewTest extends TestCase
         $player = $this->createTestPlayer(['name' => "O'Neal <script>alert('xss')</script>"]);
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -122,7 +122,7 @@ class NegotiationOfferViewTest extends TestCase
         $player = $this->createTestPlayer(['teamname' => "Team <img src=x onerror=alert(1)>"]);
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -131,6 +131,28 @@ class NegotiationOfferViewTest extends TestCase
         $this->assertStringContainsString('&lt;img', $html);
         // No unescaped <img tag with an onerror handler (legitimate player photo <img> is fine)
         $this->assertStringNotContainsString('<img src=x onerror', $html);
+    }
+
+    /**
+     * @group view
+     * @group security
+     */
+    public function testHostileNamesAreEscapedExactlyOnceInHiddenInputs(): void
+    {
+        // Arrange
+        $player = $this->createTestPlayer(['name' => 'P' . 'O\'Neal <xss>&"q"', 'teamname' => 'T' . 'O\'Neal <xss>&"q"']);
+        $demands = $this->getDefaultDemands();
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
+
+        // Act
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, 1000, $maxYearOneSalary);
+
+        // Assert
+        $escaped = 'O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;';
+        $this->assertStringContainsString('value="P' . $escaped . '"', $html);
+        $this->assertStringContainsString('value="T' . $escaped . '"', $html);
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
     }
 
     /**
@@ -153,7 +175,7 @@ class NegotiationOfferViewTest extends TestCase
             'modifier' => 1.0,
         ];
         $capSpace = 3000;
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -185,7 +207,7 @@ class NegotiationOfferViewTest extends TestCase
             'modifier' => 1.0,
         ];
         $capSpace = 2000;
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -205,7 +227,7 @@ class NegotiationOfferViewTest extends TestCase
         $player = $this->createTestPlayer(['bird' => 3]); // Has Bird rights
         $demands = $this->getDefaultDemands();
         $capSpace = 3000;
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -224,7 +246,7 @@ class NegotiationOfferViewTest extends TestCase
         $player = $this->createTestPlayer(['bird' => 2]); // No Bird rights
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -243,7 +265,7 @@ class NegotiationOfferViewTest extends TestCase
         $player = $this->createTestPlayer();
         $demands = $this->getDefaultDemands();
         $capSpace = 1234;
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -333,7 +355,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testRendersProvidedCardHtml(): void
     {
         $player = $this->createTestPlayer();
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
         $cardHtml = '<div class="card-flip-container">SENTINEL</div>';
 
         $html = NegotiationOfferView::renderNegotiationForm(

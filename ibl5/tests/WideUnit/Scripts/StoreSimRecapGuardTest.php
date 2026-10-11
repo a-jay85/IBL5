@@ -111,7 +111,7 @@ final class StoreSimRecapGuardTest extends TestCase
     {
         $htaccess = file_get_contents(__DIR__ . '/../../../scripts/.htaccess');
         self::assertNotFalse($htaccess);
-        self::assertNotEmpty($htaccess);
+        self::assertNotSame('', $htaccess);
     }
 
     public function testHtaccessDeniesStoreSimRecap(): void

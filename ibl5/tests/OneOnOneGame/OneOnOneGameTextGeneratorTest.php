@@ -24,7 +24,7 @@ final class OneOnOneGameTextGeneratorTest extends TestCase
         $text = $this->generator->getThreePointText();
 
         $this->assertIsString($text);
-        $this->assertNotEmpty($text);
+        $this->assertNotSame('', $text);
     }
 
     public function testGetOutsideTwoTextReturnsNonEmptyString(): void
@@ -32,7 +32,7 @@ final class OneOnOneGameTextGeneratorTest extends TestCase
         $text = $this->generator->getOutsideTwoText();
 
         $this->assertIsString($text);
-        $this->assertNotEmpty($text);
+        $this->assertNotSame('', $text);
     }
 
     public function testGetDriveTextReturnsNonEmptyString(): void
@@ -40,7 +40,7 @@ final class OneOnOneGameTextGeneratorTest extends TestCase
         $text = $this->generator->getDriveText();
 
         $this->assertIsString($text);
-        $this->assertNotEmpty($text);
+        $this->assertNotSame('', $text);
     }
 
     public function testGetPostTextReturnsNonEmptyString(): void
@@ -48,7 +48,7 @@ final class OneOnOneGameTextGeneratorTest extends TestCase
         $text = $this->generator->getPostText();
 
         $this->assertIsString($text);
-        $this->assertNotEmpty($text);
+        $this->assertNotSame('', $text);
     }
 
     public function testGetMadeShotTextReturnsNonEmptyString(): void
@@ -56,7 +56,7 @@ final class OneOnOneGameTextGeneratorTest extends TestCase
         $text = $this->generator->getMadeShotText();
 
         $this->assertIsString($text);
-        $this->assertNotEmpty($text);
+        $this->assertNotSame('', $text);
     }
 
     public function testGetMissedShotTextReturnsNonEmptyString(): void
@@ -64,7 +64,7 @@ final class OneOnOneGameTextGeneratorTest extends TestCase
         $text = $this->generator->getMissedShotText();
 
         $this->assertIsString($text);
-        $this->assertNotEmpty($text);
+        $this->assertNotSame('', $text);
     }
 
     public function testGetBlockTextReturnsNonEmptyString(): void
@@ -72,7 +72,7 @@ final class OneOnOneGameTextGeneratorTest extends TestCase
         $text = $this->generator->getBlockText();
 
         $this->assertIsString($text);
-        $this->assertNotEmpty($text);
+        $this->assertNotSame('', $text);
     }
 
     public function testGetStealTextReturnsNonEmptyString(): void
@@ -80,7 +80,7 @@ final class OneOnOneGameTextGeneratorTest extends TestCase
         $text = $this->generator->getStealText();
 
         $this->assertIsString($text);
-        $this->assertNotEmpty($text);
+        $this->assertNotSame('', $text);
     }
 
     public function testGetCoinFlipTextForHeads(): void

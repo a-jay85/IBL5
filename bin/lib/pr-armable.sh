@@ -5,7 +5,7 @@
 #
 # Usage: source "$(dirname "$0")/lib/pr-armable.sh"
 #
-# Covers the seven live-derivable conditions:
+# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>):
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
@@ -87,11 +87,11 @@ pr_manual_testing_clearance() {
     # "- [x] bin/test-check-pr-manual-testing — 19/19 PASS"). Holding on those would block correct
     # PRs. bin/check-pr-manual-testing's shape regex conflates the two on
     # purpose (both shapes are well-formed); this clearance axis must not.
-    if printf '%s\n' "$content" | grep -qE '^[[:space:]]*- \[ \]'; then
+    if grep -qE '^[[:space:]]*- \[ \]' <<< "$content"; then
         echo "HELD"
         return
     fi
-    if ! printf '%s\n' "$content" | grep -qiE '^[[:space:]]*No manual testing needed'; then
+    if ! grep -qiE '^[[:space:]]*No manual testing needed' <<< "$content"; then
         echo "HELD"
         return
     fi
@@ -108,21 +108,18 @@ pr_manual_testing_clearance() {
     # Keyword → required changed-file pattern table (case-insensitive, \b word boundary).
     # AND semantics: each named type must have a matching file; any absent type holds.
     local held=0
-    if printf '%s' "$tail" | grep -qiE '\b(e2e|playwright)\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/e2e/.*\.spec\.ts$'; then
+    if grep -qiE '\b(e2e|playwright)\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/e2e/.*\.spec\.ts$' <<< "$changed_files"; then
             held=1
         fi
     fi
-    if printf '%s' "$tail" | grep -qiE '\b(unit|phpunit)\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/.*Test\.php$'; then
+    if grep -qiE '\b(unit|phpunit)\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/.*Test\.php$' <<< "$changed_files"; then
             held=1
         fi
     fi
-    if printf '%s' "$tail" | grep -qiE '\bintegration\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/DatabaseIntegration/'; then
+    if grep -qiE '\bintegration\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/DatabaseIntegration/' <<< "$changed_files"; then
             held=1
         fi
     fi
@@ -156,13 +153,43 @@ pr_golden_hold() {
 #   Pass the `.labels` array, e.g. `gh pr view N --json labels --jq '.labels'`.
 pr_feat_hold() {
     local title="$1" labels_json="$2"
-    if printf '%s' "$title" | grep -qiE '^feat(\([^)]*\))?!?:'; then
+    if grep -qiE '^feat(\([^)]*\))?!?:' <<< "$title"; then
         if printf '%s' "$labels_json" \
             | jq -e 'any(.[]?; .name == "human-approved")' >/dev/null 2>&1; then
             return  # label flips it — not held
         fi
         echo "feat-awaiting-signoff"
     fi
+}
+
+# pr_gate_backtest_hold <body>
+#   Phase 6.5 condition (17). Mirrors harness/gate_backtest.py parse_gate_backtest_state.
+#   No '<!-- gate-backtest:begin -->' line -> prints nothing (not a gate PR).
+#   Block present: exactly one '<!-- gate-backtest-state: X -->' line between the
+#   markers, X in NOT-APPLICABLE|CLEARED -> prints nothing; X in HELD|UNKNOWN ->
+#   prints 'gate-backtest:X'. Zero or 2+ state lines, or no end marker -> prints
+#   'gate-backtest:UNKNOWN' (fail-closed).
+pr_gate_backtest_hold() {
+    local body="$1" line inside=0 seen_begin=0 seen_end=0 n=0 state=""
+    while IFS= read -r line; do
+        case "$line" in
+            '<!-- gate-backtest:begin -->') seen_begin=1; inside=1 ;;
+            '<!-- gate-backtest:end -->')   [ "$inside" = 1 ] && seen_end=1; inside=0 ;;
+            '<!-- gate-backtest-state: '*' -->')
+                if [ "$inside" = 1 ]; then
+                    n=$((n + 1)); state="${line#<!-- gate-backtest-state: }"; state="${state% -->}"
+                fi ;;
+        esac
+    done <<EOF
+$body
+EOF
+    [ "$seen_begin" = 0 ] && return 0
+    if [ "$seen_end" = 0 ] || [ "$n" != 1 ]; then echo "gate-backtest:UNKNOWN"; return 0; fi
+    case "$state" in
+        NOT-APPLICABLE|CLEARED) ;;
+        HELD|UNKNOWN) echo "gate-backtest:$state" ;;
+        *) echo "gate-backtest:UNKNOWN" ;;
+    esac
 }
 
 # pr_dep_holds <body>
@@ -221,7 +248,7 @@ pr_pipeline_authored_hold() {
         | jq -e 'any(.[]?; .name == "pipeline-authored")' >/dev/null 2>&1; then
         echo "pipeline-authored"
     fi
-    if [ -n "$head_ref" ] && printf '%s' "$head_ref" | grep -qE '^bug-[0-9]+(-|$)'; then
+    if [ -n "$head_ref" ] && grep -qE '^bug-[0-9]+(-|$)' <<< "$head_ref"; then
         echo "pipeline-branch"
     fi
 }

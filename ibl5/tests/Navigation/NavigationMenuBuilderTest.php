@@ -69,7 +69,7 @@ class NavigationMenuBuilderTest extends TestCase
         foreach ($menus as $name => $menu) {
             $this->assertArrayHasKey('icon', $menu, "Menu '$name' should have an icon");
             $this->assertArrayHasKey('links', $menu, "Menu '$name' should have links");
-            $this->assertNotEmpty($menu['links'], "Menu '$name' should have at least one link");
+            $this->assertNotSame([], $menu['links'], "Menu '$name' should have at least one link");
         }
     }
 
@@ -177,7 +177,7 @@ class NavigationMenuBuilderTest extends TestCase
         );
 
         if ($expectDraftLink) {
-            $this->assertNotEmpty($draftLinks, 'Draft link should be present');
+            $this->assertNotSame([], $draftLinks, 'Draft link should be present');
             $draftLink = array_values($draftLinks)[0];
             if ($expectedBadge !== null) {
                 $this->assertSame($expectedBadge, $draftLink['badge'] ?? null);
@@ -185,7 +185,7 @@ class NavigationMenuBuilderTest extends TestCase
                 $this->assertArrayNotHasKey('badge', $draftLink);
             }
         } else {
-            $this->assertEmpty($draftLinks, 'Draft link should not be present');
+            $this->assertSame([], $draftLinks, 'Draft link should not be present');
         }
     }
 
@@ -214,7 +214,7 @@ class NavigationMenuBuilderTest extends TestCase
             static fn (array $link): bool => ($link['label'] ?? '') === 'Free Agency'
         );
 
-        $this->assertNotEmpty($faLinks, 'Free Agency link should be present');
+        $this->assertNotSame([], $faLinks, 'Free Agency link should be present');
         $faLink = array_values($faLinks)[0];
         $this->assertSame('LIVE', $faLink['badge'] ?? null);
     }
@@ -236,9 +236,9 @@ class NavigationMenuBuilderTest extends TestCase
         );
 
         if ($expectWaiversLink) {
-            $this->assertNotEmpty($waiversLinks, "Waivers link should be present during $seasonPhase");
+            $this->assertNotSame([], $waiversLinks, "Waivers link should be present during $seasonPhase");
         } else {
-            $this->assertEmpty($waiversLinks, "Waivers link should not be present during $seasonPhase");
+            $this->assertSame([], $waiversLinks, "Waivers link should not be present during $seasonPhase");
         }
     }
 
@@ -301,7 +301,7 @@ class NavigationMenuBuilderTest extends TestCase
             $menus['Season']['links'],
             static fn (array $link): bool => ($link['label'] ?? '') === 'JSB Export'
         );
-        $this->assertNotEmpty($jsbExport, 'Season menu should contain JSB Export');
+        $this->assertNotSame([], $jsbExport, 'Season menu should contain JSB Export');
         $jsbLink = array_values($jsbExport)[0];
         $this->assertTrue($jsbLink['external'] ?? false, 'JSB Export should be external');
 

@@ -1,13 +1,14 @@
 """Phase 4.5 thread ingestion: fix-or-decline loop unit tests."""
 import json
 import os
+import subprocess
 import sys
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.adapters.ghad import RecordingGh
+from harness.adapters.ghad import LiveGh, RecordingGh
 from harness.adapters.gitad import ReplayGit
 from harness.adapters.llm import FixtureLlm
 from harness.state import HarnessError, UsageLedger
@@ -46,6 +47,18 @@ def _gh(tmp_path, fixture=None):
 
 def _llm(canned=None):
     return FixtureLlm(_ledger(), canned or {})
+
+
+class _CountingGh(RecordingGh):
+    """RecordingGh that counts trusted_open_threads calls (the 2nd GraphQL query)."""
+
+    def __init__(self, out_dir, fixture):
+        super().__init__(out_dir, fixture)
+        self.trusted_calls = 0
+
+    def trusted_open_threads(self, pr):
+        self.trusted_calls += 1
+        return super().trusted_open_threads(pr)
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +103,42 @@ def test_fetch_returns_none_on_cap(tmp_path):
     gh = _gh(tmp_path, {"trusted_threads": None})
     result = fetch_trusted_threads(gh, PR, pre_posting_ids={4074926171})
     assert result is None
+
+
+def test_fetch_nonempty_snapshot_calls_trusted_open_threads_once(tmp_path):
+    gh = _CountingGh(str(tmp_path), {"trusted_threads": [THREAD_2340]})
+    result = fetch_trusted_threads(gh, PR, pre_posting_ids={4074926171})
+    assert gh.trusted_calls == 1
+    assert len(result) == 1
+    assert result[0]["commentId"] == 4074926171
+
+
+def test_fetch_empty_snapshot_skips_trusted_open_threads(tmp_path):
+    gh = _CountingGh(str(tmp_path), {"trusted_threads": [THREAD_2340]})
+    result = fetch_trusted_threads(gh, PR, pre_posting_ids=set())
+    assert result is not None
+    assert result == []
+    assert gh.trusted_calls == 0
+
+
+def test_live_snapshot_failure_returns_empty_set(tmp_path, monkeypatch):
+    """A failed snapshot is the same input as an empty one.
+
+    Mutation caught: LiveGh.pr_thread_ids re-raising in its `except Exception` arm.
+    """
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+
+    def _boom(*a, **k):
+        raise RuntimeError("gh down")
+
+    monkeypatch.setattr("harness.adapters.llm._run_reaped", _boom)
+    assert gh.pr_thread_ids(PR) == set()
+
+    monkeypatch.setattr(
+        "harness.adapters.llm._run_reaped",
+        lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr=""),
+    )
+    assert gh.pr_thread_ids(PR) == set()
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +216,100 @@ def test_run_decline_resolves_without_commit(tmp_path):
     resolve_actions = [a for a in actions if a.get("action") == "pr_resolve_thread"]
     assert len(resolve_actions) == 1
     assert resolve_actions[0]["body"].startswith("Declined: ")
+
+
+def test_run_nonempty_snapshot_fetches_once_and_declines(tmp_path):
+    gh = _CountingGh(str(tmp_path), {
+        "trusted_threads": [THREAD_2340],
+        "pr_number": PR,
+    })
+    llm = _llm({PURPOSE: '{"verdict":"DECLINE","reason":"Already handles this case"}'})
+    git = ReplayGit({})
+
+    def _no_commit(msg):
+        raise AssertionError("commit should not be called for a DECLINE")
+
+    result = run_thread_ingestion(
+        gh, llm, git, str(tmp_path), PR,
+        pre_posting_ids={4074926171},
+        out_dir=str(tmp_path),
+        log=lambda msg: None,
+        commit=_no_commit,
+        push=lambda: "",
+    )
+
+    assert gh.trusted_calls == 1
+    assert result["declined"] == 1
+    actions = gh.actions()
+    resolve_actions = [a for a in actions if a.get("action") == "pr_resolve_thread"]
+    assert len(resolve_actions) == 1
+    assert resolve_actions[0]["body"].startswith("Declined: ")
+
+
+def test_run_empty_snapshot_makes_zero_trusted_calls_and_no_llm_calls(tmp_path):
+    gh = _CountingGh(str(tmp_path), {"trusted_threads": [THREAD_2340]})
+    llm = _llm({})
+
+    result = run_thread_ingestion(
+        gh, llm, ReplayGit({}), str(tmp_path), PR,
+        pre_posting_ids=set(),
+        out_dir=str(tmp_path),
+        log=lambda m: None,
+        commit=lambda m: "",
+        push=lambda: "",
+    )
+
+    assert gh.trusted_calls == 0
+    assert llm.tooled_argvs == []
+    assert result["found"] == 0
+    assert "reason" not in result
+    with open(tmp_path / "thread-ingestion.json") as fh:
+        written = json.load(fh)
+    assert written == result
+    assert written["threads"] == []
+
+
+def test_run_empty_snapshot_skips_even_when_fetch_would_fail(tmp_path):
+    gh = _CountingGh(str(tmp_path), {"trusted_threads": None})
+
+    result = run_thread_ingestion(
+        gh, _llm({}), ReplayGit({}), str(tmp_path), PR,
+        pre_posting_ids=set(),
+        out_dir=str(tmp_path),
+        log=lambda m: None,
+        commit=lambda m: "",
+        push=lambda: "",
+    )
+
+    assert gh.trusted_calls == 0
+    assert "reason" not in result
+    assert result["found"] == 0
+    assert os.path.exists(tmp_path / "thread-ingestion.json")
+
+
+def test_run_failed_snapshot_skips_fetch(tmp_path, monkeypatch):
+    live = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+
+    def _boom(*a, **k):
+        raise RuntimeError("gh down")
+
+    monkeypatch.setattr("harness.adapters.llm._run_reaped", _boom)
+    snap = live.pr_thread_ids(PR)
+
+    gh = _CountingGh(str(tmp_path), {"trusted_threads": [THREAD_2340]})
+    llm = _llm({})
+    run_thread_ingestion(
+        gh, llm, ReplayGit({}), str(tmp_path), PR,
+        pre_posting_ids=snap,
+        out_dir=str(tmp_path),
+        log=lambda m: None,
+        commit=lambda m: "",
+        push=lambda: "",
+    )
+
+    assert snap == set()
+    assert gh.trusted_calls == 0
+    assert llm.tooled_argvs == []
 
 
 def test_run_fix_with_no_edits_is_skipped_and_stays_open(tmp_path):
@@ -256,6 +399,29 @@ def test_run_cap_skips_llm_entirely(tmp_path):
 
     assert result["reason"] == "cap-or-api-error"
     assert llm.tooled_argvs == []
+
+
+def test_run_empty_snapshot_acts_on_nothing_and_writes_json(tmp_path):
+    gh = _gh(tmp_path, {"trusted_threads": [THREAD_2340]})
+    llm = _llm({})
+    git = ReplayGit({})
+
+    result = run_thread_ingestion(
+        gh, llm, git, str(tmp_path), PR,
+        pre_posting_ids=set(),
+        out_dir=str(tmp_path),
+        log=lambda msg: None,
+        commit=lambda m: "",
+        push=lambda: "",
+    )
+
+    assert result["found"] == 0
+    assert result["fixed"] == 0
+    assert result["declined"] == 0
+    assert result["skipped"] == 0
+    assert llm.tooled_argvs == []
+    with open(tmp_path / "thread-ingestion.json") as fh:
+        assert json.load(fh)["found"] == 0
 
 
 def test_resolve_failure_after_fix_counts_as_skipped_and_loop_continues(tmp_path):

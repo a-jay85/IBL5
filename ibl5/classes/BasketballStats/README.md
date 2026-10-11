@@ -1,6 +1,6 @@
 ---
 description: Static utility classes for consistent basketball stat formatting (percentages, per-game averages, totals) and safe type conversion.
-last_verified: 2026-09-22
+last_verified: 2026-10-10
 ---
 
 # BasketballStats Module - Basketball Statistics Formatting and Utilities
@@ -122,6 +122,23 @@ StatsSanitizer::sanitizeInt($value);
 // Example: sanitizeInt(null) returns 0
 ```
 
+**Strict integer conversion** (no `intval`; partial numerics, bools, arrays become 0):
+```php
+StatsSanitizer::toInt($value);
+// Example: toInt("10") returns 10
+// Example: toInt("12abc") returns 0   (sanitizeInt would return 12)
+// Example: toInt(true) returns 0      (sanitizeInt would return 1)
+// Example: toInt([]) returns 0
+```
+
+**Int from an array key, ignoring floats** (missing key, null, float, bool, array, non-numeric strings become 0):
+```php
+StatsSanitizer::intFromArray($postData, 'pid1');
+// Example: intFromArray(['k' => '12'], 'k') returns 12
+// Example: intFromArray(['k' => 1.9], 'k') returns 0   (toInt would return 1)
+// Example: intFromArray([], 'k') returns 0
+```
+
 ##### Float Sanitization
 ```php
 // Safely convert to float
@@ -136,6 +153,13 @@ StatsSanitizer::sanitizeFloat($value);
 StatsSanitizer::sanitizeString($value);
 // Example: sanitizeString("test") returns "test"
 // Example: sanitizeString(null) returns ""
+```
+
+**Scalar to string** (strings pass, ints and floats are cast, null, bool and arrays become ""):
+```php
+StatsSanitizer::scalarToString($value);
+// Example: scalarToString(23) returns "23"
+// Example: scalarToString(true) returns ""   (sanitizeString would return "1")
 ```
 
 ## Usage Examples

@@ -22,7 +22,7 @@ class NavigationRepositoryTest extends WideUnitTestCase
     {
         // setSharedLeagueContext() writes a static slot that leaks into every
         // later test in the process; always clear it.
-        \BaseMysqliRepository::clearSharedLeagueContext();
+        \Database\BaseMysqliRepository::clearSharedLeagueContext();
         parent::tearDown();
     }
 
@@ -83,7 +83,7 @@ class NavigationRepositoryTest extends WideUnitTestCase
     {
         $context = new LeagueContext();
         $context->setLeague(LeagueContext::LEAGUE_OLYMPICS);
-        \BaseMysqliRepository::setSharedLeagueContext($context);
+        \Database\BaseMysqliRepository::setSharedLeagueContext($context);
 
         $this->mockDb->setMockData([['teamid' => 5]]);
 
@@ -98,7 +98,7 @@ class NavigationRepositoryTest extends WideUnitTestCase
     {
         $context = new LeagueContext();
         $context->setLeague(LeagueContext::LEAGUE_OLYMPICS);
-        \BaseMysqliRepository::setSharedLeagueContext($context);
+        \Database\BaseMysqliRepository::setSharedLeagueContext($context);
 
         $this->mockDb->setMockData([
             ['teamid' => 1, 'team_name' => 'Celtics', 'team_city' => 'Boston', 'conference' => 'Eastern', 'division' => 'Atlantic'],

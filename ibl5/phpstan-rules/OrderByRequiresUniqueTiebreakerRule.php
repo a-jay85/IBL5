@@ -41,8 +41,14 @@ final class OrderByRequiresUniqueTiebreakerRule implements Rule
      * Case-insensitive match after stripping table/alias qualifier + backticks.
      * Extensible: add a genuinely-unique column name here (one line) when a new
      * total-order site legitimately ends on a PK the rule doesn't yet recognize.
+     *
+     * Known false-negative: 'sid' is the AUTO_INCREMENT PRIMARY KEY of nuke_stories,
+     * but nuke_comments.sid is a non-unique FK to it (KEY sid). Because matching is
+     * by bare column name, an ORDER BY over nuke_comments ending on sid would pass
+     * unflagged. No such query exists today; this is the accepted proxy trade-off
+     * (ADR-0083 favors false-negatives). Order comment lists by their own PK.
      */
-    private const UNIQUE_COLUMNS = ['id', 'pid', 'uuid', 'box_id', 'schedid', 'teamid'];
+    private const UNIQUE_COLUMNS = ['id', 'pid', 'uuid', 'box_id', 'schedid', 'teamid', 'sid'];
 
     public function getNodeType(): string
     {

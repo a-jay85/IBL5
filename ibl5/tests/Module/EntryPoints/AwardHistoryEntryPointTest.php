@@ -11,7 +11,7 @@ class AwardHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('AwardHistory');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Player Awards', $output);
         $this->assertQueryNotExecuted('ibl_awards');
     }
@@ -23,7 +23,7 @@ class AwardHistoryEntryPointTest extends ModuleEntryPointTestCase
         ]);
         $output = $this->runModule('AwardHistory', [], ['aw_name' => 'Test']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_awards');
     }
 
@@ -32,7 +32,7 @@ class AwardHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('AwardHistory', [], ['aw_name' => '']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_awards');
     }
 }

@@ -13,7 +13,7 @@ use TransactionHistory\Contracts\TransactionHistoryRepositoryInterface;
  *
  * @see TransactionHistoryRepositoryInterface
  */
-class TransactionHistoryRepository extends \BaseMysqliRepository implements TransactionHistoryRepositoryInterface
+class TransactionHistoryRepository extends \Database\BaseMysqliRepository implements TransactionHistoryRepositoryInterface
 {
     /** @var string Comma-separated transaction category IDs */
     private const CATEGORY_IDS = '1, 2, 3, 8, 10, 14';
@@ -24,6 +24,7 @@ class TransactionHistoryRepository extends \BaseMysqliRepository implements Tran
     public function getAvailableYears(): array
     {
         $rows = $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (DISTINCT YEAR(time) AS year is the whole select list, so year alone is a total order)
             "SELECT DISTINCT YEAR(time) AS year FROM nuke_stories WHERE catid IN (" . self::CATEGORY_IDS . ") ORDER BY year DESC",
             ""
         );

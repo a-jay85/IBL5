@@ -14,8 +14,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  mirror-ready:
+    name: Mirror CI images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/mirror-ci-images.yml
+    with:
+      only-missing: true
+
   audit:
     name: Full-Site Lighthouse Audit
+    needs: [mirror-ready]
+    permissions:
+      contents: read
+      issues: write
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -24,7 +38,7 @@ jobs:
 
       - name: Download baseline manifest
         id: dl-baseline
-        uses: dawidd6/action-download-artifact@d63b86af1b34672e53c440b1b83979861906bad7 # v24
+        uses: dawidd6/action-download-artifact@eab87c9830c39eff17e5a6eadb20bfb4bc880477 # v27
         continue-on-error: true
         with:
           workflow: lighthouse-baseline.yml

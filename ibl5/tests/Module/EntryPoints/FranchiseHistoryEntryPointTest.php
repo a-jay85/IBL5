@@ -9,7 +9,7 @@ class FranchiseHistoryEntryPointTest extends ModuleEntryPointTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
     }
 
@@ -22,7 +22,7 @@ class FranchiseHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('ibl_heat_win_loss', []);
         $output = $this->runModule('FranchiseHistory');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_team_info');
     }
 }

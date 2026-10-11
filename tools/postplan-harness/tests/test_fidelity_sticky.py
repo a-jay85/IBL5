@@ -361,6 +361,31 @@ def test_clean_ready_renders_target_shape():
     assert order == sorted(order) and len(set(order)) == len(order)
 
 
+def test_committed_fixture_matches_writer_tail_shape():
+    """bin/test-review-shared-skip runs skip-review.sh against this captured body; if the
+    writer's tail or audit-trail anchor ever changes, this fails before the gate goes inert."""
+    import json
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[3]
+    fx = json.loads((root / "bin/fixtures/review-shared/post-plan-sticky-pr2892.json").read_text())
+    stickies = [c["body"] for c in fx["comments"] if fidelity.STICKY_MARKER in (c.get("body") or "")]
+    assert len(stickies) == 1
+    captured = stickies[0].replace("\r", "").rstrip("\n").split("\n")
+    body = _sticky(excerpt=CLEAN_EXCERPT, ci_line=CI_PASS, diff_id="d" * 40,
+                   plan_hash="e" * 64, posted_at=TS).rstrip("\n").split("\n")
+    # Tail shape the skip-review.sh Step 8 anchor keys on: </details>, blank, READY, marker.
+    assert captured[-4:] == body[-4:] == ["</details>", "", "READY", fidelity.STICKY_MARKER]
+    opener = "<details><summary>Audit trail</summary>"
+    assert captured.count(opener) == 1 and body.count(opener) == 1
+    for lines in (captured, body):
+        block = lines[lines.index(opener) + 1:len(lines) - 4]
+        assert sum(ln.startswith("**Reviewed tree:** ") for ln in block) == 1
+        assert not any(ln.startswith(("<details", "</details", "```")) for ln in block)
+        # header, 5 labels, blank, then the --- rule that ends the Step 11 digest parse.
+        assert lines[lines.index("### Merge digest") + 7] == "---"
+    assert captured[0].startswith("**READY**") and not captured[0].startswith("**Reviewed tree:**")
+
+
 def test_deviating_status_lines_print():
     rebase = "REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; manifest=/tmp/m"
     ci_fail = "CI: local verification fail; GitHub checks are watched after this comment"
@@ -374,6 +399,16 @@ def test_deviating_status_lines_print():
     assert skipped.index(ci_skipped) < skipped.index(fidelity.MERGE_DIGEST_HEADING)
     # The expected REBASE= default beside a deviating CI line is still suppressed.
     assert "REBASE=clean" not in skipped
+
+
+def test_fidelity_expects_merged_rebase_label():
+    # Phase 2 merges origin/master in, so the plain merge label is expected and stays
+    # out of the sticky; the retired rebase label now reads as a deviation and prints.
+    merged = _sticky(rebase_line="REBASE=merged origin/master")
+    assert "REBASE=" not in merged
+    old = "REBASE=rebased onto origin/master"
+    stale = _sticky(rebase_line=old)
+    assert stale.index(old) < stale.index(fidelity.MERGE_DIGEST_HEADING)
 
 
 def test_nonempty_findings_are_kept_verbatim():

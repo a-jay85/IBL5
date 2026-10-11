@@ -6,8 +6,6 @@ namespace Tests\JsbParser;
 
 use JsbParser\Contracts\JsbExportRepositoryInterface;
 use JsbParser\JsbExportService;
-use PlrParser\PlrFieldSerializer;
-use PlrParser\PlrFileWriter;
 use JsbParser\TrnFileParser;
 use PHPUnit\Framework\TestCase;
 
@@ -19,6 +17,9 @@ class JsbExportServiceTest extends TestCase
     /** @var JsbExportRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbExportRepositoryInterface $stubRepo;
 
+    /** sha256 of exportTrnFile output for goldenTradeItems(), captured on master. */
+    private const GOLDEN_TRN_SHA256 = '1cb2a75776283ef93f7d1fa1c42f58e119ceb3fe240552df0bf0746748da33ec';
+
     protected function setUp(): void
     {
         $this->stubRepo = self::createStub(JsbExportRepositoryInterface::class);
@@ -29,246 +30,12 @@ class JsbExportServiceTest extends TestCase
         return new JsbExportService($this->stubRepo);
     }
 
-    // ── PLR helpers ──────────────────────────────────────────────
-
-    private function buildSyntheticRecord(
-        int $ordinal = 1,
-        int $pid = 12345,
-        int $teamid = 5,
-        int $bird = 3,
-        string $name = 'Test Player',
-        int $cy = 2,
-        int $cyt = 2,
-        int $salaryYr1 = 500,
-        int $salaryYr2 = 600,
-        int $salaryYr3 = 0,
-        int $salaryYr4 = 0,
-        int $salaryYr5 = 0,
-        int $salaryYr6 = 0,
-        int $faSigningFlag = 0,
-    ): string {
-        $record = str_repeat(' ', PlrFileWriter::PLAYER_RECORD_LENGTH);
-
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($ordinal, 4), 0, 4);
-        $record = substr_replace($record, str_pad($name, 32), 4, 32);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($pid, 6), 38, 6);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($teamid, 2), 44, 2);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($bird, 2), 288, 2);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($cy, 2), 290, 2);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($cyt, 2), 292, 2);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr1, 4), 298, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr2, 4), 302, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr3, 4), 306, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr4, 4), 310, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr5, 4), 314, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr6, 4), 318, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($faSigningFlag, 1), 330, 1);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($teamid, 2), 331, 2);
-        $currentIndex = $teamid === 0 ? -1 : $teamid - 1;
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($currentIndex, 2), 333, 2);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($currentIndex, 2), 335, 2);
-
-        return $record;
-    }
-
-    /**
-     * @param list<string> $records
-     */
-    private function buildPlrContent(array $records): string
+    public function testRepositoryContractExtendsPlrExportRepositoryContract(): void
     {
-        return implode("\r\n", $records) . "\r\n";
-    }
-
-    private function writeTmpFile(string $data, string $prefix = 'plr_test_'): string
-    {
-        $tmpFile = tempnam(sys_get_temp_dir(), $prefix);
-        $this->assertIsString($tmpFile);
-        file_put_contents($tmpFile, $data);
-        return $tmpFile;
-    }
-
-    // ── exportPlrFile ────────────────────────────────────────────
-
-    public function testExportPlrFileNoChangesWhenDbMatchesFile(): void
-    {
-        $record = $this->buildSyntheticRecord(1, 12345, 5, 3);
-        $content = $this->buildPlrContent([$record]);
-        $inputFile = $this->writeTmpFile($content);
-        $outputFile = $inputFile . '.out';
-
-        $this->stubRepo->method('getAllPlayerChangeableFields')->willReturn([
-            12345 => [
-                'pid' => 12345,
-                'name' => 'Test Player',
-                'teamid' => 5,
-                'bird' => 3,
-                'cy' => 2,
-                'cyt' => 2,
-                'salary_yr1' => 500,
-                'salary_yr2' => 600,
-                'salary_yr3' => 0,
-                'salary_yr4' => 0,
-                'salary_yr5' => 0,
-                'salary_yr6' => 0,
-                'fa_signing_flag' => 0,
-            ],
-        ]);
-
-        try {
-            $result = $this->makeService()->exportPlrFile($inputFile, $outputFile);
-            $this->assertSame(0, $result->playersModified);
-            $this->assertSame(0, $result->errors);
-        } finally {
-            unlink($inputFile);
-            if (file_exists($outputFile)) {
-                unlink($outputFile);
-            }
-        }
-    }
-
-    public function testExportPlrFileDetectsTidChange(): void
-    {
-        $record = $this->buildSyntheticRecord(1, 12345, 5, 3);
-        $content = $this->buildPlrContent([$record]);
-        $inputFile = $this->writeTmpFile($content);
-        $outputFile = $inputFile . '.out';
-
-        $this->stubRepo->method('getAllPlayerChangeableFields')->willReturn([
-            12345 => [
-                'pid' => 12345,
-                'name' => 'Test Player',
-                'teamid' => 10,
-                'bird' => 3,
-                'cy' => 2,
-                'cyt' => 2,
-                'salary_yr1' => 500,
-                'salary_yr2' => 600,
-                'salary_yr3' => 0,
-                'salary_yr4' => 0,
-                'salary_yr5' => 0,
-                'salary_yr6' => 0,
-                'fa_signing_flag' => 0,
-            ],
-        ]);
-
-        try {
-            $result = $this->makeService()->exportPlrFile($inputFile, $outputFile);
-            $this->assertSame(1, $result->playersModified);
-            $this->assertGreaterThanOrEqual(1, $result->fieldsChanged);
-
-            $change = $result->changeLog[0];
-            $this->assertSame(12345, $change['pid']);
-            $tidChange = array_filter(
-                $change['changes'],
-                static fn (array $c): bool => $c['field'] === 'teamid'
-            );
-            $this->assertCount(1, $tidChange);
-        } finally {
-            unlink($inputFile);
-            if (file_exists($outputFile)) {
-                unlink($outputFile);
-            }
-        }
-    }
-
-    public function testExportPlrFileDetectsMultipleFieldChanges(): void
-    {
-        $record = $this->buildSyntheticRecord(1, 12345, 5, 3, 'Test Player', 2, 2, 500, 600);
-        $content = $this->buildPlrContent([$record]);
-        $inputFile = $this->writeTmpFile($content);
-        $outputFile = $inputFile . '.out';
-
-        $this->stubRepo->method('getAllPlayerChangeableFields')->willReturn([
-            12345 => [
-                'pid' => 12345,
-                'name' => 'Test Player',
-                'teamid' => 5,
-                'bird' => 5,
-                'cy' => 3,
-                'cyt' => 3,
-                'salary_yr1' => 700,
-                'salary_yr2' => 800,
-                'salary_yr3' => 900,
-                'salary_yr4' => 0,
-                'salary_yr5' => 0,
-                'salary_yr6' => 0,
-                'fa_signing_flag' => 0,
-            ],
-        ]);
-
-        try {
-            $result = $this->makeService()->exportPlrFile($inputFile, $outputFile);
-            $this->assertSame(1, $result->playersModified);
-            $this->assertGreaterThanOrEqual(4, $result->fieldsChanged);
-        } finally {
-            unlink($inputFile);
-            if (file_exists($outputFile)) {
-                unlink($outputFile);
-            }
-        }
-    }
-
-    public function testExportPlrFileSkipsUnknownPid(): void
-    {
-        $record = $this->buildSyntheticRecord(1, 99999, 5, 3);
-        $content = $this->buildPlrContent([$record]);
-        $inputFile = $this->writeTmpFile($content);
-        $outputFile = $inputFile . '.out';
-
-        $this->stubRepo->method('getAllPlayerChangeableFields')->willReturn([
-            12345 => [
-                'pid' => 12345,
-                'name' => 'Other Player',
-                'teamid' => 10,
-                'bird' => 3,
-                'cy' => 2,
-                'cyt' => 2,
-                'salary_yr1' => 500,
-                'salary_yr2' => 600,
-                'salary_yr3' => 0,
-                'salary_yr4' => 0,
-                'salary_yr5' => 0,
-                'salary_yr6' => 0,
-                'fa_signing_flag' => 0,
-            ],
-        ]);
-
-        try {
-            $result = $this->makeService()->exportPlrFile($inputFile, $outputFile);
-            $this->assertSame(0, $result->playersModified);
-        } finally {
-            unlink($inputFile);
-            if (file_exists($outputFile)) {
-                unlink($outputFile);
-            }
-        }
-    }
-
-    public function testExportPlrFileReportsSizeMismatchError(): void
-    {
-        // Create a record, then corrupt the output by creating a content that
-        // will cause size mismatch — we can do this by testing with empty DB data
-        // that changes the record to a different length. Actually, PlrFileWriter
-        // preserves length by design. Instead, let's test the service by checking
-        // that size-match validation works on normal operation.
-        $record = $this->buildSyntheticRecord(1, 12345, 5, 3);
-        $content = $this->buildPlrContent([$record]);
-        $inputFile = $this->writeTmpFile($content);
-        $outputFile = $inputFile . '.out';
-
-        // No changes = no size mismatch = writes successfully
-        $this->stubRepo->method('getAllPlayerChangeableFields')->willReturn([]);
-
-        try {
-            $result = $this->makeService()->exportPlrFile($inputFile, $outputFile);
-            $this->assertSame(0, $result->errors);
-            $this->assertTrue(file_exists($outputFile));
-        } finally {
-            unlink($inputFile);
-            if (file_exists($outputFile)) {
-                unlink($outputFile);
-            }
-        }
+        $this->assertContains(
+            \PlrParser\Contracts\PlrExportRepositoryInterface::class,
+            class_implements(JsbExportRepositoryInterface::class),
+        );
     }
 
     // ── exportTrnFile ────────────────────────────────────────────
@@ -388,6 +155,38 @@ class JsbExportServiceTest extends TestCase
         try {
             $result = $this->makeService()->exportTrnFile($outputFile, '2025-07-01');
             $this->assertSame(0, $result->errors);
+        } finally {
+            if (file_exists($outputFile)) {
+                unlink($outputFile);
+            }
+        }
+    }
+
+    /**
+     * @return list<array{tradeofferid: int, itemid: int, itemtype: string, trade_from: string, trade_to: string, created_at: string}>
+     */
+    private function goldenTradeItems(): array
+    {
+        return [
+            ['tradeofferid' => 1, 'itemid' => 4001, 'itemtype' => \Trading\TradeItemType::Player->value, 'trade_from' => 'Celtics', 'trade_to' => 'Lakers', 'created_at' => '2026-01-15 10:00:00'],
+            ['tradeofferid' => 1, 'itemid' => 4002, 'itemtype' => \Trading\TradeItemType::Player->value, 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'created_at' => '2026-01-15 10:00:00'],
+            ['tradeofferid' => 1, 'itemid' => 2027, 'itemtype' => \Trading\TradeItemType::DraftPick->value, 'trade_from' => 'Celtics', 'trade_to' => 'Lakers', 'created_at' => '2026-01-15 10:00:00'],
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => \Trading\TradeItemType::Cash->value, 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'created_at' => '2026-01-15 10:00:00'],
+            ['tradeofferid' => 2, 'itemid' => 4003, 'itemtype' => \Trading\TradeItemType::Player->value, 'trade_from' => 'Expansion', 'trade_to' => 'Heat', 'created_at' => '2026-02-03 09:30:00'],
+        ];
+    }
+
+    public function testExportTrnFileGoldenBytesUnchanged(): void
+    {
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn($this->goldenTradeItems());
+
+        $outputFile = tempnam(sys_get_temp_dir(), 'trn_out_');
+        $this->assertIsString($outputFile);
+
+        try {
+            $result = $this->makeService()->exportTrnFile($outputFile, '2025-10-01');
+            $this->assertSame(0, $result->errors);
+            $this->assertSame(self::GOLDEN_TRN_SHA256, hash_file('sha256', $outputFile));
         } finally {
             if (file_exists($outputFile)) {
                 unlink($outputFile);

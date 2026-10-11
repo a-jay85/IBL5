@@ -1,6 +1,6 @@
 ---
 description: Updater pipeline web entry point (scripts/updateAllTheThings.php, run from the League Control Panel's "Update All The Things" button) and notes on its report-only steps.
-last_verified: 2026-09-23
+last_verified: 2026-10-03
 ---
 
 # Updater
@@ -20,7 +20,7 @@ Triggered by the **"Update All The Things"** button in the League Control Panel 
 `scripts/updateAllTheThings.php` enforces:
 
 - **Admin-only** — non-admins receive HTTP 403.
-- **POST-only** — GET requests are redirected to `leagueControlPanel.php`.
+- **POST-only.** GET requests are redirected to `modules.php?name=LeagueControlPanel`.
 - **CSRF-guarded** — token name `lcp_update_all`; invalid tokens receive HTTP 403.
 - **Progressive HTML output** — streams progress via `flush()` as each Step completes.
 

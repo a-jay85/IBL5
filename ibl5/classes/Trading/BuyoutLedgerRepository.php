@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 
 /**
@@ -64,7 +64,7 @@ class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedge
     {
         /** @var list<CashConsiderationRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_cash_considerations` WHERE teamid = ? ORDER BY label ASC",
+            "SELECT * FROM `ibl_cash_considerations` WHERE teamid = ? ORDER BY label ASC, id ASC",
             "i",
             $teamId
         );
@@ -77,7 +77,7 @@ class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedge
     {
         /** @var list<CashConsiderationRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_cash_considerations` WHERE teamid = ? AND type = 'buyout' ORDER BY label ASC",
+            "SELECT * FROM `ibl_cash_considerations` WHERE teamid = ? AND type = 'buyout' ORDER BY label ASC, id ASC",
             "i",
             $teamId
         );

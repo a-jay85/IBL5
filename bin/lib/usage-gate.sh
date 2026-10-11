@@ -63,6 +63,52 @@ usage_resets_epoch() {
         '.[$w].resets_at // empty | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601' 2>/dev/null
 }
 
+# ------------------------------------------------------------ 2c weekly pacing (bin/burndown-loop)
+
+# usage_pace_reserve
+# Echoes the weekly reserve percent kept free at seven_day.resets_at. Unset and
+# empty IBL5_BURNDOWN_RESERVE_PCT both take the default 10. A non-integer or a
+# value above 99 logs bad-reserve and also takes 10 (99 keeps the divisor > 0).
+usage_pace_reserve() {
+    local r="${IBL5_BURNDOWN_RESERVE_PCT:-10}"
+    case "$r" in ''|*[!0-9]*) usage_log "bad-reserve value=$r"; echo 10; return 0 ;; esac
+    if [ "$r" -gt 99 ]; then usage_log "bad-reserve value=$r"; echo 10; return 0; fi
+    echo "$r"
+}
+
+# usage_pace_verdict <json> <now_epoch>
+# One line: "<verdict> <weekly_pct|-> <allowed_pct|-> <wait_seconds>".
+#   go    weekly pct < allowed; wait 0.
+#   wait  weekly pct >= allowed; wait = seconds until allowed reaches pct, or until
+#         seven_day.resets_at when pct >= 100-reserve. Floor 60.
+#   zone  usage_zone (max of both windows) is drain or stop; wait 0 (caller defers
+#         to usage_prestart_gate, which writes the pause marker).
+#   blind seven_day.utilization or seven_day.resets_at missing/unparseable, or a
+#         bad now; wait 0 (caller sleeps its own cap). Fails closed.
+# allowed = (100 - reserve) * (168 - hours_left) / 168, hours_left clamped to [0,168].
+usage_pace_verdict() {
+    local body="${1:-}" now="${2:-}" r zone pct resets out
+    case "$now" in ''|*[!0-9]*) echo "blind - - 0"; return 0 ;; esac
+    r=$(usage_pace_reserve)
+    zone=$(usage_zone "$body" 2>/dev/null)
+    pct=$(printf '%s' "$body" | jq -r '.seven_day.utilization // empty | numbers' 2>/dev/null)
+    case "$zone" in drain|stop) echo "zone ${pct:--} - 0"; return 0 ;; esac
+    [ -n "$pct" ] || { echo "blind - - 0"; return 0; }
+    resets=$(usage_resets_epoch "$body" seven_day)
+    case "$resets" in ''|*[!0-9]*) echo "blind $pct - 0"; return 0 ;; esac
+    out=$(jq -nr --argjson p "$pct" --argjson r "$r" --argjson now "$now" --argjson rs "$resets" '
+        (($rs - $now) / 3600) as $hl
+        | (if $hl < 0 then 0 elif $hl > 168 then 168 else $hl end) as $h
+        | ((100 - $r) * (168 - $h) / 168) as $a
+        | ((($a * 10) | round) / 10) as $ar
+        | if $p < $a then "go \($p) \($ar) 0"
+          elif $p >= (100 - $r) then "wait \($p) \($ar) \([($rs - $now), 60] | max | floor)"
+          else "wait \($p) \($ar) \([((($p * 168 / (100 - $r)) - (168 - $h)) * 3600), 60] | max | ceil)"
+          end' 2>/dev/null)
+    [ -n "$out" ] || { echo "blind $pct - 0"; return 0; }
+    echo "$out"
+}
+
 # usage_blind_trust <json> <age> [log-suffix]
 # Called when the gate is blind: the live fetch failed and the cache is stale.
 # rc 0: trust this last reading as if fresh. Its zone is drain or stop and the
@@ -101,11 +147,25 @@ usage_runner_priority() {  # <runner>
         post-plan-now) echo 1 ;;
         automouse) echo 2 ;;
         plan-now) echo 3 ;;
+        burndown-loop) echo 4 ;;
         *) return 1 ;;
     esac
 }
 
 # usage_marker_write <sid> <runner> <resume_bin> <reason> <zone> <pct> <window> <resets_epoch>
+# usage_is_temp_path <path>: 0 when <path> sits under $TMPDIR, /tmp, or /var/folders.
+usage_is_temp_path() {
+    local p="${1:-}" t="${TMPDIR:-}"
+    t="${t%/}"
+    if [ -n "$t" ]; then
+        case "$p" in "$t"/*|/private"$t"/*) return 0 ;; esac
+    fi
+    case "$p" in
+        /tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*) return 0 ;;
+    esac
+    return 1
+}
+
 usage_marker_write() {
     local sid="${1:-}" runner="${2:-}" rbin="${3:-}" reason="${4:-}" zone="${5:-}" \
         pct="${6:-0}" window="${7:-}" resets="${8:-}"
@@ -126,6 +186,14 @@ usage_marker_write() {
         usage_log "marker-rejected reason=resume-bin-not-executable bin=$rbin"
         return 1
     fi
+    # A test harness runs a copy of a runner from a temp dir. Without its own
+    # IBL5_USAGE_GATE_STATE_DIR it would park markers in the real state dir, and the
+    # coordinator would try to resume them after the temp dir is gone. Real runners
+    # never live in a temp dir, so refuse; the caller fails open.
+    if [ -z "${IBL5_USAGE_GATE_STATE_DIR:-}" ] && usage_is_temp_path "$rbin"; then
+        usage_log "marker-rejected reason=temp-resume-bin bin=$rbin"
+        return 1
+    fi
     local dir file tmp cwd prev_count=0
     dir=$(usage_markers_dir)
     file="$dir/$sid.json"
@@ -140,7 +208,11 @@ usage_marker_write() {
     fi
     case "$pct" in ''|*[!0-9.]*) pct=0 ;; esac
     case "$resets" in ''|*[!0-9]*) resets="" ;; esac
-    if jq -n --arg sid "$sid" --arg runner "$runner" --argjson prio "$prio" \
+    local fp
+    fp=$(_usage_cred_fp)
+    local acct
+    acct=$(_usage_acct_fp)
+    if jq -n --arg fp "$fp" --arg acct "$acct" --arg sid "$sid" --arg runner "$runner" --argjson prio "$prio" \
         --arg rbin "$rbin" --arg cwd "$cwd" --arg reason "$reason" --arg zone "$zone" \
         --argjson pct "$pct" --arg window "$window" --arg resets "$resets" \
         --argjson now "$(date +%s)" --argjson rc "$prev_count" \
@@ -148,7 +220,9 @@ usage_marker_write() {
           resume_argv:[$rbin, "--resume-paused", $sid], resume_cwd:$cwd,
           reason:$reason, zone:$zone, pct:$pct, window:$window,
           resets_at:(if $resets == "" then null else ($resets|tonumber) end),
-          paused_at:$now, resume_count:$rc}' 2>/dev/null > "$tmp" \
+          paused_at:$now, resume_count:$rc,
+          acct_fp:(if $acct == "" then null else $acct end),
+          cred_fp:(if $fp == "" then null else $fp end)}' 2>/dev/null > "$tmp" \
         && mv "$tmp" "$file"; then
         return 0
     fi
@@ -265,6 +339,19 @@ usage_marker_bump_resume() {  # <sid>
     return 1
 }
 
+# usage_marker_cred_switched <sid>: 0 only when the marker and the current login both have a fingerprint and they differ.
+usage_marker_cred_switched() {
+    local sid="${1:-}" f marker_fp cur_fp
+    usage_valid_sid "$sid" || return 1
+    f="$(usage_markers_dir)/$sid.json"
+    [ -s "$f" ] || return 1
+    marker_fp=$(jq -r '.cred_fp // empty' "$f" 2>/dev/null)
+    [ -n "$marker_fp" ] || return 1
+    cur_fp=$(_usage_cred_fp)
+    [ -n "$cur_fp" ] || return 1
+    [ "$marker_fp" != "$cur_fp" ]
+}
+
 # usage_marker_eligible <sid> <now>: 0 when the coordinator may resume this marker.
 # Not eligible when: stuck; a limit-hit pause younger than 600 s (backoff, so a
 # transient 429 does not hot-loop); or a resume is already in flight (live pid).
@@ -277,8 +364,14 @@ usage_marker_eligible() {
     [ "$stuck" = "true" ] && return 1
     reason=$(jq -r '.reason // ""' "$f" 2>/dev/null)
     paused_at=$(jq -r '.paused_at // 0' "$f" 2>/dev/null)
+    # The 600 s hold is per-account backoff. After a /login switch the new account
+    # has its own budget, so the hold is skipped; the zone check still gates resume.
     if [ "$reason" = "limit-hit" ] && [ $(( now - paused_at )) -lt 600 ]; then
-        return 1
+        if usage_marker_cred_switched "$sid"; then
+            usage_log "limit-hit-hold-skipped reason=cred-switch sid=$sid"
+        else
+            return 1
+        fi
     fi
     rpid=$(jq -r '.resuming_pid // empty' "$f" 2>/dev/null)
     if [ -n "$rpid" ] && kill -0 "$rpid" 2>/dev/null; then
@@ -302,6 +395,22 @@ usage_marker_set_resuming() {
     return 1
 }
 
+# usage_marker_set_switch_resumed <sid> <key>: records that this marker took its one
+# fast resume for login switch <key>. usage_marker_write rebuilds the marker on
+# re-pause, so the stamp never carries over to a new pause.
+usage_marker_set_switch_resumed() {
+    usage_valid_sid "${1:-}" || return 1
+    local f tmp
+    f="$(usage_markers_dir)/$1.json"
+    tmp="$f.tmp.$$"
+    [ -s "$f" ] || return 1
+    if jq --arg k "${2:-}" '.switch_resumed_for = $k' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
 # usage_marker_set_stuck <sid> <reason>: the coordinator leaves a stuck marker paused.
 usage_marker_set_stuck() {
     usage_valid_sid "${1:-}" || return 1
@@ -310,6 +419,23 @@ usage_marker_set_stuck() {
     tmp="$f.tmp.$$"
     [ -s "$f" ] || return 1
     if jq --arg r "${2:-stuck}" '.stuck = true | .stuck_reason = $r' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
+# usage_marker_reset_runaway <sid> [acct_fp]: zero the resume counter and clear the
+# stuck flag. A non-empty acct_fp is recorded as reset_acct, the account the cap was
+# last cleared for. The marker's own acct_fp is left alone: the switch fast-resume
+# still reads it.
+usage_marker_reset_runaway() {
+    usage_valid_sid "${1:-}" || return 1
+    local f tmp
+    f="$(usage_markers_dir)/$1.json"
+    tmp="$f.tmp.$$"
+    [ -s "$f" ] || return 1
+    if jq --arg a "${2:-}" '.resume_count = 0 | del(.stuck, .stuck_reason) | if $a != "" then .reset_acct = $a else . end' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
         return 0
     fi
     rm -f "$tmp"
@@ -433,12 +559,17 @@ usage_delta_log() {
 
 USAGE_LIMIT_HIT_RE='hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*429|rate_limit_error'
 USAGE_ENV_ERROR_RE='hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error'
+# Claude Code resume safety check refusing a worktree-bound session. Anchored
+# to line start: the CLI prints it as a bare stderr line, while agent stream
+# output that merely quotes it is a JSON event line starting with `{`.
+USAGE_WT_RESUME_REFUSED_RE='^error: cannot resume into worktree '
 
 usage_log_matches() {  # $1=regex $2=file $3=after_line (0 = whole file)
     tail -n +"$(( ${3:-0} + 1 ))" "$2" 2>/dev/null | grep -qiE "$1"
 }
 usage_is_limit_hit() { usage_log_matches "$USAGE_LIMIT_HIT_RE" "$@"; }
 usage_is_env_error() { usage_log_matches "$USAGE_ENV_ERROR_RE" "$@"; }
+usage_is_wt_resume_refused() { usage_log_matches "$USAGE_WT_RESUME_REFUSED_RE" "$@"; }
 
 # ------------------------------------------------------------ 6a runner helpers
 

@@ -26,9 +26,9 @@ use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
  * @phpstan-import-type PlayoffAppearanceRecord from RecordHoldersRepositoryInterface
  *
  * @see RecordHoldersRepositoryInterface
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHoldersRepositoryInterface
+class RecordHoldersRepository extends \Database\BaseMysqliRepository implements RecordHoldersRepositoryInterface
 {
     private PlayerRecordRepository $playerRecords;
     private TeamRecordRepository $teamRecords;

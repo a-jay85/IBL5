@@ -25,6 +25,17 @@ import type { Viewport } from './vr-manifest';
 // points (this threshold and the ratio floor).
 const GATE_PIXEL_THRESHOLD = 0.2;
 
+// Review-only strict pass (ADR 0180, amends ADR-0074). Never gates: it only
+// feeds the gallery's changed set. 0.05 sits above the faintest anti-alias
+// fringe of a #2599 recolor (quarter coverage, min-t 0.0455) and well below
+// half-coverage and solid glyph pixels (min-t 0.0917 to 0.2042), so solid
+// and half-covered text pixels of a one-step palette recolor count.
+export const STRICT_PIXEL_THRESHOLD = 0.05;
+// Absolute floor, replacing the gate's ratio: 0.005 of a 1280x2000 full-page
+// shot is 12800 pixels, far more than one recoloured link or label. 25 pixels
+// is under a single short word's solid-glyph count and above isolated jitter.
+export const STRICT_MIN_CHANGED_PIXELS = 25;
+
 export type CellVerdict = 'changed' | 'unchanged' | 'flake' | 'new' | 'infra';
 
 export interface TriageInput {
@@ -36,6 +47,11 @@ export interface TriageInput {
   afterB: Buffer | null;
   /** per-cell ratio tolerance (VrRow.extraMaxDiffPixelRatio); defaults to 0. */
   maxDiffPixelRatio?: number;
+  /**
+   * Opt-in review-only strict pass; the I/O wrapper decides per row. Defaulting
+   * to off keeps every existing caller and test on gate-parity triage.
+   */
+  strictReview?: boolean;
 }
 
 export interface TriageResult {
@@ -44,6 +60,8 @@ export interface TriageResult {
   diff?: Buffer;
   /** fraction of pixels that differ from the baseline; present for pixel-diff 'changed'. */
   changedRatio?: number;
+  /** set only when the strict pass upgraded a gate-parity 'unchanged' to 'changed'. */
+  strict?: true;
 }
 
 function decode(buf: Buffer): PNG {
@@ -56,13 +74,15 @@ function dimsEqual(a: PNG, b: PNG): boolean {
 
 // pixelmatch THROWS when the two images differ in size, so every call site must
 // be guarded by a dimsEqual() check first — those guards are load-bearing.
-function diffRatio(a: PNG, b: PNG): { ratio: number; diff: PNG } {
+function diffRatio(
+  a: PNG,
+  b: PNG,
+  threshold = GATE_PIXEL_THRESHOLD,
+): { ratio: number; diff: PNG; count: number } {
   const { width, height } = a;
   const diff = new PNG({ width, height });
-  const changed = pixelmatch(a.data, b.data, diff.data, width, height, {
-    threshold: GATE_PIXEL_THRESHOLD,
-  });
-  return { ratio: changed / (width * height), diff };
+  const changed = pixelmatch(a.data, b.data, diff.data, width, height, { threshold });
+  return { ratio: changed / (width * height), diff, count: changed };
 }
 
 /**
@@ -76,6 +96,11 @@ function diffRatio(a: PNG, b: PNG): { ratio: number; diff: PNG } {
  *   5. dims(before) ≠ dims(afterA)   → changed (show the new render; no pixel diff)
  *   6. before vs afterA ratio ≤ T    → unchanged
  *   7. otherwise                     → changed (with pixelmatch diff + ratio)
+ *   8. strictReview && verdict unchanged && afterB present && strict A-vs-B
+ *      count < floor && strict before-vs-A count >= floor → changed (strict: true)
+ *
+ * The strict pass never produces flake, infra, or new, and never alters a
+ * non-'unchanged' verdict.
  *
  * When afterB is missing we cannot confirm self-stability, so steps 3–4 are
  * skipped and any would-be 'changed' verdict is demoted to 'infra'; 'unchanged'
@@ -98,8 +123,8 @@ export function triageCell(input: TriageInput): TriageResult {
   // 3–4. Self-stability: if the PR's two renders disagree (different size, or
   // pixels beyond tolerance) the cell is flaky — surface it in the infra
   // section, never as a real change.
-  if (afterB !== null) {
-    const b = decode(afterB);
+  const b = afterB !== null ? decode(afterB) : null;
+  if (b !== null) {
     if (!dimsEqual(a, b)) return { verdict: 'flake' };
     if (diffRatio(a, b).ratio > T) return { verdict: 'flake' };
   }
@@ -120,6 +145,24 @@ export function triageCell(input: TriageInput): TriageResult {
   // Without a second render we can't confirm the change is stable, so demote a
   // single-render 'changed' to infra. 'unchanged' stays as-is.
   if (!hasB && result.verdict === 'changed') return { verdict: 'infra' };
+
+  // 8. Review-only strict upgrade (monotonic). Only a gate-parity 'unchanged'
+  // with a second render can move, and only to 'changed'. A cell whose two
+  // renders disagree under the strict threshold keeps its 'unchanged'.
+  if (input.strictReview === true && result.verdict === 'unchanged' && b !== null) {
+    const selfDiff = diffRatio(a, b, STRICT_PIXEL_THRESHOLD);
+    if (selfDiff.count < STRICT_MIN_CHANGED_PIXELS) {
+      const strict = diffRatio(baseline, a, STRICT_PIXEL_THRESHOLD);
+      if (strict.count >= STRICT_MIN_CHANGED_PIXELS) {
+        return {
+          verdict: 'changed',
+          diff: PNG.sync.write(strict.diff),
+          changedRatio: strict.ratio,
+          strict: true,
+        };
+      }
+    }
+  }
 
   return result;
 }

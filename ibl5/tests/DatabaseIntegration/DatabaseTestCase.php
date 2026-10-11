@@ -519,20 +519,6 @@ abstract class DatabaseTestCase extends TestCase
     }
 
     /**
-     * Insert a row into ibl_trade_queue and return the new ID.
-     *
-     * @param array<string, mixed> $params JSON-encodable parameters
-     */
-    protected function insertTradeQueueRow(string $opType, array $params, string $tradeline): int
-    {
-        return $this->insertRow('ibl_trade_queue', [
-            'operation_type' => $opType,
-            'params' => json_encode($params, JSON_THROW_ON_ERROR),
-            'tradeline' => $tradeline,
-        ]);
-    }
-
-    /**
      * Insert a row into ibl_fa_offers with sensible defaults.
      * Returns the auto-increment primary_key.
      *

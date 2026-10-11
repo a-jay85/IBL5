@@ -91,7 +91,7 @@
 .auth-links a {
     color: var(--accent-500);
     text-decoration: none;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     transition: color var(--transition-fast);
 }
 
@@ -169,7 +169,7 @@
 .auth-status__title {
     font-family: var(--font-display);
     font-size: var(--text-2xl);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
     color: var(--gray-800);
@@ -180,7 +180,7 @@
     font-family: var(--font-sans);
     font-size: var(--text-lg);
     color: var(--gray-600);
-    line-height: 1.6;
+    line-height: var(--leading-loose);
     margin-bottom: var(--space-4);
 }
 
@@ -235,7 +235,7 @@
 .auth-info-text {
     font-size: 1rem;
     color: var(--gray-500);
-    line-height: 1.5;
+    line-height: var(--leading-relaxed);
     text-align: center;
 }
 

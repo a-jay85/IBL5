@@ -212,6 +212,43 @@ def test_plan_index_failure_is_a_marker_not_an_abort(tmp_path, git_shim):
     assert open(os.path.join(packet, "plan.md")).read() == "no headings\n"
 
 
+def test_plan_index_write_failure_keeps_plan_md(tmp_path, git_shim, monkeypatch):
+    """An OSError writing plan-index.txt must not replace a successfully written plan.md."""
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
+    _fake_plan_index(tmp_path, "#!/usr/bin/env bash\necho idx\n")
+    plan = tmp_path / "plan-src.md"
+    plan.write_text("## Phase 1\nreal plan\n")
+    out = tmp_path / "out"
+    out.mkdir()
+    real_open = open
+    failed = []
+
+    def flaky_open(path, mode="r", *a, **kw):
+        if os.path.basename(str(path)) == "plan-index.txt" and "w" in mode and not failed:
+            failed.append(path)
+            raise OSError("disk full")
+        return real_open(path, mode, *a, **kw)
+
+    monkeypatch.setattr("builtins.open", flaky_open)
+    packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(path=str(plan)),
+                                   "d", "b", 42, False, worktree=str(tmp_path))
+    monkeypatch.undo()
+    assert failed
+    assert open(os.path.join(packet, "plan.md")).read() == "## Phase 1\nreal plan\n"
+    assert open(os.path.join(packet, "plan-index.txt")).read() == fidelity.PLAN_INDEX_BLIND
+
+
+def test_plan_read_failure_is_still_blind(tmp_path, git_shim):
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
+    out = tmp_path / "out"
+    out.mkdir()
+    packet = fidelity.build_packet(str(out), "deadbeef", TREE,
+                                   _plan(path=str(tmp_path / "nope.md")),
+                                   "d", "b", 42, False, worktree=str(tmp_path))
+    assert "PLAN-BLIND RUN" in open(os.path.join(packet, "plan.md")).read()
+    assert open(os.path.join(packet, "plan-index.txt")).read() == fidelity.PLAN_INDEX_BLIND
+
+
 def test_plan_index_missing_script_is_a_marker(tmp_path, git_shim):
     git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
     plan = tmp_path / "plan-src.md"
@@ -221,6 +258,28 @@ def test_plan_index_missing_script_is_a_marker(tmp_path, git_shim):
     packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(path=str(plan)),
                                    "d", "b", 42, False, worktree=str(tmp_path))
     assert "unavailable" in open(os.path.join(packet, "plan-index.txt")).read()
+
+
+def test_plan_index_timeout_is_a_marker(tmp_path, monkeypatch):
+    # `exec` so the kill lands on the sleeper itself, not a shell holding the pipe open.
+    _fake_plan_index(tmp_path, "#!/usr/bin/env bash\nexec sleep 30\n")
+    monkeypatch.setattr(fidelity, "PLAN_INDEX_TIMEOUT", 0.2)
+    index = fidelity._plan_index(str(tmp_path), str(tmp_path / "plan.md"))
+    assert "timed out after 0.2s" in index
+    assert "Grep plan.md" in index
+
+
+def test_plan_index_timeout_param_overrides_default(tmp_path):
+    _fake_plan_index(tmp_path, "#!/usr/bin/env bash\nexec sleep 30\n")
+    index = fidelity._plan_index(str(tmp_path), str(tmp_path / "plan.md"), timeout=0.2)
+    assert "timed out after 0.2s" in index
+
+
+def test_plan_index_non_utf8_output_is_a_marker(tmp_path):
+    _fake_plan_index(tmp_path, "#!/usr/bin/env bash\nprintf '\\xff\\xfe\\n'\n")
+    index = fidelity._plan_index(str(tmp_path), str(tmp_path / "plan.md"))
+    assert "not valid UTF-8" in index
+    assert "Grep plan.md" in index
 
 
 def test_plan_blind_packet_has_blind_index(tmp_path, git_shim):

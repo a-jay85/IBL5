@@ -138,7 +138,7 @@ test.describe('Team page: dropdown content changes', () => {
 
     // The header should now have a sort indicator
     await expect(
-      page.locator('.ibl-data-table th.sorttable_sorted, .ibl-data-table th.sorttable_sorted_reverse')
+      page.locator('.ibl-data-table th.sorttable_sorted_reverse')
         .first()
     ).toBeVisible({ timeout: 10000 });
   });

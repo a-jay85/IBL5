@@ -9,6 +9,7 @@ use Player\PlayerImageHelper;
 use UI\Components\TooltipLabel;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
+use UI\RendersTableEnd;
 
 /**
  * View class for rendering injured players table.
@@ -17,6 +18,8 @@ use Security\HtmlSanitizer;
  */
 class InjuriesView implements InjuriesViewInterface
 {
+    use RendersTableEnd;
+
     /**
      * @see InjuriesViewInterface::render()
      */
@@ -124,15 +127,5 @@ class InjuriesView implements InjuriesViewInterface
             . $teamCell
             . "<td class=\"ibl-stat-highlight\">{$daysLabel}</td>"
             . '</tr>';
-    }
-
-    /**
-     * Render the end of the injuries table.
-     *
-     * @return string HTML table end
-     */
-    private function renderTableEnd(): string
-    {
-        return '</tbody></table>';
     }
 }

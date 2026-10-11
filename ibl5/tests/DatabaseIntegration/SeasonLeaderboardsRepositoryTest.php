@@ -141,7 +141,7 @@ class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getTeams();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         foreach ($result as $row) {
             self::assertGreaterThanOrEqual(1, $row['teamid']);
             self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $row['teamid']);

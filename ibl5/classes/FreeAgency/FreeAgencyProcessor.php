@@ -141,8 +141,8 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     {
         // Reconstruct derived values from player object
         $birdYears = $player->getTeamName() === $team->name ? ($player->getBirdYears() ?? 0) : 0;
-        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->getYearsOfExperience() ?? 0);
-        $maxContractYear1 = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
+        $veteranMinimum = \League\ContractRules::getVeteranMinimumSalary($player->getYearsOfExperience() ?? 0);
+        $maxContractYear1 = \League\ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
 
         // Reconstruct cap space data using provided team object
         $capCalculator = $this->capCalculatorFactory->forTeam($team, $this->season);
@@ -167,7 +167,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             $offer6 = 0;
         } elseif (OfferType::isLLE($offerType)) {
             // Lower-Level Exception
-            $offer1 = \ContractRules::LLE_OFFER;
+            $offer1 = \League\ContractRules::LLE_OFFER;
             $offer2 = 0;
             $offer3 = 0;
             $offer4 = 0;
@@ -175,7 +175,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             $offer6 = 0;
         } elseif (OfferType::isMLE($offerType)) {
             // Mid-Level Exception
-            $mleOffers = \ContractRules::MLE_OFFERS;
+            $mleOffers = \League\ContractRules::MLE_OFFERS;
             $offer1 = $mleOffers[0];
             $offer2 = $offerType >= 2 ? $mleOffers[1] : 0;
             $offer3 = $offerType >= 3 ? $mleOffers[2] : 0;
@@ -266,7 +266,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         ]);
 
         // Post to Discord if significant offer
-        if ($saved && $offerData['offer1'] > \ContractRules::LLE_OFFER) {
+        if ($saved && $offerData['offer1'] > \League\ContractRules::LLE_OFFER) {
             $this->postOfferToDiscord($teamName, $player);
         }
 

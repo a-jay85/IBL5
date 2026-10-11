@@ -19,6 +19,11 @@
 # Plan slugs link to their PR through one `gh pr list`. MORNING_DIGEST_GH overrides
 # the gh binary (tests stub it). A failed lookup renders bare slugs.
 
+# Held PRs come from `bin/pr-triage --held`, bounded by a wall-clock cap because a
+# live run makes several gh calls per open PR and can take minutes.
+# MORNING_DIGEST_PR_TRIAGE overrides the pr-triage path (unset or empty: the repo's
+# bin/pr-triage). MORNING_DIGEST_HELD_TIMEOUT overrides the cap in seconds (unset,
+# empty, zero or non-numeric: 600).
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -346,6 +351,69 @@ ${plan_lines}
 
 ${SPEND_LINE}"
 fi
+
+# --- Held PRs -----------------------------------------------------------------
+# Un-armed open PRs and every hold reason, one bullet each, capped so the whole DM
+# stays one Discord message (DIGEST_BUDGET bytes; bytes >= characters, so the cap
+# is conservative). Rows that do not fit are counted on a final line.
+DIGEST_BUDGET=1900
+HELD_BIN="${MORNING_DIGEST_PR_TRIAGE:-$REPO_ROOT/bin/pr-triage}"
+HELD_TIMEOUT="${MORNING_DIGEST_HELD_TIMEOUT:-600}"
+case "$HELD_TIMEOUT" in ''|0|*[!0-9]*) HELD_TIMEOUT=600 ;; esac
+
+_bytes() { printf '%s' "$1" | LC_ALL=C wc -c | tr -d ' '; }
+
+HELD_OUT="$(mktemp "${TMPDIR:-/tmp}/morning-digest-held.XXXXXX")"
+HELD_FLAG="${HELD_OUT}.timedout"
+"$HELD_BIN" --held > "$HELD_OUT" 2>/dev/null &
+held_pid=$!
+( exec 0</dev/null 1>/dev/null 2>&1
+  sleep "$HELD_TIMEOUT" && { : > "$HELD_FLAG"
+    pkill -TERM -P "$held_pid" 2>/dev/null; kill -TERM "$held_pid" 2>/dev/null; }
+) &
+held_timer=$!
+held_rc=0
+wait "$held_pid" || held_rc=$?
+pkill -P "$held_timer" 2>/dev/null || true
+kill "$held_timer" 2>/dev/null || true
+wait "$held_timer" 2>/dev/null || true
+
+if [ -e "$HELD_FLAG" ]; then
+  HELD_SECTION="Held PRs: unavailable (timed out after ${HELD_TIMEOUT}s)"
+elif [ "$held_rc" -ne 0 ]; then
+  HELD_SECTION="Held PRs: unavailable (pr-triage exit ${held_rc})"
+else
+  # hp_format_line rows: "#<num>  <url>  <title>  <reasons>", two-space columns.
+  # Header, footer and "hint:" lines never start with "#<digits>  ".
+  held_lines=()
+  while IFS= read -r row; do
+    held_lines+=("$row")
+  done < <(awk -F '  ' '/^#[0-9]+  / {
+      t = $3; for (i = 4; i < NF; i++) t = t "  " $i
+      printf "• %s %s: %s <%s>\n", $1, t, $NF, $2 }' "$HELD_OUT")
+  held_n=${#held_lines[@]}
+  if [ "$held_n" -eq 0 ]; then
+    HELD_SECTION="Held PRs: none"
+  else
+    HELD_SECTION="Held PRs (${held_n})"
+    shown=0
+    for row in "${held_lines[@]}"; do
+      cand="${HELD_SECTION}"$'\n'"${row}"
+      left=$(( held_n - shown - 1 ))
+      tail_line=""
+      [ "$left" -gt 0 ] && tail_line=$'\n'"…and ${left} more (bin/pr-triage --held)"
+      if [ $(( $(_bytes "${BODY}"$'\n\n'"${cand}${tail_line}") )) -gt "$DIGEST_BUDGET" ]; then
+        break
+      fi
+      HELD_SECTION="$cand"
+      shown=$(( shown + 1 ))
+    done
+    hidden=$(( held_n - shown ))
+    [ "$hidden" -gt 0 ] && HELD_SECTION+=$'\n'"…and ${hidden} more (bin/pr-triage --held)"
+  fi
+fi
+rm -f "$HELD_OUT" "$HELD_FLAG"
+BODY+=$'\n\n'"${HELD_SECTION}"
 
 # --- Send or dry-run ----------------------------------------------------------
 

@@ -1,0 +1,140 @@
+{
+  "duration_api_ms": 36330,
+  "stop_reason": "tool_use",
+  "session_id": "c1228f1b-31dd-4b5f-92b1-116433bfbd46",
+  "total_cost_usd": 0.2981852,
+  "usage": {
+    "input_tokens": 12,
+    "cache_creation_input_tokens": 27060,
+    "cache_read_input_tokens": 107406,
+    "output_tokens": 2931,
+    "output_tokens_details": {
+      "thinking_tokens": 869
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 27060,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "not_available",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 1424,
+        "cache_read_input_tokens": 25232,
+        "cache_creation_input_tokens": 1828,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1828
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 1456,
+      "outputTokens": 20,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.001556,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "canonicalModel": "claude-haiku-4-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    },
+    "claude-opus-5-5": {
+      "inputTokens": 12,
+      "outputTokens": 2931,
+      "cacheReadInputTokens": 107406,
+      "cacheCreationInputTokens": 27060,
+      "webSearchRequests": 0,
+      "costUSD": 0.2966292,
+      "contextWindow": 200000,
+      "maxOutputTokens": 128000,
+      "thinkingTokens": 869,
+      "canonicalModel": "claude-opus-5-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "fast_mode_disabled_reason": "sdk_opt_in_required",
+  "subagent_stats": {
+    "spawned": 0,
+    "requested": {
+      "background": 0,
+      "foreground": 0,
+      "unset": 0
+    },
+    "started_in_background": 0,
+    "max_depth": 0,
+    "spawned_by_subagents": 0,
+    "completed": 0,
+    "failed": 0,
+    "killed": {
+      "parent": 0,
+      "user": 0,
+      "system": 0
+    },
+    "refused": {
+      "depth_limit": 0,
+      "concurrency_limit": 0,
+      "budget": 0
+    },
+    "by_type": {}
+  },
+  "is_error": false,
+  "num_turns": 7,
+  "subtype": "success",
+  "api_error_status": null,
+  "result": "{\"items\":[{\"title\":\"Make the plan-gate-edit worktree check deny all main checkout edits\",\"summary\":\"The agent edited the main checkout again and the user had to correct it. Check 2 in ~/.claude/hooks/plan-gate-edit.sh only blocks main checkout edits when the plan flag file exists. Outside a plan the rule in workflow-continuity.md is enforced by nothing, so the repeat slip goes through.\",\"proposed_change\":\"Extend Check 2 of the existing plan-gate-edit.sh. Drop the plan-active flag condition for IBL5 repo files that are outside IBL5-worktrees, and keep the current exemptions for .claude config, plans and memory. Change the deny text to name bin/wt-new <slug> and EnterWorktree. Add a case to the hook's existing test. No new hook.\",\"signatures\":[\"correction:no,_you_edited_the_main_checkout_again;_work_in_the_worktree\"]},{\"title\":\"Make bin/test print only failures and the summary by default\",\"summary\":\"Context was compacted after a long test run output. bin/test passes PHPUnit output through in full, so a big run fills the context with passing-test noise.\",\"proposed_change\":\"Extend the existing bin/test front door. For unit and db runs, keep the full log in a temp file and print only failures, errors and the final summary line, plus the log path. Add a --verbose flag for the full stream. Cover it in the existing bin/test-test. Add one line to phpunit-tests.md saying to use bin/test and not raw vendor/bin/phpunit.\",\"signatures\":[\"compaction:context_compacted_after_a_long_test_run_output\"]},{\"title\":\"Tell the agent to count files at plan time so the sweep gate fires less\",\"summary\":\"The sweep-delegation gate in plan-gate-edit.sh denied a sortable column task at 5 files. The gate worked as designed. The miss is upstream, because the agent did not see the task would touch 5 or more files until it was blocked mid-turn.\",\"proposed_change\":\"Add a short note to the existing work-triage.md rule. Before the first edit, list the files the task will touch. If the count is 5 or more, delegate to the sonnet agent from the start. Also make the gate's deny message say how many files were already edited and which ones, so the handoff is easy. No change to the limit and no new gate.\",\"signatures\":[\"hook_deny:blocked_(plan-gate-edit):_N_distinct_files_edited_in_one_tur\"]}]}",
+  "structured_output": {
+    "items": [
+      {
+        "title": "Make the plan-gate-edit worktree check deny all main checkout edits",
+        "summary": "The agent edited the main checkout again and the user had to correct it. Check 2 in ~/.claude/hooks/plan-gate-edit.sh only blocks main checkout edits when the plan flag file exists. Outside a plan the rule in workflow-continuity.md is enforced by nothing, so the repeat slip goes through.",
+        "proposed_change": "Extend Check 2 of the existing plan-gate-edit.sh. Drop the plan-active flag condition for IBL5 repo files that are outside IBL5-worktrees, and keep the current exemptions for .claude config, plans and memory. Change the deny text to name bin/wt-new <slug> and EnterWorktree. Add a case to the hook's existing test. No new hook.",
+        "signatures": [
+          "correction:no,_you_edited_the_main_checkout_again;_work_in_the_worktree"
+        ]
+      },
+      {
+        "title": "Make bin/test print only failures and the summary by default",
+        "summary": "Context was compacted after a long test run output. bin/test passes PHPUnit output through in full, so a big run fills the context with passing-test noise.",
+        "proposed_change": "Extend the existing bin/test front door. For unit and db runs, keep the full log in a temp file and print only failures, errors and the final summary line, plus the log path. Add a --verbose flag for the full stream. Cover it in the existing bin/test-test. Add one line to phpunit-tests.md saying to use bin/test and not raw vendor/bin/phpunit.",
+        "signatures": [
+          "compaction:context_compacted_after_a_long_test_run_output"
+        ]
+      },
+      {
+        "title": "Tell the agent to count files at plan time so the sweep gate fires less",
+        "summary": "The sweep-delegation gate in plan-gate-edit.sh denied a sortable column task at 5 files. The gate worked as designed. The miss is upstream, because the agent did not see the task would touch 5 or more files until it was blocked mid-turn.",
+        "proposed_change": "Add a short note to the existing work-triage.md rule. Before the first edit, list the files the task will touch. If the count is 5 or more, delegate to the sonnet agent from the start. Also make the gate's deny message say how many files were already edited and which ones, so the handoff is easy. No change to the limit and no new gate.",
+        "signatures": [
+          "hook_deny:blocked_(plan-gate-edit):_N_distinct_files_edited_in_one_tur"
+        ]
+      }
+    ]
+  },
+  "ttft_ms": 4745,
+  "type": "result",
+  "duration_ms": 38778,
+  "uuid": "4a568e7e-9977-4a56-bc72-5aa449e52a96",
+  "ttft_stream_ms": 1908,
+  "time_to_request_ms": 404,
+  "first_content_frame_ms": 1909,
+  "queued_turn_count": 0,
+  "result_index": 0
+}

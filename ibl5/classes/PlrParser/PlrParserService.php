@@ -290,6 +290,29 @@ class PlrParserService implements PlrParserServiceInterface
         string $sourceArchive,
     ): array {
         return [
+            ...$this->buildSnapshotIdentityFields($derived, $endingYear, $snapshotPhase, $sourceArchive),
+            ...$this->buildSnapshotPhysicalAndRatingFields($derived),
+            ...$this->buildSnapshotContractAndDepthFields($derived),
+            ...$this->buildSnapshotSeasonStatFields($derived),
+            ...$this->buildSnapshotCareerStatFields($derived),
+            ...$this->buildSnapshotHighFields($derived),
+            ...$this->buildSnapshotRealLifeFields($derived),
+            ...$this->buildSnapshotPreferenceDraftAndDerivedFields($derived),
+            ...$this->buildSnapshotUnknownGapFields($derived),
+        ];
+    }
+
+    /**
+     * @param array<string, int|string|float> $derived
+     * @return array<string, int|string>
+     */
+    private function buildSnapshotIdentityFields(
+        array $derived,
+        int $endingYear,
+        string $snapshotPhase,
+        string $sourceArchive,
+    ): array {
+        return [
             // Identity & metadata
             'pid' => (int) $derived['pid'],
             'name' => (string) $derived['name'],
@@ -297,6 +320,16 @@ class PlrParserService implements PlrParserServiceInterface
             'snapshot_phase' => $snapshotPhase,
             'source_archive' => $sourceArchive,
             'ordinal' => (int) $derived['ordinal'],
+        ];
+    }
+
+    /**
+     * @param array<string, int|string|float> $derived
+     * @return array<string, int|string>
+     */
+    private function buildSnapshotPhysicalAndRatingFields(array $derived): array
+    {
+        return [
             // Physical & position
             'teamid' => (int) $derived['teamid'],
             'age' => (int) $derived['age'],
@@ -334,6 +367,16 @@ class PlrParserService implements PlrParserServiceInterface
             'intangibles' => (int) $derived['intangibles'],
             'clutch' => (int) $derived['clutch'],
             'consistency' => (int) $derived['consistency'],
+        ];
+    }
+
+    /**
+     * @param array<string, int|string|float> $derived
+     * @return array<string, int|string>
+     */
+    private function buildSnapshotContractAndDepthFields(array $derived): array
+    {
+        return [
             // Contract
             'exp' => (int) $derived['exp'],
             'bird' => (int) $derived['bird'],
@@ -351,6 +394,16 @@ class PlrParserService implements PlrParserServiceInterface
             'sf_depth' => (int) $derived['SFDepth'],
             'pf_depth' => (int) $derived['PFDepth'],
             'c_depth' => (int) $derived['CDepth'],
+        ];
+    }
+
+    /**
+     * @param array<string, int|string|float> $derived
+     * @return array<string, int|string>
+     */
+    private function buildSnapshotSeasonStatFields(array $derived): array
+    {
+        return [
             // Season stats (regular season)
             'stats_gs' => (int) $derived['seasonGamesStarted'],
             'stats_gm' => (int) $derived['seasonGamesPlayed'],
@@ -386,6 +439,16 @@ class PlrParserService implements PlrParserServiceInterface
             'po_stats_tvr' => (int) $derived['playoffSeasonTVR'],
             'po_stats_blk' => (int) $derived['playoffSeasonBLK'],
             'po_stats_pf' => (int) $derived['playoffSeasonPF'],
+        ];
+    }
+
+    /**
+     * @param array<string, int|string|float> $derived
+     * @return array<string, int|string>
+     */
+    private function buildSnapshotCareerStatFields(array $derived): array
+    {
+        return [
             // Career stats
             'car_gm' => (int) $derived['careerGP'],
             'car_min' => (int) $derived['careerMIN'],
@@ -404,6 +467,16 @@ class PlrParserService implements PlrParserServiceInterface
             'car_blk' => (int) $derived['careerBLK'],
             'car_pf' => (int) $derived['careerPF'],
             'car_pts' => (int) $derived['careerPTS'],
+        ];
+    }
+
+    /**
+     * @param array<string, int|string|float> $derived
+     * @return array<string, int|string>
+     */
+    private function buildSnapshotHighFields(array $derived): array
+    {
+        return [
             // Season highs
             'sh_pts' => (int) $derived['seasonHighPTS'],
             'sh_reb' => (int) $derived['seasonHighREB'],
@@ -432,6 +505,16 @@ class PlrParserService implements PlrParserServiceInterface
             'cp_ast' => (int) $derived['careerPlayoffHighAST'],
             'cp_stl' => (int) $derived['careerPlayoffHighSTL'],
             'cp_blk' => (int) $derived['careerPlayoffHighBLK'],
+        ];
+    }
+
+    /**
+     * @param array<string, int|string|float> $derived
+     * @return array<string, int|string>
+     */
+    private function buildSnapshotRealLifeFields(array $derived): array
+    {
+        return [
             // Real-life stats
             'rl_gp' => (int) $derived['realLifeGP'],
             'rl_min' => (int) $derived['realLifeMIN'],
@@ -448,6 +531,16 @@ class PlrParserService implements PlrParserServiceInterface
             'rl_tvr' => (int) $derived['realLifeTVR'],
             'rl_blk' => (int) $derived['realLifeBLK'],
             'rl_pf' => (int) $derived['realLifePF'],
+        ];
+    }
+
+    /**
+     * @param array<string, int|string|float> $derived
+     * @return array<string, int|string>
+     */
+    private function buildSnapshotPreferenceDraftAndDerivedFields(array $derived): array
+    {
+        return [
             // Preference weights
             'coach' => (int) $derived['coach'],
             'loyalty' => (int) $derived['loyalty'],
@@ -465,6 +558,16 @@ class PlrParserService implements PlrParserServiceInterface
             // Derived
             'draftyear' => (int) $derived['draftYear'],
             'salary' => (int) $derived['currentSeasonSalary'],
+        ];
+    }
+
+    /**
+     * @param array<string, int|string|float> $derived
+     * @return array<string, int|string>
+     */
+    private function buildSnapshotUnknownGapFields(array $derived): array
+    {
+        return [
             // Unknown gaps (raw capture for future decoding)
             'unk_112' => (int) $derived['unk_112'],
             'unk_114' => (int) $derived['unk_114'],

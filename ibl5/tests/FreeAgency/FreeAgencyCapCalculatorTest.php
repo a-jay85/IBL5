@@ -421,7 +421,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $players = [
             TestDataFactory::createPlayer([
                 'name' => 'Boundary Player',
-                'ordinal' => \JSB::WAIVERS_ORDINAL,
+                'ordinal' => \League\JsbConstants::WAIVERS_ORDINAL,
                 'cy' => 0,
                 'salary_yr1' => 500,
                 'salary_yr2' => 0,

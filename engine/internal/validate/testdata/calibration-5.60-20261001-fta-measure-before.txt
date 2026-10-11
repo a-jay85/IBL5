@@ -1,0 +1,5 @@
+    measure_baseline_archive_test.go:84: MEASURE fta_per_g engine=15.81 sco=21.32
+    measure_baseline_archive_test.go:89: MEASURE home_margin gt=2 engine=5.120 sco=3.319 gap=+1.802
+    measure_baseline_archive_test.go:89: MEASURE home_margin gt=4 engine=6.056 sco=3.082 gap=+2.974
+    measure_baseline_archive_test.go:132: MEASURE home_away_fta_split home=16.13 away=15.46 ratio=1.044 n=1233
+    measure_baseline_archive_test.go:136: MEASURE home_away_fta_split_SCO home=22.64 away=19.86 ratio=1.140 n=1233

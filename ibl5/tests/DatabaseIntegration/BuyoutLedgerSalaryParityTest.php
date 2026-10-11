@@ -200,7 +200,7 @@ class BuyoutLedgerSalaryParityTest extends DatabaseTestCase
             WHERE t.teamid BETWEEN 1 AND 28
         ");
 
-        self::assertNotEmpty($rows, 'Expected team salary data');
+        self::assertNotSame([], $rows, 'Expected team salary data');
 
         foreach ($rows as $row) {
             $teamid = $row['teamid'];

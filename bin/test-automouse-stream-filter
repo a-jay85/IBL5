@@ -24,12 +24,12 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FILTER="$SCRIPT_DIR/lib/automouse-stream-filter.sh"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
-
-FAILED=0
+h_tmp TMP
 
 # run_filter <ndjson-on-stdin> → captured filter stdout
 # A `result` event always terminates the filter, so every fixture ends with one.
@@ -44,15 +44,19 @@ run_filter_phase() {
     printf '%s' "$2" | "$FILTER" "$hb" "" "test-plan" "$1" 2>/dev/null
 }
 
+# run_filter_failsig <failsig_file> <ndjson> → captured filter stdout (5-arg form)
+run_filter_failsig() {
+    printf '%s' "$2" | "$FILTER" "$TMP/hb" "" "test-plan" "impl" "$1" 2>/dev/null
+}
+
 # assert_contains <name> <output> <needle>
 assert_contains() {
     local name="$1" out="$2" needle="$3"
     if printf '%s' "$out" | grep -qF -- "$needle"; then
-        echo "ok: $name"
+        h_pass "$name"
     else
-        echo "FAIL: $name — expected output to contain '$needle'"
+        h_fail "$name" "expected output to contain '$needle'"
         echo "  --- got ---"; printf '%s\n' "$out" | sed 's/^/  /'
-        FAILED=1
     fi
 }
 
@@ -60,11 +64,10 @@ assert_contains() {
 assert_not_contains() {
     local name="$1" out="$2" needle="$3"
     if printf '%s' "$out" | grep -qF -- "$needle"; then
-        echo "FAIL: $name — output unexpectedly contained '$needle'"
+        h_fail "$name" "output unexpectedly contained '$needle'"
         echo "  --- got ---"; printf '%s\n' "$out" | sed 's/^/  /'
-        FAILED=1
     else
-        echo "ok: $name"
+        h_pass "$name"
     fi
 }
 
@@ -166,9 +169,68 @@ OUT=$(run_filter '{"type":"assistant","message":{"content":[{"type":"text","text
 ')
 assert_contains "no-usage event degrades to zero" "$OUT" "peak_ctx=0"
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+# --- failure-signature capture (ADR-0160): optional 5th arg, side file only
+nd() { printf '%s\n' "$@"; }   # join args as ndjson lines
+USE1='{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"Bash","input":{"command":"vendor/bin/phpunit --filter Foo\nsecond line"}}]}}'
+USE2='{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu2","name":"Bash","input":{"command":"bin/other"}}]}}'
+ERR1='{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu1","is_error":true,"content":"Exit code 1\nAPI Error: 401 FAILURES! Tests: 3"}]}}'
+ERR1_ARR='{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu1","is_error":true,"content":[{"type":"text","text":"fatal: bad object"}]}]}}'
+ERR1_FIRST='{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu1","is_error":true,"content":"first-err"}]}}'
+ERR2_SECOND='{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu2","is_error":true,"content":"second-err"}]}}'
+OKRES='{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tuX","is_error":false,"content":"fine"}]}}'
+FS="$TMP/failsig"
+
+# f1 — the error result is recorded: tool, FIRST command line only, error text
+rm -f "$FS"
+run_filter_failsig "$FS" "$(nd "$USE1" "$ERR1" "$RESULT_LINE")" >/dev/null
+REC=$(cat "$FS" 2>/dev/null || true)
+assert_contains "f1-error-result-recorded (tool)" "$REC" "tool: Bash"
+assert_contains "f1-error-result-recorded (command)" "$REC" "command: vendor/bin/phpunit --filter Foo"
+assert_contains "f1-error-result-recorded (error)" "$REC" "FAILURES! Tests: 3"
+assert_not_contains "f1-error-result-recorded (first line only)" "$REC" "second line"
+
+# f2 — error text never reaches stdout (the env-error scan reads the log)
+OUT=$(run_filter_failsig "$FS" "$(nd "$USE1" "$ERR1" "$RESULT_LINE")")
+assert_not_contains "f2-error-text-never-on-stdout (API Error)" "$OUT" "API Error: 401"
+assert_not_contains "f2-error-text-never-on-stdout (FAILURES)" "$OUT" "FAILURES!"
+
+# f3 — text-block-array content is recorded
+rm -f "$FS"
+run_filter_failsig "$FS" "$(nd "$USE1" "$ERR1_ARR" "$RESULT_LINE")" >/dev/null
+assert_contains "f3-array-content-recorded" "$(cat "$FS" 2>/dev/null || true)" "fatal: bad object"
+
+# f4 — the last error wins
+rm -f "$FS"
+run_filter_failsig "$FS" "$(nd "$USE1" "$ERR1_FIRST" "$USE2" "$ERR2_SECOND" "$RESULT_LINE")" >/dev/null
+REC=$(cat "$FS" 2>/dev/null || true)
+assert_contains "f4-last-error-wins (second kept)" "$REC" "second-err"
+assert_not_contains "f4-last-error-wins (first gone)" "$REC" "first-err"
+
+# f5 — an error followed by 6 non-error results was recovered from: dropped
+rm -f "$FS"
+run_filter_failsig "$FS" "$(nd "$USE1" "$ERR1" "$OKRES" "$OKRES" "$OKRES" "$OKRES" "$OKRES" "$OKRES" "$RESULT_LINE")" >/dev/null
+if [ ! -e "$FS" ]; then h_pass "f5-recovered-error-dropped"; else h_fail "f5-recovered-error-dropped" "file still present"; fi
+
+# f5b — boundary: exactly 5 later results keeps the error
+rm -f "$FS"
+run_filter_failsig "$FS" "$(nd "$USE1" "$ERR1" "$OKRES" "$OKRES" "$OKRES" "$OKRES" "$OKRES" "$RESULT_LINE")" >/dev/null
+if [ -e "$FS" ]; then h_pass "f5b-five-later-results-kept"; else h_fail "f5b-five-later-results-kept" "file missing"; fi
+
+# f6 — 4-arg and 5-arg stdout are identical once the timestamp prefix is stripped
+FIX6=$(nd "$USE1" "$ERR1" "$RESULT_LINE")
+OUT5=$(run_filter_failsig "$FS" "$FIX6" | sed 's/^\[[0-9:]*\]//')
+# the 5-arg call is tagged phase=impl; compare against a 4-arg call tagged the same way
+OUT4=$(run_filter_phase impl "$FIX6" | sed 's/^\[[0-9:]*\]//')
+if [ "$OUT4" = "$OUT5" ]; then h_pass "f6-four-arg-stdout-unchanged"; else h_fail "f6-four-arg-stdout-unchanged"; echo "  4: $OUT4"; echo "  5: $OUT5"; fi
+
+# f7 — a stale side file is removed at startup
+printf 'stale' > "$FS"
+run_filter_failsig "$FS" "$(nd "$RESULT_LINE")" >/dev/null
+if [ ! -e "$FS" ]; then h_pass "f7-stale-file-removed-at-start"; else h_fail "f7-stale-file-removed-at-start" "stale file survived"; fi
+
+# f8 — a non-error result (is_error:false) writes nothing
+rm -f "$FS"
+run_filter_failsig "$FS" "$(nd "$USE1" "$OKRES" "$RESULT_LINE")" >/dev/null
+if [ ! -e "$FS" ]; then h_pass "f8-non-error-result-ignored"; else h_fail "f8-non-error-result-ignored" "file written"; fi
+
+h_done

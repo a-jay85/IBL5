@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace League;
 
-use BaseMysqliRepository;
-use JSB;
+use Database\BaseMysqliRepository;
+use Repositories\PlayerTeamJoinQuery;
 use Season\Season;
 
 /**
@@ -19,6 +19,8 @@ use Season\Season;
  */
 class League extends BaseMysqliRepository
 {
+    use PlayerTeamJoinQuery;
+
     const CONFERENCE_NAMES = array('Eastern', 'Western');
     const DIVISION_NAMES = array('Atlantic', 'Central', 'Midwest', 'Pacific');
 
@@ -83,9 +85,9 @@ class League extends BaseMysqliRepository
      */
     public function getSimLengthInDays(): int
     {
-        /** @var array{value: string}|null $result */
+        /** @var array{setting_value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Sim Length in Days",
             $this->league
@@ -95,7 +97,7 @@ class League extends BaseMysqliRepository
             return 0;
         }
 
-        return (int) $result['value'];
+        return (int) $result['setting_value'];
     }
 
     /**
@@ -122,12 +124,12 @@ class League extends BaseMysqliRepository
         // constants) are class constants, never user input — concatenate, not interpolate.
         $query = "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
         FROM `ibl_plr` p
-        JOIN `ibl_team_info` t ON p.teamid = t.teamid
+        " . $this->playerTeamInnerJoin() . "
         WHERE p.pos IN (" . $positions . ")
           AND p.teamid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
           AND p.retired = 0
           AND p.stats_gm > '14'
-        ORDER BY p.name";
+        ORDER BY p.name, p.pid ASC";
 
         /** @var list<PlayerRow> */
         return $this->fetchAll($query);
@@ -146,7 +148,7 @@ class League extends BaseMysqliRepository
             FROM `ibl_plr`
             WHERE injured > 0
               AND retired = 0
-            ORDER BY ordinal ASC"
+            ORDER BY ordinal ASC, pid ASC"
         );
     }
 
@@ -172,7 +174,7 @@ class League extends BaseMysqliRepository
                   WHEN 6 THEN salary_yr6
                   ELSE 0
               END = 0
-            ORDER BY name ASC"
+            ORDER BY name ASC, pid ASC"
         );
     }
 
@@ -190,9 +192,9 @@ class League extends BaseMysqliRepository
             WHERE ordinal > ?
               AND retired = 0
               AND name != '(no starter)'
-            ORDER BY name ASC",
+            ORDER BY name ASC, pid ASC",
             "i",
-            JSB::WAIVERS_ORDINAL
+            JsbConstants::WAIVERS_ORDINAL
         );
     }
 
@@ -207,11 +209,11 @@ class League extends BaseMysqliRepository
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
-            JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            " . $this->playerTeamInnerJoin() . "
             WHERE p.retired = 0
               AND p.stats_gm >= '41'
               AND p.stats_min / p.stats_gm >= '30'
-            ORDER BY p.name"
+            ORDER BY p.name, p.pid ASC"
         );
     }
 
@@ -226,12 +228,12 @@ class League extends BaseMysqliRepository
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
-            JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            " . $this->playerTeamInnerJoin() . "
             WHERE p.retired = 0
               AND p.stats_min / p.stats_gm >= 15
               AND p.stats_gs / p.stats_gm <= '.5'
               AND p.stats_gm >= '41'
-            ORDER BY p.name"
+            ORDER BY p.name, p.pid ASC"
         );
     }
 
@@ -246,11 +248,11 @@ class League extends BaseMysqliRepository
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
-            JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            " . $this->playerTeamInnerJoin() . "
             WHERE p.retired = 0
               AND p.exp = '1'
               AND p.stats_gm >= '41'
-            ORDER BY p.name"
+            ORDER BY p.name, p.pid ASC"
         );
     }
 
@@ -265,7 +267,7 @@ class League extends BaseMysqliRepository
             "SELECT owner_name, team_city, team_name
             FROM `ibl_team_info`
             WHERE teamid BETWEEN 1 AND ?
-            ORDER BY owner_name",
+            ORDER BY owner_name, teamid ASC",
             "i",
             self::MAX_REAL_TEAMID
         );

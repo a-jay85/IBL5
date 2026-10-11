@@ -71,7 +71,7 @@ final class AdminBoundaryTest extends TestCase
     {
         $root = self::ibl5Root();
         $phpFiles = $this->collectProductionPhpFiles($root);
-        self::assertNotEmpty($phpFiles, 'Production PHP file scan matched nothing — skip-list likely broke.');
+        self::assertNotSame([], $phpFiles, 'Production PHP file scan matched nothing — skip-list likely broke.');
 
         $constructionSites = [];
         foreach ($phpFiles as $file) {
@@ -93,7 +93,7 @@ final class AdminBoundaryTest extends TestCase
     {
         $globResult = glob(self::ibl5Root() . '/classes/FreeAgency/*.php');
         $topLevelFreeAgencyFiles = $globResult !== false ? $globResult : [];
-        self::assertNotEmpty($topLevelFreeAgencyFiles, 'Top-level FreeAgency class glob matched nothing.');
+        self::assertNotSame([], $topLevelFreeAgencyFiles, 'Top-level FreeAgency class glob matched nothing.');
 
         foreach ($topLevelFreeAgencyFiles as $file) {
             $contents = (string) file_get_contents($file);

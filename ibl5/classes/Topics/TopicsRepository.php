@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Topics;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use Topics\Contracts\TopicsRepositoryInterface;
 
 /**

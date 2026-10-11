@@ -31,7 +31,7 @@ class ComparePlayersRepositoryTest extends DatabaseTestCase
 
         $names = $this->repo->getAllPlayerNames();
 
-        self::assertNotEmpty($names);
+        self::assertNotSame([], $names);
         self::assertContains('Compare Plyr 1', $names);
     }
 

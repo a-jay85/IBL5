@@ -11,7 +11,7 @@ namespace Api\Repository;
  * HealthController remains agnostic of the raw mysqli connection and the
  * ibl.directMysqliQuery PHPStan rule is satisfied.
  */
-class HealthRepository extends \BaseMysqliRepository
+class HealthRepository extends \Database\BaseMysqliRepository
 {
     /**
      * Return true when the database answers a lightweight SELECT 1 probe.

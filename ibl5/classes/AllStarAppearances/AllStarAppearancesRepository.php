@@ -12,9 +12,9 @@ use AllStarAppearances\Contracts\AllStarAppearancesRepositoryInterface;
  * Retrieves all-star appearance counts from the ibl_awards table.
  *
  * @see AllStarAppearancesRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class AllStarAppearancesRepository extends \BaseMysqliRepository implements AllStarAppearancesRepositoryInterface
+class AllStarAppearancesRepository extends \Database\BaseMysqliRepository implements AllStarAppearancesRepositoryInterface
 {
     /**
      * @see AllStarAppearancesRepositoryInterface::getAllStarAppearances()

@@ -27,6 +27,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/db-helpers.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
+source "$REPO_ROOT/bin/lib/gh-pr.sh"
+source "$REPO_ROOT/bin/lib/wt-compose.sh"
 # wt-up manages worktrees FROM the main checkout; every $REPO_ROOT reference below
 # (config.php source, node_modules, --env-file, compose file) must point at main.
 # If invoked from inside a worktree, $0/.. resolves to the worktree — pin it back
@@ -114,18 +116,19 @@ fi
 
 # Determine URL slug
 # Sanitize slug: Docker project names can't contain slashes
-SLUG="${WORKTREE_NAME//\//-}"
+SLUG="$(wt_slug "$WORKTREE_NAME")"
 if [ "$USE_PR" = true ]; then
     if ! command -v gh &> /dev/null; then
         echo "Error: gh CLI required for --pr flag" >&2
         exit 1
     fi
-    PR_NUMBER=$(cd "$WORKTREE_PATH" && gh pr view --json number -q .number 2>/dev/null || true)
+    pr_info "" "$WORKTREE_PATH" || true
+    PR_NUMBER="$PR_NUM"
     if [ -z "$PR_NUMBER" ]; then
         echo "Error: No PR found for branch in worktree '$WORKTREE_NAME'" >&2
         exit 1
     fi
-    SLUG="pr-$PR_NUMBER"
+    SLUG="$(wt_slug "$WORKTREE_NAME" "$PR_NUMBER")"
 fi
 
 # Ensure external network exists
@@ -199,7 +202,7 @@ fi
 
 # Use the static compose file with Docker Compose variable interpolation.
 # No sed templating — ${SLUG}, ${WORKTREE_PATH}, ${REPO_ROOT} are exported as env vars.
-COMPOSE_FILE="$REPO_ROOT/docker/worktree-compose.yml"
+COMPOSE_FILE="$(wt_compose_file)"
 
 if [ ! -f "$COMPOSE_FILE" ]; then
     echo "Error: Compose file not found at $COMPOSE_FILE" >&2
@@ -210,26 +213,19 @@ fi
 echo "$SLUG" > "$WORKTREE_PATH/.wt-slug"
 
 # Export vars so Docker Compose interpolates them in the static compose file
-export SLUG WORKTREE_PATH REPO_ROOT
+wt_compose_export "$SLUG" "$WORKTREE_PATH"
 
 echo "Starting environment for '$WORKTREE_NAME' (slug: $SLUG)..."
-# --env-file points to the repo root's .env so ${DB_USER}/${DB_PASS} resolve correctly.
-# Without this, docker compose looks for .env relative to the compose file (the worktree dir),
-# which doesn't have one — causing MariaDB to skip creating the app DB user.
-ENV_FILE_FLAG=""
-if [ -f "$REPO_ROOT/.env" ]; then
-    ENV_FILE_FLAG="--env-file $REPO_ROOT/.env"
-fi
 
 # Always tear down existing containers and purge the DB volume so each wt-up
 # starts with a clean database. docker volume rm silently fails if a container
 # (even a stopped one) still references the volume, so we must compose down first.
 echo "Removing existing environment..."
-docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" down 2>/dev/null || true
+wt_compose "ibl5-$SLUG" down 2>/dev/null || true
 echo "Purging DB volume..."
 docker volume rm "ibl5-${SLUG}_db-data" 2>/dev/null || true
 
-docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" up -d --build
+wt_compose "ibl5-$SLUG" up -d --build
 
 # Wait for MariaDB to be healthy
 echo "Waiting for MariaDB (db-$SLUG) to be ready..."
@@ -246,7 +242,7 @@ done
 echo "MariaDB is ready."
 
 DB_CONTAINER="ibl5-db-$SLUG"
-DB_CMD="mariadb -u root -proot iblhoops_ibl5"
+DB_CMD="mariadb -u $DB_ROOT_USER -p$DB_ROOT_PASS $DB_DEFAULT_NAME"
 
 # For --seed/--no-data, run migrations first so the schema exists before any
 # data import. For --prod/--snapshot, db-sync-prod ships its own schema + a backfill +

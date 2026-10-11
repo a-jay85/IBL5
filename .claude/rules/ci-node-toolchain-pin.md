@@ -1,6 +1,6 @@
 ---
 description: Any CI step that compiles or bundles TypeScript/JS must be preceded by an explicit actions/setup-node pin; relying on the runner image's default Node is an unpinned dependency that no lockfile covers.
-last_verified: 2026-09-04
+last_verified: 2026-10-08
 paths: ".github/workflows/*.yml"
 ---
 
@@ -44,8 +44,8 @@ or `node-version: latest` — these are unpinned aliases that follow external re
 
 ## Version source of truth
 
-The current canonical pin is `node-version: '22'`, matching the de facto CI version in
-`.github/workflows/tests.yml` and `.github/workflows/npm-audit-fix.yml`. A future
-`.nvmrc` committed to the IBLbot source tree could serve as the single source of truth
-(via `node-version-file: ibl5/IBLbot/.nvmrc`); until that file exists, use the literal
-`'22'`.
+The canonical pin is `node-version: '22'`, used in `.github/workflows/tests.yml` and
+`.github/workflows/main.yml`. `.github/workflows/npm-audit-fix.yml` pins `'24'` on purpose
+([#2870](https://github.com/a-jay85/IBL5/pull/2870)). A future `.nvmrc` in the IBLbot
+source tree could become the single source of truth (via
+`node-version-file: ibl5/IBLbot/.nvmrc`). Until then, use the literal `'22'`.

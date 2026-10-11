@@ -12,7 +12,7 @@
 
 /* Search Form */
 .search-form {
-    background: white;
+    background: var(--white);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--gray-200);
@@ -39,7 +39,7 @@
     font-family: var(--font-sans);
     font-size: 1rem;
     color: var(--navy-800);
-    background: white;
+    background: var(--white);
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
     padding: var(--space-1) var(--space-2);
@@ -65,7 +65,7 @@
 .search-form__types-label {
     font-family: var(--font-display);
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-600);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -92,7 +92,7 @@
 }
 
 .search-form__type-label {
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 /* Search error */
@@ -109,7 +109,7 @@
 .search-results__heading {
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
     color: var(--navy-800);
@@ -126,7 +126,7 @@
 
 /* Individual Search Result */
 .search-result {
-    background: white;
+    background: var(--white);
     border-radius: var(--radius-lg);
     border: 1px solid var(--gray-200);
     padding: var(--space-4);
@@ -166,7 +166,7 @@
 .search-result__title {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--navy-800);
     text-decoration: none;
     transition: color var(--transition-fast);
@@ -231,7 +231,7 @@
 .search-pagination__link {
     font-family: var(--font-display);
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
     color: var(--accent-500);

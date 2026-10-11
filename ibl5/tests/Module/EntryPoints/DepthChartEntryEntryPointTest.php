@@ -31,7 +31,7 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpTabApiReturnsHtml(): void
@@ -41,7 +41,7 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('DepthChartEntry', ['teamid' => '1', 'display' => 'ratings', 'op' => 'tab-api'], [], []);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpNextsimApiReturnsHtml(): void
@@ -54,7 +54,7 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpApiWithoutAuthReturnsUnauthorizedJson(): void
@@ -78,6 +78,6 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

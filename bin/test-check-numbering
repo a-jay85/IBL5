@@ -2,7 +2,8 @@
 # shellcheck shell=bash
 #
 # test-check-numbering — behavioural harness for bin/check-numbering, the widened
-# allocators (bin/next-adr, bin/next-migration) and the merge=union attribute on
+# allocators (bin/next-number behind bin/next-adr and bin/next-migration, sharing
+# bin/lib/numbering.sh with the gate) and the merge=union attribute on
 # the ADR index and the backlog files.
 #
 # Each case builds a throwaway git repo under a temp dir, seeds a fixture, runs
@@ -13,42 +14,48 @@
 # Run: bin/test-check-numbering  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BASE_TMP="$(mktemp -d)"
-trap 'rm -rf "$BASE_TMP"' EXIT
+h_tmp BASE_TMP
 
-FAILED=0
 REPO=""
 REPO_WT=""
 OUT="$BASE_TMP/out"
 
 expect() { # name want got
     if [ "$3" -eq "$2" ]; then
-        echo "ok: $1 (exit $3)"
+        h_pass "$1 (exit $3)"
     else
-        echo "FAIL: $1 — expected exit $2, got $3"
+        h_fail "$1" "expected exit $2, got $3"
         sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
-        FAILED=1
     fi
 }
 
 expect_out() { # name pattern
     if grep -qE "$2" "$OUT"; then
-        echo "ok: $1"
+        h_pass "$1"
     else
-        echo "FAIL: $1 — output did not match /$2/"
+        h_fail "$1" "output did not match /$2/"
         sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
-        FAILED=1
     fi
 }
 
 expect_eq() { # name want got
     if [ "$3" = "$2" ]; then
-        echo "ok: $1 ($3)"
+        h_pass "$1 ($3)"
     else
-        echo "FAIL: $1 — expected '$2', got '$3'"
-        FAILED=1
+        h_fail "$1" "expected '$2', got '$3'"
+    fi
+}
+
+expect_line() { # name exact-line  (whole-line, fixed-string match against $OUT)
+    if grep -qxF -- "$2" "$OUT"; then
+        h_pass "$1"
+    else
+        h_fail "$1" "no line equal to: $2"
+        sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
     fi
 }
 
@@ -60,11 +67,10 @@ new_repo() {
     cp "$SCRIPT_DIR/next-adr"           "$REPO/bin/next-adr"
     cp "$SCRIPT_DIR/next-migration"     "$REPO/bin/next-migration"
     cp "$SCRIPT_DIR/lib/git-helpers.sh" "$REPO/bin/lib/git-helpers.sh"
-    chmod +x "$REPO/bin/check-numbering" "$REPO/bin/next-adr" "$REPO/bin/next-migration"
-    git -C "$REPO" init -q
-    git -C "$REPO" config user.email test@example.com
-    git -C "$REPO" config user.name "test"
-    git -C "$REPO" config commit.gpgsign false
+    cp "$SCRIPT_DIR/next-number"        "$REPO/bin/next-number"
+    cp "$SCRIPT_DIR/lib/numbering.sh"   "$REPO/bin/lib/numbering.sh"
+    chmod +x "$REPO/bin/check-numbering" "$REPO/bin/next-adr" "$REPO/bin/next-migration" "$REPO/bin/next-number"
+    h_git_repo "$REPO" --no-commit
     # The 'apply' rebase backend is patch-based and ignores merge drivers
     # entirely; the union-merge cases need the merge backend regardless of the
     # invoking user's global config.
@@ -120,7 +126,9 @@ probe_worktree() {
     cp "$SCRIPT_DIR/next-adr"           "$REPO_WT/bin/next-adr"
     cp "$SCRIPT_DIR/next-migration"     "$REPO_WT/bin/next-migration"
     cp "$SCRIPT_DIR/lib/git-helpers.sh" "$REPO_WT/bin/lib/git-helpers.sh"
-    chmod +x "$REPO_WT/bin/next-adr" "$REPO_WT/bin/next-migration"
+    cp "$SCRIPT_DIR/next-number"        "$REPO_WT/bin/next-number"
+    cp "$SCRIPT_DIR/lib/numbering.sh"   "$REPO_WT/bin/lib/numbering.sh"
+    chmod +x "$REPO_WT/bin/next-adr" "$REPO_WT/bin/next-migration" "$REPO_WT/bin/next-number"
 }
 
 echo "== bin/check-numbering =="
@@ -242,10 +250,9 @@ gadd ibl5/docs/decisions/README.md; gcommit append-b
 RC=$?
 ( cd "$REPO" && git rebase --abort >/dev/null 2>&1 ) || true
 if [ "$RC" -ne 0 ]; then
-    echo "ok: no-gitattributes-control conflicts (exit $RC)"
+    h_pass "no-gitattributes-control conflicts (exit $RC)"
 else
-    echo "FAIL: no-gitattributes-control — expected a rebase conflict, got exit 0"
-    FAILED=1
+    h_fail "no-gitattributes-control" "expected a rebase conflict, got exit 0"
 fi
 
 # 12. Union merge can duplicate a row when one side edits instead of appending;
@@ -309,6 +316,211 @@ seed_wt ibl5/migrations/037c_x.sql ibl5/migrations/20260818_120000_y.sql
 NEXT_MIG="$( ( cd "$REPO_WT" && ./bin/next-migration ) 2>"$OUT" )"
 expect_eq "next-migration skips timestamp names, honours letter suffix" "038" "${NEXT_MIG:-none}"
 
+echo "== allocator and gate characterization =="
+
+ADR_DIR_REL="ibl5/docs/decisions"
+MIG_DIR_REL="ibl5/migrations"
+
+# C1. ADR gap fixture: the next number is max + 1, not the first gap.
+new_repo
+seed "$ADR_DIR_REL/0000-template.md" "$ADR_DIR_REL/0001-a.md" "$ADR_DIR_REL/0003-b.md" "$ADR_DIR_REL/0007-c.md"
+gadd "$ADR_DIR_REL"; gcommit gap-adrs
+probe_worktree
+ALLOC="$( ( cd "$REPO_WT" && ./bin/next-adr gap-slug ) 2>"$OUT" )"; RC=$?
+expect "next-adr gap fixture" 0 "$RC"
+expect_eq "next-adr prints one line" 1 "$(printf '%s\n' "$ALLOC" | wc -l | tr -d ' ')"
+expect_eq "next-adr gap fixture name" "0008-gap-slug.md" "$(basename "${ALLOC:-none}")"
+if [ -f "$ALLOC" ]; then
+    h_pass "next-adr created the file"
+    rm -f "$ALLOC"
+else
+    h_fail "next-adr did not create $ALLOC"
+fi
+
+# C2. ADR empty tree, sibling-worktree stream, origin-ref stream.
+new_repo
+seed "$ADR_DIR_REL/0000-template.md"
+gadd "$ADR_DIR_REL"; gcommit template-only
+probe_worktree
+ALLOC="$( ( cd "$REPO_WT" && ./bin/next-adr first-one ) 2>"$OUT" )"; RC=$?
+expect "next-adr empty tree" 0 "$RC"
+expect_eq "next-adr empty tree name" "0001-first-one.md" "$(basename "${ALLOC:-none}")"
+rm -f "$ALLOC"
+# (b) a non-.md number in a sibling worktree still counts: that stream filters by name only.
+git -C "$REPO" worktree add -q "$REPO.sib" -b sib
+echo x > "$REPO.sib/$ADR_DIR_REL/0500-y.txt"
+ALLOC="$( ( cd "$REPO_WT" && ./bin/next-adr from-sib ) 2>"$OUT" )"; RC=$?
+expect "next-adr sibling stream" 0 "$RC"
+expect_eq "next-adr sibling stream name" "0501-from-sib.md" "$(basename "${ALLOC:-none}")"
+rm -f "$ALLOC"
+# (c) a number that exists only on an origin ref.
+git -C "$REPO" worktree remove --force "$REPO.sib"
+git -C "$REPO" checkout -q -b adrref
+seed "$ADR_DIR_REL/0600-z.md"
+gadd "$ADR_DIR_REL"; gcommit adrref-adr
+git -C "$REPO" update-ref refs/remotes/origin/adrref "$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q -
+rm -f "$REPO/$ADR_DIR_REL/0600-z.md" "$REPO_WT/$ADR_DIR_REL/0600-z.md"
+ALLOC="$( ( cd "$REPO_WT" && ./bin/next-adr from-ref ) 2>"$OUT" )"; RC=$?
+expect "next-adr origin-ref stream" 0 "$RC"
+expect_eq "next-adr origin-ref stream name" "0601-from-ref.md" "$(basename "${ALLOC:-none}")"
+rm -f "$ALLOC"
+git -C "$REPO" update-ref -d refs/remotes/origin/adrref
+
+# C3. Migration gap fixture and streams.
+new_repo
+seed "$MIG_DIR_REL/001_a.sql" "$MIG_DIR_REL/002_b.sql" "$MIG_DIR_REL/005_c.sql" \
+    "$MIG_DIR_REL/037c_x.sql" "$MIG_DIR_REL/20260818_120000_x.sql" "$MIG_DIR_REL/1234_x.sql"
+gadd "$MIG_DIR_REL"; gcommit gap-migs
+probe_worktree
+NEXT="$( ( cd "$REPO_WT" && ./bin/next-migration ) 2>"$OUT" )"; RC=$?
+expect "next-migration gap fixture" 0 "$RC"
+expect_eq "next-migration gap fixture number" "038" "${NEXT:-none}"
+expect_eq "next-migration stderr empty" "" "$(cat "$OUT")"
+# (b) every extension counts in a sibling worktree.
+git -C "$REPO" worktree add -q "$REPO.sib" -b sib
+echo x > "$REPO.sib/$MIG_DIR_REL/050_y.txt"
+NEXT="$( ( cd "$REPO_WT" && ./bin/next-migration ) 2>"$OUT" )"; RC=$?
+expect "next-migration sibling stream" 0 "$RC"
+expect_eq "next-migration sibling stream number" "051" "${NEXT:-none}"
+# (c) a number that exists only on an origin ref.
+git -C "$REPO" worktree remove --force "$REPO.sib"
+git -C "$REPO" checkout -q -b migref
+seed "$MIG_DIR_REL/060_z.sql"
+gadd "$MIG_DIR_REL"; gcommit migref-mig
+git -C "$REPO" update-ref refs/remotes/origin/migref "$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q -
+rm -f "$REPO/$MIG_DIR_REL/060_z.sql" "$REPO_WT/$MIG_DIR_REL/060_z.sql"
+NEXT="$( ( cd "$REPO_WT" && ./bin/next-migration ) 2>"$OUT" )"; RC=$?
+expect "next-migration origin-ref stream" 0 "$RC"
+expect_eq "next-migration origin-ref stream number" "061" "${NEXT:-none}"
+git -C "$REPO" update-ref -d refs/remotes/origin/migref
+
+# C4. Migration empty tree: nothing anywhere is an error, not "001".
+new_repo
+probe_worktree
+NEXT="$( ( cd "$REPO_WT" && ./bin/next-migration ) 2>"$OUT" )"; RC=$?
+expect "next-migration empty tree" 1 "$RC"
+expect_eq "next-migration empty tree stdout" "" "$NEXT"
+expect_line "no-migrations message" "No migrations found"
+
+# C5. bin/next-adr wrapper contract: check order, refusals, exit codes.
+new_repo
+seed "$ADR_DIR_REL/0000-template.md" "$ADR_DIR_REL/0001-dup-me.md"
+gadd "$ADR_DIR_REL"; gcommit dup-fixture
+probe_worktree
+X="$( ( cd "$REPO_WT" && ./bin/next-adr ) 2>"$OUT" )"; RC=$?
+expect "next-adr no arguments" 2 "$RC"
+expect_out "next-adr no arguments usage" '^Usage: '
+# Slug check runs before the main-checkout guard: a bad slug from the main checkout exits 2.
+X="$( ( cd "$REPO" && ./bin/next-adr Bad_Slug ) 2>"$OUT" )"; RC=$?
+expect "next-adr bad slug from main checkout" 2 "$RC"
+expect_line "bad-slug message" "Error: slug must be kebab-case (lowercase letters, digits, hyphens)."
+X="$( ( cd "$REPO" && ./bin/next-adr ok-slug ) 2>"$OUT" )"; RC=$?
+expect "next-adr from main checkout" 1 "$RC"
+expect_line "next-adr main-checkout line 1" "Error: refusing to run from the main checkout — bin/next-adr cp's the"
+expect_out "next-adr main-checkout names bin/wt-new" 'bin/wt-new'
+if compgen -G "$REPO/$ADR_DIR_REL/*-ok-slug.md" > /dev/null; then
+    h_fail "next-adr created a file in the main checkout"
+else
+    h_pass "next-adr created nothing in the main checkout"
+fi
+X="$( ( cd "$REPO_WT" && ./bin/next-adr dup-me ) 2>"$OUT" )"; RC=$?
+expect "next-adr slug reuse" 1 "$RC"
+expect_out "next-adr slug reuse message" "^Error: an ADR with slug 'dup-me' already exists at "
+if [ -e "$REPO_WT/$ADR_DIR_REL/0002-dup-me.md" ]; then
+    h_fail "next-adr created 0002-dup-me.md on slug reuse"
+else
+    h_pass "next-adr slug reuse created nothing"
+fi
+# The --help text says template-missing is exit 2; the code exits 1, and that is what is pinned.
+rm "$REPO_WT/$ADR_DIR_REL/0000-template.md"
+X="$( ( cd "$REPO_WT" && ./bin/next-adr no-template ) 2>"$OUT" )"; RC=$?
+expect "next-adr template missing" 1 "$RC"
+expect_out "next-adr template missing message" '^Error: template not found at '
+
+# C6. bin/next-migration wrapper contract: arguments ignored, main checkout refused.
+new_repo
+seed "$MIG_DIR_REL/001_a.sql"
+gadd "$MIG_DIR_REL"; gcommit one-mig
+probe_worktree
+NEXT="$( ( cd "$REPO_WT" && ./bin/next-migration foo bar ) 2>"$OUT" )"; RC=$?
+expect "next-migration ignores arguments" 0 "$RC"
+expect_eq "next-migration ignores arguments number" "002" "${NEXT:-none}"
+NEXT="$( ( cd "$REPO" && ./bin/next-migration ) 2>"$OUT" )"; RC=$?
+expect "next-migration from main checkout" 1 "$RC"
+expect_line "next-migration main-checkout line 1" "Error: refusing to hand out a migration number from the main checkout."
+expect_out "next-migration main-checkout names bin/wt-new" 'bin/wt-new'
+
+# C7. Gate accept/reject table. The 0400.md row pins the hyphen-free ADR key;
+#     the 044b/044 row pins the kept migration letter suffix.
+while IFS='|' read -r WANT DIR F1 F2; do
+    new_repo
+    index 0001
+    gadd "$ADR_DIR_REL/README.md"; gcommit index
+    seed "$DIR/$F1" "$DIR/$F2"
+    gadd "$DIR/$F1" "$DIR/$F2"
+    run_gate; expect "gate pair $F1+$F2" "$WANT" $?
+    if [ "$WANT" -eq 1 ]; then
+        expect_out "gate pair $F1+$F2 names both files" "$F1.*$F2|$F2.*$F1"
+    fi
+done <<'EOF'
+1|ibl5/docs/decisions|0400-a.md|0400-b.md
+1|ibl5/docs/decisions|0400.md|0400-b.md
+0|ibl5/docs/decisions|0000-template.md|0000-other.md
+0|ibl5/migrations|044b_x.sql|044_y.sql
+1|ibl5/migrations|044b_x.sql|044b_y.sql
+0|ibl5/migrations|20260818_120000_x.sql|20260818_120000_y.sql
+0|ibl5/migrations|1234_x.sql|1234_y.sql
+EOF
+
+# C8. bin/next-number: usage errors, creates nothing, per-kind refusal, and a
+#     source-safe lib (silent on source, functions return 0 on empty input).
+new_repo
+seed "$ADR_DIR_REL/0000-template.md" "$ADR_DIR_REL/0001-a.md" "$MIG_DIR_REL/001_a.sql"
+gadd "$ADR_DIR_REL" "$MIG_DIR_REL"; gcommit next-number-fixture
+probe_worktree
+USAGE_LINE="Usage: bin/next-number <adr|migration>"
+X="$( ( cd "$REPO_WT" && ./bin/next-number ) 2>"$OUT" )"; RC=$?
+expect "next-number no argument" 2 "$RC"
+expect_eq "next-number no argument stdout" "" "$X"
+expect_line "next-number usage" "$USAGE_LINE"
+X="$( ( cd "$REPO_WT" && ./bin/next-number bogus ) 2>"$OUT" )"; RC=$?
+expect "next-number unknown kind" 2 "$RC"
+expect_line "next-number unknown kind usage" "$USAGE_LINE"
+X="$( ( cd "$REPO_WT" && ./bin/next-number adr extra ) 2>"$OUT" )"; RC=$?
+expect "next-number extra argument" 2 "$RC"
+( cd "$REPO_WT" && ./bin/next-number --help ) > "$OUT" 2>&1; RC=$?
+expect "next-number --help" 0 "$RC"
+expect_line "next-number --help usage" "$USAGE_LINE"
+X="$( ( cd "$REPO_WT" && ./bin/next-number migration ) 2>"$OUT" )"; RC=$?
+expect "next-number migration" 0 "$RC"
+expect_eq "next-number migration number" "002" "$X"
+FILES_BEFORE="$(ls "$REPO_WT/$ADR_DIR_REL" | wc -l | tr -d ' ')"
+X="$( ( cd "$REPO_WT" && ./bin/next-number adr ) 2>"$OUT" )"; RC=$?
+expect "next-number adr" 0 "$RC"
+expect_eq "next-number adr number" "0002" "$X"
+expect_eq "next-number creates no file" "$FILES_BEFORE" "$(ls "$REPO_WT/$ADR_DIR_REL" | wc -l | tr -d ' ')"
+X="$( ( cd "$REPO" && ./bin/next-number adr ) 2>"$OUT" )"; RC=$?
+expect "next-number adr from main checkout" 1 "$RC"
+expect_line "next-number adr main-checkout line 1" "Error: refusing to run from the main checkout — bin/next-adr cp's the"
+X="$( ( cd "$REPO" && ./bin/next-number migration ) 2>"$OUT" )"; RC=$?
+expect "next-number migration from main checkout" 1 "$RC"
+expect_line "next-number migration main-checkout line 1" "Error: refusing to hand out a migration number from the main checkout."
+bash -c '. "$1"' _ "$SCRIPT_DIR/lib/numbering.sh" > "$OUT" 2>&1; RC=$?
+expect "numbering.sh sourced alone" 0 "$RC"
+expect_eq "numbering.sh is silent when sourced" "" "$(cat "$OUT")"
+bash -c 'set -euo pipefail; . "$1"; numbering_max_from_names adr </dev/null; echo "rc=$?"' \
+    _ "$SCRIPT_DIR/lib/numbering.sh" > "$OUT" 2>&1
+expect_eq "numbering_max_from_names adr on empty input" "rc=0" "$(cat "$OUT")"
+bash -c 'set -euo pipefail; . "$1"; numbering_max_from_names migration </dev/null; echo "rc=$?"' \
+    _ "$SCRIPT_DIR/lib/numbering.sh" > "$OUT" 2>&1
+expect_eq "numbering_max_from_names migration on empty input" "rc=0" "$(cat "$OUT")"
+# shellcheck disable=SC2016  # the snippet is for the inner bash, so $1/$(...) must stay literal
+bash -c 'set -euo pipefail; . "$1"; ts=20260818_120000; printf "%s|%s|%s|%s\n" "$(numbering_adr_key 0400.md)" "$(numbering_adr_key 0000-template.md)" "$(numbering_migration_key 044b_x.sql)" "$(numbering_migration_key "${ts}_x.sql")"' \
+    _ "$SCRIPT_DIR/lib/numbering.sh" > "$OUT" 2>&1
+expect_eq "numbering key functions" "0400||044b|" "$(cat "$OUT")"
+
 echo "== CI wiring =="
 
 # 16. The paths-filter that gates bin/check-numbering must cover every numbered
@@ -322,24 +534,16 @@ FILTER_BLOCK="$(awk '
 ' "$WORKFLOW")"
 for GLOB in "ibl5/docs/decisions/\*\*" "ibl5/migrations/\*\*"; do
     if printf '%s\n' "$FILTER_BLOCK" | grep -qF "$(printf '%s' "$GLOB" | tr -d '\\')"; then
-        echo "ok: numbering filter covers $(printf '%s' "$GLOB" | tr -d '\\')"
+        h_pass "numbering filter covers $(printf '%s' "$GLOB" | tr -d '\\')"
     else
-        echo "FAIL: numbering filter is missing $(printf '%s' "$GLOB" | tr -d '\\')"
-        FAILED=1
+        h_fail "numbering filter is missing $(printf '%s' "$GLOB" | tr -d '\\')"
     fi
 done
 if grep -q "steps.filter.outputs.numbering == 'true'" "$WORKFLOW" \
     && grep -q 'run: bin/check-numbering --since=' "$WORKFLOW"; then
-    echo "ok: check-numbering step is wired to the numbering filter"
+    h_pass "check-numbering step is wired to the numbering filter"
 else
-    echo "FAIL: check-numbering step is not wired to the numbering filter"
-    FAILED=1
+    h_fail "check-numbering step is not wired to the numbering filter"
 fi
 
-echo
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OneOnOneGame;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use OneOnOneGame\Contracts\OneOnOneGameEngineInterface;
 use OneOnOneGame\Contracts\OneOnOneGameRepositoryInterface;
 
@@ -29,7 +29,7 @@ class OneOnOneGameRepository extends BaseMysqliRepository implements OneOnOneGam
     {
         /** @var array<int, array{pid: int, name: string}> */
         return $this->fetchAll(
-            "SELECT pid, name FROM `ibl_plr` WHERE retired = 0 AND name != '(no starter)' ORDER BY name ASC",
+            "SELECT pid, name FROM `ibl_plr` WHERE retired = 0 AND name != '(no starter)' ORDER BY name ASC, pid ASC",
             ""
         );
     }

@@ -33,7 +33,7 @@
 .record-category__title {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--navy-800);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -62,7 +62,7 @@
 }
 
 .record-table td img { margin: 0 auto; }
-.record-table .player-cell { font-weight: 600; }
+.record-table .player-cell { font-weight: var(--font-weight-semibold); }
 .record-table .player-cell img { display: block; margin: 0 auto var(--space-1); }
 .record-table td.ibl-stat-highlight { font-size: var(--text-lg); text-align: center; }
 
@@ -99,7 +99,7 @@
 .record-section__subheading {
     font-family: var(--font-display);
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-500);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);

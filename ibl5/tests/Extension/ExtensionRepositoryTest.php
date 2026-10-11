@@ -320,7 +320,7 @@ class ExtensionRepositoryTest extends WideUnitTestCase
         $this->assertSame($dbSpy, $refDb->getValue($repo));
 
         // Parent's private $logger is a separate property — verify it resolves independently
-        $refParentLogger = new \ReflectionProperty(\BaseMysqliRepository::class, 'logger');
+        $refParentLogger = new \ReflectionProperty(\Database\BaseMysqliRepository::class, 'logger');
         $parentLogger = $refParentLogger->getValue($repo);
         $this->assertNotSame($appSpy, $parentLogger);
         $this->assertNotSame($dbSpy, $parentLogger);

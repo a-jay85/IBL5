@@ -4,7 +4,7 @@ import { setAward } from '../helpers/test-state';
 import { publicStorageState } from '../helpers/public-storage-state';
 
 // Finals MVP flow — sets Finals MVP for the current season year.
-// Uses auth fixture (admin access required for leagueControlPanel.php).
+// Uses auth fixture (admin access required for modules.php?name=LeagueControlPanel).
 // The LCP reads settings from DB directly (not cookie overrides), so
 // the test uses the LCP's own Set Season Phase form to switch to Playoffs.
 // This flow INSERTS a real 'IBL Finals MVP' award row for SEASON_YEAR; the
@@ -38,7 +38,7 @@ test.describe('LeagueControlPanel — Finals MVP flow', () => {
   });
 
   test('page loads without PHP errors', async ({ page }) => {
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     await assertNoPhpErrors(page, 'on LeagueControlPanel page');
 
     await expect(page.locator('form')).toBeVisible();
@@ -46,7 +46,7 @@ test.describe('LeagueControlPanel — Finals MVP flow', () => {
 
   test('submits Finals MVP and hides input on reload', async ({ page }) => {
     // Step 1: Set phase to Playoffs so awards controls appear
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     await assertNoPhpErrors(page, 'before phase change');
 
     const phaseSelect = page.locator('select[name="SeasonPhase"]');
@@ -110,7 +110,7 @@ test.describe('LeagueControlPanel — Update Tradition', () => {
     page,
   }) => {
     // Ensure Free Agency phase so the FA controls (incl. this button) render
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     const phaseSelect = page.locator('select[name="SeasonPhase"]');
     await phaseSelect.selectOption('Free Agency');
     const phaseButton = page.locator('button[value="set_season_phase"]');
@@ -149,7 +149,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
   let exportedFilename = '';
 
   test('export endpoint returns 409 outside Preseason and Free Agency', async ({ page }) => {
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     await assertNoPhpErrors(page, 'on LCP before export-phase test');
     await page.locator('select[name="SeasonPhase"]').selectOption('Playoffs');
     await Promise.all([
@@ -157,14 +157,14 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
       page.locator('button[value="set_season_phase"]').click(),
     ]);
 
-    const response = await page.request.post('leagueControlPanel.php', {
+    const response = await page.request.post('modules.php?name=LeagueControlPanel', {
       form: { export: 'active_players' },
     });
     expect(response.status()).toBe(409);
     const json = (await response.json()) as { error?: string };
     expect(json.error).toContain('Free Agency');
 
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     await page.locator('select[name="SeasonPhase"]').selectOption('Free Agency');
     await Promise.all([
       page.waitForURL(/success=/),
@@ -173,7 +173,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
   });
 
   test('export endpoint returns 403 without a CSRF token and issues a fresh one', async ({ page }) => {
-    const response = await page.request.post('leagueControlPanel.php', {
+    const response = await page.request.post('modules.php?name=LeagueControlPanel', {
       form: { export: 'active_players' },
     });
     expect(response.status()).toBe(403);
@@ -186,7 +186,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
 
     // page.request shares the page context's cookie jar, so the token issued to
     // this session validates on the very next POST from the same context.
-    const retry = await page.request.post('leagueControlPanel.php', {
+    const retry = await page.request.post('modules.php?name=LeagueControlPanel', {
       form: { export: 'active_players', _csrf_token: json.csrfToken ?? '' },
     });
     expect(retry.status()).toBe(200);
@@ -197,7 +197,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
 
   test('unauthenticated export POST is refused and never receives a CSRF token', async ({ browser }) => {
     const anon = await browser.newContext({ storageState: publicStorageState() });
-    const response = await anon.request.post('leagueControlPanel.php', {
+    const response = await anon.request.post('modules.php?name=LeagueControlPanel', {
       form: { export: 'active_players' },
       maxRedirects: 0,
     });
@@ -211,7 +211,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
   });
 
   test('a stale button token yields a 403 whose fresh token lets the next click succeed without a reload', async ({ page }) => {
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     await assertNoPhpErrors(page, 'on LCP before stale-token retry');
     const button = page.locator('#lcp-active-players-export button');
     await expect(button).toBeEnabled();
@@ -225,7 +225,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
 
     const [first] = await Promise.all([
       page.waitForResponse(
-        (r) => r.url().includes('leagueControlPanel.php') && r.request().method() === 'POST',
+        (r) => r.url().includes('modules.php?name=LeagueControlPanel') && r.request().method() === 'POST',
       ),
       button.click(),
     ]);
@@ -240,7 +240,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
 
     const [second] = await Promise.all([
       page.waitForResponse(
-        (r) => r.url().includes('leagueControlPanel.php') && r.request().method() === 'POST',
+        (r) => r.url().includes('modules.php?name=LeagueControlPanel') && r.request().method() === 'POST',
       ),
       button.click(),
     ]);
@@ -252,15 +252,15 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
   });
 
   test('export endpoint rejects GET', async ({ page }) => {
-    const response = await page.request.get('leagueControlPanel.php?export=active_players');
+    const response = await page.request.get('modules.php?name=LeagueControlPanel&export=active_players');
     expect(response.headers()['content-type'] ?? '').not.toContain('application/json');
   });
 
   test('export button returns JSON download URL during Free Agency', async ({ page }) => {
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     const [response] = await Promise.all([
       page.waitForResponse(
-        (r) => r.url().includes('leagueControlPanel.php') && r.request().method() === 'POST',
+        (r) => r.url().includes('modules.php?name=LeagueControlPanel') && r.request().method() === 'POST',
       ),
       page.locator('#lcp-active-players-export button').click(),
     ]);
@@ -275,7 +275,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
     await expect(button).toBeEnabled();
     const [second] = await Promise.all([
       page.waitForResponse(
-        (r) => r.url().includes('leagueControlPanel.php') && r.request().method() === 'POST',
+        (r) => r.url().includes('modules.php?name=LeagueControlPanel') && r.request().method() === 'POST',
       ),
       button.click(),
     ]);
@@ -287,7 +287,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
   }) => {
     expect(exportedFilename).not.toBe('');
     const dlResponse = await page.request.get(
-      `leagueControlPanel.php?download=${encodeURIComponent(exportedFilename)}`,
+      `modules.php?name=LeagueControlPanel&download=${encodeURIComponent(exportedFilename)}`,
     );
     expect(dlResponse.status()).toBe(200);
     expect(dlResponse.headers()['content-type']).toContain('text/csv');
@@ -296,7 +296,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
   test('download endpoint returns 404 for a path-traversal filename', async ({
     page,
   }) => {
-    const response = await page.goto('leagueControlPanel.php?download=..%2Fetc%2Fpasswd');
+    const response = await page.goto('modules.php?name=LeagueControlPanel&download=..%2Fetc%2Fpasswd');
     expect(response?.status()).toBe(404);
   });
 });
@@ -304,14 +304,15 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
 // Generate Season Awards — tests the button visibility and error path.
 // The LCP reads phase from the DB directly (not cookie overrides), so
 // phase must be set via form submission. CI uses a fresh DB per run;
-// local re-runs may need: UPDATE ibl_settings SET value='Free Agency' WHERE name='Current Season Phase';
+// local re-runs may need: UPDATE ibl_settings SET setting_value='Free Agency' WHERE setting_key='Current Season Phase';
+// Settings rows come from the ibl_settings inserts in ci-seed.sql and are written by the test-state.php upsert endpoint.
 
 test.describe('LeagueControlPanel — Generate Season Awards', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('generate_awards button visible in Playoffs', async ({ page }) => {
     // Set phase to Playoffs via the LCP form
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     await assertNoPhpErrors(page, 'before phase change');
 
     const phaseSelect = page.locator('select[name="SeasonPhase"]');
@@ -332,7 +333,7 @@ test.describe('LeagueControlPanel — Generate Season Awards', () => {
     page,
   }) => {
     // Explicitly set Playoffs phase (self-sufficient — no reliance on prior test)
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     const phaseSelect = page.locator('select[name="SeasonPhase"]');
     await phaseSelect.selectOption('Playoffs');
     const phaseButton = page.locator('button[value="set_season_phase"]');
@@ -361,7 +362,7 @@ test.describe('LeagueControlPanel — Generate Season Awards', () => {
     page,
   }) => {
     // Set phase to Regular Season
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     const phaseSelect = page.locator('select[name="SeasonPhase"]');
     await phaseSelect.selectOption('Regular Season');
     const phaseButton = page.locator('button[value="set_season_phase"]');
@@ -375,7 +376,7 @@ test.describe('LeagueControlPanel — Generate Season Awards', () => {
     ).toHaveCount(0);
 
     // Restore phase to Free Agency (CI seed default)
-    await page.goto('leagueControlPanel.php');
+    await page.goto('modules.php?name=LeagueControlPanel');
     const restoreSelect = page.locator('select[name="SeasonPhase"]');
     await restoreSelect.selectOption('Free Agency');
     const restoreButton = page.locator('button[value="set_season_phase"]');

@@ -17,7 +17,6 @@ from .planfile import _section, _strip_fenced
 from .state import HarnessError
 
 OOS_LABEL = "maintenance"
-MAX_HITS_PER_PLAN = 5
 _TAG_RE = re.compile(r"\[oos-[0-9a-f]{10}\]")
 
 DEFERRAL_RE = re.compile(
@@ -146,7 +145,10 @@ def _short(text: str, limit: int = 80) -> str:
 def file_deferral_issues(gh, hits: list[DeferralHit], slug: str,
                          pr_number: int, log=None, *,
                          plan_name: str | None = None) -> list[int]:
-    """File one backlog issue per hit, deduped by `[oos-<key>]` tag. Never raises.
+    """File every hit under the per-PR follow-up cap, deduped by `[oos-<key>]` tag. Never raises.
+
+    Hits file in plan line order (`line_no`) and nothing is dropped; hits past the cap land
+    in the roll-up (`harness/followcap.py`).
 
     A failed dedup read files nothing: a missed filing is recovered by the next rerun,
     while a duplicate never cleans itself up.
@@ -160,9 +162,6 @@ def file_deferral_issues(gh, hits: list[DeferralHit], slug: str,
         log(f"oos-sweep: dedup read failed ({exc}); filing nothing")
         return []
     seen = {m.group(0) for t in existing for m in [_TAG_RE.search(t)] if m}
-    if len(hits) > MAX_HITS_PER_PLAN:
-        log(f"oos-sweep: {len(hits) - MAX_HITS_PER_PLAN} hits over cap, not filed")
-        hits = hits[:MAX_HITS_PER_PLAN]
     nums: list[int] = []
     pr_link = f"https://github.com/a-jay85/IBL5/pull/{pr_number}"
     plan_ref = plan_name or f"{slug}.md"
@@ -180,11 +179,11 @@ def file_deferral_issues(gh, hits: list[DeferralHit], slug: str,
             f"Filed by the post-plan out-of-scope sweep. Dedup key: {hit.key}.\n"
         )
         try:
-            n = gh.issue_create(title, body, OOS_LABEL)
+            n = gh.followup_create(title, body, OOS_LABEL)
         except (HarnessError, OSError) as exc:
-            log(f"oos-sweep: issue_create failed for {hit.key} ({exc})")
+            log(f"oos-sweep: followup_create failed for {hit.key} ({exc})")
             continue
-        if n is not None:
+        if n is not None and n not in nums:
             nums.append(n)
         seen.add(tag)
         log(f"oos-sweep: filed #{n} {hit.key}")
@@ -217,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             seen = {m.group(0) for t in gh.issue_titles(None, strict=True)
                     for m in [_TAG_RE.search(t)] if m}
-            for h in hits[:MAX_HITS_PER_PLAN]:
+            for h in hits:
                 print(f"{'exists' if f'[{h.key}]' in seen else 'would-file'}\t{h.key}")
             return 0
         file_deferral_issues(gh, hits, args.slug, args.pr, log=print,

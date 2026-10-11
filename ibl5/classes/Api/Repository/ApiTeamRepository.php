@@ -12,8 +12,17 @@ use League\LeagueContext;
  * @phpstan-type TeamListRow array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, discord_id: int|null, ...<string, mixed>}
  * @phpstan-type TeamDetailRow array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, discord_id: int|null, league_record: string|null, conference_record: string|null, division_record: string|null, home_wins: int|null, home_losses: int|null, away_wins: int|null, away_losses: int|null, win_percentage: float|null, conference_games_back: string|null, division_games_back: string|null, games_remaining: int|null}
  */
-class ApiTeamRepository extends \BaseMysqliRepository
+class ApiTeamRepository extends \Database\BaseMysqliRepository
 {
+    /** Public API sort key => SQL column. The controller's allowlist is array_keys() of this map. */
+    public const SORT_COLUMNS = [
+        'team_name' => 'team_name',
+        'team_city' => 'team_city',
+        'owner_name' => 'owner_name',
+        'conference' => 'conference',
+        'division' => 'division',
+    ];
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
@@ -26,9 +35,11 @@ class ApiTeamRepository extends \BaseMysqliRepository
      */
     public function getTeams(Paginator $paginator): array
     {
-        $orderBy = $paginator->getOrderByClause();
+        $sortColumn = self::SORT_COLUMNS[$paginator->getSort()]
+            ?? throw new \InvalidArgumentException('Invalid sort column: ' . $paginator->getSort());
+        $direction = $paginator->getOrder() === 'desc' ? 'DESC' : 'ASC';
 
-        // IDENTIFIER (already-validated): $orderBy = allowlist-validated by Paginator
+        // IDENTIFIER: $sortColumn = SORT_COLUMNS map value; $direction = literal ternary
         /** @var list<TeamListRow> */
         return $this->fetchAll(
             'SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,'
@@ -37,7 +48,7 @@ class ApiTeamRepository extends \BaseMysqliRepository
             . ' FROM `ibl_team_info` t'
             . ' LEFT JOIN `ibl_standings` s ON t.teamid = s.teamid'
             . ' WHERE t.teamid BETWEEN 1 AND ?'
-            . ' ORDER BY ' . $orderBy
+            . ' ORDER BY ' . $sortColumn . ' ' . $direction
             . ' LIMIT ? OFFSET ?',
             'iii',
             League::MAX_REAL_TEAMID,

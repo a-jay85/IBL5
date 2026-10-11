@@ -76,12 +76,24 @@ def test_adr_letter_token_other_than_nnnn_gets_no_tolerance():
 
 
 def test_adr_placeholder_changed_side_stays_four_digits():
-    """Mutation caught: use `_ADR_TOKEN` in the changed-file loop of `_renumbered_adr`."""
+    """A wrong-slug `NNNN-` file and a non-digit `MMMM-` same-slug file leave the token missing."""
     items = check(_plan_with_critical(_TOK), [
         "ibl5/docs/decisions/NNNN-other.md",
         "ibl5/docs/decisions/MMMM-discord-dev-webhook-notify.md",
     ])
     assert _missing(items, "NNNN-discord-dev-webhook-notify.md")
+
+
+def test_adr_numbered_token_placeholder_changed_file_stays_missing():
+    """Mutation caught: use `_ADR_TOKEN` in the changed-file loop of `_renumbered_adr`.
+
+    A numbered token against a committed `NNNN-<same slug>` file: the changed side
+    must be four real digits, so the placeholder file never satisfies the token.
+    """
+    tok = "ibl5/docs/decisions/0146-discord-dev-webhook-notify.md"
+    items = check(_plan_with_critical(tok),
+                  ["ibl5/docs/decisions/NNNN-discord-dev-webhook-notify.md"])
+    assert _missing(items, "0146-discord-dev-webhook-notify.md")
 
 
 def test_adr_placeholder_genuinely_missing_adr_still_missing():

@@ -15,6 +15,8 @@ declare(strict_types=1);
  * Exits 2 on usage error.
  */
 
+require_once __DIR__ . '/lib/gate-common.php';
+
 const TRIGGER_DESCRIPTIONS = [
     'rename' => 'file rename under ibl5/classes/ (high refactor signal)',
     'signature-change' => 'method signature change in ibl5/classes/ (parameters or return type differ)',
@@ -51,14 +53,6 @@ Exit 0 on pass, 1 on failure, 2 on usage error.
 USAGE;
 }
 
-function runCmd(string $cmd): array
-{
-    $output = [];
-    $exit = 0;
-    exec($cmd . ' 2>/dev/null', $output, $exit);
-    return [$output, $exit];
-}
-
 function gitDiffRange(string $mode): string
 {
     return $mode === 'pr' ? 'origin/master...HEAD' : '--cached';
@@ -67,9 +61,7 @@ function gitDiffRange(string $mode): string
 /** @return list<string> */
 function diffNames(string $mode, string $filter): array
 {
-    $range = gitDiffRange($mode);
-    [$lines] = runCmd(sprintf('git diff %s --name-only --diff-filter=%s', escapeshellarg($range), escapeshellarg($filter)));
-    return array_values(array_filter($lines, static fn (string $line): bool => $line !== ''));
+    return gateDiffNames(escapeshellarg(gitDiffRange($mode)), $filter);
 }
 
 /**
@@ -272,41 +264,9 @@ function checkTestCoverage(string $mode, array $triggers): bool
     return false;
 }
 
-function fetchPrBody(string $mode, bool $fromStdin): ?string
-{
-    if ($fromStdin) {
-        $body = stream_get_contents(STDIN);
-        return $body === false ? null : $body;
-    }
-    if ($mode !== 'pr') {
-        return null;
-    }
-    $prNumber = getenv('PR_NUMBER');
-    $cmd = 'gh pr view';
-    if (is_string($prNumber) && $prNumber !== '') {
-        $cmd .= ' ' . escapeshellarg($prNumber);
-    }
-    $cmd .= ' --json body --jq .body';
-    [$lines, $exit] = runCmd($cmd);
-    if ($exit !== 0 || $lines === []) {
-        return null;
-    }
-    return implode("\n", $lines);
-}
-
 function extractBypassReason(?string $body): ?string
 {
-    if ($body === null || $body === '' || $body === 'null') {
-        return null;
-    }
-    if (preg_match(BYPASS_REGEX, $body, $m) !== 1) {
-        return null;
-    }
-    $reason = trim($m[1]);
-    if (strlen($reason) < BYPASS_MIN_LENGTH) {
-        return null;
-    }
-    return $reason;
+    return gateExtractBypassReason($body, BYPASS_REGEX, BYPASS_MIN_LENGTH);
 }
 
 // --- main ---

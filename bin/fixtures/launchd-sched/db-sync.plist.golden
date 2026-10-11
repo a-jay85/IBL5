@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.db-sync-nightly</string>
+	<!-- do NOT 'fix' this to StartInterval — StartCalendarInterval fires once at 03:20,
+	     not every N seconds; StartInterval would run this every N seconds continuously. -->
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>3</integer>
+		<key>Minute</key>
+		<integer>20</integer>
+	</dict>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@MAIN_WT@/ibl5/bin/db-sync-now</string>
+		<string>--from-backup</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>@MAIN_WT@</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew; ssh, gzip,
+		     mariadb-client must resolve. ~/.local/bin is where the Claude Code native
+		     installer puts the claude binary (not needed here, but kept for parity with
+		     the sim-recap plist so the two PATH strings can be maintained together).
+		     HOME is expanded HERE at generation time (the path is baked in), because launchd
+		     does NOT expand shell variables in EnvironmentVariables; an unexpanded reference
+		     would be a dead path. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/logs/db-sync-nightly.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/logs/db-sync-nightly.err.log</string>
+</dict>
+</plist>

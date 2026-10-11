@@ -1,6 +1,6 @@
 ---
 description: After JSB engine work ships, file and close findings in a-jay85/IBL5-backlog (label: jsb-native) — GitHub Issues are the single source of truth; git is the authority for merged-PR hashes.
-last_verified: 2026-09-30
+last_verified: 2026-10-03
 ---
 
 # JSB Engine Post-Work Checklist
@@ -23,7 +23,7 @@ Do NOT backfill hashes into the live backlog — that just relocates the cache y
 
 ## Filing and closing findings (the source of truth)
 
-Use `/backlog` (`bin/backlog`). File what this work surfaced with `bin/backlog new jsb-native "<title>"`; close what it resolved with `bin/backlog close <n> "<what closed it>"`. Search first so a duplicate Issue is not opened. Issues live in `a-jay85/IBL5-backlog` — there is no in-repo mirror, so this is bookkeeping the PR does not carry. Beyond that, this is where the durable engine knowledge lands:
+Use `/backlog` (`bin/backlog`). File what this work surfaced with `bin/backlog new jsb-native "<title>" "<body>"` (`<body>` must start with the origin PR URL and cite a file:line); close what it resolved with `bin/backlog close <n> "<what closed it>"`. Search first so a duplicate Issue is not opened. Issues live in `a-jay85/IBL5-backlog`. There is no in-repo mirror, so this is bookkeeping the PR does not carry. Beyond that, this is where the durable engine knowledge lands:
 
 1. **Current state** of each touched J-entry (what shipped, the live blocker, the next lever). Dated measurement paragraphs that are now just history belong in `a-jay85/IBL5-backlog` behind a dated pointer — keep the live entry to a single forward-looking current-state block.
 

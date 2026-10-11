@@ -29,7 +29,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
      */
     public function computeWinnerModifier(array $teamFactors, array $playerPreferences): float
     {
-        return \ContractRules::calculateWinnerModifier(
+        return \League\ContractRules::calculateWinnerModifier(
             $teamFactors['wins'] ?? 0,
             $teamFactors['losses'] ?? 0,
             $playerPreferences['winner'] ?? 1
@@ -41,7 +41,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
      */
     public function computeTraditionModifier(array $teamFactors, array $playerPreferences): float
     {
-        return \ContractRules::calculateTraditionModifier(
+        return \League\ContractRules::calculateTraditionModifier(
             $teamFactors['tradition_wins'] ?? 0,
             $teamFactors['tradition_losses'] ?? 0,
             $playerPreferences['tradition'] ?? 1
@@ -53,7 +53,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
      */
     public function computeLoyaltyModifier(array $playerPreferences): float
     {
-        return \ContractRules::calculateLoyaltyModifier($playerPreferences['loyalty'] ?? 1);
+        return \League\ContractRules::calculateLoyaltyModifier($playerPreferences['loyalty'] ?? 1);
     }
 
     /**
@@ -61,7 +61,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
      */
     public function computePlayingTimeModifier(array $teamFactors, array $playerPreferences): float
     {
-        return \ContractRules::calculatePlayingTimeModifier(
+        return \League\ContractRules::calculatePlayingTimeModifier(
             $teamFactors['money_committed_at_position'] ?? 0,
             $playerPreferences['playing_time'] ?? 1
         );

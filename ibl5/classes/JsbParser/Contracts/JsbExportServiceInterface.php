@@ -7,25 +7,12 @@ namespace JsbParser\Contracts;
 use PlrParser\PlrWriteResult;
 
 /**
- * Interface for the JSB file export orchestrator.
+ * Interface for the JSB .trn trade export.
  *
- * Coordinates reading database state and writing it to .plr and .trn files.
+ * The .plr export contract is PlrParser\Contracts\PlrExportServiceInterface.
  */
 interface JsbExportServiceInterface
 {
-    /**
-     * Export database state to a .plr file using read-modify-write.
-     *
-     * Reads the existing .plr file, compares each player's database values
-     * to the file values, and writes only the fields that differ.
-     *
-     * @param string $inputPath Path to the existing .plr file (read baseline)
-     * @param string $outputPath Path for the output .plr file (NEVER the same as input)
-     * @return PlrWriteResult Summary of changes made
-     * @throws \RuntimeException If file operations fail
-     */
-    public function exportPlrFile(string $inputPath, string $outputPath): PlrWriteResult;
-
     /**
      * Export trade transactions to a .trn file.
      *

@@ -29,6 +29,8 @@
 # Run: bin/test-automouse-canary  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER="$SCRIPT_DIR/automouse/run"
@@ -39,9 +41,7 @@ if [ ! -f "$RUNNER" ]; then
     exit 1
 fi
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-FAILED=0
+h_tmp TMP
 
 # --- extract the implementation under test -------------------------------
 
@@ -66,21 +66,12 @@ done
 # --- assertion helpers ---------------------------------------------------
 
 expect() { # label want got
-    if [ "$2" -eq "$3" ]; then echo "ok: $1"
-    else echo "FAIL: $1 (want exit $2, got $3)"; FAILED=1; fi
+    if [ "$2" -eq "$3" ]; then h_pass "$1"
+    else h_fail "$1" "want exit $2, got $3"; fi
 }
-want() { # label haystack needle
-    case "$2" in *"$3"*) echo "ok: $1" ;;
-    *) echo "FAIL: $1 (missing: $3)"; FAILED=1 ;; esac
-}
-refuse() { # label haystack needle — needle must be ABSENT
-    case "$2" in *"$3"*) echo "FAIL: $1 (unexpectedly present: $3)"; FAILED=1 ;;
-    *) echo "ok: $1" ;; esac
-}
-same() { # label want got
-    if [ "$2" = "$3" ]; then echo "ok: $1"
-    else echo "FAIL: $1 (want '$2', got '$3')"; FAILED=1; fi
-}
+want() { h_contains "$1" "$2" "$3"; }  # label haystack needle
+refuse() { h_not_contains "$1" "$2" "$3"; }  # label haystack needle (needle must be ABSENT)
+same() { h_eq "$1" "$2" "$3"; }  # label want got
 
 # --- per-case sandbox ----------------------------------------------------
 
@@ -197,9 +188,9 @@ RC=0; AUTOMOUSE_SKIP_CANARY=1 run_between_plans_canary || RC=$?
 expect "skip-returns-0-despite-red-ci" 0 "$RC"
 want "skip-logs-bypass" "$(cat "$LOG")" "skipped (AUTOMOUSE_SKIP_CANARY=1)"
 if [ -e "$CI_SENTINEL" ]; then
-    echo "FAIL: skip-never-invokes-ci-stub (sentinel present)"; FAILED=1
+    h_fail "skip-never-invokes-ci-stub" "sentinel present"
 else
-    echo "ok: skip-never-invokes-ci-stub"
+    h_pass "skip-never-invokes-ci-stub"
 fi
 same "skip-queue-unchanged" "$BEFORE" "$(snapshot_queue)"
 
@@ -222,7 +213,7 @@ if [ -f "$REPORT" ]; then
     want "park-report-counts-remaining" "$BODY" "Plans left in queue (untouched):** 2"
     want "park-report-names-bypass"    "$BODY" "AUTOMOUSE_SKIP_CANARY=1"
 else
-    echo "FAIL: park-report-written-at-dated-path (no $REPORT)"; FAILED=1
+    h_fail "park-report-written-at-dated-path" "no $REPORT"
 fi
 
 # --- Cases 8 & 9: the REAL bin/check-master-ci-green ----------------------
@@ -265,9 +256,9 @@ DISPATCH="$(awk '
 ' "$RUNNER")"
 
 if [ -z "$DISPATCH" ]; then
-    echo "FAIL: dispatch-block-extractable (empty extraction from $RUNNER)"; FAILED=1
+    h_fail "dispatch-block-extractable" "empty extraction from $RUNNER"
 else
-    echo "ok: dispatch-block-extractable"
+    h_pass "dispatch-block-extractable"
     refuse "dispatch-block-has-no-refund" "$DISPATCH" "refund_attempt"
     want "dispatch-block-guards-on-queue" "$DISPATCH" 'ls "$QUEUE_DIR"/*.md'
     want "dispatch-block-parks-on-ci-red" "$DISPATCH" 'write_canary_park_report "ci-red"'
@@ -277,14 +268,9 @@ fi
 # --- Case 11: the runner still parses ------------------------------------
 
 if bash -n "$RUNNER" 2>/dev/null; then
-    echo "ok: runner-parses-after-edit"
+    h_pass "runner-parses-after-edit"
 else
-    echo "FAIL: runner-parses-after-edit (bash -n failed)"; FAILED=1
+    h_fail "runner-parses-after-edit" "bash -n failed"
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

@@ -18,47 +18,41 @@
 # Run: bin/test-automouse-cost-rows  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-FAILED=0
 
 # assert_eq <actual> <expected> <label>
-assert_eq() {
-    if [ "$1" = "$2" ]; then
-        printf '  ok   %s (%s)\n' "$3" "$1"
-    else
-        printf '  FAIL %s: got %s, expected %s\n' "$3" "$1" "$2"
-        FAILED=1
-    fi
-}
+assert_eq() { h_eq "$3" "$2" "$1"; }
 
 # assert_near <actual> <expected> <tol> <label>
-assert_near() {
-    if awk -v a="$1" -v e="$2" -v t="$3" 'BEGIN{d=a-e; if(d<0)d=-d; exit !(d<=t)}'; then
-        printf '  ok   %s (%s)\n' "$4" "$1"
+assert_near() { h_near "$4" "$1" "$2" "$3"; }
+
+# assert_not_near <actual> <forbidden> <tol> <label>
+assert_not_near() {
+    if awk -v a="$1" -v e="$2" -v t="$3" 'BEGIN{d=a-e; if(d<0)d=-d; exit !(d>t)}'; then
+        h_pass "$4"
     else
-        printf '  FAIL %s: got %s, expected %s +/- %s\n' "$4" "$1" "$2" "$3"
-        FAILED=1
+        h_fail "$4" "got $1, which must NOT be within $3 of $2"
     fi
 }
 
 # assert_gt <actual> <threshold> <label> [why]
 assert_gt() {
     if awk -v a="$1" -v t="$2" 'BEGIN{exit !(a>t)}'; then
-        printf '  ok   %s (%s > %s)\n' "$3" "$1" "$2"
+        h_pass "$3"
     else
-        printf '  FAIL %s: got %s, expected > %s%s\n' "$3" "$1" "$2" "${4:+ -- $4}"
-        FAILED=1
+        h_fail "$3" "got $1, expected > $2${4:+ -- $4}"
     fi
 }
 
 # assert_ne <actual> <forbidden> <label>
 assert_ne() {
     if [ "$1" != "$2" ]; then
-        printf '  ok   %s (%s != %s)\n' "$3" "$1" "$2"
+        h_pass "$3"
     else
-        printf '  FAIL %s: got %s, which must NOT equal %s\n' "$3" "$1" "$2"
-        FAILED=1
+        h_fail "$3" "got $1, which must NOT equal $2"
     fi
 }
 
@@ -68,8 +62,7 @@ pj() {
 }
 
 # Sandbox NIGHTLY_DIR so the real roll-up is never touched.
-TMPROOT=$(mktemp -d)
-trap 'rm -rf "$TMPROOT"' EXIT
+h_tmp TMPROOT
 mkdir -p "$TMPROOT/reports" "$TMPROOT/logs"
 
 # shellcheck disable=SC2034  # read by the append_cost_row/regenerate_* funcs sourced below
@@ -83,6 +76,7 @@ eval "$(awk '/^model_tier\(\)/,/^}/'             "$REPO_ROOT/bin/automouse/run")
 eval "$(awk '/^_date_ago\(\)/,/^}/'              "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^acquire_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^release_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")"
+# shellcheck disable=SC2034
 COST_LOCK_HELD=0  # global read by append_cost_row; set by the driver in bin/automouse/run
 eval "$(awk '/^append_cost_row\(\)/,/^}/'        "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^strip_weekly_section\(\)/,/^}/'   "$REPO_ROOT/bin/automouse/run")"
@@ -200,6 +194,22 @@ assert_eq "$iter_peak" 2000 "peak_ctx is the max over ITERATIONS, not incl. the 
 assert_ne "$iter_peak" 100000 "peak_ctx does not fall back to the summed top-level usage"
 assert_ne "$iter_peak" 103000 "peak_ctx is not the sum of usage parts"
 
+# Haiku generation pricing: 1M in + 1M out per model id.
+#   claude-haiku-5-5            -> 0.10 + 0.50 = $0.60
+#   claude-haiku-4-5-20251001   -> 1.00 + 5.00 = $6.00  (old transcripts keep 4.5 rates)
+HKDIR="$TMPROOT/hkproj/proj"
+mkdir -p "$HKDIR"
+cat > "$HKDIR/hk55-session.jsonl" <<'JSONL'
+{"type":"assistant","timestamp":"2026-10-07T00:00:01.000Z","message":{"id":"msg_h55","model":"claude-haiku-5-5","usage":{"input_tokens":1000000,"output_tokens":1000000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+JSONL
+cat > "$HKDIR/hk45-session.jsonl" <<'JSONL'
+{"type":"assistant","timestamp":"2026-10-07T00:00:01.000Z","message":{"id":"msg_h45","model":"claude-haiku-4-5-20251001","usage":{"input_tokens":1000000,"output_tokens":1000000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+JSONL
+hk55_cost=$("$PRICER" --session-id hk55-session --proj-dir "$HKDIR" | pj - cost)
+hk45_cost=$("$PRICER" --session-id hk45-session --proj-dir "$HKDIR" | pj - cost)
+assert_near "$hk55_cost" 0.60 0.001 "claude-haiku-5-5 prices at Haiku 5.5 rates"
+assert_near "$hk45_cost" 6.00 0.001 "claude-haiku-4-5-20251001 keeps Haiku 4.5 rates"
+
 # Advisor fixture — discriminates four wrong implementations with one number.
 # Record 1: iterations with mixed types; four candidate peak answers are far apart.
 #   top-level ctx = 4+120000+1705 = 121709  (the old "sum" reading)
@@ -296,6 +306,63 @@ assert_eq "$(cmp -s "$BF_REPORT" "$TMPROOT/bf-report.snap" && echo same || echo 
     "second backfill run leaves the report byte-identical"
 assert_eq "$(cmp -s "$BF_BAK" "$TMPROOT/bf-bak.snap" && echo same || echo differs)" "same" \
     "second backfill run does not overwrite the .bak"
+
+printf '\n-- backfill: log_paths / parse_day gather per-runner and archived logs --\n'
+
+# bf_variant <name> — fresh copy of the fixture nightly tree; echoes its path.
+bf_variant() {
+    local d="$TMPROOT/bfv-$1"
+    rm -rf "$d"; cp -R "$FIXROOT/nightly" "$d"; printf '%s' "$d"
+}
+# bf_join <nightly-dir> — the dry-run's join line only.
+bf_join() {
+    NIGHTLY_DIR="$1" "$BACKFILL" --dry-run --proj-dir "$FIXROOT" 2>/dev/null | grep '^join:'
+}
+LEGACY=logs/2026-08-18.log
+IMPL_EXIT='db-query-worktree-routing/impl exit:'
+
+# Per-runner name only (bin/automouse/run names its log <date>-$$.log).
+V=$(bf_variant pid); mv "$V/$LEGACY" "$V/logs/2026-08-18-4242.log"
+assert_eq "$(bf_join "$V")" "join: 2 matched, 0 ambiguous, 0 missed" \
+    "log_paths finds a per-runner <date>-<pid>.log"
+
+# Archived per-runner log only: gathered from logs.archive/, and the sidecar
+# follows the first dir holding a match.
+V=$(bf_variant arch); mkdir "$V/logs.archive"
+mv "$V/$LEGACY" "$V/logs.archive/2026-08-18-4242.log"
+assert_eq "$(bf_join "$V")" "join: 2 matched, 0 ambiguous, 0 missed" \
+    "log_paths finds a per-runner log in logs.archive/"
+NIGHTLY_DIR="$V" "$BACKFILL" --proj-dir "$FIXROOT" > "$TMPROOT/bfv-arch.out"
+assert_eq "$([ -e "$V/logs.archive/2026-08-18.costs.jsonl" ] && echo yes || echo no)" "yes" \
+    "archived-only day writes its sidecar into logs.archive/"
+assert_eq "$([ -e "$V/logs/2026-08-18.costs.jsonl" ] && echo yes || echo no)" "no" \
+    "archived-only day writes no sidecar into logs/"
+
+# Duplicate (plan, phase) key across two runner logs: the later sorted path wins.
+# The corrupt copy moves the impl exit line to 23:59:59 so its window cannot join.
+V=$(bf_variant dup-later); mv "$V/$LEGACY" "$V/logs/2026-08-18-1.log"
+sed "s|^\[[0-9:]*\] \($IMPL_EXIT\)|[23:59:59] \1|" "$V/logs/2026-08-18-1.log" \
+    > "$V/logs/2026-08-18-2.log"
+assert_eq "$(grep -c "^\[23:59:59\] $IMPL_EXIT" "$V/logs/2026-08-18-2.log")" 1 \
+    "corrupt copy really moved the impl exit line"
+assert_eq "$(bf_join "$V")" "join: 1 matched, 0 ambiguous, 1 missed" \
+    "parse_day: later sorted path wins (corrupt copy sorts last)"
+
+V=$(bf_variant dup-earlier); mv "$V/$LEGACY" "$V/logs/2026-08-18-2.log"
+sed "s|^\[[0-9:]*\] \($IMPL_EXIT\)|[23:59:59] \1|" "$V/logs/2026-08-18-2.log" \
+    > "$V/logs/2026-08-18-1.log"
+assert_eq "$(grep -c "^\[23:59:59\] $IMPL_EXIT" "$V/logs/2026-08-18-1.log")" 1 \
+    "corrupt copy (sorts first) really moved the impl exit line"
+assert_eq "$(bf_join "$V")" "join: 2 matched, 0 ambiguous, 0 missed" \
+    "parse_day: later sorted path wins (good copy sorts last)"
+
+# Boundaries: a non-numeric suffix and a date-prefix look-alike are not runner logs.
+V=$(bf_variant nonnum); mv "$V/$LEGACY" "$V/logs/2026-08-18-x.log"
+assert_eq "$(bf_join "$V")" "join: 0 matched, 0 ambiguous, 2 missed" \
+    "log_paths ignores <date>-<non-numeric>.log"
+V=$(bf_variant lookalike); mv "$V/$LEGACY" "$V/logs/2026-08-180-1.log"
+assert_eq "$(bf_join "$V")" "join: 0 matched, 0 ambiguous, 2 missed" \
+    "log_paths ignores a <date>0-<pid>.log look-alike"
 
 printf '\n-- backfill: legacy 3- and 6-column reports migrate without corruption --\n'
 
@@ -513,6 +580,7 @@ echo "-- append_cost_row: harness-ledger path (rows 13-15) --"
 
 # Restore S2 context (S3 stanza above overwrote NIGHTLY_DIR/SELF_DIR/LOG).
 NIGHTLY_DIR="$S2"
+# shellcheck disable=SC2034
 SELF_DIR="$S2/bin/automouse"
 LOG="$S2/logs/$(date +%F).log"
 
@@ -575,6 +643,7 @@ echo "-- weekly aggregate: legacy logs without a sidecar still contribute tokens
 # diagnostics on stderr, and the numbers actually land.
 S4=$(mktemp -d)
 mkdir -p "$S4/reports" "$S4/logs"
+# shellcheck disable=SC2034
 NIGHTLY_DIR="$S4"
 S4_REPORT="$S4/reports/$(date +%F)-costs.md"
 printf '# Automouse cost roll-up — %s\n\n' "$(date +%F)" > "$S4_REPORT"
@@ -628,8 +697,7 @@ fable51_cost=$(pj "$TMPROOT/fable51.json" cost)
 assert_near "$fable51_cost" 1.0000 0.0001 \
     "fable-5-1 key() resolves to fable-5-1, cache_read at \$0.25/M"
 # Without the fable-5-1 row (or with wrong prefix match), generic fable gives $4.00.
-assert_ne "$fable51_cost" "4.0" \
+assert_not_near "$fable51_cost" 4.0 0.0001 \
     "fable-5-1 is not priced as generic fable (\$1.00/M cache_read)"
 
-
-exit "$FAILED"
+h_done

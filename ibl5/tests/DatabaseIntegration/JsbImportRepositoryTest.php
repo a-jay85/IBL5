@@ -16,7 +16,7 @@ use JsbParser\RcbFileParser;
  * ibl_jsb_transactions, ibl_jsb_history, ibl_jsb_allstar_rosters,
  * ibl_jsb_allstar_scores, ibl_rcb_alltime_records, ibl_rcb_season_records.
  *
- * Also covers getPlayerName() (DB read).
+ * Also covers getPlayerName() (DB read) and markPlayerRetired() (ibl_plr UPDATE).
  */
 #[Group('database')]
 class JsbImportRepositoryTest extends DatabaseTestCase
@@ -909,6 +909,142 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         self::assertNotNull($row);
         self::assertSame('Updated Name', $row['player_name']);
         self::assertSame(200050001, $row['pid']);
+    }
+
+    // ── markPlayerRetired ────────────────────────────────────────
+
+    /** @return array<string, int|string|null> */
+    private function fetchPlayerRow(int $pid): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, ordinal, droptime, retired '
+            . 'FROM ibl_plr WHERE pid = ?'
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $pid);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        self::assertNotFalse($result);
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        self::assertNotNull($row);
+        return $row;
+    }
+
+    private function countPlayers(): int
+    {
+        $result = $this->db->query('SELECT COUNT(*) AS c FROM ibl_plr');
+        self::assertNotFalse($result);
+        $row = $result->fetch_assoc();
+        self::assertNotNull($row);
+        return (int) $row['c'];
+    }
+
+    private function countPlayersWithPid(int $pid): int
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) AS c FROM ibl_plr WHERE pid = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $pid);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        self::assertNotFalse($result);
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        self::assertNotNull($row);
+        return (int) $row['c'];
+    }
+
+    public function testMarkPlayerRetiredFlipsZeroToOneAndLeavesOtherColumnsUntouched(): void
+    {
+        $this->insertTestPlayer(200000301, 'Mark Retired Zero');
+        $before = $this->fetchPlayerRow(200000301);
+        $restBefore = $before;
+        unset($restBefore['retired']);
+
+        $affected = $this->repo->markPlayerRetired(200000301);
+
+        self::assertSame(1, $affected);
+        $after = $this->fetchPlayerRow(200000301);
+        self::assertSame(1, $after['retired']);
+        $restAfter = $after;
+        unset($restAfter['retired']);
+        self::assertSame($restBefore, $restAfter);
+    }
+
+    public function testMarkPlayerRetiredFlipsNullToOne(): void
+    {
+        $this->insertTestPlayer(200000302, 'Mark Retired Null', ['retired' => null]);
+        $before = $this->fetchPlayerRow(200000302);
+        self::assertNull($before['retired']);
+
+        $affected = $this->repo->markPlayerRetired(200000302);
+
+        self::assertSame(1, $affected);
+        $after = $this->fetchPlayerRow(200000302);
+        self::assertSame(1, $after['retired']);
+    }
+
+    public function testMarkPlayerRetiredReturnsZeroForAlreadyRetiredPlayer(): void
+    {
+        $this->insertTestPlayer(200000303, 'Mark Retired Already', ['retired' => 1]);
+        $before = $this->fetchPlayerRow(200000303);
+        $restBefore = $before;
+        unset($restBefore['retired']);
+
+        $affected = $this->repo->markPlayerRetired(200000303);
+
+        self::assertSame(0, $affected);
+        $after = $this->fetchPlayerRow(200000303);
+        self::assertSame(1, $after['retired']);
+        $restAfter = $after;
+        unset($restAfter['retired']);
+        self::assertSame($restBefore, $restAfter);
+    }
+
+    public function testMarkPlayerRetiredSecondCallIsIdempotent(): void
+    {
+        $this->insertTestPlayer(200000304, 'Mark Retired Twice');
+
+        $first = $this->repo->markPlayerRetired(200000304);
+        $second = $this->repo->markPlayerRetired(200000304);
+
+        self::assertSame(1, $first);
+        self::assertSame(0, $second);
+        $after = $this->fetchPlayerRow(200000304);
+        self::assertSame(1, $after['retired']);
+    }
+
+    public function testMarkPlayerRetiredOnlyChangesTargetPlayer(): void
+    {
+        $this->insertTestPlayer(200000305, 'Mark Retired Target');
+        $this->insertTestPlayer(200000306, 'Mark Retired Bystander Zero');
+        $this->insertTestPlayer(200000307, 'Mark Retired Bystander Null', ['retired' => null]);
+        $this->insertTestPlayer(200000308, 'Mark Retired Bystander One', ['retired' => 1]);
+        $zeroBefore = $this->fetchPlayerRow(200000306);
+        $nullBefore = $this->fetchPlayerRow(200000307);
+        $oneBefore = $this->fetchPlayerRow(200000308);
+
+        $affected = $this->repo->markPlayerRetired(200000305);
+
+        self::assertSame(1, $affected);
+        $target = $this->fetchPlayerRow(200000305);
+        self::assertSame(1, $target['retired']);
+        self::assertSame($zeroBefore, $this->fetchPlayerRow(200000306));
+        $nullAfter = $this->fetchPlayerRow(200000307);
+        self::assertNull($nullAfter['retired']);
+        self::assertSame($nullBefore, $nullAfter);
+        self::assertSame($oneBefore, $this->fetchPlayerRow(200000308));
+    }
+
+    public function testMarkPlayerRetiredReturnsZeroAndCreatesNoRowForUnknownPid(): void
+    {
+        $before = $this->countPlayers();
+
+        $affected = $this->repo->markPlayerRetired(200000309);
+
+        self::assertSame(0, $affected);
+        self::assertSame($before, $this->countPlayers());
+        self::assertSame(0, $this->countPlayersWithPid(200000309));
     }
 
     // ── upsertHofInductee ────────────────────────────────────────

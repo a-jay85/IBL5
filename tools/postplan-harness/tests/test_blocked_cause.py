@@ -256,6 +256,107 @@ def test_local_gate_verdict_names_command_and_tail():
     assert "\n" not in line
 
 
+_FAIL_LINE = ("FAIL  /wt/IBL5/.claude/rules/x.md  16150 bytes  lazy (path-scoped) tier  "
+              "cap 16000  over by 150  -- compress this companion; do not raise the cap")
+
+_BOILERPLATE = (
+    "\n"
+    "One or more checks failed:\n"
+    "  1.   A per-file cap was exceeded. Resident (path-unscoped) rules load into EVERY\n"
+    "       session and every sub-agent — trim, or move rationale into a path-scoped\n"
+    "       companion. Lazy (path-scoped) rules have a looser regrowth cap — compress\n"
+    "       the companion. Never raise a cap to make the gate pass.\n"
+    "  2.   Aggregate resident byte budget exceeded (lazy files never count toward it).\n"
+    "       Override only deliberately, and only to diagnose:\n"
+    "       RULES_RESIDENT_BUDGET=<n> RULES_LAZY_BUDGET=<n> RULES_TOTAL_BUDGET=<n>\n"
+    "  3.   A paths: glob matches no tracked file (rule can never load). Fix or remove it.\n"
+    "  4.   A path-scoped rule is no longer named by its always-on referrer (payload\n"
+    "       unreachable). Restore the stub pointer in the always-on file.\n"
+)
+
+_BYTE_BUDGET_FULL = (
+    "On-touch doc check passed (3 files)\n"
+    "On-touch doc check passed: README.md\n"
+    "On-touch doc check passed: ibl5/docs/schema/current-schema.sql\n"
+    + _FAIL_LINE + "\n"
+    + _BOILERPLATE
+    + "Trim the rule(s) above (or move detail into a path-scoped *-detail.md\n"
+    "companion) before committing.\n"
+)
+
+
+def _truncated_result(full, **kw):
+    """Mirror gitad.commit_all: error = head slice of 800, error_output_tail = whole text."""
+    return _failed("local-gate", "local-gate: " + full[:800],
+                   error_output_tail=full, error_cmd="git commit", **kw)
+
+
+def _assert_truncation_shape():
+    from harness.adapters.gitad import classify_local_gate_denial as cls
+    head = "local-gate: " + _BYTE_BUDGET_FULL[:800]
+    assert len(_BYTE_BUDGET_FULL) > 800 and "Trim the rule(s) above" not in head
+    assert _FAIL_LINE in head                      # blocked-ship path extraction reads the head
+    assert cls(head) == "unknown" and cls(_BYTE_BUDGET_FULL) == "byte-budget"
+
+
+def _blocked_ship_text(res, tmp_path):
+    runner.write_blocked_ship(str(tmp_path), res, 3, "/wt")
+    return (tmp_path / runner.BLOCKED_SHIP_FILE).read_text()
+
+
+def test_truncated_byte_budget_denial_verdict_names_class_and_remedy():
+    _assert_truncation_shape()
+    res = _truncated_result(_BYTE_BUDGET_FULL)
+    line = runner.verdict_line(res, 3, "")
+    assert "[class=byte-budget]" in line
+    assert runner._GATE_REMEDY["byte-budget"] in line
+    assert "[class=unknown]" not in line
+    assert runner._GATE_REMEDY["unknown"] not in line
+    assert "\n" not in line
+
+
+def test_truncated_byte_budget_denial_blocked_ship_names_file_and_steps(tmp_path):
+    _assert_truncation_shape()
+    text = _blocked_ship_text(_truncated_result(_BYTE_BUDGET_FULL), tmp_path)
+    assert "/wt/IBL5/.claude/rules/x.md" in text
+    assert "A rule file under .claude/rules is over its size limit." in text
+    assert "bin/check-rules-byte-budget" in text
+    assert "A pre-commit or pre-push check refused the commit." not in text
+
+
+@pytest.mark.parametrize("tail", [
+    pytest.param("gofmt: engine/x.go needs formatting\n", id="gofmt"),
+    pytest.param("Fix the above doc issues before committing.\n", id="docs-hint"),
+    pytest.param(_BOILERPLATE, id="boilerplate-only"),
+])
+def test_truncated_tail_without_byte_budget_marker_stays_unknown(tail, tmp_path):
+    res = _truncated_result("x" * 900 + "\n" + tail)
+    line = runner.verdict_line(res, 3, "")
+    assert "[class=unknown]" in line
+    assert "[class=byte-budget]" not in line
+    text = _blocked_ship_text(res, tmp_path)
+    assert "A pre-commit or pre-push check refused the commit." in text
+    assert "over its size limit" not in text
+
+
+def test_truncated_doc_staleness_tail_is_not_upgraded(tmp_path):
+    res = _truncated_result("x" * 900 + "\nBump last_verified in docs/a.md\n")
+    line = runner.verdict_line(res, 3, "")
+    assert "[class=unknown]" in line
+    assert "[class=doc-staleness]" not in line
+    assert runner._GATE_REMEDY["doc-staleness"] not in line
+    text = _blocked_ship_text(res, tmp_path)
+    assert "A doc changed but its last_verified date was not updated." not in text
+
+
+def test_head_class_wins_over_byte_budget_tail():
+    res = _failed("local-gate", "local-gate: pre-commit-adr-gate: needs ADR ...",
+                  error_output_tail=_BYTE_BUDGET_FULL, error_cmd="git commit")
+    line = runner.verdict_line(res, 3, "")
+    assert "[class=adr]" in line
+    assert "[class=byte-budget]" not in line
+
+
 def test_fallback_names_stage_when_no_command():
     line = runner.verdict_line(_failed(None, "phase3: something odd"), 3, "")
     assert "cause unknown (stage: phase3)" in line
@@ -321,12 +422,13 @@ def test_diverged_block_names_stage_and_evidence():
 
 def test_block_10kb_error_under_budget_keeps_fix_and_log():
     big = "\n".join(f"line {i:03d} " + "x" * 40 for i in range(200))
-    res = _failed(None, big, error_cmd="c" * 10000, error_output_tail=big, slug="z" * 200)
+    res = _failed(None, big, error_cmd="c" * 10000, error_output_tail=big, slug="z" * 150)
     log = "l" * 500
     block = _block(res, wt="w" * 500, log=log)
     assert len(block) <= runner._BLOCK_BUDGET
     assert "\nFix:\n  1. cd " in block
-    assert block.splitlines()[-1] == f"Log: {log}"
+    assert f"Log: {log}" in block.splitlines()
+    assert "postplan-fix" in block.splitlines()[-1]
     assert sum(1 for ln in block.splitlines() if ln.startswith("> ")) <= 3
 
 

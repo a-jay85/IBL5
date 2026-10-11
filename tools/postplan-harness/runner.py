@@ -30,13 +30,14 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, holdrepeat, llm_calls,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, llm_calls,
                      manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
@@ -2708,6 +2709,21 @@ _GATE_REMEDY = {
 }
 
 
+def _reported_gate_class(res: RunResult) -> str:
+    """Gate class for REPORTING (verdict_line, human_block). Never use it to branch on remediation.
+
+    `res.error` is `"local-gate: " + detail[:800]`, so a long byte-budget denial loses the
+    hook's trailing `Trim the rule(s) above` line and classifies `unknown`. `error_output_tail`
+    keeps the last 4000 chars. Upgrade ONLY `unknown` -> `byte-budget`: its _GATE_REMEDY text
+    claims no action the run took. The other remedies (doc-staleness, adr, stale-base) say
+    "Auto-remediation ran" or "the harness's one ADR draft attempt", which is false when
+    truncation hid the class from the behavior sites, so they are never upgraded here."""
+    head = classify_local_gate_denial(res.error or "")
+    if head == "unknown" and classify_local_gate_denial(res.error_output_tail or "") == "byte-budget":
+        return "byte-budget"
+    return head
+
+
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
     3 = fail-closed sentinel: bin/post-plan-now MUST NOT escalate to the /post-plan
@@ -2854,6 +2870,12 @@ def _path_lines(paths: list[str], limit: int) -> list[str]:
     return out
 
 
+def _postplan_fix_cmd() -> str:
+    """Absolute path of bin/postplan-fix in the checkout this runner lives in."""
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(root, "bin", "postplan-fix")
+
+
 def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     """Plain-language message for an exit-3 stop: what broke, the exact fix, where the log is.
 
@@ -2863,6 +2885,7 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     if rc != 3:
         return ""
     branch = res.slug or "This branch"
+    fix_arg = str(res.pr_number) if res.pr_number else (res.slug or "")
     leaf = (res.slug or "branch").rsplit("/", 1)[-1]
     wt = worktree or "(the worktree folder)"
     log = log_path or "(see the run log)"
@@ -2870,7 +2893,7 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
                           "usage-pause-unconfirmed", "usage-pause-dirty"):
         key = res.error_kind
     elif res.error_kind == "local-gate":
-        key = "gate-" + classify_local_gate_denial(res.error or "")
+        key = "gate-" + _reported_gate_class(res)
     else:
         key = "unknown"
     if key == "gate-adr" and res.adr_drafted:
@@ -2961,11 +2984,13 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
         for s in steps:
             n += 1
             lines.append(f"  {n}. {s}")
-        lines += [f"  {n + 1}. bin/post-plan-now", "",
-                  "Or open Claude in that folder and ask it to fix the ship block."]
+        lines += [f"  {n + 1}. bin/post-plan-now", ""]
         if res.error_kind == "rebase-conflict" and res.block_cause:
             lines.append("Cause: " + " ".join(res.block_cause.split()))
         lines.append(f"Log: {log}")
+        if fix_arg:
+            lines += ["Or paste this to have Claude fix it:",
+                      f"{_postplan_fix_cmd()} {shlex.quote(fix_arg)}"]
         return "\n".join(lines)
 
     block = render(_BLOCK_MAX_PATHS, True)
@@ -3013,21 +3038,36 @@ def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, lo
             return False
         rec = holdrepeat.load_record(hr_dir, slug) or {}
         key = rec.get("structural_key") or ""
+        try:  # suppression is advisory: a marker failure must never undo the decline
+            marker = heldmarker.write(
+                hr_dir, slug, plan_path=plan.path,
+                now=datetime.datetime.now(datetime.timezone.utc).isoformat())
+        except Exception:  # noqa: BLE001
+            marker = None
+        marker_path, marker_new = marker if marker else ("", False)
         dm_sent = False
-        if key and rec.get("dm_sent_key") != key:
-            dm_sent = _dm(f"post-plan declined before spending tokens: {slug}\n"
-                          f"Same hold as last run: {reason}\n"
-                          "Fix the missing files, or re-fire with:\n"
-                          "  bin/post-plan-now --force")
+        if key and (rec.get("dm_sent_key") != key or marker_new):
+            msg = (f"post-plan declined before spending tokens: {slug}\n"
+                   f"Same hold as last run: {reason}\n"
+                   "Fix the missing files, or re-fire with:\n"
+                   "  bin/post-plan-now --force")
+            if marker_path:
+                msg += ("\nScheduled re-runs (bin/pr-cycle, bin/post-plan-fleet, automouse) now skip"
+                        " this slug until the plan file or this hold changes.\n"
+                        f"Marker: {marker_path}\n"
+                        "To clear it: edit the plan, or delete the marker file."
+                        " bin/post-plan-now --force bypasses it for one run.")
+            dm_sent = _dm(msg)
             if dm_sent:
                 holdrepeat.mark_dm_sent(hr_dir, slug, key)
         res.terminal = TerminalState.HOLD_REPEAT_DECLINED
         res.hold_repeat = {"early_decline": True, "reason": reason,
                            "structural_key": key,
                            "repeat_count": rec.get("repeat_count") or 0,
-                           "dm_sent": dm_sent}
+                           "dm_sent": dm_sent, "marker": marker_path}
         log(f"phase2 early hold-repeat: DECLINED, same MISSING set as last hold "
-            f"({reason}) dm={'sent' if dm_sent else 'skipped'}")
+            f"({reason}) dm={'sent' if dm_sent else 'skipped'} "
+            f"marker={'written' if marker_path else 'skipped'}")
         return True
     except Exception as exc:  # fail-open: a bug here must only cost tokens
         log(f"phase2 early hold-repeat: skipped ({exc})")
@@ -3045,6 +3085,8 @@ def _record_hold_repeat(res, decision, slug, worktree, state_dir, log) -> dict |
                                  now=datetime.datetime.now(datetime.timezone.utc).isoformat())
         out = {"action": obs.action, "key": obs.key,
                "repeat_count": obs.repeat_count, "reasons": obs.reasons, "dm": ""}
+        if obs.action in ("cleared", "recorded"):
+            heldmarker.clear(state_dir, slug)  # new key or no hold: the marker no longer describes this hold
         if obs.action == "repeat-dm":
             ok = _send_hold_repeat_dm(slug, res.pr_number, obs)
             out["dm"] = "sent" if ok else "failed"
@@ -3174,11 +3216,13 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             tail = " ".join(_error_tail(res.error_output_tail or res.error)) or "see gate output"
             cmd = _cmd_text(res.error_cmd)
             detail = f"Command: {cmd}. Error: {tail}" if cmd else tail
-            # Classify on the FULL res.error, never on `detail`: _flat truncates at 300
-            # chars and the hooks echo their guidance line LAST, so classifying the
-            # flattened form would silently degrade a long byte-budget denial to
-            # "unknown" and print the wrong remedy.
-            gate_class = classify_local_gate_denial(res.error or "")
+            # Never classify on `detail`: _flat truncates at 300 chars. res.error is itself
+            # only the 800-char head of the hook output (commit_all keeps detail[:800]) and
+            # the hooks echo their guidance line LAST, so a long byte-budget denial reads
+            # "unknown" there. _reported_gate_class also consults error_output_tail (the
+            # last 4000 chars) for that one class. Reporting only: the remediation branch
+            # keeps classifying res.error.
+            gate_class = _reported_gate_class(res)
             drafted = (f" The harness drafted {res.adr_path} ({res.adr_draft_model}) "
                        "and the hook still denied; the draft is committed locally on "
                        "the branch for review." if res.adr_drafted else "")

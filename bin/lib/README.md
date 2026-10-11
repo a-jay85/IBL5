@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-10-09
+last_verified: 2026-10-10
 ---
 
 # bin/lib — Shared Library Files
@@ -16,6 +16,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `bug-pipeline-gh.sh` | Best-effort GitHub issue-tracking seam for the autonomous bug pipeline (§3f) |
 | `harness.sh` | Shared assertion, counter, summary, tmpdir and fake-git-repo helpers (`h_*`) sourced by `bin/test-*` harnesses; exercised by `bin/test-harness-lib` |
 | `bug-pipeline-test-stubs.sh` | Shared stub scaffolding for `bin/test-bug-pipeline-*` harnesses |
+| `gate-common.php` | PHP helpers `require_once`d by `bin/adr-check` and `bin/refactor-flag`: `runCmd`, `fetchPrBody`, `gateDiffNames`, `gateExtractBypassReason`; per-gate regex, minimum length and diff range stay in each gate |
 | `db-helpers.sh` | Shared database helper functions for Docker MariaDB interactions (password-warning suppression, exec wrappers, and `db_resolve_target` / `db_container_running` — the main-stack-vs-worktree-container routing used by `ibl5/bin/db-query`) |
 | `restore-rowcount-compare.sh` | Pre-dump vs restored `COUNT(*)` check for the nightly backup in `.github/workflows/db-backup.yml`; subcommands `snapshot` / `extract` / `compare`, also piped to prod over `bash -s` (functions only, `main` is guarded) |
 | `hold-check-patterns.txt` | Ask-shaped-sentence patterns for `## Automouse Hold Justification` sections; one pattern per line, read by both `bin/lib/hold-check.sh` (POSIX ERE via `grep -E`) and `harness/planfile.py` (Python `re`) — see the file header for the two-language portable subset |

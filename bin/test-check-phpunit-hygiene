@@ -61,14 +61,16 @@ mk_repo() {
     echo "$d"
 }
 
-# run_case <name> <expected-exit> <expected-output-regex|-> <fixture-relpath> <fixture-body>
+# run_case <name> <expected-exit> <expected-output-regex|-> <fixture-relpath> <fixture-body> [allowlist-body]
 # Builds a repo with one fixture file and runs check-phpunit-hygiene (MODE=all).
+# The optional allowlist-body becomes the repo's .phpunit-source-read-allowlist.
 run_case() {
-    local name="$1" want="$2" want_re="$3" relpath="$4" body="$5"
+    local name="$1" want="$2" want_re="$3" relpath="$4" body="$5" allow="${6-}"
     local d out rc
     d="$(mk_repo)"
     mkdir -p "$d/$(dirname "$relpath")"
     printf '%s\n' "$body" > "$d/$relpath"
+    [ -n "$allow" ] && printf '%s\n' "$allow" > "$d/.phpunit-source-read-allowlist"
     out="$( ( cd "$d" && "$HYGIENE" ) 2>&1 )"
     rc=$?
     if [ "$rc" -ne "$want" ]; then
@@ -332,6 +334,134 @@ class ConstStaticCallTest extends TestCase
     }
 }'
 
+# --- New: source-text-read check ---
+
+run_case "source-read-php-literal-flagged" 1 'source-text-read' "ibl5/tests/SrcReadPhpTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadPhpTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../scripts/foo.php');
+    }
+}'
+
+run_case "source-read-getfilename-flagged" 1 'source-text-read' "ibl5/tests/SrcReadSelfTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadSelfTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents((string) (new \ReflectionClass(self::class))->getFileName());
+    }
+}'
+
+run_case "source-read-htaccess-flagged" 1 'source-text-read' "ibl5/tests/SrcReadHtaccessTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadHtaccessTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../scripts/.htaccess');
+    }
+}'
+
+run_case "source-read-fixture-sco-ok" 0 '-' "ibl5/tests/SrcReadScoTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadScoTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../scripts/data/sample.sco');
+    }
+}'
+
+run_case "source-read-golden-html-ok" 0 '-' "ibl5/tests/SrcReadHtmlTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadHtmlTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../modules/Foo/golden.html');
+    }
+}'
+
+run_case "source-read-json-not-js-ok" 0 '-' "ibl5/tests/SrcReadJsonTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadJsonTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../classes/data/payload.json');
+    }
+}'
+
+run_case "source-read-allowlisted-ok" 0 '-' "ibl5/tests/SrcReadAllowedTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadAllowedTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../scripts/foo.php');
+    }
+}' \
+"# guards the CLI entry point
+ibl5/tests/SrcReadAllowedTest.php"
+
+run_case "source-read-allowlist-other-file-flagged" 1 'source-text-read' "ibl5/tests/SrcReadOtherTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadOtherTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../scripts/foo.php');
+    }
+}' \
+"# ibl5/tests/SrcReadOtherTest.php
+ibl5/tests/OtherTest.php"
+
+run_case "source-read-inline-allow-ok" 0 '-' "ibl5/tests/SrcReadInlineTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadInlineTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // phpunit-hygiene-allow: pins the CLI guard as the first statement
+        $s = file_get_contents(__DIR__ . '/../../scripts/foo.php');
+    }
+}'
+
+run_case "source-read-short-reason-flagged" 1 'source-text-read' "ibl5/tests/SrcReadShortTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadShortTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // phpunit-hygiene-allow: too short
+        $s = file_get_contents(__DIR__ . '/../../scripts/foo.php');
+    }
+}'
+
 # --- base-ref seam (--pr): PHPUNIT_HYGIENE_BASE_REF / E2E_HYGIENE_BASE_REF ---
 # Both gates share one contract: unset or empty means origin/master, a non-empty
 # value is the --pr diff base, and a non-empty value that is not a commit exits 2.
@@ -394,6 +524,17 @@ PV=PHPUNIT_HYGIENE_BASE_REF
 # `ibl5/tests/e2e/**/*.ts`) need a subdirectory to match.
 PF="ibl5/tests/Seam/SeamSkipTest.php"
 run_seam_case "phpunit-seam-unset-defaults-origin-master" "$HYGIENE" "$PV" unset 1 'mark-test-skipped' "$PF" "$SEAM_PHP"
+SEAM_SRC_PHP='<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SeamSrcReadTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . "/../../scripts/foo.php");
+    }
+}'
+run_seam_case "source-read-pr-mode-flagged" "$HYGIENE" "$PV" base 1 'source-text-read' "ibl5/tests/Seam/SeamSrcReadTest.php" "$SEAM_SRC_PHP"
 run_seam_case "phpunit-seam-empty-defaults-origin-master" "$HYGIENE" "$PV" empty 1 'mark-test-skipped' "$PF" "$SEAM_PHP"
 run_seam_case "phpunit-seam-base-flags"                   "$HYGIENE" "$PV" base  1 'mark-test-skipped' "$PF" "$SEAM_PHP"
 run_seam_case "phpunit-seam-head-excludes-file"           "$HYGIENE" "$PV" head  0 '-' "$PF" "$SEAM_PHP"

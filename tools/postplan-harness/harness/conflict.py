@@ -391,6 +391,11 @@ def parse_verdict(reply: str) -> str:
     return next(iter(found))
 
 
+def verdict_ok_path(key: str, sha: str) -> str:
+    """The conflict-review verdict file review_resolution writes for `sha`."""
+    return f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
+
+
 def review_resolution(
     llm,
     run: Callable[..., str],
@@ -461,9 +466,7 @@ def review_resolution(
     verdict_line = parse_verdict(reply)
 
     post_resolution_sha = run("rev-parse", "HEAD").strip()
-    verdict_path = Path(
-        f"/tmp/postplan-conflict-verdict-{key}-{post_resolution_sha}.ok"
-    )
+    verdict_path = Path(verdict_ok_path(key, post_resolution_sha))
     verdict_path.write_text(verdict_line + "\n" + reply)
 
     sidecar_path = Path(f"/tmp/postplan-conflict-sha-{key}.txt")

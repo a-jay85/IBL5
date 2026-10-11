@@ -15,7 +15,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
-from harness import holdrepeat
+from harness import heldmarker, holdrepeat
 from harness.adapters.llm import FixtureLlm
 from harness.state import TerminalState, UsageLedger
 
@@ -200,3 +200,49 @@ def test_dm_cmd_empty_env_uses_discord_dm(monkeypatch):
     assert argv[0] == os.path.join(repo_root, "bin", "discord-dm")
     assert kw["timeout"] == 60
     assert "PR #none" in argv[-1]
+
+
+# --- held-unfixable marker cleanup in _record_hold_repeat ------------------------------------
+
+MISSING_A = "MISSING: ibl5/tests/Cli/CheckE2eHygieneCliTest.php"
+MISSING_B = "MISSING: ibl5/tests/Cli/OtherTest.php"
+
+
+def _seed_marker(tmp_path):
+    state = str(tmp_path / "state")
+    plan = tmp_path / "plan.md"
+    plan.write_text("# plan\n")
+    cond = [{"number": 3, "name": "tests", "blocked": True, "reason": MISSING_A}]
+    holdrepeat.observe(state, SLUG, armed=False, conditions=cond, fingerprint="fp", pr=1, now="t")
+    assert heldmarker.write(state, SLUG, plan_path=str(plan), now="t") is not None
+    marker = tmp_path / "state" / f"{SLUG}.held-unfixable.json"
+    assert marker.exists()
+    return state, plan, marker
+
+
+def _record_call(state, plan, *, armed, reason):
+    res = types.SimpleNamespace(plan=types.SimpleNamespace(found=True, path=str(plan)), pr_number=1)
+    decision = types.SimpleNamespace(
+        armed=armed,
+        conditions=[{"number": 3, "name": "tests", "blocked": True, "reason": reason}])
+    return runner._record_hold_repeat(res, decision, SLUG, None, state, lambda m: None)
+
+
+def test_record_hold_repeat_clears_marker_when_armed(tmp_path, dm):
+    state, plan, marker = _seed_marker(tmp_path)
+    _record_call(state, plan, armed=True, reason="")
+    assert not marker.exists()
+
+
+def test_record_hold_repeat_clears_marker_on_new_key(tmp_path, dm):
+    state, plan, marker = _seed_marker(tmp_path)
+    out = _record_call(state, plan, armed=False, reason=MISSING_B)
+    assert out["action"] == "recorded"
+    assert not marker.exists()
+
+
+def test_record_hold_repeat_keeps_marker_on_repeat(tmp_path, dm):
+    state, plan, marker = _seed_marker(tmp_path)
+    out = _record_call(state, plan, armed=False, reason=MISSING_A)
+    assert out["action"].startswith("repeat")
+    assert marker.exists()

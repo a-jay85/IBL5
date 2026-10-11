@@ -110,7 +110,7 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
             $monthLabel = $data['label'];
 
             $html .= '<div class="schedule-month" id="month-' . $monthKey . '">';
-            $headerClass = 'schedule-month__header';
+            $headerClass = 'ibl-card__header schedule-month__header';
             if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
                 $headerClass .= ' schedule-month__header--playoffs';
             }

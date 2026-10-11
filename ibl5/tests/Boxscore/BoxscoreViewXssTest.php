@@ -186,4 +186,14 @@ final class BoxscoreViewXssTest extends TestCase
         $this->assertStringContainsString($escaped, $output);
         $this->assertStringNotContainsString($xss, $output);
     }
+
+    public function testAllStarRenameChipCarriesChipClasses(): void
+    {
+        $view = new BoxscoreView();
+        $output = $view->renderAllStarRenameUI([
+            ['id' => 1, 'date' => '2024-01-15', 'name' => 'East', 'seasonYear' => 2024, 'teamLabel' => 'Eastern', 'players' => ['Player One']],
+        ]);
+
+        $this->assertStringContainsString('<span class="ibl-chip ibl-chip--navy all-star-rename__chip">', $output);
+    }
 }

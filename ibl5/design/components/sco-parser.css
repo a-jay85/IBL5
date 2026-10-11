@@ -108,8 +108,6 @@
     font-weight: var(--font-weight-medium);
     padding: 0.125rem 0.5rem;
     border-radius: var(--radius-full);
-    background: var(--navy-800);
-    color: white;
     white-space: nowrap;
 }
 

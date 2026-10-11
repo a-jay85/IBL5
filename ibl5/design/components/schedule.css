@@ -104,10 +104,8 @@
     overflow: hidden;
 }
 
-.schedule-month__header {
+.ibl-card__header.schedule-month__header {
     padding: 4px 8px;
-    background: var(--navy-800);
-    color: white;
     font-family: var(--font-display);
     font-size: var(--text-lg);
     font-weight: var(--font-weight-bold);
@@ -116,7 +114,7 @@
     border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
-.schedule-month__header--playoffs {
+.ibl-card__header.schedule-month__header--playoffs {
     background: var(--accent-700);
 }
 
@@ -327,7 +325,7 @@
         width: calc(100% + 16px);
     }
 
-    .schedule-month__header {
+    .ibl-card__header.schedule-month__header {
         border-radius: 0;
     }
 
@@ -416,10 +414,10 @@
 }
 
 /* Team Schedule - Color overrides using custom properties
-   --team-primary and --team-secondary are set inline on .schedule-container--team */
+   --team-color-primary and --team-color-secondary are set inline on .schedule-container--team */
 .schedule-container--team .schedule-month__header {
-    background: var(--team-primary);
-    color: var(--team-secondary);
+    background: var(--team-color-primary);
+    color: var(--team-color-secondary);
 }
 
 .schedule-container--team .schedule-month__header--playoffs {
@@ -428,20 +426,20 @@
 }
 
 .schedule-container--team .ibl-jump-menu__link:hover {
-    background: var(--team-primary);
-    color: var(--team-secondary);
+    background: var(--team-color-primary);
+    color: var(--team-color-secondary);
 }
 
 .schedule-container--team a.schedule-jump-btn {
-    background: var(--team-primary);
-    color: var(--team-secondary);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--team-primary) 40%, transparent);
+    background: var(--team-color-primary);
+    color: var(--team-color-secondary);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--team-color-primary) 40%, transparent);
 }
 
 .schedule-container--team a.schedule-jump-btn:hover {
-    background: var(--team-primary);
+    background: var(--team-color-primary);
     opacity: 0.9;
-    box-shadow: 0 4px 12px color-mix(in srgb, var(--team-primary) 50%, transparent);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--team-color-primary) 50%, transparent);
 }
 
 /* Mobile adjustments for team schedule grid with streak */

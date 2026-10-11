@@ -355,6 +355,17 @@ class DepthChartViewTest extends TestCase
     // Mobile view tests
     // =====================================================================
 
+    public function testPositionBadgeCarriesChipClasses(): void
+    {
+        $player = $this->buildTestPlayer();
+
+        ob_start();
+        $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('<span class="ibl-chip ibl-chip--navy dc-card__pos-badge">', $output);
+    }
+
     public function testRenderMobileViewContainsCardContainer(): void
     {
         $players = [$this->buildTestPlayer()];

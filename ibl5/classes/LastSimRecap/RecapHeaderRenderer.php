@@ -26,7 +26,7 @@ final class RecapHeaderRenderer
             $subtitle = $windowLabel;
         }
 
-        $h  = '<header class="last-sim-recap__head">';
+        $h  = '<header class="ibl-card__header last-sim-recap__head">';
         $h .= '  <div class="last-sim-recap__head-dates">';
         $h .= '    <span class="last-sim-recap__sub">' . HtmlSanitizer::e($subtitle) . '</span>';
         $h .= '  </div>';

@@ -4,17 +4,21 @@ from __future__ import annotations
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.adaptations import (
     DIVERGED_VERDICT,
     MAX_ADAPTED_LINES,
     LostLine,
+    Justification,
     NearMatch,
     Transform,
     accept_deterministic,
     cross_check_pre_patch,
     derive_master_transforms,
+    _pair_justifications,
     near_match,
     parse_lost_lines,
 )
@@ -328,3 +332,53 @@ def test_audit_lines_render_every_accepted_adaptation_and_summary():
         assert f"{e.path}: +{e.original} => +{e.adapted} [{e.old} -> {e.new}]" in line
     assert lines[2].startswith("adapted-lines=2 accepted")
     assert audit_lines_for_adaptations(()) == ()
+
+
+_P = "bin/t"
+_ORIG = "run /tmp/b"
+_ADPT = 'run "$RL"/b'
+_REAL = Transform("/tmp", '"$RL"')
+_M = NearMatch(_P, _ORIG, _ADPT, (_REAL,))
+_REJECT = f"no resolver justification for {_P}: +{_ORIG}"
+
+
+def _j(old, new, path=_P, original=_ORIG, adapted=_ADPT):
+    return Justification(path, original, adapted, old, new)
+
+
+def test_pair_accepts_stripped_master_transform():
+    from harness.adaptations import AcceptedAdaptation
+    got, reason = _pair_justifications((_M,), (_j("/tmp", '"$RL"'),))
+    assert reason == ""
+    assert got == (AcceptedAdaptation(_P, _ORIG, _ADPT, "/tmp", '"$RL"'),)
+
+
+def test_pair_rejects_rewrite_that_misses_adapted_line():
+    assert _pair_justifications((_M,), (_j("tmp", '"$RL"'),)) == ((), _REJECT)
+
+
+def test_pair_rejects_old_absent_from_original():
+    assert _pair_justifications((_M,), (_j("/var/", '"$RL"/'),)) == ((), _REJECT)
+
+
+@pytest.mark.parametrize("kw", [
+    {"path": "bin/u"},
+    {"original": "run /tmp/c"},
+    {"adapted": 'run "$RL"/c'},
+])
+def test_pair_rejects_mismatched_path_original_or_adapted(kw):
+    got, reason = _pair_justifications((_M,), (_j("/tmp", '"$RL"', **kw),))
+    assert got == ()
+    assert reason == _REJECT
+
+
+def test_pair_one_justification_cannot_cover_two_matches():
+    other = NearMatch(_P, "cat /tmp/z", 'cat "$RL"/z', (_REAL,))
+    one = (_j("/tmp", '"$RL"'),)
+    assert _pair_justifications((_M, other), one) == (
+        (), f"no resolver justification for {_P}: +cat /tmp/z")
+    assert _pair_justifications((_M, _M), one) == ((), _REJECT)
+
+
+def test_pair_rejects_empty_justifications():
+    assert _pair_justifications((_M,), ()) == ((), _REJECT)

@@ -57,6 +57,16 @@ class SeasonHighsRepository extends \Database\BaseMysqliRepository implements Se
         // The ibl_plr.name field is varchar(32) which stores full names
         // Also JOIN with ibl_schedule to get box_id for linking to box scores
         // Also JOIN with ibl_team_info to get team colors for styled team cell
+        // ibl.sqlStringConcatenation stays baselined for $statExpression and
+        // $safeStatName in both branches below. They are caller-supplied
+        // identifiers (an arithmetic expression over backticked columns and its
+        // alias), not a closed set this class owns, so there is no constant map
+        // for PHPStan to narrow against. Both are allowlisted at runtime above:
+        // assertSafeStatExpression() enforces STAT_EXPRESSION_PATTERN and
+        // sanitizeStatName() reduces the alias to [A-Za-z0-9_] or throws. The
+        // closed set of expressions lives in SeasonHighsService::STATS; moving it
+        // here would change the getSeasonHighs() contract. Covered by
+        // SeasonHighsRepositoryTest (reject and strip-alias cases).
         if ($tableSuffix === '') {
             $query = "SELECT p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
                 t.`team_city`, t.`color1`, t.`color2`,

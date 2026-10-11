@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-05
+last_verified: 2026-10-10
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -210,6 +210,8 @@ Omit the field entirely when the phase needs nothing beyond the always-on set. A
 The reason is 15 or more characters, free of `(`, `)`, `|` and backticks, so a reviewer can rerun the check by hand. `bin/lib/plan-matrix-assertions` skips a tagged row instead of reporting it unrealised; a malformed tag is ignored fail-closed and the row is checked. `bin/check-plan` gate `[Y]` rejects a bad shape, a tag on a non-`CLI-executable` row, and a matrix with tagged rows above one third of its rows.
 
 Out-of-repo and post-PR rows carry the tag at write time. A `CLI-executable` row whose location cell runs only `~/`, `$HOME`, or `/tmp` paths (a scratch script under `~/claude-plans/_scripts/`, a memory file, a hook) or queries the open PR with `gh run`, `gh pr`, or `gh api` has no footprint a diff can carry, so Step 6.7 would stop on its tokens. End its What-to-verify cell with `(one-time-check: <reason>)` as you write it; `bin/check-plan` gate `[Z]` fails the plan otherwise. A command that also runs a repo `bin/` script, a repo test, `composer`, `php`, `npx`, `docker`, or `curl` is in-repo and stays untagged. Tokens that sit only inside a `Mutation:` clause (from the label to its `⇒`, sentence end, or cell end) are excluded by `bin/lib/plan-matrix-assertions` and need no tag. A token also named outside the clause is still checked.
+
+**Bootstrap tokens.** A PR that adds a gate banning a token shape can need a matrix row that shows that same token. The row proving the new gate rejects `FUN_00401000` names `FUN_00401000`, the PR's own gate keeps that literal off every added line, and `bin/lib/plan-matrix-assertions` then reports the row unrealised, so Step 6.7 stops (`jsb-clean-room-rebuild-ibl5-freeze`, 2026-10-10). Write such a row one of two ways. When the evidence is one plan-time run, end the cell with `(one-time-check: <what was run and what it printed>)`. When a regression test pins the behavior, name the test method in backticks and describe the banned token in plain prose with no code span, for example "the FUN_ prefix followed by eight hex digits". Gate `[MT]` in `bin/check-plan` catches the two token shapes the helper can never match (a `:LINE` suffix and an orphan snapshot stem); the bootstrap case stays a note because only the PR under review knows which tokens its new gate bans.
 
 ## Column-bound literal citations
 

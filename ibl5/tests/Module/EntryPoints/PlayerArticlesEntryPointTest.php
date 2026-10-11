@@ -15,6 +15,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[PreserveGlobalState(false)]
 class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
 {
+    private const PREPARED_SQL = 'SELECT sid, title, time FROM nuke_stories WHERE hometext LIKE ? OR bodytext LIKE ? ORDER BY time DESC';
+
     private function runArticles(string $player): string
     {
         $_REQUEST['player'] = $player;
@@ -23,6 +25,30 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
         require __DIR__ . '/../../../modules/Player/articles.php';
 
         return (string) ob_get_clean();
+    }
+
+    /** Runs the module with $_REQUEST['player'] left unset. */
+    private function runArticlesWithoutPlayerKey(): string
+    {
+        unset($_REQUEST['player']);
+        $GLOBALS['mysqli_db'] = $this->mockDb;
+        ob_start();
+        require __DIR__ . '/../../../modules/Player/articles.php';
+
+        return (string) ob_get_clean();
+    }
+
+    private function articlesSource(): string
+    {
+        $source = file_get_contents(__DIR__ . '/../../../modules/Player/articles.php');
+        $this->assertIsString($source);
+
+        return $source;
+    }
+
+    private static function anchor(string $sid, string $title, string $time): string
+    {
+        return "\n* <a href=\"modules.php?name=News&amp;file=article&amp;sid={$sid}&amp;mode=&amp;order=0&amp;thold=0\">{$title}</a> ({$time})<br>";
     }
 
     /** @return list<mixed> */
@@ -77,5 +103,109 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
         $output = $this->runArticles('Test Player');
         $this->assertStringContainsString('sid=7', $output);
         $this->assertStringContainsString('Big &lt;b&gt;Game&lt;/b&gt;', $output);
+    }
+
+    public function testPlayerZeroRendersNoticeAndRunsNoQuery(): void
+    {
+        $output = $this->runArticles('0');
+        $this->assertStringContainsString('No player specified', $output);
+        $this->assertSame([], $this->mockDb->getExecutedQueries());
+        $this->assertSame([], $this->mockDb->getPreparedQueries());
+    }
+
+    public function testMissingPlayerKeyRendersNoticeAndRunsNoQuery(): void
+    {
+        $output = $this->runArticlesWithoutPlayerKey();
+        $this->assertStringContainsString('No player specified', $output);
+        $this->assertSame([], $this->mockDb->getExecutedQueries());
+        $this->assertSame([], $this->mockDb->getPreparedQueries());
+    }
+
+    public function testWhitespacePaddedZeroRendersNotice(): void
+    {
+        $output = $this->runArticles(' 0 ');
+        $this->assertStringContainsString('No player specified', $output);
+        $this->assertSame([], $this->mockDb->getExecutedQueries());
+        $this->assertSame([], $this->mockDb->getPreparedQueries());
+    }
+
+    public function testRendersFullAnchorLinesForMultipleRows(): void
+    {
+        $this->mockDb->onQuery('nuke_stories', [
+            ['sid' => 7, 'title' => 'Big <b>Game</b>', 'time' => '2025-01-15 10:00:00'],
+            ['sid' => 12, 'title' => 'Second', 'time' => '2025-01-16 11:30:00'],
+        ]);
+        $output = $this->runArticles('Test Player');
+        $this->assertSame(
+            '<small>'
+            . self::anchor('7', 'Big &lt;b&gt;Game&lt;/b&gt;', '2025-01-15 10:00:00')
+            . self::anchor('12', 'Second', '2025-01-16 11:30:00')
+            . '</small>',
+            $output
+        );
+    }
+
+    public function testNullTitleAndTimeRenderAsEmptyStrings(): void
+    {
+        $this->mockDb->onQuery('nuke_stories', [
+            ['sid' => 8, 'title' => null, 'time' => null],
+        ]);
+        $output = $this->runArticles('Test Player');
+        $this->assertSame('<small>' . self::anchor('8', '', '') . '</small>', $output);
+    }
+
+    public function testTimeAndTitleAreHtmlEscapedWithEntQuotes(): void
+    {
+        $this->mockDb->onQuery('nuke_stories', [
+            ['sid' => 9, 'title' => "O'Neal \"MVP\" <i>", 'time' => '2025 "x" <y> \'z\''],
+        ]);
+        $output = $this->runArticles('Test Player');
+        $this->assertStringContainsString('O&#039;Neal &quot;MVP&quot; &lt;i&gt;', $output);
+        $this->assertStringContainsString('(2025 &quot;x&quot; &lt;y&gt; &#039;z&#039;)', $output);
+        $this->assertStringNotContainsString('<i>', $output);
+    }
+
+    public function testNumericStringSidRendersSameBytes(): void
+    {
+        $this->mockDb->onQuery('nuke_stories', [
+            ['sid' => '7', 'title' => 'T', 'time' => '2025-01-01 00:00:00'],
+        ]);
+        $output = $this->runArticles('Test Player');
+        $this->assertStringContainsString('sid=7&amp;mode=', $output);
+    }
+
+    public function testNoRowsRendersEmptySmallWrapper(): void
+    {
+        $this->mockDb->onQuery('nuke_stories', []);
+        $output = $this->runArticles('Test Player');
+        $this->assertSame('<small></small>', $output);
+    }
+
+    public function testPreparedSqlLiteralAndBoundParamsAreUnchanged(): void
+    {
+        $this->mockDb->onQuery('nuke_stories', []);
+        $this->runArticles('Kobe');
+        $this->assertSame([self::PREPARED_SQL], $this->mockDb->getPreparedQueries());
+        $this->assertSame(['%Kobe%', '%Kobe%'], $this->lastBoundParams());
+    }
+
+    public function testArticlesSourcePinsPreparedStatementAndEscapingCallSites(): void
+    {
+        $source = $this->articlesSource();
+
+        $this->assertSame(1, substr_count($source, '->prepare('));
+        $this->assertStringContainsString('$query = "' . self::PREPARED_SQL . '";', $source);
+        $this->assertStringContainsString('$stmt->bind_param(\'ss\', $searchTerm, $searchTerm);', $source);
+        $this->assertSame(3, substr_count($source, 'htmlspecialchars('));
+        $this->assertSame(3, substr_count($source, ", ENT_QUOTES, 'UTF-8')"));
+        $this->assertStringContainsString(
+            '* <a href=\"modules.php?name=News&amp;file=article&amp;sid=$sid&amp;mode=&amp;order=0&amp;thold=0\">$title</a> ($time)<br>";',
+            $source
+        );
+        $this->assertStringNotContainsString('real_escape_string', $source);
+        $this->assertStringNotContainsString('->query(', $source);
+        $this->assertStringNotContainsString('$player . ', $source);
+        $this->assertStringNotContainsString('. $player', $source);
+        $this->assertStringContainsString('\'%\' . addcslashes($player, \'\\\\%_\') . \'%\'', $source);
     }
 }

@@ -46,6 +46,13 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         $this->newsServiceStub->method('computeByteCounts')->willReturn(['intro' => 0, 'full' => 0, 'total' => 0]);
 
         $this->newsViewStub = self::createStub(\Topics\News\Contracts\NewsViewInterface::class);
+
+        if (!defined('_COMMENTS')) {
+            define('_COMMENTS', 'comments');
+        }
+        if (!defined('_SEARCH')) {
+            define('_SEARCH', 'Search');
+        }
     }
 
     public function testAnonymousHomeRenderUsesStoryHomeAndSkipsRecap(): void
@@ -226,6 +233,289 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         $this->runMain($controller);
     }
 
+    public function testStoryLinkCarriesUserModeOrderAndThold(): void
+    {
+        $captured = $this->captureViewModels();
+        $controller = $this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm', 'umode' => 'nested', 'uorder' => 1, 'thold' => 0, 'storynum' => 10]),
+            team: $this->freeAgentTeam(),
+            news: $this->newsReturning([$this->storyRow()]),
+            view: $captured['view'],
+        );
+
+        $this->runMain($controller);
+
+        $this->assertSame(
+            '<a class="news-article__link" href="modules.php?name=News&amp;file=article&amp;sid=7&amp;mode=nested&amp;order=1&amp;thold=0">Read More...</a>',
+            $captured['models'][0]['morelink'],
+        );
+    }
+
+    /**
+     * @param array<string, mixed>|null $userInfo
+     */
+    #[DataProvider('userInfoLinkProvider')]
+    public function testStoryLinkOptionsFollowUserInfoShape(?array $userInfo, string $expectedHref): void
+    {
+        $captured = $this->captureViewModels();
+        $controller = $this->buildController(
+            config: $this->config(articleComm: 1),
+            auth: $userInfo === null ? null : $this->authenticatedAs($userInfo),
+            team: $this->freeAgentTeam(),
+            news: $this->newsReturning([$this->storyRow(['comments' => 1])]),
+            view: $captured['view'],
+        );
+
+        $this->runMain($controller);
+
+        $morelink = $captured['models'][0]['morelink'];
+        $this->assertIsString($morelink);
+        $this->assertSame(
+            '<a class="news-article__link" href="' . $expectedHref . '">Read More...</a>'
+                . ' | <a class="news-article__link" href="' . $expectedHref . '">1 comment</a>',
+            $morelink,
+        );
+        $this->assertSame(substr_count($morelink, 'href="'), substr_count($morelink, 'href="' . $expectedHref . '"'));
+    }
+
+    /**
+     * @return array<string, array{array<string, mixed>|null, string}>
+     */
+    public static function userInfoLinkProvider(): array
+    {
+        $url0 = 'modules.php?name=News&amp;file=article&amp;sid=7';
+
+        return [
+            'anonymous' => [null, $url0],
+            'umode only' => [['umode' => 'flat'], $url0 . '&amp;mode=flat'],
+            'null umode with numeric-string order and thold' => [
+                ['umode' => null, 'uorder' => '1', 'thold' => '2'],
+                $url0 . '&amp;order=1&amp;thold=2',
+            ],
+            'empty-string umode is set' => [
+                ['umode' => '', 'uorder' => 0, 'thold' => 0],
+                $url0 . '&amp;mode=&amp;order=0&amp;thold=0',
+            ],
+        ];
+    }
+
+    public function testStoryUrlUsesNumericStringSidUnchanged(): void
+    {
+        foreach ([7, '7'] as $sid) {
+            $captured = $this->captureViewModels();
+            $controller = $this->buildController(
+                news: $this->newsReturning([$this->storyRow(['sid' => $sid])]),
+                view: $captured['view'],
+            );
+
+            $this->runMain($controller);
+
+            $this->assertSame(
+                '<a class="news-article__link" href="modules.php?name=News&amp;file=article&amp;sid=7">Read More...</a>',
+                $captured['models'][0]['morelink'],
+            );
+        }
+    }
+
+    #[DataProvider('moreLinkProvider')]
+    public function testMoreLinkBranches(int $articleComm, mixed $acomm, mixed $comments, int $full, int $total, string $expected): void
+    {
+        $captured = $this->captureViewModels();
+        $controller = $this->buildController(
+            config: $this->config(articleComm: $articleComm),
+            news: $this->newsReturning(
+                [$this->storyRow(['acomm' => $acomm, 'comments' => $comments])],
+                ['intro' => 0, 'full' => $full, 'total' => $total],
+            ),
+            view: $captured['view'],
+        );
+
+        $this->runMain($controller);
+
+        $this->assertSame(str_replace('{COMMENTS}', (string) constant('_COMMENTS'), $expected), $captured['models'][0]['morelink']);
+    }
+
+    /**
+     * @return array<string, array{int, mixed, mixed, int, int, string}>
+     */
+    public static function moreLinkProvider(): array
+    {
+        $read = '<a class="news-article__link" href="modules.php?name=News&amp;file=article&amp;sid=7">Read More...</a>';
+        $bytes = '<span class="news-article__meta-item">120 bytes more</span>';
+        $cl = static fn (string $text): string => '<a class="news-article__link" href="modules.php?name=News&amp;file=article&amp;sid=7">' . $text . '</a>';
+
+        return [
+            'comments disabled' => [0, 0, 0, 0, 0, $read],
+            'enabled, zero comments, no read more' => [1, 0, 0, 0, 0, $cl('comments?')],
+            'one comment' => [1, 0, 1, 0, 0, $read . ' | ' . $cl('1 comment')],
+            'three comments' => [1, 0, 3, 0, 0, $read . ' | ' . $cl('3 {COMMENTS}')],
+            'acomm suppresses comment block' => [1, 1, 5, 0, 0, $read],
+            'bytes more' => [0, 0, 0, 120, 120, $read . ' | ' . $bytes],
+            'bytes more and comments question' => [1, 0, 0, 120, 120, $read . ' | ' . $bytes . ' | ' . $cl('comments?')],
+            'negative comments yields empty' => [1, 0, -1, 0, 0, ''],
+            'null comments is zero' => [1, 0, null, 0, 0, $cl('comments?')],
+            'numeric-string acomm and comments' => [1, '0', '0', 0, 0, $cl('comments?')],
+        ];
+    }
+
+    public function testCategoryPrefixAppliedOnlyForNonzeroCatid(): void
+    {
+        $withCategory = $this->newsReturning([$this->storyRow(['catid' => 4])], categoryTitle: 'Trades');
+        $captured = $this->captureViewModels();
+        $this->runMain($this->buildController(news: $withCategory, view: $captured['view']));
+
+        $this->assertSame(
+            "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=4\" aria-label=\"Trades\"><font class=\"storycat\">Trades</font></a>: Title",
+            $captured['models'][0]['title'],
+        );
+
+        $news = self::createMock(\Topics\News\Contracts\NewsServiceInterface::class);
+        $news->method('getHomePageStories')->willReturn([$this->storyRow(['catid' => 0])]);
+        $news->method('getTopicForStory')->willReturn(['topicname' => 't', 'topicimage' => 'i.png', 'topictext' => 'tt']);
+        $news->method('normalizeStoryTime')->willReturn(0);
+        $news->method('computeByteCounts')->willReturn(['intro' => 0, 'full' => 0, 'total' => 0]);
+        $news->expects($this->never())->method('getCategoryTitle');
+
+        $captured = $this->captureViewModels();
+        $this->runMain($this->buildController(news: $news, view: $captured['view']));
+
+        $this->assertSame('Title', $captured['models'][0]['title']);
+    }
+
+    public function testCategoryPrefixFallsBackToCategoryLabelWhenTitleNull(): void
+    {
+        $captured = $this->captureViewModels();
+        $controller = $this->buildController(
+            news: $this->newsReturning([$this->storyRow(['catid' => 4])]),
+            view: $captured['view'],
+        );
+
+        $this->runMain($controller);
+
+        $this->assertSame(
+            "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=4\" aria-label=\"Category\"><font class=\"storycat\"></font></a>: Title",
+            $captured['models'][0]['title'],
+        );
+    }
+
+    #[DataProvider('topicArgumentProvider')]
+    public function testTopicArgumentNormalization(mixed $arg, string $expectedMethod): void
+    {
+        $news = self::createMock(\Topics\News\Contracts\NewsServiceInterface::class);
+        $news->method('getTopicText')->willReturn(null);
+
+        if ($expectedMethod === 'getTopicPageStories') {
+            $news->expects($this->once())->method('getTopicPageStories')->with(5, 10, '')->willReturn([]);
+            $news->expects($this->never())->method('getHomePageStories');
+        } else {
+            $news->expects($this->once())->method('getHomePageStories')->with(10, '')->willReturn([]);
+            $news->expects($this->never())->method('getTopicPageStories');
+        }
+
+        $this->runMain($this->buildController(news: $news), $arg);
+    }
+
+    /**
+     * @return array<string, array{mixed, string}>
+     */
+    public static function topicArgumentProvider(): array
+    {
+        return [
+            'int 5' => [5, 'getTopicPageStories'],
+            'numeric string 5' => ['5', 'getTopicPageStories'],
+            'non-numeric string' => ['abc', 'getHomePageStories'],
+            'null' => [null, 'getHomePageStories'],
+            'zero' => [0, 'getHomePageStories'],
+        ];
+    }
+
+    public function testUserStoryNumAcceptsNumericString(): void
+    {
+        $news = self::createMock(\Topics\News\Contracts\NewsServiceInterface::class);
+        $news->expects($this->once())->method('getHomePageStories')->with(5, '')->willReturn([]);
+
+        $controller = $this->buildController(
+            config: $this->config(userNews: 1),
+            auth: $this->authenticatedAs(['username' => 'gm', 'storynum' => '5']),
+            team: $this->freeAgentTeam(),
+            news: $news,
+        );
+
+        $this->runMain($controller);
+    }
+
+    public function testCommentsBranchIsSkippedWhenArticleCommDisabledAndCommentsExist(): void
+    {
+        $captured = $this->captureViewModels();
+        $controller = $this->buildController(
+            config: $this->config(articleComm: 0),
+            news: $this->newsReturning([$this->storyRow(['comments' => 3])]),
+            view: $captured['view'],
+        );
+
+        $this->runMain($controller);
+
+        $this->assertSame(
+            '<a class="news-article__link" href="modules.php?name=News&amp;file=article&amp;sid=7">Read More...</a>',
+            $captured['models'][0]['morelink'],
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    private function storyRow(array $overrides = []): array
+    {
+        return $overrides + [
+            'sid' => 7, 'catid' => 0, 'aid' => 'AP', 'title' => 'Title',
+            'time' => '2026-05-13 12:00:00', 'hometext' => 'home', 'bodytext' => 'body',
+            'comments' => 0, 'counter' => 0, 'topic' => 1, 'informant' => 'AP',
+            'notes' => 'n', 'acomm' => 0,
+        ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param array{intro: int, full: int, total: int} $counts
+     */
+    private function newsReturning(
+        array $rows,
+        array $counts = ['intro' => 0, 'full' => 0, 'total' => 0],
+        ?string $categoryTitle = null,
+    ): \Topics\News\Contracts\NewsServiceInterface {
+        $news = self::createStub(\Topics\News\Contracts\NewsServiceInterface::class);
+        $news->method('getHomePageStories')->willReturn($rows);
+        $news->method('getTopicPageStories')->willReturn($rows);
+        $news->method('getTopicForStory')->willReturn(['topicname' => 't', 'topicimage' => 'i.png', 'topictext' => 'tt']);
+        $news->method('normalizeStoryTime')->willReturn(0);
+        $news->method('computeByteCounts')->willReturn($counts);
+        $news->method('getCategoryTitle')->willReturn($categoryTitle);
+
+        return $news;
+    }
+
+    /**
+     * @return array{view: \Topics\News\Contracts\NewsViewInterface, models: \ArrayObject<int, array<string, mixed>>}
+     */
+    private function captureViewModels(): array
+    {
+        /** @var \ArrayObject<int, array<string, mixed>> $models */
+        $models = new \ArrayObject();
+        $view = self::createMock(\Topics\News\Contracts\NewsViewInterface::class);
+        $view->expects($this->once())->method('renderStories')->with(self::callback(
+            static function (array $vm) use ($models): bool {
+                foreach ($vm as $i => $model) {
+                    $models[$i] = $model;
+                }
+
+                return true;
+            },
+        ));
+
+        return ['view' => $view, 'models' => $models];
+    }
+
     public function testControllerSanitizerCallSitesAreUnchanged(): void
     {
         $source = $this->controllerSource();
@@ -325,7 +615,7 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         );
     }
 
-    private function runMain(NewsController $controller, int $newTopic = 0): string
+    private function runMain(NewsController $controller, mixed $newTopic = 0): string
     {
         $baseLevel = ob_get_level();
         ob_start(); // L2 — capture

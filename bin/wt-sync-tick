@@ -52,6 +52,9 @@ WT_SYNC_ONDEMAND_LOCK_WAIT="${WT_SYNC_ONDEMAND_LOCK_WAIT:-3}"
 # WT_SYNC_FETCH_TIMEOUT: seconds the --only fetch may run before it is killed
 # and the verdict becomes FETCH-FAILED. Session start must stay fast.
 WT_SYNC_FETCH_TIMEOUT="${WT_SYNC_FETCH_TIMEOUT:-10}"
+# WT_SYNC_MAIN_GUARD: main-checkout dirty guard, run on every fleet tick before
+# the presence gate. Unset: the sibling bin/main-checkout-guard. Empty: skip.
+WT_SYNC_MAIN_GUARD="${WT_SYNC_MAIN_GUARD-$SCRIPT_DIR/main-checkout-guard}"
 # WT_SYNC_REPO_ROOT: override the git-derived repo root (tests set this to a
 # synthetic repo so real worktrees are never touched).
 # WT_SYNC_REPO_ROOT defaults to empty — actual derivation happens below, after
@@ -293,6 +296,18 @@ LOCK_FILE="$WT_SYNC_LOCK_DIR/wt-sync.lock"
 if [ -n "$ONLY_PATH" ]; then
     on_demand_sync "$ONLY_PATH"
     exit $?
+fi
+
+# ── Main-checkout guard ──────────────────────────────────────────────────────
+# Read-only on git. Runs on every fleet tick, before the presence gate, so an
+# operator-present tick still checks. Non-fatal: its rc is logged and never
+# changes this tick's exit code. Decision record: ADR-0193.
+if [ -n "$WT_SYNC_MAIN_GUARD" ]; then
+    guard_flag=""
+    if [ "$DRY_RUN" = true ]; then guard_flag="--dry-run"; fi
+    guard_rc=0
+    guard_out="$("$WT_SYNC_MAIN_GUARD" ${guard_flag:+"$guard_flag"} 2>&1)" || guard_rc=$?
+    log "main-checkout-guard rc=$guard_rc: ${guard_out//$'\n'/ | }"
 fi
 
 # ── Presence gate (HID idle) ──────────────────────────────────────────────────

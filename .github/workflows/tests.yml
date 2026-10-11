@@ -924,6 +924,7 @@ jobs:
             bin/test-check-plan \
             bin/test-plan-now \
             bin/test-wt-sync-tick \
+            bin/test-main-checkout-guard \
             bin/test-wt-gc-tick \
             bin/test-tick-guards \
             bin/test-bin-help \

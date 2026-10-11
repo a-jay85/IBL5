@@ -17,6 +17,8 @@
 #  12. Live interactive session whose argv only contains "-p" inside other tokens: DM held.
 #  13. Headless and interactive sessions in the same worktree: DM held.
 #  14. ps cannot read the live pid's argv: DM held (counts as live).
+#  16. Generic blocked_ship_block (no blocked-ship.txt) ends with the postplan-fix
+#      paste line, and the DM body keeps it as its last line.
 #
 # launchctl and discord-dm are stubbed; nothing leaves the machine.
 # Run: bin/test-post-plan-fail-dm  (exit 0 = all pass, 1 = a case failed)
@@ -215,5 +217,21 @@ FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
     && ok '15 empty FAILDM_DM_CMD falls back to $ROOT/bin/discord-dm' \
     || fail '15 empty FAILDM_DM_CMD falls back to $ROOT/bin/discord-dm'
 rm -rf "${WT:?}/bin" "$TMP/default-dm.argv"
+
+# 16: the generic exit-3 block (no blocked-ship.txt) ends with the postplan-fix paste line,
+# and the DM sent through the SUT keeps that line last. Pins bin/post-plan-now's 5th arg.
+reset; registry "$WT" 999999
+GEN_BLOCK=$(bash -c 'source "$1" >/dev/null 2>&1; blocked_ship_block "$2" "$3" "$4" "$5" "$6"' \
+    _ "$ROOT/bin/post-plan-now" "$TMP/no-run-dir" "feat/gen" "$WT" "$LOG" "/main/root")
+FAILDM_REGISTRY="$TMP/reg.json" FAILDM_DM_CMD="$TMP/bin/dm" \
+FAILDM_LAUNCHCTL="$TMP/bin/lc-ok" FAILDM_PLIST_DIR="$PLISTS" \
+FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
+    "$SUT" "$WT" foo "$LOG" "$GEN_BLOCK" >/dev/null 2>&1
+[ "$(tail -n 1 "$DM_OUT")" = "/main/root/bin/postplan-fix feat/gen" ] \
+    && [ "$(tail -n 2 "$DM_OUT" | head -n 1)" = "Or paste this to have Claude fix it:" ] \
+    && [ "$(tail -n 3 "$DM_OUT" | head -n 1)" = "Log: $LOG" ] \
+    && ! grep -qF "Or open Claude in that folder" "$DM_OUT" \
+    && ok "16 generic block DM ends with the postplan-fix paste line" \
+    || fail "16 generic block DM tail: $(tail -n 3 "$DM_OUT" 2>/dev/null)"
 
 h_done

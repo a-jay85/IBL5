@@ -354,6 +354,10 @@ def test_emergency_abort_exists_on_live_git():
 # blocked-ship.txt: main() hands the human block to bin/post-plan-now on exit 3.
 # ---------------------------------------------------------------------------
 
+# Main-checkout bin/postplan-fix, derived from this file's own location (not from runner).
+_FIX = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+    "bin", "postplan-fix")
 _ADR_DENIAL = ("pre-push-adr-hook: Decision-trigger surfaces detected:\n"
                "  - [bin-script] bin/foo — Tool script")
 
@@ -380,7 +384,8 @@ def test_main_writes_blocked_ship_on_rc3(monkeypatch, tmp_path, capsys):
     assert rc == 3
     text = (out / "blocked-ship.txt").read_text()
     assert text.startswith("feat/x did not ship.")
-    assert text.rstrip("\n").split("\n")[-1] == "Log: /tmp/x.log"
+    assert text.rstrip("\n").split("\n")[-3:] == [
+        "Log: /tmp/x.log", "Or paste this to have Claude fix it:", f"{_FIX} feat/x"]
     assert stdout.split("\n")[0].startswith("RESULT: post-plan BLOCKED")
 
 
@@ -437,7 +442,8 @@ def test_forced_commit_failure_names_command_and_error_end_to_end(monkeypatch, t
     assert "GUIDANCE: hook-x refused the commit" in first
     assert "Command: git commit" in block
     assert "> GUIDANCE: hook-x refused the commit" in block
-    assert block.rstrip("\n").split("\n")[-1] == "Log: /tmp/x.log"
+    assert block.rstrip("\n").split("\n")[-3:] == [
+        "Log: /tmp/x.log", "Or paste this to have Claude fix it:", f"{_FIX} feat/x"]
     for text in (first, block):
         assert secret not in text
         assert "filler 000" not in text
@@ -458,11 +464,13 @@ def test_blocked_ship_log_line_when_env_unset_or_empty(monkeypatch, tmp_path):
     res = _res(TerminalState.FAILED, "local-gate", error=_ADR_DENIAL, slug="feat/x")
     monkeypatch.delenv("POSTPLAN_LOG_PATH", raising=False)
     runner.write_blocked_ship(str(tmp_path), res, 3, "/wt")
-    assert (tmp_path / "blocked-ship.txt").read_text().endswith("Log: (see the run log)\n")
+    assert (tmp_path / "blocked-ship.txt").read_text().endswith(
+        f"Log: (see the run log)\nOr paste this to have Claude fix it:\n{_FIX} feat/x\n")
     (tmp_path / "blocked-ship.txt").unlink()
     monkeypatch.setenv("POSTPLAN_LOG_PATH", "")
     runner.write_blocked_ship(str(tmp_path), res, 3, "/wt")
-    assert (tmp_path / "blocked-ship.txt").read_text().endswith("Log: (see the run log)\n")
+    assert (tmp_path / "blocked-ship.txt").read_text().endswith(
+        f"Log: (see the run log)\nOr paste this to have Claude fix it:\n{_FIX} feat/x\n")
 
 
 def test_blocked_ship_write_error_keeps_exit_code(tmp_path):

@@ -101,7 +101,7 @@ Then it runs `bin/automouse/self-heal`, a non-fatal step that scans `skipped/`:
 
 ## How It Works
 
-1. **Daytime:** Work with Claude in plan mode. After approval, queue the plan: `bin/automouse/queue <slug>`. It refuses a plan failing `bin/check-plan`; `--force` overrides (`<plan>.md.force-override`, logged), never the `impl_model` gates.
+1. **Daytime:** Work with Claude in plan mode. After approval, queue the plan: `bin/automouse/queue <slug>`. It refuses a plan failing `bin/check-plan`; `--force` skips it (`<plan>.md.force-override`, logged). `impl_model` gates still apply.
 2. **On schedule:** `launchd` fires `bin/automouse/run`
 3. **Loop:** For each queued plan (oldest first), `bin/automouse/run` fires two `claude -p` invocations sequentially:
    - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, runs a pre-handoff conformance check (Step 6.6), writes a handoff file. Model per-plan via `impl_model:` (six values: `sonnet`/`claude-sonnet-5-5` → Sonnet (legacy: `claude-sonnet-4-6`), `haiku`/`claude-haiku-5-5` (legacy `claude-haiku-4-5`) → Haiku, `opus`/`claude-opus-5-5` or absent → Opus; validated by `bin/lib/plan-impl-model`; other values rejected before the counter). Declare `sonnet` for uniformly-mechanical plans only. Post-plan runs `bin/post-plan-now` (Sonnet `/post-plan` fallback).

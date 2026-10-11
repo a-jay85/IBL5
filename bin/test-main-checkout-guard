@@ -459,6 +459,60 @@ launchd_ok() {
 check "launchd section has a verdict" launchd_ok
 end_case
 
+# 31
+new_case snapshot_prune_keeps_newest_n
+mkdir -p "$T/state"
+for i in $(seq -w 1 25); do
+    : >"$T/state/snapshot-fake$i.txt"
+    touch -t "2020010100$i" "$T/state/snapshot-fake$i.txt"
+done
+dirty_a
+run_guard
+snap_path="$(sed -n 's/^snapshot: //p' "$T/dm.body.1")"
+check "exit 0" [ "$RC" -eq 0 ]
+check "20 snapshots remain" [ "$(ls "$T/state"/snapshot-*.txt | wc -l | tr -d ' ')" -eq 20 ]
+check "current survives" [ -f "$snap_path" ]
+check "newest fake kept" [ -f "$T/state/snapshot-fake25.txt" ]
+check "oldest fake pruned" [ ! -e "$T/state/snapshot-fake01.txt" ]
+check "state file untouched by prune" grep -Eq '^[0-9a-f]{40}$' "$T/state/state"
+end_case
+
+# 32
+new_case snapshot_prune_keep_override_spares_current
+dirty_a
+echo 1 >"$T/dm.rc"
+run_guard
+snap_path="$(sed -n 's/^snapshot: //p' "$T/dm.body.1")"
+touch -t 201901010000 "$snap_path"
+for i in $(seq -w 1 10); do
+    : >"$T/state/snapshot-fake$i.txt"
+    touch -t "2020010100$i" "$T/state/snapshot-fake$i.txt"
+done
+echo 0 >"$T/dm.rc"
+run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+    MAIN_CHECKOUT_GUARD_REPO="$R" MAIN_CHECKOUT_GUARD_STATE_DIR="$T/state" \
+    MAIN_CHECKOUT_GUARD_SNAPSHOT_KEEP=3 \
+    DISCORD_DM_BIN="$T/dm-stub" "$T/guard/main-checkout-guard"
+check "exit 0" [ "$RC" -eq 0 ]
+check "3 snapshots remain" [ "$(ls "$T/state"/snapshot-*.txt | wc -l | tr -d ' ')" -eq 3 ]
+check "older current survives" [ -f "$snap_path" ]
+check "newest fake kept" [ -f "$T/state/snapshot-fake10.txt" ]
+check "second newest fake kept" [ -f "$T/state/snapshot-fake09.txt" ]
+check "mid fake pruned" [ ! -e "$T/state/snapshot-fake05.txt" ]
+end_case
+
+# 33
+new_case snapshot_prune_skipped_in_dry_run
+mkdir -p "$T/state"
+for i in $(seq -w 1 25); do
+    : >"$T/state/snapshot-fake$i.txt"
+done
+dirty_a
+run_guard --dry-run
+check "exit 0" [ "$RC" -eq 0 ]
+check "all 25 remain" [ "$(ls "$T/state"/snapshot-*.txt | wc -l | tr -d ' ')" -eq 25 ]
+end_case
+
 echo "$PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then
     exit 1

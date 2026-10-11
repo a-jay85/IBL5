@@ -128,6 +128,7 @@ class StackedRebaseResult:
     auto_resolved: bool = False
     resolved_files: tuple = ()
     squash_note: str = ""
+    adapted_lines: tuple = ()
 
 
 class LiveGit:
@@ -565,15 +566,51 @@ class LiveGit:
         """Run the TREE-EQUIVALENT proof. Gate is conjunctive: stdout AND rc==0.
         A diverged tree exits 0 with TREE DIVERGED — weakening to either operator alone
         would silently admit lost work."""
+        rc, proof_out = self._run_lostwork(lostwork_path, key)
+        if not ("TREE-EQUIVALENT" in proof_out and rc == 0):
+            return False, f"tree proof failed: {proof_out.strip()[:400]}"
+        return True, proof_out
+
+    def _run_lostwork(self, lostwork_path: Path, key: str) -> tuple[int, str]:
+        """Run lostwork.sh and return (rc, untruncated stdout)."""
         proof_proc = subprocess.run(
             ["bash", str(lostwork_path), key],
             capture_output=True, text=True, errors="replace",
             cwd=self.worktree,
         )
-        proof_out = proof_proc.stdout
-        if not ("TREE-EQUIVALENT" in proof_out and proof_proc.returncode == 0):
-            return False, f"tree proof failed: {proof_out.strip()[:400]}"
-        return True, proof_out
+        return proof_proc.returncode, proof_proc.stdout
+
+    def _prove_with_adaptations(
+        self,
+        lostwork_path: Path,
+        key: str,
+        *,
+        resolved_files: tuple,
+        adaptations: tuple,
+        pre_rebase_sha: str,
+        master_sha: str,
+    ) -> tuple[bool, str, tuple]:
+        """The conjunctive proof, plus one narrow relaxation: a LOST branch-added line
+        passes only when it is a deterministic near-match of a rewrite master made in
+        the same file, the resolver justified it, and a read-only reviewer CONFIRMED it
+        (harness/adaptations.py). A strict pass makes no model call."""
+        from ..adaptations import accept_adapted_proof
+
+        rc, out = self._run_lostwork(lostwork_path, key)
+        if "TREE-EQUIVALENT" in out and rc == 0:
+            return True, out, ()
+        merge_base = self._run("merge-base", pre_rebase_sha, master_sha, check=False).strip()
+        ok, composed, accepted = accept_adapted_proof(
+            self.llm, self._run,
+            worktree=self.worktree, key=key, proof_out=out, rc=rc,
+            resolved_files=resolved_files, justifications=adaptations,
+            merge_base=merge_base, master_sha=master_sha,
+        )
+        if not ok:
+            return (False,
+                    f"tree proof failed: {out.strip()[:400]} | adaptation rejected: {composed}",
+                    ())
+        return True, composed, accepted
 
     def _record_resolution(
         self,
@@ -584,6 +621,7 @@ class LiveGit:
         collapse_warn: str = "",
         proof_out: str = "",
         base_sha: str = "",
+        adapted_lines: tuple = (),
     ) -> tuple[str, str]:
         """Write manifest, notes, condition-(14) flag, and run the conflict reviewer.
         Returns (manifest_path, notes_path)."""
@@ -631,6 +669,11 @@ class LiveGit:
             f"## Changed files\n\n{file_list}\n\n"
             f"## Proof\n\nTREE-EQUIVALENT\n"
         )
+        if adapted_lines:
+            notes += "\n## Adapted lines\n\n" + "".join(
+                f"- {a.path}: +{a.original} => +{a.adapted} [{a.old} -> {a.new}]\n"
+                for a in adapted_lines
+            )
         if collapse_warn:
             notes += f"\n## Collapse guard\n\n{collapse_warn}\n"
         notes_path = f"/tmp/postplan-conflict-resolution-{key}.md"
@@ -647,6 +690,7 @@ class LiveGit:
                 self.llm, self._run,
                 worktree=self.worktree, key=key,
                 resolved_files=resolved_files, proof_out=proof_out,
+                adaptations=adapted_lines,
             )
 
         return manifest_path, notes_path
@@ -673,6 +717,7 @@ class LiveGit:
         branch = self.branch()
         key = branch.replace("/", "-")
         self.last_conflict_files = ()
+        self.last_conflict_resolution = None
         master_sha = self._run("rev-parse", base).strip()
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
@@ -756,7 +801,12 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason="lostwork.sh not found at pinned master SHA")
 
-                proof_ok, proof_out = self._prove_tree_equivalent(lostwork_path, key)
+                proof_ok, proof_out, adapted = self._prove_with_adaptations(
+                    lostwork_path, key,
+                    resolved_files=resolve_result.resolved_files,
+                    adaptations=resolve_result.adaptations,
+                    pre_rebase_sha=pre_rebase_sha, master_sha=master_sha,
+                )
                 if not proof_ok:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
@@ -765,7 +815,7 @@ class LiveGit:
                 try:
                     manifest_path, notes_path = self._record_resolution(
                         key, branch, master_sha, resolve_result.resolved_files,
-                        proof_out=proof_out,
+                        proof_out=proof_out, adapted_lines=adapted,
                     )
                 except HarnessError as exc:
                     # Phase 3c: a HarnessError from _record_resolution (empty post-resolution
@@ -783,6 +833,7 @@ class LiveGit:
                     notes_path=notes_path,
                     auto_resolved=True,
                     resolved_files=resolve_result.resolved_files,
+                    adapted_lines=adapted,
                 )
             except HarnessError:
                 raise
@@ -983,6 +1034,7 @@ class LiveGit:
             capture_output=True, text=True, errors="replace",
         )
         auto_resolved_files: tuple = ()
+        adaptations: tuple = ()
         if rebase_proc.returncode != 0:
             if self.llm is None:
                 # No LLM: immediate decline. Snapshot the unmerged set FIRST; the abort
@@ -1046,6 +1098,7 @@ class LiveGit:
                                       reason=text_reason)
 
                 auto_resolved_files = resolve_result.resolved_files
+                adaptations = resolve_result.adaptations
             except HarnessError:
                 raise
             except Exception as exc:
@@ -1055,7 +1108,11 @@ class LiveGit:
 
         # Step 8: TREE-EQUIVALENT proof — gate is conjunctive (stdout contains
         # TREE-EQUIVALENT AND rc == 0), because a diverged tree exits 0 with TREE DIVERGED
-        proof_ok, proof_out = self._prove_tree_equivalent(lostwork_path, key)
+        proof_ok, proof_out, adapted = self._prove_with_adaptations(
+            lostwork_path, key,
+            resolved_files=auto_resolved_files, adaptations=adaptations,
+            pre_rebase_sha=pre_rebase_sha, master_sha=master_sha,
+        )
         if not proof_ok:
             if auto_resolved_files:
                 # Failed after auto-resolution: abort_and_restore
@@ -1069,6 +1126,7 @@ class LiveGit:
             manifest_path, notes_path = self._record_resolution(
                 key, branch, master_sha, auto_resolved_files,
                 collapse_warn=collapse_warn, proof_out=proof_out, base_sha=ibl_base,
+                adapted_lines=adapted,
             )
         except HarnessError as exc:
             if auto_resolved_files:
@@ -1093,6 +1151,7 @@ class LiveGit:
             collapse_warn=collapse_warn,
             auto_resolved=bool(auto_resolved_files),
             resolved_files=auto_resolved_files,
+            adapted_lines=adapted,
         )
 
     def capture_lostwork_pre(self, key: str) -> bool:

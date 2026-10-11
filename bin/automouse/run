@@ -1472,8 +1472,6 @@ automouse_worktree_for_plan() {
     return 1
 }
 
-# Loop-side terminal disposition: the branch has an OPEN or MERGED PR, so this plan
-# is finished regardless of what the agent did or did not do. Moves the plan to done/,
 # queue_path_for <name> — the current queue path of <name> (foo, foo.md, or an
 # NNN-foo.md entry path). Returns 1 when the plan is no longer queued. Entries are
 # renamed by `queue reorder`, so a path captured at claim time can go stale.
@@ -1497,6 +1495,8 @@ dispose_entry() {
     mv -f "$QUEUE_DIR/$e" "$NIGHTLY_DIR/$2/$(entry_to_name "$1")"
 }
 
+# Loop-side terminal disposition: the branch has an OPEN or MERGED PR, so this plan
+# is finished regardless of what the agent did or did not do. Moves the plan to done/,
 # removes the handoff, clears the attempt sidecars, and writes a minimal completion
 # report if the agent did not write one. Caller owns lock release and control flow.
 dispose_plan_done() {

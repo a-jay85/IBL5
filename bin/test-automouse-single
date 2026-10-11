@@ -158,6 +158,17 @@ sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
     "$REPO/bin/automouse/run" > "$RUNNER"
 chmod +x "$RUNNER"
 
+# qentry <queue-dir> <slug> - the NNN-<slug>.md entry path. The runner's
+# normalize_queue prefixes the bare entries the fixtures create, so "still
+# queued" asserts resolve through this. No entry prints a path that cannot exist.
+qentry() {
+    local f
+    for f in "$1"/[0-9][0-9][0-9]-"$2".md; do
+        if [ -e "$f" ] || [ -L "$f" ]; then printf '%s\n' "$f"; return 0; fi
+    done
+    printf '%s\n' "$1/(no entry for $2)"
+}
+
 # --- Helpers ---------------------------------------------------------------
 seed_plan() {
     local slug="$1"
@@ -217,7 +228,7 @@ PLANS_DIR="$PDIR" "$RUNNER" plan plan-badmodel > "$ROOT/run.out" 2>&1; rc=$?
 errexit_restore
 [ "$rc" -eq 0 ] || { echo "FAIL: case6 runner aborted (rc=$rc) instead of skipping"; FAILED=1; }
 assert_present "case6 disposed to skipped/"     "$NDIR/skipped/plan-badmodel.md"
-assert_absent  "case6 left queue"               "$NDIR/queue/plan-badmodel.md"
+assert_absent  "case6 left queue"               "$(qentry "$NDIR/queue" plan-badmodel)"
 assert_absent  "case6 no attempts sidecar"      "$NDIR/queue/plan-badmodel.md.attempts"
 assert_absent  "case6 no handoff (claude never ran)" "$NDIR/handoff/plan-badmodel.md.json"
 assert_absent  "case6 not completed"            "$NDIR/done/plan-badmodel.md"
@@ -604,9 +615,9 @@ rm -f "$ROOT/dm-calls"
 run_single plan-2
 
 assert_present "case1 plan-2 completed"  "$NDIR/done/plan-2.md"
-assert_absent  "case1 plan-2 left queue" "$NDIR/queue/plan-2.md"
+assert_absent  "case1 plan-2 left queue" "$(qentry "$NDIR/queue" plan-2)"
 for other in plan-1 plan-3; do
-    assert_present "case1 $other still queued"    "$NDIR/queue/$other.md"
+    assert_present "case1 $other still queued"    "$(qentry "$NDIR/queue" "$other")"
     assert_absent  "case1 $other not done"        "$NDIR/done/$other.md"
     assert_absent  "case1 $other no lock"         "$NDIR/queue/$other.md.lock"
     assert_absent  "case1 $other no attempts"     "$NDIR/queue/$other.md.attempts"
@@ -707,7 +718,7 @@ run_single plan-run
 assert_present "case2 plan-run completed"    "$NDIR/done/plan-run.md"
 assert_present "case2 skip still skipped"    "$NDIR/skipped/plan-skip.md"
 assert_present "case2 staleness marker kept" "$NDIR/skipped/plan-skip.md.staleness"
-assert_absent  "case2 skip NOT resurrected"  "$NDIR/queue/plan-skip.md"
+assert_absent  "case2 skip NOT resurrected"  "$(qentry "$NDIR/queue" plan-skip)"
 
 # ===========================================================================
 # Case 3 — auto-queue-if-absent (Phase 1)
@@ -719,7 +730,7 @@ printf -- '---\nimpl_model: sonnet\n---\n\n# plan-x\n' > "$PDIR/plan-x.md"   # N
 run_single plan-x
 
 assert_present "case3 plan-x auto-queued+ran" "$NDIR/done/plan-x.md"
-assert_present "case3 plan-other untouched"   "$NDIR/queue/plan-other.md"
+assert_present "case3 plan-other untouched"   "$(qentry "$NDIR/queue" plan-other)"
 assert_absent  "case3 plan-other not done"    "$NDIR/done/plan-other.md"
 assert_absent  "case3 plan-other no lock"     "$NDIR/queue/plan-other.md.lock"
 
@@ -749,7 +760,7 @@ reset_state
 seed_plan plan-dup            # writes $PDIR/plan-dup.md AND queue/ symlink
 run_single plan-dup           # must NOT abort on the already-queued symlink
 assert_present "case5 plan-dup completed"  "$NDIR/done/plan-dup.md"
-assert_absent  "case5 plan-dup left queue" "$NDIR/queue/plan-dup.md"
+assert_absent  "case5 plan-dup left queue" "$(qentry "$NDIR/queue" plan-dup)"
 grep -qi "already queued" "$ROOT/run.out" \
     && { echo "FAIL: case5 leaked an 'already queued' error"; FAILED=1; }
 
@@ -791,7 +802,7 @@ chmod +x "$STUBDIR/claude"
 # drive_attempts <slug>: up to 3 single-mode attempts, stopping once the plan leaves queue/
 drive_attempts() {
     for _ in 1 2 3; do
-        [ -L "$NDIR/queue/$1.md" ] || break
+        [ -L "$(qentry "$NDIR/queue" "$1")" ] || [ -L "$NDIR/queue/$1.md" ] || break
         run_single_rf "$1" || true
     done
 }
@@ -820,7 +831,7 @@ drive_attempts plan-rep
 RF7_REPORT="$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-rep.md"
 check "case7 exactly 2 stub calls (no 3rd attempt)" calls_are 2
 check_present "case7 moved to skipped/"      "$NDIR/skipped/plan-rep.md"
-check_absent  "case7 left queue"             "$NDIR/queue/plan-rep.md"
+check_absent  "case7 left queue"             "$(qentry "$NDIR/queue" plan-rep)"
 check_absent  "case7 no attempts sidecar"    "$NDIR/queue/plan-rep.md.attempts"
 check_absent  "case7 no failure sidecar"     "$NDIR/queue/plan-rep.md.failure"
 check_present "case7 skipped report written" "$RF7_REPORT"
@@ -843,7 +854,7 @@ drive_attempts plan-diff
 check "case8 exactly 3 stub calls (3rd attempt ran)" calls_are 3
 check "case8 attempt 3 is the escalated Opus try" attempt_is_opus 3
 check "case8 attempt 2 is not Opus" ! attempt_is_opus 2
-check_present "case8 still queued"  "$NDIR/queue/plan-diff.md"
+check_present "case8 still queued"  "$(qentry "$NDIR/queue" plan-diff)"
 check_absent  "case8 not skipped"   "$NDIR/skipped/plan-diff.md"
 check "case8 log has no REPEATED FAILURE" ! grep -rq 'REPEATED FAILURE' "$NDIR/logs"
 check "case8 failure sidecar holds attempt-3 signature" grep -q '^failure-signature: .*Undefined variable' "$NDIR/queue/plan-diff.md.failure"

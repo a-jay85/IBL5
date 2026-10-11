@@ -90,7 +90,15 @@ BLOCKED_FN=$(awk '/^dispose_plan_postplan_blocked\(\) \{/,/^\}/' "$RUN_FILE")
 REFUND_FN=$(awk '/^refund_attempt\(\) \{/,/^\}/' "$RUN_FILE")
 STALLED_FN=$(awk '/^phase_stalled\(\) \{/,/^\}/' "$RUN_FILE")
 ENVSTOP_FN=$(awk '/^write_env_stop_report\(\) \{/,/^\}/' "$RUN_FILE")
+# The queue-entry helpers: the runner sources them from bin/automouse/lib-queue-order (a symlink
+# to this file). dispose_entry / plan_still_queued are the runner's own, extracted not copied.
+# shellcheck source=lib/automouse-queue-order.sh
+. "$REPO_ROOT/bin/lib/automouse-queue-order.sh"
+DISPOSE_ENTRY_FN=$(awk '/^dispose_entry\(\) \{/,/^\}/' "$RUN_FILE")
+# plan_still_queued is a one-line function: its definition and closing brace share a line.
+STILL_QUEUED_FN=$(grep -E '^plan_still_queued\(\) \{.*\}$' "$RUN_FILE")
 eval "$REFUND_FN"; eval "$STALLED_FN"; eval "$ENVSTOP_FN"; eval "$BLOCKED_FN"
+eval "$DISPOSE_ENTRY_FN"; eval "$STILL_QUEUED_FN"
 
 # Anchor uniqueness: if an anchor is missing, the awk range reads to EOF.
 # If it is duplicated, the range starts at the wrong place.
@@ -376,8 +384,9 @@ rc3_sandbox() {
     PLANS_DIR="$SB/plans"; CMDPID_FILE="$SB/cmdpid"; REMAINING_SECS=30
     SELF_DIR="$SB/run-dir/bin"
     printf '# plan\n' > "$PLANS_DIR/$PLAN_NAME"
-    ln -s "$PLANS_DIR/$PLAN_NAME" "$QUEUE_DIR/$PLAN_NAME"   # queue entries are symlinks
-    NEXT_PLAN="$QUEUE_DIR/$PLAN_NAME"
+    # Queue entries are NNN-<slug>.md symlinks; PLAN_NAME stays the bare name the runner derives.
+    ln -s "$PLANS_DIR/$PLAN_NAME" "$QUEUE_DIR/010-$PLAN_NAME"
+    NEXT_PLAN="$QUEUE_DIR/010-$PLAN_NAME"
     # attempts=2 on purpose: refund_attempt DECREMENTS to 1 (file survives), so
     # "attempt file absent" separates the rc=3 arm from a breaker refund.
     ATTEMPT_FILE="$QUEUE_DIR/$PLAN_NAME.attempts"; echo 2 > "$ATTEMPT_FILE"
@@ -434,7 +443,7 @@ run_span "$PP_TERMINAL_SPAN"
 assert_eq "$SPAN_RC" "0" "row 12: span completes under set -euo pipefail"
 assert_eq "$(grep -c '^STUB-INVOKED$' "$STUB_RECORD")" "1" "row 12: post-plan-now invoked exactly once"
 assert_eq "$(yn test -L "$NIGHTLY_DIR/skipped/$PLAN_NAME")" "yes" "row 12: plan symlink moved to skipped/"
-assert_eq "$(yn test -L "$QUEUE_DIR/$PLAN_NAME")" "no" "row 12: plan no longer in queue/"
+assert_eq "$(yn test -L "$QUEUE_DIR/010-$PLAN_NAME")" "no" "row 12: plan no longer in queue/"
 RPT=$(skipped_report)
 assert_eq "$(yn test -n "$RPT")" "yes" "row 12: skipped report written"
 assert_contains "$(cat "$RPT" 2>/dev/null)" "$RC3_RESULT_LINE" "row 12: report quotes the RESULT: line"
@@ -525,7 +534,7 @@ rm -rf "$SB"
 # --- Row 12c (negative path): rc=1 fast exit → breaker unchanged ---
 rc3_sandbox 1 no
 run_span "$PP_TERMINAL_SPAN"
-assert_eq "$(yn test -L "$QUEUE_DIR/$PLAN_NAME")" "yes" "row 12c: rc=1 leaves plan in queue/"
+assert_eq "$(yn test -L "$QUEUE_DIR/010-$PLAN_NAME")" "yes" "row 12c: rc=1 leaves plan in queue/"
 assert_eq "$(yn test -L "$NIGHTLY_DIR/skipped/$PLAN_NAME")" "no" "row 12c: rc=1 does not skip"
 assert_eq "$(count_envstop)" "1" "row 12c: rc=1 fast exit still writes env-stop report"
 assert_eq "$(cat "$ATTEMPT_FILE" 2>/dev/null)" "1" "row 12c: rc=1 refunds the attempt (2 -> 1)"
@@ -544,7 +553,7 @@ rc3_sandbox 3 yes
 PP_TERMINAL=0   # pre-fix code has no arm, so nothing sets it
 run_span "$PP_BREAKER_ONLY"
 assert_eq "$(yn test -L "$NIGHTLY_DIR/skipped/$PLAN_NAME")" "no" "row 12-neg: without arm, plan NOT in skipped/"
-assert_eq "$(yn test -L "$QUEUE_DIR/$PLAN_NAME")" "yes" "row 12-neg: without arm, plan stays in queue/"
+assert_eq "$(yn test -L "$QUEUE_DIR/010-$PLAN_NAME")" "yes" "row 12-neg: without arm, plan stays in queue/"
 assert_eq "$(count_envstop)" "1" "row 12-neg: without arm, env-stop report written (the defect)"
 assert_eq "$(yn test -e "$CAP_REFUND_FILE")" "yes" "row 12-neg: without arm, .cap-refunds survives"
 assert_eq "$(cat "$ATTEMPT_FILE" 2>/dev/null)" "1" "row 12-neg: without arm, attempt refunded not cleared"

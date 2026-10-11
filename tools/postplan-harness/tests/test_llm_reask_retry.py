@@ -154,6 +154,14 @@ def test_auth_then_non_auth_failure_is_invalid_output(tmp_path, monkeypatch):
     assert len(seen) == 2
 
 
+def test_auth_then_non_auth_failure_label(tmp_path, monkeypatch):
+    seen = []
+    cli = _cli(tmp_path, monkeypatch, [AUTH, "I think it is fine."], seen)
+    with pytest.raises(HarnessError) as ei:
+        cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
+    assert "Failed to authenticate" not in ei.value.detail   # attempt 1's auth text is dropped
+
+
 def test_non_auth_then_auth_failure_is_auth_expired(tmp_path, monkeypatch):
     seen = []
     cli = _cli(tmp_path, monkeypatch, ["I think it is fine.", AUTH], seen)

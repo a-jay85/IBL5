@@ -57,42 +57,27 @@ class PlayerStatsCardView
     /**
      * Apply stats card styling to an existing table by adding appropriate classes
      * 
-     * This method transforms standard player-table markup to use stats-card styling.
+     * Maps .player-view-table markup onto the gold card hooks (.stats-table, .stats-table-header).
      * 
      * @param string $tableHtml The original table HTML
      * @return string Modified table HTML with stats-card classes
      */
     public static function styleTable(string $tableHtml): string
     {
-        // Replace sortable player-table with stats-table
+        // Inside the gold card the legacy title-bar modifier gives way to the
+        // card's own hook; .ibl-data-table stays so the card themes the shared table.
         $styled = str_replace(
-            'class="sortable player-table"',
-            'class="stats-table sortable"',
+            'class="sortable ibl-data-table player-view-table"',
+            'class="sortable ibl-data-table stats-table"',
             $tableHtml
         );
-        
-        // Also handle sim-stats-table variant
-        $styled = str_replace(
-            'class="sortable player-table sim-stats-table"',
-            'class="stats-table sortable sim-stats-table"',
-            $styled
-        );
-        
-        // Replace player-table-header with stats-table-header
-        $styled = str_replace(
-            'class="player-table-header"',
+
+        // Title cell: legacy blue bar becomes the gold card header
+        return str_replace(
+            'class="player-view-table__title"',
             'class="stats-table-header"',
             $styled
         );
-        
-        // Add career-row class to bold rows for additional styling
-        $styled = str_replace(
-            'class="player-table-row-bold"',
-            'class="player-table-row-bold career-row"',
-            $styled
-        );
-        
-        return $styled;
     }
 
     /**

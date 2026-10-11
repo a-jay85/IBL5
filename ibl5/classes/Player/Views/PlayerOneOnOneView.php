@@ -49,9 +49,9 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="sortable ibl-data-table player-view-table">
     <tr>
-        <td class="player-table-header">ONE-ON-ONE RESULTS</td>
+        <td class="player-view-table__title">ONE-ON-ONE RESULTS</td>
     </tr>
     <tr>
         <td>

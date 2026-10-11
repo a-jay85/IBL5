@@ -471,11 +471,10 @@
     box-sizing: border-box;
 }
 
-/* Stats Table Styling - Override .ibl-data-table and legacy .player-table styles */
+/* Stats Table Styling - Override .ibl-data-table styles inside the card */
 .player-stats-card table,
 .player-stats-card .stats-table,
-.player-stats-card table.sortable,
-.player-stats-card table.player-table {
+.player-stats-card table.sortable {
     width: 100%;
     border-collapse: collapse;
     table-layout: auto;
@@ -485,10 +484,44 @@
     margin: 0;
 }
 
+/* The card themes .ibl-data-table; cancel the base-table look it does not want.
+   Each selector out-ranks its tables.css counterpart named in the comment. */
+.player-stats-card table.ibl-data-table {          /* vs .ibl-data-table (0,1,0) */
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+}
+
+.player-stats-card table.ibl-data-table thead {    /* vs .ibl-data-table thead */
+    background: none;
+}
+
+.player-stats-card table.ibl-data-table thead th { /* vs table.sortable thead th (0,1,3) */
+    font-size: var(--pc-text-sm);
+}
+
+/* vs .ibl-data-table tbody tr:nth-child(odd|even) and tr:hover (0,2,2):
+   the base paints the <tr>, which shows through the card's transparent cells */
+.player-stats-card table.ibl-data-table tbody tr,
+.player-stats-card table.ibl-data-table tbody tr:nth-child(odd),
+.player-stats-card table.ibl-data-table tbody tr:nth-child(even),
+.player-stats-card table.ibl-data-table tbody tr:hover {
+    background-color: transparent;
+}
+
+/* vs .ibl-data-table th/td:first-child and th/td:last-child (0,2,1);
+   the title cell keeps its own padding */
+.player-stats-card table.ibl-data-table th:first-child,
+.player-stats-card table.ibl-data-table td:first-child:not(.player-view-table__title),
+.player-stats-card table.ibl-data-table th:last-child,
+.player-stats-card table.ibl-data-table td:last-child:not(.player-view-table__title) {
+    padding-left: var(--pc-pad-md);
+    padding-right: var(--pc-pad-md);
+}
+
 /* Table header - gold gradient */
 .player-stats-card .stats-table-header,
-.player-stats-card .player-table-header,
-.player-stats-card td.player-table-header,
+.player-stats-card .player-view-table td.player-view-table__title,
 .player-stats-card td.stats-table-header {
     background: linear-gradient(135deg, var(--card-border) 0%, var(--card-accent) 100%);
     color: var(--card-grad-mid);
@@ -551,9 +584,7 @@
 
 /* Career/Total Row Styling */
 .player-stats-card .career-row td,
-.player-stats-card tr.player-table-row-bold td,
-.player-stats-card .stats-table .career-row td,
-.player-stats-card .stats-table tr.player-table-row-bold td {
+.player-stats-card .stats-table .career-row td {
     font-weight: var(--font-weight-bold);
     color: var(--card-text);
     border-top: 2px solid var(--card-border);
@@ -599,8 +630,15 @@
         font-size: var(--pc-text-xs);
     }
 
+    /* vs .ibl-data-table:not(.voting-form-table):not(.voting-results-table) th/td (0,3,1) */
+    .player-stats-card table.ibl-data-table:is(.stats-table, .player-view-table) th,
+    .player-stats-card table.ibl-data-table:is(.stats-table, .player-view-table) td:not(.player-view-table__title) {
+        padding: 4px 4px;
+        font-size: var(--pc-text-xs);
+    }
+
     .player-stats-card .stats-table-header,
-    .player-stats-card .player-table-header {
+    .player-stats-card .player-view-table__title {
         font-size: var(--pc-text-md);
         padding: var(--pc-pad-md) var(--pc-pad-lg);
     }

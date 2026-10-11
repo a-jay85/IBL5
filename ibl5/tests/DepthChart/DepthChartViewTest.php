@@ -6,6 +6,7 @@ namespace Tests\DepthChart;
 
 use PHPUnit\Framework\TestCase;
 use DepthChart\DepthChartView;
+use Player\PlayerImageHelper;
 
 /**
  * Tests for DepthChartView
@@ -14,9 +15,31 @@ class DepthChartViewTest extends TestCase
 {
     private DepthChartView $view;
 
+    private ?string $photoDir = null;
+
     protected function setUp(): void
     {
         $this->view = new DepthChartView(self::createStub(\League\LeagueContext::class), new \DepthChart\DepthChartService());
+    }
+
+    protected function tearDown(): void
+    {
+        PlayerImageHelper::usePhotoDirectory(null);
+
+        if ($this->photoDir !== null) {
+            $entries = scandir($this->photoDir);
+            if ($entries !== false) {
+                foreach ($entries as $name) {
+                    if ($name !== '.' && $name !== '..') {
+                        unlink($this->photoDir . $name);
+                    }
+                }
+            }
+            rmdir($this->photoDir);
+            $this->photoDir = null;
+        }
+
+        parent::tearDown();
     }
 
     /**
@@ -346,6 +369,11 @@ class DepthChartViewTest extends TestCase
 
     public function testRenderMobileViewCardHasPhoto(): void
     {
+        $this->photoDir = sys_get_temp_dir() . '/ibl-photo-dc-' . bin2hex(random_bytes(4)) . '/';
+        mkdir($this->photoDir);
+        touch($this->photoDir . '12345.jpg');
+        PlayerImageHelper::usePhotoDirectory($this->photoDir);
+
         $players = [$this->buildTestPlayer(12345)];
 
         ob_start();

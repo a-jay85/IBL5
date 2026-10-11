@@ -87,11 +87,11 @@ pr_manual_testing_clearance() {
     # "- [x] bin/test-check-pr-manual-testing — 19/19 PASS"). Holding on those would block correct
     # PRs. bin/check-pr-manual-testing's shape regex conflates the two on
     # purpose (both shapes are well-formed); this clearance axis must not.
-    if printf '%s\n' "$content" | grep -qE '^[[:space:]]*- \[ \]'; then
+    if grep -qE '^[[:space:]]*- \[ \]' <<< "$content"; then
         echo "HELD"
         return
     fi
-    if ! printf '%s\n' "$content" | grep -qiE '^[[:space:]]*No manual testing needed'; then
+    if ! grep -qiE '^[[:space:]]*No manual testing needed' <<< "$content"; then
         echo "HELD"
         return
     fi
@@ -108,21 +108,18 @@ pr_manual_testing_clearance() {
     # Keyword → required changed-file pattern table (case-insensitive, \b word boundary).
     # AND semantics: each named type must have a matching file; any absent type holds.
     local held=0
-    if printf '%s' "$tail" | grep -qiE '\b(e2e|playwright)\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/e2e/.*\.spec\.ts$'; then
+    if grep -qiE '\b(e2e|playwright)\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/e2e/.*\.spec\.ts$' <<< "$changed_files"; then
             held=1
         fi
     fi
-    if printf '%s' "$tail" | grep -qiE '\b(unit|phpunit)\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/.*Test\.php$'; then
+    if grep -qiE '\b(unit|phpunit)\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/.*Test\.php$' <<< "$changed_files"; then
             held=1
         fi
     fi
-    if printf '%s' "$tail" | grep -qiE '\bintegration\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/DatabaseIntegration/'; then
+    if grep -qiE '\bintegration\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/DatabaseIntegration/' <<< "$changed_files"; then
             held=1
         fi
     fi
@@ -156,7 +153,7 @@ pr_golden_hold() {
 #   Pass the `.labels` array, e.g. `gh pr view N --json labels --jq '.labels'`.
 pr_feat_hold() {
     local title="$1" labels_json="$2"
-    if printf '%s' "$title" | grep -qiE '^feat(\([^)]*\))?!?:'; then
+    if grep -qiE '^feat(\([^)]*\))?!?:' <<< "$title"; then
         if printf '%s' "$labels_json" \
             | jq -e 'any(.[]?; .name == "human-approved")' >/dev/null 2>&1; then
             return  # label flips it — not held
@@ -251,7 +248,7 @@ pr_pipeline_authored_hold() {
         | jq -e 'any(.[]?; .name == "pipeline-authored")' >/dev/null 2>&1; then
         echo "pipeline-authored"
     fi
-    if [ -n "$head_ref" ] && printf '%s' "$head_ref" | grep -qE '^bug-[0-9]+(-|$)'; then
+    if [ -n "$head_ref" ] && grep -qE '^bug-[0-9]+(-|$)' <<< "$head_ref"; then
         echo "pipeline-branch"
     fi
 }

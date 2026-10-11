@@ -110,7 +110,7 @@ if [ -n "\$plan" ]; then
     if [ ! -f "\$hf" ]; then
         printf '{"branch":"x","plan":"%s","worktree":"%s"}\n' "\$plan" "$ROOT/wt" > "\$hf"
     else
-        mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
+        for e in "\$NDIR/queue/\$plan" "\$NDIR"/queue/[0-9][0-9][0-9]-"\$plan"; do mv "\$e" "\$NDIR/done/\$plan" 2>/dev/null || true; done
         rm -f "\$hf" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
     fi
 fi
@@ -130,7 +130,7 @@ NDIR="$NDIR"
 plan="\$(basename "\${3:-}")"
 sleep 2
 if [ -n "\$plan" ]; then
-    mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
+    for e in "\$NDIR/queue/\$plan" "\$NDIR"/queue/[0-9][0-9][0-9]-"\$plan"; do mv "\$e" "\$NDIR/done/\$plan" 2>/dev/null || true; done
     rm -f "\$NDIR/handoff/\$plan.json" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
 fi
 exit 0

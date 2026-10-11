@@ -49,8 +49,8 @@ command -v php >/dev/null 2>&1 || { echo "Error: php not found on PATH." >&2; ex
 # reorder engine both see bare <slug>.md names.
 # `|| true`: an empty queue prints nothing without error.
 normalize_queue "$QUEUE_DIR"
-order="$(queue_entries_ordered | while IFS= read -r f; do entry_to_name "$f"; done || true)"
-if [ -z "$order" ]; then
+queue_order="$(queue_entries_ordered | while IFS= read -r f; do entry_to_name "$f"; done || true)"
+if [ -z "$queue_order" ]; then
     echo "Queue empty, nothing to reorder."
     exit 0
 fi
@@ -78,7 +78,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # Launch — bind 127.0.0.1 ONLY (never 0.0.0.0 / never bare :PORT).
-AUTOMOUSE_QUEUE_ORDER="$order" \
+AUTOMOUSE_QUEUE_ORDER="$queue_order" \
 AUTOMOUSE_QUEUE_CMD="$QUEUE_CMD" \
 AUTOMOUSE_SENTINEL="$SENTINEL" \
 NIGHTLY_DIR="$NIGHTLY_DIR" PLANS_DIR="$PLANS_DIR" \

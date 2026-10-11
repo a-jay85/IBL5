@@ -525,7 +525,7 @@ if [ "\$mode" = "fail" ]; then
     exit 1
 fi
 if [ -n "\$plan" ]; then
-    mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
+    for e in "\$NDIR/queue/\$plan" "\$NDIR"/queue/[0-9][0-9][0-9]-"\$plan"; do mv "\$e" "\$NDIR/done/\$plan" 2>/dev/null || true; done
     rm -f "\$NDIR/handoff/\$plan.json" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
     printf '%s postplan\n' "\$plan" >> "\$TRACE"
 fi

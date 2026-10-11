@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # bin/lib/automouse-queue-order.sh — automouse queue naming and run order.
 # Source this file; do not execute it directly. No top-level side effects
 # beyond one stat-flavor probe, so it is safe to source under `set -euo pipefail`.

@@ -317,6 +317,49 @@ ERR=$(cat "$TMP/err")
 assert_eq "E1-gh-cmd-env failing exit" "$RC" "1"
 assert_match "E1-gh-cmd-env failing message" 'GraphQL fetch failed' "$ERR"
 
+cat > "$TMP/scriptgh" <<'STUB'
+#!/usr/bin/env bash
+# Fails the first SGH_FAILS calls (empty = every call) with SGH_MSG on stderr.
+n=$(cat "$SGH_COUNT" 2>/dev/null || true); n=$(( ${n:-0} + 1 ))
+printf '%s\n' "$n" > "$SGH_COUNT"
+if [ -z "${SGH_FAILS:-}" ] || [ "$n" -le "$SGH_FAILS" ]; then
+    printf '%s\n' "$SGH_MSG" >&2
+    exit 1
+fi
+cat "$GH_SNAPSHOT_FILE"
+STUB
+chmod +x "$TMP/scriptgh"
+
+rm -f "$TMP/sgh.count"
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' SGH_COUNT="$TMP/sgh.count" GH_CMD="$TMP/scriptgh" \
+    SGH_FAILS=2 SGH_MSG='HTTP 502: Bad Gateway' \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+assert_match "E2-transient-then-ok head" '^head=3$' "$OUT"
+assert_eq "E2-transient-then-ok exit" "$RC" "0"
+assert_eq "E2-transient-then-ok calls" "$(cat "$TMP/sgh.count")" "3"
+
+rm -f "$TMP/sgh.count"
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' SGH_COUNT="$TMP/sgh.count" GH_CMD="$TMP/scriptgh" \
+    SGH_FAILS='' SGH_MSG='HTTP 401: Bad credentials' \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+ERR=$(cat "$TMP/err")
+assert_eq "E3-4xx-fails-at-once exit" "$RC" "1"
+assert_match "E3-4xx-fails-at-once message" 'GraphQL fetch failed' "$ERR"
+assert_match "E3-4xx-fails-at-once stderr visible" 'HTTP 401: Bad credentials' "$ERR"
+assert_eq "E3-4xx-fails-at-once calls" "$(cat "$TMP/sgh.count")" "1"
+
+rm -f "$TMP/sgh.count"
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' SGH_COUNT="$TMP/sgh.count" GH_CMD="$TMP/scriptgh" \
+    SGH_FAILS='' SGH_MSG='HTTP 503: Service Unavailable' \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+ERR=$(cat "$TMP/err")
+assert_eq "E4-persistent-5xx-fails-closed exit" "$RC" "1"
+assert_match "E4-persistent-5xx-fails-closed message" 'GraphQL fetch failed' "$ERR"
+assert_eq "E4-persistent-5xx-fails-closed calls" "$(cat "$TMP/sgh.count")" "4"
+
 # --- R: snapshot validation and record-and-replay ---
 
 r1_check() {

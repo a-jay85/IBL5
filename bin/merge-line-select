@@ -22,6 +22,9 @@ set -euo pipefail
 # would run an empty command and fail the fetch.
 GH_CMD="${GH_CMD:-gh}"
 
+# shellcheck source=bin/lib/gh-retry.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/gh-retry.sh"
+
 usage() {
     cat <<'EOF'
 Usage: bin/merge-line-select (--input <file|-> | --live --repo <owner/name>)
@@ -229,7 +232,7 @@ if [ "$LIVE" = 1 ]; then
     NAME="${REPO#*/}"
     # $GH_CMD is intentionally unquoted so a test seam can carry arguments.
     # shellcheck disable=SC2086
-    if ! SNAPSHOT=$($GH_CMD api graphql -f owner="$OWNER" -f name="$NAME" -f query="$LIVE_QUERY"); then
+    if ! SNAPSHOT=$(gh_retry $GH_CMD api graphql -f owner="$OWNER" -f name="$NAME" -f query="$LIVE_QUERY"); then
         echo "merge-line-select: GraphQL fetch failed" >&2
         exit 1
     fi

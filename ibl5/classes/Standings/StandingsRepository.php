@@ -27,6 +27,43 @@ use Standings\Contracts\StandingsRepositoryInterface;
  */
 class StandingsRepository extends \Database\BaseMysqliRepository implements StandingsRepositoryInterface
 {
+    /**
+     * Inlined offense and defense stats subqueries, split where the per-method
+     * filter clause goes (pushed before GROUP BY). Each call site concatenates
+     * HEAD . '<literal filter clause>' . TAIL, so the whole subquery is a
+     * compile-time constant and BanSqlStringConcatenationRule can prove no
+     * runtime value reaches the query text.
+     */
+    private const OFFENSE_SUBQUERY_HEAD = "SELECT fs.franchise_id AS teamid, fs.team_name AS name, bst.season_year,
+            CAST(SUM(bst.game_2gm + bst.game_3gm) AS SIGNED) AS fgm,
+            CAST(SUM(bst.game_ftm) AS SIGNED) AS ftm,
+            CAST(SUM(bst.game_3gm) AS SIGNED) AS tgm
+        FROM `ibl_box_scores_teams` bst
+        JOIN `ibl_franchise_seasons` fs
+            ON fs.team_name = bst.name AND fs.season_ending_year = bst.season_year
+        WHERE bst.game_type = 1 AND ";
+
+    private const OFFENSE_SUBQUERY_TAIL = "
+        GROUP BY fs.franchise_id, fs.team_name, bst.season_year";
+
+    private const DEFENSE_SUBQUERY_HEAD = "SELECT fs.franchise_id AS teamid, fs.team_name AS name, my.season_year,
+            CAST(SUM(opp.game_2gm + opp.game_3gm) AS SIGNED) AS fgm,
+            CAST(SUM(opp.game_ftm) AS SIGNED) AS ftm,
+            CAST(SUM(opp.game_3gm) AS SIGNED) AS tgm
+        FROM `ibl_box_scores_teams` my
+        JOIN `ibl_box_scores_teams` opp
+            ON my.game_date = opp.game_date
+            AND my.visitor_teamid = opp.visitor_teamid
+            AND my.home_teamid = opp.home_teamid
+            AND my.game_of_that_day = opp.game_of_that_day
+            AND my.name <> opp.name
+        JOIN `ibl_franchise_seasons` fs
+            ON fs.team_name = my.name AND fs.season_ending_year = my.season_year
+        WHERE my.game_type = 1 AND ";
+
+    private const DEFENSE_SUBQUERY_TAIL = "
+        GROUP BY fs.franchise_id, fs.team_name, my.season_year";
+
     private readonly PythagoreanCalculator $pythagoreanCalculator;
 
     private readonly StandingsUpdaterRepository $updaterRepository;
@@ -176,8 +213,8 @@ class StandingsRepository extends \Database\BaseMysqliRepository implements Stan
             "SELECT
                 tos.fgm AS off_fgm, tos.ftm AS off_ftm, tos.tgm AS off_tgm,
                 tds.fgm AS def_fgm, tds.ftm AS def_ftm, tds.tgm AS def_tgm
-            FROM (" . self::buildOffenseSubquery('bst.season_year = ? AND fs.franchise_id = ?') . ") tos
-            JOIN (" . self::buildDefenseSubquery('my.season_year = ? AND fs.franchise_id = ?') . ") tds
+            FROM (" . self::OFFENSE_SUBQUERY_HEAD . 'bst.season_year = ? AND fs.franchise_id = ?' . self::OFFENSE_SUBQUERY_TAIL . ") tos
+            JOIN (" . self::DEFENSE_SUBQUERY_HEAD . 'my.season_year = ? AND fs.franchise_id = ?' . self::DEFENSE_SUBQUERY_TAIL . ") tds
                 ON tos.teamid = tds.teamid AND tos.season_year = tds.season_year",
             "iiii",
             $seasonYear,
@@ -238,8 +275,8 @@ class StandingsRepository extends \Database\BaseMysqliRepository implements Stan
                 tos.teamid,
                 tos.fgm AS off_fgm, tos.ftm AS off_ftm, tos.tgm AS off_tgm,
                 tds.fgm AS def_fgm, tds.ftm AS def_ftm, tds.tgm AS def_tgm
-            FROM (" . self::buildOffenseSubquery('bst.season_year = ?') . ") tos
-            JOIN (" . self::buildDefenseSubquery('my.season_year = ?') . ") tds
+            FROM (" . self::OFFENSE_SUBQUERY_HEAD . 'bst.season_year = ?' . self::OFFENSE_SUBQUERY_TAIL . ") tos
+            JOIN (" . self::DEFENSE_SUBQUERY_HEAD . 'my.season_year = ?' . self::DEFENSE_SUBQUERY_TAIL . ") tds
                 ON tos.teamid = tds.teamid AND tos.season_year = tds.season_year",
             "ii",
             $seasonYear,
@@ -398,43 +435,5 @@ class StandingsRepository extends \Database\BaseMysqliRepository implements Stan
     public function fetchScheduledGameCountsPerTeam(string $startDate, string $endDate): array
     {
         return $this->updaterRepository->fetchScheduledGameCountsPerTeam($startDate, $endDate);
-    }
-
-    /**
-     * Build inlined offense stats subquery with filter pushed before GROUP BY.
-     */
-    private static function buildOffenseSubquery(string $filterClause): string
-    {
-        return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, bst.season_year,
-            CAST(SUM(bst.game_2gm + bst.game_3gm) AS SIGNED) AS fgm,
-            CAST(SUM(bst.game_ftm) AS SIGNED) AS ftm,
-            CAST(SUM(bst.game_3gm) AS SIGNED) AS tgm
-        FROM `ibl_box_scores_teams` bst
-        JOIN `ibl_franchise_seasons` fs
-            ON fs.team_name = bst.name AND fs.season_ending_year = bst.season_year
-        WHERE bst.game_type = 1 AND " . $filterClause . "
-        GROUP BY fs.franchise_id, fs.team_name, bst.season_year";
-    }
-
-    /**
-     * Build inlined defense stats subquery with filter pushed before GROUP BY.
-     */
-    private static function buildDefenseSubquery(string $filterClause): string
-    {
-        return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, my.season_year,
-            CAST(SUM(opp.game_2gm + opp.game_3gm) AS SIGNED) AS fgm,
-            CAST(SUM(opp.game_ftm) AS SIGNED) AS ftm,
-            CAST(SUM(opp.game_3gm) AS SIGNED) AS tgm
-        FROM `ibl_box_scores_teams` my
-        JOIN `ibl_box_scores_teams` opp
-            ON my.game_date = opp.game_date
-            AND my.visitor_teamid = opp.visitor_teamid
-            AND my.home_teamid = opp.home_teamid
-            AND my.game_of_that_day = opp.game_of_that_day
-            AND my.name <> opp.name
-        JOIN `ibl_franchise_seasons` fs
-            ON fs.team_name = my.name AND fs.season_ending_year = my.season_year
-        WHERE my.game_type = 1 AND " . $filterClause . "
-        GROUP BY fs.franchise_id, fs.team_name, my.season_year";
     }
 }

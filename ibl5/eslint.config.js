@@ -40,7 +40,8 @@ export default [
       'playwright/no-element-handle': 'error',
 
       // --- Enforced: wait hygiene gate (no unsuppressed violations) ---
-      // The single gotoWithRetry back-off carries an inline eslint-disable-next-line.
+      // A new page.waitForNavigation() or page.waitForTimeout(1) fails CI. The single
+      // gotoWithRetry back-off carries an inline eslint-disable-next-line.
       'playwright/no-wait-for-navigation': 'error',
       'playwright/no-wait-for-timeout': 'error',
 

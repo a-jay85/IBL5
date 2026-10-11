@@ -633,6 +633,18 @@ def test_failure_body_rc3_carries_the_captured_result():
     assert "pre-push-adr-hook denied the push" in r.stdout
 
 
+def test_failure_body_rc3_unset_result_names_every_cause():
+    r = subprocess.run(["bash", "-c",
+        f'source "{PPN}" >/dev/null 2>&1; unset HARNESS_RESULT; '
+        'postplan_failure_body 3 lbl "some time"'],
+        capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert ("The harness hit a fail-closed wall and deliberately did not fall back. "
+            "Cause: a rebase conflict, a local pre-commit/pre-push gate denial, a Claude "
+            "usage limit, or an expired Claude login; the RESULT line in the log names "
+            "which\n") in r.stdout
+
+
 def test_failure_body_rc3_percent_is_safe_and_falls_back():
     # (a) percent characters in RESULT must not cause printf format-string confusion
     r = subprocess.run(["bash", "-c",

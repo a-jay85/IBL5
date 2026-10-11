@@ -72,11 +72,13 @@
 # should_fallback <rc> — decide whether to escalate to the /post-plan skill session after the
 # compiled harness exits with <rc>. Returns 0 (DO fall back) for a generic harness failure;
 # returns 1 (do NOT fall back) for success (0) and the fail-closed sentinel (3) emitted by
-# runner.py exit_code_for(). Two kinds reach exit 3: (1) a rebase conflict the auto-resolver
-# declined or could not certify (unresolvable conflict class, per-file round cap, or failed
-# TREE-EQUIVALENT proof; see ibl5/docs/decisions/0134-harness-conflict-autoresolve.md), and
-# (2) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget). Both
-# are deterministic walls a skill re-run cannot climb, so the fallback is suppressed entirely.
+# runner.py exit_code_for(). Exit 3 means the error kind is in runner.py _FAIL_CLOSED_KINDS,
+# among them: (1) a rebase conflict the auto-resolver declined or could not certify
+# (unresolvable conflict class, per-file round cap, or failed TREE-EQUIVALENT proof; see
+# ibl5/docs/decisions/0134-harness-conflict-autoresolve.md); (2) a local pre-commit/pre-push
+# gate denial (missing ADR, stale doc, rules byte budget); (3) a Claude usage limit; and
+# (4) an expired Claude CLI login (llm-auth-expired), which the skill session would reuse.
+# Each is a deterministic wall a skill re-run cannot climb, so the fallback is suppressed entirely.
 # 7 is this launcher's own main-checkout refusal (the is_in_worktree block further down):
 # nothing ran, and the fix is to cd into the right worktree. The harness never emits 7
 # (runner.py exit_code_for returns only 0, 1 or 3). Listing 7 keeps one no-fallback
@@ -148,7 +150,7 @@ postplan_failure_body() {   # <rc> <label> <started>
     if [ "$rc" != stale ]; then
         case "$rc" in
             75) printf 'Paused for usage limit; auto-resumes after reset.\n' ;;
-            3) printf 'The harness hit a fail-closed wall and deliberately did not fall back. Cause: %s\n' "${HARNESS_RESULT:-a rebase conflict, or a local pre-commit/pre-push gate denial; the RESULT line in the log names which}" ;;
+            3) printf 'The harness hit a fail-closed wall and deliberately did not fall back. Cause: %s\n' "${HARNESS_RESULT:-a rebase conflict, a local pre-commit/pre-push gate denial, a Claude usage limit, or an expired Claude login; the RESULT line in the log names which}" ;;
             *) printf 'The run ended abnormally — check the log under `/tmp/post-plan-now-*.log`.\n' ;;
         esac
     fi

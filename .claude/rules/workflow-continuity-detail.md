@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -29,12 +29,14 @@ branch; it survives you closing Claude Code. Engine selection:
   verdict to arming condition (12). It exits **0**, **1** or **3** only. There is no exit 4 and
   no Phase-5.5 re-entry. Any harness failure outside exit 3 re-runs the **full** skill from
   Phase 0. Exit **3** is the fail-closed sentinel and suppresses the skill fallback entirely.
-  Four kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
+  Five kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
   rewritten on GitHub with different content), a **local gate denial** (a `bin/pre-commit-hook`
-  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget), and a
+  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget), a
   **usage limit** (`llm-usage-limit`: a model call returned a session, rate, or API limit
-  message). A skill re-run would hit the same wall on each one, so the run stops for a human.
-  For a usage limit, re-run `bin/post-plan-now` after the limit resets.
+  message), and an **expired login** (`llm-auth-expired`: the Claude CLI login expired).
+  A skill re-run would hit the same wall on each one, so the run stops for a human.
+  For a usage limit, re-run `bin/post-plan-now` after the limit resets. For an expired
+  login, run `claude`, complete `/login`, then re-run it.
   On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped. The block ends with a paste line, `<main checkout>/bin/postplan-fix <PR|slug>`, which opens an interactive Claude session in the worktree with the failing stage, the error text, and the log paths in its opening prompt. It does not ship. The post-plan-fleet failure DMs and the pr-cycle-tick retry-cap DM end with the same line.
   `bin/post-plan-fail-dm` sends the DM. With no live interactive Claude session in the
   worktree it DMs at once. Headless `claude -p` sessions do not count. With an interactive

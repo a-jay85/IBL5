@@ -68,7 +68,7 @@ def save_record(state_dir, slug, doc) -> None:
     path = record_path(state_dir, slug)
     tmp = f"{path}.{os.getpid()}.tmp"
     try:
-        os.makedirs(state_dir, exist_ok=True)
+        os.makedirs(os.path.dirname(path) or state_dir, exist_ok=True)
         with open(tmp, "w") as fh:
             fh.write(json.dumps(doc, indent=1, sort_keys=True))
         os.replace(tmp, path)
@@ -283,3 +283,87 @@ def conflict_only_failure(record, key, current_files, pre_patch_id, manifest_pat
 def conflict_only_delta(record, key, current_files, pre_patch_id, manifest_paths, verdict_ok) -> bool:
     return conflict_only_failure(record, key, current_files, pre_patch_id,
                                  manifest_paths, verdict_ok) == ""
+
+
+REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
+                   "security-audit", "score-findings")
+
+
+def restore_body_check(record, version, input_hash, validator):
+    """(stored result, producing run id) when the body-check arm may stand in, else None."""
+    import copy
+
+    if not isinstance(record, dict) or not isinstance(record.get("key"), dict):
+        return None
+    if not version or record["key"].get("version") != version:
+        return None
+    arm = record.get("body_check")
+    if not isinstance(arm, dict) or not input_hash or arm.get("input_hash") != input_hash:
+        return None
+    result = arm.get("result")
+    if not isinstance(result, dict):
+        return None
+    try:
+        validated = validator(copy.deepcopy(result))
+    except Exception:
+        return None
+    if not isinstance(validated, dict):
+        validated = result
+    run_id = arm.get("run_id") or record.get("run_id")
+    if not isinstance(run_id, str) or not run_id:
+        return None
+    return validated, run_id
+
+
+def build_record(*, slug, pr_number, run_id, key, per_file_ids,
+                 review=None, body_check=None, fidelity=None, now=None) -> dict:
+    import datetime
+
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    return {"schema_version": SCHEMA_VERSION, "slug": slug, "pr_number": int(pr_number),
+            "run_id": run_id, "written_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "key": dict(key), "per_file_ids": dict(per_file_ids),
+            "review": review, "body_check": body_check, "fidelity": fidelity}
+
+
+def vet_review(findings, scored, degraded_agents, gates, run_id):
+    import dataclasses
+
+    if any(p in (degraded_agents or ()) for p in REVIEW_PURPOSES):
+        return None
+    if not isinstance(findings, list) or not isinstance(scored, list):
+        return None
+    out = []
+    for f in findings:
+        d = dataclasses.asdict(f) if dataclasses.is_dataclass(f) else f
+        if not isinstance(d, dict) or not isinstance(d.get("score"), int) \
+                or isinstance(d.get("score"), bool):
+            return None
+        out.append(d)
+    return {"run_id": run_id, "gates": dict(gates), "findings": out,
+            "scored_findings": [dict(s) for s in scored], "degraded_agents": []}
+
+
+def vet_body_check(input_hash, result, degraded_agents, run_id):
+    if "body-check" in (degraded_agents or ()) or not input_hash:
+        return None
+    if not isinstance(result, dict) or not isinstance(result.get("findings"), list):
+        return None
+    return {"run_id": run_id, "input_hash": input_hash, "result": result}
+
+
+def vet_fidelity(fid, run_id):
+    """A fresh, un-remediated READY / READY WITH NOTES verdict, else None."""
+    fid = fid or {}
+    verdict = fid.get("verdict_1")
+    if verdict not in FIDELITY_REUSABLE_VERDICTS or fid.get("error_kind"):
+        return None
+    # The sticky's **Re-reviewed tree:** line derives from verdict_2; any remediation
+    # round means the verdict judged a tree this run changed, so it is never cached.
+    if fid.get("verdict_2") is not None or fid.get("remediation_sha") \
+            or fid.get("rounds_completed") or fid.get("rounds"):
+        return None
+    if not fid.get("diff_id") or not fid.get("plan_hash"):
+        return None
+    return {"run_id": run_id, "verdict": verdict, "diff_id": fid["diff_id"],
+            "plan_hash": fid["plan_hash"], "remediated": False}

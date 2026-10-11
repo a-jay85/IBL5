@@ -5,7 +5,7 @@
 #
 # Pins every verdict the gate emits: each blocking pattern, the with-else and
 # inline-allow suppressions, the file-level allowlist, the comma-fallback
-# locator ban and its [attr,...] exclusion, the full vs --pr file set, and the
+# locator ban and its [attr,...] and (...) exclusions, the full vs --pr file set, and the
 # argument handling (unknown arg,
 # --help, --help outside git). The --pr base-ref seam (unset / empty / base /
 # head / bogus) is covered by bin/test-check-phpunit-hygiene and not repeated.
@@ -213,6 +213,20 @@ run_case comma-fallback-inline-allow-prev-line-passes 0 'PASS: 0 blocking hits' 
     $'// e2e-hygiene-allow: page renders either wrapper by design\nawait page.locator(\'.a, .b\').click();'
 run_case comma-fallback-allow-two-lines-above-blocks 1 '\[comma-fallback-locator\] ibl5/tests/e2e/x\.spec\.ts:3:' "$SPEC" \
     $'// e2e-hygiene-allow: page renders either wrapper by design\n// spacer line\nawait page.locator(\'.a, .b\').click();'
+run_case comma-fallback-mixed-quote-filter-blocks 1 '\[comma-fallback-locator\] ibl5/tests/e2e/x\.spec\.ts:1:' "$SPEC" \
+    "await page.locator('button, input[type=\"submit\"]').filter({ hasText: /go/ }).click();"
+run_case comma-fallback-double-quoted-single-inside-blocks 1 '\[comma-fallback-locator\]' "$SPEC" \
+    $'await page.locator("a[x=\'1\'], .b").click();'
+run_case comma-fallback-chained-locator-blocks 1 '\[comma-fallback-locator\]' "$SPEC" \
+    "await form.locator('button[type=\"submit\"], input[type=\"submit\"]').first().click();"
+run_absent comma-in-is-pseudo-excluded 0 'comma-fallback-locator' "$SPEC" \
+    "await page.locator(':is(.a, .b)').click();"
+run_absent comma-in-not-pseudo-excluded 0 'comma-fallback-locator' "$SPEC" \
+    "await page.locator('.a:not(.b, .c)').click();"
+run_absent comma-in-quoted-attribute-excluded 0 'comma-fallback-locator' "$SPEC" \
+    "await page.locator('[data-x=\"a,b\"]').click();"
+run_case comma-fallback-mixed-quote-inline-allow-passes 0 'PASS: 0 blocking hits' "$SPEC" \
+    "await page.locator('button, input[type=\"submit\"]').click(); // e2e-hygiene-allow: fixture proves allow covers the widened match"
 
 # --- No files ---
 d="$(mk_repo)"

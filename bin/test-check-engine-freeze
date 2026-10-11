@@ -1,0 +1,223 @@
+#!/bin/bash
+set -euo pipefail
+
+# Test harness for bin/check-engine-freeze (the engine/ freeze and the decompile-token gate).
+# Follows bin/test-check-docs style.
+#
+# One fixture repo lives in a mktemp dir. Each case resets it to the base commit,
+# applies a change, and asserts the gate's exit code plus an output substring.
+# Nothing is written inside the IBL5 tree.
+#
+# Fixture tokens are built by concatenation, so this file carries none of them
+# literally and the gate passes on its own PR.
+
+PASS=0
+FAIL=0
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-engine-freeze"
+
+pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+F='FUN''_'
+T_FUN="${F}00401000"
+T_DAT="DAT""_00a1b2c3"
+T_LAB="LAB""_00401a2b"
+T_OFF='+0''x210'
+T_J='jsb560''_decompiled'
+T_DC='decompiled''.c'
+T_MR='00_MASTER''_REFERENCE.md'
+
+REPO=$(mktemp -d)
+trap 'rm -rf "$REPO"' EXIT
+
+git -C "$REPO" init -q
+git -C "$REPO" config user.email "test@example.com"
+git -C "$REPO" config user.name "check-engine-freeze test"
+git -C "$REPO" config commit.gpgsign false
+mkdir -p "$REPO/bin" "$REPO/engine" "$REPO/ibl5"
+cp "$SCRIPT" "$REPO/bin/check-engine-freeze"
+chmod +x "$REPO/bin/check-engine-freeze"
+
+printf 'package a\n// cites %s\nfunc A() {}\n' "$T_FUN" >"$REPO/engine/a.go"
+printf 'package b\n\nfunc B() {}\nfunc B2() {}\nfunc B3() {}\nfunc B4() {}\n' >"$REPO/engine/b.go"
+printf 'module example.test/engine\n\ngo 1.22\n' >"$REPO/engine/go.mod"
+printf 'example.test/dep v1.0.0 h1:abc=\n' >"$REPO/engine/go.sum"
+printf '\000\001\002' >"$REPO/engine/blob.bin"
+printf 'plain line\nnote cites %s\n' "$T_FUN" >"$REPO/ibl5/x.md"
+printf '<?php\n$a = 1;\n' >"$REPO/ibl5/y.php"
+git -C "$REPO" add -A
+git -C "$REPO" commit -q -m base
+BASE=$(git -C "$REPO" rev-parse HEAD)
+
+reset_repo() {
+    git -C "$REPO" reset -q --hard "$BASE"
+    git -C "$REPO" clean -qfd
+}
+
+commit_all() {
+    git -C "$REPO" add -A
+    git -C "$REPO" commit -q -m "case"
+}
+
+# expect <label> <want_rc> <want_substring> <gate args...>
+expect() {
+    local label="$1" want="$2" sub="$3" out rc=0
+    shift 3
+    out=$(cd "$REPO" && bin/check-engine-freeze "$@" 2>&1) || rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        fail "$label: exit $rc, wanted $want"
+        echo "$out" | sed 's/^/    /'
+    elif [ -n "$sub" ] && ! printf '%s\n' "$out" | grep -qF -- "$sub"; then
+        fail "$label: output lacks '$sub'"
+        echo "$out" | sed 's/^/    /'
+    else
+        pass "$label"
+    fi
+}
+
+expect_since() { # <label> <want_rc> <want_substring>
+    expect "$1" "$2" "$3" --since="$BASE"
+}
+
+# ── Gate A: freeze ───────────────────────────────────────────────────────────
+
+reset_repo
+echo 'func Extra() {}' >>"$REPO/engine/a.go"
+commit_all
+expect_since freeze-add-line 1 'FROZEN engine/a.go'
+
+reset_repo
+printf 'package c\n' >"$REPO/engine/c.go"
+commit_all
+expect_since freeze-new-file 1 'FROZEN engine/c.go'
+
+reset_repo
+: >"$REPO/engine/e.go"
+commit_all
+expect_since freeze-new-empty 1 'FROZEN engine/e.go'
+
+reset_repo
+echo 'require example.test/dep v1.0.0' >>"$REPO/engine/go.mod"
+commit_all
+expect_since freeze-gomod 1 'FROZEN engine/go.mod'
+
+reset_repo
+echo 'example.test/dep v1.0.0/go.mod h1:def=' >>"$REPO/engine/go.sum"
+commit_all
+expect_since freeze-gosum 1 'FROZEN engine/go.sum'
+
+reset_repo
+printf '\007\010\011\012' >"$REPO/engine/blob.bin"
+commit_all
+expect_since freeze-binary 1 'FROZEN engine/blob.bin'
+
+reset_repo
+git -C "$REPO" mv engine/b.go engine/d.go
+commit_all
+expect_since freeze-rename-within 1 'FROZEN engine/d.go'
+
+reset_repo
+git -C "$REPO" mv ibl5/y.php engine/y.php
+commit_all
+expect_since freeze-rename-into 1 'FROZEN engine/y.php'
+
+reset_repo
+git -C "$REPO" mv engine/b.go ibl5/b.go
+commit_all
+expect_since freeze-rename-out 1 'moved out of engine/'
+
+reset_repo
+echo 'func Dirty() {}' >>"$REPO/engine/a.go"
+expect_since freeze-uncommitted 1 'FROZEN engine/a.go'
+
+reset_repo
+git -C "$REPO" rm -rq engine
+commit_all
+expect_since freeze-delete-tree 0 'OK'
+
+reset_repo
+git -C "$REPO" rm -q engine/blob.bin
+commit_all
+expect_since freeze-delete-binary 0 'OK'
+
+reset_repo
+sed '3d' "$REPO/engine/a.go" >"$REPO/engine/a.go.new"
+mv "$REPO/engine/a.go.new" "$REPO/engine/a.go"
+commit_all
+expect_since freeze-remove-lines 0 'OK'
+
+reset_repo
+chmod +x "$REPO/engine/a.go"
+commit_all
+expect_since freeze-mode-only 0 'OK'
+
+reset_repo
+echo '$b = 2;' >>"$REPO/ibl5/y.php"
+commit_all
+expect_since outside-only 0 'OK'
+
+# ── Gate B: decompile tokens ─────────────────────────────────────────────────
+
+reset_repo
+echo "x = $T_FUN" >>"$REPO/ibl5/y.php"
+commit_all
+expect_since token-fun 1 'ibl5/y.php:'
+out=$(cd "$REPO" && bin/check-engine-freeze --since="$BASE" 2>&1) || true
+if printf '%s\n' "$out" | grep -qF "$T_FUN"; then
+    pass "token-fun names the token"
+else
+    fail "token-fun names the token"
+fi
+
+for tok in "$T_DAT" "$T_LAB" "$T_OFF" "$T_J" "$T_DC" "$T_MR"; do
+    reset_repo
+    echo "x = $tok" >>"$REPO/ibl5/y.php"
+    commit_all
+    expect_since "token-forms $tok" 1 'DECOMPILE-TOKEN'
+done
+
+reset_repo
+echo 'plain content' >"$REPO/ibl5/${T_J}.txt"
+commit_all
+expect_since token-filename 1 'DECOMPILE-TOKEN'
+
+reset_repo
+git -C "$REPO" mv engine/a.go ibl5/a.go
+commit_all
+expect_since token-moved-out 1 'DECOMPILE-TOKEN ibl5/a.go:'
+
+reset_repo
+sed '2d' "$REPO/ibl5/x.md" >"$REPO/ibl5/x.md.new"
+mv "$REPO/ibl5/x.md.new" "$REPO/ibl5/x.md"
+commit_all
+expect_since token-delete-line 0 'OK'
+
+reset_repo
+sed '1s/.*/edited line/' "$REPO/ibl5/x.md" >"$REPO/ibl5/x.md.new"
+mv "$REPO/ibl5/x.md.new" "$REPO/ibl5/x.md"
+commit_all
+expect_since token-existing-context 0 'OK'
+
+reset_repo
+{
+    echo "${F}12345"
+    echo '+0''x1'
+    echo '0''x210'
+    echo '0''x21 starts with hex'
+} >>"$REPO/ibl5/y.php"
+commit_all
+expect_since token-boundary 0 'OK'
+
+# ── CLI ──────────────────────────────────────────────────────────────────────
+
+reset_repo
+expect cli-unknown 2 'unknown option' --bogus
+expect cli-space-form 2 'use --since=<ref>' --since "$BASE"
+expect cli-no-args 2 'use --since=<ref>'
+expect cli-bad-ref 2 'cannot resolve ref' --since=nonexistent-ref
+expect cli-help 0 'usage' --help
+expect empty-range 0 'OK' --since=HEAD
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ] || exit 1

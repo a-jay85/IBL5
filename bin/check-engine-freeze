@@ -1,0 +1,164 @@
+#!/bin/bash
+#
+# bin/check-engine-freeze — freeze engine/ and keep new decompile tokens out of the repo.
+#
+# engine/ is frozen pending its replacement. One script carries both gates so the
+# cutover PR retires a single file.
+#
+#   Gate A, freeze: a PR may delete from engine/ but never add to it.
+#     - a new, copied, type-changed, or renamed-in file fails (any status but D or M)
+#     - a modified file fails when it gains lines or is a binary change
+#     - a file renamed out of engine/ fails
+#     - deletions and mode-only changes pass
+#   Gate B, decompile tokens: no added line or added file name, anywhere in the repo,
+#     may carry a decompile artifact (function, data, and label symbols, the dumped
+#     source file names, and struct offsets). Deleted and context lines are never
+#     read, so existing citations stay and removing one passes.
+#
+# The base is always passed in with --since=<ref> (CI passes the PR base sha), never
+# derived from repo state. Diffs compare the working tree against the merge-base, so
+# staged and unstaged tracked changes count. Untracked files do not.
+#
+# There is no exemption path: fixtures in the harness are built by concatenation.
+# Keep this file free of the literal tokens, or the gate fails its own PR.
+#
+# Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
+#
+# Exit codes: 0 = pass, 1 = violation found, 2 = usage or git error.
+
+set -euo pipefail
+
+usage() {
+    echo "usage: bin/check-engine-freeze --since=<ref>"
+}
+
+die() {
+    echo "check-engine-freeze: $1" >&2
+    exit 2
+}
+
+since=""
+if [ "$#" -eq 0 ]; then
+    usage >&2
+    die "use --since=<ref>"
+fi
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) usage; exit 0 ;;
+        --since=?*) since="${arg#--since=}" ;;
+        --since=|--since) die "use --since=<ref>" ;;
+        -*) die "unknown option: $arg" ;;
+        *) die "use --since=<ref> (unexpected argument: $arg)" ;;
+    esac
+done
+[ -n "$since" ] || die "use --since=<ref>"
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
+cd "$root"
+
+git rev-parse --verify --quiet "${since}^{commit}" >/dev/null || die "cannot resolve ref: $since"
+mb=$(git merge-base "$since" HEAD 2>/dev/null) || die "no merge-base (shallow clone?)"
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+gitdiff() {
+    git -c core.quotePath=false diff --no-color --no-ext-diff --no-textconv \
+        --src-prefix=a/ --dst-prefix=b/ "$@"
+}
+
+# Run a diff into a file. A non-zero git exit is a usage or git error, never a pass.
+diff_to() {
+    local out="$1"
+    shift
+    gitdiff "$@" >"$out" || die "git diff failed: $*"
+}
+
+viol=0
+
+# ── Gate A: freeze ───────────────────────────────────────────────────────────
+
+diff_to "$tmp/status.txt" --no-renames --name-status "$mb" -- engine/
+while IFS=$'\t' read -r st path; do
+    [ -n "$st" ] || continue
+    case "$st" in
+        D) ;;
+        M) ;;
+        *) echo "FROZEN $path (status $st)"; viol=1 ;;
+    esac
+done <"$tmp/status.txt"
+
+diff_to "$tmp/numstat.txt" --no-renames --diff-filter=M --numstat "$mb" -- engine/
+while IFS=$'\t' read -r added _removed path; do
+    [ -n "$added" ] || continue
+    if [ "$added" = "-" ]; then
+        echo "FROZEN $path (binary change)"
+        viol=1
+    elif [ "$added" -gt 0 ]; then
+        echo "FROZEN $path (adds $added line(s))"
+        viol=1
+    fi
+done <"$tmp/numstat.txt"
+
+# No pathspec here, so both sides of a rename are visible.
+diff_to "$tmp/renames.txt" -M --name-status --diff-filter=R "$mb"
+while IFS=$'\t' read -r _st src dst; do
+    case "$src" in
+        engine/*)
+            case "$dst" in
+                engine/*) ;;
+                *) echo "FROZEN $src moved out of engine/ to $dst"; viol=1 ;;
+            esac
+            ;;
+    esac
+done <"$tmp/renames.txt"
+
+# ── Gate B: decompile tokens ─────────────────────────────────────────────────
+
+TOKEN_RE='FUN_[0-9A-Fa-f]{6,}|DAT_[0-9A-Fa-f]{6,}|LAB_[0-9A-Fa-f]{6,}|decompiled\.c|jsb560_decompile[d]|00_MASTER_REFERENCE\.md|\+0x[0-9A-Fa-f]{2,}'
+HUNK_RE='^@@ -[0-9,]+ \+([0-9]+)'
+
+# --no-renames: a file moved out of engine/ shows every line as added.
+diff_to "$tmp/full.diff" --no-renames -U0 "$mb"
+rc=0
+grep -E '^(\+|@@ )' "$tmp/full.diff" >"$tmp/added.diff" || rc=$?
+[ "$rc" -le 1 ] || die "grep failed on the diff"
+
+path=""
+line=0
+while IFS= read -r l; do
+    case "$l" in
+        '+++ /dev/null')
+            path=""
+            ;;
+        '+++ b/'*)
+            path="${l#+++ b/}"
+            if [[ $path =~ $TOKEN_RE ]]; then
+                echo "DECOMPILE-TOKEN $path: file name: ${BASH_REMATCH[0]}"
+                viol=1
+            fi
+            ;;
+        '@@ '*)
+            if [[ $l =~ $HUNK_RE ]]; then
+                line=${BASH_REMATCH[1]}
+            fi
+            ;;
+        '+'*)
+            # Strip the leading plus so content that starts with 0x is not a hit.
+            c="${l#+}"
+            if [[ $c =~ $TOKEN_RE ]]; then
+                echo "DECOMPILE-TOKEN $path:$line: ${BASH_REMATCH[0]}"
+                viol=1
+            fi
+            line=$((line + 1))
+            ;;
+    esac
+done <"$tmp/added.diff"
+
+if [ "$viol" -ne 0 ]; then
+    echo "engine/ is frozen pending its replacement; see .claude/rules/engine-go.md"
+    echo "remove the token from the added line"
+    exit 1
+fi
+
+echo "check-engine-freeze: OK"

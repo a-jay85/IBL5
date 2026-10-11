@@ -2639,6 +2639,113 @@ assert_viol "gateZ-phpunit-row-silent" 0 '[Z]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate [MT] fixtures (15 cases)
+# ---------------------------------------------------------------------------
+# :LINE suffix on a bare spec name (the phpstan-baseline-module-index-batch shape).
+assert_viol "gateMT-line-suffix-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | heading present at `auth-pages-extended.spec.ts:26` | E2E | post-impl | `ibl5/tests/e2e/auth-pages-extended.spec.ts` |
+'"$YROW"'
+'
+# :NN-NN range on a full path.
+assert_viol "gateMT-line-range-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | heading present at `ibl5/tests/e2e/auth-pages-extended.spec.ts:9-10` | E2E | post-impl | `ibl5/tests/e2e/auth-pages-extended.spec.ts` |
+'"$YROW"'
+'
+# The message names the bare path to cite instead.
+assert_msg "gateMT-line-message-names-bare-path" 1 'Cite the bare path `auth-pages-extended.spec.ts`' '[Z]' "$FM$YHDR"'
+| 1 | heading present at `auth-pages-extended.spec.ts:26` | E2E | post-impl | `ibl5/tests/e2e/auth-pages-extended.spec.ts` |
+'"$YROW"'
+'
+# The corrected form, a bare path, passes.
+assert_viol "gateMT-bare-path-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | heading present in `ibl5/tests/e2e/auth-pages-extended.spec.ts` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# host:port tokens are not paths: exempt by extension.
+assert_viol "gateMT-host-port-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | stack answers on `localhost:8080`, `wt-x.localhost:8080` and `iblhoops.net:443` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# A :LINE token inside the Mutation clause is blanked by the helper: silent.
+assert_viol "gateMT-mutation-clause-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds. Mutation: delete the branch at `x.php:12` makes it fail | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# A matrix inside a fenced example is never scanned. MT_FENCE is built with
+# printf so no line of this file opens a markdown fence of its own.
+MT_FENCE=$(printf '%s%s%s' '`' '`' '`')
+assert_viol "gateMT-fenced-matrix-silent" 0 '[MT]' "$FM$YHDR"'
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+
+'"$MT_FENCE$YHDR"'
+| 9 | heading present at `auth-pages-extended.spec.ts:26` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$MT_FENCE"'
+'
+# A one-time-check row is skipped by the helper, so the gate skips it too.
+assert_viol "gateMT-tagged-row-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | grep printed `x.php:12` (one-time-check: one command printed output at plan time) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+
+# Stem fixtures: a throwaway repo with one orphan stem and one stem a spec quotes.
+MT_REPO="$TMP/mt-repo"
+mkdir -p "$MT_REPO/e2e/vr.spec.ts-snapshots"
+git -C "$MT_REPO" init -q
+printf 'png\n' > "$MT_REPO/e2e/vr.spec.ts-snapshots/mt-orphan-stem.png"
+printf 'png\n' > "$MT_REPO/e2e/vr.spec.ts-snapshots/mt-saved-stem.png"
+printf "await expect(page).toHaveScreenshot('mt-saved-stem.png');\n" > "$MT_REPO/e2e/vr.spec.ts"
+git -C "$MT_REPO" add -A
+export CHECK_PLAN_MT_GIT_ROOT="$MT_REPO"
+# Bare stem found in no tracked text (the page-h1-boxscore-apikeys-1415 shape).
+assert_viol "gateMT-orphan-stem-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` baseline matches | Visual-regression | post-impl | `e2e/vr.spec.ts` |
+'"$YROW"'
+'
+# The message names the snapshot path to cite instead.
+assert_msg "gateMT-stem-message-names-snapshot" 1 'Cite the snapshot path `e2e/vr.spec.ts-snapshots/mt-orphan-stem.png`' '[Z]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` baseline matches | Visual-regression | post-impl | `e2e/vr.spec.ts` |
+'"$YROW"'
+'
+# A stem quoted in tracked text is realised by arm 3: accepted.
+assert_viol "gateMT-saved-stem-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | `mt-saved-stem` baseline matches | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# The corrected form, the snapshot path, passes.
+assert_viol "gateMT-snapshot-path-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | `e2e/vr.spec.ts-snapshots/mt-orphan-stem.png` matches | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# Not a git repo: the stem rule is skipped, the :LINE rule still fires.
+mkdir -p "$TMP/mt-nogit"
+export CHECK_PLAN_MT_GIT_ROOT="$TMP/mt-nogit"
+assert_viol "gateMT-nogit-line-still-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` and `x.php:12` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+'
+# Seam empty behaves as unset: the real repo has no mt-orphan-stem snapshot, so silent.
+export CHECK_PLAN_MT_GIT_ROOT=""
+assert_viol "gateMT-seam-empty-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` baseline matches | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# Seam unset: real repo, a valid plan with corrected forms passes.
+unset CHECK_PLAN_MT_GIT_ROOT
+assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` absent and `ibl5/tests/e2e/auth-pages-extended.spec.ts` green | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+
+# ---------------------------------------------------------------------------
 # Gate [ND] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Marker with a 15+ character reason inside a phase body: the honored shape.
@@ -2946,19 +3053,20 @@ _corpus_guard_ok() {
 # bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
 # pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags);
 # narrow-headless-marker-contract-paths, jsb-j7-param-recovery,
-# plan-gate-skill-inline (gate [Z]: untagged out-of-repo rows).
+# plan-gate-skill-inline (gate [Z]: untagged out-of-repo rows);
+# wt-rebase-merge-not-rebase, retire-rebase-prs-workflow (gate [MT]: :LINE suffix tokens).
 _n_corpus_pass=1
 for _n_slug in \
     plan-architect-phase-drift-guard \
     automouse-cost-accounting-fix redact-credentials-from-error-logs \
     session-registry-dotclaude-freshness architect-explore-fanout \
     agent-tiering-detail-trim \
-    postplan-findings-schema-degrade wt-rebase-merge-not-rebase \
+    postplan-findings-schema-degrade \
     sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
     authz-verdict-refactor-1e-trading-accept-shim \
-    autoresearch-oreb-arming-share-lever retire-rebase-prs-workflow; do
+    autoresearch-oreb-arming-share-lever; do
     _n_pf="$HOME/claude-plans/$_n_slug.md"
     [ -f "$_n_pf" ] || continue
     if ! _corpus_guard_ok "$_n_pf"; then

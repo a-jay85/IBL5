@@ -247,7 +247,7 @@ function resetDepthChart() {
         window.IBL_syncDepthChartStepperLabels();
     }
 
-    // Reset minutes number inputs to blank — the server's extractIntValue()
+    // Reset minutes number inputs to blank — the server's StatsSanitizer::intFromArray()
     // converts blank → 0 on submit, so this leaves the GM with an empty
     // field they can type into rather than a stale "0" they have to clear.
     var minInputs = form.querySelectorAll('input[type="number"][name^="min"]');

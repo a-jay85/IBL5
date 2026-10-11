@@ -231,7 +231,7 @@ parameters:
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 6
+			count: 4
 			path: classes/Negotiation/NegotiationOfferView.php
 
 		-
@@ -277,15 +277,9 @@ parameters:
 			path: classes/RookieOption/RookieOptionView.php
 
 		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 7
-			path: classes/Search/SearchRepository.php
-
-		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 72
+			count: 3
 			path: classes/Search/SearchView.php
 
 		-
@@ -303,12 +297,6 @@ parameters:
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
-			count: 6
-			path: classes/Standings/StandingsRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
 			count: 3
 			path: classes/Team/SplitStatsRepository.php
 
@@ -317,12 +305,6 @@ parameters:
 			identifier: ibl.trustedVariable
 			count: 14
 			path: classes/Team/TeamView.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 12
-			path: classes/TeamOffDefStats/TeamOffDefStatsRepository.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -445,7 +427,7 @@ parameters:
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 18
+			count: 5
 			path: classes/Trading/TradeOfferFormView.php
 
 		-
@@ -469,7 +451,7 @@ parameters:
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 5
+			count: 1
 			path: classes/Trading/TradeReviewView.php
 
 		-
@@ -1933,17 +1915,6 @@ parameters:
 			count: 1
 			path: scripts/allStarRename.php
 
-
-
-
-
-
-
-
-
-
-
-
 		-
 			rawMessage: 'Function parseBxsHeader() has parameter $teamNameToId with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
@@ -2112,15 +2083,6 @@ parameters:
 			count: 3
 			path: scripts/bulkJsbImport.php
 
-
-
-
-
-
-
-
-
-
 		-
 			rawMessage: Variable $argc might not be defined.
 			identifier: variable.undefined
@@ -2150,19 +2112,6 @@ parameters:
 			identifier: variable.undefined
 			count: 2
 			path: scripts/jsbExport.php
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 		-
 			rawMessage: 'Loose comparison via "!=" between int and int is not allowed.'
@@ -2379,13 +2328,6 @@ parameters:
 			identifier: variable.undefined
 			count: 1
 			path: scripts/reconstructPlr.php
-
-
-
-
-
-
-
 
 		-
 			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'

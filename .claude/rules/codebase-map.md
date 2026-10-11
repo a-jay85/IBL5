@@ -126,9 +126,9 @@ CareerLeaderboards -> BasketballStats Cache Player Security
 Cli -> Module
 ComparePlayers -> BasketballStats Player Repositories Security UI
 ContractList -> Player Repositories Security UI
-Database -> League
+Database -> BasketballStats League
 Debug -> Auth Clock Security Utilities
-DepthChart -> DepthChartSnapshot EventLog Http League NextSim Repositories Season Security Standings Team TeamSchedule UI Validation
+DepthChart -> BasketballStats DepthChartSnapshot EventLog Http League NextSim Repositories Season Security Standings Team TeamSchedule UI Validation
 DepthChartSnapshot -> BasketballStats Season Security Team
 Discord -> Repositories
 Draft -> Discord EventLog Repositories Season Security UI Validation

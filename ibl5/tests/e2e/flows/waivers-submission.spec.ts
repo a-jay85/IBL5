@@ -53,7 +53,7 @@ test.describe('Waivers: add player', () => {
 
     // Strip onclick handler — it disables button + calls form.submit() which
     // races with Playwright's navigation tracking
-    const submitBtn = form.locator('button[type="submit"], input[type="submit"]').first();
+    const submitBtn = form.locator('button[type="submit"]').first();
     await submitBtn.evaluate(btn => (btn as HTMLElement).removeAttribute('onclick'));
 
     const playerNameOnly = optionLabel.replace(/\s+\d.*$/, '').trim();
@@ -107,7 +107,7 @@ test.describe('Waivers: waive player', () => {
 
     // Strip onclick handler — it disables button + calls form.submit() which
     // races with Playwright's navigation tracking
-    const submitBtn = form.locator('button[type="submit"], input[type="submit"]').first();
+    const submitBtn = form.locator('button[type="submit"]').first();
     await submitBtn.evaluate(btn => (btn as HTMLElement).removeAttribute('onclick'));
 
     await submitFormAndAssertEffect(page, {

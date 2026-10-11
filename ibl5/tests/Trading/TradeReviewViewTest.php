@@ -9,6 +9,11 @@ use Trading\TradeReviewView;
 
 class TradeReviewViewTest extends TestCase
 {
+    /** Hostile input: apostrophe, angle brackets, ampersand, double quotes. */
+    private const HOSTILE = 'O\'Neal <xss>&"q"';
+    /** HtmlSanitizer::safeHtmlOutput(self::HOSTILE) under ENT_QUOTES|ENT_HTML5. */
+    private const ESCAPED = 'O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;';
+
     private TradeReviewView $view;
 
     protected function setUp(): void
@@ -39,6 +44,33 @@ class TradeReviewViewTest extends TestCase
             __DIR__ . '/fixtures/trade-review.golden.html',
             $normalized
         );
+    }
+
+    public function testHostileTeamNamesAndItemTextEscapedExactlyOnce(): void
+    {
+        $pageData = [
+            'userTeam' => 'U' . self::HOSTILE,
+            'userTeamId' => 1,
+            'tradeOffers' => [
+                1 => $this->createTradeOffer([
+                    'oppositeTeam' => 'O' . self::HOSTILE,
+                    'items' => [
+                        ['type' => 'player', 'description' => 'D' . self::HOSTILE, 'notes' => 'N' . self::HOSTILE, 'from' => 'Lakers', 'to' => 'Heat'],
+                    ],
+                ]),
+            ],
+            'teams' => [],
+            'result' => null,
+            'error' => null,
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        foreach (['U', 'O', 'D', 'N'] as $prefix) {
+            $this->assertGreaterThanOrEqual(1, substr_count($html, $prefix . self::ESCAPED), $prefix);
+        }
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
     }
 
     /**

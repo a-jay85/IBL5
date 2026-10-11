@@ -135,6 +135,28 @@ class NegotiationOfferViewTest extends TestCase
 
     /**
      * @group view
+     * @group security
+     */
+    public function testHostileNamesAreEscapedExactlyOnceInHiddenInputs(): void
+    {
+        // Arrange
+        $player = $this->createTestPlayer(['name' => 'P' . 'O\'Neal <xss>&"q"', 'teamname' => 'T' . 'O\'Neal <xss>&"q"']);
+        $demands = $this->getDefaultDemands();
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
+
+        // Act
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, 1000, $maxYearOneSalary);
+
+        // Assert
+        $escaped = 'O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;';
+        $this->assertStringContainsString('value="P' . $escaped . '"', $html);
+        $this->assertStringContainsString('value="T' . $escaped . '"', $html);
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
+    }
+
+    /**
+     * @group view
      * @group rendering
      */
     public function testShowsEditableFieldsWhenDemandsUnderMax(): void

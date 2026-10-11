@@ -14,6 +14,9 @@ concurrency:
 jobs:
   pre-flight:
     name: Pre-flight (composer --no-dev + migrate + validate-schema dry-run)
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/deploy-rehearsal.yml
     # Reusable workflows receive NO secrets by default; the rehearsal needs the
     # deploy SSH secrets (PORT/HOST/USERNAME/PRIVATE_KEY) to clone prod over SSH.

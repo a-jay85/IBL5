@@ -292,4 +292,45 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
 
         self::assertSame([], $result);
     }
+
+    private function insertRcbSeasonTie(): void
+    {
+        $base = [
+            'season_year' => 2098,
+            'scope' => 'league',
+            'context' => 'home',
+            'stat_category' => 'pts',
+            'ranking' => 10,
+            'stat_value' => 50,
+            'record_season_year' => 2098,
+        ];
+        $idA = $this->insertRow('ibl_rcb_season_records', $base + ['teamid' => 27, 'player_name' => 'Rcb Tie A']);
+        $idB = $this->insertRow('ibl_rcb_season_records', $base + ['teamid' => 28, 'player_name' => 'Rcb Tie B']);
+        self::assertLessThan($idB, $idA, 'season record ids must be strictly ascending');
+    }
+
+    public function testGetRcbSeasonHighsBreaksCrossTeamRankingTieById(): void
+    {
+        $this->insertRcbSeasonTie();
+
+        $rows = array_values(array_filter(
+            $this->repo->getRcbSeasonHighs(2098, 'home'),
+            static fn (array $row): bool => $row['stat_category'] === 'pts' && $row['ranking'] === 10,
+        ));
+
+        // The return shape carries no id, so name order stands in for id order.
+        self::assertSame(
+            ['Rcb Tie A', 'Rcb Tie B'],
+            array_map(static fn (array $row): string => $row['player_name'], $rows),
+        );
+    }
+
+    public function testGetRcbSeasonHighsExcludesOtherContext(): void
+    {
+        $this->insertRcbSeasonTie();
+
+        foreach ($this->repo->getRcbSeasonHighs(2098, 'away') as $row) {
+            self::assertStringStartsNotWith('Rcb Tie', $row['player_name']);
+        }
+    }
 }

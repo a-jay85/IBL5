@@ -289,6 +289,7 @@ class RunResult:
     error_cmd: Optional[str] = None            # command that failed (HarnessError.cmd); omitted from result.json when unset
     error_output_tail: Optional[str] = None    # last 4000 chars of that command's output (HarnessError.output)
     block_cause: Optional[str] = None          # RebaseBlockCause.render() of a rebase-conflict block; omitted from result.json when unset
+    conflict_rung: Optional[str] = None        # first-pass | regen | opus-retry | session | exhausted; omitted when no conflict
     sticky_comment_id: Optional[str] = None  # numeric id read back after the upsert; None = unconfirmed
     sticky_error: Optional[str] = None       # "sticky-post-failed" when the read-back found no comment
     retry_cap: Optional[str] = None  # reserved fail-closed seam: no production writer since the BEHIND cap stopped disarming (2026-10-04); any value still forces SHIPPED_HELD in _compute_terminal
@@ -307,6 +308,9 @@ class RunResult:
     scored_findings: list[dict] = field(default_factory=list)
     manual_demotions: list[dict] = field(default_factory=list)
     manual_testing: dict = field(default_factory=dict)  # Phase 6.7 record; popped when empty
+    run_id: str = ""                          # basename(out_dir); popped when empty
+    reused_from: dict = field(default_factory=dict)  # arm -> producing run id; popped when empty
+    review_delta: list[str] = field(default_factory=list)  # interdiff-reviewed paths; popped when empty
     hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
     pause_edit_sid: Optional[str] = None  # S of a recorded interrupted edit (ADR-0143 addendum 2026-10-10); omitted from result.json when unset
     audit: list[str] = field(default_factory=list)
@@ -314,7 +318,7 @@ class RunResult:
     def to_json(self) -> str:
         d = asdict(self)
         for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix",
-                    "pause_edit_sid"):   # unset → result.json byte-identical
+                    "pause_edit_sid", "conflict_rung"):   # unset → result.json byte-identical
             if not d.get(key):
                 d.pop(key, None)
         if self.classification:
@@ -338,4 +342,7 @@ class RunResult:
                 d["plan"].pop("plan_source", None)
         if not self.manual_testing:
             d.pop("manual_testing", None)   # keep existing replay goldens byte-identical
+        for key in ("run_id", "reused_from", "review_delta"):   # review cache; unset → byte-identical
+            if not d.get(key):
+                d.pop(key, None)
         return json.dumps(d, indent=1, default=str)

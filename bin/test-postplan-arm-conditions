@@ -2547,6 +2547,189 @@ else
     echo "ok: condition (12) verdict path is not PID-keyed"
 fi
 
+# --- §5.5 Step 1b carry-forward gate behavioural cases ---------------------------------
+# Drives the three Step 1b/1c fences (decision, materialise) in their own shells against
+# fixture sticky bodies in the Step 6 layout. The ${VAR:-...} seams on the blocks are the
+# only inputs; a live run never sets them. Each case prints "ok: <name>" or "FAIL: <name>".
+BCFD="$(extract_block '# phase 5.5 carry-forward decision' "$P55_SKILL")"
+BCFM="$(extract_block '# phase 5.5 carry-forward materialise' "$P55_SKILL")"
+if [ -z "$BCFD" ] || [ -z "$BCFM" ]; then
+    echo "FAIL: cf — carry-forward decision/materialise block missing from $P55_SKILL — marker drifted"
+    FAILED=1
+else
+CF_T="$(printf 'a%.0s' $(seq 40))"
+CF_H="$(printf 'b%.0s' $(seq 64))"
+CF_PR=999031
+CF_BODY="$BASE_TMP/cf-body.md"
+CF_DIGEST="$BASE_TMP/cf-digest.txt"
+CF_PROBE="$BASE_TMP/cf-probe.txt"
+CF_BANNER_DEFAULT="**READY** — 2026-10-01 00:00:00 UTC"
+CF_PLAN_POS=audit   # audit | above (plan-hash line above the digest, as the harness writes it)
+
+# mk_prior_body <terminal-line> <banner-line> <plan-hash-line-or-empty> <tree>
+mk_prior_body() {
+    local term="$1" banner="$2" planline="$3" tree="$4"
+    {
+        printf '%s\n\n' "$banner"
+        printf 'Findings: none.\n\n'
+        if [ -n "$planline" ] && [ "$CF_PLAN_POS" = above ]; then printf '%s\n\n' "$planline"; fi
+        printf '### Merge digest\n'
+        printf '**What changed:** x\n**Why:** x\n**Watch:** x\n**Touches:** x\n**Machine-authored fixes:** none\n'
+        printf '\n---\n\n<details><summary>Audit trail</summary>\n\n'
+        printf 'REVIEW-COVERAGE: full\n**Reviewed tree:** %s\n' "$tree"
+        if [ -n "$planline" ] && [ "$CF_PLAN_POS" = audit ]; then printf '%s\n' "$planline"; fi
+        printf '\n</details>\n\n%s\n<!-- pr-ready-verdict -->\n' "$term"
+    } > "$CF_BODY"
+}
+mk_cf_digest() {  # <line-count 4|5>
+    printf '**What changed:** x\n**Why:** x\n**Watch:** x\n**Touches:** x\n**Machine-authored fixes:** none\n' \
+        | head -n "$1" > "$CF_DIGEST"
+}
+mk_cf_probe() { printf 'CURRENT-TREE: %s\n%s\n' "$CF_T" "$1" > "$CF_PROBE"; }
+
+# cf_decide <block> [HEAD_TREE] [CUR_PLAN_HASH] [PROBE_OUT] — run the decision block, print stdout.
+cf_decide() {
+    printf '{"number":%s}' "$CF_PR" > "$BASE_TMP/fixture.json"
+    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        PROBE_OUT="${4:-$CF_PROBE}" PRIOR_BODY="$CF_BODY" PRIOR_DIGEST="$CF_DIGEST" \
+        CUR_PLAN_HASH="${3:-$CF_H}" HEAD_TREE="${2:-$CF_T}" bash -c "$1" 2>&1
+}
+# cf_check <name> <output> <line>... — each line must appear whole in the output; a line
+# starting with "!" must NOT appear as a line prefix. Prints one ok:/FAIL: for the case.
+cf_check() {
+    local name="$1" out="$2" l bad=0
+    shift 2
+    for l in "$@"; do
+        if [ "${l:0:1}" = "!" ]; then
+            if grep -q "^${l:1}" <<< "$out"; then
+                echo "FAIL: $name — unexpected '${l:1}' in: $(tr '\n' '|' <<< "$out")"; bad=1
+            fi
+        elif ! grep -qxF -- "$l" <<< "$out"; then
+            echo "FAIL: $name — missing '$l' in: $(tr '\n' '|' <<< "$out")"; bad=1
+        fi
+    done
+    if [ "$bad" = 0 ]; then echo "ok: $name"; else FAILED=1; fi
+}
+CF_PLANLINE="**Plan hash:** $CF_H"
+
+# --- happy paths
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"; mk_cf_digest 5; mk_cf_probe "SKIP-REVIEW $CF_T"
+cf_check cf-happy-ready "$(cf_decide "$BCFD")" "FIDELITY_GATE=skip" "CARRY_WORD=READY" "CARRY_TREE=$CF_T"
+
+mk_prior_body "READY WITH NOTES" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+cf_check cf-happy-ready-with-notes "$(cf_decide "$BCFD")" "FIDELITY_GATE=skip" "CARRY_WORD=READY WITH NOTES"
+
+CF_PLAN_POS=above
+mk_prior_body "READY" "**LATEST VERDICT: READY** — posted 2026-09-26 23:43:51 PDT" "$CF_PLANLINE" "$CF_T"
+cf_check cf-harness-banner "$(cf_decide "$BCFD")" "FIDELITY_GATE=skip"
+CF_PLAN_POS=audit
+
+# --- terminal-word refusals
+mk_prior_body "NOT READY — held for your final review" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+CF_NR_OUT="$(cf_decide "$BCFD")"
+cf_check cf-not-ready "$CF_NR_OUT" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-verdict-not-terminal" "!CARRY_WORD="
+
+mk_prior_body "READY WITH NOTES — all notes remediated in abc1234; reviewer verdict covers tree $CF_T, not the post-remediation head" \
+    "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+cf_check cf-suffixed-notes "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-verdict-not-terminal"
+
+mk_prior_body "READY (re-review) — findings remediated in abc1234 and re-reviewed clean on tree $CF_T; condition (12) arms on the next /post-plan Phase 6.5 run" \
+    "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+cf_check cf-re-review-line "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-verdict-not-terminal"
+
+mk_prior_body "READY" "**NOT READY** — 2026-10-01 00:00:00 UTC" "$CF_PLANLINE" "$CF_T"
+cf_check cf-banner-veto "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-banner-not-ready"
+
+# --- probe refusals
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+mk_cf_probe "RUN-REVIEW tree-changed"
+cf_check cf-probe-tree-changed "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=RUN-REVIEW tree-changed"
+mk_cf_probe "RUN-REVIEW conflicts-resolved"
+cf_check cf-probe-conflicts "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=RUN-REVIEW conflicts-resolved"
+mk_cf_probe "RUN-REVIEW multiple-sticky-comments"
+cf_check cf-probe-multiple-stickies "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "!CARRY_WORD="
+mk_cf_probe "RUN-REVIEW no-tree-line"
+cf_check cf-probe-malformed-tree "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "!CARRY_WORD="
+cf_check cf-probe-missing "$(cf_decide "$BCFD" "$CF_T" "$CF_H" "$BASE_TMP/does-not-exist")" \
+    "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=RUN-REVIEW probe-output-missing"
+
+mk_cf_probe "SKIP-REVIEW $CF_T"
+cf_check cf-tree-mismatch-head "$(cf_decide "$BCFD" "$(printf 'c%.0s' $(seq 40))")" \
+    "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=tree-mismatch-with-head"
+
+# --- plan identity
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "" "$CF_T"
+cf_check cf-plan-line-absent "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=plan-identity-absent"
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "**Plan hash:** none" "$CF_T"
+cf_check cf-plan-line-none "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=plan-identity-absent"
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+cf_check cf-plan-edited "$(cf_decide "$BCFD" "$CF_T" "$(printf 'd%.0s' $(seq 64))")" \
+    "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=plan-changed"
+cf_check cf-plan-blind "$(cf_decide "$BCFD" "$CF_T" none)" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=plan-changed"
+
+mk_cf_digest 4
+cf_check cf-digest-four-lines "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=carry-forward-files-missing"
+mk_cf_digest 5
+
+# cf_materialise <word> <carry-tree> <head-tree> <verdict-file> — run the materialise block.
+cf_materialise() {
+    printf '{"number":%s}' "$CF_PR" > "$BASE_TMP/fixture.json"
+    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" PRIOR_DIGEST="$CF_DIGEST" \
+        CARRY_WORD="$1" CARRY_TREE="$2" HEAD_TREE="$3" FIDELITY_VERDICT_FILE="$4" bash -c "$BCFM" 2>&1
+}
+
+# --- materialise: happy path feeds the real parse block and condition (12)
+CF_VF="$BASE_TMP/cf-vf.md"
+rm -f "$CF_VF"
+CF_FAILED_BEFORE=$FAILED
+CF_MOUT="$(cf_materialise READY "$CF_T" "$CF_T" "$CF_VF")"
+grep -qxF "CARRIED=$CF_VF" <<< "$CF_MOUT" || { echo "FAIL: cf-materialise-happy — no CARRIED= line: '$CF_MOUT'"; FAILED=1; }
+[ "$(head -1 "$CF_VF" 2>/dev/null)" = "READY" ] || { echo "FAIL: cf-materialise-happy — line 1 is not READY"; FAILED=1; }
+grep -qxF '## DIGEST' "$CF_VF" 2>/dev/null || { echo "FAIL: cf-materialise-happy — no ## DIGEST section"; FAILED=1; }
+[ "$(tail -1 "$CF_VF" 2>/dev/null)" = "REVIEWED_TREE=$CF_T" ] || { echo "FAIL: cf-materialise-happy — last line is not REVIEWED_TREE=$CF_T"; FAILED=1; }
+[ "$(sed -n '/^## DIGEST/,$p' "$CF_VF" 2>/dev/null | grep -c '^\*\*')" = 5 ] || { echo "FAIL: cf-materialise-happy — DIGEST section does not carry 5 label lines"; FAILED=1; }
+printf '{"number":%s}' "$CF_PR" > "$BASE_TMP/fixture.json"
+expect_fidelity "cf-materialise-happy: verdict parse reads READY" "READY" \
+    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" FIDELITY_VERDICT_FILE="$CF_VF" bash -c "$B55" 2>&1)"
+expect_block "cf-materialise-happy: condition (12) arms on the carried file -> NONE" NONE \
+    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" FIDELITY_VERDICT_FILE="$CF_VF" \
+        FIDELITY_VERDICT_FILE_2="$BASE_TMP/cf-vf-none-2.md" bash -c "$B12" 2>&1)"
+[ "$FAILED" = "$CF_FAILED_BEFORE" ] && echo "ok: cf-materialise-happy"
+rm -f "/tmp/post-plan-digest-lines-$CF_PR.txt"
+
+# --- materialise refusals: STOP: on stdout, no verdict file written
+CF_VF2="$BASE_TMP/cf-vf2.md"
+rm -f "$CF_VF2"
+CF_ROUT="$(cf_materialise "NOT READY" "$CF_T" "$CF_T" "$CF_VF2")"
+if [ "${CF_ROUT:0:5}" = "STOP:" ] && [ ! -e "$CF_VF2" ]; then echo "ok: cf-materialise-refuses-not-ready"
+else echo "FAIL: cf-materialise-refuses-not-ready — out='$CF_ROUT' file-exists=$([ -e "$CF_VF2" ] && echo yes || echo no)"; FAILED=1; fi
+
+rm -f "$CF_VF2"
+CF_ROUT="$(cf_materialise READY "$CF_T" "$(printf 'c%.0s' $(seq 40))" "$CF_VF2")"
+if [ "${CF_ROUT:0:5}" = "STOP:" ] && [ ! -e "$CF_VF2" ]; then echo "ok: cf-materialise-refuses-tree"
+else echo "FAIL: cf-materialise-refuses-tree — out='$CF_ROUT' file-exists=$([ -e "$CF_VF2" ] && echo yes || echo no)"; FAILED=1; fi
+
+rm -f "$CF_VF2"
+mk_cf_digest 4
+CF_ROUT="$(cf_materialise READY "$CF_T" "$CF_T" "$CF_VF2")"
+if [ "${CF_ROUT:0:5}" = "STOP:" ] && [ ! -e "$CF_VF2" ]; then echo "ok: cf-materialise-refuses-short-digest"
+else echo "FAIL: cf-materialise-refuses-short-digest — out='$CF_ROUT' file-exists=$([ -e "$CF_VF2" ] && echo yes || echo no)"; FAILED=1; fi
+mk_cf_digest 5
+rm -f "/tmp/post-plan-digest-lines-$CF_PR.txt"
+
+# --- mutation: widen the terminal-word case to admit the NOT READY line. cf-not-ready's own
+# inputs must then print FIDELITY_GATE=skip, proving that case's assertion is live.
+CF_MUT="$(printf '%s\n' "$BCFD" | sed 's/"READY"|"READY WITH NOTES") ;;/"READY"|"READY WITH NOTES"|"NOT READY — held for your final review") ;;/')"
+mk_prior_body "NOT READY — held for your final review" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+if [ "$CF_MUT" = "$(printf '%s\n' "$BCFD")" ]; then
+    echo "FAIL: cf-mutation-case-widened — mutation inert: sed pattern did not apply to the decision block"; FAILED=1
+elif grep -qxF "FIDELITY_GATE=skip" <<< "$(cf_decide "$CF_MUT")"; then
+    echo "ok: cf-mutation-case-widened"
+else
+    echo "FAIL: cf-mutation-case-widened — mutation inert: widened block still printed spawn"; FAILED=1
+fi
+fi
+
 # --- §5.8c findings render: extraction + composition cases ----------------
 
 # Extract _digest_labels from bin/digest-dm-build (the expect_mss idiom: anchor on

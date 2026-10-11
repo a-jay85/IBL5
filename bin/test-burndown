@@ -38,6 +38,16 @@ if [ -n "${GH_FAIL_ON:-}" ]; then
         exit 1
     fi
 fi
+# Scripted stderr failure: the first GH_ERR_TIMES matching calls (default: all)
+# print GH_ERR_MSG to stderr and exit 1. GH_ERR_STATE holds the running count.
+if [ -n "${GH_ERR_ON:-}" ] && grep -qF -- "$GH_ERR_ON" <<< "$*"; then
+    n=$(cat "${GH_ERR_STATE:-/dev/null}" 2>/dev/null || true); n=${n:-0}
+    if [ -z "${GH_ERR_TIMES:-}" ] || [ "$n" -lt "$GH_ERR_TIMES" ]; then
+        printf '%s\n' "$((n + 1))" > "${GH_ERR_STATE:-/dev/null}"
+        printf '%s\n' "${GH_ERR_MSG:-HTTP 502: Bad Gateway}" >&2
+        exit 1
+    fi
+fi
 # Dispatch
 case "$*" in
     *"issue list"*) cat "${GH_FX_DIR:-/dev/null}/issues.json" 2>/dev/null || echo '[]' ;;
@@ -257,6 +267,39 @@ OUT="$(GH_FAIL_ON="issue list" GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
     HOME="$T/home" "$SCRIPT" burndown-delta 2>&1)"; RC=$?
 [ "$RC" -eq 3 ] && ok "C8: gh failure exits 3" || fail "C8: gh failure exits 3 (got $RC)"
 want "C8: gh failure message" "$OUT" "gh issue list failed"
+
+# ── C8b/C8c/C8d: transient gh failures retry; non-transient fail at once ─────
+# c8x_run <log> [VAR=value...] — burndown-delta with a fresh scripted-failure state
+c8x_run() {
+    local log="$1"; shift
+    rm -f "$log" "$T/gh-c8x.state"
+    OUT="$(env "$@" IBL5_GH_RETRY_DELAYS="0 0 0" GH_LOG="$log" \
+        GH_ERR_STATE="$T/gh-c8x.state" GH_FX_DIR="$T/fx" \
+        BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+        HOME="$T/home" "$SCRIPT" burndown-delta 2>&1)"; RC=$?
+}
+c8x_run "$T/gh-c8b0.log" C8X_BASELINE=1
+BASE_RC=$RC
+BASE_N="$(grep -c 'issue list' "$T/gh-c8b0.log")"
+c8x_run "$T/gh-c8x.log" GH_ERR_ON="issue list" GH_ERR_MSG="HTTP 502: Bad Gateway" GH_ERR_TIMES=2
+N="$(grep -c 'issue list' "$T/gh-c8x.log")"
+[ "$RC" -eq "$BASE_RC" ] && ok "C8b: two 5xx then success recovers (rc $RC)" || fail "C8b: two 5xx then success recovers (rc $RC, baseline $BASE_RC)"
+case "$OUT" in *"gh issue list failed"*) fail "C8b: no gh failure message" ;; *) ok "C8b: no gh failure message" ;; esac
+[ "$N" -eq $((BASE_N + 2)) ] && ok "C8b: issue list called baseline+2 times" || fail "C8b: issue list called baseline+2 times (got $N, baseline $BASE_N)"
+want "C8b: transient notice" "$OUT" "gh-retry: attempt 1/4 failed (transient)"
+
+c8x_run "$T/gh-c8x.log" GH_ERR_ON="issue list" GH_ERR_MSG="HTTP 401: Bad credentials"
+N="$(grep -c 'issue list' "$T/gh-c8x.log")"
+[ "$RC" -eq 3 ] && ok "C8c: 4xx fails at once with stderr visible (rc 3)" || fail "C8c: 4xx fails at once with stderr visible (got $RC)"
+want "C8c: gh failure message" "$OUT" "gh issue list failed"
+want "C8c: stderr visible" "$OUT" "HTTP 401: Bad credentials"
+[ "$N" -eq 1 ] && ok "C8c: issue list called once" || fail "C8c: issue list called once (got $N)"
+
+c8x_run "$T/gh-c8x.log" GH_ERR_ON="issue list" GH_ERR_MSG="HTTP 503: Service Unavailable"
+N="$(grep -c 'issue list' "$T/gh-c8x.log")"
+[ "$RC" -eq 3 ] && ok "C8d: persistent 5xx fails closed after 4 attempts (rc 3)" || fail "C8d: persistent 5xx fails closed after 4 attempts (got $RC)"
+want "C8d: gh failure message" "$OUT" "gh issue list failed"
+[ "$N" -eq 4 ] && ok "C8d: issue list called 4 times" || fail "C8d: issue list called 4 times (got $N)"
 
 # ── C9: malformed report (headings only) ──────────────────────────────────────
 cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md" <<'REPORT'

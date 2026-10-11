@@ -1,6 +1,6 @@
 ---
 description: 5.60 disperses team offense through per-48 shot-VOLUME rates from season counting-stat sums, not the ODPT offense ratings; the faithful fix is to source the real rate inputs (the static real-life .plr block), not reweight a make-value knob.
-last_verified: 2026-08-08
+last_verified: 2026-10-08
 ---
 
 # ADR-0040: Team-offense dispersion is sourced from real shot-volume rates, not a make-value knob

@@ -269,6 +269,66 @@ run_sel "$P1_SNAP" --pr 99
 assert_eq "P1-pr-mode absent exit" "$RC" "1"
 assert_match "P1-pr-mode absent message" 'is not open against master' "$ERR"
 
+# --- L: post-plan-running label ---
+
+# labeled <node-json> <label>... — add a labels selection to a PR node.
+labeled() {
+    local node="$1"
+    shift
+    jq -cn --argjson node "$node" '$ARGS.positional as $names
+        | $node + {labels: {nodes: ($names | map({name: .}))}}' --args "$@"
+}
+
+RUN_RED="$(ctxs "$(cr 'Tests and Analysis' COMPLETED FAILURE)")"
+
+L1_SNAP="$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX")" post-plan-running)" \
+    "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$NOCTX")")"
+run_sel "$L1_SNAP"
+assert_match "L1-running-head-skipped head" '^head=2$' "$OUT"
+assert_match "L1-running-head-skipped action" '^action=update$' "$OUT"
+assert_match "L1-running-head-skipped skipped" '^skipped=1:running$' "$OUT"
+assert_match "L1-running-head-skipped clear" '^clear=2$' "$OUT"
+assert_absent "L1-running-head-skipped not head" '^head=1$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T6" DIRTY CONFLICTING "$RUN_RED")" post-plan-running)" \
+    "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "L2-running-precedence skipped" '^skipped=1:running$' "$OUT"
+assert_absent "L2-running-precedence not red" '1:red' "$OUT"
+assert_absent "L2-running-precedence not dirty" '1:dirty' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX")" post-plan-running)")" \
+    --pr 1 --summary "$TMP/l3.md"
+L3_SUMMARY=$(cat "$TMP/l3.md")
+assert_match "L3-pr-mode-running head" '^head=1$' "$OUT"
+assert_match "L3-pr-mode-running action" '^action=none$' "$OUT"
+assert_match "L3-pr-mode-running skipped" '^skipped=1:running$' "$OUT"
+assert_match "L3-pr-mode-running summary" 'Skipped #1: post-plan run in progress' "$L3_SUMMARY"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX")" automerge)")"
+assert_match "L4-other-label-unchanged head" '^head=1$' "$OUT"
+assert_match "L4-other-label-unchanged action" '^action=update$' "$OUT"
+assert_match "L4-other-label-unchanged skipped" '^skipped=$' "$OUT"
+
+run_sel "$(snapshot "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_eq "L5-absent-labels-tolerated no key exit" "$RC" "0"
+assert_match "L5-absent-labels-tolerated no key head" '^head=1$' "$OUT"
+assert_match "L5-absent-labels-tolerated no key skipped" '^skipped=$' "$OUT"
+run_sel "$(snapshot \
+    "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX" | jq -c '. + {labels: null}')")"
+assert_eq "L5-absent-labels-tolerated null exit" "$RC" "0"
+assert_match "L5-absent-labels-tolerated null head" '^head=1$' "$OUT"
+assert_match "L5-absent-labels-tolerated null skipped" '^skipped=$' "$OUT"
+
+run_sel "$L1_SNAP" --summary "$TMP/l6.md"
+L6_SUMMARY=$(cat "$TMP/l6.md")
+assert_match "L6-running-summary-wording running" \
+    'Skipped #1: post-plan run in progress \(post-plan-running label\)' "$L6_SUMMARY"
+assert_absent "L6-running-summary-wording no conflict" 'merge conflict' "$L6_SUMMARY"
+
 # --- L: --list and --summary ---
 
 run_sel "$C5_SNAP" --list
@@ -316,6 +376,49 @@ RC=$?
 ERR=$(cat "$TMP/err")
 assert_eq "E1-gh-cmd-env failing exit" "$RC" "1"
 assert_match "E1-gh-cmd-env failing message" 'GraphQL fetch failed' "$ERR"
+
+cat > "$TMP/scriptgh" <<'STUB'
+#!/usr/bin/env bash
+# Fails the first SGH_FAILS calls (empty = every call) with SGH_MSG on stderr.
+n=$(cat "$SGH_COUNT" 2>/dev/null || true); n=$(( ${n:-0} + 1 ))
+printf '%s\n' "$n" > "$SGH_COUNT"
+if [ -z "${SGH_FAILS:-}" ] || [ "$n" -le "$SGH_FAILS" ]; then
+    printf '%s\n' "$SGH_MSG" >&2
+    exit 1
+fi
+cat "$GH_SNAPSHOT_FILE"
+STUB
+chmod +x "$TMP/scriptgh"
+
+rm -f "$TMP/sgh.count"
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' SGH_COUNT="$TMP/sgh.count" GH_CMD="$TMP/scriptgh" \
+    SGH_FAILS=2 SGH_MSG='HTTP 502: Bad Gateway' \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+assert_match "E2-transient-then-ok head" '^head=3$' "$OUT"
+assert_eq "E2-transient-then-ok exit" "$RC" "0"
+assert_eq "E2-transient-then-ok calls" "$(cat "$TMP/sgh.count")" "3"
+
+rm -f "$TMP/sgh.count"
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' SGH_COUNT="$TMP/sgh.count" GH_CMD="$TMP/scriptgh" \
+    SGH_FAILS='' SGH_MSG='HTTP 401: Bad credentials' \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+ERR=$(cat "$TMP/err")
+assert_eq "E3-4xx-fails-at-once exit" "$RC" "1"
+assert_match "E3-4xx-fails-at-once message" 'GraphQL fetch failed' "$ERR"
+assert_match "E3-4xx-fails-at-once stderr visible" 'HTTP 401: Bad credentials' "$ERR"
+assert_eq "E3-4xx-fails-at-once calls" "$(cat "$TMP/sgh.count")" "1"
+
+rm -f "$TMP/sgh.count"
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' SGH_COUNT="$TMP/sgh.count" GH_CMD="$TMP/scriptgh" \
+    SGH_FAILS='' SGH_MSG='HTTP 503: Service Unavailable' \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+ERR=$(cat "$TMP/err")
+assert_eq "E4-persistent-5xx-fails-closed exit" "$RC" "1"
+assert_match "E4-persistent-5xx-fails-closed message" 'GraphQL fetch failed' "$ERR"
+assert_eq "E4-persistent-5xx-fails-closed calls" "$(cat "$TMP/sgh.count")" "4"
 
 # --- R: snapshot validation and record-and-replay ---
 
@@ -402,6 +505,25 @@ if [ "$W3_SELECTOR" -ge 1 ] && [ "$W3_OLD" = 0 ] && [ "$W3_GUARD" = 1 ]; then
     pass "W3-canary-uses-selector"
 else
     failcase "W3-canary-uses-selector — selector-list=$W3_SELECTOR gh-pr-list=$W3_OLD count-guard=$W3_GUARD"
+fi
+
+# The workflow path is a variable so a counterfactual copy can be swapped in.
+W4_WF="${W4_WF:-$UPDATE_WF}"
+W4_BLOCK=$(awk '/- name: Post or clear merge-line skip notices/{f=1} f&&/- name:/&&!/skip notices/{f=0} f' "$W4_WF")
+W4_ARM=$(grep -A1 -E 'running\)' <<< "$W4_BLOCK" || true)
+W4_STICKY=$(grep -E 'running' <<< "$W4_BLOCK" | grep -cF 'pr_sticky_upsert' || true)
+if grep -qE 'running\)' <<< "$W4_BLOCK" && grep -qF '::notice::' <<< "$W4_ARM" \
+    && grep -qF 'continue' <<< "$W4_ARM" && [ "$W4_STICKY" = 0 ]; then
+    pass "W4-notice-running-arm"
+else
+    failcase "W4-notice-running-arm — arm missing or malformed in the notice step"
+fi
+
+W5_LABELS=$(count_lines 'labels(first:20) { nodes { name } }' "$SEL")
+if [ "$W5_LABELS" = 1 ]; then
+    pass "W5-live-query-labels"
+else
+    failcase "W5-live-query-labels — labels selection lines=$W5_LABELS"
 fi
 
 h_done

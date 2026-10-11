@@ -68,6 +68,15 @@ class CardBaseStyles
         $draftPick = $playerData['draftPick'];
         $draftYear = $playerData['draftYear'];
 
+        // No photo: leave the frame empty, as the onerror hide did before the placeholder existed.
+        $photoHtml = PlayerImageHelper::isPlaceholderUrl($playerData['imageUrl'])
+            ? ''
+            : <<<HTML
+            <img src="{$imageUrl}"
+                 alt="{$name}"
+                 onerror="this.style.display='none'">
+HTML;
+
         $teamLogoHtml = '';
         if ($teamid > 0) {
             $safeTeamName = HtmlSanitizer::safeHtmlOutput($teamName);
@@ -91,9 +100,7 @@ class CardBaseStyles
     <!-- Player Photo & Quick Stats -->
     <div class="photo-stats-row">
         <div class="player-photo-frame">
-            <img src="{$imageUrl}"
-                 alt="{$name}"
-                 onerror="this.style.display='none'">
+{$photoHtml}
         </div>
         <div class="quick-stats">
             <div class="stats-grid">

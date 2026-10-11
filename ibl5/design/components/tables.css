@@ -124,7 +124,7 @@
 }
 
 .ibl-data-table tbody tr:nth-child(odd) {
-    background-color: white;
+    background-color: var(--white);
 }
 
 .ibl-data-table tbody tr:nth-child(even) {
@@ -340,7 +340,7 @@
 
     /* Sticky column backgrounds - consolidated for all variants */
     .responsive-table tbody tr:nth-child(odd) td[class*="sticky-col"] {
-        background-color: white;
+        background-color: var(--white);
     }
 
     .responsive-table tbody tr:nth-child(even) td[class*="sticky-col"] {
@@ -717,7 +717,7 @@
    own opaque --team-cell-bg, so the zebra/hover fill must not mask the team
    color (these rules out-specify td.ibl-team-cell--colored otherwise). */
 .sticky-table tbody tr:nth-child(odd) td[class*="sticky-col"]:not(.ibl-team-cell--colored) {
-    background-color: white;
+    background-color: var(--white);
 }
 
 .sticky-table tbody tr:nth-child(even) td[class*="sticky-col"]:not(.ibl-team-cell--colored) {

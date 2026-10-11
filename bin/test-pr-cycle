@@ -2355,6 +2355,147 @@ unset HRHARNESS HRSTATE
 end_case "case holdrepeat pre-fire skip"
 
 # ==========================================================================================
+# Pre-fire held-unfixable marker skip
+# ==========================================================================================
+# The marker is keyed by slug and needs no worktree. HRH is a real copy of this tree's harness
+# (it carries heldmarker.py). The holdrepeat record is seeded with holdrepeat.observe and no
+# dm_sent_key, so the older holdrepeat skip fails open and only the marker skip is under test.
+HMSTATE="$SCRATCH/hmstate"
+HMPLANS="$SCRATCH/hmplans"
+HM_MISSING_A="MISSING: ibl5/tests/Cli/CheckE2eHygieneCliTest.php"
+HM_MISSING_B="MISSING: ibl5/tests/Cli/OtherTest.php"
+
+# hm_observe <branch> <missing-reason> — (re)write the live hold record.
+hm_observe() {
+    env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$HMSTATE" "$1" "$2" <<'PY'
+import sys
+from harness import holdrepeat
+sd, slug, reason = sys.argv[1:4]
+holdrepeat.observe(sd, slug, armed=False, fingerprint="fp", pr=1, now="t",
+                   conditions=[{"number": 3, "name": "tests", "blocked": True, "reason": reason}])
+PY
+}
+
+# hm_fixture <pr> <branch> — armed-state entry, plan file, hold record, and an active marker.
+hm_fixture() {
+    local n="$1" branch="$2"
+    install_harness_result "$n" "$branch" hold-repeat-declined "3" CLEAN
+    mkdir -p "$HMPLANS" "$HMSTATE"
+    echo "# plan $branch" > "$HMPLANS/$branch.md"
+    hm_observe "$branch" "$HM_MISSING_A"
+    env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$HMSTATE" "$branch" "$HMPLANS/$branch.md" <<'PY'
+import sys
+from harness import heldmarker
+sd, slug, plan = sys.argv[1:4]
+assert heldmarker.write(sd, slug, plan_path=plan, now="t0") is not None, "marker seed refused"
+PY
+}
+
+hm_cleanup() { rm -rf "$HMSTATE" "$HMPLANS" "$HRH/out"; }
+
+hm_fires() {  # <label>: the PR fired once and is in stage1.txt
+    [[ "$(calls ready)" == "1" ]] || fail "marker $1: fleet ran $(calls ready) time(s), want 1"
+    grep -qxF 101 "$(rundir)/stage1.txt" 2>/dev/null || fail "marker $1: 101 missing from stage1.txt"
+    return 0
+}
+
+begin_case
+
+# M-A: an active marker suppresses the PR with no worktree.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 101 first-slug
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
+[[ $RC -eq 0 ]] || fail "marker M-A: exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] || fail "marker M-A: fleet ran $(calls ready) time(s), want 0"
+grep -qxF 101 "$(rundir)/stage1.txt" 2>/dev/null && fail "marker M-A: 101 is in stage1.txt"
+grep -qF '#101 — held-unfixable marker active' <<< "$OUT" || fail "marker M-A: skip line missing (out: $OUT)"
+grep -qF '#101 skipped holdrepeat' <<< "$OUT" || fail "marker M-A: per-PR skipped line missing"
+grep -qF 'held it for' <<< "$OUT" && fail "marker M-A: Fix 4 skipped it; the case proves nothing"
+grep -qF 'holdrepeat would decline' <<< "$OUT" && fail "marker M-A: the older holdrepeat skip fired; the case proves nothing"
+hm_cleanup
+
+# M-B: a touched plan fires.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 101 first-slug
+touch -t 203001010000 "$HMPLANS/first-slug.md"
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
+hm_fires "M-B touched plan"
+grep -qF 'held-unfixable marker active' <<< "$OUT" && fail "marker M-B: skip line printed for a touched plan"
+hm_cleanup
+
+# M-C: a changed hold fires.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 101 first-slug
+hm_observe first-slug "$HM_MISSING_B"
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
+hm_fires "M-C changed hold"
+hm_cleanup
+
+# M-D: a corrupt marker fires.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 101 first-slug
+for _hm_f in "$HMSTATE"/*.held-unfixable.json; do printf '{bad' > "$_hm_f"; done
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
+hm_fires "M-D corrupt marker"
+hm_cleanup
+
+# M-E: a DIRTY PR with an active marker still fires, carrying --state-changed.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 DIRTY rebase" > "$SCRATCH/triage-out"
+hm_fixture 101 first-slug
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
+[[ $RC -eq 0 ]] || fail "marker M-E: exit $RC, want 0"
+hm_fires "M-E DIRTY exemption"
+grep -qF -- '--state-changed-prs=101' <<< "$(cat "$SCRATCH/ready.argv")" \
+    || fail "marker M-E: ready argv lacks --state-changed-prs=101"
+grep -qF 'held-unfixable marker active' <<< "$OUT" && fail "marker M-E: the marker skip fired on a DIRTY PR"
+hm_cleanup
+
+# M-F: an absent harness fails open.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 101 first-slug
+PLANS_DIR="$HMPLANS" HRHARNESS="$SCRATCH/hr-none" HRSTATE="$HMSTATE" run --worker
+hm_fires "M-F absent harness"
+hm_cleanup
+
+# M-G: an empty PLANS_DIR falls back to ~/claude-plans (HOME is $SCRATCH), which has no plan
+# for the test branch, so the check fails open.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 101 first-slug
+rm -rf "$SCRATCH/claude-plans"
+PLANS_DIR="" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
+hm_fires "M-G empty PLANS_DIR"
+hm_cleanup
+
+# M-H: the suppressed PR frees its --max-ready slot for the next ordered PR.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 101 first-slug
+jq '. + [{"number":102,"headRefName":"second-slug","autoMergeRequest":null,"mergeStateStatus":"CLEAN"}]' \
+    "$SCRATCH/armed-state.json" > "$SCRATCH/armed-state.tmp" \
+    && mv "$SCRATCH/armed-state.tmp" "$SCRATCH/armed-state.json"
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker --max-ready 1
+[[ "$(cat "$(rundir)/stage1.txt")" == "102" ]] || fail "marker M-H: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 102"
+grep -qF '#101 — held-unfixable marker active' <<< "$OUT" || fail "marker M-H: 101 skip line missing"
+grep -qF '#102 — over --max-ready cap' <<< "$OUT" && fail "marker M-H: 102 was capped out"
+hm_cleanup
+end_case "case held-unfixable marker pre-fire skip"
+
+# ==========================================================================================
 # State-change exemption (DIRTY / BLOCKED-CHECK) and stacked-PR skip
 # ==========================================================================================
 ATTACK_DIRTY_RESCUE='# Plan of attack

@@ -60,6 +60,7 @@ def _git(dirty=False, head_trees=None):
 class _Res:
     def __init__(self):
         self.fidelity = {}
+        self.reused_from = {}
 
 
 def _drive(tmp_path, canned, git_obj=None, plan_obj=None):
@@ -297,6 +298,8 @@ def test_carry_forward_early_return_has_full_schema(tmp_path, git_shim, monkeypa
     """Carry-forward literal: full key set plus carried_forward."""
     monkeypatch.setattr(runner.fidelity, "carry_forward_predicate",
                         lambda *a, **kw: ("READY", ""))
+    monkeypatch.setattr(runner.reviewcache, "fidelity_reusable",
+                        lambda *a, **kw: "live-prior")
     vfile = tmp_path / "verdict-99.md"
     vfile.write_text("6d checks\n\nREADY\n")
     monkeypatch.setattr(runner.fidelity, "verdict_path", lambda pr: str(vfile))

@@ -7,7 +7,7 @@
 .projected-draft-order-description {
     color: var(--gray-600);
     font-size: var(--text-sm);
-    line-height: 1.5;
+    line-height: var(--leading-relaxed);
     margin-bottom: var(--space-4);
 }
 
@@ -101,7 +101,7 @@
     transform: translateY(-50%);
     color: var(--gray-400);
     font-size: var(--text-base);
-    line-height: 1;
+    line-height: var(--leading-none);
     pointer-events: none;
 }
 

@@ -6,9 +6,10 @@
 # A pure decision function over one pullRequests GraphQL snapshot. The line is
 # every auto-merge-armed, non-draft PR based on master, in FIFO order of
 # autoMergeRequest.enabledAt (PR number breaks ties). The head is the first
-# member that is neither conflicted nor red on a required check. It never calls
-# update-branch, never posts a comment, never writes to GitHub — the workflows
-# act on its output (see .github/workflows/update-behind-prs.yml, ADR-0081).
+# member that is neither conflicted, red on a required check, nor labeled
+# post-plan-running. It never calls update-branch, never posts a comment, never
+# writes to GitHub — the workflows act on its output (see
+# .github/workflows/update-behind-prs.yml, ADR-0081).
 #
 # Portability (gate 17): runs under /bin/bash 3.2 with PATH=/usr/bin:/bin. All
 # selection logic is ONE jq program; bash only parses flags and moves bytes.
@@ -22,6 +23,9 @@ set -euo pipefail
 # would run an empty command and fail the fetch.
 GH_CMD="${GH_CMD:-gh}"
 
+# shellcheck source=bin/lib/gh-retry.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/gh-retry.sh"
+
 usage() {
     cat <<'EOF'
 Usage: bin/merge-line-select (--input <file|-> | --live --repo <owner/name>)
@@ -34,6 +38,7 @@ Source (exactly one):
 Mode (at most one; default is the head-of-line pass):
   --list             Print the armed line as one compact JSON array, FIFO order.
   --pr <n>           Evaluate one named open PR on master (manual dispatch path).
+                     A post-plan-running PR yields action=none, skipped=<n>:running.
 Output:
   --dry-run          Adds dry_run=true and a dry-run banner to the summary.
   --summary <file>   Append a markdown report to <file> (/dev/stdout allowed).
@@ -148,8 +153,14 @@ def is_red:
     | select(ctx_name as $n | any(required[]; . == $n))
     | select(ctx_red) ] | length > 0;
 def is_dirty: (.mergeStateStatus == "DIRTY" or .mergeable == "CONFLICTING");
+# A live bin/post-plan-now run owns the branch while it carries this label
+# (bin/post-plan-now POSTPLAN_RUNNING_LABEL). An update-branch merge mid-run makes
+# the run reconcile a moved remote head, so the line passes over it. A snapshot
+# without a labels selection (older fixtures) reads as unlabeled.
+def is_running: any((.labels.nodes // [])[]; (.name // "") == "post-plan-running");
 def reason:
-  if is_red then "red"
+  if is_running then "running"
+  elif is_red then "red"
   elif is_dirty then "dirty"
   else null end;
 def line:
@@ -169,10 +180,13 @@ def result($mode; $n):
      then (.data.repository.pullRequests.nodes
            | map(select(.baseRefName == "master" and .number == $n))[0])
      else $ok[0] end) as $h
-  | (if $mode == "pr" and $h != null and ($h | is_dirty) then "none"
+  | (if $mode == "pr" and $h != null and (($h | is_running) or ($h | is_dirty)) then "none"
      else ($h | action_of) end) as $action
   | (if $mode == "pr"
-     then (if $h != null and ($h | is_dirty) then [{number: $h.number, reason: "dirty"}] else [] end)
+     then (if $h == null then []
+           elif ($h | is_running) then [{number: $h.number, reason: "running"}]
+           elif ($h | is_dirty) then [{number: $h.number, reason: "dirty"}]
+           else [] end)
      else ($l | map(select(.reason != null) | {number, reason})) end) as $sk
   | { queue_len: ($l | length),
       head: ($h.number // null),
@@ -203,6 +217,7 @@ SUMMARY_JQ='
    else "- Head: #\(.head) (state \(.head_state // "unknown"), action \(.action))" end),
   (.skipped[] | "- Skipped #\(.number): "
      + (if .reason == "red" then "required check failing on current head"
+        elif .reason == "running" then "post-plan run in progress (post-plan-running label)"
         else "merge conflict with master" end))
 '
 
@@ -215,6 +230,7 @@ query($owner:String!, $name:String!) {
       nodes {
         number isDraft baseRefName headRefOid mergeable mergeStateStatus
         autoMergeRequest { enabledAt }
+        labels(first:20) { nodes { name } }
         commits(last:1) { nodes { commit { oid statusCheckRollup { state
           contexts(first:100) { nodes { __typename
             ... on CheckRun { name status conclusion startedAt completedAt }
@@ -229,7 +245,7 @@ if [ "$LIVE" = 1 ]; then
     NAME="${REPO#*/}"
     # $GH_CMD is intentionally unquoted so a test seam can carry arguments.
     # shellcheck disable=SC2086
-    if ! SNAPSHOT=$($GH_CMD api graphql -f owner="$OWNER" -f name="$NAME" -f query="$LIVE_QUERY"); then
+    if ! SNAPSHOT=$(gh_retry $GH_CMD api graphql -f owner="$OWNER" -f name="$NAME" -f query="$LIVE_QUERY"); then
         echo "merge-line-select: GraphQL fetch failed" >&2
         exit 1
     fi

@@ -35,7 +35,7 @@
     font-family: var(--font-display);
     font-weight: var(--font-weight-extrabold);
     font-size: var(--text-2xl);
-    line-height: 1;
+    line-height: var(--leading-none);
     letter-spacing: .04em;
     text-transform: uppercase;
 }
@@ -48,7 +48,7 @@
     text-transform: uppercase;
 }
 .last-sim-recap__record-w { color: var(--accent-400) }
-.last-sim-recap__record-sep { color: rgba(255, 255, 255, .3); margin: 0 4px }
+.last-sim-recap__record-sep { color: var(--white-alpha-30); margin: 0 4px }
 .last-sim-recap__meta {
     justify-self: end;
     display: flex;
@@ -157,7 +157,7 @@
     text-transform: uppercase;
     letter-spacing: .02em;
     color: var(--navy-800);
-    line-height: 1;
+    line-height: var(--leading-none);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -189,7 +189,7 @@
     font-family: var(--font-display);
     font-weight: var(--font-weight-bold);
     font-size: var(--text-xl);
-    line-height: 1;
+    line-height: var(--leading-none);
     color: var(--navy-900);
     font-variant-numeric: tabular-nums;
     letter-spacing: .01em;
@@ -199,7 +199,7 @@
     font-family: var(--font-display);
     font-weight: var(--font-weight-extrabold);
     font-size: var(--text-xl);
-    line-height: 1;
+    line-height: var(--leading-none);
     color: var(--success-600);
     letter-spacing: .04em;
 }
@@ -224,7 +224,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-3xs);
     font-weight: var(--font-weight-extrabold);
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 
 /* ============================================================
@@ -254,7 +254,7 @@
     font-size: var(--text-lg);
     letter-spacing: .06em;
     text-transform: uppercase;
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 .last-sim-recap__vs {
     font-family: var(--font-mono);
@@ -263,7 +263,7 @@
     color: rgba(255, 255, 255, .85);
     letter-spacing: .06em;
     text-transform: uppercase;
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 .last-sim-recap__strip-right {
     margin-left: auto;
@@ -351,7 +351,7 @@
     text-transform: uppercase;
     letter-spacing: .02em;
     color: var(--navy-800);
-    line-height: 1;
+    line-height: var(--leading-none);
     text-align: center;
 }
 .last-sim-recap__final-rec {
@@ -540,7 +540,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     font-size: var(--text-3xs);
     font-weight: var(--font-weight-extrabold);
     margin-left: 5px;
-    line-height: 1;
+    line-height: var(--leading-none);
     vertical-align: 3px;
 }
 .last-sim-recap__inj-why {
@@ -655,7 +655,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     font-family: var(--font-mono);
     font-size: 7px;
     font-weight: var(--font-weight-extrabold);
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 .last-sim-recap__player-name {
     font-size: var(--text-sm);
@@ -807,7 +807,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
 .last-sim-recap__empty {
     padding: 1.5rem;
     text-align: center;
-    color: var(--color-gray-500, #6b7280);
+    color: var(--gray-500);
     font-size: var(--text-base);
 }
 

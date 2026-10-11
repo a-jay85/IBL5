@@ -15,6 +15,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from harness import netretry
 from harness.adapters import gitad
 from harness.adapters.gitad import LiveGit
 from harness.state import HarnessError
@@ -90,10 +91,10 @@ def test_real_fetch_recovers_after_one_kex_timeout(real_remote, monkeypatch, sle
     git.fetch_base("origin/master")
     assert count_file.read_text().strip() == "2"
     assert _git(wt, "rev-parse", "origin/master") == new_sha
-    assert sleeps == [gitad.FETCH_TRANSIENT_DELAY]
+    assert sleeps == [netretry.RETRY_DELAYS[0]]
 
 
-def test_real_fetch_persistent_kex_timeout_raises_after_two_attempts(
+def test_real_fetch_persistent_kex_timeout_raises_after_four_attempts(
         real_remote, monkeypatch, sleeps):
     git, wt, new_sha, count_file = real_remote
     monkeypatch.setenv("SHIM_FAILS", "99")
@@ -102,7 +103,8 @@ def test_real_fetch_persistent_kex_timeout_raises_after_two_attempts(
         git.fetch_base("origin/master")
     assert ei.value.kind == "git"
     assert "kex_exchange_identification" in ei.value.detail
-    assert count_file.read_text().strip() == "2"
+    assert count_file.read_text().strip() == "4"
+    assert sleeps == list(netretry.RETRY_DELAYS)
     assert _git(wt, "rev-parse", "origin/master") == before
 
 

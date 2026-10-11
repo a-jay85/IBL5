@@ -15,6 +15,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 
+from harness import netretry
 from harness.state import HarnessError
 
 log = logging.getLogger("harness.gitutil")
@@ -69,7 +70,7 @@ def content_equivalent(local_sha, remote_sha, worktree, *, run_git=None) -> bool
         return True
     _run = run_git or _default_run_git
     try:
-        fetch_r = _run(["fetch", "origin"], worktree)
+        fetch_r = netretry.call_rc(lambda: _run(["fetch", "origin"], worktree), label="git fetch origin")
         if fetch_r.returncode != 0:
             log.warning("content_equivalent: git fetch failed — treating as not equivalent")
             return False
@@ -132,7 +133,8 @@ def patch_series_equivalent(local_sha, remote_sha, worktree, *, run_git=None,
         return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else ""
 
     try:
-        if _run(["fetch", "origin"], worktree).returncode != 0:
+        if netretry.call_rc(lambda: _run(["fetch", "origin"], worktree),
+                            label="git fetch origin").returncode != 0:
             log.warning("patch_series_equivalent: git fetch failed — treating as not equivalent")
             return False
         bl = _text(_run(["merge-base", local_sha, master_ref], worktree))
@@ -159,24 +161,36 @@ def patch_series_equivalent(local_sha, remote_sha, worktree, *, run_git=None,
         return False
 
 
+# Longest stack of GitHub "Update branch" merges update_branch_merge_equivalent will walk
+# from remote_sha down to expected_sha. Each cron tick or button press adds one merge; a
+# post-plan run sees at most a handful. A longer chain fails closed (stays diverged).
+UPDATE_BRANCH_MERGE_CHAIN_CAP = 10
+
+
 def update_branch_merge_equivalent(expected_sha, remote_sha, worktree, *, run_git=None,
                                    master_ref="origin/master") -> bool:
-    """True iff remote_sha is a GitHub "Update branch" merge of master into expected_sha
-    (what .github/workflows/update-behind-prs.yml and the PR-page button produce).
+    """True iff remote_sha is a stack of 1..UPDATE_BRANCH_MERGE_CHAIN_CAP GitHub
+    "Update branch" merges of master sitting on expected_sha (what
+    .github/workflows/update-behind-prs.yml and the PR-page button produce; a cron
+    tick plus a button press, or two cron ticks, stack two merges).
     Every arm fails closed: any git rc != 0, unparseable output, timeout or OSError
     returns False.
 
-    Arms, in order:
-      1. git fetch origin succeeds (remote_sha and master_ref must be local).
-      2. remote_sha has exactly two parents (rev-list --parents -n 1).
-      3. parents[0] == expected_sha — the merge sits directly on the sha the harness
-         pushed. A second update-branch merge stacked on a first one has parents[0] ==
-         the first merge, so it stays diverged (one level only, by design).
-      4. parents[1] is an ancestor of master_ref — the merged-in side is master, not an
-         arbitrary branch.
-      5. git merge-tree --write-tree parents[0] parents[1] exits 0 (clean merge) and the
-         tree it prints equals remote_sha^{tree} — the merge commit carries exactly the
-         mechanical merge result and nothing else (no evil merge, no conflict resolution).
+    Arm 1 runs once: git fetch origin succeeds (remote_sha and master_ref must be
+    local). Then the walk starts at current = remote_sha and, for each commit,
+    checks arms 2-4 before stepping to parents[0]:
+      2. current has exactly two parents (rev-list --parents -n 1).
+      3. parents[1] is an ancestor of master_ref (the merged-in side is master, not
+         an arbitrary branch).
+      4. git merge-tree --write-tree parents[0] parents[1] exits 0 (clean merge) and
+         the tree it prints equals current^{tree}: the merge commit carries exactly
+         the mechanical merge result and nothing else (no evil merge, no conflict
+         resolution).
+    The walk returns True when a commit that passed arms 2-4 has
+    parents[0] == expected_sha. Otherwise current = parents[0] and the walk repeats.
+    A commit failing any arm anywhere in the chain returns False. A chain that has
+    not reached expected_sha after UPDATE_BRANCH_MERGE_CHAIN_CAP merges returns
+    False (logged).
     """
     if not expected_sha or not remote_sha:
         return False
@@ -186,26 +200,34 @@ def update_branch_merge_equivalent(expected_sha, remote_sha, worktree, *, run_gi
         return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else ""
 
     try:
-        if _run(["fetch", "origin"], worktree).returncode != 0:
+        if netretry.call_rc(lambda: _run(["fetch", "origin"], worktree),
+                            label="git fetch origin").returncode != 0:
             log.warning("update_branch_merge_equivalent: git fetch failed — treating as not equivalent")
             return False
-        parents_line = _text(_run(["rev-list", "--parents", "-n", "1", remote_sha], worktree))
-        parts = parents_line.split()
-        if len(parts) != 3:
-            return False
-        _, p1, p2 = parts
-        if p1 != expected_sha:
-            return False
-        if _run(["merge-base", "--is-ancestor", p2, master_ref], worktree).returncode != 0:
-            return False
-        mt = _run(["merge-tree", "--write-tree", p1, p2], worktree)
-        if mt.returncode != 0:
-            return False
-        merged_tree = mt.stdout.strip().splitlines()[0].strip() if mt.stdout.strip() else ""
-        remote_tree = _text(_run(["rev-parse", f"{remote_sha}^{{tree}}"], worktree))
-        if not merged_tree or not remote_tree:
-            return False
-        return merged_tree == remote_tree
+        current = remote_sha
+        for depth in range(1, UPDATE_BRANCH_MERGE_CHAIN_CAP + 1):
+            parts = _text(_run(["rev-list", "--parents", "-n", "1", current], worktree)).split()
+            if len(parts) != 3:
+                return False
+            _, p1, p2 = parts
+            if _run(["merge-base", "--is-ancestor", p2, master_ref], worktree).returncode != 0:
+                return False
+            mt = _run(["merge-tree", "--write-tree", p1, p2], worktree)
+            if mt.returncode != 0:
+                return False
+            merged_tree = mt.stdout.strip().splitlines()[0].strip() if mt.stdout.strip() else ""
+            current_tree = _text(_run(["rev-parse", f"{current}^{{tree}}"], worktree))
+            if not merged_tree or not current_tree or merged_tree != current_tree:
+                return False
+            if p1 == expected_sha:
+                if depth > 1:
+                    log.info("update_branch_merge_equivalent: absorbed %d stacked update-branch merges", depth)
+                return True
+            current = p1
+        log.warning("update_branch_merge_equivalent: update-branch merge chain exceeds cap %d"
+                    " without reaching expected sha — treating as not equivalent",
+                    UPDATE_BRANCH_MERGE_CHAIN_CAP)
+        return False
     except (subprocess.TimeoutExpired, OSError):
         return False
 
@@ -214,7 +236,7 @@ def sync_to_remote(branch, worktree, *, run_git=None) -> str:
     """Reset the worktree HEAD to origin/<branch>. Precondition: content_equivalent, patch_series_equivalent or update_branch_merge_equivalent is True."""
     _run = run_git or _default_run_git
     try:
-        _run(["fetch", "origin"], worktree)
+        netretry.call_rc(lambda: _run(["fetch", "origin"], worktree), label="git fetch origin")
         reset_r = _run(["reset", "--hard", f"origin/{branch}"], worktree)
         if reset_r.returncode != 0:
             raise HarnessError("remote-head-diverged",
@@ -255,14 +277,17 @@ def probe_remote_tip(remote, branch, worktree, *, run_git=None) -> tuple[bool, s
     the fetched FETCH_HEAD disagrees with ls-remote (the tip moved mid-probe)."""
     _run = run_git or _default_run_git
     try:
-        ls = _run(["ls-remote", remote, f"refs/heads/{branch}"], worktree)
+        ls = netretry.call_rc(lambda: _run(["ls-remote", remote, f"refs/heads/{branch}"], worktree),
+                              label="git ls-remote")
         if ls.returncode != 0:
             return False, ""
         if not ls.stdout.strip():
             return True, ""
         ls_sha = ls.stdout.strip().split()[0]
-        f = _run(["fetch", "--no-tags", "--refmap=", remote, f"refs/heads/{branch}"],
-                 worktree)
+        f = netretry.call_rc(
+            lambda: _run(["fetch", "--no-tags", "--refmap=", remote, f"refs/heads/{branch}"],
+                         worktree),
+            label="git fetch (probe)")
         if f.returncode != 0:
             return False, ""
         r = _run(["rev-parse", "--verify", "--quiet", "FETCH_HEAD^{commit}"], worktree)
@@ -359,7 +384,8 @@ def reconcile_remote_head(pr, expected_sha, local_sha, branch, worktree, *,
             _branch = ""
     if _branch:
         try:
-            ls = _run(["ls-remote", "origin", f"refs/heads/{_branch}"], worktree)
+            ls = netretry.call_rc(lambda: _run(["ls-remote", "origin", f"refs/heads/{_branch}"], worktree),
+                                  label="git ls-remote")
             if ls.returncode == 0 and ls.stdout.strip():
                 ls_sha = ls.stdout.strip().split()[0]
                 if ls_sha == expected_sha:

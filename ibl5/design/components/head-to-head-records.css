@@ -69,7 +69,7 @@
 }
 
 .h2h-matrix tbody tr:nth-child(odd) th[scope="row"]:not(.ibl-team-cell--colored) {
-    background-color: white;
+    background-color: var(--white);
 }
 
 .h2h-matrix tbody tr:nth-child(even) th[scope="row"]:not(.ibl-team-cell--colored) {
@@ -173,7 +173,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: var(--text-xs);
-    line-height: 1;
+    line-height: var(--leading-none);
     letter-spacing: 0.03em;
 }
 

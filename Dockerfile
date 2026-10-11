@@ -1,9 +1,14 @@
+# Base images. Defaults are Docker Hub for local builds; CI passes the
+# ghcr.io/a-jay85/mirror/* refs (.github/ci-image-mirror.txt) as build-args.
+ARG GO_BASE_IMAGE=golang:1.27
+ARG PHP_BASE_IMAGE=php:8.5-apache
+
 # ── Engine builder stage ────────────────────────────────────────────────────
 # Compile the native Go sim binary used by the PR8 shadow loader. Pinned to the
 # engine/go.mod toolchain so the build matches CI. The binary is copied to a path
 # OUTSIDE the ibl5 bind-mount; the entrypoint materializes it into ibl5/bin at
 # container start (the bind mount would otherwise shadow an image-built path).
-FROM golang:1.27 AS engine-builder
+FROM ${GO_BASE_IMAGE} AS engine-builder
 WORKDIR /src/engine
 COPY engine/ /src/engine
 RUN CGO_ENABLED=0 go build -o /opt/jsbsim ./cmd/jsbsim
@@ -14,7 +19,7 @@ RUN CGO_ENABLED=0 go build -o /opt/jsbsim ./cmd/jsbsim
 # composer.json/lock, bun.lock, package.json) e2e-tests.yml builds it in-PR from
 # this source against the gha layer cache (setup-docker-e2e `php-image: build`),
 # so E2E exercises the PR's own runtime instead of the stale published tag.
-FROM php:8.5-apache
+FROM ${PHP_BASE_IMAGE}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \

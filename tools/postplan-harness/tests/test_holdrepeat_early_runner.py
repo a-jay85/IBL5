@@ -18,7 +18,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
-from harness import conformance, holdrepeat
+from harness import conformance, heldmarker, holdrepeat
 from harness.adapters.llm import FixtureLlm
 from harness.planfile import locate_plan
 from harness.state import TerminalState, UsageLedger
@@ -319,3 +319,109 @@ def test_isolated_real_repo_declines(tmp_path, dm):
     assert res.terminal == TerminalState.HOLD_REPEAT_DECLINED
     assert _calls(ledger) == 0
     assert res.hold_repeat["early_decline"] is True
+
+
+# --- held-unfixable marker (written by the decline, consulted by the schedulers) -----------
+
+@pytest.fixture
+def plan_file(tmp_path, monkeypatch):
+    """Replay mode resolves the plan from fixture text with an empty path.
+
+    The marker keys on the plan's file, so give the resolved plan a real path."""
+    path = tmp_path / "plans" / f"{SLUG}.md"
+    path.parent.mkdir()
+    path.write_text(MISSING_PLAN)
+    real = runner.locate_plan
+
+    def locate(slug, *a, **k):
+        info = real(slug, *a, **k)
+        if k.get("content_override") is not None:
+            info.path = str(path)
+        return info
+
+    monkeypatch.setattr(runner, "locate_plan", locate)
+    return path
+
+
+def _marker_file(tmp_path):
+    return tmp_path / "state" / f"{SLUG}.held-unfixable.json"
+
+
+def test_decline_writes_active_marker(tmp_path, dm, plan_file):
+    _first_hold(tmp_path)
+    res, _, _ = _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
+    assert res.terminal == TerminalState.HOLD_REPEAT_DECLINED
+    assert _marker_file(tmp_path).exists()
+    assert heldmarker.active(str(tmp_path / "state"), SLUG, str(plan_file))[0] is True
+
+
+def test_decline_dm_names_marker_and_clear_steps(tmp_path, dm, plan_file):
+    _first_hold(tmp_path)
+    _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
+    sent = dm.log.read_text()
+    assert str(_marker_file(tmp_path)) in sent
+    assert "delete the marker file" in sent
+    assert "bin/post-plan-now --force" in sent
+
+
+def test_second_decline_sends_no_second_dm(tmp_path, dm, plan_file):
+    _first_hold(tmp_path)
+    _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
+    _run(tmp_path, 3, fixture=_fixture(diff=DIFF_XY))
+    assert dm.count() == 1
+
+
+def test_new_marker_dms_even_when_dm_key_already_sent(tmp_path, dm, plan_file):
+    _first_hold(tmp_path)
+    state = str(tmp_path / "state")
+    key = _record(tmp_path)["structural_key"]
+    holdrepeat.mark_dm_sent(state, SLUG, key)
+    assert not _marker_file(tmp_path).exists()
+    res, _, _ = _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
+    assert res.terminal == TerminalState.HOLD_REPEAT_DECLINED
+    assert dm.count() == 1
+    assert str(_marker_file(tmp_path)) in dm.log.read_text()
+
+
+def test_marker_write_never_touches_arm_or_pr(tmp_path, dm, plan_file):
+    _first_hold(tmp_path)
+    res = runner.RunResult(terminal=TerminalState.FAILED, slug=SLUG, plan=None, arm="SENTINEL",
+                           pr_number=4242)
+    plan = locate_plan(SLUG, content_override=MISSING_PLAN)
+    plan.path = str(plan_file)
+    out = str(tmp_path / "out-direct")
+    done = runner._early_hold_repeat(res, plan, [], SLUG, out, False, str(tmp_path / "state"),
+                                     lambda m: None)
+    assert done is True
+    assert res.terminal == TerminalState.HOLD_REPEAT_DECLINED
+    assert res.arm == "SENTINEL"
+    assert res.pr_number == 4242
+
+
+def test_marker_write_failure_still_declines(tmp_path, dm, plan_file, monkeypatch):
+    _first_hold(tmp_path)
+
+    def boom(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(heldmarker, "write", boom)
+    res, ledger, _ = _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
+    assert res.terminal == TerminalState.HOLD_REPEAT_DECLINED
+    assert _calls(ledger) == 0
+    assert res.pr_number is None
+    assert res.hold_repeat["marker"] == ""
+    assert "Marker:" not in dm.log.read_text()
+
+
+def test_force_writes_no_marker(tmp_path, dm, plan_file, monkeypatch):
+    _first_hold(tmp_path)
+    monkeypatch.setenv("POSTPLAN_FORCE", "1")
+    _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
+    assert not _marker_file(tmp_path).exists()
+
+
+def test_proceed_writes_no_marker(tmp_path, dm, plan_file):
+    _first_hold(tmp_path)
+    res, _, _ = _run(tmp_path, 2, fixture=_fixture(plan=MISSING_PLAN_PLUS, diff=DIFF_XY))
+    assert res.terminal != TerminalState.HOLD_REPEAT_DECLINED
+    assert not _marker_file(tmp_path).exists()

@@ -1,0 +1,6 @@
+# Docker Hub images CI pulls, mirrored to ghcr.io/a-jay85/mirror/<name>:<tag>
+# by bin/ci-image-mirror (ADR: ci-docker-hub-mirror-ghcr). One ref per line.
+# A docker.io ref used anywhere in CI must be listed here; bin/check-ci-image-registry enforces it.
+mariadb:10.11
+php:8.5-apache
+golang:1.27

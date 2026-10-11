@@ -85,7 +85,7 @@ def test_every_mutation_is_allowlisted(shim, tmp_path):
     gh.label_add(123, "human-approved")
     gh.pr_sticky_verdict(123, "body\n<!-- pr-ready-verdict -->\n")
     allowed = ("pr create", "pr edit", "pr comment", "pr merge", "pr view",
-               "repo view", "api repos/o/r/pulls/123/reviews",
+               "pr list", "repo view", "api repos/o/r/pulls/123/reviews",
                "api repos/{owner}/{repo}/issues/123/comments",
                "api --method PATCH repos/{owner}/{repo}/issues/comments/")
     for c in calls(shim):

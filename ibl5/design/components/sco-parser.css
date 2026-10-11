@@ -55,7 +55,7 @@
     line-height: 1.7;
     margin: 0;
     padding: var(--space-1) 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--white-alpha-5);
 }
 
 .sco-log__message:last-child {

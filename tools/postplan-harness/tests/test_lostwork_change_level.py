@@ -440,3 +440,23 @@ def test_last_verified_outside_frontmatter_is_not_exempt(repo, key):
     assert rc == 0
     assert "LOST: d.md: +last_verified: 2026-10-04" in out
     assert last_line(out) == DIVERGED
+
+
+def test_adapted_added_line_is_reported_lost_today(repo, key):
+    # Regression shape of bin/test-plan-now (master 1de1f3b81): master rewrites `/tmp/`
+    # to `"$RL"/` on a neighbouring line, the resolver carries the same rewrite onto the
+    # branch's added line, and the proof reports the adapted line as LOST. This pins the
+    # `LOST: <path>: +<body>` and `CHECKED:` text contract adaptations.py parses.
+    base = f_with(d=["cp /tmp/d /tmp/d2"])
+    seed_base(repo, "f.txt", text(base))
+    _commit(repo, "f.txt", text(base + ["run /tmp/new.log"]), "feat adds run line")
+    capture_pre(repo, key)
+    master_body = f_with(d=['cp /tmp/d "$RL"/d'])
+    advance_master(repo, "f.txt", text(master_body), "master rewrites /tmp/ to $RL")
+    sh(repo, "reset", "-q", "--hard", "origin/master")
+    _commit(repo, "f.txt", text(master_body + ['run "$RL"/new.log']), "adapted copy")
+    rc, out = run_lostwork(repo, key)
+    assert rc == 0
+    assert "LOST: f.txt: +run /tmp/new.log" in out
+    assert "CHECKED: files=1 added=1 deleted=0" in out
+    assert DIVERGED in out

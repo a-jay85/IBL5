@@ -1,0 +1,308 @@
+#!/bin/bash
+# bin/test-check-ci-image-registry — self-test for bin/check-ci-image-registry. Each case
+# builds a minimal tree under a temp dir (manifest + the files the case needs), runs the
+# gate with --root=DIR and asserts the exit code; every exit-1 case also asserts the rule
+# letter and the offending file:line on stderr.
+#
+# Run: bin/test-check-ci-image-registry  (exit 0 = all pass, 1 = a case failed)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GATE="$SCRIPT_DIR/check-ci-image-registry"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+N=0
+OUT=""
+RC=0
+T=""
+
+expect_exit() { # label want-code got-code
+    if [ "$3" -eq "$2" ]; then echo "ok: $1 (exit $3)"
+    else echo "FAIL: $1 - expected exit $2, got $3"; FAILED=1; fi
+}
+want() { # label output fixed-token
+    if grep -qF -- "$3" <<<"$2"; then echo "ok: $1"
+    else echo "FAIL: $1 - missing [$3] in: $2"; FAILED=1; fi
+}
+want_not() { # label output fixed-token
+    if grep -qF -- "$3" <<<"$2"; then echo "FAIL: $1 - unexpected [$3] in: $2"; FAILED=1
+    else echo "ok: $1"; fi
+}
+
+new_tree() { # sets T to a fresh tree holding the manifest
+    N=$((N + 1))
+    T="$TMP/t$N"
+    mkdir -p "$T/.github/workflows" "$T/bin"
+    printf '# manifest\nmariadb:10.11\ngolang:1.27\n' > "$T/.github/ci-image-mirror.txt"
+}
+
+run_gate() { # runs the gate on $T, sets OUT and RC
+    RC=0
+    OUT=$("$GATE" --root="$T" 2>&1) || RC=$?
+}
+
+# Service-job workflow. Image is on line 13, credentials on 14-15, needs on line 9.
+# args: image-ref  needs-value  with-credentials(1|0)
+svc_workflow() {
+    {
+        printf 'name: ci\n'
+        printf 'on: push\n'
+        printf 'jobs:\n'
+        printf '  mirror-ready:\n'
+        printf '    uses: ./.github/workflows/mirror-ci-images.yml\n'
+        printf '    permissions:\n'
+        printf '      packages: write\n'
+        printf '  db:\n'
+        printf '    needs: %s\n' "$2"
+        printf '    runs-on: ubuntu-latest\n'
+        printf '    services:\n'
+        printf '      mariadb:\n'
+        printf '        image: %s\n' "$1"
+        if [ "$3" = 1 ]; then
+            printf '        credentials:\n'
+            printf '          username: u\n'
+        fi
+    } > "$T/.github/workflows/ci.yml"
+}
+
+# 1. clean-tree
+new_tree
+svc_workflow "ghcr.io/a-jay85/mirror/mariadb:10.11" "[mirror-ready]" 1
+run_gate
+expect_exit "clean-tree" 0 "$RC"
+
+# 2. bare-service-image: rules A and B on the image line
+new_tree
+svc_workflow "mariadb:10.11" "[mirror-ready]" 1
+run_gate
+expect_exit "bare-service-image" 1 "$RC"
+want "bare-service-image names rule A at file:line" "$OUT" ".github/workflows/ci.yml:13: A:"
+want "bare-service-image names rule B at file:line" "$OUT" ".github/workflows/ci.yml:13: B:"
+
+# 3. unlisted-hub-image: redis:7 is not in the manifest, so only rule A sees it
+new_tree
+svc_workflow "redis:7" "[mirror-ready]" 1
+run_gate
+expect_exit "unlisted-hub-image" 1 "$RC"
+want "unlisted-hub-image names rule A at file:line" "$OUT" ".github/workflows/ci.yml:13: A:"
+
+# 4. docker-uri
+new_tree
+printf 'name: x\non: push\njobs:\n  a:\n    runs-on: u\n    steps:\n      - uses: docker://alpine:3.20\n' \
+    > "$T/.github/workflows/ci.yml"
+run_gate
+expect_exit "docker-uri" 1 "$RC"
+want "docker-uri names rule A at file:line" "$OUT" ".github/workflows/ci.yml:7: A:"
+
+# 5. non-hub-registries-pass
+new_tree
+printf 'name: x\non: push\njobs:\n  a:\n    runs-on: u\n    container:\n      image: mcr.microsoft.com/playwright:v1.50.0-noble\n    services:\n      php:\n        image: ghcr.io/a-jay85/ibl5/php-apache:latest\n' \
+    > "$T/.github/workflows/ci.yml"
+run_gate
+expect_exit "non-hub-registries-pass" 0 "$RC"
+
+# 6. comment-ignored
+new_tree
+printf 'name: x\non: push\njobs:\n  a:\n    runs-on: u\n    steps:\n      # was mariadb:10.11\n      - run: echo hi\n' \
+    > "$T/.github/workflows/ci.yml"
+run_gate
+expect_exit "comment-ignored" 0 "$RC"
+
+# 7. manifest-allowlisted: the manifest holds bare refs, the rest of the tree is clean
+new_tree
+printf 'name: x\non: push\njobs:\n  a:\n    runs-on: u\n    steps:\n      - run: echo hi\n' \
+    > "$T/.github/workflows/ci.yml"
+run_gate
+expect_exit "manifest-allowlisted" 0 "$RC"
+
+# 8. dockerfile-from-literal: rules B and C
+new_tree
+printf 'FROM golang:1.27 AS b\nRUN true\n' > "$T/Dockerfile"
+run_gate
+expect_exit "dockerfile-from-literal" 1 "$RC"
+want "dockerfile-from-literal names rule B at file:line" "$OUT" "Dockerfile:1: B:"
+want "dockerfile-from-literal names rule C at file:line" "$OUT" "Dockerfile:1: C:"
+
+# 9. dockerfile-arg-form
+new_tree
+printf 'ARG GO_BASE_IMAGE=golang:1.27\nFROM ${GO_BASE_IMAGE} AS b\nRUN true\nFROM b\n' > "$T/Dockerfile"
+run_gate
+expect_exit "dockerfile-arg-form" 0 "$RC"
+
+# 10. bin-default-allowed
+new_tree
+printf '#!/bin/bash\ndocker run "${IMG:-mariadb:10.11}"\n' > "$T/bin/test-x"
+run_gate
+expect_exit "bin-default-allowed" 0 "$RC"
+
+# 11. bin-bare-ref
+new_tree
+printf '#!/bin/bash\ndocker run mariadb:10.11\n' > "$T/bin/test-x"
+run_gate
+expect_exit "bin-bare-ref" 1 "$RC"
+want "bin-bare-ref names rule B at file:line" "$OUT" "bin/test-x:2: B:"
+
+# 12. workflow-default-rejected: the ${VAR:-ref} default is allowed only in bin/
+new_tree
+printf 'name: x\non: push\njobs:\n  a:\n    runs-on: u\n    steps:\n      - run: docker run "${IMG:-mariadb:10.11}"\n' \
+    > "$T/.github/workflows/ci.yml"
+run_gate
+expect_exit "workflow-default-rejected" 1 "$RC"
+want "workflow-default-rejected names rule B at file:line" "$OUT" ".github/workflows/ci.yml:7: B:"
+
+# 13. needs-missing: rule E, the credentials piece is present
+new_tree
+svc_workflow "ghcr.io/a-jay85/mirror/mariadb:10.11" "[other]" 1
+run_gate
+expect_exit "needs-missing" 1 "$RC"
+want "needs-missing names rule E at file:line" "$OUT" ".github/workflows/ci.yml:13: E:"
+want "needs-missing names mirror-ready" "$OUT" "needs: mirror-ready"
+want_not "needs-missing does not report credentials" "$OUT" "no credentials:"
+
+# 14. credentials-missing: rule E, the needs piece is present
+new_tree
+svc_workflow "ghcr.io/a-jay85/mirror/mariadb:10.11" "[mirror-ready]" 0
+run_gate
+expect_exit "credentials-missing" 1 "$RC"
+want "credentials-missing names rule E at file:line" "$OUT" ".github/workflows/ci.yml:13: E:"
+want "credentials-missing names credentials" "$OUT" "no credentials:"
+want_not "credentials-missing does not report needs" "$OUT" "no needs: mirror-ready"
+
+# 15. caller-ceiling-missing: rule F through a reusable-workflow caller
+new_tree
+printf 'name: a\non: push\njobs:\n  mirror-ready:\n    uses: ./.github/workflows/mirror-ci-images.yml\n    permissions:\n      packages: write\n' \
+    > "$T/.github/workflows/a.yml"
+printf 'name: outer\non: push\njobs:\n  call:\n    uses: ./.github/workflows/a.yml\n    permissions:\n      contents: read\n' \
+    > "$T/.github/workflows/outer.yml"
+run_gate
+expect_exit "caller-ceiling-missing" 1 "$RC"
+want "caller-ceiling-missing names rule F at file:line" "$OUT" ".github/workflows/outer.yml:5: F:"
+printf 'name: outer\non: push\njobs:\n  call:\n    uses: ./.github/workflows/a.yml\n    permissions:\n      contents: read\n      packages: write\n' \
+    > "$T/.github/workflows/outer.yml"
+run_gate
+expect_exit "caller-ceiling-missing: packages write added" 0 "$RC"
+
+# Rule G actions: setup-docker-e2e is the leaf; lighthouse-setup wraps it; a-outer-setup
+# wraps lighthouse-setup and sorts first, so one fixpoint pass cannot resolve it;
+# other-action wraps nothing.
+g_actions() {
+    local a
+    for a in setup-docker-e2e lighthouse-setup a-outer-setup other-action; do
+        mkdir -p "$T/.github/actions/$a"
+    done
+    printf 'name: s\nruns:\n  using: composite\n  steps:\n    - run: echo pull\n      shell: bash\n' \
+        > "$T/.github/actions/setup-docker-e2e/action.yml"
+    printf 'name: l\nruns:\n  using: composite\n  steps:\n    - uses: ./.github/actions/setup-docker-e2e\n' \
+        > "$T/.github/actions/lighthouse-setup/action.yml"
+    printf 'name: o\nruns:\n  using: composite\n  steps:\n    - uses: ./.github/actions/lighthouse-setup\n' \
+        > "$T/.github/actions/a-outer-setup/action.yml"
+    printf 'name: x\nruns:\n  using: composite\n  steps:\n    - run: echo hi\n      shell: bash\n' \
+        > "$T/.github/actions/other-action/action.yml"
+}
+
+# Rule G workflow g.yml, one job e2e whose last step uses ./.github/actions/<action>.
+# args: workflow-permissions-lines ("" = none)  job-permissions-lines ("" = none)  action
+g_workflow() {
+    {
+        printf 'name: g\non: push\n'
+        [ -z "$1" ] || printf '%s\n' "$1"
+        printf 'jobs:\n  e2e:\n    runs-on: ubuntu-latest\n'
+        [ -z "$2" ] || printf '%s\n' "$2"
+        printf '    steps:\n      - uses: actions/checkout@v4\n      - uses: ./.github/actions/%s\n' "$3"
+    } > "$T/.github/workflows/g.yml"
+}
+
+# 16. g-direct-missing: workflow block without packages, direct setup-docker-e2e step
+# (line 10), plus a second qualifying step (line 11) that must not add a second report
+new_tree; g_actions
+g_workflow $'permissions:\n  contents: read' "" setup-docker-e2e
+printf '      - uses: ./.github/actions/setup-docker-e2e\n' >> "$T/.github/workflows/g.yml"
+run_gate
+expect_exit "g-direct-missing" 1 "$RC"
+want "g-direct-missing names rule G at file:line" "$OUT" ".github/workflows/g.yml:10: G:"
+want "g-direct-missing names the job and action" "$OUT" "job e2e uses setup-docker-e2e"
+G_COUNT=$(grep -c ': G:' <<<"$OUT" || true)
+if [ "$G_COUNT" -eq 1 ]; then echo "ok: g-direct-missing reports the job once"
+else echo "FAIL: g-direct-missing reports the job once - got $G_COUNT G lines"; FAILED=1; fi
+g_workflow $'permissions:\n  contents: read\n  packages: read' "" setup-docker-e2e
+run_gate
+expect_exit "g-direct-missing: workflow packages read added" 0 "$RC"
+
+# 17. g-job-block-grants: the job block carries packages: write, the workflow block does not
+new_tree; g_actions
+g_workflow $'permissions:\n  contents: read' $'    permissions:\n      packages: write' setup-docker-e2e
+run_gate
+expect_exit "g-job-block-grants" 0 "$RC"
+
+# 18. g-job-block-overrides-workflow: workflow grants packages: read, but the job block
+# replaces it and omits packages (step on line 13)
+new_tree; g_actions
+g_workflow $'permissions:\n  contents: read\n  packages: read' $'    permissions:\n      contents: read' setup-docker-e2e
+run_gate
+expect_exit "g-job-block-overrides-workflow" 1 "$RC"
+want "g-job-block-overrides-workflow names rule G at file:line" "$OUT" ".github/workflows/g.yml:13: G:"
+
+# 19. g-composite-wrapper: one hop (lighthouse-setup) and two hops (a-outer-setup)
+new_tree; g_actions
+g_workflow $'permissions:\n  contents: read' "" lighthouse-setup
+run_gate
+expect_exit "g-composite-wrapper: one hop" 1 "$RC"
+want "g-composite-wrapper: one hop names rule G at file:line" "$OUT" ".github/workflows/g.yml:10: G:"
+want "g-composite-wrapper: one hop names the wrapper" "$OUT" "uses lighthouse-setup"
+g_workflow $'permissions:\n  contents: read' "" a-outer-setup
+run_gate
+expect_exit "g-composite-wrapper: two hops" 1 "$RC"
+want "g-composite-wrapper: two hops names the outer wrapper" "$OUT" "uses a-outer-setup"
+g_workflow $'permissions:\n  contents: read' $'    permissions:\n      packages: read' lighthouse-setup
+run_gate
+expect_exit "g-composite-wrapper: job packages read added" 0 "$RC"
+
+# 20. g-unrelated-action: a local action that never reaches setup-docker-e2e
+new_tree; g_actions
+g_workflow $'permissions:\n  contents: read' "" other-action
+run_gate
+expect_exit "g-unrelated-action" 0 "$RC"
+
+# 21. g-permission-forms: no block anywhere (default token), read-all, {} and a flow map
+new_tree; g_actions
+g_workflow "" "" setup-docker-e2e
+run_gate
+expect_exit "g-permission-forms: no block anywhere" 0 "$RC"
+g_workflow 'permissions: read-all' "" setup-docker-e2e
+run_gate
+expect_exit "g-permission-forms: workflow read-all" 0 "$RC"
+g_workflow $'permissions:\n  packages: read' '    permissions: {}' setup-docker-e2e
+run_gate
+expect_exit "g-permission-forms: job {} overrides workflow" 1 "$RC"
+want "g-permission-forms: job {} names rule G at file:line" "$OUT" ".github/workflows/g.yml:11: G:"
+g_workflow $'permissions:\n  contents: read' '    permissions: { contents: read, packages: read }' setup-docker-e2e
+run_gate
+expect_exit "g-permission-forms: job flow map with packages" 0 "$RC"
+
+# 22. usage-errors
+new_tree
+RC=0
+OUT=$("$GATE" --bogus 2>&1) || RC=$?
+expect_exit "usage-errors: --bogus" 2 "$RC"
+want "usage-errors: --bogus names the argument" "$OUT" "unknown argument"
+RC=0
+OUT=$("$GATE" --root "$T" 2>&1) || RC=$?
+expect_exit "usage-errors: --root DIR space form" 2 "$RC"
+want "usage-errors: space form names the argument" "$OUT" "unknown argument"
+N=$((N + 1))
+mkdir -p "$TMP/t$N"
+RC=0
+OUT=$("$GATE" --root="$TMP/t$N" 2>&1) || RC=$?
+expect_exit "usage-errors: root without manifest" 2 "$RC"
+want "usage-errors: missing manifest is named" "$OUT" "cannot read manifest"
+
+# 23. real-tree
+RC=0
+OUT=$("$GATE" 2>&1) || RC=$?
+expect_exit "real-tree" 0 "$RC"
+if [ "$RC" -ne 0 ]; then echo "$OUT"; fi
+
+if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; exit 0; fi
+echo "SOME FAILED"; exit 1

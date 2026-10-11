@@ -14,6 +14,7 @@ include __DIR__ . '/../db/db.php';
 
 use Maintenance\MaintenanceRepository;
 
+/** @var \mysqli $mysqli_db */
 $repository = new MaintenanceRepository($mysqli_db);
 
 $leagueFileName = $repository->getSetting('League File Name');
@@ -27,13 +28,16 @@ if (!file_exists($engFilePath)) {
 }
 
 $engFile = fopen($engFilePath, "rb");
+if ($engFile === false) {
+    throw new \RuntimeException("Cannot open energy file: $engFilePath");
+}
 $engArray = [];
 
 while (!feof($engFile)) {
     $line = fgets($engFile);
-    if ($line !== false && !preg_match('/^\s{3}/', $line)) {
-        if (preg_match('/(.*), (.*)/', $line, $matches)) {
-            $key = (string) $matches[1];
+    if ($line !== false && preg_match('/^\s{3}/', $line) !== 1) {
+        if (preg_match('/(.*), (.*)/', $line, $matches) === 1) {
+            $key = $matches[1];
             $value = (int) $matches[2];
             $engArray[$key] = $value;
         }
@@ -42,6 +46,7 @@ while (!feof($engFile)) {
 
 fclose($engFile);
 
-if (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'engParser.php') !== false) {
+$requestUri = $_SERVER['REQUEST_URI'] ?? null;
+if (is_string($requestUri) && strpos($requestUri, 'engParser.php') !== false) {
     var_dump($engArray);
 }

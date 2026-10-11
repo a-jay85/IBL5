@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
   pull-requests: write
 
 concurrency:
@@ -17,14 +18,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mirror-ready:
+    name: Mirror CI images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/mirror-ci-images.yml
+    with:
+      only-missing: true
+
   mutation-pr:
     name: Infection PHP (per-PR diff)
+    needs: [mirror-ready]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     services:
       mariadb:
-        image: mariadb:10.11
+        image: ghcr.io/a-jay85/mirror/mariadb:10.11
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           MARIADB_ROOT_PASSWORD: root
           MARIADB_DATABASE: ibl5

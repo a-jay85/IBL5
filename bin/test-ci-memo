@@ -52,6 +52,8 @@ vr_if_shape() {
 
 # Assertion 7 (ADR-0186): on pull_request the memo is the only skip gate for
 # the test and analysis jobs. Path-filter outputs may gate only this allowlist.
+# A memo-only job may also need mirror-ready (ADR-0191) to pull GHCR mirror
+# images. mirror-ready reads no path-filter output, so it adds no filter skip.
 CHANGES_ALLOWLIST="audit-js,audit-php,iblbot"
 MEMO_ONLY_JOBS="test harness-tests db-integration phpstan shellcheck ibl5-ts-unit"
 UNCONDITIONAL_JOBS="phpunit-hygiene host-mariadb-guard automouse-impl-model-test actionlint"
@@ -67,12 +69,13 @@ filter_free_topology() {
     for j in $MEMO_ONLY_JOBS; do
         awk -v job="$j" \
             -v want_needs="    needs: [ci-memo-check]" \
+            -v want_needs_mirror="    needs: [ci-memo-check, mirror-ready]" \
             -v want_if="    if: needs.ci-memo-check.outputs.hit != 'true'" '
             $0 == "  " job ":" { in_job=1; seen=1; next }
             /^  [a-zA-Z]/ && in_job { in_job=0 }
             in_job && /^    needs:/ { needs=$0 }
             in_job && /^    if:/    { iff=$0 }
-            END { exit !(seen && needs == want_needs && iff == want_if) }
+            END { exit !(seen && (needs == want_needs || needs == want_needs_mirror) && iff == want_if) }
         ' "$wf" || { echo "$j: needs/if not exactly [ci-memo-check] + memo clause"; bad=1; }
     done
     for j in $UNCONDITIONAL_JOBS; do
@@ -633,7 +636,7 @@ if should_run gate-topology-mutants; then
     # 7a: PHPUnit job re-gated on the src filter
     sed "/^  test:/,/^    if:/ s|^    if: needs.ci-memo-check.outputs.hit != 'true'\$|    if: needs.changes.outputs.src == 'true' \&\& needs.ci-memo-check.outputs.hit != 'true'|" "$WF_TESTS" > "$m/tests-7a.yml"
     # 7b: harness job re-adds changes to needs
-    sed "/^  harness-tests:/,/^    needs:/ s|^    needs: \[ci-memo-check\]\$|    needs: [changes, ci-memo-check]|" "$WF_TESTS" > "$m/tests-7b.yml"
+    sed "/^  harness-tests:/,/^    needs:/ s|^    needs: \[ci-memo-check|    needs: [changes, ci-memo-check|" "$WF_TESTS" > "$m/tests-7b.yml"
     # 7c: an unconditional job regains a job-level needs:
     awk '/^  actionlint:/{a=1} a && /^    runs-on:/{print "    needs: [changes]"; a=0} {print}' "$WF_TESTS" > "$m/tests-7c.yml"
     # 7d: iblbot loses its filter, so the allowlist no longer matches exactly

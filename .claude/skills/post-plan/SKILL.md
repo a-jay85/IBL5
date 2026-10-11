@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-09
+last_verified: 2026-10-10
 ---
 
 # Post-Plan Orchestrator
@@ -380,6 +380,8 @@ This phase is **never skipped**, including on a plan-blind run (`PLAN_FOUND=none
 Exactly **one `Agent` spawn** (`subagent_type: "pr-ready-phase6"`, omit `model`); never a `/pr-ready` invocation, since this skill's `disallowed-tools` forbids `Skill`.
 
 The output consumed by Phase 6.5 condition (12): the verdict file `/tmp/post-plan-fidelity-verdict-<N>.md` and the `FIDELITY=<word>` line emitted by the include.
+
+The include opens with a carry-forward gate (its Step 1b). When the PR's sticky comment already records a terminal READY or READY WITH NOTES for the current HEAD tree and the current plan hash, and the master-pinned `.claude/review-shared/scripts/skip-review.sh` agrees the sticky is well-formed, the include materialises that verdict into the same file and posts a disclosure line instead of spawning the Opus reviewer. Any doubt spawns. The compiled harness has its own equivalent (`carry_forward_predicate` in `tools/postplan-harness/harness/fidelity.py`), so this gate matters only on the skill-fallback path.
 
 ---
 

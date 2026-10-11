@@ -10,6 +10,7 @@ from dataclasses import dataclass, field, replace as _dc_replace
 from pathlib import Path
 from typing import Optional
 
+from .. import netretry
 from ..state import SUBPROCESS_TIMEOUT, HarnessError
 from ..conflict import classify, parse_unmerged
 from .llm import run_bounded
@@ -17,17 +18,6 @@ from .llm import run_bounded
 COMMIT_HOOK_TIMEOUT = 300   # seconds for `git commit` incl. bin/pre-commit-hook
 FETCH_LOCK_RETRIES = 3      # fetch_base retries after a concurrent-fetch ref-lock race
 FETCH_LOCK_BACKOFF = 1.0    # seconds; attempt n sleeps n * this
-# One retry after a short pause for a network blip on the fetch. Only stderr text
-# that names a timeout or reset counts. "Could not read from remote repository" and
-# "Could not resolve host" alone are auth/config/DNS failures and are never retried.
-FETCH_TRANSIENT_RETRIES = 1
-FETCH_TRANSIENT_DELAY = 3.0
-FETCH_TRANSIENT_MARKERS = (
-    "kex_exchange_identification",
-    "Operation timed out",
-    "Connection timed out",
-    "Connection reset by peer",
-)
 
 # Local gate denials (bin/pre-commit-hook, bin/pre-push-adr-hook) are deterministic:
 # re-running the FULL /post-plan skill hits the identical hook and cannot clear it
@@ -138,6 +128,7 @@ class StackedRebaseResult:
     auto_resolved: bool = False
     resolved_files: tuple = ()
     squash_note: str = ""
+    adapted_lines: tuple = ()
 
 
 class LiveGit:
@@ -425,27 +416,24 @@ class LiveGit:
         # expected Y". The winner already moved the ref, so a retry succeeds. The
         # usage-gate coordinator resumes paused runs in one wave, which hit this
         # (hot-files-base-ref-validate, 2026-10-09).
-        # A network blip (ssh kex timeout, connection reset) gets its own single retry
-        # after a short pause (fix-and-prevent-skill, 2026-07-26). Real ssh failures
-        # also print "fatal: Could not read from remote repository." after the kex
-        # line, so any transient marker in the detail qualifies the retry.
+        # Network blips (ssh kex timeout, connection reset) go through netretry.call:
+        # three retries after 5, 20 and 60 s. The lock-race loop keeps its own budget.
         lock_attempt = 0
-        transient_left = FETCH_TRANSIENT_RETRIES
-        while True:
-            try:
-                self._run("fetch", remote, ref)
-                return
-            except HarnessError as e:
-                detail = e.detail or ""
-                if "cannot lock ref" in detail and lock_attempt < FETCH_LOCK_RETRIES:
-                    time.sleep(FETCH_LOCK_BACKOFF * (lock_attempt + 1))
-                    lock_attempt += 1
-                    continue
-                if transient_left and any(m in detail for m in FETCH_TRANSIENT_MARKERS):
-                    transient_left -= 1
-                    time.sleep(FETCH_TRANSIENT_DELAY)
-                    continue
-                raise
+
+        def _fetch() -> None:
+            nonlocal lock_attempt
+            while True:
+                try:
+                    self._run("fetch", remote, ref)
+                    return
+                except HarnessError as e:
+                    if "cannot lock ref" in (e.detail or "") and lock_attempt < FETCH_LOCK_RETRIES:
+                        time.sleep(FETCH_LOCK_BACKOFF * (lock_attempt + 1))
+                        lock_attempt += 1
+                        continue
+                    raise
+
+        netretry.call(_fetch, label=f"git fetch {remote} {ref}")
 
     def branch_base(self, branch: str | None = None) -> str | None:
         """Stacked-branch parent tip SHA, recorded by bin/wt-new as
@@ -578,15 +566,51 @@ class LiveGit:
         """Run the TREE-EQUIVALENT proof. Gate is conjunctive: stdout AND rc==0.
         A diverged tree exits 0 with TREE DIVERGED — weakening to either operator alone
         would silently admit lost work."""
+        rc, proof_out = self._run_lostwork(lostwork_path, key)
+        if not ("TREE-EQUIVALENT" in proof_out and rc == 0):
+            return False, f"tree proof failed: {proof_out.strip()[:400]}"
+        return True, proof_out
+
+    def _run_lostwork(self, lostwork_path: Path, key: str) -> tuple[int, str]:
+        """Run lostwork.sh and return (rc, untruncated stdout)."""
         proof_proc = subprocess.run(
             ["bash", str(lostwork_path), key],
             capture_output=True, text=True, errors="replace",
             cwd=self.worktree,
         )
-        proof_out = proof_proc.stdout
-        if not ("TREE-EQUIVALENT" in proof_out and proof_proc.returncode == 0):
-            return False, f"tree proof failed: {proof_out.strip()[:400]}"
-        return True, proof_out
+        return proof_proc.returncode, proof_proc.stdout
+
+    def _prove_with_adaptations(
+        self,
+        lostwork_path: Path,
+        key: str,
+        *,
+        resolved_files: tuple,
+        adaptations: tuple,
+        pre_rebase_sha: str,
+        master_sha: str,
+    ) -> tuple[bool, str, tuple]:
+        """The conjunctive proof, plus one narrow relaxation: a LOST branch-added line
+        passes only when it is a deterministic near-match of a rewrite master made in
+        the same file, the resolver justified it, and a read-only reviewer CONFIRMED it
+        (harness/adaptations.py). A strict pass makes no model call."""
+        from ..adaptations import accept_adapted_proof
+
+        rc, out = self._run_lostwork(lostwork_path, key)
+        if "TREE-EQUIVALENT" in out and rc == 0:
+            return True, out, ()
+        merge_base = self._run("merge-base", pre_rebase_sha, master_sha, check=False).strip()
+        ok, composed, accepted = accept_adapted_proof(
+            self.llm, self._run,
+            worktree=self.worktree, key=key, proof_out=out, rc=rc,
+            resolved_files=resolved_files, justifications=adaptations,
+            merge_base=merge_base, master_sha=master_sha,
+        )
+        if not ok:
+            return (False,
+                    f"tree proof failed: {out.strip()[:400]} | adaptation rejected: {composed}",
+                    ())
+        return True, composed, accepted
 
     def _record_resolution(
         self,
@@ -597,6 +621,7 @@ class LiveGit:
         collapse_warn: str = "",
         proof_out: str = "",
         base_sha: str = "",
+        adapted_lines: tuple = (),
     ) -> tuple[str, str]:
         """Write manifest, notes, condition-(14) flag, and run the conflict reviewer.
         Returns (manifest_path, notes_path)."""
@@ -644,6 +669,11 @@ class LiveGit:
             f"## Changed files\n\n{file_list}\n\n"
             f"## Proof\n\nTREE-EQUIVALENT\n"
         )
+        if adapted_lines:
+            notes += "\n## Adapted lines\n\n" + "".join(
+                f"- {a.path}: +{a.original} => +{a.adapted} [{a.old} -> {a.new}]\n"
+                for a in adapted_lines
+            )
         if collapse_warn:
             notes += f"\n## Collapse guard\n\n{collapse_warn}\n"
         notes_path = f"/tmp/postplan-conflict-resolution-{key}.md"
@@ -660,6 +690,7 @@ class LiveGit:
                 self.llm, self._run,
                 worktree=self.worktree, key=key,
                 resolved_files=resolved_files, proof_out=proof_out,
+                adaptations=adapted_lines,
             )
 
         return manifest_path, notes_path
@@ -686,6 +717,7 @@ class LiveGit:
         branch = self.branch()
         key = branch.replace("/", "-")
         self.last_conflict_files = ()
+        self.last_conflict_resolution = None
         master_sha = self._run("rev-parse", base).strip()
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
@@ -769,7 +801,12 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason="lostwork.sh not found at pinned master SHA")
 
-                proof_ok, proof_out = self._prove_tree_equivalent(lostwork_path, key)
+                proof_ok, proof_out, adapted = self._prove_with_adaptations(
+                    lostwork_path, key,
+                    resolved_files=resolve_result.resolved_files,
+                    adaptations=resolve_result.adaptations,
+                    pre_rebase_sha=pre_rebase_sha, master_sha=master_sha,
+                )
                 if not proof_ok:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
@@ -778,7 +815,7 @@ class LiveGit:
                 try:
                     manifest_path, notes_path = self._record_resolution(
                         key, branch, master_sha, resolve_result.resolved_files,
-                        proof_out=proof_out,
+                        proof_out=proof_out, adapted_lines=adapted,
                     )
                 except HarnessError as exc:
                     # Phase 3c: a HarnessError from _record_resolution (empty post-resolution
@@ -796,6 +833,7 @@ class LiveGit:
                     notes_path=notes_path,
                     auto_resolved=True,
                     resolved_files=resolve_result.resolved_files,
+                    adapted_lines=adapted,
                 )
             except HarnessError:
                 raise
@@ -996,6 +1034,7 @@ class LiveGit:
             capture_output=True, text=True, errors="replace",
         )
         auto_resolved_files: tuple = ()
+        adaptations: tuple = ()
         if rebase_proc.returncode != 0:
             if self.llm is None:
                 # No LLM: immediate decline. Snapshot the unmerged set FIRST; the abort
@@ -1059,6 +1098,7 @@ class LiveGit:
                                       reason=text_reason)
 
                 auto_resolved_files = resolve_result.resolved_files
+                adaptations = resolve_result.adaptations
             except HarnessError:
                 raise
             except Exception as exc:
@@ -1068,7 +1108,11 @@ class LiveGit:
 
         # Step 8: TREE-EQUIVALENT proof — gate is conjunctive (stdout contains
         # TREE-EQUIVALENT AND rc == 0), because a diverged tree exits 0 with TREE DIVERGED
-        proof_ok, proof_out = self._prove_tree_equivalent(lostwork_path, key)
+        proof_ok, proof_out, adapted = self._prove_with_adaptations(
+            lostwork_path, key,
+            resolved_files=auto_resolved_files, adaptations=adaptations,
+            pre_rebase_sha=pre_rebase_sha, master_sha=master_sha,
+        )
         if not proof_ok:
             if auto_resolved_files:
                 # Failed after auto-resolution: abort_and_restore
@@ -1082,6 +1126,7 @@ class LiveGit:
             manifest_path, notes_path = self._record_resolution(
                 key, branch, master_sha, auto_resolved_files,
                 collapse_warn=collapse_warn, proof_out=proof_out, base_sha=ibl_base,
+                adapted_lines=adapted,
             )
         except HarnessError as exc:
             if auto_resolved_files:
@@ -1106,6 +1151,7 @@ class LiveGit:
             collapse_warn=collapse_warn,
             auto_resolved=bool(auto_resolved_files),
             resolved_files=auto_resolved_files,
+            adapted_lines=adapted,
         )
 
     def capture_lostwork_pre(self, key: str) -> bool:
@@ -1132,6 +1178,16 @@ class LiveGit:
         ok = "TREE-EQUIVALENT" in proc.stdout and proc.returncode == 0
         return ok, (proc.stdout + proc.stderr).strip()[:400]
 
+    def _remote_tip_is_head(self, remote: str, branch: str) -> tuple[bool, None]:
+        """netretry landed check for push: True when refs/heads/<branch> on the
+        remote already equals local HEAD. A failed read raises, so netretry stops
+        and re-raises the push's original error."""
+        rc, out = self._run_out("ls-remote", remote, f"refs/heads/{branch}")
+        if rc != 0:
+            raise HarnessError("push-failed", f"landed check: ls-remote failed: {out[:200]}")
+        tip = out.split()[0] if out.strip() else ""
+        return (bool(tip) and tip == self.head(), None)
+
     def push(self) -> None:
         if not self.push_remote:
             raise HarnessError("push-disabled",
@@ -1143,26 +1199,35 @@ class LiveGit:
         lease = self._run("rev-parse", "--verify", "--quiet",
                           f"refs/remotes/{remote}/{branch}", check=False).strip()
         if not lease:
-            rc, out = self._run_out("ls-remote", remote, f"refs/heads/{branch}")
-            if rc != 0:
-                raise HarnessError("push-failed",
-                                   f"lease read failed for {remote}/{branch}: {out[:400]}")
+            def _lease_read() -> str:
+                rc, out = self._run_out("ls-remote", remote, f"refs/heads/{branch}")
+                if rc != 0:
+                    raise HarnessError("push-failed",
+                                       f"lease read failed for {remote}/{branch}: {out[:400]}",
+                                       output=out)
+                return out
+            out = netretry.call(_lease_read, label=f"git ls-remote {remote} (lease)")
             if out.strip():
                 sha = out.strip().split()[0]
                 raise HarnessError("push-failed",
                                    f"stale-lease: {remote} holds refs/heads/{branch} ({sha}) "
                                    f"but this worktree has no refs/remotes/{remote}/{branch}")
             lease = _ZERO_SHA
-        rc, out = self._run_out("push", f"--force-with-lease={branch}:{lease}",
-                                remote, f"HEAD:refs/heads/{branch}")
-        if rc != 0:
-            if any(m in out for m in _LOCAL_GATE_MARKERS):
-                raise HarnessError("local-gate", f"git push: {out[:600]}",
+
+        def _push_once() -> None:
+            rc, out = self._run_out("push", f"--force-with-lease={branch}:{lease}",
+                                    remote, f"HEAD:refs/heads/{branch}")
+            if rc != 0:
+                if any(m in out for m in _LOCAL_GATE_MARKERS):
+                    raise HarnessError("local-gate", f"git push: {out[:600]}",
+                                       cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
+                                       output=out)
+                raise HarnessError("push-failed", out[:600],
                                    cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
                                    output=out)
-            raise HarnessError("push-failed", out[:600],
-                               cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
-                               output=out)
+
+        netretry.call(_push_once, label=f"git push {remote} {branch}",
+                      landed=lambda: self._remote_tip_is_head(remote, branch))
 
     def push_ff(self) -> str:
         if not self.push_remote:
@@ -1172,13 +1237,18 @@ class LiveGit:
         if branch == "HEAD":
             raise HarnessError("push-failed", "detached HEAD: refusing to push without a branch name")
         remote = self.push_remote
-        rc, out = self._run_out("push", remote, f"HEAD:refs/heads/{branch}")
-        if rc != 0:
-            if any(m in out for m in _LOCAL_GATE_MARKERS):
-                raise HarnessError("local-gate", f"git push: {out[:600]}",
+
+        def _push_once() -> None:
+            rc, out = self._run_out("push", remote, f"HEAD:refs/heads/{branch}")
+            if rc != 0:
+                if any(m in out for m in _LOCAL_GATE_MARKERS):
+                    raise HarnessError("local-gate", f"git push: {out[:600]}",
+                                       cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
+                raise HarnessError("push-failed", out[:600],
                                    cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
-            raise HarnessError("push-failed", out[:600],
-                               cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
+
+        netretry.call(_push_once, label=f"git push {remote} {branch} (ff)",
+                      landed=lambda: self._remote_tip_is_head(remote, branch))
         return self.head()
 
 

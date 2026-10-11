@@ -156,7 +156,6 @@ class PlayerPageController
         // Generate team color scheme
         $playerTeamid = $player->getTeamid() ?? 0;
         $colorScheme = TeamColorSchemeResolver::forTeam($this->commonRepo, $playerTeamid);
-        $tradingCardScheme = TeamColorSchemeResolver::forTradingCard($this->commonRepo, $playerTeamid);
 
         // Trading card
         $playerRepository = new PlayerRepository($this->mysqliDb);
@@ -180,7 +179,7 @@ class PlayerPageController
             $threepointcontests,
             $dunkcontests,
             $rooksoph,
-            $tradingCardScheme
+            $colorScheme
         );
         $html .= '</td></tr>';
 

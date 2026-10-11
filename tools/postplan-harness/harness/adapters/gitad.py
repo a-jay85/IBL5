@@ -617,6 +617,23 @@ class LiveGit:
                     ())
         return True, composed, accepted
 
+    def _run_proof(self, lostwork_path: Path, key: str) -> tuple[bool, str]:
+        """Strict proof for the conflict ladder. Returns (ok, FULL stdout). Gate is
+        conjunctive: stdout contains TREE-EQUIVALENT AND rc==0. A diverged tree exits 0
+        with TREE DIVERGED, so weakening to either operator alone admits lost work."""
+        rc, proof_out = self._run_lostwork(lostwork_path, key)
+        return ("TREE-EQUIVALENT" in proof_out and rc == 0), proof_out
+
+    def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
+                             lostwork_path, conflicted, proof_out):
+        from ..conflict_ladder import LadderContext, default_rungs, run_ladder
+        ctx = LadderContext(
+            llm=self.llm, run=self._run, run_out=self._run_out,
+            prove=lambda: self._run_proof(lostwork_path, key),
+            worktree=self.worktree, key=key, master_sha=master_sha,
+            pre_rebase_sha=pre_rebase_sha, conflicted_files=conflicted)
+        return run_ladder(ctx, proof_out, rungs=default_rungs(branch))
+
     def _record_resolution(
         self,
         key: str,
@@ -718,11 +735,13 @@ class LiveGit:
             abort_and_restore, assert_text_only, inventory_conflicts,
             purge_verdict_artifacts, resolve_all,
         )
+        from ..conflict_ladder import ladder_failure_reason
 
         branch = self.branch()
         key = branch.replace("/", "-")
         self.last_conflict_files = ()
         self.last_conflict_resolution = None
+        self.last_conflict_rung = ""
         master_sha = self._run("rev-parse", base).strip()
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
@@ -812,14 +831,41 @@ class LiveGit:
                     adaptations=resolve_result.adaptations,
                     pre_rebase_sha=pre_rebase_sha, master_sha=master_sha,
                 )
+                resolved_files = resolve_result.resolved_files
+                self.last_conflict_rung = "first-pass"
                 if not proof_ok:
-                    abort_and_restore(self._run, worktree=self.worktree,
-                                      pre_rebase_sha=pre_rebase_sha,
-                                      reason=proof_out)
+                    # The ladder needs the full LOST list; proof_out is the 400-char
+                    # reason string when the adaptation path rejected. Re-run the strict proof.
+                    _strict_ok, first_proof = self._run_proof(lostwork_path, key)
+                    adapt_trail = tuple(
+                        f"adaptation rejected: {p}" for p in proof_out.split(" | adaptation rejected: ", 1)[1:])
+                    try:
+                        outcome = self._run_conflict_ladder(
+                            key=key, branch=branch, master_sha=master_sha,
+                            pre_rebase_sha=pre_rebase_sha, lostwork_path=lostwork_path,
+                            conflicted=tuple(inventory.files), proof_out=first_proof)
+                    except HarnessError as exc:
+                        # The outer `except HarnessError: raise` does not restore, so a
+                        # HarnessError escaping the ladder restores here.
+                        self.last_conflict_rung = "exhausted"
+                        abort_and_restore(self._run, worktree=self.worktree,
+                                          pre_rebase_sha=pre_rebase_sha,
+                                          reason=ladder_failure_reason(
+                                              first_proof,
+                                              adapt_trail + (f"ladder error: {exc.kind}: {exc.detail}",)))
+                    if not outcome.rung:
+                        self.last_conflict_rung = "exhausted"
+                        abort_and_restore(self._run, worktree=self.worktree,
+                                          pre_rebase_sha=pre_rebase_sha,
+                                          reason=ladder_failure_reason(first_proof, adapt_trail + tuple(outcome.trail)))
+                    self.last_conflict_rung = outcome.rung
+                    proof_out = outcome.proof_out
+                    resolved_files = outcome.resolved_files
+                    adapted = ()  # a ladder rung re-proved strictly; no adaptation relaxation applies
 
                 try:
                     manifest_path, notes_path = self._record_resolution(
-                        key, branch, master_sha, resolve_result.resolved_files,
+                        key, branch, master_sha, resolved_files,
                         proof_out=proof_out, adapted_lines=adapted,
                     )
                 except HarnessError as exc:
@@ -837,8 +883,8 @@ class LiveGit:
                     manifest_path=manifest_path,
                     notes_path=notes_path,
                     auto_resolved=True,
-                    resolved_files=resolve_result.resolved_files,
                     adapted_lines=adapted,
+                    resolved_files=resolved_files,
                 )
             except HarnessError:
                 raise

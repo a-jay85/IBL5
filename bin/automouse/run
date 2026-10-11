@@ -2711,6 +2711,14 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             dispose_plan_postplan_blocked "$PLAN_NAME" "$PLAN_SLUG" "$PP_LOG_BEFORE"
             note_failure "Shipping $PLAN_SLUG was blocked, so no PR was opened. It was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$PLAN_SLUG.md"
         fi
+        # postplan-rc8-declined: begin
+        # post-plan-now exit 8 = it declined a repeat hold (holdrepeat or held-unfixable
+        # marker). Nothing ran, so a sub-minute exit with the handoff present is not environmental.
+        if [ "$PP_STATUS" -eq 8 ]; then
+            PP_TERMINAL=1
+            printf '[%s] %s post-plan-now declined a repeat hold (rc=8), not environmental\n' "$(date +%H:%M:%S)" "$PLAN_SLUG" >> "$LOG"
+        fi
+        # postplan-rc8-declined: end
         # postplan-no-worktree-merged: begin
         # A no-worktree postplan exit (pre-call resolver miss, or post-plan-now rc=7)
         # whose branch PR is MERGED already went to done/ via

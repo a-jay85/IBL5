@@ -74,11 +74,12 @@
 #   PR_CYCLE_FLEET_LOG_DIR   Where post-plan-fleet writes post-plan-fleet-<PR>.log. Read for
 #                            the end-of-run outcome counts. Default: /tmp.
 #   PR_CYCLE_HOLDREPEAT_HARNESS
-#                            postplan-harness dir whose `harness.holdrepeat check` decides
-#                            the pre-fire skip. Default:
-#                            $PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness.
+#                            postplan-harness dir whose `harness.holdrepeat check` and
+#                            `harness.heldmarker check` decide the two repeat-hold pre-fire
+#                            skips. Default: $PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness.
 #   PR_CYCLE_HOLDREPEAT_STATE_DIR
-#                            Holdrepeat state records. Default: <harness>/out/state.
+#                            Holdrepeat state records and held-unfixable markers
+#                            (<slug>.held-unfixable.json). Default: <harness>/out/state.
 #   PR_CYCLE_RESULT_FILE     Unset or empty writes nothing. Otherwise the worker atomically
 #                            writes the `# pr-cycle-result v1` TSV (one `<pr> <status> <outcome>
 #                            <reason>` row per in-scope PR) when it finishes, even after a HALT.
@@ -169,6 +170,9 @@ PR_CYCLE_FLEET_LOG_DIR="${PR_CYCLE_FLEET_LOG_DIR:-/tmp}"
 PR_CYCLE_SKIP_HELD_UNCHANGED="${PR_CYCLE_SKIP_HELD_UNCHANGED:-1}"
 PR_CYCLE_HOLDREPEAT_HARNESS="${PR_CYCLE_HOLDREPEAT_HARNESS:-$PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness}"
 PR_CYCLE_HOLDREPEAT_STATE_DIR="${PR_CYCLE_HOLDREPEAT_STATE_DIR:-$PR_CYCLE_HOLDREPEAT_HARNESS/out/state}"
+# Forwarded to the launchd worker so `harness.heldmarker check` can find the plan under a test
+# plans dir. Unset and empty both mean the default (~/claude-plans); the eval forward needs a value.
+PLANS_DIR="${PLANS_DIR:-}"
 
 # Print the usage header above: every comment line from the shebang to `set -euo pipefail`.
 usage() {
@@ -728,6 +732,27 @@ _holdrepeat_would_decline() {
     [ "$_hr_rc" -eq 10 ]
 }
 
+# _heldmarker_would_suppress N — exit 0 only when `harness.heldmarker check` returns 10 for
+# PR N's head branch: an earlier in-run decline wrote a held-unfixable marker, and neither the
+# hold nor the plan file's mtime changed since. Every other path returns 1, so the skip fails
+# open. Needs no worktree: the marker is keyed by slug and the plan resolves via locate_plan.
+_heldmarker_would_suppress() {
+    local _hm_n="$1" _hm_ref _hm_h="$PR_CYCLE_HOLDREPEAT_HARNESS" _hm_rc
+    _ensure_armed_state
+    [ -f "$RUNDIR/armed-state.json" ] || return 1
+    _hm_ref="$(jq -r --argjson n "$_hm_n" '.[] | select(.number == $n) | .headRefName // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    [ -n "$_hm_ref" ] || return 1
+    [ -d "$_hm_h/harness" ] || return 1
+    set +e
+    PYTHONPATH="$_hm_h" python3 -m harness.heldmarker check \
+        --state-dir "$PR_CYCLE_HOLDREPEAT_STATE_DIR" --slug "$_hm_ref" \
+        > /dev/null 2> "$RUNDIR/heldmarker-$_hm_n.err"
+    _hm_rc=$?
+    set -e
+    [ "$_hm_rc" -eq 10 ]
+}
+
 # _precheck_bucket N — echo PR N's current bucket, or "" when it cannot be determined.
 # Read-only: this invocation deliberately omits --arm, so it reports and changes nothing.
 # Never sets HALT and never returns non-zero: an unknown bucket must fall through to the
@@ -932,6 +957,15 @@ _stage1_list() {
         # frees the --max-ready slot for the next ordered PR. Fails open: any doubt fires.
         if _holdrepeat_would_decline "$_sl_n"; then
             echo "#$_sl_n — holdrepeat would decline (held on the same reason, nothing changed since), skipping" >> "$RUNDIR/stage1-skipped.txt"
+            echo "$_sl_n" >> "$RUNDIR/stage1-holdrepeat.txt"
+            continue
+        fi
+
+        # Pre-fire held-unfixable skip: post-plan-now would exit 8 on the marker an earlier
+        # in-run decline wrote (same hold, plan file unchanged). Skipping frees the --max-ready
+        # slot. Fails open: any doubt fires. Shares the holdrepeat bucket for the summary.
+        if _heldmarker_would_suppress "$_sl_n"; then
+            echo "#$_sl_n — held-unfixable marker active (same hold, plan unchanged), skipping (edit the plan or delete the marker)" >> "$RUNDIR/stage1-skipped.txt"
             echo "$_sl_n" >> "$RUNDIR/stage1-holdrepeat.txt"
             continue
         fi
@@ -1477,7 +1511,7 @@ _launch() {
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
                   PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
                   PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_HARNESS_OUT PR_CYCLE_FLEET_LOG_DIR \
-                  PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR \
+                  PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR PLANS_DIR \
                   PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \
                   PR_CYCLE_STOP_FILE PR_CYCLE_RESULT_FILE PR_CYCLE_SKIP_NOTES; do
             eval "_val=\${$_v}"

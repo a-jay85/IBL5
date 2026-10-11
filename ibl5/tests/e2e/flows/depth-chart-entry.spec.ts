@@ -213,6 +213,131 @@ test.describe('Depth Chart Entry flow', () => {
       .toBeGreaterThan(0);
   });
 
+  test("lineup preview photos use each row's server-resolved data-photo-url", async ({
+    page,
+  }) => {
+    const notFound: string[] = [];
+    page.on('response', (response) => {
+      if (response.url().includes('/images/player/') && response.status() === 404) {
+        notFound.push(response.url());
+      }
+    });
+    await page.goto('modules.php?name=DepthChartEntry');
+
+    await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
+    const previewTable = page.locator(
+      '#dc-lineup-preview .dc-lineup-preview-table--desktop',
+    );
+    await expect(previewTable).toBeVisible();
+    await expect(previewTable.locator('img.ibl-player-photo').first()).toBeAttached();
+
+    const rowUrls = await page.evaluate(() =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>('.depth-chart-table tbody tr[data-pid]'),
+      ).map((row) => [row.dataset.pid ?? '', row.dataset.photoUrl ?? ''] as const),
+    );
+    expect(rowUrls.length).toBeGreaterThan(0);
+    const shape =
+      /^(\.\/images\/player\/\d+\.jpg|data:image\/png;base64,[A-Za-z0-9+/=]+)$/;
+    for (const [pid, url] of rowUrls) {
+      expect(url, `row ${pid} data-photo-url`).toMatch(shape);
+    }
+    const urlByPid = new Map(rowUrls);
+
+    const previewImages = await previewTable.locator('img.ibl-player-photo').evaluateAll(
+      (imgs) =>
+        imgs.map((img) => {
+          const href = img.closest('a')?.getAttribute('href') ?? '';
+          return [href.split('pid=')[1] ?? '', img.getAttribute('src') ?? ''] as const;
+        }),
+    );
+    expect(previewImages.length).toBeGreaterThan(0);
+    for (const [pid, src] of previewImages) {
+      expect(src, `preview photo for pid ${pid}`).toBe(urlByPid.get(pid));
+    }
+
+    expect(notFound).toEqual([]);
+  });
+
+  test('lineup preview photo follows data-photo-url and escapes quotes', async ({
+    page,
+  }) => {
+    await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
+    const previewTable = page.locator(
+      '#dc-lineup-preview .dc-lineup-preview-table--desktop',
+    );
+    await expect(previewTable).toBeVisible();
+    await installPreviewObserver(page);
+
+    const sentinel = 'data:image/png;base64,AAAA" data-injected="1';
+    await page.evaluate((value) => {
+      document
+        .querySelectorAll<HTMLElement>('.depth-chart-table tbody tr[data-pid]')
+        .forEach((row) => row.setAttribute('data-photo-url', value));
+    }, sentinel);
+
+    const firstPg = page.locator('.depth-chart-table select[name^="pg"]').first();
+    const originalPg = await firstPg.inputValue();
+    await firstPg.selectOption(originalPg === '0' ? '1' : '0');
+
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            () =>
+              (window as typeof window & { __ibl_preview_mutations?: number })
+                .__ibl_preview_mutations ?? 0,
+          ),
+        { timeout: 3000 },
+      )
+      .toBeGreaterThan(0);
+
+    const sources = await previewTable
+      .locator('img.ibl-player-photo')
+      .evaluateAll((imgs) => imgs.map((img) => img.getAttribute('src')));
+    expect(sources.length).toBeGreaterThan(0);
+    for (const src of sources) {
+      expect(src).toBe(sentinel);
+    }
+    await expect(page.locator('#dc-lineup-preview [data-injected]')).toHaveCount(0);
+  });
+
+  test('lineup preview omits the photo when a row has no data-photo-url', async ({
+    page,
+  }) => {
+    await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
+    const previewTable = page.locator(
+      '#dc-lineup-preview .dc-lineup-preview-table--desktop',
+    );
+    await expect(previewTable).toBeVisible();
+    await installPreviewObserver(page);
+
+    await page.evaluate(() => {
+      document
+        .querySelectorAll<HTMLElement>('.depth-chart-table tbody tr[data-pid]')
+        .forEach((row) => row.removeAttribute('data-photo-url'));
+    });
+
+    const firstPg = page.locator('.depth-chart-table select[name^="pg"]').first();
+    const originalPg = await firstPg.inputValue();
+    await firstPg.selectOption(originalPg === '0' ? '1' : '0');
+
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            () =>
+              (window as typeof window & { __ibl_preview_mutations?: number })
+                .__ibl_preview_mutations ?? 0,
+          ),
+        { timeout: 3000 },
+      )
+      .toBeGreaterThan(0);
+
+    await expect(previewTable.locator('img.ibl-player-photo')).toHaveCount(0);
+    await expect(previewTable.locator('a[href*="pid="]').first()).toBeVisible();
+  });
+
   test('lineup preview recalculates when dc_minutes changes', async ({
     page,
   }) => {

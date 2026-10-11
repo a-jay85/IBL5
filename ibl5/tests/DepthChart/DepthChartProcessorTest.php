@@ -880,4 +880,32 @@ class DepthChartProcessorTest extends TestCase
         $this->assertSame(0, $result['playerData'][0]['pid']);
         $this->assertSame(0, $result['playerData'][1]['pid']);
     }
+
+    public function testExtractIntValueCoercesFloatBoolArrayAndNullToZero(): void
+    {
+        $pids = [1.9, true, ['5'], null, 42, '-3'];
+        $postData = [];
+        foreach ($pids as $index => $pid) {
+            $i = $index + 1;
+            $postData['Name' . $i] = 'Player ' . $i;
+            $postData['pid' . $i] = $pid;
+            $postData['pg' . $i] = '1';
+            $postData['sg' . $i] = '0';
+            $postData['sf' . $i] = '0';
+            $postData['pf' . $i] = '0';
+            $postData['c' . $i] = '0';
+            $postData['canPlayInGame' . $i] = '1';
+            $postData['min' . $i] = '20';
+            $postData['Injury' . $i] = '0';
+        }
+
+        $result = $this->processor->processSubmission($postData, 15);
+
+        $this->assertSame(0, $result['playerData'][0]['pid']);
+        $this->assertSame(0, $result['playerData'][1]['pid']);
+        $this->assertSame(0, $result['playerData'][2]['pid']);
+        $this->assertSame(0, $result['playerData'][3]['pid']);
+        $this->assertSame(42, $result['playerData'][4]['pid']);
+        $this->assertSame(-3, $result['playerData'][5]['pid']);
+    }
 }

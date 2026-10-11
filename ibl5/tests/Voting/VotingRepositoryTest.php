@@ -31,6 +31,17 @@ class VotingRepositoryTest extends WideUnitTestCase
         $this->assertSame(99, $result[0]['pid']);
     }
 
+    public function testFetchAllStarTotalsResolvesPidUsingLastCommaSplit(): void
+    {
+        $this->mockDb->setVotingResultsQueue([[['name' => 'Smith, Jr., Sting', 'votes' => 3]]]);
+        $this->mockDb->setMockData([['pid' => 77, 'name' => 'Smith, Jr.']]);
+
+        $result = $this->repository->fetchAllStarTotals(['east_f1']);
+
+        $this->assertSame(77, $result[0]['pid']);
+        $this->assertSame('Smith, Jr., Sting', $result[0]['name']);
+    }
+
     public function testFetchAllStarTotalsBlankNameUsesPlaceholder(): void
     {
         $this->mockDb->setVotingResultsQueue([[['name' => '  ', 'votes' => 3]]]);

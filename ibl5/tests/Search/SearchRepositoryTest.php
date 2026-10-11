@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Search;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Search\Contracts\SearchRepositoryInterface;
 use Search\SearchRepository;
 use Tests\WideUnit\WideUnitTestCase;
@@ -229,6 +230,44 @@ class SearchRepositoryTest extends WideUnitTestCase
         $this->assertCount(1, $result);
         $this->assertSame(2, $result[0]['catId']);
         $this->assertSame('Trades', $result[0]['title']);
+    }
+
+    #[DataProvider('unsupportedPrefixProvider')]
+    public function testUnsupportedPrefixFallsBackToNukeTables(string $prefix): void
+    {
+        $repository = new SearchRepository($this->mockDb, $prefix);
+
+        $repository->getTopics();
+
+        $sql = $this->mockDb->getPreparedQueries()[0];
+        $this->assertStringContainsString('FROM nuke_topics', $sql);
+        $this->assertStringNotContainsString('DROP', $sql);
+        if ($prefix !== '') {
+            $this->assertStringNotContainsString($prefix . '_topics', $sql);
+        }
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function unsupportedPrefixProvider(): array
+    {
+        return [
+            'well-formed other prefix' => ['foo'],
+            'case variant' => ['Nuke'],
+            'digit suffix' => ['nuke2'],
+            'empty' => [''],
+            'injection shaped' => ['nuke_topics; DROP TABLE nuke_topics; --'],
+        ];
+    }
+
+    public function testSupportedPrefixIsUsedVerbatim(): void
+    {
+        $repository = new SearchRepository($this->mockDb, 'nuke');
+
+        $repository->getTopics();
+
+        $this->assertStringContainsString('FROM nuke_topics', $this->mockDb->getPreparedQueries()[0]);
     }
 
     public function testSearchStoriesOrdersByTimeThenSid(): void

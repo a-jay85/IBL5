@@ -38,6 +38,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -50,8 +51,18 @@ concurrency:
 # most recent seasons (see bin/rehearsal-prod-dump), so a migration whose failure depends
 # ONLY on pre-previous-season rows in those four tables is NOT rehearsed here.
 jobs:
+  mirror-ready:
+    name: Mirror CI images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/mirror-ci-images.yml
+    with:
+      only-missing: true
+
   rehearse:
     name: Deploy Rehearsal (composer --no-dev + migrate + validate-schema)
+    needs: [mirror-ready]
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -63,7 +74,10 @@ jobs:
 
     services:
       mariadb:
-        image: mariadb:10.11
+        image: ghcr.io/a-jay85/mirror/mariadb:10.11
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           MARIADB_ROOT_PASSWORD: root
           MARIADB_DATABASE: iblhoops_ibl5

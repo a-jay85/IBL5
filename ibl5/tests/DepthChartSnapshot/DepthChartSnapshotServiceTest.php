@@ -97,6 +97,19 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
         $this->assertSame('', $result['player_name']);
     }
 
+    public function testBuildPlayerSnapshotNonNumericPidBecomesZero(): void
+    {
+        // DepthChartSnapshotService::buildPlayerSnapshot coerces the roster pid with toInt():
+        // '12abc' would be 12 and true would be 1 under sanitizeInt(), but both must give 0.
+        $dcSettings = ['pg' => 1];
+
+        $result = $this->service->buildPlayerSnapshot(['pid' => '12abc', 'name' => 'Junk PID Player'], $dcSettings, 1);
+        $this->assertSame(0, $result['pid']);
+
+        $result = $this->service->buildPlayerSnapshot(['pid' => true, 'name' => 'Bool PID Player'], $dcSettings, 1);
+        $this->assertSame(0, $result['pid']);
+    }
+
     public function testLoadSavedDepthChartReturnsNullWhenNotFound(): void
     {
         $this->mockDb->setMockData([]);
@@ -472,7 +485,7 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
         $this->assertCount(1, $result);
         $this->assertSame(42, $result[0]['id']);
         $this->assertTrue($result[0]['isActive']);
-        $this->assertNotEmpty($result[0]['label']);
+        $this->assertNotSame('', $result[0]['label']);
     }
 
     public function testBuildCurrentLiveLabelContainsRecordWithActiveDc(): void

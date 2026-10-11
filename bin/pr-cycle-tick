@@ -18,7 +18,9 @@
 #
 # Guards, cheapest first: stop file, usage zone, a live pr-cycle worker, then per PR:
 # post-plan in flight, post-plan finished under 30 minutes ago, checks pending or green,
-# and a one-rescue-per-head-SHA retry cap. At most 3 PRs go to one run.
+# stacked on another open PR's branch, and a one-rescue-per-head-SHA retry cap. At most
+# 3 PRs go to one run. Every skipped open PR is written to a results/<id>.skip-notes TSV
+# that the launch hands to bin/pr-cycle as PR_CYCLE_SKIP_NOTES for its your-turn DM.
 #
 # A launch is recorded as pending, not as an attempt: the detached worker outlives the tick.
 # A later tick with no live worker reads the worker's result file and settles each PR. A run
@@ -52,6 +54,8 @@ done
 
 # shellcheck source=bin/lib/pr-cycle-watch.sh
 source "$SCRIPT_DIR/lib/pr-cycle-watch.sh"
+# shellcheck source=bin/lib/dm.sh
+source "$SCRIPT_DIR/lib/dm.sh"
 
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"; }
 
@@ -65,7 +69,7 @@ else
 fi
 STATE="$(pcw_state_dir)" || { echo "pr-cycle-tick: HOME is unset" >&2; exit 2; }
 PR_CYCLE_CMD="${PR_CYCLE_TICK_PR_CYCLE_CMD:-$ROOT/bin/pr-cycle}"
-DM_CMD="${PR_CYCLE_TICK_DM_CMD:-$ROOT/bin/discord-dm}"
+DM_CMD="$(dm_bin "$ROOT/bin" PR_CYCLE_TICK_DM_CMD)"
 
 # shellcheck source=bin/lib/usage-gate.sh
 source "$SCRIPT_DIR/lib/usage-gate.sh"
@@ -128,7 +132,7 @@ strike() {
     if [[ "$n" -eq "$PCW_STRIKE_CAP" ]] && pcw_kind_dm_due "$STATE" strikes "$1" "$2"; then
         # shellcheck disable=SC2059  # the message is a fixed printf template
         msg="$(printf "$STRIKE_MSG" "$1" "${2:0:7}" "$PCW_STRIKE_CAP" "$3" "$4" "$5")"
-        "$DM_CMD" --ping "$msg" || true
+        dm_ping "$msg" || true
         pcw_kind_mark_dm "$STATE" strikes "$1" "$2"
     fi
 }
@@ -153,7 +157,7 @@ settle_row() {
             if pcw_kind_dm_due "$STATE" declined "$pr" "$sha"; then
                 # shellcheck disable=SC2059  # the message is a fixed printf template
                 msg="$(printf "$DECLINED_MSG" "$pr" "${sha:0:7}")"
-                "$DM_CMD" --ping "$msg" || true
+                dm_ping "$msg" || true
                 pcw_kind_mark_dm "$STATE" declined "$pr" "$sha"
             fi ;;
         fired:paused)
@@ -212,11 +216,28 @@ reconcile_pending
 
 # ── (d) Qualifying set ───────────────────────────────────────────────────────
 if ! PRS_JSON="$(gh pr list --state open --author @me --limit 200 \
-        --json number,headRefName,headRefOid,mergeStateStatus,isDraft 2>/dev/null)"; then
+        --json number,headRefName,headRefOid,mergeStateStatus,isDraft,baseRefName 2>/dev/null)"; then
     log "gh pr list failed"; exit 0
 fi
 if [[ "$DRY_RUN" -eq 0 ]]; then
     pcw_prune "$STATE" "$(jq -r '.[].number' <<< "$PRS_JSON")"
+fi
+
+# Every open PR's head branch -> number (drafts included: a PR stacked on a draft is
+# still stacked). Feeds pcw_stacked_on.
+OPEN_HEADS="$(jq -r '.[] | [.headRefName, .number] | @tsv' <<< "$PRS_JSON")"
+
+# Skip notes: one "<pr>\t<reason>" line per open PR this tick did not launch. pr-cycle
+# reads the file through PR_CYCLE_SKIP_NOTES and lists the reasons in its your-turn DM.
+id="$(date +%s)-$$"
+SKIP_NOTES="$STATE/results/$id.skip-notes"
+note() { [[ "$DRY_RUN" -eq 1 ]] || printf '%s\t%s\n' "$1" "$2" >> "$SKIP_NOTES"; }
+skip() { log "skip PR $1: $2"; note "$1" "$2"; }
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    mkdir -p "$STATE/results"
+    find "$STATE/results" -name '*.skip-notes' -mmin +$(( PCW_PENDING_MAX_AGE_S / 60 )) -delete 2>/dev/null || true
+    while IFS= read -r d; do note "$d" "draft"; done \
+        < <(jq -r '.[] | select(.isDraft) | .number' <<< "$PRS_JSON")
 fi
 
 # <wt>/tools/postplan-harness/out for the worktree holding $1, or nothing.
@@ -230,16 +251,16 @@ worktree_out_dir() {
 }
 
 QUALIFY=()      # "<pr>|<sha>"
-while IFS=$'\t' read -r pr branch sha mstate; do
+while IFS=$'\t' read -r pr branch sha mstate base; do
     [[ -n "$pr" ]] || continue
     if pcw_inflight "$pr" "$branch" "$SNAP"; then
-        log "skip PR $pr: post-plan in flight"; continue
+        skip "$pr" "post-plan in flight"; continue
     fi
     out_dirs=("$ROOT/tools/postplan-harness/out")
     wt_out="$(worktree_out_dir "$branch")"
     [[ -n "$wt_out" ]] && out_dirs+=("$wt_out")
     if pcw_recent_finish "$branch" "${out_dirs[@]}"; then
-        log "skip PR $pr: post-plan finished <$PCW_GRACE_MIN min ago"; continue
+        skip "$pr" "post-plan finished <$PCW_GRACE_MIN min ago"; continue
     fi
     if [[ "$mstate" == "DIRTY" ]]; then
         kind=DIRTY
@@ -250,12 +271,17 @@ while IFS=$'\t' read -r pr branch sha mstate; do
             verdict=pending
         fi
         if [[ "$verdict" != "red" ]]; then
-            log "skip PR $pr: checks $verdict"; continue
+            skip "$pr" "checks $verdict"; continue
         fi
         kind=red
     fi
+    # Stacked (base is another open PR's head): its checks run against the parent
+    # branch, so a rescue cannot fix them. Skipped before any attempt is recorded.
+    if parent="$(pcw_stacked_on "$base" "$OPEN_HEADS")"; then
+        skip "$pr" "stacked on #$parent"; continue
+    fi
     if pcw_attempted_head "$STATE" "$pr" "$sha"; then
-        log "skip PR $pr: retry cap (head ${sha:0:7})"
+        skip "$pr" "retry cap (head ${sha:0:7})"
         if pcw_dm_due "$STATE" "$pr" "$sha"; then
             msg="pr-cycle-watch: PR #$pr is still $kind on head ${sha:0:7} after one rescue. Skipping it until a new push."
             # Name why the rescue stopped, so the DM is actionable without opening a log.
@@ -265,10 +291,12 @@ while IFS=$'\t' read -r pr branch sha mstate; do
             elif [[ -n "${run_dir:-}" ]]; then
                 msg+=" Last rescue run: $run_dir"
             fi
+            # End with the one-command fix entry point, on its own line so it copies cleanly.
+            msg+=$'\nOr paste this to have Claude fix it:\n'"$ROOT/bin/postplan-fix $pr"
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 log "would DM: $DM_CMD --ping $msg"
             else
-                "$DM_CMD" --ping "$msg" || true
+                dm_ping "$msg" || true
                 pcw_mark_dm "$STATE" "$pr" "$sha"
             fi
         fi
@@ -276,24 +304,28 @@ while IFS=$'\t' read -r pr branch sha mstate; do
     fi
     # These three skips send no DM: reconcile already sent the one that matters.
     if pcw_pending_has "$STATE" "$pr"; then
-        log "skip PR $pr: rescue pending"; continue
+        skip "$pr" "rescue pending"; continue
     fi
     if pcw_declined_head "$STATE" "$pr" "$sha"; then
-        log "skip PR $pr: holdrepeat declined (head ${sha:0:7})"; continue
+        skip "$pr" "holdrepeat declined (head ${sha:0:7})"; continue
     fi
     if [[ "$(pcw_strike_count "$STATE" "$pr" "$sha")" -ge "$PCW_STRIKE_CAP" ]]; then
-        log "skip PR $pr: no-op rescue cap (head ${sha:0:7})"; continue
+        skip "$pr" "no-op rescue cap (head ${sha:0:7})"; continue
     fi
     QUALIFY+=("$pr|$sha")
 done < <(jq -r 'sort_by(.number) | .[] | select(.isDraft | not)
-                | [.number, .headRefName, .headRefOid, .mergeStateStatus] | @tsv' <<< "$PRS_JSON")
+                | [.number, .headRefName, .headRefOid, .mergeStateStatus, .baseRefName] | @tsv' <<< "$PRS_JSON")
 
 if [[ ${#QUALIFY[@]} -eq 0 ]]; then
+    rm -f "$SKIP_NOTES"
     log "idle: nothing qualifies"; exit 0
 fi
 
 # ── (e) Launch ───────────────────────────────────────────────────────────────
 LAUNCH=("${QUALIFY[@]:0:$PCW_MAX_PER_TICK}")
+for entry in "${QUALIFY[@]:$PCW_MAX_PER_TICK}"; do
+    note "${entry%%|*}" "over the $PCW_MAX_PER_TICK-per-run cap; next tick"
+done
 csv=""
 for entry in "${LAUNCH[@]}"; do csv="${csv:+$csv,}${entry%%|*}"; done
 count=${#LAUNCH[@]}
@@ -305,13 +337,12 @@ fi
 log "launching: $PR_CYCLE_CMD --go --only $csv --max-ready $count"
 # The worker outlives this tick, so the launch records a pending entry, not an attempt. The
 # entry is written first so a killed tick never loses the launch; a failed launch removes it.
-id="$(date +%s)-$$"
 pending_body="# result=$STATE/results/$id.tsv started=$(date +%s)"
 for entry in "${LAUNCH[@]}"; do
     pending_body+=$'\n'"${entry%%|*}"$'\t'"${entry#*|}"
 done
 _pcw_write "$STATE/pending/$id" "$pending_body"
-if PR_CYCLE_RESULT_FILE="$STATE/results/$id.tsv" "$PR_CYCLE_CMD" --go --only "$csv" --max-ready "$count"; then
+if PR_CYCLE_RESULT_FILE="$STATE/results/$id.tsv" PR_CYCLE_SKIP_NOTES="$SKIP_NOTES" "$PR_CYCLE_CMD" --go --only "$csv" --max-ready "$count"; then
     log "launched; pending $id"
 else
     rm -f "$STATE/pending/$id"

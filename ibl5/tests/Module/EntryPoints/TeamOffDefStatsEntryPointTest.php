@@ -18,7 +18,7 @@ class TeamOffDefStatsEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('TeamOffDefStats');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_box_scores');
     }
 
@@ -28,7 +28,7 @@ class TeamOffDefStatsEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('TeamOffDefStats');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_box_scores');
     }
 
@@ -38,7 +38,7 @@ class TeamOffDefStatsEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('TeamOffDefStats');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_box_scores');
     }
 }

@@ -34,7 +34,7 @@ class ActivityTrackerRepositoryTest extends DatabaseTestCase
     {
         $teams = $this->repo->getTeamActivity();
 
-        self::assertNotEmpty($teams);
+        self::assertNotSame([], $teams);
         $first = $teams[0];
         self::assertArrayHasKey('teamid', $first);
         self::assertArrayHasKey('team_name', $first);

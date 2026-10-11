@@ -9,36 +9,33 @@
 
 set -u
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BASE_TMP="$(mktemp -d)"
-trap 'rm -rf "$BASE_TMP"' EXIT
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
-FAILED=0
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+h_tmp BASE_TMP
 
 expect() { # name want got
     if [ "$3" -eq "$2" ]; then
-        echo "ok: $1 (exit $3)"
+        h_pass "$1 (exit $3)"
     else
-        echo "FAIL: $1 — expected exit $2, got $3"
-        FAILED=1
+        h_fail "$1" "expected exit $2, got $3"
     fi
 }
 
 expect_out() { # name needle output
     case "$3" in
-        *"$2"*) echo "ok: $1" ;;
-        *)      echo "FAIL: $1 — expected output to contain '$2'"
-                printf '%s\n' "$3" | sed 's/^/      | /'
-                FAILED=1 ;;
+        *"$2"*) h_pass "$1" ;;
+        *)      h_fail "$1" "expected output to contain '$2'"
+                printf '%s\n' "$3" | sed 's/^/      | /' ;;
     esac
 }
 
 expect_no_out() { # name needle output
     case "$3" in
-        *"$2"*) echo "FAIL: $1 — output must NOT contain '$2'"
-                printf '%s\n' "$3" | sed 's/^/      | /'
-                FAILED=1 ;;
-        *)      echo "ok: $1" ;;
+        *"$2"*) h_fail "$1" "output must NOT contain '$2'"
+                printf '%s\n' "$3" | sed 's/^/      | /' ;;
+        *)      h_pass "$1" ;;
     esac
 }
 
@@ -425,9 +422,4 @@ expect "post-dry-head-stable" 0 "$_r"
 # Terminator
 # ===========================================================================
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

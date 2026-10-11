@@ -4,7 +4,7 @@
 # Dry-run by default: prints the PRs it would process and exits. Nothing fires without --go.
 #
 # Usage:
-#   bin/post-plan-fleet [--go] [--jobs N] [--pr N[,N...]] [--pr-list N[,N...]] [--dry-run] [--wait] [--no-dm] [--allow-test-only] [--stop N[,N...]] [--stop-all] [--help]
+#   bin/post-plan-fleet [--go] [--jobs N] [--pr N[,N...]] [--pr-list N[,N...]] [--dry-run] [--wait] [--no-dm] [--allow-test-only] [--state-changed-prs=N[,N...]] [--stop N[,N...]] [--stop-all] [--help]
 #
 #   --go          Actually fire. Without it the script only reports (default).
 #   --jobs N      Max concurrent sessions (default 5). Positive integer.
@@ -30,6 +30,7 @@
 #   --no-dm       Skip the Discord DM this script sends when each fired session ends.
 #                 The /tmp log is written either way; the DM is additive, never a replacement.
 #   --allow-test-only  Pass --allow-test-only to each bin/post-plan-now session (skips only its test-only exit-5 guard). Passed by bin/pr-cycle Stage 1; not for hand use.
+#   --state-changed-prs=N[,N...]  Pass --state-changed to the listed PRs' bin/post-plan-now sessions only (skips only the repeat-hold decline, exit 8). Equals form only. Passed by bin/pr-cycle Stage 1; not for hand use.
 #
 # Examples:
 #   bin/post-plan-fleet                       # report what would run
@@ -81,7 +82,7 @@
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    sed -n '2,79p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,80p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
 fi
 
@@ -97,12 +98,8 @@ export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/
 # --git-common-dir points at the main .git even from a linked worktree, where
 # --show-toplevel would return the worktree instead.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-GIT_COMMON="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-if [[ -z "$GIT_COMMON" ]]; then
-    # git < 2.31 has no --path-format; fall back to resolving the relative answer by hand.
-    GIT_COMMON="$(cd "$SCRIPT_DIR" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"
-fi
-ROOT="$(dirname "$GIT_COMMON")"
+. "$SCRIPT_DIR/lib/git-helpers.sh"
+ROOT="$(main_checkout_root "$SCRIPT_DIR")" || ROOT=""
 # POST_PLAN_FLEET_ROOT: test seam allowing tests to override the resolved main checkout path.
 [[ -n "${POST_PLAN_FLEET_ROOT:-}" ]] && ROOT="$POST_PLAN_FLEET_ROOT"
 
@@ -112,6 +109,8 @@ ROOT="$(dirname "$GIT_COMMON")"
 # --- session-id helpers ------------------------------------------------------------------
 . "$SCRIPT_DIR/lib/session-id.sh"
 . "$SCRIPT_DIR/lib/launchd-job.sh"
+# shellcheck source=bin/lib/dm.sh
+. "$SCRIPT_DIR/lib/dm.sh"
 # Usage-gate markers (ADR-0143): a post-plan session paused by the gate is resumed by the
 # coordinator, so the fleet must not fire a second one into the same worktree.
 . "$SCRIPT_DIR/lib/usage-gate.sh"
@@ -125,6 +124,7 @@ EXPLICIT_PRS=()
 WAIT=0
 NOTIFY=1
 ALLOW_TEST_ONLY_ARG=""
+STATE_CHANGED_PRS=""
 MODE=fire          # fire | stop | stop-all
 STOP_PRS=()
 SAW_DRY_RUN=0
@@ -135,7 +135,7 @@ CEILING_SECS="${POST_PLAN_FLEET_CEILING:-7200}"
 WAIT_POLL_SECS="${POST_PLAN_FLEET_WAIT_POLL:-20}"
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,79p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,80p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -148,6 +148,11 @@ while [[ $# -gt 0 ]]; do
         --wait)    WAIT=1; shift ;;
         --no-dm)   NOTIFY=0; shift ;;
         --allow-test-only) ALLOW_TEST_ONLY_ARG="--allow-test-only"; shift ;;
+        --state-changed-prs=*)
+            STATE_CHANGED_PRS="${1#--state-changed-prs=}"
+            [[ "$STATE_CHANGED_PRS" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]] \
+                || { echo "ERROR: --state-changed-prs= needs a comma list of PR numbers, got: '$STATE_CHANGED_PRS'" >&2; exit 2; }
+            shift ;;
         --pr|--pr-list)
             [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 1; }
             IFS=',' read -r -a _prs <<< "$2"
@@ -617,16 +622,19 @@ fire_pr() {
         printf 'PR=%q\n'         "$PR"
         printf 'NOTIFY=%q\n'     "$NOTIFY"
         printf 'SESSION_ID=%q\n' "$SESSION_ID"
-        printf 'DISCORD_DM=%q\n' "${POST_PLAN_FLEET_DISCORD_DM:-$ROOT/bin/discord-dm}"
+        printf 'DISCORD_DM=%q\n' "$(dm_bin "$ROOT/bin" POST_PLAN_FLEET_DISCORD_DM)"
         printf 'GH_BIN=%q\n'     "${POST_PLAN_FLEET_GH:-gh}"
         printf 'POST_PLAN_NOW_BIN=%q\n' "${POST_PLAN_FLEET_CLAUDE:-$ROOT/bin/post-plan-now}"
         printf 'ALLOW_TEST_ONLY_ARG=%q\n' "$ALLOW_TEST_ONLY_ARG"
+        _sc_arg=""
+        [[ ",$STATE_CHANGED_PRS," == *",$PR,"* ]] && _sc_arg=--state-changed
+        printf 'STATE_CHANGED_ARG=%q\n' "$_sc_arg"
         declare -f ljob_dm_ready ljob_dm_send
         cat <<'RUNNER_EOF'
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
 RC=0
-timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?
+timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} > "$LOG" 2>&1 || RC=$?
 [ "$RC" = 124 ] && echo "post-plan-now: TIMED OUT after 90m (rc=124)" >> "$LOG"
 notify() {
     ljob_dm_ready post-plan-fleet || return 0
@@ -775,6 +783,18 @@ Fix: ${DM_NEXT}" ;;
     msg="${DM_ICON} post-plan-fleet: ${head}${title_line}
 RESULT ${DM_VERDICT}${fix_block}
 log: $LOG"
+    # Failure verdicts end with the one-command fix entry point (bin/postplan-fix).
+    # READY / HELD / READY WITH NOTES: nothing failed, so no paste line.
+    local fix_cmd=""
+    case "$DM_VERDICT" in
+        "NOT READY"|STOPPED|"TIMED OUT"|"runner exited rc="*|unconfirmed*)
+            [ -n "$PR" ] && fix_cmd="$ROOT/bin/postplan-fix $PR" ;;
+    esac
+    if [ -n "$fix_cmd" ]; then
+        msg="${msg}
+Or paste this to have Claude fix it:
+${fix_cmd}"
+    fi
     ljob_dm_send post-plan-fleet "$msg"
 }
 # Derive outcome word for pr-cycle summary and write to LOG BEFORE releasing the
@@ -855,7 +875,8 @@ RUNNER_EOF
     ljob_write_runner_plist "$PLIST" "$LABEL" "$RUNNER" "$ROOT" "$LOG"
 
     if [[ -n "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
-        echo "DRY(invocation) PR #${PR}: $ROOT/bin/post-plan-now --pr $PR --foreground${ALLOW_TEST_ONLY_ARG:+ $ALLOW_TEST_ONLY_ARG}"
+        _sc_arg=""; [[ ",$STATE_CHANGED_PRS," == *",$PR,"* ]] && _sc_arg=--state-changed
+        echo "DRY(invocation) PR #${PR}: $ROOT/bin/post-plan-now --pr $PR --foreground${ALLOW_TEST_ONLY_ARG:+ $ALLOW_TEST_ONLY_ARG}${_sc_arg:+ $_sc_arg}"
         cat "$PLIST"
         # Remove the plist when invoked via --dry-run (CLI flag sets SAW_DRY_RUN).
         # Tests that set POST_PLAN_FLEET_DRY_RUN=1 directly keep the plist for shape checks.

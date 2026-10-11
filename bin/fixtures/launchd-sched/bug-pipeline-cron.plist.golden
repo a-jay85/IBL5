@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.bug-pipeline-cron</string>
+	<key>Program</key>
+	<string>@MAIN_WT@/bin/bug-pipeline-tick</string>
+	<!-- StartInterval (net-new to the repo): the correct launchd primitive for a
+	     3-min poll. Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->
+	<key>StartInterval</key>
+	<integer>180</integer>
+	<key>WorkingDirectory</key>
+	<string>@MAIN_WT@</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- Host agent reaches Dockerized MySQL on 127.0.0.1 via config.php defaults;
+		     only DB_NAME must be overridden from the app default. -->
+		<key>DB_NAME</key>
+		<string>iblhoops_ibl5</string>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew; claude, php,
+		     curl, git must resolve. No API-key env var — claude uses ambient CLI auth.
+		     ~/.local/bin is where the Claude Code NATIVE installer puts the claude
+		     binary — omitting it is not a cosmetic gap: every tick then dies rc=127
+		     inside timeout, which reads downstream as "the agent produced nothing". That
+		     silently killed this pipeline for days. HOME interpolates HERE, at
+		     generation time — launchd does NOT expand variables in
+		     EnvironmentVariables, so a literal @HOME@ would bake in a dead path.
+		     mariadb is keg-only, so its client lives at /opt/homebrew/opt/mariadb/bin and
+		     is NOT on /opt/homebrew/bin; it is PREPENDED because /opt/homebrew/bin/mysql
+		     is a MySQL 9 client that cannot authenticate to MariaDB (ERROR 2059). Without
+		     this, bin/db-query exits 127 for every hunter and no data bug is ever
+		     reproduced — a silent throughput cliff, not a visible failure. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/opt/mariadb/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
+		<key>BUG_PIPELINE_ISSUE_REPO</key>
+		<string>a-jay85/ibl5-bugs</string>
+		<key>BUG_PIPELINE_APPROVER_ID</key>
+		<string></string>
+		<!-- Set to 1 to enable file-issues-only mode: files GitHub Issues + replies to GMs
+		     instead of autonomous hunting/fixing. Default empty = normal mode. -->
+		<key>BUG_PIPELINE_FILE_ISSUES_ONLY</key>
+		<string>0</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/logs/launchd-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/logs/launchd-stderr.log</string>
+</dict>
+</plist>

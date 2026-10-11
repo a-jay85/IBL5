@@ -17,7 +17,7 @@
 # It must NOT env-stop (that would refund + halt the loop on every collision);
 # it falls through as a counted attempt bounded by MAX_ATTEMPTS.
 #
-# should_impl_env_stop <handoff> <in_queue> <env_err> <stalled> <fast> [wt_fail]  (each 0/1; wt_fail defaults 0)
+# should_impl_env_stop <handoff> <in_queue> <env_err> <stalled> <fast> [wt_fail] [wt_refused]  (each 0/1; both optional args default 0)
 #   returns 0 (env-stop) ONLY when: handoff=0 AND in_queue=1 AND wt_fail=0 AND (env_err|stalled|fast)
 #
 # We extract the predicate from bin/automouse/run rather than copy it, so the test
@@ -28,35 +28,30 @@
 # Run: bin/test-automouse-env-breaker  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER="$SCRIPT_DIR/automouse/run"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
 if [ ! -f "$RUNNER" ]; then
     echo "FAIL: cannot find $RUNNER"
     exit 1
 fi
 
-ok()            { echo "ok: $1"; }
-fail()          { echo "FAIL: $1"; FAILED=1; }
-assert_eq()     { local d="$1" g="$2" e="$3"
-                  if [ "$g" = "$e" ]; then ok "$d"
-                  else fail "$d — expected [$e], got [$g]"; fi; }
+ok()            { h_pass "$1"; }
+fail()          { h_fail "$@"; }
+assert_eq()     { h_eq "$1" "$3" "$2"; }  # desc got expected
 assert_present(){ local d="$1" p="$2"
                   if [ -e "$p" ] || [ -L "$p" ]; then ok "$d"
                   else fail "$d — missing: $p"; fi; }
 assert_absent() { local d="$1" p="$2"
                   if [ -e "$p" ] || [ -L "$p" ]; then fail "$d — unexpected: $p"
                   else ok "$d"; fi; }
-want()          { local d="$1" h="$2" n="$3"
-                  case "$h" in *"$n"*) ok "$d" ;;
-                  *) fail "$d — missing token [$n]"; esac; }
-want_absent()   { local d="$1" h="$2" n="$3"
-                  case "$h" in *"$n"*) fail "$d — unexpected token [$n]" ;;
-                  *) ok "$d"; esac; }
+want()          { h_contains "$1" "$2" "$3"; }
+want_absent()   { h_not_contains "$1" "$2" "$3"; }
 
 # Extract `should_impl_env_stop() { ... }` (from its definition line to the first
 # line that is a lone `}`) and define it in this shell.
@@ -72,8 +67,6 @@ if [ -z "$FN_SRC" ]; then
 fi
 eval "$FN_SRC"
 
-FAILED=0
-
 # assert <name> <handoff> <in_queue> <env_err> <stalled> <fast> <wt_fail> <expect: stop|continue>
 assert() {
     name="$1"; h="$2"; q="$3"; e="$4"; s="$5"; f="$6"; wf="$7"; want="$8"
@@ -83,10 +76,24 @@ assert() {
         got="continue"
     fi
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f wf=$wf)"
-        FAILED=1
+        h_fail "$name" "expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f wf=$wf)"
     else
-        echo "ok: $name ($got)"
+        h_pass "$name ($got)"
+    fi
+}
+
+# assert_wr <name> <handoff> <in_queue> <env_err> <stalled> <fast> <wt_fail> <wt_refused> <expect: stop|continue>
+assert_wr() {
+    name="$1"; h="$2"; q="$3"; e="$4"; s="$5"; f="$6"; wf="$7"; wr="$8"; want="$9"
+    if should_impl_env_stop "$h" "$q" "$e" "$s" "$f" "$wf" "$wr"; then
+        got="stop"
+    else
+        got="continue"
+    fi
+    if [ "$got" != "$want" ]; then
+        h_fail "$name" "expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f wf=$wf wr=$wr)"
+    else
+        h_pass "$name ($got)"
     fi
 }
 
@@ -122,28 +129,43 @@ assert "no-wt-fail-fast-control"  0 1 0 0 1 0 stop
 # --- Backward compatibility: a five-arg call defaults wt_fail=0 ---
 if should_impl_env_stop 0 1 0 0 1; then got="stop"; else got="continue"; fi
 if [ "$got" != "stop" ]; then
-    echo "FAIL: five-arg-default — expected 'stop', got '$got' (wt_fail default must be 0)"
-    FAILED=1
+    h_fail "five-arg-default" "expected 'stop', got '$got' (wt_fail default must be 0)"
 else
-    echo "ok: five-arg-default ($got)"
+    h_pass "five-arg-default ($got)"
+fi
+
+# --- Worktree-resume refusal: plan STAYS in queue/, fast exit, refusal line → NEVER env-stop ---
+assert_wr "wt-refused-fast"           0 1 0 0 1 0 1 continue   # the exact 2026-10-09 shape
+assert_wr "wt-refused-with-env-sig"   0 1 1 0 1 0 1 continue   # refusal is authoritative over a stray env signature
+assert_wr "wt-refused-stalled"        0 1 0 1 0 0 1 continue
+assert_wr "wt-refused-all-signals"    0 1 1 1 1 0 1 continue
+assert_wr "wt-refused-but-handoff"    1 1 0 0 0 0 1 continue
+# Control: same shape with wt_refused=0 passed explicitly is still a genuine env-stop
+assert_wr "no-wt-refused-fast-control" 0 1 0 0 1 0 0 stop
+# Back-compat: a 6-arg call defaults wt_refused=0 (sub-minute exit still stops)
+if should_impl_env_stop 0 1 0 0 1 0; then got="stop"; else got="continue"; fi
+if [ "$got" != "stop" ]; then
+    h_fail "six-arg-default" "expected 'stop', got '$got' (wt_refused default must be 0)"
+else
+    h_pass "six-arg-default ($got)"
 fi
 
 # --- Contract: prompt-impl and run agree on the sentinel, and wt-new failure no longer skips ---
 PROMPT="$SCRIPT_DIR/automouse/prompt-impl"
 if grep -qF 'touch "$NIGHTLY_DIR/queue/$PLAN_FILE.wt-fail"' "$PROMPT"; then
-    echo "ok: contract-prompt-writes-sentinel"
+    h_pass "contract-prompt-writes-sentinel"
 else
-    echo "FAIL: contract-prompt-writes-sentinel — prompt-impl no longer tells the agent to touch queue/\$PLAN_FILE.wt-fail"; FAILED=1
+    h_fail "contract-prompt-writes-sentinel" "prompt-impl no longer tells the agent to touch queue/\$PLAN_FILE.wt-fail"
 fi
 if grep -qF 'WT_FAIL_FILE="$QUEUE_DIR/${PLAN_NAME}.wt-fail"' "$RUNNER"; then
-    echo "ok: contract-runner-reads-sentinel"
+    h_pass "contract-runner-reads-sentinel"
 else
-    echo "FAIL: contract-runner-reads-sentinel — run no longer reads queue/\${PLAN_NAME}.wt-fail"; FAILED=1
+    h_fail "contract-runner-reads-sentinel" "run no longer reads queue/\${PLAN_NAME}.wt-fail"
 fi
 if grep -E 'If bin/wt-new fails' "$PROMPT" | grep -q 'skipped/'; then
-    echo "FAIL: contract-no-skip-on-wt-fail — prompt-impl's wt-new failure line still moves the plan to skipped/"; FAILED=1
+    h_fail "contract-no-skip-on-wt-fail" "prompt-impl's wt-new failure line still moves the plan to skipped/"
 else
-    echo "ok: contract-no-skip-on-wt-fail"
+    h_pass "contract-no-skip-on-wt-fail"
 fi
 
 # ── Section 2: run-loop wt-fail cases (macOS-only — requires caffeinate) ─────
@@ -153,8 +175,9 @@ if [ "$(uname)" != "Darwin" ]; then
     echo "# Section 2: skipping macOS-only run-loop cases (uname=$(uname))"
     echo "SKIP: run-loop cases skipped on non-Darwin"
     echo ""
-    echo "# Results: $FAILED failed"
-    exit "$FAILED"
+    echo "# Results: $H_FAIL failed"
+    [ "$H_FAIL" -eq 0 ]
+    exit
 fi
 
 echo ""
@@ -199,10 +222,23 @@ mkdir -p "$E2_GATE"
 E2_PROJECTS="$E2_ROOT/projects"
 mkdir -p "$E2_PROJECTS/default"
 export IBL5_USAGE_CLAUDE_PROJECTS="$E2_PROJECTS"
+# Never consult live master CI, gh auth or main.localhost from the runner's
+# between-plans canary. A red master or a stopped main Docker stack would
+# otherwise break the loop after W1's first pass and drop its deferred line
+# (IBL5-backlog#1375). Exported once so run_e2 and the direct P4/P4b/P5
+# launches all inherit it. The W1 canary-skipped check fails if it is removed.
+export AUTOMOUSE_SKIP_CANARY=1
 printf '#!/bin/sh\nexit 1\n' > "$E2_STUB/security"
 chmod +x "$E2_STUB/security"
 E2_ARGS="$E2_ROOT/stub-args"
 : > "$E2_ARGS"
+# Worktree-resume refusal cases (R1-R4): a fake worktrees root the runner resolves
+# through WORKTREES_ROOT, a per-call cwd log, and a launch counter for STUB_MODE=wtrefuse.
+E2_WTROOT="$E2_ROOT/worktrees"
+E2_PWDS="$E2_ROOT/stub-pwds"
+E2_WTREF_COUNT="$E2_ROOT/wtref-count"
+mkdir -p "$E2_WTROOT"
+: > "$E2_PWDS"
 
 # P6 post-plan pause: the impl hands off to this worktree, and the post-plan-now stub
 # (the runner calls "$SELF_DIR/../post-plan-now", so it sits beside $E2_ROOT) writes a
@@ -229,6 +265,7 @@ set -u
 NDIR="$E2_NDIR"
 TRACE="$E2_TRACE"
 printf 'ARGS %s\n' "\$*" >> "$E2_ARGS"
+printf '%s\n' "\$(pwd -P)" >> "$E2_PWDS"
 sid=""; prev=""
 for a in "\$@"; do [ "\$prev" = "--session-id" ] && sid="\$a"; prev="\$a"; done
 case "\${STUB_MODE:-}" in
@@ -244,6 +281,22 @@ case "\${STUB_MODE:-}" in
             "$E2_PP_WT" "\$plan" > "\$NDIR/handoff/\$plan.json"
         printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":100,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
         exit 0 ;;
+    wtrefuse)
+        # -p calls 1..STUB_WTREF_REFUSALS print Claude Code's resume refusal and exit 1
+        # fast; the next -p call writes a handoff for STUB_WTREF_PLAN and succeeds.
+        # Other calls (the login preflight's `auth status`) take the default path.
+        if [ "\${1:-}" = "-p" ]; then
+            n=\$(( \$(cat "$E2_WTREF_COUNT" 2>/dev/null || echo 0) + 1 ))
+            printf '%s\n' "\$n" > "$E2_WTREF_COUNT"
+            if [ "\$n" -le "\${STUB_WTREF_REFUSALS:-1}" ]; then
+                msg="Error: cannot resume into worktree $E2_WTROOT/stub: Refusing to use $E2_WTROOT/stub as an isolation worktree: it is the checkout this session launched from. This session was not started. The worktree binding has been cleared; re-running will continue in the current directory without worktree isolation."
+                echo "\$msg" >&2; echo "\$msg"; exit 1
+            fi
+            printf '{"slug":"stub","worktree":"%s","branch":"stub","plan_file":"%s","plan_title":"stub","completed_at":"2026-01-01T00:00:00Z"}\n' \
+                "$E2_PP_WT" "\$STUB_WTREF_PLAN" > "\$NDIR/handoff/\$STUB_WTREF_PLAN.json"
+            printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":100,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+            exit 0
+        fi ;;
 esac
 plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
 if [ -n "\$plan" ]; then
@@ -286,6 +339,9 @@ reset_e2() {
     rm -rf "$E2_NDIR/queue"/*.lock "$E2_GATE"
     mkdir -p "$E2_GATE"
     : > "$E2_ARGS"
+    : > "$E2_PWDS"
+    rm -f "$E2_WTREF_COUNT"
+    rm -rf "$E2_WTROOT"; mkdir -p "$E2_WTROOT"
 }
 
 run_e2() {
@@ -314,6 +370,12 @@ want           "W1: log has deferred drain message"      "$W1_LOG" \
                "Deferred to the next run (cap-refunded or wt-new failure): wtfail.md"
 assert_eq      "W1: exactly one impl trace line"         \
                "$(grep -c 'wtfail.md impl' "$E2_TRACE" 2>/dev/null || echo 0)" "1"
+# Hermeticity tripwire: W1 always leaves wtfail.md queued, so the canary
+# dispatch always fires here. Its skip line exists only when
+# AUTOMOUSE_SKIP_CANARY is set, so dropping the export fails this even when
+# the live canary would pass.
+want           "W1: canary skipped via AUTOMOUSE_SKIP_CANARY (hermetic)" "$W1_LOG" \
+               "canary: skipped (AUTOMOUSE_SKIP_CANARY=1)"
 
 # ── W2: control — fast exit with no sentinel still env-stops ─────────────────
 echo ""
@@ -356,7 +418,7 @@ write_e2_plan "pausey"
 run_e2_mode marker
 P1_LOG="$(e2_logtxt)"
 P1_SID="$(stub_sid)"
-[ -n "$P1_SID" ] && echo "ok: P1: the impl was launched with --session-id $P1_SID" \
+[ -n "$P1_SID" ] && h_pass "P1: the impl was launched with --session-id $P1_SID" \
     || fail "P1: the impl call carried no --session-id <uuid>"
 want           "P1: log says the impl paused"            "$P1_LOG" "Impl paused (usage gate)"
 want_absent    "P1: no env-stop"                         "$P1_LOG" "Environmental failure"
@@ -415,7 +477,7 @@ printf '{"five_hour":{"utilization":95,"resets_at":null},"seven_day":{"utilizati
     "$(date +%s)" > "$E2_GATE/cache.json"
 run_e2
 P4B_SID="$(cat "$E2_NDIR/queue/pausey.md.lock/paused-held" 2>/dev/null)"
-[ -n "$P4B_SID" ] && echo "ok: P4b setup: prestart gate paused with sid $P4B_SID" \
+[ -n "$P4B_SID" ] && h_pass "P4b setup: prestart gate paused with sid $P4B_SID" \
     || fail "P4b setup: no paused-held after prestart pause"
 assert_present "P4b setup: prestart pause marker exists"   "$E2_GATE/markers/$P4B_SID.json"
 assert_eq      "P4b setup: resume_count starts at 0"       "$(jq -r .resume_count "$E2_GATE/markers/$P4B_SID.json" 2>/dev/null)" "0"
@@ -464,10 +526,222 @@ assert_eq      "P6: paused-held names the post-plan session" \
 assert_absent  "P6: attempt refunded"                    "$E2_NDIR/queue/ppausey.md.attempts"
 assert_present "P6: plan stays queued"                   "$E2_NDIR/queue/ppausey.md"
 assert_present "P6: post-plan marker survives"           "$E2_GATE/markers/$E2_PP_SID.json"
+assert_eq      "P6: lock branch breadcrumb names the handoff branch" \
+               "$(cat "$E2_NDIR/queue/ppausey.md.lock/branch" 2>/dev/null)" "stub"
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
+# ── Worktree-resume refusal cases (Claude Code resume safety check) ─────────
+# wtref_setup <plan>: pause <plan> mid-run (marker mode), give its session a
+# transcript so the resume uses --resume, and clear the launch and runner logs so
+# each case's assertions see only the resumed run. Prints the sid.
+wtref_setup() {
+    write_e2_plan "$1"
+    run_e2_mode marker
+    local sid
+    sid="$(stub_sid)"
+    touch "$E2_PROJECTS/default/$sid.jsonl"
+    : > "$E2_ARGS"; : > "$E2_PWDS"; rm -f "$E2_WTREF_COUNT"
+    rm -f "$E2_NDIR/logs"/*.log
+    printf '%s\n' "$sid"
+}
+# run_wtref <sid> <plan> <refusals> <stub_mode>: resume the paused session.
+run_wtref() {
+    STUB_MODE="$4" STUB_WTREF_PLAN="$2.md" STUB_WTREF_REFUSALS="$3" \
+    WORKTREES_ROOT="$E2_WTROOT" \
+    NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+    timeout 60 "$E2_RUNNER" --resume-paused "$1" > /dev/null 2>&1 || true
+    rm -f "$E2_PROJECTS/default/$1.jsonl"
+}
+launches()       { grep -c '^ARGS -p ' "$E2_ARGS" 2>/dev/null || true; }  # skips the login preflight's auth call
+env_stop_count() { find "$E2_NDIR/reports" -name "*-env-stop-$1.md" 2>/dev/null | wc -l | tr -d ' '; }
+REPO_REAL="$(cd "$REPO_ROOT" && pwd -P)"
+
+echo ""
+echo "# R1: one refusal → one retry from the main checkout, worktree path in the prompt, no env-stop"
+reset_e2
+R1_SID="$(wtref_setup wtref1)"
+mkdir -p "$E2_WTROOT/wtref1"
+run_wtref "$R1_SID" wtref1 1 wtrefuse
+R1_LOG="$(e2_logtxt)"
+R1_CALL1="$(grep '^ARGS -p ' "$E2_ARGS" | sed -n 1p)"
+R1_CALL2="$(grep '^ARGS -p ' "$E2_ARGS" | sed -n 2p)"
+want_absent    "R1 setup: worktree sync did not skip the plan" "$R1_LOG" "SKIPPING: worktree needs manual resolution"
+assert_eq      "R1: exactly two impl launches"            "$(launches)" "2"
+want           "R1: call 2 resumes the same session"      "$R1_CALL2" "--resume $R1_SID"
+want           "R1: call 2 prompt cds into the worktree"  "$R1_CALL2" "cd $E2_WTROOT/wtref1 && git -C $E2_WTROOT/wtref1 status"
+want           "R1: call 2 prompt forbids main-checkout edits" "$R1_CALL2" "Never edit files under $REPO_ROOT directly"
+want_absent    "R1: call 1 prompt has no refusal wording" "$R1_CALL1" "Claude Code then refused"
+assert_eq      "R1: both launches ran from the main checkout" "$(sort -u "$E2_PWDS")" "$REPO_REAL"
+want           "R1: log records the retry"                "$R1_LOG" "WORKTREE RESUME REFUSED — Claude Code would not resume session $R1_SID"
+want_absent    "R1: no second-refusal line"               "$R1_LOG" "WORKTREE RESUME REFUSED AGAIN"
+want_absent    "R1: no env-stop log line"                 "$R1_LOG" "Environmental failure during impl"
+assert_eq      "R1: no env-stop report"                   "$(env_stop_count wtref1)" "0"
+assert_eq      "R1: both plan headers read Plan #1, attempt 1" \
+               "$(grep -cF -- '--- Plan #1: wtref1.md (attempt 1)' <<<"$R1_LOG")" "2"
+want           "R1: post-plan reached (call 2 handed off)" "$R1_LOG" "Post-plan paused (usage gate)"
+assert_eq      "R1: lock held by the post-plan session, not the impl session" \
+               "$(cat "$E2_NDIR/queue/wtref1.md.lock/paused-held" 2>/dev/null)" "$E2_PP_SID"
+
+echo ""
+echo "# R2: a second refusal is a counted, deferred failure; no third launch, no env-stop"
+reset_e2
+R2_SID="$(wtref_setup wtref2)"
+mkdir -p "$E2_WTROOT/wtref2"
+run_wtref "$R2_SID" wtref2 2 wtrefuse
+R2_LOG="$(e2_logtxt)"
+assert_eq      "R2: exactly two impl launches"            "$(launches)" "2"
+want           "R2: log records the second refusal"       "$R2_LOG" "WORKTREE RESUME REFUSED AGAIN"
+want           "R2: genuine-failure branch ran"           "$R2_LOG" "Genuine impl failure"
+want_absent    "R2: no env-stop log line"                 "$R2_LOG" "Environmental failure during impl"
+assert_eq      "R2: no env-stop report"                   "$(env_stop_count wtref2)" "0"
+assert_eq      "R2: attempt counted (attempts = 1)"       "$(cat "$E2_NDIR/queue/wtref2.md.attempts" 2>/dev/null)" "1"
+assert_present "R2: failure file written"                 "$E2_NDIR/queue/wtref2.md.failure"
+assert_present "R2: plan stays queued"                    "$E2_NDIR/queue/wtref2.md"
+assert_absent  "R2: claim lock released"                  "$E2_NDIR/queue/wtref2.md.lock"
+want           "R2: deferred for the rest of the run"     "$R2_LOG" \
+               "Deferred to the next run (cap-refunded or wt-new failure): wtref2.md"
+
+echo ""
+echo "# R3: refusal with no resolvable worktree → no retry, counted failure, no env-stop"
+reset_e2
+R3_SID="$(wtref_setup wtref3)"
+run_wtref "$R3_SID" wtref3 1 wtrefuse
+R3_LOG="$(e2_logtxt)"
+assert_eq      "R3: exactly one impl launch"              "$(launches)" "1"
+want_absent    "R3: no retry line"                        "$R3_LOG" "Refunding attempt; retrying the resume once"
+want           "R3: counted as a genuine attempt"         "$R3_LOG" "counted as a genuine attempt"
+want_absent    "R3: no env-stop log line"                 "$R3_LOG" "Environmental failure during impl"
+assert_eq      "R3: attempt counted (attempts = 1)"       "$(cat "$E2_NDIR/queue/wtref3.md.attempts" 2>/dev/null)" "1"
+
+echo ""
+echo "# R4: control: a fast resume exit WITHOUT the refusal line still env-stops"
+reset_e2
+R4_SID="$(wtref_setup wtref4)"
+mkdir -p "$E2_WTROOT/wtref4"
+run_wtref "$R4_SID" wtref4 1 ""
+R4_LOG="$(e2_logtxt)"
+assert_eq      "R4: exactly one impl launch"              "$(launches)" "1"
+want           "R4: env-stop log line"                    "$R4_LOG" "Environmental failure during impl"
+assert_eq      "R4: env-stop report written"              "$(env_stop_count wtref4)" "1"
+want_absent    "R4: no refusal classification"            "$R4_LOG" "WORKTREE RESUME REFUSED"
+assert_absent  "R4: attempt refunded"                     "$E2_NDIR/queue/wtref4.md.attempts"
+
+# HB: heartbeat watcher (run_heartbeat_watcher)
+#
+# Pins the watcher's two stall outcomes (STALL-KILL and "stalled, pid gone") and
+# its orphan-exit behavior. The function is extracted from the runner, like
+# should_impl_env_stop above, so the test cannot drift from the implementation.
+HB_FN_SRC="$(awk '
+    /^run_heartbeat_watcher\(\) \{/ { capture = 1 }
+    capture { print }
+    capture && /^\}/ { exit }
+' "$RUNNER")"
+[ -n "$HB_FN_SRC" ] || { fail "HB: could not extract run_heartbeat_watcher from $RUNNER"; h_done; }
+eval "$HB_FN_SRC"
+
+# Backgrounded subshells inherit shell functions, so the eval'd watcher calls this
+# shim instead of /bin/sleep. It records each requested duration and shortens the
+# 60s tick to 1s. It calls /bin/sleep: on macOS bash 3.2, `command sleep` inside
+# a function named sleep hangs when the function runs in a backgrounded subshell.
+HB_SLEEP_LOG="$TMP/hb-sleep-args"
+sleep() {
+    printf '%s\n' "$1" >> "$HB_SLEEP_LOG"
+    case "$1" in 60) /bin/sleep 1 ;; *) /bin/sleep "$1" ;; esac
+}
+# shellcheck disable=SC2034  # read by the eval'd run_heartbeat_watcher
+STALL_KILL_SECS=5
+# shellcheck disable=SC2034  # read by the eval'd run_heartbeat_watcher
+KILL_GRACE_SECS=1
+
+# hb_wait_gone <pid> <max_secs>: 0 once the pid is gone, 1 on timeout.
+hb_wait_gone() {
+    local pid=$1 max=$2 i=0 steps
+    steps=$(( max * 5 ))
+    while [ "$i" -lt "$steps" ]; do
+        kill -0 "$pid" 2>/dev/null || return 0
+        command sleep 0.2
+        i=$(( i + 1 ))
+    done
+    return 1
+}
+
+# HB1: stale heartbeat + live target => STALL-KILL, target terminated, watcher returns.
+mkdir -p "$TMP/hb1"
+echo $(( $(date +%s) - 1000 )) > "$TMP/hb1/hb"
+( command sleep 300 & echo $! > "$TMP/hb1/cmdpid" )
+HB1_TARGET="$(cat "$TMP/hb1/cmdpid")"
+run_heartbeat_watcher "$TMP/hb1/hb" "$TMP/hb1/log" impl "$TMP/hb1/cmdpid" hb1slug &
+HB1_W=$!
+if hb_wait_gone "$HB1_W" 10; then ok "HB1: watcher returns after STALL-KILL"
+else fail "HB1: watcher returns after STALL-KILL — still running"; fi
+want "HB1: log records STALL-KILL for the impl label" "$(cat "$TMP/hb1/log" 2>/dev/null)" "STALL-KILL: impl"
+want "HB1: log names the target pid" "$(cat "$TMP/hb1/log" 2>/dev/null)" "killing pid $HB1_TARGET"
+if hb_wait_gone "$HB1_TARGET" 3; then ok "HB1: target was terminated"
+else fail "HB1: target was terminated — still running"; fi
+kill "$HB1_W" "$HB1_TARGET" 2>/dev/null || true
+
+# HB2: stale heartbeat + no pid file => "stalled, pid gone" WARNING, watcher keeps looping.
+mkdir -p "$TMP/hb2"
+echo $(( $(date +%s) - 1000 )) > "$TMP/hb2/hb"
+run_heartbeat_watcher "$TMP/hb2/hb" "$TMP/hb2/log" impl "$TMP/hb2/cmdpid" hb2slug &
+HB2_W=$!
+command sleep 3
+if kill -0 "$HB2_W" 2>/dev/null; then ok "HB2: watcher keeps looping when the pid file is absent"
+else fail "HB2: watcher keeps looping when the pid file is absent — exited"; fi
+want        "HB2: log records stalled, pid gone"   "$(cat "$TMP/hb2/log" 2>/dev/null)" "(stalled, pid gone)"
+want_absent "HB2: no STALL-KILL without a target"  "$(cat "$TMP/hb2/log" 2>/dev/null)" "STALL-KILL"
+kill "$HB2_W" 2>/dev/null; wait "$HB2_W" 2>/dev/null || true
+
+# HB3/HB4: the watcher exits within one tick of its parent run dying, and only then.
+# A wrapper bash mirrors production: the watcher is backgrounded from the run's shell.
+# No hb file is written, so the watcher sits in the `continue` branch every tick, which
+# pins "the liveness check runs before the hb-file skip".
+mkdir -p "$TMP/hb3"
+HEARTBEAT_TICK_SECS=1 bash -c "$HB_FN_SRC"'
+STALL_KILL_SECS=5; KILL_GRACE_SECS=1
+run_heartbeat_watcher "$1" "$2" impl "$3" hb3slug &
+echo $! > "$4"
+wait' _ "$TMP/hb3/hb" "$TMP/hb3/log" "$TMP/hb3/cmdpid" "$TMP/hb3/wpid" &
+HB3_WRAP=$!
+HB3_W=""
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    HB3_W="$(cat "$TMP/hb3/wpid" 2>/dev/null || true)"
+    [ -n "$HB3_W" ] && break
+    command sleep 0.2
+done
+if [ -z "$HB3_W" ]; then
+    fail "HB3: watcher never started"
+    kill "$HB3_WRAP" 2>/dev/null || true
+else
+    command sleep 2.5
+    if kill -0 "$HB3_W" 2>/dev/null; then ok "HB4: watcher survives while parent run is alive"
+    else fail "HB4: watcher survives while parent run is alive — exited"; fi
+    # wait reaps the wrapper: an unreaped zombie still answers kill -0.
+    kill -9 "$HB3_WRAP"; wait "$HB3_WRAP" 2>/dev/null || true
+    if hb_wait_gone "$HB3_W" 2; then ok "HB3: orphaned watcher exits within one tick"
+    else fail "HB3: orphaned watcher exits within one tick — still running"; kill "$HB3_W" 2>/dev/null || true; fi
+    want "HB3: exit is logged with the parent pid" "$(cat "$TMP/hb3/log" 2>/dev/null)" \
+         "watcher exiting, parent run $HB3_WRAP is gone"
 fi
-echo "RESULT: all passed"
-exit 0
+
+# HB5: HEARTBEAT_TICK_SECS unset, empty, non-numeric, and zero all fall back to 60.
+# The sleep shim records the first requested duration.
+mkdir -p "$TMP/hb5"
+hb5_first_sleep() {  # <env-mode: unset|value> [value]
+    : > "$HB_SLEEP_LOG"
+    # shellcheck disable=SC2034  # read by the eval'd run_heartbeat_watcher
+    if [ "$1" = unset ]; then unset HEARTBEAT_TICK_SECS; else HEARTBEAT_TICK_SECS="$2"; fi
+    run_heartbeat_watcher "$TMP/hb5/hb" "$TMP/hb5/log" impl "$TMP/hb5/cmdpid" hb5slug >/dev/null 2>&1 &
+    local w=$!
+    command sleep 0.5
+    kill "$w" 2>/dev/null; wait "$w" 2>/dev/null || true
+    unset HEARTBEAT_TICK_SECS
+    head -n1 "$HB_SLEEP_LOG"
+}
+assert_eq "HB5: tick for unset defaults to 60"  "$(hb5_first_sleep unset)"       "60"
+assert_eq "HB5: tick for empty defaults to 60"  "$(hb5_first_sleep value '')"     "60"
+assert_eq "HB5: tick for abc defaults to 60"    "$(hb5_first_sleep value abc)"    "60"
+assert_eq "HB5: tick for 0 defaults to 60"      "$(hb5_first_sleep value 0)"      "60"
+assert_eq "HB5: tick override 7 is honored"     "$(hb5_first_sleep value 7)"      "7"
+
+h_done

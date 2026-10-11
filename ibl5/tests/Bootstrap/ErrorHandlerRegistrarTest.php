@@ -174,7 +174,14 @@ class ErrorHandlerRegistrarTest extends TestCase
     private const SYNTHETIC_SECRET = 'SYNTH_Pa55word';
 
     /** Mirrors AuthService::loginWithUsername($username, $password, $ttl) frame shape. */
-    private function throwFromAuthLikeFrame(string $username, string $password, int $ttl): void
+    private function throwFromAuthLikeFrame(
+        // @phpstan-ignore method.unusedParameter (param exists so the stack frame carries args the handler must redact)
+        string $username,
+        // @phpstan-ignore method.unusedParameter (param exists so the stack frame carries args the handler must redact)
+        string $password,
+        // @phpstan-ignore method.unusedParameter (param exists so the stack frame carries args the handler must redact)
+        int $ttl
+    ): void
     {
         throw new \RuntimeException('boom');
     }

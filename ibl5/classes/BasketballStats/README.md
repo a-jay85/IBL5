@@ -1,6 +1,6 @@
 ---
 description: Static utility classes for consistent basketball stat formatting (percentages, per-game averages, totals) and safe type conversion.
-last_verified: 2026-09-22
+last_verified: 2026-10-10
 ---
 
 # BasketballStats Module - Basketball Statistics Formatting and Utilities
@@ -120,6 +120,15 @@ A static utility class for safe type conversion and input validation.
 StatsSanitizer::sanitizeInt($value);
 // Example: sanitizeInt("10") returns 10
 // Example: sanitizeInt(null) returns 0
+```
+
+**Strict integer conversion** (no `intval`; partial numerics, bools, arrays become 0):
+```php
+StatsSanitizer::toInt($value);
+// Example: toInt("10") returns 10
+// Example: toInt("12abc") returns 0   (sanitizeInt would return 12)
+// Example: toInt(true) returns 0      (sanitizeInt would return 1)
+// Example: toInt([]) returns 0
 ```
 
 ##### Float Sanitization

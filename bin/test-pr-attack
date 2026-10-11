@@ -9,15 +9,16 @@
 
 set -euo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ATTACK="$SCRIPT_DIR/pr-attack"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+h_tmp TMP
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
-FAILED=0
-
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 # assert_match <name> <ERE> <output>
 assert_match() {
@@ -41,7 +42,7 @@ assert_absent() {
 
 # assert_status <name> <expected> <actual>
 assert_status() {
-    if [ "$3" = "$2" ]; then pass "$1"; else failcase "$1 - expected exit $2, got $3"; fi
+    h_eq "$1" "$2" "$3"
 }
 
 # run_attack [args...] -> sets OUT (stdout+stderr merged) and ST (exit status)
@@ -908,9 +909,4 @@ if [ "$RC21" = "1" ]; then pass "21 exactly one Rebase section"; else failcase "
 # ============================================================
 # Verdict
 # ============================================================
-if [ "$FAILED" -eq 0 ]; then
-    echo "All bin/pr-attack cases passed."
-    exit 0
-fi
-echo "bin/test-pr-attack: one or more cases failed (see FAIL lines above)." >&2
-exit 1
+h_done

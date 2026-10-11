@@ -110,18 +110,6 @@ class PlayerMenuView
         $groups = self::getMenuGroups();
         $shortLabels = self::getShortLabels();
 
-        // Determine which group the current page belongs to (for mobile dropdown default)
-        $activeGroupName = 'General';
-        foreach ($groups as $groupName => $pageTypes) {
-            foreach ($pageTypes as $pt) {
-                $isActive = ($currentPageType === $pt) || ($currentPageType === null && $pt === PlayerPageType::OVERVIEW);
-                if ($isActive) {
-                    $activeGroupName = $groupName;
-                    break 2;
-                }
-            }
-        }
-
         // Team color CSS custom properties for accent coloring
         $primaryColor = $colorScheme['primary'] ?? '#f97316';
         $primaryDark = '#' . TeamColorHelper::darken($colorScheme['primary'] ?? 'f97316', 15);

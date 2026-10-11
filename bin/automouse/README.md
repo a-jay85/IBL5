@@ -53,7 +53,7 @@ The two check points:
 
 | When | Condition | Effect |
 |------|-----------|--------|
-| **Claim time**, before the attempt counter increments | no handoff to resume **and** branch has an OPEN/MERGED PR | dispose to `done/`, release the lock, `continue` — **zero `claude -p` spend**, zero attempts burned |
+| **Claim time**, before the attempt counter increments | branch has a MERGED PR, or no handoff to resume **and** an OPEN PR. A merged PR wins over a leftover handoff: a paused post-plan that resumed and merged under `post-plan-now` leaves its handoff and lock behind | dispose to `done/`, release the lock, `continue`. Spends zero `claude -p` calls and burns zero attempts |
 | **After post-plan exits**, only if the environmental breaker did not trip | plan still in `queue/` **and** branch has an OPEN/MERGED PR | dispose to `done/`, then fall through to the normal lock release and between-plans canary |
 
 **Fail-closed.** Only a positive OPEN/MERGED answer triggers a disposition. A forge

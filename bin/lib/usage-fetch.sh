@@ -2,9 +2,10 @@
 # Shared plan-usage fetcher with a persistent cache. Sourced by the usage-gate hook,
 # the coordinator, every runner, and the interactive UserPromptSubmit hook.
 #
-# The cache lives under the project state dir (not /tmp) so the launchd coordinator,
-# which has no keychain access, can read usage an interactive or headless session
-# fetched. Freshness comes from the fetched_at field, never file mtime, because
+# The cache lives under the project state dir (not /tmp) so the launchd coordinator
+# can read usage an interactive or headless session fetched, even when its own keychain
+# read fails (the --probe-keychain check in usage-gate-cron-setup is one-shot only).
+# Freshness comes from the fetched_at field, never file mtime, because
 # `stat -f %m` (BSD) breaks on the Linux CI runner. No `date -d` / `date -v`.
 #
 # A shared 429 backoff file and a mkdir fetch lock in the state dir keep concurrent
@@ -22,11 +23,34 @@ USAGE_FETCH_BACKOFF_BASE=30
 USAGE_FETCH_BACKOFF_CAP=480
 USAGE_FETCH_RETRY_AFTER_CAP=900
 USAGE_FETCH_SKIPLOG_EVERY=30
+# A 429 episode stays live until USAGE_FETCH_EPISODE_QUIET seconds pass with no 429.
+# 1800 = 2 x USAGE_FETCH_RETRY_AFTER_CAP: the longest armed wait plus as much again for caller cadence.
+USAGE_FETCH_EPISODE_QUIET=1800
+# Account-switch fast path: the switch signal stays active for USAGE_SWITCH_WINDOW;
+# within it, at most USAGE_SWITCH_RETRY_MAX 429s under the new fingerprint back off
+# for min(retry_after, USAGE_SWITCH_RETRY_CAP) instead of the normal arm.
+USAGE_SWITCH_WINDOW=1800
+USAGE_SWITCH_RETRY_CAP=45
+USAGE_SWITCH_RETRY_MAX=3
 
 # usage_state_dir
 # Echoes the state dir (creating it and markers/). Honors IBL5_USAGE_GATE_STATE_DIR;
 # an empty value falls back to the default.
+# Test mode (IBL5_USAGE_GATE_TEST_MODE non-empty; unset or empty = off): an unset/empty
+# IBL5_USAGE_GATE_STATE_DIR, or one equal to the default real path, is refused. The
+# function then warns on stderr, prints an unwritable sink path, and returns 1, so every
+# later write fails and the gate fails open. Callers use $(usage_state_dir) and ignore
+# rc, so the sink must never be an empty string.
 usage_state_dir() {
+    if [ -n "${IBL5_USAGE_GATE_TEST_MODE:-}" ]; then
+        local real="${HOME:-}/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
+        local want="${IBL5_USAGE_GATE_STATE_DIR:-}"
+        if [ -z "$want" ] || [ "${want%/}" = "$real" ]; then
+            echo "USAGE-GATE-TEST: refusing the real state dir $real (set IBL5_USAGE_GATE_STATE_DIR to a temp dir)" >&2
+            printf '%s\n' "/dev/null/usage-gate-refused"
+            return 1
+        fi
+    fi
     local d="${IBL5_USAGE_GATE_STATE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate}"
     mkdir -p "$d/markers" 2>/dev/null
     printf '%s\n' "$d"
@@ -47,13 +71,88 @@ usage_cache_path() {
 
 # _usage_cred_fp
 # Echoes a short sha256 of the keychain OAuth access token, or nothing when the
-# keychain is unreadable (the launchd coordinator). Never the token itself.
+# keychain is unreadable (possible under launchd). Never the token itself. A token
+# refresh changes it too, so switch detection pairs it with _usage_acct_fp.
 _usage_cred_fp() {
     local tok
+    [ -n "${IBL5_USAGE_GATE_TEST_MODE:-}" ] && return 0
     tok=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
         | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
     [ -n "$tok" ] || return 0
     printf '%s' "$tok" | shasum -a 256 2>/dev/null | cut -c1-16
+}
+
+# _usage_acct_fp: short sha256 of ~/.claude.json .oauthAccount.accountUuid, or nothing.
+# The account id survives a token refresh and changes on /login to another account.
+# Plain file, so no keychain needed. Never logged or stored raw.
+_usage_acct_fp() {
+    local u
+    [ -n "${HOME:-}" ] || return 0
+    u=$(jq -r '.oauthAccount.accountUuid // empty' "$HOME/.claude.json" 2>/dev/null)
+    [ -n "$u" ] || return 0
+    printf '%s' "$u" | shasum -a 256 2>/dev/null | cut -c1-16
+}
+
+# _usage_switch_signal <state_dir> <fp|-> <kind>: records a detected login switch.
+_usage_switch_signal() {
+    local f="$1/cred-switch"
+    { printf '%s %s 0 %s\n' "$(date +%s)" "${2:--}" "$3" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; } 2>/dev/null \
+        || rm -f "$f.tmp.$$"
+    usage_log "cred-switch signal kind=$3"
+}
+
+# usage_switch_active [now]: echoes the switch epoch while a cred-switch signal younger
+# than USAGE_SWITCH_WINDOW exists; echoes nothing otherwise.
+usage_switch_active() {
+    local f at rest now
+    f="$(usage_state_dir)/cred-switch"
+    [ -f "$f" ] || return 0
+    now="${1:-$(date +%s)}"
+    read -r at rest < "$f" 2>/dev/null
+    case "$at" in ''|*[!0-9]*) return 0 ;; esac
+    if [ "$now" -ge "$at" ] && [ $((now - at)) -lt "$USAGE_SWITCH_WINDOW" ]; then
+        printf '%s\n' "$at"
+    fi
+    return 0
+}
+
+# _usage_switch_short_retry <state_dir> <fp> <retry_after|"">: on a 429 inside an active
+# switch window, under the switch's fingerprint (or "-"), with short retries left, bumps
+# the count and echoes "<capped_retry_after> <count>". Returns 1 for the normal arm.
+_usage_switch_short_retry() {
+    local f="$1/cred-switch" fp="$2" ra="$3" at sfp n kind now
+    [ -f "$f" ] || return 1
+    read -r at sfp n kind < "$f" 2>/dev/null
+    case "$at" in ''|*[!0-9]*) return 1 ;; esac
+    case "$n" in ''|*[!0-9]*) n=0 ;; esac
+    now=$(date +%s)
+    [ "$now" -ge "$at" ] && [ $((now - at)) -lt "$USAGE_SWITCH_WINDOW" ] || return 1
+    [ "$sfp" = "-" ] || [ "$sfp" = "$fp" ] || return 1
+    [ "$n" -lt "$USAGE_SWITCH_RETRY_MAX" ] || return 1
+    case "$ra" in ''|*[!0-9]*) ra=0 ;; esac
+    if [ "$ra" -eq 0 ] || [ "$ra" -gt "$USAGE_SWITCH_RETRY_CAP" ]; then ra=$USAGE_SWITCH_RETRY_CAP; fi
+    n=$((n + 1))
+    { printf '%s %s %s %s\n' "$at" "$sfp" "$n" "${kind:--}" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; } 2>/dev/null \
+        || rm -f "$f.tmp.$$"
+    printf '%s %s\n' "$ra" "$n"
+}
+
+# usage_account_switch_check: keychain-free detection for the coordinator. When the
+# cached reading was fetched under another account than ~/.claude.json now names,
+# drop the cache and backoff (both belong to the old account) and signal the switch.
+# An unknown account on either side does nothing.
+usage_account_switch_check() {
+    local d old="" new
+    d=$(usage_state_dir)
+    [ -s "$d/cache.json" ] || return 0
+    [ -f "$d/acct-last" ] && read -r old < "$d/acct-last" 2>/dev/null
+    [ -n "$old" ] || return 0
+    new=$(_usage_acct_fp)
+    [ -n "$new" ] && [ "$new" != "$old" ] || return 0
+    rm -f "$d/cache.json" "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.*
+    _usage_fetch_episode_end "$d"
+    usage_log "account-switch cache-dropped"
+    _usage_switch_signal "$d" "-" account
 }
 
 # usage_cache_age
@@ -78,10 +177,12 @@ _usage_fetch_backoff_read() {
     printf '%s %s\n' "$u" "$s"
 }
 
-# _usage_fetch_backoff_arm <state_dir> <retry_after|"">: writes the backoff file, echoes the delay.
+# _usage_fetch_backoff_arm <state_dir> <retry_after|""> [<min_step>]: writes the backoff file,
+# echoes the delay. The doubling step is the larger of the file's step and min_step.
 _usage_fetch_backoff_arm() {
     local f="$1/fetch-backoff" ra="$2" bo s delay i now
     bo=$(_usage_fetch_backoff_read "$f"); s=${bo#* }
+    case "${3:-}" in ''|*[!0-9]*) ;; *) [ "$3" -gt "$s" ] && s=$3 ;; esac
     case "$ra" in ''|*[!0-9]*) ra="" ;; esac
     [ -n "$ra" ] && [ "$ra" -eq 0 ] && ra=""
     if [ -n "$ra" ]; then
@@ -98,6 +199,48 @@ _usage_fetch_backoff_arm() {
     { printf '%s %s\n' "$((now + delay))" "$((s + 1))" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; } 2>/dev/null \
         || rm -f "$f.tmp.$$"
     echo "$delay"
+}
+
+# _usage_fetch_episode_read <file>: echoes "<start> <last_429> <attempts>", "0 0 0" when absent or garbled.
+_usage_fetch_episode_read() {
+    local a="" l="" n=""
+    [ -f "$1" ] && read -r a l n < "$1" 2>/dev/null
+    case "$a" in ''|*[!0-9]*) a=0 ;; esac
+    case "$l" in ''|*[!0-9]*) l=0 ;; esac
+    case "$n" in ''|*[!0-9]*) n=0 ;; esac
+    printf '%s %s %s\n' "$a" "$l" "$n"
+}
+
+# _usage_fetch_episode_end <state_dir> [stale]: ends the 429 episode and logs its summary once.
+# With "stale", ends it only when no 429 landed in the last USAGE_FETCH_EPISODE_QUIET seconds.
+# The rename claims the file, so exactly one process logs the end, with or without the fetch lock.
+_usage_fetch_episode_end() {
+    local f="$1/fetch-429-episode" a l n
+    [ -f "$f" ] || return 0
+    if [ "${2:-}" = stale ]; then
+        read -r a l n <<< "$(_usage_fetch_episode_read "$f")"
+        [ $(( $(date +%s) - l )) -ge "$USAGE_FETCH_EPISODE_QUIET" ] || return 0
+    fi
+    mv "$f" "$f.end.$$" 2>/dev/null || return 0
+    read -r a l n <<< "$(_usage_fetch_episode_read "$f.end.$$")"
+    rm -f "$f.end.$$"
+    if [ "$n" -gt 0 ] && [ "$a" -gt 0 ] && [ "$l" -ge "$a" ]; then
+        usage_log "429-episode end duration=$((l - a)) attempts=$n"
+    fi
+    return 0
+}
+
+# _usage_fetch_episode_429 <state_dir>: records one normal-arm 429. Ends a stale episode first.
+# Echoes "<prior_attempts> new|cont". The caller holds the fetch lock.
+_usage_fetch_episode_429() {
+    local f="$1/fetch-429-episode" a l n now
+    _usage_fetch_episode_end "$1" stale
+    now=$(date +%s)
+    read -r a l n <<< "$(_usage_fetch_episode_read "$f")"
+    if [ "$n" -eq 0 ] || [ "$a" -eq 0 ]; then a=$now; n=0; fi
+    { printf '%s %s %s\n' "$a" "$now" "$((n + 1))" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; } 2>/dev/null \
+        || rm -f "$f.tmp.$$"
+    if [ "$n" -eq 0 ]; then echo "0 new"; else echo "$n cont"; fi
 }
 
 # _usage_fetch_log_once <marker_file> <key> <msg...>: logs only when key differs from the last logged key.
@@ -191,7 +334,18 @@ usage_fetch() {
             local sd
             sd=$(usage_state_dir)
             rm -f "$cache" "$sd/fetch-backoff" "$sd/fetch-backoff.logged" "$sd"/fetch-backoff.logged.*
+            _usage_fetch_episode_end "$sd"
             usage_log "cred-switch cache-dropped"
+            local aold="" anew
+            [ -f "$sd/acct-last" ] && read -r aold < "$sd/acct-last" 2>/dev/null
+            anew=$(_usage_acct_fp)
+            if [ -n "$aold" ] && [ "$aold" = "$anew" ]; then
+                usage_log "cred-switch same-account"
+            elif [ -n "$aold" ] && [ -n "$anew" ]; then
+                _usage_switch_signal "$sd" "$fp" account
+            else
+                _usage_switch_signal "$sd" "$fp" token
+            fi
             age=-1
         fi
     fi
@@ -205,6 +359,13 @@ usage_fetch() {
     bo=$(_usage_fetch_backoff_read "$d/fetch-backoff"); bo_until=${bo% *}
     if [ "$now" -lt "$bo_until" ]; then
         _usage_fetch_log_once "$d/fetch-backoff.logged" "$bo_until" "backoff-skip until=$bo_until"
+        _usage_fetch_serve_stale "$age" "$cache"; return $?
+    fi
+
+    # Test mode never reads the keychain or calls the usage API. A fresh seeded cache was
+    # already served above; anything else serves stale (rc 2) or nothing (rc 1).
+    if [ -n "${IBL5_USAGE_GATE_TEST_MODE:-}" ]; then
+        usage_log "fetch-skipped reason=test-mode"
         _usage_fetch_serve_stale "$age" "$cache"; return $?
     fi
 
@@ -256,6 +417,10 @@ usage_fetch() {
         if printf '%s' "$body" | jq --argjson t "$(date +%s)" --arg fp "$fp" '. + {fetched_at:$t, cred_fp:$fp}' > "$tmp" 2>/dev/null \
             && mv "$tmp" "$cache"; then
             rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.*
+            _usage_fetch_episode_end "$d" stale
+            local acct
+            acct=$(_usage_acct_fp)
+            if [ -n "$acct" ]; then printf '%s\n' "$acct" > "$d/acct-last" 2>/dev/null; else rm -f "$d/acct-last"; fi
             _usage_fetch_lock_release "$d"
             printf '%s' "$body" | jq 'del(.fetched_at, .cred_fp)'
             return 0
@@ -265,9 +430,15 @@ usage_fetch() {
     fi
 
     if [ "$reason" = "rate-limited" ]; then
-        local delay
-        delay=$(_usage_fetch_backoff_arm "$d" "$ra")
-        usage_log "fetch-failed reason=rate-limited retry_after=${ra:-none} backoff=$delay"
+        local delay sr ep
+        if sr=$(_usage_switch_short_retry "$d" "$fp" "$ra"); then
+            delay=$(_usage_fetch_backoff_arm "$d" "${sr% *}")
+            usage_log "fetch-failed reason=rate-limited retry_after=${ra:-none} backoff=$delay switch-retry=${sr#* }/$USAGE_SWITCH_RETRY_MAX"
+        else
+            ep=$(_usage_fetch_episode_429 "$d")
+            delay=$(_usage_fetch_backoff_arm "$d" "$ra" "${ep% *}")
+            [ "${ep#* }" = new ] && usage_log "429-episode start retry_after=${ra:-none} backoff=$delay"
+        fi
     else
         usage_log "fetch-failed reason=$reason"
     fi

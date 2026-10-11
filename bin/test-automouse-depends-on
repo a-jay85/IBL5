@@ -18,6 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 FAILED=0
 
 # ── Assertion helpers ─────────────────────────────────────────────────────────
@@ -342,6 +343,10 @@ echo ""
 echo "# Section 3: self-heal cases"
 
 SELF_HEAL="$REPO_ROOT/bin/automouse/self-heal"
+# Never let these runs sweep orphan watchers: the default knobs match any
+# reparented bin/automouse/run, including bin/test-automouse-self-heal's
+# fixtures when the CI runner runs both tests in parallel.
+export AUTOMOUSE_ORPHAN_ARGV_RE='^no-orphan-sweep-in-this-test$'
 
 heal_setup() {
     rm -rf "$TMP/heal"

@@ -211,7 +211,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getMostAllStarAppearances();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('name', $first);
         self::assertArrayHasKey('appearances', $first);
@@ -226,7 +226,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getTopTeamHalfScore('first', 'DESC');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('teamid', $first);
         self::assertArrayHasKey('team_name', $first);
@@ -240,7 +240,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getTopTeamHalfScore('second', 'ASC');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         self::assertArrayHasKey('value', $result[0]);
     }
 
@@ -254,7 +254,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getLargestMarginOfVictory('1=1');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('winner_name', $first);
         self::assertArrayHasKey('loser_name', $first);
@@ -271,7 +271,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBestWorstSeasonRecord('DESC');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('year', $first);
@@ -286,20 +286,24 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBestWorstSeasonRecord('ASC');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
     }
 
     // --- Longest Streak ---
 
     /**
      * Insert team boxscore pair (both team entries) for a single game.
+     *
+     * @param string $visitorName Row name for the visitor entry. The default 'Sharks' has no
+     *     ibl_team_info row in the test DB (teamid 2 is 'Stars'), so tests that join
+     *     ibl_team_info by name must pass 'Stars'.
      */
-    private function insertGamePair(string $date, int $homeScore, int $visitorScore): void
+    private function insertGamePair(string $date, int $homeScore, int $visitorScore, string $visitorName = 'Sharks'): void
     {
         $homeQ = (int) ($homeScore / 4);
         $visitorQ = (int) ($visitorScore / 4);
 
-        foreach (['Metros', 'Sharks'] as $name) {
+        foreach (['Metros', $visitorName] as $name) {
             $this->insertRow('ibl_box_scores_teams', [
                 'game_date' => $date,
                 'name' => $name,
@@ -348,7 +352,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getLongestStreak('winning');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('streak', $first);
@@ -364,7 +368,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getLongestStreak('losing');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('streak', $first);
         self::assertGreaterThanOrEqual(3, $first['streak']);
@@ -380,7 +384,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBestWorstSeasonStart('best');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('wins', $first);
@@ -395,7 +399,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBestWorstSeasonStart('worst');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('losses', $first);
         self::assertGreaterThanOrEqual(3, $first['losses']);
@@ -422,8 +426,8 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         self::assertArrayHasKey('Points', $result);
         self::assertArrayHasKey('Assists', $result);
-        self::assertNotEmpty($result['Points']);
-        self::assertNotEmpty($result['Assists']);
+        self::assertNotSame([], $result['Points']);
+        self::assertNotSame([], $result['Assists']);
 
         $pointsRecord = $result['Points'][0];
         self::assertArrayHasKey('pid', $pointsRecord);
@@ -594,7 +598,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         self::assertArrayHasKey('Points', $result);
         self::assertArrayHasKey('Assists', $result);
-        self::assertNotEmpty($result['Points']);
+        self::assertNotSame([], $result['Points']);
     }
 
     /**
@@ -620,7 +624,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
             '1=1'
         );
 
-        self::assertNotEmpty($result['team_points']);
+        self::assertNotSame([], $result['team_points']);
         $row = $result['team_points'][0];
 
         foreach (['teamid', 'box_id', 'game_of_that_day', 'oppTid', 'value'] as $field) {
@@ -654,7 +658,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
             "bs.game_date = '2099-04-09' AND bs.game_type = 1"
         );
 
-        self::assertNotEmpty($result['points']);
+        self::assertNotSame([], $result['points']);
         $row = $result['points'][0];
 
         foreach (['pid', 'teamid', 'box_id', 'game_of_that_day', 'oppTid', 'value'] as $field) {
@@ -675,7 +679,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         );
 
         self::assertArrayHasKey('PPG', $result);
-        self::assertNotEmpty($result['PPG']);
+        self::assertNotSame([], $result['PPG']);
         $first = $result['PPG'][0];
         self::assertArrayHasKey('pid', $first);
         self::assertArrayHasKey('name', $first);
@@ -700,7 +704,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getMostTitlesByType('Test Title');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('count', $first);
@@ -726,7 +730,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getMostTitlesByType('HEAT');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('count', $first);
@@ -844,10 +848,206 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getMostPlayoffAppearances();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('count', $first);
         self::assertArrayHasKey('years', $first);
+    }
+
+    // --- ORDER BY tie-breaker coverage ---
+
+    public function testGetQuadrupleDoublesBreaksSameDateTieByBoxScoreId(): void
+    {
+        // Same date, same player-level stats; the higher pid is inserted first so it
+        // gets the lower box-score id. Id order and pid order disagree.
+        $this->insertTestPlayer(200091002, 'Tie QD Two');
+        $this->insertHistRow(200091002, 'Tie QD Two', 2098);
+        $this->insertTestPlayer(200091001, 'Tie QD One');
+        $this->insertHistRow(200091001, 'Tie QD One', 2098);
+
+        $idFirst = $this->insertPlayerBoxscoreRow(
+            '2098-03-25', 200091002, 'Tie QD Two', 'PG', 2, 1, 1,
+            points2m: 7, orb: 5, drb: 5, ast: 10, stl: 10, blk: 10,
+        );
+        $idSecond = $this->insertPlayerBoxscoreRow(
+            '2098-03-25', 200091001, 'Tie QD One', 'PG', 2, 1, 1,
+            points2m: 7, orb: 5, drb: 5, ast: 10, stl: 10, blk: 10,
+        );
+        self::assertLessThan($idSecond, $idFirst);
+
+        $result = $this->repo->getQuadrupleDoubles();
+
+        $pids = array_values(array_map(
+            static fn (array $r): int => $r['pid'],
+            array_filter(
+                $result,
+                static fn (array $r): bool => in_array($r['pid'], [200091001, 200091002], true),
+            ),
+        ));
+
+        self::assertSame(
+            [200091002, 200091001],
+            $pids,
+            'same-date quad-doubles must be ordered by box-score id ASC, not pid',
+        );
+    }
+
+    public function testGetTopPlayerSingleGameBatchBreaksValueAndDateTieByPid(): void
+    {
+        // Higher pid inserted first -> lower box-score id, so scan order and pid order disagree.
+        foreach ([200091011, 200091010] as $pid) {
+            $name = 'PidTie ' . $pid;
+            $this->insertTestPlayer($pid, $name);
+            $this->insertHistRow($pid, $name, 2099);
+            $this->insertPlayerBoxscoreRow(
+                '2099-04-10', $pid, $name, 'PG', 2, 1, 1,
+                points2m: 35, ftm: 0, points3m: 0, // 70
+            );
+        }
+
+        $result = $this->repo->getTopPlayerSingleGameBatch(
+            ['Most Points in a Single Game' => 'bs.calc_points'],
+            "bs.game_date = '2099-04-10' AND bs.game_type = 1"
+        );
+
+        $pids = array_map(
+            static fn (array $r): int => $r['pid'],
+            $result['Most Points in a Single Game'],
+        );
+        self::assertSame([200091010, 200091011], $pids);
+    }
+
+    public function testGetTopPlayerSingleGameBatchGameDateOutranksPid(): void
+    {
+        // Earlier date must win even though its pid is higher.
+        $this->insertTestPlayer(200091021, 'DateFirst');
+        $this->insertHistRow(200091021, 'DateFirst', 2099);
+        $this->insertPlayerBoxscoreRow(
+            '2099-04-11', 200091021, 'DateFirst', 'PG', 2, 1, 1,
+            points2m: 35, ftm: 0, points3m: 0, // 70
+        );
+        $this->insertTestPlayer(200091020, 'DateSecond');
+        $this->insertHistRow(200091020, 'DateSecond', 2099);
+        $this->insertPlayerBoxscoreRow(
+            '2099-04-12', 200091020, 'DateSecond', 'PG', 2, 1, 1,
+            points2m: 35, ftm: 0, points3m: 0, // 70
+        );
+
+        $result = $this->repo->getTopPlayerSingleGameBatch(
+            ['Most Points in a Single Game' => 'bs.calc_points'],
+            "bs.game_date IN ('2099-04-11','2099-04-12') AND bs.game_type = 1"
+        );
+
+        $pids = array_map(
+            static fn (array $r): int => $r['pid'],
+            $result['Most Points in a Single Game'],
+        );
+        self::assertSame([200091021, 200091020], $pids);
+    }
+
+    public function testGetTopSeasonAverageBatchBreaksValueTieByYearThenPid(): void
+    {
+        $years = [200091031 => 2096, 200091030 => 2097, 200091033 => 2095, 200091032 => 2095];
+        foreach ($years as $pid => $year) {
+            $name = 'AvgTie ' . $pid;
+            $this->insertTestPlayer($pid, $name);
+            $this->insertHistRow($pid, $name, $year, ['games' => 1, 'pts' => 999]);
+        }
+
+        $result = $this->repo->getTopSeasonAverageBatch(
+            ['PPG' => ['statColumn' => 'pts', 'gamesColumn' => 'games']],
+            minGames: 1,
+        );
+
+        self::assertArrayHasKey('PPG', $result);
+        $pids = array_values(array_map(
+            static fn (array $r): int => $r['pid'],
+            array_filter(
+                $result['PPG'],
+                static fn (array $r): bool => array_key_exists($r['pid'], $years),
+            ),
+        ));
+
+        self::assertSame([200091032, 200091033, 200091031, 200091030], $pids);
+    }
+
+    public function testGetTopSeasonAverageBatchExcludesBelowMinGames(): void
+    {
+        $this->insertTestPlayer(200091040, 'BelowMin');
+        $this->insertHistRow(200091040, 'BelowMin', 2095, ['games' => 1, 'pts' => 999]);
+
+        $result = $this->repo->getTopSeasonAverageBatch(
+            ['PPG' => ['statColumn' => 'pts', 'gamesColumn' => 'games']],
+            minGames: 2,
+        );
+
+        $pids = array_map(
+            static fn (array $r): int => $r['pid'],
+            $result['PPG'] ?? [],
+        );
+        self::assertNotContains(200091040, $pids);
+    }
+
+    public function testGetTopTeamHalfScoreBreaksValueAndDateTieByBoxScoreId(): void
+    {
+        // Both teams score 200 in the first half on the same date; Metros has the lower id.
+        $this->insertGamePair('2098-02-20', 400, 400, 'Stars');
+
+        $result = $this->repo->getTopTeamHalfScore('first', 'DESC');
+
+        self::assertGreaterThanOrEqual(2, count($result));
+        self::assertSame(200, $result[0]['value']);
+        self::assertSame(200, $result[1]['value']);
+        self::assertSame(
+            ['Metros', 'Stars'],
+            [$result[0]['team_name'], $result[1]['team_name']],
+        );
+    }
+
+    public function testGetTopTeamSingleGameBatchBreaksValueAndDateTieByBoxScoreId(): void
+    {
+        $this->insertGamePair('2098-02-21', 100, 90, 'Stars');
+
+        $result = $this->repo->getTopTeamSingleGameBatch(
+            ['Assists' => ['expression' => 'bs.game_ast', 'order' => 'DESC']],
+            "bs.game_date = '2098-02-21'"
+        );
+
+        self::assertArrayHasKey('Assists', $result);
+        self::assertCount(2, $result['Assists']);
+        self::assertSame(20, $result['Assists'][0]['value']);
+        self::assertSame(20, $result['Assists'][1]['value']);
+        self::assertSame(
+            ['Metros', 'Stars'],
+            [$result['Assists'][0]['team_name'], $result['Assists'][1]['team_name']],
+        );
+    }
+
+    public function testGetTopTeamSingleGameBatchExcludesRowsOutsideDateFilter(): void
+    {
+        $this->insertGamePair('2098-02-21', 100, 90, 'Stars');
+
+        $result = $this->repo->getTopTeamSingleGameBatch(
+            ['Assists' => ['expression' => 'bs.game_ast', 'order' => 'DESC']],
+            "bs.game_date = '2098-02-22'"
+        );
+
+        self::assertSame([], $result['Assists'] ?? []);
+    }
+
+    public function testGetBestWorstSeasonRecordBreaksPctAndWinsTieByYear(): void
+    {
+        // Visitor Sharks win 1901 (Metros 0-1); home Metros win 1902 (Sharks 0-1).
+        // Both seasons are 0.000 with 0 wins, so only year can order them.
+        $this->insertGamePair('1901-01-10', 90, 100);
+        $this->insertGamePair('1902-01-10', 100, 90);
+
+        $result = $this->repo->getBestWorstSeasonRecord('ASC');
+
+        self::assertGreaterThanOrEqual(2, count($result));
+        self::assertSame([1901, 1902], [$result[0]['year'], $result[1]['year']]);
+        self::assertSame(0, $result[0]['wins']);
+        self::assertSame(0, $result[1]['wins']);
     }
 }

@@ -61,7 +61,7 @@ class CapSpaceRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getPlayersUnderContractAfterSeason(1);
 
-        self::assertNotEmpty($players, 'Expected at least one non-expiring player');
+        self::assertNotSame([], $players, 'Expected at least one non-expiring player');
         foreach ($players as $row) {
             // No row should have cy === cyt (that's the filter condition)
             self::assertNotSame($row['cy'], $row['cyt'], 'Found expiring contract that should have been filtered');

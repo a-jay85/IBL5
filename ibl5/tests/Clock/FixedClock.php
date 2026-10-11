@@ -8,7 +8,11 @@ use Clock\ClockInterface;
 
 final class FixedClock implements ClockInterface
 {
-    public function __construct(private int $now) {}
+    /**
+     * @param ?float $micro Explicit sub-second time. When null, microtime() returns (float) now(),
+     *                      so it follows setNow() and advance().
+     */
+    public function __construct(private int $now, private ?float $micro = null) {}
 
     public function now(): int
     {
@@ -23,5 +27,10 @@ final class FixedClock implements ClockInterface
     public function advance(int $seconds): void
     {
         $this->now += $seconds;
+    }
+
+    public function microtime(): float
+    {
+        return $this->micro ?? (float) $this->now;
     }
 }

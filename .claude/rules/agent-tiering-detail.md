@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for agent-tiering: skip-vs-spawn heuristic, fan-out and nesting rationale, task-type boundary, orchestrator context economics, /plan orchestrator evidence, prompt style, Haiku 5.5 measurement and price cliff, extra Sonnet pins. Attaches only on `.claude/agents/*.md`. Fable test and bounded checklist live in their own files.
-last_verified: 2026-10-08
+last_verified: 2026-10-09
 paths:
   - ".claude/agents/*.md"
 ---
@@ -96,6 +96,7 @@ A/B on 2026-10-08 (Sonnet twice, Haiku once, bar sealed first): `~/claude-plans/
 | `fat_tail_digest` | 6 | PASS | 0.082, 0.005 |
 | `security_probe` | 5 | PASS (on Haiku) | n/a, 0.007 |
 | `backlog_housekeeping` | 0 | NO-LIVE-SURFACE | n/a |
+| `agent_d` | 0 | TRIGGER-UNMET | n/a |
 
 Only parity moves a surface. Cost never offsets a quality drop; a refusal fails it (`case-refusal-fail`, `case-price-cliff`). Agent D stays on Sonnet until its trigger holds (20+ examples per category, 4 weeks of precision data).
 

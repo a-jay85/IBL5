@@ -15,13 +15,15 @@
 # intentional so the fixture text reaches check-plan verbatim.
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$SCRIPT_DIR/check-plan"
 TMP="$(mktemp -d)"
-trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
+trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
 
-FAILED=0
+# Inline checks further below still set FAILED=1 directly; h_done reads it.
 
 # assert <name> <expected-exit> <plan-body>
 assert() {
@@ -31,10 +33,9 @@ assert() {
     "$GUARD" "$f" >/dev/null 2>&1
     got=$?
     if [ "$got" -ne "$want" ]; then
-        echo "FAIL: $name — expected exit $want, got $got"
-        FAILED=1
+        h_fail "$name" "expected exit $want, got $got"
     else
-        echo "ok: $name (exit $got)"
+        h_pass "$name (exit $got)"
     fi
 }
 
@@ -47,15 +48,15 @@ assert_msg() {
     out="$("$GUARD" "$f" 2>&1)"; got=$?
     ok=1
     if [ "$got" -ne "$want_exit" ]; then
-        echo "FAIL: $name — expected exit $want_exit, got $got"; ok=0
+        h_fail "$name" "expected exit $want_exit, got $got"; ok=0
     fi
     if [ -n "$msg_inc" ] && ! grep -qF "$msg_inc" <<< "$out"; then
-        echo "FAIL: $name — '$msg_inc' not in output"; ok=0
+        h_fail "$name" "'$msg_inc' not in output"; ok=0
     fi
     if [ -n "$msg_exc" ] && grep -qF "$msg_exc" <<< "$out"; then
-        echo "FAIL: $name — '$msg_exc' unexpectedly in output"; ok=0
+        h_fail "$name" "'$msg_exc' unexpectedly in output"; ok=0
     fi
-    if [ "$ok" -eq 1 ]; then echo "ok: $name (exit $got)"; else FAILED=1; fi
+    if [ "$ok" -eq 1 ]; then h_pass "$name (exit $got)"; fi
 }
 
 # assert_cf <name> <plan-body> <expected --print-critical-files output>
@@ -67,12 +68,11 @@ assert_cf() {
     printf '%s\n' "$body" > "$f"
     got="$("$GUARD" --print-critical-files "$f" 2>/dev/null)"
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — classification mismatch"
+        h_fail "$name" "classification mismatch"
         echo "  want: $(printf '%s' "$want" | tr '\n' ' ')"
         echo "  got:  $(printf '%s' "$got" | tr '\n' ' ')"
-        FAILED=1
     else
-        echo "ok: $name"
+        h_pass "$name"
     fi
 }
 
@@ -90,13 +90,13 @@ assert_viol() {
     printf '%s\n' "$body" > "$f"
     out="$("$GUARD" "$f" 2>&1)"; got=$?
     if [ "$got" -ne "$want" ]; then
-        echo "FAIL: $name — expected exit $want, got $got"; FAILED=1
+        h_fail "$name" "expected exit $want, got $got"
     elif [ "$want" -eq 1 ] && ! printf '%s' "$out" | grep -qF "$tag"; then
-        echo "FAIL: $name — exit 1 but no $tag violation (wrong gate fired)"; FAILED=1
+        h_fail "$name" "exit 1 but no $tag violation (wrong gate fired)"
     elif [ "$want" -eq 0 ] && printf '%s' "$out" | grep -qF "$tag"; then
-        echo "FAIL: $name — clean fixture wrongly fired $tag"; FAILED=1
+        h_fail "$name" "clean fixture wrongly fired $tag"
     else
-        echo "ok: $name (exit $got)"
+        h_pass "$name (exit $got)"
     fi
 }
 
@@ -109,10 +109,9 @@ assert_draft() {
     "$GUARD" --draft "$f" >/dev/null 2>&1
     got=$?
     if [ "$got" -ne "$want" ]; then
-        echo "FAIL: $name — expected exit $want, got $got"
-        FAILED=1
+        h_fail "$name" "expected exit $want, got $got"
     else
-        echo "ok: $name (exit $got)"
+        h_pass "$name (exit $got)"
     fi
 }
 
@@ -2590,6 +2589,56 @@ assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate [Z] fixtures (8 cases)
+# ---------------------------------------------------------------------------
+# Untagged row whose command runs only an out-of-repo scratch script.
+assert_viol "gateZ-untagged-scratch-script-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+'"$YROW"'
+'
+# The same row with a well-formed tag: released.
+assert_viol "gateZ-tagged-scratch-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` (one-time-check: asserts an out-of-repo scratch script the diff cannot carry) | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# A repo script run over out-of-repo inputs is in-repo evidence: exempt.
+assert_viol "gateZ-mixed-repo-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `UNREALISED-ASSERTION` | CLI-executable | post-impl | `MATRIX_ASSERT_ROOT=/tmp/r bin/lib/plan-matrix-assertions ~/claude-plans/x.md -` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# /tmp/ and $HOME/ both open the out-of-repo signal; both rows fire.
+assert_viol "gateZ-tmp-and-home-fire" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `TRACE-OK` | CLI-executable | post-impl | `bash /tmp/negproof/run.sh` |
+| 5 | prints `HOOK-OK` | CLI-executable | post-impl | `bash "$HOME/.claude/hooks/x.sh"` |
+'"$YROW"'
+'
+# A post-PR CI query can never be realised by the diff.
+assert_viol "gateZ-gh-run-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | latest run concludes success; prints `PR-RUN-DONE` | CLI-executable | post-impl | `gh run list --workflow sim-recap.yml --limit 1 && echo PR-RUN-DONE` |
+'"$YROW"'
+'
+# A token-free row is never checked by the helper: silent.
+assert_viol "gateZ-no-token-row-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | the scratch run exits 0 | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/x.sh` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# curl exercises the worktree stack and only writes its output under /tmp: exempt.
+assert_viol "gateZ-curl-tmp-output-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | page holds `Roster` | CLI-executable | post-impl | `curl -s -o /tmp/page.html http://slug.localhost/ibl5/modules.php?name=Team && grep -q Roster /tmp/page.html` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# Not CLI-executable: the tag remedy does not apply, so gate Z never fires.
+assert_viol "gateZ-phpunit-row-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | `pinned_thing` works | PHPUnit | post-impl | `~/scratch/tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+
+# ---------------------------------------------------------------------------
 # Gate [ND] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Marker with a 15+ character reason inside a phase body: the honored shape.
@@ -2895,15 +2944,17 @@ _corpus_guard_ok() {
 # conference-champions-playoff-semantics, bug-pipeline-survive-db-sync,
 # bug-pipeline-test-env, sim-recap-boxid-resolution (gate [A]: migration literals);
 # bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
-# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags).
+# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags);
+# narrow-headless-marker-contract-paths, jsb-j7-param-recovery,
+# plan-gate-skill-inline (gate [Z]: untagged out-of-repo rows).
 _n_corpus_pass=1
 for _n_slug in \
     plan-architect-phase-drift-guard \
     automouse-cost-accounting-fix redact-credentials-from-error-logs \
     session-registry-dotclaude-freshness architect-explore-fanout \
-    narrow-headless-marker-contract-paths agent-tiering-detail-trim \
-    postplan-findings-schema-degrade jsb-j7-param-recovery wt-rebase-merge-not-rebase \
-    plan-gate-skill-inline sim-recap-floor-and-cold-open \
+    agent-tiering-detail-trim \
+    postplan-findings-schema-degrade wt-rebase-merge-not-rebase \
+    sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
     authz-verdict-refactor-1e-trading-accept-shim \
@@ -3850,7 +3901,7 @@ Seed every pid in 200001993000..200001993099.
 # Check C: copy-verbatim symbols resolve against the same section's cited files.
 assert_msg "L-verbatim-resolves-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Copy `bindAndExecute()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `bindAndExecute()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 '
 assert_msg "L-verbatim-shell-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: gate
@@ -3866,29 +3917,29 @@ Copy `madeUpHelperXyz()` verbatim from the 2004 restore class.
 '
 assert_msg "L-verbatim-forward-ref-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Create a new helper `madeUpHelperXyz()` in `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Create a new helper `madeUpHelperXyz()` in `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 Then copy `madeUpHelperXyz()` verbatim into the 1993 class.
 '
 assert_msg "L-verbatim-in-fence-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
 ```
-Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 ```
 '
 assert_msg "L-verbatim-gap-over-80-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Copy `madeUpHelperXyz()` and every caller it needs into the new class without any change at all, keeping it verbatim into `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `madeUpHelperXyz()` and every caller it needs into the new class without any change at all, keeping it verbatim into `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 '
 
 # Check C: a missing symbol, or one whose file is cited in another section,
 # prints an advisory; assert_msg pins the message too.
 assert_msg "L-verbatim-missing-flags" 0 "[L] copy-verbatim" "" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 '
 assert_msg "L-verbatim-other-section-flags" 0 "[L] copy-verbatim" "" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: a
-See `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+See `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 ## Phase 2: b
 Copy `bindAndExecute()` verbatim from the shell helper in `bin/check-plan`.
 '
@@ -3901,7 +3952,7 @@ for L_CASE in overflow verbatim; do
         L_WANT='[L] overflow'
     else
         printf '%s\n' "$FM_OPUS$L_MATRIX" '## Phase 1: restore' \
-            'Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.' > "$f"
+            'Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.' > "$f"
         L_WANT='[L] copy-verbatim'
     fi
     out="$("$GUARD" "$f" 2>&1)"; got=$?
@@ -3913,9 +3964,4 @@ for L_CASE in overflow verbatim; do
     fi
 done
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

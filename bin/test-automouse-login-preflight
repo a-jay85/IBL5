@@ -7,7 +7,7 @@
 # The preflight parks the loop only on a positive "login expired" signal, sends one
 # Discord DM per outage, and fails open (loudly) on anything inconclusive.
 #
-# The real probe runs against stubbed claude / security / curl binaries through the
+# The real probe runs against stubbed claude / security / perl binaries through the
 # LOGIN_PROBE_*_BIN seams. The run-loop guard block is EXTRACTED from bin/automouse/run
 # and eval'd inside a stub loop, so the test cannot drift from the implementation.
 #
@@ -16,15 +16,15 @@
 # Run: bin/test-automouse-login-preflight  (exit 0 = all pass, 1 = a case failed)
 
 set -euo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUN_SCRIPT="${LOGIN_PREFLIGHT_TEST_RUN:-$REPO/bin/automouse/run}"
 LIB="$REPO/bin/lib/login-preflight.sh"
 
-T="$(mktemp -d)"
-trap 'rm -rf "$T"' EXIT
-FAILED=0
+h_tmp T
 
 # jq is required by the real probe; link it into the sandbox PATH from wherever it lives.
 JQ="$(command -v jq || true)"
@@ -33,24 +33,22 @@ if [ -z "$JQ" ]; then
         if [ -x "$c" ]; then JQ="$c"; break; fi
     done
 fi
-if [ -z "$JQ" ]; then echo "FAIL: jq not found"; exit 1; fi
+if [ -z "$JQ" ]; then h_fail "jq not found"; exit 1; fi
 mkdir -p "$T/bin"
 ln -s "$JQ" "$T/bin/jq"
 PATH="$T/bin:$PATH"
 
 # --- helpers --------------------------------------------------------------
 
-pass() { echo "ok: $1"; }
-fail() { echo "FAIL: $1"; FAILED=1; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
-eq() { # label want got
-    if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (want '$2', got '$3')"; fi
-}
+eq() { h_eq "$1" "$2" "$3"; }  # label want got
 has() { # label file fixed-string
     if [ -f "$2" ] && grep -qF -- "$3" "$2"; then pass "$1"; else fail "$1 (no '$3' in $2)"; fi
 }
-present() { if [ -e "$2" ]; then pass "$1"; else fail "$1 (missing $2)"; fi; }
-absent() { if [ ! -e "$2" ]; then pass "$1"; else fail "$1 (unexpected $2)"; fi; }
+present() { h_exists "$1" "$2"; }
+absent() { h_absent "$1" "$2"; }
 count() { # file fixed-string -> number of matching lines (0 when file absent)
     if [ -f "$1" ]; then grep -cF -- "$2" "$1" || true; else echo 0; fi
 }
@@ -59,33 +57,33 @@ count() { # file fixed-string -> number of matching lines (0 when file absent)
 
 cat > "$T/claude" <<STUB
 #!/bin/sh
-cat "$T/claude.out"
-exit "\$(cat "$T/claude.rc")"
+if [ "\$1" = auth ]; then cat "$T/claude.out"; exit "\$(cat "$T/claude.rc")"; fi
+printf '%s %s\n' "\$PWD" "\$*" >> "$T/session.argv"
+# exec so the perl alarm kills the sleeper itself; a forked sleep would hold
+# the capture pipe open until it finished.
+[ -f "$T/session.sleep" ] && exec sleep "\$(cat "$T/session.sleep")"
+cat "$T/session.out"
+exit "\$(cat "$T/session.rc")"
 STUB
 cat > "$T/security" <<STUB
 #!/bin/sh
+echo x >> "$T/sec.calls"
 cat "$T/sec.out"
 exit "\$(cat "$T/sec.rc")"
-STUB
-cat > "$T/curl" <<STUB
-#!/bin/sh
-printf '%s\n' "\$*" >> "$T/curl.argv"
-cat >> "$T/curl.stdin"
-printf '%s' "\$(cat "$T/curl.code")"
 STUB
 cat > "$T/discord-dm" <<STUB
 #!/bin/sh
 { echo ---; cat; } >> "$T/dm.log"
 exit "\${DM_STUB_RC:-0}"
 STUB
-chmod +x "$T/claude" "$T/security" "$T/curl" "$T/discord-dm"
+chmod +x "$T/claude" "$T/security" "$T/discord-dm"
 
 export LOGIN_PROBE_CLAUDE_BIN="$T/claude"
 export LOGIN_PROBE_SECURITY_BIN="$T/security"
-export LOGIN_PROBE_CURL_BIN="$T/curl"
 
 set_claude() { printf '%s\n' "$2" > "$T/claude.out"; echo "$1" > "$T/claude.rc"; }
-set_curl() { echo "$1" > "$T/curl.code"; rm -f "$T/curl.argv" "$T/curl.stdin"; }
+set_session() { printf '%s\n' "$2" > "$T/session.out"; echo "$1" > "$T/session.rc"; rm -f "$T/session.sleep" "$T/session.argv"; }
+SESSION_OK='{"type":"result","is_error":false,"result":"ok"}'
 set_sec_rc() { printf '%s\n' "$2" > "$T/sec.out"; echo "$1" > "$T/sec.rc"; }
 set_sec() { # refresh_ms access_ms [token]
     set_sec_rc 0 "{\"claudeAiOauth\":{\"accessToken\":\"${3:-TOK}\",\"refreshToken\":\"r\",\"expiresAt\":$2,\"refreshTokenExpiresAt\":$1}}"
@@ -99,7 +97,7 @@ TODAY=$(date +%F)
 reset_stubs() {
     set_claude 0 '{"loggedIn": true}'
     set_sec "$FUTURE" "$FUTURE"
-    set_curl 200
+    set_session 0 "$SESSION_OK"; rm -f "$T/sec.calls"; unset LOGIN_PROBE_TIMEOUT_S LOGIN_PROBE_PERL_BIN
     unset AUTOMOUSE_LOGIN_PROBE_CMD
 }
 
@@ -132,7 +130,7 @@ REGION_OK=1
 if [ "$ANCHOR_COUNT" != "1" ] || [ -z "$REGION" ]; then REGION_OK=0; fi
 case "$REGION_LAST" in *'NEXT_PLAN=$(claim_next_plan)'*) ;; *) REGION_OK=0 ;; esac
 if [ "$REGION_OK" -ne 1 ]; then
-    echo "FAIL: loop-guard region not extractable from $RUN_SCRIPT (anchor count $ANCHOR_COUNT)"
+    h_fail "loop-guard region not extractable from $RUN_SCRIPT (anchor count $ANCHOR_COUNT)"
     exit 1
 fi
 
@@ -231,6 +229,7 @@ eq "seam-junk-output" "unknown:bad-probe-output" "$(login_probe)"
 set_claude 1 '{"loggedIn": false}'
 unset AUTOMOUSE_LOGIN_PROBE_CMD
 eq "seam-unset-uses-real-probe" "expired:not-logged-in" "$(login_probe)"
+absent "seam-unset-uses-real-probe: no session call" "$T/session.argv"
 export AUTOMOUSE_LOGIN_PROBE_CMD=""
 # Guard the case itself: the variable must be set-but-empty here, not unset.
 eq "seam-empty-uses-real-probe: seam is set but empty" "x" "${AUTOMOUSE_LOGIN_PROBE_CMD+x}"
@@ -240,28 +239,113 @@ echo "--- real probe tier cases ---"
 
 reset_stubs
 set_claude 1 'boom'
-set_curl 200
 eq "tier1-rc1-without-string-not-expired" "ok" "$(login_probe)"
 
 reset_stubs
 set_sec "$PAST" "$FUTURE"
 eq "tier2-refresh-expired" "expired:refresh-token-expired" "$(login_probe)"
+absent "tier2-refresh-expired: no session call" "$T/session.argv"
+
+BOGUS_401='{"is_error":true,"api_error_status":401,"terminal_reason":"api_error","result":"Failed to authenticate. API Error: 401 Invalid bearer token"}'
+REFRESH_FAILED='{"is_error":true,"api_error_status":null,"result":"Failed to authenticate: OAuth session expired and could not be refreshed"}'
+NOT_LOGGED_IN='{"is_error":true,"api_error_status":null,"result":"Not logged in · Please run /login"}'
+
+reset_stubs
+eq "session-ok-argv" "ok" "$(login_probe)"
+has "session-ok-argv: runs from /" "$T/session.argv" "/ "
+has "session-ok-argv: -p" "$T/session.argv" " -p "
+has "session-ok-argv: --model haiku" "$T/session.argv" "--model haiku"
+has "session-ok-argv: --max-turns 1" "$T/session.argv" "--max-turns 1"
+has "session-ok-argv: --no-session-persistence" "$T/session.argv" "--no-session-persistence"
+has "session-ok-argv: --tools" "$T/session.argv" "--tools"
+has "session-ok-argv: --setting-sources project" "$T/session.argv" "--setting-sources project"
+has "session-ok-argv: --output-format json" "$T/session.argv" "--output-format json"
+case "$(head -c 2 "$T/session.argv")" in
+    "/ ") pass "session-ok-argv: cwd prefix is /" ;;
+    *) fail "session-ok-argv: cwd prefix is not / ($(head -c 20 "$T/session.argv"))" ;;
+esac
 
 reset_stubs
 set_sec "$FUTURE" "$PAST"
-set_curl 401
-eq "tier2-access-expired-refresh-valid" "ok" "$(login_probe)"
-absent "tier2-access-expired-refresh-valid: curl never called" "$T/curl.argv"
+set_session 1 "$REFRESH_FAILED"
+eq "incident-access-expired-refresh-valid" "expired:session-refresh-failed" "$(login_probe)"
+
+reset_stubs
+while IFS=$'\t' read -r name rc json want; do
+    set_session "$rc" "$json"
+    eq "session-classify: $name" "$want" "$(login_probe)"
+done <<EOF
+bogus-401	1	$BOGUS_401	expired:session-401
+refresh-failed	1	$REFRESH_FAILED	expired:session-refresh-failed
+not-logged-in	1	$NOT_LOGGED_IN	expired:session-not-logged-in
+auth-403	1	{"is_error":true,"api_error_status":403,"result":"Failed to authenticate. API Error: 403"}	expired:session-403
+plain-403	1	{"is_error":true,"api_error_status":403,"result":"API Error: 403 forbidden"}	unknown:session-403
+429	1	{"is_error":true,"api_error_status":429,"result":"API Error: 429 rate limited"}	unknown:session-429
+overloaded	1	{"is_error":true,"api_error_status":529,"result":"Overloaded"}	unknown:session-529
+usage-limit	1	{"is_error":true,"api_error_status":null,"result":"Claude AI usage limit reached|1760000000"}	unknown:session-error
+rc1-not-error	1	$SESSION_OK	unknown:session-rc-1
+junk	1	not json	unknown:session-bad-output
+wording-without-is-error	1	{"result":"Not logged in"}	unknown:session-bad-output
+EOF
+# An empty field would collapse under the tab IFS, so the empty-output row runs apart.
+set_session 1 ""
+eq "session-classify: empty" "unknown:session-no-output" "$(login_probe)"
+
+reset_stubs
+export LOGIN_PROBE_TIMEOUT_S=1
+echo 20 > "$T/session.sleep"
+SECONDS=0
+TO_OUT="$(login_probe)"
+eq "session-timeout" "unknown:session-timeout" "$TO_OUT"
+if [ "$SECONDS" -lt 10 ]; then pass "session-timeout: returned within the alarm"; else fail "session-timeout: took ${SECONDS}s"; fi
+
+reset_stubs
+printf '#!/bin/sh\necho "$3" >> "%s/perl.argv"\nexec /usr/bin/perl "$@"\n' "$T" > "$T/perl"
+chmod +x "$T/perl"
+export LOGIN_PROBE_PERL_BIN="$T/perl"
+rm -f "$T/perl.argv"
+login_probe > /dev/null
+eq "timeout-env: unset gives 30" "30" "$(tail -1 "$T/perl.argv")"
+export LOGIN_PROBE_TIMEOUT_S=""
+eq "timeout-env: empty gives 30: variable is set but empty" "x" "${LOGIN_PROBE_TIMEOUT_S+x}"
+login_probe > /dev/null
+eq "timeout-env: empty gives 30" "30" "$(tail -1 "$T/perl.argv")"
+export LOGIN_PROBE_TIMEOUT_S=abc
+login_probe > /dev/null
+eq "timeout-env: abc gives 30" "30" "$(tail -1 "$T/perl.argv")"
+export LOGIN_PROBE_TIMEOUT_S=5
+login_probe > /dev/null
+eq "timeout-env: 5 gives 5" "5" "$(tail -1 "$T/perl.argv")"
+
+reset_stubs
+export LOGIN_PROBE_PERL_BIN="$T/nope"
+eq "perl-missing-never-runs-unbounded" "unknown:session-no-timeout" "$(login_probe)"
+absent "perl-missing-never-runs-unbounded: session never ran" "$T/session.argv"
+
+reset_stubs
+export LOGIN_PROBE_PERL_BIN=""
+eq "perl-empty-uses-default: variable is set but empty" "x" "${LOGIN_PROBE_PERL_BIN+x}"
+eq "perl-empty-uses-default" "ok" "$(login_probe)"
+present "perl-empty-uses-default: session ran" "$T/session.argv"
 
 reset_stubs
 set_sec_rc 44 ""
-eq "tier2-keychain-unreadable" "unknown:keychain-unreadable" "$(login_probe)"
+eq "tier2-keychain-unreadable" "ok" "$(login_probe)"
 set_sec_rc 0 "not json"
-eq "tier2-bad-json" "unknown:bad-json" "$(login_probe)"
+eq "tier2-bad-json" "ok" "$(login_probe)"
 
 reset_stubs
 set_sec_rc 0 "{\"claudeAiOauth\":{\"accessToken\":\"TOK\",\"refreshToken\":\"r\",\"expiresAt\":$PAST}}"
-eq "tier2-missing-refresh-ts-fails-open" "unknown:bad-json" "$(login_probe)"
+eq "tier2-missing-refresh-ts-fails-open" "ok" "$(login_probe)"
+
+reset_stubs
+set_sec_rc 44 ""
+set_session 1 "$BOGUS_401"
+eq "tier2-unreadable-session-401" "expired:session-401" "$(login_probe)"
+
+reset_stubs
+login_probe > /dev/null
+eq "one-keychain-read" 1 "$(count "$T/sec.calls" x)"
 
 reset_stubs
 set_sec_rc 44 ""
@@ -271,15 +355,163 @@ CM_OUT="$(login_probe)"
 export LOGIN_PROBE_CLAUDE_BIN="$CLAUDE_SAVE"
 case "$CM_OUT" in unknown:*) pass "claude-missing" ;; *) fail "claude-missing (got '$CM_OUT')" ;; esac
 
-reset_stubs
-for pair in 401:expired:usage-endpoint-401 403:expired:usage-endpoint-403 \
-    503:unknown:usage-endpoint-503 429:unknown:usage-endpoint-429 \
-    000:unknown:usage-endpoint-timeout 200:ok; do
-    code=${pair%%:*}
-    want=${pair#*:}
-    set_curl "$code"
-    eq "tier3-statuses: $code" "$want" "$(login_probe)"
+echo "--- spawn re-probe cases ---"
+
+# extract_between <file> <start> <end>: inclusive, first start to first end after it.
+extract_between() {
+    awk -v start="$2" -v end="$3" '
+        index($0, start) { capture = 1 }
+        capture { print }
+        capture && index($0, end) { exit }
+    ' "$1"
+}
+
+reprobe_tick() { # $1 = extracted region
+    (
+        refund_attempt() { echo refunded >> "$T/refunds"; }
+        eval "while true; do
+$1
+touch \"$T/spawned\"
+break
+done"
+    )
+}
+
+IMPL_START_C='# Login re-probe before the impl spawn'
+IMPL_END_C='# End login re-probe before the impl spawn'
+PP_START_C='# Login re-probe before the post-plan spawn'
+PP_END_C='# End login re-probe before the post-plan spawn'
+RP_RAN=""
+
+for spec in "impl-reprobe|$IMPL_START_C|$IMPL_END_C|impl spawn" \
+    "postplan-reprobe|$PP_START_C|$PP_END_C|post-plan spawn"; do
+    IFS='|' read -r prefix start end spawn_word <<< "$spec"
+    S_COUNT=$(grep -cF -- "$start" "$RUN_SCRIPT" || true)
+    E_COUNT=$(grep -cF -- "$end" "$RUN_SCRIPT" || true)
+    RP_REGION=$(extract_between "$RUN_SCRIPT" "$start" "$end")
+    RP_LAST=$(printf '%s\n' "$RP_REGION" | tail -1)
+    case "$RP_LAST" in
+        *"$end"*) RP_LAST_OK=1 ;;
+        *) RP_LAST_OK=0 ;;
+    esac
+    if [ "$S_COUNT" != "1" ] || [ "$E_COUNT" != "1" ] || [ "$RP_LAST_OK" != "1" ]; then
+        h_fail "$prefix-anchors (start=$S_COUNT end=$E_COUNT last-line-ok=$RP_LAST_OK)"
+        exit 1
+    fi
+    pass "$prefix-anchors"
+
+    reset_stubs
+    fresh
+    rm -f "$T/refunds" "$T/spawned"
+    export AUTOMOUSE_LOGIN_PROBE_CMD='echo expired:session-refresh-failed'
+    reprobe_tick "$RP_REGION"
+    eq "$prefix-expired-refunds-and-stops: one refund" 1 "$(count "$T/refunds" refunded)"
+    absent "$prefix-expired-refunds-and-stops: no spawn" "$T/spawned"
+    eq "$prefix-expired-refunds-and-stops: one DM" 1 "$(count "$T/dm.log" '---')"
+    has "$prefix-expired-refunds-and-stops: log names the spawn" "$LOG" "Login expired before the $spawn_word"
+    present "$prefix-expired-refunds-and-stops: report" "$NIGHTLY_DIR/reports/$TODAY-login-expired.md"
+
+    fresh
+    rm -f "$T/refunds" "$T/spawned"
+    export AUTOMOUSE_LOGIN_PROBE_CMD='echo ok'
+    reprobe_tick "$RP_REGION"
+    present "$prefix-ok-spawns: spawned" "$T/spawned"
+    absent "$prefix-ok-spawns: no refund" "$T/refunds"
+
+    fresh
+    rm -f "$T/refunds" "$T/spawned"
+    export AUTOMOUSE_LOGIN_PROBE_CMD='echo unknown:session-429'
+    reprobe_tick "$RP_REGION"
+    present "$prefix-unknown-fails-open: spawned" "$T/spawned"
+    absent "$prefix-unknown-fails-open: no refund" "$T/refunds"
+    present "$prefix-unknown-fails-open: inconclusive report" "$NIGHTLY_DIR/reports/$TODAY-login-probe-inconclusive.md"
+    absent "$prefix-unknown-fails-open: no DM" "$T/dm.log"
+
+    # Mutation: swap the refund for `:` in a copy of run, extract from the copy, and
+    # confirm the expired case no longer records a refund (the assertion above would fail).
+    sed "/$start/,/$end/s/^\([[:space:]]*\)refund_attempt\$/\1:/" "$RUN_SCRIPT" > "$T/run.mut"
+    MUT_REGION=$(extract_between "$T/run.mut" "$start" "$end")
+    fresh
+    rm -f "$T/refunds" "$T/spawned"
+    export AUTOMOUSE_LOGIN_PROBE_CMD='echo expired:session-refresh-failed'
+    reprobe_tick "$MUT_REGION"
+    absent "$prefix-mutation-caught: refund removed from the copy is detected" "$T/refunds"
+    if [ "$MUT_REGION" != "$RP_REGION" ]; then
+        pass "$prefix-mutation-caught: copy differs from the real region"
+    else
+        fail "$prefix-mutation-caught: sed did not alter the region"
+    fi
+    RP_RAN="$RP_RAN $prefix-anchors $prefix-expired-refunds-and-stops $prefix-ok-spawns"
+    RP_RAN="$RP_RAN $prefix-unknown-fails-open $prefix-mutation-caught"
 done
+unset AUTOMOUSE_LOGIN_PROBE_CMD
+
+# Both regions must have run every named case; a loop edit that skips one fails here.
+for rp_case in impl-reprobe-anchors postplan-reprobe-anchors \
+    impl-reprobe-expired-refunds-and-stops postplan-reprobe-expired-refunds-and-stops \
+    impl-reprobe-ok-spawns postplan-reprobe-ok-spawns \
+    impl-reprobe-unknown-fails-open postplan-reprobe-unknown-fails-open \
+    impl-reprobe-mutation-caught postplan-reprobe-mutation-caught; do
+    case " $RP_RAN " in
+        *" $rp_case "*) pass "$rp_case ran" ;;
+        *) fail "$rp_case did not run" ;;
+    esac
+done
+
+IMPL_RP_LINE=$(grep -nF -- "$IMPL_START_C" "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+IMPL_SPAWN_LINE=$(grep -nF 'claude -p "$IMPL_PROMPT"' "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+PP_RP_LINE=$(grep -nF -- "$PP_START_C" "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+PP_SPAWN_LINE=$(grep -nF '"$SELF_DIR/../post-plan-now"' "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+if [ -n "$IMPL_RP_LINE" ] && [ -n "$IMPL_SPAWN_LINE" ] && [ -n "$PP_RP_LINE" ] && [ -n "$PP_SPAWN_LINE" ] \
+    && [ "$IMPL_RP_LINE" -gt "$ATTEMPT_LINE" ] && [ "$IMPL_RP_LINE" -lt "$IMPL_SPAWN_LINE" ] \
+    && [ "$PP_RP_LINE" -lt "$PP_SPAWN_LINE" ]; then
+    pass "reprobes-sit-before-their-spawns"
+else
+    fail "reprobes-sit-before-their-spawns (attempt=$ATTEMPT_LINE impl=$IMPL_RP_LINE/$IMPL_SPAWN_LINE pp=$PP_RP_LINE/$PP_SPAWN_LINE)"
+fi
+
+echo "--- plan-now caller cases ---"
+
+PN_HINT="bin/plan-now --resume 20261010-000000-1"
+
+reset_stubs
+fresh
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo expired:session-401'
+PN_RC=0
+login_preflight "$NIGHTLY_DIR" "$LOG" "$T/discord-dm" plan-now "$PN_HINT" || PN_RC=$?
+eq "plan-now-expired-no-dm: rc" 1 "$PN_RC"
+absent "plan-now-expired-no-dm: no DM" "$T/dm.log"
+present "plan-now-expired-no-dm: marker" "$NIGHTLY_DIR/login-expired.alerted"
+has "plan-now-expired-no-dm: report wording" "$NIGHTLY_DIR/reports/$TODAY-login-expired.md" "plan-now parked: Claude login expired (session-401)."
+has "plan-now-expired-no-dm: report resume hint" "$NIGHTLY_DIR/reports/$TODAY-login-expired.md" "$PN_HINT"
+has "plan-now-expired-no-dm: log" "$LOG" "plan-now parking"
+
+# Same outage, no fresh: the marker from the plan-now park must silence automouse.
+tick
+absent "plan-now-then-automouse-one-alert: no DM" "$T/dm.log"
+has "plan-now-then-automouse-one-alert: log" "$LOG" "alert already sent this outage"
+
+fresh
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo unknown:session-429'
+PN_RC=0
+login_preflight "$NIGHTLY_DIR" "$LOG" "$T/discord-dm" plan-now "$PN_HINT" || PN_RC=$?
+eq "plan-now-unknown-fails-open: rc" 0 "$PN_RC"
+absent "plan-now-unknown-fails-open: no DM" "$T/dm.log"
+has "plan-now-unknown-fails-open: report" "$NIGHTLY_DIR/reports/$TODAY-login-probe-inconclusive.md" "The plan-now run started anyway (fail open)."
+has "plan-now-unknown-fails-open: log" "$LOG" "WARNING probe inconclusive (session-429)"
+
+fresh
+echo '123 session-401' > "$NIGHTLY_DIR/login-expired.alerted"
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo ok'
+PN_RC=0
+login_preflight "$NIGHTLY_DIR" "$LOG" "$T/discord-dm" plan-now "$PN_HINT" || PN_RC=$?
+eq "plan-now-ok-clears-marker: rc" 0 "$PN_RC"
+absent "plan-now-ok-clears-marker: marker gone" "$NIGHTLY_DIR/login-expired.alerted"
+
+fresh
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo expired:session-401'
+login_preflight "$NIGHTLY_DIR" "$LOG" "$T/discord-dm" plan-now || true
+has "plan-now-no-hint-default" "$NIGHTLY_DIR/reports/$TODAY-login-expired.md" "then re-run bin/plan-now"
 
 echo "--- credential-leak case ---"
 
@@ -287,12 +519,12 @@ reset_stubs
 fresh
 SENTINEL="SENTINEL-TOK-9f3a"
 set_sec "$FUTURE" "$FUTURE" "$SENTINEL"
-set_curl 401
+set_session 1 "$BOGUS_401"
 export AUTOMOUSE_LOGIN_PROBE_CMD=""
 bash -x -c ". '$LIB'; login_preflight '$NIGHTLY_DIR' '$LOG' '$T/discord-dm'" > /dev/null 2> "$T/trace" || true
-has "token-never-in-argv-log-report-dm: reached curl stdin" "$T/curl.stdin" "$SENTINEL"
+present "token-never-in-argv-log-report-dm: parked" "$NIGHTLY_DIR/reports/$TODAY-login-expired.md"
 LEAKS=""
-for f in "$T/curl.argv" "$LOG" "$T/trace" "$T/dm.log" "$NIGHTLY_DIR"/reports/*; do
+for f in "$T/session.argv" "$LOG" "$T/trace" "$T/dm.log" "$NIGHTLY_DIR"/reports/*; do
     if [ -f "$f" ] && grep -qF -- "$SENTINEL" "$f"; then LEAKS="$LEAKS $f"; fi
 done
 if [ -z "$LEAKS" ]; then
@@ -302,9 +534,4 @@ else
 fi
 
 echo
-if [ "$FAILED" -eq 0 ]; then
-    echo "RESULT: PASSED"
-    exit 0
-fi
-echo "RESULT: FAILED"
-exit 1
+h_done

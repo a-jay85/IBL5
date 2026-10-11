@@ -3,43 +3,30 @@
 # § Mandatory: No Skips, No Silent Passes. Exits 0 (clean) or 1 (blocking violations found).
 set -euo pipefail
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
-Usage: bin/check-e2e-hygiene [--pr] [--help|-h]
-
-Scans E2E specs for anti-patterns (silent passes, body.toBeVisible,
-test.skip, weak assertions). Comma-fallback locators are advisory.
-
-Modes:
-  (no args)  Scan all ibl5/tests/e2e/**/*.ts
-  --pr       Scan only files changed vs $E2E_HYGIENE_BASE_REF (default origin/master)
-  Env:       E2E_HYGIENE_BASE_REF  base ref for --pr (default: origin/master)
-
-Exceptions:
-  File-level: .e2e-hygiene-skip-allowlist (one glob per line, # comments)
-  Per-line:   // e2e-hygiene-allow: <reason >= 20 chars>
-
-See .claude/rules/playwright-tests.md § Mandatory: No Skips, No Silent Passes.
-EOF
-    exit 0
+case "$0" in
+  */*) SCRIPT_DIR="${0%/*}" ;;
+  *) SCRIPT_DIR="." ;;
+esac
+if [ ! -f "$SCRIPT_DIR/lib/scan-scope.sh" ]; then
+  echo "check-e2e-hygiene: missing $SCRIPT_DIR/lib/scan-scope.sh" >&2
+  exit 2
 fi
+# shellcheck source=bin/lib/scan-scope.sh disable=SC1091
+source "$SCRIPT_DIR/lib/scan-scope.sh"
 
-ROOT=$(git rev-parse --show-toplevel)
-BASE_REF=${E2E_HYGIENE_BASE_REF:-origin/master}
-ALLOWLIST="$ROOT/.e2e-hygiene-skip-allowlist"
-E2E_DIR="$ROOT/ibl5/tests/e2e"
-
+# shellcheck disable=SC2329  # invoked by scan_scope_parse_args
 usage() {
   cat <<'EOF'
-Usage: bin/check-e2e-hygiene [--pr] [--help|-h]
+Usage: bin/check-e2e-hygiene [--pr] [--base <ref>] [--help|-h]
 
 Scans E2E specs for anti-patterns (silent passes, body.toBeVisible,
-test.skip, weak assertions). Comma-fallback locators are advisory.
+test.skip, weak assertions, comma-fallback locators). Every hit blocks.
 
 Modes:
   (no args)  Scan all ibl5/tests/e2e/**/*.ts
   --pr       Scan only files changed vs $E2E_HYGIENE_BASE_REF (default origin/master)
   Env:       E2E_HYGIENE_BASE_REF  base ref for --pr (default: origin/master)
+  --base     <ref> base ref for --pr; overrides E2E_HYGIENE_BASE_REF
 
 Exceptions:
   File-level: .e2e-hygiene-skip-allowlist (one glob per line, # comments)
@@ -50,33 +37,17 @@ EOF
   exit 0
 }
 
-MODE="all"
-for arg in "$@"; do
-  case "$arg" in
-    --help|-h) usage ;;
-    --pr) MODE="pr" ;;
-    *) echo "Unknown argument: $arg" >&2; exit 2 ;;
-  esac
-done
+scan_scope_parse_args usage strict "$@"
 
-if [ "$MODE" = "pr" ] && [ -n "${E2E_HYGIENE_BASE_REF:-}" ] \
-  && ! git -C "$ROOT" rev-parse --verify --quiet "${BASE_REF}^{commit}" >/dev/null; then
-  echo "E2E_HYGIENE_BASE_REF=${E2E_HYGIENE_BASE_REF} does not resolve to a commit" >&2
-  exit 2
-fi
+ROOT=$(git rev-parse --show-toplevel)
+scan_scope_resolve_base E2E_HYGIENE_BASE_REF "${E2E_HYGIENE_BASE_REF:-}" 1 "$ROOT"
+ALLOWLIST="$ROOT/.e2e-hygiene-skip-allowlist"
+E2E_DIR="$ROOT/ibl5/tests/e2e"
 
 # --- Build file list ---
-if [ "$MODE" = "pr" ]; then
-  FILES=()
-  while IFS= read -r f; do
-    [ -f "$ROOT/$f" ] && FILES+=("$ROOT/$f")
-  done < <(git -C "$ROOT" diff "$BASE_REF" --name-only -- 'ibl5/tests/e2e/**/*.ts')
-else
-  FILES=()
-  while IFS= read -r f; do
-    FILES+=("$f")
-  done < <(find "$E2E_DIR" -name '*.ts' -type f | sort)
-fi
+scan_scope_collect_files "$ROOT" 'ibl5/tests/e2e/**/*.ts' "$E2E_DIR" '*.ts'
+# shellcheck disable=SC2206  # set -u-safe empty-array copy
+FILES=(${SCAN_SCOPE_FILES[@]+"${SCAN_SCOPE_FILES[@]}"})
 
 if [ ${#FILES[@]} -eq 0 ]; then
   echo "PASS: no E2E files to scan."
@@ -142,14 +113,16 @@ has_inline_allow() {
 # --- Pattern runners ---
 BLOCKING_HITS=()
 BLOCKING_TOTAL=0
-ADVISORY_HITS=()
-ADVISORY_TOTAL=0
 
 run_pattern() {
   local severity="$1"
   local label="$2"
   shift 2
   local grep_args=("$@")
+  if [ "$severity" != "blocking" ]; then
+    echo "check-e2e-hygiene: unknown severity '$severity' for [$label]" >&2
+    exit 2
+  fi
 
   for f in "${SCAN_FILES[@]}"; do
     while IFS=: read -r line_num matched_line; do
@@ -159,13 +132,8 @@ run_pattern() {
       fi
       local rel="${f#"$ROOT/"}"
       local entry="[$label] $rel:$line_num: $matched_line"
-      if [ "$severity" = "blocking" ]; then
-        BLOCKING_HITS+=("$entry")
-        BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
-      else
-        ADVISORY_HITS+=("$entry")
-        ADVISORY_TOTAL=$((ADVISORY_TOTAL + 1))
-      fi
+      BLOCKING_HITS+=("$entry")
+      BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
     done < <(grep -nE "${grep_args[@]}" "$f" 2>/dev/null || true)
   done
 }
@@ -175,6 +143,10 @@ run_pattern_pipe() {
   local label="$2"
   local pattern1="$3"
   local exclude="$4"
+  if [ "$severity" != "blocking" ]; then
+    echo "check-e2e-hygiene: unknown severity '$severity' for [$label]" >&2
+    exit 2
+  fi
 
   for f in "${SCAN_FILES[@]}"; do
     while IFS=: read -r line_num matched_line; do
@@ -184,13 +156,8 @@ run_pattern_pipe() {
       fi
       local rel="${f#"$ROOT/"}"
       local entry="[$label] $rel:$line_num: $matched_line"
-      if [ "$severity" = "blocking" ]; then
-        BLOCKING_HITS+=("$entry")
-        BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
-      else
-        ADVISORY_HITS+=("$entry")
-        ADVISORY_TOTAL=$((ADVISORY_TOTAL + 1))
-      fi
+      BLOCKING_HITS+=("$entry")
+      BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
     done < <(grep -nE "$pattern1" "$f" 2>/dev/null | grep -vE "$exclude" || true)
   done
 }
@@ -276,25 +243,13 @@ run_pattern blocking "weak-gt-neg1" \
 check_count_no_else
 check_visible_no_else
 
-# === ADVISORY patterns (reported but non-blocking) ===
-
-# TODO: tighten comma-fallback-locator to blocking after burn-down
-run_pattern_pipe advisory "comma-fallback-locator" \
+# Comma-fallback locator: a selector list inside locator('...') hides which
+# element the page actually renders. Commas inside [attr=...] are excluded.
+run_pattern_pipe blocking "comma-fallback-locator" \
   "locator\((['\"])[^'\"]*,[^'\"]*\1\)" \
   "locator\([^)]*\[[^]]*,[^]]*\][^)]*\)"
 
 # --- Report ---
-if [ "$ADVISORY_TOTAL" -gt 0 ]; then
-  echo "=== Advisory (non-blocking) ==="
-  echo ""
-  for hit in "${ADVISORY_HITS[@]}"; do
-    echo "  $hit"
-  done
-  echo ""
-  echo "Advisory: $ADVISORY_TOTAL comma-fallback locator hits (burn-down tracked)."
-  echo ""
-fi
-
 if [ "$BLOCKING_TOTAL" -eq 0 ]; then
   echo "PASS: 0 blocking hits"
   exit 0

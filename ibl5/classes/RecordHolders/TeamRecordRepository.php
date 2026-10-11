@@ -87,8 +87,9 @@ final class TeamRecordRepository extends \Database\BaseMysqliRepository
                 WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid
                 ELSE bs.visitor_teamid END
             WHERE bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            ORDER BY value " . $safeOrder . ", bs.game_date ASC
+                AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID
+            // @phpstan-ignore ibl.orderByMissingTiebreaker ($safeOrder is a validated ASC/DESC constant; the full ORDER BY ends with the bs.id PK)
+            . " ORDER BY value " . $safeOrder . ", bs.game_date ASC, bs.id ASC
             LIMIT 5";
 
         $rows = $this->fetchAll($query);
@@ -195,9 +196,10 @@ final class TeamRecordRepository extends \Database\BaseMysqliRepository
             FROM `ibl_team_win_loss` twl
             JOIN `ibl_team_info` ti ON ti.team_name = twl.currentname
             WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND (twl.wins + twl.losses) > 0
-            ORDER BY (twl.wins / (twl.wins + twl.losses)) " . $safeOrder . ",
-                twl.wins " . $safeOrder . "
+                AND (twl.wins + twl.losses) > 0"
+            // @phpstan-ignore ibl.orderByMissingTiebreaker ($safeOrder is a validated ASC/DESC constant; the full ORDER BY ends with (year, teamid), unique per ibl_team_win_loss row)
+            . " ORDER BY (twl.wins / (twl.wins + twl.losses)) " . $safeOrder . ",
+                twl.wins " . $safeOrder . ", twl.year ASC, ti.teamid ASC
             LIMIT 5";
 
         $rows = $this->fetchAll($query);
@@ -252,8 +254,9 @@ final class TeamRecordRepository extends \Database\BaseMysqliRepository
                     ELSE bs.visitor_teamid END
                 WHERE " . $dateFilter . "
                     AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                ORDER BY value " . $safeOrder . ", bs.game_date ASC
+                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID
+                // @phpstan-ignore ibl.orderByMissingTiebreaker ($safeOrder is a validated ASC/DESC constant; the full ORDER BY ends with the bs.id PK)
+                . " ORDER BY value " . $safeOrder . ", bs.game_date ASC, bs.id ASC
                 LIMIT 5)";
         }
 

@@ -328,7 +328,6 @@ class ContractRulesTest extends TestCase
         $maxRaise = ContractRules::calculateMaxRaise($maxContract, 3);
 
         // Act - Calculate salaries like renderOfferButtons does
-        $year1 = $maxContract;
         $year2 = $maxContract + $maxRaise;
         $year3 = $maxContract + ($maxRaise * 2);
         $year4 = $maxContract + ($maxRaise * 3);
@@ -351,7 +350,6 @@ class ContractRulesTest extends TestCase
         $maxRaise = ContractRules::calculateMaxRaise($maxContract, 0);
 
         // Act - Calculate salaries like renderOfferButtons does
-        $year1 = $maxContract;
         $year2 = $maxContract + $maxRaise;
         $year3 = $maxContract + ($maxRaise * 2);
         $year4 = $maxContract + ($maxRaise * 3);

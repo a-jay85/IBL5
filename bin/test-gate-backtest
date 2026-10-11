@@ -15,12 +15,13 @@
 # fix) over a synthetic history, as the proof that the hold separates a noisy gate from a good one.
 
 set -euo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GB="$REPO_ROOT/bin/gate-backtest"
 
-T="$(mktemp -d)"
-trap 'rm -rf "$T"' EXIT
+h_tmp T
 export TMPDIR="$T/tmp"
 mkdir -p "$TMPDIR"
 export GIT_AUTHOR_NAME=T GIT_AUTHOR_EMAIL=t@t.com GIT_COMMITTER_NAME=T GIT_COMMITTER_EMAIL=t@t.com
@@ -31,9 +32,8 @@ NOW="2026-09-20T00:00:00Z"
 PMA_NOISY_REV="36ae7241de2a477bacb446f192d2722129125ca7"   # #2506 squash merge: the gate as it stood when #2506 shipped
 PMA_GOOD_REV="1174acbdbb5d8c41a87e8e7d3d01c312d18b751d"    # #2520: suppresses 5 token-notation false positives
 
-FAILED=0
-ok() { printf 'PASS %s\n' "$1"; }
-fail() { printf 'FAIL %s\n' "$1"; FAILED=1; }
+ok() { h_pass "$1"; }
+fail() { h_fail "$1"; }
 
 OUT=""
 ERR=""
@@ -342,6 +342,13 @@ rp_candidate() {
     mkdir -p "$RP/bin"
     cp "$REPO_ROOT/bin/$2" "$RP/bin/$2"
     chmod 755 "$RP/bin/$2"
+    # Carry the bin/lib files the gate sources, as a real branch adding them would.
+    # shellcheck disable=SC2016  # literal $SCRIPT_DIR in the sed pattern
+    sed -n 's|^source "\$SCRIPT_DIR/lib/\([A-Za-z0-9._-]*\)".*|\1|p' "$REPO_ROOT/bin/$2" \
+        | while IFS= read -r lib; do
+            mkdir -p "$RP/bin/lib"
+            cp "$REPO_ROOT/bin/lib/$lib" "$RP/bin/lib/$lib"
+        done
     git -C "$RP" add -A
     git -C "$RP" commit -q -m "feat: rp gate $2"
     git -C "$RP" checkout -q master
@@ -628,4 +635,4 @@ else
     run_case "$ARG"
 fi
 
-exit "$FAILED"
+h_done

@@ -47,7 +47,7 @@ class FreeAgencyEntryPointTest extends ModuleEntryPointTestCase
             'pid' => '0',
         ]));
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testNegotiateActionRendersNegotiationPage(): void
@@ -75,7 +75,7 @@ class FreeAgencyEntryPointTest extends ModuleEntryPointTestCase
             'pid' => '1',
         ]));
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testUnknownActionFallsToDisplay(): void
@@ -92,7 +92,7 @@ class FreeAgencyEntryPointTest extends ModuleEntryPointTestCase
             'pid' => '0',
         ]));
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testQueryParameterReachesRenderedOutputThroughHttpRequest(): void

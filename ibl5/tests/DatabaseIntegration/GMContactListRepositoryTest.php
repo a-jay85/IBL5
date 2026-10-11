@@ -34,7 +34,7 @@ class GMContactListRepositoryTest extends DatabaseTestCase
     {
         $contacts = $this->repo->getAllTeamContacts();
 
-        self::assertNotEmpty($contacts);
+        self::assertNotSame([], $contacts);
         $first = $contacts[0];
         self::assertArrayHasKey('teamid', $first);
         self::assertArrayHasKey('team_city', $first);
@@ -92,5 +92,15 @@ class GMContactListRepositoryTest extends DatabaseTestCase
             array_unique($teamIds),
             'each in-range team must appear exactly once; a collapsing GROUP BY/DISTINCT or a fan-out JOIN would break this'
         );
+    }
+
+    public function testGetAllTeamContactsBreaksTeamCityTiesByTeamidAscending(): void
+    {
+        $this->db->query("UPDATE ibl_team_info SET team_city = 'Aaa Tie' WHERE teamid IN (12, 3)");
+        $this->db->query("UPDATE ibl_team_info SET team_city = 'Aaa Lead' WHERE teamid = 20");
+
+        $teamids = array_map('intval', array_column($this->repo->getAllTeamContacts(), 'teamid'));
+
+        self::assertSame([20, 3, 12], array_slice($teamids, 0, 3));
     }
 }

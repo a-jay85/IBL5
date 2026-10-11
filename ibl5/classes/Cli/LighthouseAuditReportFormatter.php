@@ -6,6 +6,13 @@ namespace Cli;
 
 final class LighthouseAuditReportFormatter
 {
+    private \Clock\ClockInterface $clock;
+
+    public function __construct(?\Clock\ClockInterface $clock = null)
+    {
+        $this->clock = $clock ?? new \Clock\SystemClock();
+    }
+
     /**
      * @param list<array{url: string, summary: array<string, float>}> $manifest
      * @return array{title: string, body: string}
@@ -16,7 +23,7 @@ final class LighthouseAuditReportFormatter
         ?string $workflowUrl = null,
         ?float $durationSeconds = null,
     ): array {
-        $date = date('Y-m-d');
+        $date = date('Y-m-d', $this->clock->now());
         $title = "Lighthouse Audit \u{2014} Week of $date";
 
         if ($manifest === []) {

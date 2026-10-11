@@ -25,12 +25,13 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLEANUP="$SCRIPT_DIR/cleanup"
 TMP="$(mktemp -d)"
-trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
-
-FAILED=0
+trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null; h_cleanup' EXIT
 
 # A table-driven gh stub keyed off an optional $GH_FIXTURE file. With no fixture
 # (unset or missing file) it exits 1 — byte-identical to the legacy always-fail
@@ -122,8 +123,8 @@ exit 0
 DOCKERSTUB
 chmod +x "$STUBBIN/docker"
 
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 # assert_match <name> <regex> <haystack>
 assert_match() {
@@ -351,10 +352,7 @@ fi
 # shellcheck source=bin/lib/wt-guards.sh
 . "$SCRIPT_DIR/lib/wt-guards.sh"
 hu="$TMP/huf"
-git init -q "$hu"
-git -C "$hu" config user.email t@example.com
-git -C "$hu" config user.name tester
-git -C "$hu" config commit.gpgsign false
+h_git_repo "$hu" --no-commit
 printf 'seed\n' > "$hu/seed.txt"
 git -C "$hu" add seed.txt
 git -C "$hu" commit -qm seed
@@ -945,7 +943,7 @@ _reap_kill_procs() {
         kill -9 "$p" 2>/dev/null || true
     done
 }
-trap '_reap_kill_procs; chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
+trap '_reap_kill_procs; chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null; h_cleanup' EXIT
 sleep 1
 kill_infra_processes "$kw"
 sleep 1
@@ -1082,6 +1080,25 @@ if [ "$gwp_rc" -eq 0 ] && [ "$gwp_out" = "/tmp/gwp-first" ]; then
     pass "get-worktree-path-no-sigpipe"
 else
     failcase "get-worktree-path-no-sigpipe (rc=$gwp_rc out=$gwp_out)"
+fi
+
+# Same class in bin/cleanup's own readers. A 141 here killed every wt-gc
+# sweep, so merged worktrees and their Docker stacks piled up.
+gbw_fn="$(sed -n '/^get_branch_for_worktree()/,/^}/p' "$CLEANUP")"
+gbw_rc=0
+gbw_out="$(PATH="$gwp_bin:$PATH" bash -c \
+    'set -euo pipefail; REPO_ROOT=/tmp; eval "$1"; get_branch_for_worktree /tmp/gwp-first' \
+    _ "$gbw_fn")" || gbw_rc=$?
+if [ "$gbw_rc" -eq 0 ] && [ "$gbw_out" = "gwp-target" ]; then
+    pass "get-branch-for-worktree-no-sigpipe"
+else
+    failcase "get-branch-for-worktree-no-sigpipe (rc=$gbw_rc out=$gbw_out)"
+fi
+if grep -A8 -- 'worktree list --porcelain' "$CLEANUP" \
+    | grep -qE '^[[:space:]]*exit[[:space:]]*$|;[[:space:]]*exit[[:space:]]*\}'; then
+    failcase "cleanup-worktree-list-awk-no-early-exit"
+else
+    pass "cleanup-worktree-list-awk-no-early-exit"
 fi
 rm -rf "$gwp_bin"
 
@@ -1257,9 +1274,4 @@ else
     failcase "wt-down-orphan-gh-missing (log: $(cat "$wtd_log"))"
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

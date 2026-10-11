@@ -6,6 +6,7 @@ namespace Tests\Unit\PageLayout;
 
 use PageLayout\PageLayout;
 use PHPUnit\Framework\TestCase;
+use Tests\Clock\FixedClock;
 
 class PageLayoutTest extends TestCase
 {
@@ -50,6 +51,7 @@ class PageLayoutTest extends TestCase
     {
         $_SERVER = $this->savedServer;
         $_SESSION = $this->savedSession;
+        PageLayout::setTestClock(null);
 
         foreach ($this->savedGlobals as $key => $value) {
             if ($value === '__UNSET__') {
@@ -199,6 +201,16 @@ class PageLayoutTest extends TestCase
         self::assertMatchesRegularExpression('/<!--.*Page Generation.*-->/', $output);
     }
 
+    public function testRenderPageGenerationTimeReportsElapsedSecondsSinceStartTime(): void
+    {
+        $GLOBALS['start_time'] = microtime(true) - 1.234;
+        ob_start();
+        PageLayout::renderPageGenerationTime();
+        $output = (string) ob_get_clean();
+
+        self::assertMatchesRegularExpression('/^<!-- .+ 1\.\d\d .+ -->\n$/', $output);
+    }
+
     public function testRenderPageGenerationTimeUsesDefinedLabels(): void
     {
         if (!defined('_PAGEGENERATION')) {
@@ -214,6 +226,47 @@ class PageLayoutTest extends TestCase
 
         self::assertStringContainsString(\_PAGEGENERATION, $output);
         self::assertStringContainsString(\_SECONDS, $output);
+    }
+
+    public function testRenderPageGenerationTimeUsesInjectedClock(): void
+    {
+        $label = defined('_PAGEGENERATION') ? \_PAGEGENERATION : 'Page Generation:';
+        $unit = defined('_SECONDS') ? \_SECONDS : 'seconds';
+        $GLOBALS['start_time'] = 1791549296.0;
+        PageLayout::setTestClock(new FixedClock(1791549296, 1791549296.25));
+
+        ob_start();
+        PageLayout::renderPageGenerationTime();
+        $output = (string) ob_get_clean();
+
+        self::assertSame("<!-- {$label} 0.25 {$unit} -->\n", $output);
+    }
+
+    public function testRenderPageGenerationTimeZeroElapsed(): void
+    {
+        $label = defined('_PAGEGENERATION') ? \_PAGEGENERATION : 'Page Generation:';
+        $unit = defined('_SECONDS') ? \_SECONDS : 'seconds';
+        $GLOBALS['start_time'] = 1791549296.0;
+        PageLayout::setTestClock(new FixedClock(1791549296));
+
+        ob_start();
+        PageLayout::renderPageGenerationTime();
+        $output = (string) ob_get_clean();
+
+        self::assertSame("<!-- {$label} 0 {$unit} -->\n", $output);
+    }
+
+    public function testSetTestClockNullRestoresSystemClock(): void
+    {
+        PageLayout::setTestClock(new FixedClock(1791549296, 1791549296.25));
+        PageLayout::setTestClock(null);
+        $GLOBALS['start_time'] = microtime(true) - 1.234;
+
+        ob_start();
+        PageLayout::renderPageGenerationTime();
+        $output = (string) ob_get_clean();
+
+        self::assertMatchesRegularExpression('/^<!-- .+ 1\.\d\d .+ -->\n$/', $output);
     }
 
     public function testHeaderBoostedShowsAdminPhaseGateNotice(): void

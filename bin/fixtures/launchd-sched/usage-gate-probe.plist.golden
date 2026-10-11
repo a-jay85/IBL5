@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.usage-gate-keychain-probe</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>if security find-generic-password -s "Claude Code-credentials" -w 2&gt;/dev/null | jq -e -r '.claudeAiOauth.accessToken | length &gt; 0' &gt;/dev/null; then printf 'ok %s\n' "$(date -u +%FT%TZ)"; else printf 'fail rc=%s %s\n' "$?" "$(date -u +%FT%TZ)"; fi &gt; '@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate/keychain-probe.txt'</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:@HOME@/.local/bin</string>
+	</dict>
+</dict>
+</plist>

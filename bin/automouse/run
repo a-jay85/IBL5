@@ -647,6 +647,9 @@ WATCHER_PID=""
 CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
 COST_LOCK_HELD=0  # set to 1 while append_cost_row holds the cost-report mutex
 CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded or wt-new-failed this run; claim_next_plan skips them
+WT_REFUSE_RETRIED=" "  # space-wrapped basenames whose worktree-refused impl resume was already retried this run
+WT_REFUSE_LOCK=""      # claim lock re-armed for a worktree-refusal retry and not yet re-claimed; released after the loop
+WT_REFUSE_RETRY_WT=""  # worktree path the retried resume prompt sends the agent back to; consumed once
 DEPENDS_HELD=" "  # space-wrapped basenames dependency-held this run; claim_next_plan skips them
 # Stop-file writer: records why this runner stopped, for bin/fleet-status.
 # Called only from cleanup_watcher, the EXIT trap. A clean finish already leaves
@@ -696,6 +699,18 @@ note_failure() {
     FAIL_NOTES="${FAIL_NOTES:-}  - $1
 "
 }
+# note_stop: a loop break site that ends the run early. Same FAIL_NOTES line as
+# note_failure "$1 $2", plus the cause and the next step for the one stop DM that
+# cleanup_watcher sends. First call wins: the loop breaks right after, so a
+# second call can only come from a future edit, and the first cause is the real one.
+# Call it ONLY next to a `break`. Non-stopping problems keep note_failure.
+note_stop() {
+    note_failure "$1 $2"
+    if [ -z "${STOP_DM_CAUSE:-}" ]; then
+        STOP_DM_CAUSE="$1"
+        STOP_DM_NEXT="$2"
+    fi
+}
 
 print_stop_reason() {
     local rc=$1 why="" detail=""
@@ -732,6 +747,44 @@ print_stop_reason() {
 }
 # End stop-reason printer.
 
+# Stop-DM sender: one Discord DM, one line, when an armed run ended early: a
+# signal, a crash, a partway quit, or a note_stop break site. Runs once, from
+# cleanup_watcher, after print_stop_reason. Silent for a clean finish, the login
+# break (login_preflight already DMs once per outage), the post-plan hold
+# (notify_postplan_hold already DMs) and the single-plan designed stop. Never
+# fails: DM output and errors go to $LOG, and an undeliverable DM is spooled by
+# discord-dm itself.
+send_stop_dm() {
+    local rc=$1 cause next log="${LOG:-/dev/null}"
+    [ "${STOP_DM_ARMED:-0}" = 1 ] || return 0
+    case "$rc" in
+        129) cause="It was stopped by a hangup signal (SIGHUP), usually a closed terminal or a logout."
+             next="Rerun bin/automouse/run if the stop was not intended. The plan it was on stays in queue/." ;;
+        130) cause="It was interrupted (SIGINT, Ctrl-C)."
+             next="Rerun bin/automouse/run if the stop was not intended. The plan it was on stays in queue/." ;;
+        143) cause="It was stopped by SIGTERM (a kill, a launchd unload, or a shutdown)."
+             next="Rerun bin/automouse/run if the stop was not intended. The plan it was on stays in queue/." ;;
+        0)
+            if [ "${STOP_CLEAN:-0}" != 1 ]; then
+                cause="It quit partway with exit code 0 before finishing the loop."
+                next="Read $log, then rerun bin/automouse/run."
+            elif [ -n "${STOP_DM_CAUSE:-}" ]; then
+                cause="$STOP_DM_CAUSE"
+                next="${STOP_DM_NEXT:-Read $log.}"
+            else
+                return 0
+            fi ;;
+        *)  cause="It crashed with exit code $rc${FAIL_LINE:+ at line $FAIL_LINE}."
+            next="Read $log, then rerun bin/automouse/run." ;;
+    esac
+    printf 'Automouse run %s ended early: %s Next: %s\n' "$$" "$cause" "$next" \
+        | "$SELF_DIR/../discord-dm" - --attempts 2 --quiet >> "$log" 2>&1 \
+        || { echo "Stop DM undeliverable (spooled)." >> "$log"; } 2>/dev/null \
+        || true
+    return 0
+}
+# End stop-DM sender.
+
 cleanup_watcher() {
     local stop_rc=$?
     if [ -n "$WATCHER_PID" ]; then
@@ -753,7 +806,9 @@ cleanup_watcher() {
     fi
     write_stop_file "$stop_rc"
     print_stop_reason "$stop_rc"
+    send_stop_dm "$stop_rc"
 }
+STOP_DM_ARMED=0
 trap cleanup_watcher EXIT
 # Record the last failing command so print_stop_reason can name it after a set -e
 # abort. -E makes functions and subshells inherit the trap. Assignments only.
@@ -779,7 +834,20 @@ trap 'exit_on_signal 129' HUP
 
 run_heartbeat_watcher() {
     local hb_file=$1 log_file=$2 label=$3 pid_file=$4 slug=$5
-    while sleep 60; do
+    # Orphan exit: this function runs as a backgrounded subshell of the run, so
+    # $$ is the run's pid ($BASHPID would be our own, $PPID the run's parent).
+    # A SIGKILLed run skips cleanup_watcher's kill, so the watcher must notice
+    # on its own or it loops under PPID 1 forever. The tick stays `sleep 60` by
+    # default: the self-heal orphan sweep keys on that exact child argv.
+    local parent=$$ tick=${HEARTBEAT_TICK_SECS:-60}
+    case "$tick" in ''|*[!0-9]*) tick=60 ;; esac
+    [ "$tick" -ge 1 ] || tick=60
+    while sleep "$tick"; do
+        if ! kill -0 "$parent" 2>/dev/null; then
+            printf '[%s] %s heartbeat: %s watcher exiting, parent run %s is gone\n' \
+                "$(date +%H:%M:%S)" "$slug" "$label" "$parent" >> "$log_file" 2>/dev/null || true
+            return 0
+        fi
         if [ ! -f "$hb_file" ]; then
             continue
         fi
@@ -1220,8 +1288,8 @@ dispose_plan_postplan_blocked() {
         /^=== end blocked ship ===$/       { if (inb) exit }
         inb' || true)
     if [ -z "$pp_block" ]; then
-        pp_block=$(printf '%s did not ship. No PR opened.\n\nWhy: the ship step stopped and the log has the reason.\n\nFix:\n  1. cd %s\n  2. Read the log named on the Log line below and fix what it reports\n  3. bin/post-plan-now\n\nOr open Claude in that folder and ask it to fix the ship block.\nLog: %s' \
-            "$plan_slug" "${PP_WORKTREE:-unknown}" "$LOG")
+        pp_block=$(printf '%s did not ship. No PR opened.\n\nWhy: the ship step stopped and the log has the reason.\n\nFix:\n  1. cd %s\n  2. Read the log named on the Log line below and fix what it reports\n  3. bin/post-plan-now\n\nLog: %s\nOr paste this to have Claude fix it:\n%s/bin/postplan-fix %s' \
+            "$plan_slug" "${PP_WORKTREE:-unknown}" "$LOG" "$REPO" "$plan_slug")
     fi
     printf '[%s] %s postplan terminal (rc=3) — moving to skipped/\n' \
         "$(date +%H:%M:%S)" "$plan_slug" >> "$LOG"
@@ -1297,12 +1365,22 @@ phase_stalled() {
 # With it, the exit falls through to the WT-NEW FAILURE branch in the main loop
 # as a counted attempt, bounded by MAX_ATTEMPTS.
 #
+# The wt_refused guard (7th arg, default 0) covers Claude Code's resume safety
+# check: `claude --resume <sid>` exits 1 within seconds with "Error: cannot
+# resume into worktree <wt>: Refusing to use <wt> as an isolation worktree"
+# when the session transcript recorded <wt> as its launch checkout. Claude Code
+# clears the binding before exiting, so the same resume succeeds on re-run.
+# The exit is deterministic, never environmental: the main loop retries it once
+# per plan per run (WT_REFUSE_RETRIED), and a second refusal falls through to
+# the genuine-failure branch as a counted attempt, bounded by MAX_ATTEMPTS.
+#
 # Safe under `set -e`: only ever called inside an `if` condition.
 should_impl_env_stop() {
-    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5 wt_fail=${6:-0}
+    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5 wt_fail=${6:-0} wt_refused=${7:-0}
     [ "$handoff" -eq 1 ] && return 1     # handoff written → impl succeeded
     [ "$in_queue" -eq 0 ] && return 1    # plan left queue/ → deliberate disposition, not environmental
     [ "$wt_fail" -eq 1 ] && return 1     # agent reported a bin/wt-new failure → counted attempt, not environmental
+    [ "$wt_refused" -eq 1 ] && return 1  # Claude Code refused the worktree resume → deterministic; caller retries once, else counted attempt
     [ "$env_err" -eq 1 ] || [ "$stalled" -eq 1 ] || [ "$fast" -eq 1 ]
 }
 
@@ -1325,6 +1403,13 @@ automouse_pr_state() {
         return 0
     fi
     return 1
+}
+
+# claim_pr_terminal <plan_name> <pr_state>: rc 0 when a branch PR in <pr_state> ends
+# the plan at claim time. Without a handoff any OPEN or MERGED PR does. With one,
+# only MERGED does: an OPEN PR may still need post-plan to finish.
+claim_pr_terminal() {
+    [ ! -f "$HANDOFF_DIR/$1.json" ] || [ "$2" = MERGED ]
 }
 
 # Resolve the git branch for a plan. Prefers the handoff JSON's "branch" field
@@ -1409,6 +1494,54 @@ dispose_plan_done() {
         } > "$report"
     fi
     echo "Loop-side disposition ($site): PR $pr_state ($pr_url) — moved $plan_name to done/." >> "$LOG"
+}
+
+# Resumed-post-plan disposal. A claim lock held for a post-plan usage-gate pause
+# (paused-held sid plus post-plan evidence: the handoff or the $lock/branch
+# breadcrumb) outlives the post-plan-now run the coordinator resumed. Once that run
+# is over and the branch has an OPEN or MERGED PR, the plan has shipped, so dispose
+# it to done/ instead of skipping it or stealing the lock and re-running it.
+# rc 0 = disposed (the CALLER removes the lock); rc 1 = untouched. Every doubt is
+# rc 1: a live marker, a clear younger than the grace window, an in-flight or
+# unreadable launchctl listing, a failed PR lookup. Prints nothing on stdout, because
+# claim_next_plan's stdout is the claimed plan path.
+dispose_resumed_postplan_lock() {
+    local plan_name=$1 lock=$2 slug sid stamp at now branch crumb listing pr
+    local _pid _status label safe
+    slug=${plan_name%.md}
+    sid=$(cat "$lock/paused-held" 2>/dev/null) || sid=""
+    usage_valid_sid "$sid" || return 1
+    # Post-plan phase evidence. An impl-paused lock has neither, so it is never disposed.
+    [ -f "$HANDOFF_DIR/${plan_name}.json" ] || [ -s "$lock/branch" ] || return 1
+    if usage_marker_exists "$sid"; then return 1; fi
+    # Grace window: covers the gap between the marker clear and the launchd job load.
+    stamp="$(usage_state_dir)/cleared/$sid"
+    if [ -e "$stamp" ]; then
+        at=$(cat "$stamp" 2>/dev/null) || at=""
+        case "$at" in ''|*[!0-9]*) return 1 ;; esac
+        now=$(date +%s)
+        [ "$(( now - at ))" -ge "${RESUMED_POSTPLAN_GRACE_SECS:-300}" ] || return 1
+    fi
+    # Branch: handoff .branch, else the breadcrumb, else the slug.
+    branch=$(automouse_branch_for_plan "$plan_name" "$slug")
+    if [ "$branch" = "$slug" ]; then
+        crumb=$(head -n 1 "$lock/branch" 2>/dev/null) || crumb=""
+        if [ -n "$crumb" ]; then branch=$crumb; fi
+    fi
+    # In-flight post-plan-now launchd job: fail-closed on an unreadable or empty listing.
+    listing=$("${LAUNCHCTL_CMD:-launchctl}" list 2>/dev/null) || return 1
+    [ -n "$listing" ] || return 1
+    while IFS=$'\t' read -r _pid _status label; do
+        for safe in "$(printf '%s' "$slug" | tr -cs 'A-Za-z0-9._-' '-')" \
+                    "$(printf '%s' "$branch" | tr -cs 'A-Za-z0-9._-' '-')"; do
+            case "$label" in
+                "com.ibl5.postplan-now-${safe}-"[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9]*)
+                    return 1 ;;
+            esac
+        done
+    done <<< "$listing"
+    pr=$(automouse_pr_state "$branch") || return 1
+    dispose_plan_done "$plan_name" "$slug" "${pr%% *}" "${pr#* }" resumed-postplan
 }
 
 # Postplan no-worktree disposition. Called when the postplan phase has no worktree
@@ -1815,10 +1948,21 @@ claim_next_plan() {
         # A lock held for a usage-gate pause is not stale, whatever its pid or age says.
         held=$(cat "$lock/paused-held" 2>/dev/null) || held=""
         if [ -n "$held" ] && usage_paused_hold_live "$held" "$LOCK_TTL_SECS"; then
+            # Resumed-post-plan disposal (hold window): a resumed post-plan that already
+            # shipped leaves this lock behind. Dispose first, remove the lock last.
+            if dispose_resumed_postplan_lock "$plan_name" "$lock"; then
+                rm -rf "$lock" 2>/dev/null || true
+            fi
             continue
         fi
         if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
            || [ "$(( now - lock_epoch ))" -gt "$LOCK_TTL_SECS" ]; then
+            # Resumed-post-plan disposal (before steal): an expired paused-held lock whose
+            # post-plan shipped is done, so never steal it and re-run the plan.
+            if dispose_resumed_postplan_lock "$plan_name" "$lock"; then
+                rm -rf "$lock" 2>/dev/null || true
+                continue
+            fi
             rm -rf "$lock" 2>/dev/null || true
             # Re-create atomically; the loser of a two-stealer race fails mkdir
             # here and simply falls through to the next plan.
@@ -1854,8 +1998,11 @@ PLANS_RUN=0
 STOP_CAUSE=""
 STOP_CLEAN=0
 FAIL_NOTES=""
+STOP_DM_CAUSE=""
+STOP_DM_NEXT=""
 
 echo "=== Automouse session starting at $(date) ===" >> "$LOG"
+STOP_DM_ARMED=1
 
 # Freshen the reference checkout's master so the self-heal staleness guard below
 # sees origin's latest — a re-created file or a widened guard only exists locally
@@ -1922,7 +2069,7 @@ while true; do
     ELAPSED=$(( $(date +%s) - START ))
     if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
         echo "Time guard: ${ELAPSED}s elapsed (max ${MAX_ELAPSED}s), stopping." >> "$LOG"
-        note_failure "The time limit (about 4h45m) was reached, so no more plans were started. Plans still in queue/ will run next time."
+        note_stop "The time limit (about 4h45m) was reached, so no more plans were started." "Plans still in queue/ will run next time."
         break
     fi
 
@@ -1937,15 +2084,28 @@ while true; do
     # Atomically claim the oldest queued plan not held by a live sibling runner.
     # If every queued plan is already claimed, there's nothing for us to do.
     NEXT_PLAN=$(claim_next_plan) || NEXT_PLAN=""
+    if [ -n "$WT_REFUSE_LOCK" ] && [ -n "$NEXT_PLAN" ] \
+       && [ "$QUEUE_DIR/$(basename "$NEXT_PLAN").lock" = "$WT_REFUSE_LOCK" ]; then
+        WT_REFUSE_LOCK=""   # re-claimed via the resume takeover; the normal lock lifecycle owns it again
+    fi
     if [ -z "$NEXT_PLAN" ]; then
         if [ -n "${SINGLE_PLAN:-}" ]; then
             echo "Plan ${SINGLE_PLAN%.md} is being processed by another runner — nothing to do." >> "$LOG"
         elif [ "$CAP_DEFERRED" != " " ]; then
             echo "No claimable plan left. Deferred to the next run (cap-refunded or wt-new failure):${CAP_DEFERRED% } — stopping." >> "$LOG"
+            if [ "$PLANS_RUN" -eq 0 ]; then
+                note_stop "No plan was started: every queued plan was deferred to the next run (${CAP_DEFERRED% })." "They retry on the next scheduled run. Read $LOG for why each was deferred."
+            fi
         elif [ "$DEPENDS_HELD" != " " ]; then
             echo "No claimable plan left. Dependency-held this run:${DEPENDS_HELD% } — stopping." >> "$LOG"
+            if [ "$PLANS_RUN" -eq 0 ]; then
+                note_stop "No plan was started: every queued plan is waiting on a dependency (${DEPENDS_HELD% })." "Merge or fix the named dependencies, then rerun."
+            fi
         else
             echo "All queued plans are claimed by a concurrent runner — nothing to do." >> "$LOG"
+            if [ "$PLANS_RUN" -eq 0 ]; then
+                note_stop "No plan was started: another automouse runner has claimed every queued plan." "Nothing to do. Check bin/fleet-status if no other run should be active."
+            fi
         fi
         break
     fi
@@ -2055,19 +2215,22 @@ while true; do
             ;;
     esac
 
-    # Terminal-disposition guard: no handoff to resume, but the branch already has an
-    # OPEN or MERGED PR ⇒ this plan's work has shipped. Dispose to done/ without
-    # spending a single claude -p invocation. Fail-closed: any gh error, no PR, or a
-    # CLOSED-only match falls through to the normal attempt below.
-    if [ ! -f "$HANDOFF_DIR/${PLAN_NAME}.json" ]; then
-        CLAIM_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
-        if CLAIM_PR=$(automouse_pr_state "$CLAIM_BRANCH"); then
-            dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
-                "${CLAIM_PR%% *}" "${CLAIM_PR#* }" claim-time
-            rm -rf "$CURRENT_LOCK" 2>/dev/null || true
-            CURRENT_LOCK=""
-            continue
-        fi
+    # Terminal-disposition guard: the branch already has an OPEN or MERGED PR ⇒ this
+    # plan's work has shipped. Dispose to done/ without spending a single claude -p
+    # invocation. A handoff means post-plan still has work, so an OPEN PR with a
+    # handoff falls through to resume it. A MERGED PR is terminal even with a handoff:
+    # a paused post-plan that resumed and merged under post-plan-now leaves both the
+    # handoff and the claim lock behind, and resuming it would rerun post-plan on a
+    # merged PR. Fail-closed: any gh error, no PR, or a CLOSED-only match falls
+    # through to the normal attempt below.
+    CLAIM_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
+    if CLAIM_PR=$(automouse_pr_state "$CLAIM_BRANCH") \
+       && claim_pr_terminal "$PLAN_NAME" "${CLAIM_PR%% *}"; then
+        dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
+            "${CLAIM_PR%% *}" "${CLAIM_PR#* }" claim-time
+        rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+        CURRENT_LOCK=""
+        continue
     fi
 
     # A sentinel left by a crashed earlier run must not classify THIS attempt.
@@ -2099,6 +2262,14 @@ while true; do
         CMDPID_FILE="$NIGHTLY_DIR/.cmdpid-$$-impl"
         FAILSIG_FILE="$NIGHTLY_DIR/.failsig-$$-impl"   # last failing tool call of this impl attempt (stream-filter side file; never in $LOG)
         rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE" "$FAILSIG_FILE"
+
+        # Login re-probe before the impl spawn: park (attempt refunded, queue intact, stop)
+        if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
+            echo "Login expired before the impl spawn: refunding attempt, queue intact, stopping loop." >> "$LOG"
+            refund_attempt
+            break
+        fi
+        # End login re-probe before the impl spawn
 
         run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "impl" "$CMDPID_FILE" "$PLAN_SLUG" &
         WATCHER_PID=$!
@@ -2197,6 +2368,13 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             if usage_session_started "$IMPL_SID"; then
                 IMPL_PROMPT="Continue the implementation from where it stopped. The previous turn was paused by the usage gate."
                 IMPL_SESSION_ARGS=(--resume "$IMPL_SID")
+                if [ -n "$WT_REFUSE_RETRY_WT" ]; then
+                    # Worktree-refusal retry: Claude Code cleared the session's worktree
+                    # binding, so this resume runs in $REPO with no isolation. Send the
+                    # agent back to its worktree by absolute path before any edit.
+                    IMPL_PROMPT="Continue the implementation from where it stopped. The previous turn was paused by the usage gate. Claude Code then refused to resume this session into its worktree and cleared the worktree binding, so this session now runs in the main checkout $REPO without worktree isolation. The main checkout is read-only. Before ANY edit or git command, run: cd $WT_REFUSE_RETRY_WT && git -C $WT_REFUSE_RETRY_WT status. Make every edit under $WT_REFUSE_RETRY_WT. Never edit files under $REPO directly."
+                    WT_REFUSE_RETRY_WT=""
+                fi
             else
                 IMPL_SESSION_ARGS=(--session-id "$IMPL_SID")
             fi
@@ -2282,6 +2460,8 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # A bin/wt-new failure (the agent dropped $WT_FAIL_FILE, plan still in
         # queue/) is also NOT environmental: it falls through to the WT-NEW
         # FAILURE branch below as a counted, run-deferred attempt.
+        # A worktree-resume refusal (Claude Code's resume safety check) is also NOT
+        # environmental: it is retried once just below, then counted and deferred.
         # EXCEPTION, handled just below: a slow failure that was the wall-clock
         # cap itself is refunded by the bounded cap-timeout breaker, up to
         # CAP_REFUND_LIMIT times per plan.
@@ -2296,7 +2476,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 || usage_postrun_pause automouse "$IMPL_SID" "$AUTOMOUSE_BIN" any "$LOG" "$IMPL_LOG_BEFORE"; }; then
             printf '%s\n' "$IMPL_SID" > "$CURRENT_LOCK/paused-held"
             echo "Impl paused (usage gate) — session $IMPL_SID; coordinator resumes it. Refunding attempt, stopping loop." >> "$LOG"
-            note_failure "You hit your Claude usage limit while building ${PLAN_NAME%.md}. It is paused and resumes on its own when the limit resets. The try was not counted."
+            note_stop "You hit your Claude usage limit while building ${PLAN_NAME%.md}." "It is paused and resumes on its own when the limit resets. The try was not counted."
             refund_attempt
             CURRENT_LOCK=""
             break
@@ -2306,7 +2486,32 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         IMPL_STALLED=0;  phase_stalled "$IMPL_LOG_BEFORE"   && IMPL_STALLED=1
         IMPL_FAST=0;     [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ] && IMPL_FAST=1
         IMPL_WT_FAIL=0;  [ -f "$WT_FAIL_FILE" ]  && IMPL_WT_FAIL=1
-        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST" "$IMPL_WT_FAIL"; then
+        IMPL_WT_REFUSED=0; usage_is_wt_resume_refused "$LOG" "$IMPL_LOG_BEFORE" && IMPL_WT_REFUSED=1
+        # Worktree-resume refusal retry guard: Claude Code's resume safety check
+        # refused `--resume` into the session's worktree and cleared the binding
+        # (deterministic, never environmental). Retry the same session ONCE per plan
+        # per run through the --resume-paused takeover; the retried prompt carries
+        # the absolute worktree path. A second refusal is a counted attempt.
+        WT_REFUSE_SEEN=0
+        case "$WT_REFUSE_RETRIED" in *" $PLAN_NAME "*) WT_REFUSE_SEEN=1 ;; esac
+        if [ "$IMPL_WT_REFUSED" -eq 1 ] && [ "$IMPL_HANDOFF" -eq 0 ] && [ "$IMPL_IN_QUEUE" -eq 1 ]; then
+            if [ "$WT_REFUSE_SEEN" -eq 0 ] && [ -n "$IMPL_SID" ] && [ -n "$IMPL_WT" ] && [ -d "$IMPL_WT" ]; then
+                echo "WORKTREE RESUME REFUSED — Claude Code would not resume session $IMPL_SID into $IMPL_WT and cleared the binding. Refunding attempt; retrying the resume once." >> "$LOG"
+                refund_attempt
+                PLANS_RUN=$(( PLANS_RUN - 1 ))
+                WT_REFUSE_RETRIED="$WT_REFUSE_RETRIED$PLAN_NAME "
+                printf '%s\n' "$IMPL_SID" > "$CURRENT_LOCK/paused-held"
+                WT_REFUSE_LOCK="$CURRENT_LOCK"
+                WT_REFUSE_RETRY_WT="$IMPL_WT"
+                RESUME_SID="$IMPL_SID"
+                RESUME_PLAN="$NEXT_PLAN"
+                CURRENT_LOCK=""
+                continue
+            fi
+            echo "WORKTREE RESUME REFUSED AGAIN — session ${IMPL_SID:-none} for $PLAN_NAME; counted as a genuine attempt ($(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS), deferred to the next run." >> "$LOG"
+            CAP_DEFERRED="$CAP_DEFERRED$PLAN_NAME "
+        fi
+        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST" "$IMPL_WT_FAIL" "$IMPL_WT_REFUSED"; then
             REASON="usage/rate limit, auth error, or transient"
             if [ "$IMPL_STALLED" -eq 1 ]; then
                 REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
@@ -2314,7 +2519,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 REASON="$REASON (impl exited in ${IMPL_DUR}s)"
             fi
             echo "Environmental failure during impl — $REASON. Refunding attempt, stopping loop." >> "$LOG"
-            note_failure "Building ${PLAN_NAME%.md} hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
+            note_stop "Building ${PLAN_NAME%.md} hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
             refund_attempt
             write_env_stop_report "$PLAN_NAME" impl "$REASON" "$IMPL_LOG_BEFORE"
             break
@@ -2431,6 +2636,14 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # --output-format stream-json, which post-plan-now's $CMD never emits. The watcher
         # short-circuits on `[ ! -f "$hb_file" ]`, so it costs one idle sleep loop. The live
         # bound here is `timeout "$REMAINING_SECS"` (MAX_PP_SECS, 5400). Kept deliberately.
+        # Login re-probe before the post-plan spawn: park (attempt refunded, handoff kept, stop)
+        if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
+            echo "Login expired before the post-plan spawn: refunding attempt, handoff kept, stopping loop." >> "$LOG"
+            refund_attempt
+            break
+        fi
+        # End login re-probe before the post-plan spawn
+
         run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "postplan" "$CMDPID_FILE" "$PLAN_SLUG" &
         WATCHER_PID=$!
 
@@ -2498,6 +2711,14 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             dispose_plan_postplan_blocked "$PLAN_NAME" "$PLAN_SLUG" "$PP_LOG_BEFORE"
             note_failure "Shipping $PLAN_SLUG was blocked, so no PR was opened. It was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$PLAN_SLUG.md"
         fi
+        # postplan-rc8-declined: begin
+        # post-plan-now exit 8 = it declined a repeat hold (holdrepeat or held-unfixable
+        # marker). Nothing ran, so a sub-minute exit with the handoff present is not environmental.
+        if [ "$PP_STATUS" -eq 8 ]; then
+            PP_TERMINAL=1
+            printf '[%s] %s post-plan-now declined a repeat hold (rc=8), not environmental\n' "$(date +%H:%M:%S)" "$PLAN_SLUG" >> "$LOG"
+        fi
+        # postplan-rc8-declined: end
         # postplan-no-worktree-merged: begin
         # A no-worktree postplan exit (pre-call resolver miss, or post-plan-now rc=7)
         # whose branch PR is MERGED already went to done/ via
@@ -2517,7 +2738,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 write_env_stop_report "$PLAN_NAME" postplan \
                     "post-plan-now exited 7 (no worktree) and the branch PR is not MERGED" \
                     "$PP_LOG_BEFORE"
-                note_failure "Shipping $PLAN_SLUG could not find its worktree, and its PR has not merged. The run stopped and the try was not counted. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
+                note_stop "Shipping $PLAN_SLUG could not find its worktree, and its PR has not merged. The run stopped and the try was not counted." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
                 rm -f "$PP_START_MARKER"
                 break
             fi
@@ -2528,11 +2749,13 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         if [ "$PP_STATUS" -eq 75 ]; then
             pp_sid=$(usage_marker_find post-plan-now "${PP_WORKTREE:-}") || pp_sid=""
             if [ -n "$pp_sid" ]; then
+                # Branch breadcrumb for dispose_resumed_postplan_lock: it outlives the handoff.
+                automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG" > "$CURRENT_LOCK/branch" 2>/dev/null || true
                 printf '%s\n' "$pp_sid" > "$CURRENT_LOCK/paused-held"
                 CURRENT_LOCK=""
             fi
             echo "Post-plan paused (usage gate); post-plan-now owns the resume. Refunding attempt, stopping loop." >> "$LOG"
-            note_failure "You hit your Claude usage limit while shipping $PLAN_SLUG. It is paused and resumes on its own when the limit resets. The try was not counted."
+            note_stop "You hit your Claude usage limit while shipping $PLAN_SLUG." "It is paused and resumes on its own when the limit resets. The try was not counted."
             refund_attempt
             break
         fi
@@ -2552,7 +2775,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 REASON="$REASON (postplan exited in ${PP_DUR}s)"
             fi
             echo "Environmental failure during postplan — $REASON. Refunding attempt, stopping loop." >> "$LOG"
-            note_failure "Shipping $PLAN_SLUG hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
+            note_stop "Shipping $PLAN_SLUG hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
             refund_attempt
             write_env_stop_report "$PLAN_NAME" postplan "$REASON" "$PP_LOG_BEFORE"
             break
@@ -2648,19 +2871,26 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                    "$(date +%H:%M:%S)" >> "$LOG" ;;
             1) printf '[%s] canary: ci-red — parking, queue left intact\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_canary_park_report "ci-red" "$CANARY_DETAIL"
-               note_failure "The tests on master are failing (CI is red), so no more plans were started. The queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
+               note_stop "The tests on master are failing (CI is red), so no more plans were started. The queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
                break ;;
             3) printf '[%s] canary: smoke-red — parking, queue left intact\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_canary_park_report "smoke-red" "$CANARY_DETAIL"
-               note_failure "The quick health check on master failed, so no more plans were started. The queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
+               note_stop "The quick health check on master failed, so no more plans were started. The queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
                break ;;
             2) printf '[%s] canary: ci-auth-error — env stop\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_env_stop_report "canary" "canary" "CI auth error: $CANARY_DETAIL" "$CANARY_LOG_BEFORE"
-               note_failure "Could not check master's CI because GitHub refused the login. The run stopped and the queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-canary.md"
+               note_stop "Could not check master's CI because GitHub refused the login. The run stopped and the queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-canary.md"
                break ;;
         esac
     fi
 done
+
+# A worktree-refusal retry re-armed but never re-claimed (time guard or login
+# preflight broke the loop first): release its lock. No sibling can hold it,
+# because paused-held made every sibling skip it.
+if [ -n "$WT_REFUSE_LOCK" ]; then
+    rm -rf "$WT_REFUSE_LOCK" 2>/dev/null || true
+fi
 
 # Clean up any leftover attempt files for plans that completed
 for af in "$QUEUE_DIR"/*.attempts; do

@@ -13,16 +13,19 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 SIG="$REPO/bin/lib/automouse-failure-signature"
 
-FAILED=0
 TMPS=()
-cleanup() { [ "${#TMPS[@]}" -gt 0 ] && rm -rf "${TMPS[@]}"; return 0; }
+cleanup() { [ "${#TMPS[@]}" -gt 0 ] && rm -rf "${TMPS[@]}"; h_cleanup; return 0; }
 trap cleanup EXIT
 
 WORK=$(mktemp -d)
 TMPS+=("$WORK")
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$WORK/usage"
 
 # rec <file> <tool> <command> <error-text>
 rec() {
@@ -30,8 +33,8 @@ rec() {
 }
 
 # check <name> <command-that-succeeds-on-pass...>
-pass() { echo "ok: $1"; }
-fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 # --- n1: SHAs, timestamps, worktree paths, line numbers, durations normalize equal
 rec "$WORK/a" Bash 'cd /Users/a/IBL5-worktrees/x/ibl5 && vendor/bin/phpunit' \
@@ -112,7 +115,7 @@ else
 fi
 
 # --- n8: runs under an empty environment (launchd-like PATH)
-SK=$(env -i PATH=/usr/bin:/bin "$SIG" "$WORK/a")
+SK=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH=/usr/bin:/bin "$SIG" "$WORK/a")
 if [ -n "$SK" ] && [ "$SK" = "$SA" ]; then
     pass "n8-env-i-runs"
 else
@@ -192,9 +195,4 @@ else
     fail "r6-repeat-report-carries-signature" "report missing or incomplete: $REPORT"
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

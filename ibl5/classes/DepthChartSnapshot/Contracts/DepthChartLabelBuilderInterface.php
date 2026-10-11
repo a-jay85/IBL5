@@ -26,7 +26,8 @@ interface DepthChartLabelBuilderInterface
     /**
      * "Current (Live)" label, parts joined with " ∙ ".
      * With an active DC: "<name> (Live)" (or "Current (Live)" when unnamed), phase sim range from the DC start
-     * through the current sim, date range (projected next-sim end when the DC starts after the last sim end),
+     * through the current sim ("Sim N" when the DC starts on or after the current sim, N = the DC's start sim),
+     * date range (projected next-sim end when the DC starts after the last sim end),
      * then "(W-L)" when $record is non-null. Without one: "Current (Live)", "Sim N", last sim's date range.
      *
      * @param SavedDepthChartRow|null $activeDc

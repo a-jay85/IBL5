@@ -3,17 +3,17 @@
 # Regression harness for bin/automouse/self-heal.
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$SCRIPT_DIR/automouse/self-heal"
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
 NDIR="$TMP/automouse"
 PDIR="$TMP/plans"
 
-FAILED=0
 
 setup() {
     rm -rf "$NDIR"
@@ -25,16 +25,14 @@ setup() {
 assert_present() {
     local label=$1 path=$2
     if [ ! -e "$path" ]; then
-        echo "FAIL: $label — expected present: $path"
-        FAILED=1
+        h_fail "$label" "expected present: $path"
     fi
 }
 
 assert_absent() {
     local label=$1 path=$2
     if [ -e "$path" ]; then
-        echo "FAIL: $label — expected absent: $path"
-        FAILED=1
+        h_fail "$label" "expected absent: $path"
     fi
 }
 
@@ -53,13 +51,16 @@ chmod +x "$TMP/stub-guard"
 assert_gone() {
     local label=$1 path=$2
     if [ -e "$path" ] || [ -L "$path" ]; then
-        echo "FAIL: $label — expected gone (incl. dangling symlink): $path"
-        FAILED=1
+        h_fail "$label" "expected gone (incl. dangling symlink): $path"
     fi
 }
 
+# The orphan-watcher sweep scans real processes, so every case pins its argv regex
+# to a token no process matches unless a case sets HB_ARGV_RE to its own fixtures.
 run_heal() {
-    NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" STALENESS_GUARD="$TMP/stub-guard" "$SCRIPT" "$@"
+    NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" STALENESS_GUARD="$TMP/stub-guard" \
+        AUTOMOUSE_ORPHAN_ARGV_RE="${HB_ARGV_RE:-__no_process_argv_matches_this__}" \
+        AUTOMOUSE_ORPHAN_PPID="${HB_ORPHAN_PPID:-1}" "$SCRIPT" "$@"
 }
 
 # Create fixture plans carrying a valid impl_model:, which bin/automouse/queue add
@@ -82,8 +83,7 @@ run_heal >/dev/null 2>&1
 assert_absent  "row1 skipped symlink gone"  "$NDIR/skipped/plan-fresh.md"
 assert_present "row1 queued"                "$NDIR/queue/plan-fresh.md"
 assert_absent  "row1 staleness marker gone" "$NDIR/skipped/plan-fresh.md.staleness"
-echo "ok: row1 — POSITIVE healable"
-
+h_pass "row1 — POSITIVE healable"
 # ---------------------------------------------------------------------------
 # Row 2 — NEGATIVE (still-stale): marked plan fails guard → stays in skipped/
 # ---------------------------------------------------------------------------
@@ -95,8 +95,7 @@ run_heal >/dev/null 2>&1
 assert_present "row2 skipped stays"         "$NDIR/skipped/plan-stale.md"
 assert_absent  "row2 not queued"            "$NDIR/queue/plan-stale.md"
 assert_present "row2 marker retained"       "$NDIR/skipped/plan-stale.md.staleness"
-echo "ok: row2 — NEGATIVE still-stale"
-
+h_pass "row2 — NEGATIVE still-stale"
 # ---------------------------------------------------------------------------
 # Row 3 — NEGATIVE (core safety, no marker): guard would pass but NO marker → not requeued
 # ---------------------------------------------------------------------------
@@ -107,8 +106,7 @@ ln -s "$PDIR/plan-fresh-nomarker.md" "$NDIR/skipped/plan-fresh-nomarker.md"
 run_heal >/dev/null 2>&1
 assert_present "row3 skipped stays"   "$NDIR/skipped/plan-fresh-nomarker.md"
 assert_absent  "row3 not queued"      "$NDIR/queue/plan-fresh-nomarker.md"
-echo "ok: row3 — NEGATIVE core safety (no marker, not recovered)"
-
+h_pass "row3 — NEGATIVE core safety (no marker, not recovered)"
 # ---------------------------------------------------------------------------
 # Row 4 — DRY-RUN: healable plan listed but not moved, no report written
 # ---------------------------------------------------------------------------
@@ -121,15 +119,12 @@ assert_present "row4 skipped still present" "$NDIR/skipped/plan-fresh-dry.md"
 assert_absent  "row4 not queued"            "$NDIR/queue/plan-fresh-dry.md"
 assert_present "row4 marker still present"  "$NDIR/skipped/plan-fresh-dry.md.staleness"
 if ! echo "$out" | grep -q "would heal"; then
-    echo "FAIL: row4 — expected 'would heal' in dry-run output, got: $out"
-    FAILED=1
+    h_fail "row4" "expected 'would heal' in dry-run output, got: $out"
 fi
 if ls "$NDIR/reports/"*-self-heal.md >/dev/null 2>&1; then
-    echo "FAIL: row4 — report must not be written in dry-run mode"
-    FAILED=1
+    h_fail "row4" "report must not be written in dry-run mode"
 fi
-echo "ok: row4 — DRY-RUN"
-
+h_pass "row4 — DRY-RUN"
 # ---------------------------------------------------------------------------
 # Row 5 — EDGE (empty skipped/): no-op, exit 0
 # ---------------------------------------------------------------------------
@@ -137,11 +132,9 @@ setup
 rc=0
 run_heal >/dev/null 2>&1 || rc=$?
 if [ "$rc" -ne 0 ]; then
-    echo "FAIL: row5 — expected exit 0 on empty skipped/, got $rc"
-    FAILED=1
+    h_fail "row5" "expected exit 0 on empty skipped/, got $rc"
 fi
-echo "ok: row5 — EDGE empty skipped/"
-
+h_pass "row5 — EDGE empty skipped/"
 # ---------------------------------------------------------------------------
 # Row 6 — CLEANUP: .attempts + .staleness sidecars gone after requeue
 # ---------------------------------------------------------------------------
@@ -155,8 +148,7 @@ assert_absent  "row6 skipped symlink gone"  "$NDIR/skipped/plan-fresh-clean.md"
 assert_absent  "row6 attempts gone"         "$NDIR/skipped/plan-fresh-clean.md.attempts"
 assert_absent  "row6 staleness gone"        "$NDIR/skipped/plan-fresh-clean.md.staleness"
 assert_present "row6 queued"                "$NDIR/queue/plan-fresh-clean.md"
-echo "ok: row6 — CLEANUP sidecars evicted"
-
+h_pass "row6 — CLEANUP sidecars evicted"
 # ---------------------------------------------------------------------------
 # Row 7 — TOMBSTONE (real): plan deleted from PLANS_DIR leaves a dangling
 # symlink. Pre-fix, `[ -e "$f" ] || continue` skipped it silently forever.
@@ -171,15 +163,12 @@ assert_gone "row7 staleness reaped"        "$NDIR/skipped/plan-deleted.md.stalen
 assert_gone "row7 attempts reaped"         "$NDIR/skipped/plan-deleted.md.attempts"
 assert_gone   "row7 not requeued"          "$NDIR/queue/plan-deleted.md"
 if ! echo "$out" | grep -q "reaped tombstone: plan-deleted.md"; then
-    echo "FAIL: row7 — expected 'reaped tombstone' in output, got: $out"
-    FAILED=1
+    h_fail "row7" "expected 'reaped tombstone' in output, got: $out"
 fi
 if ! echo "$out" | grep -q "1 tombstone(s) reaped"; then
-    echo "FAIL: row7 — expected tombstone count in summary, got: $out"
-    FAILED=1
+    h_fail "row7" "expected tombstone count in summary, got: $out"
 fi
-echo "ok: row7 — TOMBSTONE reaped"
-
+h_pass "row7 — TOMBSTONE reaped"
 # ---------------------------------------------------------------------------
 # Row 8 — TOMBSTONE (dry-run): reported, nothing removed.
 # ---------------------------------------------------------------------------
@@ -188,20 +177,16 @@ ln -s "$PDIR/plan-deleted-dry.md" "$NDIR/skipped/plan-deleted-dry.md"
 touch "$NDIR/skipped/plan-deleted-dry.md.staleness"
 out=$(run_heal --dry-run 2>&1)
 if [ ! -L "$NDIR/skipped/plan-deleted-dry.md" ]; then
-    echo "FAIL: row8 — dry-run must leave the dangling symlink in place"
-    FAILED=1
+    h_fail "row8" "dry-run must leave the dangling symlink in place"
 fi
 assert_present "row8 marker still present" "$NDIR/skipped/plan-deleted-dry.md.staleness"
 if ! echo "$out" | grep -q "would reap tombstone: plan-deleted-dry.md"; then
-    echo "FAIL: row8 — expected 'would reap tombstone' in output, got: $out"
-    FAILED=1
+    h_fail "row8" "expected 'would reap tombstone' in output, got: $out"
 fi
 if ! echo "$out" | grep -q "1 tombstone(s) would be reaped"; then
-    echo "FAIL: row8 — expected tombstone count in dry-run summary, got: $out"
-    FAILED=1
+    h_fail "row8" "expected tombstone count in dry-run summary, got: $out"
 fi
-echo "ok: row8 — TOMBSTONE dry-run"
-
+h_pass "row8 — TOMBSTONE dry-run"
 # ---------------------------------------------------------------------------
 # Row 9 — TOMBSTONE (no staleness marker): a tombstone with no sidecar is
 # reaped regardless of skip reason — verifies the reap block fires before the
@@ -213,15 +198,190 @@ out=$(run_heal 2>&1)
 assert_gone "row9 dangling symlink reaped" "$NDIR/skipped/plan-no-marker.md"
 assert_absent "row9 not requeued"          "$NDIR/queue/plan-no-marker.md"
 if ! echo "$out" | grep -q "reaped tombstone: plan-no-marker.md"; then
-    echo "FAIL: row9 — expected 'reaped tombstone' in output, got: $out"
-    FAILED=1
+    h_fail "row9" "expected 'reaped tombstone' in output, got: $out"
 fi
-echo "ok: row9 — TOMBSTONE reaped regardless of skip reason"
+h_pass "row9 — TOMBSTONE reaped regardless of skip reason"
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
+# Orphan-watcher sweep (sweep_orphan_watchers)
+# ---------------------------------------------------------------------------
+
+# Default-knob pins (no processes): extract the knob lines from the script and
+# eval them in a subshell, so the test cannot drift from the implementation.
+ORPHAN_KNOB_SRC="$(grep -E '^ORPHAN_ARGV_RE_DEFAULT=|^: "\$\{AUTOMOUSE_ORPHAN_' "$SCRIPT")"
+orphan_knob() {  # <var to print> [VAR=value to export first]
+    (
+        unset AUTOMOUSE_ORPHAN_ARGV_RE AUTOMOUSE_ORPHAN_PPID
+        # shellcheck disable=SC2163  # $2 is a deliberate NAME=value pair
+        [ -z "${2:-}" ] || export "$2"
+        eval "$ORPHAN_KNOB_SRC"
+        eval "printf '%s' \"\${$1}\""
+    )
+}
+DEFAULT_RE="$(orphan_knob AUTOMOUSE_ORPHAN_ARGV_RE)"
+for s in '/bin/bash /Users/x/GitHub/IBL5/bin/automouse/run' \
+         '/bin/bash bin/automouse/run --resume-paused e2777b11' \
+         '/opt/homebrew/bin/bash bin/automouse/run plan foo'; do
+    if [[ "$s" =~ $DEFAULT_RE ]]; then h_pass "default regex matches: $s"
+    else h_fail "default regex matches: $s" "no match"; fi
+done
+for s in '/bin/bash bin/automouse/runner' 'vim bin/automouse/run' 'grep bin/automouse/run' \
+         '/bin/bash bin/automouse/self-heal' '/bin/bash bin/test-automouse-run'; do
+    if [[ "$s" =~ $DEFAULT_RE ]]; then h_fail "default regex rejects: $s" "matched"
+    else h_pass "default regex rejects: $s"; fi
+done
+h_eq "unset AUTOMOUSE_ORPHAN_ARGV_RE resolves to the default" "$DEFAULT_RE" \
+     "$(orphan_knob ORPHAN_ARGV_RE_DEFAULT)"
+h_eq "empty AUTOMOUSE_ORPHAN_ARGV_RE resolves to the default" "$DEFAULT_RE" \
+     "$(orphan_knob AUTOMOUSE_ORPHAN_ARGV_RE AUTOMOUSE_ORPHAN_ARGV_RE=)"
+h_eq "unset AUTOMOUSE_ORPHAN_PPID resolves to 1" "1" "$(orphan_knob AUTOMOUSE_ORPHAN_PPID)"
+h_eq "empty AUTOMOUSE_ORPHAN_PPID resolves to 1" "1" \
+     "$(orphan_knob AUTOMOUSE_ORPHAN_PPID AUTOMOUSE_ORPHAN_PPID=)"
+
+# Process fixtures. The fixture script lives at <hbfx>/bin/automouse-fx/run so it
+# keeps the production shape but misses ORPHAN_ARGV_RE_DEFAULT. Other harnesses
+# (bin/test-automouse-single) run a real default sweep in parallel on CI, and a
+# default-matching fixture gets reaped mid-case. Only HB_ARGV_RE matches it.
+FXROOT="$TMP/hbfx$$"
+FXD="$FXROOT/bin/automouse-fx"
+mkdir -p "$FXD"
+cat > "$FXD/run" <<'FIXTURE_EOF'
+#!/usr/bin/env bash
+case "${1:-}" in
+  watcher) while sleep 60; do :; done ;;   # watcher-shaped: direct `sleep 60` child
+  busy)    while sleep 5;  do :; done ;;   # run-shaped, no `sleep 60` child
+esac
+FIXTURE_EOF
+cp "$FXD/run" "$FXD/runner"
+HB_ARGV_RE="^[^ ]*bash [^ ]*/hbfx$$/bin/automouse-fx/run( |\$)"
+FX_PIDS=""
+
+alive() { kill -0 "$1" 2>/dev/null; }
+
+# <mode> <script> <pidfile>: the intermediate subshell exits, so the kernel
+# reparents the fixture.
+spawn_orphan() {
+    ( bash "$2" "$1" </dev/null >/dev/null 2>&1 & echo $! > "$3" )
+    command sleep 0.2
+    cat "$3"
+}
+
+# Poll (bounded) until <pid> has a direct `sleep 60` child.
+wait_sleep_child() {
+    local pid=$1 i=0
+    # 10s budget: under the 4-worker CI runner the fixture's fork can lag 3s+.
+    while [ "$i" -lt 50 ]; do
+        if ps -A -o ppid= -o args= | grep -qE "^ *$pid sleep 60\$"; then return 0; fi
+        command sleep 0.2
+        i=$(( i + 1 ))
+    done
+    return 1
+}
+
+# Poll (bounded, 0.2s steps) until <pid> is gone.
+wait_gone() {
+    local pid=$1 max=$2 i=0
+    while [ "$i" -lt $(( max * 5 )) ]; do
+        alive "$pid" || return 0
+        command sleep 0.2
+        i=$(( i + 1 ))
+    done
+    return 1
+}
+
+sleep_child_of() {  # <pid>: pid of its direct `sleep 60` child
+    ps -A -o pid= -o ppid= -o args= | awk -v p="$1" '$2 == p && $3 == "sleep" && $4 == "60" { print $1; exit }'
+}
+
+# Every fixture pid lands in $TMP/fx-* (spawn_orphan pidfiles) or $FX_PIDS (the
+# direct child), so no `sleep 60` outlives the test.
+cleanup_fixtures() {
+    local p f
+    for f in "$TMP"/fx-*; do
+        [ -e "$f" ] || continue
+        FX_PIDS="$FX_PIDS $(cat "$f")"
+    done
+    for p in $FX_PIDS; do
+        pkill -TERM -P "$p" 2>/dev/null || true
+        kill -TERM "$p" 2>/dev/null || true
+    done
+    FX_PIDS=""
+}
+
+setup
+A_PIDFILE="$TMP/fx-a"
+A="$(spawn_orphan watcher "$FXD/run" "$A_PIDFILE")"
+HB_ORPHAN_PPID="$(ps -o ppid= -p "$A" | tr -d ' ')"
+if [ -z "$HB_ORPHAN_PPID" ] || [ "$HB_ORPHAN_PPID" = "$$" ]; then
+    echo "SKIP: orphan-sweep process cases need a reparented fixture (got ppid '$HB_ORPHAN_PPID')"
+    cleanup_fixtures
+    unset HB_ORPHAN_PPID
+else
+    wait_sleep_child "$A" || h_fail "sweep setup" "fixture A never started its sleep 60 child"
+    A_KID="$(sleep_child_of "$A")"
+
+    # B: live watcher whose PPID is the test shell (not the reaper).
+    bash "$FXD/run" watcher </dev/null >/dev/null 2>&1 &
+    B=$!
+    FX_PIDS="$FX_PIDS $B"
+    # C: reparented run-shaped process with no `sleep 60` child (the launchd-fired live run).
+    C="$(spawn_orphan busy "$FXD/run" "$TMP/fx-c")"
+    # D: orphan-shaped, but named by a live heartbeat file.
+    D="$(spawn_orphan watcher "$FXD/run" "$TMP/fx-d")"
+    touch "$NDIR/.heartbeat-$D-impl"
+    # E: orphan-shaped, but argv names .../runner.
+    E="$(spawn_orphan watcher "$FXD/runner" "$TMP/fx-e")"
+    for p in "$B" "$D" "$E"; do wait_sleep_child "$p" || h_fail "sweep setup" "fixture $p never started its sleep 60 child"; done
+
+    out=$(run_heal --dry-run 2>&1)
+    h_contains "dry run names the orphan" "$out" "would reap orphan watcher: pid $A"
+    for p in "$A" "$B" "$C" "$D" "$E"; do
+        if alive "$p"; then h_pass "dry run leaves pid $p alive"
+        else h_fail "dry run leaves pid $p alive" "pid is gone"; fi
+    done
+
+    out=$(run_heal 2>&1)
+    if wait_gone "$A" 3; then h_pass "real run reaps orphan A"
+    else h_fail "real run reaps orphan A" "pid $A still alive"; fi
+    if [ -n "$A_KID" ] && wait_gone "$A_KID" 3; then h_pass "real run reaps A's sleep 60 child"
+    else h_fail "real run reaps A's sleep 60 child" "child '$A_KID' still alive"; fi
+    h_contains "real run reports the reap" "$out" "reaped orphan watcher pid $A"
+    h_contains "real run counts one reap" "$out" "1 orphan watcher(s) reaped"
+    h_contains "D is spared by its heartbeat file" "$out" "spared pid $D: live heartbeat file names it"
+    for pair in "B:live watcher (PPID is not the reaper)" "C:run with no sleep 60 child" \
+                "D:named by a live heartbeat file" "E:argv does not match"; do
+        eval "p=\$${pair%%:*}"
+        if alive "$p"; then h_pass "spares ${pair#*:}"
+        else h_fail "spares ${pair#*:}" "pid $p was killed"; fi
+    done
+    rm -f "$NDIR/.heartbeat-$D-impl"
+
+    # pgid clause: a live heartbeat file naming the candidate's pgid spares it.
+    F="$(spawn_orphan watcher "$FXD/run" "$TMP/fx-f")"
+    wait_sleep_child "$F" || h_fail "sweep setup" "fixture F never started its sleep 60 child"
+    G="$(ps -o pgid= -p "$F" | tr -d ' ')"
+    if alive "$G"; then
+        touch "$NDIR/.heartbeat-$G-postplan"
+        out=$(run_heal 2>&1)
+        if alive "$F"; then h_pass "spares F when a live heartbeat file names its pgid"
+        else h_fail "spares F when a live heartbeat file names its pgid" "pid $F was killed"; fi
+        h_contains "pgid spare is reported" "$out" "spared pid $F"
+        rm -f "$NDIR/.heartbeat-$G-postplan"
+    else
+        echo "SKIP: pgid-spare case needs a live group leader (pgid $G)"
+    fi
+
+    # Malformed PPID knob disables the sweep.
+    H="$(spawn_orphan watcher "$FXD/run" "$TMP/fx-h")"
+    wait_sleep_child "$H" || h_fail "sweep setup" "fixture H never started its sleep 60 child"
+    out=$(HB_ORPHAN_PPID=abc run_heal 2>&1)
+    h_contains "malformed PPID knob disables the sweep" "$out" "sweep disabled"
+    if alive "$H"; then h_pass "malformed PPID knob leaves H alive"
+    else h_fail "malformed PPID knob leaves H alive" "pid $H was killed"; fi
+
+    cleanup_fixtures
+    unset HB_ORPHAN_PPID
 fi
-echo "RESULT: all passed"
-exit 0
+# ---------------------------------------------------------------------------
+h_done

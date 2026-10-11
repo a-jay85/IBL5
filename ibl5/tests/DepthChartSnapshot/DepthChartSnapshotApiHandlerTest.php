@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\DepthChartSnapshot;
 
 use DepthChartSnapshot\DepthChartSnapshotApiHandler;
-use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 /**
@@ -18,7 +17,7 @@ class DepthChartSnapshotApiHandlerTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->handler = new DepthChartSnapshotApiHandler($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $this->handler = new DepthChartSnapshotApiHandler($this->mockDb);
     }
 
     public function testHandleUnknownActionReturnsError(): void

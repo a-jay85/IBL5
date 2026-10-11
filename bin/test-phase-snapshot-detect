@@ -4,14 +4,15 @@
 # and bin/wt-up parser conversion. Run: bin/test-phase-snapshot-detect (exit 0 = all pass)
 set -euo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
-FAILED=0
-ok()   { echo "ok: $1"; }
-fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 CAPTURE="$SCRIPT_DIR/phase-snapshot-capture"
 
@@ -602,7 +603,7 @@ test_db_sync_prod_snapshot_load_is_offline_and_preserves_local_tables() {
     if ! docker run -d --name "$cname" \
             -e MARIADB_ROOT_PASSWORD=root \
             -e MARIADB_DATABASE=iblhoops_ibl5 \
-            mariadb:10.11 >/dev/null 2>&1; then
+            "${IBL5_TEST_MARIADB_IMAGE:-mariadb:10.11}" >/dev/null 2>&1; then
         fail "$label: throwaway container starts" "docker run failed"
         snaptest_cleanup
         return 0
@@ -727,9 +728,4 @@ test_wt_up_rejects_snapshot_without_value
 test_wt_up_rejects_snapshot_with_mode_flag
 test_wt_up_passthrough_single_call_site
 
-if [ "$FAILED" -eq 0 ]; then
-    echo "all cases passed"
-else
-    echo "one or more cases FAILED"
-fi
-exit "$FAILED"
+h_done

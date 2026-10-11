@@ -111,7 +111,7 @@ class SearchRepositoryTest extends WideUnitTestCase
         $this->repository->searchStoriesByPreset(SearchRepositoryInterface::PRESET_TRANSACTIONS);
 
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
         $executed = end($queries);
 
         // The mock interpolates bound params, so the six whitelisted category IDs
@@ -127,7 +127,7 @@ class SearchRepositoryTest extends WideUnitTestCase
         $this->repository->searchStoriesByPreset(SearchRepositoryInterface::PRESET_TRANSACTIONS, 'trade');
 
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
         $executed = end($queries);
 
         $this->assertStringContainsString('s.catid IN (', $executed);
@@ -229,6 +229,43 @@ class SearchRepositoryTest extends WideUnitTestCase
         $this->assertCount(1, $result);
         $this->assertSame(2, $result[0]['catId']);
         $this->assertSame('Trades', $result[0]['title']);
+    }
+
+    public function testSearchStoriesOrdersByTimeThenSid(): void
+    {
+        $this->mockDb->setMockData([]);
+        $this->mockDb->clearQueries();
+
+        $this->repository->searchStories('trade');
+
+        $this->assertQueryExecuted('ORDER BY s.time DESC, s.sid DESC');
+    }
+
+    public function testSearchUsersOrdersByUsernameThenId(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->searchUsers('test');
+
+        $this->assertQueryExecuted('ORDER BY username ASC, id ASC');
+    }
+
+    public function testGetTopicsOrdersByTopictextThenId(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getTopics();
+
+        $this->assertQueryExecuted('_topics ORDER BY topictext, id ASC');
+    }
+
+    public function testGetCategoriesOrdersByTitleThenCatid(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getCategories();
+
+        $this->assertQueryExecuted('_stories_cat ORDER BY title, catid ASC');
     }
 
     public function testGetAuthorsReturnsEmptyArray(): void

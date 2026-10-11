@@ -1,6 +1,6 @@
 ---
 description: Usage-limit drain, pause, and auto-resume for headless runners via an env-gated PreToolUse hook, pause markers, a drain token, and a launchd coordinator.
-last_verified: 2026-10-01
+last_verified: 2026-10-10
 ---
 
 # ADR-0143: Usage-limit drain, pause, and auto-resume
@@ -58,3 +58,41 @@ This addendum narrows one sentence of the Decision. The post-plan harness now ru
 - Toolless harness calls cannot fire the PreToolUse hook, so the adapter runs the same `usage_gate_decide` before every spawn. A pause stops every harness thread at its next call. The harness exits 75 only while a marker for S is on disk, and it clears that marker on every other exit.
 - A harness pause raised while a tooled edit left the worktree changed is fail-closed. The harness clears the marker and exits 3 for a human, since a resumed run would otherwise commit a partial edit.
 - Resume replays `post-plan-now --resume-paused S`. The harness has no resumable state, so the run re-enters at its start. Git and GitHub steps are already idempotent on re-entry. Review-comment posts are skipped when an earlier launch under the same S already posted them at the same head, using a ledger at `runs/<S>.effects.json` in the gate state dir.
+
+## Addendum (2026-10-08): login switch fast resume
+
+On 2026-10-08 a `/login` to a second account left three paused sessions waiting about 15 minutes. The cache drop from the 2026-10-01 addendum fired. The first fetch under the new token then got a 429 with `retry-after: 3598`, the shared backoff armed for 900 s, and the coordinator's stale branch kept waiting for the old account's `resets_at`.
+
+- **Account identity.** `~/.claude.json` `.oauthAccount.accountUuid` survives a token refresh and changes on a switch. Its 16-hex sha256 (`acct_fp`) is stamped on each marker and kept as `acct-last` beside the cache. The raw id is never stored or logged. Reading it needs no keychain.
+- **Switch signal.** `usage_fetch` writes the `cred-switch` state file at its cache-drop site unless both account fingerprints are known and equal. The coordinator also writes it, and drops the cache, when the cached reading's account differs from the current one.
+- **Short first fetches.** Within 1800 s of the signal, up to 3 rate-limited fetches under the new fingerprint back off for at most 45 s. After that the normal arm applies. A 429 with no signal behaves as before.
+- **Fast resume.** In the stale branch, a marker whose `acct_fp` differs from the current account resumes on the next tick. When either account is unknown, a marker paused before the signal, or one carrying another `cred_fp`, resumes instead. Each marker takes one fast resume per switch (`switch_resumed_for`). `check_runaway` and `usage_marker_eligible` still apply.
+- **Keychain access.** The coordinator may be able to read the keychain (the setup probe reported `ok`), and the design does not depend on it. The library comments claim only that it may lack access.
+
+A switch now resumes paused work within about one coordinator tick, without a fresh reading. The pause hook re-pauses a session if the new account is near its limit too. A same-account token refresh never fast-resumes while `~/.claude.json` is readable. When it is unreadable, a refresh can cost one extra resume per marker, capped by the 5-resume runaway rule. If a Claude Code release stops writing `oauthAccount`, the signal fallback applies. If it writes the field but stops updating it on `/login`, the account test vetoes the fast path and the coordinator waits for `resets_at` as it did before this addendum.
+
+## Addendum: account switch clears the runaway cap (2026-10-10)
+
+The addendum above kept `check_runaway` ahead of every resume. A marker paused 5 times under one account was marked stuck, and a later `/login` to a fresh account never resumed it. On 2026-10-10 the burndown loop sat stuck at the old account's 94% weekly reading while the new account read 69%.
+
+`check_runaway` now clears the pause count and the stuck flag when the marker's `acct_fp` and the current account are both known and differ. The 5-pause cap counts pauses within one account's usage window, so a new account starts a new count. The reset records the current account in the marker's `reset_acct`, leaving `acct_fp` for the switch fast-resume, so it fires once per switch even when the resumed run exits without pausing; a run that keeps failing then hits the 5-resume cap under the new account. When either account is unknown, the cap still applies as before. Tests: `test_coord_runaway_account_switch`, `test_coord_runaway_same_account_stays_stuck`, and the updated `test_coord_switch_respects_runaway_and_hold` in `bin/test-usage-gate`.
+
+## Addendum (2026-10-10): a provable interrupted edit is discarded on resume
+
+The 2026-09-30 addendum made every dirty harness pause fail closed (marker cleared, exit 3). Two causes reached that exit. Read-only tooled calls (the plan-fidelity review and re-review, the conflict review) were reported dirty when the worktree fingerprint failed or saw a concurrent change. Write-capable calls left a partial edit that the resumed run could not tell apart from real work.
+
+A tooled call whose allowed tools are all in `Read`, `Grep` and `Glob` is now never dirty. Any other tool, including an unknown or MCP tool, counts as write-capable.
+
+Before a write-capable call, the adapter captures HEAD, the worktree tree hash (tracked files plus untracked files that git does not ignore) and any in-progress merge, rebase or cherry-pick head. On a pause, the runner records the interrupted edit in `runs/<S>.pause.json` beside the effects ledger, sets a `pause_edit_sid` witness in the per-slug state file, and exits 75. It records only when HEAD did not move, no operation head was present before or after, no other write-capable call overlapped, and the record write succeeded. Anything else keeps the 2026-09-30 exit 3. Conflict resolution always runs mid-merge, so it always keeps exit 3. A call whose Bash committed or pushed also keeps exit 3, because a local discard cannot undo a push.
+
+Before staging anything, the next launch for the slug checks the witness. With no witness it behaves as before. With a witness it requires a well-formed record for the current session, an unchanged HEAD and a worktree tree equal to the recorded post-pause tree. It then restores the recorded paths to the pre-spawn tree, verifies the result and continues. Any mismatch exits 3 without touching the worktree. A partial edit is never committed. The resumed run starts from Phase 2 the same way a clean pause does.
+
+## Addendum (2026-10-10): 429 backoff survives intermittent successes
+
+This supersedes two phrases in item 1 of the 2026-10-01 addendum. "Doubling per consecutive 429" now means doubling per 429 within one 429 episode. "A successful fetch clears the backoff" now applies to the wait only, and the step lives on in the episode.
+
+The usage endpoint alternates 200 and 429 responses. Under the 2026-10-01 rule each 200 deleted `fetch-backoff`, the only place the doubling step lived, so the next 429 started again at 30 s. The usage-gate log showed 1537 waits of 30 s, 651 of 60 s, 185 of 120 s, 49 of 240 s and 43 of 480 s. Successes were never logged, so the doubling looked capped at 60 s.
+
+A 429 episode now carries the step. `bin/lib/usage-fetch.sh` records each normal-arm 429 in the state file `fetch-429-episode` as `<start> <last_429> <attempts>`. The episode stays live until `USAGE_FETCH_EPISODE_QUIET` (1800 s) pass with no 429. That is twice the 900 s Retry-After cap, so an armed wait alone never ends an episode. The doubling step is the larger of the step in `fetch-backoff` and the episode's prior attempt count, so waits climb 30, 60, 120, 240 and 480 s across intervening successes. A success still deletes `fetch-backoff`, so callers fetch live again as soon as the wait ends. A numeric Retry-After still sets the wait directly. The login-switch fast path from the 2026-10-08 addendum keeps its own counter and does not count toward the episode.
+
+An episode ends lazily. The first success or 429 that finds it quiet for the full window ends it. Either account-switch cache drop ends it at once, because the episode belongs to the old account. The log carries `429-episode start retry_after=<n|none> backoff=<s>` once per episode and `429-episode end duration=<s> attempts=<n>` once at its end. These replace the per-attempt `fetch-failed reason=rate-limited` line. The switch fast path keeps its per-attempt `switch-retry=<n>/3` line, and other fetch failures keep their per-attempt `fetch-failed reason=` line.

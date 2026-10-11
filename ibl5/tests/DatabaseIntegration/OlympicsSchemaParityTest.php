@@ -101,7 +101,7 @@ class OlympicsSchemaParityTest extends DatabaseTestCase
         $stmt->close();
 
         $missing = array_diff($allOlympicsTables, $existing);
-        self::assertEmpty($missing, 'Missing Olympics tables: ' . implode(', ', $missing));
+        self::assertSame([], $missing, 'Missing Olympics tables: ' . implode(', ', $missing));
     }
 
     #[DataProvider('tablePairsProvider')]
@@ -128,7 +128,7 @@ class OlympicsSchemaParityTest extends DatabaseTestCase
                 . "ibl5/tests/DatabaseIntegration/OlympicsSchemaParityTest.php)";
         }
 
-        self::assertEmpty($drift, implode("\n", $drift));
+        self::assertSame([], $drift, implode("\n", $drift));
     }
 
     #[DataProvider('tablePairsProvider')]
@@ -158,7 +158,7 @@ class OlympicsSchemaParityTest extends DatabaseTestCase
             }
         }
 
-        self::assertEmpty($drift, implode("\n", $drift));
+        self::assertSame([], $drift, implode("\n", $drift));
     }
 
     /**

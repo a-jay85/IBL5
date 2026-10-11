@@ -34,7 +34,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
      * Build the controller under test with an explicit request snapshot, so each
      * test supplies its own input instead of mutating global state.
      */
-    private function buildController(?HttpRequest $request = null, ?PlayerRepositoryInterface $playerRepository = null): PlayerPageController
+    private function buildController(?HttpRequest $request = null, ?PlayerRepositoryInterface $playerRepository = null, ?\Closure $playerLoader = null): PlayerPageController
     {
         return new PlayerPageController(
             $this->mockDb,
@@ -43,14 +43,15 @@ class PlayerPageControllerTest extends WideUnitTestCase
             $request ?? new HttpRequest(),
             null,
             $playerRepository,
+            $playerLoader,
         );
     }
 
-    private function seedInvariantQueries(): void
+    private function seedInvariantQueries(int $playerTeamid = 5): void
     {
         $playerRow = [
             'pid' => 1, 'ordinal' => 1, 'name' => 'Test Player', 'nickname' => null,
-            'age' => 25, 'teamid' => 5, 'pos' => 'PG',
+            'age' => 25, 'teamid' => $playerTeamid, 'pos' => 'PG',
             'r_fga' => 70, 'r_fgp' => 50, 'r_fta' => 60, 'r_ftp' => 80,
             'r_3ga' => 40, 'r_3gp' => 35, 'r_orb' => 30, 'r_drb' => 50,
             'r_ast' => 60, 'r_stl' => 50, 'r_tvr' => 40, 'r_blk' => 30,
@@ -143,6 +144,21 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
         $this->assertStringContainsString('Test Player', $html);
         $this->assertStringContainsString('card-flip-container', $html);
+    }
+
+    public function testRenderPageFreeAgentKeepsGoldTradingCardAndTeamZeroPageColors(): void
+    {
+        $this->seedInvariantQueries(0);
+        $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
+        $this->stubRepo->method('getTeamColorRow')->willReturn(['color1' => '888888', 'color2' => 'cccccc']);
+
+        $html = $this->buildController()->renderPage(1, null, 'nobody');
+
+        // Menu and stats cards use the unguarded team-0 row (gray); the trading card stays gold.
+        $this->assertStringContainsStringIgnoringCase('888888', $html);
+        $card = substr($html, (int) strpos($html, 'card-flip-container'), 600);
+        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $card);
     }
 
     public function testRenderPageOverviewForRetiredPlayer(): void
@@ -505,5 +521,74 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
         $this->assertSame($this->controller->renderPage(1, 3, 'testuser'), $html);
         $this->assertNotSame($this->controller->renderPage(1, null, 'testuser'), $html);
+    }
+
+    public function testShowPageUnknownPidReturnsNotFoundPanelWith404(): void
+    {
+        $this->mockDb->onQuery('team_name AS teamname', []);
+
+        $html = $this->controller->showPage('99999999|0|4040454', null, '');
+
+        $this->assertSame(404, $this->controller->responseStatus());
+        $this->assertStringContainsString('Player Not Found', $html);
+    }
+
+    public function testShowPageZeroPidReturnsNotFound(): void
+    {
+        $this->mockDb->onQuery('team_name AS teamname', []);
+
+        $html = $this->controller->showPage('0', null, '');
+
+        $this->assertSame(404, $this->controller->responseStatus());
+        $this->assertStringContainsString('Player Not Found', $html);
+    }
+
+    public function testShowPageNegativePidReturnsNotFound(): void
+    {
+        $this->mockDb->onQuery('team_name AS teamname', []);
+
+        $html = $this->controller->showPage('-5', null, '');
+
+        $this->assertSame(404, $this->controller->responseStatus());
+        $this->assertStringContainsString('Player Not Found', $html);
+    }
+
+    public function testShowPageValidPidKeepsStatus200(): void
+    {
+        $html = $this->controller->showPage('1', null, '');
+
+        $this->assertSame(200, $this->controller->responseStatus());
+        $this->assertStringNotContainsString('Player Not Found', $html);
+    }
+
+    public function testNotFoundBodyIsIdenticalForDifferentHostilePids(): void
+    {
+        $this->mockDb->onQuery('team_name AS teamname', []);
+
+        $first = $this->buildController()->showPage('99999999|0|4040454', null, '');
+        $second = $this->buildController()->showPage('<script>alert(1)</script>', null, '');
+
+        $this->assertSame($first, $second);
+        foreach ([$first, $second] as $body) {
+            $this->assertStringNotContainsString('99999999', $body);
+            $this->assertStringNotContainsString('4040454', $body);
+            $this->assertStringNotContainsString('<script>', $body);
+        }
+    }
+
+    public function testRenderPagePropagatesNonNotFoundRuntimeException(): void
+    {
+        $controller = $this->buildController(
+            null,
+            null,
+            static function (int $pid): never {
+                throw new \RuntimeException('connection lost');
+            },
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('connection lost');
+
+        $controller->renderPage(1, null, '');
     }
 }

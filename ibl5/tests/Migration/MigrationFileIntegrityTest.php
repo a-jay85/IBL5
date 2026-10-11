@@ -34,7 +34,7 @@ final class MigrationFileIntegrityTest extends TestCase
     {
         $files = glob($this->migrationsDir . '/*.sql');
         self::assertNotFalse($files);
-        self::assertNotEmpty($files, 'No .sql migration files found');
+        self::assertNotSame([], $files, 'No .sql migration files found');
 
         $prefixes = [];
 
@@ -65,7 +65,7 @@ final class MigrationFileIntegrityTest extends TestCase
         }
 
         // Ensure we actually found numbered migrations
-        self::assertNotEmpty($prefixes, 'No numbered migration files found');
+        self::assertNotSame([], $prefixes, 'No numbered migration files found');
     }
 
     public function testAllMigrationFilesAreNonEmpty(): void
@@ -77,14 +77,14 @@ final class MigrationFileIntegrityTest extends TestCase
             $phpFiles ? $phpFiles : []
         );
 
-        self::assertNotEmpty($files, 'No migration files found');
+        self::assertNotSame([], $files, 'No migration files found');
 
         foreach ($files as $file) {
             self::assertFileIsReadable($file);
 
             $content = file_get_contents($file);
             self::assertNotFalse($content, sprintf('Could not read %s', basename($file)));
-            self::assertNotEmpty(
+            self::assertNotSame('', 
                 trim($content),
                 sprintf('Migration file "%s" is empty', basename($file))
             );
@@ -96,7 +96,7 @@ final class MigrationFileIntegrityTest extends TestCase
         $resolver = new MigrationFileResolver($this->migrationsDir);
         $migrations = $resolver->getAvailableMigrations();
 
-        self::assertNotEmpty($migrations, 'MigrationFileResolver returned no migrations');
+        self::assertNotSame([], $migrations, 'MigrationFileResolver returned no migrations');
         self::assertContains('000_baseline_schema.sql', $migrations, 'Baseline schema must be present');
     }
 

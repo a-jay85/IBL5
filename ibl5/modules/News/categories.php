@@ -67,26 +67,27 @@ function theindex($catid)
     $viewModels = [];
     foreach ($stories as $row) {
         $s_sid = intval($row['sid']);
+        /** @var string $aid nuke_stories.aid is NOT NULL varchar */
         $aid = $row['aid'];
         $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title']);
         $time = $row['time'];
+        /** @var string|null $hometext nuke_stories.hometext is nullable mediumtext */
         $hometext = $row['hometext'];
         $bodytext = $row['bodytext'];
         $comments = intval($row['comments']);
         $counter = intval($row['counter']);
         $topic = intval($row['topic']);
+        /** @var string $informant nuke_stories.informant is NOT NULL varchar */
         $informant = $row['informant'];
         $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
         $topicRow = $newsService->getTopicForStory($s_sid);
-        $topicid = (int) ($topicRow['topicid'] ?? 0);
         $topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
         $topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
         $topictext = \Security\HtmlSanitizer::e($topicRow['topictext'] ?? '');
         $time = $newsService->normalizeStoryTime($time);
         $datetime = ucfirst(date(_DATESTRING, $time));
         $counts = $newsService->computeByteCounts((string) ($hometext ?? ''), (string) ($bodytext ?? ''));
-        $introcount = $counts['intro'];
         $fullcount = $counts['full'];
         $totalcount = $counts['total'];
         $c_count = $comments;
@@ -107,7 +108,6 @@ function theindex($catid)
         }
         $morelink .= " ";
         $morelink = str_replace(" |  | ", " | ", $morelink);
-        $sid = intval($s_sid);
         $catTitle = $newsService->getCategoryTitle($catid);
         $title1 = \Security\HtmlSanitizer::safeHtmlOutput($catTitle ?? '');
         $title = "$title1: $title";

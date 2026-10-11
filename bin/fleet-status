@@ -116,10 +116,13 @@ HARNESS_OUT="${FLEET_STATUS_HARNESS_OUT:-$MAIN_CHECKOUT/tools/postplan-harness/o
 LOG_DIR="${FLEET_STATUS_LOG_DIR:-/tmp}"
 TRANSCRIPT_ROOT="${FLEET_STATUS_TRANSCRIPT_ROOT:-$HOME/.claude/projects}"
 JQ_BIN="${FLEET_STATUS_JQ:-jq}"
+GH_BIN="${FLEET_STATUS_GH:-gh}"
 BURNDOWN_LOG="${FLEET_STATUS_BURNDOWN_LOG:-$HOME/.claude/burndown-loop/loop.log}"
 AUTOMOUSE_PLIST="${FLEET_STATUS_AUTOMOUSE_PLIST:-$HOME/Library/LaunchAgents/com.ibl5.automouse.plist}"
 REORDER_APP_DIR="${FLEET_STATUS_REORDER_APP_DIR:-$HOME/Library/Caches/ibl5}"
 OSACOMPILE_BIN="${FLEET_STATUS_OSACOMPILE:-osacompile}"
+# Same default and override as usage_state_dir in bin/lib/usage-fetch.sh.
+USAGE_STATE_DIR="${IBL5_USAGE_GATE_STATE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate}"
 # shellcheck source=bin/lib/session-id.sh
 . "$SCRIPT_DIR/lib/session-id.sh"
 # shellcheck source=bin/automouse/lib-queue-order
@@ -627,13 +630,21 @@ burndown_next_run() {
 # A runner has no section of its own. Its details print under the queue row of the
 # plan it is working on, so the plan and the job driving it read as one block.
 
-# The first heartbeat file for a PID, or nothing. Callers validate the PID first
-# (pid_alive_matching rejects non-digits), so the glob never sees a stray value.
+# The file that names a live runner's current phase, or nothing. Callers validate
+# the PID first (pid_alive_matching rejects non-digits), so the glob never sees a
+# stray value.
+#
+# The heartbeat file wins because it carries the last-event epoch. Only the impl
+# phase ever gets one: bin/lib/automouse-stream-filter.sh writes it, and the
+# post-plan phase runs bin/post-plan-now, which emits no stream-json. A post-plan
+# phase leaves only .cmdpid-<pid>-postplan, so fall back to the cmdpid file. That
+# also covers an impl that has not logged its first event yet.
+#
 # A runner writes one phase at a time. If a leaked -impl file sits beside a live
 # -postplan one, the glob's alphabetical order shows impl.
-runner_heartbeat() {
+runner_phase_file() {
     local hb
-    for hb in "$AUTOMOUSE_DIR/.heartbeat-$1-"*; do
+    for hb in "$AUTOMOUSE_DIR/.heartbeat-$1-"* "$AUTOMOUSE_DIR/.cmdpid-$1-"*; do
         [ -f "$hb" ] && { printf '%s' "$hb"; return 0; }
     done
     return 1
@@ -648,6 +659,54 @@ queue_lock_runner() {
     pid="$(tr -dc '0-9' < "$pf" 2>/dev/null)"
     pid_alive_matching "$pid" 'automouse' || return 1
     printf '%s' "$pid"
+}
+
+# The session id a usage-gate pause wrote into queue/<name>.lock/paused-held, or
+# nothing. bin/automouse/run writes it when it stops on the usage limit and keeps
+# the lock so no sibling steals the plan before the resume.
+lock_paused_sid() {
+    local f="$AUTOMOUSE_DIR/queue/$1.lock/paused-held"
+    [ -f "$f" ] || return 0
+    tr -dc '0-9a-f-' < "$f" 2>/dev/null
+}
+
+# True while the usage-gate pause marker for <sid> still exists, which is the
+# same test bin/lib/usage-gate.sh's usage_marker_exists makes. Read-only: this
+# never sources the gate lib, whose state-dir helper mkdirs.
+paused_marker_exists() {
+    [ -n "${1:-}" ] && [ -s "$USAGE_STATE_DIR/markers/$1.json" ]
+}
+
+# The branch a queued plan's post-plan run works on. The automouse handoff names
+# it; without one, the plan's own slug. They can differ: the plan
+# hot-files-base-ref-validate-1401.md shipped from branch hot-files-base-ref-validate.
+plan_branch() {
+    local hf="$AUTOMOUSE_DIR/handoff/$1.json" b=''
+    if [ -f "$hf" ] && have_jq; then
+        b="$("$JQ_BIN" -r '.branch // empty' "$hf" 2>/dev/null)" || b=''
+    fi
+    printf '%s' "${b:-${1%.md}}"
+}
+
+# True while a post-plan-now run on <branch> is alive. Both modes end in
+# `exec /bin/bash -lc "$CMD"`, and $CMD exports POSTPLAN_LABEL=
+# 'com.ibl5.postplan-now-<safe-branch>-<YYYYmmdd>-<HHMMSS>-<pid>', so the
+# label lives in the run's own command line. The date suffix stops branch foo
+# from matching a run on foo-bar.
+postplan_live_for() {
+    local safe
+    # shellcheck disable=SC2016  # the $ is a literal ERE metacharacter to escape
+    safe="$(printf '%s' "$1" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/[][\.*^$()+?{}|/]/\\&/g')"
+    pgrep -f -- "POSTPLAN_LABEL='com\.ibl5\.postplan-now-${safe}-[0-9]{8}-[0-9]{6}-" >/dev/null 2>&1
+}
+
+# True when <branch> has a MERGED PR. Only stale lock rows ask, so the page's one
+# network call stays off the common path. Any gh failure reads as not merged.
+pr_merged_for() {
+    local hit
+    hit="$(GH_PROMPT_DISABLED=1 "$GH_BIN" pr list --head "$1" --state merged \
+        --limit 1 --json number --jq 'length' 2>/dev/null)" || return 1
+    [ "$hit" = 1 ]
 }
 
 # impl_model, auto_merge and title of a queued plan, tab-separated. The awk is
@@ -677,14 +736,14 @@ plan_meta() {
 # yesterday's file: take the newest dated log, never today's by name. The
 # ????-??-??.log glob keeps launchd-rearm.log out.
 render_runner_detail() {
-    local pid="$1" slug="$2" hb="$3" phase now hb_ts hb_age attempts safe d audit='' log progress=''
+    local pid="$1" slug="$2" hb="$3" phase now hb_ts='' hb_age activity='' attempts safe d audit='' log progress=''
 
-    phase="$(basename "$hb")"; phase="${phase#.heartbeat-}"; phase="${phase#*-}"
+    phase="$(basename "$hb")"; phase="${phase#.heartbeat-}"; phase="${phase#.cmdpid-}"; phase="${phase#*-}"
     now="$(date +%s)"
-    hb_ts="$(tr -dc '0-9' < "$hb" 2>/dev/null)"
-    case "$hb_ts" in
-        ''|*[!0-9]*) hb_age='' ;;
-        *) hb_age="$(( now - hb_ts ))" ;;
+    # A heartbeat file holds the last-event epoch. A cmdpid file holds a PID, so
+    # a post-plan phase takes its activity time from the audit.log below.
+    case "$(basename "$hb")" in
+        .heartbeat-*) hb_ts="$(tr -dc '0-9' < "$hb" 2>/dev/null)" ;;
     esac
     attempts=''
     [ -f "$AUTOMOUSE_DIR/queue/$slug.md.attempts" ] && \
@@ -696,8 +755,16 @@ render_runner_detail() {
         if [ -n "$d" ] && [ -f "${d%/}/audit.log" ]; then
             audit="${d%/}/audit.log"
             progress="$(last_line "$audit" 64 '^\[[0-9:]+\] phase')"
+            [ -z "$hb_ts" ] && hb_ts="$(file_mtime "$audit")"
         fi
     fi
+    case "$hb_ts" in
+        ''|*[!0-9]*) hb_age='' ;;
+        *) hb_age="$(( now - hb_ts ))" ;;
+    esac
+    # No timestamp at all (an impl before its first event) drops the field
+    # rather than print "last activity ? ago".
+    [ -n "$hb_age" ] && activity=" last activity $(human_age "$hb_age") ago"
     # Each runner writes its own logs/<date>-<pid>.log (bin/automouse/run). Read
     # THIS runner's file: with two runners live, the newest log overall belongs
     # to the other one, and the slug grep below would come back empty. ls -t
@@ -710,9 +777,9 @@ render_runner_detail() {
     [ -z "$progress" ] && progress="(no activity logged yet)"
 
     track_pid "$pid"
-    printf '      %s●%s %-8s pid %-7s up %-8s last activity %s ago%s%s\n' \
+    printf '      %s●%s %-8s pid %-7s up %-8s%s%s%s\n' \
         "$GRN" "$R" "$phase" "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" \
-        "$(human_age "$hb_age")" "$attempts" "$(log_word "$audit" "$log")"
+        "$activity" "$attempts" "$(log_word "$audit" "$log")"
     printf '      %s%s%s\n' "$DIM" "$progress" "$R"
 }
 
@@ -1037,7 +1104,7 @@ EOF_LS
 
 render_queue() {
     local count=0 shown=0 stale=0 f base next ends pad hb rest pid slug slug_ld slug_lb
-    local claimed=' ' queue_list meta model merge title reorder
+    local claimed=' ' queue_list meta model merge title reorder mark state sid
 
     next="$(automouse_next_run)"
     ends="$(automouse_run_end)"
@@ -1081,15 +1148,22 @@ EOF_Q
     # and only counted. A live one is a runner on a plan that is not in queue/
     # (its lock dir outlived the .md, or a one-off run), so it leads the section
     # with its own row rather than vanishing.
-    for hb in "$AUTOMOUSE_DIR"/.heartbeat-*; do
+    #
+    # The cmdpid files follow so a post-plan phase, which has no heartbeat (see
+    # runner_phase_file), still gets its row. Heartbeats go first, and each shown
+    # PID joins $claimed, so a runner holding both files prints once. Only
+    # heartbeats count as stale residue: every run that leaves one also leaves a
+    # cmdpid file, and counting both would double the figure.
+    for hb in "$AUTOMOUSE_DIR"/.heartbeat-* "$AUTOMOUSE_DIR"/.cmdpid-*; do
         [ -f "$hb" ] || continue
-        rest="$(basename "$hb")"; rest="${rest#.heartbeat-}"
+        rest="$(basename "$hb")"; rest="${rest#.heartbeat-}"; rest="${rest#.cmdpid-}"
         pid="${rest%%-*}"
         case "$claimed" in *" $pid "*) continue ;; esac
         if ! pid_alive_matching "$pid" 'automouse'; then
-            stale=$(( stale + 1 ))
+            case "$(basename "$hb")" in .heartbeat-*) stale=$(( stale + 1 )) ;; esac
             continue
         fi
+        claimed="$claimed$pid "
         # Slug: the lock directory holding this PID is authoritative for both
         # queue-draining and one-off (plan <slug>) invocations. Fallback: command-
         # line scrape, which only matches the explicit .md invocation form.
@@ -1136,13 +1210,37 @@ EOF_Q
         # occupy the same 3 columns, which keeps the name column straight whether
         # the queue is 9 plans long or 90.
         if [ -e "$AUTOMOUSE_DIR/queue/$base.lock" ]; then
-            printf '  %s  ▶%s %s%s %-17s %-6s %s%s%s\n' \
-                "$YEL" "$R" "$(link_file "$f" "$base")" "$pad" "$model" "$merge" \
-                "$YEL" 'in progress' "$R"
+            # The lock dir alone says nothing about whether work is happening.
+            # It outlives its runner twice over: a usage-gate pause keeps it on
+            # purpose (paused-held names the session), and a SIGKILL skips the
+            # cleanup trap. Label from the runner, then the pause marker.
+            pid=''; mark="$YEL  ▶$R"; state="$YEL"'in progress'"$R"
+            if ! pid="$(queue_lock_runner "$base")"; then
+                pid=''
+                sid="$(lock_paused_sid "$base")"
+                # The marker is gone once the pause is resumed. Post-plan resumes
+                # run under post-plan-now, which never rewrites the lock's pid,
+                # so the hold outlives the pause. And it outlives the resume too:
+                # a merged PR leaves the lock behind. So "resumed" needs a live
+                # post-plan-now on the plan's branch.
+                if [ -n "$sid" ] && paused_marker_exists "$sid"; then
+                    mark="$DIM  ‖$R"; state="$DIM"'paused (usage limit)'"$R"
+                elif [ -n "$sid" ] && postplan_live_for "$(plan_branch "$base")"; then
+                    state="$YEL"'resumed (post-plan)'"$R"
+                elif pr_merged_for "$(plan_branch "$base")"; then
+                    # bin/automouse/run disposes a merged plan when it next
+                    # claims it, so this lock needs no hand cleanup.
+                    mark="$DIM  ×$R"; state="$DIM"'PR merged (runner clears it)'"$R"
+                elif [ -n "$sid" ]; then
+                    mark="$DIM  ×$R"; state="$DIM"'stale lock (post-plan gone)'"$R"
+                else
+                    mark="$DIM  ×$R"; state="$DIM"'stale lock (runner gone)'"$R"
+                fi
+            fi
+            printf '  %s %s%s %-17s %-6s %s\n' \
+                "$mark" "$(link_file "$f" "$base")" "$pad" "$model" "$merge" "$state"
             [ -n "$title" ] && printf '      %s%s%s\n' "$DIM" "$title" "$R"
-            # Details only for a LIVE runner. A SIGKILLed one leaves the lock dir
-            # with a dead PID: the row still reads in progress, with nothing under it.
-            pid="$(queue_lock_runner "$base")" && hb="$(runner_heartbeat "$pid")" && \
+            [ -n "$pid" ] && hb="$(runner_phase_file "$pid")" && \
                 render_runner_detail "$pid" "${base%.md}" "$hb"
         else
             printf '  %s%2d.%s %s%s %-17s %-6s %s%s%s\n' \

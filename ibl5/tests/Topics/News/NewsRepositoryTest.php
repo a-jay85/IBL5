@@ -6,17 +6,26 @@ namespace Tests\Topics\News;
 
 use PHPUnit\Framework\TestCase;
 use Topics\News\NewsRepository;
+use Tests\Clock\FixedClock;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 class NewsRepositoryTest extends TestCase
 {
     private NewsRepository $newsService;
     private MockDatabase $mockDb;
+    private string $savedTimezone;
 
     protected function setUp(): void
     {
+        $this->savedTimezone = date_default_timezone_get();
+        date_default_timezone_set('UTC');
         $this->mockDb = new MockDatabase();
         $this->newsService = new NewsRepository($this->mockDb);
+    }
+
+    protected function tearDown(): void
+    {
+        date_default_timezone_set($this->savedTimezone);
     }
 
     public function testCreateNewsStoryExecutesInsert(): void
@@ -47,6 +56,41 @@ class NewsRepositoryTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
         $this->assertStringContainsString('Custom Author', $queries[0]);
+    }
+
+    public function testCreateNewsStoryBindsCurrentDateTimeString(): void
+    {
+        $this->newsService->createNewsStory(3, 5, 'Timed Story', 'Body');
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertMatchesRegularExpression('/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/', $queries[0]);
+    }
+
+    public function testCreateNewsStoryBindsTimeFromInjectedClock(): void
+    {
+        $repository = new NewsRepository($this->mockDb, null, new FixedClock(1791549296));
+
+        $repository->createNewsStory(3, 5, 'Timed Story', 'Body');
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('2026-10-09 12:34:56', $queries[0]);
+    }
+
+    public function testCreateNewsStoryTimeAtUtcMidnightBoundary(): void
+    {
+        $clock = new FixedClock(1791763199);
+        $repository = new NewsRepository($this->mockDb, null, $clock);
+
+        $repository->createNewsStory(3, 5, 'First Story', 'Body');
+        $clock->advance(1);
+        $repository->createNewsStory(3, 5, 'Second Story', 'Body');
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(2, $queries);
+        $this->assertStringContainsString('2026-10-11 23:59:59', $queries[0]);
+        $this->assertStringContainsString('2026-10-12 00:00:00', $queries[1]);
     }
 
     public function testGetTopicIDByTeamName(): void
@@ -149,7 +193,7 @@ class NewsRepositoryTest extends TestCase
 
         $result = $this->newsService->getHomePageStories(10);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertStringContainsString('nuke_stories', $queries[0]);
         $this->assertStringContainsString('LIMIT', $queries[0]);

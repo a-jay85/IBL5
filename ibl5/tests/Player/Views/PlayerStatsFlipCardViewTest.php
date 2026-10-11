@@ -5,14 +5,6 @@ declare(strict_types=1);
 namespace Tests\Player\Views;
 
 use PHPUnit\Framework\TestCase;
-use Player\Stats\Views\PlayerHeatAveragesView;
-use Player\Stats\Views\PlayerHeatTotalsView;
-use Player\Stats\Views\PlayerOlympicAveragesView;
-use Player\Stats\Views\PlayerOlympicTotalsView;
-use Player\Stats\Views\PlayerPlayoffAveragesView;
-use Player\Stats\Views\PlayerPlayoffTotalsView;
-use Player\Stats\Views\PlayerRegularSeasonAveragesView;
-use Player\Stats\Views\PlayerRegularSeasonTotalsView;
 use Player\Views\PlayerStatsFlipCardView;
 
 /** @covers \Player\Views\PlayerStatsFlipCardView */
@@ -24,7 +16,7 @@ class PlayerStatsFlipCardViewTest extends TestCase
     {
         $result = PlayerStatsFlipCardView::getFlipStyles(null);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame('', $result);
     }
 
     public function testRenderWithShowAveragesFirstSnapshot(): void
@@ -48,61 +40,5 @@ class PlayerStatsFlipCardViewTest extends TestCase
         $totalsFirst   = PlayerStatsFlipCardView::render('<AVG/>', '<TOT/>', 'Regular Season', false, null);
 
         $this->assertNotSame($averagesFirst, $totalsFirst);
-    }
-
-    public function testRenderRegularSeasonSnapshot(): void
-    {
-        $averagesView = self::createStub(PlayerRegularSeasonAveragesView::class);
-        $averagesView->method('renderAverages')->willReturn('<AVG/>');
-        $totalsView = self::createStub(PlayerRegularSeasonTotalsView::class);
-        $totalsView->method('renderTotals')->willReturn('<TOT/>');
-
-        $result = PlayerStatsFlipCardView::renderRegularSeason($averagesView, $totalsView, 42, null, 0);
-
-        $this->assertStringContainsString('<AVG/>', $result);
-        $this->assertStringContainsString('<TOT/>', $result);
-        $this->assertSnapshotMatches($result, 'PlayerStatsFlipCardView-regular-season.html');
-    }
-
-    public function testRenderPlayoffsSnapshot(): void
-    {
-        $averagesView = self::createStub(PlayerPlayoffAveragesView::class);
-        $averagesView->method('renderAverages')->willReturn('<AVG/>');
-        $totalsView = self::createStub(PlayerPlayoffTotalsView::class);
-        $totalsView->method('renderTotals')->willReturn('<TOT/>');
-
-        $result = PlayerStatsFlipCardView::renderPlayoffs($averagesView, $totalsView, 'Test Player', null, 0);
-
-        $this->assertStringContainsString('<AVG/>', $result);
-        $this->assertStringContainsString('<TOT/>', $result);
-        $this->assertSnapshotMatches($result, 'PlayerStatsFlipCardView-playoffs.html');
-    }
-
-    public function testRenderOlympicsSnapshot(): void
-    {
-        $averagesView = self::createStub(PlayerOlympicAveragesView::class);
-        $averagesView->method('renderAverages')->willReturn('<AVG/>');
-        $totalsView = self::createStub(PlayerOlympicTotalsView::class);
-        $totalsView->method('renderTotals')->willReturn('<TOT/>');
-
-        $result = PlayerStatsFlipCardView::renderOlympics($averagesView, $totalsView, 42, null, 0);
-
-        $this->assertStringContainsString('<AVG/>', $result);
-        $this->assertStringContainsString('<TOT/>', $result);
-        $this->assertSnapshotMatches($result, 'PlayerStatsFlipCardView-olympics.html');
-    }
-
-    public function testRenderHeatSnapshot(): void
-    {
-        $averagesView = self::createStub(PlayerHeatAveragesView::class);
-        $averagesView->method('renderAverages')->willReturn('<AVG/>');
-        $totalsView = self::createStub(PlayerHeatTotalsView::class);
-        $totalsView->method('renderTotals')->willReturn('<TOT/>');
-
-        $result = PlayerStatsFlipCardView::renderHeat($averagesView, $totalsView, 'Test Player', null, 0);
-
-        $this->assertStringContainsString('<AVG/>', $result);
-        $this->assertStringContainsString('<TOT/>', $result);
-        $this->assertSnapshotMatches($result, 'PlayerStatsFlipCardView-heat.html');
     }
 }

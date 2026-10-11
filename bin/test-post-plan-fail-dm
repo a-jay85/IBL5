@@ -11,28 +11,33 @@
 #   6. Held job, newer log for the branch: no DM.
 #   7. Held job, no newer log: DM, prefixed so you know nobody re-ran it.
 #   8. Held job, newer log for a longer branch name ("foo-bar" vs "foo"): still DMs.
-#   9. Static: every DM_CMD invocation passes --ping.
+#   9. Static: every DM goes through dm_ping, which passes --ping.
 #  10. Live headless session (argv has -p) in the worktree: DM now, no job.
 #  11. Live headless session (argv has --print): DM now, no job.
 #  12. Live interactive session whose argv only contains "-p" inside other tokens: DM held.
 #  13. Headless and interactive sessions in the same worktree: DM held.
 #  14. ps cannot read the live pid's argv: DM held (counts as live).
+#  16. Generic blocked_ship_block (no blocked-ship.txt) ends with the postplan-fix
+#      paste line, and the DM body keeps it as its last line.
 #
 # launchctl and discord-dm are stubbed; nothing leaves the machine.
 # Run: bin/test-post-plan-fail-dm  (exit 0 = all pass, 1 = a case failed)
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SUT="$ROOT/bin/post-plan-fail-dm"
 
-FAILS=0
-ok()   { printf '  ok   %s\n' "$1"; }
-fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-post-plan-fail-dm.XXXXXX")
 STUBS=""
 trap 'kill $STUBS 2>/dev/null; rm -rf "$TMP"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 WT="$TMP/wt"; OTHER="$TMP/other"; LOGS="$TMP/logs"; PLISTS="$TMP/plists"
 mkdir -p "$WT" "$OTHER" "$LOGS" "$TMP/bin"
@@ -107,6 +112,9 @@ run
 [ "$(dm_count)" = 1 ] && [ "$(lc_count)" = 0 ] && ok "1 dead session: DM now" || fail "1 dead session: DM now"
 grep -qF -- '--ping' <<< "$(cat "$DM_ARGV" 2>/dev/null)" \
     && ok "1b immediate DM carries --ping" || fail "1b immediate DM lacks --ping"
+[ "$(tail -n 1 "$DM_ARGV")" = "--ping --quiet --attempts 2 the-msg" ] \
+    && ok "1c immediate DM argv is --ping --quiet --attempts 2 <msg>" \
+    || fail "1c immediate DM argv: $(tail -n 1 "$DM_ARGV")"
 
 reset; registry "$WT" $$
 run
@@ -152,12 +160,13 @@ reset; touch -t 202609261800 "$LOG.faildm-stamp"
 run --deferred
 [ "$(dm_count)" = 1 ] && ok "8 other branch log ignored" || fail "8 other branch log ignored"
 
-# Static: every DM_CMD invocation line (line-leading, so the env-forwarding line is skipped) pings.
-_inv=$(grep -c '^ *"$DM_CMD"' "$SUT")
-_ping=$(grep -c '^ *"$DM_CMD" --ping' "$SUT")
-[ "$_inv" -ge 1 ] && [ "$_inv" = "$_ping" ] \
-    && ok "9 every DM_CMD call passes --ping ($_ping of $_inv)" \
-    || fail "9 DM_CMD calls without --ping ($_ping of $_inv)"
+# Static: the SUT sends only through dm_ping, and dm_ping always passes --ping.
+_bare=$(grep -c '^ *"$DM_CMD"' "$SUT")
+_via=$(grep -c '^ *dm_ping "$1" --quiet --attempts 2' "$SUT")
+_lib=$(grep -cF '"$DM_CMD" --ping "$@" "$msg"' "$(dirname "$SUT")/lib/dm.sh")
+[ "$_bare" = 0 ] && [ "$_via" -ge 1 ] && [ "$_lib" = 1 ] \
+    && ok "9 every DM goes through dm_ping, which passes --ping" \
+    || fail "9 DM path: bare=$_bare via-dm_ping=$_via lib-ping=$_lib"
 
 spawn_stub -p hello;      HP=$STUB_PID
 spawn_stub --print hello; HPRINT=$STUB_PID
@@ -190,8 +199,39 @@ PATH="$TMP/psbad:$PATH" run
 [ "$(dm_count)" = 0 ] && [ "$(lc_count)" = 1 ] \
     && ok "14 argv unreadable: DM held" || fail "14 argv unreadable: DM held"
 
-if [ "$FAILS" -gt 0 ]; then
-    echo "test-post-plan-fail-dm: $FAILS case(s) failed"
-    exit 1
-fi
-echo "test-post-plan-fail-dm: all cases passed"
+# 15: an empty FAILDM_DM_CMD falls back to $ROOT/bin/discord-dm (:- semantics).
+reset; registry "$WT" 999999
+mkdir -p "$WT/bin"
+cat > "$WT/bin/discord-dm" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$TMP/default-dm.argv"
+EOF
+chmod +x "$WT/bin/discord-dm"
+rm -f "$TMP/default-dm.argv"
+FAILDM_REGISTRY="$TMP/reg.json" FAILDM_DM_CMD="" \
+FAILDM_LAUNCHCTL="$TMP/bin/lc-ok" FAILDM_PLIST_DIR="$PLISTS" \
+FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
+    "$SUT" "$WT" foo "$LOG" "the-msg" >/dev/null 2>&1
+[ "$(wc -l < "$TMP/default-dm.argv" 2>/dev/null | tr -d ' ')" = 1 ] \
+    && [ "$(cat "$TMP/default-dm.argv")" = "--ping --quiet --attempts 2 the-msg" ] \
+    && ok '15 empty FAILDM_DM_CMD falls back to $ROOT/bin/discord-dm' \
+    || fail '15 empty FAILDM_DM_CMD falls back to $ROOT/bin/discord-dm'
+rm -rf "${WT:?}/bin" "$TMP/default-dm.argv"
+
+# 16: the generic exit-3 block (no blocked-ship.txt) ends with the postplan-fix paste line,
+# and the DM sent through the SUT keeps that line last. Pins bin/post-plan-now's 5th arg.
+reset; registry "$WT" 999999
+GEN_BLOCK=$(bash -c 'source "$1" >/dev/null 2>&1; blocked_ship_block "$2" "$3" "$4" "$5" "$6"' \
+    _ "$ROOT/bin/post-plan-now" "$TMP/no-run-dir" "feat/gen" "$WT" "$LOG" "/main/root")
+FAILDM_REGISTRY="$TMP/reg.json" FAILDM_DM_CMD="$TMP/bin/dm" \
+FAILDM_LAUNCHCTL="$TMP/bin/lc-ok" FAILDM_PLIST_DIR="$PLISTS" \
+FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
+    "$SUT" "$WT" foo "$LOG" "$GEN_BLOCK" >/dev/null 2>&1
+[ "$(tail -n 1 "$DM_OUT")" = "/main/root/bin/postplan-fix feat/gen" ] \
+    && [ "$(tail -n 2 "$DM_OUT" | head -n 1)" = "Or paste this to have Claude fix it:" ] \
+    && [ "$(tail -n 3 "$DM_OUT" | head -n 1)" = "Log: $LOG" ] \
+    && ! grep -qF "Or open Claude in that folder" "$DM_OUT" \
+    && ok "16 generic block DM ends with the postplan-fix paste line" \
+    || fail "16 generic block DM tail: $(tail -n 3 "$DM_OUT" 2>/dev/null)"
+
+h_done

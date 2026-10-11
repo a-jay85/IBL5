@@ -462,6 +462,62 @@ class SrcReadShortTest extends TestCase
     }
 }'
 
+# --- Allowlist integrity: .phpunit-source-read-allowlist -----------------------
+# allowlist_problems <root> <allowlist-file>: print one STALE / NO-REASON line per
+# defect. STALE = an entry names a file that does not exist under <root>.
+# NO-REASON = an entry has no '#' comment line directly above it.
+allowlist_problems() {
+    local root="$1" file="$2" line prev=""
+    while IFS= read -r line; do
+        case "$line" in
+            ''|[[:space:]]*'#'*|'#'*) ;;
+            *)
+                [ -f "$root/$line" ] || echo "STALE $line"
+                case "$prev" in '#'*) ;; *) echo "NO-REASON $line" ;; esac
+                ;;
+        esac
+        prev="$line"
+    done < "$file"
+}
+
+# allowlist_case <name> <expected-regex|-> <allowlist-body>: run against a throwaway root.
+allowlist_case() {
+    local name="$1" want_re="$2" body="$3" d out
+    d="$(mk_repo)"
+    mkdir -p "$d/ibl5/tests"
+    : > "$d/ibl5/tests/RealTest.php"
+    printf '%s\n' "$body" > "$d/al"
+    out="$(allowlist_problems "$d" "$d/al")"
+    if [ "$want_re" = "-" ]; then
+        if [ -z "$out" ]; then pass "$name (clean)"; else failcase "$name — unexpected: $out"; fi
+    elif printf '%s' "$out" | grep -qE "$want_re"; then
+        pass "$name (flagged)"
+    else
+        failcase "$name — expected /$want_re/, got: ${out:-<clean>}"
+    fi
+}
+
+allowlist_case "allowlist-clean-ok" '-' '# guards the CLI entry point
+ibl5/tests/RealTest.php'
+allowlist_case "allowlist-stale-entry-flagged" 'STALE ibl5/tests/DoesNotExistTest.php' '# guards the CLI entry point
+ibl5/tests/DoesNotExistTest.php'
+allowlist_case "allowlist-blank-above-flagged" 'NO-REASON ibl5/tests/RealTest.php' '# header
+
+ibl5/tests/RealTest.php'
+
+# The shipped allowlist must be clean against the real tree.
+SHIPPED_AL="$SCRIPT_DIR/../.phpunit-source-read-allowlist"
+if [ -f "$SHIPPED_AL" ]; then
+    shipped_out="$(allowlist_problems "$SCRIPT_DIR/.." "$SHIPPED_AL")"
+    if [ -z "$shipped_out" ]; then
+        pass "allowlist-shipped-file-clean"
+    else
+        failcase "allowlist-shipped-file-clean — $shipped_out"
+    fi
+else
+    failcase "allowlist-shipped-file-clean — .phpunit-source-read-allowlist is missing"
+fi
+
 # --- base-ref seam (--pr): PHPUNIT_HYGIENE_BASE_REF / E2E_HYGIENE_BASE_REF ---
 # Both gates share one contract: unset or empty means origin/master, a non-empty
 # value is the --pr diff base, and a non-empty value that is not a commit exits 2.

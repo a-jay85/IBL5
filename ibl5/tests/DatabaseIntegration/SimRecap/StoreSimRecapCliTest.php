@@ -169,7 +169,8 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
 
     /**
      * The routing host comes only from IBL5_CANONICAL_HOST. A caller-supplied
-     * --host argument is an unknown argument: exit 1, nothing written.
+     * --host argument is an unknown argument: exit 1, nothing written
+     * (the same no-row assertNull(find()) pin as the parse-failure tests).
      */
     public function testHostArgumentIsRejectedAsUnknownArgument(): void
     {

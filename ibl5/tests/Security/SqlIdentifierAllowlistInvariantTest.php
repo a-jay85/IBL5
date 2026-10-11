@@ -248,6 +248,9 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
             self::nonIdentifierValues($map, self::PREFIX_PATTERN, true),
         );
 
+        // A hyphenated prefix is outside the shape, so adding one to SUPPORTED_PREFIXES fails.
+        self::assertSame(['nuke-prod'], self::nonIdentifierValues(['nuke', 'nuke-prod'], self::PREFIX_PATTERN, true));
+
         // A trailing underscore is not a prefix; the "_stories" suffix supplies the separator.
         self::assertNotSame([], self::nonIdentifierValues(['nuke_'], self::PREFIX_PATTERN, true));
     }

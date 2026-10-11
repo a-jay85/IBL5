@@ -70,7 +70,7 @@ test.describe('Draft board: renders', () => {
     page,
   }) => {
     // CI seed: Metros own pick 1.
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
+    const submitBtn = page.locator('form[name="draft_form"] button[type="submit"]').filter({
       hasText: /draft player/i,
     });
     await expect(submitBtn.first()).toBeVisible();
@@ -120,7 +120,7 @@ test.describe('Draft selection: submission', () => {
     // Submit the form — HTMX hx-boost intercepts the POST so waitForNavigation
     // doesn't reliably capture the op=select navigation. Just click and wait
     // for the success message to appear in the swapped body.
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
+    const submitBtn = page.locator('form[name="draft_form"] button[type="submit"]').filter({
       hasText: /draft player/i,
     });
     await submitBtn.first().click();

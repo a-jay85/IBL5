@@ -66,7 +66,7 @@ test.describe('ASG Voting: submission', () => {
       }
     }
 
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
+    const submitBtn = page.locator('button').filter({
       hasText: /submit votes/i,
     });
 
@@ -113,7 +113,7 @@ test.describe('ASG Voting: submission', () => {
       picked.push((await ecbBoxes.nth(i).getAttribute('value')) as string);
     }
 
-    const submitBtn = page.locator('form[name="ASGVote"] button[type="submit"], form[name="ASGVote"] input[type="submit"]');
+    const submitBtn = page.locator('form[name="ASGVote"] button[type="submit"]');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('op=submit_asg') && r.request().method() === 'POST'),
       submitBtn.first().click(),
@@ -181,7 +181,7 @@ test.describe('ASG Voting: validation errors', () => {
     }
 
     // Submit with too few votes
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
+    const submitBtn = page.locator('button').filter({
       hasText: /submit votes/i,
     });
 
@@ -221,7 +221,7 @@ test.describe('ASG Voting: validation errors', () => {
     await ecfTable.locator('input[type="checkbox"]').first().check();
 
     await page
-      .locator('button, input[type="submit"]')
+      .locator('button')
       .filter({ hasText: /submit votes/i })
       .first()
       .click();
@@ -241,7 +241,7 @@ test.describe('ASG Voting: validation errors', () => {
 
     // Locate by form, not by label — pre-fix the button reads "Submitting…".
     const restoredBtns = page.locator(
-      'form[name="ASGVote"] button[type="submit"], form[name="ASGVote"] input[type="submit"]',
+      'form[name="ASGVote"] button[type="submit"]',
     );
     await expect(restoredBtns.first(), 'restored ballot must render a submit button').toBeVisible();
     await expect(restoredBtns.first(), 'submit label must be restored').toHaveText(
@@ -273,7 +273,7 @@ test.describe('ASG Voting: validation errors', () => {
       await checkboxes.nth(i).check();
     }
 
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
+    const submitBtn = page.locator('button').filter({
       hasText: /submit votes/i,
     });
 
@@ -315,7 +315,7 @@ test.describe('EOY Voting: validation errors', () => {
     }
 
     // Submit without selecting MVP
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
+    const submitBtn = page.locator('button').filter({
       hasText: /submit votes/i,
     });
 
@@ -373,7 +373,7 @@ test.describe('EOY Voting: validation errors', () => {
     }
 
     // Submit
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
+    const submitBtn = page.locator('button').filter({
       hasText: /submit votes/i,
     });
 
@@ -421,7 +421,7 @@ test.describe('EOY Voting: submission', () => {
       }
     }
 
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
+    const submitBtn = page.locator('button').filter({
       hasText: /submit votes/i,
     });
 
@@ -466,7 +466,7 @@ test.describe('EOY Voting: submission', () => {
     await mvp1.check();
     const mvp1Value = (await mvp1.getAttribute('value')) as string;
 
-    const submitBtn = page.locator('form[name="EOYVote"] button[type="submit"], form[name="EOYVote"] input[type="submit"]');
+    const submitBtn = page.locator('form[name="EOYVote"] button[type="submit"]');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('op=submit_eoy') && r.request().method() === 'POST'),
       submitBtn.first().click(),

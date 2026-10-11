@@ -32,6 +32,9 @@ USAGE_FETCH_EPISODE_QUIET=1800
 USAGE_SWITCH_WINDOW=1800
 USAGE_SWITCH_RETRY_CAP=45
 USAGE_SWITCH_RETRY_MAX=3
+# A live fetch that finds no login in the keychain, or gets a 401, marks the login dead for
+# USAGE_AUTH_DEAD_TTL seconds. The coordinator holds login-switch resumes while it is set.
+USAGE_AUTH_DEAD_TTL=900
 
 # usage_state_dir
 # Echoes the state dir (creating it and markers/). Honors IBL5_USAGE_GATE_STATE_DIR;
@@ -135,6 +138,20 @@ _usage_switch_short_retry() {
     { printf '%s %s %s %s\n' "$at" "$sfp" "$n" "${kind:--}" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; } 2>/dev/null \
         || rm -f "$f.tmp.$$"
     printf '%s %s\n' "$ra" "$n"
+}
+
+# usage_auth_dead [now]: echoes the reason (no-token or http-401) and returns 0 when
+# the last live fetch, under USAGE_AUTH_DEAD_TTL seconds ago, found the login missing
+# or rejected. A later successful fetch clears it. Returns 1 otherwise.
+usage_auth_dead() {
+    local f now at reason
+    f="$(usage_state_dir)/fetch-auth-dead"
+    [ -f "$f" ] || return 1
+    read -r at reason < "$f" 2>/dev/null
+    case "$at" in ''|*[!0-9]*) return 1 ;; esac
+    now="${1:-$(date +%s)}"
+    [ $((now - at)) -lt "$USAGE_AUTH_DEAD_TTL" ] || return 1
+    printf '%s\n' "${reason:-unknown}"
 }
 
 # usage_account_switch_check: keychain-free detection for the coordinator. When the
@@ -388,11 +405,15 @@ usage_fetch() {
         _usage_fetch_serve_stale "$age" "$cache"; return $?
     fi
 
-    local reason="" tok="" body="" hdr="$d/fetch.hdr.$$" crc=0 status="" ra=""
-    tok=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
-        | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+    local reason="" tok="" body="" hdr="$d/fetch.hdr.$$" crc=0 status="" ra="" raw="" src=0 dead=""
+    raw=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null); src=$?
+    tok=$(printf '%s' "$raw" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+    raw=""
     if [ -z "$tok" ]; then
         reason="no-token"
+        # 44 is item-not-found and rc 0 is an item with no token: no login. Any other
+        # rc (locked keychain, no UI access under launchd) says nothing about the login.
+        if [ "$src" -eq 44 ] || [ "$src" -eq 0 ]; then dead="no-token"; fi
     else
         rm -f "$hdr"
         body=$(curl -s -m 4 -D "$hdr" https://api.anthropic.com/api/oauth/usage \
@@ -416,7 +437,7 @@ usage_fetch() {
         local tmp="$cache.tmp.$$"
         if printf '%s' "$body" | jq --argjson t "$(date +%s)" --arg fp "$fp" '. + {fetched_at:$t, cred_fp:$fp}' > "$tmp" 2>/dev/null \
             && mv "$tmp" "$cache"; then
-            rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.*
+            rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.* "$d/fetch-auth-dead"
             _usage_fetch_episode_end "$d" stale
             local acct
             acct=$(_usage_acct_fp)
@@ -429,6 +450,8 @@ usage_fetch() {
         reason="bad-body"
     fi
 
+    [ "$reason" = http-401 ] && dead="http-401"
+    if [ -n "$dead" ]; then printf '%s %s\n' "$(date +%s)" "$dead" > "$d/fetch-auth-dead" 2>/dev/null; fi
     if [ "$reason" = "rate-limited" ]; then
         local delay sr ep
         if sr=$(_usage_switch_short_retry "$d" "$fp" "$ra"); then

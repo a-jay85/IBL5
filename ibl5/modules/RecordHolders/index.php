@@ -20,12 +20,6 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use Cache\DatabaseCache;
-use RecordHolders\RecordHoldersRepository;
-use RecordHolders\RecordHoldersService;
-use RecordHolders\CachedRecordHoldersService;
-use RecordHolders\RecordHoldersView;
-
 $module_name = basename(dirname(__FILE__));
 
 $rawOp = $_GET['op'] ?? null;
@@ -33,20 +27,17 @@ $op = (is_string($rawOp) && $rawOp === 'allstar') ? 'allstar' : 'records';
 
 $pagetitle = $op === 'allstar' ? '- All-Star Appearances' : '- Record Holders';
 
-global $mysqli_db, $leagueContext;
-
 PageLayout\PageLayout::header();
 
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\RecordHoldersFactory::class);
+
 if ($op === 'allstar') {
-    $appearancesRepository = new \AllStarAppearances\AllStarAppearancesRepository($mysqli_db);
-    $appearancesView = new \AllStarAppearances\AllStarAppearancesView();
+    $appearancesRepository = $factory->allStarRepository();
+    $appearancesView = $factory->allStarView();
     echo $appearancesView->render($appearancesRepository->getAllStarAppearances());
 } else {
-    $repository = new RecordHoldersRepository($mysqli_db, $leagueContext);
-    $innerService = new RecordHoldersService($repository);
-    $cache = new DatabaseCache($mysqli_db);
-    $service = new CachedRecordHoldersService($innerService, $cache);
-    $view = new RecordHoldersView();
+    $service = $factory->service();
+    $view = $factory->view();
     echo $view->render($service->getAllRecords());
 }
 

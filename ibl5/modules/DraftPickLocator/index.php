@@ -18,22 +18,16 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use DraftPickLocator\DraftPickLocatorRepository;
-use DraftPickLocator\DraftPickLocatorService;
-use DraftPickLocator\DraftPickLocatorView;
-
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db;
-
-$season = new \Season\Season($mysqli_db);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\DraftPickLocatorFactory::class);
+$season = $factory->season();
 
 $pagetitle = "- Draft Pick Locator";
 
 // Initialize services
-$repository = new DraftPickLocatorRepository($mysqli_db);
-$service = new DraftPickLocatorService($repository);
-$view = new DraftPickLocatorView();
+$service = $factory->service();
+$view = $factory->view();
 
 // Get teams with their draft picks
 $teamsWithPicks = $service->getAllTeamsWithPicks();

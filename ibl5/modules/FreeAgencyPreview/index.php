@@ -19,16 +19,13 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use FreeAgencyPreview\FreeAgencyPreviewRepository;
 use FreeAgencyPreview\FreeAgencyPreviewService;
-use FreeAgencyPreview\FreeAgencyPreviewView;
 
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db;
-
 // Get current season info
-$season = new \Season\Season($mysqli_db);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\FreeAgencyPreviewFactory::class);
+$season = $factory->season();
 
 // Check if season is available
 if ($season->endingYear === null || $season->endingYear === 0) {
@@ -45,9 +42,8 @@ $requestedYear = FreeAgencyPreviewService::resolveRequestedYear($rawYear, $seaso
 $pagetitle = "- Upcoming Free Agents ($requestedYear)";
 
 // Initialize services
-$repository = new FreeAgencyPreviewRepository($mysqli_db);
-$service = new FreeAgencyPreviewService($repository);
-$view = new FreeAgencyPreviewView();
+$service = $factory->service();
+$view = $factory->view();
 
 // Get upcoming free agents
 $freeAgents = $service->getUpcomingFreeAgents($requestedYear, $season->endingYear);

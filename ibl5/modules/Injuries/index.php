@@ -18,9 +18,6 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use Injuries\InjuriesService;
-use Injuries\InjuriesView;
-
 $module_name = basename(dirname(__FILE__));
 
 $pagetitle = "- Injured Players";
@@ -30,11 +27,10 @@ $pagetitle = "- Injured Players";
 // inputs are now read from $_REQUEST explicitly here.
 $teamid = is_numeric($_REQUEST['teamid'] ?? null) ? (int) $_REQUEST['teamid'] : 0;
 
-global $mysqli_db;
-
 // Initialize services
-$service = new InjuriesService($mysqli_db);
-$view = new InjuriesView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\InjuriesFactory::class);
+$service = $factory->service();
+$view = $factory->view();
 
 // Get injured players data
 $injuredPlayers = $service->getInjuredPlayersWithTeams();

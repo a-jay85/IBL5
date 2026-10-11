@@ -31,14 +31,10 @@ $module_name = basename(dirname(__FILE__));
 
 $pagetitle = "- $module_name";
 
-global $mysqli_db;
-
 // Initialize classes
-$validator = new \PlayerSearch\PlayerSearchValidator();
-$repository = new \PlayerSearch\PlayerSearchRepository($mysqli_db);
-$playerRepository = new \Player\PlayerRepository($mysqli_db);
-$service = new \PlayerSearch\PlayerSearchService($validator, $repository, $playerRepository);
-$view = new \PlayerSearch\PlayerSearchView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\PlayerSearchFactory::class);
+$service = $factory->service();
+$view = $factory->view();
 
 // Get and validate search parameters from POST
 $searchResult = $service->search($_POST);

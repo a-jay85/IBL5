@@ -15,17 +15,11 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use GameBoxscore\GameBoxscoreRepository;
-use GameBoxscore\GameBoxscoreService;
-use GameBoxscore\GameBoxscoreView;
-
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db, $leagueContext;
-
-$repository = new GameBoxscoreRepository($mysqli_db, $leagueContext);
-$service = new GameBoxscoreService($repository);
-$view = new GameBoxscoreView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\GameBoxscoreFactory::class);
+$service = $factory->service();
+$view = $factory->view();
 
 $viewModel = $service->getBoxscore($_GET['date'] ?? null, $_GET['game'] ?? null);
 

@@ -18,13 +18,11 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use Topics\TopicsService;
-use Topics\TopicsView;
 use Search\Contracts\SearchRepositoryInterface;
 
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db, $prefix, $user_prefix, $tipath, $articlecomm;
+global $prefix,$user_prefix, $tipath, $articlecomm;
 
 $ThemeSel = 'IBL';
 
@@ -34,8 +32,9 @@ $themePath = (is_dir("themes/{$ThemeSel}/images/topics/"))
     : (string) $tipath;
 
 // Initialize service (owns the Topics + Search repositories)
-$service = new TopicsService($mysqli_db, $prefix);
-$view = new TopicsView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\TopicsFactory::class);
+$service = $factory->service(is_string($prefix) ? $prefix : 'nuke');
+$view = $factory->view();
 $pagetitle = "- " . _ACTIVETOPICS;
 
 // Assemble page data (topics + search filters)

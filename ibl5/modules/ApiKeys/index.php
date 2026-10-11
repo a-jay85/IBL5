@@ -16,15 +16,13 @@ if (stripos($_SERVER['PHP_SELF'], 'modules.php') === false) {
     die("You can't access this file directly...");
 }
 
-global $mysqli_db, $user, $authService;
+global $user;
 
-$httpRequest = \Http\HttpRequest::fromGlobals();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\ApiKeysFactory::class);
+
+$httpRequest = $factory->request();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : 'main';
 
-$repository = new \ApiKeys\ApiKeysRepository($mysqli_db);
-$service    = new \ApiKeys\ApiKeysService($repository);
-$view       = new \ApiKeys\ApiKeysView();
-$nukeCompat = new \Utilities\NukeCompat();
-$controller = new \ApiKeys\ApiKeysController($service, $view, $nukeCompat, $authService);
+$controller = $factory->controller();
 
 $controller->handle($op, $user);

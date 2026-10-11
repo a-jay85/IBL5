@@ -25,40 +25,13 @@ $module_name = basename(dirname(__FILE__));
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
 // inputs are read here via the Http\HttpRequest value object.
-$httpRequest = \Http\HttpRequest::fromGlobals();
+$httpRequest = \Module\ModuleServices::current()->request();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
-use Voting\VotingBallotService;
-use Voting\VotingBallotView;
-use Voting\VotingRepository;
-use Voting\VotingResultsController;
-use Voting\VotingResultsService;
-use Voting\VotingResultsView;
-use Voting\VotingSubmissionService;
-use Voting\VotingSubmissionView;
+global $user;
 
-global $mysqli_db, $user, $authService;
-
-$repository        = new VotingRepository($mysqli_db);
-$ballotService     = new VotingBallotService($mysqli_db);
-$ballotView        = new VotingBallotView();
-$submissionService = new VotingSubmissionService($repository);
-$submissionView    = new VotingSubmissionView();
-$nukeCompat        = new \Utilities\NukeCompat();
-$teamIdentityRepo  = new \Repositories\TeamIdentityRepository($mysqli_db);
-// Constructed unconditionally; VotingController only calls render() for admins, so the
-// results query never runs for anyone else. Keeping the gate in one place means deleting
-// it fails a unit test instead of being masked by a second check here.
-$resultsController = new VotingResultsController(
-    new VotingResultsService($repository),
-    new VotingResultsView(),
-    new \Season\Season($mysqli_db)
-);
-$controller        = new \Voting\VotingController(
-    $mysqli_db, $ballotService, $ballotView,
-    $submissionService, $submissionView, $nukeCompat, $authService,
-    $teamIdentityRepo, $resultsController
-);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\VotingFactory::class);
+$controller = $factory->controller();
 
 switch ($op) {
     case 'submit_asg':

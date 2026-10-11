@@ -20,16 +20,13 @@ $module_name = basename(dirname(__FILE__));
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
 // inputs are read here via the Http\HttpRequest value object.
-$httpRequest = \Http\HttpRequest::fromGlobals();
+$httpRequest = \Module\ModuleServices::current()->request();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
-global $mysqli_db, $user;
+global $user;
 
-$repository = new \ComparePlayers\ComparePlayersRepository($mysqli_db);
-$service    = new \ComparePlayers\ComparePlayersService($repository);
-$view       = new \ComparePlayers\ComparePlayersView();
-$nukeCompat = new \Utilities\NukeCompat();
-$controller = new \ComparePlayers\ComparePlayersController($repository, $service, $view, $nukeCompat);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\ComparePlayersFactory::class);
+$controller = $factory->controller();
 
 switch ($op) {
     default:

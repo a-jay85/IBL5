@@ -17,18 +17,14 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use GMContactList\GMContactListRepository;
-use GMContactList\GMContactListView;
-
 $module_name = basename(dirname(__FILE__));
 
 $pagetitle = "- IBL GM Contact List";
 
-global $mysqli_db;
-
 // Initialize services
-$repository = new GMContactListRepository($mysqli_db);
-$view = new GMContactListView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\GMContactListFactory::class);
+$repository = $factory->repository();
+$view = $factory->view();
 
 // Get contact list data
 $contacts = $repository->getAllTeamContacts();

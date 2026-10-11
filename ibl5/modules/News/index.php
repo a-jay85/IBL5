@@ -23,30 +23,15 @@ if (!defined('INDEX_FILE')) {
 }
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db, $authService, $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang;
-assert($mysqli_db instanceof \mysqli);
-assert($authService instanceof \Auth\Contracts\AuthServiceInterface);
-
-$newsPageConfig = new \Topics\News\NewsPageConfig(
+global $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang;
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\NewsFactory::class);
+$controller = $factory->controller(
     storyHome: is_numeric($storyhome) ? (int) $storyhome : 0,
     userNews: is_numeric($user_news) ? (int) $user_news : 0,
     articleComm: is_numeric($articlecomm) ? (int) $articlecomm : 0,
     siteName: is_string($sitename) ? $sitename : '',
     multilingual: is_numeric($multilingual) ? (int) $multilingual : 0,
     currentLang: is_string($currentlang) ? $currentlang : '',
-);
-
-$controller = new \Topics\News\NewsController(
-    $newsPageConfig,
-    $authService,
-    new \Repositories\TeamIdentityRepository($mysqli_db),
-    new \LastSimRecap\LastSimRecapService(
-        new \LastSimRecap\LastSimRecapRepository($mysqli_db),
-        new \Repositories\PlayerLookupRepository($mysqli_db),
-    ),
-    new \LastSimRecap\LastSimRecapView(),
-    new \Topics\News\NewsService($mysqli_db),
-    new \Topics\News\NewsView(),
 );
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().

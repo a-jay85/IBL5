@@ -18,8 +18,6 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use Search\SearchRepository;
-use Search\SearchView;
 use Search\Contracts\SearchRepositoryInterface;
 
 $module_name = basename(dirname(__FILE__));
@@ -42,7 +40,7 @@ $preset = array_key_exists($presetRaw, SearchRepositoryInterface::PRESET_CATEGOR
 $offset = 10;
 $max = $min + $offset;
 
-global $prefix, $user_prefix, $mysqli_db, $module_name, $articlecomm;
+global $prefix, $user_prefix, $module_name, $articlecomm;
 
 // Redirect if query is too short
 if ($preset === '' && $query !== '' && strlen($query) < 3) {
@@ -52,8 +50,9 @@ if ($preset === '' && $query !== '' && strlen($query) < 3) {
 $pagetitle = "- " . _SEARCH;
 
 // Initialize services
-$service = new SearchRepository($mysqli_db, $prefix);
-$view = new SearchView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\SearchFactory::class);
+$service = $factory->repository(is_string($prefix) ? $prefix : 'nuke');
+$view = $factory->view();
 
 // Get topic context for header display
 $topicText = _ALLTOPICS;

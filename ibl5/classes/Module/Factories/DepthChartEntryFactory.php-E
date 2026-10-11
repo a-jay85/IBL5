@@ -1,0 +1,67 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Module\Factories;
+
+use Module\Contracts\ModuleFactoryInterface;
+use Module\ModuleServices;
+
+/**
+ * Composition root for modules/DepthChartEntry/index.php.
+ *
+ * Each handler function in index.php resolves this factory in its own body, after
+ * its own gates, and calls the one method for the object it dispatches to.
+ */
+final class DepthChartEntryFactory implements ModuleFactoryInterface
+{
+    public function __construct(private readonly ModuleServices $services)
+    {
+    }
+
+    public function controller(): \DepthChartEntry\DepthChartEntryController
+    {
+        $db = $this->services->db();
+        $commonRepo = $this->services->teamIdentity();
+
+        $repository = new \DepthChartEntry\DepthChartEntryRepository($db);
+        $service = new \DepthChartEntry\DepthChartEntryService();
+        $view = new \DepthChartEntry\DepthChartEntryView($this->services->leagueContext(), $service);
+        $teamRepository = new \Team\TeamRepository($db);
+        $teamTableService = new \Team\TeamTableService($db, $teamRepository);
+        $submissionHandler = new \DepthChartEntry\DepthChartEntrySubmissionHandler($db, $commonRepo);
+
+        return new \DepthChartEntry\DepthChartEntryController(
+            $db,
+            $commonRepo,
+            $repository,
+            $service,
+            $view,
+            $teamTableService,
+            $submissionHandler,
+            $this->services->request()
+        );
+    }
+
+    public function apiHandler(): \DepthChartEntry\DepthChartEntryApiHandler
+    {
+        return new \DepthChartEntry\DepthChartEntryApiHandler(
+            $this->services->db(),
+            $this->services->teamIdentity(),
+            $this->services->leagueContext()
+        );
+    }
+
+    public function nextSimTabApiHandler(): \NextSim\NextSimTabApiHandler
+    {
+        return new \NextSim\NextSimTabApiHandler($this->services->db());
+    }
+
+    public function savedDepthChartApiHandler(): \SavedDepthChart\SavedDepthChartApiHandler
+    {
+        return new \SavedDepthChart\SavedDepthChartApiHandler(
+            $this->services->db(),
+            $this->services->teamIdentity()
+        );
+    }
+}

@@ -13,24 +13,13 @@ if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
 
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db, $user;
+global $user;
 
-$httpRequest = \Http\HttpRequest::fromGlobals();
+$httpRequest = \Module\ModuleServices::current()->request();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
-$commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
-$season = new \Season\Season($mysqli_db);
-$validator = new \Draft\DraftValidator();
-$repository = new \Draft\DraftRepository($mysqli_db, $commonRepository);
-$processor = new \Draft\DraftProcessor();
-$view = new \Draft\DraftView();
-$service = new \Draft\DraftService($mysqli_db, $commonRepository, $season);
-$nukeCompat = new \Utilities\NukeCompat();
-$controller = new \Draft\DraftController(
-    $mysqli_db, $commonRepository, $season,
-    $validator, $repository, $processor, $view, $service,
-    null, null, $nukeCompat
-);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\DraftFactory::class);
+$controller = $factory->controller();
 
 switch ($op) {
     case 'select':

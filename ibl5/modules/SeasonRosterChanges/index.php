@@ -17,18 +17,14 @@ if (!defined('MODULE_FILE')) {
 
 $module_name = basename(dirname(__FILE__));
 
-use SeasonRosterChanges\SeasonRosterChangesRepository;
-use SeasonRosterChanges\SeasonRosterChangesView;
-
-global $mysqli_db;
-
-$season = new \Season\Season($mysqli_db);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\SeasonRosterChangesFactory::class);
+$season = $factory->season();
 $previousSeasonEndingYear = $season->endingYear - 1;
 
 $pagetitle = "- Player Movement";
 
-$repository = new SeasonRosterChangesRepository($mysqli_db);
-$view = new SeasonRosterChangesView();
+$repository = $factory->repository();
+$view = $factory->view();
 
 $movements = $repository->getSeasonRosterChanges($previousSeasonEndingYear);
 

@@ -6,15 +6,10 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use Auth\AuthRepository;
-use Auth\AuthService;
-use ProjectedDraftOrder\ProjectedDraftOrderRepository;
-use ProjectedDraftOrder\ProjectedDraftOrderService;
-use ProjectedDraftOrder\ProjectedDraftOrderView;
-
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db;
+global $authService;
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 
 // Module inputs read via the Http\HttpRequest value object (legacy globals are no
 // longer auto-extracted). Only the JSON save_order route branches off $op; every other
@@ -29,8 +24,6 @@ if ($op === 'save_order') {
     // guard (405), JSON content-type, and validation branches are preserved
     // verbatim; each early `return` exits this included file before the page render.
     header('Content-Type: application/json');
-
-    $authService = new AuthService(new AuthRepository($mysqli_db));
 
     if (!$authService->isAdmin()) {
         http_response_code(403);
@@ -85,9 +78,9 @@ if ($op === 'save_order') {
     }
 
     try {
-        $season = new \Season\Season($mysqli_db);
-        $repository = new ProjectedDraftOrderRepository($mysqli_db);
-        $service = new ProjectedDraftOrderService($repository);
+        $factory = \Module\ModuleServices::current()->factory(\Module\Factories\ProjectedDraftOrderFactory::class);
+        $season = $factory->season();
+        $service = $factory->service();
         $service->saveLotteryOrder($season->endingYear, $intOrder);
 
         echo json_encode(['success' => true]);
@@ -99,12 +92,12 @@ if ($op === 'save_order') {
     return;
 }
 
-$season = new \Season\Season($mysqli_db);
-$repository = new ProjectedDraftOrderRepository($mysqli_db);
-$service = new ProjectedDraftOrderService($repository);
-$view = new ProjectedDraftOrderView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\ProjectedDraftOrderFactory::class);
+$season = $factory->season();
+$repository = $factory->repository();
+$service = $factory->service();
+$view = $factory->view();
 
-$authService = new AuthService(new AuthRepository($mysqli_db));
 $isAdmin = $authService->isAdmin();
 $isFinalized = $repository->isDraftOrderFinalized();
 $isDraftStarted = $isFinalized && $repository->isDraftStarted($season->endingYear);

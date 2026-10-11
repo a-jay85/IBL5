@@ -15,6 +15,9 @@ use PHPUnit\Framework\TestCase;
  * its counts to whatever the tree holds). This test is not: a new bare-variable
  * trusted($x) in these files fails CI even after a baseline regen, and a stale
  * entry (a site later converted) fails too.
+ *
+ * The CI baseline-drift gate (.github/workflows/tests.yml:505) only compares
+ * counts, so it passes after a regen. This test is the independent check.
  */
 final class TrustedArgumentShapeTest extends TestCase
 {
@@ -91,6 +94,10 @@ final class TrustedArgumentShapeTest extends TestCase
         $this->assertSame(['$safeTitle', "\$rows['html']"], self::nonRuleShapedTrustedArguments($src));
     }
 
+    /**
+     * Accepted: literals, numeric casts, $this->method() and $this->prop->method()
+     * calls. safeHtmlOutput( is ignored because it is not a `::trusted(` call.
+     */
     public function testClassifierAcceptsRuleShapes(): void
     {
         $src = '<?php echo HtmlSanitizer::trusted(\'lit\'), HtmlSanitizer::trusted(42), HtmlSanitizer::trusted((int) $n),'

@@ -22,7 +22,6 @@
         "ibl.directHeader": 2,
         "ibl.echoInNonView": 1,
         "ibl.hardcodedEnvString": 8,
-        "ibl.orderByMissingTiebreaker": 9,
         "ibl.sqlStringConcatenation": 26,
         "ibl.trustedVariable": 17,
         "ibl.unknownCliOption": 2,

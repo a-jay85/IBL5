@@ -60,6 +60,10 @@ class ModuleServiceTest extends TestCase
 - Test behaviors through public APIs only; one behavior per test; descriptive names.
 - Use data providers for similar cases; `@see` not `{@inheritdoc}`.
 
+## Source-text reads
+
+Prefer executing code over reading its text. A test that calls `file_get_contents` on a production `.php`, `.js`, `.css`, or `.htaccess` file breaks on harmless refactors and passes when behavior regresses along a path its string match misses. Call the class, run the script through `proc_open`, or assert on what a mock recorded. A source guard is justified only when no seam exists (a script that exits at top level) or the property is the file's shape (a first-statement CLI guard, an `.htaccess` deny block). `bin/check-phpunit-hygiene` blocks new source-text reads (`source-text-read`). To keep a justified guard, list its path in `.phpunit-source-read-allowlist` with a `#` comment naming the property, or put `// phpunit-hygiene-allow: <reason>` on the read or the line above.
+
 ## DON'T
 
 - **NEVER** `createMock()` with no `expects()` — use `createStub()` (mocks without expectations emit a notice).

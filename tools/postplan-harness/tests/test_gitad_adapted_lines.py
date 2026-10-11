@@ -146,7 +146,9 @@ def test_fixture_master_rewrite_derives_real_transform(repo):
     mb = _sh(d, "merge-base", "HEAD", master_sha).stdout.strip()
     got = derive_master_transforms(
         lambda *a, **_k: _sh(d, *a).stdout, path=_PATH, merge_base=mb, master_sha=master_sha)
-    assert got == (Transform("/tmp", '"$RL"'),)
+    # master's mode= line derives a second transform, so check membership not equality
+    assert Transform("/tmp", '"$RL"') in got
+    assert Transform("/tmp", "$RL") not in got
 
 
 def _assert_restored(d, key, branch, pre):

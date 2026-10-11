@@ -3,7 +3,7 @@
 #
 # bin/test-check-phpunit-hygiene — regression test for bin/check-phpunit-hygiene.
 #
-# Pins THREE checks the gate enforces:
+# Pins FOUR checks the gate enforces:
 #   mark-test-skipped  markTestSkipped() is a blocking hit; an inline
 #                      `// phpunit-hygiene-allow:` marker suppresses it.
 #   no-db-group        a CONCRETE class extending DatabaseTestCase that lacks
@@ -15,6 +15,11 @@
 #                      a no-op since PHP 8.1, deprecated since 8.5 (fatal in
 #                      PHP 9), so it emits a deprecation on every suite run. An
 #                      inline `// phpunit-hygiene-allow:` marker suppresses it.
+#   const-restatement  an `alreadyNarrowedType` ignore whose statement names a
+#                      `Class::CONST`, or a single-line assertSame/assertEquals
+#                      of a literal against `Class::CONST`, is a blocking hit —
+#                      the test restates the declaration. One hit per statement;
+#                      an inline `// phpunit-hygiene-allow:` marker suppresses it.
 #
 # Each case builds a throwaway git repo under mktemp (check-phpunit-hygiene
 # resolves its scan root from `git rev-parse --show-toplevel`) with a single
@@ -195,6 +200,135 @@ class NoReflectTest extends TestCase
     public function testThing(): void
     {
         $this->assertSame("setAccessible(true)", $doc);
+    }
+}'
+
+# --- New: const-restatement check --------------------------------------------
+
+# The assertion line also matches the literal shape; one hit pins the dedupe.
+run_case "const-restatement-ignore-flagged" 1 'FAIL: 1 blocking hits' "ibl5/tests/ConstIgnoreTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstIgnoreTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (x)
+        self::assertSame(1000, Foo::BATCH_SIZE);
+    }
+}'
+
+run_case "const-restatement-multiline-flagged" 1 'const-restatement' "ibl5/tests/ConstMultilineTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstMultilineTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore method.alreadyNarrowedType (x)
+        $this->assertSame([
+            "a" => "b",
+            "c" => "d",
+        ], Foo::MAP);
+    }
+}'
+
+run_case "const-restatement-variable-arg-flagged" 1 'const-restatement' "ibl5/tests/ConstVariableArgTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstVariableArgTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore method.alreadyNarrowedType (x)
+        $this->assertSame($expected, Foo::STATS);
+    }
+}'
+
+run_case "const-restatement-reversed-flagged" 1 'const-restatement' "ibl5/tests/ConstReversedTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstReversedTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (x)
+        self::assertSame(\Ns\Foo::DAYS, 180);
+    }
+}'
+
+# The literal shape needs no ignore directive.
+run_case "const-restatement-literal-no-ignore-flagged" 1 'const-restatement' "ibl5/tests/ConstLiteralTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstLiteralTest extends TestCase
+{
+    public function testThing(): void
+    {
+        self::assertEquals(180, Foo::DAYS);
+    }
+}'
+
+# An allow marker on the line before the directive suppresses the hit.
+run_case "const-restatement-marker-suppresses" 0 '-' "ibl5/tests/ConstMarkedTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstMarkedTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // phpunit-hygiene-allow: wire value persisted to a JSB export file
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (x)
+        self::assertSame(22, Foo::MONTH);
+    }
+}'
+
+# The window stops at the statement end, so the next statement is never scanned.
+run_case "const-restatement-variables-ok" 0 '-' "ibl5/tests/ConstVariablesTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstVariablesTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore method.alreadyNarrowedType (x)
+        $this->assertNotSame($a, $b);
+        $c = Foo::LIMIT;
+    }
+}'
+
+# A prose mention opens no window, and `::class` is lowercase so never matches.
+run_case "const-restatement-class-literal-ok" 0 '-' "ibl5/tests/ConstClassLiteralTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstClassLiteralTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // PHPStan reports method.alreadyNarrowedType here
+        $this->assertTrue((new \ReflectionClass(Foo::class))->implementsInterface(Bar::class));
+    }
+}'
+
+# An uppercase name followed by `(` is a static call, not a constant.
+run_case "const-restatement-static-call-ok" 0 '-' "ibl5/tests/ConstStaticCallTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstStaticCallTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (x)
+        self::assertSame(1, Foo::MAKE());
     }
 }'
 

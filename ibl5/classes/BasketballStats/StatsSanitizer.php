@@ -56,6 +56,45 @@ class StatsSanitizer
     }
 
     /**
+     * Read an int from an array by key, ignoring floats.
+     *
+     * An int is returned as is and a numeric string is cast with (int).
+     * Everything else (missing key, null, float, bool, array, non-numeric
+     * string) is 0. Unlike toInt(), a float yields 0. Semantics copied
+     * verbatim from the former private DepthChart and DepthChartSnapshot copies.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function intFromArray(array $data, string $key): int
+    {
+        $value = $data[$key] ?? 0;
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+        return 0;
+    }
+
+    /**
+     * Narrow a mixed value to string.
+     *
+     * Returns strings unchanged and stringifies ints and floats. Anything else
+     * (null, bool, array) yields ''. Unlike sanitizeString(), bool is not '1'.
+     */
+    public static function scalarToString(mixed $value): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+        return '';
+    }
+
+    /**
      * Safely convert a value to a float
      * Returns 0.0 for null, empty string, or non-numeric values
      *

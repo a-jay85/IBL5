@@ -341,7 +341,7 @@ for f in "$ROOT"/bin/test-*; do
     case "$n" in test-plan-now|test-plans-dir) continue ;; esac
     # One grep, no pipe (shell-pipefail-grep.md): a line counts when its first
     # non-blank character is not '#' and it names the literal path.
-    if grep -qE '^[[:space:]]*[^[:space:]#].*/tmp/(plan-now|post-plan-now)-' "$f"; then
+    if grep -qE '^[[:space:]]*([^[:space:]#].*)?/tmp/(plan-now|post-plan-now)-' "$f"; then
         SHARED_LOG_LEAKS+="$n "
     fi
 done

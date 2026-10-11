@@ -3,7 +3,7 @@
 Fixture repos run the REAL lostwork.sh. The stub LLM writes the merged file as the
 resolver, then answers the adaptation reviewer and CONFLICT-REVIEW from a reply table.
 The base fixture replays the bin/test-plan-now failure: master rewrote every
-`"/tmp/plan-now-$RES_TS` path to `"$RL/plan-now-$RES_TS`, and the branch added a new
+`/tmp/plan-now-$RES_TS` path to `"$RL"/plan-now-$RES_TS`, and the branch added a new
 `/tmp/` line that the resolver adapted.
 """
 import json
@@ -20,20 +20,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness.adapters.gitad import LiveGit
+from harness.adaptations import Transform, derive_master_transforms
 from harness.armable import conflict_flag_path
 from harness.state import HarnessError
 from test_gitad_stacked_rebase import _COLLAPSE, _LOSTWORK, _cleanup_full, _rev, _sh
 
 _PATH = "bin/test-plan-now"
-_ORIGINAL = """        parkedlog) printf '...' > "/tmp/plan-now-$RES_TS.log" ;;"""
-_ADAPTED = """        parkedlog) printf '...' > "$RL/plan-now-$RES_TS.log" ;;"""
-_EXTRA_EDIT = """        parkedlog) printf '...' > "$RL/plan-now-$RES_TS.txt" ;;"""
+_ORIGINAL = """        parkedlog) printf '...' > /tmp/plan-now-$RES_TS.log ;;"""
+_ADAPTED = """        parkedlog) printf '...' > "$RL"/plan-now-$RES_TS.log ;;"""
+_EXTRA_EDIT = """        parkedlog) printf '...' > "$RL"/plan-now-$RES_TS.txt ;;"""
 
 _BASE = (
     "#!/usr/bin/env bash\n"
     "setup\n"
-    """    printf 'a\\n' > "/tmp/plan-now-$RES_TS.sh"\n"""
-    """    printf 'b\\n' > "/tmp/plan-now-$RES_TS.session"\n"""
+    """    printf 'a\\n' > /tmp/plan-now-$RES_TS.sh\n"""
+    """    printf 'b\\n' > /tmp/plan-now-$RES_TS.session\n"""
     "keep one\n"
     "mode=base\n"
     "keep two\n"
@@ -42,7 +43,7 @@ _BASE = (
     "tail\n"
 )
 _MASTER = (
-    _BASE.replace('"/tmp/plan-now', '"$RL/plan-now').replace("mode=base", "mode=master")
+    _BASE.replace("/tmp/plan-now", '"$RL"/plan-now').replace("mode=base", "mode=master")
 )
 _BRANCH = _BASE.replace("mode=base", "mode=branch") + _ORIGINAL + "\n"
 
@@ -53,7 +54,7 @@ def _merged(added_line):
     return text + (added_line + "\n" if added_line is not None else "")
 
 
-def _justification(old="/tmp", new="$RL", to=_ADAPTED):
+def _justification(old="/tmp/", new='"$RL"/', to=_ADAPTED):
     return "ADAPTED-LINE: " + json.dumps(
         {"from": _ORIGINAL, "to": to, "old": old, "new": new})
 
@@ -140,6 +141,16 @@ def _head_file(d):
     return _sh(d, "show", f"HEAD:{_PATH}").stdout
 
 
+def test_fixture_master_rewrite_derives_real_transform(repo):
+    d, master_sha, _key, _branch = repo()
+    mb = _sh(d, "merge-base", "HEAD", master_sha).stdout.strip()
+    got = derive_master_transforms(
+        lambda *a, **_k: _sh(d, *a).stdout, path=_PATH, merge_base=mb, master_sha=master_sha)
+    # master's mode= line derives a second transform, so check membership not equality
+    assert Transform("/tmp", '"$RL"') in got
+    assert Transform("/tmp", "$RL") not in got
+
+
 def _assert_restored(d, key, branch, pre):
     assert _rev(d, "HEAD") == pre
     assert _sh(d, "status", "--porcelain").stdout.strip() == ""
@@ -168,15 +179,32 @@ def test_regression_replay_tmp_to_rl_is_accepted_and_hold_still_set(repo):
     assert len(res.adapted_lines) == 1
     a = res.adapted_lines[0]
     assert (a.path, a.original, a.adapted, a.old, a.new) == (
-        _PATH, _ORIGINAL, _ADAPTED, "/tmp", "$RL")
+        _PATH, _ORIGINAL, _ADAPTED, "/tmp/", '"$RL"/')
     notes = open(res.notes_path).read()
     assert "## Adapted lines" in notes
     assert _ADAPTED in notes
     verdict = open(f"/tmp/postplan-adapt-review-{key}/verdict.txt").read()
     assert verdict.splitlines()[0] == "ADAPTED-LINE-1=CONFIRMED"
+    # the reviewer sees the derived master transform, never the resolver's j.old/j.new
+    blocks = open(f"/tmp/postplan-adapt-review-{key}/adaptations.txt").read()
+    assert '    rewrite:  /tmp -> "$RL"' in blocks.splitlines()
+    assert "/tmp/ ->" not in blocks
     assert llm.purposes() == ["conflict-resolve", "conflict-adapt-review", "conflict-review"]
     assert "adaptations.txt" in llm.calls[2]["prompt"]
     assert os.path.exists(f"/tmp/postplan-conflict-review-{key}/adaptations.txt")
+
+
+def test_stripped_form_justification_is_still_accepted(repo):
+    d, _master, _key, branch = repo()
+    llm = _Llm(d, _merged(_ADAPTED),
+               resolve_reply=_justification(old="/tmp", new='"$RL"') + "\nRESOLVED")
+    g = LiveGit(d, llm=llm)
+    g.rebase_onto("origin/master")
+
+    assert _ADAPTED in _head_file(d).splitlines()
+    assert os.path.exists(conflict_flag_path(branch))
+    a = g.last_conflict_resolution.adapted_lines[0]
+    assert (a.old, a.new) == ("/tmp", '"$RL"')
 
 
 def test_reviewer_denies_adaptation_exits_fail_closed(repo):
@@ -235,7 +263,7 @@ def test_missing_justification_fails_closed(repo):
     pre = _rev(d, "HEAD")
     llm = _Llm(d, _merged(_ADAPTED))
     detail = _rebase_fails(d, llm)
-    assert "no resolver justification" in detail or "claimed no adaptation" in detail
+    assert "claimed no adaptation" in detail
     assert "conflict-adapt-review" not in llm.purposes()
     _assert_restored(d, key, branch, pre)
 
@@ -266,7 +294,7 @@ def test_no_resolved_files_keeps_strict_proof(repo):
     g = LiveGit(d, llm=llm)
     script = g._load_lostwork(master_sha, key)
     from harness.adaptations import Justification
-    j = Justification(_PATH, _ORIGINAL, _ADAPTED, "/tmp", "$RL")
+    j = Justification(_PATH, _ORIGINAL, _ADAPTED, "/tmp", '"$RL"')
     ok, out, adapted = g._prove_with_adaptations(
         script, key, resolved_files=(), adaptations=(j,),
         pre_rebase_sha=_rev(d, "HEAD"), master_sha=master_sha)

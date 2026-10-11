@@ -14,8 +14,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  mirror-ready:
+    name: Mirror CI images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/mirror-ci-images.yml
+    with:
+      only-missing: true
+
   audit:
     name: Full-Site Lighthouse Audit
+    needs: [mirror-ready]
+    permissions:
+      contents: read
+      issues: write
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 120
 

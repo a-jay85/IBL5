@@ -36,9 +36,7 @@ test.describe('ASG Voting', () => {
     await ecfHeader.click();
 
     // Wait for the first visible table to show
-    const firstVisibleTable = page.locator(
-      '#ECF, #ECB, #WCF, #WCB',
-    ).first();
+    const firstVisibleTable = page.locator('#ECF');
     await expect(firstVisibleTable).toBeVisible();
 
     // Should have checkboxes

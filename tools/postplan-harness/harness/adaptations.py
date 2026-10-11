@@ -439,13 +439,21 @@ class AcceptedAdaptation:
 def _pair_justifications(
     matches: tuple[NearMatch, ...], justifications: tuple[Justification, ...]
 ) -> tuple[tuple[AcceptedAdaptation, ...], str]:
-    """Pair each near-match with one unused resolver justification naming its rewrite."""
+    """Pair each near-match with one unused resolver justification whose rewrite yields it.
+
+    A justification pairs when it names the match's (path, original, adapted) and its own
+    `original.replace(old, new)` reproduces `adapted` exactly. The resolver may word the
+    rewrite wider than the derived master transform (`/tmp/` -> `"$RL"/` for a derived
+    `/tmp` -> `"$RL"`); `near_match` has already proved `adapted` is master's rewrite.
+    A justification naming one of the derived transforms still pairs, as before."""
     used: set[int] = set()
     accepted: list[AcceptedAdaptation] = []
     for m in matches:
         for i, j in enumerate(justifications):
             if (i not in used and (j.path, j.original, j.adapted) == (m.path, m.original, m.adapted)
-                    and Transform(j.old, j.new) in m.transforms):
+                    and (Transform(j.old, j.new) in m.transforms
+                         or (j.old in m.original
+                             and m.original.replace(j.old, j.new) == m.adapted))):
                 used.add(i)
                 accepted.append(AcceptedAdaptation(m.path, m.original, m.adapted, j.old, j.new))
                 break

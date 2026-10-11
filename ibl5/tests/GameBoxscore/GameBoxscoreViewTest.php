@@ -138,6 +138,38 @@ class GameBoxscoreViewTest extends TestCase
         self::assertStringNotContainsString('2026-02-20', $output);
     }
 
+    public function testFoundRenderHasExactlyOneVisuallyHiddenHeadingOne(): void
+    {
+        $output = $this->view->render($this->buildViewModel());
+
+        self::assertSame(1, substr_count($output, '<h1'));
+        self::assertStringContainsString('<h1 class="sr-only">Game Boxscore</h1>', $output);
+    }
+
+    public function testFoundRenderHeadingOneOpensSectionBeforeScoreboard(): void
+    {
+        $output = $this->view->render($this->buildViewModel());
+
+        self::assertStringStartsWith('<section class="game-boxscore"><h1 class="sr-only">Game Boxscore</h1>', $output);
+        $h1 = strpos($output, '<h1 class="sr-only">');
+        $scoreboard = strpos($output, 'game-boxscore__scoreboard');
+        self::assertNotFalse($h1);
+        self::assertNotFalse($scoreboard);
+        self::assertLessThan($scoreboard, $h1);
+    }
+
+    public function testNotFoundRenderKeepsSingleVisibleHeadingOne(): void
+    {
+        $viewModel = $this->buildViewModel();
+        $viewModel['found'] = false;
+
+        $output = $this->view->render($viewModel);
+
+        self::assertSame(1, substr_count($output, '<h1'));
+        self::assertStringContainsString('<h1 class="ibl-title">Game Not Found</h1>', $output);
+        self::assertStringNotContainsString('sr-only', $output);
+    }
+
     /**
      * @return GameBoxscoreViewModel
      */

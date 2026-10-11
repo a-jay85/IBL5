@@ -1342,6 +1342,51 @@ while IFS= read -r row; do
 done < "$MATRIX_FILE"
 
 # ---------------------------------------------------------------------------
+# Gate MT: a What-to-verify backtick token bin/lib/plan-matrix-assertions can never
+# realise, so Step 6.7 stops with UNREALISED-ASSERTION after implementation.
+#  (1) `<path>:NN` / `<path>:NN-NN`: arm 2c (_path_realised) needs a whole path or a
+#      /-aligned suffix, so the :LINE suffix makes the token unmatchable. Host:port
+#      tokens (`<name>.localhost:8080`, `iblhoops.net:443`) are exempt by extension.
+#  (2) a bare word equal to the stem of a tracked *-snapshots/*.png: it never enters
+#      arm 2c, and arm 3 saves it only when git grep finds it in tracked text, so it is
+#      rejected only when that grep finds nothing.
+# Rows come from $GATEP_MATRIX (fence-aware). A row ending in the one-time-check tag is
+# skipped, as the helper skips it. Text from the first `Mutation:` label on is ignored,
+# mirroring the helper's blanking (it under-rejects; accepted). A `name=value` token is
+# cut at `=`, as the helper cuts it. CHECK_PLAN_MT_GIT_ROOT is a test seam naming the
+# repo whose snapshots and tracked text rule (2) reads; unset or empty means $REPO_ROOT.
+# Outside a git repo the snapshot list is empty and rule (2) is skipped; rule (1) needs
+# no git and always runs.
+# ---------------------------------------------------------------------------
+_mt_root="${CHECK_PLAN_MT_GIT_ROOT:-$REPO_ROOT}"
+_mt_line_re='^[A-Za-z0-9_./-]+\.([A-Za-z][A-Za-z0-9]*):[0-9]+(-[0-9]+)?$'
+_mt_host_ext_re='^(localhost|local|test|com|net|org|io|dev)$'
+_mt_stem_re='^[A-Za-z0-9_-]+$'
+_mt_snaps=$(git -C "$_mt_root" ls-files 2>/dev/null | grep -E -- '-snapshots/.*\.png$' || true)
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    _mt_what="${MC_WHAT//$MSEN/|}"
+    grep -qE "$_y_shape" <<< "$_mt_what" && continue
+    _mt_what="${_mt_what%%Mutation:*}"
+    while IFS= read -r _mt_tok; do
+        _mt_tok="${_mt_tok#\`}"; _mt_tok="${_mt_tok%\`}"; _mt_tok="${_mt_tok%%=*}"
+        [ -n "$_mt_tok" ] || continue
+        if [[ "$_mt_tok" =~ $_mt_line_re ]]; then
+            [[ "${BASH_REMATCH[1]}" =~ $_mt_host_ext_re ]] && continue
+            viol "[MT] matrix token \`${_mt_tok}\` ends in a :LINE suffix; bin/lib/plan-matrix-assertions matches only a whole path or a /-aligned path suffix, so the row stays UNREALISED and Step 6.7 stops. Cite the bare path \`${_mt_tok%:*}\` and put the line number in prose outside backticks: ${row}"
+            continue
+        fi
+        [ -n "$_mt_snaps" ] || continue
+        [[ "$_mt_tok" =~ $_mt_stem_re ]] || continue
+        _mt_snap=$(grep -E -- "/${_mt_tok}\.png\$" <<< "$_mt_snaps" | head -n 1 || true)
+        [ -n "$_mt_snap" ] || continue
+        git -C "$_mt_root" grep -qF -e "$_mt_tok" -- ':(exclude)*.png' 2>/dev/null && continue
+        viol "[MT] matrix token \`${_mt_tok}\` is the stem of ${_mt_snap} and appears in no tracked text file, so bin/lib/plan-matrix-assertions can never realise it and Step 6.7 stops. Cite the snapshot path \`${_mt_snap}\` or the name of the test that writes it: ${row}"
+    done < <(grep -oE '`[^`[:space:]]+`' <<< "$_mt_what" || true)
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
 # Gate ND: a `**No diff:** <reason>` phase marker. The post-plan harness reads it only
 # from a `## Phase N:` / `## Step N:` body (planfile.parse_phases) and honors it only
 # with a reason of NO_DIFF_MIN_REASON (15) characters or more; anything else is a silent

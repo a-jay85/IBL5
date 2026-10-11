@@ -230,8 +230,27 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
 
         $window = $this->currentSqlMap(self::SEED_CURRENT_ENDING_YEAR)['getFiveSeasonWindowRows'];
         $explainRows = $this->runFrozen('EXPLAIN ' . $window['sql'], $window['types'], ...$window['params']);
-        $rangeRows = array_filter($explainRows, static fn (array $row): bool => $row['type'] === 'range');
-        self::assertNotSame([], $rangeRows, 'window EXPLAIN has no range access over box scores');
+        self::assertNotSame([], self::dateFilteredBoxScoreRows($explainRows), 'window EXPLAIN never pushes the game_date range into idx_gt_date_teams');
+
+        $year = self::SEED_CURRENT_ENDING_YEAR;
+        $frozenExplain = $this->runFrozen('EXPLAIN ' . self::FROZEN_WINDOW_SQL, 'ii', $year - 4, $year);
+        self::assertSame([], self::dateFilteredBoxScoreRows($frozenExplain), 'the pre-fix window plan already pushes a game_date range, so this check proves nothing');
+    }
+
+    /**
+     * EXPLAIN rows where MariaDB applies the game_date range through idx_gt_date_teams
+     * (index condition pushdown). MariaDB 10.11 plans these as `ref` on game_type, not `range`.
+     *
+     * @param list<array<string, mixed>> $explainRows
+     * @return list<array<string, mixed>>
+     */
+    private static function dateFilteredBoxScoreRows(array $explainRows): array
+    {
+        return array_values(array_filter(
+            $explainRows,
+            static fn (array $row): bool => ($row['key'] ?? null) === 'idx_gt_date_teams'
+                && str_contains((string) ($row['Extra'] ?? ''), 'Using index condition')
+        ));
     }
 
     /**

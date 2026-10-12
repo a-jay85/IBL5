@@ -16,9 +16,10 @@ $op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : '';
 
 $pagetitle = " - Depth Chart Entry";
 
-global $mysqli_db, $commonRepo, $user;
+global $mysqli_db, $commonRepo, $nukeCompat, $user;
 /** @var \mysqli $mysqli_db */
 $commonRepo = new Repositories\TeamIdentityRepository($mysqli_db);
+$nukeCompat = new \Utilities\NukeCompat();
 
 function userinfo(string $username): void
 {
@@ -39,12 +40,15 @@ function userinfo(string $username): void
 
 function main(mixed $user): void
 {
-    if (!is_user($user)) {
-        loginbox();
+    global $nukeCompat;
+    /** @var \Utilities\NukeCompat $nukeCompat */
+
+    if (!$nukeCompat->isUser($user)) {
+        $nukeCompat->loginBox();
     } else {
         global $authService;
         /** @var \Auth\Contracts\AuthServiceInterface $authService */
-        cookiedecode($user);
+        $nukeCompat->cookieDecode($user);
         userinfo($authService->getUsername() ?? '');
     }
 }
@@ -58,21 +62,22 @@ function renderInlineSubmitError(): void
 
 function submit(mixed $user): void
 {
-    global $mysqli_db, $commonRepo, $leagueContext, $authService;
+    global $mysqli_db, $commonRepo, $leagueContext, $authService, $nukeCompat;
     /** @var \mysqli $mysqli_db */
     /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
     /** @var \League\LeagueContext $leagueContext */
     /** @var \Auth\Contracts\AuthServiceInterface $authService */
+    /** @var \Utilities\NukeCompat $nukeCompat */
 
     // Auth + ownership gate (IDOR fix D-09). The write target is derived from
     // the session team inside the handler, never from POST `Team_Name`, so an
     // authenticated GM cannot replay a valid CSRF token against another team.
-    if (!is_user($user)) {
+    if (!$nukeCompat->isUser($user)) {
         renderInlineSubmitError();
         return;
     }
 
-    cookiedecode($user);
+    $nukeCompat->cookieDecode($user);
     $username = $authService->getUsername() ?? '';
     $sessionTeam = $commonRepo->getTeamnameFromUsername($username);
     if ($sessionTeam === null || $sessionTeam === '' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {
@@ -123,19 +128,20 @@ function nextSimApi(): void
 
 function api(mixed $user): void
 {
-    global $mysqli_db, $commonRepo, $authService;
+    global $mysqli_db, $commonRepo, $authService, $nukeCompat;
     /** @var \mysqli $mysqli_db */
     /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
     /** @var \Auth\Contracts\AuthServiceInterface $authService */
+    /** @var \Utilities\NukeCompat $nukeCompat */
 
-    if (!is_user($user)) {
+    if (!$nukeCompat->isUser($user)) {
         header('Content-Type: application/json; charset=utf-8');
         http_response_code(401);
         echo json_encode(['error' => 'Unauthorized']);
         return;
     }
 
-    cookiedecode($user);
+    $nukeCompat->cookieDecode($user);
     $username = $authService->getUsername() ?? '';
 
     $teamName = $commonRepo->getTeamnameFromUsername($username);

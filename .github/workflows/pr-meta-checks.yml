@@ -202,11 +202,11 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bin/refactor-flag --pr
 
+      # Scans every E2E file, so two PRs that each pass alone can't leave
+      # master red together. A master push runs it too, as a backstop.
       - name: Run bin/check-e2e-hygiene
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.e2ehygiene == 'true' }}
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: bin/check-e2e-hygiene --pr
+        if: ${{ !cancelled() && (github.event_name == 'push' || steps.filter.outputs.e2ehygiene == 'true') }}
+        run: bin/check-e2e-hygiene
 
       # The PR step above scans only changed files, so two PRs can each pass and
       # still leave master red together. A master push scans the whole tree.

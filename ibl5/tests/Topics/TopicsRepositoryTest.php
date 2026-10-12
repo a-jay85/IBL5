@@ -110,7 +110,7 @@ class TopicsRepositoryTest extends WideUnitTestCase
         $wellFormed->getTopicsWithArticles();
 
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertCount(2, $queries);
         foreach ($queries as $query) {
             $this->assertStringContainsString('nuke_topics', $query);
             $this->assertStringNotContainsString('evil', $query);

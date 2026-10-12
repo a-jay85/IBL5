@@ -12,8 +12,15 @@
 # Contract:
 #   - Every assertion takes the label as $1 and returns 0, so a `set -e`
 #     harness keeps running after a failed check. h_done owns the exit code.
-#   - Output lines are `ok: <label>`, `FAIL: <label> — <detail>`, and one
-#     `RESULT:` line from h_done.
+#   - Output lines are `ok: <label>`, `FAIL: <label> — <detail>`,
+#     `skip: <label>`, and one `RESULT:` line from h_done.
+#   - Opt-in knobs, reset to their defaults each time the lib is sourced so
+#     an inherited env value never changes output: H_FAIL_FD (1 or 2; where
+#     h_fail prints; unset or empty means 1) and H_SKIP_OK (1 lets a run
+#     with zero assertions and at least one h_skip exit 0).
+#   - h_mark VAR saves the counters into VAR; h_rewind "$VAR" restores
+#     them, for a harness that runs a checker against a mutant and must
+#     discard what it counted. Both exit 2 on a malformed argument.
 #   - h_tmp and h_git_repo exit 2 with `HARNESS-SETUP: <msg>` on stderr when
 #     setup breaks. A broken fixture is not an assertion result.
 #   - h_tmp must not run in a subshell: the tmpdir registration would be lost.
@@ -35,6 +42,9 @@ H_PASS=0
 H_FAIL=0
 H_TMPDIRS=""
 H_ORIGIN=""
+H_SKIP=0
+H_SKIP_OK=0
+H_FAIL_FD=1
 
 _h_setup_die() {
     printf 'HARNESS-SETUP: %s\n' "$1" >&2
@@ -48,12 +58,41 @@ h_pass() {
 }
 
 h_fail() {
+    local fd="${H_FAIL_FD:-1}"
+    case "$fd" in
+        1 | 2) ;;
+        *) _h_setup_die "h_fail: H_FAIL_FD must be 1 or 2, got [$fd]" ;;
+    esac
     if [ -n "${2:-}" ]; then
-        printf 'FAIL: %s — %s\n' "$1" "$2"
+        printf 'FAIL: %s — %s\n' "$1" "$2" >&"$fd"
     else
-        printf 'FAIL: %s\n' "$1"
+        printf 'FAIL: %s\n' "$1" >&"$fd"
     fi
     H_FAIL=$((H_FAIL + 1))
+    return 0
+}
+
+h_skip() {
+    printf 'skip: %s\n' "$1"
+    H_SKIP=$((H_SKIP + 1))
+    return 0
+}
+
+h_mark() {
+    case "${1:-}" in
+        '' | [0-9]* | *[!A-Za-z0-9_]*) _h_setup_die "h_mark: bad variable name [${1:-}]" ;;
+    esac
+    printf -v "$1" '%s:%s' "$H_PASS" "$H_FAIL"
+}
+
+h_rewind() {
+    case "${1:-}" in
+        *[!0-9:]* | *:*:* | :* | *:) _h_setup_die "h_rewind: bad mark [${1:-}]" ;;
+        *:*) ;;
+        *) _h_setup_die "h_rewind: bad mark [${1:-}]" ;;
+    esac
+    H_PASS=${1%%:*}
+    H_FAIL=${1#*:}
     return 0
 }
 
@@ -181,20 +220,27 @@ h_git_repo() {
 }
 
 h_done() {
-    local total=$((H_PASS + H_FAIL))
+    local total=$((H_PASS + H_FAIL)) sfx=""
+    if [ "$H_SKIP" -gt 0 ]; then
+        sfx=" ($H_SKIP skipped)"
+    fi
     if [ "$total" -eq 0 ]; then
-        printf 'RESULT: FAILED (no assertions ran)\n'
+        if [ "$H_SKIP_OK" = 1 ] && [ "$H_SKIP" -gt 0 ] && [ "${FAILED:-0}" = 0 ]; then
+            printf 'RESULT: all skipped (%s)\n' "$H_SKIP"
+            exit 0
+        fi
+        printf 'RESULT: FAILED (no assertions ran)%s\n' "$sfx"
         exit 1
     fi
     if [ "$H_FAIL" -gt 0 ]; then
-        printf 'RESULT: FAILED (%s of %s assertions failed)\n' "$H_FAIL" "$total"
+        printf 'RESULT: FAILED (%s of %s assertions failed)%s\n' "$H_FAIL" "$total" "$sfx"
         exit 1
     fi
     if [ "${FAILED:-0}" != 0 ]; then
-        printf 'RESULT: FAILED (legacy FAILED=%s)\n' "${FAILED:-0}"
+        printf 'RESULT: FAILED (legacy FAILED=%s)%s\n' "${FAILED:-0}" "$sfx"
         exit 1
     fi
-    printf 'RESULT: all passed (%s assertions)\n' "$total"
+    printf 'RESULT: all passed (%s assertions)%s\n' "$total" "$sfx"
     exit 0
 }
 

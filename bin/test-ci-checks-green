@@ -12,6 +12,9 @@
 #
 # Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+H_FAIL_FD=2  # FAIL: lines stay on stderr, as before migration
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     echo "Usage: bin/test-ci-checks-green [--help|-h]"
@@ -23,11 +26,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHECK="$SCRIPT_DIR/check-master-ci-green"
 LIB="$SCRIPT_DIR/lib/ci-checks-green.sh"
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP"; h_cleanup' EXIT
 
-FAILED=0
-ok()   { echo "ok: $1"; }
-fail() { echo "FAIL: $1" >&2; FAILED=1; }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$1"; }
 
 # --- shared fixtures ---------------------------------------------------------
 SHIMD="$TMP/shim"
@@ -391,5 +393,4 @@ p17_try --startup-grace-seconds=x
 p17_try --base-ref master
 if [ "$p17_ok" -eq 1 ]; then ok "P17 rejected base-ref and grace forms"; else fail "P17 rejected base-ref and grace forms"; fi
 
-
-exit "$FAILED"
+h_done

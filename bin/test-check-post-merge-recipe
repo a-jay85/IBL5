@@ -12,12 +12,12 @@
 
 set -euo pipefail
 
-SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-post-merge-recipe"
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-check-post-merge-recipe.XXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
-PASSED=0
-FAILED=0
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-post-merge-recipe"
+h_tmp TMP
+
 RC=0
 OUT=""
 ERR=""
@@ -49,11 +49,9 @@ check() {
         why="stdout missing '$outpat' (stdout: $OUT)"
     fi
     if [[ -z "$why" ]]; then
-        echo "PASS $name"
-        PASSED=$((PASSED + 1))
+        h_pass "$name"
     else
-        echo "FAIL $name: $why"
-        FAILED=$((FAILED + 1))
+        h_fail "$name: $why"
     fi
 }
 
@@ -580,12 +578,9 @@ elif [[ "$got_s3" != "$first_del " ]]; then
     why="shape 3 pointers '$got_s3' != single del( line '$first_del'"
 fi
 if [[ -z "$why" ]]; then
-    echo "PASS replay-2144"
-    PASSED=$((PASSED + 1))
+    h_pass "replay-2144"
 else
-    echo "FAIL replay-2144: $why"
-    FAILED=$((FAILED + 1))
+    h_fail "replay-2144: $why"
 fi
 
-echo "$PASSED passed, $FAILED failed"
-[[ "$FAILED" -eq 0 ]]
+h_done

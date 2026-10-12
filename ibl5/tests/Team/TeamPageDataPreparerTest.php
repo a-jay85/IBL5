@@ -139,6 +139,14 @@ class TeamPageDataPreparerTest extends TestCase
         return $repo;
     }
 
+    /** @param list<array<string, mixed>> $rows */
+    private function repoReturning(string $method, array $rows): TeamRepositoryInterface
+    {
+        $repo = self::createStub(TeamRepositoryInterface::class);
+        $repo->method($method)->willReturn($rows);
+        return $repo;
+    }
+
     // -------------------------------------------------------------------------
     // prepareBannerData
     // -------------------------------------------------------------------------
@@ -402,5 +410,261 @@ class TeamPageDataPreparerTest extends TestCase
         $result = $this->buildPreparer($repo)->prepareCurrentSeasonData(self::bullsTeam());
 
         $this->assertNotNull($result);
+    }
+
+    // -------------------------------------------------------------------------
+    // preparePlayoffData
+    // -------------------------------------------------------------------------
+
+    public function testPreparePlayoffDataWithNoResultsReturnsFourEmptyRounds(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getPlayoffResults', []));
+
+        $result = $preparer->preparePlayoffData(self::bullsTeam());
+
+        $this->assertSame(
+            ['First Round', 'Conference Semis', 'Conference Finals', 'IBL Finals'],
+            array_column($result['rounds'], 'name'),
+        );
+        foreach ($result['rounds'] as $round) {
+            $this->assertSame(0, $round['gameWins']);
+            $this->assertSame(0, $round['gameLosses']);
+            $this->assertSame(0, $round['seriesWins']);
+            $this->assertSame(0, $round['seriesLosses']);
+            $this->assertSame([], $round['results']);
+        }
+        $this->assertSame(0, $result['totalGameWins']);
+        $this->assertSame(0, $result['totalGameLosses']);
+        $this->assertSame(0, $result['totalSeriesWins']);
+        $this->assertSame(0, $result['totalSeriesLosses']);
+    }
+
+    public function testPreparePlayoffDataSkipsRoundsOutsideOneThroughFour(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getPlayoffResults', [
+            self::playoffRow(2001, 0, 'Bulls', 'Nets', 4, 0),
+            self::playoffRow(2002, 5, 'Bulls', 'Nets', 4, 0),
+            self::playoffRow(2003, 1, 'Bulls', 'Nets', 4, 1),
+        ]));
+
+        $result = $preparer->preparePlayoffData(self::bullsTeam());
+
+        $this->assertSame(4, $result['totalGameWins']);
+        $this->assertSame(1, $result['totalGameLosses']);
+        $this->assertSame(1, $result['totalSeriesWins']);
+        $this->assertSame(0, $result['totalSeriesLosses']);
+        $this->assertCount(1, $result['rounds'][0]['results']);
+        $this->assertSame([], $result['rounds'][1]['results']);
+        $this->assertSame([], $result['rounds'][2]['results']);
+        $this->assertSame([], $result['rounds'][3]['results']);
+    }
+
+    public function testPreparePlayoffDataAggregatesSeveralSeriesWithinOneRound(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getPlayoffResults', [
+            self::playoffRow(2019, 2, 'Bulls', 'Celtics', 4, 3),
+            self::playoffRow(2018, 2, 'Nets', 'Bulls', 4, 0),
+            self::playoffRow(2017, 2, 'Bulls', 'Heat', 4, 2),
+        ]));
+
+        $result = $preparer->preparePlayoffData(self::bullsTeam());
+
+        $round = $result['rounds'][1];
+        $this->assertSame(8, $round['gameWins']);
+        $this->assertSame(9, $round['gameLosses']);
+        $this->assertSame(2, $round['seriesWins']);
+        $this->assertSame(1, $round['seriesLosses']);
+        $this->assertSame(['2019', '2018', '2017'], array_column($round['results'], 'year'));
+        $this->assertSame(8, $result['totalGameWins']);
+        $this->assertSame(9, $result['totalGameLosses']);
+        $this->assertSame(2, $result['totalSeriesWins']);
+        $this->assertSame(1, $result['totalSeriesLosses']);
+    }
+
+    public function testPreparePlayoffDataResultItemsCarryIsWinAndNamesThatYear(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getPlayoffResults', [
+            self::playoffRow(2020, 4, 'Bulls', 'Lakers', 4, 2, 'Stags', 'Lakers'),
+            self::playoffRow(2019, 3, 'Celtics', 'Bulls', 4, 1, 'Celtics', 'Old Bulls'),
+        ]));
+
+        $result = $preparer->preparePlayoffData(self::bullsTeam());
+
+        $this->assertSame(
+            ['year' => '2020', 'winner' => 'Stags', 'loser' => 'Lakers', 'winnerGames' => 4, 'loserGames' => 2, 'isWin' => true],
+            $result['rounds'][3]['results'][0],
+        );
+        $this->assertSame(
+            ['year' => '2019', 'winner' => 'Celtics', 'loser' => 'Old Bulls', 'winnerGames' => 4, 'loserGames' => 1, 'isWin' => false],
+            $result['rounds'][2]['results'][0],
+        );
+    }
+
+    public function testPreparePlayoffDataEscapesHistoricalTeamNames(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getPlayoffResults', [
+            self::playoffRow(2020, 1, 'Bulls', 'Nets', 4, 0, '<b>Stags</b>', 'Nets & Co'),
+        ]));
+
+        $result = $preparer->preparePlayoffData(self::bullsTeam());
+
+        $this->assertSame('&lt;b&gt;Stags&lt;/b&gt;', $result['rounds'][0]['results'][0]['winner']);
+        $this->assertSame('Nets &amp; Co', $result['rounds'][0]['results'][0]['loser']);
+    }
+
+    // -------------------------------------------------------------------------
+    // prepareWinLossHistoryData
+    // -------------------------------------------------------------------------
+
+    public function testPrepareWinLossHistoryDataEmptyHistoryReturnsZeroTotalsAndNoRecords(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getRegularSeasonHistory', []));
+
+        $result = $preparer->prepareWinLossHistoryData(self::bullsTeam(), 'regular');
+
+        $this->assertSame([], $result['records']);
+        $this->assertSame(0, $result['totalWins']);
+        $this->assertSame(0, $result['totalLosses']);
+        $this->assertSame(1, $result['teamid']);
+    }
+
+    public function testPrepareWinLossHistoryDataSingleSeasonIsBest(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getRegularSeasonHistory', [
+            self::historyRow(2024, 50, 32),
+        ]));
+
+        $result = $preparer->prepareWinLossHistoryData(self::bullsTeam(), 'regular');
+
+        $this->assertCount(1, $result['records']);
+        $this->assertTrue($result['records'][0]['isBest']);
+        $this->assertSame(50, $result['totalWins']);
+        $this->assertSame(32, $result['totalLosses']);
+    }
+
+    public function testPrepareWinLossHistoryDataRegularSeasonLabelAndUrlYear(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getRegularSeasonHistory', [
+            self::historyRow(2024, 50, 32, 'Stags'),
+        ]));
+
+        $result = $preparer->prepareWinLossHistoryData(self::bullsTeam(), 'regular');
+
+        $this->assertSame(
+            ['year' => 2024, 'label' => '2023-2024 Stags', 'wins' => 50, 'losses' => 32, 'urlYear' => 2024, 'isBest' => true],
+            $result['records'][0],
+        );
+    }
+
+    public function testPrepareWinLossHistoryDataHeatUsesHeatHistoryWithOffsetYear(): void
+    {
+        $repo = self::createMock(TeamRepositoryInterface::class);
+        $repo->expects($this->once())->method('getHEATHistory')->with('Bulls')
+            ->willReturn([self::historyRow(2024, 10, 5, 'Stags')]);
+        $repo->expects($this->never())->method('getRegularSeasonHistory');
+
+        $result = $this->buildPreparer($repo)->prepareWinLossHistoryData(self::bullsTeam(), 'heat');
+
+        $this->assertSame('2024 Stags', $result['records'][0]['label']);
+        $this->assertSame(2024, $result['records'][0]['year']);
+        $this->assertSame(2025, $result['records'][0]['urlYear']);
+    }
+
+    public function testPrepareWinLossHistoryDataTreatsUnknownTypeAsRegularSeason(): void
+    {
+        $repo = self::createMock(TeamRepositoryInterface::class);
+        $repo->expects($this->once())->method('getRegularSeasonHistory')->with('Bulls')
+            ->willReturn([self::historyRow(2024, 50, 32)]);
+        $repo->expects($this->never())->method('getHEATHistory');
+
+        $result = $this->buildPreparer($repo)->prepareWinLossHistoryData(self::bullsTeam(), 'playoff');
+
+        $this->assertSame('2023-2024 Bulls', $result['records'][0]['label']);
+    }
+
+    /** @return array<string, array{list<array<string, mixed>>, list<bool>}> */
+    public static function tiedPercentageProvider(): array
+    {
+        return [
+            'fewer wins first' => [[self::historyRow(2022, 20, 20), self::historyRow(2023, 41, 41)], [false, true]],
+            'more wins first' => [[self::historyRow(2023, 41, 41), self::historyRow(2022, 20, 20)], [true, false]],
+        ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param list<bool> $expectedIsBest
+     */
+    #[DataProvider('tiedPercentageProvider')]
+    public function testPrepareWinLossHistoryDataTieOnPercentageFavorsMoreWins(array $rows, array $expectedIsBest): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getRegularSeasonHistory', $rows));
+
+        $result = $preparer->prepareWinLossHistoryData(self::bullsTeam(), 'regular');
+
+        $this->assertSame($expectedIsBest, array_column($result['records'], 'isBest'));
+    }
+
+    public function testPrepareWinLossHistoryDataExactTieKeepsFirstRecord(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getRegularSeasonHistory', [
+            self::historyRow(2024, 50, 32),
+            self::historyRow(2023, 50, 32),
+        ]));
+
+        $result = $preparer->prepareWinLossHistoryData(self::bullsTeam(), 'regular');
+
+        $this->assertSame([true, false], array_column($result['records'], 'isBest'));
+    }
+
+    public function testPrepareWinLossHistoryDataSkipsZeroGameSeasonsWhenPickingBest(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getRegularSeasonHistory', [
+            self::historyRow(2022, 0, 0),
+            self::historyRow(2023, 30, 20),
+        ]));
+
+        $result = $preparer->prepareWinLossHistoryData(self::bullsTeam(), 'regular');
+
+        $this->assertSame([false, true], array_column($result['records'], 'isBest'));
+        $this->assertSame(30, $result['totalWins']);
+        $this->assertSame(20, $result['totalLosses']);
+    }
+
+    public function testPrepareWinLossHistoryDataMarksNoBestWhenEverySeasonHasZeroGames(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getRegularSeasonHistory', [
+            self::historyRow(2022, 0, 0),
+            self::historyRow(2023, 0, 0),
+        ]));
+
+        $result = $preparer->prepareWinLossHistoryData(self::bullsTeam(), 'regular');
+
+        $this->assertSame([false, false], array_column($result['records'], 'isBest'));
+        $this->assertSame(0, $result['totalWins']);
+        $this->assertSame(0, $result['totalLosses']);
+    }
+
+    public function testPrepareWinLossHistoryDataCastsStringWinsAndLosses(): void
+    {
+        $row = array_merge(self::historyRow(2024, 0, 0), ['wins' => '50', 'losses' => '32']);
+        $preparer = $this->buildPreparer($this->repoReturning('getRegularSeasonHistory', [$row]));
+
+        $result = $preparer->prepareWinLossHistoryData(self::bullsTeam(), 'regular');
+
+        $this->assertSame(50, $result['records'][0]['wins']);
+        $this->assertSame(32, $result['records'][0]['losses']);
+        $this->assertSame(50, $result['totalWins']);
+    }
+
+    public function testPrepareWinLossHistoryDataEscapesNameThatYearInLabel(): void
+    {
+        $preparer = $this->buildPreparer($this->repoReturning('getRegularSeasonHistory', [
+            self::historyRow(2024, 50, 32, '<i>X</i>'),
+        ]));
+
+        $result = $preparer->prepareWinLossHistoryData(self::bullsTeam(), 'regular');
+
+        $this->assertSame('2023-2024 &lt;i&gt;X&lt;/i&gt;', $result['records'][0]['label']);
     }
 }

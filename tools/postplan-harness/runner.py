@@ -42,8 +42,14 @@ from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, confor
                      manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
-                             manual_testing_clearance, meta_checks_clearance,
+                             manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
                              select_fidelity_verdict)
+
+# Directory of the pre-push meta-checks flag. Module-level so tests monkeypatch it
+# (`monkeypatch.setattr(runner, "META_CHECKS_TMP_DIR", str(tmp_path))`) and never
+# read or delete the real /tmp flag. Not an env var on purpose: nothing outside the
+# test suite should be able to redirect where condition (16) looks.
+META_CHECKS_TMP_DIR = "/tmp"
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
                               MERGE_DIGEST_BEGIN, MERGE_DIGEST_END, render_merge_digest,
                               upsert_merge_digest,
@@ -747,8 +753,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             except Exception as _e:
                 log(f"phase6.5: red-ci-check probe error — {_e}")
         # condition (16) inputs: pre-push flag and post-pr run
-        _mc_branch_slug = git.branch().replace("/", "-")
-        _mc_flag = f"/tmp/ibl5-meta-checks-prepush-{_mc_branch_slug}.failed"
+        _mc_flag = meta_checks_flag_path(git.branch(), META_CHECKS_TMP_DIR)
         if live and pr:
             _mc_argv = [os.path.join(worktree or "", "bin", "run-meta-checks-local"),
                         "--stage", "post-pr", "--pr", str(pr)]
@@ -829,6 +834,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             inputs.fidelity_tree_2, inputs.current_tree)
         res.fidelity = fid
         state.checkpoint("fidelity", res)
+        _post_sticky = None   # bound below when a PR exists; Phase 7's re-arm re-posts through it
         if pr:
             # Posted BEFORE arming on purpose: `--auto` merges immediately when the checks
             # are already green, and merge-digest-notify.yml reads the last marker comment
@@ -842,26 +848,29 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                        "GitHub checks are watched after this comment")
             if rsha:
                 ci_line += f"; remediation commit {rsha} is inside that watch"
-            sticky = fidelity.compose_sticky(
-                rebase_line, ci_line, fid, decision, digest,
-                fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
-                fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"),
-                                       fid.get("remediation_sha"),
-                                       fid.get("verdict_2"), fid.get("reviewed_tree_2"),
-                                       fid.get("rounds_completed", 0)),
-                diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
-                reused_from=res.reused_from,
-                posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
-            try:
-                cid = gh.pr_sticky_verdict(pr, sticky)
-            except (HarnessError, OSError, subprocess.SubprocessError):
-                cid = ""
-            res.sticky_comment_id = cid or None
-            if not cid:
-                # Arming is deliberately UNCHANGED by a failed post: the skill's own post is
-                # `|| true`, and a new hold here would change condition semantics.
-                res.sticky_error = "sticky-post-failed"
-                log("phase6.5: sticky verdict comment not confirmed")
+            def _post_sticky(decision_, ci_line_, phase_label):
+                sticky_ = fidelity.compose_sticky(
+                    rebase_line, ci_line_, fid, decision_, digest,
+                    fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
+                    fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"),
+                                           fid.get("remediation_sha"),
+                                           fid.get("verdict_2"), fid.get("reviewed_tree_2"),
+                                           fid.get("rounds_completed", 0)),
+                    diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
+                    reused_from=res.reused_from,
+                    posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
+                try:
+                    cid_ = gh.pr_sticky_verdict(pr, sticky_)
+                except (HarnessError, OSError, subprocess.SubprocessError):
+                    cid_ = ""
+                res.sticky_comment_id = cid_ or None
+                if not cid_:
+                    # Arming is deliberately UNCHANGED by a failed post: the skill's own post is
+                    # `|| true`, and a new hold here would change condition semantics.
+                    res.sticky_error = "sticky-post-failed"
+                    log(f"{phase_label}: sticky verdict comment not confirmed")
+                return sticky_
+            sticky = _post_sticky(decision, ci_line, "phase6.5")
             # Digest at the top of the PR body, from the same rows the sticky printed.
             # Still BEFORE arming, and never able to change it: log-and-continue.
             try:
@@ -931,9 +940,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.final_pr_state = gh.pr_state() if (mode == "replay" or live) else "N/A"
         log(f"phase7 ci: exit={outcome.exit_code} failed={outcome.failed} ({outcome.evidence})")
 
-        # Phase 7 fix loop: runs after Phase 6.5 arming has executed and never reads or
-        # writes `decision`. Replay enters only when the fixture scripts the re-watches,
-        # so every legacy red-CI fixture keeps its pass-through.
+        # Phase 7 fix loop: runs after Phase 6.5 arming has executed; `_ci_fix_loop` never
+        # reads or writes `decision`, and `_rearm_after_ci_fix` below is the only place
+        # Phase 7 may replace it. Replay enters only when the fixture scripts the
+        # re-watches, so every legacy red-CI fixture keeps its pass-through.
+        fix_loop_ran = False
         fix_enabled = ("ci_fix_rewatch" in (fixture or {}) if mode == "replay"
                        else bool(live and pr))
         if fix_enabled and outcome.exit_code == 8:
@@ -946,6 +957,14 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                                            "indeterminate")
             log(f"phase7 ci(after fix loop): exit={outcome.exit_code} "
                 f"failed={outcome.failed}")
+            fix_loop_ran = True
+
+        if fix_loop_ran and outcome.exit_code == 0 and not decision.armed and pr:
+            decision = _rearm_after_ci_fix(
+                git, gh, llm, log, res, state, inputs, decision, outcome,
+                worktree=worktree, pr=pr, sha=sha, live=live, fixture=fixture,
+                out_dir=out_dir, state_dir=_state_dir(out_dir, live, state_dir), slug=slug,
+                flag=_mc_flag, post_sticky=_post_sticky)
 
         if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
@@ -1893,6 +1912,63 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
     return sha, outcome
 
 
+def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome, *,
+                        worktree, pr, sha, live, fixture, out_dir, state_dir, slug,
+                        flag, post_sticky):
+    """Phase 7: re-run Phase 6.5's arming decision after the fix loop turned CI green.
+
+    Same ArmInputs, same evaluate(). Only (15), (16), (17) and current_tree are refreshed,
+    and only when the head tree is the one Phase 6.5 reviewed. Never clears on UNKNOWN.
+    """
+    rc = _post_fix_meta_checks(worktree, pr, flag, live=live, fixture=fixture, log=log)
+    cur_tree = git.head_tree()
+    if not live and (fixture or {}).get("current_tree"):
+        cur_tree = fixture["current_tree"]        # replay-only seam, parity with Phase 6.5
+    if cur_tree != inputs.current_tree:
+        log(f"phase7 re-arm: REFUSED — fix loop moved HEAD tree {inputs.current_tree[:12]} -> "
+            f"{cur_tree[:12]}; review/conformance/fidelity evidence is for the old tree; "
+            "hold stands")
+        res.rearm = {"outcome": "refused-tree-moved", "post_fix_meta_rc": rc,
+                     "tree_65": inputs.current_tree, "tree_now": cur_tree}
+        return decision
+    gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
+                              fixture=fixture, log=log)
+    new = dataclasses.replace(
+        inputs, current_tree=cur_tree,
+        meta_checks_status=meta_checks_clearance(flag, rc),
+        failed_checks=sorted(set(outcome.failed or [])),
+        gate_backtest_status=gb.status, gate_backtest_reason=gb.reason,
+        llm_safety_holds=[])
+    preview = evaluate(new)
+    if not preview.holds:
+        verdict = llm.call("safety-verdict", "haiku",
+                           llm_calls.safety_verdict_prompt(new.classification, new.pr_title,
+                                                           preview),
+                           schemas.validate_safety_verdict)
+        new.llm_safety_holds = verdict["holds"]
+    nd = evaluate(new)
+    res.arm = nd
+    log("phase7 re-arm: " + ("ARMED" if nd.armed else
+                             "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"
+                                                   for c in nd.holds)))
+    res.rearm = {"outcome": "armed" if nd.armed else "held", "post_fix_meta_rc": rc,
+                 "holds": [c.number for c in nd.holds]}
+    if ((live or state_dir is not None)
+            and holdrepeat.structural_key(nd.conditions)
+            != holdrepeat.structural_key(decision.conditions)):
+        # armed -> observe() clears the record and the held marker; a different hold set ->
+        # a fresh record (and marker clear). Same set -> leave Phase 6.5's record alone, so a
+        # single run never sends a second repeat DM.
+        res.hold_repeat = _record_hold_repeat(res, nd, slug, worktree, state_dir, log)
+    if callable(post_sticky):
+        post_sticky(nd, f"CI: green after Phase 7 fix loop on {(sha or '')[:8]}; "
+                        "arming re-evaluated on the reviewed tree", "phase7 re-arm")
+    if nd.armed:
+        gh.pr_merge_auto(pr)          # AFTER the sticky re-post: merge-digest-notify reads the last marker
+    state.checkpoint("arm", res)
+    return nd
+
+
 def _should_resolve_behind(live: bool, pr, decision, outcome) -> bool:
     """Call-site predicate for the Phase 7 BEHIND-resolution entry guard."""
     return bool(live and pr and decision.armed and outcome.exit_code == 0)
@@ -2251,6 +2327,35 @@ def _body_check(llm, git, gh, copy, copy_degraded, cls, log, worktree=None,
     return result, degraded
 
 
+def _post_fix_meta_checks(worktree, pr, flag, *, live, fixture, log) -> int:
+    """Phase 7: post-pr meta-checks on the head the fix loop left behind.
+
+    rc 0 is the only result that deletes the pre-push flag. rc 1 (red) and rc 2
+    (could not run / UNKNOWN) leave it in place: condition (16) clears on fresh
+    evidence only, never on a failure to gather it.
+    """
+    if live and pr:
+        argv = [os.path.join(worktree or "", "bin", "run-meta-checks-local"),
+                "--stage", "post-pr", "--pr", str(pr)]
+        try:
+            rc = subprocess.run(argv, cwd=worktree, capture_output=True, text=True).returncode
+        except OSError:
+            rc = 2
+    else:
+        # replay-only seam, the meta_checks_post_rc pattern. Absent key = 2 (UNKNOWN), so
+        # a legacy fixture that scripts a green fix loop can never clear (16) by omission.
+        rc = int((fixture or {}).get("meta_checks_post_rc_after_fix", 2))
+    if rc == 0:
+        try:
+            os.unlink(flag)
+            log("phase7 re-arm: post-pr meta-checks passed on current head; pre-push flag deleted")
+        except FileNotFoundError:
+            log("phase7 re-arm: post-pr meta-checks passed on current head; no pre-push flag present")
+    else:
+        log(f"phase7 re-arm: post-pr meta-checks rc={rc} on current head; pre-push flag kept")
+    return rc
+
+
 def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,
                          failures_out: list | None = None, llm=None) -> bool:
     if os.environ.get("PRE_PUSH_META_CHECKS_SKIP") == "1":
@@ -2270,8 +2375,7 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
     argv = [runner, "--stage", "pre-push", "--base", base]
     if body_file:
         argv += ["--body-file", body_file]
-    branch_slug = git.branch().replace("/", "-")
-    flag = f"/tmp/ibl5-meta-checks-prepush-{branch_slug}.failed"
+    flag = meta_checks_flag_path(git.branch(), META_CHECKS_TMP_DIR)
     result = subprocess.run(argv, cwd=repo_root, capture_output=True, text=True)
     last_result = result
     rc = result.returncode

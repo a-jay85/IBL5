@@ -55,8 +55,8 @@ final class ScriptsBaselineArgvExitPinTest extends TestCase
                 ['1', '1', '1', '1', '$summary->hasErrors()?1:0'],
                 ['--dry-run', '--file-type=', '--season=', '--verify'],
             ],
-            'build-engine-bundle' => ['build-engine-bundle.php', ['1', '1', '1'], []],
-            'runEngineShadow' => ['runEngineShadow.php', ['1', '0', '0', '0', '1'], []],
+            'build-engine-bundle' => ['build-engine-bundle.php', ['1', '1', '1', '1'], []],
+            'runEngineShadow' => ['runEngineShadow.php', ['1', '1', '0', '0', '0', '1'], []],
         ];
     }
 
@@ -78,6 +78,61 @@ final class ScriptsBaselineArgvExitPinTest extends TestCase
     public function testCliFlagLiteralsArePinned(string $file, array $exits, array $flags): void
     {
         self::assertSame($flags, self::flagLiterals(self::source($file)));
+    }
+
+    /** @return array<string, array{string, list<string>}> */
+    public static function rejectedArgumentProvider(): array
+    {
+        return [
+            'runEngineShadow unknown option' => ['runEngineShadow.php', ['--bogus=1']],
+            'runEngineShadow space form' => ['runEngineShadow.php', ['--year', '2026']],
+            'build-engine-bundle typo' => ['build-engine-bundle.php', ['--yaer=2026']],
+            'build-engine-bundle space form' => ['build-engine-bundle.php', ['--year', '2026']],
+        ];
+    }
+
+    /** @return array<string, array{string}> */
+    public static function engineScriptProvider(): array
+    {
+        return [
+            'runEngineShadow' => ['runEngineShadow.php'],
+            'build-engine-bundle' => ['build-engine-bundle.php'],
+        ];
+    }
+
+    /** @param list<string> $args */
+    #[DataProvider('rejectedArgumentProvider')]
+    public function testEngineScriptsRejectUnknownOrSpaceFormArguments(string $file, array $args): void
+    {
+        $command = escapeshellarg(PHP_BINARY)
+            . ' ' . escapeshellarg(dirname(__DIR__, 3) . '/scripts/' . $file)
+            . ' ' . implode(' ', array_map('escapeshellarg', $args)) . ' 2>&1';
+        $out = [];
+        $code = 0;
+        exec($command, $out, $code);
+
+        self::assertSame(1, $code);
+        self::assertStringContainsString('unknown or malformed argument', implode("\n", $out));
+    }
+
+    #[DataProvider('engineScriptProvider')]
+    public function testUnknownOptionGuardAcceptsEveryGetoptOption(string $file): void
+    {
+        $src = self::source($file);
+        self::assertSame(1, preg_match('/getopt\(\'\', \[([^\]]*)\]\)/', $src, $getopt));
+        self::assertSame(1, preg_match('/\$acceptedOptions = \[([^\]]*)\];/', $src, $accepted));
+
+        self::assertSame(self::optionNames($getopt[1]), self::optionNames($accepted[1]));
+    }
+
+    /** @return list<string> */
+    private static function optionNames(string $list): array
+    {
+        preg_match_all('/\'([a-z-]+):*\'/', $list, $matches);
+        $names = $matches[1];
+        sort($names);
+
+        return $names;
     }
 
     /** @return list<string> */

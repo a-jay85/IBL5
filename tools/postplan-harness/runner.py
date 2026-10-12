@@ -2129,9 +2129,18 @@ def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str
     """Return `body` carrying exactly one Merge danger line: the mechanical floor merged
     with any line already in the body, which may only raise Door / Blast radius.
 
-    Phase 6 calls this on the live body too, so a PR opened before this field existed (or
-    whose body a human edited) gets the line on the rerun instead of holding condition (18)
-    for good."""
+    Phase 2 writes the line. Any later phase (6, 5.5, 7) only re-applies the floor to a
+    body that already carries one well-formed line, so a raised Door cannot be lowered. A
+    missing or malformed line is left alone there and condition (18) holds it until a human
+    adds the line: refilling it would turn a deleted one-way line into the mechanical two-way."""
+    if phase != "phase2":
+        try:
+            if merge_danger.parse_merge_danger(body) is None:
+                log(f"{phase}: merge-danger line missing, left for condition (18) to hold")
+                return body
+        except merge_danger.MalformedMergeDanger as exc:
+            log(f"{phase}: merge-danger line malformed, left for condition (18) to hold ({exc})")
+            return body
     mech = merge_danger.derive_from_worktree(worktree or ".", diff_body)
     try:
         prior = merge_danger.parse_merge_danger(body)

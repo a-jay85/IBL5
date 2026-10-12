@@ -611,8 +611,11 @@ def test_ci_fix_denied_tools_add_gh_pr_edit_only_for_cifix(monkeypatch, tmp_path
 
 
 def test_benign_body_proposal_applied_once_and_waits_fresh_meta_run(monkeypatch, tmp_path):
-    proposed = _BODY.replace("Old summary paragraph.", "New, clearer summary paragraph.")
-    gh = CiFixGh(body=_BODY)
+    md_line = ("**Merge danger:** Door: two-way · Blast radius: localized · "
+               "Why: mechanical: no one-way trigger in the realized diff")
+    body = _BODY + "\n" + md_line + "\n"
+    proposed = body.replace("Old summary paragraph.", "New, clearer summary paragraph.")
+    gh = CiFixGh(body=body)
     gh.checks = [[_meta(100, "FAILURE")],    # failed-job log refs
                  [_meta(100, "FAILURE")],    # baseline before the edit
                  [_meta(100, "FAILURE")],    # poll 1: only the pre-edit run
@@ -622,7 +625,7 @@ def test_benign_body_proposal_applied_once_and_waits_fresh_meta_run(monkeypatch,
              failed=[_META], commit=("",))
     sha, outcome = r.out
     assert len(gh.body_edits) == 1
-    # the applied body is the proposal plus the Merge danger floor the runner re-applies
+    # the applied body is the proposal with the Merge danger floor re-applied to its line
     applied = gh.body_edits[0][1]
     assert applied.startswith(proposed.rstrip("\n"))
     assert merge_danger.classify_body(applied) == "TWO-WAY"

@@ -126,3 +126,9 @@ def test_empty_summary_is_left_alone_on_clean_tree_rerun(tmp_path):
     findings, _ = _run(copy, wt, _diff("bin/lib/pr-armable.sh"))
     assert copy["summary_md"] == ""
     assert findings == []
+
+
+def test_later_phase_leaves_missing_or_malformed_line_alone(tmp_path):
+    for body in ("## Summary\n\nno field here\n",
+                 "**Merge danger:** Door: maybe · Blast radius: module · Why: twenty characters at least\n"):
+        assert runner._merge_danger_body(body, str(tmp_path), "", lambda *_: None, "phase6") == body

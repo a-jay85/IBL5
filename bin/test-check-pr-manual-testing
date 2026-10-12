@@ -11,19 +11,17 @@
 # Run: bin/test-check-pr-manual-testing  (exit 0 = all pass, exit 1 = any fail)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BASE_TMP="$(mktemp -d)"
-trap 'rm -rf "$BASE_TMP"' EXIT
-
-FAILED=0
+h_tmp BASE_TMP
 
 expect() { # name want got
     if [ "$3" -eq "$2" ]; then
-        echo "ok: $1 (exit $3)"
+        h_pass "$1 (exit $3)"
     else
-        echo "FAIL: $1 — expected exit $2, got $3"
-        FAILED=1
+        h_fail "$1" "expected exit $2, got $3"
     fi
 }
 
@@ -231,18 +229,16 @@ source "$SCRIPT_DIR/lib/pr-armable.sh"
 
 verdict2=$(pr_manual_testing_clearance "$body2")
 if [[ "$verdict2" == "CLEARED" ]]; then
-    echo "ok: 12a — cross-check: sentinel body (case 2) → pr_manual_testing_clearance=CLEARED"
+    h_pass "12a — cross-check: sentinel body (case 2) → pr_manual_testing_clearance=CLEARED"
 else
-    echo "FAIL: 12a — cross-check: sentinel body (case 2) → expected CLEARED, got $verdict2"
-    FAILED=1
+    h_fail "12a — cross-check: sentinel body (case 2) → expected CLEARED, got $verdict2"
 fi
 
 verdict5=$(pr_manual_testing_clearance "$body5")
 if [[ "$verdict5" == "HELD" ]]; then
-    echo "ok: 12b — cross-check: checkbox body (case 5) → pr_manual_testing_clearance=HELD"
+    h_pass "12b — cross-check: checkbox body (case 5) → pr_manual_testing_clearance=HELD"
 else
-    echo "FAIL: 12b — cross-check: checkbox body (case 5) → expected HELD, got $verdict5"
-    FAILED=1
+    h_fail "12b — cross-check: checkbox body (case 5) → expected HELD, got $verdict5"
 fi
 
 # 12c/12d pin the divergence the two layers are SUPPOSED to have. The gate
@@ -261,10 +257,9 @@ No manual testing needed — all changes are covered by automated tests.
 expect "12c — mixed sentinel + unchecked box is well-formed SHAPE" 0 "$(run_gate "$body12c")"
 verdict12c=$(pr_manual_testing_clearance "$body12c")
 if [[ "$verdict12c" == "HELD" ]]; then
-    echo "ok: 12c — unchecked box outranks sentinel → pr_manual_testing_clearance=HELD"
+    h_pass "12c — unchecked box outranks sentinel → pr_manual_testing_clearance=HELD"
 else
-    echo "FAIL: 12c — unchecked box outranks sentinel → expected HELD, got $verdict12c"
-    FAILED=1
+    h_fail "12c — unchecked box outranks sentinel → expected HELD, got $verdict12c"
 fi
 
 # 12d: sentinel AND a CHECKED box (completed automated evidence) → still CLEARED.
@@ -278,19 +273,12 @@ No manual testing needed — all changes are covered by automated tests.
 expect "12d — sentinel + checked evidence box is well-formed SHAPE" 0 "$(run_gate "$body12d")"
 verdict12d=$(pr_manual_testing_clearance "$body12d")
 if [[ "$verdict12d" == "CLEARED" ]]; then
-    echo "ok: 12d — checked evidence box does NOT hold → pr_manual_testing_clearance=CLEARED"
+    h_pass "12d — checked evidence box does NOT hold → pr_manual_testing_clearance=CLEARED"
 else
-    echo "FAIL: 12d — checked evidence box must not hold → expected CLEARED, got $verdict12d"
-    FAILED=1
+    h_fail "12d — checked evidence box must not hold → expected CLEARED, got $verdict12d"
 fi
 
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-if [[ "$FAILED" -eq 0 ]]; then
-    echo "All cases passed."
-    exit 0
-else
-    echo "Some cases FAILED."
-    exit 1
-fi
+h_done

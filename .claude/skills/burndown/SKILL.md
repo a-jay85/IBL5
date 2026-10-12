@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-08
+last_verified: 2026-10-10
 ---
 
 # /burndown
@@ -126,7 +126,8 @@ item you cannot do gets one of three skip forms, then report why:
   clears itself on a later run once that PR merges or closes.
 - The target files live outside the repo: `bin/backlog burndown-record <ledger> <n> status=skipped reason=out-of-repo`.
   The `out-of-repo` label stays until a human removes it.
-- Any other reason you cannot classify: plain `status=skipped`.
+- Any other reason: `bin/backlog burndown-record <ledger> <n> status=skipped why=<one line, at most 200 chars>`.
+  A skip with no `why=` (and no `reason=`) exits 2 and writes nothing. The text lands in the item's `reason` field.
 
 A `reason=` record that exits 3 means the ledger kept the skip but the tag failed.
 Check `gh auth status`, then rerun `bin/backlog burndown-tag <n> reason=...`.
@@ -148,7 +149,7 @@ numbers at implement time, base on master, do not touch the paths of every other
 item across the given ledgers, emit `## Backlog issues` with
 `closes a-jay85/IBL5-backlog#<n>` plus each `also_closes`, and carry a corpus diff for a
 parser or gate change. Do not read `.claude/skills/plan-prompt/SKILL.md`. Exit 2 or 3
-from `burndown-prompt` stops this item: record `status=skipped` and report the stderr.
+from `burndown-prompt` stops this item: record `status=skipped why=burndown-prompt exit <code>` and report the stderr.
 
 An item with empty `.paths` claims no files and shares the batch like any other item.
 Its `Do not touch` list carries the paths of every other live item. No other item's
@@ -184,11 +185,11 @@ The record omits `pr_url=` because the PR may not exist yet, and the next sweep 
 A failed item:
 
 ```bash
-bin/backlog burndown-record <ledger> <n> route=ad-hoc slug=<slug> status=skipped
+bin/backlog burndown-record <ledger> <n> route=ad-hoc slug=<slug> status=skipped why=<what failed>
 ```
 
 Its worktree stays dirty and keeps the issue in flight through the Phase 3c worktree check.
-A failed ad-hoc item keeps its unit.
+A failed ad-hoc item keeps its unit and its cost. Any other skip records cost 0, so the ledger's units_used counts only live units.
 
 **Backfill.** Once every item in the current ledger has a settled status (closed-fixed,
 skipped, queued, or shipped), check for freed units. If any item closed-fixed, or was

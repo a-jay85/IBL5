@@ -7,6 +7,9 @@
 #   exit 0 = all selected cases pass, 1 = at least one failed
 
 set -euo pipefail
+_USAGE_TMP="$(mktemp -d "${TMPDIR:-/tmp}/usage-iso.XXXXXX")"
+[ -n "$(trap -p EXIT)" ] || trap 'rm -rf "$_USAGE_TMP"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$_USAGE_TMP"
 
 HELPER="${HELPER:-$(cd "$(dirname "$0")/.." && pwd)/bin/lib/plan-matrix-assertions}"
 MATRIX_ASSERTIONS_SCRIPT="$HELPER"
@@ -718,7 +721,7 @@ empty-env)
     # Reference output from normal run
     ref=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     # Empty-env run (rely on cwd for tree root)
-    got=$( (cd "$root" && env -i PATH=/usr/bin:/bin "$HELPER" plan.md diff.txt) 2>/dev/null)
+    got=$( (cd "$root" && env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH=/usr/bin:/bin "$HELPER" plan.md diff.txt) 2>/dev/null)
     got_rc=$?
     if [ "$ref" = "$got" ] && [ "$got_rc" -eq 0 ]; then
         ok "empty-env"

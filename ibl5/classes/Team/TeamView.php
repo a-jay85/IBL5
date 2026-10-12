@@ -127,7 +127,6 @@ class TeamView implements TeamViewInterface
                 $tradeButton = '<a href="modules.php?name=Trading&amp;op=reviewtrade" class="team-action-link">' . $tradeInner . '</a>';
                 $discordButton = '<a href="https://discord.com/channels/' . Discord::getGuildID() . '" class="team-action-link team-action-link--discord" target="_blank" rel="noopener noreferrer">' . $discordInner . '</a>';
             } else {
-                $partnerParam = \Security\HtmlSanitizer::safeHtmlOutput($team->name);
                 $tradeButton = '<a href="modules.php?name=Trading&amp;op=offertrade&amp;partner=' . urlencode($team->name) . '" class="team-action-link">' . $tradeInner . '</a>';
                 if ($team->discord_id !== null) {
                     $discordIDSafe = \Security\HtmlSanitizer::safeHtmlOutput((string) $team->discord_id);

@@ -31,7 +31,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
         // CI seed has active players in ibl_plr
         $players = $this->repo->getActivePlayers();
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         self::assertArrayHasKey('pid', $players[0]);
         self::assertArrayHasKey('name', $players[0]);
         self::assertIsInt($players[0]['pid']);
@@ -81,7 +81,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
     {
         $players = $this->repo->getActivePlayers();
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
 
         // Verify general ascending order by checking consecutive pairs.
         // MySQL collation may differ from PHP's sort() for punctuation/dots,

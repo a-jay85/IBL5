@@ -24,7 +24,7 @@ class FranchiseRecordBookRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getTeamSingleSeasonRecords(1);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertSame('team', $first['scope']);
         self::assertSame(1, $first['teamid']);
@@ -51,7 +51,7 @@ class FranchiseRecordBookRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getLeagueCareerRecords();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertSame('league', $first['scope']);
         self::assertSame('career', $first['record_type']);
@@ -61,7 +61,7 @@ class FranchiseRecordBookRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getLeagueSingleSeasonRecords();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertSame('league', $first['scope']);
         self::assertSame('single_season', $first['record_type']);

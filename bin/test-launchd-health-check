@@ -6,21 +6,20 @@
 #
 # Run: bin/test-launchd-health-check  (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BASE_PATH="$PATH"
 BASE_HOME="$HOME"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 # shellcheck source=bin/lib/launchd-expected-jobs.sh
 . "$SCRIPT_DIR/lib/launchd-expected-jobs.sh"
 
-FAILED=0
-PASS_COUNT=0
-
-ok() { echo "PASS $1"; PASS_COUNT=$((PASS_COUNT+1)); }
-fail() { echo "FAIL $1: $2"; FAILED=$((FAILED+1)); }
+ok() { h_pass "$1"; }
+fail() { h_fail "$1" "$2"; }
 
 # --- setup_case <case_dir> -----------------------------------------------------
 # Creates the case dir, all stubs, exports all env seams, and aborts (exit 3)
@@ -848,5 +847,4 @@ fi
 
 # ---------------------------------------------------------------------------
 echo ""
-echo "Results: $PASS_COUNT passed, $FAILED failed"
-[ "$FAILED" -eq 0 ]
+h_done

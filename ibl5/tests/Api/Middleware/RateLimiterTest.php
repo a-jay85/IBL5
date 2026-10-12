@@ -186,4 +186,20 @@ class RateLimiterTest extends TestCase
             $rateLimiter->limitHeaders($this->makeApiKey('mystery_tier')),
         );
     }
+
+    public function testClockInterfaceStubSatisfiesMicrotimeContract(): void
+    {
+        $clockStub = self::createStub(ClockInterface::class);
+        $clockStub->method('now')->willReturn(1791549296);
+        $clockStub->method('microtime')->willReturn(1791549296.5);
+
+        $rateLimiter = new RateLimiter(self::createStub(RateLimitRepository::class), $clockStub);
+
+        $this->assertSame(1791549296, $clockStub->now());
+        $this->assertSame(1791549296.5, $clockStub->microtime());
+        $this->assertSame(
+            ['X-RateLimit-Limit' => '60'],
+            $rateLimiter->limitHeaders($this->makeApiKey('standard')),
+        );
+    }
 }

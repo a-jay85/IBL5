@@ -92,7 +92,7 @@ class TradeValidatorTest extends TestCase
 
         // Assert
         $this->assertTrue($result->isValid(), 'Valid salary caps should pass validation');
-        $this->assertEmpty($result->getErrorMessages(), 'No errors should be returned for valid caps');
+        $this->assertSame([], $result->getErrorMessages(), 'No errors should be returned for valid caps');
         $this->assertSame(4900, $result->getContext()['userPostTradeCapTotal']); // 5000 - 500 + 400
         $this->assertSame(5600, $result->getContext()['partnerPostTradeCapTotal']); // 5500 - 400 + 500
     }

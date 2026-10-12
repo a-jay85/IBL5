@@ -280,6 +280,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     try:
         # ---- Phase 2/3: ship + classify -------------------------------
         if mode != "replay":
+            _reconcile_paused_edit(state, res, worktree, log)
             git.stage_all()
             if live:
                 git.fetch_base()
@@ -909,7 +910,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log(f"FAILED: {res.error}")
     except usage_pause.UsagePause as p:
         res.terminal = TerminalState.FAILED
-        res.error_kind = "usage-pause-dirty" if p.dirty else "usage-pause"
+        res.error_kind = _classify_pause(p, llm, res, log)
         res.error = f"{res.error_kind}: {p.purpose}"
         log(f"PAUSED: {res.error}")
     finally:
@@ -2707,6 +2708,21 @@ _GATE_REMEDY = {
 }
 
 
+def _reported_gate_class(res: RunResult) -> str:
+    """Gate class for REPORTING (verdict_line, human_block). Never use it to branch on remediation.
+
+    `res.error` is `"local-gate: " + detail[:800]`, so a long byte-budget denial loses the
+    hook's trailing `Trim the rule(s) above` line and classifies `unknown`. `error_output_tail`
+    keeps the last 4000 chars. Upgrade ONLY `unknown` -> `byte-budget`: its _GATE_REMEDY text
+    claims no action the run took. The other remedies (doc-staleness, adr, stale-base) say
+    "Auto-remediation ran" or "the harness's one ADR draft attempt", which is false when
+    truncation hid the class from the behavior sites, so they are never upgraded here."""
+    head = classify_local_gate_denial(res.error or "")
+    if head == "unknown" and classify_local_gate_denial(res.error_output_tail or "") == "byte-budget":
+        return "byte-budget"
+    return head
+
+
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
     3 = fail-closed sentinel: bin/post-plan-now MUST NOT escalate to the /post-plan
@@ -2869,7 +2885,7 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
                           "usage-pause-unconfirmed", "usage-pause-dirty"):
         key = res.error_kind
     elif res.error_kind == "local-gate":
-        key = "gate-" + classify_local_gate_denial(res.error or "")
+        key = "gate-" + _reported_gate_class(res)
     else:
         key = "unknown"
     if key == "gate-adr" and res.adr_drafted:
@@ -3173,11 +3189,13 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             tail = " ".join(_error_tail(res.error_output_tail or res.error)) or "see gate output"
             cmd = _cmd_text(res.error_cmd)
             detail = f"Command: {cmd}. Error: {tail}" if cmd else tail
-            # Classify on the FULL res.error, never on `detail`: _flat truncates at 300
-            # chars and the hooks echo their guidance line LAST, so classifying the
-            # flattened form would silently degrade a long byte-budget denial to
-            # "unknown" and print the wrong remedy.
-            gate_class = classify_local_gate_denial(res.error or "")
+            # Never classify on `detail`: _flat truncates at 300 chars. res.error is itself
+            # only the 800-char head of the hook output (commit_all keeps detail[:800]) and
+            # the hooks echo their guidance line LAST, so a long byte-budget denial reads
+            # "unknown" there. _reported_gate_class also consults error_output_tail (the
+            # last 4000 chars) for that one class. Reporting only: the remediation branch
+            # keeps classifying res.error.
+            gate_class = _reported_gate_class(res)
             drafted = (f" The harness drafted {res.adr_path} ({res.adr_draft_model}) "
                        "and the hook still denied; the draft is committed locally on "
                        "the branch for review." if res.adr_drafted else "")
@@ -3271,6 +3289,67 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}"
             f"{_hold_reasons_note(res)}")
+
+
+def _classify_pause(p, llm, res: RunResult, log) -> str:
+    """ADR-0143 addendum 2026-10-10: a provable partial edit pauses (75); else dirty (3)."""
+    if not p.dirty:
+        return "usage-pause"
+    if p.prespawn is None or not p.cwd:
+        return "usage-pause-dirty"
+    ctx, _ = usage_pause.context_from_env()
+    if ctx is None:
+        return "usage-pause-dirty"
+    if not usage_pause.edit_since(p.cwd, p.prespawn):
+        log("pause: site cleanup already restored the pre-spawn tree")
+        return "usage-pause"
+    if getattr(llm, "write_overlap", False):
+        log("pause: partial edit not recordable (write-overlap)")
+        return "usage-pause-dirty"
+    reason = usage_pause.pause_record_write(ctx, p.purpose, p.prespawn, p.cwd)
+    if reason == "no-edit":
+        return "usage-pause"
+    if reason is not None:
+        log(f"pause: partial edit not recordable ({reason})")
+        return "usage-pause-dirty"
+    res.pause_edit_sid = ctx.session_id
+    _, rec = usage_pause.pause_record_load(ctx)
+    n = len(rec["changed"]) if rec else 0
+    log(f"pause: partial edit recorded ({n} paths) for discard on resume")
+    return "usage-pause"
+
+
+def _reconcile_paused_edit(state, res: RunResult, worktree, log) -> None:
+    """ADR-0143 addendum 2026-10-10: discard a recorded interrupted edit or fail closed.
+
+    Runs before the first `git add -A`, so an interrupted edit is never staged. Every
+    refusal raises usage-pause-dirty (exit 3) and leaves the worktree untouched.
+    """
+    witness = (state.previous or {}).get("pause_edit_sid")
+    if not witness:
+        return
+    ctx, _ = usage_pause.context_from_env()
+    if ctx is None:
+        raise HarnessError("usage-pause-dirty",
+                           f"resume: interrupted edit from session {witness} but no gate context")
+    if witness != ctx.session_id:
+        # Keep the witness while that session's record exists, so its own
+        # --resume-paused can still discard; with the record gone, drop it.
+        other = usage_pause._pause_record_path_for(ctx, witness)
+        if other is not None and os.path.exists(other):
+            res.pause_edit_sid = witness
+        raise HarnessError("usage-pause-dirty",
+                           f"resume: interrupted edit belongs to session {witness}; "
+                           f"run bin/post-plan-now --resume-paused {witness}")
+    status, rec = usage_pause.pause_record_load(ctx)
+    if status != "ok":
+        raise HarnessError("usage-pause-dirty", f"resume: pause record {status}")
+    reason = usage_pause.restore_from_record(worktree, rec, ctx.session_id)
+    if reason is not None:
+        raise HarnessError("usage-pause-dirty", f"resume: {reason}")
+    usage_pause.pause_record_clear(ctx)
+    log(f"resume: discarded interrupted edit from {rec['purpose']} "
+        f"({len(rec['changed'])} paths)")
 
 
 def _settle_pause_marker(res: RunResult, rc: int) -> int:

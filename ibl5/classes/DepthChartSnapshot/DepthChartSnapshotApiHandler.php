@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace DepthChartSnapshot;
 
 use Security\HtmlSanitizer;
-use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Team;
 use Season\Season;
 
@@ -19,19 +18,17 @@ class DepthChartSnapshotApiHandler
     private \mysqli $db;
     private DepthChartSnapshotService $service;
     private DepthChartSnapshotRepository $repository;
-    private TeamIdentityRepositoryInterface $commonRepo;
     private \Api\Response\HtmlResponder $responder;
     /**
      * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
      */
     private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, ?Season $season = null)
+    public function __construct(\mysqli $db, ?Season $season = null)
     {
         $this->db = $db;
         $this->service = new DepthChartSnapshotService($db);
         $this->repository = new DepthChartSnapshotRepository($db);
-        $this->commonRepo = $commonRepo;
         $this->responder = new \Api\Response\HtmlResponder();
         $this->season = $season;
     }
@@ -113,7 +110,6 @@ class DepthChartSnapshotApiHandler
         }
 
         // Get current roster PIDs
-        $teamName = $this->commonRepo->getTeamnameFromTeamID($teamid) ?? '';
 
         $depthChartRepo = new \DepthChart\DepthChartRepository($this->db);
         $rosterPlayers = ($teamid > 0) ? $depthChartRepo->getPlayersOnTeam($teamid) : [];

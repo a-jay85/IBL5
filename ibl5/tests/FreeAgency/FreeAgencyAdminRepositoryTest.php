@@ -57,7 +57,7 @@ class FreeAgencyAdminRepositoryTest extends TestCase
         $result = $repository->getAllOffersWithBirdYears();
 
         $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     // ============================================
@@ -97,7 +97,7 @@ class FreeAgencyAdminRepositoryTest extends TestCase
         // Verify the UPDATE query was executed
         $queries = $this->mockDb->getExecutedQueries();
         $mleQueries = array_filter($queries, static fn (string $q): bool => stripos($q, 'has_mle') !== false);
-        $this->assertNotEmpty($mleQueries);
+        $this->assertNotSame([], $mleQueries);
     }
 
     // ============================================
@@ -112,7 +112,7 @@ class FreeAgencyAdminRepositoryTest extends TestCase
 
         $queries = $this->mockDb->getExecutedQueries();
         $lleQueries = array_filter($queries, static fn (string $q): bool => stripos($q, 'has_lle') !== false);
-        $this->assertNotEmpty($lleQueries);
+        $this->assertNotSame([], $lleQueries);
     }
 
     // ============================================

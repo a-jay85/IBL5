@@ -53,7 +53,7 @@ class PlayerTeamJoinSitesSqlCharacterizationTest extends TestCase
             }
         }
 
-        $this->assertNotEmpty($actual, "$label captured no player-team join query");
+        $this->assertNotSame([], $actual, "$label captured no player-team join query");
         $this->assertSame($expectedSql, $actual, $label);
     }
 

@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-10-03
+last_verified: 2026-10-09
 ---
 
 # Playwright E2E Testing Rules
@@ -166,6 +166,7 @@ if (!(await form.isVisible().catch(() => false))) return;     // BANNED — swal
 if (count === 0) return;                                       // BANNED — bare return
 if (count > 0) { assertA(); } else { assertB(); }             // BANNED — dual-path
 if (count > 0) { await expect(el).toBeVisible(); }            // BANNED — true-only guard
+await expect(page.locator('.a, .b').first()).toBeVisible();  // BANNED: comma fallback; anchor on the one selector the page always renders
 ```
 
 ## Shared Helpers

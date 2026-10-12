@@ -33,6 +33,7 @@ PLAN_SKILL="$REPO_ROOT/.claude/skills/plan/SKILL.md"
 
 BASE_TMP="$(mktemp -d)"
 trap 'rm -rf "$BASE_TMP"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$BASE_TMP/usage"
 FAILED=0
 
 # A gh shim emulating the only calls the condition blocks make:

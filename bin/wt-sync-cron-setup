@@ -23,6 +23,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/launchd-sched.sh
+. "$REPO_ROOT/bin/lib/launchd-sched.sh"
 ACTION=""
 
 while [ $# -gt 0 ]; do
@@ -44,8 +46,7 @@ done
 # Program/WorkingDirectory MUST point at the main checkout, never this worktree
 # (a worktree gets torn down — the LaunchAgent would then point at a dead path).
 # The first `git worktree list` entry is the main working tree.
-MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
-[ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"   # fallback: not in a git tree
+MAIN_WT="$(lsched_main_wt "$REPO_ROOT")"
 
 PLIST_LABEL="com.ibl5.wt-sync"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
@@ -58,24 +59,17 @@ SETTINGS="$HOME/.claude/settings.json"
 
 # Single source of truth for the plist — used by both --print-schedule and
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
-build_plist() {
+plist_body() {
+  lsched_key_string Label "$PLIST_LABEL"
+  lsched_key_string Program "$PROGRAM"
   cat <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>${PLIST_LABEL}</string>
-	<key>Program</key>
-	<string>${PROGRAM}</string>
 	<!-- StartInterval: the correct launchd primitive for a 15-min poll.
 	     Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->
-	<key>StartInterval</key>
-	<integer>900</integer>
-	<key>WorkingDirectory</key>
-	<string>${MAIN_WT}</string>
-	<key>EnvironmentVariables</key>
-	<dict>
+PLIST
+  lsched_key_integer StartInterval 900
+  lsched_key_string WorkingDirectory "$MAIN_WT"
+  lsched_env_open
+  cat <<PLIST
 		<!-- launchd agents start with a minimal PATH that omits Homebrew and
 		     ~/.local/bin (where the Claude Code native installer puts claude).
 		     Every binary the tick shells out to must resolve here: git, lsof,
@@ -85,16 +79,11 @@ build_plist() {
 		     HOME interpolates HERE, at generation time — launchd does NOT expand
 		     variables in EnvironmentVariables, so a literal $HOME would bake in
 		     a dead path. -->
-		<key>PATH</key>
-		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/bin</string>
-	</dict>
-	<key>StandardOutPath</key>
-	<string>${LOG_DIR}/launchd-stdout.log</string>
-	<key>StandardErrorPath</key>
-	<string>${LOG_DIR}/launchd-stderr.log</string>
-</dict>
-</plist>
 PLIST
+  lsched_key_string PATH "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/bin" 2
+  lsched_env_close
+  lsched_key_string StandardOutPath "${LOG_DIR}/launchd-stdout.log"
+  lsched_key_string StandardErrorPath "${LOG_DIR}/launchd-stderr.log"
 }
 
 build_hook_entry() {
@@ -105,18 +94,14 @@ JSON
 
 case "$ACTION" in
   print)
-    build_plist
+    lsched_plist plist_body
     ;;
   install)
-    mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
-    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
-    build_plist > "$PLIST_PATH"
-    launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+    lsched_install "$PLIST_LABEL" "$PLIST_PATH" plist_body "$LOG_DIR"
     echo "Installed ${PLIST_LABEL} (StartInterval 900s). Program: $PROGRAM"
     ;;
   uninstall)
-    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
-    rm -f "$PLIST_PATH"                                                   # idempotent
+    lsched_uninstall "$PLIST_LABEL" "$PLIST_PATH"
     echo "Uninstalled ${PLIST_LABEL}."
     ;;
   print-hook)

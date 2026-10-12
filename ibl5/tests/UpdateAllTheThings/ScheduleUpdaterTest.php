@@ -144,7 +144,7 @@ class ScheduleUpdaterTest extends TestCase
         ob_get_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
         $this->assertSame('DELETE FROM ibl_schedule', $queries[0]);
     }
 
@@ -336,7 +336,7 @@ class ScheduleUpdaterTest extends TestCase
         ob_get_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
         $this->assertSame('DELETE FROM ibl_olympics_schedule', $queries[0]);
     }
 

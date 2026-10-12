@@ -87,15 +87,11 @@ function parseHtmlBoxscore(string $html): ?array
     $attendance = 0;
     $capacity = 0;
 
-    $seenSecondHeader = false; // Second header row separates visitor from home
     $seenVisitorTotal = false;
 
     foreach ($rows as $row) {
         // Skip header rows (contain <th> tags)
         if (str_contains($row, '<th>')) {
-            if ($seenVisitorTotal) {
-                $seenSecondHeader = true;
-            }
             continue;
         }
 

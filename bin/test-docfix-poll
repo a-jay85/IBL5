@@ -4,13 +4,14 @@
 # Tests 1-12 and 17-22 from the docfix-pipeline-recovery plan Phase 6.
 # Run: bin/test-docfix-poll  (exit 0 = all pass).
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REAL_POLL="$REPO_ROOT/bin/docfix-poll"
 WORKFLOW="$REPO_ROOT/.github/workflows/doc-freshness-audit.yml"
-FAILED=0
-ok()  { echo "ok: $1"; }
-bad() { echo "FAIL: $1"; FAILED=1; }
+ok()  { h_pass "$1"; }
+bad() { h_fail "$@"; }
 
 # _ts_ago $1=seconds_ago → ISO-8601 UTC timestamp.
 _ts_ago() {
@@ -830,9 +831,4 @@ printf '%s\n' "$OUT25C" | grep -qF 'It has survived 1 nightly salvage attempt(s)
   && ok "(25d) wedged outputs stay 3 lines and drop the automatic-salvage promise" \
   || bad "(25d) wedged outputs: 3-line contract / no automatic-salvage promise"
 
-if [ "$FAILED" -eq 0 ]; then
-    echo "All docfix-poll checks passed."
-else
-    echo "Some docfix-poll checks FAILED."
-fi
-exit "$FAILED"
+h_done

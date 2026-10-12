@@ -132,7 +132,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->assertSame(0, $result['gamesSkipped']);
         $this->assertSame(0, $result['linesProcessed']);
         $this->assertIsArray($result['messages']);
-        $this->assertNotEmpty($result['messages']);
+        $this->assertNotSame([], $result['messages']);
     }
 
     public function testProcessScoFileUsesProvidedSeasonParams(): void
@@ -334,7 +334,6 @@ class BoxscoreProcessorTest extends TestCase
         // getLastBoxScoreDate() returns lastSimEndDate on the mock, so set it to the new date
         // We need to manipulate this carefully — Mock Season returns lastSimEndDate from getLastBoxScoreDate()
         // So we create two processor instances: one for setup, one after updating lastSimEndDate
-        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $season);
 
         // The mock Season's getLastBoxScoreDate() returns $this->lastSimEndDate
         // We need it to return a *different* date. Override it by changing the property AFTER construction

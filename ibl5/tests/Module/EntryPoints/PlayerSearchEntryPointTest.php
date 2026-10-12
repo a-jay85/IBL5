@@ -13,7 +13,7 @@ class PlayerSearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('PlayerSearch');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Player Search', $output);
     }
 
@@ -24,7 +24,7 @@ class PlayerSearchEntryPointTest extends ModuleEntryPointTestCase
         ]);
         $output = $this->runModule('PlayerSearch', [], ['search_name' => 'Test']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_plr');
     }
 
@@ -33,7 +33,7 @@ class PlayerSearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('PlayerSearch', [], ['search_name' => '']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_plr');
     }
 }

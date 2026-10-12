@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DepthChartSnapshot;
 
+use BasketballStats\StatsSanitizer;
 use DepthChartSnapshot\Contracts\SlotAssignmentResolverInterface;
 
 /**
@@ -55,12 +56,12 @@ class SlotAssignmentResolver implements SlotAssignmentResolverInterface
      */
     private function findPidIndex(array $player, array $postData, int $ordinal): int
     {
-        $playerPid = $this->toInt($player['pid'] ?? 0);
+        $playerPid = StatsSanitizer::toInt($player['pid'] ?? 0);
 
         // Try to match by pid hidden field
         for ($i = 1; $i <= self::MAX_SLOTS; $i++) {
             $pidField = 'pid' . $i;
-            if (isset($postData[$pidField]) && $this->toInt($postData[$pidField]) === $playerPid) {
+            if (isset($postData[$pidField]) && StatsSanitizer::toInt($postData[$pidField]) === $playerPid) {
                 return $i;
             }
         }
@@ -93,23 +94,6 @@ class SlotAssignmentResolver implements SlotAssignmentResolverInterface
             return $value;
         }
         if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-        return 0;
-    }
-
-    /**
-     * Safely convert mixed value to int
-     */
-    private function toInt(mixed $value): int
-    {
-        if (is_int($value)) {
-            return $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-        if (is_float($value)) {
             return (int) $value;
         }
         return 0;

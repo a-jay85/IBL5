@@ -34,6 +34,7 @@ TSBASE="tpc$$"
 
 _cleanup() { rm -rf "$SCRATCH" "/tmp/pr-cycle-$TSBASE"* ; }
 trap _cleanup EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$SCRATCH/usage"
 
 FAILED=0
 CASE_BASE=0

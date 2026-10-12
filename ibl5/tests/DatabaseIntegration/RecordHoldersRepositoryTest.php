@@ -211,7 +211,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getMostAllStarAppearances();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('name', $first);
         self::assertArrayHasKey('appearances', $first);
@@ -226,7 +226,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getTopTeamHalfScore('first', 'DESC');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('teamid', $first);
         self::assertArrayHasKey('team_name', $first);
@@ -240,7 +240,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getTopTeamHalfScore('second', 'ASC');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         self::assertArrayHasKey('value', $result[0]);
     }
 
@@ -254,7 +254,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getLargestMarginOfVictory('1=1');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('winner_name', $first);
         self::assertArrayHasKey('loser_name', $first);
@@ -271,7 +271,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBestWorstSeasonRecord('DESC');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('year', $first);
@@ -286,7 +286,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBestWorstSeasonRecord('ASC');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
     }
 
     // --- Longest Streak ---
@@ -348,7 +348,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getLongestStreak('winning');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('streak', $first);
@@ -364,7 +364,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getLongestStreak('losing');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('streak', $first);
         self::assertGreaterThanOrEqual(3, $first['streak']);
@@ -380,7 +380,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBestWorstSeasonStart('best');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('wins', $first);
@@ -395,7 +395,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBestWorstSeasonStart('worst');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('losses', $first);
         self::assertGreaterThanOrEqual(3, $first['losses']);
@@ -422,8 +422,8 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         self::assertArrayHasKey('Points', $result);
         self::assertArrayHasKey('Assists', $result);
-        self::assertNotEmpty($result['Points']);
-        self::assertNotEmpty($result['Assists']);
+        self::assertNotSame([], $result['Points']);
+        self::assertNotSame([], $result['Assists']);
 
         $pointsRecord = $result['Points'][0];
         self::assertArrayHasKey('pid', $pointsRecord);
@@ -594,7 +594,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         self::assertArrayHasKey('Points', $result);
         self::assertArrayHasKey('Assists', $result);
-        self::assertNotEmpty($result['Points']);
+        self::assertNotSame([], $result['Points']);
     }
 
     /**
@@ -620,7 +620,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
             '1=1'
         );
 
-        self::assertNotEmpty($result['team_points']);
+        self::assertNotSame([], $result['team_points']);
         $row = $result['team_points'][0];
 
         foreach (['teamid', 'box_id', 'game_of_that_day', 'oppTid', 'value'] as $field) {
@@ -654,7 +654,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
             "bs.game_date = '2099-04-09' AND bs.game_type = 1"
         );
 
-        self::assertNotEmpty($result['points']);
+        self::assertNotSame([], $result['points']);
         $row = $result['points'][0];
 
         foreach (['pid', 'teamid', 'box_id', 'game_of_that_day', 'oppTid', 'value'] as $field) {
@@ -675,7 +675,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         );
 
         self::assertArrayHasKey('PPG', $result);
-        self::assertNotEmpty($result['PPG']);
+        self::assertNotSame([], $result['PPG']);
         $first = $result['PPG'][0];
         self::assertArrayHasKey('pid', $first);
         self::assertArrayHasKey('name', $first);
@@ -700,7 +700,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getMostTitlesByType('Test Title');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('count', $first);
@@ -726,7 +726,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getMostTitlesByType('HEAT');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('count', $first);
@@ -844,7 +844,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getMostPlayoffAppearances();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('count', $first);

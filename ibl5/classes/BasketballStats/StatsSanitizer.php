@@ -34,6 +34,28 @@ class StatsSanitizer
     }
 
     /**
+     * Strictly convert a mixed value to int.
+     *
+     * Unlike sanitizeInt(), this never uses intval(): an int is returned as is,
+     * a numeric string or a float is cast with (int), and everything else
+     * (null, '', non-numeric or partially numeric strings, bool, array) is 0.
+     * Semantics copied verbatim from the former private DepthChartSnapshot copies.
+     */
+    public static function toInt(mixed $value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+        if (is_float($value)) {
+            return (int) $value;
+        }
+        return 0;
+    }
+
+    /**
      * Safely convert a value to a float
      * Returns 0.0 for null, empty string, or non-numeric values
      *

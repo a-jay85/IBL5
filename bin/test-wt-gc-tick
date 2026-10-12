@@ -568,6 +568,8 @@ mkdir -p "$EMIT/bin"
 git init -q "$EMIT" >/dev/null 2>&1
 cp "$CRON_SETUP" "$EMIT/bin/wt-gc-cron-setup"
 chmod +x "$EMIT/bin/wt-gc-cron-setup"
+mkdir -p "$EMIT/bin/lib"
+cp "$SCRIPT_DIR/lib/launchd-sched.sh" "$SCRIPT_DIR/lib/launchd-job.sh" "$EMIT/bin/lib/"
 
 begin_case G13-plist
 LOGDIR="$ROOT/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc"

@@ -220,6 +220,12 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
 PLANS_DIR="$(plans_dir PLAN_NOW_PLANS_DIR)"
 mkdir -p "$PLANS_DIR"
 
+# Runner-artifact dir (log, prompt, runner, transcript, session sidecar).
+# Production leaves PLAN_NOW_LOG_DIR unset so every path stays /tmp/plan-now-*,
+# where bin/fleet-status, bin/watch-run and bin/post-plan-fail-dm look.
+# bin/test-* set it to a private mktemp -d dir. Unset or empty both mean /tmp.
+RUNLOG_DIR="${PLAN_NOW_LOG_DIR:-/tmp}"
+
 # --- resume resolution (--resume only) ---
 # Everything the old run left in /tmp is read here, before any gate or mint:
 # refuse loudly on the four unrecoverable states, then inherit MODEL and
@@ -228,8 +234,8 @@ mkdir -p "$PLANS_DIR"
 # skipped below, so the old override has nothing to override.
 if [ -n "$RESUME_ID" ]; then
     OLD_LABEL="com.ibl5.plan-now-$RESUME_ID"
-    OLD_LOG="/tmp/plan-now-$RESUME_ID.log"
-    OLD_RUNNER="/tmp/plan-now-$RESUME_ID.sh"
+    OLD_LOG="$RUNLOG_DIR/plan-now-$RESUME_ID.log"
+    OLD_RUNNER="$RUNLOG_DIR/plan-now-$RESUME_ID.sh"
     OLD_SIDECAR=$(session_sidecar_path "$OLD_LOG")
     resume_refuse() { echo "plan-now: cannot resume $RESUME_ID: $1" >&2; exit 2; }
 
@@ -355,10 +361,10 @@ fi
 
 TS=$(date +%Y%m%d-%H%M%S)-$$
 LABEL="com.ibl5.plan-now-$TS"
-LOG="/tmp/plan-now-$TS.log"
-PROMPT="/tmp/plan-now-$TS.prompt"
-RUNNER="/tmp/plan-now-$TS.sh"
-OUT="/tmp/plan-now-$TS.out"     # claude's own transcript, kept separate from $LOG
+LOG="$RUNLOG_DIR/plan-now-$TS.log"
+PROMPT="$RUNLOG_DIR/plan-now-$TS.prompt"
+RUNNER="$RUNLOG_DIR/plan-now-$TS.sh"
+OUT="$RUNLOG_DIR/plan-now-$TS.out"   # claude's own transcript, kept separate from $LOG
                                 # so the PLAN_FILE: grep can't match the runner's echoes.
                                 # Left on disk after the run like $PROMPT and $RUNNER —
                                 # it duplicates $LOG's transcript, but /tmp is the right
@@ -394,7 +400,7 @@ if [ -n "$RESUME_ID" ]; then
     # draft recovery; point it at the old run's copy. If macOS has cleared that
     # file, run_slug() finds nothing and both recovery legs no-op, which is the
     # existing slugless-prompt behaviour.
-    PROMPT="/tmp/plan-now-$RESUME_ID.prompt"
+    PROMPT="$RUNLOG_DIR/plan-now-$RESUME_ID.prompt"
 else
 # Own a private copy: the caller's mktemp block may be cleaned up long before
 # launchd gets around to running the job.

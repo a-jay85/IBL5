@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-10-07
+last_verified: 2026-10-10
 paths: "bin/automouse/**"
 ---
 
@@ -30,12 +30,12 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Skip the between-plans master canary | `AUTOMOUSE_SKIP_CANARY=1 bin/automouse/run` |
 | Self-heal staleness-FP skips | `bin/automouse/self-heal` |
 | Preview self-heal (no changes) | `bin/automouse/self-heal --dry-run` |
-| Check logs (all of today's runners; older days like 2000-01-01.log stay out) | `cat ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d)*.log` |
+| Check logs (all of today's runners) | `cat ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d)*.log` |
 | Today's logs, newest first (suffix = runner pid) | `ls -t ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d)-*.log` |
 
 ### Disarm ordering and safety
 
-Arm-before-disarm: `disarm-tonight` and `disarm-until` bootstrap the re-arm launchd agent before unloading the recurring job (failure keeps the pipeline running). Both refuse to act while a run is in flight. Breadcrumb: `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/.disarmed-until`. Repeated disarms evict prior `com.ibl5.automouse-rearm-*` agents first.
+Arm-before-disarm: `disarm-tonight` and `disarm-until` bootstrap the re-arm launchd agent before unloading the recurring job (a failure keeps the pipeline up). Both refuse to act while a run is in flight. Breadcrumb: `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/.disarmed-until`. Repeated disarms evict prior `com.ibl5.automouse-rearm-*` agents first.
 
 ## Directory Layout
 
@@ -62,7 +62,7 @@ Arm-before-disarm: `disarm-tonight` and `disarm-until` bootstrap the re-arm laun
 
 Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-MM-DD-costs.md` and a line-delimited JSON file `logs/YYYY-MM-DD.costs.jsonl` (the *sidecar ledger*). One JSON object per priced phase is written next to the log by `bin/automouse/run` going forward, and by `bin/automouse/backfill-costs` for history. The weekly aggregate in the costs report reads the sidecar rather than re-parsing the markdown rows, replacing the old fragile column-count heuristic.
 
-**Recomputed vs. harness cost.** The harness `result` event undercounts: it sums only the top-level `usage` of the main transcript, missing `usage.iterations[]` entries and all subagent transcripts. `bin/lib/automouse-pricer` recomputes from transcripts after the phase exits — subagent transcripts are still flushing when `result` fires.
+**Recomputed vs. harness cost.** The harness `result` event undercounts: it sums only the main transcript's top-level `usage`, missing `usage.iterations[]` and all subagent transcripts. `bin/lib/automouse-pricer` recomputes from transcripts after the phase exits, because subagent transcripts are still flushing when `result` fires.
 
 **Prov column:** `recomputed` (transcript recomputation succeeded, no anomaly flagged), `recomputed-anomalous` (>$0.01 below harness or duration mismatch), `unknown` (no transcript, e.g. aged out after ~30 days; harness figure kept), `harness-ledger` (harness's own `result.json` usage ledger; harness-only runs exiting 0 or 3, no Sonnet session).
 
@@ -79,9 +79,8 @@ move it. `queue`/`queue reorder` stamp the link (`touch -h`).
 ### Self-heal
 
 Before the startup archival block, `bin/automouse/run` freshens local master (`git fetch` +
-`merge --ff-only`); the same refresh runs at each plan boundary while plans remain queued (the
-between-plans master canary). Then it runs `bin/automouse/self-heal`, a non-fatal step that
-scans `skipped/`:
+`merge --ff-only`; the same refresh runs at each plan boundary, the between-plans master canary).
+Then it runs `bin/automouse/self-heal`, a non-fatal step that scans `skipped/`:
 
 - **Heal** — a plan carrying a `<plan>.md.staleness` marker (skipped by the staleness gate, not
   for ambiguity / poison-pill; already-merged plans land in `done/`) is re-checked with
@@ -90,8 +89,13 @@ scans `skipped/`:
 - **Reap** — a symlink whose plan file left `~/claude-plans` is deleted with its sidecars and
   named in the output. Runs before the marker gate, so a dead entry is reaped whatever the
   skip reason, and never requeues.
+- **Orphan watchers.** A heartbeat watcher exits on its next tick once its run's pid is
+  gone. Older orphans are reaped only when user-owned, PPID 1, running `bin/automouse/run`
+  under bash, with a direct `sleep 60` child and no live `.heartbeat-<pid>-*` file naming
+  their pid or pgid. `SINGLE_PLAN` runs skip self-heal. Tests: `bin/test-automouse-env-breaker`,
+  `bin/test-automouse-self-heal`.
 
-`--dry-run` previews both without acting; the summary counts healed / still-stale / reaped.
+`--dry-run` previews all three without acting; the summary counts healed / still-stale / reaped, and orphan watchers reaped / spared.
 
 ## How It Works
 
@@ -101,12 +105,12 @@ scans `skipped/`:
    - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, runs a pre-handoff conformance check (Step 6.6), writes a handoff file. Model per-plan via `impl_model:` (six values: `sonnet`/`claude-sonnet-5-5` → Sonnet (legacy: `claude-sonnet-4-6`), `haiku`/`claude-haiku-5-5` (legacy `claude-haiku-4-5`) → Haiku, `opus`/`claude-opus-5-5` or absent → Opus; validated by `bin/lib/plan-impl-model`; other values rejected before the counter). Declare `sonnet` for uniformly-mechanical plans only. Post-plan runs `bin/post-plan-now` (Sonnet `/post-plan` fallback).
    - **Post-plan** (`bin/post-plan-now --foreground`, run in the handoff's worktree): runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
 4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times (after genuine, full-length attempts) are moved to `skipped/` as poison pills.
-   - Environmental failures stop the run cleanly. A usage/rate limit, auth error, or any transient that kills an agent refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. One dead-budget run cannot grind every queued plan into `skipped/`. Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. The watchdog stall threshold is **30 min, not 10**, because an asynchronous `Agent` delegate emits nothing on the parent's stream while it works. A deliberate impl disposition (to `done/` or `skipped/`) is an outcome; the loop continues. A `bin/wt-new` failure is a counted attempt; the agent drops `<plan>.wt-fail` and the loop defers the plan. `MAX_ATTEMPTS` bounds retries. A wall-clock cap-timeout is refunded too, but only a bounded number of times per plan, and does not break the loop. Exact signatures, thresholds and refund limits: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()`. Locked by `bin/test-automouse-env-breaker` and `bin/test-automouse-impl-cap-timeout`. Post-plan uses `postplan_cap_timeout()` (classifies 124/137/143 against `REMAINING_SECS`) and `should_hold_postplan_disposal()`: a cap-killed OPEN PR whose Phase 5.5 verdict predates the run is held in `queue/`; `notify_postplan_hold()` DMs the PR URL. Locked by `bin/test-automouse-postplan-disposition`.
+   - Environmental failures stop the run cleanly. A usage/rate limit, auth error, or other agent-killing transient refunds the attempt and breaks the loop; the **entire queue** resumes next run. Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. The watchdog stall threshold is **30 min**, since an async `Agent` delegate is silent on the parent's stream. A deliberate impl disposition (`done/` or `skipped/`) is an outcome; the loop continues. A `bin/wt-new` failure is a counted attempt; the agent drops `<plan>.wt-fail`; the loop defers it. A `cannot resume into worktree` refusal retries once with the worktree path; a second counts and defers. `MAX_ATTEMPTS` bounds retries. A wall-clock cap-timeout is refunded too (bounded per plan); the loop continues. Signatures: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()`. Locked by `bin/test-automouse-env-breaker` and `bin/test-automouse-impl-cap-timeout`. Post-plan uses `postplan_cap_timeout()` (classifies 124/137/143 against `REMAINING_SECS`) and `should_hold_postplan_disposal()`: a cap-killed OPEN PR whose Phase 5.5 verdict predates the run is held in `queue/`; `notify_postplan_hold()` DMs the PR URL. Locked by `bin/test-automouse-postplan-disposition`.
 5. **After a run:** Check `gh pr list` for new PRs, read reports for details
 
 ## Headless Mode
 
-`bin/automouse/run` sets `CLAUDE_HEADLESS=1`. This environment variable gates `/post-plan` Phase 10 (Preview Environment), which is skipped since no human is present to verify visually. All other phases run normally.
+`bin/automouse/run` sets `CLAUDE_HEADLESS=1`, which skips `/post-plan` Phase 10 (Preview Environment) since no human is present. All other phases run normally.
 
 ## Plan frontmatter: the autonomy contract
 
@@ -132,7 +136,7 @@ Every parser is **line-1-anchored** (frontmatter only, to the closing `---`), so
 
 ## Feature PRs cannot auto-merge
 
-Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge unattended. They wait for a human to apply the `human-approved` label after inspection (ADR-0062). `/post-plan` Phase 6.5 condition (8) deterministically **never arms** a `feat:` PR (a literal title grep), so there is no arm-then-strip; the required `human-signoff` check remains the independent floor that blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before, still subject to Phase 6.5's other conditions, including the PR-time safety verdict (9) on the realized diff. Check `gh pr list` for `feat:` PRs awaiting your label.
+Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge unattended. They wait for a human to apply the `human-approved` label after inspection (ADR-0062). `/post-plan` Phase 6.5 condition (8) deterministically **never arms** a `feat:` PR (a literal title grep); the required `human-signoff` check stays the independent floor. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before, subject to Phase 6.5's other conditions, including the PR-time safety verdict (9) on the realized diff. Check `gh pr list` for `feat:` PRs awaiting your label.
 
 ## `depends_on:` hold gate
 
@@ -167,4 +171,4 @@ A slug dependency is checked in two steps. First, `<slug>.md` must be in `done/`
 - An `unresolvable` verdict is never cleared automatically. `self-heal` logs a warning and keeps the hold until a human fixes the dependency (reopens and merges the PR, or edits `depends_on:`).
 - An orphan sidecar (plan left `queue/`) is reaped by `self-heal`. `bin/automouse/queue remove` never touches `.depends-hold`, so that reap is the only cleanup path.
 
-**Run-scoped dedup:** once a plan is held within a run, it is skipped for the rest of that run (space-padded `DEPENDS_HELD` string). When every plan in the queue is held, the run terminates cleanly rather than spinning.
+**Run-scoped dedup:** once a plan is held within a run, it is skipped for the rest of that run (space-padded `DEPENDS_HELD` string). When every plan in the queue is held, the run terminates cleanly.

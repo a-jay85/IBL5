@@ -62,7 +62,7 @@ final class AwardHistoryServiceTest extends TestCase
 
         $result = $this->service->search([]);
 
-        $this->assertEmpty($result['awards']);
+        $this->assertSame([], $result['awards']);
         $this->assertSame(0, $result['count']);
     }
 

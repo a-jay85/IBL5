@@ -84,7 +84,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             'set_waivers_to_free_agents' => $this->setWaiversToFreeAgents(),
             'set_fa_factors_pfw' => $this->setFaFactorsPfw($postData),
             'update_tradition' => $this->updateTradition(),
-            'generate_awards' => $this->generateAwards($postData),
+            'generate_awards' => $this->generateAwards(),
             'set_finals_mvp' => $this->setFinalsMvp($postData),
             default => ['success' => false, 'message' => 'Unknown action: ' . $action],
         };
@@ -322,10 +322,9 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     }
 
     /**
-     * @param array<string, mixed> $postData
      * @return array{success: bool, message: string}
      */
-    private function generateAwards(array $postData): array
+    private function generateAwards(): array
     {
         $currentPhase = $this->repository->getSetting('Current Season Phase') ?? '';
 

@@ -14,17 +14,17 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SEL="$SCRIPT_DIR/merge-line-select"
 FIXTURES="$SCRIPT_DIR/fixtures/merge-line"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+h_tmp TMP
 
-FAILED=0
-
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 # Herestrings, not printf|grep: no SIGPIPE under pipefail (shell-pipefail-grep rule).
 assert_match() {
@@ -45,13 +45,7 @@ assert_absent() {
     fi
 }
 
-assert_eq() {
-    if [ "$2" = "$3" ]; then
-        pass "$1"
-    else
-        failcase "$1 — expected '$3', got '$2'"
-    fi
-}
+assert_eq() { h_eq "$1" "$3" "$2"; }
 
 # --- Snapshot builders ---
 
@@ -410,7 +404,4 @@ else
     failcase "W3-canary-uses-selector — selector-list=$W3_SELECTOR gh-pr-list=$W3_OLD count-guard=$W3_GUARD"
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    exit 1
-fi
-exit 0
+h_done

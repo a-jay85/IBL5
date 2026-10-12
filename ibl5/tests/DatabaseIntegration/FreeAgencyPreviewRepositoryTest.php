@@ -31,7 +31,7 @@ class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getActivePlayers();
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
     }
 
     public function testGetActivePlayersIncludesRatingsAndPreferences(): void
@@ -40,7 +40,7 @@ class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getActivePlayers();
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         $first = $players[0];
 
         // Rating fields

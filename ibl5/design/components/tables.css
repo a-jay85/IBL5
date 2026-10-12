@@ -1161,4 +1161,10 @@ td.ibl-team-cell--colored {
     border-radius: var(--radius-sm);
 }
 
+/* Keyboard focus ring. The tooltip has no border, so the 10%-alpha
+   --ring-accent would be near-invisible; use the strong token. */
+.ibl-tooltip:focus-visible {
+    box-shadow: var(--ring-accent-strong);
+}
+
 } /* end @layer components */

@@ -16,12 +16,13 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WTSTATUS="$SCRIPT_DIR/wt-status"
 TMP="$(mktemp -d)"
 trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
-
-FAILED=0
 
 # env-var-driven gh stub.
 # Answers only pr_info's combined query (--json state,number,headRefOid); any
@@ -43,8 +44,8 @@ esac
 GH
 chmod +x "$STUBBIN/gh"
 
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 # assert_match <name> <regex> <haystack>
 assert_match() {
@@ -299,9 +300,4 @@ assert_absent "default-output-no-protected-row" 'PROTECTED' "$out_default"
 # ----------------------------------------------------------------------------
 # Final result
 # ----------------------------------------------------------------------------
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

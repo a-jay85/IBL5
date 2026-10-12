@@ -17,6 +17,17 @@ from .llm import run_bounded
 COMMIT_HOOK_TIMEOUT = 300   # seconds for `git commit` incl. bin/pre-commit-hook
 FETCH_LOCK_RETRIES = 3      # fetch_base retries after a concurrent-fetch ref-lock race
 FETCH_LOCK_BACKOFF = 1.0    # seconds; attempt n sleeps n * this
+# One retry after a short pause for a network blip on the fetch. Only stderr text
+# that names a timeout or reset counts. "Could not read from remote repository" and
+# "Could not resolve host" alone are auth/config/DNS failures and are never retried.
+FETCH_TRANSIENT_RETRIES = 1
+FETCH_TRANSIENT_DELAY = 3.0
+FETCH_TRANSIENT_MARKERS = (
+    "kex_exchange_identification",
+    "Operation timed out",
+    "Connection timed out",
+    "Connection reset by peer",
+)
 
 # Local gate denials (bin/pre-commit-hook, bin/pre-push-adr-hook) are deterministic:
 # re-running the FULL /post-plan skill hits the identical hook and cannot clear it
@@ -218,6 +229,26 @@ class LiveGit:
                               capture_output=True, text=True, errors="replace")
         return proc.returncode, f"{proc.stdout}\n{proc.stderr}".strip()
 
+    def _run_bytes(self, *args: str, check: bool = True) -> bytes:
+        """`_run` without text-mode translation. Use only where the bytes are
+        written back out verbatim (the lostwork PRE patch): text mode strips
+        the CR from CRLF files and replaces non-UTF-8 bytes with U+FFFD, which
+        makes lostwork.sh report every CRLF line as LOST (13 blocked runs,
+        2026-10-09/10)."""
+        proc = subprocess.run(["git", "-C", self.worktree, *args],
+                              capture_output=True)
+        if check and proc.returncode != 0:
+            stdout = proc.stdout.decode("utf-8", errors="replace")
+            stderr = proc.stderr.decode("utf-8", errors="replace")
+            blob = f"{stdout}\n{stderr}"
+            if any(m in blob for m in _LOCAL_GATE_MARKERS):
+                detail = "\n".join(s for s in (stderr.strip(), stdout.strip()) if s)
+                raise HarnessError("local-gate", f"git {' '.join(args)}: {detail[:600]}",
+                                   cmd=f"git {' '.join(args)}", output=detail)
+            raise HarnessError("git", f"git {' '.join(args)}: {stderr.strip()[:400]}",
+                               cmd=f"git {' '.join(args)}", output=stderr.strip())
+        return proc.stdout
+
     def _snapshot_conflicted_paths(self) -> tuple[str, ...]:
         """Record the unmerged paths of a stopped rebase on self.last_conflict_files.
 
@@ -394,14 +425,27 @@ class LiveGit:
         # expected Y". The winner already moved the ref, so a retry succeeds. The
         # usage-gate coordinator resumes paused runs in one wave, which hit this
         # (hot-files-base-ref-validate, 2026-10-09).
-        for attempt in range(FETCH_LOCK_RETRIES + 1):
+        # A network blip (ssh kex timeout, connection reset) gets its own single retry
+        # after a short pause (fix-and-prevent-skill, 2026-07-26). Real ssh failures
+        # also print "fatal: Could not read from remote repository." after the kex
+        # line, so any transient marker in the detail qualifies the retry.
+        lock_attempt = 0
+        transient_left = FETCH_TRANSIENT_RETRIES
+        while True:
             try:
                 self._run("fetch", remote, ref)
                 return
             except HarnessError as e:
-                if attempt == FETCH_LOCK_RETRIES or "cannot lock ref" not in (e.detail or ""):
-                    raise
-                time.sleep(FETCH_LOCK_BACKOFF * (attempt + 1))
+                detail = e.detail or ""
+                if "cannot lock ref" in detail and lock_attempt < FETCH_LOCK_RETRIES:
+                    time.sleep(FETCH_LOCK_BACKOFF * (lock_attempt + 1))
+                    lock_attempt += 1
+                    continue
+                if transient_left and any(m in detail for m in FETCH_TRANSIENT_MARKERS):
+                    transient_left -= 1
+                    time.sleep(FETCH_TRANSIENT_DELAY)
+                    continue
+                raise
 
     def branch_base(self, branch: str | None = None) -> str | None:
         """Stacked-branch parent tip SHA, recorded by bin/wt-new as
@@ -646,9 +690,9 @@ class LiveGit:
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
         self._pre_rebase_sha = pre_rebase_sha  # arm SIGTERM handler
-        pre_patch = self._run("diff", f"{master_sha}...HEAD")
+        pre_patch = self._run_bytes("diff", f"{master_sha}...HEAD")
         if pre_patch.strip():
-            Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre_patch)
+            Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre_patch)
 
         purge_verdict_artifacts(key)
 
@@ -874,10 +918,10 @@ class LiveGit:
             return StackedRebaseResult(False, "worktree dirty at resolution entry")
 
         # Step 4: pre-side capture — must happen before touching history
-        pre_patch = self._run("diff", f"{ibl_base}...HEAD")
+        pre_patch = self._run_bytes("diff", f"{ibl_base}...HEAD")
         if not pre_patch.strip():
             return StackedRebaseResult(False, "pre-rebase diff vs iblBase is empty")
-        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre_patch)
+        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre_patch)
 
         # Pin master_sha once so a concurrent fetch cannot split the proof across two bases
         master_sha = self._run("rev-parse", "origin/master").strip()
@@ -1066,10 +1110,10 @@ class LiveGit:
 
     def capture_lostwork_pre(self, key: str) -> bool:
         """Pre-side capture for lostwork.sh. Must run BEFORE fetch/rebase."""
-        pre = self.diff_vs_base("origin/master")
+        pre = self._run_bytes("diff", self._merge_base("origin/master"))
         if not pre.strip():
             return False
-        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre)
+        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre)
         return True
 
     def prove_lostwork(self, key: str) -> tuple[bool, str]:

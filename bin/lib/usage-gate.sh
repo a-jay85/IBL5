@@ -425,14 +425,17 @@ usage_marker_set_stuck() {
     return 1
 }
 
-# usage_marker_reset_runaway <sid>: zero the resume counter and clear the stuck flag.
+# usage_marker_reset_runaway <sid> [acct_fp]: zero the resume counter and clear the
+# stuck flag. A non-empty acct_fp is recorded as reset_acct, the account the cap was
+# last cleared for. The marker's own acct_fp is left alone: the switch fast-resume
+# still reads it.
 usage_marker_reset_runaway() {
     usage_valid_sid "${1:-}" || return 1
     local f tmp
     f="$(usage_markers_dir)/$1.json"
     tmp="$f.tmp.$$"
     [ -s "$f" ] || return 1
-    if jq '.resume_count = 0 | del(.stuck, .stuck_reason)' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
+    if jq --arg a "${2:-}" '.resume_count = 0 | del(.stuck, .stuck_reason) | if $a != "" then .reset_acct = $a else . end' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
         return 0
     fi
     rm -f "$tmp"
@@ -556,12 +559,17 @@ usage_delta_log() {
 
 USAGE_LIMIT_HIT_RE='hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*429|rate_limit_error'
 USAGE_ENV_ERROR_RE='hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error'
+# Claude Code resume safety check refusing a worktree-bound session. Anchored
+# to line start: the CLI prints it as a bare stderr line, while agent stream
+# output that merely quotes it is a JSON event line starting with `{`.
+USAGE_WT_RESUME_REFUSED_RE='^error: cannot resume into worktree '
 
 usage_log_matches() {  # $1=regex $2=file $3=after_line (0 = whole file)
     tail -n +"$(( ${3:-0} + 1 ))" "$2" 2>/dev/null | grep -qiE "$1"
 }
 usage_is_limit_hit() { usage_log_matches "$USAGE_LIMIT_HIT_RE" "$@"; }
 usage_is_env_error() { usage_log_matches "$USAGE_ENV_ERROR_RE" "$@"; }
+usage_is_wt_resume_refused() { usage_log_matches "$USAGE_WT_RESUME_REFUSED_RE" "$@"; }
 
 # ------------------------------------------------------------ 6a runner helpers
 

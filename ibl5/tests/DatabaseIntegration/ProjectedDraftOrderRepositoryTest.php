@@ -157,7 +157,7 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getPointDifferentials(2099);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // Find Metros (teamid=1): Game 1 home: 110 scored, 90 allowed. Game 2 visitor: 95 scored, 100 allowed.
         $metros = null;
         foreach ($result as $row) {

@@ -269,7 +269,7 @@ class DepthChartSnapshotRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getLiveRosterSettings(1);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $names = array_column($result, 'name');
         self::assertContains('Live Roster P1', $names);
 

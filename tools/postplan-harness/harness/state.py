@@ -308,11 +308,13 @@ class RunResult:
     manual_demotions: list[dict] = field(default_factory=list)
     manual_testing: dict = field(default_factory=dict)  # Phase 6.7 record; popped when empty
     hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
+    pause_edit_sid: Optional[str] = None  # S of a recorded interrupted edit (ADR-0143 addendum 2026-10-10); omitted from result.json when unset
     audit: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
         d = asdict(self)
-        for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix"):   # unset → result.json byte-identical
+        for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix",
+                    "pause_edit_sid"):   # unset → result.json byte-identical
             if not d.get(key):
                 d.pop(key, None)
         if self.classification:

@@ -354,7 +354,7 @@ class TradeWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertFalse($result->isValid(), 'Trade should be rejected when user exceeds hard cap');
-        $this->assertNotEmpty($result->getErrorMessages());
+        $this->assertNotSame([], $result->getErrorMessages());
         $this->assertStringContainsString('hard cap', $result->getErrorMessages()[0]);
         $this->assertSame(7500, $result->getContext()['userPostTradeCapTotal']);
     }
@@ -382,7 +382,7 @@ class TradeWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertFalse($result->isValid(), 'Trade should be rejected when team exceeds 15-player roster limit');
-        $this->assertNotEmpty($result->getErrors());
+        $this->assertNotSame([], $result->getErrors());
         $this->assertStringContainsString('roster limit', $result->getErrors()[0]);
     }
 

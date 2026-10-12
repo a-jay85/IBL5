@@ -72,6 +72,7 @@ PASS=0
 FAIL=0
 SANDBOX="$(mktemp -d)"
 trap 'rm -rf "$SANDBOX"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$SANDBOX/usage"
 
 seam_ok()   { PASS=$(( PASS + 1 )); printf 'ok  %s\n' "$1"; }
 seam_fail() { FAIL=$(( FAIL + 1 )); printf 'FAIL %s\n' "$1"; }

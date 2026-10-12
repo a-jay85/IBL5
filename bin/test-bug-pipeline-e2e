@@ -54,6 +54,7 @@ bpt_expect_absent() {     # <label> <needle> <haystack>
 T="$(mktemp -d)"
 _cleanup() { rm -rf "$T"; }
 trap '_cleanup' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
 
 JQ_PATH="$(command -v jq || true)"
 if [ -z "$JQ_PATH" ]; then echo "FAIL: jq not on PATH (both targets need it)" >&2; exit 1; fi
@@ -283,9 +284,9 @@ else
     bpe_run() {   # <gate: 1|0|none> <args...>; sets RC OUT ERR. env -i keeps a developer's exports out.
         local gate="$1"; shift
         if [ "$gate" = none ]; then
-            OUT=$(env -i PATH="$T/e2estub:$BASE_PATH" HOME="$T/home" bash "$BPE_SCRIPT" "$@" 2>"$T/err")
+            OUT=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH="$T/e2estub:$BASE_PATH" HOME="$T/home" bash "$BPE_SCRIPT" "$@" 2>"$T/err")
         else
-            OUT=$(env -i PATH="$T/e2estub:$BASE_PATH" HOME="$T/home" BUG_PIPELINE_E2E="$gate" bash "$BPE_SCRIPT" "$@" 2>"$T/err")
+            OUT=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH="$T/e2estub:$BASE_PATH" HOME="$T/home" BUG_PIPELINE_E2E="$gate" bash "$BPE_SCRIPT" "$@" 2>"$T/err")
         fi
         RC=$?; ERR=$(cat "$T/err")
     }

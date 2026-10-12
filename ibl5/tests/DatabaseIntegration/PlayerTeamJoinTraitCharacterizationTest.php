@@ -107,7 +107,7 @@ class PlayerTeamJoinTraitCharacterizationTest extends DatabaseTestCase
 
         foreach ($sites as $label => $call) {
             $rows = $call();
-            $this->assertNotEmpty($rows, "$label returned no rows; fixture no longer satisfies its filters");
+            $this->assertNotSame([], $rows, "$label returned no rows; fixture no longer satisfies its filters");
             $row = $rows[0];
             $this->assertArrayHasKey('teamname', $row, "$label lost the joined teamname alias");
             $this->assertArrayHasKey('color1', $row, "$label lost the joined color1 column");

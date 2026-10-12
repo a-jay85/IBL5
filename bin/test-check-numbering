@@ -14,52 +14,48 @@
 # Run: bin/test-check-numbering  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BASE_TMP="$(mktemp -d)"
-trap 'rm -rf "$BASE_TMP"' EXIT
+h_tmp BASE_TMP
 
-FAILED=0
 REPO=""
 REPO_WT=""
 OUT="$BASE_TMP/out"
 
 expect() { # name want got
     if [ "$3" -eq "$2" ]; then
-        echo "ok: $1 (exit $3)"
+        h_pass "$1 (exit $3)"
     else
-        echo "FAIL: $1 — expected exit $2, got $3"
+        h_fail "$1" "expected exit $2, got $3"
         sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
-        FAILED=1
     fi
 }
 
 expect_out() { # name pattern
     if grep -qE "$2" "$OUT"; then
-        echo "ok: $1"
+        h_pass "$1"
     else
-        echo "FAIL: $1 — output did not match /$2/"
+        h_fail "$1" "output did not match /$2/"
         sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
-        FAILED=1
     fi
 }
 
 expect_eq() { # name want got
     if [ "$3" = "$2" ]; then
-        echo "ok: $1 ($3)"
+        h_pass "$1 ($3)"
     else
-        echo "FAIL: $1 — expected '$2', got '$3'"
-        FAILED=1
+        h_fail "$1" "expected '$2', got '$3'"
     fi
 }
 
 expect_line() { # name exact-line  (whole-line, fixed-string match against $OUT)
     if grep -qxF -- "$2" "$OUT"; then
-        echo "ok: $1"
+        h_pass "$1"
     else
-        echo "FAIL: $1 — no line equal to: $2"
+        h_fail "$1" "no line equal to: $2"
         sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
-        FAILED=1
     fi
 }
 
@@ -74,10 +70,7 @@ new_repo() {
     cp "$SCRIPT_DIR/next-number"        "$REPO/bin/next-number"
     cp "$SCRIPT_DIR/lib/numbering.sh"   "$REPO/bin/lib/numbering.sh"
     chmod +x "$REPO/bin/check-numbering" "$REPO/bin/next-adr" "$REPO/bin/next-migration" "$REPO/bin/next-number"
-    git -C "$REPO" init -q
-    git -C "$REPO" config user.email test@example.com
-    git -C "$REPO" config user.name "test"
-    git -C "$REPO" config commit.gpgsign false
+    h_git_repo "$REPO" --no-commit
     # The 'apply' rebase backend is patch-based and ignores merge drivers
     # entirely; the union-merge cases need the merge backend regardless of the
     # invoking user's global config.
@@ -257,10 +250,9 @@ gadd ibl5/docs/decisions/README.md; gcommit append-b
 RC=$?
 ( cd "$REPO" && git rebase --abort >/dev/null 2>&1 ) || true
 if [ "$RC" -ne 0 ]; then
-    echo "ok: no-gitattributes-control conflicts (exit $RC)"
+    h_pass "no-gitattributes-control conflicts (exit $RC)"
 else
-    echo "FAIL: no-gitattributes-control — expected a rebase conflict, got exit 0"
-    FAILED=1
+    h_fail "no-gitattributes-control" "expected a rebase conflict, got exit 0"
 fi
 
 # 12. Union merge can duplicate a row when one side edits instead of appending;
@@ -339,11 +331,10 @@ expect "next-adr gap fixture" 0 "$RC"
 expect_eq "next-adr prints one line" 1 "$(printf '%s\n' "$ALLOC" | wc -l | tr -d ' ')"
 expect_eq "next-adr gap fixture name" "0008-gap-slug.md" "$(basename "${ALLOC:-none}")"
 if [ -f "$ALLOC" ]; then
-    echo "ok: next-adr created the file"
+    h_pass "next-adr created the file"
     rm -f "$ALLOC"
 else
-    echo "FAIL: next-adr did not create $ALLOC"
-    FAILED=1
+    h_fail "next-adr did not create $ALLOC"
 fi
 
 # C2. ADR empty tree, sibling-worktree stream, origin-ref stream.
@@ -430,19 +421,17 @@ expect "next-adr from main checkout" 1 "$RC"
 expect_line "next-adr main-checkout line 1" "Error: refusing to run from the main checkout — bin/next-adr cp's the"
 expect_out "next-adr main-checkout names bin/wt-new" 'bin/wt-new'
 if compgen -G "$REPO/$ADR_DIR_REL/*-ok-slug.md" > /dev/null; then
-    echo "FAIL: next-adr created a file in the main checkout"
-    FAILED=1
+    h_fail "next-adr created a file in the main checkout"
 else
-    echo "ok: next-adr created nothing in the main checkout"
+    h_pass "next-adr created nothing in the main checkout"
 fi
 X="$( ( cd "$REPO_WT" && ./bin/next-adr dup-me ) 2>"$OUT" )"; RC=$?
 expect "next-adr slug reuse" 1 "$RC"
 expect_out "next-adr slug reuse message" "^Error: an ADR with slug 'dup-me' already exists at "
 if [ -e "$REPO_WT/$ADR_DIR_REL/0002-dup-me.md" ]; then
-    echo "FAIL: next-adr created 0002-dup-me.md on slug reuse"
-    FAILED=1
+    h_fail "next-adr created 0002-dup-me.md on slug reuse"
 else
-    echo "ok: next-adr slug reuse created nothing"
+    h_pass "next-adr slug reuse created nothing"
 fi
 # The --help text says template-missing is exit 2; the code exits 1, and that is what is pinned.
 rm "$REPO_WT/$ADR_DIR_REL/0000-template.md"
@@ -545,24 +534,16 @@ FILTER_BLOCK="$(awk '
 ' "$WORKFLOW")"
 for GLOB in "ibl5/docs/decisions/\*\*" "ibl5/migrations/\*\*"; do
     if printf '%s\n' "$FILTER_BLOCK" | grep -qF "$(printf '%s' "$GLOB" | tr -d '\\')"; then
-        echo "ok: numbering filter covers $(printf '%s' "$GLOB" | tr -d '\\')"
+        h_pass "numbering filter covers $(printf '%s' "$GLOB" | tr -d '\\')"
     else
-        echo "FAIL: numbering filter is missing $(printf '%s' "$GLOB" | tr -d '\\')"
-        FAILED=1
+        h_fail "numbering filter is missing $(printf '%s' "$GLOB" | tr -d '\\')"
     fi
 done
 if grep -q "steps.filter.outputs.numbering == 'true'" "$WORKFLOW" \
     && grep -q 'run: bin/check-numbering --since=' "$WORKFLOW"; then
-    echo "ok: check-numbering step is wired to the numbering filter"
+    h_pass "check-numbering step is wired to the numbering filter"
 else
-    echo "FAIL: check-numbering step is not wired to the numbering filter"
-    FAILED=1
+    h_fail "check-numbering step is not wired to the numbering filter"
 fi
 
-echo
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

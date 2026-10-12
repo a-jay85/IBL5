@@ -20,6 +20,14 @@
 #   - Nothing here reads HOME or global git identity, so harnesses still run
 #     under `env -i PATH=/usr/bin:/bin`.
 #   - bash 3.2 safe: no associative arrays, no empty-array expansion.
+#   - Sourcing isolates the usage gate: it creates one private dir with h_tmp
+#     and calls usage_test_isolate (bin/lib/usage-test-isolation.sh), which
+#     exports IBL5_USAGE_GATE_STATE_DIR, IBL5_USAGE_CLAUDE_PROJECTS, and
+#     IBL5_USAGE_GATE_TEST_MODE=1. A consumer that runs the automouse runner
+#     needs no setup of its own. A consumer may still set its own
+#     IBL5_USAGE_GATE_STATE_DIR after sourcing; the later export wins.
+#   - Sourcing installs the h_tmp EXIT trap when none is set. A consumer that
+#     replaces the trap without calling h_cleanup leaves that one dir behind.
 
 [ -n "${_H_LOADED:-}" ] && return 0
 _H_LOADED=1
@@ -189,3 +197,11 @@ h_done() {
     printf 'RESULT: all passed (%s assertions)\n' "$total"
     exit 0
 }
+
+# Usage-gate isolation for every consumer (see Contract above). Runs once per
+# process: the _H_LOADED guard at the top returns before reaching it again.
+# shellcheck source=bin/lib/usage-test-isolation.sh
+. "$(dirname "${BASH_SOURCE[0]}")/usage-test-isolation.sh"
+h_tmp _H_USAGE_DIR
+usage_test_isolate "$_H_USAGE_DIR" ||
+    _h_setup_die "usage_test_isolate failed for [$_H_USAGE_DIR]"

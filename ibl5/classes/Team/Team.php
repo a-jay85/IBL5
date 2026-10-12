@@ -80,9 +80,7 @@ class Team extends \Database\BaseMysqliRepository
      */
     protected function load(int|string|array $identifier): void
     {
-        if (is_int($identifier) && $identifier === 0) {
-            $identifier = League::FREE_AGENTS_TEAMID;
-        } elseif (is_string($identifier) && $identifier === '') {
+        if (is_string($identifier) && $identifier === '') {
             $identifier = League::FREE_AGENTS_TEAMID;
         }
 

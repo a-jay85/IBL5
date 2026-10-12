@@ -187,7 +187,7 @@ class AllStarTeamRepositoryTest extends DatabaseTestCase
             static fn (array $r): bool => $r['game_date'] === '2025-02-20',
         );
 
-        self::assertNotEmpty($matching);
+        self::assertNotSame([], $matching);
         $first = array_values($matching)[0];
         self::assertSame('Team Away', $first['name']);
         self::assertSame(50, $first['visitor_teamid']);
@@ -217,7 +217,7 @@ class AllStarTeamRepositoryTest extends DatabaseTestCase
             static fn (array $r): bool => $r['game_date'] === '2025-02-21',
         );
 
-        self::assertEmpty($matching);
+        self::assertSame([], $matching);
     }
 
     public function testGetPlayersForAllStarTeamReturnsPlayerNames(): void

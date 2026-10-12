@@ -36,7 +36,7 @@ class ApiPlayerRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getPlayers($paginator);
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         self::assertLessThanOrEqual(10, count($players));
     }
 
@@ -50,7 +50,7 @@ class ApiPlayerRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getPlayers($paginator);
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         $player = $players[0];
 
         self::assertArrayHasKey('player_uuid', $player);
@@ -76,7 +76,7 @@ class ApiPlayerRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getPlayers($paginator, ['position' => 'PG']);
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         foreach ($players as $player) {
             self::assertSame('PG', $player['position']);
         }
@@ -96,7 +96,7 @@ class ApiPlayerRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getPlayers($paginator, ['search' => 'UniqueSearchName']);
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         $names = array_column($players, 'name');
         self::assertContains('DB UniqueSearchName Batch7', $names);
     }

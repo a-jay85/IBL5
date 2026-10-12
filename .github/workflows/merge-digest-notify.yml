@@ -114,7 +114,8 @@ jobs:
         uses: ./.github/actions/notify-discord
         with:
           # message-file defaults to /tmp/discord-msg.txt -- the path written above.
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          # Merge notices go to #merged, not #dev (DISCORD_MERGED_WEBHOOK_URL).
+          webhook-url: ${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}
           ping: 'true'
           # A silently-dropped merge notification is indistinguishable from "nothing merged",
           # which is the exact failure the ledger had. Fail the run instead.

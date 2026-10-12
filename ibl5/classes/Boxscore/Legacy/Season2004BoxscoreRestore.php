@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Boxscore;
+namespace Boxscore\Legacy;
 
+use Boxscore\Boxscore;
 use mysqli;
 use RuntimeException;
 
@@ -451,7 +452,7 @@ final class Season2004BoxscoreRestore
             ];
 
             $this->bindAndExecute($stmt, 'ss' . str_repeat('i', 32), $values);
-            $teams += $stmt->affected_rows;
+            $teams += (int) $stmt->affected_rows;
         }
         $stmt->close();
 
@@ -476,7 +477,7 @@ final class Season2004BoxscoreRestore
             ];
 
             $this->bindAndExecute($stmt, 'ssss' . str_repeat('i', 25), $values);
-            $players += $stmt->affected_rows;
+            $players += (int) $stmt->affected_rows;
         }
         $stmt->close();
 

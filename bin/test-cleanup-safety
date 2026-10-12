@@ -25,12 +25,13 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLEANUP="$SCRIPT_DIR/cleanup"
 TMP="$(mktemp -d)"
 trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
-
-FAILED=0
 
 # A table-driven gh stub keyed off an optional $GH_FIXTURE file. With no fixture
 # (unset or missing file) it exits 1 — byte-identical to the legacy always-fail
@@ -122,8 +123,8 @@ exit 0
 DOCKERSTUB
 chmod +x "$STUBBIN/docker"
 
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 # assert_match <name> <regex> <haystack>
 assert_match() {
@@ -351,10 +352,7 @@ fi
 # shellcheck source=bin/lib/wt-guards.sh
 . "$SCRIPT_DIR/lib/wt-guards.sh"
 hu="$TMP/huf"
-git init -q "$hu"
-git -C "$hu" config user.email t@example.com
-git -C "$hu" config user.name tester
-git -C "$hu" config commit.gpgsign false
+h_git_repo "$hu" --no-commit
 printf 'seed\n' > "$hu/seed.txt"
 git -C "$hu" add seed.txt
 git -C "$hu" commit -qm seed
@@ -1276,9 +1274,4 @@ else
     failcase "wt-down-orphan-gh-missing (log: $(cat "$wtd_log"))"
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

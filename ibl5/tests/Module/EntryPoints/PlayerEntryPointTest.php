@@ -22,7 +22,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Player');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('No player selected', $output);
     }
 
@@ -31,7 +31,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Player', ['pa' => 'bogus']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('No player selected', $output);
     }
 
@@ -70,7 +70,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
             ['pa' => 'showpage', 'pid' => '1'],
         );
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_plr');
     }
 
@@ -78,7 +78,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->seedShowpageMocks(['pid' => 0, 'name' => 'Unknown']);
 
-        $output = $this->runModule(
+        $this->runModule(
             'Player',
             ['pa' => 'showpage', 'pid' => 'garbage'],
         );
@@ -98,7 +98,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'negotiate', 'pid' => '1']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testNegotiateWithAuthRendersNegotiation(): void
@@ -112,7 +112,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'negotiate', 'pid' => '1']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     /**
@@ -237,7 +237,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'showpage', 'pid' => $uuid]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted("uuid = '" . $uuid . "'");
         $this->assertQueryExecuted('p.pid = 42');
     }
@@ -250,7 +250,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'showpage', 'pid' => $uuid]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted("uuid = '" . $uuid . "'");
         $this->assertQueryExecuted('p.pid = 0');
     }

@@ -27,6 +27,38 @@ final class StatsSanitizerTest extends TestCase
         $this->assertSame(-5, StatsSanitizer::sanitizeInt(-5));
     }
 
+    public function testToIntCoercesNumericInput(): void
+    {
+        // int passthrough, including bounds and zero
+        $this->assertSame(10, StatsSanitizer::toInt(10));
+        $this->assertSame(0, StatsSanitizer::toInt(0));
+        $this->assertSame(-5, StatsSanitizer::toInt(-5));
+        $this->assertSame(PHP_INT_MAX, StatsSanitizer::toInt(PHP_INT_MAX));
+
+        // numeric strings, including negative and "0"
+        $this->assertSame(10, StatsSanitizer::toInt('10'));
+        $this->assertSame(-5, StatsSanitizer::toInt('-5'));
+        $this->assertSame(0, StatsSanitizer::toInt('0'));
+
+        // floats and float strings truncate toward zero
+        $this->assertSame(10, StatsSanitizer::toInt(10.7));
+        $this->assertSame(-10, StatsSanitizer::toInt(-10.7));
+        $this->assertSame(10, StatsSanitizer::toInt('10.7'));
+    }
+
+    public function testToIntReturnsZeroForNonCoercibleInput(): void
+    {
+        $this->assertSame(0, StatsSanitizer::toInt(null));
+        $this->assertSame(0, StatsSanitizer::toInt(''));
+        $this->assertSame(0, StatsSanitizer::toInt('abc'));
+        $this->assertSame(0, StatsSanitizer::toInt('12abc'));   // sanitizeInt() would give 12
+        $this->assertSame(0, StatsSanitizer::toInt(true));      // sanitizeInt() would give 1
+        $this->assertSame(0, StatsSanitizer::toInt(false));
+        $this->assertSame(0, StatsSanitizer::toInt([]));
+        $this->assertSame(0, StatsSanitizer::toInt(['7']));
+        $this->assertSame(0, StatsSanitizer::toInt(new \stdClass()));
+    }
+
     public function testSanitizeFloat(): void
     {
         // Test normal floats

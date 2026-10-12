@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.watch-pr-cycle</string>
+	<key>Program</key>
+	<string>@MAIN_WT@/bin/pr-cycle-tick</string>
+	<!-- StartInterval: the correct launchd primitive for a 30-min poll.
+	     Do NOT "fix" this to a calendar-interval key, which is calendar-only.
+	     RunAtLoad stays false so installing never fires a tick. -->
+	<key>StartInterval</key>
+	<integer>1800</integer>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>WorkingDirectory</key>
+	<string>@MAIN_WT@</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew and
+		     the Claude Code native install dir under the home directory.
+		     Every binary the tick shells out to must resolve here: bash, gh,
+		     jq, git, launchctl, find, tr, and date. claude is reached only
+		     through bin/pr-cycle's worker.
+		     HOME interpolates HERE, at generation time. launchd does NOT expand
+		     variables in EnvironmentVariables, so a literal home variable would
+		     bake in a dead path. -->
+		<key>PATH</key>
+		<string>@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>@HOME@/.ibl5-pr-cycle-watch/tick.log</string>
+	<key>StandardErrorPath</key>
+	<string>@HOME@/.ibl5-pr-cycle-watch/tick.log</string>
+</dict>
+</plist>

@@ -281,6 +281,7 @@ class TeamPageDataPreparerTest extends TestCase
 
     public function testPrepareBannerDataPreservesInputOrderAndTeamIdentity(): void
     {
+        // Catches a sort or reversal such as array_reverse($champBanners): 2022 stays ahead of 2018.
         $repo = self::createStub(TeamRepositoryInterface::class);
         $repo->method('getChampionshipBanners')->willReturn([
             self::bannerRow(2022, 1),
@@ -458,6 +459,7 @@ class TeamPageDataPreparerTest extends TestCase
 
     public function testPreparePlayoffDataWithNoResultsReturnsFourEmptyRounds(): void
     {
+        // The last round must be named 'IBL Finals'; a rename to 'Finals' fails the name list below.
         $preparer = $this->buildPreparer($this->repoReturning('getPlayoffResults', []));
 
         $result = $preparer->preparePlayoffData(self::bullsTeam());
@@ -748,6 +750,7 @@ class TeamPageDataPreparerTest extends TestCase
 
     public function testPrepareDraftPicksDataPreservesPickOrderAndNullNotes(): void
     {
+        // Catches iteration over array_reverse($resultPicks): the Bulls pick must stay first.
         $preparer = $this->buildPreparer(
             self::createStub(TeamRepositoryInterface::class),
             $this->queryRepoWithPicks([

@@ -28,7 +28,7 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
 {
     private const WIRING_TOKEN = 'ModuleServices::current(';
     private const IDENTITY_PARAMETER_PATTERN = '/(loggedin|currentuser|username|userteam|ownteam|highlightteam|session|cookie|actor)/i';
-    private const GATE_TOKEN_PATTERN = '/is_admin\(|->isAdmin\(|->isAuthenticated\(|\bloginbox\(|CsrfGuard::/';
+    private const GATE_TOKEN_PATTERN = '/is_admin\(|->isAdmin\(|->isAuthenticated\(|\bloginbox\(|->loginBox\(|CsrfGuard::/';
 
     /** Request and auth state a factory must never read. */
     private const FORBIDDEN_VARIABLES = [
@@ -52,7 +52,8 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
     /**
      * Gate-token line count per modules/<dir>/index.php, recorded from the
      * untouched tree with:
-     * grep -cE 'is_admin\(|->isAdmin\(|->isAuthenticated\(|\bloginbox\(|CsrfGuard::'
+     * grep -cE 'is_admin\(|->isAdmin\(|->isAuthenticated\(|\bloginbox\(|->loginBox\(|CsrfGuard::'
+     * (->loginBox( is the NukeCompat spelling of the same gate, e.g. DepthChartEntry.)
      *
      * @var array<string, int>
      */

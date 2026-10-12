@@ -131,6 +131,7 @@ class ModuleCompositionRootRatchetTest extends TestCase
 
     public function testFrontControllerPublishesServicesAfterPageCacheExit(): void
     {
+        // phpunit-hygiene-allow: guards statement ORDER inside the modules.php front controller (cache exit before publish); the file cannot be included in-process without exiting
         $source = file_get_contents(self::ibl5Root() . '/modules.php');
         $this->assertNotFalse($source);
 

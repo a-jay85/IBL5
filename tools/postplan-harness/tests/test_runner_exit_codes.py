@@ -31,6 +31,16 @@ def test_usage_limit_exits_3():
     would hit the same wall, so the harness stops for a human to retry later."""
     assert runner.exit_code_for(_res(TerminalState.FAILED, "llm-usage-limit")) == 3
 
+def test_auth_expired_exits_3():
+    """An expired Claude CLI login is environmental — the skill session would reuse
+    the same login, so the harness stops for a human to sign in again."""
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "llm-auth-expired")) == 3
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "llm-invalid-output")) == 1
+
+def test_auth_expired_is_not_a_transient_round_kind():
+    """No round retry against a dead login."""
+    assert "llm-auth-expired" not in runner._TRANSIENT_ROUND_KINDS
+
 def test_other_typed_failure_exits_1():          # negative path: not everything is 3
     assert runner.exit_code_for(_res(TerminalState.FAILED, "push-disabled")) == 1
     assert runner.exit_code_for(_res(TerminalState.FAILED, None)) == 1

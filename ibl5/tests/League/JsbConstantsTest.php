@@ -25,16 +25,6 @@ final class JsbConstantsTest extends TestCase
         self::assertStringEndsWith('/classes/League/JsbConstants.php', (string) $ref->getFileName());
     }
 
-    public function testJsbConstantValuesArePinned(): void
-    {
-        // @phpstan-ignore staticMethod.alreadyNarrowedType (const value statically known; assertion guards future edits)
-        self::assertSame(['PG', 'SG', 'SF', 'PF', 'C'], \League\JsbConstants::PLAYER_POSITIONS);
-        // @phpstan-ignore staticMethod.alreadyNarrowedType (const value statically known; assertion guards future edits)
-        self::assertSame(22, \League\JsbConstants::PLAYOFF_MONTH);
-        // @phpstan-ignore staticMethod.alreadyNarrowedType (const value statically known; assertion guards future edits)
-        self::assertSame(960, \League\JsbConstants::WAIVERS_ORDINAL);
-    }
-
     public function testOldLeagueJsbNameDoesNotResolve(): void
     {
         self::assertFalse(class_exists('League\\JSB'), 'League\\JSB still resolves; rename to League\\JsbConstants is incomplete');

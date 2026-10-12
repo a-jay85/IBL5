@@ -128,6 +128,12 @@ class StackedRebaseResult:
     auto_resolved: bool = False
     resolved_files: tuple = ()
     squash_note: str = ""
+    adapted_lines: tuple = ()
+
+
+def lostwork_pre_path(key: str) -> str:
+    """The pre-rebase PR patch capture_lostwork_pre writes (lostwork.sh reads it too)."""
+    return f"/tmp/pr-ready-diff-pre-{key}.patch"
 
 
 class LiveGit:
@@ -565,15 +571,68 @@ class LiveGit:
         """Run the TREE-EQUIVALENT proof. Gate is conjunctive: stdout AND rc==0.
         A diverged tree exits 0 with TREE DIVERGED — weakening to either operator alone
         would silently admit lost work."""
+        rc, proof_out = self._run_lostwork(lostwork_path, key)
+        if not ("TREE-EQUIVALENT" in proof_out and rc == 0):
+            return False, f"tree proof failed: {proof_out.strip()[:400]}"
+        return True, proof_out
+
+    def _run_lostwork(self, lostwork_path: Path, key: str) -> tuple[int, str]:
+        """Run lostwork.sh and return (rc, untruncated stdout)."""
         proof_proc = subprocess.run(
             ["bash", str(lostwork_path), key],
             capture_output=True, text=True, errors="replace",
             cwd=self.worktree,
         )
-        proof_out = proof_proc.stdout
-        if not ("TREE-EQUIVALENT" in proof_out and proof_proc.returncode == 0):
-            return False, f"tree proof failed: {proof_out.strip()[:400]}"
-        return True, proof_out
+        return proof_proc.returncode, proof_proc.stdout
+
+    def _prove_with_adaptations(
+        self,
+        lostwork_path: Path,
+        key: str,
+        *,
+        resolved_files: tuple,
+        adaptations: tuple,
+        pre_rebase_sha: str,
+        master_sha: str,
+    ) -> tuple[bool, str, tuple]:
+        """The conjunctive proof, plus one narrow relaxation: a LOST branch-added line
+        passes only when it is a deterministic near-match of a rewrite master made in
+        the same file, the resolver justified it, and a read-only reviewer CONFIRMED it
+        (harness/adaptations.py). A strict pass makes no model call."""
+        from ..adaptations import accept_adapted_proof
+
+        rc, out = self._run_lostwork(lostwork_path, key)
+        if "TREE-EQUIVALENT" in out and rc == 0:
+            return True, out, ()
+        merge_base = self._run("merge-base", pre_rebase_sha, master_sha, check=False).strip()
+        ok, composed, accepted = accept_adapted_proof(
+            self.llm, self._run,
+            worktree=self.worktree, key=key, proof_out=out, rc=rc,
+            resolved_files=resolved_files, justifications=adaptations,
+            merge_base=merge_base, master_sha=master_sha,
+        )
+        if not ok:
+            return (False,
+                    f"tree proof failed: {out.strip()[:400]} | adaptation rejected: {composed}",
+                    ())
+        return True, composed, accepted
+
+    def _run_proof(self, lostwork_path: Path, key: str) -> tuple[bool, str]:
+        """Strict proof for the conflict ladder. Returns (ok, FULL stdout). Gate is
+        conjunctive: stdout contains TREE-EQUIVALENT AND rc==0. A diverged tree exits 0
+        with TREE DIVERGED, so weakening to either operator alone admits lost work."""
+        rc, proof_out = self._run_lostwork(lostwork_path, key)
+        return ("TREE-EQUIVALENT" in proof_out and rc == 0), proof_out
+
+    def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
+                             lostwork_path, conflicted, proof_out):
+        from ..conflict_ladder import LadderContext, default_rungs, run_ladder
+        ctx = LadderContext(
+            llm=self.llm, run=self._run, run_out=self._run_out,
+            prove=lambda: self._run_proof(lostwork_path, key),
+            worktree=self.worktree, key=key, master_sha=master_sha,
+            pre_rebase_sha=pre_rebase_sha, conflicted_files=conflicted)
+        return run_ladder(ctx, proof_out, rungs=default_rungs(branch))
 
     def _record_resolution(
         self,
@@ -584,6 +643,7 @@ class LiveGit:
         collapse_warn: str = "",
         proof_out: str = "",
         base_sha: str = "",
+        adapted_lines: tuple = (),
     ) -> tuple[str, str]:
         """Write manifest, notes, condition-(14) flag, and run the conflict reviewer.
         Returns (manifest_path, notes_path)."""
@@ -631,6 +691,11 @@ class LiveGit:
             f"## Changed files\n\n{file_list}\n\n"
             f"## Proof\n\nTREE-EQUIVALENT\n"
         )
+        if adapted_lines:
+            notes += "\n## Adapted lines\n\n" + "".join(
+                f"- {a.path}: +{a.original} => +{a.adapted} [{a.old} -> {a.new}]\n"
+                for a in adapted_lines
+            )
         if collapse_warn:
             notes += f"\n## Collapse guard\n\n{collapse_warn}\n"
         notes_path = f"/tmp/postplan-conflict-resolution-{key}.md"
@@ -647,6 +712,7 @@ class LiveGit:
                 self.llm, self._run,
                 worktree=self.worktree, key=key,
                 resolved_files=resolved_files, proof_out=proof_out,
+                adaptations=adapted_lines,
             )
 
         return manifest_path, notes_path
@@ -669,17 +735,20 @@ class LiveGit:
             abort_and_restore, assert_text_only, inventory_conflicts,
             purge_verdict_artifacts, resolve_all,
         )
+        from ..conflict_ladder import ladder_failure_reason
 
         branch = self.branch()
         key = branch.replace("/", "-")
         self.last_conflict_files = ()
+        self.last_conflict_resolution = None
+        self.last_conflict_rung = ""
         master_sha = self._run("rev-parse", base).strip()
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
         self._pre_rebase_sha = pre_rebase_sha  # arm SIGTERM handler
         pre_patch = self._run_bytes("diff", f"{master_sha}...HEAD")
         if pre_patch.strip():
-            Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre_patch)
+            Path(lostwork_pre_path(key)).write_bytes(pre_patch)
 
         purge_verdict_artifacts(key)
 
@@ -756,16 +825,48 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason="lostwork.sh not found at pinned master SHA")
 
-                proof_ok, proof_out = self._prove_tree_equivalent(lostwork_path, key)
+                proof_ok, proof_out, adapted = self._prove_with_adaptations(
+                    lostwork_path, key,
+                    resolved_files=resolve_result.resolved_files,
+                    adaptations=resolve_result.adaptations,
+                    pre_rebase_sha=pre_rebase_sha, master_sha=master_sha,
+                )
+                resolved_files = resolve_result.resolved_files
+                self.last_conflict_rung = "first-pass"
                 if not proof_ok:
-                    abort_and_restore(self._run, worktree=self.worktree,
-                                      pre_rebase_sha=pre_rebase_sha,
-                                      reason=proof_out)
+                    # The ladder needs the full LOST list; proof_out is the 400-char
+                    # reason string when the adaptation path rejected. Re-run the strict proof.
+                    _strict_ok, first_proof = self._run_proof(lostwork_path, key)
+                    adapt_trail = tuple(
+                        f"adaptation rejected: {p}" for p in proof_out.split(" | adaptation rejected: ", 1)[1:])
+                    try:
+                        outcome = self._run_conflict_ladder(
+                            key=key, branch=branch, master_sha=master_sha,
+                            pre_rebase_sha=pre_rebase_sha, lostwork_path=lostwork_path,
+                            conflicted=tuple(inventory.files), proof_out=first_proof)
+                    except HarnessError as exc:
+                        # The outer `except HarnessError: raise` does not restore, so a
+                        # HarnessError escaping the ladder restores here.
+                        self.last_conflict_rung = "exhausted"
+                        abort_and_restore(self._run, worktree=self.worktree,
+                                          pre_rebase_sha=pre_rebase_sha,
+                                          reason=ladder_failure_reason(
+                                              first_proof,
+                                              adapt_trail + (f"ladder error: {exc.kind}: {exc.detail}",)))
+                    if not outcome.rung:
+                        self.last_conflict_rung = "exhausted"
+                        abort_and_restore(self._run, worktree=self.worktree,
+                                          pre_rebase_sha=pre_rebase_sha,
+                                          reason=ladder_failure_reason(first_proof, adapt_trail + tuple(outcome.trail)))
+                    self.last_conflict_rung = outcome.rung
+                    proof_out = outcome.proof_out
+                    resolved_files = outcome.resolved_files
+                    adapted = ()  # a ladder rung re-proved strictly; no adaptation relaxation applies
 
                 try:
                     manifest_path, notes_path = self._record_resolution(
-                        key, branch, master_sha, resolve_result.resolved_files,
-                        proof_out=proof_out,
+                        key, branch, master_sha, resolved_files,
+                        proof_out=proof_out, adapted_lines=adapted,
                     )
                 except HarnessError as exc:
                     # Phase 3c: a HarnessError from _record_resolution (empty post-resolution
@@ -782,7 +883,8 @@ class LiveGit:
                     manifest_path=manifest_path,
                     notes_path=notes_path,
                     auto_resolved=True,
-                    resolved_files=resolve_result.resolved_files,
+                    adapted_lines=adapted,
+                    resolved_files=resolved_files,
                 )
             except HarnessError:
                 raise
@@ -908,7 +1010,7 @@ class LiveGit:
         pre_patch = self._run_bytes("diff", f"{ibl_base}...HEAD")
         if not pre_patch.strip():
             return StackedRebaseResult(False, "pre-rebase diff vs iblBase is empty")
-        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre_patch)
+        Path(lostwork_pre_path(key)).write_bytes(pre_patch)
 
         # Pin master_sha once so a concurrent fetch cannot split the proof across two bases
         master_sha = self._run("rev-parse", "origin/master").strip()
@@ -983,6 +1085,7 @@ class LiveGit:
             capture_output=True, text=True, errors="replace",
         )
         auto_resolved_files: tuple = ()
+        adaptations: tuple = ()
         if rebase_proc.returncode != 0:
             if self.llm is None:
                 # No LLM: immediate decline. Snapshot the unmerged set FIRST; the abort
@@ -1046,6 +1149,7 @@ class LiveGit:
                                       reason=text_reason)
 
                 auto_resolved_files = resolve_result.resolved_files
+                adaptations = resolve_result.adaptations
             except HarnessError:
                 raise
             except Exception as exc:
@@ -1055,7 +1159,11 @@ class LiveGit:
 
         # Step 8: TREE-EQUIVALENT proof — gate is conjunctive (stdout contains
         # TREE-EQUIVALENT AND rc == 0), because a diverged tree exits 0 with TREE DIVERGED
-        proof_ok, proof_out = self._prove_tree_equivalent(lostwork_path, key)
+        proof_ok, proof_out, adapted = self._prove_with_adaptations(
+            lostwork_path, key,
+            resolved_files=auto_resolved_files, adaptations=adaptations,
+            pre_rebase_sha=pre_rebase_sha, master_sha=master_sha,
+        )
         if not proof_ok:
             if auto_resolved_files:
                 # Failed after auto-resolution: abort_and_restore
@@ -1069,6 +1177,7 @@ class LiveGit:
             manifest_path, notes_path = self._record_resolution(
                 key, branch, master_sha, auto_resolved_files,
                 collapse_warn=collapse_warn, proof_out=proof_out, base_sha=ibl_base,
+                adapted_lines=adapted,
             )
         except HarnessError as exc:
             if auto_resolved_files:
@@ -1093,6 +1202,7 @@ class LiveGit:
             collapse_warn=collapse_warn,
             auto_resolved=bool(auto_resolved_files),
             resolved_files=auto_resolved_files,
+            adapted_lines=adapted,
         )
 
     def capture_lostwork_pre(self, key: str) -> bool:
@@ -1100,7 +1210,7 @@ class LiveGit:
         pre = self._run_bytes("diff", self._merge_base("origin/master"))
         if not pre.strip():
             return False
-        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre)
+        Path(lostwork_pre_path(key)).write_bytes(pre)
         return True
 
     def prove_lostwork(self, key: str) -> tuple[bool, str]:

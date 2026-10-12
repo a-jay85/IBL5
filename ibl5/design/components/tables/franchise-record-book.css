@@ -29,7 +29,7 @@
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
     font-size: var(--text-sm);
-    background: white;
+    background: var(--white);
 }
 
 .record-book-section-title {

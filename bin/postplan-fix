@@ -62,7 +62,11 @@ IFS=$'\t' read -r RUN WHY < <(pcw_last_block "$branch" \
 
 safe="$(ljob_safe_slug "$branch")"
 PNLOG=""
-for f in /tmp/post-plan-now-"$safe"-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*.log; do
+# Reader seam: mirrors the writer's LOG="${POSTPLAN_LOG_DIR:-/tmp}/post-plan-now-..."
+# line in bin/post-plan-now. Unset and empty both stay /tmp; tests point it at a
+# private dir so no fake runner log lands in the shared /tmp.
+PNLOG_DIR="${POSTPLAN_LOG_DIR:-/tmp}"
+for f in "$PNLOG_DIR"/post-plan-now-"$safe"-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*.log; do
     [ -f "$f" ] || continue
     if [ -z "$PNLOG" ] || [[ "$f" > "$PNLOG" ]]; then PNLOG="$f"; fi
 done

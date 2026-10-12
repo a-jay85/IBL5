@@ -512,8 +512,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      # Scans every test file. A scan of only the PR's changed files let two
+      # PRs each pass and still leave master red together (#3142 + #3148).
+      # The merge line reruns CI on the latest master, so a full scan catches
+      # that before merge. The scan takes about 2 seconds.
       - name: Ban silently-disabled tests (markTestSkipped)
-        run: bin/check-phpunit-hygiene --pr
+        run: bin/check-phpunit-hygiene
 
   shellcheck:
     name: ShellCheck (bash 3.2 compat)
@@ -1041,6 +1045,9 @@ jobs:
       # Exercises a real lsof port guard, so it cannot share the runner.
       - name: bin/test-bug-pipeline-e2e
         run: bin/test-bug-pipeline-e2e
+      # Needs a scrubbed environment, so it cannot share the runner.
+      - name: bin/test-gh-retry
+        run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-gh-retry'
       # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-burndown
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown'

@@ -254,6 +254,11 @@ class _UsageLimitLlm(_RecordingLlm):
         raise HarnessError("llm-usage-limit", "x")
 
 
+class _AuthExpiredLlm(_RecordingLlm):
+    def call(self, purpose, model, prompt, validate, max_retries=1, normalizer=None):
+        raise HarnessError("llm-auth-expired", "x")
+
+
 class _AdapterLikeLlm(_RecordingLlm):
     """Re-raises a schema failure as llm-invalid-output, as ClaudeCli.call does after its last try."""
 
@@ -280,6 +285,12 @@ def test_pr_copy_reraises_non_invalid_output_errors():
     with pytest.raises(HarnessError) as e:
         _run_pr_copy(_UsageLimitLlm(None))
     assert e.value.kind == "llm-usage-limit"
+
+
+def test_pr_copy_reraises_auth_expired():
+    with pytest.raises(HarnessError) as e:
+        _run_pr_copy(_AuthExpiredLlm(None))
+    assert e.value.kind == "llm-auth-expired"
 
 
 def test_pr_copy_passes_normalizer_to_llm():

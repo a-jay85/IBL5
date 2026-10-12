@@ -161,4 +161,40 @@ final class StatsSanitizerTest extends TestCase
         // Test zero
         $this->assertSame(0.0, StatsSanitizer::sanitizeMinutes(0));
     }
+
+    public function testIntFromArrayPassesIntsAndCastsNumericStrings(): void
+    {
+        $this->assertSame(7, StatsSanitizer::intFromArray(['a' => 7], 'a'));
+        $this->assertSame(12, StatsSanitizer::intFromArray(['a' => '12'], 'a'));
+        $this->assertSame(-3, StatsSanitizer::intFromArray(['a' => '-3'], 'a'));
+        $this->assertSame(0, StatsSanitizer::intFromArray(['a' => 0], 'a'));
+    }
+
+    public function testIntFromArrayReturnsZeroForNonIntegralValues(): void
+    {
+        $this->assertSame(0, StatsSanitizer::intFromArray(['a' => 1.9], 'a'));
+        $this->assertSame(0, StatsSanitizer::intFromArray(['a' => true], 'a'));
+        $this->assertSame(0, StatsSanitizer::intFromArray(['a' => ['5']], 'a'));
+        $this->assertSame(0, StatsSanitizer::intFromArray(['a' => null], 'a'));
+        $this->assertSame(0, StatsSanitizer::intFromArray(['a' => 'abc'], 'a'));
+        $this->assertSame(0, StatsSanitizer::intFromArray(['a' => ''], 'a'));
+        $this->assertSame(0, StatsSanitizer::intFromArray(['a' => '12abc'], 'a'));
+        $this->assertSame(0, StatsSanitizer::intFromArray([], 'a'));
+    }
+
+    public function testScalarToStringStringifiesStringsIntsAndFloats(): void
+    {
+        $this->assertSame('Bob', StatsSanitizer::scalarToString('Bob'));
+        $this->assertSame('', StatsSanitizer::scalarToString(''));
+        $this->assertSame('23', StatsSanitizer::scalarToString(23));
+        $this->assertSame('1.5', StatsSanitizer::scalarToString(1.5));
+    }
+
+    public function testScalarToStringReturnsEmptyForNullBoolAndArray(): void
+    {
+        $this->assertSame('', StatsSanitizer::scalarToString(null));
+        $this->assertSame('', StatsSanitizer::scalarToString(true));
+        $this->assertSame('', StatsSanitizer::scalarToString(false));
+        $this->assertSame('', StatsSanitizer::scalarToString(['x']));
+    }
 }

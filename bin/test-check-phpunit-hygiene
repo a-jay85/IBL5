@@ -3,7 +3,7 @@
 #
 # bin/test-check-phpunit-hygiene — regression test for bin/check-phpunit-hygiene.
 #
-# Pins THREE checks the gate enforces:
+# Pins FOUR checks the gate enforces:
 #   mark-test-skipped  markTestSkipped() is a blocking hit; an inline
 #                      `// phpunit-hygiene-allow:` marker suppresses it.
 #   no-db-group        a CONCRETE class extending DatabaseTestCase that lacks
@@ -15,6 +15,11 @@
 #                      a no-op since PHP 8.1, deprecated since 8.5 (fatal in
 #                      PHP 9), so it emits a deprecation on every suite run. An
 #                      inline `// phpunit-hygiene-allow:` marker suppresses it.
+#   const-restatement  an `alreadyNarrowedType` ignore whose statement names a
+#                      `Class::CONST`, or a single-line assertSame/assertEquals
+#                      of a literal against `Class::CONST`, is a blocking hit —
+#                      the test restates the declaration. One hit per statement;
+#                      an inline `// phpunit-hygiene-allow:` marker suppresses it.
 #
 # Each case builds a throwaway git repo under mktemp (check-phpunit-hygiene
 # resolves its scan root from `git rev-parse --show-toplevel`) with a single
@@ -56,14 +61,16 @@ mk_repo() {
     echo "$d"
 }
 
-# run_case <name> <expected-exit> <expected-output-regex|-> <fixture-relpath> <fixture-body>
+# run_case <name> <expected-exit> <expected-output-regex|-> <fixture-relpath> <fixture-body> [allowlist-body]
 # Builds a repo with one fixture file and runs check-phpunit-hygiene (MODE=all).
+# The optional allowlist-body becomes the repo's .phpunit-source-read-allowlist.
 run_case() {
-    local name="$1" want="$2" want_re="$3" relpath="$4" body="$5"
+    local name="$1" want="$2" want_re="$3" relpath="$4" body="$5" allow="${6-}"
     local d out rc
     d="$(mk_repo)"
     mkdir -p "$d/$(dirname "$relpath")"
     printf '%s\n' "$body" > "$d/$relpath"
+    [ -n "$allow" ] && printf '%s\n' "$allow" > "$d/.phpunit-source-read-allowlist"
     out="$( ( cd "$d" && "$HYGIENE" ) 2>&1 )"
     rc=$?
     if [ "$rc" -ne "$want" ]; then
@@ -198,6 +205,319 @@ class NoReflectTest extends TestCase
     }
 }'
 
+# --- New: const-restatement check --------------------------------------------
+
+# The assertion line also matches the literal shape; one hit pins the dedupe.
+run_case "const-restatement-ignore-flagged" 1 'FAIL: 1 blocking hits' "ibl5/tests/ConstIgnoreTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstIgnoreTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (x)
+        self::assertSame(1000, Foo::BATCH_SIZE);
+    }
+}'
+
+run_case "const-restatement-multiline-flagged" 1 'const-restatement' "ibl5/tests/ConstMultilineTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstMultilineTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore method.alreadyNarrowedType (x)
+        $this->assertSame([
+            "a" => "b",
+            "c" => "d",
+        ], Foo::MAP);
+    }
+}'
+
+run_case "const-restatement-variable-arg-flagged" 1 'const-restatement' "ibl5/tests/ConstVariableArgTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstVariableArgTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore method.alreadyNarrowedType (x)
+        $this->assertSame($expected, Foo::STATS);
+    }
+}'
+
+run_case "const-restatement-reversed-flagged" 1 'const-restatement' "ibl5/tests/ConstReversedTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstReversedTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (x)
+        self::assertSame(\Ns\Foo::DAYS, 180);
+    }
+}'
+
+# The literal shape needs no ignore directive.
+run_case "const-restatement-literal-no-ignore-flagged" 1 'const-restatement' "ibl5/tests/ConstLiteralTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstLiteralTest extends TestCase
+{
+    public function testThing(): void
+    {
+        self::assertEquals(180, Foo::DAYS);
+    }
+}'
+
+# An allow marker on the line before the directive suppresses the hit.
+run_case "const-restatement-marker-suppresses" 0 '-' "ibl5/tests/ConstMarkedTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstMarkedTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // phpunit-hygiene-allow: wire value persisted to a JSB export file
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (x)
+        self::assertSame(22, Foo::MONTH);
+    }
+}'
+
+# The window stops at the statement end, so the next statement is never scanned.
+run_case "const-restatement-variables-ok" 0 '-' "ibl5/tests/ConstVariablesTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstVariablesTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore method.alreadyNarrowedType (x)
+        $this->assertNotSame($a, $b);
+        $c = Foo::LIMIT;
+    }
+}'
+
+# A prose mention opens no window, and `::class` is lowercase so never matches.
+run_case "const-restatement-class-literal-ok" 0 '-' "ibl5/tests/ConstClassLiteralTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstClassLiteralTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // PHPStan reports method.alreadyNarrowedType here
+        $this->assertTrue((new \ReflectionClass(Foo::class))->implementsInterface(Bar::class));
+    }
+}'
+
+# An uppercase name followed by `(` is a static call, not a constant.
+run_case "const-restatement-static-call-ok" 0 '-' "ibl5/tests/ConstStaticCallTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ConstStaticCallTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (x)
+        self::assertSame(1, Foo::MAKE());
+    }
+}'
+
+# --- New: source-text-read check ---
+
+run_case "source-read-php-literal-flagged" 1 'source-text-read' "ibl5/tests/SrcReadPhpTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadPhpTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../scripts/foo.php');
+    }
+}'
+
+run_case "source-read-getfilename-flagged" 1 'source-text-read' "ibl5/tests/SrcReadSelfTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadSelfTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents((string) (new \ReflectionClass(self::class))->getFileName());
+    }
+}'
+
+run_case "source-read-htaccess-flagged" 1 'source-text-read' "ibl5/tests/SrcReadHtaccessTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadHtaccessTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../scripts/.htaccess');
+    }
+}'
+
+run_case "source-read-fixture-sco-ok" 0 '-' "ibl5/tests/SrcReadScoTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadScoTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../scripts/data/sample.sco');
+    }
+}'
+
+run_case "source-read-golden-html-ok" 0 '-' "ibl5/tests/SrcReadHtmlTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadHtmlTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../modules/Foo/golden.html');
+    }
+}'
+
+run_case "source-read-json-not-js-ok" 0 '-' "ibl5/tests/SrcReadJsonTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadJsonTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../classes/data/payload.json');
+    }
+}'
+
+run_case "source-read-allowlisted-ok" 0 '-' "ibl5/tests/SrcReadAllowedTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadAllowedTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../scripts/foo.php');
+    }
+}' \
+"# guards the CLI entry point
+ibl5/tests/SrcReadAllowedTest.php"
+
+run_case "source-read-allowlist-other-file-flagged" 1 'source-text-read' "ibl5/tests/SrcReadOtherTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadOtherTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . '/../../scripts/foo.php');
+    }
+}' \
+"# ibl5/tests/SrcReadOtherTest.php
+ibl5/tests/OtherTest.php"
+
+run_case "source-read-inline-allow-ok" 0 '-' "ibl5/tests/SrcReadInlineTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadInlineTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // phpunit-hygiene-allow: pins the CLI guard as the first statement
+        $s = file_get_contents(__DIR__ . '/../../scripts/foo.php');
+    }
+}'
+
+run_case "source-read-short-reason-flagged" 1 'source-text-read' "ibl5/tests/SrcReadShortTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SrcReadShortTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // phpunit-hygiene-allow: too short
+        $s = file_get_contents(__DIR__ . '/../../scripts/foo.php');
+    }
+}'
+
+# --- Allowlist integrity: .phpunit-source-read-allowlist -----------------------
+# allowlist_problems <root> <allowlist-file>: print one STALE / NO-REASON line per
+# defect. STALE = an entry names a file that does not exist under <root>.
+# NO-REASON = an entry has no '#' comment line directly above it.
+allowlist_problems() {
+    local root="$1" file="$2" line prev=""
+    while IFS= read -r line; do
+        case "$line" in
+            ''|[[:space:]]*'#'*|'#'*) ;;
+            *)
+                [ -f "$root/$line" ] || echo "STALE $line"
+                case "$prev" in '#'*) ;; *) echo "NO-REASON $line" ;; esac
+                ;;
+        esac
+        prev="$line"
+    done < "$file"
+}
+
+# allowlist_case <name> <expected-regex|-> <allowlist-body>: run against a throwaway root.
+allowlist_case() {
+    local name="$1" want_re="$2" body="$3" d out
+    d="$(mk_repo)"
+    mkdir -p "$d/ibl5/tests"
+    : > "$d/ibl5/tests/RealTest.php"
+    printf '%s\n' "$body" > "$d/al"
+    out="$(allowlist_problems "$d" "$d/al")"
+    if [ "$want_re" = "-" ]; then
+        if [ -z "$out" ]; then pass "$name (clean)"; else failcase "$name — unexpected: $out"; fi
+    elif printf '%s' "$out" | grep -qE "$want_re"; then
+        pass "$name (flagged)"
+    else
+        failcase "$name — expected /$want_re/, got: ${out:-<clean>}"
+    fi
+}
+
+allowlist_case "allowlist-clean-ok" '-' '# guards the CLI entry point
+ibl5/tests/RealTest.php'
+allowlist_case "allowlist-stale-entry-flagged" 'STALE ibl5/tests/DoesNotExistTest.php' '# guards the CLI entry point
+ibl5/tests/DoesNotExistTest.php'
+allowlist_case "allowlist-blank-above-flagged" 'NO-REASON ibl5/tests/RealTest.php' '# header
+
+ibl5/tests/RealTest.php'
+
+# The shipped allowlist must be clean against the real tree.
+SHIPPED_AL="$SCRIPT_DIR/../.phpunit-source-read-allowlist"
+if [ -f "$SHIPPED_AL" ]; then
+    shipped_out="$(allowlist_problems "$SCRIPT_DIR/.." "$SHIPPED_AL")"
+    if [ -z "$shipped_out" ]; then
+        pass "allowlist-shipped-file-clean"
+    else
+        failcase "allowlist-shipped-file-clean — $shipped_out"
+    fi
+else
+    failcase "allowlist-shipped-file-clean — .phpunit-source-read-allowlist is missing"
+fi
+
 # --- base-ref seam (--pr): PHPUNIT_HYGIENE_BASE_REF / E2E_HYGIENE_BASE_REF ---
 # Both gates share one contract: unset or empty means origin/master, a non-empty
 # value is the --pr diff base, and a non-empty value that is not a commit exits 2.
@@ -260,6 +580,17 @@ PV=PHPUNIT_HYGIENE_BASE_REF
 # `ibl5/tests/e2e/**/*.ts`) need a subdirectory to match.
 PF="ibl5/tests/Seam/SeamSkipTest.php"
 run_seam_case "phpunit-seam-unset-defaults-origin-master" "$HYGIENE" "$PV" unset 1 'mark-test-skipped' "$PF" "$SEAM_PHP"
+SEAM_SRC_PHP='<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SeamSrcReadTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $s = file_get_contents(__DIR__ . "/../../scripts/foo.php");
+    }
+}'
+run_seam_case "source-read-pr-mode-flagged" "$HYGIENE" "$PV" base 1 'source-text-read' "ibl5/tests/Seam/SeamSrcReadTest.php" "$SEAM_SRC_PHP"
 run_seam_case "phpunit-seam-empty-defaults-origin-master" "$HYGIENE" "$PV" empty 1 'mark-test-skipped' "$PF" "$SEAM_PHP"
 run_seam_case "phpunit-seam-base-flags"                   "$HYGIENE" "$PV" base  1 'mark-test-skipped' "$PF" "$SEAM_PHP"
 run_seam_case "phpunit-seam-head-excludes-file"           "$HYGIENE" "$PV" head  0 '-' "$PF" "$SEAM_PHP"

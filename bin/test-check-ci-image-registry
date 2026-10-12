@@ -184,7 +184,104 @@ printf 'name: outer\non: push\njobs:\n  call:\n    uses: ./.github/workflows/a.y
 run_gate
 expect_exit "caller-ceiling-missing: packages write added" 0 "$RC"
 
-# 16. usage-errors
+# Rule G actions: setup-docker-e2e is the leaf; lighthouse-setup wraps it; a-outer-setup
+# wraps lighthouse-setup and sorts first, so one fixpoint pass cannot resolve it;
+# other-action wraps nothing.
+g_actions() {
+    local a
+    for a in setup-docker-e2e lighthouse-setup a-outer-setup other-action; do
+        mkdir -p "$T/.github/actions/$a"
+    done
+    printf 'name: s\nruns:\n  using: composite\n  steps:\n    - run: echo pull\n      shell: bash\n' \
+        > "$T/.github/actions/setup-docker-e2e/action.yml"
+    printf 'name: l\nruns:\n  using: composite\n  steps:\n    - uses: ./.github/actions/setup-docker-e2e\n' \
+        > "$T/.github/actions/lighthouse-setup/action.yml"
+    printf 'name: o\nruns:\n  using: composite\n  steps:\n    - uses: ./.github/actions/lighthouse-setup\n' \
+        > "$T/.github/actions/a-outer-setup/action.yml"
+    printf 'name: x\nruns:\n  using: composite\n  steps:\n    - run: echo hi\n      shell: bash\n' \
+        > "$T/.github/actions/other-action/action.yml"
+}
+
+# Rule G workflow g.yml, one job e2e whose last step uses ./.github/actions/<action>.
+# args: workflow-permissions-lines ("" = none)  job-permissions-lines ("" = none)  action
+g_workflow() {
+    {
+        printf 'name: g\non: push\n'
+        [ -z "$1" ] || printf '%s\n' "$1"
+        printf 'jobs:\n  e2e:\n    runs-on: ubuntu-latest\n'
+        [ -z "$2" ] || printf '%s\n' "$2"
+        printf '    steps:\n      - uses: actions/checkout@v4\n      - uses: ./.github/actions/%s\n' "$3"
+    } > "$T/.github/workflows/g.yml"
+}
+
+# 16. g-direct-missing: workflow block without packages, direct setup-docker-e2e step
+# (line 10), plus a second qualifying step (line 11) that must not add a second report
+new_tree; g_actions
+g_workflow $'permissions:\n  contents: read' "" setup-docker-e2e
+printf '      - uses: ./.github/actions/setup-docker-e2e\n' >> "$T/.github/workflows/g.yml"
+run_gate
+expect_exit "g-direct-missing" 1 "$RC"
+want "g-direct-missing names rule G at file:line" "$OUT" ".github/workflows/g.yml:10: G:"
+want "g-direct-missing names the job and action" "$OUT" "job e2e uses setup-docker-e2e"
+G_COUNT=$(grep -c ': G:' <<<"$OUT" || true)
+if [ "$G_COUNT" -eq 1 ]; then echo "ok: g-direct-missing reports the job once"
+else echo "FAIL: g-direct-missing reports the job once - got $G_COUNT G lines"; FAILED=1; fi
+g_workflow $'permissions:\n  contents: read\n  packages: read' "" setup-docker-e2e
+run_gate
+expect_exit "g-direct-missing: workflow packages read added" 0 "$RC"
+
+# 17. g-job-block-grants: the job block carries packages: write, the workflow block does not
+new_tree; g_actions
+g_workflow $'permissions:\n  contents: read' $'    permissions:\n      packages: write' setup-docker-e2e
+run_gate
+expect_exit "g-job-block-grants" 0 "$RC"
+
+# 18. g-job-block-overrides-workflow: workflow grants packages: read, but the job block
+# replaces it and omits packages (step on line 13)
+new_tree; g_actions
+g_workflow $'permissions:\n  contents: read\n  packages: read' $'    permissions:\n      contents: read' setup-docker-e2e
+run_gate
+expect_exit "g-job-block-overrides-workflow" 1 "$RC"
+want "g-job-block-overrides-workflow names rule G at file:line" "$OUT" ".github/workflows/g.yml:13: G:"
+
+# 19. g-composite-wrapper: one hop (lighthouse-setup) and two hops (a-outer-setup)
+new_tree; g_actions
+g_workflow $'permissions:\n  contents: read' "" lighthouse-setup
+run_gate
+expect_exit "g-composite-wrapper: one hop" 1 "$RC"
+want "g-composite-wrapper: one hop names rule G at file:line" "$OUT" ".github/workflows/g.yml:10: G:"
+want "g-composite-wrapper: one hop names the wrapper" "$OUT" "uses lighthouse-setup"
+g_workflow $'permissions:\n  contents: read' "" a-outer-setup
+run_gate
+expect_exit "g-composite-wrapper: two hops" 1 "$RC"
+want "g-composite-wrapper: two hops names the outer wrapper" "$OUT" "uses a-outer-setup"
+g_workflow $'permissions:\n  contents: read' $'    permissions:\n      packages: read' lighthouse-setup
+run_gate
+expect_exit "g-composite-wrapper: job packages read added" 0 "$RC"
+
+# 20. g-unrelated-action: a local action that never reaches setup-docker-e2e
+new_tree; g_actions
+g_workflow $'permissions:\n  contents: read' "" other-action
+run_gate
+expect_exit "g-unrelated-action" 0 "$RC"
+
+# 21. g-permission-forms: no block anywhere (default token), read-all, {} and a flow map
+new_tree; g_actions
+g_workflow "" "" setup-docker-e2e
+run_gate
+expect_exit "g-permission-forms: no block anywhere" 0 "$RC"
+g_workflow 'permissions: read-all' "" setup-docker-e2e
+run_gate
+expect_exit "g-permission-forms: workflow read-all" 0 "$RC"
+g_workflow $'permissions:\n  packages: read' '    permissions: {}' setup-docker-e2e
+run_gate
+expect_exit "g-permission-forms: job {} overrides workflow" 1 "$RC"
+want "g-permission-forms: job {} names rule G at file:line" "$OUT" ".github/workflows/g.yml:11: G:"
+g_workflow $'permissions:\n  contents: read' '    permissions: { contents: read, packages: read }' setup-docker-e2e
+run_gate
+expect_exit "g-permission-forms: job flow map with packages" 0 "$RC"
+
+# 22. usage-errors
 new_tree
 RC=0
 OUT=$("$GATE" --bogus 2>&1) || RC=$?
@@ -201,7 +298,7 @@ OUT=$("$GATE" --root="$TMP/t$N" 2>&1) || RC=$?
 expect_exit "usage-errors: root without manifest" 2 "$RC"
 want "usage-errors: missing manifest is named" "$OUT" "cannot read manifest"
 
-# 17. real-tree
+# 23. real-tree
 RC=0
 OUT=$("$GATE" 2>&1) || RC=$?
 expect_exit "real-tree" 0 "$RC"

@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 ---
 
 # bin/lib — Shared Library Files
@@ -14,6 +14,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `automouse-stream-filter.sh` | Filter for `claude -p --output-format stream-json` NDJSON; emits per-phase log lines (tool:/exit:/COMPACTION:) and maintains heartbeat |
 | `headless-elapsed-hook.sh` | PostToolUse hook that appends an elapsed-clock line (`elapsed <E>s / <B>s`) after every tool call in opt-in runs; activated by `IBL5_BUDGET_START_EPOCH` and `IBL5_BUDGET_SECS` set by `bin/automouse/run` on the impl invocation; exits 0 with no output in all other sessions |
 | `bug-pipeline-gh.sh` | Best-effort GitHub issue-tracking seam for the autonomous bug pipeline (§3f) |
+| `gh-retry.sh` | `gh_retry <cmd> [args...]` reruns a `gh` call on a transient failure (HTTP 5xx, timeout, connection reset or refused) with the backoff in `IBL5_GH_RETRY_DELAYS` (default `5 20 60`); never retries a 4xx; sourced by `bin/lib/burndown.sh` and `bin/merge-line-select`; exercised by `bin/test-gh-retry` |
 | `harness.sh` | Shared assertion, counter, summary, tmpdir and fake-git-repo helpers (`h_*`) sourced by `bin/test-*` harnesses; exercised by `bin/test-harness-lib` |
 | `bug-pipeline-test-stubs.sh` | Shared stub scaffolding for `bin/test-bug-pipeline-*` harnesses |
 | `gate-common.php` | PHP helpers `require_once`d by `bin/adr-check` and `bin/refactor-flag`: `runCmd`, `fetchPrBody`, `gateDiffNames`, `gateExtractBypassReason`; per-gate regex, minimum length and diff range stay in each gate |

@@ -504,11 +504,26 @@ test_batch_abort_cap_fail_closed() {
     run_loop run
     assert_eq abort_cap:rc 1 "$RC"
     assert_eq abort_cap:calls 3 "$(calls "$T/claude.calls")"
-    assert_eq abort_cap:sleeps 2 "$(printf '%s\n' "$OUT" | grep -c 'sleep 600s reason=retry-after-abort')"
+    assert_eq abort_cap:sleeps 2 "$(printf '%s\n' "$OUT" | grep -c 'reason=retry-after-abort')"
+    assert_eq abort_cap:sleep-600 1 "$(printf '%s\n' "$OUT" | grep -c 'sleep 600s reason=retry-after-abort')"
+    assert_eq abort_cap:sleep-1200 1 "$(printf '%s\n' "$OUT" | grep -c 'sleep 1200s reason=retry-after-abort')"
+    assert_eq abort_cap:sleep-order "sleep 600s sleep 1200s" "$(grep -oE 'sleep [0-9]+s reason=retry-after-abort' <<< "$OUT" | sed 's/ reason=retry-after-abort//' | tr '\n' ' ' | sed 's/ $//')"
     assert_contains abort_cap:fails "$OUT" "fails=3/3"
     assert_contains abort_cap:finish "$OUT" "finish reason=fail-closed"
     assert_contains abort_cap:dm "$(cat "$T/dm.calls" 2>/dev/null)" "finished (fail-closed)"
     assert_contains abort_cap:last-fail "$(cat "$T/dm.calls" 2>/dev/null)" "last fail: reason=abort-exit-3"
+}
+
+test_batch_abort_backoff_doubles() {
+    new_env
+    seed_usage 5 0 1
+    queue exit3 exit3 exit3 exit3
+    IBL5_BURNDOWN_MAX_FAILS=4 run_loop run
+    assert_eq abort_doubles:rc 1 "$RC"
+    assert_eq abort_doubles:calls 4 "$(calls "$T/claude.calls")"
+    assert_eq abort_doubles:sleep-order "sleep 600s sleep 1200s sleep 2400s" "$(grep -oE 'sleep [0-9]+s reason=retry-after-abort' <<< "$OUT" | sed 's/ reason=retry-after-abort//' | tr '\n' ' ' | sed 's/ $//')"
+    assert_contains abort_doubles:fails "$OUT" "fails=4/4"
+    assert_contains abort_doubles:finish "$OUT" "finish reason=fail-closed"
 }
 
 test_batch_abort_then_ran_resets() {

@@ -2529,6 +2529,156 @@ XSECOND='
 assert_viol "gateX-second-token-marker-unchanged" 0 '[X]' "$FM$XSECOND"
 
 # ---------------------------------------------------------------------------
+# Gate [RO] fixtures (19 cases)
+# The (run-only) marker exempts a row's token from the harness MISSING item, so
+# the gate pins: whole-cell planning type, marker directly after the row's
+# planned token, one marker per token, token exists on the base ref, token is
+# not a must-appear Critical Files entry. Checks 6-7 are warnings (exit stays 0).
+# Cases 1-18 resolve existence against HEAD (the worktree's own tree) so a
+# default-depth CI checkout with no origin/master still works.
+# ---------------------------------------------------------------------------
+export CHECK_PLAN_MASTER_REF=HEAD
+ROHDR='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|'
+RONAV='ibl5/tests/e2e/smoke/navigation.spec.ts'
+ROSNAP='ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots'
+RONEW='ibl5/tests/e2e/smoke/gate-ro-fixture-missing.spec.ts'
+# 1. the honored shape on an existing file: no [RO] violation.
+RO1="$ROHDR
+| 1 | nav smoke passes | E2E | post-impl | \`$RONAV\` (run-only) |
+"
+assert_viol "gateRO-e2e-existing-ok" 0 '[RO]' "$FM$RO1"
+# 2. a directory token (snapshots dir) passes: cat-file -e accepts a tree.
+RO2="$ROHDR
+| 1 | baselines unchanged | Visual-regression | post-impl | \`$ROSNAP\` (run-only) |
+"
+assert_viol "gateRO-vr-directory-ok" 0 '[RO]' "$FM$RO2"
+# 3. check 1: a CLI row plans no test, so the marker is a no-op there.
+RO3="$ROHDR
+| 1 | x | CLI-executable | post-impl | \`bin/test-foo\` (run-only) |
+"
+assert_viol "gateRO-cli-row-fires" 1 '[RO]' "$FM$RO3"
+# 4. check 2 (position): marker before the token.
+RO4="$ROHDR
+| 1 | x | E2E | post-impl | (run-only) \`$RONAV\` |
+"
+assert_viol "gateRO-marker-before-token-fires" 1 '[RO]' "$FM$RO4"
+# 5. check 2 (identity). Deliberately stricter than gateX-second-token-marker-
+# unchanged: the harness exempts only the row's FIRST test|spec token, so a
+# marker on the second token exempts nothing and MISSING would return after
+# implementation.
+RO5="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` and \`ibl5/tests/e2e/smoke/visual-regression.spec.ts\` (run-only) |
+"
+assert_msg "gateRO-second-token-fires" 1 "but the row's planned test token is" "" "$FM$RO5"
+# 6. check 3: both markers on one row. Gate [X] also fires here (its marker is
+# not directly after the token); the include-string pins the real cause.
+RO6="$ROHDR
+| 1 | baselines unchanged | Visual-regression | post-impl | \`$ROSNAP\` (run-only) (no-change) |
+"
+assert_msg "gateRO-both-markers-fires" 1 "row carries both (run-only) and (no-change)" "" "$FM$RO6"
+# 7. check 4: the path is not on the base ref.
+RO7="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` (run-only) |
+"
+assert_msg "gateRO-missing-on-base-fires" 1 "does not exist on" "" "$FM$RO7"
+# 8. a PHPUnit row passes check 1 (reaching check 4 proves it).
+RO8="$ROHDR
+| 1 | x | PHPUnit | post-impl | \`ibl5/tests/GateRo/FixtureMissingTest.php\` (run-only) |
+
+<!-- no-test-methods: gate RO fixture; methods are not under test here -->
+"
+assert_msg "gateRO-phpunit-type-accepted" 1 "does not exist on" "" "$FM$RO8"
+# 9. check 5: the token is a must-appear Critical Files entry.
+RO9="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Critical Files
+
+- \`$RONAV\` — extend the smoke assertions
+"
+assert_msg "gateRO-must-appear-critical-file-fires" 1 "is a must-appear ## Critical Files entry" "" "$FM$RO9"
+# 10. a (reference) entry is exempt, so the marker is fine.
+RO10="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Critical Files
+
+- \`$RONAV\` (reference)
+"
+assert_viol "gateRO-reference-critical-file-ok" 0 '[RO]' "$FM$RO10"
+# 11. check 6: a phase line pairs the token with an edit verb -> warning only.
+RO11="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Phase 1: Smoke
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Extend \`$RONAV\` with a footer assertion.
+"
+assert_msg "gateRO-phase-edit-verb-warns" 0 "[RO] warning: (run-only) path" "" "$FM$RO11"
+# 12. a phase line that only runs the token stays silent.
+RO12="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Phase 1: Smoke
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Run \`$RONAV\` before and after.
+"
+assert_msg "gateRO-phase-run-verb-silent" 0 "" "[RO] warning: (run-only) path" "$FM$RO12"
+# 13. check 7: unmarked row, path exists on base, nothing cites it -> warning.
+RO13="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+"
+assert_msg "gateRO-unmarked-existing-uncited-warns" 0 "[RO] warning: unmarked test row" "" "$FM$RO13"
+# 14. the same row cited by a phase body line stays silent.
+RO14="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+
+## Phase 1: Smoke
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Extend \`$RONAV\` with a footer assertion.
+"
+assert_msg "gateRO-unmarked-existing-cited-in-phase-silent" 0 "" "[RO] warning: unmarked" "$FM$RO14"
+# 15. an unmarked row for a test being written (not on base) is the normal case.
+RO15="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` |
+"
+assert_msg "gateRO-unmarked-new-path-silent" 0 "" "[RO] warning" "$FM$RO15"
+# 16. a (run-only) quoted only in a code span is a mention, not a marker. The row
+# is unmarked + existing + uncited, so the check-7 WARNING appears; the tag is
+# narrowed to the violation prefix so the warning does not trip the clean branch.
+RO16="$ROHDR
+| 1 | a \`(run-only)\` mention in a code span is not a marker | E2E | post-impl | \`$RONAV\` |
+"
+assert_viol "gateRO-code-span-mention-ignored" 0 '[RO] (run-only)' "$FM$RO16"
+# 17. a fenced fixture block carrying a marker never counts (same shape as XFENCE).
+RO17="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` |
+
+\`\`\`$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` (run-only) |
+\`\`\`
+"
+assert_viol "gateRO-fenced-fixture-ignored" 0 '[RO]' "$FM$RO17"
+# 18. regression guard: an existing (no-change) row neither fires [RO] nor the
+# check-7 warning (the has_nc skip).
+RO18="$ROHDR
+| 1 | baselines unchanged | Visual-regression | post-impl | \`$ROSNAP\` (no-change) |
+"
+assert_viol "gateRO-no-change-row-untouched" 0 '[RO]' "$FM$RO18"
+# 19. no resolvable base ref fails OPEN for the existence checks.
+export CHECK_PLAN_MASTER_REF=refs/heads/gate-ro-no-such-ref-fixture
+assert_viol "gateRO-no-ref-fails-open" 0 '[RO]' "$FM$RO7"
+unset CHECK_PLAN_MASTER_REF
+
+# ---------------------------------------------------------------------------
 # Gate [Y] fixtures (9 cases)
 # ---------------------------------------------------------------------------
 YHDR='
@@ -2636,6 +2786,113 @@ assert_viol "gateZ-phpunit-row-silent" 0 '[Z]' "$FM$YHDR"'
 | 1 | `pinned_thing` works | PHPUnit | post-impl | `~/scratch/tests/XTest.php` |
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate Z props -->
+'
+
+# ---------------------------------------------------------------------------
+# Gate [MT] fixtures (15 cases)
+# ---------------------------------------------------------------------------
+# :LINE suffix on a bare spec name (the phpstan-baseline-module-index-batch shape).
+assert_viol "gateMT-line-suffix-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | heading present at `auth-pages-extended.spec.ts:26` | E2E | post-impl | `ibl5/tests/e2e/auth-pages-extended.spec.ts` |
+'"$YROW"'
+'
+# :NN-NN range on a full path.
+assert_viol "gateMT-line-range-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | heading present at `ibl5/tests/e2e/auth-pages-extended.spec.ts:9-10` | E2E | post-impl | `ibl5/tests/e2e/auth-pages-extended.spec.ts` |
+'"$YROW"'
+'
+# The message names the bare path to cite instead.
+assert_msg "gateMT-line-message-names-bare-path" 1 'Cite the bare path `auth-pages-extended.spec.ts`' '[Z]' "$FM$YHDR"'
+| 1 | heading present at `auth-pages-extended.spec.ts:26` | E2E | post-impl | `ibl5/tests/e2e/auth-pages-extended.spec.ts` |
+'"$YROW"'
+'
+# The corrected form, a bare path, passes.
+assert_viol "gateMT-bare-path-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | heading present in `ibl5/tests/e2e/auth-pages-extended.spec.ts` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# host:port tokens are not paths: exempt by extension.
+assert_viol "gateMT-host-port-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | stack answers on `localhost:8080`, `wt-x.localhost:8080` and `iblhoops.net:443` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# A :LINE token inside the Mutation clause is blanked by the helper: silent.
+assert_viol "gateMT-mutation-clause-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds. Mutation: delete the branch at `x.php:12` makes it fail | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# A matrix inside a fenced example is never scanned. MT_FENCE is built with
+# printf so no line of this file opens a markdown fence of its own.
+MT_FENCE=$(printf '%s%s%s' '`' '`' '`')
+assert_viol "gateMT-fenced-matrix-silent" 0 '[MT]' "$FM$YHDR"'
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+
+'"$MT_FENCE$YHDR"'
+| 9 | heading present at `auth-pages-extended.spec.ts:26` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$MT_FENCE"'
+'
+# A one-time-check row is skipped by the helper, so the gate skips it too.
+assert_viol "gateMT-tagged-row-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | grep printed `x.php:12` (one-time-check: one command printed output at plan time) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+
+# Stem fixtures: a throwaway repo with one orphan stem and one stem a spec quotes.
+MT_REPO="$TMP/mt-repo"
+mkdir -p "$MT_REPO/e2e/vr.spec.ts-snapshots"
+git -C "$MT_REPO" init -q
+printf 'png\n' > "$MT_REPO/e2e/vr.spec.ts-snapshots/mt-orphan-stem.png"
+printf 'png\n' > "$MT_REPO/e2e/vr.spec.ts-snapshots/mt-saved-stem.png"
+printf "await expect(page).toHaveScreenshot('mt-saved-stem.png');\n" > "$MT_REPO/e2e/vr.spec.ts"
+git -C "$MT_REPO" add -A
+export CHECK_PLAN_MT_GIT_ROOT="$MT_REPO"
+# Bare stem found in no tracked text (the page-h1-boxscore-apikeys-1415 shape).
+assert_viol "gateMT-orphan-stem-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` baseline matches | Visual-regression | post-impl | `e2e/vr.spec.ts` |
+'"$YROW"'
+'
+# The message names the snapshot path to cite instead.
+assert_msg "gateMT-stem-message-names-snapshot" 1 'Cite the snapshot path `e2e/vr.spec.ts-snapshots/mt-orphan-stem.png`' '[Z]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` baseline matches | Visual-regression | post-impl | `e2e/vr.spec.ts` |
+'"$YROW"'
+'
+# A stem quoted in tracked text is realised by arm 3: accepted.
+assert_viol "gateMT-saved-stem-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | `mt-saved-stem` baseline matches | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# The corrected form, the snapshot path, passes.
+assert_viol "gateMT-snapshot-path-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | `e2e/vr.spec.ts-snapshots/mt-orphan-stem.png` matches | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# Not a git repo: the stem rule is skipped, the :LINE rule still fires.
+mkdir -p "$TMP/mt-nogit"
+export CHECK_PLAN_MT_GIT_ROOT="$TMP/mt-nogit"
+assert_viol "gateMT-nogit-line-still-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` and `x.php:12` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+'
+# Seam empty behaves as unset: the real repo has no mt-orphan-stem snapshot, so silent.
+export CHECK_PLAN_MT_GIT_ROOT=""
+assert_viol "gateMT-seam-empty-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` baseline matches | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# Seam unset: real repo, a valid plan with corrected forms passes.
+unset CHECK_PLAN_MT_GIT_ROOT
+assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` absent and `ibl5/tests/e2e/auth-pages-extended.spec.ts` green | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
 '
 
 # ---------------------------------------------------------------------------
@@ -2946,19 +3203,20 @@ _corpus_guard_ok() {
 # bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
 # pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags);
 # narrow-headless-marker-contract-paths, jsb-j7-param-recovery,
-# plan-gate-skill-inline (gate [Z]: untagged out-of-repo rows).
+# plan-gate-skill-inline (gate [Z]: untagged out-of-repo rows);
+# wt-rebase-merge-not-rebase, retire-rebase-prs-workflow (gate [MT]: :LINE suffix tokens).
 _n_corpus_pass=1
 for _n_slug in \
     plan-architect-phase-drift-guard \
     automouse-cost-accounting-fix redact-credentials-from-error-logs \
     session-registry-dotclaude-freshness architect-explore-fanout \
     agent-tiering-detail-trim \
-    postplan-findings-schema-degrade wt-rebase-merge-not-rebase \
+    postplan-findings-schema-degrade \
     sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
     authz-verdict-refactor-1e-trading-accept-shim \
-    autoresearch-oreb-arming-share-lever retire-rebase-prs-workflow; do
+    autoresearch-oreb-arming-share-lever; do
     _n_pf="$HOME/claude-plans/$_n_slug.md"
     [ -f "$_n_pf" ] || continue
     if ! _corpus_guard_ok "$_n_pf"; then

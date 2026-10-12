@@ -62,7 +62,7 @@ Arm-before-disarm: `disarm-tonight` and `disarm-until` bootstrap the re-arm laun
 
 ### Cost accounting and the sidecar ledger
 
-Each phase's cost is recorded in the markdown row in `reports/YYYY-MM-DD-costs.md` and in a line-delimited JSON file `logs/YYYY-MM-DD.costs.jsonl` (the *sidecar ledger*). `bin/automouse/run` writes one JSON object per priced phase; `bin/automouse/backfill-costs` fills history. The weekly aggregate reads the sidecar.
+Each phase's cost is recorded in the markdown row in `reports/YYYY-MM-DD-costs.md` and in a line-delimited JSON file `logs/YYYY-MM-DD.costs.jsonl` (the *sidecar ledger*). `bin/automouse/run` writes one JSON object per priced phase; `bin/automouse/backfill-costs` fills history. The weekly aggregate reads the sidecar. A phase the usage gate paused before it started writes no row in either file. A phase that ran without cost data keeps its `?` row. The weekly aggregate drops a null-cost `unknown` row when a priced row shares its date, plan and phase, so sidecars written before the skip still count right.
 
 **Recomputed vs. harness cost.** The harness `result` event undercounts: it sums only the top-level `usage` of the main transcript, missing `usage.iterations[]` entries and all subagent transcripts. `bin/lib/automouse-pricer` recomputes from transcripts after the phase exits, because subagent transcripts are still flushing when `result` fires.
 

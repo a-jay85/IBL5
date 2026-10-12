@@ -61,7 +61,9 @@ def _install_stubs(monkeypatch, fx):
 def _armable_fixture(monkeypatch, tmp_path, **extra):
     monkeypatch.setattr(runner, "META_CHECKS_TMP_DIR", str(tmp_path))
     fx = _red_fixture(meta_checks_post_rc=0, **extra)
-    fx["pr_meta"]["body"] = "## Manual Testing\n\nNo manual testing needed\n"
+    fx["pr_meta"]["body"] = ("## Manual Testing\n\nNo manual testing needed\n\n"
+                             "**Merge danger:** Door: two-way · Blast radius: localized · "
+                             "Why: mechanical: no one-way trigger in the realized diff\n")
     _install_stubs(monkeypatch, fx)
     return fx
 

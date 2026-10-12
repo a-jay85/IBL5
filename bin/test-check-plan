@@ -2793,12 +2793,21 @@ assert_viol "gateZ-var-scratch-script-fires" 1 '[Z]' "$FM$YHDR"'
 | 1 | the mutation turns the case red; prints `MUTATE-RED` | CLI-executable | post-impl | `bash "$RD/mutate.sh"` |
 '"$YROW"'
 '
-# Brace form and a second scratch name each fire on their own row.
-assert_viol "gateZ-var-brace-and-second-name-fire" 2 '[Z]' "$FM$YHDR"'
+# Brace form and a second scratch name each fire on their own row. The exit
+# code is 1 for any violation, so count the [Z] lines instead.
+_zb_body="$FM$YHDR"'
 | 1 | prints `COMPARE-OK` | CLI-executable | post-impl | `bash ${RD}/compare.sh` |
 | 5 | prints `1` for `ST=$?` | CLI-executable | post-impl | `grep -cF ST "$T/rwr.txt"` |
 '"$YROW"'
 '
+printf '%s\n' "$_zb_body" > "$TMP/gateZ-var-brace-and-second-name-fire.md"
+_zb_out="$("$GUARD" "$TMP/gateZ-var-brace-and-second-name-fire.md" 2>&1)"
+_zb_n="$(grep -c '^\[Z\] ' <<< "$_zb_out")"
+if [ "$_zb_n" = "2" ]; then
+    h_pass "gateZ-var-brace-and-second-name-fire (2 [Z] lines)"
+else
+    h_fail "gateZ-var-brace-and-second-name-fire" "expected 2 [Z] lines, got $_zb_n"
+fi
 # A repo script in the same command is in-repo evidence: exempt.
 assert_viol "gateZ-var-mixed-repo-script-ok" 0 '[Z]' "$FM$YHDR"'
 | 1 | prints `MUTATE-RED` | CLI-executable | post-impl | `bash "$RD/mutate.sh" && bin/test-check-plan` |

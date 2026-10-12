@@ -625,7 +625,8 @@ case_usage_gate_isolated() {
         [ -f "$f" ] || continue
         nc=$(grep -vE '^[[:space:]]*#' "$f")
         if grep -qE '^[[:space:]]*(\.|source)[[:space:]].*lib/usage-test-isolation\.sh' <<<"$nc" &&
-            ! grep -qF IBL5_USAGE_GATE_STATE_DIR <<<"$nc" && [ "${f##*/}" != test-harness-lib ]; then
+            ! grep -qF IBL5_USAGE_GATE_STATE_DIR <<<"$nc" && [ "${f##*/}" != test-harness-lib ] &&
+            ! grep -qE 'lib/harness\.sh' <<<"$nc"; then
             canary=$f
             break
         fi

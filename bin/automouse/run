@@ -1150,7 +1150,7 @@ day_exit_lines() {
 
 regenerate_weekly_section() {
     local report=$1 reports_dir logs_dir d f i lf
-    local all_sidecar cost_rows tok_rows tok_stream split_miss unpriced
+    local all_sidecar cost_rows tok_rows tok_stream split_miss unpriced dedup_sidecar
     local floor_raw low_raw high_raw floor_total low_total high_total
     reports_dir=$(dirname "$report")
     logs_dir="$NIGHTLY_DIR/logs"
@@ -1160,6 +1160,25 @@ regenerate_weekly_section() {
         d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"
         if [ -f "$f" ]; then cat "$f" >> "$all_sidecar"; fi
     done
+    # weekly-stub-dedup:begin
+    # Drop a null-cost unknown stub when a priced row (cost != null) shares
+    # (date, plan, phase). Sidecars written before append_cost_row learned to skip
+    # pre-start pauses still hold such stubs. Priced rows and lone stubs survive.
+    # On a jq failure keep the undeduped file: the report degrades to old figures.
+    if [ -s "$all_sidecar" ]; then
+        dedup_sidecar=$(mktemp)
+        if jq -c -s '
+            def key: [.date, .plan, .phase] | tojson;
+            ([.[] | select(.cost != null) | {key: key, value: true}] | from_entries) as $priced
+            | .[]
+            | select(((.cost == null and .provenance == "unknown") and ($priced[key] // false)) | not)
+        ' "$all_sidecar" > "$dedup_sidecar"; then
+            mv "$dedup_sidecar" "$all_sidecar"
+        else
+            rm -f "$dedup_sidecar"
+        fi
+    fi
+    # weekly-stub-dedup:end
     floor_raw="0" low_raw="0" high_raw="0" unpriced=0
     if [ -s "$all_sidecar" ]; then
         unpriced=$(jq -s '[.[] | select(.provenance=="unknown")] | length' "$all_sidecar") || unpriced=0

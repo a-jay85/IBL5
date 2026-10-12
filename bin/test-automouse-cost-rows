@@ -784,4 +784,71 @@ append_cost_row "stub-e.md" impl "$before" "claude-sonnet-5-5"
 assert_eq "$(stub_rows stub-e.md impl)" 1 "marker plus cost=: row kept"
 assert_eq "$(stub_field stub-e.md impl cost)" 0.4200 "marker plus cost=: row is priced"
 
+# ---------------------------------------------------------------------------
+# Weekly reader dedup (reader-only: sidecar lines are hand-built on purpose).
+# A null-cost unknown stub is dropped only when a priced row shares
+# (date, plan, phase). Asserted on the unpriced note, the one figure it moves.
+# ---------------------------------------------------------------------------
+printf '\n-- weekly aggregate: stub rows with a priced sibling are dropped --\n'
+TODAY=$(date +%F)
+YDAY=$(_date_ago 1)
+wk_row() {  # $1 date, $2 plan, $3 phase, $4 cost (number or null), $5 provenance
+    jq -n -c --arg d "$1" --arg p "$2" --arg ph "$3" --argjson c "$4" --arg pv "$5" \
+        '{date:$d,plan:$p,phase:$ph,model:"claude-sonnet-5-5",tier:"sonnet",
+          session_id:"",cost:$c,surcharge_low:null,surcharge_high:null,inp:null,
+          out:null,cr:null,w5:null,w1:null,peak_ctx:0,compactions_main:null,
+          compactions_sub:null,provenance:$pv,price_asof:"",logged_cost:null}'
+}
+wk_run() {  # $1 today's sidecar lines, $2 optional yesterday's lines; sets WK_REPORT
+    local dir
+    dir=$(mktemp -d "$STUBROOT/wk.XXXXXX")
+    mkdir -p "$dir/logs" "$dir/reports"
+    NIGHTLY_DIR="$dir"
+    printf '%s\n' "$1" > "$dir/logs/$TODAY.costs.jsonl"
+    if [ -n "${2:-}" ]; then printf '%s\n' "$2" > "$dir/logs/$YDAY.costs.jsonl"; fi
+    WK_REPORT="$dir/reports/$TODAY-costs.md"
+    printf '# Costs\n' > "$WK_REPORT"
+    regenerate_weekly_section "$WK_REPORT"
+}
+wk_unpriced() {  # N from the "excludes N unpriced rows" note, 0 when absent
+    local n
+    n=$(sed -nE 's/^> \*\*excludes ([0-9]+) unpriced rows\*\*$/\1/p' "$WK_REPORT")
+    echo "${n:-0}"
+}
+wk_total() {
+    awk -F'|' '/\*\*Total\*\*/ && !f {gsub(/[ \t]/,"",$3); print $3; f=1}' "$WK_REPORT"
+}
+
+# W1: stub + recomputed priced row, same key -> stub dropped, nothing unpriced.
+wk_run "$(wk_row "$TODAY" dup-a.md impl null unknown)
+$(wk_row "$TODAY" dup-a.md impl 1.6554 recomputed)"
+assert_eq "$(wk_unpriced)" 0 "stub with a priced sibling is not counted unpriced"
+assert_eq "$(wk_total)" "1.6554" "dedup leaves the priced row's cost intact"
+
+# W2: lone stub, no priced sibling -> kept and counted.
+wk_run "$(wk_row "$TODAY" lone-b.md postplan null unknown)"
+assert_eq "$(wk_unpriced)" 1 "lone stub is still counted unpriced"
+
+# W3: two priced rows with one key -> both survive.
+wk_run "$(wk_row "$TODAY" two-c.md impl 1.0 recomputed)
+$(wk_row "$TODAY" two-c.md impl 2.0 recomputed)"
+assert_eq "$(wk_total)" "3.0000" "two priced rows with one key both survive"
+
+# W4: stub and priced row differ only in phase -> stub kept.
+wk_run "$(wk_row "$TODAY" dup-a.md postplan null unknown)
+$(wk_row "$TODAY" dup-a.md impl 1.6554 recomputed)"
+assert_eq "$(wk_unpriced)" 1 "stub of another phase is kept"
+
+# W5: stub yesterday, priced today, same plan and phase -> stub kept (key has date).
+wk_run "$(wk_row "$TODAY" dup-a.md impl 1.6554 recomputed)" \
+       "$(wk_row "$YDAY" dup-a.md impl null unknown)"
+assert_eq "$(wk_unpriced)" 1 "stub dated another day is kept"
+
+# W6: priced sibling is itself provenance unknown (harness figure kept) -> the
+# stub is dropped and only the priced-unknown row counts. Pins "priced" as
+# cost != null, never provenance != unknown.
+wk_run "$(wk_row "$TODAY" dup-d.md impl null unknown)
+$(wk_row "$TODAY" dup-d.md impl 0.5 unknown)"
+assert_eq "$(wk_unpriced)" 1 "priced-unknown sibling drops the stub and counts once"
+
 h_done

@@ -197,12 +197,17 @@ class WaiversViewTest extends TestCase
             'Test Team',
             1,
             'add',
-            [['playerID' => 42, 'playerName' => 'Jane Doe', 'contract' => '103', 'waitTime' => '']],
+            [
+                ['playerID' => 42, 'playerName' => 'Jane Doe', 'contract' => '103', 'waitTime' => ''],
+                ['playerID' => 43, 'playerName' => 'John Roe', 'contract' => '205', 'waitTime' => ''],
+            ],
             5,
             5
         );
 
         $this->assertStringContainsString('<option value="42">Jane Doe 103</option>', $output);
+        // Numeric values only: excludes the empty-value "Select player..." placeholder.
+        $this->assertSame(2, preg_match_all('/<option value="\d+">/', $output));
     }
 
     public function testRenderWaiverFormAppendsWaitTimeWhenPresent(): void

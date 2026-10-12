@@ -30,10 +30,8 @@ class IntegrationDirectoryRenameTest extends TestCase
         $this->assertFileExists($this->testsDir . '/WideUnit/WideUnitTestCase.php');
     }
 
-    public function testWideUnitTestCaseHasCorrectNamespace(): void
+    public function testWideUnitTestCaseAutoloadsUnderItsNamespace(): void
     {
-        $content = file_get_contents($this->testsDir . '/WideUnit/WideUnitTestCase.php');
-        $this->assertIsString($content);
-        $this->assertStringContainsString('namespace Tests\\WideUnit;', $content);
+        $this->assertTrue(class_exists(\Tests\WideUnit\WideUnitTestCase::class));
     }
 }

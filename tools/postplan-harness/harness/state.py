@@ -142,6 +142,7 @@ class PlanInfo:
     has_reuse: bool = False
     planned_test_paths: list[str] = field(default_factory=list)
     no_change_test_paths: list[str] = field(default_factory=list)  # planned tokens every VR row marked `(no-change)`; conformance skips these
+    run_only_test_paths: list[str] = field(default_factory=list)  # planned tokens every row marked `(run-only)`; conformance skips MISSING for these when the file is tracked
     critical_files: list[tuple] = field(default_factory=list)  # (path, annotation, exempt)
     required_test_methods: list[str] = field(default_factory=list)
     backlog_issues: list[tuple] = field(default_factory=list)  # (kind, number); kind in {"closes", "refs"}

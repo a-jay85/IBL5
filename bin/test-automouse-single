@@ -43,6 +43,8 @@ FAILED=0
 # calls api.anthropic.com in the foreground, which defers the runner's SIGTERM
 # trap and makes case 12 time out. The runner's own seam replaces it.
 export AUTOMOUSE_LOGIN_PROBE_CMD="echo ok"
+# Phase 3 seam: skip the real bin/check-plan; these fixtures carry no Verification Matrix.
+export AUTOMOUSE_CHECK_PLAN=/usr/bin/true
 
 assert_present() {
     local desc="$1" path="$2"

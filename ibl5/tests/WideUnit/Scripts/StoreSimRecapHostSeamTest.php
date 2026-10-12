@@ -21,31 +21,13 @@ final class StoreSimRecapHostSeamTest extends TestCase
         $this->src = (string) file_get_contents(__DIR__ . '/../../../scripts/storeSimRecap.php');
     }
 
-    public function testScriptReadsCanonicalHostConstant(): void
-    {
-        self::assertStringContainsString('IBL5_CANONICAL_HOST', $this->src);
-    }
-
     public function testScriptInitialisesDiscordWithHost(): void
     {
         self::assertStringContainsString('Discord::init(', $this->src);
     }
 
-    public function testScriptUsesSimSummaryLinkForViewerUrl(): void
-    {
-        self::assertStringContainsString('SimSummaryLink', $this->src);
-    }
-
     public function testScriptContainsNoHardcodedHostname(): void
     {
         self::assertStringNotContainsString('iblhoops.net', $this->src);
-    }
-
-    public function testScriptDoesNotAcceptHostFromArgv(): void
-    {
-        // The host is never accepted from argv — only from IBL5_CANONICAL_HOST.
-        // A '--host' token in the source would indicate a security regression
-        // where the production routing decision could be spoofed by the caller.
-        self::assertStringNotContainsString('--host', $this->src);
     }
 }

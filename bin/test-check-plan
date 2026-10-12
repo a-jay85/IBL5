@@ -2529,6 +2529,156 @@ XSECOND='
 assert_viol "gateX-second-token-marker-unchanged" 0 '[X]' "$FM$XSECOND"
 
 # ---------------------------------------------------------------------------
+# Gate [RO] fixtures (19 cases)
+# The (run-only) marker exempts a row's token from the harness MISSING item, so
+# the gate pins: whole-cell planning type, marker directly after the row's
+# planned token, one marker per token, token exists on the base ref, token is
+# not a must-appear Critical Files entry. Checks 6-7 are warnings (exit stays 0).
+# Cases 1-18 resolve existence against HEAD (the worktree's own tree) so a
+# default-depth CI checkout with no origin/master still works.
+# ---------------------------------------------------------------------------
+export CHECK_PLAN_MASTER_REF=HEAD
+ROHDR='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|'
+RONAV='ibl5/tests/e2e/smoke/navigation.spec.ts'
+ROSNAP='ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots'
+RONEW='ibl5/tests/e2e/smoke/gate-ro-fixture-missing.spec.ts'
+# 1. the honored shape on an existing file: no [RO] violation.
+RO1="$ROHDR
+| 1 | nav smoke passes | E2E | post-impl | \`$RONAV\` (run-only) |
+"
+assert_viol "gateRO-e2e-existing-ok" 0 '[RO]' "$FM$RO1"
+# 2. a directory token (snapshots dir) passes: cat-file -e accepts a tree.
+RO2="$ROHDR
+| 1 | baselines unchanged | Visual-regression | post-impl | \`$ROSNAP\` (run-only) |
+"
+assert_viol "gateRO-vr-directory-ok" 0 '[RO]' "$FM$RO2"
+# 3. check 1: a CLI row plans no test, so the marker is a no-op there.
+RO3="$ROHDR
+| 1 | x | CLI-executable | post-impl | \`bin/test-foo\` (run-only) |
+"
+assert_viol "gateRO-cli-row-fires" 1 '[RO]' "$FM$RO3"
+# 4. check 2 (position): marker before the token.
+RO4="$ROHDR
+| 1 | x | E2E | post-impl | (run-only) \`$RONAV\` |
+"
+assert_viol "gateRO-marker-before-token-fires" 1 '[RO]' "$FM$RO4"
+# 5. check 2 (identity). Deliberately stricter than gateX-second-token-marker-
+# unchanged: the harness exempts only the row's FIRST test|spec token, so a
+# marker on the second token exempts nothing and MISSING would return after
+# implementation.
+RO5="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` and \`ibl5/tests/e2e/smoke/visual-regression.spec.ts\` (run-only) |
+"
+assert_msg "gateRO-second-token-fires" 1 "but the row's planned test token is" "" "$FM$RO5"
+# 6. check 3: both markers on one row. Gate [X] also fires here (its marker is
+# not directly after the token); the include-string pins the real cause.
+RO6="$ROHDR
+| 1 | baselines unchanged | Visual-regression | post-impl | \`$ROSNAP\` (run-only) (no-change) |
+"
+assert_msg "gateRO-both-markers-fires" 1 "row carries both (run-only) and (no-change)" "" "$FM$RO6"
+# 7. check 4: the path is not on the base ref.
+RO7="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` (run-only) |
+"
+assert_msg "gateRO-missing-on-base-fires" 1 "does not exist on" "" "$FM$RO7"
+# 8. a PHPUnit row passes check 1 (reaching check 4 proves it).
+RO8="$ROHDR
+| 1 | x | PHPUnit | post-impl | \`ibl5/tests/GateRo/FixtureMissingTest.php\` (run-only) |
+
+<!-- no-test-methods: gate RO fixture; methods are not under test here -->
+"
+assert_msg "gateRO-phpunit-type-accepted" 1 "does not exist on" "" "$FM$RO8"
+# 9. check 5: the token is a must-appear Critical Files entry.
+RO9="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Critical Files
+
+- \`$RONAV\` — extend the smoke assertions
+"
+assert_msg "gateRO-must-appear-critical-file-fires" 1 "is a must-appear ## Critical Files entry" "" "$FM$RO9"
+# 10. a (reference) entry is exempt, so the marker is fine.
+RO10="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Critical Files
+
+- \`$RONAV\` (reference)
+"
+assert_viol "gateRO-reference-critical-file-ok" 0 '[RO]' "$FM$RO10"
+# 11. check 6: a phase line pairs the token with an edit verb -> warning only.
+RO11="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Phase 1: Smoke
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Extend \`$RONAV\` with a footer assertion.
+"
+assert_msg "gateRO-phase-edit-verb-warns" 0 "[RO] warning: (run-only) path" "" "$FM$RO11"
+# 12. a phase line that only runs the token stays silent.
+RO12="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Phase 1: Smoke
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Run \`$RONAV\` before and after.
+"
+assert_msg "gateRO-phase-run-verb-silent" 0 "" "[RO] warning: (run-only) path" "$FM$RO12"
+# 13. check 7: unmarked row, path exists on base, nothing cites it -> warning.
+RO13="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+"
+assert_msg "gateRO-unmarked-existing-uncited-warns" 0 "[RO] warning: unmarked test row" "" "$FM$RO13"
+# 14. the same row cited by a phase body line stays silent.
+RO14="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+
+## Phase 1: Smoke
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Extend \`$RONAV\` with a footer assertion.
+"
+assert_msg "gateRO-unmarked-existing-cited-in-phase-silent" 0 "" "[RO] warning: unmarked" "$FM$RO14"
+# 15. an unmarked row for a test being written (not on base) is the normal case.
+RO15="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` |
+"
+assert_msg "gateRO-unmarked-new-path-silent" 0 "" "[RO] warning" "$FM$RO15"
+# 16. a (run-only) quoted only in a code span is a mention, not a marker. The row
+# is unmarked + existing + uncited, so the check-7 WARNING appears; the tag is
+# narrowed to the violation prefix so the warning does not trip the clean branch.
+RO16="$ROHDR
+| 1 | a \`(run-only)\` mention in a code span is not a marker | E2E | post-impl | \`$RONAV\` |
+"
+assert_viol "gateRO-code-span-mention-ignored" 0 '[RO] (run-only)' "$FM$RO16"
+# 17. a fenced fixture block carrying a marker never counts (same shape as XFENCE).
+RO17="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` |
+
+\`\`\`$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` (run-only) |
+\`\`\`
+"
+assert_viol "gateRO-fenced-fixture-ignored" 0 '[RO]' "$FM$RO17"
+# 18. regression guard: an existing (no-change) row neither fires [RO] nor the
+# check-7 warning (the has_nc skip).
+RO18="$ROHDR
+| 1 | baselines unchanged | Visual-regression | post-impl | \`$ROSNAP\` (no-change) |
+"
+assert_viol "gateRO-no-change-row-untouched" 0 '[RO]' "$FM$RO18"
+# 19. no resolvable base ref fails OPEN for the existence checks.
+export CHECK_PLAN_MASTER_REF=refs/heads/gate-ro-no-such-ref-fixture
+assert_viol "gateRO-no-ref-fails-open" 0 '[RO]' "$FM$RO7"
+unset CHECK_PLAN_MASTER_REF
+
+# ---------------------------------------------------------------------------
 # Gate [Y] fixtures (9 cases)
 # ---------------------------------------------------------------------------
 YHDR='

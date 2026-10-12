@@ -5,7 +5,7 @@
 #
 # Usage: source "$(dirname "$0")/lib/pr-armable.sh"
 #
-# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>):
+# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>; 18: pr_merge_danger_hold <body>):
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
@@ -190,6 +190,20 @@ EOF
         HELD|UNKNOWN) echo "gate-backtest:$state" ;;
         *) echo "gate-backtest:UNKNOWN" ;;
     esac
+}
+
+# pr_merge_danger_hold <body>
+#   Phase 6.5 condition (18). Mirrors harness/merge_danger.py classify_body.
+#   Prints nothing for exactly one well-formed line with Door two-way; otherwise prints
+#   merge-danger:ONE-WAY | merge-danger:MISSING | merge-danger:MALFORMED (fail-closed).
+pr_merge_danger_hold() {
+    local body="$1" n well
+    n=$(printf '%s\n' "$body" | grep -cE '^\*\*Merge danger:\*\*' || true)
+    [ "$n" = 0 ] && { echo "merge-danger:MISSING"; return 0; }
+    [ "$n" != 1 ] && { echo "merge-danger:MALFORMED"; return 0; }
+    well=$(printf '%s\n' "$body" | grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external) · Why: .{20,}$' || true)
+    [ -z "$well" ] && { echo "merge-danger:MALFORMED"; return 0; }
+    case "$well" in *'Door: one-way'*) echo "merge-danger:ONE-WAY" ;; esac
 }
 
 # pr_dep_holds <body>

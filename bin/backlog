@@ -20,8 +20,9 @@
 #                                        select units up to 5 (less what the earlier ledgers of
 #                                        this run hold) and write the ledger
 #   bin/backlog burndown-record <ledger> <issue> key=value...
-#                                        update one ledger item (route, slug, status, pr_url)
-#     keys: route= slug= status= pr_url= reason=blocked|out-of-repo blocked_by=<PR>
+#                                        update one ledger item (route, slug, status, pr_url, reason)
+#     keys: route= slug= status= pr_url= reason=blocked|out-of-repo blocked_by=<PR> why=<text>
+#     status=skipped needs why= (one line, at most 200 chars) or reason=
 #   bin/backlog burndown-tag <issue> reason=blocked|out-of-repo [blocked_by=<PR>]
 #                                        tag an issue burndown skips, with no ledger
 #   bin/backlog burndown-status [<ledger>]        read-only live status table
@@ -92,7 +93,7 @@ Usage: bin/backlog [--dry-run] <subcommand> [args...]
   burndown [--pair A,B] [--after <ledger>]...
                         Pick units up to 5, less what the earlier ledgers of this run hold; prints LEDGER: <path> last
   burndown-record <ledger> <n> key=value...
-                        Set route=, slug=, status=, pr_url=, reason=, blocked_by= on ledger item <n>
+                        Set route=, slug=, status=, pr_url=, reason=, blocked_by=, why= on ledger item <n>
   burndown-tag <n> reason=blocked|out-of-repo [blocked_by=<PR>]
                         Tag issue <n> so burndown skips it (no ledger needed)
   burndown-status [<ledger>]

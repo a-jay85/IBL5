@@ -97,6 +97,37 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
         $this->assertSame('', $result['player_name']);
     }
 
+    public function testBuildPlayerSnapshotCoercesNonStringNamesViaToString(): void
+    {
+        $cases = [
+            [23, '23'],
+            [1.5, '1.5'],
+            [null, ''],
+            [true, ''],
+            [['x'], ''],
+            ['Bob', 'Bob'],
+        ];
+
+        foreach ($cases as [$name, $expected]) {
+            $result = $this->service->buildPlayerSnapshot(['pid' => 400, 'name' => $name], [], 1);
+
+            $this->assertSame($expected, $result['player_name']);
+        }
+    }
+
+    public function testBuildPlayerSnapshotNonNumericPidBecomesZero(): void
+    {
+        // DepthChartSnapshotService::buildPlayerSnapshot coerces the roster pid with toInt():
+        // '12abc' would be 12 and true would be 1 under sanitizeInt(), but both must give 0.
+        $dcSettings = ['pg' => 1];
+
+        $result = $this->service->buildPlayerSnapshot(['pid' => '12abc', 'name' => 'Junk PID Player'], $dcSettings, 1);
+        $this->assertSame(0, $result['pid']);
+
+        $result = $this->service->buildPlayerSnapshot(['pid' => true, 'name' => 'Bool PID Player'], $dcSettings, 1);
+        $this->assertSame(0, $result['pid']);
+    }
+
     public function testLoadSavedDepthChartReturnsNullWhenNotFound(): void
     {
         $this->mockDb->setMockData([]);

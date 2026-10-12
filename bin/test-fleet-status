@@ -70,6 +70,8 @@
 # Run: bin/test-fleet-status  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FLEET="$SCRIPT_DIR/fleet-status"
@@ -99,9 +101,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-FAILED=0
-pass() { printf '  ok    %s\n' "$1"; }
-fail() { printf '  FAIL  %s\n' "$1"; FAILED=1; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$1"; }
 
 # Herestrings, not `printf | grep -q`: grep exits early on a match and SIGPIPEs
 # the writer, which under pipefail makes a SUCCESSFUL match report 141.
@@ -1466,9 +1467,4 @@ else
 fi
 
 printf '\n'
-if [ "$FAILED" -eq 0 ]; then
-    printf 'test-fleet-status: ALL PASS\n'
-else
-    printf 'test-fleet-status: FAILURES\n'
-fi
-exit "$FAILED"
+h_done

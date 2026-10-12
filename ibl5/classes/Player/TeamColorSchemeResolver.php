@@ -16,21 +16,8 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
 final class TeamColorSchemeResolver
 {
     /**
-     * Trading-card scheme: teamid <= 0 (free agents, unsigned) gets the default
-     * gold scheme without a lookup.
-     *
-     * @return ColorScheme
-     */
-    public static function forTradingCard(TeamIdentityRepositoryInterface $teamRepo, int $teamid): array
-    {
-        if ($teamid <= 0) {
-            return TeamColorHelper::getDefaultColorScheme();
-        }
-        return self::fromRow($teamRepo->getTeamColorRow($teamid));
-    }
-
-    /**
-     * Page/menu/stats-card scheme: always looks the row up, teamid 0 included.
+     * Scheme for every card, page, and menu: always looks the row up, teamid 0
+     * included, so a free agent gets the seeded Free Agents colors everywhere.
      *
      * @return ColorScheme
      */

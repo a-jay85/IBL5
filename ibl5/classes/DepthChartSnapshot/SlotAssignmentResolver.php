@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DepthChartSnapshot;
 
+use BasketballStats\StatsSanitizer;
 use DepthChartSnapshot\Contracts\SlotAssignmentResolverInterface;
 
 /**
@@ -30,18 +31,18 @@ class SlotAssignmentResolver implements SlotAssignmentResolverInterface
         }
 
         return [
-            'pg' => $this->extractIntFromPost($postData, 'pg' . $slot),
-            'sg' => $this->extractIntFromPost($postData, 'sg' . $slot),
-            'sf' => $this->extractIntFromPost($postData, 'sf' . $slot),
-            'pf' => $this->extractIntFromPost($postData, 'pf' . $slot),
-            'c' => $this->extractIntFromPost($postData, 'c' . $slot),
-            'canPlayInGame' => $this->extractIntFromPost($postData, 'canPlayInGame' . $slot),
-            'min' => $this->extractIntFromPost($postData, 'min' . $slot),
-            'of' => $this->extractIntFromPost($postData, 'OF' . $slot),
-            'df' => $this->extractIntFromPost($postData, 'DF' . $slot),
-            'oi' => $this->extractIntFromPost($postData, 'OI' . $slot),
-            'di' => $this->extractIntFromPost($postData, 'DI' . $slot),
-            'bh' => $this->extractIntFromPost($postData, 'BH' . $slot),
+            'pg' => StatsSanitizer::intFromArray($postData, 'pg' . $slot),
+            'sg' => StatsSanitizer::intFromArray($postData, 'sg' . $slot),
+            'sf' => StatsSanitizer::intFromArray($postData, 'sf' . $slot),
+            'pf' => StatsSanitizer::intFromArray($postData, 'pf' . $slot),
+            'c' => StatsSanitizer::intFromArray($postData, 'c' . $slot),
+            'canPlayInGame' => StatsSanitizer::intFromArray($postData, 'canPlayInGame' . $slot),
+            'min' => StatsSanitizer::intFromArray($postData, 'min' . $slot),
+            'of' => StatsSanitizer::intFromArray($postData, 'OF' . $slot),
+            'df' => StatsSanitizer::intFromArray($postData, 'DF' . $slot),
+            'oi' => StatsSanitizer::intFromArray($postData, 'OI' . $slot),
+            'di' => StatsSanitizer::intFromArray($postData, 'DI' . $slot),
+            'bh' => StatsSanitizer::intFromArray($postData, 'BH' . $slot),
         ];
     }
 
@@ -55,21 +56,21 @@ class SlotAssignmentResolver implements SlotAssignmentResolverInterface
      */
     private function findPidIndex(array $player, array $postData, int $ordinal): int
     {
-        $playerPid = $this->toInt($player['pid'] ?? 0);
+        $playerPid = StatsSanitizer::toInt($player['pid'] ?? 0);
 
         // Try to match by pid hidden field
         for ($i = 1; $i <= self::MAX_SLOTS; $i++) {
             $pidField = 'pid' . $i;
-            if (isset($postData[$pidField]) && $this->toInt($postData[$pidField]) === $playerPid) {
+            if (isset($postData[$pidField]) && StatsSanitizer::toInt($postData[$pidField]) === $playerPid) {
                 return $i;
             }
         }
 
         // Fall back to matching by name (existing pattern) or ordinal
-        $playerName = $this->toString($player['name'] ?? '');
+        $playerName = StatsSanitizer::scalarToString($player['name'] ?? '');
         for ($i = 1; $i <= self::MAX_SLOTS; $i++) {
             $nameField = 'Name' . $i;
-            $postName = isset($postData[$nameField]) ? $this->toString($postData[$nameField]) : '';
+            $postName = isset($postData[$nameField]) ? StatsSanitizer::scalarToString($postData[$nameField]) : '';
             if ($postName !== '' && trim(strip_tags($postName)) === $playerName) {
                 return $i;
             }
@@ -81,51 +82,5 @@ class SlotAssignmentResolver implements SlotAssignmentResolverInterface
         }
 
         return 0;
-    }
-
-    /**
-     * @param array<string, mixed> $postData
-     */
-    private function extractIntFromPost(array $postData, string $key): int
-    {
-        $value = $postData[$key] ?? 0;
-        if (is_int($value)) {
-            return $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-        return 0;
-    }
-
-    /**
-     * Safely convert mixed value to int
-     */
-    private function toInt(mixed $value): int
-    {
-        if (is_int($value)) {
-            return $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-        if (is_float($value)) {
-            return (int) $value;
-        }
-        return 0;
-    }
-
-    /**
-     * Safely convert mixed value to string
-     */
-    private function toString(mixed $value): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-        return '';
     }
 }

@@ -24,12 +24,12 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FILTER="$SCRIPT_DIR/lib/automouse-stream-filter.sh"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
-
-FAILED=0
+h_tmp TMP
 
 # run_filter <ndjson-on-stdin> → captured filter stdout
 # A `result` event always terminates the filter, so every fixture ends with one.
@@ -53,11 +53,10 @@ run_filter_failsig() {
 assert_contains() {
     local name="$1" out="$2" needle="$3"
     if printf '%s' "$out" | grep -qF -- "$needle"; then
-        echo "ok: $name"
+        h_pass "$name"
     else
-        echo "FAIL: $name — expected output to contain '$needle'"
+        h_fail "$name" "expected output to contain '$needle'"
         echo "  --- got ---"; printf '%s\n' "$out" | sed 's/^/  /'
-        FAILED=1
     fi
 }
 
@@ -65,11 +64,10 @@ assert_contains() {
 assert_not_contains() {
     local name="$1" out="$2" needle="$3"
     if printf '%s' "$out" | grep -qF -- "$needle"; then
-        echo "FAIL: $name — output unexpectedly contained '$needle'"
+        h_fail "$name" "output unexpectedly contained '$needle'"
         echo "  --- got ---"; printf '%s\n' "$out" | sed 's/^/  /'
-        FAILED=1
     else
-        echo "ok: $name"
+        h_pass "$name"
     fi
 }
 
@@ -211,33 +209,28 @@ assert_not_contains "f4-last-error-wins (first gone)" "$REC" "first-err"
 # f5 — an error followed by 6 non-error results was recovered from: dropped
 rm -f "$FS"
 run_filter_failsig "$FS" "$(nd "$USE1" "$ERR1" "$OKRES" "$OKRES" "$OKRES" "$OKRES" "$OKRES" "$OKRES" "$RESULT_LINE")" >/dev/null
-if [ ! -e "$FS" ]; then echo "ok: f5-recovered-error-dropped"; else echo "FAIL: f5-recovered-error-dropped — file still present"; FAILED=1; fi
+if [ ! -e "$FS" ]; then h_pass "f5-recovered-error-dropped"; else h_fail "f5-recovered-error-dropped" "file still present"; fi
 
 # f5b — boundary: exactly 5 later results keeps the error
 rm -f "$FS"
 run_filter_failsig "$FS" "$(nd "$USE1" "$ERR1" "$OKRES" "$OKRES" "$OKRES" "$OKRES" "$OKRES" "$RESULT_LINE")" >/dev/null
-if [ -e "$FS" ]; then echo "ok: f5b-five-later-results-kept"; else echo "FAIL: f5b-five-later-results-kept — file missing"; FAILED=1; fi
+if [ -e "$FS" ]; then h_pass "f5b-five-later-results-kept"; else h_fail "f5b-five-later-results-kept" "file missing"; fi
 
 # f6 — 4-arg and 5-arg stdout are identical once the timestamp prefix is stripped
 FIX6=$(nd "$USE1" "$ERR1" "$RESULT_LINE")
 OUT5=$(run_filter_failsig "$FS" "$FIX6" | sed 's/^\[[0-9:]*\]//')
 # the 5-arg call is tagged phase=impl; compare against a 4-arg call tagged the same way
 OUT4=$(run_filter_phase impl "$FIX6" | sed 's/^\[[0-9:]*\]//')
-if [ "$OUT4" = "$OUT5" ]; then echo "ok: f6-four-arg-stdout-unchanged"; else echo "FAIL: f6-four-arg-stdout-unchanged"; echo "  4: $OUT4"; echo "  5: $OUT5"; FAILED=1; fi
+if [ "$OUT4" = "$OUT5" ]; then h_pass "f6-four-arg-stdout-unchanged"; else h_fail "f6-four-arg-stdout-unchanged"; echo "  4: $OUT4"; echo "  5: $OUT5"; fi
 
 # f7 — a stale side file is removed at startup
 printf 'stale' > "$FS"
 run_filter_failsig "$FS" "$(nd "$RESULT_LINE")" >/dev/null
-if [ ! -e "$FS" ]; then echo "ok: f7-stale-file-removed-at-start"; else echo "FAIL: f7-stale-file-removed-at-start — stale file survived"; FAILED=1; fi
+if [ ! -e "$FS" ]; then h_pass "f7-stale-file-removed-at-start"; else h_fail "f7-stale-file-removed-at-start" "stale file survived"; fi
 
 # f8 — a non-error result (is_error:false) writes nothing
 rm -f "$FS"
 run_filter_failsig "$FS" "$(nd "$USE1" "$OKRES" "$RESULT_LINE")" >/dev/null
-if [ ! -e "$FS" ]; then echo "ok: f8-non-error-result-ignored"; else echo "FAIL: f8-non-error-result-ignored — file written"; FAILED=1; fi
+if [ ! -e "$FS" ]; then h_pass "f8-non-error-result-ignored"; else h_fail "f8-non-error-result-ignored" "file written"; fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

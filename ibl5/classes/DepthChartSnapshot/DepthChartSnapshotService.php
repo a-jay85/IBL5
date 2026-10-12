@@ -9,6 +9,7 @@ use DepthChartSnapshot\Contracts\DepthChartSnapshotRepositoryInterface;
 use DepthChartSnapshot\Contracts\DepthChartLabelBuilderInterface;
 use DepthChartSnapshot\Contracts\SlotAssignmentResolverInterface;
 use Season\Season;
+use BasketballStats\StatsSanitizer;
 
 /**
  * @phpstan-import-type SavedDepthChartRow from Contracts\DepthChartSnapshotRepositoryInterface
@@ -256,8 +257,8 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
     public function buildPlayerSnapshot(array $rosterPlayer, array $dcSettings, int $ordinal): array
     {
         return [
-            'pid' => $this->toInt($rosterPlayer['pid'] ?? 0),
-            'player_name' => $this->toString($rosterPlayer['name'] ?? ''),
+            'pid' => StatsSanitizer::toInt($rosterPlayer['pid'] ?? 0),
+            'player_name' => StatsSanitizer::scalarToString($rosterPlayer['name'] ?? ''),
             'ordinal' => $ordinal,
             'dc_pg_depth' => $dcSettings['pg'] ?? 0,
             'dc_sg_depth' => $dcSettings['sg'] ?? 0,
@@ -272,37 +273,6 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
             'dc_di' => $dcSettings['di'] ?? 0,
             'dc_bh' => $dcSettings['bh'] ?? 0,
         ];
-    }
-
-    /**
-     * Safely convert mixed value to int
-     */
-    private function toInt(mixed $value): int
-    {
-        if (is_int($value)) {
-            return $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-        if (is_float($value)) {
-            return (int) $value;
-        }
-        return 0;
-    }
-
-    /**
-     * Safely convert mixed value to string
-     */
-    private function toString(mixed $value): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-        return '';
     }
 
     /**

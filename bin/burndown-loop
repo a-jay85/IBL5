@@ -39,7 +39,7 @@
 # Exit codes: 0 loop finished (stop requested, or --once done; an empty --once batch ends here).
 #             1 consecutive-failure cap hit. Failed batches and /burndown exit-3
 #               aborts share the cap; below it a failure retries after 300s and an
-#               abort after 600s.
+#               abort after 600s, doubling per consecutive abort (600s, 1200s, ...).
 #             2 usage or environment error.
 #             4 another instance holds the lock.
 #             75 paused by the usage gate (coordinator resumes it).
@@ -466,7 +466,7 @@ log: $LOOP_LOG"
             bl_log "batch aborted: burndown exit 3 fails=$FAILS/$MAX_FAILS log=$BLOG"
             if [ "$FAILS" -ge "$MAX_FAILS" ]; then bl_finish fail-closed 1; fi
             if [ "$ONCE" -eq 0 ]; then
-                bl_sleep 600 retry-after-abort || bl_stopped
+                bl_sleep $((600 * (1 << (FAILS - 1)))) retry-after-abort || bl_stopped
             fi
             ;;
         *)

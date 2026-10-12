@@ -809,9 +809,11 @@ SH
     local digest
     digest="$(digest_of <<< "$ER_OUT")"
     expect_eq "row31: live dry-run exits 0" 0 "$ER_RC"
-    expect_has "row31: seeded authenticated route team" "$digest" "team"
-    expect_has "row31: seeded authenticated route player" "$digest" "player"
-    expect_has "row31: seeded authenticated route depth_chart" "$digest" "depth_chart"
+    # Seeded authenticated counts (seed.sql): 3 GMs x 2 days = 6 each for team and
+    # player; depth_chart is 6 page views plus 1 depth_chart_saved row = 7.
+    expect_has_exact "row31: seeded authenticated route team count" "$digest" "  6  team"
+    expect_has_exact "row31: seeded authenticated route player count" "$digest" "  6  player"
+    expect_has_exact "row31: seeded authenticated route depth_chart count" "$digest" "  7  depth_chart"
     expect_has_exact "row31: active GMs: 3" "$digest" "active GMs: 3"
     expect_has_exact "row31: NULL-class rows show as unclassified 4" "$digest" "unclassified 4"
     local tok

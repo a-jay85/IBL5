@@ -1,6 +1,6 @@
 ---
 description: A required aggregator check, All checks green, blocks auto-merge on any red check on the PR head; condition (15) demotes to a warning only while protection lists it.
-last_verified: 2026-09-30
+last_verified: 2026-10-11
 owner: ajaynicolas
 ---
 
@@ -142,3 +142,15 @@ The `gh run rerun` payload caveat in `.claude/rules/ci-gotchas.md` does not bite
 ## Lineage
 
 ADR-0120 (manual protection flip with a checked read-back) and ADR-0145 (append-only context POST, `--protection-readback`).
+
+## Addendum 2026-10-11: stacked-base fail-fast
+
+A PR stacked on another open PR has a base other than master. `tests.yml` and `pr-meta-checks.yml` filter on `branches: [ master, develop ]` and `e2e-tests.yml` on `[ master ]`, so the Tests and Analysis, E2E Tests and Meta checks anchors never report on such a PR. The aggregator waited out its 2400 s deadline and failed red on every push, about 45 runner minutes each time.
+
+The workflow now passes `BASE_REF` (the PR's base branch, through a step `env:` line) to `bin/check-pr-checks-green --base-ref=`. When the base is not in the script's `MASTER_LIKE_BASES` list (`master develop`), the script exits 1 before any API call with a `FAIL: stacked on <base>` message. The message tells the author to push after the parent merges and GitHub retargets the PR. The gate stays closed: a stacked PR was red before and is red now, only faster. Master-based PRs keep the same anchors, the same 60 s startup grace (moved from an inline `sleep 60` into `--startup-grace-seconds=60`, still outside the deadline), and the same 2400 s deadline.
+
+A retarget alone starts no CI, because `tests.yml` and `e2e-tests.yml` do not list `edited`. The child PR must push anyway to absorb the parent's squash commit (`.claude/rules/linear-history-squash-merge.md`), and that push fires `synchronize` and a fresh aggregator run.
+
+Correction to `## Re-run recovery (stale aggregator)`: the aggregator now reads `base.ref` from the event payload as well as the head SHA. A `gh run rerun` replays the frozen payload, so re-running a stacked-base failure after the retarget still sees the old base and fails again. Push instead. The re-run recipe above stays correct for a master-based PR.
+
+`bin/check-composite-contracts` A5 pins the wiring: the step passes `--base-ref="$BASE_REF"`, and the base-ref expression appears only on the `BASE_REF:` env line, never inline in `run:`.

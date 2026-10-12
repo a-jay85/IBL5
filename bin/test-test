@@ -10,22 +10,19 @@
 # Run: bin/test-test  (exit 0 = all pass, non-zero = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DISPATCHER="$SCRIPT_DIR/test"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
-FAILED=0
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+h_tmp TMP
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$1"; }
 
 # Fresh non-worktree repo (main-checkout-like: git-dir == git-common-dir).
 mk_main() {
     local d; d="$(mktemp -d "$TMP/main.XXXXXX")"
-    git init -q "$d" >/dev/null 2>&1
-    git -C "$d" config user.email t@example.com >/dev/null 2>&1
-    git -C "$d" config user.name tester >/dev/null 2>&1
-    git -C "$d" config commit.gpgsign false >/dev/null 2>&1
+    h_git_repo "$d" --no-commit >/dev/null
     echo "$d"
 }
 
@@ -34,11 +31,7 @@ mk_main() {
 mk_worktree() {
     local slug="$1" base parent wt
     base="$(mktemp -d "$TMP/base.XXXXXX")"
-    git init -q "$base" >/dev/null 2>&1
-    git -C "$base" config user.email t@example.com >/dev/null 2>&1
-    git -C "$base" config user.name tester >/dev/null 2>&1
-    git -C "$base" config commit.gpgsign false >/dev/null 2>&1
-    git -C "$base" commit --allow-empty -q -m init >/dev/null 2>&1   # HEAD for worktree add
+    h_git_repo "$base" >/dev/null   # includes the init commit: HEAD for worktree add
     parent="$(mktemp -d "$TMP/wtp.XXXXXX")"
     wt="$parent/$slug"
     git -C "$base" worktree add -q "$wt" -b "b-$slug" >/dev/null 2>&1
@@ -137,11 +130,4 @@ e2e_local_case "e2e-local-non-help-falls-through" "$E2E_LOCAL" "$STUBS" nonzero 
 e2e_local_case "e2e-local-wt-guard-names-front-door" "$WT_LOCAL/ibl5/bin/e2e-local" "$STUBS_NOGIT" 1 'bin/wt-up <slug> --seed && bin/test e2e' empty -- --headed
 e2e_local_case "e2e-wt-help-names-front-door"        "$SCRIPT_DIR/e2e-wt"           "$STUBS"       0 'bin/test e2e'                             empty -- --help
 
-# --- Result -------------------------------------------------------------------
-
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

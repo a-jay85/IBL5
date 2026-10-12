@@ -10,10 +10,12 @@
 
 # shellcheck disable=SC2034  # used in later phases sourced from this file
 BD_BUDGET=5
+# shellcheck source=bin/lib/gh-retry.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gh-retry.sh"
 BD_CODE_REPO="a-jay85/IBL5"
 BD_LABEL_BLOCKED="blocked"
 BD_LABEL_OUT_OF_REPO="out-of-repo"
-BD_SKIP_LABELS_JSON='["blocked","out-of-repo"]'
+BD_SKIP_LABELS_JSON='["blocked","out-of-repo","deferred"]'
 BD_RANKS='^P[1-4]$'
 # Live-item predicate over a jq -s slurp of ledgers. A live item holds its unit
 # and its paths. Closed-fixed and merged items are settled, and so is a skip
@@ -89,8 +91,8 @@ bd_report_since() {
 # bd_fetch_issues <out-file> — fetches open backlog issues to a JSON file
 bd_fetch_issues() {
     local out="$1" raw
-    if ! raw="$("$GH" issue list --repo "$REPO" --state open --limit 1000 \
-            --json number,title,body,url,updatedAt,labels 2>/dev/null)"; then
+    if ! raw="$(gh_retry "$GH" issue list --repo "$REPO" --state open --limit 1000 \
+            --json number,title,body,url,updatedAt,labels)"; then
         bd_die 3 "gh issue list failed"
     fi
     if ! jq -e 'type=="array"' <<< "$raw" >/dev/null 2>&1; then
@@ -346,7 +348,8 @@ bd_paths_for() {
         || bd_die 3 "bd_paths_for called before bd_load_repo_files"
     local fl bare base tab
     tab="$(printf '\t')"
-    fl="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//')" || true
+    # Drop absolute candidates: "~/x.md:5" matches as "/x.md:5", never a repo path.
+    fl="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//' | grep -v '^/')" || true
     bare="$(grep -oE '[A-Za-z0-9_./-]*/[A-Za-z0-9_./-]*' <<< "$1" \
         | sed -e 's#^\./##' -e 's/[.,;]*$//' | LC_ALL=C sort -u \
         | LC_ALL=C comm -12 - "$BD_REPO_FILES")" || true
@@ -998,7 +1001,7 @@ bd_cmd_record() {
     jq -e --argjson n "$issue_num" 'any(.items[]; .issue_num == $n)' "$ledger" \
         >/dev/null 2>&1 || bd_die 2 "no item #$issue_num in $ledger"
 
-    local kv route="" slug="" status="" pr_url="" reason="" blocked_by="" applied_keys=""
+    local kv route="" slug="" status="" pr_url="" reason="" blocked_by="" why="" applied_keys=""
     while [ $# -gt 0 ]; do
         kv="$1"; shift
         local k="${kv%%=*}" v="${kv#*=}"
@@ -1031,12 +1034,18 @@ bd_cmd_record() {
                 [[ "$v" =~ ^[1-9][0-9]{0,6}$ ]] \
                     || bd_die 2 "blocked_by=$v rejected: must be a PR number"
                 blocked_by="$v" ;;
+            why)
+                { [ -n "$v" ] && [ "${#v}" -le 200 ] && [[ "$v" != *[[:cntrl:]]* ]]; } \
+                    || bd_die 2 "why= rejected: must be non-empty single-line text of at most 200 chars"
+                why="$v" ;;
             *)
                 bd_die 2 "$k=$v rejected: unknown key $k" ;;
         esac
         applied_keys="${applied_keys} ${kv}"
     done
     bd_validate_skip_args "$reason" "$blocked_by"
+    [ -z "$why" ] || [ -z "$reason" ] \
+        || bd_die 2 "why= and reason= are exclusive: reason= writes its own skip text"
 
     # Build patch object
     local patch="{}"
@@ -1046,6 +1055,15 @@ bd_cmd_record() {
     [ -z "$pr_url" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$pr_url"  '$p+{pr_url:$v}')"
     [ -z "$reason" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$reason"  '$p+{skip_label:$v}')"
     [ -z "$blocked_by" ] || patch="$(jq -n --argjson p "$patch" --argjson v "$blocked_by" '$p+{blocked_by:$v}')"
+    local reason_text=""
+    if [ "$reason" = "$BD_LABEL_BLOCKED" ]; then
+        reason_text="skip-label: blocked (PR #$blocked_by)"
+    elif [ -n "$reason" ]; then
+        reason_text="skip-label: $reason"
+    else
+        reason_text="$why"
+    fi
+    [ -z "$reason_text" ] || patch="$(jq -n --argjson p "$patch" --arg v "$reason_text" '$p+{reason:$v}')"
 
     # Cross-field rules (preview the patched item without writing)
     local preview_item new_status new_route
@@ -1058,7 +1076,15 @@ bd_cmd_record() {
     [ "$new_status" != "shipped" ] || [ "$new_route" = "ad-hoc" ] \
         || bd_die 2 "status=shipped requires route=ad-hoc"
     [ -z "$reason" ] || [ "$new_status" = "skipped" ] || bd_die 2 "reason requires status=skipped"
+    [ -z "$why" ] || [ "$new_status" = "skipped" ] || bd_die 2 "why requires status=skipped"
+    if [ "$status" = "skipped" ] \
+        && [ -z "$(jq -r '.reason // ""' <<< "$preview_item")" ]; then
+        bd_die 2 "status=skipped needs a reason: pass why=<text> (or reason=blocked|out-of-repo)"
+    fi
     if [ "$new_status" = "closed-fixed" ]; then
+        patch="$(jq -n --argjson p "$patch" '$p+{cost:0}')"
+    fi
+    if [ "$new_status" = "skipped" ] && [ "$new_route" != "ad-hoc" ]; then
         patch="$(jq -n --argjson p "$patch" '$p+{cost:0}')"
     fi
 
@@ -1389,10 +1415,24 @@ bd_sweep_queued() {
         && [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
         && [[ "$created" < "$BD_SWEEP_CUTOFF" ]]; then
         if [ -e "$BD_PLANS_DIR/$slug.md" ]; then
-            printf 'STALE-PLAN #%s %s (plan file, no queue entry, no PR; not flipped)\n' \
-                "$issue_num" "$slug"
+            # A closed issue means the work landed under another branch or was dropped,
+            # so the plan file no longer holds anything. Retire the row; never on a gh failure.
+            local view_raw="" istate=""
+            if view_raw="$("$GH" issue view "$issue_num" --repo "$REPO" --json state 2>/dev/null)"; then
+                istate="$(jq -r '.state // ""' <<< "$view_raw" 2>/dev/null)" || istate=""
+            fi
+            if [ "$istate" = "CLOSED" ]; then
+                bd_record_apply "$ledger" "$issue_num" \
+                    '{"status":"skipped","cost":0,"reason":"sweep: stale plan, issue already closed"}'
+                printf 'RETIRED #%s %s -> skipped (stale plan, issue closed)\n' \
+                    "$issue_num" "$slug"
+            else
+                printf 'STALE-PLAN #%s %s (plan file, no queue entry, no PR; not flipped)\n' \
+                    "$issue_num" "$slug"
+            fi
         else
-            bd_record_apply "$ledger" "$issue_num" '{"status":"skipped"}'
+            bd_record_apply "$ledger" "$issue_num" \
+                '{"status":"skipped","cost":0,"reason":"sweep: zombie queued item (no plan, no queue entry, no PR)"}'
             printf 'ZOMBIE #%s %s -> skipped (no plan, no queue entry, no PR)\n' \
                 "$issue_num" "$slug"
         fi
@@ -1414,7 +1454,8 @@ bd_sweep_picked() {
     if [ "$status" = "picked" ] && [ -z "$route" ] && [ -z "$slug" ] \
         && [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
         && [[ "$created" < "$BD_SWEEP_CUTOFF" ]]; then
-        bd_record_apply "$ledger" "$issue_num" '{"status":"skipped"}'
+        bd_record_apply "$ledger" "$issue_num" \
+            '{"status":"skipped","cost":0,"reason":"sweep: zombie picked item (no route, no slug, ledger older than 24h)"}'
         printf 'ZOMBIE-PICK #%s -> skipped (no route, no slug, ledger older than 24h)\n' \
             "$issue_num"
         return 0

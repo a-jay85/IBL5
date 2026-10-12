@@ -1,6 +1,6 @@
 ---
-description: Ingests externally-generated sim recap documents and queues them for the sim recap pipeline; RecapPhasePolicy gates generation to HEAT and Regular Season; SimRecapContextRepository precomputes roster context for generation.
-last_verified: 2026-09-30
+description: Ingests externally-generated sim recap documents and queues them for the sim recap pipeline; RecapPhasePolicy gates generation to HEAT and Regular Season; SimRecapContextRepository precomputes roster context for generation; MentionMapBuilder builds the Discord mention map for the queue script.
+last_verified: 2026-10-11
 ---
 
 # SimRecap
@@ -16,6 +16,7 @@ Handles the ingest of externally-generated simulation recap documents into the a
 | `RecapDocument` | Assembles the postable document from intro + game rows + outro, shaped like `bin/lib/sim-recap-exemplar.txt`; prefers the stored text when the parts are degraded or incomplete |
 | `SimRecapContextRepository` | Precomputes current rosters, active injuries, and in-window trades for a sim |
 | `GitHubDispatchClient` | Posts a `repository_dispatch` of type `sim-recap` to GitHub; `fromConfig()` returns null when the config file or token is missing, and `dispatch()` never throws |
+| `MentionMapBuilder` | Builds the team name to Discord snowflake map for the `simRecapQueue.php mention-map` verb; ids leave as strings and teams with no id are omitted. State-free: its only collaborator is `TeamIdentityRepositoryInterface` |
 
 ## Dispatch and hosts
 

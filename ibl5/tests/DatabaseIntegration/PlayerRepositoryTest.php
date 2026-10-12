@@ -48,6 +48,14 @@ class PlayerRepositoryTest extends DatabaseTestCase
         $this->repo->loadByID(99999);
     }
 
+    public function testLoadByIdThrowsPlayerNotFoundExceptionForUnknownPlayer(): void
+    {
+        $this->expectException(\Player\PlayerNotFoundException::class);
+        $this->expectExceptionMessageIsOrContains('Player with ID 99999 not found');
+
+        $this->repo->loadByID(99999);
+    }
+
     public function testGetFreeAgencyDemandsReturnsZeroesWhenNoDemandRow(): void
     {
         $this->insertTestPlayer(200010004, 'PLR DemandTst');

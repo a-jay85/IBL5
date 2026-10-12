@@ -26,8 +26,11 @@ interface NewsRepositoryInterface
     /** @return array<int, array<string, mixed>> */
     public function getStoriesByTopic(int $topicId, int $limit, string $langClause = ''): array;
 
-    /** @return array<int, array<string, mixed>> */
-    public function getStoriesByCategory(int $catId, int $limit, string $langClause = ''): array;
+    /**
+     * @param string|null $language Bound to nuke_stories.alanguage; null skips the language clause.
+     * @return array<int, array<string, mixed>>
+     */
+    public function getStoriesByCategory(int $catId, int $limit, ?string $language = null): array;
 
     /** @return array<string, mixed>|null */
     public function getStoryById(int $sid): ?array;

@@ -2,24 +2,24 @@
 # bin/test-db-query-routing — regression harness for ibl5/bin/db-query target routing.
 # Runs with no Docker, no MariaDB and no PHP: php/mariadb/docker are stubbed on PATH.
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-FAILED=0
+h_tmp TMP
 
-pass()     { echo "PASS: $1"; }
-failcase() { echo "FAIL: $1"; echo "      $2"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$1" "$2"; }
 
 assert_match() {  # <label> <needle> <haystack>
-    case "$3" in *"$2"*) pass "$1" ;; *) failcase "$1" "expected to contain: $2 | got: $3" ;; esac
+    h_contains "$1" "$3" "$2"
 }
 assert_absent() { # <label> <needle> <haystack>
-    case "$3" in *"$2"*) failcase "$1" "expected NOT to contain: $2 | got: $3" ;; *) pass "$1" ;; esac
+    h_not_contains "$1" "$3" "$2"
 }
 assert_eq() {     # <label> <expected> <actual>
-    if [ "$2" = "$3" ]; then pass "$1"; else failcase "$1" "expected: [$2] got: [$3]"; fi
+    h_eq "$1" "$2" "$3"
 }
 
 STUBBIN="$TMP/stubbin"
@@ -75,9 +75,7 @@ chmod +x "$MAIN/ibl5/bin/db-query"
 ln -s ../ibl5/bin/db-query "$MAIN/bin/db-query"
 echo '<?php $dbuname="stubuser"; $dbpass="stubpass"; $dbname="stubdb";' > "$MAIN/ibl5/config.php"
 
-git -C "$MAIN" init -q -b master
-git -C "$MAIN" config user.email t@example.com
-git -C "$MAIN" config user.name  Test
+h_git_repo "$MAIN" --no-commit
 git -C "$MAIN" add -A
 git -C "$MAIN" commit -qm init
 git -C "$MAIN" worktree add -q -b "$SLUG" "$WT_PARENT/$SLUG" >/dev/null 2>&1
@@ -340,5 +338,4 @@ assert_match  "N8 mariadb -h 127.0.0.1 on degraded route" "-h 127.0.0.1" "$(argv
 assert_match  "N8 degraded banner on stderr" "defaulting to the main stack" "$ERR"
 
 
-if [ "$FAILED" -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi
-echo "All db-query routing tests passed"
+h_done

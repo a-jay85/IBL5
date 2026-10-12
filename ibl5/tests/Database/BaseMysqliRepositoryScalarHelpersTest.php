@@ -87,6 +87,22 @@ final class BaseMysqliRepositoryScalarHelpersTest extends TestCase
         }
     }
 
+    /**
+     * BaseMysqliRepository::scalarToString delegates to StatsSanitizer::scalarToString.
+     */
+    public function testScalarToStringDelegatesToStatsSanitizer(): void
+    {
+        $inputs = ['abc', 7, 1.5, null, true, ['x']];
+
+        foreach ($inputs as $input) {
+            $this->assertSame(
+                \BasketballStats\StatsSanitizer::scalarToString($input),
+                ($this->toString)($input),
+                'input: ' . var_export($input, true)
+            );
+        }
+    }
+
     public function testScalarHelpersAreProtectedStaticAndInheritedByBoxscoreRepositories(): void
     {
         foreach (['scalarToInt', 'scalarToString'] as $name) {

@@ -37,12 +37,12 @@
 
 .ibl-tab:hover {
     color: white;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--white-alpha-5);
 }
 
 .ibl-tab--active {
     color: white;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--white-alpha-10);
     border-bottom-color: var(--accent-500);
 }
 
@@ -251,13 +251,13 @@
 }
 
 .ibl-jump-menu__link:hover {
-    background: white;
+    background: var(--white);
     color: var(--navy-900);
     box-shadow: var(--shadow-sm);
 }
 
 .ibl-jump-menu__link--active {
-    background: white;
+    background: var(--white);
     color: var(--accent-500);
     box-shadow: var(--shadow-sm);
 }
@@ -287,7 +287,7 @@
 }
 
 .mobile-menu-scroll::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--white-alpha-5);
 }
 
 .mobile-menu-scroll::-webkit-scrollbar-thumb {
@@ -350,7 +350,7 @@
 
 .nav-dropdown-item--team:hover {
     color: white;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--white-alpha-5);
 }
 
 .group:hover .nav-dropdown-item {
@@ -428,7 +428,7 @@ nav .group > a:hover {
 
 .nav-dropdown-item:hover {
     color: white;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: var(--white-alpha-5);
     border-left-color: var(--color-accent-500);
 }
 
@@ -476,7 +476,7 @@ span.nav-dropdown-item a:hover {
 
 .mobile-dropdown-link:hover {
     color: white;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: var(--white-alpha-5);
     border-left-color: var(--color-accent-500);
 }
 
@@ -492,7 +492,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .mobile-dropdown-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--white-alpha-5);
 }
 
 /* Mobile home link */
@@ -569,7 +569,7 @@ span.nav-dropdown-item a:hover {
 
 .plr-nav__pill:hover {
     color: var(--navy-800);
-    background: white;
+    background: var(--white);
     box-shadow: var(--shadow-sm);
 }
 
@@ -607,7 +607,7 @@ span.nav-dropdown-item a:hover {
         font-size: 1rem;
         font-weight: var(--font-weight-semibold);
         color: var(--navy-800);
-        background: white;
+        background: var(--white);
         border: 2px solid var(--gray-200);
         border-radius: var(--radius-lg);
         appearance: none;
@@ -741,7 +741,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-icon-btn:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--white-alpha-10);
 }
 
 .nav-trigger {
@@ -792,7 +792,7 @@ span.nav-dropdown-item a:hover {
     border-bottom-left-radius: 0.5rem;
     border-bottom-right-radius: 0.5rem;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--white-alpha-10);
     overflow: hidden;
 }
 
@@ -811,11 +811,11 @@ span.nav-dropdown-item a:hover {
 .nav-select {
     width: 100%;
     appearance: none;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--white-alpha-10);
     color: white;
     font-size: var(--text-sm);
     font-weight: var(--font-weight-medium);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--white-alpha-20);
     border-radius: var(--radius-xl);
     padding: 0.625rem 2rem 0.625rem 0.75rem;
     cursor: pointer;
@@ -823,8 +823,8 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-select:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: var(--white-alpha-15);
+    border-color: var(--white-alpha-30);
 }
 
 .nav-select:focus {
@@ -845,11 +845,11 @@ span.nav-dropdown-item a:hover {
     display: block;
     width: 100%;
     text-align: center;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--white-alpha-10);
     color: white;
     font-size: var(--text-sm);
     font-weight: var(--font-weight-medium);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--white-alpha-20);
     border-radius: var(--radius-xl);
     padding: 0.625rem 0.75rem;
     cursor: pointer;
@@ -857,8 +857,8 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-logout-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: var(--white-alpha-15);
+    border-color: var(--white-alpha-30);
 }
 
 @media (min-width: 1024px) {
@@ -884,8 +884,8 @@ span.nav-dropdown-item a:hover {
 
 .nav-login-input {
     width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--white-alpha-5);
+    border: 1px solid var(--white-alpha-10);
     border-radius: var(--radius-xl);
     padding: 0.75rem 1rem 0.75rem 2.75rem;
     font-size: 1rem;
@@ -952,8 +952,8 @@ span.nav-dropdown-item a:hover {
 
 .nav-login-checkbox {
     appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--white-alpha-20);
+    background: var(--white-alpha-5);
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-fast);

@@ -12,8 +12,11 @@ interface NewsServiceInterface
     /** @return array<int, array<string, mixed>> */
     public function getTopicPageStories(int $topicId, int $limit, string $langClause): array;
 
-    /** @return array<int, array<string, mixed>> */
-    public function getCategoryPageStories(int $catId, int $limit, string $langClause): array;
+    /**
+     * @param string|null $language Bound to nuke_stories.alanguage; null skips the language clause.
+     * @return array<int, array<string, mixed>>
+     */
+    public function getCategoryPageStories(int $catId, int $limit, ?string $language): array;
 
     /** @return array<string, mixed>|null */
     public function getStory(int $sid): ?array;

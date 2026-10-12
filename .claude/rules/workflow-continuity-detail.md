@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-11
+last_verified: 2026-10-12
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -37,6 +37,14 @@ branch; it survives you closing Claude Code. Engine selection:
   A skill re-run would hit the same wall on each one, so the run stops for a human.
   For a usage limit, re-run `bin/post-plan-now` after the limit resets. For an expired
   login, run `claude`, complete `/login`, then re-run it.
+  A conflict on a generated file flagged `regen_on_conflict` in the ladder's `GENERATED_FILES`
+  registry skips the LLM resolver. Today only `ibl5/phpstan-baseline.neon` carries the flag.
+  Once every other conflicted file resolves, the harness takes master's copy, runs
+  `bin/regen-baselines` on the merged tree and commits the output in the merge commit. It then
+  rewrites that file's section of the lost-work pre-patch to the master-to-merged diff, so the
+  proof checks every other file unchanged. A generator that fails, times out or writes a file
+  outside its registry outputs declines with `resolver declined: <path>`, the same exit-3 reason
+  as before. `conflict_rung` reads `regen` when no file needed the resolver.
   Before a rebase conflict reaches exit 3, a first resolution that fails the lost-work proof
   goes through the conflict ladder in `tools/postplan-harness/harness/conflict_ladder.py`.
   Rung 1 takes master's copy of each generated file and reruns its generator, with no model

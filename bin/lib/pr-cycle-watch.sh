@@ -146,6 +146,40 @@ pcw_stacked_on() {
     [[ -n "$base" && "$base" != "master" ]] || return 1
     awk -F'\t' -v b="$base" '$1 == b { print $2; f = 1; exit } END { exit !f }' <<< "$heads"
 }
+# pcw_patch_id <root> <pr>: print the PR's patch-id (40 lowercase hex), or nothing on any
+# failure. Always returns 0. A non-empty PR_CYCLE_PATCH_ID_CMD replaces the git default
+# (`<cmd> <pr>` prints the id). The default fetches the PR head into refs/pr-cycle/<pr> and
+# hashes `git diff <merge-base with origin/master> <head>` through git patch-id --verbatim.
+# The caller removes the ref: bin/pr-cycle via _cleanup_fetch_refs, the tick via
+# pcw_drop_pr_ref. The diff keeps git's default 3 context lines. bin/pr-cycle's sticky
+# verdicts store ids made this way, so a different diff mode would invalidate them. A
+# rebase that changes lines next to the PR's hunks therefore changes the id.
+pcw_patch_id() {
+    local root="$1" pr="$2" pid="" base=""
+    [[ "$pr" =~ ^[0-9]+$ ]] || return 0
+    if [[ -n "${PR_CYCLE_PATCH_ID_CMD:-}" ]]; then
+        pid="$("$PR_CYCLE_PATCH_ID_CMD" "$pr" 2>/dev/null)" || true
+    else
+        git -C "$root" fetch --quiet origin master \
+            "+refs/pull/$pr/head:refs/pr-cycle/$pr" 2>/dev/null || true
+        base="$(git -C "$root" merge-base origin/master "refs/pr-cycle/$pr" 2>/dev/null)" || true
+        if [[ -n "$base" ]]; then
+            pid="$(git -C "$root" diff "$base" "refs/pr-cycle/$pr" 2>/dev/null \
+                | git -C "$root" patch-id --verbatim 2>/dev/null \
+                | awk '{print $1; exit}')" || true
+        fi
+    fi
+    [[ "$pid" =~ ^[0-9a-f]{40}$ ]] && printf '%s\n' "$pid"
+    return 0
+}
+# pcw_drop_pr_ref <root> <pr>: delete refs/pr-cycle/<pr> and nothing else, so a concurrent
+# bin/pr-cycle run keeps the refs it fetched. Always returns 0.
+pcw_drop_pr_ref() {
+    [[ "$2" =~ ^[0-9]+$ ]] || return 0
+    git -C "$1" update-ref -d "refs/pr-cycle/$2" 2>/dev/null || true
+    return 0
+}
+
 _pcw_write() {   # atomic: temp file then rename, so a killed tick never leaves half a SHA
     mkdir -p "$(dirname "$1")" && printf '%s\n' "$2" > "$1.tmp.$$" && mv -f "$1.tmp.$$" "$1"
 }

@@ -565,7 +565,7 @@ _auth_probe() {
 
 # _pr_patch_id N — echo the patch-id (40 lowercase hex) for PR N, or "" on any error.
 # Cached per run in $RUNDIR/patchid-N.txt.
-# Uses PR_CYCLE_PATCH_ID_CMD seam when set; otherwise does a git fetch + diff + patch-id.
+# Delegates to pcw_patch_id (bin/lib/pr-cycle-watch.sh), which honours PR_CYCLE_PATCH_ID_CMD.
 # Note: this may write refs/pr-cycle/N into ROOT; call _cleanup_fetch_refs at run end.
 _pr_patch_id() {
     _ppn="$1"
@@ -573,21 +573,7 @@ _pr_patch_id() {
     [ -f "$_ppf" ] && { tr -d '\n' < "$_ppf"; return 0; }
 
     local _pid=""
-    if [ -n "${PR_CYCLE_PATCH_ID_CMD:-}" ]; then
-        set +e
-        _pid="$("$PR_CYCLE_PATCH_ID_CMD" "$_ppn" 2>/dev/null)"
-        set -e
-    else
-        set +e
-        git -C "$ROOT" fetch --quiet origin master \
-            "+refs/pull/$_ppn/head:refs/pr-cycle/$_ppn" 2>/dev/null
-        _pid="$(git -C "$ROOT" diff \
-            "$(git -C "$ROOT" merge-base origin/master "refs/pr-cycle/$_ppn" 2>/dev/null)" \
-            "refs/pr-cycle/$_ppn" 2>/dev/null \
-            | git -C "$ROOT" patch-id --verbatim 2>/dev/null \
-            | awk '{print $1; exit}')"
-        set -e
-    fi
+    _pid="$(pcw_patch_id "$ROOT" "$_ppn")" || true
 
     # Validate: must be exactly 40 lowercase hex characters.
     if [[ "${_pid:-}" =~ ^[0-9a-f]{40}$ ]]; then

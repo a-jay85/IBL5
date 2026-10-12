@@ -14,7 +14,7 @@ ibl5/tests/WideUnit/Scripts/SimSummariesGuardTest.php
 ibl5/tests/WideUnit/Scripts/FaprepGuardTest.php
 # CLI guard is the first statement, no SQL composed, no hardcoded snowflake, write before post, only --sim is int-cast, scripts/.htaccess denies only storeSimRecap.php
 ibl5/tests/WideUnit/Scripts/StoreSimRecapGuardTest.php
-# CLI guard, no SQL, snowflakes stay strings in the inline buildMentionMap, scripts/.htaccess denial in Apache 2.4 syntax; top-level require/exit leaves no seam
+# CLI guard, no SQL, scripts/.htaccess denial in Apache 2.4 syntax; top-level require/exit leaves no seam
 ibl5/tests/WideUnit/Scripts/SimRecapQueueGuardTest.php
 # Discord::init receives the canonical host (Discord short-circuits under PHPUnit, so no behavior seam) and no hostname is hardcoded
 ibl5/tests/WideUnit/Scripts/StoreSimRecapHostSeamTest.php

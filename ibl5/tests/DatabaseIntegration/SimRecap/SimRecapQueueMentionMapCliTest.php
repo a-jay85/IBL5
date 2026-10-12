@@ -63,7 +63,7 @@ final class SimRecapQueueMentionMapCliTest extends DatabaseTestCase
         $json = json_decode($result['stdout'], true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($json);
 
-        self::assertSame(true, $json['ok']);
+        self::assertTrue($json['ok']);
         self::assertSame('mention-map', $json['cmd']);
         self::assertIsArray($json['teams']);
         self::assertSame(['ok', 'cmd', 'teams'], array_keys($json));

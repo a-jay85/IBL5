@@ -126,13 +126,30 @@ msg="\$*"; nl=\$'\n'
 printf '%s\n' "\${msg//\$nl/\\\\n}" >> "$SCRATCH/dm.log"
 exit 0
 DM_EOF
-chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub"
+# pad40 <sha>: the fixture's patch-id for a head. Fixture SHAs are 7 hex chars and the
+# tick's pcw_patch_id accepts only 40 hex, so the identity seam pads with 0 to 40.
+# This is the ONE definition; the shim and key_of both call it.
+cat > "$SCRATCH/pad40" <<'PAD_EOF'
+#!/usr/bin/env bash
+s="$1"; z="0000000000000000000000000000000000000000"
+[[ "$s" =~ ^[0-9a-f]{1,40}$ ]] || exit 1
+printf '%s%s\n' "$s" "${z:${#s}}"
+PAD_EOF
+# Default PR_CYCLE_PATCH_ID_CMD: patch-id == pad40(current head SHA of PR $1).
+cat > "$SCRATCH/patchid-identity" <<PID_EOF
+#!/usr/bin/env bash
+s="\$(jq -r --argjson n "\$1" '.[] | select(.number == \$n) | .headRefOid' "$SCRATCH/prs.json" 2>/dev/null)"
+[[ -n "\$s" ]] || exit 1
+exec "$SCRATCH/pad40" "\$s"
+PID_EOF
+chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub" "$SCRATCH/pad40" "$SCRATCH/patchid-identity"
 
 # --- per-case state ------------------------------------------------------------------------
 UNSET="__UNSET__"
 E_ZONE=normal; E_STOP="$UNSET"; E_STATE="$UNSET"
 E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
 E_HOME="set"; E_STUB_RC=0
+E_PATCHID="$SCRATCH/patchid-identity"
 
 reset() {
     rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
@@ -144,6 +161,7 @@ reset() {
     E_ZONE=normal; E_STOP="$UNSET"; E_STATE="$UNSET"
     E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
     E_HOME="set"; E_STUB_RC=0
+    E_PATCHID="$SCRATCH/patchid-identity"
 }
 
 # set_prs "<num>|<branch>|<sha>|<mergeStateStatus>|<isDraft>[|<baseRefName>]" ...
@@ -192,6 +210,7 @@ run_tick() {
     _envv PR_CYCLE_WATCH_STATE_DIR "$E_STATE"
     _envv PR_CYCLE_TICK_PR_CYCLE_CMD "$E_PRCMD"
     _envv PR_CYCLE_TICK_DM_CMD "$E_DMCMD"
+    _envv PR_CYCLE_PATCH_ID_CMD "$E_PATCHID"
     if [[ "$E_HOME" == "set" ]]; then _SET+=("HOME=$HOME_DIR"); else _DROP+=(-u HOME); fi
     ERR="$SCRATCH/last.err"
     OUT="$(cd "$SCRATCH" && env ${_DROP[@]+"${_DROP[@]}"} ${_SET[@]+"${_SET[@]}"} \
@@ -211,6 +230,7 @@ pending_count() { find "$STATE_DIR/pending" -type f 2>/dev/null | wc -l | tr -d 
 dm_count() { if [[ -f "$SCRATCH/dm.log" ]]; then wc -l < "$SCRATCH/dm.log" | tr -d ' '; else echo 0; fi; }
 launch_count() { if [[ -f "$SCRATCH/pr-cycle.log" ]]; then wc -l < "$SCRATCH/pr-cycle.log" | tr -d ' '; else echo 0; fi; }
 strikes() { cat "$STATE_DIR/strikes/$1" 2>/dev/null; }
+key_of() { "$SCRATCH/pad40" "$1"; }
 # set_result "<pr>\t<status>\t<outcome>\t<reason>" ...: the file the stub hands the tick.
 set_result() {
     { echo "# pr-cycle-result v1"; printf '%b\n' "$@"; } > "$SCRATCH/result-canned"
@@ -843,6 +863,18 @@ env HOME="$HOME_DIR" PATH="$SHIMS:$PATH" "$CRON" --uninstall-schedule >/dev/null
 no_file "$LABEL_PLIST" || fail "cron-setup-cli: uninstall left the plist"
 grep -qF 'bootout' "$SCRATCH/launchctl.log" 2>/dev/null || fail "cron-setup-cli: no bootout in launchctl.log"
 end_case cron-setup-cli
+
+reset; begin_case
+set_prs "$RED101"
+got="$("$SCRATCH/patchid-identity" 101)"
+[[ "$got" =~ ^[0-9a-f]{40}$ ]] || fail "identity-seam-shape: shim printed '$got', want 40 hex"
+[[ "$got" == "$(key_of aaa1111)" && "$got" == aaa1111* ]] \
+    || fail "identity-seam-shape: shim '$got' != key_of aaa1111"
+"$SCRATCH/patchid-identity" 999 >/dev/null 2>&1 \
+    && fail "identity-seam-shape: shim succeeded for an unknown PR"
+"$SCRATCH/pad40" 'not-hex' >/dev/null 2>&1 \
+    && fail "identity-seam-shape: pad40 accepted a non-hex SHA"
+end_case identity-seam-shape
 
 # --- summary -------------------------------------------------------------------------------
 h_done

@@ -514,6 +514,7 @@ B7="$(extract_block '# condition (7)')"
 B13="$(extract_block '# condition (13)')"
 B15="$(extract_block '# condition (15)')"
 B17="$(extract_block '# condition (17)')"
+B18="$(extract_block '# condition (18)')"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 S1X="$(extract_block '# phase 6 step 1 extract' "$P25_SKILL")"
@@ -598,6 +599,7 @@ else
 fi
 assert_self_contained '# condition (15)' "condition (15)"
 assert_self_contained '# condition (17)' "condition (17)"
+assert_self_contained '# condition (18)' "condition (18)"
 assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
 assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"
 
@@ -1524,6 +1526,57 @@ else
         echo "FAIL: (17) unreadable body should say 'cannot read the PR body', got: '$out'"
         FAILED=1
     fi
+fi
+
+# condition (18) — merge danger door. The block reads the PR body's Merge danger line
+# through pr_merge_danger_hold; only one well-formed two-way line passes.
+# run_cond18 <body|__fail__> — scratch repo with the real predicate library symlinked.
+MD_TWO='**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff'
+MD_ONE='**Merge danger:** Door: one-way · Blast radius: site-wide · Why: mechanical: arming-path:bin/lib/pr-armable.sh'
+run_cond18() {
+    local c18="$BASE_TMP/c18"
+    rm -rf "$c18"
+    mkdir -p "$c18/bin/lib"
+    git -C "$c18" init -q
+    ln -s "$REPO_ROOT/bin/lib/pr-armable.sh" "$c18/bin/lib/pr-armable.sh"
+    local fail=""
+    if [ "$1" = "__fail__" ]; then
+        fail=1
+        printf '{"number":2100,"body":""}' > "$BASE_TMP/fixture.json"
+    else
+        jq -n --arg b "$1" '{number: 2100, body: $b}' > "$BASE_TMP/fixture.json"
+    fi
+    ( cd "$c18" && PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        GH_PR_FAIL="$fail" bash -c "$B18" 2>&1 )
+}
+expect_c18_text() { # label out needle
+    if [[ "$2" == *"$3"* ]]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 should say '$3', got: '$2'"
+        FAILED=1
+    fi
+}
+
+if [ -z "$B18" ]; then
+    echo "FAIL: no block matching '# condition (18)' in $SKILL — marker drifted"
+    FAILED=1
+else
+    expect_block "(18) two-way line -> NONE" NONE "$(run_cond18 "## Summary"$'\n'"$MD_TWO")"
+    out="$(run_cond18 "## Summary"$'\n'"$MD_ONE")"
+    expect_block "(18) one-way line -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) one-way names the door" "$out" "Door is one-way"
+    out="$(run_cond18 "## Summary"$'\n'"no field here")"
+    expect_block "(18) no line -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) missing line names the field" "$out" "no **Merge danger:** line"
+    out="$(run_cond18 "$MD_TWO"$'\n'"$MD_TWO")"
+    expect_block "(18) two lines -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) two lines read as malformed" "$out" "malformed (MALFORMED)"
+    out="$(run_cond18 '**Merge danger:** Door: maybe · Blast radius: module · Why: twenty characters at least')"
+    expect_block "(18) bad door value -> BLOCK" BLOCK "$out"
+    out="$(run_cond18 __fail__)"
+    expect_block "(18) unreadable PR body -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) unreadable body is fail-closed" "$out" "fail-closed"
 fi
 
 # --- Phase 5.0d autonomy contract: run_p50d helper + D1..D6 cases ---------
@@ -3346,7 +3399,7 @@ done
 # §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
 # catches: a block can be perfect while the surrounding prose still claims twelve
 # conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
-have "§5.9k: SKILL.md counts fifteen conditions"         "$P25_TXT" '**All fifteen conditions**'
+have "§5.9k: SKILL.md counts eighteen conditions"        "$P25_TXT" '**All eighteen conditions**'
 have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
 have "§5.9k: the shared-predicate list carries (15)"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)/(15)'
 
@@ -3379,7 +3432,7 @@ else
     lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
 fi
 # §5.9l: the Phase 6.5 reference doc carries the (14) and (15) entries that
-# SKILL.md's "All fifteen conditions" count promises, as prose pointing at its block.
+# SKILL.md's "All eighteen conditions" count promises, as prose pointing at its block.
 ARM_TXT="$(cat "$SKILL")"
 have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
 have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'

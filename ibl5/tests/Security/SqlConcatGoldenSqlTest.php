@@ -828,7 +828,7 @@ final class SqlConcatGoldenSqlTest extends TestCase
             },
             null,
             [
-                'SELECT t.pid, p.name, p.pos, STR_TO_DATE(CONCAT(CASE WHEN t.transaction_month >= 9 '
+                'SELECT t.id, t.pid, p.name, p.pos, STR_TO_DATE(CONCAT(CASE WHEN t.transaction_month >= 9 '
                     . 'THEN t.season_year - 1 ELSE t.season_year END, \'-\', t.transaction_month, \'-\', '
                     . 't.transaction_day), \'%Y-%c-%e\') AS injury_date, t.injury_description, '
                     . 't.injury_games_missed, DATEDIFF(DATE_ADD(STR_TO_DATE(CONCAT(CASE WHEN '

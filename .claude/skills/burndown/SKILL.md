@@ -51,6 +51,9 @@ Exit 3 stops the run with stderr shown to the user.
 A `HELD #N <path> (...)` line names a skipped ad-hoc item whose worktree still has unshipped
 work (dirty or ahead of origin/master, no PR, ledger older than 24h). `HELD-UNKNOWN` means
 the probe failed. The sweep never changes either; ship the worktree or remove it.
+A `STALE-PLAN` line names a queued item that has a plan file but no queue entry and no PR.
+When the issue is already closed, the sweep retires the row to skipped and prints `RETIRED`
+in place of `STALE-PLAN`. A failed issue lookup keeps the `STALE-PLAN` line.
 
 ```bash
 bin/backlog burndown-delta > "$W/delta.json"
@@ -101,7 +104,9 @@ sentinel (the path in `IBL5_BURNDOWN_EMPTY_SENTINEL`). The loop calls a batch em
 when that file exists. A live-unknown round (exit 1) writes no sentinel. Run step 4
 exactly as written; the sentinel needs no action from the skill.
 
-A `SKIP ... skip-label: <label>` row is a tagged item. It consumes no unit. A
+A `SKIP ... skip-label: <label>` row is a tagged item. It consumes no unit. The skip
+labels are `blocked`, `out-of-repo`, and `deferred`. A human adds `deferred` to an issue
+that needs its own design pass before any run should pick it. A
 `cleared blocked on #N` line on stderr means the blocking PR closed and the item is
 eligible again.
 

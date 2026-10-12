@@ -147,6 +147,46 @@ class TeamPageDataPreparerTest extends TestCase
         return $repo;
     }
 
+    /** @param list<array<string, mixed>> $teamRows */
+    private function leagueWithTeams(array $teamRows): League
+    {
+        $league = self::createStub(League::class);
+        $league->method('getAllTeamsResult')->willReturn($teamRows);
+        return $league;
+    }
+
+    /** @return list<array<string, mixed>> Bulls (teamid 1) and Lakers (teamid 2) */
+    private static function bullsAndLakersRows(): array
+    {
+        return [
+            self::bullsRow(),
+            TestDataFactory::createTeam(['teamid' => 2, 'team_name' => 'Lakers', 'team_city' => 'Los Angeles']),
+        ];
+    }
+
+    /** @return array<string, mixed> one DraftPickRow; extra columns omitted, the preparer does not read them */
+    private static function draftPickRow(
+        int $pickId,
+        string $owner,
+        string $originalTeam,
+        int|string $year,
+        int|string $round,
+        ?string $notes = null,
+    ): array {
+        return [
+            'pickid' => $pickId, 'ownerofpick' => $owner, 'teampick' => $originalTeam,
+            'year' => $year, 'round' => $round, 'notes' => $notes,
+        ];
+    }
+
+    /** @param list<array<string, mixed>> $picks */
+    private function queryRepoWithPicks(array $picks): TeamQueryRepositoryInterface
+    {
+        $queryRepo = self::createStub(TeamQueryRepositoryInterface::class);
+        $queryRepo->method('getDraftPicks')->willReturn($picks);
+        return $queryRepo;
+    }
+
     // -------------------------------------------------------------------------
     // prepareBannerData
     // -------------------------------------------------------------------------
@@ -666,5 +706,144 @@ class TeamPageDataPreparerTest extends TestCase
         $result = $preparer->prepareWinLossHistoryData(self::bullsTeam(), 'regular');
 
         $this->assertSame('2023-2024 &lt;i&gt;X&lt;/i&gt;', $result['records'][0]['label']);
+    }
+
+    // -------------------------------------------------------------------------
+    // prepareDraftPicksData
+    // -------------------------------------------------------------------------
+
+    public function testPrepareDraftPicksDataReturnsEmptyListWhenNoPicks(): void
+    {
+        $preparer = $this->buildPreparer(
+            self::createStub(TeamRepositoryInterface::class),
+            $this->queryRepoWithPicks([]),
+            $this->leagueWithTeams(self::bullsAndLakersRows()),
+        );
+
+        $this->assertSame([], $preparer->prepareDraftPicksData(self::bullsTeam()));
+    }
+
+    public function testPrepareDraftPicksDataMapsOriginalTeamFromLeagueTeams(): void
+    {
+        $preparer = $this->buildPreparer(
+            self::createStub(TeamRepositoryInterface::class),
+            $this->queryRepoWithPicks([self::draftPickRow(11, 'Bulls', 'Lakers', '2026', '1', 'Top 5 protected')]),
+            $this->leagueWithTeams(self::bullsAndLakersRows()),
+        );
+
+        $result = $preparer->prepareDraftPicksData(self::bullsTeam());
+
+        $this->assertSame(
+            [[
+                'originalTeamID' => 2,
+                'originalTeamCity' => 'Los Angeles',
+                'originalTeamName' => 'Lakers',
+                'year' => '2026',
+                'round' => '1',
+                'notes' => 'Top 5 protected',
+            ]],
+            $result,
+        );
+    }
+
+    public function testPrepareDraftPicksDataPreservesPickOrderAndNullNotes(): void
+    {
+        $preparer = $this->buildPreparer(
+            self::createStub(TeamRepositoryInterface::class),
+            $this->queryRepoWithPicks([
+                self::draftPickRow(12, 'Bulls', 'Bulls', '2026', '2'),
+                self::draftPickRow(13, 'Bulls', 'Lakers', '2027', '1', 'Swap'),
+            ]),
+            $this->leagueWithTeams(self::bullsAndLakersRows()),
+        );
+
+        $result = $preparer->prepareDraftPicksData(self::bullsTeam());
+
+        $this->assertCount(2, $result);
+        $this->assertSame(1, $result[0]['originalTeamID']);
+        $this->assertSame('Chicago', $result[0]['originalTeamCity']);
+        $this->assertSame('Bulls', $result[0]['originalTeamName']);
+        $this->assertNull($result[0]['notes']);
+        $this->assertSame(2, $result[1]['originalTeamID']);
+        $this->assertSame('Swap', $result[1]['notes']);
+    }
+
+    public function testPrepareDraftPicksDataCastsIntegerYearToString(): void
+    {
+        $preparer = $this->buildPreparer(
+            self::createStub(TeamRepositoryInterface::class),
+            $this->queryRepoWithPicks([self::draftPickRow(14, 'Bulls', 'Bulls', 2027, 2)]),
+            $this->leagueWithTeams(self::bullsAndLakersRows()),
+        );
+
+        $result = $preparer->prepareDraftPicksData(self::bullsTeam());
+
+        $this->assertSame('2027', $result[0]['year']);
+        $this->assertSame(2, $result[0]['round']);
+    }
+
+    public function testPrepareDraftPicksDataRequestsPicksForTheTeamId(): void
+    {
+        $queryRepo = self::createMock(TeamQueryRepositoryInterface::class);
+        $queryRepo->expects($this->once())->method('getDraftPicks')->with(1)->willReturn([]);
+
+        $preparer = $this->buildPreparer(
+            self::createStub(TeamRepositoryInterface::class),
+            $queryRepo,
+            $this->leagueWithTeams(self::bullsAndLakersRows()),
+        );
+
+        $this->assertSame([], $preparer->prepareDraftPicksData(self::bullsTeam()));
+    }
+
+    // -------------------------------------------------------------------------
+    // prepareAwardsData
+    // -------------------------------------------------------------------------
+
+    public function testPrepareAwardsDataDelegatesWithTeamIdOwnerNameAndTeamName(): void
+    {
+        $repo = self::createMock(TeamRepositoryInterface::class);
+        $repo->expects($this->once())->method('getGMTenures')->with(1)->willReturn([]);
+        $repo->expects($this->once())->method('getGMAwards')->with('JohnGM')->willReturn([]);
+        $repo->expects($this->once())->method('getTeamAccomplishments')->with('Bulls')->willReturn([]);
+
+        $result = $this->buildPreparer($repo)->prepareAwardsData(self::bullsTeam());
+
+        $this->assertSame(['tenures' => [], 'gmAwards' => [], 'teamAccomplishments' => []], $result);
+    }
+
+    public function testPrepareAwardsDataReturnsRepositoryListsUnchangedUnderTheirKeys(): void
+    {
+        $tenures = [[
+            'id' => 1, 'franchise_id' => 1, 'gm_display_name' => 'John GM',
+            'start_season_year' => 2005, 'end_season_year' => null,
+            'is_mid_season_start' => 0, 'is_mid_season_end' => 0,
+        ]];
+        $gmAwards = [['year' => 2010, 'award' => 'GM of the Year', 'name' => 'JohnGM', 'table_id' => 7]];
+        $accomplishments = [['year' => 2011, 'name' => 'Bulls', 'award' => 'Best Record', 'id' => 3]];
+
+        $repo = self::createStub(TeamRepositoryInterface::class);
+        $repo->method('getGMTenures')->willReturn($tenures);
+        $repo->method('getGMAwards')->willReturn($gmAwards);
+        $repo->method('getTeamAccomplishments')->willReturn($accomplishments);
+
+        $result = $this->buildPreparer($repo)->prepareAwardsData(self::bullsTeam());
+
+        $this->assertSame(
+            ['tenures' => $tenures, 'gmAwards' => $gmAwards, 'teamAccomplishments' => $accomplishments],
+            $result,
+        );
+    }
+
+    public function testPrepareAwardsDataWithEmptyRepositoryResultsReturnsThreeEmptyLists(): void
+    {
+        $repo = self::createStub(TeamRepositoryInterface::class);
+        $repo->method('getGMTenures')->willReturn([]);
+        $repo->method('getGMAwards')->willReturn([]);
+        $repo->method('getTeamAccomplishments')->willReturn([]);
+
+        $result = $this->buildPreparer($repo)->prepareAwardsData(self::bullsTeam());
+
+        $this->assertSame(['tenures' => [], 'gmAwards' => [], 'teamAccomplishments' => []], $result);
     }
 }

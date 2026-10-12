@@ -512,8 +512,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      # A PR scans only its own changed files, so two PRs can each pass and still
+      # leave master red together (#3142 + #3148). A master push scans the whole
+      # tree; there `--pr` would diff master against itself and scan nothing.
       - name: Ban silently-disabled tests (markTestSkipped)
-        run: bin/check-phpunit-hygiene --pr
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "push" ]; then
+            bin/check-phpunit-hygiene
+          else
+            bin/check-phpunit-hygiene --pr
+          fi
 
   shellcheck:
     name: ShellCheck (bash 3.2 compat)

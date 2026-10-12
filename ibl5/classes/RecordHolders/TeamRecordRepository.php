@@ -123,7 +123,7 @@ final class TeamRecordRepository extends \Database\BaseMysqliRepository
      */
     public function getLargestMarginOfVictory(string $dateFilter): array
     {
-        $query = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . "
+        $query = "WITH _game_of_day AS " . self::GAME_OF_THAT_DAY_SUBQUERY . "
             SELECT
                 winner_t.teamid AS winner_tid,
                 winner_t.team_name AS winner_name,

@@ -33,7 +33,7 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
      */
     public function getQuadrupleDoubles(): array
     {
-        $query = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . ",
+        $query = "WITH _game_of_day AS " . self::GAME_OF_THAT_DAY_SUBQUERY . ",
             _qd_candidates AS (
                 -- Provably-complete candidate prune: every quad-double has >= 2 of
                 -- {ast,stl,blk} >= 10, so this UNION is a superset of qualifying rows.
@@ -198,7 +198,7 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
         }
 
         // CTE materializes game_of_that_day lookup once instead of per UNION ALL branch
-        $cte = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . "\n";
+        $cte = "WITH _game_of_day AS " . self::GAME_OF_THAT_DAY_SUBQUERY . "\n";
         $query = $cte . implode("\nUNION ALL\n", $unions);
         $rows = $this->fetchAll($query);
 

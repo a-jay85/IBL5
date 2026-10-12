@@ -244,6 +244,8 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
      * Primary source for regular-season career averages. ibl_hist is refreshed every
      * sim from `ibl_plr_snapshots` and contains per-season aggregates (~12K rows) — much
      * faster than aggregating 589K+ ibl_box_scores rows.
+     *
+     * @param 'p.name = ?'|'h.pid = ?' $filterClause
      */
     private static function buildHistCareerAveragesQuery(string $filterClause): string
     {
@@ -284,6 +286,8 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
      * Build career averages from `ibl_box_scores` for playoff/HEAT game types
      * (game_type 2 and 3). Regular-season averages (game_type=1) use
      * buildHistCareerAveragesQuery() to avoid scanning 489K+ box-score rows.
+     *
+     * @param 'p.name = ?' $filterClause
      */
     private function buildCareerAveragesQuery(int $gameType, string $filterClause): string
     {

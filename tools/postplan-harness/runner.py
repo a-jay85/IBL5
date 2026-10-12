@@ -986,10 +986,17 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         except HarnessError as e:
             retro = {"save": False, "error": e.kind}
             log(f"phase9: retrospective unavailable ({e.kind}) — terminal unchanged")
+        except usage_pause.UsagePause:
+            # The PR is already shipped and arming has run; the retrospective is
+            # record-only bookkeeping. A usage pause here skips it and keeps the real
+            # terminal instead of reporting FAILED/usage-pause (ADR-0143 addendum).
+            retro = {"save": False, "skipped": "usage-pause"}
+            log(f"phase9: retrospective skipped (usage-pause) — terminal "
+                f"{res.terminal.value} unchanged")
         res.retrospective = retro
         if retro.get("save"):
             log(f"phase9: memory-save intent recorded: {retro.get('name')}")
-        elif not retro.get("error"):
+        elif not retro.get("error") and not retro.get("skipped"):
             log("phase9: no durable lesson — nothing saved")
 
         # ---- Phase 10: preview environment ------------------------------

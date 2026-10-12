@@ -82,7 +82,7 @@ class NegotiationService implements NegotiationServiceInterface
             $threepointcontests,
             $dunkcontests,
             $rooksoph,
-            \Player\TeamColorSchemeResolver::forTradingCard($this->teamRepo, $player->getTeamid() ?? 0)
+            \Player\TeamColorSchemeResolver::forTeam($this->teamRepo, $player->getTeamid() ?? 0)
         );
 
         $output .= NegotiationOfferView::renderNegotiationForm(

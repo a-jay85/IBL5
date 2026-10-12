@@ -120,12 +120,9 @@ class DesktopNavView implements DesktopNavViewInterface
             $title = 'Switch to production';
         }
 
-        $safeUrl = HtmlSanitizer::e($url);
-        $safeTitle = HtmlSanitizer::e($title);
-
         ob_start();
         ?>
-            <a href="<?= HtmlSanitizer::trusted($safeUrl) ?>" class="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full opacity-40 hover:opacity-100 transition-opacity duration-200 overflow-visible nav-dev-switch" title="<?= HtmlSanitizer::trusted($safeTitle) ?>">
+            <a href="<?= HtmlSanitizer::e($url) ?>" class="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full opacity-40 hover:opacity-100 transition-opacity duration-200 overflow-visible nav-dev-switch" title="<?= HtmlSanitizer::e($title) ?>">
                 <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <circle cx="12" cy="12" r="10"/>
                     <ellipse cx="12" cy="12" rx="4" ry="10"/>
@@ -155,9 +152,7 @@ class DesktopNavView implements DesktopNavViewInterface
         ?>
         <div class="relative group self-stretch flex items-center"<?= $includeLoginForm ? ' data-nav-login' : '' ?>>
             <button class="nav-trigger">
-                <?php if ($icon !== ''): ?>
-                    <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= HtmlSanitizer::trusted($icon) ?></span>
-                <?php endif; ?>
+                <?= HtmlSanitizer::trusted($this->renderDropdownIcon($icon)) ?>
                 <span><?= HtmlSanitizer::e($title) ?></span>
                 <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
@@ -186,6 +181,20 @@ class DesktopNavView implements DesktopNavViewInterface
         </div>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the accent-colored icon wrapper for a dropdown trigger.
+     *
+     * @param string $icon Builder-authored SVG/HTML (`NavigationMenuBuilder` `icon` entries)
+     */
+    private function renderDropdownIcon(string $icon): string
+    {
+        if ($icon === '') {
+            return '';
+        }
+
+        return '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
     }
 
     /**

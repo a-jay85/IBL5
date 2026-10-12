@@ -727,7 +727,8 @@ stub_field() {  # $1 plan, $2 phase, $3 field -> first matching row's field
         '[.[] | select(.plan == $p and .phase == $ph)][0][$f]' "$STUB_SIDECAR"
 }
 
-# Literal 1: the impl pause line printed by bin/automouse/run.
+# Literal 1: the impl pause line printed by bin/automouse/run (plan cited
+# bin/automouse/run:2398; the line has drifted, the pattern finds it anyway).
 IMPL_PAT="printf '.*usage gate paused before the impl started"
 assert_eq "$(grep -cE "$IMPL_PAT" "$RUN_SRC")" 1 \
     "impl pause printf appears exactly once in run"
@@ -737,7 +738,8 @@ IMPL_MARKER=$(printf "$impl_fmt" "00:00:01" "stub-a")
 assert_eq "$IMPL_MARKER" "[00:00:01] stub-a usage gate paused before the impl started" \
     "impl pause literal renders to the exact logged line"
 
-# Literal 2: the postplan pre-start pause line printed by bin/post-plan-now.
+# Literal 2: the postplan pre-start pause line printed by bin/post-plan-now
+# (plan cited bin/post-plan-now:688; the line has drifted, the pattern finds it).
 PPN_PAT='echo "post-plan-now: usage gate .*paused before start'
 assert_eq "$(grep -cE "$PPN_PAT" "$PPN_SRC")" 1 \
     "post-plan-now pre-start echo appears exactly once"

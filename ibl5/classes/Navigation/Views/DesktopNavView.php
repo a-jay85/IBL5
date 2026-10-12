@@ -194,7 +194,9 @@ class DesktopNavView implements DesktopNavViewInterface
             return '';
         }
 
-        return '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
+        // Whitespace reproduces the original template bytes (pinned by ThemeIblOutputTest).
+        return str_repeat(' ', 20) . '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . "</span>\n"
+            . str_repeat(' ', 16);
     }
 
     /**

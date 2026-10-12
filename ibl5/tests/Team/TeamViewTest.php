@@ -438,7 +438,8 @@ class TeamViewTest extends TestCase
         $html = $this->view->render($this->createPageData(['tableOutput' => $table]));
 
         $this->assertStringContainsString(
-            '<div class="table-scroll-container" tabindex="0" role="region" aria-label="Team roster">' . $table,
+            "<div class=\"table-scroll-container\" tabindex=\"0\" role=\"region\" aria-label=\"Team roster\">\n"
+                . str_repeat(' ', 20) . $table,
             $html
         );
         $this->assertStringNotContainsString('&lt;table', $html);

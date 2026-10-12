@@ -57,7 +57,7 @@ class TeamView implements TeamViewInterface
             <?= HtmlSanitizer::trusted($this->renderYearHeading($isActualTeam, $yr, $team->name ?? '')) ?>
             <?= HtmlSanitizer::trusted($this->renderRosterRegion($tableOutput)) ?>
         </div>
-        <?= HtmlSanitizer::trusted($this->renderCardsRow($isActualTeam, $team, $currentSeasonCard, $draftPicksTable, $awardsCard)) ?>
+                <?= HtmlSanitizer::trusted($this->renderCardsRow($isActualTeam, $team, $currentSeasonCard, $draftPicksTable, $awardsCard)) ?>
         <?= HtmlSanitizer::trusted($this->renderFranchiseHistory($isActualTeam, $franchiseHistoryCard)) ?>
         <?= HtmlSanitizer::trusted($this->renderRafters($isActualTeam, $rafters)) ?>
     </div>
@@ -107,10 +107,12 @@ class TeamView implements TeamViewInterface
      */
     private function renderRosterRegion(string $tableOutput): string
     {
-        return '<div class="table-scroll-wrapper">'
-            . '<div class="table-scroll-container" tabindex="0" role="region" aria-label="Team roster">'
-            . $tableOutput
-            . '</div></div>';
+        // Whitespace reproduces the original template bytes (pinned by TeamServiceSnapshotTest).
+        return "<div class=\"table-scroll-wrapper\">\n"
+            . str_repeat(' ', 16) . "<div class=\"table-scroll-container\" tabindex=\"0\" role=\"region\" aria-label=\"Team roster\">\n"
+            . str_repeat(' ', 20) . $tableOutput
+            . str_repeat(' ', 16) . "</div>\n"
+            . str_repeat(' ', 12) . "</div>\n";
     }
 
     /**
@@ -245,6 +247,8 @@ class TeamView implements TeamViewInterface
      */
     private function renderDraftPicksBody(string $draftPicksTable): string
     {
-        return '<div class="team-card__body--flush">' . $draftPicksTable . '</div>';
+        return "<div class=\"team-card__body--flush\">\n"
+            . str_repeat(' ', 8) . $draftPicksTable
+            . str_repeat(' ', 4) . "</div>\n";
     }
 }

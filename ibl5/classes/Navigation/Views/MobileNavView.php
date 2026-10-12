@@ -184,7 +184,9 @@ class MobileNavView implements MobileNavViewInterface
             return '';
         }
 
-        return '<span class="text-accent-500">' . $icon . '</span>';
+        // Whitespace reproduces the original template bytes (pinned by ThemeIblOutputTest).
+        return str_repeat(' ', 24) . '<span class="text-accent-500">' . $icon . "</span>\n"
+            . str_repeat(' ', 20);
     }
 
     /**
@@ -194,7 +196,7 @@ class MobileNavView implements MobileNavViewInterface
      */
     private function renderRawHtmlLink(string $rawHtml): string
     {
-        return '<span class="mobile-dropdown-link">' . $rawHtml . '</span>';
+        return '<span class="mobile-dropdown-link">' . $rawHtml . "</span>\n";
     }
 
     /**

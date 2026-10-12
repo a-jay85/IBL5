@@ -569,4 +569,28 @@ EMPTY_GOLDEN;
         /** @var array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: string, min: int, offset: int, topicText: string, topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, results: list<mixed>|null, hasMore: bool, articleComm: bool, error: string} */
         return array_merge($defaults, $overrides);
     }
+
+    public function testUserResultsCarryCompactModifierOnWrapper(): void
+    {
+        $html = $this->view->render(self::createPageData([
+            'type' => 'users',
+            'query' => 'x',
+            'results' => [['userId' => 2, 'username' => 'bob', 'name' => 'Bob']],
+        ]));
+
+        $this->assertStringContainsString('<div class="search-result search-result--compact" style="--anim-delay: 0ms">', $html);
+    }
+
+    public function testLocalTimeKeepsTimeElementInStoryAndCommentResults(): void
+    {
+        $html = $this->view->render(self::createPageData([
+            'query' => 'x',
+            'results' => [
+                ['sid' => 1, 'aid' => 'admin', 'informant' => '', 'title' => 'T', 'time' => 1700000000, 'comments' => 0, 'topicId' => 0, 'topicText' => ''],
+            ],
+        ]));
+
+        $this->assertStringContainsString('<time datetime="2023-11-14T22:13:20+00:00" class="local-time">', $html);
+        $this->assertStringNotContainsString('&lt;time', $html);
+    }
 }

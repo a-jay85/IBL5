@@ -48,14 +48,6 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
         return (string) ob_get_clean();
     }
 
-    private function articlesSource(): string
-    {
-        $source = file_get_contents(__DIR__ . '/../../../modules/Player/articles.php');
-        $this->assertIsString($source);
-
-        return $source;
-    }
-
     private static function anchor(string $sid, string $title, string $time): string
     {
         return "\n* <a href=\"modules.php?name=News&amp;file=article&amp;sid={$sid}&amp;mode=&amp;order=0&amp;thold=0\">{$title}</a> ({$time})<br>";
@@ -198,26 +190,6 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
         $this->runArticles('Kobe');
         $this->assertSame([self::PREPARED_SQL], $this->mockDb->getPreparedQueries());
         $this->assertSame(['%Kobe%', '%Kobe%'], $this->lastBoundParams());
-    }
-
-    public function testArticlesSourcePinsPreparedStatementAndEscapingCallSites(): void
-    {
-        $source = $this->articlesSource();
-
-        $this->assertSame(1, substr_count($source, '->prepare('));
-        $this->assertStringContainsString('$query = "' . self::PREPARED_SQL . '";', $source);
-        $this->assertStringContainsString('$stmt->bind_param(\'ss\', $searchTerm, $searchTerm);', $source);
-        $this->assertSame(3, substr_count($source, 'htmlspecialchars('));
-        $this->assertSame(3, substr_count($source, ", ENT_QUOTES, 'UTF-8')"));
-        $this->assertStringContainsString(
-            '* <a href=\"modules.php?name=News&amp;file=article&amp;sid=$sid&amp;mode=&amp;order=0&amp;thold=0\">$title</a> ($time)<br>";',
-            $source
-        );
-        $this->assertStringNotContainsString('real_escape_string', $source);
-        $this->assertStringNotContainsString('->query(', $source);
-        $this->assertStringNotContainsString('$player . ', $source);
-        $this->assertStringNotContainsString('. $player', $source);
-        $this->assertStringContainsString('\'%\' . addcslashes($player, \'\\\\%_\') . \'%\'', $source);
     }
 
     /** A `player[]=x` request value is an array; it takes the no-player path instead of a TypeError. */

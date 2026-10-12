@@ -208,6 +208,12 @@ jobs:
         if: ${{ !cancelled() && (github.event_name == 'push' || steps.filter.outputs.e2ehygiene == 'true') }}
         run: bin/check-e2e-hygiene
 
+      # The PR step above scans only changed files, so two PRs can each pass and
+      # still leave master red together. A master push scans the whole tree.
+      - name: Run bin/check-e2e-hygiene (full tree)
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        run: bin/check-e2e-hygiene
+
       - name: Run bin/check-e2e-fa-offers-owner
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.e2ehygiene == 'true' }}
         run: bin/check-e2e-fa-offers-owner

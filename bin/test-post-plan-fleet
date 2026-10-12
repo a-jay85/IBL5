@@ -407,12 +407,16 @@ for _ro_form in "--rebase-only-prs=abc" "--rebase-only-prs=" "--rebase-only-prs=
     [[ $rc -eq 2 ]] || fail "rebase-only-prs-rejected: '$_ro_form' exit $rc, want 2 (out: $out)"
     grep -qF 'ERROR:' <<< "$out" || fail "rebase-only-prs-rejected: '$_ro_form' printed no ERROR: $out"
     grep -qF -- '--rebase-only-prs' <<< "$out" || fail "rebase-only-prs-rejected: '$_ro_form' error does not name the flag: $out"
+    if [[ "$_ro_form" == --rebase-only-prs=* ]]; then
+        grep -qF 'needs a comma list' <<< "$out" \
+            || fail "rebase-only-prs-rejected: '$_ro_form' error lacks 'needs a comma list': $out"
+    fi
     [[ ! -e /tmp/post-plan-fleet-runner-1901.sh ]] || fail "rebase-only-prs-rejected: '$_ro_form' wrote a runner"
 done
 end_case rebase-only-prs-rejected
 
 # bin/post-plan-now: a rebase-only failure never falls back to the skill, and the harness
-# flag appears only in rebase-only mode. A valued --rebase-only= is an unknown argument (exit 1).
+# flag appears only in rebase-only mode.
 begin_case
 _ppn_bin="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/post-plan-now"
 _ppn_probe="$(
@@ -426,11 +430,16 @@ _ppn_probe="$(
 )"
 [[ "$_ppn_probe" == "a1 b0 c0 d1 e[ --rebase-only] f[] g[]" ]] \
     || fail "post-plan-now-rebase-only-helpers: probe gave '$_ppn_probe'"
+end_case post-plan-now-rebase-only-helpers
+
+# A valued --rebase-only= is an unknown argument. post-plan-now exits 1 for every unknown
+# argument, and tools/postplan-harness/tests/test_post_plan_now_fallback.py pins that code.
+begin_case
 out="$("$_ppn_bin" --rebase-only=yes 2>&1)"; rc=$?
 [[ $rc -eq 1 ]] || fail "post-plan-now-rejects-rebase-only-value: exit $rc, want 1 (out: $out)"
 grep -qF "unknown argument '--rebase-only=yes'" <<< "$out" \
     || fail "post-plan-now-rejects-rebase-only-value: no unknown-argument error: $out"
-end_case post-plan-now-rebase-only-helpers
+end_case post-plan-now-rejects-rebase-only-value
 
 # --- case 6.5: session re-fire — sidecar holds SECOND uuid, not first (sweep-ordering) ----
 begin_case

@@ -144,4 +144,16 @@ class FreeAgencyFormViewTest extends TestCase
         $html = $this->formView->renderExceptionButtons('FOO');
         $this->assertSame('', $html);
     }
+
+    public function testOfferButtonCarriesEscapedTestId(): void
+    {
+        $method = new \ReflectionMethod($this->formView, 'renderOfferButtonForm');
+
+        $withId = (string) $method->invoke($this->formView, [100, 110], 2, 0, 'quick"x');
+        $withoutId = (string) $method->invoke($this->formView, [100, 110], 2, 0, '');
+
+        $this->assertStringContainsString(' data-testid="quick&quot;x"', $withId);
+        $this->assertStringNotContainsString('&amp;quot;', $withId);
+        $this->assertStringNotContainsString('data-testid', $withoutId);
+    }
 }

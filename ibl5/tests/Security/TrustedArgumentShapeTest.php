@@ -8,82 +8,49 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Pins the exact residual set of HtmlSanitizer::trusted() arguments that
- * RequireTrustedAnnotationRule would reject, per view.
+ * Scans every ibl5/classes/**\/*View.php and fails on any HtmlSanitizer::trusted()
+ * argument that RequireTrustedAnnotationRule would reject. Nothing is allowed.
  *
  * The PHPStan baseline is a regenerable allowance (bin/regen-baselines rewrites
  * its counts to whatever the tree holds). This test is not: a new bare-variable
- * trusted($x) in these files fails CI even after a baseline regen, and a stale
- * entry (a site later converted) fails too.
+ * trusted($x) in any view fails CI even after a baseline regen.
  *
  * The CI baseline-drift gate (.github/workflows/tests.yml:505) only compares
  * counts, so it passes after a regen. This test is the independent check.
  */
 final class TrustedArgumentShapeTest extends TestCase
 {
-    /** Non-rule-shaped trusted() arguments that are built HTML and intentionally stay. */
-    private const ALLOWLIST = [
-        'Search/SearchView.php' => ['$itemBody', '$time', '$date'],
-        'Trading/TradeOfferFormView.php' => [
-            "\$userPlayerRows['html']",
-            "\$userPickRows['html']",
-            "\$partnerPlayerRows['html']",
-            "\$partnerPickRows['html']",
-            '$thumbnail',
-        ],
-        'Trading/TradeReviewView.php' => ['$cell'],
-        'Negotiation/NegotiationOfferView.php' => [
-            "\$cardHtml ?? ''",
-            'self::buildDemandDisplay($demands)',
-            'self::renderEditableOfferFields($demands)',
-            'self::renderMaxSalaryFields($maxYearOneSalary, $maxRaise, $demands)',
-        ],
-        'FreeAgency/FreeAgencyOfferView.php' => [
-            'FreeAgencyFormView::renderPlayerRatings($player)',
-            '$csrfHtml',
-            '$birdRightsText',
-        ],
-        'FreeAgency/FreeAgencyTeamFreeAgentsSectionView.php' => ["\$resolved['thumbnail']"],
-        'FreeAgency/FreeAgencyUnderContractSectionView.php' => ['$actionUrl'],
-        'RookieOption/RookieOptionView.php' => ["\$cardHtml ?? ''"],
-        'Waivers/WaiversView.php' => ['$optionHtml'],
-        'YourAccount/LoginView.php' => ['nl2br(HtmlSanitizer::e($error))'],
-    ];
-
     /**
      * @return array<string, array{string}>
      */
     public static function viewProvider(): array
     {
+        $root = dirname(__DIR__, 2) . '/classes';
         $sets = [];
-        foreach (array_keys(self::ALLOWLIST) as $relPath) {
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($files as $file) {
+            if (!$file instanceof \SplFileInfo || !str_ends_with($file->getFilename(), 'View.php')) {
+                continue;
+            }
+            $relPath = str_replace('\\', '/', substr($file->getPathname(), strlen($root) + 1));
             $sets[$relPath] = [$relPath];
         }
+        ksort($sets);
+
+        self::assertGreaterThanOrEqual(20, count($sets), 'View scan found too few files; did classes/ move?');
 
         return $sets;
     }
 
     #[DataProvider('viewProvider')]
-    public function testEveryTrustedArgumentIsRuleShapedOrAllowlisted(string $relPath): void
+    public function testEveryTrustedArgumentInEveryViewIsRuleShaped(string $relPath): void
     {
-        $args = self::nonRuleShapedTrustedArguments(self::readView($relPath));
-
         $this->assertSame(
             [],
-            array_values(array_diff(array_unique($args), self::ALLOWLIST[$relPath])),
-            "Unexpected trusted() argument in {$relPath}; escape at the echo with safeHtmlOutput() instead"
-        );
-    }
-
-    #[DataProvider('viewProvider')]
-    public function testAllowlistEntriesAreStillPresent(string $relPath): void
-    {
-        $args = self::nonRuleShapedTrustedArguments(self::readView($relPath));
-
-        $this->assertSame(
-            [],
-            array_values(array_diff(self::ALLOWLIST[$relPath], $args)),
-            "Stale allowlist entry for {$relPath}; remove it from ALLOWLIST"
+            array_values(array_unique(self::nonRuleShapedTrustedArguments(self::readView($relPath)))),
+            "Non-rule-shaped trusted() argument in {$relPath}; escape at the echo with HtmlSanitizer::e() or build the HTML in a \$this->render…() method"
         );
     }
 
@@ -102,9 +69,24 @@ final class TrustedArgumentShapeTest extends TestCase
     {
         $src = '<?php echo HtmlSanitizer::trusted(\'lit\'), HtmlSanitizer::trusted(42), HtmlSanitizer::trusted((int) $n),'
             . ' HtmlSanitizer::trusted((bool) $b), HtmlSanitizer::trusted($this->renderX($a, [1])),'
-            . ' HtmlSanitizer::trusted($this->helper->render()), HtmlSanitizer::safeHtmlOutput($raw);';
+            . ' HtmlSanitizer::trusted($this->helper->render()), HtmlSanitizer::trusted($this->formView->renderCsrfInput()),'
+            . ' HtmlSanitizer::trusted((int) $x), HtmlSanitizer::safeHtmlOutput($raw);';
 
         $this->assertSame([], self::nonRuleShapedTrustedArguments($src));
+    }
+
+    public function testClassifierRejectsStaticCallArgument(): void
+    {
+        $src = '<?= HtmlSanitizer::trusted(PageLayout::renderFontPreconnectLinks()) ?>';
+
+        $this->assertSame(['PageLayout::renderFontPreconnectLinks()'], self::nonRuleShapedTrustedArguments($src));
+    }
+
+    public function testClassifierRejectsPropertyFetchArgument(): void
+    {
+        $src = '<?= HtmlSanitizer::trusted($this->csrfHtml) ?>';
+
+        $this->assertSame(['$this->csrfHtml'], self::nonRuleShapedTrustedArguments($src));
     }
 
     /**
@@ -150,7 +132,7 @@ final class TrustedArgumentShapeTest extends TestCase
             }
 
             $argument = trim(preg_replace('/\s+/', ' ', $text) ?? $text);
-            if (preg_match('/^([\'"]|\d|\((int|float|bool)\)|\$this->)/', $argument) !== 1) {
+            if (preg_match('/^([\'"]|\d|\((int|float|bool)\)\s*|\$this->[A-Za-z_]\w*(->[A-Za-z_]\w*)?\()/', $argument) !== 1) {
                 $rejected[] = $argument;
             }
         }

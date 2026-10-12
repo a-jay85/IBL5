@@ -116,6 +116,34 @@ class ScriptedLlm:
         return ""
 
 
+class MetaLogGh(CiFixGh):
+    """CiFixGh whose run_log_failed writes a scripted `gh run view --log-failed` body.
+    `logs` maps job_id -> text; a job_id absent from `logs` writes nothing."""
+
+    def __init__(self, logs=None, body=""):
+        super().__init__(body=body)
+        self.logs = dict(logs or {})
+        self.log_calls: list[tuple] = []
+
+    def run_log_failed(self, run_id, job_id, dest):
+        self.log_calls.append((run_id, job_id))
+        if job_id in self.logs:
+            with open(dest, "w") as fh:
+                fh.write(self.logs[job_id])
+        return job_id in self.logs
+
+
+# `gh run view --log-failed` prefixes each line with "<job>\t<step>\t" (live adapter:
+# harness/adapters/ghad.py run_log_failed). Step names come from
+# .github/workflows/pr-meta-checks.yml.
+META_PROSE_LOG = ("Meta checks\tRun bin/check-prose (self-test + added lines)\t"
+                  "2026-10-11T09:30:00.0000000Z .claude/rules/x.md:12 em-dash\n")
+META_BODY_LOG = ("Meta checks\tRun bin/check-pr-manual-testing\t"
+                 "2026-10-11T09:30:00.0000000Z missing Manual Testing section\n")
+META_CHECKS_ROW = {"name": "Meta checks", "state": "FAILURE",
+                   "link": "https://github.com/a/b/actions/runs/900/job/9001"}
+
+
 def _run(monkeypatch, tmp_path, git, gh, llm, *, failed, commit=("b" * 40,),
          rewatch=(), res=None, run_started=None):
     """Drive _ci_fix_loop in live mode with every external call faked. `commit` is a
@@ -227,6 +255,59 @@ def test_char_probe_reruns_failed_run_on_no_change(monkeypatch, tmp_path):
              commit=("",))
     assert gh.reruns == ["777"]
     assert _has(r.lines, "phase7 ci-fix rerun probe: outcome=")
+
+
+_PROSE_RECORDED = [{"name": "check-prose-since", "output": "x"}]
+
+
+def _meta_run(monkeypatch, tmp_path, gh, *, failed, recorded):
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.meta_check_failures = list(recorded)
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, llm, failed=failed,
+             commit=("b" * 40,), res=res)
+    return r, llm
+
+
+def test_char_meta_body_check_failure_still_runs_cifix(monkeypatch, tmp_path):
+    """Body checks skip in phase 2, so nothing is recorded; ci-fix owns the proposal flow."""
+    gh = MetaLogGh(logs={"9001": META_BODY_LOG})
+    gh.checks = [META_CHECKS_ROW]
+    _r, llm = _meta_run(monkeypatch, tmp_path, gh,
+                        failed=["All checks green", "Meta checks"], recorded=[])
+    assert len(llm.calls) == 1
+    assert llm.calls[0][0] == "ci-fix"
+
+
+def test_char_meta_unattributed_log_still_runs_cifix(monkeypatch, tmp_path):
+    gh = MetaLogGh(logs={"9001": META_BODY_LOG})
+    gh.checks = [META_CHECKS_ROW]
+    _r, llm = _meta_run(monkeypatch, tmp_path, gh,
+                        failed=["All checks green", "Meta checks"],
+                        recorded=_PROSE_RECORDED)
+    assert len(llm.calls) == 1
+    assert llm.calls[0][0] == "ci-fix"
+
+
+def test_char_meta_missing_log_still_runs_cifix(monkeypatch, tmp_path):
+    gh = MetaLogGh(logs={})
+    gh.checks = [META_CHECKS_ROW]
+    _r, llm = _meta_run(monkeypatch, tmp_path, gh,
+                        failed=["All checks green", "Meta checks"],
+                        recorded=_PROSE_RECORDED)
+    assert len(llm.calls) == 1
+    assert llm.calls[0][0] == "ci-fix"
+
+
+def test_char_meta_with_other_actionable_red_still_runs_cifix(monkeypatch, tmp_path):
+    gh = MetaLogGh(logs={"9001": META_PROSE_LOG})
+    gh.checks = [META_CHECKS_ROW,
+                 {"name": "PHPUnit", "state": "FAILURE",
+                  "link": "https://github.com/a/b/actions/runs/901/job/9011"}]
+    _r, llm = _meta_run(monkeypatch, tmp_path, gh,
+                        failed=["Meta checks", "PHPUnit"], recorded=_PROSE_RECORDED)
+    assert len(llm.calls) == 1
+    assert llm.calls[0][0] == "ci-fix"
 
 
 # The probe-guard tests below run with the rest of tools/postplan-harness/tests/test_cifix_ship.py

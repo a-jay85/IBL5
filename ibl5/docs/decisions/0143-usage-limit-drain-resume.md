@@ -1,6 +1,6 @@
 ---
 description: Usage-limit drain, pause, and auto-resume for headless runners via an env-gated PreToolUse hook, pause markers, a drain token, and a launchd coordinator.
-last_verified: 2026-10-10
+last_verified: 2026-10-12
 ---
 
 # ADR-0143: Usage-limit drain, pause, and auto-resume
@@ -96,3 +96,11 @@ The usage endpoint alternates 200 and 429 responses. Under the 2026-10-01 rule e
 A 429 episode now carries the step. `bin/lib/usage-fetch.sh` records each normal-arm 429 in the state file `fetch-429-episode` as `<start> <last_429> <attempts>`. The episode stays live until `USAGE_FETCH_EPISODE_QUIET` (1800 s) pass with no 429. That is twice the 900 s Retry-After cap, so an armed wait alone never ends an episode. The doubling step is the larger of the step in `fetch-backoff` and the episode's prior attempt count, so waits climb 30, 60, 120, 240 and 480 s across intervening successes. A success still deletes `fetch-backoff`, so callers fetch live again as soon as the wait ends. A numeric Retry-After still sets the wait directly. The login-switch fast path from the 2026-10-08 addendum keeps its own counter and does not count toward the episode.
 
 An episode ends lazily. The first success or 429 that finds it quiet for the full window ends it. Either account-switch cache drop ends it at once, because the episode belongs to the old account. The log carries `429-episode start retry_after=<n|none> backoff=<s>` once per episode and `429-episode end duration=<s> attempts=<n>` once at its end. These replace the per-attempt `fetch-failed reason=rate-limited` line. The switch fast path keeps its per-attempt `switch-retry=<n>/3` line, and other fetch failures keep their per-attempt `fetch-failed reason=` line.
+
+## Addendum (2026-10-12): a usage pause in the retrospective keeps the shipped terminal
+
+The post-plan harness runs a record-only retrospective in Phase 9, after it has computed the terminal and executed arming. A usage-gate trip there used to escape to the run-level `UsagePause` handler. That handler set the terminal to `failed` with `error_kind=usage-pause`, and the run exited 75. Between 2026-10-06 and 2026-10-12, 18 runs ended this way. In a spot-check of 10, all had an open PR with green CI and 8 were armed. Each one sent a false failure DM and counted as paused in `bin/pr-cycle`.
+
+Phase 9 in `tools/postplan-harness/runner.py` now catches `UsagePause` around the retrospective call only. The run skips the retrospective, logs `phase9: retrospective skipped (usage-pause)`, records `{"save": false, "skipped": "usage-pause"}` as the retrospective, and keeps the terminal it already had: `shipped-armed`, `shipped-held` or `degraded`. The exit is 0, so `bin/post-plan-now` sends no failure DM. `_settle_pause_marker` clears the marker the gate wrote before raising, as it does at any non-75 exit. Nothing after Phase 9 calls the model, so the paused adapter is never asked again.
+
+A pause in any earlier phase, ci-fix included, still ends `failed` with `usage-pause` and exit 75, and resumes as before. `tools/postplan-harness/tests/test_usage_pause_swallow_sites.py` now counts three `UsagePause` handlers in `runner.py`. A fourth site needs the same review.

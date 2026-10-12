@@ -129,11 +129,7 @@ def test_rebase_conflict_after_declined_autoresolve_still_exits_3():
 
 def test_phase2_conflict_arm_guards_on_kind_and_logs_before_resolving():
     """Detection-time flag must be logged before the resolution attempt (fail-closed ordering)."""
-    src = inspect.getsource(runner)
-    # Slice the region between `pre_rebase = git.head()` and `git.push()`
-    start = src.index("pre_rebase = git.head()")
-    end = src.index("git.push()", start)
-    region = src[start:end]
+    region = inspect.getsource(runner._phase2_rebase)   # the extracted Phase 2 rebase block
     assert 'if e.kind != "rebase-conflict"' in region
     assert "CONFLICT_FLAG=set" in region
     assert "autoresolve_stacked_rebase(" in region
@@ -142,10 +138,7 @@ def test_phase2_conflict_arm_guards_on_kind_and_logs_before_resolving():
 
 def test_local_gate_is_not_intercepted_by_the_conflict_arm():
     """The new conflict arm must not swallow local-gate denials."""
-    src = inspect.getsource(runner)
-    start = src.index("pre_rebase = git.head()")
-    end = src.index("git.push()", start)
-    region = src[start:end]
+    region = inspect.getsource(runner._phase2_rebase)   # the extracted Phase 2 rebase block
     assert "local-gate" not in region
 
 

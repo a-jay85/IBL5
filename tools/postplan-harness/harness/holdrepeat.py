@@ -199,6 +199,24 @@ def mark_dm_sent(state_dir, slug, key: str) -> None:
     _save_record(state_dir, slug, record)
 
 
+def refresh_fingerprint(state_dir, slug, fp: str, now: str) -> bool:
+    """Replace only `fingerprint` (and `updated_at`) on an existing record.
+
+    Used after a rebase-only run whose net diff (patch-id) did not change, so the
+    next cycle still sees "same hold". Never creates a record, never touches
+    hold_set, structural, structural_key, repeat_count or dm_sent_key.
+    """
+    if not fp:
+        return False
+    record = load_record(state_dir, slug)
+    if record is None:
+        return False
+    record["fingerprint"] = fp
+    record["updated_at"] = now
+    _save_record(state_dir, slug, record)
+    return True
+
+
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 

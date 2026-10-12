@@ -95,3 +95,34 @@ def test_cli_rejects_missing_slug(tmp_path):
     with pytest.raises(SystemExit) as exc:
         holdrepeat.main(["rebase-eligible", "--state-dir", str(tmp_path)])
     assert exc.value.code == 2
+
+
+# --- Phase 4: refresh_fingerprint ------------------------------------------------------
+
+def test_refresh_fingerprint_updates_only_fingerprint(tmp_path):
+    d = str(tmp_path)
+    conds = [_cond(7), _cond(8)]
+    holdrepeat.observe(d, SLUG, armed=False, conditions=conds, fingerprint="fp", pr=1, now="t")
+    holdrepeat.mark_dm_sent(d, SLUG, holdrepeat.structural_key(conds))
+    before = holdrepeat.load_record(d, SLUG)
+    assert holdrepeat.refresh_fingerprint(d, SLUG, "new", "t2") is True
+    after = holdrepeat.load_record(d, SLUG)
+    assert after["fingerprint"] == "new"
+    assert after["updated_at"] == "t2"
+    for key in ("hold_set", "structural", "structural_key", "repeat_count", "dm_sent_key"):
+        assert after[key] == before[key], key
+
+
+def test_refresh_fingerprint_unknown_slug_writes_nothing(tmp_path):
+    d = str(tmp_path)
+    assert holdrepeat.refresh_fingerprint(d, "no-such-slug", "new", "t2") is False
+    assert os.listdir(d) == []
+
+
+def test_refresh_fingerprint_empty_fp_is_noop(tmp_path):
+    d = str(tmp_path)
+    _seed(d, [7])
+    path = holdrepeat.record_path(d, SLUG)
+    before = open(path, "rb").read()
+    assert holdrepeat.refresh_fingerprint(d, SLUG, "", "t2") is False
+    assert open(path, "rb").read() == before

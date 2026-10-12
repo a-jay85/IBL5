@@ -129,7 +129,8 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('Invalid or expired form submission', $output);
         $this->assertQueryNotExecuted('UPDATE');
         $this->assertQueryNotExecuted('INSERT');
-        // The team lookup runs only past the auth gate.
+        // The team lookup runs only past the auth gate: replacing !isUser() with false in
+        // submit() lets it through, so gm_username is the assertion that discriminates.
         $this->assertQueryNotExecuted('gm_username');
     }
 
@@ -150,6 +151,7 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
         $this->assertQueryNotExecuted('UPDATE');
         $this->assertQueryNotExecuted('INSERT');
         $this->assertQueryExecuted('gm_username');
+        // cookieDecode() must leave ['teamless','teamless',''] in $GLOBALS['cookie'].
         $this->assertSame(['teamless', 'teamless', ''], $GLOBALS['cookie']);
     }
 

@@ -140,6 +140,59 @@ class VotingRepositoryTest extends DatabaseTestCase
         self::assertSame(3, $byName['Test Player Three, Stars']['votes']);
     }
 
+    public function testAllStarTotalsCountOnlySelectedColumns(): void
+    {
+        $name = 'Grounding Selected Columns, Metros';
+        $this->setAsgVote('Metros', 'east_f1', $name);
+        $this->setAsgVote('Metros', 'east_f3', $name);
+        $this->setAsgVote('Stars', 'east_f2', $name);
+        $this->setAsgVote('Stars', 'west_f1', $name);
+
+        $results = $this->repo->fetchAllStarTotals(['east_f1', 'east_f2']);
+
+        $byName = $this->indexByName($results);
+        self::assertArrayHasKey($name, $byName);
+
+        // Independent count: ballots naming the player in the selected columns only.
+        $stmt = $this->db->prepare('SELECT COALESCE(SUM((east_f1 = ?) + (east_f2 = ?)), 0) AS n FROM `ibl_votes_ASG`');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('ss', $name, $name);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        self::assertIsArray($row);
+
+        self::assertSame(2, (int) $row['n']);
+        self::assertSame((int) $row['n'], $byName[$name]['votes']);
+    }
+
+    public function testEndOfYearTotalsWeightOnlySelectedColumns(): void
+    {
+        $name = 'Grounding Weighted Columns, Metros';
+        $this->setEoyVote('Metros', 'mvp_1', $name);
+        $this->setEoyVote('Stars', 'mvp_1', $name);
+        $this->setEoyVote('Metros', 'six_1', $name);
+        $this->setEoyVote('Metros', 'mvp_3', $name);
+        $this->setEoyVote('Stars', 'roy_1', $name);
+
+        $results = $this->repo->fetchEndOfYearTotals(['mvp_1' => 5, 'six_1' => 2]);
+
+        $byName = $this->indexByName($results);
+        self::assertArrayHasKey($name, $byName);
+
+        // Independent total: 5 per mvp_1 ballot plus 2 per six_1 ballot; mvp_3 and roy_1 are unselected.
+        $stmt = $this->db->prepare('SELECT COALESCE(SUM((mvp_1 = ?) * 5 + (six_1 = ?) * 2), 0) AS n FROM `ibl_votes_EOY`');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('ss', $name, $name);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        self::assertIsArray($row);
+
+        self::assertSame(12, (int) $row['n']);
+        self::assertSame((int) $row['n'], $byName[$name]['votes']);
+    }
+
     public function testFetchPlayerIdsByNamesReturnsPidMap(): void
     {
         $result = $this->repo->fetchPlayerIdsByNames(['Test Player One', 'Test Player Three']);

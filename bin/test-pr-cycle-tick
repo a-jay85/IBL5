@@ -142,7 +142,14 @@ s="\$(jq -r --argjson n "\$1" '.[] | select(.number == \$n) | .headRefOid' "$SCR
 [[ -n "\$s" ]] || exit 1
 exec "$SCRATCH/pad40" "\$s"
 PID_EOF
-chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub" "$SCRATCH/pad40" "$SCRATCH/patchid-identity"
+# patchid-file: per-PR controllable patch-id; prints $SCRATCH/key-<pr>, fails when absent.
+cat > "$SCRATCH/patchid-file" <<PF_EOF
+#!/usr/bin/env bash
+cat "$SCRATCH/key-\$1" 2>/dev/null
+PF_EOF
+printf '#!/usr/bin/env bash\nexit 1\n' > "$SCRATCH/patchid-fail"
+printf '#!/usr/bin/env bash\necho not-a-patch-id\n' > "$SCRATCH/patchid-junk"
+chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub" "$SCRATCH/pad40" "$SCRATCH/patchid-identity" "$SCRATCH/patchid-file" "$SCRATCH/patchid-fail" "$SCRATCH/patchid-junk"
 
 # --- per-case state ------------------------------------------------------------------------
 UNSET="__UNSET__"
@@ -154,6 +161,7 @@ E_PATCHID="$SCRATCH/patchid-identity"
 reset() {
     rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
     rm -f "$SCRATCH/pr-cycle-skip-notes-env" "$SCRATCH/pr-cycle-skip-notes-copy"
+    rm -f "$SCRATCH"/key-*
     rm -rf "$HOME_DIR" "$REPO/tools" "$WT/tools" "$SCRATCH/usage-gate" "$SCRATCH/watch-state"
     mkdir -p "$HOME_DIR"
     : > "$SCRATCH/launchctl-list.txt"
@@ -231,6 +239,8 @@ dm_count() { if [[ -f "$SCRATCH/dm.log" ]]; then wc -l < "$SCRATCH/dm.log" | tr 
 launch_count() { if [[ -f "$SCRATCH/pr-cycle.log" ]]; then wc -l < "$SCRATCH/pr-cycle.log" | tr -d ' '; else echo 0; fi; }
 strikes() { cat "$STATE_DIR/strikes/$1" 2>/dev/null; }
 key_of() { "$SCRATCH/pad40" "$1"; }
+set_key() { printf '%s\n' "$2" > "$SCRATCH/key-$1"; }
+pr_refs() { git -C "$REPO" for-each-ref refs/pr-cycle; }
 # set_result "<pr>\t<status>\t<outcome>\t<reason>" ...: the file the stub hands the tick.
 set_result() {
     { echo "# pr-cycle-result v1"; printf '%b\n' "$@"; } > "$SCRATCH/result-canned"
@@ -517,7 +527,7 @@ set_result "112\tholdrepeat\t-\t-"
 run_tick
 [[ "$(launch_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: tick 1 did not launch"
 run_tick
-[[ "$(cat "$STATE_DIR/declined/112" 2>/dev/null)" == "bbb2222" ]] \
+[[ "$(cat "$STATE_DIR/declined/112" 2>/dev/null)" == "$(key_of bbb2222)" ]] \
     || fail "holdrepeat-skip-no-attempt: declined/112 is '$(cat "$STATE_DIR/declined/112" 2>/dev/null)'"
 no_file "$STATE_DIR/attempts/112" || fail "holdrepeat-skip-no-attempt: a declined PR was charged an attempt"
 [[ "$(dm_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: want 1 DM, got $(dm_count)"
@@ -535,12 +545,12 @@ set_prs "$RED101"; set_checks aaa1111 red
 set_result "101\tfired\tfailed\tno-result"
 run_tick
 run_tick
-[[ "$(strikes 101)" == "aaa1111 1" ]] || fail "fleet-no-result-strike: tick 2 strikes/101 is '$(strikes 101)'"
+[[ "$(strikes 101)" == "$(key_of aaa1111) 1" ]] || fail "fleet-no-result-strike: tick 2 strikes/101 is '$(strikes 101)'"
 [[ "$(attempt 101)" == "" ]] || fail "fleet-no-result-strike: a no-op rescue was charged an attempt"
 [[ "$(dm_count)" == "0" ]] || fail "fleet-no-result-strike: DM on the first strike"
 [[ "$(launch_count)" == "2" ]] || fail "fleet-no-result-strike: want a relaunch on tick 2, got $(launch_count) launches"
 run_tick
-[[ "$(strikes 101)" == "aaa1111 2" ]] || fail "fleet-no-result-strike: tick 3 strikes/101 is '$(strikes 101)'"
+[[ "$(strikes 101)" == "$(key_of aaa1111) 2" ]] || fail "fleet-no-result-strike: tick 3 strikes/101 is '$(strikes 101)'"
 [[ "$(dm_count)" == "1" ]] || fail "fleet-no-result-strike: want 1 cap DM on tick 3, got $(dm_count)"
 grep -qF 'pr-cycle-watch: PR #101 on head aaa1111: the rescue never reached post-plan 2 times (last: fired failed no-result). Skipping it until a new push.' "$SCRATCH/dm.log" \
     || fail "fleet-no-result-strike: cap DM wording: $(cat "$SCRATCH/dm.log")"
@@ -556,7 +566,7 @@ set_prs "$RED101"; set_checks aaa1111 red
 set_result "101\tfired\tfailed\tkind=test"
 run_tick
 run_tick
-[[ "$(attempt 101)" == "aaa1111" ]] || fail "real-run-still-red-attempt: attempts/101 is '$(attempt 101)'"
+[[ "$(attempt 101)" == "$(key_of aaa1111)" ]] || fail "real-run-still-red-attempt: attempts/101 is '$(attempt 101)'"
 no_file "$STATE_DIR/strikes/101" || fail "real-run-still-red-attempt: a real run was struck"
 [[ "$(launch_count)" == "1" ]] || fail "real-run-still-red-attempt: relaunched after a real run"
 grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until a new push.' "$SCRATCH/dm.log" \
@@ -583,7 +593,7 @@ rf="$(sed -n '1s/^# result=\(.*\) started=.*$/\1/p' "$pf")"
 { printf '# result=%s started=%s\n' "$rf" "$(( $(date +%s) - 14400 ))"; tail -n +2 "$pf"; } > "$pf.new" \
     && mv "$pf.new" "$pf"
 run_tick
-[[ "$(strikes 101)" == "aaa1111 1" ]] || fail "stale-pending-strikes: strikes/101 is '$(strikes 101)'"
+[[ "$(strikes 101)" == "$(key_of aaa1111) 1" ]] || fail "stale-pending-strikes: strikes/101 is '$(strikes 101)'"
 no_file "$pf" || fail "stale-pending-strikes: the stale entry was not removed"
 out_has 'no result file after' || fail "stale-pending-strikes: no stale log line: $OUT"
 end_case stale-pending-strikes
@@ -678,8 +688,8 @@ rf="$(find "$STATE_DIR/results" -type f 2>/dev/null | head -1)"
 [[ -n "$rf" && "$(sed -n 1p "$rf")" == "# pr-cycle-result v1" ]] \
     || fail "integration-real-worker-reconcile: the real worker wrote no result file (out: $OUT)"
 run_tick
-[[ "$(attempt 11)" == "aaa1111" ]] || fail "integration-real-worker-reconcile: attempts/11 is '$(attempt 11)' (file: $(cat "$rf" 2>/dev/null))"
-[[ "$(cat "$STATE_DIR/declined/12" 2>/dev/null)" == "bbb2222" ]] \
+[[ "$(attempt 11)" == "$(key_of aaa1111)" ]] || fail "integration-real-worker-reconcile: attempts/11 is '$(attempt 11)' (file: $(cat "$rf" 2>/dev/null))"
+[[ "$(cat "$STATE_DIR/declined/12" 2>/dev/null)" == "$(key_of bbb2222)" ]] \
     || fail "integration-real-worker-reconcile: declined/12 is '$(cat "$STATE_DIR/declined/12" 2>/dev/null)'"
 no_file "$STATE_DIR/strikes/11" || fail "integration-real-worker-reconcile: 11 was struck"
 rm -rf "$RW" /tmp/pr-cycle-tpt*
@@ -875,6 +885,246 @@ got="$("$SCRATCH/patchid-identity" 101)"
 "$SCRATCH/pad40" 'not-hex' >/dev/null 2>&1 \
     && fail "identity-seam-shape: pad40 accepted a non-hex SHA"
 end_case identity-seam-shape
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"; K2="$(key_of 2222222)"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "101\tfired\tfailed\tkind=test"
+run_tick
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "rebase-keeps-cap: want 1 launch before the rebase, got $(launch_count)"
+[[ "$(attempt 101)" == "$K1" ]] || fail "rebase-keeps-cap: attempts/101 is '$(attempt 101)', want the patch-id key"
+[[ "$(dm_count)" == "1" ]] || fail "rebase-keeps-cap: want 1 retry-cap DM before the rebase, got $(dm_count)"
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "rebase-keeps-cap: relaunched after a rebase that kept the patch-id"
+out_has 'retry cap' || fail "rebase-keeps-cap: no retry-cap skip line: $OUT"
+[[ "$(dm_count)" == "1" ]] || fail "rebase-keeps-cap: retry-cap DM resent for the rebased head ($(dm_count))"
+grep -qF 'Skipping it until a new push.' "$SCRATCH/dm.log" \
+    || fail "rebase-keeps-cap: retry-cap DM wording: $(cat "$SCRATCH/dm.log")"
+end_case rebase-keeps-cap
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"; K2="$(key_of 2222222)"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "101\tfired\tfailed\tkind=test"
+run_tick
+run_tick
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red; set_key 101 "$K2"
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "content-change-requalifies: want a second launch for a new patch-id, got $(launch_count)"
+end_case content-change-requalifies
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"; K2="$(key_of 2222222)"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "101\tfired\tfailed\tkind=test"
+run_tick
+grep -qxF "$(printf '101\taaa1111\t%s' "$K1")" "$STATE_DIR"/pending/* \
+    || fail "settle-uses-launch-key: pending line is not <pr>TAB<sha>TAB<key>: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red; set_key 101 "$K2"
+run_tick
+[[ "$(attempt 101)" == "$K1" ]] || fail "settle-uses-launch-key: attempts/101 is '$(attempt 101)', want the launch-time key $K1"
+end_case settle-uses-launch-key
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"
+set_prs '112|b12|bbb2222|BLOCKED|false'; set_checks bbb2222 red; set_key 112 "$K1"
+set_result "112\tfired\tdeclined\tholdrepeat"
+run_tick
+run_tick
+[[ "$(cat "$STATE_DIR/declined/112" 2>/dev/null)" == "$K1" ]] \
+    || fail "declined-survives-rebase: declined/112 is '$(cat "$STATE_DIR/declined/112" 2>/dev/null)', want the key"
+[[ "$(dm_count)" == "1" ]] || fail "declined-survives-rebase: want 1 decline DM, got $(dm_count)"
+set_prs '112|b12|fff6666|BLOCKED|false'; set_checks fff6666 red
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "declined-survives-rebase: relaunched a declined PR after a rebase"
+out_has 'holdrepeat declined' || fail "declined-survives-rebase: no decline skip line: $OUT"
+[[ "$(dm_count)" == "1" ]] || fail "declined-survives-rebase: decline DM resent ($(dm_count))"
+end_case declined-survives-rebase
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "999\tfired\tshipped\t-"
+run_tick
+run_tick
+run_tick
+[[ "$(strikes 101)" == "$K1 2" ]] || fail "strikes-survive-rebase: strikes/101 is '$(strikes 101)', want '$K1 2'"
+[[ "$(launch_count)" == "2" ]] || fail "strikes-survive-rebase: want 2 launches before the rebase, got $(launch_count)"
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "strikes-survive-rebase: launched past the strike cap after a rebase"
+out_has 'no-op rescue cap' || fail "strikes-survive-rebase: no cap skip line: $OUT"
+end_case strikes-survive-rebase
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-fail"
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "patchid-fallback-dm: a failed patch-id stranded the PR (launches: $(launch_count))"
+[[ "$(dm_count)" == "1" ]] || fail "patchid-fallback-dm: want 1 fallback DM, got $(dm_count)"
+grep -qF 'could not compute its patch-id' "$SCRATCH/dm.log" || fail "patchid-fallback-dm: DM wording: $(cat "$SCRATCH/dm.log" 2>/dev/null)"
+out_has 'patch-id unavailable; retry key falls back to head aaa1111' || fail "patchid-fallback-dm: no fallback log line: $OUT"
+[[ "$(cat "$STATE_DIR/dm-patchid/101" 2>/dev/null)" == "aaa1111" ]] \
+    || fail "patchid-fallback-dm: dm-patchid/101 is '$(cat "$STATE_DIR/dm-patchid/101" 2>/dev/null)'"
+grep -qxF "$(printf '101\taaa1111\taaa1111')" "$STATE_DIR"/pending/* \
+    || fail "patchid-fallback-dm: pending line key is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+run_tick
+[[ "$(dm_count)" == "1" ]] || fail "patchid-fallback-dm: fallback DM resent for the same head ($(dm_count))"
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red
+run_tick
+[[ "$(dm_count)" == "2" ]] || fail "patchid-fallback-dm: want one DM per head (2), got $(dm_count)"
+end_case patchid-fallback-dm
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-junk"
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+out_has 'patch-id unavailable' || fail "patchid-nonhex-falls-back: non-hex output was accepted: $OUT"
+[[ "$(dm_count)" == "1" ]] || fail "patchid-nonhex-falls-back: want 1 fallback DM, got $(dm_count)"
+grep -qxF "$(printf '101\taaa1111\taaa1111')" "$STATE_DIR"/pending/* \
+    || fail "patchid-nonhex-falls-back: pending key column is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+grep -qF 'not-a-patch-id' "$STATE_DIR"/pending/* && fail "patchid-nonhex-falls-back: junk reached the pending file"
+end_case patchid-nonhex-falls-back
+
+begin_case
+for mode in unset empty; do
+    reset
+    if [[ "$mode" == unset ]]; then E_PATCHID="$UNSET"; else E_PATCHID=""; fi
+    set_prs "$RED101"; set_checks aaa1111 red
+    run_tick
+    out_has 'patch-id unavailable' || fail "patchid-default-unset-and-empty ($mode): no fallback log line: $OUT"
+    [[ "$(launch_count)" == "1" ]] || fail "patchid-default-unset-and-empty ($mode): want 1 launch, got $(launch_count)"
+    [[ "$(dm_count)" == "1" ]] || fail "patchid-default-unset-and-empty ($mode): want 1 DM, got $(dm_count)"
+    [[ -z "$(pr_refs)" ]] || fail "patchid-default-unset-and-empty ($mode): left refs/pr-cycle refs: $(pr_refs)"
+done
+end_case patchid-default-unset-and-empty
+
+# Hand-written state: the point of the legacy cases is reading what the pre-key tick left.
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"
+mkdir -p "$STATE_DIR/pending" "$STATE_DIR/results"
+printf '# result=%s started=%s\n101\taaa1111\n' "$STATE_DIR/results/legacy-1.tsv" "$(date +%s)" > "$STATE_DIR/pending/legacy-1"
+printf '# pr-cycle-result v1\n101\tfired\tfailed\tkind=test\n' > "$STATE_DIR/results/legacy-1.tsv"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+run_tick
+[[ "$(attempt 101)" == "aaa1111" ]] || fail "legacy-pending-no-key: attempts/101 is '$(attempt 101)', want the head SHA for a keyless line"
+[[ "$(pending_count)" == "0" ]] || fail "legacy-pending-no-key: the legacy entry did not settle"
+[[ "$(launch_count)" == "0" ]] || fail "legacy-pending-no-key: relaunched a head the legacy record covers"
+end_case legacy-pending-no-key
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"
+mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+run_tick
+[[ "$(launch_count)" == "0" ]] || fail "legacy-sha-state-one-reset: the legacy SHA record did not hold the cap on the same head"
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red
+set_result "101\tfired\tfailed\tkind=test"
+run_tick
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "legacy-sha-state-one-reset: want one rescue after the push, got $(launch_count)"
+[[ "$(attempt 101)" == "$K1" ]] || fail "legacy-sha-state-one-reset: attempts/101 is '$(attempt 101)', want the key"
+set_prs '101|branch-one|9999999|BLOCKED|false'; set_checks 9999999 red
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "legacy-sha-state-one-reset: the key did not hold the cap after the one reset"
+end_case legacy-sha-state-one-reset
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"
+mkdir -p "$STATE_DIR/strikes"; echo 'aaa1111 1' > "$STATE_DIR/strikes/101"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "999\tfired\tshipped\t-"
+run_tick
+run_tick
+[[ "$(strikes 101)" == "$K1 2" ]] || fail "legacy-strike-carries-over: strikes/101 is '$(strikes 101)', want '$K1 2'"
+out_has 'no-op rescue cap' || fail "legacy-strike-carries-over: no cap skip line: $OUT"
+end_case legacy-strike-carries-over
+
+reset; begin_case
+E_PATCHID="$UNSET"
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick --dry-run
+out_has 'would DM:' || fail "dry-run-patchid-inert: no 'would DM:' line: $OUT"
+out_has 'could not compute its patch-id' || fail "dry-run-patchid-inert: the would-DM line lacks the patch-id text: $OUT"
+[[ "$(dm_count)" == "0" ]] || fail "dry-run-patchid-inert: sent a DM in dry-run"
+[[ "$(launch_count)" == "0" ]] || fail "dry-run-patchid-inert: launched in dry-run"
+no_file "$STATE_DIR/dm-patchid" || fail "dry-run-patchid-inert: wrote dm-patchid/"
+no_file "$STATE_DIR/attempts" || fail "dry-run-patchid-inert: wrote attempts/"
+no_file "$STATE_DIR/pending" || fail "dry-run-patchid-inert: wrote pending/"
+[[ -z "$(pr_refs)" ]] || fail "dry-run-patchid-inert: left refs/pr-cycle refs: $(pr_refs)"
+end_case dry-run-patchid-inert
+
+# The real git default, no network: a local bare repo is origin.
+reset; begin_case
+BARE="$SCRATCH/rg-origin.git"; W="$SCRATCH/rg-work"; C="$SCRATCH/rg-consumer"
+RGLIB="$SCRIPT_DIR/lib/pr-cycle-watch.sh"
+wg() { git -C "$W" "$@"; }
+sub() { sed "s/^$2\$/$3/" "$W/$1" > "$W/$1.tmp" && mv "$W/$1.tmp" "$W/$1"; }
+git init -q --bare -b master "$BARE"
+git init -q -b master "$W"
+wg config user.email t@t.invalid; wg config user.name t; wg config commit.gpgsign false
+wg remote add origin "$BARE"
+seq 1 20 | sed 's/^/l/' > "$W/a.txt"; echo x > "$W/b.txt"
+wg add -A; wg commit -qm base
+wg checkout -q -b p7
+sub a.txt l10 l10-pr; wg commit -qam p7
+P7="$(wg rev-parse HEAD)"
+wg checkout -q master
+wg push -q origin master p7:refs/pull/7/head
+echo y > "$W/b.txt"; wg commit -qam m2; wg push -q origin master
+wg checkout -q -b p8 master; wg cherry-pick "$P7" >/dev/null; wg push -q origin p8:refs/pull/8/head
+wg checkout -q -b p9 master; sub a.txt l10 l10-other; wg commit -qam p9; wg push -q origin p9:refs/pull/9/head
+wg checkout -q master; sub a.txt l8 l8-m; wg commit -qam m3; wg push -q origin master
+wg checkout -q -b p10 master; wg cherry-pick "$P7" >/dev/null; wg push -q origin p10:refs/pull/10/head
+git clone -q "$BARE" "$C"
+(
+    unset PR_CYCLE_PATCH_ID_CMD
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    pcw_patch_id "$C" 7 > "$SCRATCH/rg-id7"
+    pcw_patch_id "$C" 8 > "$SCRATCH/rg-id8"
+    pcw_patch_id "$C" 9 > "$SCRATCH/rg-id9"
+    pcw_patch_id "$C" 10 > "$SCRATCH/rg-id10"
+    pcw_patch_id "$C" 404 > "$SCRATCH/rg-id404"
+    pcw_patch_id "$C" 'x;y' > "$SCRATCH/rg-idxy"
+)
+id7="$(cat "$SCRATCH/rg-id7")"; id8="$(cat "$SCRATCH/rg-id8")"
+id9="$(cat "$SCRATCH/rg-id9")"; id10="$(cat "$SCRATCH/rg-id10")"
+[[ "$id7" =~ ^[0-9a-f]{40}$ ]] || fail "patch-id-real-git: id7 '$id7' is not 40 hex"
+[[ "$id8" == "$id7" ]] || fail "patch-id-real-git: a clean rebase changed the id ($id8 != $id7)"
+[[ "$id9" != "$id7" ]] || fail "patch-id-real-git: a content change kept the id"
+[[ "$id10" != "$id7" ]] || fail "patch-id-real-git: an edit inside the hunk's context kept the id (documented limit)"
+[[ "$(wc -c < "$SCRATCH/rg-id404" | tr -d ' ')" == "0" ]] || fail "patch-id-real-git: unknown PR 404 printed something"
+[[ "$(wc -c < "$SCRATCH/rg-idxy" | tr -d ' ')" == "0" ]] || fail "patch-id-real-git: non-numeric PR printed something"
+[[ "$(git -C "$C" for-each-ref refs/pr-cycle | wc -l | tr -d ' ')" == "4" ]] \
+    || fail "patch-id-real-git: want refs 7..10 only, got: $(git -C "$C" for-each-ref refs/pr-cycle)"
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    pcw_drop_pr_ref "$C" 7
+)
+git -C "$C" rev-parse -q --verify refs/pr-cycle/7 >/dev/null 2>&1 && fail "patch-id-real-git: pcw_drop_pr_ref left refs/pr-cycle/7"
+git -C "$C" rev-parse -q --verify refs/pr-cycle/8 >/dev/null 2>&1 || fail "patch-id-real-git: pcw_drop_pr_ref swept refs/pr-cycle/8"
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    pcw_drop_pr_ref "$C" 8; pcw_drop_pr_ref "$C" 9; pcw_drop_pr_ref "$C" 10
+)
+[[ -z "$(git -C "$C" for-each-ref refs/pr-cycle)" ]] || fail "patch-id-real-git: refs left after dropping all: $(git -C "$C" for-each-ref refs/pr-cycle)"
+# Tick wiring, dry-run: the real default against a local origin.
+git -C "$REPO" remote add origin "$BARE"
+E_PATCHID="$UNSET"
+p7sha="$(git ls-remote "$BARE" refs/pull/7/head | cut -f1)"
+set_prs "7|p7|$p7sha|BLOCKED|false"; set_checks "$p7sha" red
+run_tick --dry-run
+out_has 'would run:' || fail "patch-id-real-git: dry-run did not qualify PR 7: $OUT"
+out_has 'patch-id unavailable' && fail "patch-id-real-git: the tick fell back despite a reachable origin: $OUT"
+[[ -z "$(pr_refs)" ]] || fail "patch-id-real-git: dry-run left refs/pr-cycle refs: $(pr_refs)"
+no_file "$STATE_DIR/pending" || fail "patch-id-real-git: dry-run wrote pending/"
+git -C "$REPO" remote remove origin
+end_case patch-id-real-git
 
 # --- summary -------------------------------------------------------------------------------
 h_done

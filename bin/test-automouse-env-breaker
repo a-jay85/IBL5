@@ -25,6 +25,8 @@
 # reads only its five positional args), so eval'ing its definition is safe and
 # does not run the runner's top-level loop.
 #
+# Also pins the plan-defect sentinel (queue/<plan>.plan-defect) contract between prompt-impl and run.
+#
 # Run: bin/test-automouse-env-breaker  (exit 0 = all pass, 1 = a case failed)
 
 set -u
@@ -191,6 +193,31 @@ if grep -E 'If bin/wt-new fails' "$PROMPT" | grep -q 'skipped/'; then
     h_fail "contract-no-skip-on-wt-fail" "prompt-impl's wt-new failure line still moves the plan to skipped/"
 else
     h_pass "contract-no-skip-on-wt-fail"
+fi
+
+# --- Contract: prompt-impl and run agree on the plan-defect sentinel path and marker ---
+if grep -qF '} > "$NIGHTLY_DIR/queue/$PLAN_FILE.plan-defect"' "$PROMPT"; then
+    h_pass "contract-prompt-writes-plan-defect"
+else
+    h_fail "contract-prompt-writes-plan-defect" "prompt-impl no longer writes queue/\$PLAN_FILE.plan-defect"
+fi
+if grep -qF 'PLAN_DEFECT_FILE="$QUEUE_DIR/${PLAN_NAME}.plan-defect"' "$RUNNER"; then
+    h_pass "contract-runner-reads-plan-defect"
+else
+    h_fail "contract-runner-reads-plan-defect" "run no longer reads queue/\${PLAN_NAME}.plan-defect"
+fi
+if grep -qF "printf 'automouse-plan-defect: v1" "$PROMPT" \
+    && grep -qF '[ "$_pdm_line" = "automouse-plan-defect: v1" ]' "$RUNNER"; then
+    h_pass "contract-plan-defect-marker-agrees"
+else
+    h_fail "contract-plan-defect-marker-agrees" "prompt-impl and run disagree on the plan-defect marker literal"
+fi
+if grep -qF 'An `unavailable` verdict is never a plan defect' "$PROMPT" \
+    && grep -qF 'you are NOT stopping because of the time budget' "$PROMPT" \
+    && grep -qF 'every test, lint, and static-analysis run you did in this attempt passed on its last run' "$PROMPT"; then
+    h_pass "contract-plan-defect-retry-wins-conditions"
+else
+    h_fail "contract-plan-defect-retry-wins-conditions" "prompt-impl dropped an unavailable/time-budget/red-run exclusion from the plan-defect rule"
 fi
 
 # ── Section 2: run-loop wt-fail cases (macOS-only — requires caffeinate) ─────

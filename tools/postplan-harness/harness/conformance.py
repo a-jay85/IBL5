@@ -442,6 +442,18 @@ def _method_in_changed_tree(name: str, changed_files: list[str],
     return None
 
 
+def _run_only_tracked(tok: str, tracked: set[str]) -> bool:
+    """True when a `(run-only)` token names a tracked file, or a tracked directory
+    (a `-snapshots` dir is a token; `git ls-files` lists only the files inside it).
+    Exact repo-relative match on purpose: bin/check-plan gate [RO] already demands the
+    base-branch path, so a suffix or basename tolerance here would only widen the
+    arming-condition-(3) exemption past what the authoring gate checked."""
+    if tok in tracked:
+        return True
+    prefix = tok.rstrip("/") + "/"
+    return any(p.startswith(prefix) for p in tracked)
+
+
 def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
           phase5_status: str | None = None,
           resolutions: dict[str, str] | None = None,
@@ -454,6 +466,10 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
 
     A planned token listed in `plan.no_change_test_paths` (every planning row is a
     Visual-regression row marked `(no-change)`) never yields `MISSING:`.
+
+    A planned token listed in `plan.run_only_test_paths` (every planning row marked
+    `(run-only)`) is skipped only when it names a tracked file or directory; otherwise
+    MISSING is kept and a `RUN-ONLY-REFUSED:` note records why.
 
     `UNMET-CONTRACT:` items are produced even when the plan has no Verification
     Matrix — a matrix-less doc/tooling plan is exactly what `evidence-present`
@@ -490,6 +506,7 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     items.extend(phase_omission_items(plan, changed_files, tracked_files, notes))
     if not plan.has_matrix:
         return items
+    _tracked: set[str] | None = None  # lazy; only a (run-only) miss pays for git ls-files
     for t in plan.planned_test_paths:
         if t in plan.no_change_test_paths:
             # Every row planning this token is a Visual-regression row marked
@@ -500,6 +517,18 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
             continue
         hit = _resolve(t, changed_files)
         if hit is None:
+            if t in plan.run_only_test_paths:
+                # Every row planning this token is marked `(run-only)`: the plan
+                # runs an existing test and writes nothing, so an absent diff entry
+                # is the pass condition. Honored only for a file tracked in the PR
+                # tree; git unavailable (tracked None) keeps MISSING (fail closed).
+                if _tracked is None:
+                    _tr = tracked_files if tracked_files is not None else _tracked_files()
+                    _tracked = set(_tr) if _tr is not None else set()
+                if _run_only_tracked(t, _tracked):
+                    _note(notes, f"RUN-ONLY: {t} — every planning row marked (run-only) and the file is tracked; MISSING skipped")
+                    continue
+                _note(notes, f"RUN-ONLY-REFUSED: {t} — marked (run-only) but not a tracked file; MISSING kept")
             items.append(f"MISSING: {t} (matrix planned a test the diff never wrote)")
         elif resolutions is not None and hit != t:
             resolutions[t] = hit

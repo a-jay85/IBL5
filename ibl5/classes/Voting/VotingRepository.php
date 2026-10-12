@@ -239,7 +239,7 @@ class VotingRepository extends \Database\BaseMysqliRepository implements VotingR
         $playerNames = [];
         foreach ($rows as $row) {
             if ($row['name'] !== self::BLANK_BALLOT_LABEL) {
-                $playerName = self::extractPlayerName($row['name']);
+                $playerName = VotingResultsService::extractPlayerName($row['name']);
                 $voteToPlayer[$row['name']] = $playerName;
                 $playerNames[$playerName] = true;
             }
@@ -257,21 +257,5 @@ class VotingRepository extends \Database\BaseMysqliRepository implements VotingR
         }
 
         return $rows;
-    }
-
-    /**
-     * Extract player name from "LeBron James, Sting" format
-     *
-     * Strips the trailing ", TeamName" portion. If there is no comma,
-     * returns the full string (handles GM names).
-     */
-    private static function extractPlayerName(string $voteName): string
-    {
-        $lastComma = strrpos($voteName, ',');
-        if ($lastComma === false) {
-            return trim($voteName);
-        }
-
-        return trim(substr($voteName, 0, $lastComma));
     }
 }

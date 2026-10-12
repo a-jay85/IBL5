@@ -118,7 +118,7 @@ jobs:
       contents: write
       pull-requests: write
       actions: write
-      packages: read
+      packages: write
     uses: ./.github/workflows/e2e-tests.yml
     # actionlint checks these keys against the workflow_call inputs: a key such as
     # refresh_sha: (not an input) fails the lint.

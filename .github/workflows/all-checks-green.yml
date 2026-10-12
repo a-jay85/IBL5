@@ -42,15 +42,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
           # Startup grace: sibling workflows started by the same event register
-          # their workflow runs within seconds; wait before the first read so
-          # the actions/runs anchor (V4) sees them.
-          sleep 60
+          # their workflow runs within seconds; the script sleeps before its first
+          # read so the actions/runs anchor (V4) sees them. --base-ref runs first:
+          # a PR stacked on another branch never gets the master-only anchors, so
+          # the script fails it in seconds with a retarget-and-push message instead
+          # of timing out (ADR-0149 Addendum 2026-10-11).
           bin/check-pr-checks-green \
-            --repo="$REPO" --sha="$HEAD_SHA" --wait \
+            --repo="$REPO" --sha="$HEAD_SHA" --base-ref="$BASE_REF" --wait \
             --self='All checks green' \
             --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \
             --ignore='human-signoff,needs-a-human label,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Infection PHP,Notify Mutation Failure' \
-            --interval-seconds=60 --timeout-seconds=2400
+            --interval-seconds=60 --timeout-seconds=2400 --startup-grace-seconds=60

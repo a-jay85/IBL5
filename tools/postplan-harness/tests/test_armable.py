@@ -23,7 +23,7 @@ def inputs(**kw):
                 classification=Classification(), findings=[], unresolved_conformance=[],
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
-                unresolved_findings=[], conflict_resolved=False)
+                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY")
     base.update(kw)
     return ArmInputs(**base)
 
@@ -151,9 +151,9 @@ def test_condition_set_is_skill_numbered():
     review-thread findings, (14) reads the conflict-resolved flag, (15) checks for
     already-red CI checks on the PR head at arm time, and (16) checks the pre-push
     local meta-check gate. (17) holds when the gate backtest flagged clean PRs or could
-    not run."""
+    not run. (18) holds unless the body's Merge danger line is well-formed and two-way."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
 
 
 def test_fidelity_is_additive_and_releases_nothing():

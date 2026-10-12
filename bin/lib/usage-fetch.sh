@@ -23,12 +23,18 @@ USAGE_FETCH_BACKOFF_BASE=30
 USAGE_FETCH_BACKOFF_CAP=480
 USAGE_FETCH_RETRY_AFTER_CAP=900
 USAGE_FETCH_SKIPLOG_EVERY=30
+# A 429 episode stays live until USAGE_FETCH_EPISODE_QUIET seconds pass with no 429.
+# 1800 = 2 x USAGE_FETCH_RETRY_AFTER_CAP: the longest armed wait plus as much again for caller cadence.
+USAGE_FETCH_EPISODE_QUIET=1800
 # Account-switch fast path: the switch signal stays active for USAGE_SWITCH_WINDOW;
 # within it, at most USAGE_SWITCH_RETRY_MAX 429s under the new fingerprint back off
 # for min(retry_after, USAGE_SWITCH_RETRY_CAP) instead of the normal arm.
 USAGE_SWITCH_WINDOW=1800
 USAGE_SWITCH_RETRY_CAP=45
 USAGE_SWITCH_RETRY_MAX=3
+# A live fetch that finds no login in the keychain, or gets a 401, marks the login dead for
+# USAGE_AUTH_DEAD_TTL seconds. The coordinator holds login-switch resumes while it is set.
+USAGE_AUTH_DEAD_TTL=900
 
 # usage_state_dir
 # Echoes the state dir (creating it and markers/). Honors IBL5_USAGE_GATE_STATE_DIR;
@@ -134,6 +140,20 @@ _usage_switch_short_retry() {
     printf '%s %s\n' "$ra" "$n"
 }
 
+# usage_auth_dead [now]: echoes the reason (no-token or http-401) and returns 0 when
+# the last live fetch, under USAGE_AUTH_DEAD_TTL seconds ago, found the login missing
+# or rejected. A later successful fetch clears it. Returns 1 otherwise.
+usage_auth_dead() {
+    local f now at reason
+    f="$(usage_state_dir)/fetch-auth-dead"
+    [ -f "$f" ] || return 1
+    read -r at reason < "$f" 2>/dev/null
+    case "$at" in ''|*[!0-9]*) return 1 ;; esac
+    now="${1:-$(date +%s)}"
+    [ $((now - at)) -lt "$USAGE_AUTH_DEAD_TTL" ] || return 1
+    printf '%s\n' "${reason:-unknown}"
+}
+
 # usage_account_switch_check: keychain-free detection for the coordinator. When the
 # cached reading was fetched under another account than ~/.claude.json now names,
 # drop the cache and backoff (both belong to the old account) and signal the switch.
@@ -147,6 +167,7 @@ usage_account_switch_check() {
     new=$(_usage_acct_fp)
     [ -n "$new" ] && [ "$new" != "$old" ] || return 0
     rm -f "$d/cache.json" "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.*
+    _usage_fetch_episode_end "$d"
     usage_log "account-switch cache-dropped"
     _usage_switch_signal "$d" "-" account
 }
@@ -173,10 +194,12 @@ _usage_fetch_backoff_read() {
     printf '%s %s\n' "$u" "$s"
 }
 
-# _usage_fetch_backoff_arm <state_dir> <retry_after|"">: writes the backoff file, echoes the delay.
+# _usage_fetch_backoff_arm <state_dir> <retry_after|""> [<min_step>]: writes the backoff file,
+# echoes the delay. The doubling step is the larger of the file's step and min_step.
 _usage_fetch_backoff_arm() {
     local f="$1/fetch-backoff" ra="$2" bo s delay i now
     bo=$(_usage_fetch_backoff_read "$f"); s=${bo#* }
+    case "${3:-}" in ''|*[!0-9]*) ;; *) [ "$3" -gt "$s" ] && s=$3 ;; esac
     case "$ra" in ''|*[!0-9]*) ra="" ;; esac
     [ -n "$ra" ] && [ "$ra" -eq 0 ] && ra=""
     if [ -n "$ra" ]; then
@@ -193,6 +216,48 @@ _usage_fetch_backoff_arm() {
     { printf '%s %s\n' "$((now + delay))" "$((s + 1))" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; } 2>/dev/null \
         || rm -f "$f.tmp.$$"
     echo "$delay"
+}
+
+# _usage_fetch_episode_read <file>: echoes "<start> <last_429> <attempts>", "0 0 0" when absent or garbled.
+_usage_fetch_episode_read() {
+    local a="" l="" n=""
+    [ -f "$1" ] && read -r a l n < "$1" 2>/dev/null
+    case "$a" in ''|*[!0-9]*) a=0 ;; esac
+    case "$l" in ''|*[!0-9]*) l=0 ;; esac
+    case "$n" in ''|*[!0-9]*) n=0 ;; esac
+    printf '%s %s %s\n' "$a" "$l" "$n"
+}
+
+# _usage_fetch_episode_end <state_dir> [stale]: ends the 429 episode and logs its summary once.
+# With "stale", ends it only when no 429 landed in the last USAGE_FETCH_EPISODE_QUIET seconds.
+# The rename claims the file, so exactly one process logs the end, with or without the fetch lock.
+_usage_fetch_episode_end() {
+    local f="$1/fetch-429-episode" a l n
+    [ -f "$f" ] || return 0
+    if [ "${2:-}" = stale ]; then
+        read -r a l n <<< "$(_usage_fetch_episode_read "$f")"
+        [ $(( $(date +%s) - l )) -ge "$USAGE_FETCH_EPISODE_QUIET" ] || return 0
+    fi
+    mv "$f" "$f.end.$$" 2>/dev/null || return 0
+    read -r a l n <<< "$(_usage_fetch_episode_read "$f.end.$$")"
+    rm -f "$f.end.$$"
+    if [ "$n" -gt 0 ] && [ "$a" -gt 0 ] && [ "$l" -ge "$a" ]; then
+        usage_log "429-episode end duration=$((l - a)) attempts=$n"
+    fi
+    return 0
+}
+
+# _usage_fetch_episode_429 <state_dir>: records one normal-arm 429. Ends a stale episode first.
+# Echoes "<prior_attempts> new|cont". The caller holds the fetch lock.
+_usage_fetch_episode_429() {
+    local f="$1/fetch-429-episode" a l n now
+    _usage_fetch_episode_end "$1" stale
+    now=$(date +%s)
+    read -r a l n <<< "$(_usage_fetch_episode_read "$f")"
+    if [ "$n" -eq 0 ] || [ "$a" -eq 0 ]; then a=$now; n=0; fi
+    { printf '%s %s %s\n' "$a" "$now" "$((n + 1))" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; } 2>/dev/null \
+        || rm -f "$f.tmp.$$"
+    if [ "$n" -eq 0 ]; then echo "0 new"; else echo "$n cont"; fi
 }
 
 # _usage_fetch_log_once <marker_file> <key> <msg...>: logs only when key differs from the last logged key.
@@ -286,6 +351,7 @@ usage_fetch() {
             local sd
             sd=$(usage_state_dir)
             rm -f "$cache" "$sd/fetch-backoff" "$sd/fetch-backoff.logged" "$sd"/fetch-backoff.logged.*
+            _usage_fetch_episode_end "$sd"
             usage_log "cred-switch cache-dropped"
             local aold="" anew
             [ -f "$sd/acct-last" ] && read -r aold < "$sd/acct-last" 2>/dev/null
@@ -339,11 +405,15 @@ usage_fetch() {
         _usage_fetch_serve_stale "$age" "$cache"; return $?
     fi
 
-    local reason="" tok="" body="" hdr="$d/fetch.hdr.$$" crc=0 status="" ra=""
-    tok=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
-        | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+    local reason="" tok="" body="" hdr="$d/fetch.hdr.$$" crc=0 status="" ra="" raw="" src=0 dead=""
+    raw=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null); src=$?
+    tok=$(printf '%s' "$raw" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+    raw=""
     if [ -z "$tok" ]; then
         reason="no-token"
+        # 44 is item-not-found and rc 0 is an item with no token: no login. Any other
+        # rc (locked keychain, no UI access under launchd) says nothing about the login.
+        if [ "$src" -eq 44 ] || [ "$src" -eq 0 ]; then dead="no-token"; fi
     else
         rm -f "$hdr"
         body=$(curl -s -m 4 -D "$hdr" https://api.anthropic.com/api/oauth/usage \
@@ -367,7 +437,8 @@ usage_fetch() {
         local tmp="$cache.tmp.$$"
         if printf '%s' "$body" | jq --argjson t "$(date +%s)" --arg fp "$fp" '. + {fetched_at:$t, cred_fp:$fp}' > "$tmp" 2>/dev/null \
             && mv "$tmp" "$cache"; then
-            rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.*
+            rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.* "$d/fetch-auth-dead"
+            _usage_fetch_episode_end "$d" stale
             local acct
             acct=$(_usage_acct_fp)
             if [ -n "$acct" ]; then printf '%s\n' "$acct" > "$d/acct-last" 2>/dev/null; else rm -f "$d/acct-last"; fi
@@ -379,14 +450,17 @@ usage_fetch() {
         reason="bad-body"
     fi
 
+    [ "$reason" = http-401 ] && dead="http-401"
+    if [ -n "$dead" ]; then printf '%s %s\n' "$(date +%s)" "$dead" > "$d/fetch-auth-dead" 2>/dev/null; fi
     if [ "$reason" = "rate-limited" ]; then
-        local delay sr
+        local delay sr ep
         if sr=$(_usage_switch_short_retry "$d" "$fp" "$ra"); then
             delay=$(_usage_fetch_backoff_arm "$d" "${sr% *}")
             usage_log "fetch-failed reason=rate-limited retry_after=${ra:-none} backoff=$delay switch-retry=${sr#* }/$USAGE_SWITCH_RETRY_MAX"
         else
-            delay=$(_usage_fetch_backoff_arm "$d" "$ra")
-            usage_log "fetch-failed reason=rate-limited retry_after=${ra:-none} backoff=$delay"
+            ep=$(_usage_fetch_episode_429 "$d")
+            delay=$(_usage_fetch_backoff_arm "$d" "$ra" "${ep% *}")
+            [ "${ep#* }" = new ] && usage_log "429-episode start retry_after=${ra:-none} backoff=$delay"
         fi
     else
         usage_log "fetch-failed reason=$reason"

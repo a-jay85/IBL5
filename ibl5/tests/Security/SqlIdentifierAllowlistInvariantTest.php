@@ -13,10 +13,12 @@ use JsbParser\PlayerIdResolver;
 use League\LeagueContext;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Search\SearchRepository;
 use SeasonLeaderboards\SeasonLeaderboardsRepository;
 use Standings\StandingsRepository;
 use Standings\StandingsUpdaterRepository;
 use Team\TeamQueryRepository;
+use TeamOffDefStats\TeamOffDefStatsRepository;
 use Voting\VotingRepository;
 
 /**
@@ -37,6 +39,14 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
     private const BACKTICKED_COLUMN_PATTERN = '/^`[a-z_]+`$/';
     private const SORT_EXPRESSION_PATTERN = '/^[()`a-z_*+\-\/0-9]+$/';
     private const VOTE_COLUMN_PATTERN = '/^[a-z0-9_]+$/';
+    private const PREFIX_PATTERN = '/^[a-z]+$/';
+    private const SQL_CONCAT_BASELINE_IDENTIFIER = 'ibl.sqlStringConcatenation';
+    /** Files whose ibl.sqlStringConcatenation entries were cleared; they must stay at zero. */
+    private const CLEARED_SQL_CONCAT_PATHS = [
+        'classes/Search/SearchRepository.php',
+        'classes/Standings/StandingsRepository.php',
+        'classes/TeamOffDefStats/TeamOffDefStatsRepository.php',
+    ];
 
     /**
      * Every class whose SQL identifier construction was converted under
@@ -59,6 +69,8 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
             'TeamStatsCalculator' => [TeamStatsCalculator::class],
             'PlayerIdResolver' => [PlayerIdResolver::class],
             'Boxscore' => [Boxscore::class],
+            'SearchRepository' => [SearchRepository::class],
+            'TeamOffDefStatsRepository' => [TeamOffDefStatsRepository::class],
         ];
     }
 
@@ -91,6 +103,7 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
             'TeamStatsCalculator::STANDINGS_TABLES' => [TeamStatsCalculator::class, 'STANDINGS_TABLES', self::TABLE_PATTERN, false, false],
             'PlayerIdResolver::PLR_TABLES' => [PlayerIdResolver::class, 'PLR_TABLES', self::TABLE_PATTERN, false, false],
             'PlayerIdResolver::SNAPSHOT_TABLES' => [PlayerIdResolver::class, 'SNAPSHOT_TABLES', self::TABLE_PATTERN, false, false],
+            'SearchRepository::SUPPORTED_PREFIXES' => [SearchRepository::class, 'SUPPORTED_PREFIXES', self::PREFIX_PATTERN, false, true],
         ];
     }
 
@@ -225,6 +238,38 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
             [],
             self::nonIdentifierValues(['ibl' => 'ibl_olympics_plr_snapshots'], self::TABLE_PATTERN, false)
         );
+    }
+
+    public function testPrefixShapeCheckFlagsInjectedPrefixValue(): void
+    {
+        $map = ['nuke', 'nuke_topics; DROP TABLE nuke_topics; --'];
+        self::assertSame(
+            ['nuke_topics; DROP TABLE nuke_topics; --'],
+            self::nonIdentifierValues($map, self::PREFIX_PATTERN, true),
+        );
+
+        // A hyphenated prefix is outside the shape, so adding one to SUPPORTED_PREFIXES fails.
+        self::assertSame(['nuke-prod'], self::nonIdentifierValues(['nuke', 'nuke-prod'], self::PREFIX_PATTERN, true));
+
+        // A trailing underscore is not a prefix; the "_stories" suffix supplies the separator.
+        self::assertNotSame([], self::nonIdentifierValues(['nuke_'], self::PREFIX_PATTERN, true));
+    }
+
+    public function testClearedRepositoriesStayOutOfSqlConcatenationBaseline(): void
+    {
+        $neon = file_get_contents(__DIR__ . '/../../phpstan-baseline.neon');
+        self::assertIsString($neon);
+
+        $matched = preg_match_all(
+            '/identifier: ' . preg_quote(self::SQL_CONCAT_BASELINE_IDENTIFIER, '/') . '\s*\n\s*count: \d+\s*\n\s*path: (\S+)/',
+            $neon,
+            $matches,
+        );
+        self::assertNotFalse($matched);
+
+        // Proves the regex matches the live file format (this block is intentionally kept).
+        self::assertContains('classes/SeasonHighs/SeasonHighsRepository.php', $matches[1]);
+        self::assertSame([], array_values(array_intersect($matches[1], self::CLEARED_SQL_CONCAT_PATHS)));
     }
 
     public function testColumnShapeCheckFlagsInjectedDepthColumnValue(): void

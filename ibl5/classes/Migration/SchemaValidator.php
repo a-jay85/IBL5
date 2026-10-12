@@ -7,7 +7,7 @@ namespace Migration;
 /**
  * Validates that the actual database schema matches expected column assertions.
  *
- * Uses a single batched INFORMATION_SCHEMA query to check all assertions at once.
+ * Runs one bound INFORMATION_SCHEMA query per assertion.
  * Designed to run after migrations to catch silent no-ops (e.g., IF EXISTS guards
  * that swallowed a failed column rename).
  */
@@ -25,28 +25,21 @@ class SchemaValidator extends \Database\BaseMysqliRepository
         }
 
         $expectedKeys = [];
-        $tuples = [];
+        $foundKeys = [];
 
         foreach ($assertions as $assertion) {
             $expectedKeys[] = $assertion->toKey();
-            $tuples[] = '(' . $this->quote($assertion->table) . ', ' . $this->quote($assertion->column) . ')';
-        }
 
-        $tupleList = implode(', ', $tuples);
-
-        /** @var list<array{TABLE_NAME: string, COLUMN_NAME: string}> $rows */
-        $rows = $this->fetchAll(
-            // $tupleList is a list of real_escape_string-quoted (table, column)
-            // value-tuples built via quote() above; concatenate, not interpolate.
-            "SELECT TABLE_NAME, COLUMN_NAME
-             FROM INFORMATION_SCHEMA.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE()
-               AND (TABLE_NAME, COLUMN_NAME) IN (" . $tupleList . ")"
-        );
-
-        $foundKeys = [];
-        foreach ($rows as $row) {
-            $foundKeys[] = $row['TABLE_NAME'] . '.' . $row['COLUMN_NAME'];
+            /** @var list<array{TABLE_NAME: string, COLUMN_NAME: string}> $rows */
+            $rows = $this->fetchAll(
+                'SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+                'ss',
+                $assertion->table,
+                $assertion->column,
+            );
+            foreach ($rows as $row) {
+                $foundKeys[] = $row['TABLE_NAME'] . '.' . $row['COLUMN_NAME'];
+            }
         }
 
         $missing = array_values(array_diff($expectedKeys, $foundKeys));
@@ -55,10 +48,5 @@ class SchemaValidator extends \Database\BaseMysqliRepository
             passed: $missing === [],
             missing: $missing,
         );
-    }
-
-    private function quote(string $value): string
-    {
-        return "'" . $this->db->real_escape_string($value) . "'";
     }
 }

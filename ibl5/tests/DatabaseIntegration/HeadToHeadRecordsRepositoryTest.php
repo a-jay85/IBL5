@@ -473,7 +473,7 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
         self::assertSame('new3.png', $axis['H2HZeta']['logo']);
         self::assertSame('new17.png', $axis['H2HBeta']['logo']);
         self::assertSame('new22.png', $axis['H2HGamma']['logo']);
-        self::assertSame([[17, 'Spurs'], [22, 'Nobodies']], $calls);
+        self::assertSame([[17,'Spurs'],[22,'Nobodies']], $calls);
     }
 
     public function testCurrentScopeDerivesGmAxisFromRecordsOnly(): void
@@ -489,7 +489,7 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
 
         $payload = $this->repo->buildGmsMatrix('regular', 'current');
 
-        self::assertSame(['H2HAlpha', 'H2HGamma'], array_column($payload['axis'], 'key'));
+        self::assertSame(['H2HAlpha','H2HGamma'], array_column($payload['axis'], 'key'));
     }
 
     public function testCurrentScopeWithNoCurrentSeasonGamesReturnsEmptyAxis(): void

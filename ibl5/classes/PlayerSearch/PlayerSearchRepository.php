@@ -6,7 +6,6 @@ namespace PlayerSearch;
 
 use Database\BaseMysqliRepository;
 use PlayerSearch\Contracts\PlayerSearchRepositoryInterface;
-use Validation\QueryConditions;
 
 /**
  * PlayerSearchRepository - Database operations for player search
@@ -20,44 +19,25 @@ use Validation\QueryConditions;
  */
 class PlayerSearchRepository extends BaseMysqliRepository implements PlayerSearchRepositoryInterface
 {
-    private const COLUMN_MAP = [
-        'pos' => 'pos',
-        'age' => 'age',
-        'search_name' => 'name',
-        'college' => 'college',
-        'exp' => 'exp',
-        'exp_max' => 'exp_max',
-        'bird' => 'bird',
-        'bird_max' => 'bird_max',
-        'r_fga' => 'r_fga',
-        'r_fgp' => 'r_fgp',
-        'r_fta' => 'r_fta',
-        'r_ftp' => 'r_ftp',
-        'r_3ga' => 'r_3ga',
-        'r_3gp' => 'r_3gp',
-        'r_orb' => 'r_orb',
-        'r_drb' => 'r_drb',
-        'r_ast' => 'r_ast',
-        'r_stl' => 'r_stl',
-        'r_blk' => 'r_blk',
-        // Filter keys match the form-field names (legacy user-facing API);
-        // values are the post-rename DB column names.
-        'r_to' => 'r_tvr',
-        'r_foul' => 'r_foul',
-        'Clutch' => 'clutch',
-        'Consistency' => 'consistency',
-        'talent' => 'talent',
-        'skill' => 'skill',
-        'intangibles' => 'intangibles',
-        'oo' => 'oo',
-        'do' => 'r_drive_off',
-        'po' => 'po',
-        'to' => 'r_trans_off',
-        'od' => 'od',
-        'dd' => 'dd',
-        'pd' => 'pd',
-        'td' => 'td',
+    private const GREATER_THAN_FILTERS = [
+        'Clutch', 'Consistency', 'talent', 'skill', 'intangibles',
+        'oo', 'do', 'po', 'to', 'od', 'dd', 'pd', 'td',
+        'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_3ga', 'r_3gp',
+        'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_blk', 'r_to', 'r_foul'
     ];
+
+    /**
+     * Fully constant search WHERE. Every optional predicate is flag-guarded,
+     * `(? = 0 OR <pred>)`, and searchPlayers() always binds a flag then a value for
+     * each one (flag 0 + neutral value when the filter is absent). Placeholder order:
+     * active flag, then (flag, value) for name, college, pos, age, exp, exp_max, bird,
+     * bird_max, then (flag, value) for each GREATER_THAN_FILTERS entry in order. The
+     * rating groups map form-field name to DB column (r_to -> r_tvr, do -> r_drive_off,
+     * to -> r_trans_off, Clutch -> clutch, Consistency -> consistency; the rest are
+     * identical).
+     */
+    private const SEARCH_WHERE = '`ibl_plr`.`pid` > 0 AND (? = 0 OR `ibl_plr`.`retired` = 0) AND (? = 0 OR `ibl_plr`.`name` LIKE ?) AND (? = 0 OR `ibl_plr`.`college` LIKE ?) AND (? = 0 OR `ibl_plr`.`pos` = ?) AND (? = 0 OR `ibl_plr`.`age` <= ?) AND (? = 0 OR `ibl_plr`.`exp` >= ?) AND (? = 0 OR `ibl_plr`.`exp` <= ?) AND (? = 0 OR `ibl_plr`.`bird` >= ?) AND (? = 0 OR `ibl_plr`.`bird` <= ?) AND '
+        . '(? = 0 OR `ibl_plr`.`clutch` >= ?) AND (? = 0 OR `ibl_plr`.`consistency` >= ?) AND (? = 0 OR `ibl_plr`.`talent` >= ?) AND (? = 0 OR `ibl_plr`.`skill` >= ?) AND (? = 0 OR `ibl_plr`.`intangibles` >= ?) AND (? = 0 OR `ibl_plr`.`oo` >= ?) AND (? = 0 OR `ibl_plr`.`r_drive_off` >= ?) AND (? = 0 OR `ibl_plr`.`po` >= ?) AND (? = 0 OR `ibl_plr`.`r_trans_off` >= ?) AND (? = 0 OR `ibl_plr`.`od` >= ?) AND (? = 0 OR `ibl_plr`.`dd` >= ?) AND (? = 0 OR `ibl_plr`.`pd` >= ?) AND (? = 0 OR `ibl_plr`.`td` >= ?) AND (? = 0 OR `ibl_plr`.`r_fga` >= ?) AND (? = 0 OR `ibl_plr`.`r_fgp` >= ?) AND (? = 0 OR `ibl_plr`.`r_fta` >= ?) AND (? = 0 OR `ibl_plr`.`r_ftp` >= ?) AND (? = 0 OR `ibl_plr`.`r_3ga` >= ?) AND (? = 0 OR `ibl_plr`.`r_3gp` >= ?) AND (? = 0 OR `ibl_plr`.`r_orb` >= ?) AND (? = 0 OR `ibl_plr`.`r_drb` >= ?) AND (? = 0 OR `ibl_plr`.`r_ast` >= ?) AND (? = 0 OR `ibl_plr`.`r_stl` >= ?) AND (? = 0 OR `ibl_plr`.`r_blk` >= ?) AND (? = 0 OR `ibl_plr`.`r_tvr` >= ?) AND (? = 0 OR `ibl_plr`.`r_foul` >= ?)';
 
     /**
      * Constructor - inherits from BaseMysqliRepository
@@ -75,58 +55,57 @@ class PlayerSearchRepository extends BaseMysqliRepository implements PlayerSearc
      */
     public function searchPlayers(array $params): array
     {
-        $baseConditions = ['`ibl_plr`.`pid` > 0'];
-        if ($params['active'] === 0) {
-            $baseConditions[] = '`ibl_plr`.`retired` = 0';
-        }
-        $qc = new QueryConditions($baseConditions);
+        $input = $params;
 
-        // String filters (LIKE)
-        $nameSearch = is_string($params['search_name']) ? '%' . $params['search_name'] . '%' : null;
-        $qc->addIfNotNull('`ibl_plr`.`name` LIKE ?', 's', $nameSearch);
+        $types = 'i';
+        $bind = [$input['active'] === 0 ? 1 : 0];
 
-        $collegeSearch = is_string($params['college']) ? '%' . $params['college'] . '%' : null;
-        $qc->addIfNotNull('`ibl_plr`.`college` LIKE ?', 's', $collegeSearch);
+        // String filters (LIKE / equality)
+        $nameSearch = is_string($input['search_name']) ? '%' . $input['search_name'] . '%' : null;
+        $types .= 'is';
+        $bind[] = $nameSearch !== null ? 1 : 0;
+        $bind[] = $nameSearch ?? '';
 
-        $qc->addIfNotNull('`ibl_plr`.`pos` = ?', 's', is_string($params['pos']) ? $params['pos'] : null);
+        $collegeSearch = is_string($input['college']) ? '%' . $input['college'] . '%' : null;
+        $types .= 'is';
+        $bind[] = $collegeSearch !== null ? 1 : 0;
+        $bind[] = $collegeSearch ?? '';
 
-        // Integer filters (range)
-        $qc->addIfNotNull('`ibl_plr`.`age` <= ?', 'i', is_int($params['age']) ? $params['age'] : null);
-        $qc->addIfNotNull('`ibl_plr`.`exp` >= ?', 'i', is_int($params['exp']) ? $params['exp'] : null);
-        $qc->addIfNotNull('`ibl_plr`.`exp` <= ?', 'i', is_int($params['exp_max']) ? $params['exp_max'] : null);
-        $qc->addIfNotNull('`ibl_plr`.`bird` >= ?', 'i', is_int($params['bird']) ? $params['bird'] : null);
-        $qc->addIfNotNull('`ibl_plr`.`bird` <= ?', 'i', is_int($params['bird_max']) ? $params['bird_max'] : null);
+        $pos = is_string($input['pos']) ? $input['pos'] : null;
+        $types .= 'is';
+        $bind[] = $pos !== null ? 1 : 0;
+        $bind[] = $pos ?? '';
 
-        // Rating filters (>= threshold)
-        $greaterThanFilters = [
-            'Clutch', 'Consistency', 'talent', 'skill', 'intangibles',
-            'oo', 'do', 'po', 'to', 'od', 'dd', 'pd', 'td',
-            'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_3ga', 'r_3gp',
-            'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_blk', 'r_to', 'r_foul'
+        // Integer filters (range): age <=, exp >=, exp <=, bird >=, bird <=
+        $rangeValues = [
+            is_int($input['age']) ? $input['age'] : null,
+            is_int($input['exp']) ? $input['exp'] : null,
+            is_int($input['exp_max']) ? $input['exp_max'] : null,
+            is_int($input['bird']) ? $input['bird'] : null,
+            is_int($input['bird_max']) ? $input['bird_max'] : null,
         ];
-
-        foreach ($greaterThanFilters as $filter) {
-            $filterValue = $params[$filter] ?? null;
-            if (is_int($filterValue)) {
-                // $column is a value from the closed COLUMN_MAP allowlist keyed by the
-                // hardcoded $greaterThanFilters list (no user input) — concatenate the
-                // validated, backticked identifier rather than interpolating it.
-                $column = self::COLUMN_MAP[$filter];
-                $qc->add("`ibl_plr`.`" . $column . "` >= ?", 'i', $filterValue);
-            }
+        foreach ($rangeValues as $rangeValue) {
+            $types .= 'ii';
+            $bind[] = $rangeValue !== null ? 1 : 0;
+            $bind[] = $rangeValue ?? 0;
         }
 
-        // $whereClause is a QueryConditions-built clause whose values are bound (?)
-        // params; concatenate it rather than interpolating, and backtick every
-        // ibl_<table>.<column> reference now exposed in this non-interpolated literal.
-        $whereClause = $qc->toWhereClause();
+        // Rating filters (>= threshold); columns are baked into SEARCH_WHERE
+        foreach (self::GREATER_THAN_FILTERS as $filter) {
+            $filterValue = $input[$filter] ?? null;
+            $filterValue = is_int($filterValue) ? $filterValue : null;
+            $types .= 'ii';
+            $bind[] = $filterValue !== null ? 1 : 0;
+            $bind[] = $filterValue ?? 0;
+        }
+
         $query = "SELECT `ibl_plr`.*, `ibl_team_info`.`team_name` AS teamname, `ibl_team_info`.`color1`, `ibl_team_info`.`color2`
             FROM `ibl_plr`
             LEFT JOIN `ibl_team_info` ON `ibl_plr`.`teamid` = `ibl_team_info`.`teamid`
-            WHERE " . $whereClause . "
+            WHERE " . self::SEARCH_WHERE . "
             ORDER BY `ibl_plr`.`retired` ASC, `ibl_plr`.`ordinal` ASC, `ibl_plr`.`pid` ASC";
 
-        $stmt = $this->executeQuery($query, $qc->getTypes(), ...$qc->getParams());
+        $stmt = $this->executeQuery($query, $types, ...$bind);
         $result = $stmt->get_result();
 
         if ($result === false) {

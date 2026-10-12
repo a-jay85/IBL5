@@ -631,4 +631,17 @@ class LeagueControlPanelViewTest extends TestCase
             'hasFinalsMvp' => false,
         ], $overrides);
     }
+
+    public function testHeadContainsFontPreconnectLinksAndStylesheet(): void
+    {
+        $html = $this->renderWithDefaults();
+
+        $this->assertStringContainsString('<head>', $html);
+        $this->assertStringContainsString('<meta charset="UTF-8">', $html);
+        $this->assertStringContainsString('<title>IBLv5 Control Panel</title>', $html);
+        $this->assertStringContainsString('<link rel="stylesheet" href="/ibl5/themes/IBL/style/style.css">', $html);
+        $this->assertStringContainsString("</head>\n<body>", $html);
+        $this->assertStringNotContainsString('&lt;link', $html);
+        $this->assertSame(1, substr_count($html, '<head>'));
+    }
 }

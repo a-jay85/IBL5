@@ -14,6 +14,9 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 DRIVER="$SCRIPT_DIR/pr-cycle"
 [[ -x "$DRIVER" ]] || { echo "FAIL: $DRIVER missing or not executable" >&2; exit 1; }
@@ -32,16 +35,15 @@ SCRATCH="$(mktemp -d)"
 # delete this run's directories out from under it, which is the exact failure being fixed.
 TSBASE="tpc$$"
 
-_cleanup() { rm -rf "$SCRATCH" "/tmp/pr-cycle-$TSBASE"* ; }
+_cleanup() { rm -rf "$SCRATCH" "/tmp/pr-cycle-$TSBASE"* ; h_cleanup; }
 trap _cleanup EXIT
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$SCRATCH/usage"
 
-FAILED=0
 CASE_BASE=0
-fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
-begin_case() { CASE_BASE=$FAILED; }
+fail() { h_fail "$*"; }
+begin_case() { CASE_BASE=$H_FAIL; }
 end_case() {  # $1 = case name; prints "<name> OK" only if the case added no failures
-    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+    if [[ $H_FAIL -eq $CASE_BASE ]]; then h_pass "$1"; else echo "$1 FAILED" >&2; fi
 }
 
 BIN="$SCRATCH/.local/bin"
@@ -1044,7 +1046,7 @@ grep -qF -- '--only 102' <<< "$OUT" || fail "worker did not announce its scope"
 # Stage 1 is the only caller that exempts the fleet from the test-only exit-5 refusal.
 grep -qF -- '--allow-test-only' "$SCRATCH/ready.argv" \
     || fail "stage1-passes-allow-test-only: fleet argv lacks --allow-test-only: $(sed -n 1p "$SCRATCH/ready.argv")"
-echo "stage1-passes-allow-test-only OK"
+h_pass "stage1-passes-allow-test-only"
 
 # The hash form is the same set: normalization happens at parse time, not at match time.
 reset_state
@@ -2985,9 +2987,4 @@ run --dry-run --only 101,abc --max-ready 2
 end_case "tick-argv-contract"
 
 # --- summary --------------------------------------------------------------------------------
-if [[ $FAILED -eq 0 ]]; then
-    echo "test-pr-cycle: ALL PASS"
-    exit 0
-fi
-echo "test-pr-cycle: $FAILED failure(s)" >&2
-exit 1
+h_done

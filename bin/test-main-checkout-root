@@ -9,8 +9,10 @@
 
 set -uo pipefail
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+h_tmp TMP
 
 # Hermetic: no user or system git config leaks in.
 export HOME="$TMP/home"
@@ -20,18 +22,13 @@ mkdir -p "$HOME"
 # shellcheck source=lib/git-helpers.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib/git-helpers.sh"
 
-PASS=0
-FAIL=0
-
 # check <name> <want> <got> <rc> [want_rc]
 check() {
     local name="$1" want="$2" got="$3" rc="$4" want_rc="${5:-0}"
     if [ "$got" = "$want" ] && [ "$rc" = "$want_rc" ]; then
-        echo "PASS: $name"
-        PASS=$((PASS + 1))
+        h_pass "$name"
     else
-        echo "FAIL: $name: got '$got' rc=$rc, want '$want' rc=$want_rc"
-        FAIL=$((FAIL + 1))
+        h_fail "$name: got '$got' rc=$rc, want '$want' rc=$want_rc"
     fi
 }
 
@@ -49,7 +46,7 @@ want="$(git -C "$TMP/main" worktree list --porcelain \
 
 # run_cases: returns the number of failing cases.
 run_cases() {
-    local before="$FAIL" got rc
+    local before="$H_FAIL" got rc
     got="$(cd "$TMP/main" && main_checkout_root)"; rc=$?
     check main-top "$want" "$got" "$rc"
     got="$(cd "$TMP/main/sub/deep" && main_checkout_root)"; rc=$?
@@ -62,7 +59,7 @@ run_cases() {
     check explicit-dir-from-root "$want" "$got" "$rc"
     got="$(cd "$TMP/wt" && main_checkout_root .)"; rc=$?
     check explicit-dot "$want" "$got" "$rc"
-    return $((FAIL - before))
+    return $((H_FAIL - before))
 }
 
 run_cases
@@ -101,16 +98,13 @@ check old-git-fallback-non-git "" "$got" "$rc" 1
 mut_fail="$(
     main_checkout_root() { git -C "${1:-.}" rev-parse --show-toplevel; }
     run_cases >/dev/null
-    echo "$FAIL"
+    echo "$H_FAIL"
 )"
-mut_fail=$((mut_fail - FAIL))
+mut_fail=$((mut_fail - H_FAIL))
 if [ "$mut_fail" -ge 1 ]; then
-    echo "PASS: mutation-show-toplevel caught ($mut_fail case failures)"
-    PASS=$((PASS + 1))
+    h_pass "mutation-show-toplevel caught ($mut_fail case failures)"
 else
-    echo "FAIL: mutation-show-toplevel not caught"
-    FAIL=$((FAIL + 1))
+    h_fail "mutation-show-toplevel not caught"
 fi
 
-echo "test-main-checkout-root: $PASS passed, $FAIL failed"
-exit $((FAIL > 0))
+h_done

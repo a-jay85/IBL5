@@ -354,8 +354,19 @@ class SearchView implements SearchViewInterface
         ob_start();
         ?><div class="search-results__list"><?php foreach ($itemBodies as $index => $itemBody) {
             $delay = min($index * 40, 400);
-        ?><div class="search-result<?= HtmlSanitizer::safeHtmlOutput($itemModifier) ?>" style="--anim-delay: <?= (int) $delay ?>ms"><?= HtmlSanitizer::trusted($itemBody) ?></div><?php } ?></div><?php
+        ?><?= HtmlSanitizer::trusted($this->renderResultItem($itemBody, $itemModifier, $delay)) ?><?php } ?></div><?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Wrap one pre-built card body in its animated result container.
+     *
+     * @param string $itemBody Already-escaped inner HTML for the card body
+     */
+    private function renderResultItem(string $itemBody, string $itemModifier, int $delay): string
+    {
+        return '<div class="search-result' . HtmlSanitizer::safeHtmlOutput($itemModifier)
+            . '" style="--anim-delay: ' . $delay . 'ms">' . $itemBody . '</div>';
     }
 
     /**
@@ -369,7 +380,6 @@ class SearchView implements SearchViewInterface
         foreach ($results as $result) {
             $sid = $result['sid'];
             $informant = $result['informant'];
-            $time = $this->nukeCompat->formatLocalTime($result['time']);
             $comments = $result['comments'];
             $topicId = $result['topicId'];
             $topicText = $result['topicText'];
@@ -379,7 +389,7 @@ class SearchView implements SearchViewInterface
             if ($informant !== '') {
                 ?><span class="search-result__meta-item"><?= HtmlSanitizer::safeHtmlOutput(_CONTRIBUTEDBY) ?> <?= HtmlSanitizer::safeHtmlOutput($informant) ?></span><?php
             }
-            ?><span class="search-result__meta-item"><?= HtmlSanitizer::safeHtmlOutput(_POSTEDBY) ?> <?= HtmlSanitizer::safeHtmlOutput($result['aid']) ?> <?= HtmlSanitizer::safeHtmlOutput(_ON) ?> <?= HtmlSanitizer::trusted($time) ?></span><?php
+            ?><span class="search-result__meta-item"><?= HtmlSanitizer::safeHtmlOutput(_POSTEDBY) ?> <?= HtmlSanitizer::safeHtmlOutput($result['aid']) ?> <?= HtmlSanitizer::safeHtmlOutput(_ON) ?> <?= HtmlSanitizer::trusted($this->nukeCompat->formatLocalTime($result['time'])) ?></span><?php
             if ($topicText !== '') {
                 ?><span class="search-result__meta-item"><?= HtmlSanitizer::safeHtmlOutput(_TOPIC) ?>: <a href="modules.php?name=Search&amp;query=&amp;topic=<?= (int) $topicId ?>"><?= HtmlSanitizer::safeHtmlOutput($topicText) ?></a></span><?php
             }
@@ -408,7 +418,6 @@ class SearchView implements SearchViewInterface
         foreach ($results as $result) {
             $teamid = $result['teamid'];
             $sid = $result['sid'];
-            $date = $this->nukeCompat->formatLocalTime($result['date']);
             $name = $result['name'];
             $articleTitle = $result['articleTitle'];
             $replyCount = $result['replyCount'];
@@ -416,7 +425,7 @@ class SearchView implements SearchViewInterface
             ob_start();
             ?><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;thold=-1&amp;mode=flat&amp;order=1&amp;sid=<?= (int) $sid ?>#<?= (int) $teamid ?>" class="search-result__title"><?= HtmlSanitizer::safeHtmlOutput($result['subject']) ?></a></div><div class="search-result__meta"><?php
             if ($name !== '') {
-                ?><span class="search-result__meta-item"><?= HtmlSanitizer::safeHtmlOutput(_POSTEDBY) ?> <?= HtmlSanitizer::safeHtmlOutput($name) ?> <?= HtmlSanitizer::safeHtmlOutput(_ON) ?> <?= HtmlSanitizer::trusted($date) ?></span><?php
+                ?><span class="search-result__meta-item"><?= HtmlSanitizer::safeHtmlOutput(_POSTEDBY) ?> <?= HtmlSanitizer::safeHtmlOutput($name) ?> <?= HtmlSanitizer::safeHtmlOutput(_ON) ?> <?= HtmlSanitizer::trusted($this->nukeCompat->formatLocalTime($result['date'])) ?></span><?php
             }
             if ($articleTitle !== '') {
                 ?><span class="search-result__meta-item"><?= HtmlSanitizer::safeHtmlOutput(_ATTACHART) ?>: <?= HtmlSanitizer::safeHtmlOutput($articleTitle) ?></span><?php

@@ -4,12 +4,11 @@
 # bin/test-burndown — offline harness for bin/backlog burndown* subcommands.
 set -uo pipefail
 
-PASS=0
-FAIL=0
-FAILURES=()
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
-ok()   { printf '[PASS] %s\n' "$1"; PASS=$((PASS + 1)); }
-fail() { printf '[FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); FAILURES+=("$1"); }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$1"; }
 want() {
     local label="$1" output="$2" token="$3"
     if grep -qF -- "$token" <<< "$output"; then
@@ -21,8 +20,7 @@ want() {
 
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/backlog"
 
-T="$(mktemp -d)"
-trap 'rm -rf "$T"' EXIT
+h_tmp T
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
 
 mkdir -p "$T/home" "$T/fx"
@@ -2953,10 +2951,4 @@ OUT="$(bdl burndown-record "$L" 42 status=skipped "why=duplicate of a merged fix
 OUT="$("$SCRIPT" --help 2>&1)"
 want "SR26: help lists why=" "$OUT" "blocked_by=, why= on ledger item"
 
-echo ""
-echo "Results: $PASS passed, $FAIL failed"
-if [ "$FAIL" -gt 0 ]; then
-    for f in "${FAILURES[@]}"; do printf '  FAIL: %s\n' "$f"; done
-    exit 1
-fi
-exit 0
+h_done

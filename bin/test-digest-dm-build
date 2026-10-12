@@ -12,6 +12,9 @@
 # of .claude/review-shared/scripts/digest.sh (the producer).
 
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+H_FAIL_FD=2  # FAIL: lines stay on stderr, as before migration
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -19,7 +22,7 @@ DRIVER="$SCRIPT_DIR/digest-dm-build"
 PRODUCER="$ROOT/.claude/review-shared/scripts/digest.sh"
 
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/tddb.XXXXXX")"
-trap 'rm -rf "$SCRATCH"' EXIT
+trap 'rm -rf "$SCRATCH"; h_cleanup' EXIT
 
 # Same UTF-8 locale selection as the driver, so ${#v} counts characters here too.
 for _l in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
@@ -28,10 +31,10 @@ for _l in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
     esac
 done
 
-PASS=0; FAILN=0; CASE=""
+CASE=""
 begin_case() { CASE="$1"; }
-ok()   { PASS=$((PASS + 1)); }
-fail() { FAILN=$((FAILN + 1)); printf 'FAIL [%s] %s\n' "$CASE" "$1" >&2; }
+ok()   { h_pass "$CASE"; }
+fail() { h_fail "[$CASE] $1"; }
 want() { case "$2" in *"$3"*) ok ;; *) fail "$1: expected to contain <<$3>>, got <<$2>>" ;; esac; }
 wantnot() { case "$2" in *"$3"*) fail "$1: expected NOT to contain <<$3>>" ;; *) ok ;; esac; }
 eq()   { [ "$2" = "$3" ] && ok || fail "$1: want <<$3>>, got <<$2>>"; }
@@ -420,6 +423,5 @@ eq "unknown flag exits 2" "$RC" "2"
 run "$SCRATCH/f1" --pr-body-file /nonexistent
 eq "unreadable body file exits 2" "$RC" "2"
 
-printf '\n%s case(s) passed, %s failed\n' "$PASS" "$FAILN"
-[ "$FAILN" -eq 0 ] || exit 1
-printf 'All %s cases passed\n' "$PASS"
+
+h_done

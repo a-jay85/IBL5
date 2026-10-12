@@ -27,6 +27,13 @@ class ConfigBootstrap implements BootstrapStepInterface
         'redirect' => '/^[a-z0-9]*$/i',
     ];
 
+    /**
+     * Closed map of config-table identifiers keyed by supported prefix. The table
+     * name is an identifier (never bindable), so only values from this map reach
+     * query text; PHPStan then proves the SELECT is a constant string.
+     */
+    private const CONFIG_TABLES = ['nuke' => 'nuke_config'];
+
     public function __construct(string $basePath, bool $includeNukeConfig = true)
     {
         $this->basePath = $basePath;
@@ -181,21 +188,20 @@ class ConfigBootstrap implements BootstrapStepInterface
      * Resolve the nuke_config table name from the operator-controlled config prefix.
      *
      * The table name is a SQL **identifier** (never a bound value), so it is
-     * validated against a conservative identifier pattern and concatenated, not
-     * interpolated. Boot must never fatal on a bad prefix (the existing contract
-     * is "return early, never throw"), so this validate-then-fallback returns the
-     * default `nuke_config` for any non-conforming prefix rather than throwing —
-     * an attacker-style prefix can never reach the query text.
+     * looked up in the closed CONFIG_TABLES map, not built from the prefix. Boot
+     * must never fatal on a bad prefix (the existing contract is "return early,
+     * never throw"), so any prefix outside the map returns the default
+     * `nuke_config` rather than throwing — an unknown or attacker-style prefix
+     * can never reach the query text.
      *
      * Extracted as a pure static helper so the negative-path test can exercise it
      * without bootstrapping globals or requiring config.php.
+     *
+     * @return value-of<self::CONFIG_TABLES>
      */
     public static function resolveConfigTable(string $prefix): string
     {
-        if (preg_match('/^[a-z0-9_]+$/i', $prefix) === 1) {
-            return $prefix . '_config';
-        }
-        return 'nuke_config';
+        return self::CONFIG_TABLES[$prefix] ?? 'nuke_config';
     }
 
     private function configureErrorReporting(): void

@@ -34,7 +34,7 @@ final class WaiversFactory implements ModuleFactoryInterface
         );
         $view = new \Waivers\WaiversView();
         $teamQueryRepo = new \Team\TeamQueryRepository($db);
-        $service = new \Waivers\WaiversService($teamIdentityRepo, $processor, $view, $teamQueryRepo, $db);
+        $service = new \Waivers\WaiversService($teamIdentityRepo, $processor, $teamQueryRepo, $db);
 
         return new \Waivers\WaiversController(
             $service,

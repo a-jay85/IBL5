@@ -27,6 +27,9 @@ class League extends BaseMysqliRepository
     const EASTERN_CONFERENCE_TEAMIDS = array(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 22, 25, 27);
     const WESTERN_CONFERENCE_TEAMIDS = array(6, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 26, 28);
 
+    /** One `?` per team id in a conference constant (14 each). */
+    private const CONFERENCE_TID_PLACEHOLDERS = '?,?,?,?,?,?,?,?,?,?,?,?,?,?';
+
     const ALL_STAR_BACKCOURT_POSITIONS = "'PG', 'SG'";
     const ALL_STAR_FRONTCOURT_POSITIONS = "'C', 'SF', 'PF'";
 
@@ -64,18 +67,6 @@ class League extends BaseMysqliRepository
     {
         parent::__construct($db, $leagueContext);
         $this->league = $leagueContext !== null ? $leagueContext->getCurrentLeague() : LeagueContext::LEAGUE_IBL;
-    }
-
-    /**
-     * Format team IDs for SQL IN clause
-     *
-     * @param array<int, int> $conferenceTids Array of team IDs
-     * @return string Formatted string for SQL IN clause
-     */
-    public function formatTidsForSqlQuery(array $conferenceTids): string
-    {
-        $tidsFormattedForQuery = join("','", $conferenceTids);
-        return $tidsFormattedForQuery;
     }
 
     /**
@@ -120,19 +111,23 @@ class League extends BaseMysqliRepository
             $positions = self::ALL_STAR_BACKCOURT_POSITIONS;
         }
 
-        // $positions (fixed position-list constant) and $conferenceTids (int team-id
-        // constants) are class constants, never user input — concatenate, not interpolate.
+        if (count($conferenceTids) !== 14) {
+            throw new \LogicException('Conference constant must hold 14 team ids');
+        }
+
+        // $positions (fixed position-list constant) is a class constant, never user input.
+        // The conference team ids are bound, one placeholder each.
         $query = "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
         FROM `ibl_plr` p
         " . $this->playerTeamInnerJoin() . "
         WHERE p.pos IN (" . $positions . ")
-          AND p.teamid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
+          AND p.teamid IN (" . self::CONFERENCE_TID_PLACEHOLDERS . ")
           AND p.retired = 0
           AND p.stats_gm > '14'
         ORDER BY p.name, p.pid ASC";
 
         /** @var list<PlayerRow> */
-        return $this->fetchAll($query);
+        return $this->fetchAll($query, str_repeat('i', 14), ...$conferenceTids);
     }
 
     /**

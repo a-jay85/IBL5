@@ -82,17 +82,17 @@ class WaiversViewXssTest extends TestCase
         $view = new WaiversView();
         $xssPayload = '<script>alert("xss")</script>';
 
-        $option = $view->buildPlayerOption(1, $xssPayload, '$100');
-
         $html = $view->renderWaiverForm(
             'Test Team',
             1,
             'waive',
-            [$option],
+            [['playerID' => 1, 'playerName' => $xssPayload, 'contract' => '$100', 'waitTime' => '']],
             5,
             5
         );
 
         $this->assertStringNotContainsString('<script>alert("xss")</script>', $html);
+        $this->assertStringContainsString('&lt;script&gt;', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
     }
 }

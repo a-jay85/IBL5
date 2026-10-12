@@ -83,6 +83,21 @@ class TradeReviewView
     }
 
     /**
+     * Render one team cell of the partner-selection table
+     *
+     * @param array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string, mobileOrder: int} $team
+     */
+    private function renderTeamSelectionCell(array $team): string
+    {
+        $teamName = HtmlSanitizer::safeHtmlOutput($team['name']);
+        $partnerUrl = 'modules.php?name=Trading&amp;op=offertrade&amp;partner=' . $teamName;
+        $cityHtml = HtmlSanitizer::safeHtmlOutput($team['city']);
+        $nameHtml = '<span class="ibl-team-cell__city">' . $cityHtml . ' </span>' . $teamName;
+
+        return TeamCellHelper::renderTeamCell($team['teamid'], $team['fullName'], $team['color1'], $team['color2'], '', $partnerUrl, $nameHtml, '--mobile-order: ' . $team['mobileOrder'] . '; ');
+    }
+
+    /**
      * @see \Trading\Contracts\TradingViewInterface::renderTeamSelectionLinks()
      *
      * @param list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string, mobileOrder: int}> $teams Conference-split, sorted, interleaved team list from TradingService::buildTeamList()
@@ -100,16 +115,8 @@ class TradeReviewView
     </thead>
     <tbody>
 <?php foreach ($teams as $team): ?>
-        <?php
-        $teamId = $team['teamid'];
-        $teamName = HtmlSanitizer::safeHtmlOutput($team['name']);
-        $partnerUrl = 'modules.php?name=Trading&amp;op=offertrade&amp;partner=' . $teamName;
-        $cityHtml = HtmlSanitizer::safeHtmlOutput($team['city']);
-        $nameHtml = '<span class="ibl-team-cell__city">' . $cityHtml . ' </span>' . $teamName;
-        $cell = TeamCellHelper::renderTeamCell($teamId, $team['fullName'], $team['color1'], $team['color2'], '', $partnerUrl, $nameHtml, '--mobile-order: ' . $team['mobileOrder'] . '; ');
-        ?>
-        <tr>
-            <?= HtmlSanitizer::trusted($cell) ?>
+                <tr>
+            <?= HtmlSanitizer::trusted($this->renderTeamSelectionCell($team)) ?>
         </tr>
 <?php endforeach; ?>
     </tbody>

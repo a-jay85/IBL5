@@ -121,7 +121,7 @@ def _fixture(**over):
         "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
         "pr_number": 9999,
         "pr_meta": {"number": 9999, "title": "fix: synthetic",
-                    "body": "## Manual Testing\n\nNo manual testing needed\n",
+                    "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
                     "headRefOid": "deadbeef"},
         "labels": [],
         "final_state": "OPEN",

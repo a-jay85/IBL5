@@ -168,6 +168,25 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
     }
 
     /**
+     * The routing host comes only from IBL5_CANONICAL_HOST. A caller-supplied
+     * --host argument is an unknown argument: exit 1, nothing written
+     * (the same no-row assertNull(find()) pin as the parse-failure tests).
+     */
+    public function testHostArgumentIsRejectedAsUnknownArgument(): void
+    {
+        $result = $this->runScript(['--sim=' . self::SIM, '--host=evil.example'], self::VALID_PAYLOAD);
+
+        self::assertNotSame(0, $result['exit_code'], 'exit must be non-zero for --host');
+        self::assertStringContainsString(
+            'storeSimRecap: unknown argument: --host=evil.example',
+            $result['stderr'],
+            'exact STDERR message expected for --host'
+        );
+        self::assertNull($this->repo->find(self::SIM), 'no row must be written when --host is passed');
+        self::assertStringNotContainsString('evil.example', $result['stdout'], 'spoofed host must never reach the URL');
+    }
+
+    /**
      * Malformed JSON on stdin: exit 1, nothing written.
      *
      * Verification matrix row 41 (malformed-JSON branch).

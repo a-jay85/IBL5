@@ -10,10 +10,12 @@
 
 # shellcheck disable=SC2034  # used in later phases sourced from this file
 BD_BUDGET=5
+# shellcheck source=bin/lib/gh-retry.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gh-retry.sh"
 BD_CODE_REPO="a-jay85/IBL5"
 BD_LABEL_BLOCKED="blocked"
 BD_LABEL_OUT_OF_REPO="out-of-repo"
-BD_SKIP_LABELS_JSON='["blocked","out-of-repo"]'
+BD_SKIP_LABELS_JSON='["blocked","out-of-repo","deferred"]'
 BD_RANKS='^P[1-4]$'
 # Live-item predicate over a jq -s slurp of ledgers. A live item holds its unit
 # and its paths. Closed-fixed and merged items are settled, and so is a skip
@@ -89,8 +91,8 @@ bd_report_since() {
 # bd_fetch_issues <out-file> — fetches open backlog issues to a JSON file
 bd_fetch_issues() {
     local out="$1" raw
-    if ! raw="$("$GH" issue list --repo "$REPO" --state open --limit 1000 \
-            --json number,title,body,url,updatedAt,labels 2>/dev/null)"; then
+    if ! raw="$(gh_retry "$GH" issue list --repo "$REPO" --state open --limit 1000 \
+            --json number,title,body,url,updatedAt,labels)"; then
         bd_die 3 "gh issue list failed"
     fi
     if ! jq -e 'type=="array"' <<< "$raw" >/dev/null 2>&1; then
@@ -1424,8 +1426,21 @@ bd_sweep_queued() {
         && [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
         && [[ "$created" < "$BD_SWEEP_CUTOFF" ]]; then
         if [ -e "$BD_PLANS_DIR/$slug.md" ]; then
-            printf 'STALE-PLAN #%s %s (plan file, no queue entry, no PR; not flipped)\n' \
-                "$issue_num" "$slug"
+            # A closed issue means the work landed under another branch or was dropped,
+            # so the plan file no longer holds anything. Retire the row; never on a gh failure.
+            local view_raw="" istate=""
+            if view_raw="$("$GH" issue view "$issue_num" --repo "$REPO" --json state 2>/dev/null)"; then
+                istate="$(jq -r '.state // ""' <<< "$view_raw" 2>/dev/null)" || istate=""
+            fi
+            if [ "$istate" = "CLOSED" ]; then
+                bd_record_apply "$ledger" "$issue_num" \
+                    '{"status":"skipped","cost":0,"reason":"sweep: stale plan, issue already closed"}'
+                printf 'RETIRED #%s %s -> skipped (stale plan, issue closed)\n' \
+                    "$issue_num" "$slug"
+            else
+                printf 'STALE-PLAN #%s %s (plan file, no queue entry, no PR; not flipped)\n' \
+                    "$issue_num" "$slug"
+            fi
         else
             bd_record_apply "$ledger" "$issue_num" \
                 '{"status":"skipped","cost":0,"reason":"sweep: zombie queued item (no plan, no queue entry, no PR)"}'

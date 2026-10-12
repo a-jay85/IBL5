@@ -146,7 +146,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->assertStringContainsString('card-flip-container', $html);
     }
 
-    public function testRenderPageFreeAgentKeepsGoldTradingCardAndTeamZeroPageColors(): void
+    public function testRenderPageFreeAgentUsesTeamZeroColorsOnEveryCard(): void
     {
         $this->seedInvariantQueries(0);
         $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
@@ -155,10 +155,11 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
         $html = $this->buildController()->renderPage(1, null, 'nobody');
 
-        // Menu and stats cards use the unguarded team-0 row (gray); the trading card stays gold.
+        // The trading card uses the same team-0 row (gray) as the menu and stats cards.
         $this->assertStringContainsStringIgnoringCase('888888', $html);
         $card = substr($html, (int) strpos($html, 'card-flip-container'), 600);
-        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $card);
+        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#cccccc', $card);
+        $this->assertStringNotContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $card);
     }
 
     public function testRenderPageOverviewForRetiredPlayer(): void

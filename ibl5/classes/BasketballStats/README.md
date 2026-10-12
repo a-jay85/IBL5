@@ -131,6 +131,14 @@ StatsSanitizer::toInt($value);
 // Example: toInt([]) returns 0
 ```
 
+**Int from an array key, ignoring floats** (missing key, null, float, bool, array, non-numeric strings become 0):
+```php
+StatsSanitizer::intFromArray($postData, 'pid1');
+// Example: intFromArray(['k' => '12'], 'k') returns 12
+// Example: intFromArray(['k' => 1.9], 'k') returns 0   (toInt would return 1)
+// Example: intFromArray([], 'k') returns 0
+```
+
 ##### Float Sanitization
 ```php
 // Safely convert to float
@@ -145,6 +153,13 @@ StatsSanitizer::sanitizeFloat($value);
 StatsSanitizer::sanitizeString($value);
 // Example: sanitizeString("test") returns "test"
 // Example: sanitizeString(null) returns ""
+```
+
+**Scalar to string** (strings pass, ints and floats are cast, null, bool and arrays become ""):
+```php
+StatsSanitizer::scalarToString($value);
+// Example: scalarToString(23) returns "23"
+// Example: scalarToString(true) returns ""   (sanitizeString would return "1")
 ```
 
 ## Usage Examples

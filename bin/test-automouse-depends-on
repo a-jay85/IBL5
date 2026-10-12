@@ -13,18 +13,17 @@
 # Run: bin/test-automouse-depends-on  (exit 0 = all pass, 1 = any case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
-FAILED=0
+h_tmp TMP
 
 # ── Assertion helpers ─────────────────────────────────────────────────────────
 
-ok()   { echo "ok: $1"; }
-fail() { echo "FAIL: $1"; FAILED=1; }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 assert_eq() {
     local desc="$1" got="$2" expected="$3"
@@ -347,6 +346,8 @@ SELF_HEAL="$REPO_ROOT/bin/automouse/self-heal"
 # reparented bin/automouse/run, including bin/test-automouse-self-heal's
 # fixtures when the CI runner runs both tests in parallel.
 export AUTOMOUSE_ORPHAN_ARGV_RE='^no-orphan-sweep-in-this-test$'
+# Phase 3 seam: skip the real bin/check-plan; these fixtures carry no Verification Matrix.
+export AUTOMOUSE_CHECK_PLAN=/usr/bin/true
 
 heal_setup() {
     rm -rf "$TMP/heal"
@@ -436,8 +437,7 @@ if [ "$(uname)" != "Darwin" ]; then
     echo "# Section 2: skipping macOS-only run-loop cases (uname=$(uname))"
     echo "SKIP: run-loop cases skipped on non-Darwin"
     echo ""
-    echo "# Results: $FAILED failed"
-    exit "$FAILED"
+    exit "$((H_FAIL > 0 ? 1 : 0))"
 fi
 
 echo ""
@@ -844,5 +844,4 @@ assert_eq "P4: post-plan invoked exactly MAX_ATTEMPTS=3 times across all runs" \
 # ── Final summary ─────────────────────────────────────────────────────────────
 
 echo ""
-echo "# Results: $FAILED failed"
-exit "$FAILED"
+h_done

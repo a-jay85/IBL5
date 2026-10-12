@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 # Test harness for bin/check-docs: checkSkillDraftPlaceholder() (tests 1-4) and
 # the iterChangedDocs() local-date fallback (tests 5-6), and the engine
@@ -10,16 +12,14 @@ set -euo pipefail
 # Assertions check for the specific FAIL label in output, not bare exit code,
 # because a sparse fixture may trip unrelated checks.
 
-PASS=0
-FAIL=0
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REAL_SCRIPT="$SCRIPT_DIR/check-docs"
 
 label_present() {   echo "$1" | grep -qF 'skill DRAFT= command-substitution'; }
 label_absent()  { ! echo "$1" | grep -qF 'skill DRAFT= command-substitution'; }
 
-pass() { echo "PASS: $1"; ((PASS++)) || true; }
-fail() { echo "FAIL: $1"; ((FAIL++)) || true; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 skip() { echo "SKIP: $1"; }
 
 make_repo() {
@@ -404,6 +404,4 @@ fi
 
 # ── Results ───────────────────────────────────────────────────────────────────
 
-echo ""
-echo "PASS: $PASS, FAIL: $FAIL"
-[[ "$FAIL" -eq 0 ]]
+h_done

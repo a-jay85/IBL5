@@ -220,15 +220,20 @@ def test_no_paste_line_without_slug_or_pr():
 
 
 def test_paste_line_survives_budget_shrink(monkeypatch):
-    error = "\n".join(f"Merge conflict in ibl5/classes/X{i}.php" for i in range(40))
-    res = _res("rebase-conflict", error, slug="z" * 200)
-    wt, log = "w" * 500, "l" * 500
+    # An unknown kind carries a long error tail (the `detail` block), so the shrink
+    # must run all three steps: drop paths, then drop the detail block.
+    error = "\n".join(f"TAILMARK{i} " + "e" * 90 for i in range(10))
+    res = _res(None, error, slug="z" * 200, error_cmd="c" * 200)
+    wt, log = "w" * 450, "l" * 450
     with monkeypatch.context() as m:
         m.setattr(runner, "_BLOCK_BUDGET", 10**6)
         full = runner.human_block(res, 3, wt, log)
+    assert len(full) > runner._BLOCK_BUDGET
     shrunk = runner.human_block(res, 3, wt, log)
     assert len(shrunk) < len(full)
-    assert "ibl5/classes/X0.php" not in shrunk
+    assert len(shrunk) <= runner._BLOCK_BUDGET
+    assert "TAILMARK" in full
+    assert "TAILMARK" not in shrunk
     lines = shrunk.split("\n")
     assert lines[-2] == "Or paste this to have Claude fix it:"
     assert lines[-1].startswith(FIX)

@@ -147,7 +147,7 @@ probes and reports without writing to the PR.
 |----|---------|
 | 0 | Success: PR opened, held for a manual gate, or already merged. |
 | 1 | Generic harness failure. `bin/post-plan-now` falls back to the Sonnet `/post-plan` skill session. |
-| 3 | Fail-closed sentinel. No skill fallback fires. Two causes: (a) a rebase conflict the auto-resolver declined or could not certify; the harness classifies the conflict, attempts bounded per-file resolution, then requires the TREE-EQUIVALENT proof; rc=3 is returned when any of those refuses; (b) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget). A successful auto-resolution holds auto-merge at condition (14) until a `CONFLICT-REVIEW=CLEAN` verdict from the read-only reviewer clears it. See `ibl5/docs/decisions/0134-harness-conflict-autoresolve.md` for the full decision. |
+| 3 | Fail-closed sentinel. No skill fallback fires. Two causes: (a) a rebase conflict the auto-resolver declined or could not certify; the harness classifies the conflict, attempts bounded per-file resolution, then requires the TREE-EQUIVALENT proof; rc=3 is returned when any of those refuses; a branch-added line the resolver adapted to a rewrite master made in the same file passes the proof only with a deterministic near-match, the resolver's own ADAPTED-LINE justification, and a per-line CONFIRMED verdict from a separate read-only reviewer, and every accepted line is written to audit.log; (b) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget). A successful auto-resolution holds auto-merge at condition (14) until a `CONFLICT-REVIEW=CLEAN` verdict from the read-only reviewer clears it. See `ibl5/docs/decisions/0134-harness-conflict-autoresolve.md` for the full decision. |
 
 ## Retries on LLM output and on the base fetch
 
@@ -163,9 +163,26 @@ When either reply says `Failed to authenticate` or `OAuth session expired`, the
 to log the Claude CLI back in; a JSON repair cannot help. The kind and the exit
 code stay the same.
 
-`LiveGit.fetch_base` (`harness/adapters/gitad.py`) retries once after
-`FETCH_TRANSIENT_DELAY` seconds when the fetch stderr names a network blip:
-`kex_exchange_identification`, `Operation timed out`, `Connection timed out`, or
-`Connection reset by peer`. `Could not read from remote repository` and
-`Could not resolve host` on their own are not retried. The separate
-`cannot lock ref` retry (`FETCH_LOCK_RETRIES`) is unchanged.
+`harness/netretry.py` retries git and gh calls that fail with a known
+network-transient error. It waits 5, 20, then 60 seconds, so a call gets four
+attempts at most. The signatures are `kex_exchange_identification`,
+`Operation timed out`, `Connection timed out`, `Connection reset by peer`,
+`TLS handshake timeout`, and the Go HTTP shape `Post "https://...": EOF` (a
+quoted URL followed by `: EOF`). Any other error fails on the first attempt with
+the same kind and detail as before. `Could not read from remote repository` and
+`Could not resolve host` on their own are not retried. When the retries run out,
+the first error is raised and every wrapped call in the same process makes a
+single attempt for the next 300 seconds. Each retry logs one warning on the
+`harness.netretry` logger.
+
+The wrapped calls are `LiveGit.fetch_base`, the lease `ls-remote`, `push` and
+`push_ff` in `harness/adapters/gitad.py`, the fetch and `ls-remote` helpers in
+`harness/gitutil.py`, and `LiveGh._gh` in `harness/adapters/ghad.py`.
+`LiveGh._gh` retries only the argv shapes in `GH_RETRY_SAFE_SUBCOMMANDS` and
+`api` GET calls. `pr create`, `pr comment` and the reviews POST retry only with a
+landed check. Before the first attempt the harness snapshots the open PRs for the
+branch, or the count of identical comments or reviews. If the failed attempt
+landed anyway, it returns that result and makes no second call. A push counts as
+landed when the remote branch tip already equals HEAD. A failed snapshot or
+landed check means one attempt, and so does every other mutation. The
+`cannot lock ref` fetch retry (`FETCH_LOCK_RETRIES`) keeps its own budget.

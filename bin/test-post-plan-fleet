@@ -2426,6 +2426,27 @@ grep -qF '**Reviewed tree:**' ".claude/review-shared/_phase7-verdict.md" \
     || fail "_phase7-verdict.md missing Reviewed-tree contract line (skip-review.sh match target)"
 end_case "skip-review-delta-row 30"
 
+# --- case: Phase 5.5 carry-forward gate companion assertions -----------------------------
+begin_case
+P55=".claude/skills/post-plan/_phase-5.5-fidelity.md"
+# The probe is pinned to master (same shape as _phase-4-review-audit.md), never the worktree copy.
+grep -qF 'git show <MASTER_SHA>:.claude/review-shared/scripts/skip-review.sh' "$P55" \
+    || fail "_phase-5.5-fidelity.md probe not pinned to git show <MASTER_SHA>: skip-review.sh"
+# Block markers bin/test-postplan-arm-conditions extracts by name.
+for marker in 'carry-forward probe' 'carry-forward decision' 'carry-forward materialise'; do
+    grep -qF "# phase 5.5 $marker" "$P55" \
+        || fail "_phase-5.5-fidelity.md missing block marker '# phase 5.5 $marker'"
+done
+grep -qF '**Plan hash:**' "$P55" || fail "_phase-5.5-fidelity.md missing **Plan hash:** label"
+# The harness writes the same label, so the two engines can read each other's stickies.
+grep -qF '**Plan hash:**' tools/postplan-harness/harness/fidelity.py \
+    || fail "fidelity.py no longer writes the **Plan hash:** label"
+grep -qF '**Carried forward:**' "$P55" || fail "_phase-5.5-fidelity.md missing **Carried forward:** line"
+# The digest awk stops at a horizontal rule, scoped to the digest span (hr-stop).
+grep -qF 'in_digest && /^---$/' "$PRD_SR/scripts/skip-review.sh" \
+    || fail "skip-review.sh digest awk lost its hr-stop rule"
+end_case skip-review-phase55-carry-forward
+
 # --- case: review-owed.sh decision ladder ------------------------------------------------
 # Exercises .claude/review-shared/scripts/review-owed.sh through its --sticky-file and
 # --current-tree seams, with a logging stub standing in for bin/pr-review-now.

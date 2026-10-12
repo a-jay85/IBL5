@@ -18,22 +18,27 @@
 #
 # Guards, cheapest first: stop file, usage zone, a live pr-cycle worker, then per PR:
 # post-plan in flight, post-plan finished under 30 minutes ago, checks pending or green,
-# stacked on another open PR's branch, and a one-rescue-per-head-SHA retry cap. At most
+# stacked on another open PR's branch, and a one-rescue-per-patch-id retry cap. At most
 # 3 PRs go to one run. Every skipped open PR is written to a results/<id>.skip-notes TSV
 # that the launch hands to bin/pr-cycle as PR_CYCLE_SKIP_NOTES for its your-turn DM.
+# The retry key is the PR's patch-id (pcw_patch_id), so the rescue's own rebase-and-push
+# does not reset the cap and a push that changes the diff does. When the patch-id cannot
+# be computed the key is the head SHA, the tick logs it, and one DM per (PR, head) says so.
 #
 # A launch is recorded as pending, not as an attempt: the detached worker outlives the tick.
 # A later tick with no live worker reads the worker's result file and settles each PR. A run
-# that reached post-plan counts as the one rescue. A holdrepeat decline is remembered per head.
-# A rescue that never reached post-plan is a strike, and two strikes per head stop the retries.
+# that reached post-plan counts as the one rescue. A holdrepeat decline is remembered per key.
+# A rescue that never reached post-plan is a strike, and two strikes per key stop the retries.
 #
 # Env seams (unset and empty both take the default):
 #   PR_CYCLE_STOP_FILE         default $HOME/.ibl5-pr-cycle.stop (same name bin/pr-cycle reads)
 #   PR_CYCLE_WATCH_STATE_DIR   default $HOME/.ibl5-pr-cycle-watch. Holds attempts/, dm-sent/,
-#                              pending/, results/, declined/, strikes/, dm-declined/ and
-#                              dm-strikes/.
+#                              pending/, results/, declined/, strikes/, dm-declined/,
+#                              dm-strikes/ and dm-patchid/.
 #   PR_CYCLE_TICK_PR_CYCLE_CMD default $ROOT/bin/pr-cycle
 #   PR_CYCLE_TICK_DM_CMD       default $ROOT/bin/discord-dm
+#   PR_CYCLE_PATCH_ID_CMD      default: the git computation in pcw_patch_id (fetch, diff
+#                              against the merge-base with origin/master, git patch-id)
 #   PR_CYCLE_TICK_USAGE_ZONE   empty means read the live usage zone
 #
 # See the ADR for bin/pr-cycle-tick (ibl5/docs/decisions/) for the design rationale.
@@ -121,8 +126,8 @@ done <<< "$SNAP"
 # `pr-cycle --go` detaches a launchd worker and returns, so the launch itself says nothing
 # about the outcome. The tick records a pending entry, and the first later tick that finds no
 # live worker (guard c) reads the file the worker wrote and settles each PR here.
-DECLINED_MSG='pr-cycle-watch: PR #%s on head %s was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until a new push.'
-STRIKE_MSG='pr-cycle-watch: PR #%s on head %s: the rescue never reached post-plan %s times (last: %s %s %s). Skipping it until a new push.'
+DECLINED_MSG='pr-cycle-watch: PR #%s on head %s was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until its diff changes.'
+STRIKE_MSG='pr-cycle-watch: PR #%s on head %s: the rescue never reached post-plan %s times (last: %s %s %s). Skipping it until its diff changes.'
 PATCHID_MSG='pr-cycle-watch: PR #%s on head %s: could not compute its patch-id, so its retry cap is keyed on the head SHA for now and a rebase-only push will re-qualify it. See the tick log.'
 
 # strike <pr> <sha> <key> <status> <outcome> <reason>: one no-op rescue; DM once when the cap is hit.
@@ -305,7 +310,7 @@ while IFS=$'\t' read -r pr branch sha mstate base; do
     if pcw_attempted_head "$STATE" "$pr" "$key" "$sha"; then
         skip "$pr" "retry cap (head ${sha:0:7})"
         if pcw_dm_due "$STATE" "$pr" "$key" "$sha"; then
-            msg="pr-cycle-watch: PR #$pr is still $kind on head ${sha:0:7} after one rescue. Skipping it until a new push."
+            msg="pr-cycle-watch: PR #$pr is still $kind on head ${sha:0:7} after one rescue. Skipping it until its diff changes."
             # Name why the rescue stopped, so the DM is actionable without opening a log.
             IFS=$'\t' read -r run_dir why <<< "$(pcw_last_block "$branch" "${out_dirs[@]}")" || true
             if [[ -n "${why:-}" ]]; then

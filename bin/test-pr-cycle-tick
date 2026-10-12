@@ -456,7 +456,7 @@ reset; begin_case
 set_prs "$RED101"; set_checks aaa1111 red
 mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
 run_tick
-grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until a new push.\nOr paste this to have Claude fix it:\n'"$REPO/bin/postplan-fix 101" \
+grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until its diff changes.\nOr paste this to have Claude fix it:\n'"$REPO/bin/postplan-fix 101" \
     "$SCRATCH/dm.log" 2>/dev/null \
     || fail "still-red-dm-full-wording: DM was '$(cat "$SCRATCH/dm.log" 2>/dev/null)'"
 end_case still-red-dm-full-wording
@@ -531,7 +531,7 @@ run_tick
     || fail "holdrepeat-skip-no-attempt: declined/112 is '$(cat "$STATE_DIR/declined/112" 2>/dev/null)'"
 no_file "$STATE_DIR/attempts/112" || fail "holdrepeat-skip-no-attempt: a declined PR was charged an attempt"
 [[ "$(dm_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: want 1 DM, got $(dm_count)"
-grep -qF 'pr-cycle-watch: PR #112 on head bbb2222 was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until a new push.' "$SCRATCH/dm.log" \
+grep -qF 'pr-cycle-watch: PR #112 on head bbb2222 was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until its diff changes.' "$SCRATCH/dm.log" \
     || fail "holdrepeat-skip-no-attempt: declined DM wording: $(cat "$SCRATCH/dm.log")"
 [[ "$(pending_count)" == "0" ]] || fail "holdrepeat-skip-no-attempt: settled entry still pending"
 run_tick
@@ -552,7 +552,7 @@ run_tick
 run_tick
 [[ "$(strikes 101)" == "$(key_of aaa1111) 2" ]] || fail "fleet-no-result-strike: tick 3 strikes/101 is '$(strikes 101)'"
 [[ "$(dm_count)" == "1" ]] || fail "fleet-no-result-strike: want 1 cap DM on tick 3, got $(dm_count)"
-grep -qF 'pr-cycle-watch: PR #101 on head aaa1111: the rescue never reached post-plan 2 times (last: fired failed no-result). Skipping it until a new push.' "$SCRATCH/dm.log" \
+grep -qF 'pr-cycle-watch: PR #101 on head aaa1111: the rescue never reached post-plan 2 times (last: fired failed no-result). Skipping it until its diff changes.' "$SCRATCH/dm.log" \
     || fail "fleet-no-result-strike: cap DM wording: $(cat "$SCRATCH/dm.log")"
 [[ "$(launch_count)" == "2" ]] || fail "fleet-no-result-strike: relaunched at the cap"
 run_tick
@@ -569,7 +569,7 @@ run_tick
 [[ "$(attempt 101)" == "$(key_of aaa1111)" ]] || fail "real-run-still-red-attempt: attempts/101 is '$(attempt 101)'"
 no_file "$STATE_DIR/strikes/101" || fail "real-run-still-red-attempt: a real run was struck"
 [[ "$(launch_count)" == "1" ]] || fail "real-run-still-red-attempt: relaunched after a real run"
-grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until a new push.' "$SCRATCH/dm.log" \
+grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until its diff changes.' "$SCRATCH/dm.log" \
     || fail "real-run-still-red-attempt: still-red DM wording: $(cat "$SCRATCH/dm.log" 2>/dev/null)"
 run_tick
 [[ "$(dm_count)" == "1" ]] || fail "real-run-still-red-attempt: still-red DM sent twice"
@@ -900,7 +900,7 @@ run_tick
 [[ "$(launch_count)" == "1" ]] || fail "rebase-keeps-cap: relaunched after a rebase that kept the patch-id"
 out_has 'retry cap' || fail "rebase-keeps-cap: no retry-cap skip line: $OUT"
 [[ "$(dm_count)" == "1" ]] || fail "rebase-keeps-cap: retry-cap DM resent for the rebased head ($(dm_count))"
-grep -qF 'Skipping it until a new push.' "$SCRATCH/dm.log" \
+grep -qF "PR #101 is still red on head aaa1111 after one rescue. Skipping it until its diff changes." "$SCRATCH/dm.log" \
     || fail "rebase-keeps-cap: retry-cap DM wording: $(cat "$SCRATCH/dm.log")"
 end_case rebase-keeps-cap
 

@@ -1772,7 +1772,9 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 refused.append((attempt, verdict.reason, proposal or ""))
             elif verdict.action == "apply":
                 baseline = cifix_ship.meta_run_id(gh.pr_checks_json(pr))
-                gh.pr_edit_body(pr, verdict.body)
+                # The fixer's body may drop or lower the Merge danger line; re-apply the floor.
+                gh.pr_edit_body(pr, _merge_danger_body(verdict.body, worktree,
+                                                       git.diff_vs_base(), log, "phase7"))
                 body_applied = True
                 log("phase7 ci-fix: body proposal applied")
 

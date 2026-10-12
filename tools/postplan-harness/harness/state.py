@@ -142,6 +142,7 @@ class PlanInfo:
     has_reuse: bool = False
     planned_test_paths: list[str] = field(default_factory=list)
     no_change_test_paths: list[str] = field(default_factory=list)  # planned tokens every VR row marked `(no-change)`; conformance skips these
+    run_only_test_paths: list[str] = field(default_factory=list)  # planned tokens every row marked `(run-only)`; conformance skips MISSING for these when the file is tracked
     critical_files: list[tuple] = field(default_factory=list)  # (path, annotation, exempt)
     required_test_methods: list[str] = field(default_factory=list)
     backlog_issues: list[tuple] = field(default_factory=list)  # (kind, number); kind in {"closes", "refs"}
@@ -289,6 +290,7 @@ class RunResult:
     error_cmd: Optional[str] = None            # command that failed (HarnessError.cmd); omitted from result.json when unset
     error_output_tail: Optional[str] = None    # last 4000 chars of that command's output (HarnessError.output)
     block_cause: Optional[str] = None          # RebaseBlockCause.render() of a rebase-conflict block; omitted from result.json when unset
+    conflict_rung: Optional[str] = None        # first-pass | regen | opus-retry | session | exhausted; omitted when no conflict
     sticky_comment_id: Optional[str] = None  # numeric id read back after the upsert; None = unconfirmed
     sticky_error: Optional[str] = None       # "sticky-post-failed" when the read-back found no comment
     retry_cap: Optional[str] = None  # reserved fail-closed seam: no production writer since the BEHIND cap stopped disarming (2026-10-04); any value still forces SHIPPED_HELD in _compute_terminal
@@ -317,7 +319,7 @@ class RunResult:
     def to_json(self) -> str:
         d = asdict(self)
         for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix",
-                    "pause_edit_sid"):   # unset → result.json byte-identical
+                    "pause_edit_sid", "conflict_rung"):   # unset → result.json byte-identical
             if not d.get(key):
                 d.pop(key, None)
         if self.classification:

@@ -25,7 +25,7 @@
 #                   starts (no filters, no `labeled`), M2 exact context shared with
 #                   the ADR and unique, M3 never job-skipped (no job-level `if:` or
 #                   `continue-on-error`), M4 the --min-msi=100 threshold intact.
-#   all-checks-green: four invariants (A1-A4) that keep the required aggregator
+#   all-checks-green: five invariants (A1-A5) that keep the required aggregator
 #                   check `All checks green` (ADR-0149) reporting on every PR and
 #                   failing closed: A1 always starts (no filters; synchronize,
 #                   labeled, unlabeled and edited types), A2 one context literal
@@ -485,7 +485,7 @@ else
 fi  # end mp_file present
 
 # ---------------------------------------------------------------------------
-# all-checks-green invariants (A1-A4, ADR-0149). The aggregator is a required
+# all-checks-green invariants (A1-A5, ADR-0149). The aggregator is a required
 # context, so a run that never starts or never ends blocks every merge, and a
 # name that drifts from the predicates' literal silently re-arms condition (15).
 # ---------------------------------------------------------------------------
@@ -610,6 +610,27 @@ else
     fail=1
   else
     echo "composite-contracts: all-checks-green is bounded, waits, ignores only itself, and is read-only (A4)"
+  fi
+
+  # A5: the poller gets the PR base, so a PR stacked on a non-master branch fails
+  # in seconds instead of waiting out the deadline (ADR-0149 Addendum 2026-10-11).
+  # base.ref is PR-author-chosen text, so it reaches the shell only through a step
+  # env var; an inline ${{ }} in run: would be a script-injection path.
+  _a5_bad=""
+  _a5_refs="$(grep -E 'github\.event\.pull_request\.base\.ref' "$agg_file" || true)"
+  # shellcheck disable=SC2016  # $BASE_REF is the literal workflow text, not a shell expansion
+  if ! grep -qF -- '--base-ref="$BASE_REF"' <<< "$agg_jobs"; then
+    _a5_bad='bin/check-pr-checks-green is not called with --base-ref="$BASE_REF"'
+  elif ! grep -qE '^[[:space:]]+BASE_REF:[[:space:]]*\$\{\{[[:space:]]*github\.event\.pull_request\.base\.ref[[:space:]]*\}\}[[:space:]]*$' <<< "$agg_jobs"; then
+    _a5_bad='no step env line BASE_REF: ${{ github.event.pull_request.base.ref }}'
+  elif [ -n "$_a5_refs" ] && grep -vqE '^[[:space:]]+BASE_REF:' <<< "$_a5_refs"; then
+    _a5_bad="github.event.pull_request.base.ref appears outside the BASE_REF env line"
+  fi
+  if [ -n "$_a5_bad" ]; then
+    echo "composite-contracts: all-checks-green (A5) — $_a5_bad; a stacked PR would wait out the deadline or the base ref would reach run: unquoted ($agg_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: all-checks-green passes the PR base via env to --base-ref (A5)"
   fi
 
 fi  # end agg_file present

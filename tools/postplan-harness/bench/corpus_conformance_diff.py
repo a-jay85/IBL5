@@ -25,6 +25,7 @@ def main() -> int:
 
     changed = [c for c in args.changed.split(",") if c]
     no_change_parser = getattr(planfile, "parse_no_change_test_paths", None)  # absent on the old tree
+    run_only_parser = getattr(planfile, "parse_run_only_test_paths", None)  # absent on the old tree
     for path in sorted(glob.glob(os.path.join(args.plans_dir, "*.md"))):
         with open(path, encoding="utf-8", errors="replace") as fh:
             content = fh.read()
@@ -35,6 +36,8 @@ def main() -> int:
                         planned_test_paths=planned, truly_manual_rows=manual)
         if no_change_parser is not None:
             info.no_change_test_paths = no_change_parser(content)
+        if run_only_parser is not None:
+            info.run_only_test_paths = run_only_parser(content)
         items = [i for i in conformance.check(info, changed) if i.startswith("MISSING: ")]
         print(f"{os.path.basename(path)}\t{len(items)}\t{' ;; '.join(items)}")
     return 0

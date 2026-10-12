@@ -151,12 +151,15 @@ def _tooled_env(allowed_tools, denied_tools) -> dict:
 
 
 def _tooled_argv(model, *, agent, allowed_tools, denied_tools, add_dirs,
-                 append_system_prompt, setting_sources, max_turns) -> list[str]:
+                 append_system_prompt, setting_sources, max_turns,
+                 max_budget_usd: float | None = None) -> list[str]:
     """Pure argv builder so replay can record a live run's exact command line."""
     argv = ["claude", "-p", "--output-format", "json",
             "--max-turns", str(max_turns),
             "--permission-prompts", "none",
             "--setting-sources", setting_sources]
+    if max_budget_usd is not None:
+        argv += ["--max-budget-usd", f"{max_budget_usd:.2f}"]
     if agent:
         # no --model: the agent def's own `model:` pin wins, mirroring the skill's spawn
         argv += ["--agent", agent]
@@ -345,7 +348,8 @@ class ClaudeCli:
                     setting_sources: str = "user,project",
                     timeout: int = TOOLED_TIMEOUT,
                     max_turns: int = TOOLED_MAX_TURNS,
-                    max_retries: int = 1) -> str:
+                    max_retries: int = 1,
+                    max_budget_usd: float | None = None) -> str:
         """Bounded, tool-enabled call. Returns the envelope's RAW `result` text.
 
         The verdict this exists to fetch is a prose document, so parsing belongs to the
@@ -363,7 +367,8 @@ class ClaudeCli:
         argv = _tooled_argv(model, agent=agent, allowed_tools=allowed_tools,
                             denied_tools=denied_tools, add_dirs=add_dirs,
                             append_system_prompt=append_system_prompt,
-                            setting_sources=setting_sources, max_turns=max_turns)
+                            setting_sources=setting_sources, max_turns=max_turns,
+                            max_budget_usd=max_budget_usd)
         rec = LlmCallRecord(purpose=purpose, model=MODEL_MAP[model])
         # A read-only call cannot edit the worktree, so its pause is never dirty.
         can_write = usage_pause.tools_can_write(allowed_tools, denied_tools)
@@ -506,13 +511,15 @@ class FixtureLlm:
                     setting_sources: str = "user,project",
                     timeout: int = TOOLED_TIMEOUT,
                     max_turns: int = TOOLED_MAX_TURNS,
-                    max_retries: int = 1) -> str:
+                    max_retries: int = 1,
+                    max_budget_usd: float | None = None) -> str:
         if not allowed_tools:
             raise HarnessError("llm-tooled-no-tools", purpose)
         self.tooled_argvs.append((purpose, _tooled_argv(
             model, agent=agent, allowed_tools=allowed_tools, denied_tools=denied_tools,
             add_dirs=add_dirs, append_system_prompt=append_system_prompt,
-            setting_sources=setting_sources, max_turns=max_turns)))
+            setting_sources=setting_sources, max_turns=max_turns,
+            max_budget_usd=max_budget_usd)))
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
         val = self.canned[purpose]

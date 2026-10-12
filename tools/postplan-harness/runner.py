@@ -388,7 +388,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 for line in audit_lines_for_adaptations(
                         getattr(plain_resolution, "adapted_lines", ())):
                     log(f"phase2: {line}")
+                res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
             except HarnessError as e:
+                res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
                 if e.kind != "rebase-conflict":
                     raise
                 # DETECTION-TIME flag: recorded before the resolution attempt begins, so a

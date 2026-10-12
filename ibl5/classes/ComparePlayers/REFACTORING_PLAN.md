@@ -335,7 +335,7 @@ ibl5/tests/ComparePlayers/
 - **Schema**: `ibl5/schema.sql` (ibl_plr table)
 - **Database Guide**: `ibl5/docs/DATABASE_GUIDE.md`
 - **Development Guide**: `ibl5/docs/DEVELOPMENT_GUIDE.md`
-- **Reference Modules**: PlayerDatabase, FreeAgency, Player
+- **Reference Modules**: PlayerSearch, FreeAgency, Player
 - **Service Class**: `ibl5/classes/Services/DatabaseService.php`
 
 ---

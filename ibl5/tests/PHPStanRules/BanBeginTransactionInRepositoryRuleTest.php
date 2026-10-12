@@ -48,4 +48,16 @@ final class BanBeginTransactionInRepositoryRuleTest extends RuleTestCase
             [],
         );
     }
+
+    /**
+     * A subclass of Fixtures\Lookalike\BaseMysqliRepository shares the short name
+     * but not the FQCN, so the exact-match rule must not flag it.
+     */
+    public function testAllowsBeginTransactionInLookalikeBaseSubclass(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/LookalikeBaseCallsBeginTransaction.php'],
+            [],
+        );
+    }
 }

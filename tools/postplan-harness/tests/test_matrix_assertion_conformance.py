@@ -250,7 +250,7 @@ def test_fidelity_work_list_excludes_unrealised_assertion(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Token-notation false-positive fixes (multi-arg call, ${VAR:-}, glob, `=`)
+# Token-notation false-positive fixes (multi-arg call, ${VAR:-}, glob skip, deleted-file header, `=`)
 # ---------------------------------------------------------------------------
 
 def _plan_with_row(tmp_path, cell: str) -> PlanInfo:
@@ -286,17 +286,36 @@ def test_shell_var_with_default_realised(tmp_path, monkeypatch):
     assert _unrealised(items) == []
 
 
-def test_glob_prefix_realised(tmp_path, monkeypatch):
-    """`test_something_*` is realised when a tracked file holds `test_something_impl`."""
-    git_root = _make_git_root(tmp_path)
-    with open(os.path.join(git_root, "fixture.txt"), "w") as fh:
-        fh.write("test_something_impl\n")
-    subprocess.run(["git", "-C", git_root, "add", "fixture.txt"],
-                   capture_output=True, check=True)
-    monkeypatch.setenv("MATRIX_ASSERT_ROOT", git_root)
+_DELETED_HOF_DIFF = (
+    "diff --git a/ibl5/images/hof/jordan.jpg b/ibl5/images/hof/jordan.jpg\n"
+    "deleted file mode 100644\n"
+    "index 3b18e51..0000000\n"
+    "Binary files a/ibl5/images/hof/jordan.jpg and /dev/null differ\n"
+)
+
+
+def test_glob_token_skipped(tmp_path, monkeypatch):
+    """A glob token is skipped: `test_something_*` leaves the row silent."""
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", _make_git_root(tmp_path))
     plan = _plan_with_row(tmp_path, "glob match: `test_something_*` present")
     items = _matrix_assertion_items(plan, "+unrelated\n", "")
     assert _unrealised(items) == []
+
+
+def test_deleted_file_header_realises_component_token(tmp_path, monkeypatch):
+    """A deletion header realises `images/hof`, a directory component of the deleted path."""
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", _make_git_root(tmp_path))
+    plan = _plan_with_row(tmp_path, "offloaded `images/hof` photos")
+    items = _matrix_assertion_items(plan, _DELETED_HOF_DIFF, "")
+    assert _unrealised(items) == []
+
+
+def test_deleted_file_header_keeps_plain_token_flagged(tmp_path, monkeypatch):
+    """A plain token absent from the deleted paths is still flagged beside a realised one."""
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", _make_git_root(tmp_path))
+    plan = _plan_with_row(tmp_path, "offloaded `images/hof` and `fixture_absent_tok`")
+    items = _matrix_assertion_items(plan, _DELETED_HOF_DIFF, "")
+    assert len(_unrealised(items)) == 1
 
 
 def test_equals_class4_name_realised(tmp_path, monkeypatch):

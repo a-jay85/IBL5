@@ -67,7 +67,7 @@ class PlayerOverviewViewTest extends TestCase
 
         $html = $view->renderOverview(1, self::createStub(Player::class), self::createStub(PlayerStats::class), $season);
 
-        $this->assertNotEmpty($html);
+        $this->assertNotSame('', $html);
     }
 
     public function testHeatPhaseDoesNotThrow(): void
@@ -77,7 +77,7 @@ class PlayerOverviewViewTest extends TestCase
 
         $html = $view->renderOverview(1, self::createStub(Player::class), self::createStub(PlayerStats::class), $season);
 
-        $this->assertNotEmpty($html);
+        $this->assertNotSame('', $html);
     }
 
     public function testColorSchemePassedThrough(): void

@@ -27,7 +27,7 @@ class CommonContractValidator implements CommonContractValidatorInterface
     public function validateRaises(array $offer, int $birdYears): array
     {
         $year1Value = $offer['year1'] ?? 0;
-        $maxIncrease = \ContractRules::calculateMaxRaise($year1Value, $birdYears);
+        $maxIncrease = \League\ContractRules::calculateMaxRaise($year1Value, $birdYears);
         
         $years = ['year1', 'year2', 'year3', 'year4', 'year5', 'year6'];
         
@@ -94,7 +94,7 @@ class CommonContractValidator implements CommonContractValidatorInterface
      */
     public function validateMaximumYearOne(array $offer, int $yearsExperience): array
     {
-        $maxYearOneOffer = \ContractRules::getMaxContractSalary($yearsExperience);
+        $maxYearOneOffer = \League\ContractRules::getMaxContractSalary($yearsExperience);
         $yearOneOffer = $offer['year1'] ?? 0;
         
         if ($yearOneOffer > $maxYearOneOffer) {

@@ -99,12 +99,6 @@ final class BulkImportRunner
                 // Snapshot types: one entry per archive
                 $archives = $this->extractor->findAllArchives($dirPath);
                 foreach ($archives as $archive) {
-                    $plrMap = null;
-                    if ($fileType === JsbFileType::Plb) {
-                        // PlrOrdinalMap is built once per season, reused across entries
-                        // (handled below in processPlbSeason)
-                    }
-
                     $entries[] = new ImportEntry(
                         path: $dirPath,
                         label: basename($archive['path']),

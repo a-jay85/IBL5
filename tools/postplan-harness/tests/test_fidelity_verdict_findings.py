@@ -132,3 +132,21 @@ def test_nested_bullet_under_finding_is_own_item(tmp_path):
         "\n## DIGEST\nstuff\n",
     )
     assert fidelity._verdict_findings(path) == ["- parent finding", "- nested detail"]
+
+
+def test_numbered_unmarked_nested_bullets_stay_separate(tmp_path):
+    """Catches marker-aware grouping altering unmarked output.
+
+    Guards test_fidelity_verdict_findings.py: with no marker the legacy shape holds.
+    """
+    path = _write(
+        tmp_path,
+        _DISPOSITIONS
+        + "\nNOT READY\n\n## FINDINGS\n\n1. first finding\n   - its detail\n2. second\n"
+        "\n## DIGEST\nstuff\n",
+    )
+    assert fidelity._verdict_findings(path) == [
+        "1. first finding",
+        "- its detail",
+        "2. second",
+    ]

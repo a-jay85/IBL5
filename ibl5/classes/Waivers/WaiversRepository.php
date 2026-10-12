@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Waivers;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use Season\Season;
 use Waivers\Contracts\WaiversRepositoryInterface;
 

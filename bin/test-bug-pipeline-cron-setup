@@ -8,24 +8,17 @@
 # write to ~/Library/LaunchAgents.
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETUP_BIN="$SCRIPT_DIR/bug-pipeline-cron-setup"
 
-PASSED=0
-FAILED=0
+bpt_ok()   { h_pass "$1"; }
+bpt_fail() { h_fail "$@"; }
+bpt_expect_eq() { h_eq "$1" "$2" "$3"; }
 
-bpt_ok()   { echo "ok: $1";  PASSED=$(( PASSED + 1 )); }
-bpt_fail() { echo "FAIL: $1"; FAILED=$(( FAILED + 1 )); }
-bpt_expect_eq() {
-    if [ "$2" = "$3" ]; then bpt_ok "$1"
-    else bpt_fail "$1 — want [$2] got [$3]"
-    fi
-}
-
-STUB="$(mktemp -d)"
-_cleanup() { rm -rf "$STUB"; }
-trap '_cleanup' EXIT
+h_tmp STUB
 
 # Capture --print-bot output once (side-effect-free).
 OUT="$("$SETUP_BIN" --print-bot 2>/dev/null)"
@@ -279,8 +272,4 @@ else
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
-printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
-if [ "$FAILED" -ne 0 ]; then
-    exit 1
-fi
-exit 0
+h_done

@@ -7,7 +7,7 @@
 #        GH_API_CMD seam (a `gh` shim answers `auth status`; a throwaway git repo
 #        supplies the origin remote).
 # L1-L5  source the lib and call its functions directly.
-# P1-P12 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
+# P1-P17 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
 #        (the Nth poll serves the Nth fixture; every case uses --interval-seconds=0).
 #
 # Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
@@ -163,7 +163,7 @@ else
     fail "L1-L5 cannot run: $LIB is missing"
 fi
 
-# --- P1-P12: bin/check-pr-checks-green (PR-head poller) ---------------------
+# --- P1-P17: bin/check-pr-checks-green (PR-head poller) ---------------------
 POLL="$SCRIPT_DIR/check-pr-checks-green"
 P_SHA="0123456789abcdef0123456789abcdef01234567"
 
@@ -309,6 +309,87 @@ run_poll --anchor=A
 if [ "$RC" -eq 1 ] && grep -qF 'A (unknown)' "$ERR"; then
     ok "P12 null conclusion fails"
 else fail "P12 null conclusion fails (rc=$RC err=$(cat "$ERR"))"; fi
+
+# P13: a stacked base fails at once, before the grace sleep and before any API call.
+new_case p13
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+s13=$SECONDS
+run_poll --anchor=A --wait --timeout-seconds=30 --startup-grace-seconds=30 --base-ref=vr-pr-body-changed-screens
+el13=$((SECONDS - s13))
+if [ "$RC" -eq 1 ] && [ "$el13" -lt 5 ] && [ "$(counter)" = "0" ]; then
+    ok "P13 stacked base fails fast with zero API calls"
+else fail "P13 stacked base fails fast (rc=$RC el=${el13}s counter=$(counter))"; fi
+for tok in 'FAIL: stacked on vr-pr-body-changed-screens' \
+           'Tests and Analysis, E2E Tests, Meta checks' \
+           'retargets this PR to master, push' \
+           'gh run rerun'; do
+    if grep -qF -- "$tok" "$ERR"; then ok "P13 message carries '$tok'"
+    else fail "P13 message carries '$tok' (err=$(cat "$ERR"))"; fi
+done
+
+# P14: master and develop pass through to the normal poll.
+for b in master develop; do
+    new_case "p14-$b"
+    cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+    run_poll --anchor=A --wait --timeout-seconds=5 --base-ref="$b"
+    if [ "$RC" -eq 0 ] && grep -q '^PASS:' "$OUT" && [ "$(counter)" = "1" ] \
+            && ! grep -qF 'stacked on' "$ERR"; then
+        ok "P14 base $b reaches the normal poll"
+    else fail "P14 base $b reaches the normal poll (rc=$RC counter=$(counter) err=$(cat "$ERR"))"; fi
+done
+
+# P15: a master base keeps the exact anchor wait behavior.
+new_case p15
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A,B --wait --timeout-seconds=1
+rc15a=$RC; cp "$ERR" "$TMP/p15-a"
+new_case p15
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A,B --wait --timeout-seconds=1 --base-ref=master
+rc15b=$RC; cp "$ERR" "$TMP/p15-b"
+p15_ok=1
+for f in "$TMP/p15-a" "$TMP/p15-b"; do
+    grep -qF 'WAIT: anchors not reported/completed: B' "$f" && grep -qF 'TIMEOUT:' "$f" || p15_ok=0
+done
+# Interval 0 means the number of repeated WAIT lines varies with timing; collapse repeats.
+sed 's/after [0-9]*s/after Ns/' "$TMP/p15-a" | uniq > "$TMP/p15-an"
+sed 's/after [0-9]*s/after Ns/' "$TMP/p15-b" | uniq > "$TMP/p15-bn"
+if [ "$rc15a" -eq 1 ] && [ "$rc15b" -eq 1 ] && [ "$p15_ok" -eq 1 ] \
+        && cmp -s "$TMP/p15-an" "$TMP/p15-bn"; then
+    ok "P15 master base keeps the anchor wait behavior"
+else fail "P15 master base keeps the anchor wait behavior (rc=$rc15a/$rc15b ok=$p15_ok)"; fi
+
+# P16: the startup grace is slept on the master path and excluded from the deadline.
+new_case p16
+cr 1 "[{\"name\":\"A\",\"status\":\"in_progress\",\"conclusion\":null,\"completed_at\":null}]"; wr 1 "$RUNS_DONE"
+cr 2 "[{\"name\":\"A\",$G}]"; wr 2 "$RUNS_DONE"
+s16=$SECONDS
+run_poll --anchor=A --wait --timeout-seconds=1 --startup-grace-seconds=2 --base-ref=master
+el16=$((SECONDS - s16))
+if [ "$RC" -eq 0 ] && [ "$el16" -ge 2 ] && [ "$(counter)" = "2" ]; then
+    ok "P16 startup grace honored and outside the deadline"
+else fail "P16 startup grace (rc=$RC el=${el16}s counter=$(counter) err=$(cat "$ERR"))"; fi
+
+# P17: rejected --base-ref and grace forms exit 2 with zero API calls.
+p17_ok=1
+p17_try() {
+    new_case p17
+    cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+    GH_API_CMD="$PSHIM" "$POLL" --repo=a-jay85/IBL5 --sha="$P_SHA" --interval-seconds=0 "$@" \
+        >/dev/null 2>"$TMP/p17err"; rc=$?
+    if [ "$rc" -ne 2 ] || ! grep -qiE 'unknown flag|invalid|unexpected' "$TMP/p17err" \
+            || [ "$(counter)" != "0" ]; then
+        p17_ok=0; echo "  P17 '$*' -> rc=$rc counter=$(counter): $(head -1 "$TMP/p17err")" >&2
+    fi
+}
+p17_try --base-ref=
+p17_try --base-ref=-x
+p17_try --base-ref=a..b
+p17_try '--base-ref=a;b'
+p17_try '--base-ref=a b'
+p17_try --startup-grace-seconds=x
+p17_try --base-ref master
+if [ "$p17_ok" -eq 1 ]; then ok "P17 rejected base-ref and grace forms"; else fail "P17 rejected base-ref and grace forms"; fi
 
 
 exit "$FAILED"

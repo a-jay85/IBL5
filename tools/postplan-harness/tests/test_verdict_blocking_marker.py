@@ -1,0 +1,237 @@
+"""Severity marker (`[BLOCKING]` / `[NOTE]`) on plan-fidelity verdict FINDINGS bullets.
+
+`harness/fidelity.py` `_verdict_findings` folds nested lines into their marked parent,
+drops `[NOTE]` groups from the hold-12 work list, keeps `[BLOCKING]` and unmarked
+bullets (fail-closed), and returns every group when a NOT READY verdict is all `[NOTE]`.
+"""
+from __future__ import annotations
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from harness import fidelity
+
+_DISPOSITIONS = (
+    "1. **Intent coverage.** Not assessable from the diff alone.\n"
+    "2. **Plan-named files.** Passes.\n"
+    "3. **Scope creep.** No finding.\n"
+    "4. **Body claims.** Passes.\n"
+    "    - **4a. Numbers.** Does not fire.\n"
+    "    - **4b. Paths.** Does not fire.\n"
+    "5. **Test realisation.** Passes.\n"
+    "6. **Conflict-resolution audit.** Passes.\n"
+)
+
+_MARKED_BODY = (
+    "- [BLOCKING] Phase 2 never edited `a.py`; restore the planned change.\n"
+    "  - nested detail line for the first finding\n"
+    "- [NOTE] The PR body says 3 files; the diff touches 4.\n"
+    "### Re-review\n"
+    "- [BLOCKING] Check 5 row 4 names `test_x`, absent from the diff.\n"
+)
+
+_MARKED_ITEMS = [
+    "- [BLOCKING] Phase 2 never edited `a.py`; restore the planned change.\n"
+    "- nested detail line for the first finding",
+    "- [BLOCKING] Check 5 row 4 names `test_x`, absent from the diff.",
+]
+
+
+def _write(tmp_path, text):
+    p = tmp_path / "verdict.md"
+    p.write_text(text)
+    return str(p)
+
+
+def _verdict(word, body):
+    return (
+        _DISPOSITIONS
+        + f"\n## FINDINGS\n\n{body}\n{word}\n\n## DIGEST\nstuff\n"
+    )
+
+
+def test_note_groups_dropped_and_nested_lines_fold_into_blocking_parent(tmp_path):
+    """Catches a [NOTE] group reaching the fixer, or a nested line split from its marked parent."""
+    path = _write(tmp_path, _verdict("NOT READY", _MARKED_BODY))
+    assert fidelity._verdict_findings(path) == _MARKED_ITEMS
+
+
+def test_build_work_list_carries_only_blocking_groups_as_hold_12(tmp_path):
+    """Catches build_work_list re-adding [NOTE] text or splitting a group into two items."""
+    path = _write(tmp_path, _verdict("NOT READY", _MARKED_BODY))
+    assert fidelity.build_work_list(path, [], [], []) == [
+        {"hold": "12", "text": item} for item in _MARKED_ITEMS
+    ]
+
+
+def test_unmarked_bullet_still_returned_fail_closed(tmp_path):
+    """Catches filtering to `[BLOCKING]` bullets only."""
+    body = "- Phase 2 never edited a.py.\n- Note: body count is off.\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- Phase 2 never edited a.py.",
+        "- Note: body count is off.",
+    ]
+
+
+def test_mixed_verdict_keeps_unmarked_and_drops_note(tmp_path):
+    """Catches dropping unmarked bullets once any marked bullet exists, or keeping [NOTE]."""
+    body = "- [BLOCKING] one\n- unlabelled two\n- [NOTE] three\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- [BLOCKING] one",
+        "- unlabelled two",
+    ]
+
+
+def test_ready_with_notes_note_bullets_yield_no_work(tmp_path):
+    """Catches dropping the `parse_verdict != NOT READY` early return."""
+    body = "- [NOTE] first note\n- [NOTE] second note\n"
+    path = _write(tmp_path, _verdict("READY WITH NOTES", body))
+    assert fidelity._verdict_findings(path) == []
+    assert fidelity.build_work_list(path, [], [], []) == []
+
+
+def test_unmarked_parent_keeps_nested_bullets_as_separate_items(tmp_path):
+    """Catches grouping nested lines under an UNMARKED parent (legacy output drift)."""
+    body = (
+        "- Phase 2 never edited a.py.\n"
+        "  - nested detail under an unmarked parent\n"
+        "- second unmarked finding\n"
+    )
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- Phase 2 never edited a.py.",
+        "- nested detail under an unmarked parent",
+        "- second unmarked finding",
+    ]
+
+
+def test_non_exact_marker_is_unmarked_and_kept(tmp_path):
+    """Catches a case-insensitive or bold-tolerant marker regex dropping a finding."""
+    body = (
+        "- [note] lower-case marker is not a marker\n"
+        "  - nested under the lower-case bullet\n"
+        "- **[NOTE]** bold-wrapped marker is not a marker\n"
+    )
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- [note] lower-case marker is not a marker",
+        "- nested under the lower-case bullet",
+        "- **[NOTE]** bold-wrapped marker is not a marker",
+    ]
+
+
+def test_all_note_not_ready_returns_every_group_fail_closed(tmp_path):
+    """Catches the filter returning [] for an all-[NOTE] NOT READY verdict."""
+    body = "- [NOTE] first\n  - detail one\n- [NOTE] second\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- [NOTE] first\n- detail one",
+        "- [NOTE] second",
+    ]
+    assert fidelity.build_work_list(path, [], [], []) != []
+
+
+def test_note_nested_under_unmarked_parent_is_kept(tmp_path):
+    """Catches a marker on a nested line being honored under an unmarked parent."""
+    body = "- unmarked parent\n  - [NOTE] nested note line\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- unmarked parent",
+        "- [NOTE] nested note line",
+    ]
+
+
+def test_note_group_closes_at_sibling_so_unmarked_sibling_kept(tmp_path):
+    """Catches a group that never closes and swallows the next top-level bullet."""
+    body = "- [NOTE] a note\n  - its detail\n- unmarked sibling after the note\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == ["- unmarked sibling after the note"]
+
+
+def test_deeper_nesting_all_attaches_to_marked_head(tmp_path):
+    """Catches attaching only one level of nesting, or comparing against the last line's indent."""
+    body = (
+        "- [BLOCKING] head\n"
+        "  - level one\n"
+        "    - level two\n"
+        "  - level one again\n"
+        "- [NOTE] dropped\n"
+    )
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- [BLOCKING] head\n- level one\n- level two\n- level one again",
+    ]
+
+
+def test_numbered_marked_bullet_groups_and_note_drops(tmp_path):
+    """Catches a marker regex that only accepts `-`/`*` bullet prefixes."""
+    body = "1. [BLOCKING] numbered head\n   - numbered detail\n2. [NOTE] numbered note\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "1. [BLOCKING] numbered head\n- numbered detail",
+    ]
+
+
+def test_marker_without_trailing_boundary_is_unmarked(tmp_path):
+    """Catches a marker regex missing its trailing whitespace-or-end lookahead."""
+    body = "- [NOTE]: glued colon is not a marker\n- [NOTE] real note\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == ["- [NOTE]: glued colon is not a marker"]
+
+
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
+
+def _flat(rel):
+    with open(os.path.join(REPO, rel), encoding="utf-8") as fh:
+        return " ".join(fh.read().split())
+
+
+def test_def_item_2a_states_marker_grammar():
+    """Catches deleting the severity paragraph or moving it out of item 2a."""
+    text = _flat(".claude/agents/pr-ready-phase6.md")
+    for needle in (
+        "**Severity marker.**",
+        "Open every top-level finding bullet with exactly one marker",
+        "inherits its marker and carries none of its own",
+        "`NOT READY` has at least one `[BLOCKING]` bullet",
+        "`READY WITH NOTES` has only `[NOTE]` bullets",
+        "and `READY` has an empty `## FINDINGS` section",
+        "Keep it out of the finding's title",
+        "treats that finding as blocking",
+    ):
+        assert needle in text, needle
+    i2a = text.index("2a. Emit a `## FINDINGS` section")
+    isev = text.index("**Severity marker.**")
+    i3 = text.index("3. **Append a `## DIGEST` section")
+    assert i2a < isev < i3
+
+
+def test_procedure_6e_points_to_def_item_2a():
+    """Catches deleting the 6e pointer or reverting the writing-style exemption."""
+    text = _flat(".claude/review-shared/_plan-fidelity-review.md")
+    lo = text.index("**6e. Verdict shape.**")
+    hi = text.index("**6e(b). Merge digest")
+    for needle in (
+        "Open each `## FINDINGS` bullet with `[BLOCKING]` or `[NOTE]`",
+        "specified in `.claude/agents/pr-ready-phase6.md` § Output contract item 2a; "
+        "that item is authoritative",
+    ):
+        assert lo < text.index(needle) < hi, needle
+    assert "and the `[BLOCKING]` / `[NOTE]` finding marker" in text
+    assert "Finding titles, without the marker, are copied verbatim" in text
+
+
+def test_procedure_does_not_restate_marker_invariant():
+    """Catches a second copy of the grammar in the procedure (drift)."""
+    text = _flat(".claude/review-shared/_plan-fidelity-review.md")
+    for needle in (
+        "has at least one `[BLOCKING]` bullet",
+        "has only `[NOTE]` bullets",
+        "**Severity marker.**",
+    ):
+        assert needle not in text, needle

@@ -62,7 +62,7 @@ class CapSpaceView implements CapSpaceViewInterface
         $html .= '<th class="divider"><span class="sr-only">Separator</span></th>';
 
         // Position columns (current year only)
-        foreach (\JSB::PLAYER_POSITIONS as $position) {
+        foreach (\League\JsbConstants::PLAYER_POSITIONS as $position) {
             $safeBeginningYear = HtmlSanitizer::safeHtmlOutput($beginningYear);
             $safeEndingYear = HtmlSanitizer::safeHtmlOutput($endingYear);
             $safePosition = HtmlSanitizer::safeHtmlOutput($position);
@@ -123,7 +123,7 @@ class CapSpaceView implements CapSpaceViewInterface
         $html .= '<td class="divider"></td>';
 
         // Position salary columns
-        foreach (\JSB::PLAYER_POSITIONS as $position) {
+        foreach (\League\JsbConstants::PLAYER_POSITIONS as $position) {
             $html .= '<td>';
             $safePositionSalary = HtmlSanitizer::safeHtmlOutput($teamData['positionSalaries'][$position] ?? 0);
             $html .= $safePositionSalary;

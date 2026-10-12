@@ -18,7 +18,7 @@ use League\LeagueContext;
  *
  * @see LastSimRecapRepositoryInterface
  */
-class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRecapRepositoryInterface
+class LastSimRecapRepository extends \Database\BaseMysqliRepository implements LastSimRecapRepositoryInterface
 {
     /**
      * Calendar year of a Sep-Dec transaction = season_year - 1 (season_year is
@@ -179,7 +179,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
                   AND t.injury_games_missed IS NOT NULL
                   AND " . $dateExpr . " <= ?
                   AND DATE_ADD(" . $dateExpr . ", INTERVAL t.injury_games_missed DAY) > ?
-                ORDER BY is_new DESC, injury_date DESC";
+                ORDER BY is_new DESC, injury_date DESC, t.id DESC";
 
         // Build types/params: ss (date for days_remaining + is_new), pids (i...), ss (date <= + date <)
         $types = 'ss' . str_repeat('i', count($playerIds)) . 'ss';
@@ -278,10 +278,10 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
      */
     public function getStarterPidsFromSnapshot(int $tid, string $date): ?array
     {
-        // Use the SavedDepthChart repo to find a chart whose window covers
+        // Use the DepthChartSnapshot repo to find a chart whose window covers
         // the date. This duplicates the lookup but keeps the modules
         // independent of each other's internal table names.
-        $depthRepo = new \SavedDepthChart\SavedDepthChartRepository($this->db);
+        $depthRepo = new \DepthChartSnapshot\DepthChartSnapshotRepository($this->db);
         $result = $depthRepo->findActiveChartForTeamOnDate($tid, $date);
         if ($result === null) {
             return null;

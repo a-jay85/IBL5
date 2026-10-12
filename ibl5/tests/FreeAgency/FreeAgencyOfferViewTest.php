@@ -152,7 +152,7 @@ class FreeAgencyOfferViewTest extends TestCase
         preg_match_all('/value="([0-9a-f]{64})"/', $html, $matches);
         $uniqueTokens = array_unique($matches[1]);
 
-        $this->assertNotEmpty($uniqueTokens, 'Expected at least one CSRF token in full render');
+        $this->assertNotSame([], $uniqueTokens, 'Expected at least one CSRF token in full render');
         $this->assertCount(1, $uniqueTokens, 'All forms must share exactly one CSRF token');
     }
 }

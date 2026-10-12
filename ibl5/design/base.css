@@ -8,6 +8,7 @@
  * - Legacy PHP-Nuke class compatibility (@layer base)
  * - Mobile forced layouts for legacy tables (@layer components)
  * - FOUT suppression during webfont load (unlayered — see note below)
+ * - Reduced-motion override for transitions and animations (unlayered, !important — see block below)
  *
  * Note: Utility classes like .text-center, .font-bold, .bg-white, etc.
  * are provided by Tailwind CSS and should NOT be duplicated here.
@@ -43,6 +44,31 @@
 
 .fonts-loaded body {
     visibility: visible;
+}
+
+/* ==========================================================================
+   Reduced Motion — INTENTIONALLY UNLAYERED, INTENTIONALLY !important
+
+   Honors the OS-level "reduce motion" preference. Unlayered so it outranks
+   every @layer rule; !important so it also beats inline style="transition:..."
+   (an unlayered !important declaration out-ranks inline normal declarations).
+   Do NOT wrap this block in @layer. Literal 0s, not the 0.01ms idiom, because
+   0.01ms computes to 1e-05s and the e2e pin asserts 0s. Delays are zeroed too
+   (navigation.css mobile-menu stagger, topics/search --anim-delay) or a stagger
+   survives the zeroed durations. Infinite animations (updater-spin, pulse-glow)
+   settle on a single frame; the spinners sit beside status text.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+        animation-iteration-count: 1 !important;
+    }
 }
 
 /* ==========================================================================

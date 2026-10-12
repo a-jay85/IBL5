@@ -18,7 +18,7 @@ Docker container**.
 | Migrations (app context) | `migrate`, `migrate-seed`, `run-migrations-ci`, `validate-schema` |
 | PHPStan / coverage gates | `check-baseline-drift`, `check-coverage`, `check-coverage-regression`, `check-new-class-coverage`, `check-infection-excludes` |
 | Cache ops (run in container) | `warm-cache`, `purge-page-cache`, `rebuild-record-holders-cache` |
-| E2E / visual regression | `e2e-local`, `visual-regression` |
+| E2E / visual regression | `e2e-local` (main checkout only; prefer the front door `bin/test e2e`), `visual-regression` |
 | DB CLI | `db-query` (symlinked from `bin/db-query`) |
 
 ## What does NOT belong here

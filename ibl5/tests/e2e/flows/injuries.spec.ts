@@ -35,7 +35,7 @@ test.describe('Injuries flow', () => {
 
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on player page from Injuries');
-    await expect(page.locator('h2, h3').first()).toBeVisible();
+    await expect(page.locator('.plr-nav').first()).toBeVisible();
   });
 
   test('team name cells link to team pages', async ({ page }) => {

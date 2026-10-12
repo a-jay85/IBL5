@@ -10,32 +10,30 @@
 # Run: bin/test-bun-audit-triage  (exit 0 = all pass, 1 = a case failed)
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")"
 SCRIPT="$SCRIPT_DIR/bun-audit-triage"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
 # Suppress unused ROOT — it satisfies the conventional ROOT declaration pattern.
 : "${ROOT}"
 
-FAILED=0
-
 expect() { # name want-exit got-exit
     if [ "$3" -eq "$2" ]; then
-        echo "ok: $1 (exit $3)"
+        h_pass "$1 (exit $3)"
     else
-        echo "FAIL: $1 — expected exit $2, got $3"
-        FAILED=1
+        h_fail "$1" "expected exit $2, got $3"
     fi
 }
 
 expect_empty() { # name got-output
     if [ -z "$2" ]; then
-        echo "ok: $1 (no output)"
+        h_pass "$1 (no output)"
     else
-        echo "FAIL: $1 — expected no output, got: $2"
-        FAILED=1
+        h_fail "$1" "expected no output, got: $2"
     fi
 }
 
@@ -45,11 +43,10 @@ expect_advisory_count() { # name want-count got-output
         ACTUAL=$(printf '%s\n' "$3" | grep -c 'ADVISORY:' || printf '0')
     fi
     if [ "$ACTUAL" -eq "$2" ]; then
-        echo "ok: $1 (ADVISORY lines: $ACTUAL)"
+        h_pass "$1 (ADVISORY lines: $ACTUAL)"
     else
-        echo "FAIL: $1 — expected $2 ADVISORY line(s), got $ACTUAL"
+        h_fail "$1" "expected $2 ADVISORY line(s), got $ACTUAL"
         printf '%s\n' "$3" | sed 's/^/    /'
-        FAILED=1
     fi
 }
 
@@ -125,10 +122,9 @@ expect_advisory_count "mixed: exactly 2 ADVISORY lines" 2 "$OUT"
 RC=0; ERR=$(printf '' | "$SCRIPT" --nope 2>&1 >/dev/null) || RC=$?
 expect "unknown flag: exit 2" 2 "$RC"
 if printf '%s' "$ERR" | grep -q 'unknown flag\|Usage:'; then
-    echo "ok: unknown flag: usage on stderr"
+    h_pass "unknown flag: usage on stderr"
 else
-    echo "FAIL: unknown flag: expected usage/error on stderr"
-    FAILED=1
+    h_fail "unknown flag: expected usage/error on stderr"
 fi
 
 # ---------------------------------------------------------------------------
@@ -144,10 +140,9 @@ RC=0; OUT=$(printf '%s' "$HIGH_FIXTURE" | "$SCRIPT" --json 2>/dev/null) || RC=$?
 expect "--json mode: exit 1" 1 "$RC"
 JSON_LEN=$(printf '%s\n' "$OUT" | jq 'length' 2>/dev/null || printf '-1')
 if [ "$JSON_LEN" -eq 1 ]; then
-    echo "ok: --json mode: output is JSON array of length 1"
+    h_pass "--json mode: output is JSON array of length 1"
 else
-    echo "FAIL: --json mode: expected JSON array length 1, got: $JSON_LEN"
-    FAILED=1
+    h_fail "--json mode: expected JSON array length 1, got: $JSON_LEN"
 fi
 
 # ---------------------------------------------------------------------------
@@ -160,10 +155,4 @@ expect "file-arg mode: exit 1" 1 "$RC"
 expect_advisory_count "file-arg mode: one ADVISORY line" 1 "$OUT"
 
 # ---------------------------------------------------------------------------
-echo ""
-if [ "$FAILED" -eq 0 ]; then
-    echo "All tests passed."
-else
-    echo "$FAILED test(s) FAILED."
-fi
-exit "$FAILED"
+h_done

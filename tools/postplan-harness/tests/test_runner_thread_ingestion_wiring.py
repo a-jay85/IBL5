@@ -151,6 +151,45 @@ def test_phase45_swallows_non_gate_errors(tmp_path, monkeypatch):
     )
 
 
+_ALNUM36 = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
+
+
+def test_thread_ingestion_harness_error_is_redacted(tmp_path, monkeypatch):
+    """The stored HarnessError text carries no token and keeps its kind prefix.
+
+    Mutation caught: dropping the _redact wrapper on the HarnessError arm.
+    """
+    secret = "ghp_" + _ALNUM36
+
+    def _fake_ingestion(*args, **kwargs):
+        raise HarnessError("gh-api", f"GET https://x:{secret}@api.github.com failed")
+
+    monkeypatch.setattr(runner, "run_thread_ingestion", _fake_ingestion)
+    result = runner._run_thread_ingestion_phase(
+        _gh(tmp_path), None, _git(), str(tmp_path), None, {111}, str(tmp_path), _log(), _res())
+
+    assert secret not in result["error"]
+    assert result["error"].startswith("gh-api: ")
+
+
+def test_thread_ingestion_unexpected_error_is_redacted(tmp_path, monkeypatch):
+    """The generic-exception arm stores a redacted repr().
+
+    Mutation caught: dropping the _redact wrapper on the repr(e) arm.
+    """
+    secret = "ghp_" + _ALNUM36
+
+    def _fake_ingestion(*args, **kwargs):
+        raise RuntimeError(f"token {secret}")
+
+    monkeypatch.setattr(runner, "run_thread_ingestion", _fake_ingestion)
+    result = runner._run_thread_ingestion_phase(
+        _gh(tmp_path), None, _git(), str(tmp_path), None, {111}, str(tmp_path), _log(), _res())
+
+    assert secret not in result["error"]
+    assert result["error"].startswith("RuntimeError(")
+
+
 @pytest.mark.parametrize("kind", ["gate-path-edit", "push-failed"])
 def test_phase45_propagates_gate_path_edit_and_push_failed(tmp_path, monkeypatch, kind):
     """gate-path-edit and push-failed must propagate, never be swallowed.

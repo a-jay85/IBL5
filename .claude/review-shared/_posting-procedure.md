@@ -1,6 +1,6 @@
 ---
 description: Shared posting procedure — re-check eligibility, the never-hand-write rule, dispositioning open threads, remediating pre-existing trusted threads, and link format rules — used by /pr-review and /security-audit.
-last_verified: 2026-09-22
+last_verified: 2026-10-05
 ---
 
 # Review Posting Procedure (shared)

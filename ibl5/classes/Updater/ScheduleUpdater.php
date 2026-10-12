@@ -12,7 +12,7 @@ use JsbParser\SchFileParser;
 use Security\HtmlSanitizer;
 use Season\Season;
 
-class ScheduleUpdater extends \BaseMysqliRepository {
+class ScheduleUpdater extends \Database\BaseMysqliRepository {
     private Season $season;
 
     /** @var array<int, string> Team ID to name lookup (for logging) */

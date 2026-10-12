@@ -15,7 +15,7 @@ use League\LeagueContext;
  * ADR-0093: this repository is SELECT-only and uses the read-only credential
  * injected via db/db.php; it composes no credential of its own.
  */
-final class SimRecapContextRepository extends \BaseMysqliRepository
+final class SimRecapContextRepository extends \Database\BaseMysqliRepository
 {
     private LastSimRecapRepository $lastSimRecap;
 

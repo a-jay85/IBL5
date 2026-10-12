@@ -59,6 +59,38 @@ final class BanReservedWordColumnsRuleTest extends RuleTestCase
         );
     }
 
+    public function testFlagsBareValueInIblSettingsSql(): void
+    {
+        $message = 'Banned bare column reference value in ibl_settings SQL string. '
+            . 'Rename to `setting_value`; ibl_settings.value was renamed to the non-reserved '
+            . 'setting_value (backlog#217).';
+
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/BannedSettingsValueColumn.php'],
+            [
+                [$message, 5],
+                [$message, 6],
+                [$message, 7],
+            ],
+        );
+    }
+
+    public function testIgnoresBacktickedValueOnCacheTable(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/AllowedCacheValueColumn.php'],
+            [],
+        );
+    }
+
+    public function testIgnoresSettingValueColumnInIblSettingsSql(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/AllowedSettingValueColumn.php'],
+            [],
+        );
+    }
+
     public function testAllowsPostMigrationNames(): void
     {
         $this->analyse(

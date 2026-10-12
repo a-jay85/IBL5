@@ -125,7 +125,7 @@ class BaseMysqliRepositoryHelpersTest extends DatabaseTestCase
 /**
  * @internal Test double exposing protected helpers for testing.
  */
-class TestableRepository extends \BaseMysqliRepository
+class TestableRepository extends \Database\BaseMysqliRepository
 {
     /**
      * @param list<int|string> $ids
@@ -159,7 +159,7 @@ class TestableRepository extends \BaseMysqliRepository
 /**
  * @internal Counts calls to fetchAll to verify the empty-list short-circuit.
  */
-class QueryCountingRepository extends \BaseMysqliRepository
+class QueryCountingRepository extends \Database\BaseMysqliRepository
 {
     private int $queryCount = 0;
 

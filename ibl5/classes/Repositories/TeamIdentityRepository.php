@@ -11,7 +11,7 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
  * @phpstan-import-type UserRow from TeamIdentityRepositoryInterface
  * @phpstan-import-type TeamInfoRow from TeamIdentityRepositoryInterface
  */
-class TeamIdentityRepository extends \BaseMysqliRepository implements TeamIdentityRepositoryInterface
+class TeamIdentityRepository extends \Database\BaseMysqliRepository implements TeamIdentityRepositoryInterface
 {
     protected function rewriteTableNames(string $query): string
     {
@@ -101,6 +101,36 @@ class TeamIdentityRepository extends \BaseMysqliRepository implements TeamIdenti
         );
 
         return $result !== null ? $result['team_name'] : null;
+    }
+
+    /**
+     * @see TeamIdentityRepositoryInterface::getTeamColorRow()
+     */
+    public function getTeamColorRow(int $teamid): ?array
+    {
+        /** @var array{color1: string, color2: string}|null $result */
+        $result = $this->fetchOne(
+            "SELECT color1, color2 FROM `ibl_team_info` WHERE teamid = ? LIMIT 1",
+            "i",
+            $teamid
+        );
+
+        return $result;
+    }
+
+    /**
+     * @see TeamIdentityRepositoryInterface::getOwnerName()
+     */
+    public function getOwnerName(int $teamid): ?string
+    {
+        /** @var array{owner_name: string}|null $result */
+        $result = $this->fetchOne(
+            "SELECT owner_name FROM `ibl_team_info` WHERE teamid = ? LIMIT 1",
+            "i",
+            $teamid
+        );
+
+        return $result !== null ? $result['owner_name'] : null;
     }
 
     public function getTeamDiscordID(string $teamName): ?int

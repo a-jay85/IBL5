@@ -1,0 +1,8 @@
+# Current Claude model ids, one per line. '#' starts a comment; blank lines are ignored.
+# Single source of truth for bin/check-model-pins and the harness drift test
+# (tools/postplan-harness/tests/test_model_pins.py). When a model ships, edit this file
+# and the pins in the same PR.
+claude-opus-5-5
+claude-sonnet-5-5
+claude-haiku-5-5
+claude-fable-5-1

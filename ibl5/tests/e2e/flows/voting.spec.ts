@@ -36,9 +36,7 @@ test.describe('ASG Voting', () => {
     await ecfHeader.click();
 
     // Wait for the first visible table to show
-    const firstVisibleTable = page.locator(
-      '#ECF, #ECB, #WCF, #WCB',
-    ).first();
+    const firstVisibleTable = page.locator('#ECF');
     await expect(firstVisibleTable).toBeVisible();
 
     // Should have checkboxes
@@ -47,9 +45,7 @@ test.describe('ASG Voting', () => {
   });
 
   test('submit button visible', async ({ page }) => {
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
-      hasText: /submit votes/i,
-    });
+    const submitBtn = page.getByRole('button', { name: /submit votes/i });
     await expect(submitBtn.first()).toBeVisible();
   });
 
@@ -90,6 +86,27 @@ test.describe('ASG Voting', () => {
     await expect(ecfTable).toBeVisible();
     await expect(ecfTable).toHaveClass(/responsive-table/);
   });
+
+  test.describe('at phone width from first paint', () => {
+    // Viewport is set on the context before the beforeEach goto, so no
+    // resize/orientationchange event fires after the click. The only thing
+    // that can add responsive-table to the expanded table is the ShowAndHide
+    // click handler's own refresh call.
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    test('clicking a ballot category header makes its table responsive', async ({ page }) => {
+      const ecfTable = page.locator('#ECF');
+
+      // Collapsed at load: responsive-tables.js skips hidden tables, so no class yet
+      await expect(ecfTable).toBeHidden();
+      await expect(ecfTable).not.toHaveClass(/responsive-table/);
+
+      await page.locator('.voting-category').first().click();
+
+      await expect(ecfTable).toBeVisible();
+      await expect(ecfTable).toHaveClass(/responsive-table/);
+    });
+  });
 });
 
 // ============================================================
@@ -122,7 +139,7 @@ test.describe('EOY Voting', () => {
     const header = page.locator('.voting-category').first();
     await header.click();
 
-    const firstTable = page.locator('#MVP, #Six, #ROY, #GM').first();
+    const firstTable = page.locator('#MVP');
     await expect(firstTable).toBeVisible();
 
     const radios = firstTable.locator('input[type="radio"]');
@@ -130,9 +147,7 @@ test.describe('EOY Voting', () => {
   });
 
   test('submit button visible', async ({ page }) => {
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
-      hasText: /submit votes/i,
-    });
+    const submitBtn = page.getByRole('button', { name: /submit votes/i });
     await expect(submitBtn.first()).toBeVisible();
   });
 

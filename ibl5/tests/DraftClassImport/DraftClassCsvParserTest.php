@@ -179,7 +179,7 @@ class DraftClassCsvParserTest extends TestCase
             $result['errors'],
             static fn(string $e): bool => str_contains($e, '26') && str_contains($e, '27')
         );
-        $this->assertNotEmpty($fieldCountErrors, 'Expected field-count error naming 26 columns and 27 minimum');
+        $this->assertNotSame([], $fieldCountErrors, 'Expected field-count error naming 26 columns and 27 minimum');
     }
 
     // -------------------------------------------------------------------------
@@ -189,14 +189,6 @@ class DraftClassCsvParserTest extends TestCase
     public function testRowWithExactlyTwentySevenFieldsIsAccepted(): void
     {
         // Build a row with exactly 27 properly-valued fields (no trailing empties).
-        $columns = [
-            'name', 'pos', 'age', 'team',
-            'fga', 'fgp', 'fta', 'ftp', 'r_3ga', 'r_3gp',
-            'orb', 'drb', 'ast', 'stl', 'tvr', 'blk', 'oo',
-            'r_drive_off', 'po', 'r_trans_off',
-            'od', 'dd', 'pd', 'td',
-            'talent', 'skill', 'intangibles',
-        ];
         $values = array_fill(0, 27, '5');
         $values[0] = 'Test Player'; // name
         $values[1] = 'PG';         // pos
@@ -268,7 +260,7 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $this->assertStringContainsString('Line 1', $result['errors'][0]);
         $this->assertStringContainsString('QB', $result['errors'][0]);
     }
@@ -283,12 +275,12 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $posErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'position is blank')
         );
-        $this->assertNotEmpty($posErrors, 'Expected "position is blank" error');
+        $this->assertNotSame([], $posErrors, 'Expected "position is blank" error');
     }
 
     // -------------------------------------------------------------------------
@@ -302,12 +294,12 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $nameErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'longer than 32 characters')
         );
-        $this->assertNotEmpty($nameErrors, 'Expected name-too-long error');
+        $this->assertNotSame([], $nameErrors, 'Expected name-too-long error');
     }
 
     // -------------------------------------------------------------------------
@@ -331,7 +323,7 @@ class DraftClassCsvParserTest extends TestCase
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'longer than 32 characters')
         );
-        $this->assertEmpty($nameErrors, 'Accented 32-mb_strlen name should NOT trigger length error');
+        $this->assertSame([], $nameErrors, 'Accented 32-mb_strlen name should NOT trigger length error');
         $this->assertSame([], $result['errors']);
     }
 
@@ -345,7 +337,7 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $this->assertStringContainsString('Line 1', $result['errors'][0]);
         // The label the league reads ('2ga'), not the DB column name ('fga') — the
         // commissioner matches the message against their export, not the schema.
@@ -366,7 +358,7 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $joined = implode("\n", $result['errors']);
         $this->assertStringNotContainsString('r_', $joined);
         $this->assertStringContainsString('3ga', $joined);
@@ -384,13 +376,13 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $rangeErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'outside the allowed range')
                 && str_contains($e, '256')
         );
-        $this->assertNotEmpty($rangeErrors, 'Expected out-of-range error for 256');
+        $this->assertNotSame([], $rangeErrors, 'Expected out-of-range error for 256');
     }
 
     // -------------------------------------------------------------------------
@@ -403,13 +395,13 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $rangeErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'outside the allowed range')
                 && str_contains($e, '-1')
         );
-        $this->assertNotEmpty($rangeErrors, 'Expected out-of-range error for -1');
+        $this->assertNotSame([], $rangeErrors, 'Expected out-of-range error for -1');
     }
 
     // -------------------------------------------------------------------------
@@ -422,12 +414,12 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $nameErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'player name is blank')
         );
-        $this->assertNotEmpty($nameErrors, 'Expected blank-name error');
+        $this->assertNotSame([], $nameErrors, 'Expected blank-name error');
     }
 
     // -------------------------------------------------------------------------
@@ -448,7 +440,7 @@ class DraftClassCsvParserTest extends TestCase
                 && str_contains($e, '1')
                 && str_contains($e, '2')
         );
-        $this->assertNotEmpty($dupErrors, 'Expected duplicate-name error naming lines 1 and 2');
+        $this->assertNotSame([], $dupErrors, 'Expected duplicate-name error naming lines 1 and 2');
     }
 
     // -------------------------------------------------------------------------
@@ -509,12 +501,12 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $zeroErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'no data rows')
         );
-        $this->assertNotEmpty($zeroErrors, 'Expected "no data rows" error');
+        $this->assertNotSame([], $zeroErrors, 'Expected "no data rows" error');
     }
 
     // -------------------------------------------------------------------------
@@ -539,6 +531,6 @@ class DraftClassCsvParserTest extends TestCase
             $errors,
             static fn(string $e): bool => str_contains($e, 'position is blank')
         );
-        $this->assertNotEmpty($posErrors, 'validateRows() must reject a stored row with blank pos');
+        $this->assertNotSame([], $posErrors, 'validateRows() must reject a stored row with blank pos');
     }
 }

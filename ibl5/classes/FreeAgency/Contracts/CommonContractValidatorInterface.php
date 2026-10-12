@@ -35,8 +35,8 @@ interface CommonContractValidatorInterface
      *  - Error message includes specific year, amounts offered, and legal maximum
      *  - Uses ContractRules::getMaxRaisePercentage() for raise calculation
      * 
-     * @see \ContractRules::getMaxRaisePercentage()
-     * @see \ContractRules::BIRD_RIGHTS_THRESHOLD
+     * @see \League\ContractRules::getMaxRaisePercentage()
+     * @see \League\ContractRules::BIRD_RIGHTS_THRESHOLD
      * 
      * @example
      * // With Bird Rights (12.5% max raise)
@@ -99,8 +99,8 @@ interface CommonContractValidatorInterface
      *  - Uses ContractRules::getMaxContractSalary() for tier lookup
      *  - Maximum tiers: 0-6 years = 1063, 7-9 years = 1275, 10+ years = 1451
      * 
-     * @see \ContractRules::getMaxContractSalary()
-     * @see \ContractRules::MAX_CONTRACT_SALARIES
+     * @see \League\ContractRules::getMaxContractSalary()
+     * @see \League\ContractRules::MAX_CONTRACT_SALARIES
      * 
      * @example
      * // Valid: within max for 5-year player (max 1063)

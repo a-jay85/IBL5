@@ -46,6 +46,23 @@ test.describe('Last-Sim Recap card (authenticated GM)', () => {
     await expect(verdictStrip).toBeVisible();
     await expect(verdictStrip).toHaveClass(/last-sim-recap__strip(?!--loss)/);
   });
+
+  test('box score link renders for the seeded 2026-03-03 game', async ({ page }) => {
+    await page.goto('modules.php?name=News');
+    await assertNoPhpErrors(page, 'on News with recap box link');
+
+    // toHaveCount, not toBeVisible: the 2026-03-03 panel may be a hidden tab.
+    // Guards the seed dependency the VR `last-sim-recap` row relies on: a seed
+    // edit that zeroes game_of_that_day would blank this link and the baseline.
+    // Seed sources: ci-seed.sql:1409-1410 (ibl_schedule 1@3 on 2026-03-03),
+    // :1470-1480 (ibl_box_scores_teams game_of_that_day = 1), :61-62 (sim 689),
+    // read through BoxScoreUrlBuilder.php:21-28.
+    await expect(
+      page.locator(
+        '.last-sim-recap__box-link[href*="name=GameBoxscore"][href*="date=2026-03-03"][href*="game=1"]',
+      ),
+    ).toHaveCount(1);
+  });
 });
 
 test.describe('Last-Sim Recap card · tab keyboard nav', () => {

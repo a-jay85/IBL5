@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,8 +31,18 @@ concurrency:
 
 jobs:
 
+  mirror-ready:
+    name: Mirror CI images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/mirror-ci-images.yml
+    with:
+      only-missing: true
+
   schema-parity-check:
     name: Bash vs PHP Schema Parity
+    needs: [mirror-ready]
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -46,7 +57,10 @@ jobs:
 
     services:
       mariadb:
-        image: mariadb:10.11
+        image: ghcr.io/a-jay85/mirror/mariadb:10.11
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           MARIADB_ROOT_PASSWORD: root
         ports:
@@ -96,7 +110,13 @@ jobs:
           -e "CREATE TABLE IF NOT EXISTS migrations (id INT AUTO_INCREMENT PRIMARY KEY, migration VARCHAR(255) NOT NULL, batch INT NOT NULL);"
         mysql -h 127.0.0.1 -u root -proot ibl5_php \
           -e "INSERT INTO migrations (migration, batch) VALUES ('000_baseline_schema.sql', 0);"
-        php bin/migrate
+        php bin/migrate 2>&1 | tee "$RUNNER_TEMP/migrate.log"
+        test "${PIPESTATUS[0]}" -eq 0
+        # backlog#987: successful PHP-migration output must reach the log.
+        if ! grep -qE '^    \[[0-9]+_[A-Za-z0-9_]+\.php\] ' "$RUNNER_TEMP/migrate.log"; then
+          echo "::error::bin/migrate printed no [NNN_name.php] output lines; PHP-migration stdout is being dropped (backlog#987)"
+          exit 1
+        fi
 
     - name: Dump and compare schemas
       run: |
@@ -119,6 +139,7 @@ jobs:
 
   schema-completeness:
     name: Schema Completeness
+    needs: [mirror-ready]
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -130,7 +151,10 @@ jobs:
 
     services:
       mariadb:
-        image: mariadb:10.11
+        image: ghcr.io/a-jay85/mirror/mariadb:10.11
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           MARIADB_ROOT_PASSWORD: root
           MARIADB_DATABASE: ibl5_completeness
@@ -312,11 +336,13 @@ jobs:
 
   regen-schema-dump:
     name: Regenerate current-schema.sql
+    needs: [mirror-ready]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: write
+      packages: read
 
     env:
       DB_HOST: 127.0.0.1
@@ -326,7 +352,10 @@ jobs:
 
     services:
       mariadb:
-        image: mariadb:10.11
+        image: ghcr.io/a-jay85/mirror/mariadb:10.11
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           MARIADB_ROOT_PASSWORD: root
           MARIADB_DATABASE: ibl5_schema
@@ -369,6 +398,7 @@ jobs:
 
   old-code-compat-selftest:
     name: Old-Code Compat Self-Test
+    needs: [mirror-ready]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -381,7 +411,10 @@ jobs:
 
     services:
       mariadb:
-        image: mariadb:10.11
+        image: ghcr.io/a-jay85/mirror/mariadb:10.11
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           MARIADB_ROOT_PASSWORD: root
         ports:
@@ -407,6 +440,7 @@ jobs:
 
   old-code-compat:
     name: Old-Code Compat (production PHP on PR-head schema)
+    needs: [mirror-ready]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -419,7 +453,10 @@ jobs:
 
     services:
       mariadb:
-        image: mariadb:10.11
+        image: ghcr.io/a-jay85/mirror/mariadb:10.11
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           MARIADB_ROOT_PASSWORD: root
         ports:
@@ -473,7 +510,7 @@ jobs:
   gate:
     name: Migration Safety
     if: always()
-    needs: [schema-parity-check, schema-completeness, destructive-migration-scan, migration-naming-check, old-code-compat, old-code-compat-selftest]
+    needs: [schema-parity-check, schema-completeness, destructive-migration-scan, migration-naming-check, old-code-compat, old-code-compat-selftest, mirror-ready]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

@@ -1,0 +1,4 @@
+args= exit=1
+No action given. See --help.
+args=--bogus-flag exit=1
+Unknown option: --bogus-flag

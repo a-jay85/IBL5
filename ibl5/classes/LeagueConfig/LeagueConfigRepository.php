@@ -12,7 +12,7 @@ use LeagueConfig\Contracts\LeagueConfigRepositoryInterface;
  *
  * @see LeagueConfigRepositoryInterface For the interface contract
  */
-class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConfigRepositoryInterface
+class LeagueConfigRepository extends \Database\BaseMysqliRepository implements LeagueConfigRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
@@ -95,7 +95,7 @@ class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConf
     {
         /** @var list<LeagueConfigRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_league_config` WHERE season_ending_year = ? ORDER BY team_slot ASC",
+            "SELECT * FROM `ibl_league_config` WHERE season_ending_year = ? ORDER BY team_slot ASC, id ASC",
             'i',
             $seasonEndingYear,
         );
@@ -107,7 +107,7 @@ class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConf
     public function getFranchiseTeamsBySeason(int $seasonEndingYear): array
     {
         $rows = $this->fetchAll(
-            'SELECT franchise_id, team_name FROM `ibl_franchise_seasons` WHERE season_ending_year = ? ORDER BY franchise_id ASC',
+            'SELECT franchise_id, team_name FROM `ibl_franchise_seasons` WHERE season_ending_year = ? ORDER BY franchise_id ASC, id ASC',
             'i',
             $seasonEndingYear,
         );

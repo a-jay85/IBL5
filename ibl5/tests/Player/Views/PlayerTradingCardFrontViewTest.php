@@ -23,7 +23,7 @@ class PlayerTradingCardFrontViewTest extends TestCase
         /** @var Player&\PHPUnit\Framework\MockObject\Stub $player */
         $player = self::createStub(Player::class);
 
-        // CardBaseStyles::preparePlayerData() and getColorSchemeForTeam() getters
+        // CardBaseStyles::preparePlayerData() getters
         $player->method('getTeamid')->willReturn(7);
         $player->method('getName')->willReturn('Test Player');
         $player->method('getNickname')->willReturn(null);

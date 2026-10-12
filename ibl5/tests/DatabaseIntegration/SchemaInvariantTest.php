@@ -437,7 +437,7 @@ class SchemaInvariantTest extends DatabaseTestCase
             array_keys($fkColumns),
         );
 
-        self::assertEmpty(
+        self::assertSame([], 
             $overlap,
             'These columns are listed as BOTH an expected FK and a known gap: '
             . implode(', ', $overlap)

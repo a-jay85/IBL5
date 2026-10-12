@@ -12,7 +12,7 @@ declare(strict_types=1);
  * the slot-1 rows only. It never touches slot 5.
  *
  * This file is a thin driver. All selection logic, every SQL statement, and the
- * fingerprint guard live in Boxscore\Season1993PhantomRepair, which is what the
+ * fingerprint guard live in Boxscore\Legacy\Season1993PhantomRepair, which is what the
  * DatabaseIntegration suite exercises; nothing is re-literalled here.
  *
  * Migration 180 creates the two backup tables. MigrationFileResolver sorts with
@@ -76,9 +76,9 @@ function countCoordinateRows(mysqli $db, string $table, int $gameOfThatDay): int
         throw new RuntimeException('Failed to prepare count query for ' . $table);
     }
 
-    $date = Boxscore\Season1993PhantomRepair::GAME_DATE;
-    $visitor = Boxscore\Season1993PhantomRepair::PHANTOM_VISITOR_TEAMID;
-    $home = Boxscore\Season1993PhantomRepair::PHANTOM_HOME_TEAMID;
+    $date = Boxscore\Legacy\Season1993PhantomRepair::GAME_DATE;
+    $visitor = Boxscore\Legacy\Season1993PhantomRepair::PHANTOM_VISITOR_TEAMID;
+    $home = Boxscore\Legacy\Season1993PhantomRepair::PHANTOM_HOME_TEAMID;
     $stmt->bind_param('siii', $date, $visitor, $home, $gameOfThatDay);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -88,16 +88,16 @@ function countCoordinateRows(mysqli $db, string $table, int $gameOfThatDay): int
     return (int) ($row[0] ?? 0);
 }
 
-$repair = new Boxscore\Season1993PhantomRepair($mysqli_db);
+$repair = new Boxscore\Legacy\Season1993PhantomRepair($mysqli_db);
 
-$phantomOrdinal = Boxscore\Season1993PhantomRepair::GAME_OF_THAT_DAY;
-$realOrdinal = Boxscore\Season1993PhantomRepair::REAL_GAME_OF_THAT_DAY;
+$phantomOrdinal = Boxscore\Legacy\Season1993PhantomRepair::GAME_OF_THAT_DAY;
+$realOrdinal = Boxscore\Legacy\Season1993PhantomRepair::REAL_GAME_OF_THAT_DAY;
 
 $coordinates = [
-    'phantom teams (ordinal 1)'   => [Boxscore\Season1993PhantomRepair::TEAM_TABLE, $phantomOrdinal],
-    'phantom players (ordinal 1)' => [Boxscore\Season1993PhantomRepair::PLAYER_TABLE, $phantomOrdinal],
-    'real teams (ordinal 5)'      => [Boxscore\Season1993PhantomRepair::TEAM_TABLE, $realOrdinal],
-    'real players (ordinal 5)'    => [Boxscore\Season1993PhantomRepair::PLAYER_TABLE, $realOrdinal],
+    'phantom teams (ordinal 1)'   => [Boxscore\Legacy\Season1993PhantomRepair::TEAM_TABLE, $phantomOrdinal],
+    'phantom players (ordinal 1)' => [Boxscore\Legacy\Season1993PhantomRepair::PLAYER_TABLE, $phantomOrdinal],
+    'real teams (ordinal 5)'      => [Boxscore\Legacy\Season1993PhantomRepair::TEAM_TABLE, $realOrdinal],
+    'real players (ordinal 5)'    => [Boxscore\Legacy\Season1993PhantomRepair::PLAYER_TABLE, $realOrdinal],
 ];
 
 $before = [];

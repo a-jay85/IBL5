@@ -7,14 +7,21 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from runner import _inject_residual_phases
+from harness import conformance
 from harness.state import PhaseInfo, PlanInfo
 
 
-def test_inject_adds_block_and_logs_when_phase_missing():
+def _pin_tracked(monkeypatch, *paths):
+    """Pin conformance's git ls-files lookup to `paths` for this test only."""
+    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: tuple(paths))
+
+
+def test_inject_adds_block_and_logs_when_phase_missing(monkeypatch):
     """Phase 3 cites harness/nope.py, not in files → block added and logged.
 
     Mutation caught: forgetting to assign back to copy["summary_md"] leaves body unchanged.
     """
+    _pin_tracked(monkeypatch, "harness/nope.py", "harness/other.py")
     ph = PhaseInfo(number=3, heading="Phase 3: Do stuff", evidence_paths=["harness/nope.py"])
     plan = PlanInfo(found=True, phases=[ph])
     copy = {"summary_md": "## Summary\n- x"}
@@ -27,11 +34,12 @@ def test_inject_adds_block_and_logs_when_phase_missing():
     assert logs[0].startswith("phase2 residual-phase: MISSING-PHASE: 3 —")
 
 
-def test_inject_is_noop_for_plan_blind_and_shipped_runs():
+def test_inject_is_noop_for_plan_blind_and_shipped_runs(monkeypatch):
     """found=False and all phases shipped both return [] and leave body unchanged.
 
     Mutation caught: calling check() instead of phase_omission_items() adds MISSING: items.
     """
+    _pin_tracked(monkeypatch, "harness/b.py")
     body = "## Summary\n- x"
 
     # plan-blind
@@ -54,11 +62,12 @@ def test_inject_is_noop_for_plan_blind_and_shipped_runs():
     assert logs2 == []
 
 
-def test_inject_is_idempotent_across_reruns():
+def test_inject_is_idempotent_across_reruns(monkeypatch):
     """Two calls with same inputs give one block; third call with phase shipped removes it.
 
     Mutation caught: append-only upsert duplicates the block on the second call.
     """
+    _pin_tracked(monkeypatch, "harness/b.py")
     from harness.classify import RESIDUAL_PHASES_BEGIN
 
     ph = PhaseInfo(number=2, heading="Phase 2: B", evidence_paths=["harness/b.py"])
@@ -75,4 +84,6 @@ def test_inject_is_idempotent_across_reruns():
 
     # phase now shipped
     _inject_residual_phases(copy, plan, ["harness/b.py"], [].append)
-    assert copy["summary_md"].strip() == orig_body.strip()
+    # Removal re-terminates the head with exactly one "\n" (orig_body.rstrip() + "\n"),
+    # so the restored body is the original plus a single trailing newline.
+    assert copy["summary_md"] == orig_body.rstrip() + "\n"

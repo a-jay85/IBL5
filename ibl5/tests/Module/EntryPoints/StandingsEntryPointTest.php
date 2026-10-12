@@ -9,7 +9,7 @@ class StandingsEntryPointTest extends ModuleEntryPointTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
         $this->mockDb->onQuery('ibl_schedule', []);
         $this->mockDb->setMockData([]);
@@ -19,7 +19,7 @@ class StandingsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Standings');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_standings');
     }
 
@@ -27,7 +27,7 @@ class StandingsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Standings');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_power');
     }
 
@@ -80,7 +80,7 @@ class StandingsEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Standings');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Olympics Standings', $output);
 
         \League\OlympicsTeamFilter::resetCache();

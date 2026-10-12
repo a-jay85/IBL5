@@ -12,7 +12,7 @@ class YourAccountRepositoryTest extends TestCase
     public function testRepositoryCanBeInstantiated(): void
     {
         self::assertContains(
-            \BaseMysqliRepository::class,
+            \Database\BaseMysqliRepository::class,
             (array) class_parents(YourAccountRepository::class)
         );
     }

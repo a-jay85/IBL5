@@ -14,7 +14,7 @@ use Team\Team;
  *
  * @phpstan-import-type ExtensionOffer from ExtensionRepositoryInterface
  *
- * @phpstan-type ExtensionData array{playerID?: int, player?: \Player\Player, teamName?: string, team?: Team, offer: ExtensionOffer, demands?: array{total: int, years: int}|ExtensionOffer|null}
+ * @phpstan-type ExtensionData array{playerID?: int, playerName?: string, player?: \Player\Player, teamName?: string, team?: Team, offer: ExtensionOffer, demands?: array{total: int, years: int}|ExtensionOffer|null}
  * @phpstan-type ExtensionSuccessResult array{success: true, accepted: bool, message: string, offerValue: float, demandValue: float, modifier: float, extensionYears: int, offerInMillions: float, offerDetails: string, discordNotificationSent: bool, discordChannel: string, refusalMessage?: string}
  * @phpstan-type ExtensionErrorResult array{success: false, error: string}
  * @phpstan-type ExtensionResult ExtensionSuccessResult|ExtensionErrorResult

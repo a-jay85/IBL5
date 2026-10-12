@@ -6,6 +6,7 @@ namespace AllStarAppearances;
 
 use AllStarAppearances\Contracts\AllStarAppearancesViewInterface;
 use Player\PlayerImageHelper;
+use UI\RendersTableEnd;
 
 /**
  * View class for rendering all-star appearances table.
@@ -14,6 +15,8 @@ use Player\PlayerImageHelper;
  */
 class AllStarAppearancesView implements AllStarAppearancesViewInterface
 {
+    use RendersTableEnd;
+
     /**
      * @see AllStarAppearancesViewInterface::render()
      */
@@ -76,15 +79,5 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
         }
 
         return $output;
-    }
-
-    /**
-     * Render the end of the table.
-     *
-     * @return string HTML table end
-     */
-    private function renderTableEnd(): string
-    {
-        return '</tbody></table>';
     }
 }

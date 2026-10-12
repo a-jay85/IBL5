@@ -12,6 +12,7 @@ use Waivers\Contracts\WaiversValidatorInterface;
 use Player\Player;
 use Season\Season;
 
+/** @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface */
 #[AllowMockObjectsWithoutExpectations]
 class WaiversProcessorTest extends TestCase
 {
@@ -80,6 +81,155 @@ class WaiversProcessorTest extends TestCase
         }
 
         return $player;
+    }
+
+    /**
+     * Full PlayerRow fixture for determineContractData(). Contract and
+     * experience keys default to 0, matching PlayerDataConverter's `?? 0`.
+     *
+     * @return PlayerRow
+     */
+    private function buildPlayerRow(
+        int $teamid,
+        int $exp = 0,
+        int $cy = 0,
+        int $cyt = 0,
+        int $salaryYr1 = 0,
+        int $salaryYr2 = 0,
+        int $salaryYr3 = 0,
+    ): array {
+        return [
+            'pid' => 1,
+            'name' => 'Test Player',
+            'nickname' => null,
+            'age' => 0,
+            'teamid' => $teamid,
+            'teamname' => null,
+            'pos' => 'PG',
+            'stamina' => 0,
+            'exp' => $exp,
+            'bird' => 0,
+            'cy' => $cy,
+            'cyt' => $cyt,
+            'salary_yr1' => $salaryYr1,
+            'salary_yr2' => $salaryYr2,
+            'salary_yr3' => $salaryYr3,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'ordinal' => 0,
+            'injured' => 0,
+            'retired' => 0,
+            'droptime' => 0,
+            'stats_gs' => 0,
+            'stats_gm' => 0,
+            'stats_min' => 0,
+            'stats_fgm' => 0,
+            'stats_fga' => 0,
+            'stats_ftm' => 0,
+            'stats_fta' => 0,
+            'stats_3gm' => 0,
+            'stats_3ga' => 0,
+            'stats_orb' => 0,
+            'stats_drb' => 0,
+            'stats_ast' => 0,
+            'stats_stl' => 0,
+            'stats_tvr' => 0,
+            'stats_blk' => 0,
+            'stats_pf' => 0,
+            'sh_pts' => 0,
+            'sh_reb' => 0,
+            'sh_ast' => 0,
+            'sh_stl' => 0,
+            'sh_blk' => 0,
+            's_dd' => 0,
+            's_td' => 0,
+            'sp_pts' => 0,
+            'sp_reb' => 0,
+            'sp_ast' => 0,
+            'sp_stl' => 0,
+            'sp_blk' => 0,
+            'ch_pts' => 0,
+            'ch_reb' => 0,
+            'ch_ast' => 0,
+            'ch_stl' => 0,
+            'ch_blk' => 0,
+            'c_dd' => 0,
+            'c_td' => 0,
+            'cp_pts' => 0,
+            'cp_reb' => 0,
+            'cp_ast' => 0,
+            'cp_stl' => 0,
+            'cp_blk' => 0,
+            'car_gm' => 0,
+            'car_min' => 0,
+            'car_fgm' => 0,
+            'car_fga' => 0,
+            'car_ftm' => 0,
+            'car_fta' => 0,
+            'car_3gm' => 0,
+            'car_3ga' => 0,
+            'car_orb' => 0,
+            'car_drb' => 0,
+            'car_reb' => 0,
+            'car_ast' => 0,
+            'car_stl' => 0,
+            'car_tvr' => 0,
+            'car_blk' => 0,
+            'car_pf' => 0,
+            'r_fga' => 0,
+            'r_fgp' => 0,
+            'r_fta' => 0,
+            'r_ftp' => 0,
+            'r_3ga' => 0,
+            'r_3gp' => 0,
+            'r_orb' => 0,
+            'r_drb' => 0,
+            'r_ast' => 0,
+            'r_stl' => 0,
+            'r_tvr' => 0,
+            'r_blk' => 0,
+            'r_foul' => 0,
+            'oo' => 0,
+            'od' => 0,
+            'r_drive_off' => 0,
+            'dd' => 0,
+            'po' => 0,
+            'pd' => 0,
+            'r_trans_off' => 0,
+            'td' => 0,
+            'clutch' => 0,
+            'consistency' => 0,
+            'talent' => 0,
+            'skill' => 0,
+            'intangibles' => 0,
+            'loyalty' => 0,
+            'playing_time' => 0,
+            'winner' => 0,
+            'tradition' => 0,
+            'security' => 0,
+            'draftround' => 0,
+            'draftedby' => null,
+            'draftedbycurrentname' => null,
+            'draftyear' => 0,
+            'draftpickno' => 0,
+            'htft' => 0,
+            'htin' => 0,
+            'wt' => 0,
+            'college' => null,
+            'dc_pg_depth' => 0,
+            'dc_sg_depth' => 0,
+            'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0,
+            'dc_c_depth' => 0,
+            'dc_can_play_in_game' => 0,
+            'dc_minutes' => 0,
+            'dc_of' => 0,
+            'dc_df' => 0,
+            'dc_oi' => 0,
+            'dc_di' => 0,
+            'dc_bh' => 0,
+        ];
     }
     
     public function testCalculateVeteranMinimumSalaryFor10PlusYears(): void
@@ -228,14 +378,7 @@ class WaiversProcessorTest extends TestCase
     
     public function testDetermineContractDataForNewContract(): void
     {
-        $playerData = [
-            'pid' => 1,
-            'name' => 'Test Player',
-            'teamid' => 0,
-            'pos' => 'PG',
-            'salary_yr1' => 0,
-            'exp' => 8,
-        ];
+        $playerData = $this->buildPlayerRow(teamid: 0, exp: 8);
         
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
         
@@ -245,17 +388,7 @@ class WaiversProcessorTest extends TestCase
     
     public function testDetermineContractDataForExistingContract(): void
     {
-        $playerData = [
-            'pid' => 1,
-            'name' => 'Test Player',
-            'teamid' => 1,
-            'pos' => 'PG',
-            'salary_yr1' => 500,
-            'cy' => 1,
-            'cyt' => 3,
-            'salary_yr2' => 550,
-            'salary_yr3' => 600,
-        ];
+        $playerData = $this->buildPlayerRow(teamid: 1, cy: 1, cyt: 3, salaryYr1: 500, salaryYr2: 550, salaryYr3: 600);
         
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
         
@@ -265,17 +398,7 @@ class WaiversProcessorTest extends TestCase
     
     public function testDetermineContractDataForMidContract(): void
     {
-        $playerData = [
-            'pid' => 1,
-            'name' => 'Test Player',
-            'teamid' => 1,
-            'pos' => 'PG',
-            'salary_yr1' => 500,
-            'cy' => 2,
-            'cyt' => 3,
-            'salary_yr2' => 550,
-            'salary_yr3' => 600,
-        ];
+        $playerData = $this->buildPlayerRow(teamid: 1, cy: 2, cyt: 3, salaryYr1: 500, salaryYr2: 550, salaryYr3: 600);
         
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
         
@@ -310,15 +433,7 @@ class WaiversProcessorTest extends TestCase
     
     public function testDetermineContractDataForNewContractDuringFreeAgency(): void
     {
-        $playerData = [
-            'pid' => 1,
-            'name' => 'Test Player',
-            'teamid' => 0,
-            'pos' => 'PG',
-            'salary_yr1' => 0,
-            'salary_yr2' => 0,
-            'exp' => 6,
-        ];
+        $playerData = $this->buildPlayerRow(teamid: 0, exp: 6);
         
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonFreeAgency);
         

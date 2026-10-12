@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Updater\Steps;
 
 use Boxscore\BoxscoreProcessor;
-use Boxscore\BoxscoreRepository;
+use Boxscore\AllStarTeamRepository;
 use Boxscore\BoxscoreView;
 use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
@@ -21,7 +21,7 @@ class ProcessAllStarGamesStep implements PipelineStepInterface
 {
     public function __construct(
         private readonly BoxscoreProcessor $processor,
-        private readonly BoxscoreRepository $boxscoreRepo,
+        private readonly AllStarTeamRepository $boxscoreRepo,
         private readonly BoxscoreView $view,
         private readonly JsbSourceResolverInterface $sourceResolver,
     ) {

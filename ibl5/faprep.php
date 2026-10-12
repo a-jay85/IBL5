@@ -2,6 +2,31 @@
 
 declare(strict_types=1);
 
+/**
+ * Free Agent Prep Report (faprep.php).
+ *
+ * An admin-only HTML table of every non-retired player (ibl_plr rows with
+ * retired = 0, ordered by ordinal) with team name, ordinal, coach, stamina,
+ * and the other free agency prep columns. The commissioner uses it to
+ * prepare the free agency period.
+ *
+ * Access is limited to admins. Anyone else gets HTTP 403 from the
+ * is_admin() check below. There is no nav or admin-panel link. Open it
+ * directly at /ibl5/faprep.php.
+ *
+ * It stays separate from the public FreeAgencyPreview module
+ * (modules.php?name=FreeAgencyPreview). Preview filters to players whose
+ * contracts expire in the chosen year and does not show coach, stamina,
+ * or ordinal. This report lists all active players with those columns.
+ *
+ * Tests: tests/WideUnit/Scripts/FaprepGuardTest.php plus the Playwright
+ * specs tests/e2e/smoke/faprep-admin.spec.ts,
+ * tests/e2e/flows/faprep-xss-escape.spec.ts, and
+ * tests/e2e/flows/role-gating-non-admin.spec.ts.
+ *
+ * Runbook: ibl5/docs/OPERATIONS_RUNBOOK.md, section 9.
+ */
+
 require __DIR__ . '/mainfile.php';
 
 use Security\HtmlSanitizer;

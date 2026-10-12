@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Usage: bin/sim-recap-ssh-gate            (forced command; reads SSH_ORIGINAL_COMMAND)
+#        bin/sim-recap-ssh-gate --print-key-line <pubkey-file>
+#
+# Forced command for the dedicated `sim-recap-actions` key on the prod box
+# (ADR-0154). Admits exactly the command shapes bin/sim-recap-tick issues via
+# q(), qctx() and the store call, and nothing else. The argv is rebuilt from
+# matched pieces: no eval, no `sh -c`, and the raw request is never executed.
+set -u
+
+ROOT="${SIM_RECAP_GATE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+PHP="${SIM_RECAP_GATE_PHP_BIN:-php}"
+
+usage() {
+    echo "usage: sim-recap-ssh-gate [--print-key-line <pubkey-file>]" >&2
+    exit 2
+}
+
+deny() {
+    echo "sim-recap-ssh-gate: denied: ${1:0:80}" >&2
+    logger -t sim-recap-ssh-gate "denied" 2>/dev/null || true
+    exit 2
+}
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+fi
+
+if [ "$#" -gt 0 ]; then
+    if [ "$1" != "--print-key-line" ] || [ "$#" -ne 2 ] || [ ! -f "$2" ]; then
+        usage
+    fi
+    [ "$(grep -c . "$2")" -eq 1 ] || usage
+    key_line="$(grep -m1 '^ssh-ed25519 ' "$2")" || usage
+    read -r key_type key_blob _ <<<"$key_line"
+    printf 'restrict,port-forwarding,permitopen="127.0.0.1:3306",command="%s/bin/sim-recap-ssh-gate" %s %s sim-recap-actions\n' \
+        "$ROOT" "$key_type" "$key_blob"
+    exit 0
+fi
+
+cmd="${SSH_ORIGINAL_COMMAND:-}"
+[ -n "$cmd" ] || { echo "sim-recap-ssh-gate: denied: no command" >&2; exit 2; }
+
+re='^php (.+)/ibl5/scripts/(simRecapQueue|simRecapContext|storeSimRecap)\.php (.*)$'
+[[ $cmd =~ $re ]] || deny "$cmd"
+req_root="${BASH_REMATCH[1]}"
+script="${BASH_REMATCH[2]}"
+args="${BASH_REMATCH[3]}"
+
+# String comparison only; never realpath attacker-supplied input.
+[ "$req_root" = "$ROOT" ] || deny "$cmd"
+
+sim_re='^--sim=[0-9]{1,9}$'
+verb_re='^(claim|park|find) (--sim=[0-9]{1,9})$'
+argv=()
+case "$script" in
+    simRecapQueue)
+        case "$args" in
+            claim-next|reclaim-stale|recent-themes|mention-map) argv=("$args") ;;
+            *)
+                [[ $args =~ $verb_re ]] || deny "$cmd"
+                argv=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")
+                ;;
+        esac
+        ;;
+    simRecapContext|storeSimRecap)
+        [[ $args =~ $sim_re ]] || deny "$cmd"
+        argv=("$args")
+        ;;
+    *) deny "$cmd" ;;
+esac
+
+exec "$PHP" "$ROOT/ibl5/scripts/$script.php" "${argv[@]}"

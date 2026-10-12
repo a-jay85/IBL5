@@ -32,7 +32,7 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
         $results = $this->repo->getAllOffersWithBirdYears();
 
-        self::assertNotEmpty($results);
+        self::assertNotSame([], $results);
 
         // Find our test row
         $found = null;
@@ -142,7 +142,6 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT has_mle FROM ibl_team_info WHERE team_name = ?');
         self::assertNotFalse($stmt);
-        $team = 'Metros';
         $stmt->bind_param('s', $team);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
@@ -166,7 +165,6 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT has_lle FROM ibl_team_info WHERE team_name = ?');
         self::assertNotFalse($stmt);
-        $team = 'Metros';
         $stmt->bind_param('s', $team);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();

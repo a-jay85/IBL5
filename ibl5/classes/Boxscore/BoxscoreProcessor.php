@@ -26,6 +26,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
 
     protected \mysqli $db;
     protected BoxscoreRepository $repository;
+    private BoxscoreAuditRepository $auditRepository;
     protected Season $season;
     private ?LeagueContext $leagueContext;
     private ProgressReporterInterface $progressReporter;
@@ -42,17 +43,25 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         ?RegularSeasonGameProcessor $regularSeasonProcessor = null,
         ?RisingStarsGameProcessor $risingStarsProcessor = null,
         ?AllStarGameProcessor $allStarProcessor = null,
+        ?BoxscoreAuditRepository $auditRepository = null,
+        ?AllStarTeamRepository $allStarRepository = null,
     ) {
         $this->db = $db;
         $this->leagueContext = $leagueContext;
         $this->repository = $repository ?? new BoxscoreRepository($db, $leagueContext);
+        $this->auditRepository = $auditRepository ?? new BoxscoreAuditRepository($db, $leagueContext);
         $this->season = $season ?? new Season($db);
         $this->progressReporter = $progressReporter ?? new FlushProgressReporter();
         $resolver = new GameUpsertResolver($this->repository);
         $writer = new GameLineWriter($db, $this->repository);
         $this->regularSeasonProcessor = $regularSeasonProcessor ?? new RegularSeasonGameProcessor($resolver, $writer);
         $this->risingStarsProcessor = $risingStarsProcessor ?? new RisingStarsGameProcessor($resolver, $writer);
-        $this->allStarProcessor = $allStarProcessor ?? new AllStarGameProcessor($resolver, $writer, $this->repository);
+        $this->allStarProcessor = $allStarProcessor ?? new AllStarGameProcessor(
+            $resolver,
+            $writer,
+            $this->repository,
+            $allStarRepository ?? new AllStarTeamRepository($db, $leagueContext),
+        );
     }
 
     /**
@@ -234,7 +243,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             $messages = array_merge($messages, $simDateMessages);
         }
 
-        $rejectsRecorded = $this->repository->recordRejectedGames(
+        $rejectsRecorded = $this->auditRepository->recordRejectedGames(
             $operatingSeasonEndingYear,
             $rejectedGames,
             $sourceArchive,

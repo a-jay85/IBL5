@@ -18,7 +18,7 @@ use Season\Season;
  *
  * @see SplitStatsRepositoryInterface
  */
-class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRepositoryInterface
+class SplitStatsRepository extends \Database\BaseMysqliRepository implements SplitStatsRepositoryInterface
 {
     /**
      * Map of split keys to human-readable labels.

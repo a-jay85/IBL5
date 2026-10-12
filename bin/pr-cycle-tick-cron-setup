@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# One-time setup for the pr-cycle watcher tick (ADR-0167).
+#
+# Installs a Mac-local launchd LaunchAgent (com.ibl5.watch-pr-cycle) that fires
+# the main checkout's bin/pr-cycle-tick every 1800s via StartInterval. The plist
+# Program/WorkingDirectory point at the durable MAIN checkout (never a worktree,
+# which gets torn down).
+#
+# INSTALL ONLY AFTER THIS LANDS ON master: the launchd Program points at
+# the main checkout's bin/pr-cycle-tick, which must exist there.
+#
+# Usage:
+#   bin/pr-cycle-tick-cron-setup --print-schedule      # emit the plist to stdout (no side effect)
+#   bin/pr-cycle-tick-cron-setup --install-schedule    # install + load the LaunchAgent
+#   bin/pr-cycle-tick-cron-setup --uninstall-schedule  # unload + remove the LaunchAgent
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ACTION=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --install-schedule)   ACTION="install";   shift ;;
+    --uninstall-schedule) ACTION="uninstall"; shift ;;
+    --print-schedule)     ACTION="print";     shift ;;
+    -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+: "${HOME:?pr-cycle-tick-cron-setup: HOME is unset}"
+
+# shellcheck source=bin/lib/launchd-sched.sh
+. "$REPO_ROOT/bin/lib/launchd-sched.sh"
+
+[ -n "$ACTION" ] || { echo "No action given. See --help." >&2; exit 1; }
+
+# ── Durable MAIN-checkout derivation ─────────────────────────────────────────
+# Program/WorkingDirectory MUST point at the main checkout, never this worktree
+# (a worktree gets torn down, and the LaunchAgent would then point at a dead path).
+# The first `git worktree list` entry is the main working tree.
+MAIN_WT="$(lsched_main_wt "$REPO_ROOT")"
+
+PLIST_LABEL="com.ibl5.watch-pr-cycle"
+PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
+LOG_DIR="$HOME/.ibl5-pr-cycle-watch"
+PROGRAM="$MAIN_WT/bin/pr-cycle-tick"
+
+# Single source of truth for the plist, used by both --print-schedule and
+# --install-schedule, so the MAIN-checkout derivation is exercised by tests.
+plist_body() {
+  lsched_key_string Label "$PLIST_LABEL"
+  lsched_key_string Program "$PROGRAM"
+  cat <<PLIST
+	<!-- StartInterval: the correct launchd primitive for a 30-min poll.
+	     Do NOT "fix" this to a calendar-interval key, which is calendar-only.
+	     RunAtLoad stays false so installing never fires a tick. -->
+PLIST
+  lsched_key_integer StartInterval 1800
+  lsched_key_bool RunAtLoad false
+  lsched_key_string WorkingDirectory "$MAIN_WT"
+  lsched_env_open
+  cat <<PLIST
+		<!-- launchd agents start with a minimal PATH that omits Homebrew and
+		     the Claude Code native install dir under the home directory.
+		     Every binary the tick shells out to must resolve here: bash, gh,
+		     jq, git, launchctl, find, tr, and date. claude is reached only
+		     through bin/pr-cycle's worker.
+		     HOME interpolates HERE, at generation time. launchd does NOT expand
+		     variables in EnvironmentVariables, so a literal home variable would
+		     bake in a dead path. -->
+PLIST
+  lsched_key_string PATH "${HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" 2
+  lsched_env_close
+  lsched_key_string StandardOutPath "${LOG_DIR}/tick.log"
+  lsched_key_string StandardErrorPath "${LOG_DIR}/tick.log"
+}
+
+case "$ACTION" in
+  print)
+    lsched_plist plist_body
+    ;;
+  install)
+    # launchd does not create a log's parent dir.
+    lsched_install "$PLIST_LABEL" "$PLIST_PATH" plist_body "$LOG_DIR"
+    echo "Installed ${PLIST_LABEL} (StartInterval 1800s). Program: $PROGRAM"
+    ;;
+  uninstall)
+    lsched_uninstall "$PLIST_LABEL" "$PLIST_PATH"
+    echo "Uninstalled ${PLIST_LABEL}."
+    ;;
+esac

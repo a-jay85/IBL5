@@ -14,6 +14,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/git-helpers.sh disable=SC1091
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
 REMOTE_DIR="backups/db/phase-snapshots"
 DEST="${REPO_ROOT}/ibl5/backups/phase-snapshots"
 # cPanel prod host has no system rsync; a static binary lives in ~/bin/rsync.
@@ -53,7 +55,7 @@ SSH_HOST="${PROD_SSH_HOST:-}"
 if [ -z "$SSH_HOST" ]; then
   ENV_FILE="${REPO_ROOT}/.env"
   if [ ! -f "$ENV_FILE" ]; then
-    GIT_ROOT="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')" || true
+    GIT_ROOT="$(main_checkout_root "$REPO_ROOT")" || GIT_ROOT=""
     if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.env" ]; then
       ENV_FILE="$GIT_ROOT/.env"
     else

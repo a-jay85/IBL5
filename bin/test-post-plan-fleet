@@ -243,6 +243,125 @@ else
 fi
 end_case plist-shape
 
+# A hand-started --go run never carries --allow-test-only, so the rescue-only exemption
+# cannot leak into interactive fleet runs. The header holds an empty value and the body
+# expands it to zero words.
+begin_case
+if [[ -f /tmp/post-plan-fleet-runner-1901.sh ]]; then
+    grep -qxF 'timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} > "$LOG" 2>&1 || RC=$?' \
+        /tmp/post-plan-fleet-runner-1901.sh \
+        || fail "runner-line-hand-started: runner lacks the post-plan-now line"
+    grep -qxF "ALLOW_TEST_ONLY_ARG=''" /tmp/post-plan-fleet-runner-1901.sh \
+        || fail "runner-line-hand-started: header lacks ALLOW_TEST_ONLY_ARG=''"
+    grep -qxF "STATE_CHANGED_ARG=''" /tmp/post-plan-fleet-runner-1901.sh \
+        || fail "runner-line-hand-started: header lacks STATE_CHANGED_ARG=''"
+    grep -qE '^ALLOW_TEST_ONLY_ARG=.*--allow-test-only' /tmp/post-plan-fleet-runner-1901.sh \
+        && fail "runner-line-hand-started: a hand-started runner carries --allow-test-only"
+else
+    fail "runner-line-hand-started: no runner to inspect"
+fi
+end_case runner-line-hand-started
+
+# The runner's DISCORD_DM= line: a set seam lands verbatim, an empty one falls back to
+# bin/discord-dm, and the declare -f injection of ljob_dm_ready survives.
+begin_case
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+POST_PLAN_FLEET_DISCORD_DM="$SCRATCH/dm-stub" POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
+    POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 1901 >/dev/null 2>&1
+grep -qxF "DISCORD_DM=$SCRATCH/dm-stub" /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "dm-seam-runner-line: a set seam did not land as DISCORD_DM=$SCRATCH/dm-stub"
+grep -qx 'ljob_dm_ready () ' /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "dm-seam-runner-line: runner lacks the injected ljob_dm_ready"
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+POST_PLAN_FLEET_DISCORD_DM='' POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
+    POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 1901 >/dev/null 2>&1
+grep -qE '^DISCORD_DM=.*/bin/discord-dm$' /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "dm-seam-runner-line: an empty seam did not fall back to bin/discord-dm"
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+clean_slots
+end_case dm-seam-runner-line
+
+# --allow-test-only bakes the flag into the runner header; the stub sees it as an argument.
+# Evaluates only the header assignment plus the timeout line, so no launchd or DM is involved.
+_allow_stub_run() {  # $1 = runner path, $2 = stub argv output file
+    local runner="$1" out="$2" stub="$SCRATCH/allow-stub"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" > %q\n' "$out" > "$stub"
+    chmod +x "$stub"
+    ( ROOT=/tmp PR=1901 LOG=/dev/null RC=0 POST_PLAN_NOW_BIN="$stub"
+      eval "$(grep -E '^(ALLOW_TEST_ONLY_ARG|STATE_CHANGED_ARG)=' "$runner")"
+      eval "$(grep -E '^timeout 5400 ' "$runner" | sed 's/^timeout 5400 //')" ) 2>/dev/null
+}
+begin_case
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 1901 --allow-test-only 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "runner-header-allow-test-only: --go exited $rc (out: $out)"
+grep -qxF 'ALLOW_TEST_ONLY_ARG=--allow-test-only' /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "runner-header-allow-test-only: header lacks ALLOW_TEST_ONLY_ARG=--allow-test-only"
+grep -qF -- '--foreground --allow-test-only' <<< "$out" \
+    || fail "runner-header-allow-test-only: dry-run invocation line lacks the flag: $out"
+_allow_stub_run /tmp/post-plan-fleet-runner-1901.sh "$SCRATCH/allow-argv"
+[[ "$(cat "$SCRATCH/allow-argv" 2>/dev/null)" == "--pr 1901 --foreground --allow-test-only" ]] \
+    || fail "runner-header-allow-test-only: stub saw '$(cat "$SCRATCH/allow-argv" 2>/dev/null)'"
+end_case runner-header-allow-test-only
+
+# Hand-started: exactly `--pr <n> --foreground`, with no empty-string argument.
+begin_case
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 1901 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "runner-stub-hand-started: --go exited $rc (out: $out)"
+_allow_stub_run /tmp/post-plan-fleet-runner-1901.sh "$SCRATCH/allow-argv"
+[[ "$(cat "$SCRATCH/allow-argv" 2>/dev/null)" == "--pr 1901 --foreground" ]] \
+    || fail "runner-stub-hand-started: stub saw '$(cat "$SCRATCH/allow-argv" 2>/dev/null)'"
+end_case runner-stub-hand-started
+
+begin_case
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver --allow-test-only=1 2>&1)"; rc=$?
+[[ $rc -eq 2 ]] || fail "allow-test-only-value-form-rejected: exit $rc, want 2"
+grep -qF 'ERROR: unknown flag: --allow-test-only=1' <<< "$out" \
+    || fail "allow-test-only-value-form-rejected: no unknown-flag error: $out"
+end_case allow-test-only-value-form-rejected
+
+# --state-changed-prs=<csv> bakes --state-changed into only the listed PRs' runners.
+begin_case
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-*.sh
+_sc_prs="$(jq -r '.[].number' "$SCRATCH/two-open.json" | paste -sd, -)"
+_sc_other="$(jq -r '.[].number' "$SCRATCH/two-open.json" | grep -vx 1901 | head -n 1)"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr-list "$_sc_prs" --allow-test-only --state-changed-prs=1901 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "runner-header-state-changed-prs: --go exited $rc (out: $out)"
+grep -qxF 'STATE_CHANGED_ARG=--state-changed' /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "runner-header-state-changed-prs: 1901 header lacks STATE_CHANGED_ARG=--state-changed"
+grep -qxF "STATE_CHANGED_ARG=''" "/tmp/post-plan-fleet-runner-${_sc_other}.sh" 2>/dev/null \
+    || fail "runner-header-state-changed-prs: PR ${_sc_other} header lacks STATE_CHANGED_ARG=''"
+grep -E '^DRY\(invocation\) PR #1901:' <<< "$out" | grep -qE -- '--foreground --allow-test-only --state-changed$' \
+    || fail "runner-header-state-changed-prs: 1901 dry-run line does not end with the flags: $out"
+grep -E "^DRY\(invocation\) PR #${_sc_other}:" <<< "$out" | grep -qF -- '--state-changed' \
+    && fail "runner-header-state-changed-prs: PR ${_sc_other} dry-run line carries --state-changed"
+_allow_stub_run /tmp/post-plan-fleet-runner-1901.sh "$SCRATCH/allow-argv"
+[[ "$(cat "$SCRATCH/allow-argv" 2>/dev/null)" == "--pr 1901 --foreground --allow-test-only --state-changed" ]] \
+    || fail "runner-header-state-changed-prs: stub saw '$(cat "$SCRATCH/allow-argv" 2>/dev/null)'"
+rm -f /tmp/post-plan-fleet-runner-*.sh
+clean_slots
+end_case runner-header-state-changed-prs
+
+# Equals form only; every malformed value or form exits 2 with ERROR: and writes no runner.
+begin_case
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-*.sh
+for _sc_form in "--state-changed-prs 1901" "--state-changed-prs=" "--state-changed-prs=19a1" "--state-changed-prs=1901," "--state-changed"; do
+    # shellcheck disable=SC2086
+    out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 1901 $_sc_form 2>&1)"; rc=$?
+    [[ $rc -eq 2 ]] || fail "state-changed-prs-rejected-forms: '$_sc_form' exit $rc, want 2 (out: $out)"
+    grep -qF 'ERROR:' <<< "$out" || fail "state-changed-prs-rejected-forms: '$_sc_form' printed no ERROR: $out"
+    grep -qF -- '--state-changed' <<< "$out" || fail "state-changed-prs-rejected-forms: '$_sc_form' error does not name the flag: $out"
+    [[ ! -e /tmp/post-plan-fleet-runner-1901.sh ]] || fail "state-changed-prs-rejected-forms: '$_sc_form' wrote a runner"
+done
+end_case state-changed-prs-rejected-forms
+
 # --- case 6.5: session re-fire — sidecar holds SECOND uuid, not first (sweep-ordering) ----
 begin_case
 clean_slots
@@ -312,6 +431,29 @@ grep -q 'already running' <<< "$out"  && fail "PR 19011's label wrongly suppress
 grep -qE '1901 +branch-one +WT +WOULD FIRE' <<< "$out" || fail "PR 1901 should fire with PRE=WT (out: $out)"
 clear_live_labels
 end_case label-anchor
+
+# --- case 10b: post-plan-now in flight for the same branch --------------------------------
+# A worktree-fired post-plan-now holds com.ibl5.postplan-now-<slug>-<ts>-<pid>. A fleet
+# rescue for the same branch would race it, so the fire loop must skip that PR.
+begin_case
+clean_slots
+set_live_labels "40477	0	com.ibl5.postplan-now-branch-one-20261003-120000-4242"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "inflight run exited $rc, want 0 (out: $out)"
+grep -q '1901 .*post-plan-now in flight' <<< "$out" \
+    || fail "PR 1901 fired despite a live postplan-now label (out: $out)"
+grep -qE '1902 +branch-two +WT +WOULD FIRE' <<< "$out" \
+    || fail "PR 1902 should still fire (out: $out)"
+# Anchor: a label for slug branch-one-extra must not suppress branch-one.
+clean_slots
+set_live_labels "40477	0	com.ibl5.postplan-now-branch-one-extra-20261003-120000-4242"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"
+grep -q 'post-plan-now in flight' <<< "$out" \
+    && fail "branch-one-extra label wrongly suppressed branch-one (out: $out)"
+grep -qE '1901 +branch-one +WT +WOULD FIRE' <<< "$out" \
+    || fail "PR 1901 should fire under the anchor fixture (out: $out)"
+clear_live_labels
+end_case postplan-now-inflight-skip
 
 # --- Phase 8 fixture setup ---------------------------------------------------------------
 # Shared fixtures for preflight/report cases.
@@ -435,6 +577,32 @@ grep -qE '2011.*SKIP' <<< "$out_fb" || \
     fail "preflight-grep-form: foo-bar-only WTL: PR 2011 (foo) should SKIP (out: $out_fb)"
 end_case preflight-grep-form
 
+# --- case 18b: explicit-pr-no-worktree-live ------------------------------------------------
+# An explicit --pr with no local worktree must SKIP (no worktree) on a live --go run, same as
+# the default path. Only a dry run (POST_PLAN_FLEET_DRY_RUN=1, fictional PR numbers) bypasses.
+begin_case
+clean_slots
+# The shared gh shim only answers `pr list`; swap in one that also answers `pr view`
+# (the live explicit-PR path calls it), then restore.
+cp "$SCRATCH/.local/bin/gh" "$SCRATCH/gh-shim-18b.bak"
+cat > "$SCRATCH/.local/bin/gh" <<'GH_EOF'
+#!/usr/bin/env bash
+printf '{"number":2090,"state":"OPEN","isDraft":false,"headRefName":"no-wt-branch-2090","author":{"login":"a-jay85"}}\n'
+GH_EOF
+out_live="$(run_driver --go --pr 2090 2>&1)"
+cp "$SCRATCH/gh-shim-18b.bak" "$SCRATCH/.local/bin/gh"
+grep -qE '2090.*SKIP \(no worktree\)' <<< "$out_live" || \
+    fail "explicit-pr-no-worktree-live: live --go --pr 2090 should SKIP (no worktree) (out: $out_live)"
+grep -qE '2090.*WOULD FIRE' <<< "$out_live" && \
+    fail "explicit-pr-no-worktree-live: live --go --pr 2090 must not be selected to fire (out: $out_live)"
+[[ "$(plist_count)" -eq 0 ]] || \
+    fail "explicit-pr-no-worktree-live: live run left a plist for a no-worktree PR"
+out_dry="$(POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 2090 2>&1)"
+grep -qE '2090.*WOULD FIRE' <<< "$out_dry" || \
+    fail "explicit-pr-no-worktree-live: dry run --pr 2090 should still bypass the worktree check (out: $out_dry)"
+clean_slots
+end_case explicit-pr-no-worktree-live
+
 # --- case 19: wait-dry-run-inert ---------------------------------------------------------
 # POST_PLAN_FLEET_DRY_RUN=1 skips the real wait block even with --wait --go:
 # no "waiting for" line, fast exit.
@@ -482,6 +650,26 @@ wait "$_wd_bg" 2>/dev/null
 grep -qE 'waiting for [0-9]+ session' <<< "$out_b" \
     || fail "wait-drains/B: never printed a 'waiting for N session(s)' line — the wait block did not wait (out: $out_b)"
 [[ "$(plist_count)" -eq 0 ]] || fail "wait-drains/B: drained to $(plist_count) plists, want 0"
+clear_live_labels
+clean_slots
+
+# Sub-case C — N changes 2 -> 1 -> 0; one timestamped line per distinct N.
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9998.plist"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
+set_live_labels "40476	0	com.ibl5.post-plan-fleet-9998" "40477	0	com.ibl5.post-plan-fleet-9999"
+( sleep 2; printf '40477\t0\tcom.ibl5.post-plan-fleet-9999\n' > "$SCRATCH/launchctl-list.txt"
+  sleep 3; : > "$SCRATCH/launchctl-list.txt" ) &
+_wd_bg=$!
+out_c="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 \
+         run_driver --go --wait 2>&1)"; rc_c=$?
+wait "$_wd_bg" 2>/dev/null
+[[ $rc_c -eq 0 ]] || fail "wait-drains/C: exit $rc_c (out: $out_c)"
+_ts_re='^\[[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\] waiting for [0-9]+ session\(s\) to finish'
+[[ "$(grep -c 'waiting for 2 session' <<< "$out_c")" == 1 ]] || fail "wait-drains/C: want one N=2 line (out: $out_c)"
+[[ "$(grep -c 'waiting for 1 session' <<< "$out_c")" == 1 ]] || fail "wait-drains/C: want one N=1 line (out: $out_c)"
+[[ "$(grep -c 'waiting for' <<< "$out_c")" == "$(grep -cE "$_ts_re" <<< "$out_c")" ]] \
+    || fail "wait-drains/C: a waiting line lacks the [YYYY-MM-DDTHH:MM:SS] prefix (out: $out_c)"
 clear_live_labels
 clean_slots
 end_case wait-drains
@@ -796,8 +984,8 @@ end_case stop-fails-closed
 
 # === DM-dispatch cases (driver slice, 37–52) =============================================
 # Shared setup: PR 9901 with headRefName=branch-live (already in WTL_FIXTURE at line 58),
-# a DM-capture stub, a caffeinate shim (strips -s + timeout SECS; execs the remainder),
-# and derive_status sourced from the driver for the cross-slice guards in cases 44 and 47.
+# a DM-capture stub, and derive_status sourced from the driver for the cross-slice
+# guards in cases 44 and 47.
 _DM_PR=9901
 _DM_JSON="$SCRATCH/dm-9901.json"
 cat > "$_DM_JSON" <<'DMJSON'
@@ -809,22 +997,18 @@ _DM_STUB="$SCRATCH/.local/bin/pr-ready-dm-capture"
 printf '#!/usr/bin/env bash\ncat >> "%s"\n' "$_DM_CAPTURE" > "$_DM_STUB"
 chmod +x "$_DM_STUB"
 
-# Shim: strip -s, then the 'timeout SECS' pair, then exec the remainder.  Avoids any
-# dependency on a system timeout binary when the runner is executed manually in tests.
-cat > "$SCRATCH/.local/bin/caffeinate" <<'CAFF'
-#!/usr/bin/env bash
-[ "${1:-}" = "-s" ] && shift
-if [ "${1:-}" = "timeout" ]; then shift; shift; fi
-exec "$@"
-CAFF
-chmod +x "$SCRATCH/.local/bin/caffeinate"
+# _assert_paste_line <case label>: a failure DM ends with the lead-in then the
+# main-checkout bin/postplan-fix line for this PR (last two lines of the capture).
+_assert_paste_line() {
+    [[ "$(tail -n 1 "$_DM_CAPTURE")" =~ /bin/postplan-fix\ ${_DM_PR}$ ]] \
+        || fail "$1: last line is not the postplan-fix paste line ($(tail -n 2 "$_DM_CAPTURE" 2>/dev/null))"
+    [[ "$(tail -n 2 "$_DM_CAPTURE" | head -n 1)" == "Or paste this to have Claude fix it:" ]] \
+        || fail "$1: line before the paste line is not the lead-in"
+}
 
 _DM_RUNNER="/tmp/post-plan-fleet-runner-${_DM_PR}.sh"
 _DM_LOG="/tmp/post-plan-fleet-${_DM_PR}.log"
-_DM_MARKER="/tmp/pr-ready-marker-${_DM_PR}.txt"
-TMP_LOGS+=("$_DM_CAPTURE" "$_DM_LOG" "$_DM_MARKER" "$_DM_RUNNER"
-           "/tmp/post-plan-fleet-prompt-${_DM_PR}.md"
-           "/tmp/pr-ready-commenturl-${_DM_PR}.txt")
+TMP_LOGS+=("$_DM_CAPTURE" "$_DM_LOG" "$_DM_RUNNER")
 
 # run_driver bakes POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" unconditionally via env; DM cases
 # need their own stubs, so they bypass run_driver and call the driver directly.
@@ -848,7 +1032,7 @@ eval "$(sed -n '/^derive_status()/,/^}/p' "$DRIVER")"
 
 # --- case 37: dm-fires-on-marker ----------------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs37="$SCRATCH/.local/bin/dm-cs-37"
 cat > "$_cs37" <<'STUB'
 #!/usr/bin/env bash
@@ -867,11 +1051,13 @@ _dm37_count="$(grep -c 'post-plan-fleet: PR #9901' "$_DM_CAPTURE" 2>/dev/null ||
     || fail "dm-fires-on-marker: expected 1 DM header, got $_dm37_count"
 grep -q 'RESULT READY' "$_DM_CAPTURE" \
     || fail "dm-fires-on-marker: DM missing 'RESULT READY'"
+! grep -q 'postplan-fix' "$_DM_CAPTURE" \
+    || fail "dm-ready: READY DM must not carry a paste line"
 end_case dm-fires-on-marker
 
 # --- case 38: dm-fires-on-stop-line -------------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs38="$SCRATCH/.local/bin/dm-cs-38"
 printf '#!/usr/bin/env bash\nprintf "STOP: xyzzy-test-stop-reason\n"\n' > "$_cs38"
 chmod +x "$_cs38"
@@ -885,11 +1071,12 @@ grep -q 'RESULT STOPPED' "$_DM_CAPTURE" \
     || fail "dm-fires-on-stop-line: DM not classified as STOPPED"
 grep -q 'xyzzy-test-stop-reason' "$_DM_CAPTURE" \
     || fail "dm-fires-on-stop-line: DM missing first STOP: line text"
+_assert_paste_line "dm-stopped"
 end_case dm-fires-on-stop-line
 
 # --- case 39: dm-fires-on-timeout ---------------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs39="$SCRATCH/.local/bin/dm-cs-39"
 printf '#!/usr/bin/env bash\nexit 124\n' > "$_cs39"
 chmod +x "$_cs39"
@@ -901,11 +1088,12 @@ HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
     || fail "dm-fires-on-timeout: no DM sent"
 grep -q 'TIMED OUT' "$_DM_CAPTURE" \
     || fail "dm-fires-on-timeout: DM not classified as timeout"
+_assert_paste_line "dm-timed-out"
 end_case dm-fires-on-timeout
 
 # --- case 40: dm-fires-on-nonzero-exit ---------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs40="$SCRATCH/.local/bin/dm-cs-40"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$_cs40"
 chmod +x "$_cs40"
@@ -917,11 +1105,30 @@ HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
     || fail "dm-fires-on-nonzero-exit: no DM sent"
 grep -q 'runner exited rc=1' "$_DM_CAPTURE" \
     || fail "dm-fires-on-nonzero-exit: DM missing crash classification"
+_assert_paste_line "dm-nonzero-exit"
 end_case dm-fires-on-nonzero-exit
+
+# --- case 40b: dm-runner-exited-rc7-paste-line --------------------------------------------
+# Pins the "runner exited rc="* glob: the one failure arm whose DM_VERDICT is built at run time.
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
+_cs40b="$SCRATCH/.local/bin/dm-cs-40b"
+printf '#!/usr/bin/env bash\nexit 7\n' > "$_cs40b"
+chmod +x "$_cs40b"
+POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+    POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_cs40b" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ -f "$_DM_CAPTURE" ]] \
+    || fail "dm-runner-exited-rc7: no DM sent"
+grep -q 'RESULT runner exited rc=7' "$_DM_CAPTURE" \
+    || fail "dm-runner-exited-rc7: DM missing 'RESULT runner exited rc=7' ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+_assert_paste_line "dm-runner-exited-rc7"
+end_case dm-runner-exited-rc7-paste-line
 
 # --- case 41: dm-undeliverable-is-not-fatal -----------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _dm41_stub="$SCRATCH/.local/bin/dm-41-undeliverable"
 printf '#!/usr/bin/env bash\ncat > /dev/null\nexit 1\n' > "$_dm41_stub"
 chmod +x "$_dm41_stub"
@@ -937,7 +1144,7 @@ end_case dm-undeliverable-is-not-fatal
 
 # --- case 42: dm-missing-binary-degrades --------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 # Sub-case a: non-existent path.
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     POST_PLAN_FLEET_DISCORD_DM="$SCRATCH/.local/bin/no-such-dm" POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" \
@@ -946,7 +1153,7 @@ _out42a="$(HOME="$SCRATCH" bash "$_DM_RUNNER" 2>&1 || true)"
 grep -q 'no executable discord-dm' <<< "$_out42a" \
     || fail "dm-missing-binary-degrades: non-existent path missing degrade message"
 # Sub-case b: existing but non-executable.
-rm -f "$_DM_LOG" "$_DM_MARKER"
+rm -f "$_DM_LOG"
 _dm42b="$SCRATCH/.local/bin/dm-42b-nonexec"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$_dm42b"
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
@@ -960,7 +1167,7 @@ end_case dm-missing-binary-degrades
 
 # --- case 43: dm-suppressed-by-no-dm -------------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" \
     run_dm_driver --go --no-dm >/dev/null 2>&1
@@ -971,7 +1178,7 @@ end_case dm-suppressed-by-no-dm
 
 # --- case 44: dm-does-not-pollute-status --------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs44="$SCRATCH/.local/bin/dm-cs-44"
 cat > "$_cs44" <<'STUB'
 #!/usr/bin/env bash
@@ -995,7 +1202,7 @@ end_case dm-unknown-flag-rejected
 
 # --- case 47: dm-marker-absent-rc0-no-stop ------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs47="$SCRATCH/.local/bin/dm-cs-47"
 printf '#!/usr/bin/env bash\nprintf "run completed without verdict\n"\n' > "$_cs47"
 chmod +x "$_cs47"
@@ -1011,7 +1218,7 @@ end_case dm-marker-absent-rc0-no-stop
 
 # --- case 48: dm-teardown-order-static ---------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER"
+clean_slots; rm -f "$_DM_LOG"
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" \
     run_dm_driver --go >/dev/null 2>&1
@@ -1030,16 +1237,17 @@ end_case dm-teardown-order-static
 # Writes stdin to <per-case run dir>/result.json, builds a claude stub that logs
 # `harness-run-dir=<dir>` plus the given RESULT: line, then runs driver + runner so the DM
 # lands in $_DM_CAPTURE. Same driver/runner invocation as cases 37–40.
-_dm_result_case() {  # $1 = case number, $2 = RESULT: line to log; stdin = result.json body
-    local n="$1" result_line="$2"
+_dm_result_case() {  # $1 = case number, $2 = RESULT: line to log; stdin = result.json body; $3 = stub exit code (default 0)
+    local n="$1" result_line="$2" exit_code="${3:-0}"
     local dir="$SCRATCH/harness-run-$n" stub="$SCRATCH/.local/bin/dm-cs-$n"
-    clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+    clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
     rm -rf "$dir"; mkdir -p "$dir"
     cat > "$dir/result.json"
     {
         printf '#!/usr/bin/env bash\n'
         printf 'echo %q\n' "harness-run-dir=$dir"
         printf 'echo %q\n' "$result_line"
+        printf 'exit %s\n' "$exit_code"
     } > "$stub"
     chmod +x "$stub"
     POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
@@ -1128,6 +1336,8 @@ RJSON
 [[ -f "$_DM_CAPTURE" ]] || fail "dm-held-terminal-reports-held: no DM sent"
 grep -q 'RESULT HELD' "$_DM_CAPTURE" \
     || fail "dm-held-terminal-reports-held: held READY not reported as HELD ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -q 'postplan-fix' "$_DM_CAPTURE" \
+    || fail "dm-held: HELD DM must not carry a paste line"
 grep -qx 'Fix:' "$_DM_CAPTURE" \
     || fail "dm-held-terminal-reports-held: HELD DM missing the Fix: header"
 grep -qF '• plan says auto_merge: false — review and merge by hand' "$_DM_CAPTURE" \
@@ -1194,7 +1404,7 @@ end_case dm-armed-empty-warning-silent
 # The run bailed (no verdict, rc!=0): post-plan-now's own lines become the Fix: block,
 # minus its postplan-rc=/harness-run-dir= bookkeeping.
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 printf '#!/usr/bin/env bash\nprintf "My [cool] PR\\thttps://github.com/o/r/pull/9901\\n"\n' \
     > "$SCRATCH/.local/bin/gh-title"
 chmod +x "$SCRATCH/.local/bin/gh-title"
@@ -1249,7 +1459,7 @@ end_case dm-malformed-result-json-falls-back
 # HELD. Case 52 exercises this incidentally (malformed JSON); this case exercises it
 # directly (no result.json path emitted at all).
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs53="$SCRATCH/.local/bin/dm-cs-53"
 printf '#!/usr/bin/env bash\nprintf "RESULT: terminal=shipped-held\n"\n' > "$_cs53"
 chmod +x "$_cs53"
@@ -1268,7 +1478,7 @@ end_case dm-held-fallback
 # HELD must not suppress a failing verdict. terminal=shipped-held with verdict_1=NOT READY
 # must report NOT READY, not HELD.
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs54_dir="$SCRATCH/harness-run-54"; mkdir -p "$_cs54_dir"
 printf '%s\n' '{"terminal":"shipped-held","fidelity":{"verdict_1":"NOT READY","verdict_2":null,"rounds":[],"reviewed_tree_2":null,"error_kind":null,"remediation_sha":null}}' \
     > "$_cs54_dir/result.json"
@@ -1286,6 +1496,7 @@ HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
 [[ -f "$_DM_CAPTURE" ]] || fail "dm-held-not-ready-unchanged: no DM sent"
 grep -q 'RESULT NOT READY' "$_DM_CAPTURE" \
     || fail "dm-held-not-ready-unchanged: held+NOT READY did not report NOT READY ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+_assert_paste_line "dm-not-ready"
 ! grep -q 'RESULT HELD' "$_DM_CAPTURE" \
     || fail "dm-held-not-ready-unchanged: HELD suppressed a failing verdict"
 end_case dm-held-not-ready-unchanged
@@ -1415,7 +1626,7 @@ grep -qF 'repo may be missing review assets' "$SCRIPT_DIR/../bin/post-plan-fleet
 end_case post-plan-fleet-digest-gate
 
 # --- case 19: E15 rebase delegate is never told to push ----------------------------------
-# The delegate packet runs under ~/.claude/hooks/plan-gate-commit.sh, which denies `git push`
+# The delegate packet runs under ~/.claude/hooks/bash-guard.sh (Check 22), which denies `git push`
 # for sub-agents. Any positive push instruction in the packet is an instant hard-fail.
 begin_case
 REBASE="$SCRIPT_DIR/../.claude/review-shared/_rebase-and-conflicts.md"
@@ -1477,6 +1688,12 @@ grep -qF 'names the proof command that was run in this step' "$SCRIPT_DIR/../.cl
 # Removing the 4c sub-clause makes this fail.
 grep -qF 'not decidable from the diff' "$SCRIPT_DIR/../.claude/review-shared/_plan-fidelity-review.md" \
   || fail "27g: _plan-fidelity-review.md lost 'not decidable from the diff' — #669 reader-side 4c carve-out removed"
+# 27h: backlog #1237 — _plan-fidelity-review.md 6d.4d omitted-behaviors check and its
+# non-blocking verdict. Removing the 4d heading or its note-not-blocker sentence makes this fail.
+grep -qF 'Omitted behaviors within a named file' "$SCRIPT_DIR/../.claude/review-shared/_plan-fidelity-review.md" \
+  || fail "27h: _plan-fidelity-review.md lost 'Omitted behaviors within a named file' — 4d omitted-behaviors check removed"
+grep -qF 'never `NOT READY`' "$SCRIPT_DIR/../.claude/review-shared/_plan-fidelity-review.md" \
+  || fail "27h: _plan-fidelity-review.md lost 'never \`NOT READY\`' — 4d non-blocking verdict removed"
 end_case e22-e23-prevention-prose-pins
 
 # --- case 28 (pr-ready skill block): merge-digest extraction + body shape ---
@@ -1694,7 +1911,9 @@ f=".claude/skills/post-plan/SKILL.md"
 grep -qF '.claude/review-shared/_prose-voice-contract.md' "$f" \
     || fail "28t: voice-contract Read instruction missing from post-plan SKILL.md"
 n_cdp=$(grep -cF 'bin/check-digest-prose' "$f" || true)
-[[ $n_cdp -ge 4 ]] || fail "28t: expected >=4 bin/check-digest-prose call sites in post-plan SKILL.md, got $n_cdp"
+# 3 sites: Scope why-paragraph, its follow-on paragraph, and the four narrative elements.
+# The Reviewer verification voice check went away with that section.
+[[ $n_cdp -ge 3 ]] || fail "28t: expected >=3 bin/check-digest-prose call sites in post-plan SKILL.md, got $n_cdp"
 grep -qF '.claude/skills/review-shared/' "$f" \
     && fail "28t: post-plan SKILL.md cites the non-existent .claude/skills/review-shared/ path"
 
@@ -1811,23 +2030,7 @@ end_case pr-ready-merge-digest-shape
 # === Marker-parse and prose-pin cases (skill slice, 28–38) ===============================
 _PRD="$SCRIPT_DIR/../.claude/review-shared"
 _VM_PR=8801
-TMP_LOGS+=("/tmp/pr-ready-marker-${_VM_PR}.txt"
-           "/tmp/pr-ready-commenturl-${_VM_PR}.txt"
-           "/tmp/pr-ready-holdsout-${_VM_PR}.txt")
-
-# --- case 31: verdict-marker-line-not-misclassified ---------------------------------------
-# Cross-slice guard: the marker line starts with 'P', which must NOT match
-# derive_status's READY pattern (^[[:space:]>*_`-]*READY). If someone widens the
-# sentinel prefix to start with "READY|...", this case fails immediately.
-begin_case
-_log31="/tmp/pr-ready-test-marker-classify-$$.log"
-TMP_LOGS+=("$_log31")
-printf 'PR-READY-VERDICT-MARKER-V1|pr=%s|verdict=READY|url=-|holds=none\n' \
-    "$_VM_PR" > "$_log31"
-_st31="$(derive_status "$_log31")"
-[[ "$_st31" == "NOT READY" ]] \
-    || fail "verdict-marker-line-not-misclassified: derive_status='$_st31' on marker-only log, want 'NOT READY' — sentinel leaked into READY pattern"
-end_case verdict-marker-line-not-misclassified
+TMP_LOGS+=("/tmp/pr-ready-holdsout-${_VM_PR}.txt")
 
 # --- case 35: no-command-substitution-after-worktree -------------------------------------
 begin_case
@@ -2223,6 +2426,27 @@ grep -qF '**Reviewed tree:**' ".claude/review-shared/_phase7-verdict.md" \
     || fail "_phase7-verdict.md missing Reviewed-tree contract line (skip-review.sh match target)"
 end_case "skip-review-delta-row 30"
 
+# --- case: Phase 5.5 carry-forward gate companion assertions -----------------------------
+begin_case
+P55=".claude/skills/post-plan/_phase-5.5-fidelity.md"
+# The probe is pinned to master (same shape as _phase-4-review-audit.md), never the worktree copy.
+grep -qF 'git show <MASTER_SHA>:.claude/review-shared/scripts/skip-review.sh' "$P55" \
+    || fail "_phase-5.5-fidelity.md probe not pinned to git show <MASTER_SHA>: skip-review.sh"
+# Block markers bin/test-postplan-arm-conditions extracts by name.
+for marker in 'carry-forward probe' 'carry-forward decision' 'carry-forward materialise'; do
+    grep -qF "# phase 5.5 $marker" "$P55" \
+        || fail "_phase-5.5-fidelity.md missing block marker '# phase 5.5 $marker'"
+done
+grep -qF '**Plan hash:**' "$P55" || fail "_phase-5.5-fidelity.md missing **Plan hash:** label"
+# The harness writes the same label, so the two engines can read each other's stickies.
+grep -qF '**Plan hash:**' tools/postplan-harness/harness/fidelity.py \
+    || fail "fidelity.py no longer writes the **Plan hash:** label"
+grep -qF '**Carried forward:**' "$P55" || fail "_phase-5.5-fidelity.md missing **Carried forward:** line"
+# The digest awk stops at a horizontal rule, scoped to the digest span (hr-stop).
+grep -qF 'in_digest && /^---$/' "$PRD_SR/scripts/skip-review.sh" \
+    || fail "skip-review.sh digest awk lost its hr-stop rule"
+end_case skip-review-phase55-carry-forward
+
 # --- case: review-owed.sh decision ladder ------------------------------------------------
 # Exercises .claude/review-shared/scripts/review-owed.sh through its --sticky-file and
 # --current-tree seams, with a logging stub standing in for bin/pr-review-now.
@@ -2462,27 +2686,139 @@ HOME="$SCRATCH" POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-
 rm -f "$_plist_tmp"
 end_case plist-shape-dry-run
 
-# --- 6c.3: absent result.json produces a hold (static assertion) -------------------------
-begin_case
-# The script must guard on result.json existence before reading it.
-grep -qE '\[ -f.*result\.json' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.3 absent: post-plan-fleet missing [ -f ...result.json ] existence guard — absent file would abort"
-# An absent result produces 'unconfirmed' (holds the PR, never emits READY).
-grep -qF 'unconfirmed' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.3 absent: 'unconfirmed' verdict absent — absent result not treated as a hold"
-# A null latest-round verdict must block the RESULT: fallback (never borrow a stale word).
-grep -qF '[ -z "$latest_unconfirmed" ]' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.3 absent: RESULT fallback not gated on latest_unconfirmed — null verdict_2 would fall back"
-end_case result-absent-holds
+# _dm_hold_case: _dm_result_case's sibling for the hold fixtures. result.json may be
+# absent or garbage and the RESULT: line is optional. A counting DM stub writes one
+# @@DM@@ line per dispatch so a case can assert exactly one DM.
+_HOLD_DM_STUB="$SCRATCH/.local/bin/dm-hold-capture"
+printf '#!/usr/bin/env bash\necho "@@DM@@" >> "%s"\ncat >> "%s"\n' \
+    "$_DM_CAPTURE" "$_DM_CAPTURE" > "$_HOLD_DM_STUB"
+chmod +x "$_HOLD_DM_STUB"
+_HOLD_PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-${_DM_PR}.plist"
+_dm_hold_case() {  # $1 arm id, $2 absent|garbage, $3 RESULT: line or "", $4 bash flag or ""
+    local n="$1" mode="$2" result_line="$3" bflag="${4:-}"
+    local dir="$SCRATCH/harness-run-$n" stub="$SCRATCH/.local/bin/dm-cs-$n"
+    clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE" "$_DM_RUNNER"
+    rm -rf "$dir"; mkdir -p "$dir"
+    if [ "$mode" = garbage ]; then printf 'not json {{{\n' > "$dir/result.json"; fi
+    {
+        printf '#!/usr/bin/env bash\n'
+        printf 'echo %q\n' "harness-run-dir=$dir"
+        if [ -n "$result_line" ]; then printf 'echo %q\n' "$result_line"; fi
+    } > "$stub"
+    chmod +x "$stub"
+    POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+        POST_PLAN_FLEET_DISCORD_DM="$_HOLD_DM_STUB" POST_PLAN_FLEET_CLAUDE="$stub" \
+        run_dm_driver --go >/dev/null 2>&1
+    [[ -f "$_DM_RUNNER" ]] || fail "$n: driver generated no runner at $_DM_RUNNER"
+    [[ -f "$_HOLD_PLIST" ]] || fail "$n: precondition: no plist at $_HOLD_PLIST before the run"
+    HOME="$SCRATCH" bash $bflag "$_DM_RUNNER" >/dev/null 2>&1 || true
+}
+# _assert_hold: the shared hold contract for 6c.3 / 6c.4 arms.
+_assert_hold() {  # $1 = case label
+    local c="$1" dms
+    dms=$(grep -c '^@@DM@@$' "$_DM_CAPTURE" 2>/dev/null || true)
+    [[ "$dms" == 1 ]] || fail "$c: want exactly one DM, got '${dms:-0}'"
+    grep -qF 'RESULT unconfirmed' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "$c: DM lacks 'RESULT unconfirmed' ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+    grep -qF 'no verdict marker' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "$c: DM lacks 'no verdict marker'"
+    _assert_paste_line "$c"
+    ! grep -qF 'RESULT READY' "$_DM_CAPTURE" 2>/dev/null || fail "$c: DM says RESULT READY"
+    ! grep -qF "merge when you're ready" "$_DM_CAPTURE" 2>/dev/null \
+        || fail "$c: DM says merge when you're ready"
+    grep -qxF 'post-plan-fleet: outcome=failed' "$_DM_LOG" 2>/dev/null \
+        || fail "$c: log lacks 'post-plan-fleet: outcome=failed' ($(grep 'outcome=' "$_DM_LOG" 2>/dev/null))"
+    [[ ! -f "$_HOLD_PLIST" ]] || fail "$c: plist not removed (slot leaked)"
+}
 
-# --- 6c.4: unparseable result.json produces a hold (static assertion) --------------------
+# --- 6c.3: absent result.json produces a hold (behavioral) ------------------------------
+# Real runner path: run dir exists, result.json missing, no RESULT: line -> unconfirmed hold.
 begin_case
-# The verdict extraction must be guarded so a parse failure does not propagate non-zero.
-grep -qF 'import json' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.4 unparseable: no python3 json parse of result.json — parse missing entirely"
-grep -qF 'result.json" 2>/dev/null || true)' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.4 unparseable: result.json parse not guarded by '|| true' — malformed JSON would abort"
+_dm_hold_case 63a absent ''
+_assert_hold result-absent-holds
+end_case result-absent-holds
+# Fallback arm: same absent file plus RESULT: terminal=shipped-armed -> READY. Proves the
+# hold above comes from the missing signal and is not a blanket reject.
+begin_case
+_dm_hold_case 63b absent 'RESULT: terminal=shipped-armed'
+grep -qF 'RESULT READY' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "result-absent-fallback-ready: DM lacks RESULT READY ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+grep -qxF 'post-plan-fleet: outcome=shipped' "$_DM_LOG" 2>/dev/null \
+    || fail "result-absent-fallback-ready: log lacks outcome=shipped"
+end_case result-absent-fallback-ready
+
+# --- 6c.4: unparseable result.json produces a hold (behavioral) -------------------------
+# Garbage result.json, no RESULT: line. Case 52 owns garbage-plus-RESULT (fallback works).
+begin_case
+_dm_hold_case 64a garbage ''
+_assert_hold result-unparseable-holds
 end_case result-unparseable-holds
+# Strict arm: under bash -e the '|| true' parse guards become observable. Positive
+# control first: bash -e must not break the runner on a fallback-READY fixture.
+begin_case
+_dm_hold_case 64c absent 'RESULT: terminal=shipped-armed' -e
+if grep -qF 'RESULT READY' "$_DM_CAPTURE" 2>/dev/null; then
+    _dm_hold_case 64s garbage '' -e
+    _assert_hold result-unparseable-strict-holds
+else
+    echo "SKIP: result-unparseable-strict-holds: runner is not bash -e clean (control gave no READY)" >&2
+fi
+end_case result-unparseable-strict-holds
+
+# --- 6c.5: runner timeout fires for real (behavioral) -----------------------------------
+# Cases 39 and fleet-outcome-line fake rc=124 with a stub that exits 124. This case drives
+# the REAL timeout binary: the generated runner's 'timeout 5400' becomes 'timeout 1' and
+# the stub sleeps 30 s, so timeout kills it and rc=124 arises naturally.
+_dm_timeout_arm() {  # $1 = arm id, $2 = stub body line; sets _T_ELAPSED
+    local n="$1" body="$2" t0
+    local stub="$SCRATCH/.local/bin/dm-cs-$n"
+    clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE" "$_DM_RUNNER"
+    printf '#!/usr/bin/env bash\n%s\n' "$body" > "$stub"; chmod +x "$stub"
+    POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+        POST_PLAN_FLEET_DISCORD_DM="$_HOLD_DM_STUB" POST_PLAN_FLEET_CLAUDE="$stub" \
+        run_dm_driver --go >/dev/null 2>&1
+    grep -qF 'timeout 5400 ' "$_DM_RUNNER" 2>/dev/null \
+        || fail "$n: precondition: generated runner has no 'timeout 5400 ' literal"
+    sed 's/timeout 5400 /timeout 1 /' "$_DM_RUNNER" > "$_DM_RUNNER.t1" \
+        && mv "$_DM_RUNNER.t1" "$_DM_RUNNER"
+    grep -qF 'timeout 1 ' "$_DM_RUNNER" || fail "$n: sed rewrite to 'timeout 1 ' did not take"
+    t0=$SECONDS
+    HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+    _T_ELAPSED=$((SECONDS - t0))
+}
+if ! command -v timeout >/dev/null 2>&1; then
+    echo "SKIP: runner-real-timeout + runner-fast-exit-no-timeout: no 'timeout' on PATH (brew install coreutils)" >&2
+else
+    begin_case
+    _dm_timeout_arm 65t 'exec sleep 30'
+    grep -qxF 'post-plan-now: TIMED OUT after 90m (rc=124)' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-real-timeout: log lacks the TIMED OUT rc=124 line ($(cat "$_DM_LOG" 2>/dev/null))"
+    grep -qxF 'post-plan-fleet: outcome=timed-out' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-real-timeout: log lacks 'post-plan-fleet: outcome=timed-out'"
+    _t_dms=$(grep -c '^@@DM@@$' "$_DM_CAPTURE" 2>/dev/null || true)
+    [[ "$_t_dms" == 1 ]] || fail "runner-real-timeout: want exactly one DM, got '${_t_dms:-0}'"
+    grep -qF 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-real-timeout: DM lacks TIMED OUT ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+    [[ ! -f "$_HOLD_PLIST" ]] || fail "runner-real-timeout: plist not removed (slot leaked)"
+    (( _T_ELAPSED <= 10 )) \
+        || fail "runner-real-timeout: runner took ${_T_ELAPSED}s; the 1 s timeout never fired"
+    end_case runner-real-timeout
+
+    # Negative control: same sed rewrite, stub exits 0 at once -> no timeout path at all.
+    begin_case
+    _dm_timeout_arm 65f 'exit 0'
+    ! grep -qF 'TIMED OUT' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-exit-no-timeout: log says TIMED OUT for a fast stub"
+    ! grep -qF 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-fast-exit-no-timeout: DM says TIMED OUT for a fast stub"
+    grep -qxF 'post-plan-fleet: outcome=failed' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-exit-no-timeout: want outcome=failed ($(grep 'outcome=' "$_DM_LOG" 2>/dev/null))"
+    grep -qxF 'post-plan-fleet: reason=no-result' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-exit-no-timeout: want reason=no-result ($(grep 'reason=' "$_DM_LOG" 2>/dev/null))"
+    _f_dms=$(grep -c '^@@DM@@$' "$_DM_CAPTURE" 2>/dev/null || true)
+    [[ "$_f_dms" == 1 ]] || fail "runner-fast-exit-no-timeout: want exactly one DM, got '${_f_dms:-0}'"
+    end_case runner-fast-exit-no-timeout
+fi
 
 # --- wait-timeout-exits-nonzero ----------------------------------------------------------
 # A held slot that never drains drives the wait block to its ceiling, which must:
@@ -2496,11 +2832,13 @@ mkdir -p "$SCRATCH/Library/LaunchAgents"
 : > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
 set_live_labels "40477	0	com.ibl5.post-plan-fleet-9999"
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
-       POST_PLAN_FLEET_CEILING=2 POST_PLAN_FLEET_WAIT_POLL=1 \
+       POST_PLAN_FLEET_CEILING=3 POST_PLAN_FLEET_WAIT_POLL=1 \
        run_driver --go --wait 2>&1)"; rc=$?
 [[ $rc -eq 1 ]] || fail "wait-timeout-exits-nonzero: exit $rc, want 1 (out: $out)"
 grep -qF 'TIMED OUT waiting for' <<< "$out" || \
     fail "wait-timeout-exits-nonzero: TIMED OUT text missing (out: $out)"
+[[ "$(grep -c 'waiting for 1 session(s) to finish' <<< "$out")" == 1 ]] \
+    || fail "wait-timeout-exits-nonzero: unchanged N printed more than once (out: $out)"
 _rpath="$(echo "$out" | tail -1)"
 [[ -f "$_rpath" ]] || fail "wait-timeout-exits-nonzero: report not written (last line: $_rpath)"
 [[ "$_rpath" == *pr-firstpass-*.md ]] || fail "wait-timeout-exits-nonzero: last line is not a report path: $_rpath"
@@ -2592,28 +2930,71 @@ rm -f "$_apf_e" "$_apf_pr" "$_plist_301"
 end_case auth-probe-false
 
 # --- case: fleet-outcome-line ------------------------------------------------------------
-# Each run writes one `post-plan-fleet: outcome=<word>` line that bin/pr-cycle counts.
-# shipped-armed -> shipped, shipped-held -> held, anything else -> blocked, rc 124 -> timed-out.
+# Each run writes one `post-plan-fleet: outcome=<word>` line that bin/pr-cycle counts, plus a
+# `post-plan-fleet: reason=<short>` line. Words: shipped, held, declined, paused, conflict,
+# failed, and timed-out (rc 124).
 begin_case
 _outcome_of() { grep -m1 '^post-plan-fleet: outcome=' "$_DM_LOG" 2>/dev/null | cut -d= -f2; }
+_reason_of() { grep -m1 '^post-plan-fleet: reason=' "$_DM_LOG" 2>/dev/null | cut -d= -f2-; }
 _dm_result_case 91 'RESULT: terminal=shipped-armed' <<< '{"terminal": "shipped-armed"}'
 [[ "$(_outcome_of)" == shipped ]] || fail "fleet-outcome-line: shipped-armed gave '$(_outcome_of)'"
+! grep -q '^post-plan-fleet: reason=' "$_DM_LOG" || fail "fleet-outcome-line: shipped-armed w/o PR printed a reason"
 _dm_result_case 92 'RESULT: terminal=shipped-held' <<< '{"terminal": "shipped-held"}'
 [[ "$(_outcome_of)" == held ]] || fail "fleet-outcome-line: shipped-held gave '$(_outcome_of)'"
+! grep -q '^post-plan-fleet: reason=' "$_DM_LOG" || fail "fleet-outcome-line: shipped-held w/o PR printed a reason"
 _dm_result_case 93 'RESULT: post-plan BLOCKED terminal=failed' <<< '{"terminal": "failed"}'
-[[ "$(_outcome_of)" == blocked ]] || fail "fleet-outcome-line: failed gave '$(_outcome_of)'"
+[[ "$(_outcome_of)" == failed ]] || fail "fleet-outcome-line: failed gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == 'terminal=failed' ]] || fail "fleet-outcome-line: failed reason '$(_reason_of)'"
 # An unparseable result.json falls back to the RESULT: line.
 _dm_result_case 94 'RESULT: post-plan complete terminal=shipped-held' <<< 'not json'
 [[ "$(_outcome_of)" == held ]] || fail "fleet-outcome-line: RESULT-line fallback gave '$(_outcome_of)'"
+_dm_result_case 95 'RESULT: post-plan DECLINED — held twice on the same reason and nothing changed since; rerun with FORCE=1' <<< '{}'
+[[ "$(_outcome_of)" == declined ]] || fail "fleet-outcome-line: DECLINED gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == holdrepeat ]] || fail "fleet-outcome-line: DECLINED reason '$(_reason_of)'"
+_dm_result_case 96 'RESULT: post-plan PAUSED at retrospective (usage gate); resumes automatically' <<< '{}'
+[[ "$(_outcome_of)" == paused ]] || fail "fleet-outcome-line: PAUSED gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == usage-gate ]] || fail "fleet-outcome-line: PAUSED reason '$(_reason_of)'"
+grep -qF 'resumes on its own' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: PAUSED DM lacks the no-action hint ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+_dm_result_case 97 $'RESULT: post-plan BLOCKED terminal=failed\npost-plan-now: postplan-rc=75 harness-rc=75' 75 <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == paused ]] || fail "fleet-outcome-line: postplan-rc=75 gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == usage-gate ]] || fail "fleet-outcome-line: postplan-rc=75 reason '$(_reason_of)'"
+grep -qF 'PAUSED (usage gate)' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: postplan-rc=75 DM lacks PAUSED ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -qF 'runner exited' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: postplan-rc=75 DM still says runner exited"
+_dm_result_case 98 'RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed, no PR opened. rebase-conflict: tree proof failed: 17a18 > 2 2 .claude/rules/codebase-map.md 35d35 < 3 3 .claude/rules/codebase-map.md TREE DIVERGED' <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == conflict ]] || fail "fleet-outcome-line: tree-proof conflict gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == '.claude/rules/codebase-map.md' ]] || fail "fleet-outcome-line: conflict reason '$(_reason_of)'"
+_dm_result_case 99 'RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed. rebase-conflict: tree proof failed: 3a4 > 1 1 ibl5/modules/Player/index.php 9d9 < 2 2 .claude/rules/codebase-map.md TREE DIVERGED' <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == conflict ]] || fail "fleet-outcome-line: multi-path conflict gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == 'ibl5/modules/Player/index.php .claude/rules/codebase-map.md' ]] \
+    || fail "fleet-outcome-line: multi-path conflict reason '$(_reason_of)'"
+_dm_result_case 100 'RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed. rebase-conflict: rebase --continue failed: Rebasing (2/14) error: could not apply 25aafa14c... x' <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == conflict ]] || fail "fleet-outcome-line: rebase-continue conflict gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == rebase-continue-failed ]] || fail "fleet-outcome-line: rebase-continue reason '$(_reason_of)'"
+_dm_result_case 101 'RESULT: post-plan BLOCKED — lost-work proof failed on re-rebase; ERROR terminal=failed kind=lostwork-unproved PR #2876' <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == failed ]] || fail "fleet-outcome-line: lostwork gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == lostwork-unproved ]] || fail "fleet-outcome-line: lostwork reason '$(_reason_of)'"
+_dm_result_case 102 'RESULT: post-plan complete — terminal=shipped-armed auto-merge=armed PR #2801' <<< '{"terminal": "shipped-armed"}'
+[[ "$(_outcome_of)" == shipped ]] || fail "fleet-outcome-line: shipped w/ PR gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == 'PR #2801' ]] || fail "fleet-outcome-line: shipped reason '$(_reason_of)'"
+_dm_result_case 103 'RESULT: post-plan complete — terminal=shipped-held auto-merge=HELD (human merges) PR #2802' <<< '{"terminal": "shipped-held"}'
+[[ "$(_outcome_of)" == held ]] || fail "fleet-outcome-line: held w/ PR gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == 'PR #2802' ]] || fail "fleet-outcome-line: held reason '$(_reason_of)'"
+_dm_result_case 104 'RESULT: something unexpected' <<< 'not json'
+[[ "$(_outcome_of)" == failed ]] || fail "fleet-outcome-line: unexpected gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == no-result ]] || fail "fleet-outcome-line: unexpected reason '$(_reason_of)'"
 # rc 124 is what `timeout` returns on expiry.
 _to_stub="$SCRATCH/.local/bin/dm-cs-timeout"
 printf '#!/usr/bin/env bash\nexit 124\n' > "$_to_stub"; chmod +x "$_to_stub"
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_to_stub" \
     run_dm_driver --go >/dev/null 2>&1
 HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
 [[ "$(_outcome_of)" == timed-out ]] || fail "fleet-outcome-line: rc 124 gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == timeout ]] || fail "fleet-outcome-line: rc 124 reason '$(_reason_of)'"
 grep -q 'TIMED OUT after 90m' "$_DM_LOG" || fail "fleet-outcome-line: rc 124 log lacks TIMED OUT"
 grep -q 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
     || fail "fleet-outcome-line: rc 124 DM lacks TIMED OUT ($(cat "$_DM_CAPTURE" 2>/dev/null))"

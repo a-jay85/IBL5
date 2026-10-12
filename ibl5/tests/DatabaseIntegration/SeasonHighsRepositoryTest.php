@@ -38,7 +38,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
             '2098-01-31',
         );
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('name', $first);
         self::assertArrayHasKey('date', $first);
@@ -63,7 +63,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
             '2098-01-31',
         );
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('name', $first);
         self::assertArrayHasKey('value', $first);
@@ -175,7 +175,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('ASSISTS', $result);
 
         // POINTS leader is player one (12*2 + 8 + 4*3 = 44)
-        self::assertNotEmpty($result['POINTS']);
+        self::assertNotSame([], $result['POINTS']);
         self::assertSame('Batch Test One', $result['POINTS'][0]['name']);
         self::assertSame(44, $result['POINTS'][0]['value']);
         self::assertArrayHasKey('pid', $result['POINTS'][0]);
@@ -183,7 +183,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('gameOfThatDay', $result['POINTS'][0]);
 
         // ASSISTS leader is player two
-        self::assertNotEmpty($result['ASSISTS']);
+        self::assertNotSame([], $result['ASSISTS']);
         self::assertSame('Batch Test Two', $result['ASSISTS'][0]['name']);
         self::assertSame(15, $result['ASSISTS'][0]['value']);
     }
@@ -278,7 +278,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getRcbSeasonHighs(2098, 'home');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertSame('pts', $first['stat_category']);
         self::assertSame(1, $first['ranking']);
@@ -291,5 +291,46 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getRcbSeasonHighs(9999, 'home');
 
         self::assertSame([], $result);
+    }
+
+    private function insertRcbSeasonTie(): void
+    {
+        $base = [
+            'season_year' => 2098,
+            'scope' => 'league',
+            'context' => 'home',
+            'stat_category' => 'pts',
+            'ranking' => 10,
+            'stat_value' => 50,
+            'record_season_year' => 2098,
+        ];
+        $idA = $this->insertRow('ibl_rcb_season_records', $base + ['teamid' => 27, 'player_name' => 'Rcb Tie A']);
+        $idB = $this->insertRow('ibl_rcb_season_records', $base + ['teamid' => 28, 'player_name' => 'Rcb Tie B']);
+        self::assertLessThan($idB, $idA, 'season record ids must be strictly ascending');
+    }
+
+    public function testGetRcbSeasonHighsBreaksCrossTeamRankingTieById(): void
+    {
+        $this->insertRcbSeasonTie();
+
+        $rows = array_values(array_filter(
+            $this->repo->getRcbSeasonHighs(2098, 'home'),
+            static fn (array $row): bool => $row['stat_category'] === 'pts' && $row['ranking'] === 10,
+        ));
+
+        // The return shape carries no id, so name order stands in for id order.
+        self::assertSame(
+            ['Rcb Tie A', 'Rcb Tie B'],
+            array_map(static fn (array $row): string => $row['player_name'], $rows),
+        );
+    }
+
+    public function testGetRcbSeasonHighsExcludesOtherContext(): void
+    {
+        $this->insertRcbSeasonTie();
+
+        foreach ($this->repo->getRcbSeasonHighs(2098, 'away') as $row) {
+            self::assertStringStartsNotWith('Rcb Tie', $row['player_name']);
+        }
     }
 }

@@ -30,4 +30,14 @@ class SystemClockTest extends TestCase
         self::assertGreaterThanOrEqual($before, $result);
         self::assertLessThanOrEqual($after, $result);
     }
+
+    public function testMicrotimeApproximatesCurrentTime(): void
+    {
+        $before = microtime(true);
+        $result = $this->clock->microtime();
+        $after = microtime(true);
+
+        self::assertGreaterThanOrEqual($before, $result);
+        self::assertLessThanOrEqual($after, $result);
+    }
 }

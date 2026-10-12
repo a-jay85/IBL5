@@ -143,8 +143,8 @@ def _call(cli):
     return cli.call("p", "haiku", "prompt", lambda d: None, max_retries=0)
 
 
-def _call_tooled(cli, cwd):
-    return cli.call_tooled("t", "sonnet", "prompt", cwd=str(cwd), allowed_tools=("Read",),
+def _call_tooled(cli, cwd, tools=("Read",)):
+    return cli.call_tooled("t", "sonnet", "prompt", cwd=str(cwd), allowed_tools=tools,
                            max_retries=0)
 
 
@@ -395,7 +395,7 @@ def test_tooled_hook_pause_dirty_tree(shim, gate, tmp_path, monkeypatch):
     monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
     monkeypatch.setenv("CLAUDE_SHIM_TOUCH", str(repo / "half-edit.txt"))
     with pytest.raises(UsagePause) as ei:
-        _call_tooled(_cli(tmp_path), repo)
+        _call_tooled(_cli(tmp_path), repo, ("Read", "Edit"))
     assert ei.value.dirty is True
 
 
@@ -731,3 +731,536 @@ def test_real_lib_prespawn_decide_keys_run_sid(tmp_path, monkeypatch):
     marker = json.loads((state / "markers" / f"{S}.json").read_text())
     assert marker["runner"] == "post-plan-now"
     assert usage_pause.marker_exists(ctx) is True
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 1
+
+def _sh(cwd, *args):
+    return subprocess.run(["git", *args], cwd=str(cwd), check=True, capture_output=True,
+                          text=True).stdout.strip()
+
+
+def test_tools_can_write_allowlist():
+    assert usage_pause.tools_can_write("Read,Grep,Glob") is False
+    assert usage_pause.tools_can_write("Read,Edit") is True
+    assert usage_pause.tools_can_write(["Read", "mcp__x__y"]) is True
+    assert usage_pause.tools_can_write("Bash(git:*)") is True
+    assert usage_pause.tools_can_write("Read,Bash", "Bash") is False
+    assert usage_pause.tools_can_write("") is True
+    assert usage_pause.tools_can_write(("Read", "Grep"), ("Bash", "Agent")) is False
+
+
+def test_capture_prespawn_none_outside_repo(tmp_path):
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    assert usage_pause.capture_prespawn(str(plain)) is None
+    assert usage_pause.edit_since(str(plain), None) is True
+
+
+def test_edit_since_untracked_file_is_edit(tmp_path):
+    repo = _git_repo(tmp_path / "wt")
+    pre = usage_pause.capture_prespawn(str(repo))
+    assert pre is not None
+    (repo / "new.txt").write_text("x\n")
+    assert usage_pause.edit_since(str(repo), pre) is True
+    (repo / "new.txt").unlink()
+    assert usage_pause.edit_since(str(repo), pre) is False
+
+
+def test_edit_since_head_move_is_edit(tmp_path):
+    repo = _git_repo(tmp_path / "wt")
+    pre = usage_pause.capture_prespawn(str(repo))
+    _sh(repo, "commit", "-q", "--allow-empty", "-m", "moved")
+    assert usage_pause.edit_since(str(repo), pre) is True
+
+
+def test_edit_since_merge_head_is_edit(tmp_path):
+    repo = _git_repo(tmp_path / "wt")
+    pre = usage_pause.capture_prespawn(str(repo))
+    (repo / ".git" / "MERGE_HEAD").write_text(_sh(repo, "rev-parse", "HEAD") + "\n")
+    assert usage_pause.edit_since(str(repo), pre) is True
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 2
+
+READ_ONLY = ("Read", "Grep", "Glob")
+
+
+def test_readonly_tooled_pause_fp_none_not_dirty(shim, gate, tmp_path, monkeypatch):
+    """The nested-repo false dirty: git fails, yet a read-only call is never dirty."""
+    repo = _git_repo(tmp_path / "wt")
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    monkeypatch.setattr(usage_pause, "capture_prespawn", lambda cwd: None)
+    monkeypatch.setattr(usage_pause, "worktree_fingerprint", lambda cwd: None)
+    with pytest.raises(UsagePause) as ei:
+        _call_tooled(_cli(tmp_path), repo, READ_ONLY)
+    assert ei.value.dirty is False
+    assert ei.value.prespawn is None
+
+
+def test_readonly_tooled_pause_with_touch_not_dirty(shim, gate, tmp_path, monkeypatch):
+    """A concurrent writer cannot make a read-only review pause dirty."""
+    repo = _git_repo(tmp_path / "wt")
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    monkeypatch.setenv("CLAUDE_SHIM_TOUCH", str(repo / "stray.txt"))
+    with pytest.raises(UsagePause) as ei:
+        _call_tooled(_cli(tmp_path), repo, READ_ONLY)
+    assert ei.value.dirty is False
+
+
+def test_tooled_hook_pause_carries_prespawn(shim, gate, tmp_path, monkeypatch):
+    repo = _git_repo(tmp_path / "wt")
+    head = _sh(repo, "rev-parse", "HEAD")
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    monkeypatch.setenv("CLAUDE_SHIM_TOUCH", str(repo / "half-edit.txt"))
+    with pytest.raises(UsagePause) as ei:
+        _call_tooled(_cli(tmp_path), repo, ("Read", "Edit", "Write"))
+    assert ei.value.dirty is True
+    assert ei.value.prespawn is not None
+    assert ei.value.prespawn.head == head
+    assert ei.value.cwd == str(repo)
+
+
+def test_write_overlap_flag_set_on_concurrent_calls(shim, tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDE_SHIM_SLEEP", "1")
+    repo = _git_repo(tmp_path / "wt")
+
+    def both(tools_a, tools_b):
+        cli = _cli(tmp_path)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            futs = [ex.submit(_call_tooled, cli, repo, t) for t in (tools_a, tools_b)]
+            for f in futs:
+                f.result()
+        return cli.write_overlap
+
+    assert both(("Read", "Edit"), ("Read", "Edit")) is True
+    assert both(("Read",), ("Read", "Edit")) is False
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 3
+
+@pytest.fixture()
+def rec_gate(gate, tmp_path, monkeypatch):
+    """Gate env plus a state dir, so the pause record has somewhere to live."""
+    state = tmp_path / "gate-state"
+    monkeypatch.setenv("FAKE_STATE_DIR", str(state))
+    ctx, why = usage_pause.context_from_env()
+    assert why == "ok"
+    return ctx, state / "runs" / f"{S}.pause.json"
+
+
+def _edit_repo(tmp_path):
+    """A repo with tracked b.txt, plus a pre-spawn staged change a.txt."""
+    repo = _git_repo(tmp_path / "wt")
+    (repo / "b.txt").write_text("b\n")
+    _sh(repo, "add", "b.txt")
+    _sh(repo, "commit", "-qm", "b")
+    (repo / "a.txt").write_text("staged\n")
+    _sh(repo, "add", "a.txt")
+    return repo
+
+
+def _partial_edit(repo):
+    (repo / "b.txt").write_text("half\n")
+    (repo / "c.txt").write_text("new\n")
+
+
+def _set_merge_head(repo):
+    (repo / ".git" / "MERGE_HEAD").write_text(_sh(repo, "rev-parse", "HEAD") + "\n")
+
+
+def test_pause_record_roundtrip(rec_gate, tmp_path):
+    ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    assert usage_pause.pause_record_write(ctx, "gate-fix", pre, str(repo)) is None
+    status, rec = usage_pause.pause_record_load(ctx)
+    assert status == "ok" and path.exists()
+    assert rec["pre_tree"] == pre.tree
+    assert rec["post_tree"] != pre.tree
+    assert rec["post_tree"] == usage_pause.capture_prespawn(str(repo)).tree
+    assert sorted(p for _, p in rec["changed"]) == ["b.txt", "c.txt"]
+    assert rec["session_id"] == S and rec["head"] == pre.head
+
+
+def test_pause_record_refuses_head_move(rec_gate, tmp_path):
+    ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    _sh(repo, "commit", "-q", "--allow-empty", "-m", "moved")
+    assert usage_pause.pause_record_write(ctx, "ci-fix", pre, str(repo)) == "head-moved"
+    assert not path.exists()
+
+
+def test_pause_record_refuses_merge_head(rec_gate, tmp_path):
+    ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    _set_merge_head(repo)
+    assert usage_pause.pause_record_write(ctx, "conflict", pre, str(repo)) == "op-in-progress"
+    assert not path.exists()
+
+
+def _recorded(rec_gate, tmp_path):
+    ctx, _ = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    assert usage_pause.pause_record_write(ctx, "gate-fix", pre, str(repo)) is None
+    return ctx, repo, usage_pause.pause_record_load(ctx)[1]
+
+
+def test_restore_discards_only_the_edit(rec_gate, tmp_path):
+    _ctx, repo, rec = _recorded(rec_gate, tmp_path)
+    assert usage_pause.restore_from_record(str(repo), rec, S) is None
+    assert (repo / "b.txt").read_text() == "b\n"
+    assert not (repo / "c.txt").exists()
+    assert (repo / "a.txt").read_text() == "staged\n"
+    assert "a.txt" in _sh(repo, "diff", "--cached", "--name-only")
+
+
+def test_restore_refuses_unrelated_dirt(rec_gate, tmp_path):
+    _ctx, repo, rec = _recorded(rec_gate, tmp_path)
+    (repo / "d.txt").write_text("stranger\n")
+    before = {n: (repo / n).read_bytes() for n in ("a.txt", "b.txt", "c.txt", "d.txt")}
+    assert usage_pause.restore_from_record(str(repo), rec, S) == "tree-mismatch"
+    assert {n: (repo / n).read_bytes() for n in before} == before
+
+
+def test_restore_refuses_session_mismatch_and_malformed(rec_gate, tmp_path):
+    ctx, repo, rec = _recorded(rec_gate, tmp_path)
+    other = "6b6b6b6b-1111-4222-8333-444444444444"
+    assert usage_pause.restore_from_record(str(repo), rec, other) == "session-mismatch"
+    assert (repo / "b.txt").read_text() == "half\n"
+    _, path = rec_gate
+    path.write_text(json.dumps({"version": 2}))
+    assert usage_pause.pause_record_load(ctx) == ("malformed", None)
+
+
+def test_ledger_clear_removes_pause_record(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    path.parent.mkdir(parents=True)
+    path.write_text("{}")
+    effects = path.parent / f"{S}.effects.json"
+    effects.write_text("[]")
+    usage_pause.ledger_clear()
+    assert not path.exists()
+    assert not effects.exists()
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 4
+
+class _StubLlm:
+    write_overlap = False
+
+
+def _classify(p, llm=None):
+    res = RunResult(terminal=TerminalState.FAILED, slug="x")
+    logs = []
+    kind = runner._classify_pause(p, llm or _StubLlm(), res, logs.append)
+    return kind, res, logs
+
+
+def _dirty_pause(repo, pre):
+    return UsagePause("gate-fix", dirty=True, prespawn=pre, cwd=str(repo))
+
+
+def test_classify_pause_records_edit(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    kind, res, logs = _classify(_dirty_pause(repo, pre))
+    assert kind == "usage-pause"
+    assert res.pause_edit_sid == S
+    assert path.exists()
+    assert any("partial edit recorded (2 paths)" in ln for ln in logs)
+
+
+def test_classify_pause_site_restored_is_clean(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    (repo / "c.txt").write_text("new\n")
+    (repo / "c.txt").unlink()
+    kind, res, logs = _classify(_dirty_pause(repo, pre))
+    assert kind == "usage-pause"
+    assert res.pause_edit_sid is None
+    assert not path.exists()
+    assert any("site cleanup already restored" in ln for ln in logs)
+
+
+def test_classify_pause_overlap_stays_dirty(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    llm = _StubLlm()
+    llm.write_overlap = True
+    kind, res, _ = _classify(_dirty_pause(repo, pre), llm)
+    assert kind == "usage-pause-dirty"
+    assert res.pause_edit_sid is None
+    assert not path.exists()
+
+
+def test_classify_pause_no_prespawn_stays_dirty(rec_gate):
+    kind, res, _ = _classify(UsagePause("x", dirty=True))
+    assert kind == "usage-pause-dirty"
+    assert res.pause_edit_sid is None
+
+
+def test_classify_pause_head_move_stays_dirty(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    _sh(repo, "commit", "-q", "--allow-empty", "-m", "moved")
+    kind, res, logs = _classify(_dirty_pause(repo, pre))
+    assert kind == "usage-pause-dirty"
+    assert res.pause_edit_sid is None
+    assert not path.exists()
+    assert any("not recordable (head-moved)" in ln for ln in logs)
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 5
+
+class _StubState:
+    def __init__(self, previous):
+        self.previous = previous
+
+
+def _reconcile(repo, previous):
+    res = RunResult(terminal=TerminalState.FAILED, slug="x")
+    logs = []
+    runner._reconcile_paused_edit(_StubState(previous), res, str(repo), logs.append)
+    return res, logs
+
+
+def test_reconcile_no_witness_is_noop(rec_gate, tmp_path):
+    repo = _edit_repo(tmp_path)
+    _partial_edit(repo)
+    before = {n: (repo / n).read_bytes() for n in ("a.txt", "b.txt", "c.txt")}
+    res, _ = _reconcile(repo, {})
+    assert res.pause_edit_sid is None
+    assert {n: (repo / n).read_bytes() for n in before} == before
+
+
+def test_reconcile_restores_and_clears(rec_gate, tmp_path):
+    _ctx, repo, rec = _recorded(rec_gate, tmp_path)
+    _, path = rec_gate
+    res, logs = _reconcile(repo, {"pause_edit_sid": S})
+    assert usage_pause.capture_prespawn(str(repo)).tree == rec["pre_tree"]
+    assert (repo / "b.txt").read_text() == "b\n"
+    assert not (repo / "c.txt").exists()
+    assert not path.exists()
+    assert res.pause_edit_sid is None
+    assert any("discarded interrupted edit from gate-fix (2 paths)" in ln for ln in logs)
+
+
+def test_reconcile_missing_record_fails_closed(rec_gate, tmp_path):
+    repo = _edit_repo(tmp_path)
+    _partial_edit(repo)
+    with pytest.raises(HarnessError) as ei:
+        _reconcile(repo, {"pause_edit_sid": S})
+    assert ei.value.kind == "usage-pause-dirty"
+    assert "pause record missing" in ei.value.detail
+    assert (repo / "b.txt").read_text() == "half\n"
+    assert (repo / "c.txt").exists()
+
+
+OLD_S = "7c7c7c7c-1111-4222-8333-444444444444"
+
+
+def test_reconcile_session_mismatch_keeps_witness(rec_gate, tmp_path):
+    """Writes runs/S-old.pause.json first (S-old is OLD_S, a valid session id)."""
+    _ctx, path = rec_gate
+    old = path.parent / f"{OLD_S}.pause.json"
+    old.parent.mkdir(parents=True)
+    old.write_text("{}")
+    repo = _edit_repo(tmp_path)
+    _partial_edit(repo)
+    res = RunResult(terminal=TerminalState.FAILED, slug="x")
+    with pytest.raises(HarnessError) as ei:
+        runner._reconcile_paused_edit(_StubState({"pause_edit_sid": OLD_S}), res,
+                                      str(repo), lambda m: None)
+    assert ei.value.kind == "usage-pause-dirty"
+    assert f"--resume-paused {OLD_S}" in ei.value.detail
+    assert res.pause_edit_sid == OLD_S
+    assert (repo / "b.txt").read_text() == "half\n"
+
+
+def test_reconcile_session_mismatch_record_gone_drops_witness(rec_gate, tmp_path):
+    repo = _edit_repo(tmp_path)
+    _partial_edit(repo)
+    res = RunResult(terminal=TerminalState.FAILED, slug="x")
+    with pytest.raises(HarnessError) as ei:
+        runner._reconcile_paused_edit(_StubState({"pause_edit_sid": OLD_S}), res,
+                                      str(repo), lambda m: None)
+    assert ei.value.kind == "usage-pause-dirty"
+    assert res.pause_edit_sid is None
+
+
+def test_reconcile_head_moved_fails_closed(rec_gate, tmp_path):
+    _ctx, repo, _rec = _recorded(rec_gate, tmp_path)
+    _sh(repo, "commit", "-q", "--allow-empty", "-m", "moved")
+    with pytest.raises(HarnessError) as ei:
+        _reconcile(repo, {"pause_edit_sid": S})
+    assert ei.value.kind == "usage-pause-dirty"
+    assert "head-moved" in ei.value.detail
+    assert (repo / "b.txt").read_text() == "half\n"
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 6
+# End to end: two real run() launches under one S against a real git repo.
+
+E2E_SLUG = "feat/pause-e2e"
+E2E_SPEC = {"kind": "usage-pause", "edit": {"path": "partial.txt", "content": "half"}}
+
+
+def _e2e_repo(tmp_path):
+    """Base on master with an origin/master ref, plus committed branch work (kept.txt)."""
+    repo = _git_repo(tmp_path / "e2e-wt")
+    _sh(repo, "update-ref", "refs/remotes/origin/master", "HEAD")
+    _sh(repo, "checkout", "-q", "-b", E2E_SLUG)
+    (repo / "kept.txt").write_text("keep")
+    _sh(repo, "add", "kept.txt")
+    _sh(repo, "commit", "-qm", "kept")
+    return repo
+
+
+def _launch(repo, tmp_path, monkeypatch, tag, state_dir, spec=None):
+    """One runner.run() launch; returns (res, rc, audit_text).
+
+    spec -> the launch pauses mid-edit at a ci-fix call made right before classify
+    (scaffolding). No spec -> the launch stops right after the classify log line,
+    before any LLM or gh work."""
+    out = tmp_path / f"out-{tag}"
+    plans = tmp_path / "plans-empty"
+    plans.mkdir(exist_ok=True)
+    llm = runner.FixtureLlm(UsageLedger(), {"ci-fix": spec or {}})
+    real_classify = runner.classify
+
+    def paused_classify(*a, **k):
+        llm.call_tooled("ci-fix", "opus", "p", cwd=str(repo), allowed_tools=("Read", "Edit"))
+        return real_classify(*a, **k)
+
+    def stop(*a, **k):
+        raise HarnessError("e2e-stop", "stopped after classify")
+
+    with monkeypatch.context() as mp:
+        if spec is not None:
+            mp.setattr(runner, "classify", paused_classify)
+        else:
+            mp.setattr(runner, "_early_hold_repeat", stop)
+        mp.setattr(runner, "_install_sigterm_handler", lambda: None)
+        res = runner.run(None, str(out), llm, mode="isolated", worktree=str(repo),
+                         state_dir=str(state_dir), plans_dir=str(plans))
+    rc = runner._settle_pause_marker(res, runner.exit_code_for(res))
+    if rc != runner.PAUSE_EXIT:
+        usage_pause.ledger_clear()
+    return res, rc, (out / "audit.log").read_text()
+
+
+@pytest.fixture()
+def e2e(gate, tmp_path, monkeypatch):
+    gate_state = tmp_path / "gate-state"
+    monkeypatch.setenv("FAKE_STATE_DIR", str(gate_state))
+    state_dir = tmp_path / "harness-state"
+    repo = _e2e_repo(tmp_path)
+    record = gate_state / "runs" / f"{S}.pause.json"
+    state_file = state_dir / (runner.statefile.safe_slug(E2E_SLUG) + ".json")
+    return repo, state_dir, record, state_file
+
+
+def _sid(state_file):
+    return json.loads(state_file.read_text()).get("pause_edit_sid")
+
+
+def _pause_first(e2e, tmp_path, monkeypatch, spec=None):
+    repo, state_dir, record, state_file = e2e
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    res, rc, _ = _launch(repo, tmp_path, monkeypatch, "1", state_dir, spec or E2E_SPEC)
+    return res, rc
+
+
+def test_e2e_pause_mid_edit_then_resume_continues(e2e, gate, tmp_path, monkeypatch):
+    repo, state_dir, record, state_file = e2e
+    _res, rc = _pause_first(e2e, tmp_path, monkeypatch)
+    assert rc == 75
+    assert record.exists()
+    assert _sid(state_file) == S
+    assert (repo / "partial.txt").exists()
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "1")
+    _res2, _rc2, audit = _launch(repo, tmp_path, monkeypatch, "2", state_dir)
+    assert "resume: discarded interrupted edit" in audit
+    assert "phase3 classify" in audit
+    assert not (repo / "partial.txt").exists()
+    assert "half" not in _sh(repo, "diff", "--cached")
+    log_p = _sh(repo, "log", "-p")
+    assert "half" not in log_p and "keep" in log_p
+    assert not record.exists()
+    assert _sid(state_file) is None
+
+
+def test_e2e_unrelated_dirt_then_resume_exits_3(e2e, gate, tmp_path, monkeypatch):
+    repo, state_dir, record, state_file = e2e
+    _res, rc = _pause_first(e2e, tmp_path, monkeypatch)
+    assert rc == 75 and record.exists()
+    (repo / "stranger.txt").write_text("stranger")
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    res2, rc2, _ = _launch(repo, tmp_path, monkeypatch, "2", state_dir)
+    assert rc2 == 3
+    assert res2.error_kind == "usage-pause-dirty"
+    assert (repo / "partial.txt").read_bytes() == b"half"
+    assert (repo / "stranger.txt").read_bytes() == b"stranger"
+    assert "half" not in _sh(repo, "log", "-p", "--all")
+    assert f"clear {S}" in gate.read_text()
+
+
+def test_e2e_witness_without_record_exits_3(e2e, gate, tmp_path, monkeypatch):
+    repo, state_dir, record, state_file = e2e
+    _res, rc = _pause_first(e2e, tmp_path, monkeypatch)
+    assert rc == 75 and record.exists()
+    record.unlink()
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "1")
+    res2, rc2, _ = _launch(repo, tmp_path, monkeypatch, "2", state_dir)
+    assert rc2 == 3
+    assert "pause record missing" in res2.error
+    assert (repo / "partial.txt").exists()
+
+
+def test_e2e_witness_other_session_exits_3(e2e, gate, tmp_path, monkeypatch):
+    repo, state_dir, record, state_file = e2e
+    _res, rc = _pause_first(e2e, tmp_path, monkeypatch)
+    assert rc == 75 and record.exists()
+    monkeypatch.setenv("IBL5_USAGE_GATE_SESSION_ID", "6b6b6b6b-1111-4222-8333-444444444444")
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "1")
+    res2, rc2, _ = _launch(repo, tmp_path, monkeypatch, "2", state_dir)
+    assert rc2 == 3
+    assert f"--resume-paused {S}" in res2.error
+    assert _sid(state_file) == S
+    assert (repo / "partial.txt").exists()
+
+
+def test_e2e_conflict_resolve_pause_exits_3(e2e, gate, tmp_path, monkeypatch):
+    """Negative row for conflict.py:202: an in-progress merge is never recorded."""
+    repo, state_dir, record, state_file = e2e
+    res, rc = _pause_first(e2e, tmp_path, monkeypatch, dict(E2E_SPEC, merge_head=True))
+    assert rc == 3
+    assert res.error_kind == "usage-pause-dirty"
+    assert not record.exists()
+    assert f"clear {S}" in gate.read_text()
+
+
+def test_e2e_bash_site_commit_pause_exits_3(e2e, gate, tmp_path, monkeypatch):
+    """Negative row for ci-fix, fidelity remediation and thread ingestion: a moved HEAD
+    is never recorded."""
+    repo, state_dir, record, state_file = e2e
+    res, rc = _pause_first(e2e, tmp_path, monkeypatch, dict(E2E_SPEC, move_head=True))
+    assert rc == 3
+    assert res.error_kind == "usage-pause-dirty"
+    assert not record.exists()
+    assert f"clear {S}" in gate.read_text()

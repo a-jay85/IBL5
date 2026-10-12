@@ -116,7 +116,7 @@ final class QueueSimSummaryStepDbTest extends DatabaseTestCase
     private function setSeasonPhase(string $phase): void
     {
         $stmt = $this->db->prepare(
-            'UPDATE `ibl_settings` SET `value` = ? WHERE `setting_key` = \'Current Season Phase\''
+            'UPDATE `ibl_settings` SET `setting_value` = ? WHERE `setting_key` = \'Current Season Phase\''
         );
         self::assertNotFalse($stmt, 'Prepare must succeed: ' . $this->db->error);
         $stmt->bind_param('s', $phase);
@@ -137,7 +137,7 @@ final class QueueSimSummaryStepDbTest extends DatabaseTestCase
 
         $rows = $this->repo->listAll();
 
-        self::assertNotEmpty($rows, 'listAll() must return at least one row');
+        self::assertNotSame([], $rows, 'listAll() must return at least one row');
 
         $firstRow = $rows[0];
 

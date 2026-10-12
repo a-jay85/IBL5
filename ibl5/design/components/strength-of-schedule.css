@@ -63,7 +63,7 @@
   padding: 2px 8px;
   border-radius: var(--radius-sm);
   font-size: var(--text-2xs);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--white);
   text-transform: uppercase;
   letter-spacing: var(--tracking-display);
@@ -80,11 +80,11 @@
 }
 
 .sos-summary__label {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .sos-summary__value {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--gray-800);
 }
 

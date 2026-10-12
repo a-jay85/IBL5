@@ -964,24 +964,6 @@ def test_remediation_prompt_embeds_procedure_verdict_and_diff(tmp_path, git_shim
     assert "=== END DIFF ===" in prompt
 
 
-def test_remediation_prompt_never_relies_on_packet_path_alone(tmp_path, git_shim):
-    """When a packet path appears in the prompt, its content is also inline."""
-    packet_dir = _packet(tmp_path)
-    with open(os.path.join(packet_dir, "diff.patch"), "w") as fh:
-        fh.write("+SENTINEL_DIFF_LINE\n")
-    verdict_path = str(tmp_path / "verdict_path.md")
-    with open(verdict_path, "w") as fh:
-        fh.write("6d checks\n\nNOT READY\n\n- finding one\n\n## DIGEST\nstuff\n")
-    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
-    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
-                       packet_dir, verdict_path, "deadbeef")
-    prompt = llm.captured_prompts["fidelity-remediation"]
-    # The diff content is inline unconditionally, so the check cannot pass vacuously
-    # when the packet path happens to be absent from the prompt.
-    assert "+SENTINEL_DIFF_LINE" in prompt
-    assert "=== END DIFF ===" in prompt
-
-
 def test_remediation_prompt_truncates_oversized_diff(tmp_path, git_shim):
     """Diffs beyond REMEDIATION_DIFF_INLINE_CAP are truncated; tail content absent."""
     packet_dir = _packet(tmp_path)
@@ -1332,12 +1314,98 @@ def test_comment_nit_re_drops_verb_anchored_rewording_nits(title, detail):
     # Not filtered: defect in detail overrides the nit classification
     ("Clarify _ALREADY_DONE_RE docstring in fidelity.py",
      "The regex drops real followups silently when they name an old PR."),
+    # Not filtered: nit-like titles with no verb prefix (the regex is verb-anchored)
+    ("Stale docstring in compose_sticky",
+     "The docstring is out of date."),
+    ("Misleading comment above the retry loop",
+     "It says three tries but the code does five."),
 ])
 def test_comment_nit_re_keeps_additive_and_defect_notes(title, detail):
     """Additive docstring notes and notes with defect details are not filtered."""
     assert not fidelity._is_comment_nit(title, detail), (
         f"Expected _is_comment_nit to return False for title: {title!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# _ALREADY_DONE_RE regression: backlog#1070 — `recorded` verb and body target
+# ---------------------------------------------------------------------------
+# Branch isolation: "in the PR body" is caught by the earlier `the pr` target, so
+# it never reaches the body alternative. The body-only cases use "in (the) body"
+# with `fixed`; the verb-only cases use `recorded` with a non-body target.
+
+@pytest.mark.parametrize("text,pr_number", [
+    # `recorded` verb, non-body target (pins the verb alternative alone)
+    ("Deviation recorded in this PR.", None),
+    ("Deviation recorded in PR #2400.", 2400),
+    ("The drift was recorded by the remediation.", None),
+    # body target, non-`recorded` verb (pins the body alternative alone)
+    ("Caveat fixed in the body.", None),
+    ("Caveat fixed in body.", None),
+    # both branches together, including the issue's own wording
+    ("Deviation recorded in the PR body.", None),
+    ("RECORDED IN THE BODY", None),
+])
+def test_already_done_re_drops_recorded_and_body_notes(text, pr_number):
+    """The `recorded` verb and the `(the) (PR) body` target mark a note as landed."""
+    assert fidelity._says_already_done(text, pr_number), (
+        f"Expected _says_already_done to return True for: {text!r}"
+    )
+
+
+@pytest.mark.parametrize("text,pr_number", [
+    # negation in the 20 chars before the verb cancels the match
+    ("Not recorded in the PR body. Add it.", None),
+    ("never recorded in the body", None),
+    # `recorded` with a target outside the alternation
+    ("Recorded in the backlog.", None),
+    ("recorded in the review thread", None),
+    # word boundary around `body`
+    ("recorded in the embodiment of the spec", None),
+    ("recorded in the bodywork", None),
+    # the [^.]{0,40}? window between verb and preposition is capped at 40 chars;
+    # widening it to {0,80} would make this case match and fail the test
+    ("recorded elsewhere in the long document, then later in the body", None),
+    # an older numbered PR stays filable when the reviewed PR is known
+    ("Recorded in PR #1900 earlier", 2400),
+])
+def test_already_done_re_keeps_unrecorded_and_non_body_notes(text, pr_number):
+    """Negated, off-target, out-of-window, and older-PR notes stay filable."""
+    assert not fidelity._says_already_done(text, pr_number), (
+        f"Expected _says_already_done to return False for: {text!r}"
+    )
+
+
+def test_extract_notes_drops_recorded_and_body_followups(tmp_path):
+    """`recorded` and body-target notes drop; negated, off-target, older-PR notes file."""
+    notes_fixture = [
+        {"title": "Note the cap-rounding deviation", "kind": "followup",
+         "detail": "Deviation recorded in the PR body."},
+        {"title": "Flag the trade-window caveat", "kind": "followup",
+         "detail": "Caveat fixed in the body."},
+        {"title": "Cap the roster at fifteen", "kind": "followup",
+         "detail": "Drift recorded by the remediation."},
+        {"title": "Backfill the missing draft picks", "kind": "followup",
+         "detail": "Not recorded in the PR body. Add the backfill."},
+        {"title": "Seed the waiver wire fixture", "kind": "followup",
+         "detail": "Recorded in PR #1900 earlier; the fixture is still missing."},
+        {"title": "Guard the empty depth chart", "kind": "followup",
+         "detail": "Recorded in the backlog and still unfixed."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"),
+                                    pr_number=2400)
+    assert [n["title"] for n in result] == ["Backfill the missing draft picks",
+                                            "Seed the waiver wire fixture",
+                                            "Guard the empty depth chart"]
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "backlog#1070 known limitation: _ALREADY_DONE_RE drops a note that names work "
+    "after 'recorded in the PR body'. Remove this marker when the regex is narrowed."))
+def test_already_done_re_keeps_note_that_names_work_after_recorded_body():
+    """The issue's own example names owed work, so it should stay filable."""
+    assert not fidelity._says_already_done("drift recorded in the PR body; add a guard")
 
 
 @pytest.mark.parametrize("pr_number,expected", [(4242, "gh pr edit 4242 --body-file"),

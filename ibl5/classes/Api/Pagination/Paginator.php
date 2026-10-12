@@ -65,14 +65,6 @@ class Paginator
     }
 
     /**
-     * Get the SQL ORDER BY clause (without "ORDER BY" prefix).
-     */
-    public function getOrderByClause(): string
-    {
-        return $this->sort . ' ' . strtoupper($this->order);
-    }
-
-    /**
      * Build pagination metadata for the response envelope.
      *
      * @return array{page: int, per_page: int, total: int, total_pages: int, sort: string, order: string}

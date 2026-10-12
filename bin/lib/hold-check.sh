@@ -4,8 +4,10 @@
 # `## Automouse Hold Justification` plan sections.
 #
 # Consumers:
-#   bin/check-plan      gate [H] — bash (Phase 2)
-#   tools/postplan-harness/harness/classify.py — Python mirror (Phase 6)
+#   bin/check-plan      gate [H] (hold_check_violations, hold_decision_paragraphs)
+#   .claude/skills/post-plan/SKILL.md Phase 6 (hold_decision_paragraphs,
+#                       hold_manual_confirmation_block)
+#   tools/postplan-harness/harness/classify.py (Python mirror)
 #
 # Usage: source "$(dirname "$0")/lib/hold-check.sh"
 #        (or source with an absolute path)
@@ -84,6 +86,96 @@ hold_check_section() {
         fi
         printf '%d:%s\n' "$lineno" "$line"
     done < "$plan_file"
+    return 0
+}
+
+# hold_decision_paragraphs <plan-file>
+# Prints the raw lines of every `**Decision:**` block in the plan's
+# `## Automouse Hold Justification` section. This is the complement of
+# hold_check_section's (d) exclusion, under the same (a)-(c) bounds:
+# heading skipped, section ends at the next `## `, fenced lines ignored,
+# anchor is leading SPACES only. A block runs from the `**Decision:**` line
+# to the next empty line; a second `**Decision:**` line inside an open block
+# continues that block. Separate blocks are joined by exactly one empty line.
+# No line numbers, no trailing empty line. Prints nothing and returns 0 when
+# the section or every Decision line is absent.
+# Byte parity with harness classify.decision_paragraphs is pinned by
+# tools/postplan-harness/tests/test_decision_render_parity.py.
+hold_decision_paragraphs() {
+    local plan_file="$1"
+    local line ws_trimmed sp_trimmed
+    local in_section=0 in_fence=0 in_decision=0 emitted=0
+    # `|| [ -n "$line" ]` keeps a final line that lacks a trailing newline;
+    # Python's splitlines() keeps it, so parity needs it here too.
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [ "$in_section" -eq 0 ]; then
+            case "$line" in
+                '## Automouse Hold Justification'*) in_section=1 ;;
+            esac
+            continue
+        fi
+        case "$line" in
+            '## '*) break ;;
+        esac
+        ws_trimmed="${line#"${line%%[![:space:]]*}"}"
+        case "$ws_trimmed" in
+            '```'*)
+                in_fence=$(( 1 - in_fence ))
+                continue
+                ;;
+        esac
+        if [ "$in_fence" -eq 1 ]; then
+            continue
+        fi
+        sp_trimmed="${line#"${line%%[! ]*}"}"
+        case "$sp_trimmed" in
+            '**Decision:**'*)
+                if [ "$in_decision" -eq 0 ] && [ "$emitted" -eq 1 ]; then
+                    printf '\n'
+                fi
+                in_decision=1
+                emitted=1
+                printf '%s\n' "$line"
+                continue
+                ;;
+        esac
+        if [ "$in_decision" -eq 1 ]; then
+            if [ -z "$line" ]; then
+                in_decision=0
+            else
+                printf '%s\n' "$line"
+            fi
+        fi
+    done < "$plan_file"
+    return 0
+}
+
+# hold_manual_confirmation_block <plan-file>
+# Prints the marker-delimited `## Manual confirmation needed` PR-body block
+# built from hold_decision_paragraphs. Output equals harness
+# classify.render_manual_confirmation(classify.manual_confirmation_text(...))
+# plus one trailing newline (tools/postplan-harness/tests/test_decision_render_parity.py).
+# Prints nothing and returns 1 when the plan has no Decision line, so the
+# caller takes the no-Decision fallback and never writes an empty block.
+hold_manual_confirmation_block() {
+    local plan_file="$1" text line
+    text="$(hold_decision_paragraphs "$plan_file")"
+    # Mirror Python str.strip() on the whole text (render_manual_confirmation).
+    text="${text#"${text%%[![:space:]]*}"}"
+    text="${text%"${text##*[![:space:]]}"}"
+    if [ -z "$text" ]; then
+        return 1
+    fi
+    printf '%s\n' '<!-- manual-confirmation:begin -->' \
+        '## Manual confirmation needed' ''
+    # Mirror classify._neutralize_headings: "> " + line, or ">" when blank.
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            *[![:space:]]*) printf '> %s\n' "$line" ;;
+            *) printf '>\n' ;;
+        esac
+    done <<< "$text"
+    printf '%s\n' '<!-- manual-confirmation:end -->'
     return 0
 }
 

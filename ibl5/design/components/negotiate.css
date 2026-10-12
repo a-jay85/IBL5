@@ -41,7 +41,7 @@
 }
 
 .offer-salary-cell__value {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 /* Narrow number input for salary year fields */

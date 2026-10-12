@@ -13,9 +13,9 @@ use League\League;
  * Retrieves team and GM contact info from the ibl_team_info table.
  *
  * @see GMContactListRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class GMContactListRepository extends \BaseMysqliRepository implements GMContactListRepositoryInterface
+class GMContactListRepository extends \Database\BaseMysqliRepository implements GMContactListRepositoryInterface
 {
     /**
      * @see GMContactListRepositoryInterface::getAllTeamContacts()
@@ -26,7 +26,7 @@ class GMContactListRepository extends \BaseMysqliRepository implements GMContact
                          ti.owner_name, ti.discord_id
             FROM `ibl_team_info` ti
             WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            ORDER BY ti.team_city ASC";
+            ORDER BY ti.team_city ASC, ti.teamid ASC";
 
         /** @var array<int, array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, discord_id: int|null}> */
         return $this->fetchAll($query);

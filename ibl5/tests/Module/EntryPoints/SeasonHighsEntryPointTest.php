@@ -9,7 +9,7 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
         $this->mockDb->onQuery('ibl_schedule', []);
         $this->mockDb->setMockData([]);
@@ -19,7 +19,7 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('SeasonHighs');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Regular Season', $output);
     }
 
@@ -27,7 +27,7 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('SeasonHighs', ['seasonPhase' => 'Playoffs']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Playoffs', $output);
     }
 
@@ -35,7 +35,7 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('SeasonHighs', ['seasonPhase' => '']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Regular Season', $output);
     }
 }

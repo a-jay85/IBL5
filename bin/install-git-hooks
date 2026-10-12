@@ -9,7 +9,8 @@
 # the common .git). The pre-commit shim exec's bin/pre-commit-hook (the gate
 # body, version-controlled) and fails closed if that file is absent. The pre-push
 # shim chains git-lfs (preserving LFS pushes) then exec's bin/pre-push-adr-hook,
-# where the gate logic lives version-controlled.
+# where the gate logic lives version-controlled. The post-merge shim likewise
+# chains git-lfs then exec's bin/post-merge-hook (migrate, warm-cache, cleanup).
 #
 # It also injects a version-controlled CSS auto-heal call into post-checkout,
 # post-merge, and post-rewrite. These git ops bulk-rewrite the working tree in a
@@ -46,6 +47,7 @@ rewritten in place and a pre-existing non-shim hook is backed up once.
 Installed hooks:
   pre-commit    Shim that exec's bin/pre-commit-hook (version-controlled).
   pre-push      Chains git-lfs then exec's bin/pre-push-adr-hook.
+  post-merge    Chains git-lfs then exec's bin/post-merge-hook.
   post-checkout, post-merge, post-rewrite  CSS auto-heal trigger.
 EOF
     exit 0
@@ -109,6 +111,38 @@ EOF
 chmod 0755 "$SHIM"
 
 echo "Installed pre-push ADR hook: $SHIM"
+
+# --- post-merge: shim that exec's bin/post-merge-hook ------------------------
+# The body (cleanup, prod-seed refresh, migrate, warm-cache, IBL6 rebuild)
+# lives version-controlled at bin/post-merge-hook. The shim also carries the
+# git-lfs smudge and the CSS auto-heal sentinel, so inject_css_heal below
+# leaves it alone. A pre-existing non-shim post-merge is backed up once.
+POSTMERGE_SENTINEL='# IBL5-POSTMERGE-HOOK'
+POSTMERGE_SHIM="$HOOKS_DIR/post-merge"
+
+if [ -e "$POSTMERGE_SHIM" ] && ! grep -qF "$POSTMERGE_SENTINEL" "$POSTMERGE_SHIM"; then
+    BACKUP="$HOOKS_DIR/post-merge.pre-shim.bak"
+    if [ ! -e "$BACKUP" ]; then
+        cp "$POSTMERGE_SHIM" "$BACKUP"
+        echo "Backed up existing post-merge hook to $BACKUP"
+    fi
+fi
+
+cat > "$POSTMERGE_SHIM" <<'EOF'
+#!/bin/sh
+# IBL5-POSTMERGE-HOOK (installed by bin/install-git-hooks)
+# IBL5-CSS-REBUILD (installed by bin/install-git-hooks)
+"$(git rev-parse --show-toplevel 2>/dev/null)/bin/rebuild-css-if-source-changed" >/dev/null 2>&1 || true
+# Git LFS smudge runs on every merge, all branches, before the body's
+# master-only early exit.
+if command -v git-lfs >/dev/null 2>&1; then git lfs post-merge "$@"; fi
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+[ -x "$REPO_ROOT/bin/post-merge-hook" ] || exit 0
+exec "$REPO_ROOT/bin/post-merge-hook" "$@"
+EOF
+chmod 0755 "$POSTMERGE_SHIM"
+
+echo "Installed post-merge hook shim: $POSTMERGE_SHIM"
 
 # --- CSS auto-heal: inject into post-checkout / post-merge / post-rewrite ------
 # These git ops bulk-rewrite the working tree; the --watch container misses that,

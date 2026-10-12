@@ -17,14 +17,12 @@ from harness.classify import (_manual_testing_span, classify, files_from_diff, f
                                is_gm_visible_path,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL,
                                MANUAL_TESTING_SENTINEL_STATIC,
-                               name_status_from_diff, qualify_backlog_refs, rename_sources_from_diff,
-                               render_files_changed,
-                               render_reviewer_verification,
+                               name_status_from_diff, numstat_text, qualify_backlog_refs, rename_sources_from_diff,
                                retro_registry_row_from_diff,
                                REVIEWER_VERIFICATION_BEGIN, REVIEWER_VERIFICATION_END,
                                slice_agent_e_diff,
-                               restore_manual_testing_section, strip_manual_testing_section,
-                               upsert_files_changed,
+                               restore_manual_testing_section, strip_change_blocks, strip_manual_testing_section,
+                               TESTS_CHANGED_BEGIN, TESTS_CHANGED_END,
                                upsert_reviewer_verification)
 from harness.planfile import parse_hold_justification, split_hold_justification
 
@@ -212,7 +210,7 @@ def test_e2e_module_from_content_refs():
 
 
 # ---------------------------------------------------------------------------
-# New tests: name_status_from_diff / render_files_changed / upsert_files_changed
+# name_status_from_diff / rename_sources_from_diff
 # ---------------------------------------------------------------------------
 
 NAME_STATUS_DIFF = """\
@@ -275,86 +273,6 @@ def test_files_from_diff_unchanged_by_rename_sources():
     ]
 
 
-def test_render_files_changed():
-    block = render_files_changed(NAME_STATUS_DIFF)
-    assert FILES_CHANGED_BEGIN in block
-    assert FILES_CHANGED_END in block
-    assert "- `A` `ibl5/added.php`" in block
-    assert "- `M` `ibl5/modified.php`" in block
-    assert "- `D` `ibl5/deleted.php`" in block
-    assert "- `R` `ibl5/old-name.php → ibl5/new-name.php`" in block
-    # markers must be the outer bounds
-    assert block.startswith(FILES_CHANGED_BEGIN)
-    assert block.endswith(FILES_CHANGED_END)
-
-
-def test_upsert_files_changed_replace():
-    """Surrounding prose is byte-identical after a replace-between-markers upsert."""
-    block_v1 = (f"{FILES_CHANGED_BEGIN}\n**Files changed** ...:\n\n- `M` `foo.php`\n"
-                f"{FILES_CHANGED_END}")
-    block_v2 = (f"{FILES_CHANGED_BEGIN}\n**Files changed** ...:\n\n- `A` `bar.php`\n"
-                f"{FILES_CHANGED_END}")
-    before = "preamble text\n\n"
-    after = "\n\ntrailing text"
-    body_with_v1 = before + block_v1 + after
-
-    result = upsert_files_changed(body_with_v1, block_v2)
-
-    assert result.startswith(before)
-    assert result.endswith(after)
-    assert block_v2 in result
-    assert block_v1 not in result
-    # only one begin marker
-    assert result.count(FILES_CHANGED_BEGIN) == 1
-
-
-def test_upsert_files_changed_append_when_absent():
-    """Block is appended when neither marker is present."""
-    body = "some PR prose without any markers"
-    block = render_files_changed(NAME_STATUS_DIFF)
-    result = upsert_files_changed(body, block)
-    assert result.startswith(body.rstrip())
-    assert block in result
-    assert result.count(FILES_CHANGED_BEGIN) == 1
-
-
-def test_upsert_files_changed_orphan_begin():
-    """Orphan BEGIN: the orphan survives and a fresh complete block is appended."""
-    orphan = FILES_CHANGED_BEGIN + "\nsome stale content without an end marker"
-    block = render_files_changed(NAME_STATUS_DIFF)
-    result = upsert_files_changed(orphan, block)
-    # orphan begin marker still present (untouched)
-    assert orphan.rstrip() in result
-    # fresh complete block also present
-    assert block in result
-    # end marker appears (from the appended block)
-    assert FILES_CHANGED_END in result
-
-
-def test_upsert_files_changed_orphan_end():
-    """Orphan END: the orphan survives and a fresh complete block is appended."""
-    orphan = "some body\n" + FILES_CHANGED_END + "\nmore text"
-    block = render_files_changed(NAME_STATUS_DIFF)
-    result = upsert_files_changed(orphan, block)
-    # orphan end marker still present (untouched)
-    assert FILES_CHANGED_END in result
-    # the orphan text itself survives
-    assert "some body" in result
-    # the complete fresh block is also appended
-    assert block in result
-    # begin marker appears (from the appended block)
-    assert FILES_CHANGED_BEGIN in result
-
-
-def test_upsert_files_changed_idempotent():
-    """upsert(upsert(body, b), b) == upsert(body, b) on a normal body."""
-    body = "## Summary\n\nAdds widget support.\n\n## Manual Testing\n\nNo manual testing needed.\n"
-    block = render_files_changed(NAME_STATUS_DIFF)
-    once = upsert_files_changed(body, block)
-    twice = upsert_files_changed(once, block)
-    assert once == twice
-
-
 # ---------------------------------------------------------------------------
 # Predicate-safety test
 # ---------------------------------------------------------------------------
@@ -382,16 +300,17 @@ new file mode 100644
 
 
 def test_predicate_safety():
-    """The files-changed block must not corrupt the two key shell/harness predicates.
+    """A legacy files-changed block must not corrupt manual_testing_clearance().
 
-    Proves:
-    1. manual_testing_clearance() returns the same value whether or not the block
-       is present, for CLEARED, HELD, and UNKNOWN bodies.
-    2. No rendered line starts with '## ' or 'Depends-on:' at column 0 — the
-       safety is structural (every rendered line begins with '<!--', '**', or
-       '- '), so no adversarial path substring can ever reach column 0.
+    Bodies written before the blocks were retired still carry one. The block is
+    hand-built here in the retired shape (every line begins with '<!--', '**', or '- ').
+    manual_testing_clearance() returns the same value whether or not it is present,
+    for CLEARED, HELD, and UNKNOWN bodies, and strip_change_blocks() removes it.
     """
-    block = render_files_changed(_ADVERSARIAL_DIFF)
+    block = "\n".join(
+        [FILES_CHANGED_BEGIN, "**Files changed** (legacy):", ""]
+        + [f"- `{st}` `{path}`" for st, path in name_status_from_diff(_ADVERSARIAL_DIFF)]
+        + [FILES_CHANGED_END])
 
     # Verify the block contains the adversarial path substrings (so the test is live)
     assert "Depends-on:" in block
@@ -427,13 +346,62 @@ def test_predicate_safety():
     # The runner's real ordering puts the block BEFORE `## Manual Testing` (it is
     # written at PR creation; the sentinel is appended in Phase 6). Cover that too.
     assert manual_testing_clearance(
-        upsert_files_changed(unknown_body, block)
+        unknown_body + "\n\n" + block + "\n"
         + "\n\n## Manual Testing\n\nNo manual testing needed — all changes are covered by automated tests.\n"
     ) == "CLEARED"
     assert manual_testing_clearance(
-        upsert_files_changed(unknown_body, block)
+        unknown_body + "\n\n" + block + "\n"
         + "\n\n## Manual Testing\n\n- [ ] Verify the widget renders.\n"
     ) == "HELD"
+
+    # strip_change_blocks removes the legacy block entirely
+    assert FILES_CHANGED_BEGIN not in strip_change_blocks(held_body + "\n\n" + block + "\n")
+
+
+# ---------------------------------------------------------------------------
+# strip_change_blocks
+# ---------------------------------------------------------------------------
+
+_FILES_BLOCK = FILES_CHANGED_BEGIN + "\n**Files changed**:\n\n- `M` `a.py`\n" + FILES_CHANGED_END
+_TESTS_BLOCK = TESTS_CHANGED_BEGIN + "\n**Tests changed**:\n\n- `M` `t.py`\n" + TESTS_CHANGED_END
+
+
+def test_strip_change_blocks_removes_both_and_keeps_surrounding_text():
+    body = ("## Summary\n\nText.\n\n" + _FILES_BLOCK + "\n\n" + _TESTS_BLOCK
+            + "\n\n## Notes\n\nMore.\n")
+    result = strip_change_blocks(body)
+    assert result == "## Summary\n\nText.\n\n## Notes\n\nMore.\n"
+    assert "\n\n\n" not in result
+
+
+def test_strip_change_blocks_no_blocks_unchanged():
+    body = "## Summary\n\nText.\n\n\n\nKept as is.\n"
+    assert strip_change_blocks(body) == body
+    assert strip_change_blocks("") == ""
+    assert strip_change_blocks(None) == ""
+
+
+def test_strip_change_blocks_orphan_begin_untouched():
+    body = f"## A\n\n{FILES_CHANGED_BEGIN}\nlone\n\n## B\n"
+    assert strip_change_blocks(body) == body
+
+
+def test_strip_change_blocks_end_before_begin_untouched():
+    body = f"## A\n{TESTS_CHANGED_END}\nmid\n{TESTS_CHANGED_BEGIN}\n"
+    assert strip_change_blocks(body) == body
+
+
+def test_strip_change_blocks_block_at_end_leaves_single_newline():
+    body = "## Summary\n\nText.\n\n" + _FILES_BLOCK + "\n\n" + _TESTS_BLOCK + "\n\n\n"
+    assert strip_change_blocks(body) == "## Summary\n\nText.\n"
+
+
+def test_strip_change_blocks_keeps_manual_testing_section_byte_identical():
+    manual = "## Manual Testing\n\n- [x] Verified.\n  indented  \n"
+    body = "## Summary\n\nText.\n\n" + manual + "\n" + _FILES_BLOCK + "\n"
+    result = strip_change_blocks(body)
+    assert result.startswith("## Summary\n\nText.\n\n" + manual)
+    assert FILES_CHANGED_BEGIN not in result
 
 
 # ---------------------------------------------------------------------------
@@ -969,6 +937,13 @@ _RV_BODY = (
     "## Notes\n\nSome notes.\n"
 )
 
+_RV_BLOCK = (
+    REVIEWER_VERIFICATION_BEGIN + "\n"
+    "## Reviewer verification\n\n"
+    '- "Verify links resolve." \u2014 `cli-executable`: settleable\n'
+    + REVIEWER_VERIFICATION_END
+)
+
 
 def test_reviewer_verification_lands_after_manual_testing():
     """The block inserts between the last checkbox and ## Notes.
@@ -977,10 +952,7 @@ def test_reviewer_verification_lands_after_manual_testing():
     the next ## heading still contains every original checkbox — the verification
     block does NOT overwrite the checkboxes.
     """
-    block = render_reviewer_verification([
-        {"text": "Verify links resolve.", "category": "cli-executable",
-         "probe": ["bin/check-docs"], "rationale": "settleable"},
-    ])
+    block = _RV_BLOCK
     result = upsert_reviewer_verification(_RV_BODY, block)
 
     rv_start = result.index(REVIEWER_VERIFICATION_BEGIN)
@@ -1005,10 +977,7 @@ def test_reviewer_verification_appends_when_no_following_heading():
         "## Manual Testing\n\n"
         "- [ ] Verify the layout\n"
     )
-    block = render_reviewer_verification([
-        {"text": "Run docs check.", "category": "cli-executable",
-         "probe": ["bin/check-docs"], "rationale": "cli"},
-    ])
+    block = _RV_BLOCK
     result = upsert_reviewer_verification(body, block)
 
     assert REVIEWER_VERIFICATION_BEGIN in result
@@ -1024,10 +993,7 @@ def test_reviewer_verification_appends_when_no_following_heading():
 
 def test_reviewer_verification_empty_block_removes_pair():
     """Idempotent cleanup: upserting an empty block removes the pair."""
-    block = render_reviewer_verification([
-        {"text": "Verify docs.", "category": "cli-executable",
-         "probe": ["bin/check-docs"], "rationale": "cli"},
-    ])
+    block = _RV_BLOCK
     with_block = upsert_reviewer_verification(_RV_BODY, block)
     assert REVIEWER_VERIFICATION_BEGIN in with_block
 
@@ -1035,38 +1001,6 @@ def test_reviewer_verification_empty_block_removes_pair():
     assert REVIEWER_VERIFICATION_BEGIN not in cleaned
     assert REVIEWER_VERIFICATION_END not in cleaned
     assert "## Notes" in cleaned  # rest of body preserved
-
-
-def test_reviewer_verification_emits_no_heading_lines_in_bullets():
-    """Arming-gate defense: a source sentence beginning '## Manual Testing' is
-    neutralized; no emitted bullet starts with '#', and no bullet contains
-    '- [ ]' (which the clearance scanner would count)."""
-    hostile_entries = [
-        {
-            "text": "## Manual Testing\n\n- [ ] All clear\n\n## After",
-            "category": "truly-manual",
-            "probe": None,
-            "rationale": "hostile sentence",
-        },
-        {
-            "text": "Check - [x] already done.",
-            "category": "truly-manual",
-            "probe": None,
-            "rationale": "checkbox in text",
-        },
-    ]
-    block = render_reviewer_verification(hostile_entries)
-
-    # Every line must either be part of the block structure (begin/end markers,
-    # blank lines, preamble, or the legitimate '## Reviewer verification'
-    # heading) or must NOT start with '#'.  Hostile '##' lines embedded in
-    # source text must be blockquoted.
-    legitimate_headings = {"## Reviewer verification"}
-    for line in block.splitlines():
-        if line.startswith("#") and line not in legitimate_headings:
-            raise AssertionError(f"un-neutralized heading line in block: {line!r}")
-    # No content may contain an unchecked checkbox
-    assert "- [ ]" not in block, "emitted block must not contain unchecked checkbox"
 
 
 # ---------------------------------------------------------------------------
@@ -1189,9 +1123,10 @@ def test_upsert_residual_phases_append_replace_remove():
     assert "3 — C" in replaced
     assert "2 — B" not in replaced
 
-    # remove: body equals pre-append body
+    # remove: upsert re-terminates the head with exactly one "\n" (body.rstrip() + "\n"),
+    # so the restored body is the original plus a single trailing newline, not byte-identical.
     removed = upsert_residual_phases(replaced, "")
-    assert removed.strip() == body.strip()
+    assert removed == body.rstrip() + "\n"
 
 
 def test_upsert_residual_phases_noop_without_items_or_markers():
@@ -1210,116 +1145,31 @@ def test_upsert_residual_phases_noop_without_items_or_markers():
     assert "2 — B" in result
 
 
-from harness.classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END,
-                              TESTS_CHANGED_BEGIN, TESTS_CHANGED_END,
-                              render_files_changed, render_tests_changed,
-                              upsert_files_changed, upsert_tests_changed)
+_NUMSTAT_DIFF = (
+    "diff --git a/q.sql b/q.sql\n"
+    "index 111..222 100644\n"
+    "--- a/q.sql\n"
+    "+++ b/q.sql\n"
+    "@@ -1,3 +1,3 @@\n"
+    " keep\n"
+    "--- sql comment\n"
+    "+++x\n"
+    "-gone\n"
+    "+new\n"
+    "diff --git a/n.txt b/n.txt\n"
+    "new file mode 100644\n"
+    "--- /dev/null\n"
+    "+++ b/n.txt\n"
+    "@@ -0,0 +1 @@\n"
+    "+line\n"
+)
 
 
-def _make_diff_entry(path: str, status: str) -> str:
-    """Build a minimal diff --git block for the given path and A/M/D status."""
-    if status == "A":
-        return (f"diff --git a/{path} b/{path}\n"
-                f"new file mode 100644\n"
-                f"--- /dev/null\n"
-                f"+++ b/{path}\n"
-                f"@@ -0,0 +1,1 @@\n"
-                f"+x\n")
-    elif status == "D":
-        return (f"diff --git a/{path} b/{path}\n"
-                f"deleted file mode 100644\n"
-                f"--- a/{path}\n"
-                f"+++ /dev/null\n"
-                f"@@ -1,1 +0,0 @@\n"
-                f"-x\n")
-    else:
-        return (f"diff --git a/{path} b/{path}\n"
-                f"index aaa..bbb 100644\n"
-                f"--- a/{path}\n"
-                f"+++ b/{path}\n"
-                f"@@ -1,1 +1,2 @@\n"
-                f"+x\n")
+def test_numstat_text_counts_dash_prefixed_content_inside_hunks():
+    # Deleted '-- sql comment' renders as '--- sql comment'; added '++x' as '+++x'.
+    assert numstat_text(_NUMSTAT_DIFF).splitlines() == ["2\t2\tq.sql", "1\t0\tn.txt"]
 
 
-def test_render_tests_changed_filters_to_test_paths():
-    diff = (
-        _make_diff_entry("ibl5/classes/Foo.php", "M")
-        + _make_diff_entry("ibl5/tests/Unit/FooTest.php", "A")
-        + _make_diff_entry("ibl5/tests/e2e/roster.spec.ts", "M")
-        + _make_diff_entry("tools/postplan-harness/tests/test_classify.py", "M")
-        + _make_diff_entry("engine/internal/sim/rng_test.go", "A")
-        + _make_diff_entry("bin/test-plan-now", "M")
-    )
-    block = render_tests_changed(diff)
-    assert "- `A` `ibl5/tests/Unit/FooTest.php`" in block
-    assert "- `M` `ibl5/tests/e2e/roster.spec.ts`" in block
-    assert "- `M` `tools/postplan-harness/tests/test_classify.py`" in block
-    assert "- `A` `engine/internal/sim/rng_test.go`" in block
-    assert "- `M` `bin/test-plan-now`" in block
-    assert "ibl5/classes/Foo.php" not in block
-
-
-def test_render_tests_changed_reports_none_when_no_tests():
-    diff = (
-        _make_diff_entry("ibl5/classes/Foo.php", "M")
-        + _make_diff_entry("README.md", "M")
-    )
-    block = render_tests_changed(diff)
-    header = ("**Tests changed** (generated from "
-              "`git diff --name-status origin/master...HEAD` — do not edit by hand):")
-    expected = (TESTS_CHANGED_BEGIN + "\n" + header + "\n\n"
-                "- _(no test files changed)_\n" + TESTS_CHANGED_END)
-    assert block == expected
-
-
-def test_render_tests_changed_empty_diff():
-    block = render_tests_changed("")
-    assert block.startswith(TESTS_CHANGED_BEGIN)
-    assert block.endswith(TESTS_CHANGED_END)
-    assert "_(no test files changed)_" in block
-
-
-def test_upsert_tests_changed_replace():
-    old_block = (TESTS_CHANGED_BEGIN + "\nold header\n\n- `M` `old.py`\n" + TESTS_CHANGED_END)
-    body = "## Before\n\n" + old_block + "\n\n## After\n"
-    new_block = (TESTS_CHANGED_BEGIN + "\nnew header\n\n- `A` `new.py`\n" + TESTS_CHANGED_END)
-    result = upsert_tests_changed(body, new_block)
-    assert result == "## Before\n\n" + new_block + "\n\n## After\n"
-
-
-def test_upsert_tests_changed_append_when_absent_and_empty_body():
-    block = render_tests_changed("")
-    body = "## Summary\n- x"
-    result = upsert_tests_changed(body, block)
-    assert result == body.rstrip() + "\n\n" + block + "\n"
-
-    assert upsert_tests_changed("", block) == block
-    assert upsert_tests_changed(None, block) == block
-
-
-def test_upsert_tests_changed_orphan_marker_appends():
-    orphan_body = f"## Orphan\n{TESTS_CHANGED_END}\n- lone begin: {TESTS_CHANGED_BEGIN}\n"
-    block = render_tests_changed("")
-    result = upsert_tests_changed(orphan_body, block)
-    assert orphan_body.rstrip() in result
-    assert result.count(TESTS_CHANGED_BEGIN) >= 2
-    assert result.endswith(block + "\n")
-
-
-def test_upsert_tests_changed_preserves_files_changed_block():
-    diff = _make_diff_entry("ibl5/tests/Unit/FooTest.php", "A")
-    files_block = render_files_changed(diff)
-    tests_block = render_tests_changed(diff)
-    body_with_files = upsert_files_changed("## Summary\n", files_block)
-    files_snapshot = body_with_files[
-        body_with_files.find(FILES_CHANGED_BEGIN):
-        body_with_files.find(FILES_CHANGED_END) + len(FILES_CHANGED_END)
-    ]
-
-    result_1 = upsert_tests_changed(body_with_files, tests_block)
-    result_2 = upsert_tests_changed(result_1, tests_block)
-
-    assert files_snapshot in result_1
-    assert files_snapshot in result_2
-    assert result_1.count(TESTS_CHANGED_BEGIN) == 1
-    assert result_1 == result_2
+def test_numstat_text_does_not_count_file_headers():
+    diff = ("diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1 +1 @@\n-x\n+y\n")
+    assert numstat_text(diff) == "1\t1\ta"

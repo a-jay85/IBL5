@@ -91,7 +91,7 @@ class SearchRepositoryTest extends DatabaseTestCase
         // CI seed has auth_users with username 'testgm'
         $result = $this->repo->searchUsers('testgm');
 
-        self::assertNotEmpty($result['results']);
+        self::assertNotSame([], $result['results']);
         self::assertArrayHasKey('userId', $result['results'][0]);
         self::assertArrayHasKey('username', $result['results'][0]);
         self::assertArrayHasKey('name', $result['results'][0]);

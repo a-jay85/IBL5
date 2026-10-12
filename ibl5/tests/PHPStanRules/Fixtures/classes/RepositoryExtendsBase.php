@@ -2,6 +2,6 @@
 
 declare(strict_types=1);
 
-class FooRepository extends \BaseMysqliRepository
+class FooRepository extends \Database\BaseMysqliRepository
 {
 }

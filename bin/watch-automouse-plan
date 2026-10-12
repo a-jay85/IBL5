@@ -20,8 +20,10 @@
 #                      86400 (24h — launchd fires it overnight)
 #   --detach           re-exec under nohup and print the watcher log path
 #   --force            skip the "plan must currently be in queue/" precondition
+#   --smoke-test       one-shot dry run: run every check, print the DM, send nothing
 #
 # Exit: 0 notified · 1 notification undeliverable · 2 usage/precondition error.
+#       --smoke-test: 0 every check ok · 1 a check failed · 2 usage error.
 #
 # ── Why the predicates are what they are ────────────────────────────────────────
 # PRIMARY is the stream filter's own per-phase verdict line, emitted by
@@ -59,6 +61,9 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # PLAN_NOW_PLANS_DIR). Nothing in production sets it.
 AM="${AUTOMOUSE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 LOG_DIR="$AM/logs"
+# WATCH_AUTOMOUSE_GH_BIN overrides the gh binary so a test can stub the PR lookup;
+# the PATH prepend above would beat a PATH stub. Unset or empty means plain `gh`.
+GH_BIN="${WATCH_AUTOMOUSE_GH_BIN:-gh}"
 
 SLUG=""
 PHASE=postplan
@@ -68,6 +73,7 @@ MAX_SECS=21600
 WAIT_SECS=86400
 DETACH=0
 FORCE=0
+SMOKE=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -79,7 +85,8 @@ while [ $# -gt 0 ]; do
         --wait)    WAIT_SECS="${2:-}"; shift 2 ;;
         --detach)  DETACH=1; shift ;;
         --force)   FORCE=1; shift ;;
-        -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --smoke-test) SMOKE=1; shift ;;
+        -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)         echo "watch-automouse-plan: unknown argument $1" >&2; exit 2 ;;
     esac
 done
@@ -89,6 +96,11 @@ case "$PHASE" in
     impl|postplan) ;;
     *) echo "watch-automouse-plan: --phase must be impl or postplan" >&2; exit 2 ;;
 esac
+
+if [ "$SMOKE" = 1 ] && [ "$DETACH" = 1 ]; then
+    echo "watch-automouse-plan: --smoke-test cannot be combined with --detach" >&2
+    exit 2
+fi
 
 PLAN="$SLUG.md"
 WATCH_LOG="$AM/watch-$SLUG-$PHASE.log"
@@ -119,12 +131,12 @@ dur() {
 # slugs that a prefix glob would match.
 exists() { [ -e "$1" ] || [ -L "$1" ]; }
 
-if [ -e "$SENTINEL" ]; then
+if [ "$SMOKE" != 1 ] && [ -e "$SENTINEL" ]; then
     say "sentinel present ($SENTINEL) — already notified for $SLUG/$PHASE. Exiting."
     exit 0
 fi
 
-if [ "$FORCE" != 1 ] && ! exists "$AM/queue/$PLAN"; then
+if [ "$SMOKE" != 1 ] && [ "$FORCE" != 1 ] && ! exists "$AM/queue/$PLAN"; then
     if exists "$AM/done/$PLAN"; then
         where="done/ (already shipped)"
     elif exists "$AM/skipped/$PLAN"; then
@@ -150,7 +162,7 @@ count_hits() {
 }
 
 pr_line() {
-    (cd "$REPO" && gh pr list --head "$SLUG" --state all \
+    (cd "$REPO" && "$GH_BIN" pr list --head "$SLUG" --state all \
         --json number,url,state,title --limit 1 2>/dev/null \
         | jq -r '.[0] | select(.) | "PR #\(.number) [\(.state)] \(.title)\n\(.url)"') || true
 }
@@ -169,12 +181,20 @@ slug_log() {
     printf '%s' "${newest:-$LOG_DIR/}"
 }
 
-fire() { # verdict-line
-    local msg pr dm_args=()
+# The DM body: verdict line, optional PR block, log link. fire() sends it;
+# --smoke-test prints it. One builder so the two can never drift.
+build_msg() { # verdict-line
+    local msg pr
     pr=$(pr_line)
     msg="$1"
     [ -n "$pr" ] && msg="$msg"$'\n\n'"$pr"
     msg="$msg"$'\n\n'"log: $(slug_log)"
+    printf '%s' "$msg"
+}
+
+fire() { # verdict-line
+    local msg dm_args=()
+    msg=$(build_msg "$1")
     [ -n "$TO" ] && dm_args=(--to "$TO")
 
     # ${a[@]+"${a[@]}"} — macOS ships bash 3.2, where `set -u` treats an empty
@@ -204,6 +224,38 @@ settle_disposition() {
     done
     echo "none"
 }
+
+# --smoke-test: exercise every check and the real message build, send nothing.
+if [ "$SMOKE" = 1 ]; then
+    SMOKE_FAILS=0
+    smoke_check() { # <label> <command...>
+        local label="$1"; shift
+        if "$@" >/dev/null 2>&1; then printf 'ok: %s\n' "$label"
+        else printf 'FAIL: %s\n' "$label"; SMOKE_FAILS=$(( SMOKE_FAILS + 1 )); fi
+    }
+    smoke_check "state dir $AM" test -d "$AM"
+    smoke_check "logs dir $LOG_DIR" test -d "$LOG_DIR"
+    smoke_check "discord-dm executable at $REPO/bin/discord-dm" test -x "$REPO/bin/discord-dm"
+    smoke_check "gh resolves ($GH_BIN)" command -v "$GH_BIN"
+    smoke_check "jq resolves" command -v jq
+    hits=$(count_hits)
+    smoke_check "baseline hits=$hits" test "$hits" -ge 0
+    rp=$(runner_pid)
+    if [ -n "$rp" ]; then printf 'info: runner alive (pid %s)\n' "$rp"
+    else printf 'info: runner not running\n'; fi
+    if exists "$AM/queue/$PLAN"; then where=queue/
+    elif exists "$AM/done/$PLAN"; then where=done/
+    elif exists "$AM/skipped/$PLAN"; then where=skipped/
+    else where=nowhere; fi
+    printf 'info: plan location %s\n' "$where"
+    if [ -e "$SENTINEL" ]; then printf 'info: sentinel present (ignored by --smoke-test)\n'; fi
+    printf -- '--- message (not sent) ---\n'
+    build_msg "🧪 smoke test for **$SLUG** ($PHASE) — nothing was sent."
+    printf '\n--- end message ---\n'
+    if [ "$SMOKE_FAILS" -eq 0 ]; then echo "smoke-test: PASS"; exit 0; fi
+    echo "smoke-test: FAIL ($SMOKE_FAILS checks failed)"
+    exit 1
+fi
 
 BASE_HITS=$(count_hits)
 LAUNCH_EPOCH=$(date +%s)

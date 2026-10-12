@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-02
+last_verified: 2026-10-11
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -53,6 +53,16 @@ A bare path OR a path you annotate with a change-description is still checked; o
 - `` `…-snapshots` — VR baselines `` → MUST_APPEAR, and `[VR]` fails the plan. <!-- slop-ok -->
 
 The gate is a hard fail. Every flagged plan holds deterministically whenever VR is green, and one marker clears it. The 2026-10-01 corpus scan flagged 3 of 1050 plans, all already shipped.
+
+**Glob entries.** To name a file family without listing each member, write one glob entry such as `` `bin/test-automouse-*` (conditional) ``. `bin/lib/plan-scope-conformance` counts every matching path as planned, except a `.claude/` path. Keep a glob entry `(conditional)`, because Phase 5.0's `MISSING-FILE:` check matches entries literally.
+
+### Run-only matrix rows
+
+**Matrix rows that only RUN an existing test** (a smoke suite as a regression check, a characterization run of a suite the PR does not edit) carry `(run-only)` right after the token's closing backtick: `` `ibl5/tests/e2e/smoke/navigation.spec.ts` (run-only) ``. Without it Phase 5.0 emits `MISSING:` for the untouched file and arming condition (3) holds. Honored on any PHPUnit / API-test / E2E / Visual-regression row, only for a path tracked on master, only when every row naming the token carries `(run-only)` or `(no-change)`; it never exempts a Critical Files entry (mark that `(reference)`). Gate `[RO]` fails a marker on a path absent from master, a path a must-appear Critical Files entry names, a row that also carries `(no-change)`, or a marker not directly after the planned token. Use `(no-change)` for an untouched Visual-regression baseline and `(run-only)` for everything else.
+
+### Existing tests the spec forces to edit
+
+Post-plan's scope check (`bin/lib/plan-scope-conformance`) exempts an added test path but flags an undeclared edit to an existing one by design, and the fidelity review reports it as scope creep. Listing the test in `## Critical Files` keeps that edit in scope.
 
 ### Phase-count guard — HTML comment mechanism
 
@@ -188,6 +198,7 @@ For a phase that is **genuinely verbose or parallelizable**, delegate the **whol
 This does **not** regress the ~15K economics: tiny sub-tier phases still stay inline because a sub-agent's fixed startup exceeds the work a one/two-edit phase moves. The rule changes only that such a phase is now *labeled* `(inline — …)` instead of left bare — zero new delegation is forced, only an explicit decision. The force applies solely to below-run-model phases whose moved work *already* clears ~15K, which the doctrine *already* says should be packets; the rule makes that latent "should" mechanically enforced.
 
 Two past PRs were blocked by a delegate that tested one property where the plan wrote four. That incident is why each packet carries an `Assertions:` field.
+A grep for the property name is green from birth, so it cannot stand in for running the test.
 
 ## Self-apply the Automouse Hold Challenge
 
@@ -218,3 +229,23 @@ Omit the field entirely when the phase needs nothing beyond the always-on set. A
 ## One-time-check tag shape
 
 The reason is 15 or more characters, free of `(`, `)`, `|` and backticks, so a reviewer can rerun the check by hand. `bin/lib/plan-matrix-assertions` skips a tagged row instead of reporting it unrealised; a malformed tag is ignored fail-closed and the row is checked. `bin/check-plan` gate `[Y]` rejects a bad shape, a tag on a non-`CLI-executable` row, and a matrix with tagged rows above one third of its rows.
+
+Out-of-repo and post-PR rows carry the tag at write time. A `CLI-executable` row whose location cell runs only `~/`, `$HOME`, or `/tmp` paths (a scratch script under `~/claude-plans/_scripts/`, a memory file, a hook) or queries the open PR with `gh run`, `gh pr`, or `gh api` has no footprint a diff can carry, so Step 6.7 would stop on its tokens. End its What-to-verify cell with `(one-time-check: <reason>)` as you write it; `bin/check-plan` gate `[Z]` fails the plan otherwise. A command that also runs a repo `bin/` script, a repo test, `composer`, `php`, `npx`, `docker`, or `curl` is in-repo and stays untagged. Tokens that sit only inside a `Mutation:` clause (from the label to its `⇒`, sentence end, or cell end) are excluded by `bin/lib/plan-matrix-assertions` and need no tag. A token also named outside the clause is still checked.
+
+**Bootstrap tokens.** A PR that adds a gate banning a token shape can need a matrix row that shows that same token. The row proving the new gate rejects `FUN_00401000` names `FUN_00401000`, the PR's own gate keeps that literal off every added line, and `bin/lib/plan-matrix-assertions` then reports the row unrealised, so Step 6.7 stops (`jsb-clean-room-rebuild-ibl5-freeze`, 2026-10-10). Write such a row one of two ways. When the evidence is one plan-time run, end the cell with `(one-time-check: <what was run and what it printed>)`. When a regression test pins the behavior, name the test method in backticks and describe the banned token in plain prose with no code span, for example "the FUN_ prefix followed by eight hex digits". Gate `[MT]` in `bin/check-plan` catches the two token shapes the helper can never match (a `:LINE` suffix and an orphan snapshot stem); the bootstrap case stays a note because only the PR under review knows which tokens its new gate bans.
+
+## Column-bound literal citations
+
+A column-bound literal is any value a recipe sends to a DB column: a seed id band, a sentinel, a code value. Copy `<sqltype>` from `ibl5/docs/schema/current-schema.sql`. A copy-verbatim recipe names only helpers the new code calls, and cites the defining source file by backticked repo path in the same `##`/`###` section. The citation shape follows the `(per <source>)` citation in `.claude/skills/post-plan/_pr-body-claims.md` § Citation rule. `bin/check-plan` gate `[L]` validates every present citation; `/plan` Step 4 gate 18 owns the presence judgment.
+
+## Non-diff phase marker shape
+
+Use the `**No diff:** <reason>` line for a phase whose deliverable is not a change to the tree: closing a backlog issue through the PR body, queueing a parked plan, or a post-merge step.
+
+post-plan's Phase 6.5 condition (3) skips a marked phase and logs `NO-DIFF-PHASE` in the audit log. The marker is read only from a `## Phase N:` / `## Step N:` body, exact case, at line start (an optional `- ` bullet is fine). A fenced example, a code-span mention, or a reason under 15 characters is ignored, and the phase is checked as unmarked. `bin/check-plan` gate `[ND]` rejects those shapes at plan time.
+
+A phase that cites only non-repo tokens (`/proc/...`, `~/...`, `origin/master`, an `owner/repo` slug, a URL route fragment) needs no marker: condition (3) treats it as uncheckable and logs `UNCHECKABLE-PHASE`. Any citation that could name a tracked file or directory, by exact path, suffix, or basename, keeps the phase checkable. So a phase that reads `bin/wt-up` without changing it still needs the marker.
+
+## Context bounds rationale
+
+A sectioned delivery keeps one context across all turns, so what you read on turn 1 is still in front of you on turn 9. Re-Reading the contract re-pays ~7K tokens for text the architect already holds. Opening a `*-detail.md` companion costs ~5K tokens and changes no decision made while writing a plan. Re-reading a `$DRAFT` that grows each turn costs quadratically across the delivery.

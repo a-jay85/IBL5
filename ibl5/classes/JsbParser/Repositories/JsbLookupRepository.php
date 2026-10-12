@@ -6,7 +6,7 @@ namespace JsbParser\Repositories;
 
 use League\LeagueContext;
 
-class JsbLookupRepository extends \BaseMysqliRepository
+class JsbLookupRepository extends \Database\BaseMysqliRepository
 {
     /** @var array<int, string> */
     public const JSB_TEAM_NAMES = [

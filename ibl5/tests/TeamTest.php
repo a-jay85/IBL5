@@ -43,6 +43,6 @@ class TeamTest extends \PHPUnit\Framework\TestCase
 
     public function testExtendsBaseMysqliRepository(): void
     {
-        self::assertContains(\BaseMysqliRepository::class, (array) class_parents(Team::class));
+        self::assertContains(\Database\BaseMysqliRepository::class, (array) class_parents(Team::class));
     }
 }

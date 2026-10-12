@@ -101,7 +101,7 @@ foreach ($args as $arg) {
 // resolution runs. Only the duplicate invariant is queried here: orphan and
 // missing-boxscore findings can never raise this path's exit code.
 if ($duplicatesOnly) {
-    $dupRepo = new \Boxscore\BoxscoreRepository($mysqli_db);
+    $dupRepo = new \Boxscore\BoxscoreAuditRepository($mysqli_db);
     $dupRows = $dupRepo->findDuplicateTripleGames($season);
 
     $scope = $season === null ? 'all seasons' : "season {$season}";
@@ -292,9 +292,10 @@ if ($replayPath !== null) {
 
 // ── Audit mode ────────────────────────────────────────────────────────────────
 
-$repo   = new \Boxscore\BoxscoreRepository($mysqli_db);
-$audit  = new \Boxscore\ScheduleReconciliationAudit($repo);
-$report = $audit->run($season);
+$repo      = new \Boxscore\BoxscoreRepository($mysqli_db);
+$auditRepo = new \Boxscore\BoxscoreAuditRepository($mysqli_db);
+$audit     = new \Boxscore\ScheduleReconciliationAudit($repo, $auditRepo);
+$report    = $audit->run($season);
 
 if ($jsonMode) {
     $errorsJson = [];

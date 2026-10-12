@@ -19,7 +19,7 @@ use Extension\Contracts\ExtensionRepositoryInterface;
  *
  * @see ExtensionRepositoryInterface
  */
-class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepositoryInterface
+class ExtensionRepository extends \Database\BaseMysqliRepository implements ExtensionRepositoryInterface
 {
     private \Topics\News\NewsRepository $newsService;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('app'). */

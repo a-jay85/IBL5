@@ -17,7 +17,7 @@ use Tests\WideUnit\Mocks\MockDatabase;
  * Verifies that Extension, Negotiation, and FreeAgency produce identical
  * modifier components for the same inputs, ensuring no future drift.
  *
- * @covers \ContractRules
+ * @covers \League\ContractRules
  * @covers \Extension\ExtensionOfferEvaluator
  * @covers \Negotiation\ExtensionContractDemandCalculator
  * @covers \FreeAgency\FreeAgencyMarketDemandCalculator
@@ -36,7 +36,7 @@ class ModifierConsistencyTest extends TestCase
 
     public function testAllModulesProduceIdenticalWinnerModifier(): void
     {
-        $expected = \ContractRules::calculateWinnerModifier(self::WINS, self::LOSSES, self::WINNER_PREF);
+        $expected = \League\ContractRules::calculateWinnerModifier(self::WINS, self::LOSSES, self::WINNER_PREF);
 
         $evaluator = new ExtensionOfferEvaluator();
         $extensionResult = $evaluator->computeWinnerModifier(
@@ -49,7 +49,7 @@ class ModifierConsistencyTest extends TestCase
 
     public function testAllModulesProduceIdenticalTraditionModifier(): void
     {
-        $expected = \ContractRules::calculateTraditionModifier(self::TRAD_WINS, self::TRAD_LOSSES, self::TRADITION_PREF);
+        $expected = \League\ContractRules::calculateTraditionModifier(self::TRAD_WINS, self::TRAD_LOSSES, self::TRADITION_PREF);
 
         $evaluator = new ExtensionOfferEvaluator();
         $extensionResult = $evaluator->computeTraditionModifier(
@@ -62,7 +62,7 @@ class ModifierConsistencyTest extends TestCase
 
     public function testAllModulesProduceIdenticalLoyaltyModifier(): void
     {
-        $expected = \ContractRules::calculateLoyaltyModifier(self::LOYALTY_PREF);
+        $expected = \League\ContractRules::calculateLoyaltyModifier(self::LOYALTY_PREF);
 
         $evaluator = new ExtensionOfferEvaluator();
         $extensionResult = $evaluator->computeLoyaltyModifier(['winner' => 1, 'tradition' => 1, 'loyalty' => self::LOYALTY_PREF, 'playing_time' => 1]);
@@ -72,7 +72,7 @@ class ModifierConsistencyTest extends TestCase
 
     public function testAllModulesProduceIdenticalPlayingTimeModifier(): void
     {
-        $expected = \ContractRules::calculatePlayingTimeModifier(self::MONEY_COMMITTED, self::PLAYING_TIME_PREF);
+        $expected = \League\ContractRules::calculatePlayingTimeModifier(self::MONEY_COMMITTED, self::PLAYING_TIME_PREF);
 
         $evaluator = new ExtensionOfferEvaluator();
         $extensionResult = $evaluator->computePlayingTimeModifier(
@@ -98,10 +98,10 @@ class ModifierConsistencyTest extends TestCase
 
         $calculator = new ExtensionContractDemandCalculator($mockDb, self::createStub(SalaryCapRepositoryInterface::class));
 
-        $expectedWinner = \ContractRules::calculateWinnerModifier(self::WINS, self::LOSSES, self::WINNER_PREF);
-        $expectedTradition = \ContractRules::calculateTraditionModifier(self::TRAD_WINS, self::TRAD_LOSSES, self::TRADITION_PREF);
-        $expectedLoyalty = \ContractRules::calculateLoyaltyModifier(self::LOYALTY_PREF);
-        $expectedPT = \ContractRules::calculatePlayingTimeModifier(self::MONEY_COMMITTED, self::PLAYING_TIME_PREF);
+        $expectedWinner = \League\ContractRules::calculateWinnerModifier(self::WINS, self::LOSSES, self::WINNER_PREF);
+        $expectedTradition = \League\ContractRules::calculateTraditionModifier(self::TRAD_WINS, self::TRAD_LOSSES, self::TRADITION_PREF);
+        $expectedLoyalty = \League\ContractRules::calculateLoyaltyModifier(self::LOYALTY_PREF);
+        $expectedPT = \League\ContractRules::calculatePlayingTimeModifier(self::MONEY_COMMITTED, self::PLAYING_TIME_PREF);
         $expectedTotal = 1.0 + $expectedWinner + $expectedTradition + $expectedLoyalty + $expectedPT;
 
         $player = $this->createConfiguredPlayer();

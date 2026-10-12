@@ -198,7 +198,7 @@ class TrnFileParserTest extends TestCase
             $result = TrnFileParser::parseFile($tmpFile);
 
             $this->assertArrayHasKey('transactions', $result);
-            $this->assertNotEmpty($result['transactions']);
+            $this->assertNotSame([], $result['transactions']);
         } finally {
             unlink($tmpFile);
         }
@@ -238,7 +238,7 @@ class TrnFileParserTest extends TestCase
                 static fn (array $t): bool => $t['type'] === TrnFileParser::TYPE_INJURY
             );
 
-            $this->assertNotEmpty($injuries, 'Should find at least one injury record');
+            $this->assertNotSame([], $injuries, 'Should find at least one injury record');
 
             $injury = reset($injuries);
             $this->assertIsArray($injury);
@@ -270,7 +270,7 @@ class TrnFileParserTest extends TestCase
                     && $t['trade_items'] !== []
             );
 
-            $this->assertNotEmpty($trades, 'Should find at least one trade record with items');
+            $this->assertNotSame([], $trades, 'Should find at least one trade record with items');
 
             $trade = reset($trades);
             $this->assertIsArray($trade);
@@ -305,7 +305,7 @@ class TrnFileParserTest extends TestCase
                     || $t['type'] === TrnFileParser::TYPE_WAIVER_RELEASE
             );
 
-            $this->assertNotEmpty($waivers, 'Should find at least one waiver record');
+            $this->assertNotSame([], $waivers, 'Should find at least one waiver record');
 
             $waiver = reset($waivers);
             $this->assertIsArray($waiver);
@@ -335,7 +335,7 @@ class TrnFileParserTest extends TestCase
                     && $t['trade_items'] !== []
             );
 
-            $this->assertNotEmpty($trades, 'Should find at least one trade record with draft pick items');
+            $this->assertNotSame([], $trades, 'Should find at least one trade record with draft pick items');
 
             $trade = reset($trades);
             $this->assertIsArray($trade);

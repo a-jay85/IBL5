@@ -82,7 +82,7 @@ class PlayerExportControllerTest extends WideUnitTestCase
         // Strip UTF-8 BOM if present
         $output = ltrim($output, "\xEF\xBB\xBF");
 
-        $this->assertNotEmpty($output, 'CSV output should not be empty');
+        $this->assertNotSame('', $output, 'CSV output should not be empty');
         $this->assertStringContainsString(',', $output);
     }
 

@@ -58,7 +58,7 @@ def _fixture(**over):
         "pr_meta": {
             "number": 9999,
             "title": "fix: synthetic",
-            "body": "## Manual Testing\n\nNo manual testing needed\n",
+            "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
             "headRefOid": "deadbeef",
         },
         "labels": [],
@@ -514,3 +514,19 @@ def test_out_state_is_gitignored():
         "git status shows untracked/dirty files under tools/postplan-harness/out: "
         + status.stdout
     )
+
+
+def test_statefile_persists_pause_edit_sid(tmp_path):
+    """The dirty-pause witness survives into the next launch's `previous`."""
+    path = str(tmp_path / "state" / "witness.json")
+
+    class _StubGit:
+        def head(self):
+            return "0" * 40
+
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.pause_edit_sid = "S1"
+    statefile.StateFile(path, "witness", _StubGit(), "/tmp/fake-out", lambda m: None) \
+        .checkpoint("terminal", res)
+    nxt = statefile.StateFile(path, "witness", _StubGit(), "/tmp/fake-out", lambda m: None)
+    assert nxt.previous["pause_edit_sid"] == "S1"

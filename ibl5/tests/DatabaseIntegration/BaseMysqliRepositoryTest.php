@@ -18,7 +18,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        \BaseMysqliRepository::clearSharedLeagueContext();
+        \Database\BaseMysqliRepository::clearSharedLeagueContext();
         $this->repo = new TestableBaseMysqliRepository($this->db);
     }
 
@@ -152,7 +152,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
     public function testFetchAllRealTeamsDefaultOrder(): void
     {
         $teams = $this->repo->callFetchAllRealTeams();
-        self::assertNotEmpty($teams);
+        self::assertNotSame([], $teams);
 
         $names = array_column($teams, 'team_name');
         $sorted = $names;
@@ -163,7 +163,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
     public function testFetchAllRealTeamsOrderByTeamid(): void
     {
         $teams = $this->repo->callFetchAllRealTeams(\TeamOrderBy::TeamId);
-        self::assertNotEmpty($teams);
+        self::assertNotSame([], $teams);
 
         $ids = array_column($teams, 'teamid');
         $sorted = $ids;
@@ -186,7 +186,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         $repo = new \Repositories\TeamIdentityRepository($this->db);
         $teams = $repo->getAllRealTeams('teamid ASC');
 
-        self::assertNotEmpty($teams);
+        self::assertNotSame([], $teams);
         $ids = array_column($teams, 'teamid');
         $sorted = $ids;
         sort($sorted, SORT_NUMERIC);
@@ -485,7 +485,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
-        \BaseMysqliRepository::setSharedLeagueContext($context);
+        \Database\BaseMysqliRepository::setSharedLeagueContext($context);
 
         $repo = new TestableBaseMysqliRepository($this->db);
         $query = "SELECT * FROM `ibl_plr` WHERE pid = ?";
@@ -503,7 +503,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         // would fatal on a non-existent table.
         $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
-        \BaseMysqliRepository::setSharedLeagueContext($context);
+        \Database\BaseMysqliRepository::setSharedLeagueContext($context);
 
         $repo = new TestableBaseMysqliRepository($this->db);
 
@@ -604,7 +604,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
 /**
  * @internal Test double exposing protected BaseMysqliRepository methods.
  */
-class TestableBaseMysqliRepository extends \BaseMysqliRepository
+class TestableBaseMysqliRepository extends \Database\BaseMysqliRepository
 {
     public ?string $lastPreparedQuery = null;
 

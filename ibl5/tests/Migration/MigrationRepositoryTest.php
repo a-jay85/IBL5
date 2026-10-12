@@ -50,7 +50,7 @@ final class MigrationRepositoryTest extends TestCase
         $this->repository->recordMigration('003_new.sql', 5);
 
         $queries = $this->db->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
 
         $lastQuery = end($queries);
         $this->assertIsString($lastQuery);
@@ -99,7 +99,7 @@ final class MigrationRepositoryTest extends TestCase
         $this->repository->truncate();
 
         $queries = $this->db->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
 
         $lastQuery = end($queries);
         $this->assertIsString($lastQuery);

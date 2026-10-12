@@ -43,6 +43,15 @@ env:
   FRESH_HOURS: 12
 
 jobs:
+  mirror-ready:
+    name: Mirror CI images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/mirror-ci-images.yml
+    with:
+      only-missing: true
+
   # Fail-open by design: if the artifact API is unreachable, returns nothing, or
   # the latest baseline has expired, `stale` is true and the audit runs. A
   # missing baseline is the expensive failure (lighthouse-audit.yml falls back to
@@ -91,7 +100,10 @@ jobs:
 
   baseline:
     name: Generate baseline
-    needs: [freshness]
+    needs: [freshness, mirror-ready]
+    permissions:
+      contents: read
+      packages: read
     if: needs.freshness.outputs.stale == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120

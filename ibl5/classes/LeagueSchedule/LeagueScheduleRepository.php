@@ -14,7 +14,7 @@ use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
  *
  * @see LeagueScheduleRepositoryInterface For the interface contract
  */
-class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueScheduleRepositoryInterface
+class LeagueScheduleRepository extends \Database\BaseMysqliRepository implements LeagueScheduleRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

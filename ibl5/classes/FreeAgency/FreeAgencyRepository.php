@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Repositories\PlayerTeamJoinQuery;
 
@@ -118,7 +118,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
         return $this->fetchAll(
             $this->playerWithTeamSelect() . "
             WHERE p.teamid <> ? AND p.retired = 0
-            ORDER BY p.ordinal ASC",
+            ORDER BY p.ordinal ASC, p.pid ASC",
             "i",
             $teamId
         );

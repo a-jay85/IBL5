@@ -6,6 +6,7 @@ namespace Tests\Debug;
 
 use Debug\DebugSession;
 use PHPUnit\Framework\TestCase;
+use Tests\Clock\FixedClock;
 
 class DebugSessionTest extends TestCase
 {
@@ -132,5 +133,56 @@ class DebugSessionTest extends TestCase
         $_SESSION['debug_view_all_extensions'] = true;
         $session = new DebugSession('A-Jay', 'iblhoops.net');
         $this->assertFalse($session->isViewAllExtensionsEnabled());
+    }
+
+    public function testCookieExpiryWhenEnablingIsThirtyDaysAhead(): void
+    {
+        $session = new DebugSession('A-Jay', 'localhost', null, false, new FixedClock(1791549296));
+        $this->assertSame(1794141296, $session->cookieExpiry(true));
+    }
+
+    public function testCookieExpiryWhenDisablingIsOneHourInPast(): void
+    {
+        $session = new DebugSession('A-Jay', 'localhost', null, false, new FixedClock(1791549296));
+        $this->assertSame(1791545696, $session->cookieExpiry(false));
+    }
+
+    public function testToggleOnRequestsEnableExpiry(): void
+    {
+        $mock = $this->getMockBuilder(DebugSession::class)
+            ->setConstructorArgs(['A-Jay', 'localhost', null, false, new FixedClock(1791549296)])
+            ->onlyMethods(['cookieExpiry'])
+            ->getMock();
+        $mock->expects($this->once())->method('cookieExpiry')->with(true)->willReturn(1794141296);
+
+        $this->assertArrayNotHasKey('debug_view_all_extensions', $_SESSION);
+        @$mock->toggleViewAllExtensions();
+        $this->assertTrue($mock->isViewAllExtensionsEnabled());
+    }
+
+    public function testToggleOffRequestsDeleteExpiry(): void
+    {
+        $_SESSION['debug_view_all_extensions'] = true;
+        $mock = $this->getMockBuilder(DebugSession::class)
+            ->setConstructorArgs(['A-Jay', 'localhost', null, false, new FixedClock(1791549296)])
+            ->onlyMethods(['cookieExpiry'])
+            ->getMock();
+        $mock->expects($this->once())->method('cookieExpiry')->with(false)->willReturn(1791545696);
+
+        $this->assertTrue($mock->isViewAllExtensionsEnabled());
+        @$mock->toggleViewAllExtensions();
+        $this->assertFalse($mock->isViewAllExtensionsEnabled());
+    }
+
+    public function testToggleForNonAdminNeverComputesExpiry(): void
+    {
+        $mock = $this->getMockBuilder(DebugSession::class)
+            ->setConstructorArgs(['SomeoneElse', 'localhost', null, false, new FixedClock(1791549296)])
+            ->onlyMethods(['cookieExpiry'])
+            ->getMock();
+        $mock->expects($this->never())->method('cookieExpiry');
+
+        @$mock->toggleViewAllExtensions();
+        $this->assertFalse($mock->isViewAllExtensionsEnabled());
     }
 }

@@ -49,7 +49,7 @@ class LeagueStartersService implements LeagueStartersServiceInterface
      */
     public function getAllStartersByPosition(): array
     {
-        $positions = \JSB::PLAYER_POSITIONS;
+        $positions = \League\JsbConstants::PLAYER_POSITIONS;
 
         /** @var array<string, array<int, Player>> $startersByPosition */
         $startersByPosition = [];
@@ -97,12 +97,7 @@ class LeagueStartersService implements LeagueStartersServiceInterface
             $team = Team::initialize($this->db, $teamRow);
 
             foreach ($positions as $position) {
-                if (isset($starterMap[$team->teamid][$position])) {
-                    $player = $starterMap[$team->teamid][$position];
-                } else {
-                    $player = $this->buildPlaceholderForTeam($team);
-                }
-                $startersByPosition[$position][] = $player;
+                $startersByPosition[$position][] = $starterMap[$team->teamid][$position] ?? $this->buildPlaceholderForTeam($team);
             }
         }
 

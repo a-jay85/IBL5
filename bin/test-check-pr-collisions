@@ -10,16 +10,15 @@
 # Run: bin/test-check-pr-collisions  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$SCRIPT_DIR/check-pr-collisions"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+h_tmp TMP
 
-FAILED=0
-
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 assert_match() {
     if printf '%s' "$3" | grep -qE "$2"; then
@@ -192,9 +191,4 @@ assert_match "sweep-posts-sticky-marker" \
 
 # --- Results ---
 
-if [[ "$FAILED" -ne 0 ]]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

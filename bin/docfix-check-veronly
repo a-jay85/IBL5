@@ -400,10 +400,11 @@ awk '
 
     # Body: delete ## Automouse Hold Justification through EOF or the next ##.
     # If the section was already removed, in_hold never becomes 1 → idempotent.
+    # Also strip the now-contradictory " Held for human merge." seed sentence.
     fm_closed {
         if (/^## Automouse Hold Justification/) { in_hold=1; next }
         if (in_hold && /^## /) { in_hold=0 }
-        if (!in_hold) { print }
+        if (!in_hold) { gsub(/ Held for human merge\./, ""); print }
         next
     }
 

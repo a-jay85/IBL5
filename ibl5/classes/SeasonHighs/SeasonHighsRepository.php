@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SeasonHighs;
 
 use League\LeagueContext;
+use Repositories\PlayerTeamJoinQuery;
 use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
 use SeasonHighs\Contracts\SeasonHighsServiceInterface;
 
@@ -16,10 +17,12 @@ use SeasonHighs\Contracts\SeasonHighsServiceInterface;
  * @phpstan-import-type SeasonHighEntry from SeasonHighsServiceInterface
  *
  * @see SeasonHighsRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighsRepositoryInterface
+class SeasonHighsRepository extends \Database\BaseMysqliRepository implements SeasonHighsRepositoryInterface
 {
+    use PlayerTeamJoinQuery;
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
@@ -54,6 +57,16 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         // The ibl_plr.name field is varchar(32) which stores full names
         // Also JOIN with ibl_schedule to get box_id for linking to box scores
         // Also JOIN with ibl_team_info to get team colors for styled team cell
+        // ibl.sqlStringConcatenation stays baselined for $statExpression and
+        // $safeStatName in both branches below. They are caller-supplied
+        // identifiers (an arithmetic expression over backticked columns and its
+        // alias), not a closed set this class owns, so there is no constant map
+        // for PHPStan to narrow against. Both are allowlisted at runtime above:
+        // assertSafeStatExpression() enforces STAT_EXPRESSION_PATTERN and
+        // sanitizeStatName() reduces the alias to [A-Za-z0-9_] or throws. The
+        // closed set of expressions lives in SeasonHighsService::STATS; moving it
+        // here would change the getSeasonHighs() contract. Covered by
+        // SeasonHighsRepositoryTest (reject and strip-alias cases).
         if ($tableSuffix === '') {
             $query = "SELECT p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
                 t.`team_city`, t.`color1`, t.`color2`,
@@ -62,10 +75,11 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 " . $statExpression . " AS `" . $safeStatName . "`
                 FROM `ibl_box_scores` bs
                 JOIN `ibl_plr` p ON bs.pid = p.pid
-                LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+                " . $this->playerTeamLeftJoin() . "
                 LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                WHERE bs.`game_date` BETWEEN ? AND ?" . $locationCondition . "
-                ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC, bs.`id` ASC
+                WHERE bs.`game_date` BETWEEN ? AND ?" . $locationCondition
+                // @phpstan-ignore ibl.orderByMissingTiebreaker (rule sees only the fragment before the concatenated stat column; the full ORDER BY ends with the bs.id PK)
+                . " ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC, bs.`id` ASC
                 LIMIT " . $limit;
         } else {
             // For team stats, JOIN with ibl_team_info to get team ID and colors for linking
@@ -78,8 +92,9 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 FROM `ibl_box_scores_teams` bs
                 JOIN `ibl_team_info` t ON bs.name = t.team_name
                 LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                WHERE bs.`game_date` BETWEEN ? AND ?
-                ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC, bs.`id` ASC
+                WHERE bs.`game_date` BETWEEN ? AND ?"
+                // @phpstan-ignore ibl.orderByMissingTiebreaker (rule sees only the fragment before the concatenated stat column; the full ORDER BY ends with the bs.id PK)
+                . " ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC, bs.`id` ASC
                 LIMIT " . $limit;
         }
 
@@ -143,7 +158,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                     (" . $statExpression . ") AS stat_value
                     FROM `ibl_box_scores` bs
                     JOIN `ibl_plr` p ON bs.pid = p.pid
-                    LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+                    " . $this->playerTeamLeftJoin() . "
                     LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                     WHERE bs.`game_date` BETWEEN ? AND ?" . $locationCondition . "
                     ORDER BY stat_value DESC, bs.`game_date` ASC, bs.`id` ASC
@@ -287,7 +302,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
             "SELECT stat_category, ranking, player_name, player_position, stat_value, record_season_year
              FROM `ibl_rcb_season_records`
              WHERE season_year = ? AND scope = 'league' AND context = ?
-             ORDER BY stat_category, ranking",
+             ORDER BY stat_category, ranking, id ASC",
             'is',
             $seasonYear,
             $context

@@ -19,8 +19,8 @@ queue ◄──── queue-reorder-ui (browser drag-reorder UI, writes queue or
 
 | Script | Role |
 |--------|------|
-| `run` | Outer loop. Drains the queue, fires two `claude -p` invocations per plan (implementation, then post-plan review), manages logs/heartbeat, and schedules one-shot launchd runs (`run schedule "…"`) or temporary disarms with automatic re-enabling (`run disarm-tonight`, `run disarm-until "YYYY-MM-DD HH:MM [TZ]"`). Holds the `SELF` absolute-path pin used to generate one-shot plists (ADR-0092). Validates each plan's `impl_model` **before** incrementing the attempt counter, disposing an unusable one to `skipped/` with a report so a typo never burns a retry. |
-| `queue` | Add/remove/list/requeue/reorder plans in the nightly queue. Enforces the `impl_model` ↔ Verification-Matrix consistency backstop via `../lib/plan-model-consistency`. The listing's MODEL column is wide enough to render full model ids (`claude-sonnet-5-5`) unclipped. |
+| `run` | Outer loop. Drains the queue, fires two `claude -p` invocations per plan (implementation, then post-plan review), manages logs/heartbeat, and schedules one-shot launchd runs (`run schedule "…"`, where a bare time already passed today means tomorrow) or temporary disarms with automatic re-enabling (`run disarm-tonight`, `run disarm-until "[YYYY-MM-DD] HH:MM [TZ]"`, with the same bare-time rule). Holds the `SELF` absolute-path pin used to generate one-shot plists (ADR-0092). Validates each plan's `impl_model` **before** incrementing the attempt counter, disposing an unusable one to `skipped/` with a report so a typo never burns a retry. |
+| `queue` | Add/remove/list/requeue/reorder plans in the nightly queue. Enforces the `impl_model` ↔ Verification-Matrix consistency backstop via `../lib/plan-model-consistency`. Then runs the full `../check-plan` and refuses a failing plan; `--force` queues it anyway and writes a `.force-override` sidecar plus a line in `force-overrides.log`. `add <slug>` is a synonym of the bare form. `status` prints one next-action line per skipped, failed, paused, held, or forced plan. The listing's MODEL column is wide enough to render full model ids (`claude-sonnet-5-5`) unclipped. |
 | `queue-reorder-ui` | Local browser UI to drag-reorder the queue; shells out to `queue reorder` and `../lib/automouse-reorder-router.php`. Also launched by the `reorder` link on `bin/fleet-status`'s queue header. |
 | `self-heal` | Top-of-run recovery. Requeues plans skipped by the staleness gate that now pass `../check-plan-staleness` (only those carrying a `.md.staleness` sidecar marker). |
 | `prompt-impl` | The implementation-phase prompt text fed to `claude -p`. |
@@ -43,15 +43,17 @@ clear the `.attempts` / `.failure` / `.cap-refunds` sidecars, and write
 decide only whether auto-merge arms, so a PR held for a human (a `feat:` title, an
 unmet autonomy contract, any unmet Phase 6.5 condition) is the pipeline's *normal*
 terminal state — not a failure. Agents that read "held" as "not success" used to leave
-the plan in `queue/`, where it was re-claimed and re-post-planned every iteration,
-forever: creating the handoff resets the attempt counter, so `MAX_ATTEMPTS` never
-retired it. The loop-side check ends that cycle.
+the plan in `queue/`, where it was re-claimed and re-post-planned on every iteration.
+Creating the handoff seeds the attempt counter at 1, so the impl run's post-plan is
+attempt 1 and a plan whose post-plan keeps failing gets at most `MAX_ATTEMPTS`
+post-plan runs before the claim-time cap moves it to `skipped/`. A held PR is a
+success, so the loop-side check files it to `done/` before it burns those attempts.
 
 The two check points:
 
 | When | Condition | Effect |
 |------|-----------|--------|
-| **Claim time**, before the attempt counter increments | no handoff to resume **and** branch has an OPEN/MERGED PR | dispose to `done/`, release the lock, `continue` — **zero `claude -p` spend**, zero attempts burned |
+| **Claim time**, before the attempt counter increments | branch has a MERGED PR, or no handoff to resume **and** an OPEN PR. A merged PR wins over a leftover handoff: a paused post-plan that resumed and merged under `post-plan-now` leaves its handoff and lock behind | dispose to `done/`, release the lock, `continue`. Spends zero `claude -p` calls and burns zero attempts |
 | **After post-plan exits**, only if the environmental breaker did not trip | plan still in `queue/` **and** branch has an OPEN/MERGED PR | dispose to `done/`, then fall through to the normal lock release and between-plans canary |
 
 **Fail-closed.** Only a positive OPEN/MERGED answer triggers a disposition. A forge

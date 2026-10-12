@@ -196,14 +196,12 @@ class TeamPageDataPreparer
         foreach ($playoffResults as $playoff) {
             $round = $playoff['round'];
             $winner = $playoff['winner'];
-            $loser = $playoff['loser'];
 
             if (!isset($roundsMap[$round])) {
                 continue;
             }
 
             $isWin = ($winner === $teamName);
-            $isLoss = ($loser === $teamName);
 
             $year = \Security\HtmlSanitizer::safeHtmlOutput((string) $playoff['year']);
             $winnerSafe = \Security\HtmlSanitizer::safeHtmlOutput($playoff['winner_name_that_year']);

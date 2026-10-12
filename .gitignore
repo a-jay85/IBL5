@@ -25,6 +25,7 @@ database_dump_*.sql
 localDbUpdate.sh
 ibl5/classes/DatabaseConnection.php
 ibl5/config/discord.config.php
+ibl5/config/github-dispatch.config.php
 ibl5/config/mail.config.php
 ibl5/config/logging.config.php
 ibl5/themes/IBL/style/style.css

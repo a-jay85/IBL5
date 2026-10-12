@@ -27,6 +27,8 @@ global $db, $user, $mysqli_db, $authService;
 if (!is_user($user)) {
     loginbox();
 } else {
+    /** @var \mysqli $mysqli_db */
+    /** @var \Auth\Contracts\AuthServiceInterface $authService */
     $commonRepository = new Repositories\TeamIdentityRepository($mysqli_db);
     $season = new \Season\Season($mysqli_db);
 

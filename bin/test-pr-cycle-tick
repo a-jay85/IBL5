@@ -116,9 +116,12 @@ fi
 exit "\${STUB_RC:-0}"
 PC_EOF
 
+# A DM can span lines (the paste line sits on its own line). Flatten each newline to the two
+# characters \n so one DM stays one dm.log line for dm_count and the line-count assertions.
 cat > "$SCRATCH/dm-stub" <<DM_EOF
 #!/usr/bin/env bash
-printf '%s\n' "\$*" >> "$SCRATCH/dm.log"
+msg="\$*"; nl=\$'\n'
+printf '%s\n' "\${msg//\$nl/\\\\n}" >> "$SCRATCH/dm.log"
 exit 0
 DM_EOF
 chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub"
@@ -410,6 +413,8 @@ no_file "$SCRATCH/pr-cycle.log" || fail "retry-cap-dm-once: launched past the ca
 [[ "$(wc -l < "$SCRATCH/dm.log" 2>/dev/null | tr -d ' ')" == "1" ]] \
     || fail "retry-cap-dm-once: dm.log has $(wc -l < "$SCRATCH/dm.log" 2>/dev/null | tr -d ' ') lines, want 1"
 grep -qF '#101' "$SCRATCH/dm.log" 2>/dev/null || fail "retry-cap-dm-once: DM does not name #101"
+grep -qE '\\nOr paste this to have Claude fix it:\\n.*/bin/postplan-fix 101$' "$SCRATCH/dm.log" \
+    || fail "retry-cap-dm-once: DM does not end with the postplan-fix paste line"
 grep -qF 'Why:' "$SCRATCH/dm.log" 2>/dev/null && fail "retry-cap-dm-once: DM has a Why: with no run dir"
 end_case retry-cap-dm-once
 
@@ -419,7 +424,7 @@ reset; begin_case
 set_prs "$RED101"; set_checks aaa1111 red
 mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
 run_tick
-grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until a new push.' \
+grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until a new push.\nOr paste this to have Claude fix it:\n'"$REPO/bin/postplan-fix 101" \
     "$SCRATCH/dm.log" 2>/dev/null \
     || fail "still-red-dm-full-wording: DM was '$(cat "$SCRATCH/dm.log" 2>/dev/null)'"
 end_case still-red-dm-full-wording
@@ -441,6 +446,9 @@ grep -qF 'Why: master changed the same lines Fix steps:' "$SCRATCH/dm.log" 2>/de
     || fail "retry-cap-dm-why: DM lacks the newest Why: line: $(cat "$SCRATCH/dm.log" 2>/dev/null)"
 grep -qF 'live-branch-one-20261004-120000/blocked-ship.txt' "$SCRATCH/dm.log" 2>/dev/null \
     || fail "retry-cap-dm-why: DM lacks the fix-steps path"
+grep -qE 'Fix steps: .*blocked-ship\.txt\\nOr paste this to have Claude fix it:\\n.*/bin/postplan-fix 101$' \
+    "$SCRATCH/dm.log" 2>/dev/null \
+    || fail "retry-cap-dm-why: paste line does not come after Fix steps: $(cat "$SCRATCH/dm.log" 2>/dev/null)"
 grep -qE 'old reason|sibling reason|not this' "$SCRATCH/dm.log" 2>/dev/null \
     && fail "retry-cap-dm-why: DM quoted the wrong run or line"
 end_case retry-cap-dm-why

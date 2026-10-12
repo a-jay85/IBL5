@@ -258,7 +258,7 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
     {
         return [
             'pid' => StatsSanitizer::toInt($rosterPlayer['pid'] ?? 0),
-            'player_name' => $this->toString($rosterPlayer['name'] ?? ''),
+            'player_name' => StatsSanitizer::scalarToString($rosterPlayer['name'] ?? ''),
             'ordinal' => $ordinal,
             'dc_pg_depth' => $dcSettings['pg'] ?? 0,
             'dc_sg_depth' => $dcSettings['sg'] ?? 0,
@@ -273,20 +273,6 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
             'dc_di' => $dcSettings['di'] ?? 0,
             'dc_bh' => $dcSettings['bh'] ?? 0,
         ];
-    }
-
-    /**
-     * Safely convert mixed value to string
-     */
-    private function toString(mixed $value): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-        return '';
     }
 
     /**

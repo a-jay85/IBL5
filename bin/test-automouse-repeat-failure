@@ -20,7 +20,7 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 SIG="$REPO/bin/lib/automouse-failure-signature"
 
 TMPS=()
-cleanup() { [ "${#TMPS[@]}" -gt 0 ] && rm -rf "${TMPS[@]}"; return 0; }
+cleanup() { [ "${#TMPS[@]}" -gt 0 ] && rm -rf "${TMPS[@]}"; h_cleanup; return 0; }
 trap cleanup EXIT
 
 WORK=$(mktemp -d)

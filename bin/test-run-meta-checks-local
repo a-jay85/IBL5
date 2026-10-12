@@ -293,6 +293,49 @@ else
     fail "case k: state file not written at $STATUS_FILE"
 fi
 
+# ─── Case pbg: adr-check / refactor-flag SKIP, DEFER, advisory, hard rows ───
+# pbg_run <workflow> <env-assignments...> -- <runner args...>; sets OUT/RC.
+pbg_run() {
+    local wf="$1"; shift
+    local envs=(); while [ "$1" != "--" ]; do envs+=("$1"); shift; done; shift
+    REPO=$(make_repo "$wf"); BASE=$(get_base "$REPO")
+    printf 'x\n' > "$REPO/changed.txt"; git -C "$REPO" add .; git -C "$REPO" commit -q -m x
+    run_check_both env ${envs[@]+"${envs[@]}"} "$REPO/bin/run-meta-checks-local" \
+        --self-test-hook "$REPO" --base "$BASE" "$@"
+    OUT="$_LAST_OUT"; RC="$_LAST_RC"; rm -rf "$REPO"
+}
+# pbg-1 pre-push, no PR, filters true → DEFER both, never run
+pbg_run "$FIXTURE_WORKFLOW_ALL" STUB_RC_adr_check=1 STUB_RC_refactor_flag=1 --
+want   "pbg-1 DEFER adr"  "$OUT" "DEFER adr-check (deferred to post-pr for PR bypass check)"
+want   "pbg-1 DEFER ref"  "$OUT" "DEFER refactor-flag (deferred to post-pr for PR bypass check)"
+want   "pbg-1 summary adr" "$OUT" "META-CHECK-DEFERRED: adr-check"
+want   "pbg-1 summary ref" "$OUT" "META-CHECK-DEFERRED: refactor-flag"
+absent "pbg-1 adr not run" "$OUT" "WARN  adr-check"
+[ "$RC" -eq 0 ] && pass "pbg-1 exit 0" || fail "pbg-1 exit 0 (got $RC)"
+# pbg-2 pre-push, --pr set, failing stubs → advisory WARN, exit 0, no DEFER
+pbg_run "$FIXTURE_WORKFLOW_ALL" STUB_RC_adr_check=1 STUB_RC_refactor_flag=1 -- --pr 99998
+want   "pbg-2 WARN adr" "$OUT" "WARN  adr-check (advisory, not blocking)"
+want   "pbg-2 WARN ref" "$OUT" "WARN  refactor-flag (advisory, not blocking)"
+absent "pbg-2 no DEFER" "$OUT" "DEFER adr-check"
+[ "$RC" -eq 0 ] && pass "pbg-2 exit 0" || fail "pbg-2 exit 0 (got $RC)"
+# pbg-3 pre-push, filters false → SKIP both, no DEFER
+pbg_run "$FIXTURE_WORKFLOW" --
+want   "pbg-3 SKIP adr" "$OUT" "SKIP  adr-check (filter adr=false)"
+want   "pbg-3 SKIP ref" "$OUT" "SKIP  refactor-flag (filter refactor=false)"
+absent "pbg-3 no DEFER" "$OUT" "DEFER "
+# pbg-4 post-pr, failing stubs → hard FAIL, exit 1
+pbg_run "$FIXTURE_WORKFLOW_ALL" STUB_RC_adr_check=1 STUB_RC_refactor_flag=1 -- --stage post-pr --pr 99997
+want   "pbg-4 FAIL adr" "$OUT" "META-CHECK-FAILED: adr-check"
+want   "pbg-4 FAIL ref" "$OUT" "META-CHECK-FAILED: refactor-flag"
+[ "$RC" -eq 1 ] && pass "pbg-4 exit 1" || fail "pbg-4 exit 1 (got $RC)"
+# pbg-5 post-pr, filters false → SKIP each exactly once, no DEFER
+pbg_run "$FIXTURE_WORKFLOW" -- --stage post-pr --pr 99996
+[ "$(printf '%s\n' "$OUT" | grep -c 'SKIP  adr-check (filter adr=false)')" -eq 1 ] \
+    && pass "pbg-5 SKIP adr once" || fail "pbg-5 SKIP adr once"
+want   "pbg-5 SKIP ref" "$OUT" "SKIP  refactor-flag (filter refactor=false)"
+absent "pbg-5 no DEFER" "$OUT" "DEFER "
+rm -f /tmp/ibl5-meta-checks-99997.status /tmp/ibl5-meta-checks-99996.status
+
 # ─── Case l: bidirectional CI-parity assertion ────────────────────────────────
 # Extract bin/<name> from the real workflow's run: blocks only (not comments).
 WF_SCRIPTS=$(python3 - "$REAL_WF" <<'PYEOF'
@@ -382,12 +425,13 @@ for line in block:
 PYEOF
 )
 
-# Extract filter names from the runner: third arg to run_filtered_step, and
-# literal args to _fmap (excludes the $filter variable call in the function body).
+# Extract filter names from the runner: third arg to run_filtered_step, second
+# arg to run_pr_bypass_gate, and literal args to _fmap (excludes the $filter variable call in the function body).
 RUNNER_FILTERS=$(
     {
         grep -E '^[[:space:]]+run_filtered_step' "$RUNNER" | awk '{gsub(/"/, "", $4); print $4}' || true
         grep -oE '\$\(_fmap [a-z][a-z0-9-]+\)' "$RUNNER" | sed 's/\$(_fmap //; s/)//' || true
+        grep -E '^[[:space:]]+run_pr_bypass_gate "' "$RUNNER" | awk '{print $3}' || true
     } | sort -u
 )
 

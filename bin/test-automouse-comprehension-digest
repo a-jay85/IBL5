@@ -2,25 +2,25 @@
 # bin/test-automouse-comprehension-digest — fixture harness for bin/automouse/comprehension-digest.
 # Drives only the CLI. gh, claude, the usage gate, and discord-dm are stubbed through the
 # script's env seams, so no case reaches GitHub, a real model, or Discord.
+# shellcheck disable=SC2329  # case_* and helpers are dispatched via "$c"
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$SCRIPT_DIR/automouse/comprehension-digest"
 CRON_SETUP="$SCRIPT_DIR/automouse/comprehension-digest-cron-setup"
-T="$(mktemp -d)"
-trap 'rm -rf "$T"' EXIT
+h_tmp T
 BINSTUB="$T/stub"
 mkdir -p "$BINSTUB"
-PASS=0
-FAILED=0
 
-ok()  { PASS=$((PASS + 1)); }
-bad() { echo "FAIL: $1"; FAILED=$((FAILED + 1)); }
-assert_eq() { if [ "$2" = "$3" ]; then ok; else bad "$1 — want [$2], got [$3]"; fi; }
-assert_contains() { case "$3" in *"$2"*) ok ;; *) bad "$1 — missing: $2" ;; esac; }
-assert_not_contains() { case "$3" in *"$2"*) bad "$1 — unexpected: $2" ;; *) ok ;; esac; }
-assert_exists() { if [ -e "$2" ]; then ok; else bad "$1 — absent: $2"; fi; }
-assert_absent() { if [ -e "$2" ]; then bad "$1 — unexpected: $2"; else ok; fi; }
+ok()  { h_pass "$1"; }
+bad() { h_fail "$@"; }
+assert_eq() { h_eq "$1" "$2" "$3"; }
+assert_contains() { h_contains "$1" "$3" "$2"; }
+assert_not_contains() { h_not_contains "$1" "$3" "$2"; }
+assert_exists() { h_exists "$1" "$2"; }
+assert_absent() { h_absent "$1" "$2"; }
 
 # --- Stubs ---------------------------------------------------------------------
 
@@ -138,7 +138,7 @@ case_rejected_flags() {
     # shellcheck disable=SC2086
     err=$(run_cdd $args 2>&1 >/dev/null) || rc=$?
     assert_eq "rejected [$args]: exit" 1 "$rc"
-    if [ -n "$err" ]; then ok; else bad "rejected [$args]: empty stderr"; fi
+    if [ -n "$err" ]; then ok "rejected [$args]: stderr not empty"; else bad "rejected [$args]: empty stderr"; fi
     assert_absent "rejected [$args]: no DM" "$T/dm.out"
     assert_absent "rejected [$args]: no report" "$T/reports"
   done
@@ -216,7 +216,7 @@ case_fence_integrity() {
   b=$(grep -n '^BEGIN_UNTRUSTED_PR_DATA_' "$f" | head -n 1 | cut -d: -f1)
   e=$(grep -n '^END_UNTRUSTED_PR_DATA_' "$f" | head -n 1 | cut -d: -f1)
   p=$(grep -n 'PWNED' "$f" | tail -n 1 | cut -d: -f1)
-  if [ "$p" -gt "$b" ] && [ "$p" -lt "$e" ]; then ok; else bad "fence: PWNED line outside the fence ($b < $p < $e)"; fi
+  if [ "$p" -gt "$b" ] && [ "$p" -lt "$e" ]; then ok "fence: PWNED line inside the fence"; else bad "fence: PWNED line outside the fence ($b < $p < $e)"; fi
   assert_not_contains "fence: human-signoff PR text stays out" "feat(trade)" "$(cat "$f")"
 }
 
@@ -336,5 +336,4 @@ for c in case_classify_buckets case_window_edges case_rejected_flags case_dry_ru
   "$c"
 done
 
-echo "comprehension-digest harness: $PASS passed, $FAILED failed"
-[ "$FAILED" -eq 0 ]
+h_done

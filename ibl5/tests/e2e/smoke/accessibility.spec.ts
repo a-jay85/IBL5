@@ -67,8 +67,7 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     // Seeded empirically — see plan a11y-1-ratchet-best-practice
     // Auth pages
     'your account',
-    'api keys', // Added 2026-10-10 (axe-spec-missing-pages): html (no <h1>). See a-jay85/IBL5-backlog (label: a11y).
-    'game boxscore', // Added 2026-10-10 (axe-spec-missing-pages): html (no <h1>). See a-jay85/IBL5-backlog (label: a11y).
+    // The api keys and game boxscore pages left KNOWN_FAILING['page-has-heading-one'] once each rendered an h1.
   ]),
 
   // Heading-level skip (h4 after h2, no h3). See a-jay85/IBL5-backlog (label: a11y).

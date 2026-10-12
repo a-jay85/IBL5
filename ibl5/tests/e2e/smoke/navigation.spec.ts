@@ -127,7 +127,7 @@ test.describe('Shared layout landmark and favicon (public)', () => {
       await page.goto(path);
       await assertNoPhpErrors(page, `on ${path}`);
       // Not zero (landmark present) and not duplicate (duplicate also fails the audit).
-      await expect(page.locator('main, [role="main"]')).toHaveCount(1);
+      await expect(page.locator('[role="main"]')).toHaveCount(1);
     });
 
     test(`favicon link present in head on ${path}`, async ({ page }) => {

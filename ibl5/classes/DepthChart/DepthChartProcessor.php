@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DepthChart;
 
+use BasketballStats\StatsSanitizer;
 use DepthChart\Contracts\DepthChartProcessorInterface;
 
 /**
@@ -36,20 +37,20 @@ class DepthChartProcessor implements DepthChartProcessorInterface
                 continue;
             }
 
-            $injury = $this->extractIntValue($postData, 'Injury' . $i);
+            $injury = StatsSanitizer::intFromArray($postData, 'Injury' . $i);
 
             /** @var string $rawName */
             $rawName = $postData['Name' . $i];
             $player = [
-                'pid' => $this->extractIntValue($postData, 'pid' . $i),
+                'pid' => StatsSanitizer::intFromArray($postData, 'pid' . $i),
                 'name' => $this->sanitizePlayerName($rawName),
-                'pg' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'pg' . $i)),
-                'sg' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'sg' . $i)),
-                'sf' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'sf' . $i)),
-                'pf' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'pf' . $i)),
-                'c' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'c' . $i)),
-                'canPlayInGame' => $this->sanitizeActiveValue($this->extractIntValue($postData, 'canPlayInGame' . $i)),
-                'min' => $this->sanitizeMinutesValue($this->extractIntValue($postData, 'min' . $i)),
+                'pg' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'pg' . $i)),
+                'sg' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'sg' . $i)),
+                'sf' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'sf' . $i)),
+                'pf' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'pf' . $i)),
+                'c' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'c' . $i)),
+                'canPlayInGame' => $this->sanitizeActiveValue(StatsSanitizer::intFromArray($postData, 'canPlayInGame' . $i)),
+                'min' => $this->sanitizeMinutesValue(StatsSanitizer::intFromArray($postData, 'min' . $i)),
                 'of' => 0,
                 'df' => 0,
                 'oi' => 0,
@@ -117,23 +118,6 @@ class DepthChartProcessor implements DepthChartProcessorInterface
         ];
     }
     
-    /**
-     * Extract an integer value from POST data by key
-     *
-     * @param array<string, mixed> $postData
-     */
-    private function extractIntValue(array $postData, string $key): int
-    {
-        $value = $postData[$key] ?? 0;
-        if (is_int($value)) {
-            return $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-        return 0;
-    }
-
     private function sanitizePlayerName(string $name): string
     {
         return trim(strip_tags($name));

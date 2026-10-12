@@ -735,6 +735,82 @@ grep -qF 'head -1 <<< "$BODY" | grep -m1 -oE' "$RO_SCRIPT" \
     || fail "review-owed-unwidened-pin: line-1 parse missing from review-owed.sh"
 end_case review-owed-unwidened-pin
 
+# --- post-plan Step 6 layout: audit trail below a horizontal rule -----------------------
+# The post-plan sticky closes the five digest labels with a blank line and `---`, then the
+# Audit trail block. The digest extraction must stop at the `---`, or the rule and the
+# `<details>` lines would count as digest lines and the carry-forward would never fire.
+# _mk_postplan_body <sixth-label-line-or-empty>  -> body on stdout.
+_mk_postplan_body() {
+    printf '%s\n' \
+        "**READY** — 2026-10-01 00:00:00 UTC" \
+        "" \
+        "Findings: none." \
+        "" \
+        "### Merge digest" \
+        "**What changed:** desc" \
+        "**Why:** reason" \
+        "**Watch:** nothing" \
+        "**Touches:** test.txt" \
+        "**Machine-authored fixes:** none"
+    [ -n "${1:-}" ] && printf '%s\n' "$1"
+    printf '%s\n' \
+        "" \
+        "---" \
+        "" \
+        "<details><summary>Audit trail</summary>" \
+        "" \
+        "REVIEW-COVERAGE: full" \
+        "**Reviewed tree:** $TREE" \
+        "**Plan hash:** $(printf 'b%.0s' $(seq 64))" \
+        "" \
+        "</details>" \
+        "" \
+        "READY" \
+        "<!-- pr-ready-verdict -->"
+}
+_mk_postplan_fixture() {  # $1 = out path, $2 = optional sixth-label line
+    local bj
+    bj="$(_mk_postplan_body "${2:-}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')"
+    printf '{"comments": [{"body": %s}], "headRefName": "pr-branch"}\n' "$bj" > "$1"
+}
+
+begin_case
+rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md"
+PP_FIX="$SCRATCH/fix-postplan.json"
+_mk_postplan_fixture "$PP_FIX"
+_run_skip "$PP_FIX"
+[ "$RS_STATUS" -eq 0 ] || fail "postplan-layout-skip: exit status was $RS_STATUS, want 0"
+want "postplan-layout SKIP-REVIEW" "$RS_LAST" "SKIP-REVIEW"
+want "postplan-layout SKIP-REVIEW tree" "$RS_LAST" "$TREE"
+[ -f "/tmp/pr-ready-digest-lines-9999.txt" ] || fail "postplan-layout-skip: digest-lines file not written"
+PP_DLINES="$(wc -l < /tmp/pr-ready-digest-lines-9999.txt | tr -d ' ')"
+[ "$PP_DLINES" -eq 5 ] || fail "postplan-layout-skip: digest-lines file has $PP_DLINES lines, want 5"
+end_case postplan-layout-skip
+
+begin_case
+rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md"
+PP_FIX6="$SCRATCH/fix-postplan-6.json"
+_mk_postplan_fixture "$PP_FIX6" "**Extra:** x"
+_run_skip "$PP_FIX6"
+[ "$RS_STATUS" -eq 0 ] || fail "postplan-layout-sixth-label: exit status was $RS_STATUS, want 0"
+want "postplan-layout sixth label" "$RS_LAST" "RUN-REVIEW prior-digest-unparseable"
+end_case postplan-layout-sixth-label
+
+# Mutation: delete the horizontal-rule stop. The post-plan fixture that SKIPs above must now
+# fail closed, proving the postplan-layout-skip case depends on that line.
+begin_case
+rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md"
+HR_MUTANT="$SCRATCH/skip-review-hr-mutant.sh"
+grep -vF 'in_digest && /^---$/' "$SKIP_SCRIPT" > "$HR_MUTANT"
+if [ "$(grep -c '' "$HR_MUTANT")" -ge "$(grep -c '' "$SKIP_SCRIPT")" ]; then
+    fail "hr-stop mutation inert: hr-stop line not removed from the mutant copy"
+fi
+_run_skip "$PP_FIX" "$HR_MUTANT"
+printf '%s\n' "$RS_LAST" | grep -qF "RUN-REVIEW prior-digest-unparseable" \
+    || fail "hr-stop mutation inert: mutant without the rule stop printed '$RS_LAST'"
+rm -f "$HR_MUTANT"
+end_case hr-stop-reverted
+
 # --- mutation check ----------------------------------------------------------------------
 # Invert the tree comparison in step 10 and confirm case 4's fixture now produces SKIP-REVIEW.
 # Skippable with --skip-mutation for environments where sed -i differs.

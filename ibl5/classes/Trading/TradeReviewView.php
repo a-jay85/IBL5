@@ -20,7 +20,7 @@ class TradeReviewView
     {
         /** @var array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string, mobileOrder: int}>, result?: string, error?: string} $pageData */
 
-        $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
+        $userTeam = $pageData['userTeam'];
         $userTeamId = $pageData['userTeamId'];
         $tradeOffers = $pageData['tradeOffers'];
         $teams = $pageData['teams'];
@@ -127,8 +127,6 @@ class TradeReviewView
      */
     private function renderTradeOfferCard(int $offerId, array $offer, string $userTeam, int $userTeamId, string $acceptToken, string $rejectToken): string
     {
-        $oppositeTeam = HtmlSanitizer::safeHtmlOutput($offer['oppositeTeam']);
-
         ob_start();
         ?>
 <div class="trade-offer-card">
@@ -148,21 +146,19 @@ class TradeReviewView
         <form name="tradereject" method="post" action="/ibl5/modules/Trading/rejecttradeoffer.php" class="trade-offer-card__form">
             <input type="hidden" name="_csrf_token" value="<?= HtmlSanitizer::e($rejectToken) ?>">
             <input type="hidden" name="offer" value="<?= HtmlSanitizer::e($offerId) ?>">
-            <input type="hidden" name="teamRejecting" value="<?= HtmlSanitizer::trusted($userTeam) ?>">
-            <input type="hidden" name="teamReceiving" value="<?= HtmlSanitizer::trusted($oppositeTeam) ?>">
+            <input type="hidden" name="teamRejecting" value="<?= HtmlSanitizer::safeHtmlOutput($userTeam) ?>">
+            <input type="hidden" name="teamReceiving" value="<?= HtmlSanitizer::safeHtmlOutput($offer['oppositeTeam']) ?>">
             <button type="submit" class="ibl-btn ibl-btn--danger">Reject</button>
         </form>
     </div>
     <div class="trade-offer-items">
 <?php foreach ($offer['items'] as $item): ?>
     <?php if ($item['description'] !== ''):
-        $descriptionEscaped = HtmlSanitizer::safeHtmlOutput($item['description']);
     ?>
-        <p><?= HtmlSanitizer::trusted($descriptionEscaped) ?></p>
+        <p><?= HtmlSanitizer::safeHtmlOutput($item['description']) ?></p>
         <?php if ($item['notes'] !== null):
-            $notesEscaped = HtmlSanitizer::safeHtmlOutput($item['notes']);
         ?>
-            <p class="trade-offer-card__notes"><?= HtmlSanitizer::trusted($notesEscaped) ?></p>
+            <p class="trade-offer-card__notes"><?= HtmlSanitizer::safeHtmlOutput($item['notes']) ?></p>
         <?php endif; ?>
     <?php endif; ?>
 <?php endforeach; ?>

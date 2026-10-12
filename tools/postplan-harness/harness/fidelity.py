@@ -976,6 +976,7 @@ EXCERPT_LIMIT = 30000
 # `REVIEWED_TREE=<sha>` line and is unchanged by this PR.
 STICKY_REVIEWED_DIFF_RE = re.compile(r"^\*\*Reviewed diff:\*\* ([0-9a-f]{40})$", re.M)
 STICKY_PLAN_HASH_RE = re.compile(r"^\*\*Plan hash:\*\* ([0-9a-f]{64})$", re.M)
+STICKY_REUSED_FROM_RE = re.compile(r"^\*\*Reused from:\*\* (\S+) \(([a-z-]+(?:, [a-z-]+)*)\)$", re.M)
 CARRY_FORWARD_VERDICTS = ("READY", "READY WITH NOTES")
 
 _MERGE_DIGEST_HEADING_RE = re.compile(r"^#{1,6}[ \t]+Merge digest")
@@ -1268,7 +1269,7 @@ def digest_rows_for_display(digest: list, fid: dict) -> list:
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
                    digest: list, excerpt: str, terminal: str, *,
                    diff_id: str = "", plan_hash: str = "",
-                   posted_at: str = "") -> str:
+                   posted_at: str = "", reused_from: dict | None = None) -> str:
     """The full sticky comment body, marker last.
 
     Ordering is a contract, not a style: every non-label line sits above `### Merge digest`
@@ -1350,9 +1351,18 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
         out.append(f"**Reviewed diff:** {diff_id}")
     if plan_hash:
         out.append(f"**Plan hash:** {plan_hash}")
+    by_run: dict = {}
+    for arm, run_id in (reused_from or {}).items():
+        by_run.setdefault(run_id, []).append(arm)
+    for run_id, arms in by_run.items():
+        out.append(f"**Reused from:** {run_id} ({', '.join(sorted(arms))})")
     if fid.get("carried_forward"):
-        out.append("**Carried forward:** prior review reused; branch diff (patch-id) and "
-                   "plan unchanged since the recorded verdict")
+        if fid.get("carry_reason") == "conflict-only-delta":
+            out.append("**Carried forward:** prior review reused; branch diff changed only in "
+                       "conflict-resolved files reviewed this run (conflict-only delta)")
+        else:
+            out.append("**Carried forward:** prior review reused; branch diff (patch-id) and "
+                       "plan unchanged since the recorded verdict")
     if fid.get("verdict_2") is not None:
         out.append(f"**Re-reviewed tree:** {fid.get('reviewed_tree_2') or 'unrecorded'} "
                    f"({fid.get('verdict_2')})")

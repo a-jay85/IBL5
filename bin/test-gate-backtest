@@ -45,7 +45,7 @@ run_gb() {
     ERR=$(cat "$T/err")
 }
 
-has() { printf '%s\n' "$1" | grep -qF -- "$2"; }
+has() { grep -qF -- "$2" <<<"$1"; }
 
 # commit_in <repo> <subject> <file> <content> [mode]
 commit_in() {

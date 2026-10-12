@@ -166,6 +166,8 @@ settle_row() {
                 dm_ping "$msg" || true
                 pcw_kind_mark_dm "$STATE" declined "$pr" "$key"
             fi ;;
+        fired:rebased)
+            log "PR $pr: rebase-only ran (merged master, still held for a human); no attempt recorded (head ${sha:0:7})" ;;
         fired:paused)
             log "PR $pr: paused by usage gate, retry later" ;;
         *) strike "$pr" "$sha" "$key" "$status" "$outcome" "$reason" ;;

@@ -248,24 +248,18 @@ def inject_merge_danger(body: str, md: MergeDanger) -> str:
     return f"{base}\n\n{rendered}" if base else rendered
 
 
-def derive_from_worktree(diff_text: str, worktree: str | Path,
-                         gate_changes: list[GateChange] | None = None) -> MergeDanger:
-    """IO shim: read candidate files from a checked-out tree and derive the floor."""
+def derive_from_worktree(worktree: str | Path, diff_text: str) -> MergeDanger:
+    """IO shim: build the detect_gate_changes inputs from the worktree's files, then delegate
+    to the pure derive_merge_danger. It only reads files."""
     root = Path(worktree)
     changed = changes_from_unified_diff(diff_text)
 
     def read_candidate(path: str) -> str | None:
-        try:
-            return (root / path).read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            return None
+        p = root / path
+        return p.read_text(encoding="utf-8", errors="replace") if p.is_file() else None
 
-    if gate_changes is None:
-        sources: dict[str, str] = {}
-        bin_dir = root / "bin"
-        if bin_dir.is_dir():
-            for f in sorted(bin_dir.glob("check-*")):
-                if f.is_file():
-                    sources[f"bin/{f.name}"] = f.read_text(encoding="utf-8", errors="replace")
-        gate_changes = detect_gate_changes(changed, read_candidate, sources)
-    return derive_merge_danger(changed, diff_text, gate_changes, read_candidate)
+    bin_dir = root / "bin"
+    check_sources = {f"bin/{p.name}": p.read_text(encoding="utf-8", errors="replace")
+                     for p in sorted(bin_dir.glob("check-*")) if p.is_file()} if bin_dir.is_dir() else {}
+    gates = detect_gate_changes(changed, read_candidate, check_sources)
+    return derive_merge_danger(changed, diff_text, gates, read_candidate)

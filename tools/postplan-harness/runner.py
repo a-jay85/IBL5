@@ -61,6 +61,7 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
+from harness import merge_danger
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
@@ -370,6 +371,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _inject_residual_phases(copy, plan, conf_files, log)
         log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
+        if _inject_merge_danger(copy, worktree, diff, log):
+            body_check_degraded = True
         log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
@@ -2097,6 +2100,33 @@ def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str
     for note in notes:
         log(f"phase2 residual-phase-exempt: {note}")
     return items
+
+
+def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list[str]:
+    """Phase 2: mechanical Merge danger floor; the LLM line in summary_md only supplies Why
+    and may raise Door / Blast radius. Always runs, fixture or live, degraded or not.
+
+    Returns the body-check findings for the final body ([] when it carries one well-formed
+    line); a non-empty result marks the body check degraded, which holds arming.
+
+    An empty summary_md is the clean-tree rerun: the live body is left as is, and condition
+    (18) reads that body at arm time."""
+    if not copy["summary_md"]:
+        return []
+    mech = merge_danger.derive_from_worktree(worktree or ".", diff_body)
+    try:
+        llm = merge_danger.parse_merge_danger(copy["summary_md"])
+    except merge_danger.MalformedMergeDanger as exc:
+        log(f"phase2: merge-danger LLM line malformed, using mechanical Why ({exc})")
+        llm = None
+    final = merge_danger.merge_verdicts(mech, llm.door if llm else None,
+                                        llm.blast if llm else None, llm.why if llm else None)
+    copy["summary_md"] = merge_danger.inject_merge_danger(copy["summary_md"], final)
+    log(f"phase2: merge danger Door={final.door} Blast={final.blast} triggers={list(final.triggers)}")
+    findings = merge_danger.validate_merge_danger_field(copy["summary_md"])
+    for f in findings:
+        log(f"phase2 body-check finding: {f}")
+    return findings
 
 
 def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_body: str,

@@ -278,6 +278,55 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
         self::assertSame(['classes/Foo/FooRepository.php'], $matches[1]);
     }
 
+    public function testNoSqlTextBuiltWithStringFormattingFunctions(): void
+    {
+        // BanSqlStringConcatenationRule only visits `.` concatenation, so SQL assembled by
+        // sprintf()/strtr() would slip past it with the baseline still empty. The two files
+        // below predate the rule; their counts may shrink but never grow.
+        $allowed = [
+            'Boxscore/BoxscoreAuditRepository.php' => 1,
+            'HeadToHeadRecords/HeadToHeadRecordsRepository.php' => 5,
+        ];
+        $classesDir = realpath(__DIR__ . '/../../classes');
+        self::assertIsString($classesDir);
+
+        $excess = [];
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($classesDir, \FilesystemIterator::SKIP_DOTS));
+        foreach ($files as $file) {
+            if (!$file instanceof \SplFileInfo || $file->getExtension() !== 'php') {
+                continue;
+            }
+            // phpunit-hygiene-allow: the property is source shape; no runtime seam shows how SQL text was assembled
+            $source = file_get_contents($file->getPathname());
+            self::assertIsString($source);
+            $relative = substr($file->getPathname(), strlen($classesDir) + 1);
+            $count = count(self::formattedSqlCalls($source));
+            if ($count > ($allowed[$relative] ?? 0)) {
+                $excess[] = $relative . ' (' . $count . ')';
+            }
+        }
+
+        self::assertSame([], $excess, 'SQL text built with sprintf/strtr: ' . implode(', ', $excess));
+    }
+
+    public function testFormattedSqlScanDetectsSampleCalls(): void
+    {
+        // Positive control: keeps testNoSqlTextBuiltWithStringFormattingFunctions from passing vacuously.
+        $source = "\$a = strtr('SELECT * FROM t WHERE x = :x', \$map);\n"
+            . "\$b = sprintf(\"UPDATE t SET y = %d\", \$y);\n"
+            . "\$c = sprintf('%d players', \$n);\n";
+
+        self::assertSame(["strtr('SELECT", 'sprintf("UPDATE'], self::formattedSqlCalls($source));
+    }
+
+    /** @return list<string> */
+    private static function formattedSqlCalls(string $source): array
+    {
+        preg_match_all('/\b(?:sprintf|strtr)\s*\(\s*[\'"]\s*(?:SELECT|INSERT|UPDATE|DELETE|REPLACE)\b/i', $source, $matches);
+
+        return $matches[0];
+    }
+
     public function testColumnShapeCheckFlagsInjectedDepthColumnValue(): void
     {
         $map = (new \ReflectionClassConstant(TeamQueryRepository::class, 'LAST_SIM_DEPTH_COLUMNS'))->getValue();

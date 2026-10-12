@@ -286,10 +286,21 @@ if [ "$stale" -eq 1 ]; then
     [ -n "$SWITCH_AT" ] && CUR_FP=$(_usage_cred_fp)
     FAST=0
     SLOW=0
+    # A login switch passes through a dead login (no keychain login, or a 401), and a
+    # run resumed then fails at its first call. Hold switch resumes until a usage
+    # check succeeds; the normal zone then resumes them.
+    AUTH_DEAD=$(usage_auth_dead "$NOW")
+    HELD=0
     for sid in $MARKERS; do
         check_runaway "$sid" && continue
         usage_marker_eligible "$sid" "$NOW" || continue
         if key=$(switch_fast_key "$sid"); then
+            if [ -n "$AUTH_DEAD" ]; then
+                HELD=$((HELD + 1))
+                if [ "$DRY" -eq 1 ]; then printf 'ACTION hold %s auth-%s\n' "$sid" "$AUTH_DEAD"; fi
+                usage_log "switch-resume-held sid=$sid reason=auth-$AUTH_DEAD"
+                continue
+            fi
             if [ "$DRY" -ne 1 ]; then usage_marker_set_switch_resumed "$sid" "$key" || continue; fi
             if launch_resume "$sid"; then
                 FAST=$((FAST + 1))
@@ -322,7 +333,9 @@ if [ "$stale" -eq 1 ]; then
             sw_note=""
             [ -n "$SWITCH_AT" ] && sw_note="login switch detected at $(fmt_epoch "$SWITCH_AT"); "
             bo=$(_usage_fetch_backoff_read "$STATE/fetch-backoff"); bo_until=${bo% *}
-            if [ "$NOW" -lt "$bo_until" ]; then
+            if [ "$HELD" -gt 0 ]; then
+                advice="The Claude login is missing or rejected ($AUTH_DEAD), so $HELD login-switch resume(s) wait until a usage check succeeds. Run claude and sign in."
+            elif [ "$NOW" -lt "$bo_until" ]; then
                 advice="Usage fetch is backing off after a 429 until $(fmt_epoch "$bo_until"); the cache refreshes on the first fetch after that."
             else
                 advice="Run any interactive claude prompt to refresh the cache."

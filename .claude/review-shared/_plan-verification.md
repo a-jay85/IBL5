@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time; no deferred manual items; E2E assertions must be seed- and DOM-grounded.
-last_verified: 2026-09-30
+last_verified: 2026-10-11
 ---
 
 # Plan Verification Matrix
@@ -65,6 +65,8 @@ Harness rules (`parse_no_change_test_paths` in `tools/postplan-harness/harness/p
 - Honored only on a row with a cell reading exactly `Visual-regression`. Elsewhere the marker is ignored. `bin/check-plan` gate `[X]` rejects it on other row types and anywhere but directly after the token.
 - Exempts only that row's token. If another row plans the same token unmarked, the unmarked row wins.
 - Fenced examples and a code-span `(no-change)` never count. Gate `[X]` skips both.
+
+A row that only runs an existing test takes `(run-only)` the same way: _plan-verification-detail.md § Test rows that run an existing test without changing it
 
 ### Pre-prod exercise paths
 

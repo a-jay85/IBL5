@@ -42,8 +42,14 @@ from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, confor
                      manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
-                             manual_testing_clearance, meta_checks_clearance,
+                             manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
                              select_fidelity_verdict)
+
+# Directory of the pre-push meta-checks flag. Module-level so tests monkeypatch it
+# (`monkeypatch.setattr(runner, "META_CHECKS_TMP_DIR", str(tmp_path))`) and never
+# read or delete the real /tmp flag. Not an env var on purpose: nothing outside the
+# test suite should be able to redirect where condition (16) looks.
+META_CHECKS_TMP_DIR = "/tmp"
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
                               MERGE_DIGEST_BEGIN, MERGE_DIGEST_END, render_merge_digest,
                               upsert_merge_digest,
@@ -61,6 +67,7 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
+from harness import merge_danger
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
@@ -370,6 +377,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _inject_residual_phases(copy, plan, conf_files, log)
         log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
+        if _inject_merge_danger(copy, worktree, diff, log):
+            body_check_degraded = True
         log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
@@ -388,7 +397,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 for line in audit_lines_for_adaptations(
                         getattr(plain_resolution, "adapted_lines", ())):
                     log(f"phase2: {line}")
+                res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
             except HarnessError as e:
+                res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
                 if e.kind != "rebase-conflict":
                     raise
                 # DETECTION-TIME flag: recorded before the resolution attempt begins, so a
@@ -661,6 +672,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _gate_fix_block = render_gate_fix(res.gate_fix)
         if _gate_fix_block:   # never strips a block an earlier run published
             body = upsert_gate_fix(body, _gate_fix_block)
+        body = _merge_danger_body(body, worktree, diff, log, "phase6")
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)
         _sweep_out_of_scope(gh, pr, plan, slug, log)
@@ -741,8 +753,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             except Exception as _e:
                 log(f"phase6.5: red-ci-check probe error — {_e}")
         # condition (16) inputs: pre-push flag and post-pr run
-        _mc_branch_slug = git.branch().replace("/", "-")
-        _mc_flag = f"/tmp/ibl5-meta-checks-prepush-{_mc_branch_slug}.failed"
+        _mc_flag = meta_checks_flag_path(git.branch(), META_CHECKS_TMP_DIR)
         if live and pr:
             _mc_argv = [os.path.join(worktree or "", "bin", "run-meta-checks-local"),
                         "--stage", "post-pr", "--pr", str(pr)]
@@ -756,8 +767,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
         _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                    fixture=fixture, log=log)
+        _arm_body = gh.pr_body() or body
         inputs = ArmInputs(
-            pr_body=gh.pr_body() or body, pr_title=meta.get("title", copy["title"]),
+            pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
@@ -785,6 +797,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             meta_checks_status=_mc_status,
             gate_backtest_status=_gb.status,
             gate_backtest_reason=_gb.reason,
+            merge_danger_state=merge_danger.classify_body(_arm_body),
         )
         if not live and (fixture or {}).get("current_tree"):
             # replay-only seam, the checks_outcome pattern: live mode never reads it
@@ -821,6 +834,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             inputs.fidelity_tree_2, inputs.current_tree)
         res.fidelity = fid
         state.checkpoint("fidelity", res)
+        _post_sticky = None   # bound below when a PR exists; Phase 7's re-arm re-posts through it
         if pr:
             # Posted BEFORE arming on purpose: `--auto` merges immediately when the checks
             # are already green, and merge-digest-notify.yml reads the last marker comment
@@ -834,26 +848,29 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                        "GitHub checks are watched after this comment")
             if rsha:
                 ci_line += f"; remediation commit {rsha} is inside that watch"
-            sticky = fidelity.compose_sticky(
-                rebase_line, ci_line, fid, decision, digest,
-                fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
-                fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"),
-                                       fid.get("remediation_sha"),
-                                       fid.get("verdict_2"), fid.get("reviewed_tree_2"),
-                                       fid.get("rounds_completed", 0)),
-                diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
-                reused_from=res.reused_from,
-                posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
-            try:
-                cid = gh.pr_sticky_verdict(pr, sticky)
-            except (HarnessError, OSError, subprocess.SubprocessError):
-                cid = ""
-            res.sticky_comment_id = cid or None
-            if not cid:
-                # Arming is deliberately UNCHANGED by a failed post: the skill's own post is
-                # `|| true`, and a new hold here would change condition semantics.
-                res.sticky_error = "sticky-post-failed"
-                log("phase6.5: sticky verdict comment not confirmed")
+            def _post_sticky(decision_, ci_line_, phase_label):
+                sticky_ = fidelity.compose_sticky(
+                    rebase_line, ci_line_, fid, decision_, digest,
+                    fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
+                    fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"),
+                                           fid.get("remediation_sha"),
+                                           fid.get("verdict_2"), fid.get("reviewed_tree_2"),
+                                           fid.get("rounds_completed", 0)),
+                    diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
+                    reused_from=res.reused_from,
+                    posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
+                try:
+                    cid_ = gh.pr_sticky_verdict(pr, sticky_)
+                except (HarnessError, OSError, subprocess.SubprocessError):
+                    cid_ = ""
+                res.sticky_comment_id = cid_ or None
+                if not cid_:
+                    # Arming is deliberately UNCHANGED by a failed post: the skill's own post is
+                    # `|| true`, and a new hold here would change condition semantics.
+                    res.sticky_error = "sticky-post-failed"
+                    log(f"{phase_label}: sticky verdict comment not confirmed")
+                return sticky_
+            sticky = _post_sticky(decision, ci_line, "phase6.5")
             # Digest at the top of the PR body, from the same rows the sticky printed.
             # Still BEFORE arming, and never able to change it: log-and-continue.
             try:
@@ -923,9 +940,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.final_pr_state = gh.pr_state() if (mode == "replay" or live) else "N/A"
         log(f"phase7 ci: exit={outcome.exit_code} failed={outcome.failed} ({outcome.evidence})")
 
-        # Phase 7 fix loop: runs after Phase 6.5 arming has executed and never reads or
-        # writes `decision`. Replay enters only when the fixture scripts the re-watches,
-        # so every legacy red-CI fixture keeps its pass-through.
+        # Phase 7 fix loop: runs after Phase 6.5 arming has executed; `_ci_fix_loop` never
+        # reads or writes `decision`, and `_rearm_after_ci_fix` below is the only place
+        # Phase 7 may replace it. Replay enters only when the fixture scripts the
+        # re-watches, so every legacy red-CI fixture keeps its pass-through.
+        fix_loop_ran = False
         fix_enabled = ("ci_fix_rewatch" in (fixture or {}) if mode == "replay"
                        else bool(live and pr))
         if fix_enabled and outcome.exit_code == 8:
@@ -938,6 +957,14 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                                            "indeterminate")
             log(f"phase7 ci(after fix loop): exit={outcome.exit_code} "
                 f"failed={outcome.failed}")
+            fix_loop_ran = True
+
+        if fix_loop_ran and outcome.exit_code == 0 and not decision.armed and pr:
+            decision = _rearm_after_ci_fix(
+                git, gh, llm, log, res, state, inputs, decision, outcome,
+                worktree=worktree, pr=pr, sha=sha, live=live, fixture=fixture,
+                out_dir=out_dir, state_dir=_state_dir(out_dir, live, state_dir), slug=slug,
+                flag=_mc_flag, post_sticky=_post_sticky)
 
         if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
@@ -1764,7 +1791,9 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 refused.append((attempt, verdict.reason, proposal or ""))
             elif verdict.action == "apply":
                 baseline = cifix_ship.meta_run_id(gh.pr_checks_json(pr))
-                gh.pr_edit_body(pr, verdict.body)
+                # The fixer's body may drop or lower the Merge danger line; re-apply the floor.
+                gh.pr_edit_body(pr, _merge_danger_body(verdict.body, worktree,
+                                                       git.diff_vs_base(), log, "phase7"))
                 body_applied = True
                 log("phase7 ci-fix: body proposal applied")
 
@@ -1881,6 +1910,63 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             log("phase7 ci-fix: survivor comment not posted")
     log(f"phase7 ci-fix: ceiling reached - {len(trail)} attempt(s), survivors={survivors}")
     return sha, outcome
+
+
+def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome, *,
+                        worktree, pr, sha, live, fixture, out_dir, state_dir, slug,
+                        flag, post_sticky):
+    """Phase 7: re-run Phase 6.5's arming decision after the fix loop turned CI green.
+
+    Same ArmInputs, same evaluate(). Only (15), (16), (17) and current_tree are refreshed,
+    and only when the head tree is the one Phase 6.5 reviewed. Never clears on UNKNOWN.
+    """
+    rc = _post_fix_meta_checks(worktree, pr, flag, live=live, fixture=fixture, log=log)
+    cur_tree = git.head_tree()
+    if not live and (fixture or {}).get("current_tree"):
+        cur_tree = fixture["current_tree"]        # replay-only seam, parity with Phase 6.5
+    if cur_tree != inputs.current_tree:
+        log(f"phase7 re-arm: REFUSED — fix loop moved HEAD tree {inputs.current_tree[:12]} -> "
+            f"{cur_tree[:12]}; review/conformance/fidelity evidence is for the old tree; "
+            "hold stands")
+        res.rearm = {"outcome": "refused-tree-moved", "post_fix_meta_rc": rc,
+                     "tree_65": inputs.current_tree, "tree_now": cur_tree}
+        return decision
+    gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
+                              fixture=fixture, log=log)
+    new = dataclasses.replace(
+        inputs, current_tree=cur_tree,
+        meta_checks_status=meta_checks_clearance(flag, rc),
+        failed_checks=sorted(set(outcome.failed or [])),
+        gate_backtest_status=gb.status, gate_backtest_reason=gb.reason,
+        llm_safety_holds=[])
+    preview = evaluate(new)
+    if not preview.holds:
+        verdict = llm.call("safety-verdict", "haiku",
+                           llm_calls.safety_verdict_prompt(new.classification, new.pr_title,
+                                                           preview),
+                           schemas.validate_safety_verdict)
+        new.llm_safety_holds = verdict["holds"]
+    nd = evaluate(new)
+    res.arm = nd
+    log("phase7 re-arm: " + ("ARMED" if nd.armed else
+                             "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"
+                                                   for c in nd.holds)))
+    res.rearm = {"outcome": "armed" if nd.armed else "held", "post_fix_meta_rc": rc,
+                 "holds": [c.number for c in nd.holds]}
+    if ((live or state_dir is not None)
+            and holdrepeat.structural_key(nd.conditions)
+            != holdrepeat.structural_key(decision.conditions)):
+        # armed -> observe() clears the record and the held marker; a different hold set ->
+        # a fresh record (and marker clear). Same set -> leave Phase 6.5's record alone, so a
+        # single run never sends a second repeat DM.
+        res.hold_repeat = _record_hold_repeat(res, nd, slug, worktree, state_dir, log)
+    if callable(post_sticky):
+        post_sticky(nd, f"CI: green after Phase 7 fix loop on {(sha or '')[:8]}; "
+                        "arming re-evaluated on the reviewed tree", "phase7 re-arm")
+    if nd.armed:
+        gh.pr_merge_auto(pr)          # AFTER the sticky re-post: merge-digest-notify reads the last marker
+    state.checkpoint("arm", res)
+    return nd
 
 
 def _should_resolve_behind(live: bool, pr, decision, outcome) -> bool:
@@ -2097,6 +2183,54 @@ def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str
     return items
 
 
+def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list[str]:
+    """Phase 2: mechanical Merge danger floor; the LLM line in summary_md only supplies Why
+    and may raise Door / Blast radius. Always runs, fixture or live, degraded or not.
+
+    Returns the body-check findings for the final body ([] when it carries one well-formed
+    line); a non-empty result marks the body check degraded, which holds arming.
+
+    An empty summary_md is the clean-tree rerun: the live body is left as is, and condition
+    (18) reads that body at arm time."""
+    if not copy["summary_md"]:
+        return []
+    copy["summary_md"] = _merge_danger_body(copy["summary_md"], worktree, diff_body, log, "phase2")
+    findings = merge_danger.validate_merge_danger_field(copy["summary_md"])
+    for f in findings:
+        log(f"phase2 body-check finding: {f}")
+    return findings
+
+
+def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str) -> str:
+    """Return `body` carrying exactly one Merge danger line: the mechanical floor merged
+    with any line already in the body, which may only raise Door / Blast radius.
+
+    Phase 2 writes the line. Any later phase (6, 5.5, 7) only re-applies the floor to a
+    body that already carries one well-formed line, so a raised Door cannot be lowered. A
+    missing or malformed line is left alone there and condition (18) holds it until a human
+    adds the line: refilling it would turn a deleted one-way line into the mechanical two-way."""
+    if phase != "phase2":
+        try:
+            if merge_danger.parse_merge_danger(body) is None:
+                log(f"{phase}: merge-danger line missing, left for condition (18) to hold")
+                return body
+        except merge_danger.MalformedMergeDanger as exc:
+            log(f"{phase}: merge-danger line malformed, left for condition (18) to hold ({exc})")
+            return body
+    mech = merge_danger.derive_from_worktree(worktree or ".", diff_body)
+    try:
+        prior = merge_danger.parse_merge_danger(body)
+    except merge_danger.MalformedMergeDanger as exc:
+        log(f"{phase}: merge-danger line malformed, using mechanical Why ({exc})")
+        prior = None
+    final = merge_danger.merge_verdicts(mech, prior.door if prior else None,
+                                        prior.blast if prior else None,
+                                        prior.why if prior else None)
+    log(f"{phase}: merge danger Door={final.door} Blast={final.blast} "
+        f"triggers={list(final.triggers)}")
+    return merge_danger.inject_merge_danger(body, final)
+
+
 def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_body: str,
                         log) -> list[str]:
     """Phase 2: upsert `## Unplanned changes` into copy["summary_md"] from scope notes.
@@ -2193,6 +2327,35 @@ def _body_check(llm, git, gh, copy, copy_degraded, cls, log, worktree=None,
     return result, degraded
 
 
+def _post_fix_meta_checks(worktree, pr, flag, *, live, fixture, log) -> int:
+    """Phase 7: post-pr meta-checks on the head the fix loop left behind.
+
+    rc 0 is the only result that deletes the pre-push flag. rc 1 (red) and rc 2
+    (could not run / UNKNOWN) leave it in place: condition (16) clears on fresh
+    evidence only, never on a failure to gather it.
+    """
+    if live and pr:
+        argv = [os.path.join(worktree or "", "bin", "run-meta-checks-local"),
+                "--stage", "post-pr", "--pr", str(pr)]
+        try:
+            rc = subprocess.run(argv, cwd=worktree, capture_output=True, text=True).returncode
+        except OSError:
+            rc = 2
+    else:
+        # replay-only seam, the meta_checks_post_rc pattern. Absent key = 2 (UNKNOWN), so
+        # a legacy fixture that scripts a green fix loop can never clear (16) by omission.
+        rc = int((fixture or {}).get("meta_checks_post_rc_after_fix", 2))
+    if rc == 0:
+        try:
+            os.unlink(flag)
+            log("phase7 re-arm: post-pr meta-checks passed on current head; pre-push flag deleted")
+        except FileNotFoundError:
+            log("phase7 re-arm: post-pr meta-checks passed on current head; no pre-push flag present")
+    else:
+        log(f"phase7 re-arm: post-pr meta-checks rc={rc} on current head; pre-push flag kept")
+    return rc
+
+
 def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,
                          failures_out: list | None = None, llm=None) -> bool:
     if os.environ.get("PRE_PUSH_META_CHECKS_SKIP") == "1":
@@ -2212,8 +2375,7 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
     argv = [runner, "--stage", "pre-push", "--base", base]
     if body_file:
         argv += ["--body-file", body_file]
-    branch_slug = git.branch().replace("/", "-")
-    flag = f"/tmp/ibl5-meta-checks-prepush-{branch_slug}.failed"
+    flag = meta_checks_flag_path(git.branch(), META_CHECKS_TMP_DIR)
     result = subprocess.run(argv, cwd=repo_root, capture_output=True, text=True)
     last_result = result
     rc = result.returncode
@@ -2808,6 +2970,10 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         body = strip_change_blocks(live_body)
         body = _apply_backlog_closes(body, plan, log)
         body = _upsert_no_adr_markers(body, plan)
+        # Re-derived on the post-round diff: a remediation commit can add a one-way trigger,
+        # and a fixer that drops the line would otherwise hold condition (18) as MISSING.
+        body = _merge_danger_body(body, worktree, git.diff_vs_base(), log,
+                                  f"phase5.5 round {round_num}")
         gh.pr_edit_body(pr, body)
         # sha is either a real commit sha or BODY_ONLY_SHA. fidelity.re_review()'s only
         # test of it is `if not remediation_sha: return None, None, None`, so a non-empty
@@ -2926,7 +3092,8 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 # Deterministic walls a full skill re-run cannot climb — see exit_code_for. A
 # subprocess-timeout is one too: the skill re-run would hang on the same step.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
-                      "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty",
+                      "llm-usage-limit", "llm-auth-expired",
+                      "usage-pause-unconfirmed", "usage-pause-dirty",
                       SUBPROCESS_TIMEOUT)
 PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
@@ -2968,13 +3135,14 @@ def _reported_gate_class(res: RunResult) -> str:
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
     3 = fail-closed sentinel: bin/post-plan-now MUST NOT escalate to the /post-plan
-        skill session. Four kinds land here. `rebase-conflict` — a stacked-branch
+        skill session. Five kinds land here. `rebase-conflict` — a stacked-branch
         rebase a human must judge. `local-gate` — a pre-commit/pre-push hook denial
         (ADR trigger, stale doc, rules byte budget). `remote-head-diverged`: the PR
         branch was rewritten on GitHub with content the harness did not produce; a
         skill re-run would re-rebase and push over it. `llm-usage-limit`: the Claude
         CLI returned a session/rate/API limit message; a skill re-run would hit the
-        same wall immediately. All four are deterministic walls the ~1M-token skill
+        same wall immediately. `llm-auth-expired`: the Claude CLI login expired; the
+        skill re-run uses the same login. All five are deterministic walls the ~1M-token skill
         re-run cannot climb.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
     0 = shipped (armed or held), nothing to ship, degraded, or hold-repeat declined.
@@ -3131,6 +3299,7 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     wt = worktree or "(the worktree folder)"
     log = log_path or "(see the run log)"
     if res.error_kind in ("rebase-conflict", "remote-head-diverged", "llm-usage-limit",
+                          "llm-auth-expired",
                           "usage-pause-unconfirmed", "usage-pause-dirty"):
         key = res.error_kind
     elif res.error_kind == "local-gate":
@@ -3188,6 +3357,10 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     elif key in ("llm-usage-limit", "usage-pause-unconfirmed"):
         why = "The Claude usage limit was reached before the ship step finished."
         steps = ["Wait for the limit to reset (the log shows the reset time)"]
+    elif key == "llm-auth-expired":
+        why = "The Claude sign-in on this computer has expired, so the ship step could not run."
+        steps = ["In a command window, run claude and sign in again with /login",
+                 "Re-run bin/post-plan-now"]
     elif key == "usage-pause-dirty":
         why = ("The usage gate paused a model call while it was editing the worktree, "
                "so the edit may be half done.")
@@ -3476,6 +3649,12 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     f"ERROR terminal=failed kind=llm-usage-limit. "
                     + (f"{detail} " if detail else "")
                     + "Re-run bin/post-plan-now after the limit resets.")
+        if res.error_kind == "llm-auth-expired":
+            detail = _flat(res.error or "")
+            return (f"RESULT: post-plan BLOCKED — Claude CLI login expired (environmental); "
+                    f"ERROR terminal=failed kind=llm-auth-expired. "
+                    + (f"{detail} " if detail else "")
+                    + "Run `claude` and complete /login, then re-run bin/post-plan-now.")
         if res.error_kind == "usage-pause-unconfirmed":
             detail = _flat(res.error or "")
             return (f"RESULT: post-plan BLOCKED — usage gate paused but the pause marker "

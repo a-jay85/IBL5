@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 ---
 
 # Post-Plan Orchestrator
@@ -198,7 +198,7 @@ fi
 ```
 
 3. push
-4. **If no PR exists for the current branch:** create one with `gh pr create`. Read `.claude/skills/post-plan/_pr-body-claims.md` and apply it before writing the body. Read `.claude/review-shared/_prose-voice-contract.md` before writing any PR-body prose — it carries the five written-voice rules and the two annotated failure samples, and it governs every prose surface this phase and Phase 6 compose. <!-- slop-ok -->
+4. **If no PR exists for the current branch:** create one with `gh pr create`. Read `.claude/skills/post-plan/_pr-body-claims.md` and apply it before writing the body. The body carries exactly one `**Merge danger:**` line per `_pr-body-claims.md` § Merge danger rule; when any listed one-way trigger is in the diff the Door is `one-way`. Read `.claude/review-shared/_prose-voice-contract.md` before writing any PR-body prose — it carries the five written-voice rules and the two annotated failure samples, and it governs every prose surface this phase and Phase 6 compose. <!-- slop-ok -->
 
    > **Voice check, once.** After writing the Scope why-paragraph, pipe it through `bin/check-digest-prose` (`printf '%s\n' "$SCOPE_PROSE" | bin/check-digest-prose`). If it reports a violation, rewrite that paragraph **once** to address the named rule, then continue. Do not loop twice and do not abort: `bin/check-digest-prose` always exits 0 and never blocks the PR — ship whatever the single rewrite produces. <!-- slop-ok -->
 
@@ -564,7 +564,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All fifteen conditions** must be true. It is an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
+**All eighteen conditions** must be true. It is an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
 
 1. Manual testing is cleared. The PR body carries the `No manual testing needed` sentinel. The skill writes it in Phase 6 step 4; the compiled harness writes `MANUAL_TESTING_SENTINEL_TICKED` in Phase 6.7 once every row it ticked is confirmed on a fresh read.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
@@ -581,6 +581,9 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
 14. **No unreviewed conflict this run.** The Phase 2 rebase did not conflict, or it did and `_phase-2-conflict-resolution.md` step 7.5 wrote a verdict whose first line is exactly `CONFLICT-REVIEW=CLEAN` at the path keyed to this branch slug and the current `HEAD` sha. Fail-closed: the flag existing blocks, and only that exact verdict clears it. A missing, empty, negative, or stale-sha verdict blocks.
 15. **No already-red CI check.** It is a warning when the aggregator is required. No check on the PR's current head sits in `gh`'s `fail` bucket, excluding `human-signoff` (red by design on every `feat:` PR, and already covered by condition (8)). This closes the gap that merged #2304: a check outside master's required-status-checks list can be red without blocking the queued merge, so nothing downstream of arming would have caught it. Blocks only while master's protection lacks the `All checks green` context (ADR-0149); once that context is required, a red check is reported as a WARNING and arming proceeds, because the required context makes GitHub hold the merge itself. Fail-closed on unreadable protection (keeps blocking). Fail-OPEN on pending checks, unlike its fail-closed neighbours: an empty probe result means "no failure proven at arm time", never "all checks are green", so a check that has not yet reported clears this condition.
+16. **Meta checks.** The local meta checks passed pre-push and post-PR.
+17. **Gate backtest.** A changed ship-pipeline gate flags fewer than 2 clean merged PRs in the Gate backtest block; HELD or UNKNOWN holds.
+18. **Merge danger door.** The body's `**Merge danger:**` line reads `Door: two-way`; one-way, missing, malformed, or unreadable holds.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
@@ -632,7 +635,7 @@ Conditions (1)/(5)/(6)/(8)/(10)/(11)/(15) come from the shared predicate `bin/li
 
 **Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).
 
-**You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block, in order, BEFORE arming — do not arm without it.** The reference holds the eleven per-condition bash blocks (conditions 1, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13 — conditions 2/9 are the Phase-4 score check and the realized-diff hold-enumeration, run against state you already hold), each **self-contained** per the SELF-CONTAINED invariant above (every block re-`source`s the predicate in-block — a hoisted `source` does not survive into a separately-executed block and would fail OPEN). It also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only — the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file — never recompute them.
+You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block in order BEFORE arming. Never arm without it. The reference holds the fifteen per-condition bash blocks (conditions 1, 3-8, 10-13, 15-18). Conditions 2 and 9 are the Phase-4 score check and the realized-diff hold-enumeration, run against state you already hold. Each block is **self-contained** per the SELF-CONTAINED invariant above: every block re-`source`s the predicate in-block, because a hoisted `source` does not survive into a separately-executed block and would fail OPEN. The reference also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only. That state is the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file. Never recompute any of it.
 
 **Fail-closed default:** if any condition is indeterminate, errors, or you are unsure, treat it as **BLOCKED** and do NOT arm. A false HOLD costs one manual human merge; a false ARM ships unreviewed code — only under-holding is dangerous.
 

@@ -22,6 +22,8 @@
 # Run: bin/test-wt-gc-tick  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TICK="${WT_GC_TICK_UNDER_TEST:-$SCRIPT_DIR/wt-gc-tick}"
@@ -40,8 +42,6 @@ trap cleanup_root EXIT
 # shellcheck source=bin/lib/git-helpers.sh disable=SC1091
 source "$SCRIPT_DIR/lib/git-helpers.sh"
 
-PASSED=0
-FAILED=0
 CASE=""
 CD=""
 CASE_ERRS=""
@@ -144,11 +144,9 @@ note_err() { CASE_ERRS="${CASE_ERRS:+$CASE_ERRS; }$1"; }
 
 finish_case() {
     if [ -z "$CASE_ERRS" ]; then
-        echo "PASS $CASE"
-        PASSED=$((PASSED + 1))
+        h_pass "$CASE"
     else
-        echo "FAIL $CASE: $CASE_ERRS"
-        FAILED=$((FAILED + 1))
+        h_fail "$CASE: $CASE_ERRS"
     fi
 }
 
@@ -592,7 +590,7 @@ done
 if [ "$(uname -s)" = Darwin ] && command -v plutil >/dev/null 2>&1; then
     plutil -lint - < "$PLIST_OUT" >/dev/null 2>&1 || note_err "plutil -lint rejected the plist"
 else
-    echo "SKIP: plutil (non-Darwin)"
+    h_skip "plutil (non-Darwin)"
 fi
 [ -e "$ROOT/home/Library" ] && note_err "print-schedule wrote under HOME/Library"
 finish_case
@@ -645,5 +643,4 @@ if grep -E -- '--discard-generated|--discard-closed|--drop-merged-stashes' "$ROO
 fi
 finish_case
 
-echo "$PASSED passed, $FAILED failed"
-[ "$FAILED" -eq 0 ]
+h_done

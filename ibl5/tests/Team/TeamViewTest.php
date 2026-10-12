@@ -20,6 +20,9 @@ use Discord\Discord;
  */
 class TeamViewTest extends TestCase
 {
+    /** Whitespace-normalized render of the default actual-team fixture, captured from master before the #1460 refactor. */
+    private const CHARACTERIZATION_HTML = '<div class="team-page-layout"><div class="team-page-main"><div class="team-stats-block"><div class="team-banner-row" style="--team-color-primary: #FF0000; --team-color-secondary: #0000FF;"><a href="modules.php?name=Schedule&amp;teamid=1" class="team-action-link"><span class="team-action-link__text">Schedule</span><img src="./images/schedule-icon.svg" alt="Schedule" class="team-action-link__icon"></a><div class="team-banner-logo"><h1><img src="./images/logo/1.jpg" alt="Celtics"></h1></div><a href="modules.php?name=DraftInfo&amp;tab=history&amp;teamid=1" class="team-action-link"><span class="team-action-link__text">Draft History</span><img src="./images/draft-history-icon.svg" alt="Draft History" class="team-action-link__icon"></a></div><div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Team roster"><table><caption class="team-table-caption"><div class="ibl-tabs">tabs</div></caption><tbody><tr><td>roster</td></tr></tbody></table></div></div></div><div class="team-cards-row"><div class="team-card">current season</div><div class="team-card" style="--team-color-primary: #FF0000; --team-color-secondary: #0000FF;"><div class="team-card__header"><h2 class="team-card__title">Draft Picks</h2></div><div class="team-card__body--flush"><table>picks</table></div></div><div class="team-card">awards</div></div><div class="franchise-history-wrapper"><div class="team-card">franchise history</div></div><div class="team-page-rafters"><div>banners</div></div></div></div>';
+
     private TeamView $view;
 
     protected function setUp(): void
@@ -390,5 +393,77 @@ class TeamViewTest extends TestCase
 
         $this->assertStringContainsString('<div id="stub-banner"></div>', $output);
         $this->assertStringNotContainsString('ibl-alert--success', $output);
+    }
+
+    public function testRenderNormalizedHtmlMatchesCharacterization(): void
+    {
+        $html = $this->view->render($this->createPageData());
+        $normalized = preg_replace(['/>\s+</', '/\s+/'], ['><', ' '], trim($html));
+
+        $this->assertSame(self::CHARACTERIZATION_HTML, $normalized);
+    }
+
+    public function testHostileTeamNameInYearHeadingEscapedExactlyOnce(): void
+    {
+        $team = self::createStub(\Team\Team::class);
+        $team->name = 'O\'Neal <xss>&"q"';
+        $team->color1 = 'FF0000';
+        $team->color2 = '0000FF';
+        $team->discord_id = null;
+
+        $html = $this->view->render($this->createPageData(['team' => $team, 'yr' => '2024']));
+
+        $this->assertStringContainsString('<h2 class="ibl-title">2024 O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;</h2>', $html);
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
+    }
+
+    public function testHostileImagesPathEscapedExactlyOnceInBanner(): void
+    {
+        $html = $this->view->render($this->createPageData([
+            'imagesPath' => 'img"><script>',
+            'userTeamName' => 'Hawks',
+            'isOwnTeam' => true,
+        ]));
+
+        $this->assertSame(5, substr_count($html, 'src="./img&quot;&gt;&lt;script&gt;'));
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringNotContainsString('&amp;quot;', $html);
+    }
+
+    public function testPrebuiltRosterTableRendersAsHtml(): void
+    {
+        $table = '<table id="roster-fixture"><tr><td>x</td></tr></table>';
+
+        $html = $this->view->render($this->createPageData(['tableOutput' => $table]));
+
+        $this->assertStringContainsString(
+            "<div class=\"table-scroll-container\" tabindex=\"0\" role=\"region\" aria-label=\"Team roster\">\n"
+                . str_repeat(' ', 20) . $table,
+            $html
+        );
+        $this->assertStringNotContainsString('&lt;table', $html);
+    }
+
+    public function testNonActualTeamRendersFreeAgentsHeadingAndNoCards(): void
+    {
+        $team = self::createStub(\Team\Team::class);
+        $team->name = 'Free Agents';
+        $team->color1 = '000000';
+        $team->color2 = 'FFFFFF';
+        $team->discord_id = null;
+
+        $html = $this->view->render($this->createPageData([
+            'teamid' => 0,
+            'team' => $team,
+            'isActualTeam' => false,
+        ]));
+
+        $this->assertStringContainsString('<h1 class="ibl-title">Free Agents</h1>', $html);
+        $this->assertStringContainsString('team-logo-fallback', $html);
+        $this->assertStringNotContainsString('team-cards-row', $html);
+        $this->assertStringNotContainsString('franchise-history-wrapper', $html);
+        $this->assertStringNotContainsString('team-page-rafters', $html);
+        $this->assertStringNotContainsString('team-banner-row', $html);
     }
 }

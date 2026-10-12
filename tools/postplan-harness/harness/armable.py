@@ -104,6 +104,17 @@ def manual_testing_clearance(body: str, changed_files: Sequence[str] = ()) -> st
     return "CLEARED"
 
 
+def meta_checks_flag_path(branch: str, tmp_dir: str = "/tmp") -> str:
+    """The pre-push meta-checks failure flag for a branch.
+
+    Spelling must stay byte-identical to the shell side
+    (`/tmp/ibl5-meta-checks-prepush-<branch with / -> ->.failed`): Phase 2 writes it,
+    Phase 6.5 reads it for condition (16), and Phase 7's post-fix re-run deletes it.
+    `tmp_dir` exists so tests never touch the real /tmp.
+    """
+    return os.path.join(tmp_dir, f"ibl5-meta-checks-prepush-{branch.replace('/', '-')}.failed")
+
+
 def meta_checks_clearance(flag_path: str, post_pr_rc: int) -> str:
     """Three-state clearance for condition (16): pre-push flag file or post-pr run.
 
@@ -180,6 +191,7 @@ class ArmInputs:
     meta_checks_status: str = "CLEARED"               # pre-push meta-check gate; "HELD"/"UNKNOWN" blocks
     gate_backtest_status: str = "NOT-APPLICABLE"      # gate replay verdict; "HELD"/"UNKNOWN"/other blocks
     gate_backtest_reason: str = ""                    # verdict reason, surfaced in the hold line
+    merge_danger_state: str = "MISSING"   # harness/merge_danger.classify_body(pr_body); only "TWO-WAY" arms (fail-closed default)
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -384,5 +396,10 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     gb_blocked = gb not in ("NOT-APPLICABLE", "CLEARED")
     gb_reason = f"state={gb}" + (f"; {inp.gate_backtest_reason}" if inp.gate_backtest_reason else "")
     cs.append(ConditionResult(17, "gate-backtest", gb_blocked, gb_reason if gb_blocked else ""))
+
+    # Condition (18) — merge danger door: only a well-formed two-way line arms.
+    md = inp.merge_danger_state
+    md_blocked = md != "TWO-WAY"
+    cs.append(ConditionResult(18, "merge-danger", md_blocked, f"state={md}" if md_blocked else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

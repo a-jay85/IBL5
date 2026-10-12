@@ -175,6 +175,19 @@ jobs:
         if: ${{ !cancelled() }}
         run: bin/test-check-model-pins
 
+      # --- engine freeze + decompile-token gate: UNCONDITIONAL on every PR, no
+      # path filter. The token half scans added lines in every path, and the
+      # freeze half must see a rename out of engine/. The harness runs first so
+      # a broken pattern fails loudly. The engine cutover PR deletes this step
+      # together with engine/ (.claude/rules/engine-go.md). Hard gate. ---
+      - name: Run bin/check-engine-freeze (harness + PR diff)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          bin/test-check-engine-freeze
+          bin/check-engine-freeze --since="$BASE_SHA"
+
       # --- Hard gates (path-gated): a non-zero exit fails the job, same as the
       # former standalone workflows. `!cancelled()` makes each report
       # independently of an earlier step's failure (no sequential masking). ---
@@ -202,11 +215,17 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bin/refactor-flag --pr
 
+      # Scans every E2E file, so two PRs that each pass alone can't leave
+      # master red together. A master push runs it too, as a backstop.
       - name: Run bin/check-e2e-hygiene
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.e2ehygiene == 'true' }}
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: bin/check-e2e-hygiene --pr
+        if: ${{ !cancelled() && (github.event_name == 'push' || steps.filter.outputs.e2ehygiene == 'true') }}
+        run: bin/check-e2e-hygiene
+
+      # The PR step above scans only changed files, so two PRs can each pass and
+      # still leave master red together. A master push scans the whole tree.
+      - name: Run bin/check-e2e-hygiene (full tree)
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        run: bin/check-e2e-hygiene
 
       - name: Run bin/check-e2e-fa-offers-owner
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.e2ehygiene == 'true' }}

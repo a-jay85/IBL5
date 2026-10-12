@@ -7,6 +7,7 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 use RecordHolders\RecordHoldersRepository;
+use RecordHolders\RecordStatDefinitions;
 
 #[Group('database')]
 class RecordHoldersRepositoryTest extends DatabaseTestCase
@@ -433,6 +434,39 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('pid', $pointsRecord);
         self::assertArrayHasKey('name', $pointsRecord);
         self::assertArrayHasKey('value', $pointsRecord);
+    }
+
+    public function testEveryRecordStatExpressionExecutesAgainstSchema(): void
+    {
+        $pid = 200090600;
+        $this->insertTestPlayer($pid, 'StatDefs Test');
+        $this->insertHistRow($pid, 'StatDefs Test', 2098);
+        $this->insertPlayerBoxscoreRow('2098-01-15', $pid, 'StatDefs Test', 'PG', 2, 1, 1, minutes: 35);
+
+        $expressions = [];
+        foreach (RecordStatDefinitions::STATS as $definition) {
+            $expressions[$definition['recordLabel']] = $definition['expression'];
+        }
+
+        $result = $this->repo->getTopPlayerSingleGameBatch($expressions, '1=1');
+
+        foreach (array_keys($expressions) as $label) {
+            self::assertArrayHasKey($label, $result);
+            self::assertNotSame([], $result[$label], $label);
+        }
+    }
+
+    public function testEveryRecordDateFilterExecutesAgainstSchema(): void
+    {
+        $expressions = [];
+        foreach (RecordStatDefinitions::STATS as $definition) {
+            $expressions[$definition['recordLabel']] = $definition['expression'];
+        }
+
+        foreach (RecordStatDefinitions::DATE_FILTERS as $gameType => $filter) {
+            $result = $this->repo->getTopPlayerSingleGameBatch($expressions, $filter);
+            self::assertSame([], array_diff_key($result, $expressions), $gameType);
+        }
     }
 
     public function testGetTopPlayerSingleGameBatchOrdersDescAndCapsAtFive(): void

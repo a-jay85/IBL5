@@ -1,6 +1,6 @@
 ---
-description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line.
-last_verified: 2026-10-10
+description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges.
+last_verified: 2026-10-11
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -190,3 +190,13 @@ The Unchanged section above says `bin/pr-triage` updates a newly armed BEHIND PR
 **Live evidence.** On 2026-10-10 the pr-cycle runs updated 10, 13, 11, 7, 6, 8 and 12 PRs in single bursts, counted from the `updated branch on` lines in each run's `triage.txt`. The 18:05 PDT burst updated 12 PRs in under a minute. Each update started a full CI round. The head of the line, #3084, then waited behind those runs for runners.
 
 **Behavior from today.** `--arm` arms every ARMABLE PR as before. A BEHIND PR is no longer updated inside the arm loop. When the loop armed at least one BEHIND PR, `bin/pr-triage` runs `bin/merge-line-watch --once` one time after the loop. That pass updates the head of the line only, using the same selector as `.github/workflows/update-behind-prs.yml`. A failed pass exits 1 and leaves every PR armed for the workflow's next run.
+
+## Addendum: post-plan-running skip and stacked update-branch absorption (2026-10-11)
+
+PR #3022 showed two update-branch merges landing on a PR while `bin/post-plan-now` was running on it. The cron line pushed one merge and a later tick or the PR-page button pushed a second on top. Post-plan's remote-head reconcile accepted one update-branch merge on the sha it pushed, so the second left the run diverged and Phase 7 failed closed.
+
+Two changes close the gap.
+
+**Prevention.** `bin/merge-line-select` treats a PR carrying the `post-plan-running` label as skipped with reason `running`. The label marks a live run (`bin/post-plan-now` adds it at start and removes it at exit). Precedence is `running`, then `red`, then `dirty`. In line mode the next PR becomes the head. In `--pr` dispatch mode the selector returns `action=none`. The workflow's notice step logs a `::notice::` for `running` and posts no sticky comment, and a running PR is left out of `clear`. The live query now selects `labels`; a snapshot without labels reads as unlabeled.
+
+**Absorption.** The PR-page "Update branch" button can still push mid-run, so prevention alone is incomplete. `update_branch_merge_equivalent` in `tools/postplan-harness/harness/gitutil.py` now walks first parents from the remote head down to the sha the harness pushed. Every commit on that walk must be a two-parent merge whose second parent is an ancestor of `origin/master` and whose tree equals the clean `git merge-tree --write-tree` result. The walk stops at `UPDATE_BRANCH_MERGE_CHAIN_CAP` (10) merges. Any failing arm, git error, timeout, or an over-cap chain leaves the run diverged. The tree-equivalent and patch-series checks are unchanged.

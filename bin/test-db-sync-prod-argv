@@ -11,21 +11,20 @@
 # fail-closed probe, S1 dump stdout/stderr separation, L1-L4 db_cmd unit cases,
 # M1-M3 DB_CMD composition in db-migrate/db-test-up/wt-up, E1 e2e-wt pin.
 set -euo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-PASS=0
-FAIL=0
+h_tmp TMP
 
-pass()     { echo "PASS: $1"; PASS=$((PASS + 1)); }
-failcase() { echo "FAIL: $1"; echo "      $2"; FAIL=$((FAIL + 1)); }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$1" "$2"; }
 
 assert_eq() {  # <label> <expected> <actual>
-    if [ "$2" = "$3" ]; then pass "$1"; else failcase "$1" "expected: [$2] got: [$3]"; fi
+    h_eq "$1" "$2" "$3"
 }
 assert_match() {  # <label> <needle> <haystack>
-    case "$3" in *"$2"*) pass "$1" ;; *) failcase "$1" "expected to contain: $2 | got: $3" ;; esac
+    h_contains "$1" "$3" "$2"
 }
 count_in() {  # <needle> <haystack> — fixed-string line count, herestring (no pipe SIGPIPE)
     grep -cF -- "$1" <<<"$2" || true
@@ -70,9 +69,7 @@ cp "$REPO_ROOT/bin/lib/db-helpers.sh"  "$MAIN/bin/lib/db-helpers.sh"
 cp "$REPO_ROOT/bin/lib/git-helpers.sh" "$MAIN/bin/lib/git-helpers.sh"
 cp "$REPO_ROOT/bin/db-sync-prod"       "$MAIN/bin/db-sync-prod"
 chmod +x "$MAIN/bin/db-sync-prod"
-git -C "$MAIN" init -q -b master
-git -C "$MAIN" config user.email t@example.com
-git -C "$MAIN" config user.name  Test
+h_git_repo "$MAIN" --no-commit
 git -C "$MAIN" add -A
 git -C "$MAIN" commit -qm init
 
@@ -233,5 +230,4 @@ assert_eq "E1 reads getenv" "1" "$(grep -cF -- 'getenv("E2E_DB_NAME")' "$E2E" ||
 assert_eq "E1 no literal name" "0" "$(grep -cF -- '"iblhoops_ibl5")' "$E2E" || true)"
 assert_eq "E1 sources db-helpers" "1" "$(grep -cF -- 'source "$REPO_ROOT/bin/lib/db-helpers.sh"' "$E2E" || true)"
 
-echo "PASS: $PASS  FAIL: $FAIL"
-[ "$FAIL" -eq 0 ] || exit 1
+h_done

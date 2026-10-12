@@ -99,6 +99,27 @@ final class SchemaValidatorTest extends TestCase
         ], $result->missing);
     }
 
+    public function testPreparesOneBoundQueryPerAssertion(): void
+    {
+        $this->mockDb->onQuery('INFORMATION_SCHEMA', []);
+
+        $validator = new SchemaValidator($this->mockDb);
+        $validator->validate([
+            new SchemaAssertion('ibl_plr', 'pid'),
+            new SchemaAssertion('ibl_team_info', 'teamid'),
+        ]);
+
+        $prepared = $this->mockDb->getPreparedQueries();
+        $this->assertCount(2, $prepared);
+        foreach ($prepared as $sql) {
+            $this->assertSame(
+                'SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+                $sql
+            );
+        }
+        $this->assertSame(['ibl_team_info', 'teamid'], $this->mockDb->getLastBoundParams());
+    }
+
     public function testSchemaAssertionToKey(): void
     {
         $assertion = new SchemaAssertion('ibl_plr', 'dc_canPlayInGame');

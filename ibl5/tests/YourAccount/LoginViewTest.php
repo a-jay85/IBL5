@@ -63,7 +63,7 @@ final class LoginViewTest extends TestCase
         self::assertStringContainsString('Line one<br />', $html);
     }
 
-    public function testLoginPageEscapesHostileErrorExactlyOnce(): void
+    public function testHostileMultilineErrorEscapedOnceWithBrTags(): void
     {
         $html = $this->view->renderLoginPage('O\'Neal <xss>&"q"' . "\nnext");
 

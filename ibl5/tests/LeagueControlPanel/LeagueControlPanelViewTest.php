@@ -632,7 +632,7 @@ class LeagueControlPanelViewTest extends TestCase
         ], $overrides);
     }
 
-    public function testRenderEmitsHeadBlockBeforeBody(): void
+    public function testHeadContainsFontPreconnectLinksAndStylesheet(): void
     {
         $html = $this->renderWithDefaults();
 
@@ -642,5 +642,6 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('<link rel="stylesheet" href="/ibl5/themes/IBL/style/style.css">', $html);
         $this->assertStringContainsString("</head>\n<body>", $html);
         $this->assertStringNotContainsString('&lt;link', $html);
+        $this->assertSame(1, substr_count($html, '<head>'));
     }
 }

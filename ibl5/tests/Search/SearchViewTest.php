@@ -570,7 +570,7 @@ EMPTY_GOLDEN;
         return array_merge($defaults, $overrides);
     }
 
-    public function testUserResultsCarryCompactModifierOnWrapper(): void
+    public function testResultItemsRenderBodyAsHtmlWithEscapedModifier(): void
     {
         $html = $this->view->render(self::createPageData([
             'type' => 'users',

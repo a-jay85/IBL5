@@ -191,7 +191,7 @@ class WaiversViewTest extends TestCase
         $this->assertStringContainsString('waivers', strtolower($output));
     }
 
-    public function testRenderWaiverFormBuildsOptionFromPlainData(): void
+    public function testPlayerOptionsRenderAsOptionTags(): void
     {
         $output = $this->view->renderWaiverForm(
             'Test Team',
@@ -235,5 +235,12 @@ class WaiversViewTest extends TestCase
 
         $this->assertStringContainsString('<option value="1">A 100</option>', $output);
         $this->assertStringContainsString('<option value="2">B 200</option>', $output);
+    }
+
+    public function testEmptyWaitTimeOmitsTrailingSpace(): void
+    {
+        $option = $this->view->buildPlayerOption(5, 'Jane Doe', '103', '');
+
+        $this->assertSame('<option value="5">Jane Doe 103</option>', $option);
     }
 }

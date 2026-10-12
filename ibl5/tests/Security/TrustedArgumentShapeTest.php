@@ -54,6 +54,10 @@ final class TrustedArgumentShapeTest extends TestCase
         );
     }
 
+    /**
+     * Rejected shapes: bare variables, Class::static() calls and $this->prop fetches.
+     * Accepted shapes: literals, casts, $this->m() and $this->p->m() calls.
+     */
     public function testClassifierRejectsBareVariableArgument(): void
     {
         $src = '<?php echo HtmlSanitizer::trusted($safeTitle); echo \Security\HtmlSanitizer::trusted($rows[\'html\']);';

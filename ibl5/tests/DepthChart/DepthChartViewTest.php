@@ -804,7 +804,7 @@ class DepthChartViewTest extends TestCase
         $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
     }
 
-    public function testRenderPlayerRowLinkWrapsThumbnailAndEscapedName(): void
+    public function testHostilePlayerNameEscapedExactlyOnceNextToThumbnail(): void
     {
         $player = $this->buildTestPlayer(77, 'O\'Neal <xss>&"q"');
 

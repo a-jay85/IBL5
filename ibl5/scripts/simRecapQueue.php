@@ -94,7 +94,7 @@ function collectRecentThemes(\SimRecap\SimSummaryRepository $repo): array
 //    Runs entirely before any repository is constructed.
 $verb = null;
 $simRaw = null;
-foreach (array_slice($argv, 1) as $arg) {
+foreach (array_slice($argv ?? [], 1) as $arg) {
     if (!is_string($arg)) {
         continue;
     }
@@ -140,7 +140,9 @@ switch ($verb) {
         break;
 
     case 'claim':
-        /** @var int $sim */
+        if (!is_int($sim)) {
+            fail('sim number is required for this verb');
+        }
         $out = ['ok' => true, 'cmd' => 'claim', 'sim' => $sim, 'claimed' => $repo->claimPending($sim)];
         break;
 
@@ -149,12 +151,16 @@ switch ($verb) {
         break;
 
     case 'park':
-        /** @var int $sim */
+        if (!is_int($sim)) {
+            fail('sim number is required for this verb');
+        }
         $out = ['ok' => true, 'cmd' => 'park', 'sim' => $sim, 'outcome' => $repo->parkOrFail($sim)];
         break;
 
     case 'find':
-        /** @var int $sim */
+        if (!is_int($sim)) {
+            fail('sim number is required for this verb');
+        }
         $row = $repo->find($sim);
         // Project the full envelope down to the six queue-state keys the tick
         // reads; the frozen find() returns recap_text (MEDIUMTEXT) and the

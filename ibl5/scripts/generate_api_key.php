@@ -17,7 +17,8 @@ if (php_sapi_name() !== 'cli') {
     exit(1);
 }
 
-if ($argc < 2) {
+$cliArgs = $argv ?? [];
+if (count($cliArgs) < 2) {
     echo "Usage: php scripts/generate_api_key.php \"Owner Name\" [permission_level] [rate_limit_tier]\n";
     echo "\n";
     echo "  permission_level: public (default), team_owner, commissioner\n";
@@ -25,9 +26,9 @@ if ($argc < 2) {
     exit(1);
 }
 
-$ownerName = $argv[1];
-$permissionLevel = $argv[2] ?? 'public';
-$rateLimitTier = $argv[3] ?? 'standard';
+$ownerName = $cliArgs[1];
+$permissionLevel = $cliArgs[2] ?? 'public';
+$rateLimitTier = $cliArgs[3] ?? 'standard';
 
 $validPermissions = ['public', 'team_owner', 'commissioner'];
 $validTiers = ['standard', 'elevated', 'unlimited'];

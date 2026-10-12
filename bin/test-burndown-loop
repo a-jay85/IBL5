@@ -9,15 +9,14 @@
 # launchd or Discord. Named tests run as arguments: bin/test-burndown-loop test_cli_no_args
 
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOOP="$REPO_ROOT/bin/burndown-loop"
-PASS=0
-FAIL=0
-FAILED_NAMES=""
 
-pass() { PASS=$((PASS + 1)); echo "  ok   $1"; }
-fail() { FAIL=$((FAIL + 1)); FAILED_NAMES="$FAILED_NAMES $1"; echo "  FAIL $1${2:+ — $2}"; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 assert_eq() {  # name expected actual
     if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "expected [$2] got [$3]"; fi
@@ -610,7 +609,7 @@ test_zone_pauses_75() {
 
 test_zone_marker_write_fails_no_launch() {
     new_env
-    if [ "$(id -u)" = 0 ]; then echo "  SKIP zone_marker_write_fails (root ignores chmod)"; return 0; fi
+    if [ "$(id -u)" = 0 ]; then h_skip "zone_marker_write_fails (root ignores chmod)"; return 0; fi
     seed_usage 95 10 100
     chmod 555 "$IBL5_USAGE_GATE_STATE_DIR/markers"
     run_loop run --once
@@ -1200,10 +1199,4 @@ for t in $TESTS; do
     "$t"
 done
 
-echo
-echo "passed=$PASS failed=$FAIL"
-if [ "$FAIL" -ne 0 ]; then
-    echo "failed:$FAILED_NAMES"
-    exit 1
-fi
-exit 0
+h_done

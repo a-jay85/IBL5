@@ -196,7 +196,9 @@ else
     fail "r6-repeat-report-carries-signature" "report missing or incomplete: $REPORT"
 fi
 
-# p1: a sentinel whose line 1 is exactly the marker is read as a plan defect
+# p1: a sentinel whose line 1 is exactly the marker is read as a plan defect.
+# Renaming plan_defect_marker_present in bin/automouse/run fails the extractor loop
+# above as extract-plan_defect_marker_present, before p1 runs.
 PD="$QUEUE_DIR/plan-p.md.plan-defect"
 printf 'automouse-plan-defect: v1\nUNREALISED-ASSERTION: row 3 testFoo\nMISSING-FILE: bin/x\n' > "$PD"
 if plan_defect_marker_present "$PD"; then

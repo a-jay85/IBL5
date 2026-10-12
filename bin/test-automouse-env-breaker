@@ -169,7 +169,8 @@ assert_pd "plan-defect-with-env-sig"   0 1 1 0 0 0 0 1 continue   # sentinel is 
 assert_pd "plan-defect-stalled"        0 1 0 1 0 0 0 1 continue
 # Control: same shape with plan_defect=0 is still a genuine env-stop (guard scoped to plan_defect only)
 assert_pd "no-plan-defect-env-control" 0 1 1 0 0 0 0 0 stop
-# Back-compat: a 7-arg call defaults plan_defect=0 (sub-minute exit still stops)
+# Back-compat: a 7-arg call defaults plan_defect=0 (sub-minute exit still stops).
+# Mutation pin: changing the default to ${8:-1} in should_impl_env_stop makes this case fail.
 if should_impl_env_stop 0 1 0 0 1 0 0; then got="stop"; else got="continue"; fi
 if [ "$got" != "stop" ]; then
     h_fail "seven-arg-default" "expected 'stop', got '$got' (plan_defect default must be 0)"

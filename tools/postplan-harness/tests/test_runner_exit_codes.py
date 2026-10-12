@@ -57,8 +57,25 @@ _EXIT_CODE_TABLE = (
     + [(t, None, 0) for t in (
         TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
         TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED,
-        TerminalState.HOLD_REPEAT_DECLINED)]
+        TerminalState.HOLD_REPEAT_DECLINED, TerminalState.REBASED_HELD)]
 )
+
+
+def test_rebased_held_value_pinned():
+    """bin/post-plan-fleet, bin/pr-cycle and bin/pr-cycle-tick key on this literal."""
+    assert TerminalState.REBASED_HELD.value == "rebased-held"
+    assert TerminalState.REBASED_HELD != TerminalState.FAILED
+
+
+def test_verdict_line_rebased_held():
+    res = _res(TerminalState.REBASED_HELD, rebase_only={"noop": False, "hold": "7,8"})
+    line = runner.verdict_line(res, 0)
+    assert "terminal=rebased-held" in line
+    assert "merged origin/master and pushed" in line
+    assert "auto-merge not armed" in line
+    assert "prior hold 7,8" in line
+    noop = _res(TerminalState.REBASED_HELD, rebase_only={"noop": True, "hold": "3"})
+    assert "nothing pushed" in runner.verdict_line(noop, 0)
 
 
 @pytest.mark.parametrize("terminal,error_kind,expected", _EXIT_CODE_TABLE)

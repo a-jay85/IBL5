@@ -150,6 +150,31 @@ else
     h_pass "six-arg-default ($got)"
 fi
 
+# assert_pd <name> <handoff> <in_queue> <env_err> <stalled> <fast> <wt_fail> <wt_refused> <plan_defect> <expected>
+assert_pd() {
+    local name=$1 got
+    if should_impl_env_stop "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9"; then got="stop"; else got="continue"; fi
+    if [ "$got" != "${10}" ]; then
+        h_fail "$name" "expected '${10}', got '$got'"
+    else
+        h_pass "$name ($got)"
+    fi
+}
+
+# --- Plan-defect stop: plan STAYS in queue/, valid sentinel → NEVER env-stop ---
+assert_pd "plan-defect-fast"           0 1 0 0 1 0 0 1 continue
+assert_pd "plan-defect-with-env-sig"   0 1 1 0 0 0 0 1 continue   # sentinel is authoritative over a stray env signature
+assert_pd "plan-defect-stalled"        0 1 0 1 0 0 0 1 continue
+# Control: same shape with plan_defect=0 is still a genuine env-stop (guard scoped to plan_defect only)
+assert_pd "no-plan-defect-env-control" 0 1 1 0 0 0 0 0 stop
+# Back-compat: a 7-arg call defaults plan_defect=0 (sub-minute exit still stops)
+if should_impl_env_stop 0 1 0 0 1 0 0; then got="stop"; else got="continue"; fi
+if [ "$got" != "stop" ]; then
+    h_fail "seven-arg-default" "expected 'stop', got '$got' (plan_defect default must be 0)"
+else
+    h_pass "seven-arg-default ($got)"
+fi
+
 # --- Contract: prompt-impl and run agree on the sentinel, and wt-new failure no longer skips ---
 PROMPT="$SCRIPT_DIR/automouse/prompt-impl"
 if grep -qF 'touch "$NIGHTLY_DIR/queue/$PLAN_FILE.wt-fail"' "$PROMPT"; then

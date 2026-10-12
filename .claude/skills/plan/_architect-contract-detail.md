@@ -23,6 +23,18 @@ An assertion whose catching mutation you cannot state is vacuous: it survives a 
 
 Write the mutation into the row's **How** cell as a clause on the command, so an implementer cannot substitute a text grep without leaving the stated mutation unmet, and a later reviewer inherits a stated predicate instead of having to re-derive the row's intent. If you cannot state the catching mutation, the row is not yet an assertion — rewrite it until you can.
 
+**Non-compliant (bundled claims, one mutation).** Row 17 at `~/claude-plans/plan-review-dm-outcome-update.md` line 510 asserted three claims (the sweep fires on interval, `clearInterval` stops it, a re-entrant call is a no-op) and named one mutation, deleting the `sweeping` flag. The "fires on interval" claim had no catching mutation. The shipped test called `clearInterval` before advancing the fake timers, so it passed with the interval code deleted. It merged in PR #2294 and PR #2636 repaired it. The compliant form is three rows, or one row naming three mutations: delete the `setInterval` call, delete the `clearInterval` call, delete the `sweeping` flag.
+
+**Non-compliant (restated logic, pre-plan era).** `testPostToChannelStripsHashFromChannelName` in `ibl5/tests/Discord/DiscordIntegrationTest.php` (line 175) asserts `ltrim('#transactions', '#') === 'transactions'` and never calls `Discord::postToChannel` in `ibl5/classes/Discord/Discord.php` (line 346). Deleting the strip from production leaves it green. `ibl5/tests/Discord/DiscordTest.php` (lines 77 and 99) copies the TradeProcessor branch into the test body under a `// Simulate the TradeProcessor logic` comment.
+
+**Non-compliant (pre-seeded state, implementation deviation).** Row 23 of the same plan family said to burn to FORCED via `set_ack '' 400`. The implementer wrote `printf 'ao6\tFORCED\n' > "$STATE"` in `bin/test-plan-review-seam`, so the retry ladder never ran. PR #2641 repaired it. The plan text was correct, so plan wording could not have caught this case. The **Negative check** step (apply the named mutation, see the row go red, restore it) is the defense. <!-- slop-ok -->
+
+**Non-compliant (guarded assertion).** PR #2663 (`if packet_dir in prompt:`) and PR #2574 (`if body_edits:`) put the assertion behind a guard. When the guard is false the assertion never runs and the test passes.
+
+**Compliant exemplar (extract and run).** `bin/test-automouse-postplan-engine` (lines 71 to 74) awk-extracts the real runner span and `eval`s it, so the test executes production text. Its row 12-neg is the mutation control.
+
+**Rejected executable gates (measured 2026-10-02 for backlog#922).** A comment regex over test code (`to simulate`, `simulate the X logic`) hit 13 of 1603 test files, with 2 real instances. A PHP heuristic that flags test methods whose body references no production class flagged 238 of 9031 methods. Sampled hits such as `ibl5/tests/Bootstrap/FilterFunctionTest.php` and `ibl5/tests/YourAccount/BuildRedirectUrlTest.php` call production global functions and are false positives, and the heuristic sees only PHP while the plan-originated cases are TypeScript and bash. The fix therefore lives in plan guidance. A plan-time mutation-presence check would need `bin/check-plan`, which backlog#947 owns. <!-- slop-ok -->
+
 ### Critical Files parsing — counter-examples
 
 The `(conditional)` marker exempts an entry from the MISSING-FILE check, but only when `conditional` *opens* the parenthesized group immediately followed by `)` or a separator (`—`/`–`/`-`/`:`/`;`/`,`):
@@ -47,6 +59,10 @@ The gate is a hard fail. Every flagged plan holds deterministically whenever VR 
 ### Run-only matrix rows
 
 **Matrix rows that only RUN an existing test** (a smoke suite as a regression check, a characterization run of a suite the PR does not edit) carry `(run-only)` right after the token's closing backtick: `` `ibl5/tests/e2e/smoke/navigation.spec.ts` (run-only) ``. Without it Phase 5.0 emits `MISSING:` for the untouched file and arming condition (3) holds. Honored on any PHPUnit / API-test / E2E / Visual-regression row, only for a path tracked on master, only when every row naming the token carries `(run-only)` or `(no-change)`; it never exempts a Critical Files entry (mark that `(reference)`). Gate `[RO]` fails a marker on a path absent from master, a path a must-appear Critical Files entry names, a row that also carries `(no-change)`, or a marker not directly after the planned token. Use `(no-change)` for an untouched Visual-regression baseline and `(run-only)` for everything else.
+
+### Existing tests the spec forces to edit
+
+Post-plan's scope check (`bin/lib/plan-scope-conformance`) exempts an added test path but flags an undeclared edit to an existing one by design, and the fidelity review reports it as scope creep. Listing the test in `## Critical Files` keeps that edit in scope.
 
 ### Phase-count guard — HTML comment mechanism
 
@@ -181,7 +197,8 @@ For a phase that is **genuinely verbose or parallelizable**, delegate the **whol
 
 This does **not** regress the ~15K economics: tiny sub-tier phases still stay inline because a sub-agent's fixed startup exceeds the work a one/two-edit phase moves. The rule changes only that such a phase is now *labeled* `(inline — …)` instead of left bare — zero new delegation is forced, only an explicit decision. The force applies solely to below-run-model phases whose moved work *already* clears ~15K, which the doctrine *already* says should be packets; the rule makes that latent "should" mechanically enforced.
 
-Why the `Assertions:` field exists: two past PRs were blocked by a delegate that tested one property where the plan wrote four. A grep for the property name is green from birth, so it cannot stand in for running the test.
+Two past PRs were blocked by a delegate that tested one property where the plan wrote four. That incident is why each packet carries an `Assertions:` field.
+A grep for the property name is green from birth, so it cannot stand in for running the test.
 
 ## Self-apply the Automouse Hold Challenge
 

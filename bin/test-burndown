@@ -1699,6 +1699,36 @@ OUT="$(BURNDOWN_NOW=$SW_NOW GH_FAIL_ON="pr list" bd_home "$SW" burndown-sweep 2>
     && ok "C50h: unknown state exits 1, nothing closed, ledgers untouched" \
     || fail "C50h: unknown state exits 1, nothing closed, ledgers untouched (got $RC: $OUT)"
 
+# RETIRE1: a stale plan whose issue is already closed is retired, not reported forever.
+sw_reset
+printf '%s' '{"state":"CLOSED"}' > "$T/fx/issue-193.json"
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$SW" burndown-sweep 2>&1)"; RC=$?
+rm -f "$T/fx/issue-193.json"
+[ "$RC" -eq 0 ] && [ "$(sw_item "$SW_OLD" 193 status)" = "skipped" ] \
+    && [ "$(sw_item "$SW_OLD" 193 cost)" = "0" ] \
+    && ok "RETIRE1: closed-issue stale plan flipped to skipped, cost 0" \
+    || fail "RETIRE1: closed-issue stale plan flipped to skipped, cost 0 (got $RC: $OUT)"
+want "RETIRE1: RETIRED line names the issue" "$OUT" "RETIRED #193 stale-193"
+! grep -qF 'STALE-PLAN #193' <<< "$OUT" \
+    && ok "RETIRE1: no STALE-PLAN line for the retired row" || fail "RETIRE1: no STALE-PLAN line for the retired row"
+! grep -qF 'issue close 193' "$T/gh.log" \
+    && ok "RETIRE1: retiring never re-closes the issue" || fail "RETIRE1: retiring never re-closes the issue"
+
+# RETIRE2: an open issue, or an issue view that fails, keeps the STALE-PLAN report and the row.
+sw_reset
+printf '%s' '{"state":"OPEN"}' > "$T/fx/issue-193.json"
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$SW" burndown-sweep 2>&1)"
+rm -f "$T/fx/issue-193.json"
+[ "$(sw_item "$SW_OLD" 193 status)" = "queued" ] && grep -qF 'STALE-PLAN #193' <<< "$OUT" \
+    && ok "RETIRE2: open issue keeps STALE-PLAN" || fail "RETIRE2: open issue keeps STALE-PLAN (got: $OUT)"
+sw_reset
+printf '%s' '{"state":"CLOSED"}' > "$T/fx/issue-193.json"
+OUT="$(BURNDOWN_NOW=$SW_NOW GH_FAIL_ON="issue view 193" bd_home "$SW" burndown-sweep 2>&1)"
+rm -f "$T/fx/issue-193.json"
+[ "$(sw_item "$SW_OLD" 193 status)" = "queued" ] && grep -qF 'STALE-PLAN #193' <<< "$OUT" \
+    && ok "RETIRE2: failed issue view keeps STALE-PLAN, row untouched" \
+    || fail "RETIRE2: failed issue view keeps STALE-PLAN, row untouched (got: $OUT)"
+
 sw_reset
 printf '{"not_items":1}\n' > "$SW/claude-plans/_reports/burndown-batch-20260930T000000.json"
 cp "$SW_OLD" "$T/sw-old.before"
@@ -2149,6 +2179,13 @@ want "L3: #42 PICK" "$OUT" "PICK  #42"
 if grep -qF "PICK  #40" <<< "$OUT"; then fail "L3: #40 must not PICK"; else ok "L3: #40 not PICKed"; fi
 if grep -qF "PICK  #41" <<< "$OUT"; then fail "L3: #41 must not PICK"; else ok "L3: #41 not PICKed"; fi
 want "L3: units 3/5" "$OUT" "units: 3/5"
+
+# ── L3b: a deferred-labeled issue is skipped like the other skip labels ───────
+lbl_issues '[]' '[{"name":"deferred"}]'
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L3b: deferred run exits 0" || fail "L3b: deferred run exits 0 (got $RC)"
+want "L3b: #41 deferred row" "$OUT" "skip-label: deferred"
+if grep -qF "PICK  #41" <<< "$OUT"; then fail "L3b: #41 must not PICK"; else ok "L3b: #41 not PICKed"; fi
 
 # ── L4: boundary — label check beats stale-rank ───────────────────────────────
 lbl_issues '[{"name":"blocked"}]' '[]' '2026-09-28T00:00:00Z'

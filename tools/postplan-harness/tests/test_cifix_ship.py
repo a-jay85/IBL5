@@ -17,7 +17,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
-from harness import merge_danger
+from harness import cifix, merge_danger
 from harness.ciwatch import CiOutcome
 from harness.state import HarnessError, RunResult, TerminalState
 
@@ -124,6 +124,10 @@ class MetaLogGh(CiFixGh):
         super().__init__(body=body)
         self.logs = dict(logs or {})
         self.log_calls: list[tuple] = []
+        self.reruns: list = []
+
+    def run_rerun_failed(self, run_id):
+        self.reruns.append(run_id)
 
     def run_log_failed(self, run_id, job_id, dest):
         self.log_calls.append((run_id, job_id))
@@ -308,6 +312,24 @@ def test_char_meta_with_other_actionable_red_still_runs_cifix(monkeypatch, tmp_p
                         failed=["Meta checks", "PHPUnit"], recorded=_PROSE_RECORDED)
     assert len(llm.calls) == 1
     assert llm.calls[0][0] == "ci-fix"
+
+
+def test_meta_prose_failure_recorded_skips_cifix_and_names_check(monkeypatch, tmp_path):
+    """PR #3022: a recorded check-prose-since failure spends no ci-fix attempt, no probe."""
+    gh = MetaLogGh(logs={"9001": META_PROSE_LOG})
+    gh.checks = [META_CHECKS_ROW]
+    r, llm = _meta_run(monkeypatch, tmp_path, gh,
+                       failed=["All checks green", "Meta checks"],
+                       recorded=_PROSE_RECORDED)
+    assert len(llm.calls) == 0
+    assert gh.reruns == []
+    assert r.watched == []
+    assert r.out[1].exit_code == 8
+    assert r.out[1].failed == ["All checks green", "Meta checks"]
+    assert _has(r.lines, "phase7 ci-fix: skipped - Meta checks red on check-prose-since")
+    assert gh.comments[0][1] == cifix.SURVIVOR_TITLE
+    assert "check-prose-since" in _trail_text(gh)
+    assert "Meta checks" in _trail_text(gh)
 
 
 # The probe-guard tests below run with the rest of tools/postplan-harness/tests/test_cifix_ship.py

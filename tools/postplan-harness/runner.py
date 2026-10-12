@@ -1566,6 +1566,34 @@ def _phase7_rewatch(gh, log, res, worktree, pr, sha, out_dir, run_started):
     return outcome, sha
 
 
+def _meta_check_skip(gh, pr, res, names, out_dir) -> list[str]:
+    """Phase-2 check names that explain a Meta-checks-only red, or [] to run ci-fix
+    as today. Every fetch or read failure fails open to []."""
+    if not cifix.meta_only(names):
+        return []
+    recorded = [f.get("name") for f in (res.meta_check_failures or [])]
+    if not recorded:
+        return []
+    skip_dir = os.path.join(out_dir, "ci-fix-meta-skip")
+    dest = os.path.join(skip_dir, "Meta-checks.log")
+    try:
+        ref = cifix.failed_job_refs(gh.pr_checks_json(pr),
+                                    [cifix.META_CHECK_NAME]).get(cifix.META_CHECK_NAME)
+        if not ref:
+            return []
+        os.makedirs(skip_dir, exist_ok=True)
+        try:
+            os.unlink(dest)  # never judge a stale log from an earlier iteration
+        except FileNotFoundError:
+            pass
+        gh.run_log_failed(ref[0], ref[1], dest)
+        with open(dest, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except (HarnessError, OSError, subprocess.SubprocessError):
+        return []
+    return cifix.attribute_meta_failure(text, recorded)
+
+
 def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                  mode, fixture, run_started):
     """Phase 7 CI fix loop — attempts to fix red CI with Opus.
@@ -1618,6 +1646,28 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
         if kind == "green":
             log("phase7 ci-fix: only human-signoff failed - treating CI as green")
             return sha, ciwatch.CiOutcome(0, [], outcome.evidence + " (human-signoff dropped)")
+
+        # Meta-checks skip: phase 2 already recorded this failure locally and ci-fix
+        # cannot edit gate-owned files, so spend no LLM attempt and no rerun probe.
+        # Fails open on any doubt. `outcome` is returned unchanged, so CI stays red
+        # and no arming path can fire on it.
+        if kind == "actionable":
+            skipped = _meta_check_skip(gh, pr, res, names, out_dir)
+            if skipped:
+                trail.append(cifix.meta_skip_note(skipped))
+                log(f"phase7 ci-fix: skipped - {cifix.META_CHECK_NAME} red on "
+                    f"{', '.join(skipped)} (phase 2 recorded it locally); "
+                    f"{attempt} LLM attempt(s) spent")
+                try:
+                    gh.post_review_summary(
+                        pr, cifix.SURVIVOR_TITLE,
+                        cifix.survivor_comment(
+                            names, trail, probed,
+                            refused=[(a, r, cifix_ship.quote_proposal(t, _redact))
+                                     for a, r, t in refused]))
+                except (HarnessError, OSError, subprocess.SubprocessError):
+                    log("phase7 ci-fix: survivor comment not posted")
+                return sha, outcome
 
         # Probe branch: fires on rollup-only or no-change
         if kind == "rollup-only" or last == "no-change":

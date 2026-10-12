@@ -117,15 +117,6 @@ class PlayerTeamJoinSitesSqlCharacterizationTest extends TestCase
                     'SELECT p.pid, p.teamid, p.name, t.team_name AS teamname, p.pos, p.age, p.draftyear, p.exp, p.cy, p.cyt, p.salary_yr1, p.salary_yr2, p.salary_yr3, p.salary_yr4, p.salary_yr5, p.salary_yr6, p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_3ga, p.r_3gp, p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_blk, p.r_tvr, p.r_foul, p.oo, p.r_drive_off, p.po, p.r_trans_off, p.od, p.dd, p.pd, p.td, p.talent, p.skill, p.intangibles, p.loyalty, p.winner, p.playing_time, p.security, p.tradition, t.team_city, t.color1, t.color2 FROM ibl_plr p LEFT JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 ORDER BY p.ordinal ASC, p.pid ASC',
                 ],
             ],
-            'SeasonHighs-getSeasonHighs' => [
-                'SeasonHighs-getSeasonHighs',
-                static function (MockDatabase $db): void {
-                    (new \SeasonHighs\SeasonHighsRepository($db))->getSeasonHighs('(`game_2gm`*2)', 'POINTS', '', '2025-01-01', '2025-01-31');
-                },
-                [
-                    'SELECT p.pid, p.name, p.teamid, t.team_name AS teamname, t.team_city, t.color1, t.color2, bs.game_date AS date, sch.box_id, COALESCE(bs.game_of_that_day, 0) AS game_of_that_day, (game_2gm*2) AS POINTS FROM ibl_box_scores bs JOIN ibl_plr p ON bs.pid = p.pid LEFT JOIN ibl_team_info t ON p.teamid = t.teamid LEFT JOIN ibl_schedule sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid WHERE bs.game_date BETWEEN \'2025-01-01\' AND \'2025-01-31\' ORDER BY POINTS DESC, bs.game_date ASC, bs.id ASC LIMIT 15',
-                ],
-            ],
             'SeasonHighs-getSeasonHighsBatch' => [
                 'SeasonHighs-getSeasonHighsBatch',
                 static function (MockDatabase $db): void {

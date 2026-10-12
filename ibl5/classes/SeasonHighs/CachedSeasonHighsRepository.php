@@ -30,31 +30,6 @@ class CachedSeasonHighsRepository implements SeasonHighsRepositoryInterface
     }
 
     /**
-     * @see SeasonHighsRepositoryInterface::getSeasonHighs()
-     *
-     * @return list<SeasonHighEntry>
-     */
-    public function getSeasonHighs(
-        string $statExpression,
-        string $statName,
-        string $tableSuffix,
-        string $startDate,
-        string $endDate,
-        int $limit = 15,
-        ?string $locationFilter = null
-    ): array {
-        return $this->inner->getSeasonHighs(
-            $statExpression,
-            $statName,
-            $tableSuffix,
-            $startDate,
-            $endDate,
-            $limit,
-            $locationFilter
-        );
-    }
-
-    /**
      * @see SeasonHighsRepositoryInterface::getSeasonHighsBatch()
      *
      * @param array<string, string> $stats Map of stat name => SQL expression

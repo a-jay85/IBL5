@@ -125,6 +125,67 @@ final class ScriptsBaselineArgvExitPinTest extends TestCase
         self::assertSame(self::optionNames($getopt[1]), self::optionNames($accepted[1]));
     }
 
+    /** @return array<string, array{string, string}> */
+    public static function adminGateProvider(): array
+    {
+        $allStarRenameGate = <<<'GATE'
+// SECURITY: Admin-only endpoint
+if (!function_exists('is_admin') || !is_admin($admin)) {
+    header('Content-Type: application/json');
+    header('HTTP/1.1 403 Forbidden');
+    echo json_encode(['success' => false, 'error' => 'Access denied.']);
+    exit;
+}
+GATE;
+        $updateAllTheThingsGate = <<<'GATE'
+// SECURITY: Redirect logged-out users to login
+if (!function_exists('is_user') || !is_user($user ?? '')) {
+    $_SESSION['redirect_after_login'] = 'name=LeagueControlPanel'
+        . (isset($_GET['league']) && $_GET['league'] === League\LeagueContext::LEAGUE_OLYMPICS ? '&league=olympics' : '');
+    header('Location: ../modules.php?name=YourAccount');
+    exit;
+}
+
+// SECURITY: Admin-only — logged-in non-admins get 403
+if (!is_admin()) {
+    http_response_code(403);
+    die('Access denied. This script requires administrator privileges.');
+}
+
+// SECURITY: This is a destructive full-league mutation — POST-only closes the
+// GET-based CSRF vector (e.g. <img src=".../updateAllTheThings.php">). A GET
+// from a stale link/bookmark bounces back to the control panel.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: ../modules.php?name=LeagueControlPanel');
+    exit;
+}
+
+// SECURITY: Validate CSRF token (form name must match the LCP View's generateToken call)
+$csrfToken = isset($_POST['_csrf_token']) && is_string($_POST['_csrf_token']) ? $_POST['_csrf_token'] : '';
+if (!\Security\CsrfGuard::validateToken($csrfToken, 'lcp_update_all')) {
+    http_response_code(403);
+    die('Invalid CSRF token.');
+}
+GATE;
+
+        return [
+            'allStarRename' => ['allStarRename.php', $allStarRenameGate],
+            'updateAllTheThings' => ['updateAllTheThings.php', $updateAllTheThingsGate],
+        ];
+    }
+
+    #[DataProvider('adminGateProvider')]
+    public function testAdminScriptAuthGatesAreByteIdentical(string $file, string $gateBlock): void
+    {
+        $src = self::source($file);
+        $gatePos = strpos($src, $gateBlock);
+
+        self::assertNotFalse($gatePos, 'Auth gate block changed in scripts/' . $file);
+        $dbPos = strpos($src, '$mysqli_db');
+        self::assertNotFalse($dbPos);
+        self::assertLessThan($dbPos, $gatePos, 'Auth gate must precede the first $mysqli_db use');
+    }
+
     /** @return list<string> */
     private static function optionNames(string $list): array
     {

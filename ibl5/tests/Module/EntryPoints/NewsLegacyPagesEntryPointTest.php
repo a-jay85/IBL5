@@ -95,21 +95,32 @@ class NewsLegacyPagesEntryPointTest extends ModuleEntryPointTestCase
 
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
-    public function testCategoriesCatidZeroStillRendersPage(): void
+    public function testCategoriesCatidZeroRedirectsAndRendersNothing(): void
     {
         $output = $this->runCategories(['op' => 'newindex', 'catid' => '0']);
 
-        $this->assertStringContainsString('News Categories', $output);
-        $this->assertStringContainsString('catid = 0', $this->executedQueryContaining('SELECT sid, aid, title'));
+        $this->assertSame('', $output);
+        $this->assertQueryNotExecuted('nuke_stories');
     }
 
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
-    public function testCategoriesNonNumericCatidIsCastToZero(): void
+    public function testCategoriesNonNumericCatidIsCastToZeroAndRedirects(): void
     {
-        $this->runCategories(['op' => 'newindex', 'catid' => 'abc']);
+        $output = $this->runCategories(['op' => 'newindex', 'catid' => 'abc']);
 
-        $this->assertStringContainsString('catid = 0', $this->executedQueryContaining('SELECT sid, aid, title'));
+        $this->assertSame('', $output);
+        $this->assertQueryNotExecuted('nuke_stories');
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testCategoriesMissingCatidRedirectsAndRendersNothing(): void
+    {
+        $output = $this->runCategories(['op' => 'newindex']);
+
+        $this->assertSame('', $output);
+        $this->assertQueryNotExecuted('nuke_stories');
     }
 
     #[RunInSeparateProcess]

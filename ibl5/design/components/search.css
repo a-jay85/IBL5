@@ -12,7 +12,7 @@
 
 /* Search Form */
 .search-form {
-    background: white;
+    background: var(--white);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--gray-200);
@@ -39,7 +39,7 @@
     font-family: var(--font-sans);
     font-size: 1rem;
     color: var(--navy-800);
-    background: white;
+    background: var(--white);
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
     padding: var(--space-1) var(--space-2);
@@ -126,7 +126,7 @@
 
 /* Individual Search Result */
 .search-result {
-    background: white;
+    background: var(--white);
     border-radius: var(--radius-lg);
     border: 1px solid var(--gray-200);
     padding: var(--space-4);

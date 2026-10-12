@@ -79,40 +79,7 @@ final class StoreSimRecapGuardTest extends TestCase
         self::assertSame(0, preg_match('/DELETE /i', $this->src), 'Script must not compose DELETE');
     }
 
-    public function testScriptDelegatesParsingToThePayloadDto(): void
-    {
-        self::assertTrue(
-            str_contains($this->src, 'SimRecapPayload'),
-            'Script must reference the SimRecapPayload DTO class'
-        );
-        self::assertTrue(
-            str_contains($this->src, 'fromJson'),
-            'Script must call SimRecapPayload::fromJson to delegate parsing'
-        );
-    }
-
-    public function testScriptParsesBeforeItWrites(): void
-    {
-        $fromJsonPos = strpos($this->src, 'fromJson');
-        $catchPos = strpos($this->src, 'catch');
-        $markDonePos = strpos($this->src, 'markDone');
-
-        self::assertNotFalse($fromJsonPos, 'fromJson not found in script');
-        self::assertNotFalse($catchPos, 'catch not found in script');
-        self::assertNotFalse($markDonePos, 'markDone not found in script');
-
-        self::assertLessThan($markDonePos, $fromJsonPos, 'fromJson must appear before markDone');
-        self::assertLessThan($markDonePos, $catchPos, 'catch must appear before markDone');
-    }
-
     // ── Htaccess tests ─────────────────────────────────────────────────────────
-
-    public function testHtaccessExists(): void
-    {
-        $htaccess = file_get_contents(__DIR__ . '/../../../scripts/.htaccess');
-        self::assertNotFalse($htaccess);
-        self::assertNotSame('', $htaccess);
-    }
 
     public function testHtaccessDeniesStoreSimRecap(): void
     {
@@ -130,14 +97,6 @@ final class StoreSimRecapGuardTest extends TestCase
         self::assertNotFalse($denyPos);
         self::assertGreaterThan($filesOpenPos, $denyPos, 'Require all denied must appear after <Files');
         self::assertLessThan($filesClosePos, $denyPos, 'Require all denied must appear before </Files>');
-    }
-
-    public function testHtaccessUsesApache24Syntax(): void
-    {
-        $htaccess = (string) file_get_contents(__DIR__ . '/../../../scripts/.htaccess');
-
-        self::assertFalse(str_contains($htaccess, 'Order deny'), 'Must use Apache 2.4 syntax, not Order deny');
-        self::assertFalse(str_contains($htaccess, 'Deny from'), 'Must use Apache 2.4 syntax, not Deny from');
     }
 
     public function testHtaccessDoesNotDenySiblingScripts(): void

@@ -61,6 +61,7 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
+from harness import merge_danger
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
@@ -370,6 +371,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _inject_residual_phases(copy, plan, conf_files, log)
         log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
+        if _inject_merge_danger(copy, worktree, diff, log):
+            body_check_degraded = True
         log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
@@ -388,7 +391,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 for line in audit_lines_for_adaptations(
                         getattr(plain_resolution, "adapted_lines", ())):
                     log(f"phase2: {line}")
+                res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
             except HarnessError as e:
+                res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
                 if e.kind != "rebase-conflict":
                     raise
                 # DETECTION-TIME flag: recorded before the resolution attempt begins, so a
@@ -661,6 +666,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _gate_fix_block = render_gate_fix(res.gate_fix)
         if _gate_fix_block:   # never strips a block an earlier run published
             body = upsert_gate_fix(body, _gate_fix_block)
+        body = _merge_danger_body(body, worktree, diff, log, "phase6")
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)
         _sweep_out_of_scope(gh, pr, plan, slug, log)
@@ -756,8 +762,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
         _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                    fixture=fixture, log=log)
+        _arm_body = gh.pr_body() or body
         inputs = ArmInputs(
-            pr_body=gh.pr_body() or body, pr_title=meta.get("title", copy["title"]),
+            pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
@@ -785,6 +792,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             meta_checks_status=_mc_status,
             gate_backtest_status=_gb.status,
             gate_backtest_reason=_gb.reason,
+            merge_danger_state=merge_danger.classify_body(_arm_body),
         )
         if not live and (fixture or {}).get("current_tree"):
             # replay-only seam, the checks_outcome pattern: live mode never reads it
@@ -1764,7 +1772,9 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 refused.append((attempt, verdict.reason, proposal or ""))
             elif verdict.action == "apply":
                 baseline = cifix_ship.meta_run_id(gh.pr_checks_json(pr))
-                gh.pr_edit_body(pr, verdict.body)
+                # The fixer's body may drop or lower the Merge danger line; re-apply the floor.
+                gh.pr_edit_body(pr, _merge_danger_body(verdict.body, worktree,
+                                                       git.diff_vs_base(), log, "phase7"))
                 body_applied = True
                 log("phase7 ci-fix: body proposal applied")
 
@@ -2095,6 +2105,54 @@ def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str
     for note in notes:
         log(f"phase2 residual-phase-exempt: {note}")
     return items
+
+
+def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list[str]:
+    """Phase 2: mechanical Merge danger floor; the LLM line in summary_md only supplies Why
+    and may raise Door / Blast radius. Always runs, fixture or live, degraded or not.
+
+    Returns the body-check findings for the final body ([] when it carries one well-formed
+    line); a non-empty result marks the body check degraded, which holds arming.
+
+    An empty summary_md is the clean-tree rerun: the live body is left as is, and condition
+    (18) reads that body at arm time."""
+    if not copy["summary_md"]:
+        return []
+    copy["summary_md"] = _merge_danger_body(copy["summary_md"], worktree, diff_body, log, "phase2")
+    findings = merge_danger.validate_merge_danger_field(copy["summary_md"])
+    for f in findings:
+        log(f"phase2 body-check finding: {f}")
+    return findings
+
+
+def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str) -> str:
+    """Return `body` carrying exactly one Merge danger line: the mechanical floor merged
+    with any line already in the body, which may only raise Door / Blast radius.
+
+    Phase 2 writes the line. Any later phase (6, 5.5, 7) only re-applies the floor to a
+    body that already carries one well-formed line, so a raised Door cannot be lowered. A
+    missing or malformed line is left alone there and condition (18) holds it until a human
+    adds the line: refilling it would turn a deleted one-way line into the mechanical two-way."""
+    if phase != "phase2":
+        try:
+            if merge_danger.parse_merge_danger(body) is None:
+                log(f"{phase}: merge-danger line missing, left for condition (18) to hold")
+                return body
+        except merge_danger.MalformedMergeDanger as exc:
+            log(f"{phase}: merge-danger line malformed, left for condition (18) to hold ({exc})")
+            return body
+    mech = merge_danger.derive_from_worktree(worktree or ".", diff_body)
+    try:
+        prior = merge_danger.parse_merge_danger(body)
+    except merge_danger.MalformedMergeDanger as exc:
+        log(f"{phase}: merge-danger line malformed, using mechanical Why ({exc})")
+        prior = None
+    final = merge_danger.merge_verdicts(mech, prior.door if prior else None,
+                                        prior.blast if prior else None,
+                                        prior.why if prior else None)
+    log(f"{phase}: merge danger Door={final.door} Blast={final.blast} "
+        f"triggers={list(final.triggers)}")
+    return merge_danger.inject_merge_danger(body, final)
 
 
 def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_body: str,
@@ -2808,6 +2866,10 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         body = strip_change_blocks(live_body)
         body = _apply_backlog_closes(body, plan, log)
         body = _upsert_no_adr_markers(body, plan)
+        # Re-derived on the post-round diff: a remediation commit can add a one-way trigger,
+        # and a fixer that drops the line would otherwise hold condition (18) as MISSING.
+        body = _merge_danger_body(body, worktree, git.diff_vs_base(), log,
+                                  f"phase5.5 round {round_num}")
         gh.pr_edit_body(pr, body)
         # sha is either a real commit sha or BODY_ONLY_SHA. fidelity.re_review()'s only
         # test of it is `if not remediation_sha: return None, None, None`, so a non-empty

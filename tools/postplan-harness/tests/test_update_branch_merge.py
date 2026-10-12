@@ -8,6 +8,7 @@ Phase 5: Runner-level replay tests via ciwatch.watch_or_reuse.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import pathlib
 import stat
@@ -103,6 +104,52 @@ def _update_branch_merge(s, *, message="Merge branch 'master' into feat"):
     _sh("merge", "-q", "--no-ff", "--no-edit", "-m", message, "origin/master", cwd=s["peer"])
     _sh("push", "-q", "origin", "HEAD:refs/heads/feat", cwd=s["peer"])
     return _sh("rev-parse", "HEAD", cwd=s["peer"])
+
+
+def _advance_master(s, name):
+    """Peer lands one more commit on origin/master so the next update-branch merge is real."""
+    _sh("fetch", "-q", "origin", cwd=s["peer"])
+    _sh("checkout", "-q", "-B", "master", "origin/master", cwd=s["peer"])
+    sha = _commit_file(s["peer"], f"{name}.txt", f"{name}\n", name.upper())
+    _sh("push", "-q", "origin", "master", cwd=s["peer"])
+    return sha
+
+
+def _evil_update_branch_merge(s, extra_name):
+    """An update-branch-shaped merge (parents feat-tip + master) that ALSO adds a file:
+    its tree differs from the mechanical merge-tree result."""
+    _sh("fetch", "-q", "origin", cwd=s["peer"])
+    _sh("checkout", "-q", "-B", "feat", "origin/feat", cwd=s["peer"])
+    _sh("merge", "-q", "--no-ff", "--no-commit", "origin/master", cwd=s["peer"])
+    _commit_file(s["peer"], f"{extra_name}.txt", "evil\n", "Merge branch 'master' into feat")
+    _sh("push", "-q", "origin", "HEAD:refs/heads/feat", cwd=s["peer"])
+    return _sh("rev-parse", "HEAD", cwd=s["peer"])
+
+
+def _side_branch_merge(s, name):
+    """A clean two-parent merge into feat whose second parent is a branch NOT on master."""
+    _sh("fetch", "-q", "origin", cwd=s["peer"])
+    _sh("checkout", "-q", "-B", name, "origin/master", cwd=s["peer"])
+    _commit_file(s["peer"], f"{name}.txt", f"{name}\n", name)
+    _sh("push", "-q", "origin", f"HEAD:refs/heads/{name}", cwd=s["peer"])
+    _sh("checkout", "-q", "-B", "feat", "origin/feat", cwd=s["peer"])
+    _sh("merge", "-q", "--no-ff", "--no-edit", f"origin/{name}", cwd=s["peer"])
+    _sh("push", "-q", "origin", "HEAD:refs/heads/feat", cwd=s["peer"])
+    return _sh("rev-parse", "HEAD", cwd=s["peer"])
+
+
+def _stack_clean_merges(s, n):
+    """n clean update-branch merges stacked on old_head; returns the list of merge shas."""
+    shas = []
+    for i in range(n):
+        if i:
+            _advance_master(s, f"m{i + 1}")
+        shas.append(_update_branch_merge(s))
+    return shas
+
+
+def _predicate(s, expected, remote, run_git=None):
+    return gitutil.update_branch_merge_equivalent(expected, remote, s["wt"], run_git=run_git)
 
 
 # ---------------------------------------------------------------------------
@@ -212,17 +259,22 @@ def test_conflict_resolved_merge_stays_diverged(tmp_path):
     _assert_diverged(s, r)
 
 
-# Arm 3 (p1 == expected_sha), stacked case. Mutation: accept any ancestor chain of
-# update-branch merges (e.g. walk first-parents until expected_sha).
-def test_stacked_second_update_branch_merge_stays_diverged(tmp_path):
+# Stacked update-branch merges are absorbed. Mutation: restore the one-level
+# `p1 != expected_sha` early return at the top of the walk (action goes back to diverged).
+def test_stacked_second_update_branch_merge_syncs(tmp_path):
     s = _build_scenario(tmp_path)
     _update_branch_merge(s)                                        # merge 1 (would sync alone)
     _sh("checkout", "-q", "master", cwd=s["peer"])
     _commit_file(s["peer"], "m2.txt", "m2\n", "M2")
     _sh("push", "-q", "origin", "master", cwd=s["peer"])
     merge2 = _update_branch_merge(s)                               # merge 2 on top of merge 1
+    parents = _sh("rev-list", "--parents", "-n", "1", merge2, cwd=s["peer"]).split()[1:]
+    assert parents[0] != s["old_head"]                 # really stacked: merge2 sits on merge1
     r = _reconcile(s, merge2, tmp_path)
-    _assert_diverged(s, r)
+    assert r.action == "synced"
+    assert r.remote_sha == merge2
+    assert "update-branch merge of master" in r.evidence
+    assert _sh("rev-parse", "HEAD", cwd=s["wt"]) == merge2
 
 
 # Arm 4 (p2 on master). Mutation: drop the merge-base --is-ancestor check.
@@ -307,6 +359,103 @@ def test_first_parent_must_equal_expected_sha_not_local_sha(tmp_path):
     gh_cmd = _fake_gh(tmp_path, [merge_sha])
     r = gitutil.reconcile_remote_head(42, s["old_head"], s["m0"], "feat", s["wt"], gh_cmd=gh_cmd)
     assert r.action == "synced" and r.remote_sha == merge_sha
+
+
+# Mutation: drop the `current = p1` step, so the second iteration re-checks the top commit
+# and never reaches expected.
+def test_predicate_accepts_two_stacked_merges(tmp_path, caplog):
+    s = _build_scenario(tmp_path)
+    shas = _stack_clean_merges(s, 2)
+    caplog.set_level(logging.INFO, logger=gitutil.log.name)
+    assert _predicate(s, s["old_head"], shas[-1]) is True
+    assert "absorbed 2 stacked update-branch merges" in caplog.text
+
+
+# Mutation: drop the `merged_tree != current_tree` comparison.
+def test_stacked_evil_second_merge_stays_diverged(tmp_path):
+    s = _build_scenario(tmp_path)
+    _update_branch_merge(s)
+    _advance_master(s, "m2")
+    evil = _evil_update_branch_merge(s, "extra2")
+    _assert_diverged(s, _reconcile(s, evil, tmp_path))
+
+
+# Mutation: run arms 2-4 only on the top commit (the remote_sha iteration) and just follow
+# parents[0] below it.
+def test_stacked_evil_first_merge_stays_diverged(tmp_path):
+    s = _build_scenario(tmp_path)
+    _evil_update_branch_merge(s, "extra1")
+    _advance_master(s, "m2")
+    top = _update_branch_merge(s)
+    assert _predicate(s, s["old_head"], top) is False
+    _assert_diverged(s, _reconcile(s, top, tmp_path))
+
+
+# Mutation: drop the `merge-base --is-ancestor` check inside the loop.
+def test_stacked_non_master_side_in_chain_stays_diverged(tmp_path):
+    s = _build_scenario(tmp_path)
+    _side_branch_merge(s, "side")
+    _advance_master(s, "m2")
+    top = _update_branch_merge(s)
+    assert _predicate(s, s["old_head"], top) is False
+
+
+# Mutation: return True when the walk bottoms out on a non-merge commit instead of
+# requiring `p1 == expected_sha`.
+def test_stacked_chain_not_reaching_expected_sha_is_false(tmp_path):
+    s = _build_scenario(tmp_path)
+    shas = _stack_clean_merges(s, 2)
+    assert _predicate(s, s["commits"][0], shas[-1]) is False
+
+
+# Mutation: `range(1, CAP)` (cap off by one, low).
+def test_stacked_chain_at_cap_is_accepted(tmp_path, monkeypatch):
+    monkeypatch.setattr(gitutil, "UPDATE_BRANCH_MERGE_CHAIN_CAP", 2)
+    s = _build_scenario(tmp_path)
+    shas = _stack_clean_merges(s, 2)
+    assert _predicate(s, s["old_head"], shas[-1]) is True
+
+
+# Mutation: `range(1, CAP + 2)` (cap off by one, high) or a `while True` with no cap.
+def test_stacked_chain_over_cap_is_false(tmp_path, monkeypatch, caplog):
+    monkeypatch.setattr(gitutil, "UPDATE_BRANCH_MERGE_CHAIN_CAP", 2)
+    s = _build_scenario(tmp_path)
+    shas = _stack_clean_merges(s, 3)
+    assert _predicate(s, s["old_head"], shas[-1]) is False
+    assert "exceeds cap 2" in caplog.text
+
+
+# Mutation: changing the constant.
+def test_chain_cap_default_is_ten():
+    assert gitutil.UPDATE_BRANCH_MERGE_CHAIN_CAP == 10
+
+
+# Mutation: treat a non-zero rc or empty output as "skip this arm" on later iterations, or
+# narrow the `except` so TimeoutExpired/OSError escapes.
+@pytest.mark.parametrize("subcmd,failure", [
+    ("rev-list", _R(1)),
+    ("merge-base", _R(1)),
+    ("merge-tree", subprocess.TimeoutExpired(cmd="git", timeout=1)),
+    ("rev-parse", OSError("boom")),
+    ("merge-tree", _R(0, out="")),
+])
+def test_predicate_mid_walk_failure_fails_closed(tmp_path, subcmd, failure):
+    s = _build_scenario(tmp_path)
+    shas = _stack_clean_merges(s, 2)
+    assert _predicate(s, s["old_head"], shas[-1]) is True            # sanity: the chain is valid
+    calls = {"n": 0}
+
+    def run(args, cwd):
+        if args[0] == subcmd:
+            calls["n"] += 1
+            if calls["n"] == 2:
+                if isinstance(failure, BaseException):
+                    raise failure
+                return failure
+        return gitutil._default_run_git(args, cwd)
+
+    assert _predicate(s, s["old_head"], shas[-1], run_git=run) is False
+    assert calls["n"] >= 2                             # failure really landed mid-walk
 
 
 # ---------------------------------------------------------------------------

@@ -96,6 +96,10 @@ jobs:
              '[.comments[] | select(.body | contains($marker))] | last | .body // ""' \
              /tmp/pr-comments.json > /tmp/verdict-body.md
 
+          # The Merge danger line (post-plan _pr-body-claims.md § Merge danger rule) lives in
+          # the PR body, not the sticky comment. Pass a path, never the text (shell injection).
+          gh pr view "$PR_NUMBER" --json body --jq '.body // ""' > /tmp/pr-body.md
+
           # `bash bin/...` rather than `bin/...`: the exec bit on a brand-new script is one
           # `git update-index` mistake away from missing, and that failure would surface only
           # here, on master, after merge.
@@ -104,6 +108,7 @@ jobs:
             --title "$PR_TITLE" \
             --url "$PR_URL" \
             --branch "$PR_BRANCH" \
+            --pr-body-file /tmp/pr-body.md \
             < /tmp/verdict-body.md \
             > /tmp/discord-msg.txt
 

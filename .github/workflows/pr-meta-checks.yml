@@ -175,6 +175,19 @@ jobs:
         if: ${{ !cancelled() }}
         run: bin/test-check-model-pins
 
+      # --- engine freeze + decompile-token gate: UNCONDITIONAL on every PR, no
+      # path filter. The token half scans added lines in every path, and the
+      # freeze half must see a rename out of engine/. The harness runs first so
+      # a broken pattern fails loudly. The engine cutover PR deletes this step
+      # together with engine/ (.claude/rules/engine-go.md). Hard gate. ---
+      - name: Run bin/check-engine-freeze (harness + PR diff)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          bin/test-check-engine-freeze
+          bin/check-engine-freeze --since="$BASE_SHA"
+
       # --- Hard gates (path-gated): a non-zero exit fails the job, same as the
       # former standalone workflows. `!cancelled()` makes each report
       # independently of an earlier step's failure (no sequential masking). ---

@@ -56,8 +56,8 @@ class NewsController implements NewsControllerInterface
         $sitename = $this->config->siteName;
         $user_news = $this->config->userNews;
         $userinfo = $this->authService->isAuthenticated() ? $this->authService->getUserInfo() : null;
-        $new_topic = intval($new_topic);
-        if ($multilingual == 1) {
+        $new_topic = is_numeric($new_topic) ? (int) $new_topic : 0;
+        if ($multilingual === 1) {
             $querylang = "AND (alanguage='$currentlang' OR alanguage='')";
         } else {
             $querylang = "";
@@ -72,7 +72,8 @@ class NewsController implements NewsControllerInterface
 
         if ($this->authService->isAuthenticated()) {
             $teamRepo = $this->teamIdentityRepository;
-            $teamName = $teamRepo->getTeamnameFromUsername($userinfo['username'] ?? null);
+            $username = $userinfo['username'] ?? null;
+            $teamName = $teamRepo->getTeamnameFromUsername(is_string($username) ? $username : null);
             if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
                 $tid = $teamRepo->getTidFromTeamname($teamName);
                 if ($tid !== null && \League\League::isRealFranchise($tid)) {
@@ -89,8 +90,9 @@ class NewsController implements NewsControllerInterface
             blocks("Center");
         }
 
-        if (isset($userinfo['storynum']) and $user_news == 1) {
-            $storynum = $userinfo['storynum'];
+        $userStoryNum = $userinfo['storynum'] ?? null;
+        if (is_numeric($userStoryNum) && $user_news === 1) {
+            $storynum = (int) $userStoryNum;
         } else {
             $storynum = $storyhome;
         }
@@ -117,26 +119,30 @@ class NewsController implements NewsControllerInterface
             echo "<br>";
         }
 
-        $stories = ($new_topic == 0)
-            ? $newsService->getHomePageStories((int) $storynum, $querylang)
-            : $newsService->getTopicPageStories((int) $new_topic, (int) $storynum, $querylang);
+        $stories = ($new_topic === 0)
+            ? $newsService->getHomePageStories($storynum, $querylang)
+            : $newsService->getTopicPageStories($new_topic, $storynum, $querylang);
         $viewModels = [];
+        /**
+         * nuke_stories row (per ibl5/docs/schema/current-schema.sql): sid int(11) NOT NULL, catid int(11) NOT NULL,
+         * aid varchar(30) NOT NULL, title varchar(80) NULL, time datetime NULL (normalizeStoryTime(int|string)
+         * already requires non-null; unchanged), hometext/bodytext/notes mediumtext NULL, comments int(11) NULL,
+         * counter mediumint NULL, topic int(11) NOT NULL, informant varchar(20) NOT NULL, acomm int(11) NOT NULL.
+         * @var array{sid: int, catid: int, aid: string, title: string|null, time: string, hometext: string|null, bodytext: string|null, comments: int|null, counter: int|null, topic: int, informant: string, notes: string|null, acomm: int} $row
+         */
         foreach ($stories as $row) {
-            $s_sid = intval($row['sid']);
-            $catid = intval($row['catid']);
-            /** @var string $aid nuke_stories.aid is NOT NULL varchar */
+            $s_sid = (int) $row['sid'];
+            $catid = (int) $row['catid'];
             $aid = $row['aid'];
             $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title']);
-            /** @var string|null $hometext nuke_stories.hometext is nullable mediumtext */
             $hometext = $row['hometext'];
             $bodytext = $row['bodytext'];
-            $comments = intval($row['comments']);
-            $counter = intval($row['counter']);
-            $topic = intval($row['topic']);
-            /** @var string $informant nuke_stories.informant is NOT NULL varchar */
+            $comments = (int) $row['comments'];
+            $counter = (int) $row['counter'];
+            $topic = (int) $row['topic'];
             $informant = $row['informant'];
             $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes']);
-            $acomm = intval($row['acomm']);
+            $acomm = (int) $row['acomm'];
             $topicRow = $newsService->getTopicForStory($s_sid);
             $topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
             $topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
@@ -147,27 +153,30 @@ class NewsController implements NewsControllerInterface
             $totalcount = $counts['total'];
             $c_count = $comments;
             $r_options = "";
-            if (isset($userinfo['umode'])) {$r_options .= "&amp;mode=" . $userinfo['umode'];}
-            if (isset($userinfo['uorder'])) {$r_options .= "&amp;order=" . $userinfo['uorder'];}
-            if (isset($userinfo['thold'])) {$r_options .= "&amp;thold=" . $userinfo['thold'];}
+            $umode = $userinfo['umode'] ?? null;
+            $uorder = $userinfo['uorder'] ?? null;
+            $thold = $userinfo['thold'] ?? null;
+            if (is_string($umode)) {$r_options .= "&amp;mode=" . $umode;}
+            if (is_int($uorder) || is_string($uorder)) {$r_options .= "&amp;order=" . $uorder;}
+            if (is_int($thold) || is_string($thold)) {$r_options .= "&amp;thold=" . $thold;}
             $story_url = "modules.php?name=News&amp;file=article&amp;sid=$s_sid$r_options";
             $morelink_parts = [];
-            if ($fullcount > 0 or $c_count > 0 or $articlecomm == 0 or $acomm == 1) {
+            if ($fullcount > 0 or $c_count > 0 or $articlecomm === 0 or $acomm === 1) {
                 $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">" . _READMORE . "</a>";
             }
             if ($fullcount > 0) {
                 $morelink_parts[] = "<span class=\"news-article__meta-item\">$totalcount " . _BYTESMORE . "</span>";
             }
-            if ($articlecomm == 1 and $acomm == 0) {
-                if ($c_count == 0) {
+            if ($articlecomm === 1 and $acomm === 0) {
+                if ($c_count === 0) {
                     $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">" . _COMMENTSQ . "</a>";
-                } elseif ($c_count == 1) {
+                } elseif ($c_count === 1) {
                     $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">$c_count " . _COMMENT . "</a>";
                 } elseif ($c_count > 1) {
                     $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">$c_count " . _COMMENTS . "</a>";
                 }
             }
-            if ($catid != 0) {
+            if ($catid !== 0) {
                 $catTitle = $newsService->getCategoryTitle($catid);
                 $title1 = \Security\HtmlSanitizer::safeHtmlOutput($catTitle ?? '');
                 $catLabel = $title1 !== '' ? $title1 : 'Category';

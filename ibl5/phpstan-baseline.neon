@@ -313,24 +313,6 @@ parameters:
 			path: classes/TeamSchedule/TeamScheduleRepository.php
 
 		-
-			rawMessage: 'Binary operation "." between ''&amp;mode='' and mixed results in an error.'
-			identifier: binaryOp.invalid
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Binary operation "." between ''&amp;order='' and mixed results in an error.'
-			identifier: binaryOp.invalid
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Binary operation "." between ''&amp;thold='' and mixed results in an error.'
-			identifier: binaryOp.invalid
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
 			rawMessage: '''
 				Call to deprecated function CloseTable():
 				Use CSS classes directly: </div> (closing .ibl-card)
@@ -353,69 +335,9 @@ parameters:
 			path: classes/Topics/News/NewsController.php
 
 		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 2
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Casting to int something that''s already int<min, -1>|int<1, max>.'
-			identifier: cast.useless
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Loose comparison via "!=" between int and int is not allowed.'
-			identifier: notEqual.notAllowed
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between int and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 8
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between int<min, -1>|int<1, max> and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $time of method Topics\News\Contracts\NewsServiceInterface::normalizeStoryTime() expects int|string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $username of method Repositories\Contracts\TeamIdentityRepositoryInterface::getTeamnameFromUsername() expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $value of function intval expects array|bool|float|GMP|int|resource|SimpleXMLElement|string|null, mixed given.'
-			identifier: argument.type
-			count: 7
-			path: classes/Topics/News/NewsController.php
-
-		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
 			identifier: ibl.echoInNonView
 			count: 6
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'intval() is banned. Use (int) cast instead. PHPStan can narrow types through casts but not through these functions, and intval(''08'') silently returns 0 (octal radix surprise).'
-			identifier: ibl.castFunction
-			count: 7
 			path: classes/Topics/News/NewsController.php
 
 		-
@@ -993,84 +915,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/OneOnOneGame/index.php
-
-		-
-			rawMessage: Cannot access offset 'sid' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: Cannot access offset 'time' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: Cannot access offset 'title' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method bind_param() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method close() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method execute() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method fetch_assoc() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method get_result() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method prepare() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
-			identifier: empty.notAllowed
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Parameter #1 $string of function htmlspecialchars expects string, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Parameter #1 $string of function trim expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/articles.php
 
 		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'

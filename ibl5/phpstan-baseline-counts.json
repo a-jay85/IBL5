@@ -19,7 +19,6 @@
         "ibl.directHeader": 2,
         "ibl.echoInNonView": 1,
         "ibl.hardcodedEnvString": 8,
-        "ibl.trustedVariable": 17,
         "ibl.unknownCliOption": 2,
         "if.condNotBoolean": 1,
         "method.nonObject": 3,

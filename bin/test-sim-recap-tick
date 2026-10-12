@@ -11,18 +11,19 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SRT_DRIVER="$SCRIPT_DIR/sim-recap-tick"
 SRT_PROMPT_BIN="$SCRIPT_DIR/sim-recap-prompt"
 SRT_EXEMPLAR="$SCRIPT_DIR/lib/sim-recap-exemplar.txt"
 
-FAILED=0
-SRT_NFAIL=0
 SRT_RC=0
 SRT_PROMPT_RC=0
 
-srt_ok()   { echo "ok: $1"; }
-srt_fail() { echo "FAIL: $1"; FAILED=1; SRT_NFAIL=$((SRT_NFAIL + 1)); }
+srt_ok()   { h_pass "$1"; }
+srt_fail() { h_fail "$1"; }
 
 # srt_expect_eq <name> <want> <got>
 srt_expect_eq() {
@@ -54,7 +55,7 @@ srt_count() {
 # ── One-time scaffolding ───────────────────────────────────────────────────────
 srt_setup() {
     STUB="$(mktemp -d)"
-    trap 'rm -rf "$STUB"' EXIT
+    trap 'rm -rf "$STUB"; h_cleanup' EXIT
 
     # ssh stub: log every call; dispatch on storeSimRecap.php vs verb.
     # $STUB is exported and available to the stub at exec time.
@@ -1315,29 +1316,29 @@ srt_lacks_both() {
 # srt_group_ok <name> <nfail-before> — summary line that stays honest: ok only
 # when no sub-check since <nfail-before> failed.
 srt_group_ok() {
-    if [ "$SRT_NFAIL" -eq "$2" ]; then srt_ok "$1"; else srt_fail "$1"; fi
+    if [ "$H_FAIL" -eq "$2" ]; then srt_ok "$1"; else srt_fail "$1"; fi
 }
 
 srt_reset
 SIM_RECAP_HOST_MODE=actions STUB_SENTINEL=1 SIM_RECAP_DB_PASSWORD=PW-SENTINEL-9f3 srt_run_split
 srt_log_has "$STUB" tick.stderr "stored" "hygiene sub-check: fixture reaches the store path"
 
-n0=$SRT_NFAIL
+n0=$H_FAIL
 # 1.
 srt_lacks_both "AGENT-STDOUT-SENTINEL" "agent stdout"
 srt_group_ok "actions: agent stdout never reaches job streams" "$n0"
 # 2.
-n0=$SRT_NFAIL
+n0=$H_FAIL
 srt_lacks_both "AGENT-STDERR-SENTINEL" "agent stderr"
 srt_group_ok "actions: agent stderr never reaches job streams" "$n0"
 # 3.
-n0=$SRT_NFAIL
+n0=$H_FAIL
 srt_lacks_both "PAYLOAD-SENTINEL" "payload"
 srt_lacks_both "ROSTER-SENTINEL" "roster"
 srt_lacks_both "DB-OUTPUT-SENTINEL" "db output"
 srt_group_ok "actions: payload, roster, db output never reach job streams" "$n0"
 # 4.
-n0=$SRT_NFAIL
+n0=$H_FAIL
 srt_lacks_both "PW-SENTINEL-9f3" "db password"
 srt_log_lacks "$STUB" ssh.log "PW-SENTINEL-9f3" "hygiene sub-check: db password never in ssh argv"
 srt_log_has "$STUB" claude.argv "--model" "hygiene sub-check: claude argv was recorded"
@@ -1347,7 +1348,7 @@ srt_group_ok "actions: db password never reaches job streams or ssh argv" "$n0"
 srt_expect_eq "actions: tick stdout is empty on the live path" 0 \
     "$(wc -c < "$STUB/tick.stdout" | tr -d '[:space:]')"
 # 6.
-n0=$SRT_NFAIL
+n0=$H_FAIL
 srt_log_lacks "$STUB" tick.stderr "PHASE-SENTINEL" "hygiene sub-check: phase absent when recaps are enabled"
 srt_reset
 printf '%s\n' '{"ok":true,"cmd":"claim-next","sim":null,"recaps_enabled":false,"phase":"PHASE-SENTINEL"}' \
@@ -1516,6 +1517,4 @@ if [ -n "${SRT_CHECK_PR_RUN:-}" ]; then
     srt_expect_eq "PR-RUN-DONE: log holds no masked T7 line" 0 "$pr_run_masked"
 fi
 
-echo "----"
-[ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
-exit "$FAILED"
+h_done

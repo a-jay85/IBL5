@@ -2429,7 +2429,9 @@ grep -qF '201' <<< "$(ro_argv)" || fail "rebase-only-rescue-path: 201 was not re
 grep -qF -- '--rebase-only-prs=201' <<< "$(ro_argv)" || fail "rebase-only-rescue-path: argv lacks --rebase-only-prs=201: $(ro_argv)"
 end_case "rebase-only-rescue-path"
 
-# Unset and empty both mean enabled; only 0 disables.
+# Unset and empty both mean enabled; only 0 disables. The seam default is `${VAR:-1}`. Under
+# `${VAR-1}` an empty value stays empty, so the empty run pins that the `!= "0"` check still
+# selects it; a `= "1"` check fails that run.
 begin_case
 for _ro_mode in unset empty zero; do
     ro_setup 101 first-slug DIRTY

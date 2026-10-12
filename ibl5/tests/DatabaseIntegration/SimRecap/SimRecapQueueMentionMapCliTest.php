@@ -68,7 +68,11 @@ final class SimRecapQueueMentionMapCliTest extends DatabaseTestCase
         self::assertIsArray($json['teams']);
         self::assertSame(['ok', 'cmd', 'teams'], array_keys($json));
 
-        self::assertSame('100000000000000001', $json['teams']['Metros'] ?? null);
+        self::assertSame(
+            '100000000000000001',
+            $json['teams']['Metros'] ?? null,
+            'teams.Metros must be the seed snowflake as a string (db-seed.sql line 44)'
+        );
 
         // Seed teams 2 and 3 carry no discord_id, so they must be absent.
         self::assertArrayNotHasKey('Stars', $json['teams']);

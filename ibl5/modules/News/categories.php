@@ -129,6 +129,7 @@ switch ($op) {
     case "newindex":
         if ($catid === 0) {
             header("Location: modules.php?name=$module_name");
+            break;
         }
         theindex($catid);
         break;

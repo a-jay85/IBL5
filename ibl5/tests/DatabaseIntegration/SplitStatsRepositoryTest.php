@@ -210,10 +210,10 @@ class SplitStatsRepositoryTest extends DatabaseTestCase
     ): array {
         $nearPid = 200090211;
         $farPid = 200090212;
-        $this->insertTestPlayer($nearPid, 'Near Opponent Player');
-        $this->insertTestPlayer($farPid, 'Far Opponent Player');
-        $this->insertPlayerBoxscoreRow('2098-01-15', $nearPid, 'Near Opponent Player', 'PG', 2, self::TEST_TID, self::TEST_TID);
-        $this->insertPlayerBoxscoreRow('2098-01-16', $farPid, 'Far Opponent Player', 'PG', 3, self::TEST_TID, self::TEST_TID);
+        $this->insertTestPlayer($nearPid, 'Near Opp');
+        $this->insertTestPlayer($farPid, 'Far Opp');
+        $this->insertPlayerBoxscoreRow('2098-01-15', $nearPid, 'Near Opp', 'PG', 2, self::TEST_TID, self::TEST_TID);
+        $this->insertPlayerBoxscoreRow('2098-01-16', $farPid, 'Far Opp', 'PG', 3, self::TEST_TID, self::TEST_TID);
 
         $this->setStandingsGroup(2, $nearDivision, $nearConference);
         $this->setStandingsGroup(3, $farDivision, $farConference);

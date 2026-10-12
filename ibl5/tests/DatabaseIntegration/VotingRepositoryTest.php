@@ -154,7 +154,7 @@ class VotingRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey($name, $byName);
 
         // Independent count: ballots naming the player in the selected columns only.
-        $stmt = $this->db->prepare('SELECT COALESCE(SUM((east_f1 = ?) + (east_f2 = ?)), 0) AS n FROM `ibl_votes_ASG`');
+        $stmt = $this->db->prepare('SELECT COALESCE(SUM((east_f1 <=> ?) + (east_f2 <=> ?)), 0) AS n FROM `ibl_votes_ASG`');
         self::assertNotFalse($stmt);
         $stmt->bind_param('ss', $name, $name);
         $stmt->execute();
@@ -181,7 +181,7 @@ class VotingRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey($name, $byName);
 
         // Independent total: 5 per mvp_1 ballot plus 2 per six_1 ballot; mvp_3 and roy_1 are unselected.
-        $stmt = $this->db->prepare('SELECT COALESCE(SUM((mvp_1 = ?) * 5 + (six_1 = ?) * 2), 0) AS n FROM `ibl_votes_EOY`');
+        $stmt = $this->db->prepare('SELECT COALESCE(SUM((mvp_1 <=> ?) * 5 + (six_1 <=> ?) * 2), 0) AS n FROM `ibl_votes_EOY`');
         self::assertNotFalse($stmt);
         $stmt->bind_param('ss', $name, $name);
         $stmt->execute();

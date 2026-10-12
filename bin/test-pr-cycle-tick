@@ -13,22 +13,24 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SRC_TICK="$SCRIPT_DIR/pr-cycle-tick"
 [[ -x "$SRC_TICK" ]] || { echo "FAIL: $SRC_TICK missing or not executable" >&2; exit 1; }
 REAL_TOP="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
 
 SCRATCH="$(mktemp -d)"
-trap 'rm -rf "$SCRATCH"' EXIT
+trap 'rm -rf "$SCRATCH"; h_cleanup' EXIT
 
-FAILED=0
 CASE_BASE=0
-fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
-begin_case() { CASE_BASE=$FAILED; }
+fail() { h_fail "$*"; }
+begin_case() { CASE_BASE=$H_FAIL; }
 end_case() {  # $1 = case name; prints "<name> OK" only if the case added no failures
     # The tick must never spend: every case, pass or fail, proves the claude shim stayed cold.
     [[ ! -e "$SCRATCH/claude.log" ]] || fail "$1: claude was invoked"
-    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+    if [[ $H_FAIL -eq $CASE_BASE ]]; then h_pass "$1"; else echo "$1 FAILED" >&2; fi
 }
 
 # --- fixture repo --------------------------------------------------------------------------
@@ -843,9 +845,4 @@ grep -qF 'bootout' "$SCRATCH/launchctl.log" 2>/dev/null || fail "cron-setup-cli:
 end_case cron-setup-cli
 
 # --- summary -------------------------------------------------------------------------------
-if [[ $FAILED -eq 0 ]]; then
-    echo "test-pr-cycle-tick: ALL PASS"
-    exit 0
-fi
-echo "test-pr-cycle-tick: $FAILED failure(s)" >&2
-exit 1
+h_done

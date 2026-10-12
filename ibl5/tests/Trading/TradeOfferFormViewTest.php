@@ -70,6 +70,53 @@ class TradeOfferFormViewTest extends TestCase
         $this->assertStringNotContainsString('&amp;lt;', $html);
     }
 
+    public function testPlayerCellLinkRendersThumbnailAndEscapedName(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+        $pageData['userPlayers'] = [
+            $this->playerRow(100, self::HOSTILE),
+            $this->playerRow(101, 'A|B'),
+        ];
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=100"><img', $html);
+        $this->assertSame(1, preg_match('/pid=100"><img[^>]*>' . preg_quote(self::ESCAPED, '/') . '<\/a>/', $html));
+        $this->assertStringContainsString('pid=101">AB</a>', $html);
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
+    }
+
+    public function testFieldCountersMatchRowOrder(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+        $pageData['userPlayers'] = [$this->playerRow(100, 'One'), $this->playerRow(101, 'Two')];
+        $pageData['userPicks'] = [
+            ['pickid' => 7, 'ownerofpick' => 'Lakers', 'teampick' => 'Lakers', 'teampick_id' => 3, 'year' => '2026', 'round' => '1', 'notes' => null, 'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00'],
+        ];
+        $pageData['partnerPlayers'] = [$this->playerRow(200, 'Three')];
+        $pageData['partnerPicks'] = [
+            ['pickid' => 8, 'ownerofpick' => 'Celtics', 'teampick' => 'Celtics', 'teampick_id' => 4, 'year' => '2026', 'round' => '2', 'notes' => null, 'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00'],
+        ];
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('name="switchCounter" value="3"', $html);
+        $this->assertStringContainsString('name="fieldsCounter" value="4"', $html);
+        foreach (range(0, 4) as $index) {
+            $this->assertSame(1, substr_count($html, 'name="index' . $index . '"'), 'index' . $index);
+        }
+        $this->assertStringNotContainsString('name="index5"', $html);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function playerRow(int $pid, string $name): array
+    {
+        return ['pos' => 'G', 'name' => $name, 'pid' => $pid, 'ordinal' => 1, 'cy' => 1, 'salary_yr1' => 500, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0];
+    }
+
     /**
      * @return array<string, mixed>
      */

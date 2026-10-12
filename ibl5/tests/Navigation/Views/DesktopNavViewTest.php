@@ -195,4 +195,21 @@ class DesktopNavViewTest extends TestCase
         // Guests never see the logout footer
         $this->assertStringNotContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
     }
+
+    public function testDevSwitchHostileRequestUriEscapedExactlyOnce(): void
+    {
+        $config = new NavigationConfig(
+            isLoggedIn: true,
+            username: 'A-Jay',
+            currentLeague: 'ibl',
+            serverName: 'www.iblhoops.net',
+            requestUri: '/ibl5/?q="><script>',
+        );
+        $html = (new DesktopNavView($config, new LoginFormView(), new TeamsDropdownView()))->renderDevSwitch();
+
+        $this->assertStringContainsString('href="http://localhost/ibl5/?q=&quot;&gt;&lt;script&gt;"', $html);
+        $this->assertStringContainsString('title="Switch to localhost"', $html);
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringNotContainsString('&amp;quot;', $html);
+    }
 }

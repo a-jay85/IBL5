@@ -33,7 +33,7 @@ class LoginView
         <div class="ibl-card__body">
             <?php if ($error !== null): ?>
                 <div class="ibl-alert ibl-alert--error">
-                    <?= HtmlSanitizer::trusted(nl2br(HtmlSanitizer::e($error))) ?>
+                    <?= HtmlSanitizer::trusted($this->renderErrorMessage($error)) ?>
                 </div>
             <?php endif; ?>
 
@@ -77,5 +77,10 @@ class LoginView
 </div>
         <?php
         return (string) ob_get_clean();
+    }
+
+    private function renderErrorMessage(string $error): string
+    {
+        return nl2br(HtmlSanitizer::e($error));
     }
 }

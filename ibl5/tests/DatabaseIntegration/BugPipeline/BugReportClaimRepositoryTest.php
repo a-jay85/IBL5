@@ -107,6 +107,61 @@ class BugReportClaimRepositoryTest extends DatabaseTestCase
         self::assertSame(self::THREAD, $row['thread_id']);
     }
 
+    public function testTransitionWritesNullWhenOptionIsNull(): void
+    {
+        $id = $this->insertBugReport([
+            'status'              => 'hunting',
+            'thread_id'           => self::THREAD,
+            'approval_message_id' => self::APPROVAL,
+            'blocked_until'       => '2099-01-01 00:00:00',
+        ]);
+        $before = $this->fetchBugReport($id);
+        self::assertNotNull($before);
+        self::assertSame(self::THREAD, $before['thread_id']);
+        self::assertSame(self::APPROVAL, $before['approval_message_id']);
+        self::assertSame('2099-01-01 00:00:00', $before['blocked_until']);
+
+        // A key present with a null value is "set to NULL", not "leave alone".
+        // @phpstan-ignore argument.type (the null is the behavior under test)
+        self::assertTrue($this->repo->transition($id, 'needs_human', ['thread_id' => null, 'blocked_until' => null]));
+
+        $row = $this->fetchBugReport($id);
+        self::assertNotNull($row);
+        self::assertSame('needs_human', $row['status']);
+        self::assertNull($row['thread_id']);
+        self::assertNull($row['blocked_until']);
+        self::assertSame(self::APPROVAL, $row['approval_message_id'], 'A column not named in the options keeps its value');
+    }
+
+    public function testTransitionLeavesUnmentionedOptionalColumnsUntouched(): void
+    {
+        $id = $this->insertBugReport([
+            'status'              => 'hunting',
+            'pr_number'           => 41,
+            'issue_number'        => 17,
+            'thread_id'           => self::THREAD,
+            'approval_message_id' => self::APPROVAL,
+            'blocked_until'       => '2099-01-01 00:00:00',
+            'hunt_attempts'       => 2,
+            'lease_owner'         => 'worker-1',
+            'lease_expires'       => '2099-02-02 00:00:00',
+        ]);
+
+        self::assertTrue($this->repo->transition($id, 'pr_open', ['pr_number' => 99]));
+
+        $row = $this->fetchBugReport($id);
+        self::assertNotNull($row);
+        self::assertSame('pr_open', $row['status']);
+        self::assertSame(99, $row['pr_number']);
+        self::assertSame(17, $row['issue_number']);
+        self::assertSame(self::THREAD, $row['thread_id']);
+        self::assertSame(self::APPROVAL, $row['approval_message_id']);
+        self::assertSame('2099-01-01 00:00:00', $row['blocked_until']);
+        self::assertSame(2, $row['hunt_attempts']);
+        self::assertSame('worker-1', $row['lease_owner']);
+        self::assertSame('2099-02-02 00:00:00', $row['lease_expires']);
+    }
+
     public function testTransitionWithReleaseLeaseClearsLeaseColumns(): void
     {
         $id = $this->insertBugReport([

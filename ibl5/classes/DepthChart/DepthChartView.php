@@ -171,6 +171,13 @@ the earlier slot in that order claims them.</p>
             <tbody>';
     }
 
+    private function renderPlayerLink(int $pid, string $playerName): string
+    {
+        return '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . HtmlSanitizer::e($pid) . '">'
+            . \Player\PlayerImageHelper::renderThumbnail($pid) . HtmlSanitizer::e($playerName)
+            . '</a>';
+    }
+
     /**
      * @see DepthChartViewInterface::renderPlayerRow()
      * @param PlayerRow $player
@@ -180,7 +187,6 @@ the earlier slot in that order claims them.</p>
         $playerName = $player['name'];
         $jsbProduction = $this->service->computeJsbProduction($player);
 
-        $thumbnail = \Player\PlayerImageHelper::renderThumbnail((int) $player['pid']);
         $photoUrl = \Player\PlayerImageHelper::getImageUrl($player['pid']);
 
         echo '<tr data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '" data-quality-score="' . HtmlSanitizer::e($player['quality_score'] ?? 0.0) . '" data-photo-url="' . HtmlSanitizer::e($photoUrl) . '">'
@@ -189,9 +195,7 @@ the earlier slot in that order claims them.</p>
             . '<input type="hidden" name="pid' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['pid']) . '">'
             . '<input type="hidden" name="Injury' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['injured'] ?? 0) . '">'
             . '<input type="hidden" name="Name' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($playerName) . '">'
-            . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . HtmlSanitizer::e($player['pid']) . '">'
-            . HtmlSanitizer::trusted($thumbnail) . HtmlSanitizer::e($playerName)
-            . '</a>'
+            . HtmlSanitizer::trusted($this->renderPlayerLink((int) $player['pid'], $playerName))
             . '</td>';
 
         // Active status — hidden input submits "0" when checkbox is unchecked;

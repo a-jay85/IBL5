@@ -35,13 +35,7 @@ class SimSummariesView
         ?>
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sim Recaps</title>
-    <?= HtmlSanitizer::trusted(PageLayout::renderFontPreconnectLinks()) // @phpstan-ignore ibl.trustedVariable (three literal <link> tags built from string constants in PageLayout — no parameters, no interpolation, no request or DB data) ?>
-    <link rel="stylesheet" href="/ibl5/themes/IBL/style/style.css">
-</head>
+<?= HtmlSanitizer::trusted($this->renderHead()) ?>
 <body>
 <div class="updater">
     <h1 class="updater__title">Sim Recaps</h1>
@@ -165,6 +159,17 @@ class SimSummariesView
 </html>
         <?php
         return (string) ob_get_clean();
+    }
+
+    private function renderHead(): string
+    {
+        return "<head>\n"
+            . "    <meta charset=\"UTF-8\">\n"
+            . "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+            . "    <title>Sim Recaps</title>\n"
+            . '    ' . PageLayout::renderFontPreconnectLinks() . "\n"
+            . "    <link rel=\"stylesheet\" href=\"/ibl5/themes/IBL/style/style.css\">\n"
+            . "</head>\n";
     }
 
     /**

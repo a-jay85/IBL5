@@ -46,18 +46,6 @@ class TradeOfferFormView
 
         // Build player + pick rows for both teams, tracking the form field counter
         $k = 0;
-        $userPlayerRows = $this->buildPlayerRows($pageData['userPlayers'], $pageData['seasonPhase'], $k, $checkedItems);
-        $k = $userPlayerRows['nextK'];
-        $userPickRows = $this->buildPickRows($pageData['userPicks'], $k, $checkedItems);
-        $k = $userPickRows['nextK'];
-
-        $switchCounter = $k;
-
-        $partnerPlayerRows = $this->buildPlayerRows($pageData['partnerPlayers'], $pageData['seasonPhase'], $k, $checkedItems);
-        $k = $partnerPlayerRows['nextK'];
-        $partnerPickRows = $this->buildPickRows($pageData['partnerPicks'], $k, $checkedItems);
-        $k = $partnerPickRows['nextK'];
-        $k--;
 
         ob_start();
         echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, \Trading\TradeAlertMap::MAP, $pageData['error'] ?? null);
@@ -88,7 +76,7 @@ class TradeOfferFormView
                                 <col class="trading-col--stat">
                             </colgroup>
                             <tbody>
-                                <?= HtmlSanitizer::trusted($userPlayerRows['html']) ?>
+                                <?= HtmlSanitizer::trusted($this->buildPlayerRows($pageData['userPlayers'], $pageData['seasonPhase'], $k, $checkedItems)) ?>
                             </tbody>
                         </table>
                     </div>
@@ -99,7 +87,7 @@ class TradeOfferFormView
                                 <col>
                             </colgroup>
                             <tbody>
-                                <?= HtmlSanitizer::trusted($userPickRows['html']) ?>
+                                <?= HtmlSanitizer::trusted($this->buildPickRows($pageData['userPicks'], $k, $checkedItems)) ?>
                             </tbody>
                         </table>
                     </div>
@@ -113,6 +101,7 @@ class TradeOfferFormView
                 </details>
             </div>
             <div class="trading-layout__card">
+<?php $switchCounter = $k; ?>
                 <input type="hidden" name="switchCounter" value="<?= HtmlSanitizer::e($switchCounter) ?>">
                 <input type="hidden" name="listeningTeam" value="<?= HtmlSanitizer::safeHtmlOutput($partnerTeam) ?>">
                 <details class="trading-roster-details" open>
@@ -134,7 +123,7 @@ class TradeOfferFormView
                                 <col class="trading-col--stat">
                             </colgroup>
                             <tbody>
-                                <?= HtmlSanitizer::trusted($partnerPlayerRows['html']) ?>
+                                <?= HtmlSanitizer::trusted($this->buildPlayerRows($pageData['partnerPlayers'], $pageData['seasonPhase'], $k, $checkedItems)) ?>
                             </tbody>
                         </table>
                     </div>
@@ -145,7 +134,7 @@ class TradeOfferFormView
                                 <col>
                             </colgroup>
                             <tbody>
-                                <?= HtmlSanitizer::trusted($partnerPickRows['html']) ?>
+                                <?= HtmlSanitizer::trusted($this->buildPickRows($pageData['partnerPicks'], $k, $checkedItems)) ?>
                             </tbody>
                         </table>
                     </div>
@@ -161,6 +150,7 @@ class TradeOfferFormView
         </div>
 <?= HtmlSanitizer::trusted($this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1)) ?>
         <div class="trading-layout__submit">
+<?php $k--; ?>
             <input type="hidden" name="fieldsCounter" value="<?= HtmlSanitizer::e($k) ?>">
             <button type="submit" class="ibl-btn ibl-btn--primary" id="trade-submit-btn" disabled>Make Trade Offer</button>
         </div>
@@ -195,17 +185,26 @@ $tradeConfig = [
     }
 
     /**
+     * Build the player-name link with its thumbnail
+     */
+    private function renderPlayerCellLink(int $pid, string $rawName): string
+    {
+        $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $rawName);
+
+        return '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . HtmlSanitizer::e($pid) . '">'
+            . $resolved['thumbnail'] . HtmlSanitizer::e((string) $resolved['name']) . '</a>';
+    }
+
+    /**
      * Build HTML rows for players in the trade form
      *
      * @param list<TradingPlayerRow> $players Player rows from repository
      * @param string $seasonPhase Current season phase
-     * @param int $startK Starting form field counter
+     * @param int $k Form field counter, advanced in place by one per row
      * @param array<string, true> $checkedItems Previously checked items keyed by "type:id"
-     * @return array{html: string, nextK: int}
      */
-    private function buildPlayerRows(array $players, string $seasonPhase, int $startK, array $checkedItems = []): array
+    private function buildPlayerRows(array $players, string $seasonPhase, int &$k, array $checkedItems = []): string
     {
-        $k = $startK;
         $isOffseason = ($seasonPhase === 'Playoffs' || $seasonPhase === 'Draft' || $seasonPhase === 'Free Agency');
 
         ob_start();
@@ -213,9 +212,6 @@ $tradeConfig = [
             $pid = $row['pid'];
             $ordinal = $row['ordinal'] ?? 0;
             $contractYear = $row['cy'] ?? 0;
-            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $row['name']);
-            /** @var string $thumbnail */
-            $thumbnail = $resolved['thumbnail'];
 
             if ($isOffseason) {
                 $contractYear++;
@@ -245,7 +241,7 @@ $tradeConfig = [
         <input type="hidden" name="check<?= HtmlSanitizer::e($k) ?>">
     </td>
 <?php endif; ?>
-    <td class="ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= HtmlSanitizer::e($pid) ?>"><?= HtmlSanitizer::trusted($thumbnail) ?><?= HtmlSanitizer::safeHtmlOutput((string) $resolved['name']) ?></a></td>
+    <td class="ibl-player-cell"><?= HtmlSanitizer::trusted($this->renderPlayerCellLink((int) $pid, $row['name'])) ?></td>
     <td><?= HtmlSanitizer::safeHtmlOutput($row['pos']) ?></td>
     <td><?= HtmlSanitizer::e($contractAmount) ?></td>
 </tr>
@@ -254,20 +250,18 @@ $tradeConfig = [
         }
         $html = (string) ob_get_clean();
 
-        return ['html' => $html, 'nextK' => $k];
+        return $html;
     }
 
     /**
      * Build HTML rows for draft picks in the trade form
      *
      * @param list<TradingDraftPickRow> $picks Draft pick rows from repository
-     * @param int $startK Starting form field counter
+     * @param int $k Form field counter, advanced in place by one per row
      * @param array<string, true> $checkedItems Previously checked items keyed by "type:id"
-     * @return array{html: string, nextK: int}
      */
-    private function buildPickRows(array $picks, int $startK, array $checkedItems = []): array
+    private function buildPickRows(array $picks, int &$k, array $checkedItems = []): string
     {
-        $k = $startK;
 
         ob_start();
         foreach ($picks as $row) {
@@ -300,7 +294,7 @@ $tradeConfig = [
         }
         $html = (string) ob_get_clean();
 
-        return ['html' => $html, 'nextK' => $k];
+        return $html;
     }
 
     /**

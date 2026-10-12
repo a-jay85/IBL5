@@ -3,13 +3,11 @@
 #
 # bin/test-backlog — offline harness for bin/backlog (--dry-run, a stub gh, or a stateful fake gh).
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
-PASS=0
-FAIL=0
-FAILURES=()
-
-ok()   { printf '[PASS] %s\n' "$1"; PASS=$((PASS + 1)); }
-fail() { printf '[FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); FAILURES+=("$1"); }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$1"; }
 want() {
     local label="$1" output="$2" token="$3"
     if grep -qF -- "$token" <<< "$output"; then
@@ -60,7 +58,7 @@ if command -v python3 >/dev/null 2>&1; then
         ok "--dry-run new wrote nothing"
     fi
 else
-    printf '[SKIP] Case 2 --dry-run new (python3 not installed)\n'
+    h_skip "Case 2 --dry-run new (python3 not installed)"
 fi
 
 # Case 3: unknown subcommand exits non-zero
@@ -157,7 +155,7 @@ STUB
         fi
     done
 else
-    printf '[SKIP] Case 9 for-pr filter (jq not installed)\n'
+    h_skip "Case 9 for-pr filter (jq not installed)"
 fi
 
 # Cases 10-14: the per-PR cap through `new`, against the stateful fake gh.
@@ -243,7 +241,7 @@ no location here, but long enough to clear the length floor on its own so only f
     [ "$RC" -eq 2 ] && ok "Case 14 invalid body exits 2" || fail "Case 14 invalid body exits 2 (got $RC)"
     [ ! -e "$FAKE_STORE.log" ] && ok "Case 14 gh never ran" || fail "Case 14 gh never ran"
 else
-    printf '[SKIP] Cases 10-14 (python3 not installed)\n'
+    h_skip "Cases 10-14 (python3 not installed)"
 fi
 
 # Case 15: the skill doc that agents read names the cap decisions (`backlog/SKILL.md`).
@@ -251,10 +249,4 @@ SKILL_DOC="$(cd "$(dirname "$0")/.." && pwd)/.claude/skills/backlog/SKILL.md"
 want "backlog skill documents would-convert" "$(cat "$SKILL_DOC")" "would-convert"
 want "backlog skill documents the cap of 3" "$(cat "$SKILL_DOC")" "caps each origin PR at 3 follow-up issues"
 
-echo ""
-echo "Results: $PASS passed, $FAIL failed"
-if [ "$FAIL" -gt 0 ]; then
-    for f in "${FAILURES[@]}"; do printf '  FAIL: %s\n' "$f"; done
-    exit 1
-fi
-exit 0
+h_done

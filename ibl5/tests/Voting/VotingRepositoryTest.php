@@ -75,11 +75,11 @@ class VotingRepositoryTest extends WideUnitTestCase
     }
 
     /**
-     * Literal copy of the vote-column allowlist (independent oracle).
+     * Literal copy of the ASG vote-column allowlist (independent oracle).
      *
      * @return array<string, array{string}>
      */
-    public static function allowlistedVoteColumnProvider(): array
+    public static function allowlistedAsgColumnProvider(): array
     {
         return [
             'east_f1' => ['east_f1'],
@@ -98,6 +98,17 @@ class VotingRepositoryTest extends WideUnitTestCase
             'west_b2' => ['west_b2'],
             'west_b3' => ['west_b3'],
             'west_b4' => ['west_b4'],
+        ];
+    }
+
+    /**
+     * Literal copy of the EOY vote-column allowlist (independent oracle).
+     *
+     * @return array<string, array{string}>
+     */
+    public static function allowlistedEoyColumnProvider(): array
+    {
+        return [
             'mvp_1' => ['mvp_1'],
             'mvp_2' => ['mvp_2'],
             'mvp_3' => ['mvp_3'],
@@ -113,24 +124,85 @@ class VotingRepositoryTest extends WideUnitTestCase
         ];
     }
 
-    #[DataProvider('allowlistedVoteColumnProvider')]
+    #[DataProvider('allowlistedAsgColumnProvider')]
     public function testFetchAllStarTotalsSplicesEachAllowlistedColumn(string $column): void
     {
         $this->mockDb->setVotingResultsQueue([[]]);
 
         $this->repository->fetchAllStarTotals([$column]);
 
-        $this->assertQueryExecuted('SELECT ' . $column . ' AS name FROM ibl_votes_ASG');
+        $this->assertQueryExecuted('SELECT ' . $column . ' AS name FROM ibl_votes_ASG WHERE 1 = 1');
     }
 
-    #[DataProvider('allowlistedVoteColumnProvider')]
+    #[DataProvider('allowlistedEoyColumnProvider')]
     public function testFetchEndOfYearTotalsSplicesEachAllowlistedColumn(string $column): void
     {
         $this->mockDb->setVotingResultsQueue([[]]);
 
         $this->repository->fetchEndOfYearTotals([$column => 3]);
 
-        $this->assertQueryExecuted('SELECT ' . $column . ' AS name, 3 AS score FROM ibl_votes_EOY');
+        $this->assertQueryExecuted('SELECT ' . $column . ' AS name, CAST(3 AS SIGNED) AS score FROM ibl_votes_EOY WHERE 1 = 1');
+    }
+
+    public function testAllStarTotalsRejectEndOfYearColumn(): void
+    {
+        try {
+            $this->repository->fetchAllStarTotals(['mvp_1']);
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('Invalid vote column', $e->getMessage());
+            self::assertSame([], $this->mockDb->getExecutedQueries());
+        }
+    }
+
+    public function testEndOfYearTotalsRejectAllStarColumn(): void
+    {
+        try {
+            $this->repository->fetchEndOfYearTotals(['east_f1' => 3]);
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('Invalid vote column', $e->getMessage());
+            self::assertSame([], $this->mockDb->getExecutedQueries());
+        }
+    }
+
+    public function testAllStarTotalsRejectDuplicateColumn(): void
+    {
+        try {
+            $this->repository->fetchAllStarTotals(['east_f1', 'east_f1']);
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('Duplicate vote column', $e->getMessage());
+            self::assertSame([], $this->mockDb->getExecutedQueries());
+        }
+    }
+
+    public function testAllStarTotalsBindOneFlagPerColumnInTableOrder(): void
+    {
+        $this->mockDb->setVotingResultsQueue([[]]);
+
+        $this->repository->fetchAllStarTotals(['east_f1', 'west_b4']);
+
+        $expected = array_fill(0, 16, 0);
+        $expected[0] = 1;
+        $expected[15] = 1;
+        self::assertSame($expected, $this->mockDb->getLastBoundParams());
+    }
+
+    public function testEndOfYearTotalsBindZeroFlagForUnselectedColumns(): void
+    {
+        $this->mockDb->setVotingResultsQueue([[]]);
+
+        $this->repository->fetchEndOfYearTotals(['mvp_1' => 3, 'gm_3' => 1]);
+
+        // Bound as (weight, selected flag) per column in EOY_COLUMNS order: mvp_1 is
+        // the first pair, gm_3 the last; every other pair is (0, 0).
+        $expected = array_fill(0, 24, 0);
+        $expected[0] = 3;
+        $expected[1] = 1;
+        $expected[22] = 1;
+        $expected[23] = 1;
+        self::assertSame($expected, $this->mockDb->getLastBoundParams());
     }
 
     public function testFetchEndOfYearTotalsRejectsNonAllowlistedColumn(): void

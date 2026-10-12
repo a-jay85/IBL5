@@ -22,13 +22,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ?>
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IBLv5 Control Panel</title>
-    <?= HtmlSanitizer::trusted(PageLayout::renderFontPreconnectLinks()) ?>
-    <link rel="stylesheet" href="/ibl5/themes/IBL/style/style.css">
-</head>
+<?= HtmlSanitizer::trusted($this->renderHead()) ?>
 <body>
 <main class="updater">
     <h1 class="updater__title">League Control Panel</h1>
@@ -86,6 +80,17 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
 </div>
         <?php
         return (string) ob_get_clean();
+    }
+
+    private function renderHead(): string
+    {
+        return "<head>\n"
+            . "    <meta charset=\"UTF-8\">\n"
+            . "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+            . "    <title>IBLv5 Control Panel</title>\n"
+            . '    ' . PageLayout::renderFontPreconnectLinks() . "\n"
+            . "    <link rel=\"stylesheet\" href=\"/ibl5/themes/IBL/style/style.css\">\n"
+            . "</head>\n";
     }
 
     private function renderFlashMessage(?string $message, bool $success): string

@@ -26,7 +26,7 @@ class BugReportClaimRepository extends \Database\BaseMysqliRepository implements
      *
      * @var array<string, string>
      */
-    private const OPTIONAL_TRANSITION_COLUMNS = [
+    public const OPTIONAL_TRANSITION_COLUMNS = [
         'class'               => 's',
         'pr_number'           => 'i',
         'issue_number'        => 'i',
@@ -35,6 +35,14 @@ class BugReportClaimRepository extends \Database\BaseMysqliRepository implements
         'blocked_until'       => 's',
         'hunt_attempts'       => 'i',
     ];
+
+    /**
+     * transition() UPDATE, generated from OPTIONAL_TRANSITION_COLUMNS: each optional column binds
+     * a set-flag then its value (`IF(flag, value, col)`), and the lease release binds one flag per
+     * lease column. Regenerate both constants when OPTIONAL_TRANSITION_COLUMNS changes.
+     */
+    private const TRANSITION_SQL = 'UPDATE `ibl_bug_reports` SET status = ?, class = IF(?, ?, class), pr_number = IF(?, ?, pr_number), issue_number = IF(?, ?, issue_number), thread_id = IF(?, ?, thread_id), approval_message_id = IF(?, ?, approval_message_id), blocked_until = IF(?, ?, blocked_until), hunt_attempts = IF(?, ?, hunt_attempts), lease_owner = IF(?, NULL, lease_owner), lease_expires = IF(?, NULL, lease_expires), updated_at = NOW() WHERE id = ?';
+    public const TRANSITION_TYPES = 'sisiiiiisisisiiiii';
 
     /**
      * Fetch a single report by PK, snowflake-cast. Private helper so the claim
@@ -185,9 +193,8 @@ class BugReportClaimRepository extends \Database\BaseMysqliRepository implements
      * an absent key keeps the column's current value ("build conditional SQL; bind_param has no
      * NULL type" — core-coding.md). Keys outside OPTIONAL_TRANSITION_COLUMNS are ignored.
      *
-     * $setClauses fragments ('status = ?', 'pr_number = ?', …) derive from the fixed
-     * OPTIONAL_TRANSITION_COLUMNS constant (compile-time literal column names / bound params) —
-     * concatenate literal fragments, do NOT interpolate values.
+     * The statement is the fixed TRANSITION_SQL literal; every optional column binds a
+     * set-flag plus its value, so no runtime value reaches the SQL text.
      *
      * @param array<string, int|string> $opts Accepted keys: pr_number, issue_number, hunt_attempts
      *   (ints); class (ENUM string); thread_id, approval_message_id (snowflakes, bound "s");
@@ -198,31 +205,20 @@ class BugReportClaimRepository extends \Database\BaseMysqliRepository implements
      */
     public function transition(int $id, string $status, array $opts = [], bool $releaseLease = false): bool
     {
-        $setClauses = ['status = ?'];
-        $types = 's';
-        $values = [$status];
-
-        foreach (self::OPTIONAL_TRANSITION_COLUMNS as $col => $type) {
-            if (array_key_exists($col, $opts)) {
-                $setClauses[] = $col . ' = ?';
-                $types .= $type;
-                $values[] = $opts[$col];
-            }
+        $params = [$status];
+        foreach (array_keys(self::OPTIONAL_TRANSITION_COLUMNS) as $col) {
+            $set = array_key_exists($col, $opts) ? 1 : 0;
+            $params[] = $set;
+            $params[] = $set === 1 ? $opts[$col] : null;
         }
-        if ($releaseLease) {
-            // Literal NULLs (no bound param) — atomic lease-drop for →needs_human / →queued reset.
-            $setClauses[] = 'lease_owner = NULL';
-            $setClauses[] = 'lease_expires = NULL';
-        }
-        $setClauses[] = 'updated_at = NOW()';
+        // One flag per lease column: 1 NULLs lease_owner + lease_expires atomically
+        // (→needs_human / →queued reset); 0 keeps both.
+        $release = $releaseLease ? 1 : 0;
+        $params[] = $release;
+        $params[] = $release;
+        $params[] = $id;
 
-        // $setClauses elements are literal fragments from the fixed constant map above;
-        // no runtime value is interpolated into column names — only ? placeholders for values.
-        $query = 'UPDATE `ibl_bug_reports` SET ' . implode(', ', $setClauses) . ' WHERE id = ?';
-        $types .= 'i';
-        $values[] = $id;
-
-        return $this->execute($query, $types, ...$values) === 1;
+        return $this->execute(self::TRANSITION_SQL, self::TRANSITION_TYPES, ...$params) === 1;
     }
 
     /**

@@ -1,6 +1,6 @@
 ---
 description: ADR-0194, engine/ is frozen and bin/check-engine-freeze gates new decompile tokens on every PR.
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 ---
 
 # ADR-0194: Freeze engine/ and gate new decompile tokens
@@ -27,7 +27,7 @@ The shadow-only Go engine under `engine/` (ADR-0035, ADR-0037) is scheduled for 
 - Positive: new citations cannot spread, and the freeze cannot be dodged by moving a file out of `engine/`.
 - Negative: existing citations stay until their files change, and editing a line that already carries a token fails, so the editor drops the token from that line.
 - Negative: direct pushes to master stay ungated.
-- Negative: a verbatim copy out of `engine/` that keeps the source and carries no token is not detected, and binary file content is not scanned for tokens.
+- Negative: a verbatim copy out of `engine/` that keeps the source and carries no token is not detected, and binary file content is not scanned for tokens. Git writes no name header for a new empty or binary file, so a token in such a name is caught only under `engine/`.
 
 ## References
 

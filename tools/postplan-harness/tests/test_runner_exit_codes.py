@@ -48,12 +48,12 @@ def test_other_typed_failure_exits_1():          # negative path: not everything
 _EXIT_CODE_TABLE = (
     [(TerminalState.FAILED, k, 3) for k in (
         "rebase-conflict", "local-gate", "remote-head-diverged",
-        "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty",
+        "llm-usage-limit", "llm-auth-expired", "usage-pause-unconfirmed", "usage-pause-dirty",
         "subprocess-timeout")]
     + [(TerminalState.FAILED, "usage-pause", 75)]
     + [(TerminalState.FAILED, k, 1) for k in (
         "push-disabled", "push-failed", "push-retry-cap",
-        "lostwork-unproved", "git", None)]
+        "lostwork-unproved", "llm-invalid-output", "git", None)]
     + [(t, None, 0) for t in (
         TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
         TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED,

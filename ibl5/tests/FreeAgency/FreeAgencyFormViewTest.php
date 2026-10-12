@@ -44,15 +44,30 @@ class FreeAgencyFormViewTest extends TestCase
         $this->player->method('getYearsOfExperience')->willReturn(5);
         $this->player->method('getTeamName')->willReturn('TestTeam');
 
-        // No setCsrfHtml() call — $csrfHtml defaults to '' → deterministic output
+        // No setCsrfToken() call — $csrfToken defaults to '' → deterministic output
         $this->formView = new FreeAgencyFormView('TestTeam', $this->player);
     }
 
     public function testRenderPlayerRatings(): void
     {
-        $html = FreeAgencyFormView::renderPlayerRatings($this->player);
+        $html = $this->formView->renderPlayerRatings($this->player);
         $golden = self::FIXTURES . '/fa-form-player-ratings.golden.html';
         $this->assertStringEqualsFile($golden, $html);
+    }
+
+    public function testCsrfInputEscapesTokenExactlyOnce(): void
+    {
+        $this->formView->setCsrfToken('t"<x>&');
+
+        $html = $this->formView->renderCsrfInput();
+
+        $this->assertSame('<input type="hidden" name="_csrf_token" value="t&quot;&lt;x&gt;&amp;">', $html);
+        $this->assertStringNotContainsString('&amp;quot;', $html);
+    }
+
+    public function testCsrfInputWithUnsetTokenRendersNothing(): void
+    {
+        $this->assertSame('', $this->formView->renderCsrfInput());
     }
 
     public function testRenderDemandDisplay(): void

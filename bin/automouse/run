@@ -956,6 +956,18 @@ append_cost_row() {
     # Sibling-relative, never $REPO: a worktree copy of `run` must price with its
     # own checkout's pricer, not the main checkout's.
     local root="${SELF_DIR:-}/.."
+    # cost-row-prestart-skip:begin
+    # A phase the usage gate paused before launch never ran, so it gets no row
+    # (no report row, no sidecar line). Markers: the impl pause printf below in
+    # this file and the pre-start echo in bin/post-plan-now. Fail-safe: a slice
+    # carrying cost= or session_id= ran, and keeps its row.
+    local slice
+    slice=$(tail -n +"$((log_before + 1))" "$LOG") || true
+    if grep -qE 'usage gate paused before the impl started|usage gate .*paused before start' <<< "$slice" \
+            && ! grep -qE 'cost=\$|session_id=' <<< "$slice"; then
+        return 0
+    fi
+    # cost-row-prestart-skip:end
     tier=$(model_tier "$model")
     # `|| true` is load-bearing: under `set -euo pipefail` a killed phase emits no
     # `cost=` line, so grep exits non-zero and would abort the whole automouse loop.

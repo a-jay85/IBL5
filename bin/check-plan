@@ -221,6 +221,19 @@
 #                              after implementation.
 #                              A mention inside a backtick code span, or inside a
 #                              fenced fixture block, is not a marker and is skipped.
+#   RO (run-only) marker     — a `(run-only)` matrix marker (any PHPUnit / API-test /
+#                              E2E / Visual-regression row) sits directly after the
+#                              row's planned test token, names a path that exists on
+#                              the base branch, is not also marked (no-change), and
+#                              is not a must-appear ## Critical Files entry. The
+#                              post-plan harness honors it nowhere else, and a
+#                              misplaced one is a silent no-op that holds arming
+#                              condition (3) after implementation. Warns (never
+#                              fails) when a phase line pairs the token with an
+#                              edit verb, and when an unmarked test row names a
+#                              path that exists on the base branch but no phase
+#                              line or Critical Files entry cites. No resolvable
+#                              base ref fails OPEN for the existence checks only.
 #   ND **No diff:** marker   — a `**No diff:** <reason>` phase marker sits inside a
 #                              `## Phase N:` / `## Step N:` body with a reason of 15+
 #                              characters. The post-plan harness honors it nowhere
@@ -1275,6 +1288,109 @@ while IFS= read -r row; do
         viol "[X] (no-change) marker on a non-Visual-regression matrix row — the harness honors it only when a whole cell reads Visual-regression; write the test the row plans, or retype the row: ${row}"
     elif ! grep -qiE '`[[:space:]]*\(no-change\)' <<< "$row"; then
         viol "[X] (no-change) marker is not directly after the row's backticked test token — the harness honors only the shape \`path\` (no-change): ${row}"
+    fi
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
+# Gate RO: the `(run-only)` matrix marker (tools/postplan-harness/harness/planfile.py
+# parse_run_only_test_paths + conformance.check). It exempts the row's token from the
+# Phase 5.0 `MISSING:` item, so this gate makes sure the marker can only sit on a row
+# that RUNS an existing test. Checks, in order:
+#   1. the row has a whole-cell planning type (PHPUnit / API-test / E2E /
+#      Visual-regression) — a CLI row plans nothing and the marker is a no-op there;
+#   2. the marker is directly after a backticked token, and that token is the row's
+#      planned test token (first backticked test|spec token), so the harness and the
+#      author agree on which path is exempted;
+#   3. the same row does not also carry a bare `(no-change)` — one marker per token;
+#   4. the token exists on the base branch (git cat-file -e <ref>:<path>; dirs pass);
+#   5. the token is not a MUST_APPEAR ## Critical Files entry (that entry says the
+#      diff must touch it; the marker says it will not).
+# Warnings (never violations), because plan prose cannot prove an edit either way:
+#   6. a `## Phase N` / `## Step N` body line cites the token in backticks together
+#      with an edit verb;
+#   7. an UNMARKED planning row names a path that exists on the base branch, and no
+#      phase/step body line or Critical Files entry cites it — the author may have
+#      meant (run-only), or may have forgotten to name the edit in a phase.
+# Reference tree: CHECK_PLAN_MASTER_REF when set (test seam), else the first of
+# origin/master, master, HEAD that resolves (same chain as gate A). No resolvable
+# ref fails OPEN for checks 4 and 7 only; checks 1-3 and 5 still run.
+# ---------------------------------------------------------------------------
+_ro_ref=""
+if [ -n "${CHECK_PLAN_MASTER_REF:-}" ]; then
+    _ro_cands="$CHECK_PLAN_MASTER_REF"
+else
+    _ro_cands="origin/master master HEAD"
+fi
+for _ro_c in $_ro_cands; do
+    if git -C "$REPO_ROOT" rev-parse --verify -q "${_ro_c}^{commit}" >/dev/null 2>&1; then
+        _ro_ref="$_ro_c"
+        break
+    fi
+done
+_ro_on_base() {  # $1 = repo-relative path (file or directory)
+    [ -n "$_ro_ref" ] || return 0   # fail open: nothing to compare against
+    git -C "$REPO_ROOT" cat-file -e "${_ro_ref}:${1%/}" 2>/dev/null
+}
+_ro_must_appear="$(cf_parse_section "$PLAN_FILE" | sed -n 's/^MUST_APPEAR://p')"
+# Phase/step body lines (fence-stripped) for checks 6 and 7.
+_ro_phase_lines="$(awk '
+    /^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]/ { inp = 1; next }
+    /^##[[:space:]]/ { inp = 0 }
+    inp { print }
+' "$GATEP_BODY")"
+_ro_cf_lines="$(cf_section_named "$PLAN_FILE" "Critical Files")"
+_ro_edit_verbs='(edit|extend|modify|modif|update|rewrite|change|append|insert|replace|add|create|write|delete|remove|rename)'
+while IFS= read -r row; do
+    [ -n "$row" ] || continue
+    bare=$(sed 's/`[^`]*`//g' <<< "$row")
+    has_ro=0; grep -qiF '(run-only)' <<< "$bare" && has_ro=1
+    has_nc=0; grep -qiF '(no-change)' <<< "$bare" && has_nc=1
+    # Whole-cell planning type, same awk as gate X but for all four labels.
+    if ! awk -F'|' '
+        { for (i = 1; i <= NF; i++) { c = tolower($i); gsub(/^[[:space:]*`_]+|[[:space:]*`_]+$/, "", c)
+          if (c ~ /^(phpunit|api.?test|e2e|visual-?regression)([[:space:]]*\(|[[:space:]]*[+\/,&]|-analogue|[[:space:]]+db-integration|$)/) found = 1 } }
+        END { exit found ? 0 : 1 }' <<< "$row"; then
+        if [ "$has_ro" -eq 1 ]; then
+            viol "[RO] (run-only) marker on a row with no PHPUnit / API-test / E2E / Visual-regression type cell — the harness plans no test from this row, so the marker is a no-op; drop it: ${row}"
+        fi
+        continue
+    fi
+    planned=$(grep -oE '`[^`]*(test|spec|Test)[^`]*`' <<< "$row" | head -1 | tr -d '`')
+    [ -n "$planned" ] || continue
+    if [ "$has_ro" -eq 1 ]; then
+        if ! grep -qiE '`[[:space:]]*\(run-only\)' <<< "$row"; then
+            viol "[RO] (run-only) marker is not directly after the row's backticked test token — the harness honors only the shape \`path\` (run-only): ${row}"
+            continue
+        fi
+        marked=$(sed -nE 's/.*`([^`]+)`[[:space:]]*\([Rr][Uu][Nn]-[Oo][Nn][Ll][Yy]\).*/\1/p' <<< "$row")
+        if [ "$marked" != "$planned" ]; then
+            viol "[RO] (run-only) follows \`${marked}\` but the row's planned test token is \`${planned}\` — the harness exempts only the first test|spec token; move the marker: ${row}"
+            continue
+        fi
+        if [ "$has_nc" -eq 1 ]; then
+            viol "[RO] row carries both (run-only) and (no-change) — one marker per token; keep (no-change) for an untouched Visual-regression baseline, (run-only) for a test that is run but not written: ${row}"
+            continue
+        fi
+        if ! _ro_on_base "$planned"; then
+            viol "[RO] (run-only) path \`${planned}\` does not exist on ${_ro_ref} — a run-only row can only run a test that already exists; write the test (drop the marker) or fix the path: ${row}"
+            continue
+        fi
+        if grep -qxF -- "$planned" <<< "$_ro_must_appear"; then
+            viol "[RO] (run-only) path \`${planned}\` is a must-appear ## Critical Files entry — the entry says the diff must touch it, the marker says it will not; mark the entry (reference) or drop (run-only): ${row}"
+            continue
+        fi
+        if grep -iE "\`${planned}\`" <<< "$_ro_phase_lines" | grep -qiE "\\b${_ro_edit_verbs}" ; then
+            warn "[RO] warning: (run-only) path \`${planned}\` appears on a phase line with an edit verb — if that phase edits the file, drop (run-only); if it only runs it, reword the line"
+        fi
+        continue
+    fi
+    # Unmarked planning row (check 7): existing-on-base path that nothing else cites.
+    [ "$has_nc" -eq 1 ] && continue
+    [ -n "$_ro_ref" ] || continue
+    _ro_on_base "$planned" || continue
+    if ! grep -qF -- "\`${planned}\`" <<< "$_ro_phase_lines" \
+       && ! grep -qF -- "\`${planned}\`" <<< "$_ro_cf_lines"; then
+        warn "[RO] warning: unmarked test row names \`${planned}\`, which exists on ${_ro_ref}, and no phase line or Critical Files entry cites it — Phase 5.0 will emit MISSING unless the diff touches it; add (run-only) if the plan only runs it, or cite the edit in a phase"
     fi
 done < "$GATEP_MATRIX"
 

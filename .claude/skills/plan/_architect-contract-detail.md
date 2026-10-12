@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -43,6 +43,10 @@ A bare path OR a path you annotate with a change-description is still checked; o
 The gate is a hard fail. Every flagged plan holds deterministically whenever VR is green, and one marker clears it. The 2026-10-01 corpus scan flagged 3 of 1050 plans, all already shipped.
 
 **Glob entries.** To name a file family without listing each member, write one glob entry such as `` `bin/test-automouse-*` (conditional) ``. `bin/lib/plan-scope-conformance` counts every matching path as planned, except a `.claude/` path. Keep a glob entry `(conditional)`, because Phase 5.0's `MISSING-FILE:` check matches entries literally.
+
+### Run-only matrix rows
+
+**Matrix rows that only RUN an existing test** (a smoke suite as a regression check, a characterization run of a suite the PR does not edit) carry `(run-only)` right after the token's closing backtick: `` `ibl5/tests/e2e/smoke/navigation.spec.ts` (run-only) ``. Without it Phase 5.0 emits `MISSING:` for the untouched file and arming condition (3) holds. Honored on any PHPUnit / API-test / E2E / Visual-regression row, only for a path tracked on master, only when every row naming the token carries `(run-only)` or `(no-change)`; it never exempts a Critical Files entry (mark that `(reference)`). Gate `[RO]` fails a marker on a path absent from master, a path a must-appear Critical Files entry names, a row that also carries `(no-change)`, or a marker not directly after the planned token. Use `(no-change)` for an untouched Visual-regression baseline and `(run-only)` for everything else.
 
 ### Phase-count guard — HTML comment mechanism
 

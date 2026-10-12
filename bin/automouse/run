@@ -1865,6 +1865,38 @@ write_repeat_failure_report() {
     } > "$_rfr_dir/$(date +%Y-%m-%d)-skipped-$_rfr_slug.md"
 }
 
+# Plan-defect sentinel (queue/<plan>.md.plan-defect). The impl agent writes it at
+# prompt-impl Step 6.7 when the plan's Verification Matrix cannot be realised, the
+# stop is not the time-budget wall, and no test or lint run this attempt was red.
+# Line 1 is the fixed marker; lines 2.. are the UNREALISED-ASSERTION: and
+# MISSING-FILE: lines verbatim. Exit 0 iff <file> exists and line 1 is exactly
+# the marker. A garbled or absent line 1 returns 1, so the attempt keeps the
+# normal retry ladder.
+# Args: <sentinel_file>
+plan_defect_marker_present() {
+    local _pdm_line=""
+    [ -f "$1" ] || return 1
+    { IFS= read -r _pdm_line || true; } < "$1"
+    [ "$_pdm_line" = "automouse-plan-defect: v1" ]
+}
+
+# Write the skipped report for a plan stopped on a plan defect. Same path shape
+# as write_repeat_failure_report; morning-digest surfaces it. Carries the
+# sentinel's lines 2..101 verbatim (the marker line itself is never copied).
+# Args: <plan_name> <sentinel_file> <attempt_num>
+write_plan_defect_report() {
+    local _pdr_dir="$NIGHTLY_DIR/reports" _pdr_slug _pdr_rows
+    _pdr_slug=$(basename "$1" .md)
+    _pdr_rows=$(sed -n '2,101p' "$2" 2>/dev/null)
+    [ -n "$_pdr_rows" ] || _pdr_rows="(the sentinel listed no rows; see this attempt's error report)"
+    mkdir -p "$_pdr_dir"
+    {
+        printf 'Plan "%s" stopped after attempt %s: its Verification Matrix could not be realised. That is a plan defect a retry cannot fix, so the remaining attempts were not spent. Fix the rows below in the plan, then requeue.\n\n' \
+            "$_pdr_slug" "$3"
+        printf '## Failing rows\n\n```\n%s\n```\n' "$_pdr_rows"
+    } > "$_pdr_dir/$(date +%Y-%m-%d)-skipped-$_pdr_slug.md"
+}
+
 # Decide whether to feed the prior-failure report to this attempt's impl prompt.
 # YES iff escalation fired (impl model != base model) AND the sidecar is present.
 # DECOUPLED from the escalation trigger (ADR-0085): the report is fed only when

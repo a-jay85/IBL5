@@ -181,6 +181,27 @@ def test_conflict_review_site_propagates_pause(tmp_path):
 
 # --- harness/adr_draft.py -----------------------------------------------------
 
+def test_conflict_ladder_site_propagates_pause(tmp_path):
+    from harness.conflict_ladder import LadderContext, RungAttempt, run_ladder
+
+    def run(*args, check=True):
+        return "abc1234" if args and args[0] == "rev-parse" else ""
+
+    llm = PausingLlm()
+    ctx = LadderContext(
+        llm=llm, run=run, run_out=lambda *a: (0, ""), prove=lambda: (False, ""),
+        worktree=str(tmp_path), key="pause-ladder", master_sha="m", pre_rebase_sha="p",
+        conflicted_files=())
+
+    def probe(c, proof_out):
+        c.llm.call_tooled("conflict-ladder-probe", "opus", "x", cwd=c.worktree)
+        return RungAttempt(False, (), "unreachable")
+
+    with pytest.raises(UsagePause):
+        run_ladder(ctx, "LOST: a.txt: +x\n", (("probe", probe),))
+    assert llm.purposes == ["conflict-ladder-probe"]
+
+
 def test_adr_draft_site_propagates_pause_and_discards(repo, tmp_path, monkeypatch):  # noqa: F811
     wt, git = repo["wt"], repo["git"]
     out_dir = str(tmp_path / "out")
@@ -295,15 +316,6 @@ def test_runner_manual_recheck_site_propagates_pause():
         runner._recheck_manual_rows(llm, None, plan, Classification(), _NOOP,
                                     types.SimpleNamespace(manual_demotions=[]))
     assert llm.purposes == ["manual-recheck"]
-
-
-def test_runner_hold_discharge_site_propagates_pause():
-    justification = ("Why held.\n- the diff is visual only, a probe could check it\n\n"
-                     "**Decision:** hold for a human.\n")
-    llm = PausingLlm()
-    with pytest.raises(UsagePause):
-        runner._discharge_hold_sentences(llm, None, justification, _NOOP)
-    assert llm.purposes == ["hold-discharge"]
 
 
 _CANNED_RUN = {

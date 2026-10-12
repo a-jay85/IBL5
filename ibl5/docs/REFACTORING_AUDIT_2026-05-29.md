@@ -1,6 +1,6 @@
 ---
 description: Ranked refactoring audit of ibl5/classes — dead code, duplication, ADR-boundary findings (2026-05-29).
-last_verified: 2026-09-29
+last_verified: 2026-10-05
 ---
 
 # Refactoring Audit — `ibl5/classes/` (2026-05-29)
@@ -105,7 +105,7 @@ _(2.3–2.7 were not individually re-verified during the 2026-07-29 pass; findin
 
 _(Most Tier 3 items were not individually re-verified in the 2026-07-29 pass; items with an explicit status note were checked.)_
 
-- **`safeHtmlOutput()` vs `e()` drift.** At audit time (2026-05-29): 299 long-form calls across 54 files. As of 2026-09-29: 317 calls across 66 files. `e()` is the documented View alias (71 files). Standardize Views on `::e()`. Real noise but ~317-site churn; batch into one mechanical PR. *Priority: readability.*
+- **`safeHtmlOutput()` vs `e()` drift.** At audit time (2026-05-29): 299 long-form calls across 54 files. As of 2026-09-29: 317 calls across 66 files. `HtmlSanitizer::e()` is the documented View alias; 91 non-test, non-doc files call it as of 2026-10-05. Standardize Views on `::e()`. Real noise but ~317-site churn; batch into one mechanical PR. *Priority: readability.*
 - **Magic `82` (games/season)** in `StandingsUpdater:285,353,412,463` → add `League::GAMES_PER_SEASON`. *(Done 2026-07-29: constant is `League::REGULAR_SEASON_GAMES`; all four sites use it.)*
 - **Magic `1440` (max player ordinal)** in PlrParser declared 3×; `PlrLineParser:26` uses a bare literal. Reference `PlrFileWriter::MAX_PLAYER_ORDINAL` everywhere.
 - **`+1` JSB-year decode** duplicated in `RcbFileParser:343,428`, `TrnFileParser:119`, `HisFileParser:102` → `decodeJsbYear(int): int`.

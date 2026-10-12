@@ -5,8 +5,9 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.gate_backtest import (HistoricalPR, ReplaySpec, detect_gate_changes, expand_argv,
-                                   resolve_spec)
+from harness.gate_backtest import (ALLOWED_PLACEHOLDERS, REPLAY_SPECS, HistoricalPR, ReplaySpec,
+                                   _PLACEHOLDER_RE, detect_gate_changes, expand_argv, expand_env,
+                                   expand_stdin, placeholder_names, resolve_spec)
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 T0 = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
@@ -108,6 +109,83 @@ def test_registry_covers_every_check_script():
         rel = "bin/" + os.path.basename(script)
         state, _, reason = resolve_spec(rel, "")
         assert state in ("replayable", "not-replayable"), f"{rel} unspecified: {reason}"
+
+
+def test_body_file_gates_replay_from_body_file():
+    state, spec, _ = resolve_spec("bin/check-pr-manual-testing", "")
+    assert state == "replayable"
+    assert spec.argv == ("--body-file", "{body_file}")
+    assert expand_argv(spec, {"body_file": "/tmp/7.body"}) == ["--body-file", "/tmp/7.body"]
+
+
+def test_post_merge_recipe_pins_repo_slug():
+    state, spec, _ = resolve_spec("bin/check-post-merge-recipe", "")
+    assert state == "replayable"
+    assert spec.argv == ("--body-file", "{body_file}", "--repo-slug", "a-jay85/IBL5")
+    assert spec.flag_exits == frozenset({1})
+
+
+def test_hygiene_gates_replay_pr_mode_against_base():
+    for gate, var in (("bin/check-e2e-hygiene", "E2E_HYGIENE_BASE_REF"),
+                      ("bin/check-phpunit-hygiene", "PHPUNIT_HYGIENE_BASE_REF")):
+        state, spec, _ = resolve_spec(gate, "")
+        assert state == "replayable", gate
+        assert spec.argv == ("--pr",), gate
+        assert expand_env(spec, {"base": "abc123"}) == {var: "abc123"}, gate
+
+
+def test_live_state_gates_stay_not_replayable():
+    for gate in ("bin/check-hot-files", "bin/check-pr-collisions",
+                 "bin/check-master-ci-green", "bin/check-pr-checks-green"):
+        state, spec, reason = resolve_spec(gate, "")
+        assert state == "not-replayable", gate
+        assert spec is None and reason, gate
+    for path, entry in REPLAY_SPECS.items():
+        if isinstance(entry, str):
+            assert "gh --pr" not in entry, path
+
+
+def test_registry_specs_use_only_allowed_placeholders():
+    # A typo such as `{bodyfile}` is not in ALLOWED_PLACEHOLDERS and fails here.
+    for path, entry in REPLAY_SPECS.items():
+        if not isinstance(entry, ReplaySpec):
+            continue
+        bad = placeholder_names(entry) - ALLOWED_PLACEHOLDERS
+        assert not bad, f"{path}: unknown placeholder(s) {sorted(bad)}"
+
+
+def test_placeholder_names_covers_stdin_and_rejects_typo():
+    spec = ReplaySpec(argv=("--since={base}",), env=(("X", "{head}"),), stdin="{bodyfile}")
+    assert placeholder_names(spec) == {"base", "head", "bodyfile"}
+    assert {"bodyfile"} <= placeholder_names(spec) - ALLOWED_PLACEHOLDERS
+
+
+def test_destructive_migrations_replays_bypass_from_body_stdin():
+    state, spec, _ = resolve_spec("bin/check-destructive-migrations", "")
+    assert state == "replayable"
+    assert spec.argv == ("--since={base}", "--bypass-from-stdin")
+    assert spec.stdin == "{body_file}"
+    assert expand_stdin(spec, {"base": "abc", "body_file": "/tmp/7.body"}) == "/tmp/7.body"
+
+
+def test_destructive_migrations_script_has_no_header_override():
+    # resolve_spec prefers a `# gate-backtest-argv:` header over the registry entry.
+    with open(os.path.join(REPO_ROOT, "bin", "check-destructive-migrations")) as fh:
+        text = fh.read()
+    _, spec, _ = resolve_spec("bin/check-destructive-migrations", text)
+    assert spec.stdin == "{body_file}"
+
+
+def test_other_registry_specs_keep_devnull_stdin():
+    for path, entry in REPLAY_SPECS.items():
+        if isinstance(entry, ReplaySpec) and path != "bin/check-destructive-migrations":
+            assert entry.stdin == "", path
+    assert expand_stdin(ReplaySpec(argv=()), {"body_file": "/tmp/x"}) == ""
+
+
+def test_expand_stdin_is_literal():
+    hostile = "x;$(touch /tmp/pwn)`"
+    assert expand_stdin(ReplaySpec(argv=(), stdin="{body_file}"), {"body_file": hostile}) == hostile
 
 
 def test_expand_argv_is_literal():

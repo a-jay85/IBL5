@@ -16,15 +16,16 @@
 #
 # no-adr: stub-driven regression harness copying the bin/test-watch-run pattern; it adds no architectural constraint and no new governance gate
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # WATCHER_UNDER_TEST lets the mutation checks point the harness at a mutated copy.
 SRC="${WATCHER_UNDER_TEST:-$REPO_ROOT/bin/watch-automouse-plan}"
 # An ambient GH_REPO/GH_HOST would let a real gh resolve a repo from the temp tree.
 unset GH_REPO GH_HOST
-FAILED=0
-TMP_ROOT=$(mktemp -d); trap 'rm -rf "$TMP_ROOT"' EXIT
-pass() { printf '  ok   %s\n' "$1"; }
-fail() { printf '  FAIL %s\n' "$1"; FAILED=1; }
+h_tmp TMP_ROOT
+pass() { h_pass "$1"; }
+fail() { h_fail "$1"; }
 want() { if grep -qF -- "$3" <<< "$2"; then pass "$1"; else fail "$1 (missing: $3)"; fi; }
 deny() { if grep -qF -- "$3" <<< "$2"; then fail "$1 (unexpected: $3)"; else pass "$1"; fi; }
 
@@ -295,5 +296,4 @@ make_tree c22
 OUT=$(AUTOMOUSE_DIR="$AM" WATCH_AUTOMOUSE_GH_BIN="" "$T/bin/watch-automouse-plan" --slug s1 --smoke-test 2>&1); RC=$?
 want "empty seam falls back to gh" "$OUT" "gh resolves (gh)"
 
-[ "$FAILED" = 0 ] && { echo "all watch-automouse-plan cases passed"; exit 0; }
-echo "watch-automouse-plan harness: FAILURES above"; exit 1
+h_done

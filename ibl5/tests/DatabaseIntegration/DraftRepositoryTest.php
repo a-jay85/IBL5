@@ -107,7 +107,7 @@ class DraftRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getAllDraftClassPlayers();
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
 
         $found = false;
         foreach ($players as $player) {

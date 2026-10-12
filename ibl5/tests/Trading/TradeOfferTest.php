@@ -15,6 +15,9 @@ use Trading\TradeOffer;
 use Trading\TradeValidator;
 use Season\Season;
 use Discord\Discord;
+use Validation\ValidationError;
+use Validation\ValidationResult;
+use Validation\ValidationResultWithContext;
 
 /**
  * @covers \Trading\TradeOffer
@@ -110,10 +113,7 @@ class TradeOfferTest extends TestCase
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->method('validateMinimumCashAmounts')->willReturn([
-            'valid' => false,
-            'error' => 'Cash too low',
-        ]);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::failure('Cash too low'));
 
         $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season);
         $result = $offer->createTradeOffer($this->makeTradeData());
@@ -127,13 +127,8 @@ class TradeOfferTest extends TestCase
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
-        $validator->method('validateSalaryCaps')->willReturn([
-            'valid' => false,
-            'errors' => ['Over hard cap'],
-            'userPostTradeCapTotal' => 999999,
-            'partnerPostTradeCapTotal' => 0,
-        ]);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
+        $validator->method('validateSalaryCaps')->willReturn(self::capResult(['Over hard cap'], 999999, 0));
         $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
@@ -156,13 +151,8 @@ class TradeOfferTest extends TestCase
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
-        $validator->method('validateSalaryCaps')->willReturn([
-            'valid' => false,
-            'errors' => ['Over hard cap'],
-            'userPostTradeCapTotal' => 999999,
-            'partnerPostTradeCapTotal' => 0,
-        ]);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
+        $validator->method('validateSalaryCaps')->willReturn(self::capResult(['Over hard cap'], 999999, 0));
         $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
@@ -182,13 +172,8 @@ class TradeOfferTest extends TestCase
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
-        $capResult = [
-            'valid' => false,
-            'errors' => ['Over hard cap'],
-            'userPostTradeCapTotal' => 150000,
-            'partnerPostTradeCapTotal' => 0,
-        ];
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
+        $capResult = self::capResult(['Over hard cap'], 150000, 0);
         $validator->method('validateSalaryCaps')->willReturn($capResult);
         $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
@@ -201,7 +186,49 @@ class TradeOfferTest extends TestCase
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         $this->assertFalse($result['success']);
-        $this->assertSame($capResult, $result['capData']);
+        $this->assertSame(['valid' => false, 'errors' => ['Over hard cap'], 'userPostTradeCapTotal' => 150000, 'partnerPostTradeCapTotal' => 0], $result['capData']);
+        $this->assertSame(['Over hard cap'], $result['errors']);
+    }
+
+    public function testCreateTradeOfferReturnsValidatorCashErrorVerbatim(): void
+    {
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::failure('Cash too low'));
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
+            'cashSentToThem' => 0,
+            'cashSentToMe' => 0,
+        ]);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashHandler->method('hasCashInTrade')->willReturn(false);
+
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season);
+        $result = $offer->createTradeOffer($this->makeTradeData());
+
+        $this->assertSame(['success' => false, 'error' => 'Cash too low'], $result);
+    }
+
+    public function testCreateTradeOfferRosterFailureOmitsCapData(): void
+    {
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
+        $validator->method('validateSalaryCaps')->willReturn(self::capResult([], 0, 0));
+        $validator->method('validateRosterLimits')->willReturn(ValidationResult::failures(['Roster over 15']));
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
+            'cashSentToThem' => 0,
+            'cashSentToMe' => 0,
+        ]);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashHandler->method('hasCashInTrade')->willReturn(false);
+
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season);
+        $result = $offer->createTradeOffer($this->makeTradeData());
+
+        $this->assertSame(['success' => false, 'errors' => ['Roster over 15']], $result);
+        $this->assertArrayNotHasKey('capData', $result);
     }
 
     // ── Roster limits ────────────────────────────────────────────
@@ -211,17 +238,9 @@ class TradeOfferTest extends TestCase
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
-        $validator->method('validateSalaryCaps')->willReturn([
-            'valid' => true,
-            'errors' => [],
-            'userPostTradeCapTotal' => 50000,
-            'partnerPostTradeCapTotal' => 50000,
-        ]);
-        $validator->method('validateRosterLimits')->willReturn([
-            'valid' => false,
-            'errors' => ['Over roster limit'],
-        ]);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
+        $validator->method('validateSalaryCaps')->willReturn(self::capResult([], 50000, 50000));
+        $validator->method('validateRosterLimits')->willReturn(ValidationResult::failures(['Over roster limit']));
         $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
@@ -246,13 +265,8 @@ class TradeOfferTest extends TestCase
         $season = self::createStub(Season::class);
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->expects($this->once())->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
-        $validator->expects($this->once())->method('validateSalaryCaps')->willReturn([
-            'valid' => true,
-            'errors' => [],
-            'userPostTradeCapTotal' => 50000,
-            'partnerPostTradeCapTotal' => 50000,
-        ]);
+        $validator->expects($this->once())->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
+        $validator->expects($this->once())->method('validateSalaryCaps')->willReturn(self::capResult([], 50000, 50000));
         $validator->expects($this->once())->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
@@ -274,7 +288,7 @@ class TradeOfferTest extends TestCase
                 2, // 2 user players sent (indices 0,1 < switchCounter=2)
                 1, // 1 partner player sent (index 2 >= switchCounter=2)
             )
-            ->willReturn(['valid' => true, 'errors' => []]);
+            ->willReturn(ValidationResult::success());
 
         $offerRepository->method('insertTradeItem')->willReturn(1);
         $assetRepository->method('getDraftPickById')->willReturn(null);
@@ -293,14 +307,9 @@ class TradeOfferTest extends TestCase
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(42);
-        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
-        $validator->method('validateSalaryCaps')->willReturn([
-            'valid' => true,
-            'errors' => [],
-            'userPostTradeCapTotal' => 50000,
-            'partnerPostTradeCapTotal' => 50000,
-        ]);
-        $validator->method('validateRosterLimits')->willReturn(['valid' => true, 'errors' => []]);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
+        $validator->method('validateSalaryCaps')->willReturn(self::capResult([], 50000, 50000));
+        $validator->method('validateRosterLimits')->willReturn(ValidationResult::success());
         $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
@@ -320,14 +329,9 @@ class TradeOfferTest extends TestCase
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
-        $validator->method('validateSalaryCaps')->willReturn([
-            'valid' => true,
-            'errors' => [],
-            'userPostTradeCapTotal' => 50000,
-            'partnerPostTradeCapTotal' => 50000,
-        ]);
-        $validator->method('validateRosterLimits')->willReturn(['valid' => true, 'errors' => []]);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
+        $validator->method('validateSalaryCaps')->willReturn(self::capResult([], 50000, 50000));
+        $validator->method('validateRosterLimits')->willReturn(ValidationResult::success());
         $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
@@ -348,14 +352,9 @@ class TradeOfferTest extends TestCase
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
-        $validator->method('validateSalaryCaps')->willReturn([
-            'valid' => true,
-            'errors' => [],
-            'userPostTradeCapTotal' => 50000,
-            'partnerPostTradeCapTotal' => 50000,
-        ]);
-        $validator->method('validateRosterLimits')->willReturn(['valid' => true, 'errors' => []]);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
+        $validator->method('validateSalaryCaps')->willReturn(self::capResult([], 50000, 50000));
+        $validator->method('validateRosterLimits')->willReturn(ValidationResult::success());
         $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
@@ -386,10 +385,7 @@ class TradeOfferTest extends TestCase
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->method('validateMinimumCashAmounts')->willReturn([
-            'valid' => false,
-            'error' => 'Cash too low',
-        ]);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::failure('Cash too low'));
 
         // Discord should never be called
         $discord = $this->createMock(Discord::class);
@@ -411,7 +407,7 @@ class TradeOfferTest extends TestCase
         $season = self::createStub(Season::class);
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->expects($this->once())->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
+        $validator->expects($this->once())->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
         $validator->expects($this->once())->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
@@ -424,13 +420,8 @@ class TradeOfferTest extends TestCase
                 return $capData['userCapSentToPartner'] === 0
                     && $capData['partnerCapSentToUser'] === 0;
             }))
-            ->willReturn([
-                'valid' => true,
-                'errors' => [],
-                'userPostTradeCapTotal' => 50000,
-                'partnerPostTradeCapTotal' => 50000,
-            ]);
-        $validator->expects($this->once())->method('validateRosterLimits')->willReturn(['valid' => true, 'errors' => []]);
+            ->willReturn(self::capResult([], 50000, 50000));
+        $validator->expects($this->once())->method('validateRosterLimits')->willReturn(ValidationResult::success());
         $cashHandler->method('hasCashInTrade')->willReturn(false);
 
         // Self-trade: same team on both sides
@@ -467,7 +458,7 @@ class TradeOfferTest extends TestCase
         // collaborator actually consulted (not an internally-constructed one).
         $validator = self::createStub(TradeValidator::class);
         $validator->method('validateMinimumCashAmounts')
-            ->willReturn(['valid' => false, 'error' => 'injected validator reached']);
+            ->willReturn(ValidationResult::failure('injected validator reached'));
 
         $offer = new TradeOffer(
             new MockDatabase(),
@@ -492,14 +483,9 @@ class TradeOfferTest extends TestCase
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
-        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
-        $validator->method('validateSalaryCaps')->willReturn([
-            'valid' => true,
-            'errors' => [],
-            'userPostTradeCapTotal' => 50000,
-            'partnerPostTradeCapTotal' => 50000,
-        ]);
-        $validator->method('validateRosterLimits')->willReturn(['valid' => true, 'errors' => []]);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
+        $validator->method('validateSalaryCaps')->willReturn(self::capResult([], 50000, 50000));
+        $validator->method('validateRosterLimits')->willReturn(ValidationResult::success());
         $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
@@ -726,6 +712,18 @@ class TradeOfferTest extends TestCase
         $this->assertSame(
             ['userCurrentSeasonCapTotal' => 0, 'partnerCurrentSeasonCapTotal' => 0, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
             $subject->exposeCalculateSalaryCapData($this->makeTradeData())
+        );
+    }
+
+    /**
+     * @param list<string> $msgs
+     * @return ValidationResultWithContext<array{userPostTradeCapTotal: int, partnerPostTradeCapTotal: int}>
+     */
+    private static function capResult(array $msgs, int $user, int $partner): ValidationResultWithContext
+    {
+        return ValidationResultWithContext::fromErrors(
+            array_map(static fn (string $m): ValidationError => new ValidationError('salary_cap', $m), $msgs),
+            ['userPostTradeCapTotal' => $user, 'partnerPostTradeCapTotal' => $partner],
         );
     }
 }

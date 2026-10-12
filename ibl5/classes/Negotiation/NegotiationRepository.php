@@ -15,11 +15,13 @@ use Repositories\Contracts\SalaryCapRepositoryInterface;
 class NegotiationRepository extends BaseMysqliRepository implements NegotiationRepositoryInterface
 {
     private SalaryCapRepositoryInterface $salaryCapRepo;
+    private \Clock\ClockInterface $clock;
 
-    public function __construct(\mysqli $db, SalaryCapRepositoryInterface $salaryCapRepo)
+    public function __construct(\mysqli $db, SalaryCapRepositoryInterface $salaryCapRepo, ?\Clock\ClockInterface $clock = null)
     {
         parent::__construct($db);
         $this->salaryCapRepo = $salaryCapRepo;
+        $this->clock = $clock ?? new \Clock\SystemClock();
     }
 
     /**
@@ -192,7 +194,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
             return null;
         }
 
-        if ($row['expiration'] < time()) {
+        if ($row['expiration'] < $this->clock->now()) {
             return null;
         }
 
@@ -225,7 +227,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
             "ssi",
             self::MARKET_MAX_CACHE_KEY,
             $encoded,
-            time() + self::MARKET_MAX_TTL
+            $this->clock->now() + self::MARKET_MAX_TTL
         );
     }
 }

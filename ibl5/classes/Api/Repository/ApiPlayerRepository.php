@@ -56,7 +56,7 @@ class ApiPlayerRepository extends \Database\BaseMysqliRepository
         $direction = $paginator->getOrder() === 'desc' ? 'DESC' : 'ASC';
 
         // IDENTIFIER: $whereClause = hardcoded fragments; $sortColumn = SORT_COLUMNS map value; $direction = literal ternary
-        $query = 'SELECT * FROM vw_player_current ' . $whereClause . ' ORDER BY ' . $sortColumn . ' ' . $direction . ' LIMIT ? OFFSET ?';
+        $query = 'SELECT * FROM vw_player_current ' . $whereClause . ' ORDER BY ' . $sortColumn . ' ' . $direction . ', pid ASC LIMIT ? OFFSET ?';
         $types .= 'ii';
         $params[] = $paginator->getLimit();
         $params[] = $paginator->getOffset();
@@ -111,7 +111,7 @@ class ApiPlayerRepository extends \Database\BaseMysqliRepository
     public function getAllPlayersForExport(): array
     {
         /** @var list<PlayerCurrentRow> */
-        return $this->fetchAll('SELECT * FROM vw_player_current ORDER BY name ASC', '');
+        return $this->fetchAll('SELECT * FROM vw_player_current ORDER BY name ASC, pid ASC', '');
     }
 
     /**

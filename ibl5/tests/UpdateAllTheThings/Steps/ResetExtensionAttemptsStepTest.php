@@ -36,6 +36,6 @@ class ResetExtensionAttemptsStepTest extends TestCase
         $queries = $mockDb->getExecutedQueries();
         $found = array_filter($queries, static fn (string $q): bool => str_contains($q, 'ibl_team_info'));
 
-        $this->assertNotEmpty($found, 'Expected at least one query targeting ibl_team_info');
+        $this->assertNotSame([], $found, 'Expected at least one query targeting ibl_team_info');
     }
 }

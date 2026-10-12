@@ -50,7 +50,7 @@ class ApiTeamRepositoryTest extends DatabaseTestCase
 
         $teams = $this->repo->getTeams($paginator);
 
-        self::assertNotEmpty($teams);
+        self::assertNotSame([], $teams);
         $team = $teams[0];
 
         self::assertArrayHasKey('teamid', $team);
@@ -85,7 +85,7 @@ class ApiTeamRepositoryTest extends DatabaseTestCase
         // Pages should not overlap
         $ids1 = array_column($teams1, 'teamid');
         $ids2 = array_column($teams2, 'teamid');
-        self::assertEmpty(array_intersect($ids1, $ids2));
+        self::assertSame([], array_intersect($ids1, $ids2));
     }
 
     // ── countTeams ──────────────────────────────────────────────
@@ -108,7 +108,7 @@ class ApiTeamRepositoryTest extends DatabaseTestCase
             ['team_name'],
         );
         $teams = $this->repo->getTeams($paginator);
-        self::assertNotEmpty($teams);
+        self::assertNotSame([], $teams);
         $uuid = $teams[0]['uuid'];
         self::assertIsString($uuid);
 

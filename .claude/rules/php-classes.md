@@ -1,7 +1,7 @@
 ---
 description: Interface-driven PHP class standards, XSS rules, and PHPStan gotchas for ibl5/classes.
 paths: ibl5/classes/**/*.php
-last_verified: 2026-10-03
+last_verified: 2026-10-08
 ---
 
 # PHP Class Development Rules
@@ -56,7 +56,7 @@ Only implement methods with active callers. Dead code increases maintenance burd
 ## PHPStan Common Pitfalls
 
 ### Type `\mysqli` for database parameters, not `object`
-When a class stores or passes a database connection, type the property and parameter as `\mysqli`, not `object`. Using `object` causes cascading PHPStan errors everywhere the connection is passed to methods that expect `\mysqli` (e.g., `Season`, `TeamColorHelper::getTeamColors()`, `Team::initialize()`).
+When a class stores or passes a database connection, type the property and parameter as `\mysqli`, not `object`. Using `object` causes cascading PHPStan errors everywhere the connection is passed to methods that expect `\mysqli` (e.g., `Season`, `Team::initialize()`).
 
 ### Handle nullable Player properties
 `Player` properties like `$player->name` (`?string`), `$player->teamID` (`?int`) are nullable. Always use null coalescing when passing to methods that expect non-nullable types: `$player->name ?? ''`, `$player->teamID ?? 0`.

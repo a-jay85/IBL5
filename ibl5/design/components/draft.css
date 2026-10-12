@@ -20,7 +20,7 @@
 
 .draft-error a {
     color: var(--error-600);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .draft-table input[type="radio"] {
@@ -34,7 +34,7 @@
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 40;
+    z-index: var(--z-fixed);
     background: var(--page-bg);
     padding: 0.75rem 1rem;
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
@@ -83,7 +83,7 @@
     color: inherit;
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
-    background-color: white;
+    background-color: var(--white);
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
     background-position: right 0.25rem center;
     background-repeat: no-repeat;

@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 7: the all-Opus CI fix procedure, the BEHIND re-rebase loop, and the harness background-CI-outcome short-circuit.
-last_verified: 2026-09-26
+last_verified: 2026-10-07
 ---
 
 # Phase 7 — CI Monitoring (post-plan reference)
@@ -57,7 +57,7 @@ re-invocation, so a turn that ends with work still running is a stall-kill.
    cat /tmp/postplan-automerge-was-<KEY>.txt
    ```
 
-   Without this file the run cannot tell, after the force-push, whether re-arming restores prior
+   Without this file the run cannot tell, after the push, whether re-arming restores prior
    state or newly arms a PR that Phase 6.5 deliberately held.
 
 2. **Disarm, before any history rewrite.** If step 1 printed `armed`:
@@ -85,18 +85,19 @@ re-invocation, so a turn that ends with work still running is a stall-kill.
    base. The proof compares *this* rebase's before and after; a stale pre-patch from Phase 2
    would compare across two rebases and report `TREE DIVERGED` on a perfectly good run.
 
-5. **Re-run the `# phase 2 rebase` block** from `.claude/skills/post-plan/SKILL.md`, unmodified.
-   All four arms behave exactly as they do at Phase 2.
+5. **Re-run the `# phase 2 merge` block** from `.claude/skills/post-plan/SKILL.md`, unmodified.
+   Every arm behaves exactly as it does at Phase 2.
 
 6. **Branch on the result.**
-   - `REBASE=clean` / `REBASE=rebased` → force-push, then re-probe:
+   - `REBASE=clean` / `REBASE=merged` → push, then re-probe:
 
      ```bash
-     git push --force-with-lease origin HEAD:<BRANCH>
+     git push origin HEAD:<BRANCH>
      ```
 
-     `<BRANCH>` is the branch name literal; worktrees have no upstream, so a bare
-     `--force-with-lease` silently no-ops there — always name the remote and the ref.
+     `<BRANCH>` is the branch name literal. Worktrees have no upstream, so always name the
+     remote and the ref. A merge only adds commits on top of the pushed head, so this push is a
+     fast-forward and needs no force flag.
    - `REBASE=indeterminate` → **halt** with a `STOP:` line, fail-closed, exactly as at Phase 2.
      Do not force-push, do not re-arm.
    - `REBASE=conflict` → go to § Disarm-on-conflict below.
@@ -123,18 +124,15 @@ test "$(cat /tmp/postplan-automerge-was-<KEY>.txt)" = armed \
 
 Never add `--delete-branch`. A PR that was `unarmed` before the loop stays unarmed.
 
-### On iteration 4 — halt
+### At the ceiling (after iteration 3)
+
+Iteration 3 exits through `On loop exit` like every other exit, so the re-arm gate above has already run: the PR is armed again when its prior state read `armed` and the conflict flag is absent or cleared, and it stays unarmed otherwise. Then print this NOTE and continue to Phase 8:
 
 ```
-STOP: BEHIND re-rebase loop hit its 3-iteration ceiling. master is moving faster than this run can rebase onto it. Nothing is broken — the PR is correct and CI passed; it is simply behind a master that keeps advancing. Auto-merge has been left disarmed. Rebase and merge by hand, or re-run /post-plan when master is quieter. Loop bound lives in .claude/skills/post-plan/_phase-7-ci-monitoring.md.
+NOTE: BEHIND re-rebase loop hit its 3-iteration ceiling. master is moving faster than this run can rebase onto it. Nothing is broken: the PR is correct and CI passed on the rewritten branch. The re-arm gate has already run, so auto-merge is back in its pre-loop state. An armed PR is carried to merge by .github/workflows/update-behind-prs.yml (ADR-0081), which refreshes the head of the merge line on every push to master. Loop bound lives in .claude/skills/post-plan/_phase-7-ci-monitoring.md.
 ```
 
-The ceiling is a terminal state, not a retry hint: three consecutive losses to a moving master
-means the contention is structural, and an unbounded loop in a headless run is how a
-`MAX_PP_SECS` timeout becomes an abandoned half-pushed branch. Leaving auto-merge **disarmed**
-at the ceiling is deliberate — the last thing the loop did was rewrite the branch, and arming a
-rewritten branch it then walked away from is exactly the unattended-merge risk the disarm exists
-to prevent.
+The ceiling is a terminal state for this run. Three consecutive losses to a moving master mean the contention is structural, and an unbounded loop in a headless run is how a `MAX_PP_SECS` timeout becomes an abandoned half-pushed branch. The run stops rebasing; it does not disarm. Before `.github/workflows/update-behind-prs.yml` existed an armed PR left BEHIND waited forever, so the ceiling disarmed to make a human look. Today the merge line owns that wait (ADR-0081, head-of-line addendum), and a disarmed PR is the one that sits open until a human re-arms it by hand, which is what happened to two READY PRs on 2026-10-04. The per-iteration disarm before each rewrite (step 2) is unchanged: a branch is never rewritten while armed.
 
 ### Disarm-on-conflict
 
@@ -144,8 +142,8 @@ An iteration whose rebase printed `REBASE=conflict` has already had its arm writ
 1. Enter `.claude/skills/post-plan/_phase-2-conflict-resolution.md` exactly as at Phase 2, now
    including step 7's `POST_RESOLUTION_SHA` capture and step 7.5's review. Record the sha step 7
    printed as this iteration's `<POST_RESOLUTION_SHA>` literal before running the step 6.1
-   re-arm block. The `--onto` recipe, three-way resolution, and `lostwork.sh` gate are unchanged.
-   `TREE-EQUIVALENT` remains the precondition for the force-push.
+   re-arm block. The pinned-SHA merge, three-way resolution, and `lostwork.sh` gate are unchanged.
+   `TREE-EQUIVALENT` remains the precondition for the push.
 2. Auto-merge stays disarmed unless step 7.5 cleared the resolution for `<POST_RESOLUTION_SHA>`
    and step 1 of this iteration recorded `armed`. Condition (14) cannot help here; Phase 6.5
    already ran. This is the second entry point into the hold, and it is enforced by the step 6.1
@@ -167,7 +165,7 @@ invalidates both verdicts, and the loop does not try to re-run them either; it l
 disarmed, posts the hold, and routes the PR to a human. The held sticky comment carries the
 "this needs re-review" signal.
 
-A conflict-free re-rebase that runs after a Phase 2 conflict already cleared clean force-pushes
+A conflict-free re-rebase that runs after a Phase 2 conflict already cleared clean pushes
 a new HEAD. The step 6.1 re-arm gate fires: the verdict file is keyed to the recorded
 `<POST_RESOLUTION_SHA>` literal, so it still exists and reads CLEAN after the subsequent
 conflict-free re-rebase. That is the same `TREE-EQUIVALENT` outcome described above: the

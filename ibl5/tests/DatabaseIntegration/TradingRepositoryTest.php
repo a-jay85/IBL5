@@ -384,4 +384,16 @@ class TradingRepositoryTest extends DatabaseTestCase
         $stmt2->close();
         self::assertNull($cashRow);
     }
+
+    public function testGetTeamPlayersForTradingBreaksOrdinalTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200139142, 'Tie 1391 B', ['ordinal' => 777, 'teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200139141, 'Tie 1391 A', ['ordinal' => 777, 'teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200139143, 'Tie 1391 C', ['ordinal' => 776, 'teamid' => 1, 'retired' => 0]);
+
+        $rows = $this->formRepo->getTeamPlayersForTrading(1);
+
+        $ordered = array_values(array_filter(array_column($rows, 'pid'), static fn ($p): bool => in_array($p, [200139141, 200139142, 200139143], true)));
+        self::assertSame([200139143, 200139141, 200139142], $ordered);
+    }
 }

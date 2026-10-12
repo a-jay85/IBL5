@@ -35,7 +35,7 @@ class TeamScheduleRepository extends \Database\BaseMysqliRepository implements T
             FROM `ibl_schedule` s
             LEFT JOIN " . $this->gameOfThatDaySubquery() . " bst ON bst.game_date = s.game_date AND bst.visitor_teamid = s.visitor_teamid AND bst.home_teamid = s.home_teamid
             WHERE s.season_year = ? AND (s.visitor_teamid = ? OR s.home_teamid = ?)
-            ORDER BY s.game_date ASC",
+            ORDER BY s.game_date ASC, s.id ASC",
             'iii',
             $seasonYear,
             $teamid,
@@ -56,7 +56,7 @@ class TeamScheduleRepository extends \Database\BaseMysqliRepository implements T
              WHERE season_year = ?
                AND (visitor_teamid = ? OR home_teamid = ?)
                AND game_date BETWEEN ADDDATE(?, 1) AND ?
-             ORDER BY game_date ASC",
+             ORDER BY game_date ASC, id ASC",
             'iiiss',
             $seasonYear,
             $teamid,

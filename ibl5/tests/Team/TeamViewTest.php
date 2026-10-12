@@ -373,4 +373,22 @@ class TeamViewTest extends TestCase
         $this->assertStringNotContainsString('<script>', $output);
         $this->assertStringContainsString('&lt;script&gt;', $output);
     }
+
+    public function testRenderUsesInjectedExtensionView(): void
+    {
+        $stub = new class implements \Extension\Contracts\ExtensionViewInterface {
+            public function renderResultBanner(?string $result, ?string $msg): string
+            {
+                return '<div id="stub-banner"></div>';
+            }
+        };
+
+        $output = (new TeamView($stub))->render($this->createPageData([
+            'extensionResult' => 'extension_accepted',
+            'extensionMsg' => 'Deal done.',
+        ]));
+
+        $this->assertStringContainsString('<div id="stub-banner"></div>', $output);
+        $this->assertStringNotContainsString('ibl-alert--success', $output);
+    }
 }

@@ -40,6 +40,7 @@ class WaiversProcessor implements WaiversProcessorInterface
      * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
      */
     private ?Season $season = null;
+    private \Clock\ClockInterface $clock;
 
     public function __construct(
         WaiversRepositoryInterface $repository,
@@ -49,7 +50,8 @@ class WaiversProcessor implements WaiversProcessorInterface
         \Topics\News\NewsRepository $newsService,
         \mysqli $db,
         ?\Psr\Log\LoggerInterface $logger = null,
-        ?Season $season = null
+        ?Season $season = null,
+        ?\Clock\ClockInterface $clock = null
     ) {
         $this->repository = $repository;
         $this->teamIdentityRepo = $teamIdentityRepo;
@@ -60,6 +62,7 @@ class WaiversProcessor implements WaiversProcessorInterface
         $this->contractCalculator = new PlayerContractCalculator();
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->season = $season;
+        $this->clock = $clock ?? new \Clock\SystemClock();
     }
 
     /**
@@ -180,7 +183,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             return ['success' => false, 'error' => 'Player not found.'];
         }
 
-        $timestamp = time();
+        $timestamp = $this->clock->now();
 
         if (!$this->repository->dropPlayerToWaivers($playerID, $timestamp)) {
             return ['success' => false, 'error' => 'Failed to drop player to waivers. Please try again.'];

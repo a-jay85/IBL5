@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database;
 
+use BasketballStats\StatsSanitizer;
 use League\League;
 
 /**
@@ -467,6 +468,39 @@ abstract class BaseMysqliRepository
         $types = $prefixTypes . str_repeat($type, count($ids));
         /** @var list<array<string, mixed>> */
         return $this->fetchAll($expanded, $types, ...$prefixParams, ...$ids);
+    }
+
+    /**
+     * Narrow a mixed fetchAll() column value to int.
+     *
+     * Returns ints unchanged, truncates floats, and casts numeric strings.
+     * Anything else (null, bool, array, non-numeric string) yields 0. For
+     * INT NOT NULL columns the fallback is defensive only: 0 never matches a
+     * real id, so it cannot produce a malformed index key.
+     */
+    protected static function scalarToInt(mixed $value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_float($value)) {
+            return (int) $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+        return 0;
+    }
+
+    /**
+     * Narrow a mixed fetchAll() column value to string.
+     *
+     * Returns strings unchanged and stringifies ints and floats. Anything else
+     * (null, bool, array) yields ''.
+     */
+    protected static function scalarToString(mixed $value): string
+    {
+        return StatsSanitizer::scalarToString($value);
     }
 
     /**

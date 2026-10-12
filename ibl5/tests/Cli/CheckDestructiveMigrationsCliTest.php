@@ -174,6 +174,8 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertSame(1, $result['exit'], "Output: {$result['output']}");
         self::assertStringContainsString('PR-body', $result['output']);
         self::assertStringContainsString('drop-column', $result['output']);
+        // The marker-error must tell the author the required tagged form.
+        self::assertStringContainsString('untagged bypass marker; use -- destructive-migration[<trigger>]', $result['output']);
     }
 
     public function testShortPrBodyBypassExitsOne(): void
@@ -552,6 +554,42 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertStringContainsString('--full-scan takes no range and no stdin', $result['output']);
     }
 
+    public function testSchemaFlagRejectsMissingFile(): void
+    {
+        $result = $this->runScript(['--schema=' . $this->tmpDir . '/does-not-exist.sql']);
+
+        self::assertSame(2, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('schema file not found', $result['output']);
+    }
+
+    public function testSchemaFlagRejectsEmptyValue(): void
+    {
+        $result = $this->runScript(['--schema=']);
+
+        self::assertSame(2, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('--schema requires a path', $result['output']);
+    }
+
+    public function testSchemaFlagIsHonouredByFullScan(): void
+    {
+        $narrowHit = '[narrow-type] ibl5/migrations/034_add_column_comments.sql:422';
+
+        // Frozen schema: ibl_settings.`value` exists, so the hit is absent.
+        self::assertStringNotContainsString($narrowHit, $this->runRepoFullScan()['output']);
+
+        // Renamed column: the old type can no longer be resolved, so the hit appears.
+        $frozen = file_get_contents(self::frozenSchemaPath());
+        self::assertNotFalse($frozen);
+        $needle = "  `value` varchar(128) NOT NULL COMMENT 'Setting value',";
+        self::assertStringContainsString($needle, $frozen);
+        $renamed = $this->tmpDir . '/renamed.schema';
+        file_put_contents($renamed, str_replace($needle, "  `setting_value` varchar(128) NOT NULL COMMENT 'Setting value',", $frozen));
+
+        $result = $this->execRepoFullScan($renamed);
+
+        self::assertStringContainsString($narrowHit, $result['output']);
+    }
+
     public function testSelfTestFlagExitsZero(): void
     {
         $result = $this->runScript(['--self-test']);
@@ -669,6 +707,145 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
 
         self::assertSame(1, $result['exit'], "Output: {$result['output']}");
         self::assertStringContainsString('unresolved', $result['output']);
+    }
+
+    public function testPreparedNarrowTypeInMigration151IsFlagged(): void
+    {
+        $src = file_get_contents(dirname(__DIR__, 2) . '/migrations/151_downsize_ibl_draft_team.sql');
+        self::assertNotFalse($src);
+        $setLine = null;
+        foreach (explode("\n", $src) as $index => $line) {
+            if (str_contains($line, 'SET @alter_sql')) {
+                $setLine = $index + 1;
+                break;
+            }
+        }
+        self::assertNotNull($setLine, 'SET @alter_sql not found in migration 151');
+
+        $this->writeSchema("CREATE TABLE `ibl_draft` (\n  `team` varchar(255) NOT NULL DEFAULT '',\n  PRIMARY KEY (`team`)\n) ENGINE=InnoDB;\n");
+        $this->writeMigration('151_downsize_ibl_draft_team.sql', $src);
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[narrow-type]', $result['output']);
+        self::assertStringContainsString("151_downsize_ibl_draft_team.sql:{$setLine} ", $result['output']);
+    }
+
+    public function testPreparedDropColumnReportedAtSetLine(): void
+    {
+        $this->writeMigration(
+            '230_prep_drop.sql',
+            "-- header\nSET @s = IF(@n = 1,\n  'ALTER TABLE foo DROP COLUMN bar',\n  'SELECT 1');\nPREPARE st FROM @s;\nEXECUTE st;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-column]', $result['output']);
+        self::assertStringContainsString('230_prep_drop.sql:2 ', $result['output']);
+        self::assertStringNotContainsString('230_prep_drop.sql:5 ', $result['output']);
+    }
+
+    public function testPreparedSelectOnlyBranchesAreClean(): void
+    {
+        $this->writeMigration(
+            '231_prep_select.sql',
+            "SET @s = IF(@n = 1, 'SELECT 1', 'SELECT 2');\nPREPARE st FROM @s;\nEXECUTE st;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('No destructive migration patterns detected', $result['output']);
+    }
+
+    public function testPreparedNonDdlSetLiteralIsClean(): void
+    {
+        $this->writeMigration(
+            '232_prep_nonddl.sql',
+            "SET @msg = 'SHOW TABLES';\nPREPARE st FROM @msg;\nEXECUTE st;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testPrepareFromUnsetVariableIsClean(): void
+    {
+        // An unresolved variable must produce no virtual statement. A fallback
+        // to statements[-1] would scan an unrelated statement and report a false hit.
+        $this->writeMigration('233_prep_unset.sql', "PREPARE st FROM @never_set;\nEXECUTE st;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testPreparedPrepareLineOnlyEditIsNotRescanned(): void
+    {
+        $base = "SET @s = IF(@n = 1,\n  'ALTER TABLE foo DROP COLUMN bar',\n  'SELECT 1');\nPREPARE st FROM @s;\nEXECUTE st;\n";
+        $this->writeMigration('234_prep_range.sql', $base);
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "base"');
+
+        $this->writeMigration(
+            '234_prep_range.sql',
+            "SET @s = IF(@n = 1,\n  'ALTER TABLE foo DROP COLUMN bar',\n  'SELECT 1');\nPREPARE st2 FROM @s;\nEXECUTE st2;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testPreparedSetLiteralEditIsRescanned(): void
+    {
+        $base = "SET @s = IF(@n = 1,\n  'ALTER TABLE foo DROP COLUMN bar',\n  'SELECT 1');\nPREPARE st FROM @s;\nEXECUTE st;\n";
+        $this->writeMigration('235_prep_range.sql', $base);
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "base"');
+
+        $this->writeMigration(
+            '235_prep_range.sql',
+            "SET @s = IF(@n = 1,\n  'ALTER TABLE foo DROP COLUMN baz',\n  'SELECT 1');\nPREPARE st FROM @s;\nEXECUTE st;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-column]', $result['output']);
+    }
+
+    public function testPreparedDropColumnSuppressedByTaggedMarker(): void
+    {
+        $this->writeMigration(
+            '236_prep_marker.sql',
+            "-- destructive-migration[drop-column]: guarded by information_schema check before the prepared ALTER runs\n"
+            . "SET @s = IF(@n = 1, 'ALTER TABLE foo DROP COLUMN bar', 'SELECT 1');\nPREPARE st FROM @s;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('PASS (bypass)', $result['output']);
     }
 
     public function testNarrowTypeResolvedFromSameFileAddColumn(): void
@@ -1014,7 +1191,10 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
      * Runs --full-scan over the real ibl5/migrations and compares the
      * `[tag] file:line` tokens with the pinned golden. Files numbered above
      * the golden's pinned-through header are ignored, so a new migration
-     * never breaks this test.
+     * never breaks this test. The scan resolves narrow-type old types from the
+     * frozen destructive-migration-full-scan.schema fixture, not the live
+     * current-schema.sql, so a column rename in current-schema.sql never breaks
+     * it. Regenerate the schema fixture and the golden together.
      */
     public function testFullScanMatchesGoldenFixture(): void
     {
@@ -1099,18 +1279,33 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
     private function runRepoFullScan(): array
     {
         if (self::$repoFullScan === null) {
-            $output = [];
-            $exit = 0;
-            $root = dirname(__DIR__, 3);
-            exec(
-                'cd ' . escapeshellarg($root) . ' && bash ' . escapeshellarg($this->scriptPath) . ' --full-scan 2>&1',
-                $output,
-                $exit,
-            );
-            self::$repoFullScan = ['output' => implode("\n", $output), 'exit' => $exit];
+            self::$repoFullScan = $this->execRepoFullScan(self::frozenSchemaPath());
         }
 
         return self::$repoFullScan;
+    }
+
+    private static function frozenSchemaPath(): string
+    {
+        return __DIR__ . '/fixtures/destructive-migration-full-scan.schema';
+    }
+
+    /**
+     * @return array{output: string, exit: int}
+     */
+    private function execRepoFullScan(string $schemaPath): array
+    {
+        $output = [];
+        $exit = 0;
+        $root = dirname(__DIR__, 3);
+        exec(
+            'cd ' . escapeshellarg($root) . ' && bash ' . escapeshellarg($this->scriptPath)
+                . ' --full-scan --schema=' . escapeshellarg($schemaPath) . ' 2>&1',
+            $output,
+            $exit,
+        );
+
+        return ['output' => implode("\n", $output), 'exit' => $exit];
     }
 
     /**

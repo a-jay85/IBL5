@@ -99,20 +99,17 @@ cat > "$STUBBIN/gh" <<'SH'
 sub="${2:-}"
 case "$sub" in
     view)
-        br="${3:-}"; field="${5:-}"
-        case "$field" in
-            state)
-                case "$br" in
-                    wt-merged) echo MERGED ;;
-                    wt-open)   echo OPEN ;;
-                    *)         exit 1 ;;
-                esac ;;
-            number)
-                case "$br" in
-                    wt-merged|wt-open) echo 7 ;;
-                    *)                 exit 1 ;;
-                esac ;;
+        br="${3:-}"
+        case "$*" in
+            *"--json state,number,headRefOid"*) ;;
             *) exit 1 ;;
+        esac
+        # pr_info's combined TSV: state, number, headRefOid. headRefOid is
+        # left empty, as the old stub never answered a headRefOid query.
+        case "$br" in
+            wt-merged) printf 'MERGED\t7\t\n' ;;
+            wt-open)   printf 'OPEN\t7\t\n' ;;
+            *)         exit 1 ;;
         esac ;;
     list) : ;;
     *) exit 1 ;;
@@ -535,7 +532,7 @@ chk_rc "empty LOG and LOCK_DIR" 0
 fresh
 run_tick WT_GC_REPO_ROOT= -- --dry-run --force
 chk_rc "derived repo root" 0
-expected_root="$(git -C "$(dirname "$TICK")/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+expected_root="$(git -C "$(dirname "$TICK")/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
 recorded_cwd="$(cat "$CD/cwd" 2>/dev/null)"
 if [ -z "$expected_root" ] || [ "$recorded_cwd" != "$expected_root" ]; then
     note_err "derived cwd '$recorded_cwd' != first worktree '$expected_root'"
@@ -571,6 +568,8 @@ mkdir -p "$EMIT/bin"
 git init -q "$EMIT" >/dev/null 2>&1
 cp "$CRON_SETUP" "$EMIT/bin/wt-gc-cron-setup"
 chmod +x "$EMIT/bin/wt-gc-cron-setup"
+mkdir -p "$EMIT/bin/lib"
+cp "$SCRIPT_DIR/lib/launchd-sched.sh" "$SCRIPT_DIR/lib/launchd-job.sh" "$EMIT/bin/lib/"
 
 begin_case G13-plist
 LOGDIR="$ROOT/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc"
@@ -602,6 +601,9 @@ finish_case
 # G14 — emitter rejects bad input; install refuses without the tick
 # ══════════════════════════════════════════════════════════════════════════════
 begin_case G14-emitter-rejects
+# Earlier tick cases log `launchctl list` from the live-post-plan-run guard
+# (bin/lib/wt-guards.sh); start clean so only this case's calls count.
+rm -f "$ROOT/launchctl.calls"
 for a in --bogus --install-hook; do
     RC=0
     env HOME="$ROOT/home" PATH="$STUBBIN:$PATH" "$EMIT/bin/wt-gc-cron-setup" "$a" >"$CD/out" 2>"$CD/err" || RC=$?

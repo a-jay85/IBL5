@@ -52,8 +52,9 @@ runs:
       run: |
         cp config.php.example config.php
         # config.php requires the gitignored config.local.php for DB credentials
-        # (no getenv() fallback). Job-level DB_* env overrides; the defaults match
-        # the step-scoped DB_* blocks in tests.yml and mutation.yml.
+        # (no getenv() fallback). Job-level DB_* env overrides. The defaults below
+        # must match the step-scoped DB_* blocks in tests.yml, mutation.yml and
+        # mutation-pr.yml; bin/check-composite-contracts (D1) enforces it.
         printf '<?php\n$dbhost = %s;\n$dbuname = %s;\n$dbpass = %s;\n$dbname = %s;\n' \
           "'${DB_HOST:-127.0.0.1}'" "'${DB_USER:-root}'" "'${DB_PASS:-root}'" \
           "'${DB_NAME:-ibl5}'" > config.local.php

@@ -388,16 +388,38 @@ final class DatabaseCacheTest extends TestCase
         $this->assertFalse($mockDb->wasReleaseLockCalled());
     }
 
-    public function testLockSqlIsParameterized(): void
+    public function testAcquireLockBindsHostileKeyAsParameter(): void
     {
         // Security: the lock name must NEVER be interpolated into the SQL string.
-        // GET_LOCK/RELEASE_LOCK must use bound placeholders (?), not string concat.
-        $source = (string) file_get_contents(__DIR__ . '/../../classes/Cache/DatabaseCache.php');
+        $hostileKey = "x') OR SLEEP(5) -- ";
+        $mockDb = new MockCacheDb();
+        $mockDb->setLockResult(1);
+        $cache = new DatabaseCache($mockDb);
 
-        $this->assertStringContainsString('GET_LOCK(?, ?)', $source);
-        $this->assertStringContainsString('RELEASE_LOCK(?)', $source);
-        $this->assertStringNotContainsString('GET_LOCK(\'', $source);
-        $this->assertStringNotContainsString('RELEASE_LOCK(\'', $source);
+        $cache->acquireLock($hostileKey, 10);
+
+        $stmt = $mockDb->findPreparedStatement('GET_LOCK');
+        $this->assertNotNull($stmt);
+        $this->assertSame('SELECT GET_LOCK(?, ?) AS got', $stmt->getQuery());
+        $this->assertSame('si', $stmt->getBoundTypes());
+        $this->assertSame([$hostileKey, 10], $stmt->getBoundParams());
+        $this->assertStringNotContainsString($hostileKey, $stmt->getQuery());
+    }
+
+    public function testReleaseLockBindsHostileKeyAsParameter(): void
+    {
+        $hostileKey = "x') OR SLEEP(5) -- ";
+        $mockDb = new MockCacheDb();
+        $cache = new DatabaseCache($mockDb);
+
+        $cache->releaseLock($hostileKey);
+
+        $stmt = $mockDb->findPreparedStatement('RELEASE_LOCK');
+        $this->assertNotNull($stmt);
+        $this->assertSame('DO RELEASE_LOCK(?)', $stmt->getQuery());
+        $this->assertSame('s', $stmt->getBoundTypes());
+        $this->assertSame([$hostileKey], $stmt->getBoundParams());
+        $this->assertStringNotContainsString($hostileKey, $stmt->getQuery());
     }
 }
 
@@ -418,6 +440,8 @@ class MockCacheDb extends \mysqli
     /** Value GET_LOCK returns: 1 = acquired, 0 = timeout, null = error/killed. */
     private ?int $lockResult = 1;
     private bool $releaseLockCalled = false;
+    /** @var list<MockCacheStmt> */
+    private array $preparedStatements = [];
 
     public function __construct()
     {
@@ -487,7 +511,24 @@ class MockCacheDb extends \mysqli
             return false;
         }
 
-        return new MockCacheStmt($this, $query);
+        $stmt = new MockCacheStmt($this, $query);
+        $this->preparedStatements[] = $stmt;
+
+        return $stmt;
+    }
+
+    /**
+     * Last recorded prepared statement whose SQL contains $needle.
+     */
+    public function findPreparedStatement(string $needle): ?MockCacheStmt
+    {
+        foreach (array_reverse($this->preparedStatements) as $stmt) {
+            if (str_contains($stmt->getQuery(), $needle)) {
+                return $stmt;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -525,6 +566,9 @@ class MockCacheStmt
     private string $boundKey = '';
     private string $boundValue = '';
     private int $boundExpiration = 0;
+    private ?string $boundTypes = null;
+    /** @var list<mixed> */
+    private array $boundParams = [];
 
     public function __construct(MockCacheDb $db, string $query)
     {
@@ -532,8 +576,28 @@ class MockCacheStmt
         $this->query = $query;
     }
 
+    public function getQuery(): string
+    {
+        return $this->query;
+    }
+
+    public function getBoundTypes(): ?string
+    {
+        return $this->boundTypes;
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    public function getBoundParams(): array
+    {
+        return $this->boundParams;
+    }
+
     public function bind_param(string $types, mixed &...$params): bool
     {
+        $this->boundTypes = $types;
+        $this->boundParams = array_values($params);
         if ($params !== []) {
             $this->boundKey = (string) $params[0];
         }

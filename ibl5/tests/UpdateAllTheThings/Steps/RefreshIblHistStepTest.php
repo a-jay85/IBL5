@@ -42,6 +42,7 @@ class RefreshIblHistStepTest extends TestCase
     /**
      * Pins the phase-rank CASE in the ORDER BY. Mutation: delete the CASE expression
      * and only `id DESC` remains — this assertion then fails.
+     * Order of the playoff-round arms is pinned by testConfFinalsRanksAboveEarlierPlayoffRoundsInRefreshQuery.
      */
     public function testPhaseRankCaseExpressionPresentInRefreshQuery(): void
     {
@@ -83,5 +84,46 @@ class RefreshIblHistStepTest extends TestCase
             $statsGmPos,
             'stats_gm DESC must appear before the phase-rank CASE in the ORDER BY',
         );
+    }
+
+    /**
+     * Pins the playoff-round arm order: later rounds first, matching the Training
+     * Camp baseline list. Mutation: restore the pre-#782 order (conf-finals after
+     * rd1) and the conf-finals < rd2 assertion fails.
+     */
+    public function testConfFinalsRanksAboveEarlierPlayoffRoundsInRefreshQuery(): void
+    {
+        $mockDb = new MockDatabase();
+        (new RefreshIblHistStep($mockDb))->execute();
+
+        $queries = implode("\n", $mockDb->getExecutedQueries());
+
+        $chain = [
+            'finals',
+            'heat-end',
+            'conf-finals-gm4-7',
+            'conf-finals-gm1-3',
+            'playoffs-rd2-gm4-7',
+            'playoffs-rd2-gm1-3',
+            'playoffs-rd1-gm4-7',
+            'playoffs-rd1-gm1-3',
+            'heat-wb',
+        ];
+
+        $previousPhase = null;
+        $previousPos = null;
+        foreach ($chain as $phase) {
+            $pos = strpos($queries, "WHEN '" . $phase . "'");
+            $this->assertNotFalse($pos, "WHEN '{$phase}' must be in the refresh query");
+            if ($previousPos !== null) {
+                $this->assertLessThan(
+                    $pos,
+                    $previousPos,
+                    "'{$previousPhase}' must rank above '{$phase}'",
+                );
+            }
+            $previousPhase = $phase;
+            $previousPos = $pos;
+        }
     }
 }

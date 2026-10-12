@@ -1,6 +1,6 @@
 ---
 description: bin/check-destructive-migrations scans whole SQL statements (and .php migrations) through a python3 engine, adds four data-loss triggers, and requires bypass markers to name the triggers they suppress.
-last_verified: 2026-10-03
+last_verified: 2026-10-06
 ---
 
 # ADR-0164: Statement-level destructive migration scan with tagged bypass markers
@@ -47,3 +47,11 @@ Stricter-only behaviour is enforced by three checks. `ibl5/tests/Cli/CheckDestru
 - `ibl5/migrations/README.md`
 - `ibl5/tests/Cli/CheckDestructiveMigrationsCliTest.php`
 - `ibl5/tests/Cli/PreCommitHookDestructiveScanTest.php`
+
+## Addendum — prepared-statement DDL (2026-10-06) <!-- slop-ok -->
+
+The engine as first shipped masked every string literal before matching, so DDL executed through `PREPARE n FROM @v` was invisible. Migration 151 (`ibl5/migrations/151_downsize_ibl_draft_team.sql`) narrows `ibl_draft.team` to `varchar(35)` that way, and the narrow-type rule never saw it (backlog issue a-jay85/IBL5-backlog#1333).
+
+`extract_sql` now follows each `PREPARE n FROM @v` back to the nearest preceding `SET @v = ...` and re-splits that statement's DDL-headed string literals into virtual statements placed after the PREPARE. They carry the SET's line numbers, so added-range selection and marker scope key on the SET. `PREPARE n FROM '<literal>'` is handled the same way. A variable built by `CONCAT(...)` or bound by `SELECT ... INTO @v` stays unscanned, the same class as PHP `sprintf`.
+
+The change only adds hits. Three of the ten historical PREPARE migrations (077, 009 and 030) each gained one golden token; the remaining seven gained none. An engine-only change now also runs the PHPUnit job, because `.github/workflows/tests.yml` lists the engine, its wrapper and the golden fixtures under the `src:` filter.

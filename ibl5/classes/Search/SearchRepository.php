@@ -32,7 +32,17 @@ use Search\Contracts\SearchRepositoryInterface;
  */
 class SearchRepository extends BaseMysqliRepository implements SearchRepositoryInterface
 {
-    /** @var string Database table prefix for nuke_stories/nuke_topics */
+    /**
+     * Table prefixes this repository may splice into table names. The prefix is
+     * an identifier (never bindable), so it is allowlisted here and the property
+     * below is typed as a member of this list; PHPStan then proves every table
+     * name built from it is a constant string (BanSqlStringConcatenationRule).
+     *
+     * @var list<string>
+     */
+    private const SUPPORTED_PREFIXES = ['nuke'];
+
+    /** @var value-of<self::SUPPORTED_PREFIXES> Database table prefix for nuke_stories/nuke_topics */
     private string $prefix;
 
     /**
@@ -43,10 +53,10 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
     {
         parent::__construct($db);
         // The prefix is an operator-controlled config identifier spliced into table
-        // names (never a bindable value). Validate it against a conservative
-        // identifier pattern and fall back to the default 'nuke' so an unexpected
-        // value can never reach query text; real prefixes match unchanged.
-        $this->prefix = preg_match('/^[a-z0-9_]+$/i', $prefix) === 1 ? $prefix : 'nuke';
+        // names (never a bindable value). Only members of SUPPORTED_PREFIXES reach
+        // query text; anything else falls back to 'nuke', the only prefix the
+        // schema defines (see ibl5/docs/schema/current-schema.sql).
+        $this->prefix = in_array($prefix, self::SUPPORTED_PREFIXES, true) ? $prefix : 'nuke';
     }
 
     /**
@@ -102,7 +112,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
         }
 
         // Fetch one extra to detect if there are more results
-        $sql .= " ORDER BY s.time DESC LIMIT ?, ?";
+        $sql .= " ORDER BY s.time DESC, s.sid DESC LIMIT ?, ?";
         $types .= 'ii';
         $params[] = $offset;
         $params[] = $limit + 1;
@@ -207,9 +217,8 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
 
         // Fetch one extra to detect if there are more results. sid breaks time ties
         // so the LIMIT window is stable across pages (ADR-0083). sid is the
-        // AUTO_INCREMENT primary key of nuke_stories, so it is genuinely unique; it
-        // is simply absent from the rule's curated allowlist.
-        // @phpstan-ignore ibl.orderByMissingTiebreaker
+        // AUTO_INCREMENT primary key of nuke_stories, so it is genuinely unique and
+        // is on the rule's UNIQUE_COLUMNS allowlist.
         $sql .= " ORDER BY s.time DESC, s.sid DESC LIMIT ?, ?";
         $types .= 'ii';
         $params[] = $offset;
@@ -250,7 +259,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
         $sql = "SELECT id AS user_id, username
                 FROM auth_users
                 WHERE username LIKE ?
-                ORDER BY username ASC
+                ORDER BY username ASC, id ASC
                 LIMIT ?, ?";
 
         /** @var list<UserDbRow> $rows */
@@ -281,7 +290,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
     {
         /** @var list<TopicDbRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT topicid, topictext FROM " . $this->prefix . "_topics ORDER BY topictext"
+            "SELECT topicid, topictext FROM " . $this->prefix . "_topics ORDER BY topictext, id ASC"
         );
 
         $topics = [];
@@ -303,7 +312,8 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
     {
         /** @var list<CategoryDbRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT catid, title FROM " . $this->prefix . "_stories_cat ORDER BY title"
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (catid is the nuke_stories_cat primary key, absent from the rule allowlist)
+            "SELECT catid, title FROM " . $this->prefix . "_stories_cat ORDER BY title, catid ASC"
         );
 
         $categories = [];

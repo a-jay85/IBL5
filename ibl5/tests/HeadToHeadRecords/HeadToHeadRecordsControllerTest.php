@@ -10,6 +10,7 @@ use HeadToHeadRecords\HeadToHeadRecordsView;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 
 /**
@@ -70,7 +71,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
 
     /**
      * Build a controller with a fixed owner_name lookup.
-     * Uses an anonymous subclass to override lookupOwnerName().
+     * Stubs getOwnerName() on the team identity repository.
      */
     private function makeControllerWithOwner(
         HeadToHeadRecordsRepositoryInterface $repo,
@@ -79,27 +80,9 @@ class HeadToHeadRecordsControllerTest extends TestCase
         object $user,
         ?string $ownerName
     ): HeadToHeadRecordsController {
-        return new class ($repo, $view, $season, $user, self::createStub(\mysqli::class), $ownerName)
-            extends HeadToHeadRecordsController {
-            private ?string $fakeOwner;
-
-            public function __construct(
-                HeadToHeadRecordsRepositoryInterface $repo,
-                HeadToHeadRecordsView $view,
-                Season $season,
-                object $user,
-                \mysqli $db,
-                ?string $fakeOwner
-            ) {
-                parent::__construct($repo, $view, $season, $user, $db);
-                $this->fakeOwner = $fakeOwner;
-            }
-
-            protected function lookupOwnerName(int $teamid): ?string
-            {
-                return $this->fakeOwner;
-            }
-        };
+        $teamRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamRepo->method('getOwnerName')->willReturn($ownerName);
+        return new HeadToHeadRecordsController($repo, $view, $season, $user, $teamRepo);
     }
 
     // ---------------------------------------------------------------------------
@@ -112,7 +95,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
         $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
         $repo->method('currentSeasonHasGames')->willReturn(true);
-        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(TeamIdentityRepositoryInterface::class));
 
         $result = $ctrl->resolveFilters([
             'dimension' => 'invalid_dim',
@@ -130,7 +113,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         $season = $this->makeSeasonWithPhase('Regular Season');
         /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
         $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
-        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(TeamIdentityRepositoryInterface::class));
 
         $result = $ctrl->resolveFilters([
             'dimension' => 'gms',
@@ -148,7 +131,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         $season = $this->makeSeasonWithPhase('Playoffs');
         /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
         $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
-        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(TeamIdentityRepositoryInterface::class));
 
         $result = $ctrl->resolveFilters([]);
 
@@ -161,7 +144,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
         $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
         $repo->method('currentSeasonHasGames')->willReturn(true);
-        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(TeamIdentityRepositoryInterface::class));
 
         // PHP type coercion edge-cases: pass an array instead of string
         $result = $ctrl->resolveFilters([
@@ -183,7 +166,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
         $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
         $repo->method('currentSeasonHasGames')->willReturn(false);
-        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(TeamIdentityRepositoryInterface::class));
 
         $result = $ctrl->resolveFilters([]);
 
@@ -196,7 +179,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
         $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
         $repo->method('currentSeasonHasGames')->willReturn(true);
-        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(TeamIdentityRepositoryInterface::class));
 
         $result = $ctrl->resolveFilters([]);
 
@@ -210,7 +193,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
         // currentSeasonHasGames should NOT be called when scope is explicitly POSTed.
         $repo->expects($this->never())->method('currentSeasonHasGames');
-        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(TeamIdentityRepositoryInterface::class));
 
         $result = $ctrl->resolveFilters(['scope' => 'current']);
 
@@ -230,7 +213,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         $user = new \stdClass();
         $user->teamid = 7;
 
-        $ctrl    = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, $user, self::createStub(\mysqli::class));
+        $ctrl    = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, $user, self::createStub(TeamIdentityRepositoryInterface::class));
         $payload = $this->makePayload([]);
         $keys    = $ctrl->resolveUserMatchKeys('franchises', $payload);
 
@@ -246,7 +229,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         $user = new \stdClass();
         $user->teamid = '7';
 
-        $ctrl    = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, $user, self::createStub(\mysqli::class));
+        $ctrl    = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, $user, self::createStub(TeamIdentityRepositoryInterface::class));
         $payload = $this->makePayload([]);
         $keys    = $ctrl->resolveUserMatchKeys('franchises', $payload);
 
@@ -272,7 +255,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
             $this->makeEntry(['key' => 'lakers-2020',  'franchise_id' => 5]),
         ];
         $payload = $this->makePayload($axis);
-        $ctrl    = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, $user, self::createStub(\mysqli::class));
+        $ctrl    = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, $user, self::createStub(TeamIdentityRepositoryInterface::class));
         $keys    = $ctrl->resolveUserMatchKeys('teams', $payload);
 
         self::assertSame(['celtics-2010', 'celtics-2020'], $keys);
@@ -339,7 +322,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         $axis    = [$this->makeEntry()];
         $payload = $this->makePayload($axis);
 
-        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, $user, self::createStub(\mysqli::class));
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, $user, self::createStub(TeamIdentityRepositoryInterface::class));
         $keys = $ctrl->resolveUserMatchKeys('franchises', $payload);
 
         self::assertSame([], $keys);

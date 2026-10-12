@@ -1,5 +1,5 @@
 ---
-description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section.
+description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section. A daily and on-demand refresh workflow republishes stale galleries, and retention cleanup keeps every gallery dir an open PR links to.
 paths:
   - ".github/workflows/e2e-tests.yml"
   - ".github/workflows/pages-deploy.yml"
@@ -14,7 +14,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-09-14
+last_verified: 2026-10-08
 ---
 
 # Visual-review PRs
@@ -50,20 +50,18 @@ They are skipped only during baseline regen (the `update-baselines` label).
    source = GitHub Actions, no Jekyll), which is dispatched by the deploy step below once the
    gh-pages push lands (one deploy per real content change, not one per E2E run) and re-publishes the
    whole tree. That dispatch is **debounced**: it is skipped when a `pages-deploy` run exists that has
-   not started yet, because such a run checks out `gh-pages` *after* this push landed and therefore
-   already serves it. The status filter is a **denylist** (anything that is neither `completed` nor
-   `in_progress`) rather than an allowlist of the pre-execution spellings — a missed spelling would
-   make the guard a silent no-op nothing would surface, whereas over-suppressing just makes one push
-   wait for the next deploy, which re-serves the whole tree anyway. The debounce never fires on an
-   `in_progress` run (that one may have checked out `gh-pages` first) and fails **open** — an API
-   error dispatches anyway. This is what stops a push fan-out (one master push → multiple open-PR
-   updates → N gh-pages pushes) from producing N deploys, most of which the `pages`
-   concurrency group would just cancel; the fan-out collapses to roughly **two** deploys (one
-   in-flight plus one pending), not one. Because every open PR's VR job pushes to the same `gh-pages` ref, concurrent runs
-   collide on the ref lock; the deploy is spelled out as **one attempt plus two retries** (the
-   action re-clones `gh-pages` each time, so a retry sees the ref that beat it). An **assert step**
-   fails the job if all three are exhausted — the retries absorb contention, they never soften the
-   gate.
+   not started yet, since that run checks out `gh-pages` *after* this push and already serves it. The
+   status filter is a **denylist** (neither `completed` nor `in_progress`), so a missed spelling
+   over-suppresses one push instead of silently no-opping. The debounce never fires on an
+   `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API error
+   dispatches. A not-started run older than an hour counts as stuck. The step cancels it and leaves it
+   out of the count, so one stuck run cannot block every later deploy. This stops a push fan-out (one
+   master push → multiple open-PR updates → N gh-pages pushes) from producing N deploys that the `pages`
+   concurrency group would mostly cancel. It collapses to roughly **two** deploys (one in-flight
+   plus one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
+   collide on the ref lock. The deploy runs **one attempt plus two retries** (each re-clones
+   `gh-pages`, so a retry sees the ref that beat it). An **assert step** fails the job if all three
+   fail. The retries absorb contention and never soften the gate.
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
    the sticky markdown.
 5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
@@ -72,6 +70,21 @@ A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) pr
 per-SHA gallery dirs whose newest commit is older than 7 days. Its `gh-pages` push carries the same
 rebase-and-retry loop for the same ref contention. A prune reaches the served site when
 `pages-deploy.yml` next re-publishes the tree (the cleanup job dispatches `pages-deploy.yml` itself once its prune push lands).
+It keeps every dir an open PR still links to. See [Refreshing stale galleries](#refreshing-stale-galleries).
+
+## Refreshing stale galleries
+
+`.github/workflows/vr-refresh.yml` republishes the gallery, both sticky comments, and the PR-body block for open visual PRs whose screenshots went stale. It calls the `Visual Regression` job of `e2e-tests.yml` through its `workflow_call` inputs.
+
+- **Daily schedule.** Refreshes each open visual PR whose linked gallery dir is older than 7 days. At most 10 PRs per sweep, 2 at a time.
+- **Manual dispatch.** `gh workflow run vr-refresh.yml -f pr=<N>` refreshes one PR. A blank `pr` refreshes every open visual PR, with the same cap. Add `-f dry_run=true` to list what would refresh and what cleanup would keep.
+- **Visual PR.** A PR whose `visual-review` sticky comment links a gallery, as `<sha>/visual-review` or `pr/<N>/visual-review`. The first link wins. The banner-only comment links none and is never refreshed.
+- **Age.** The `gh-pages` commit time of the dir that comment links to (`<sha>` or `pr/<N>/visual-review`). Every publish writes `refreshed-at.txt` into the dir, so a refresh always moves the age forward.
+- **Skipped PRs.** Forks, PRs labeled `update-baselines`, drafts (unless named by `pr`), PRs whose base is not `master`, and PRs behind `master`. A push republishes a behind PR anyway (ADR-0182 gives the reason).
+- **Publish key.** A refresh publishes under the PR head SHA and rewrites the links to it. A push to the PR still publishes under the test-merge SHA.
+- **Never a gate.** Every write runs on a master-ref event, so a refresh adds no check run to a PR head and a failed refresh leaves required checks alone. One sweep dispatches `pages-deploy.yml` once.
+- **Retention.** `vr-pages-cleanup` keeps every per-SHA dir that any open PR's comments or body link to, plus each open PR's head SHA, through both the 7-day age pass and the 300-dir cap. When the keep-list cannot be computed, that run prunes nothing. The keep-list holds 40-hex SHAs only, since `bin/prune-vr-galleries` never prunes `pr/<N>/` dirs.
+- **Pull-request dry-run.** A PR that edits the refresh workflow, `bin/vr-refresh-targets`, `ibl5/tests/e2e/vr-refresh.ts`, or `bin/prune-vr-galleries` runs the read-only `VR refresh select` job, which prints both lists.
 
 ## Reading the comment
 
@@ -116,6 +129,8 @@ Each cell is captured twice — render A (`.a.png`) and a reload render B (`.b.p
 whose reload `.b.png` is missing is likewise demoted to infra. See ADR-0073 for the
 infra-vs-pixel-diff labeling this reuses.
 
+A second, review-only strict pass (ADR-0180) runs after this triage. It uses per-pixel threshold `STRICT_PIXEL_THRESHOLD` (0.05) and an absolute floor `STRICT_MIN_CHANGED_PIXELS` (25), both in `ibl5/tests/e2e/vr-gallery.ts`. It can only upgrade an `unchanged` cell to `changed`, and only when the reload render exists and A and B agree under the strict threshold. It never creates a flake cell and never touches the VR check, whose 0.2 threshold and 0.005 ratio are unchanged. Rows that set `extraMaxDiffPixelRatio` skip it.
+
 ## New screens in the PR body
 
 In addition to the sticky comment, brand-new views (`gallery.newCells`) are published inline at the
@@ -131,8 +146,8 @@ steps run after "Deploy gallery to per-SHA Pages" and "Post sticky comment":
   `update-baselines`), so it never goes stale. `--dry-run` exercises the splice without mutating a
   real PR.
 
-Both steps are `continue-on-error: true` — a failure here degrades to "no inline image," it never
-fails the VR job or blocks the sticky comment. The pure splice/copy-plan logic lives in
+Both steps are `continue-on-error: true`. A failure here only means no inline image. The VR job
+and sticky comment still succeed. The pure splice/copy-plan logic lives in
 `ibl5/tests/e2e/vr-pr-body.ts` (unit-tested in `ibl5/tests/ts-unit/vr-pr-body.test.ts`); only `gh`/
 `fetch`/`fs` I/O lives in the `bin/vr-review-comment` glue layer.
 
@@ -145,7 +160,7 @@ comment markup lives in `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). 
 unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `ibl5/tests/ts-unit/vr-coverage-map.test.ts`,
 `ibl5/tests/ts-unit/vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). Per-row
 source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing this selection logic is
-a mechanical-enforcement surface and requires an ADR** (current: ADR-0074). The PR-body new-screens
+a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body new-screens
 publishing surface (`--copy-new-screens`/`--update-pr-body` on `bin/vr-review-comment`,
 `ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is likewise a
 mechanical-enforcement surface, covered by **ADR-0076**.
@@ -162,12 +177,12 @@ vr: label=team-page-header; role=anon; url=modules.php?name=Team&op=view&teamID=
 
 `label=` is a kebab slug, `role=` is `anon|regular|admin`, `url=` is relative to the app root, and
 `anchor=` is the selector waited on before the shot. Zero or more `setup=<GET|POST|DELETE> <path>`
-clauses drive `ibl5/test-state.php` into the state the shot needs — an unknown `action=` there
-answers **400**, so a typo surfaces in the PR comment as a failed row instead of a silently wrong
-screenshot. Clauses are `;`-separated because `|` would break the matrix table. A row that genuinely
+clauses drive `ibl5/test-state.php` into the state the shot needs. An unknown `action=` there
+answers **400**, so a typo surfaces in the PR comment as a failed row instead of a wrong
+screenshot. Clauses are `;`-separated because `|` would break the matrix table. A row that
 cannot be shot (print CSS, an email render) uses `no-vr: <reason ≥ 15 chars>` instead.
 
-The pipeline is a **review aid, never a gate** — every step below is `continue-on-error: true` and
+The pipeline is a **review aid**. Every step below is `continue-on-error: true` and
 runs in its own config so a bad `vr:` cell can never turn the baseline-diff step red:
 
 | Stage | Where |

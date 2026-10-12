@@ -183,7 +183,7 @@ def file_deferral_issues(gh, hits: list[DeferralHit], slug: str,
         except (HarnessError, OSError) as exc:
             log(f"oos-sweep: followup_create failed for {hit.key} ({exc})")
             continue
-        if n is not None:
+        if n is not None and n not in nums:
             nums.append(n)
         seen.add(tag)
         log(f"oos-sweep: filed #{n} {hit.key}")

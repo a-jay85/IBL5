@@ -41,6 +41,7 @@ regexes = [
   # Sentinel value used in bin/test-sim-recap-tick to verify passwords are never
   # logged — deliberately fake, never a real credential.
   '''hunter2_sentinel_xyz''',
+  '''PW-SENTINEL-9f3''',
 
   # Verdict-file key fixture in bin/test-postplan-arm-conditions (a filename
   # fragment, not a credential; the VKEY name trips generic-api-key).
@@ -50,6 +51,11 @@ regexes = [
   # (tests/Discord/*, tests/Team/TeamViewTest.php).
   '''123456789012345678''',
   '''999888777666555444''',
+
+  # Owner's Discord user ID passed as the DM target in bin/test-events-review.
+  # A public user ID (also hardcoded as OWNER_ID in bin/discord-dm), not a
+  # credential; the DISCORD_DM_TO= prefix trips discord-client-id.
+  '''DISCORD_DM_TO=283183467804491776''',
 
   # Literal documentation placeholder in API guides (.archive/, removed docs).
   '''your-api-key''',

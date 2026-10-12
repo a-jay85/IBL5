@@ -50,6 +50,24 @@ class ApiStandingsRepositoryTest extends WideUnitTestCase
         $this->assertQueryExecuted('conference');
     }
 
+    public function testGetStandingsWithoutFilterOrdersByTeamidTiebreaker(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getStandings();
+
+        $this->assertQueryExecuted('ORDER BY conference ASC, win_percentage DESC, full_team_name ASC, teamid ASC');
+    }
+
+    public function testGetStandingsWithConferenceFilterOrdersByTeamidTiebreaker(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getStandings('East');
+
+        $this->assertQueryExecuted('ORDER BY win_percentage DESC, full_team_name ASC, teamid ASC');
+    }
+
     public function testGetStandingsWithConferenceFilterDoesNotReturnOtherConferences(): void
     {
         // MockDatabase returns whatever is in mockData regardless, but the SQL with

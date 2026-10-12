@@ -4,14 +4,6 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Player\Stats\Views\PlayerHeatAveragesView;
-use Player\Stats\Views\PlayerHeatTotalsView;
-use Player\Stats\Views\PlayerOlympicAveragesView;
-use Player\Stats\Views\PlayerOlympicTotalsView;
-use Player\Stats\Views\PlayerPlayoffAveragesView;
-use Player\Stats\Views\PlayerPlayoffTotalsView;
-use Player\Stats\Views\PlayerRegularSeasonAveragesView;
-use Player\Stats\Views\PlayerRegularSeasonTotalsView;
 use Security\HtmlSanitizer;
 
 /**
@@ -100,85 +92,5 @@ class PlayerStatsFlipCardView
 </div>
         <?php
         return (string) ob_get_clean();
-    }
-
-    /**
-     * Render Regular Season stats with flip between Averages and Totals
-     */
-    public static function renderRegularSeason(
-        PlayerRegularSeasonAveragesView $averagesView,
-        PlayerRegularSeasonTotalsView $totalsView,
-        int $playerID,
-        ?\mysqli $db = null,
-        int $teamid = 0
-    ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
-        return self::render(
-            $averagesView->renderAverages($playerID),
-            $totalsView->renderTotals($playerID),
-            'Regular Season',
-            true,
-            $colorScheme
-        );
-    }
-
-    /**
-     * Render Playoff stats with flip between Averages and Totals
-     */
-    public static function renderPlayoffs(
-        PlayerPlayoffAveragesView $averagesView,
-        PlayerPlayoffTotalsView $totalsView,
-        string $playerName,
-        ?\mysqli $db = null,
-        int $teamid = 0
-    ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
-        return self::render(
-            $averagesView->renderAverages($playerName),
-            $totalsView->renderTotals($playerName),
-            'Playoffs',
-            true,
-            $colorScheme
-        );
-    }
-
-    /**
-     * Render Olympics stats with flip between Averages and Totals
-     */
-    public static function renderOlympics(
-        PlayerOlympicAveragesView $averagesView,
-        PlayerOlympicTotalsView $totalsView,
-        int $playerID,
-        ?\mysqli $db = null,
-        int $teamid = 0
-    ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
-        return self::render(
-            $averagesView->renderAverages($playerID),
-            $totalsView->renderTotals($playerID),
-            'Olympics',
-            true,
-            $colorScheme
-        );
-    }
-
-    /**
-     * Render H.E.A.T. stats with flip between Averages and Totals
-     */
-    public static function renderHeat(
-        PlayerHeatAveragesView $averagesView,
-        PlayerHeatTotalsView $totalsView,
-        string $playerName,
-        ?\mysqli $db = null,
-        int $teamid = 0
-    ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
-        return self::render(
-            $averagesView->renderAverages($playerName),
-            $totalsView->renderTotals($playerName),
-            'H.E.A.T.',
-            true,
-            $colorScheme
-        );
     }
 }

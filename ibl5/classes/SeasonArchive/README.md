@@ -1,11 +1,11 @@
 ---
 description: Displays historical season archives including stats, standings, and awards for past seasons.
-last_verified: 2026-09-24
+last_verified: 2026-10-05
 ---
 
 # SeasonArchive
 
-Presents an indexed and detail view of past IBL seasons, including final standings, statistical leaders, and award winners. `SeasonArchiveService` assembles the data for both the index and the per-season detail page, delegating award extraction to `SeasonAwardExtractor` and playoff-bracket assembly to `SeasonPlayoffBracketBuilder`. Views are rendered by `SeasonArchiveIndexView` and `SeasonDetailView` respectively. `SeasonArchiveRenderHelpers` provides shared rendering utilities used by both views. Entry point: `ibl5/modules/SeasonArchive/index.php`.
+Presents an indexed and detail view of past IBL seasons, including H.E.A.T. standings, statistical leaders, and award winners. `SeasonArchiveService` assembles the data for both the index and the per-season detail page, delegating award extraction to `SeasonAwardExtractor` and playoff-bracket assembly to `SeasonPlayoffBracketBuilder`. Views are rendered by `SeasonArchiveIndexView` and `SeasonDetailView` respectively. `SeasonArchiveRenderHelpers` provides shared rendering utilities used by both views. Entry point: `ibl5/modules/SeasonArchive/index.php`.
 
 | Class | Role |
 |---|---|

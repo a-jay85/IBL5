@@ -32,7 +32,7 @@
     background: var(--gradient-navy-header);
     color: white;
     font-family: var(--font-display);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
     padding: 0.25rem 0.2rem;

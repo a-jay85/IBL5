@@ -10,10 +10,12 @@
 
 # shellcheck disable=SC2034  # used in later phases sourced from this file
 BD_BUDGET=5
+# shellcheck source=bin/lib/gh-retry.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gh-retry.sh"
 BD_CODE_REPO="a-jay85/IBL5"
 BD_LABEL_BLOCKED="blocked"
 BD_LABEL_OUT_OF_REPO="out-of-repo"
-BD_SKIP_LABELS_JSON='["blocked","out-of-repo"]'
+BD_SKIP_LABELS_JSON='["blocked","out-of-repo","deferred"]'
 BD_RANKS='^P[1-4]$'
 # Live-item predicate over a jq -s slurp of ledgers. A live item holds its unit
 # and its paths. Closed-fixed and merged items are settled, and so is a skip
@@ -89,8 +91,8 @@ bd_report_since() {
 # bd_fetch_issues <out-file> — fetches open backlog issues to a JSON file
 bd_fetch_issues() {
     local out="$1" raw
-    if ! raw="$("$GH" issue list --repo "$REPO" --state open --limit 1000 \
-            --json number,title,body,url,updatedAt,labels 2>/dev/null)"; then
+    if ! raw="$(gh_retry "$GH" issue list --repo "$REPO" --state open --limit 1000 \
+            --json number,title,body,url,updatedAt,labels)"; then
         bd_die 3 "gh issue list failed"
     fi
     if ! jq -e 'type=="array"' <<< "$raw" >/dev/null 2>&1; then
@@ -141,6 +143,54 @@ bd_cmd_delta() {
     k="$(jq '.issues | length' <<< "$out")"
     printf 'delta: %s issue(s) to rank since %s\n' "$k" "$BD_SINCE" >&2
     printf '%s\n' "$out"
+}
+
+# bd_wt_list — print "<path><TAB><branch>" for every worktree that has a branch.
+# Returns 1 when `git worktree list` fails; callers decide fail-closed handling.
+bd_wt_list() {
+    local raw rc=0 line wpath=""
+    raw="$("$BD_GIT" -C "$BD_REPO_ROOT" worktree list --porcelain 2>/dev/null)" || rc=$?
+    [ "$rc" -eq 0 ] || return 1
+    while IFS= read -r line; do
+        case "$line" in
+            "worktree "*) wpath="${line#worktree }" ;;
+            "branch refs/heads/"*) printf '%s\t%s\n' "$wpath" "${line#branch refs/heads/}" ;;
+        esac
+    done <<< "$raw"
+}
+
+# bd_wt_state <path> <branch> — classify a live worktree. Prints exactly one of:
+#   idle                          clean, 0 commits ahead of origin/master, zero PRs for head
+#   pr                            at least one PR (any state) exists for head <branch>
+#   held<TAB><0|1 dirty><TAB><N>  dirty or N>0 ahead, zero PRs for head
+#   unknown<TAB><reason>          a git or gh probe failed (callers treat as in-flight)
+# Fail-closed by design (.claude/rules/shell-fail-open-probe.md): no probe failure
+# ever yields "idle", because "idle" releases the issue back into selection.
+bd_wt_state() {
+    local path="$1" branch="$2" st ahead raw dirty=0 prs
+    if ! st="$("$BD_GIT" -C "$path" status --porcelain 2>/dev/null)"; then
+        printf 'unknown\tgit status failed\n'; return 0
+    fi
+    if ! ahead="$("$BD_GIT" -C "$path" rev-list --count origin/master..HEAD 2>/dev/null)"; then
+        printf 'unknown\tgit rev-list failed\n'; return 0
+    fi
+    if ! [[ "$ahead" =~ ^[0-9]+$ ]]; then
+        printf 'unknown\tgit rev-list printed no count\n'; return 0
+    fi
+    [ -z "$st" ] || dirty=1
+    if ! raw="$("$GH" pr list --repo "$BD_CODE_REPO" --head "$branch" --state all \
+        --limit 5 --json number 2>/dev/null)" \
+        || ! jq -e 'type=="array"' <<< "$raw" >/dev/null 2>&1; then
+        printf 'unknown\tgh failed\n'; return 0
+    fi
+    prs="$(jq 'length' <<< "$raw")"
+    if [ "$prs" -gt 0 ]; then
+        printf 'pr\n'
+    elif [ "$dirty" -eq 0 ] && [ "$ahead" -eq 0 ]; then
+        printf 'idle\n'
+    else
+        printf 'held\t%s\t%s\n' "$dirty" "$ahead"
+    fi
 }
 
 # bd_inflight <out-tsv> — write num<TAB>reason lines for every in-flight issue
@@ -211,37 +261,32 @@ bd_inflight() {
             "$ledger" >> "$out"
     done
 
-    # Source 5: live worktrees
-    local wt_out wt_rc=0
-    wt_out="$("$BD_GIT" -C "$BD_REPO_ROOT" worktree list --porcelain 2>/dev/null)" || wt_rc=$?
+    # Source 5: live worktrees. A worktree whose state is "idle" (clean, 0 ahead,
+    # no PR) no longer holds its issue; every other state, including a failed
+    # probe, keeps it in-flight.
+    local wt_list wt_rc=0 wpath wbranch
+    wt_list="$(bd_wt_list)" || wt_rc=$?
     [ "$wt_rc" -eq 0 ] || bd_die 3 "git worktree list failed"
-    if [ -n "$wt_out" ]; then
-        local wbranch=""
-        while IFS= read -r wline; do
-            if [[ "$wline" =~ ^branch\ refs/heads/(.+)$ ]]; then
-                wbranch="${BASH_REMATCH[1]}"
-                # Issues from any ledger item (any status) whose slug matches this branch
-                for ledger in "$BD_REPORTS_DIR"/burndown-batch-*.json; do
-                    [ -e "$ledger" ] || continue
-                    jq -r --arg b "$wbranch" \
-                        '.items[] | select(.slug == $b) | .issue_num | tostring' \
-                        "$ledger" 2>/dev/null | \
-                    while IFS= read -r wn; do
-                        [ -n "$wn" ] && printf '%s\tworktree %s\n' "$wn" "$wbranch" >> "$out"
-                    done
-                done
-                # Issues from ~/claude-plans/<branch>.md
-                local wplan="$BD_PLANS_DIR/$wbranch.md"
-                if [ -f "$wplan" ]; then
-                    grep -oE 'IBL5-backlog#[0-9]+' "$wplan" 2>/dev/null | \
-                    while IFS= read -r wmatch; do
-                        local wn="${wmatch##*#}"
-                        [ -n "$wn" ] && printf '%s\tworktree %s\n' "$wn" "$wbranch" >> "$out"
-                    done
-                fi
-            fi
-        done <<< "$wt_out"
-    fi
+    while IFS=$'\t' read -r wpath wbranch; do
+        [ -n "$wbranch" ] || continue
+        local wnums="" wplan="$BD_PLANS_DIR/$wbranch.md" wstate
+        for ledger in "$BD_REPORTS_DIR"/burndown-batch-*.json; do
+            [ -e "$ledger" ] || continue
+            wnums+="$(jq -r --arg b "$wbranch" \
+                '.items[] | select(.slug == $b) | .issue_num | tostring' \
+                "$ledger" 2>/dev/null)"$'\n'
+        done
+        if [ -f "$wplan" ]; then
+            wnums+="$(grep -oE 'IBL5-backlog#[0-9]+' "$wplan" 2>/dev/null \
+                | sed 's/.*#//')"$'\n' || true
+        fi
+        grep -q '[0-9]' <<< "$wnums" || continue
+        wstate="$(bd_wt_state "$wpath" "$wbranch")"
+        [ "$wstate" = idle ] && continue
+        while IFS= read -r wn; do
+            [ -n "$wn" ] && printf '%s\tworktree %s\n' "$wn" "$wbranch" >> "$out"
+        done <<< "$wnums"
+    done <<< "$wt_list"
 }
 
 # bd_issue_is_open <num> <issues_file> — exit 0 if open
@@ -303,7 +348,8 @@ bd_paths_for() {
         || bd_die 3 "bd_paths_for called before bd_load_repo_files"
     local fl bare base tab
     tab="$(printf '\t')"
-    fl="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//')" || true
+    # Drop absolute candidates: "~/x.md:5" matches as "/x.md:5", never a repo path.
+    fl="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//' | grep -v '^/')" || true
     bare="$(grep -oE '[A-Za-z0-9_./-]*/[A-Za-z0-9_./-]*' <<< "$1" \
         | sed -e 's#^\./##' -e 's/[.,;]*$//' | LC_ALL=C sort -u \
         | LC_ALL=C comm -12 - "$BD_REPO_FILES")" || true
@@ -740,6 +786,13 @@ bd_cmd_burndown() {
     if [ "$used" -eq 0 ]; then
         printf 'LEDGER: none\n'
         [ "$BD_LIVE_UNKNOWN" -eq 0 ] || return 1
+        # Empty-backlog sentinel: bin/burndown-loop exports a batch-scoped
+        # path and treats a batch as empty only when this file exists. First
+        # selection round only (no --after); unset or empty var = no-op.
+        if [ -n "${IBL5_BURNDOWN_EMPTY_SENTINEL:-}" ] && [ -z "$afters" ]; then
+            printf 'LEDGER: none\n' > "$IBL5_BURNDOWN_EMPTY_SENTINEL" 2>/dev/null \
+                || printf 'burndown: cannot write empty sentinel %s\n' "$IBL5_BURNDOWN_EMPTY_SENTINEL" >&2
+        fi
         return 0
     fi
 
@@ -948,7 +1001,7 @@ bd_cmd_record() {
     jq -e --argjson n "$issue_num" 'any(.items[]; .issue_num == $n)' "$ledger" \
         >/dev/null 2>&1 || bd_die 2 "no item #$issue_num in $ledger"
 
-    local kv route="" slug="" status="" pr_url="" reason="" blocked_by="" applied_keys=""
+    local kv route="" slug="" status="" pr_url="" reason="" blocked_by="" why="" applied_keys=""
     while [ $# -gt 0 ]; do
         kv="$1"; shift
         local k="${kv%%=*}" v="${kv#*=}"
@@ -981,12 +1034,18 @@ bd_cmd_record() {
                 [[ "$v" =~ ^[1-9][0-9]{0,6}$ ]] \
                     || bd_die 2 "blocked_by=$v rejected: must be a PR number"
                 blocked_by="$v" ;;
+            why)
+                { [ -n "$v" ] && [ "${#v}" -le 200 ] && [[ "$v" != *[[:cntrl:]]* ]]; } \
+                    || bd_die 2 "why= rejected: must be non-empty single-line text of at most 200 chars"
+                why="$v" ;;
             *)
                 bd_die 2 "$k=$v rejected: unknown key $k" ;;
         esac
         applied_keys="${applied_keys} ${kv}"
     done
     bd_validate_skip_args "$reason" "$blocked_by"
+    [ -z "$why" ] || [ -z "$reason" ] \
+        || bd_die 2 "why= and reason= are exclusive: reason= writes its own skip text"
 
     # Build patch object
     local patch="{}"
@@ -996,6 +1055,15 @@ bd_cmd_record() {
     [ -z "$pr_url" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$pr_url"  '$p+{pr_url:$v}')"
     [ -z "$reason" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$reason"  '$p+{skip_label:$v}')"
     [ -z "$blocked_by" ] || patch="$(jq -n --argjson p "$patch" --argjson v "$blocked_by" '$p+{blocked_by:$v}')"
+    local reason_text=""
+    if [ "$reason" = "$BD_LABEL_BLOCKED" ]; then
+        reason_text="skip-label: blocked (PR #$blocked_by)"
+    elif [ -n "$reason" ]; then
+        reason_text="skip-label: $reason"
+    else
+        reason_text="$why"
+    fi
+    [ -z "$reason_text" ] || patch="$(jq -n --argjson p "$patch" --arg v "$reason_text" '$p+{reason:$v}')"
 
     # Cross-field rules (preview the patched item without writing)
     local preview_item new_status new_route
@@ -1008,7 +1076,15 @@ bd_cmd_record() {
     [ "$new_status" != "shipped" ] || [ "$new_route" = "ad-hoc" ] \
         || bd_die 2 "status=shipped requires route=ad-hoc"
     [ -z "$reason" ] || [ "$new_status" = "skipped" ] || bd_die 2 "reason requires status=skipped"
+    [ -z "$why" ] || [ "$new_status" = "skipped" ] || bd_die 2 "why requires status=skipped"
+    if [ "$status" = "skipped" ] \
+        && [ -z "$(jq -r '.reason // ""' <<< "$preview_item")" ]; then
+        bd_die 2 "status=skipped needs a reason: pass why=<text> (or reason=blocked|out-of-repo)"
+    fi
     if [ "$new_status" = "closed-fixed" ]; then
+        patch="$(jq -n --argjson p "$patch" '$p+{cost:0}')"
+    fi
+    if [ "$new_status" = "skipped" ] && [ "$new_route" != "ad-hoc" ]; then
         patch="$(jq -n --argjson p "$patch" '$p+{cost:0}')"
     fi
 
@@ -1339,16 +1415,85 @@ bd_sweep_queued() {
         && [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
         && [[ "$created" < "$BD_SWEEP_CUTOFF" ]]; then
         if [ -e "$BD_PLANS_DIR/$slug.md" ]; then
-            printf 'STALE-PLAN #%s %s (plan file, no queue entry, no PR; not flipped)\n' \
-                "$issue_num" "$slug"
+            # A closed issue means the work landed under another branch or was dropped,
+            # so the plan file no longer holds anything. Retire the row; never on a gh failure.
+            local view_raw="" istate=""
+            if view_raw="$("$GH" issue view "$issue_num" --repo "$REPO" --json state 2>/dev/null)"; then
+                istate="$(jq -r '.state // ""' <<< "$view_raw" 2>/dev/null)" || istate=""
+            fi
+            if [ "$istate" = "CLOSED" ]; then
+                bd_record_apply "$ledger" "$issue_num" \
+                    '{"status":"skipped","cost":0,"reason":"sweep: stale plan, issue already closed"}'
+                printf 'RETIRED #%s %s -> skipped (stale plan, issue closed)\n' \
+                    "$issue_num" "$slug"
+            else
+                printf 'STALE-PLAN #%s %s (plan file, no queue entry, no PR; not flipped)\n' \
+                    "$issue_num" "$slug"
+            fi
         else
-            bd_record_apply "$ledger" "$issue_num" '{"status":"skipped"}'
+            bd_record_apply "$ledger" "$issue_num" \
+                '{"status":"skipped","cost":0,"reason":"sweep: zombie queued item (no plan, no queue entry, no PR)"}'
             printf 'ZOMBIE #%s %s -> skipped (no plan, no queue entry, no PR)\n' \
                 "$issue_num" "$slug"
         fi
         return 0
     fi
     printf 'WAIT #%s queued\n' "$issue_num"
+}
+
+# bd_sweep_picked <ledger> <item> <issue_num> — flip a zombie picked item to skipped,
+# else WAIT. Zombie: status picked, empty route, empty slug, ledger .created valid and
+# strictly older than BD_SWEEP_CUTOFF. A picked row with no route and no slug was never
+# routed by /burndown and holds its issue in bd_inflight forever.
+bd_sweep_picked() {
+    local ledger="$1" item="$2" issue_num="$3" slug route status created
+    slug="$(jq -r '.slug // ""' <<< "$item")"
+    route="$(jq -r '.route // ""' <<< "$item")"
+    status="$(jq -r '.status // ""' <<< "$item")"
+    created="$(jq -r '.created // ""' "$ledger")"
+    if [ "$status" = "picked" ] && [ -z "$route" ] && [ -z "$slug" ] \
+        && [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
+        && [[ "$created" < "$BD_SWEEP_CUTOFF" ]]; then
+        bd_record_apply "$ledger" "$issue_num" \
+            '{"status":"skipped","cost":0,"reason":"sweep: zombie picked item (no route, no slug, ledger older than 24h)"}'
+        printf 'ZOMBIE-PICK #%s -> skipped (no route, no slug, ledger older than 24h)\n' \
+            "$issue_num"
+        return 0
+    fi
+    printf 'WAIT #%s unrouted\n' "$issue_num"
+}
+
+# bd_held_item <ledger> <item> <issue_num> — print a HELD line for a skipped ad-hoc item
+# whose live worktree still carries unshipped work (dirty or ahead of origin/master, no PR)
+# and whose ledger is older than 24h. Prints HELD-UNKNOWN when the probe fails, so a
+# held tree is never silently dropped. Read-only: never writes the ledger.
+# Needs BD_SWEEP_CUTOFF (bd_sweep_cutoff) and BD_WT_LIST / BD_WT_LIST_RC (bd_wt_list).
+bd_held_item() {
+    local ledger="$1" item="$2" issue_num="$3" route slug created
+    local wpath="" p b state dirty ahead
+    [ "${BD_WT_LIST_RC:-1}" -eq 0 ] || return 0
+    route="$(jq -r '.route // ""' <<< "$item")"
+    slug="$(jq -r '.slug // ""' <<< "$item")"
+    [ "$route" = ad-hoc ] && [ -n "$slug" ] || return 0
+    created="$(jq -r '.created // ""' "$ledger")"
+    [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
+        && [[ "$created" < "$BD_SWEEP_CUTOFF" ]] || return 0
+    while IFS=$'\t' read -r p b; do
+        [ "$b" = "$slug" ] && wpath="$p"
+    done <<< "$BD_WT_LIST"
+    [ -n "$wpath" ] || return 0
+    state="$(bd_wt_state "$wpath" "$slug")"
+    case "$state" in
+        held*)
+            IFS=$'\t' read -r _ dirty ahead <<< "$state"
+            printf 'HELD #%s %s (%s, %s ahead, no PR)\n' "$issue_num" "$wpath" \
+                "$([ "$dirty" = 1 ] && echo dirty || echo clean)" "$ahead"
+            ;;
+        unknown*)
+            printf 'HELD-UNKNOWN #%s %s (%s)\n' "$issue_num" "$wpath" "${state#unknown$'\t'}"
+            ;;
+    esac
+    return 0
 }
 
 # bd_close_ledger <ledger> <caller> <mode> — per-ledger merge handling shared by
@@ -1366,6 +1511,9 @@ bd_close_ledger() {
         route="$(jq -r '.route // ""' <<< "$item")"
         n=$((n + 1))
 
+        if [ "$mode" = sweep ] && [ "$ledger_status" = skipped ]; then
+            bd_held_item "$ledger" "$item" "$issue_num"
+        fi
         case "$ledger_status" in merged|closed-fixed|skipped) continue ;; esac
 
         local live_line live_state live_pr
@@ -1402,6 +1550,10 @@ bd_close_ledger() {
                     ;;
                 queued)
                     bd_sweep_queued "$ledger" "$item" "$issue_num"
+                    continue
+                    ;;
+                unrouted)
+                    bd_sweep_picked "$ledger" "$item" "$issue_num"
                     continue
                     ;;
             esac
@@ -1499,11 +1651,38 @@ bd_cmd_sweep() {
         jq -e '.items | type == "array"' "$f" >/dev/null 2>&1 \
             || bd_die 3 "malformed ledger $f"
     done
+    BD_WT_LIST_RC=0
+    BD_WT_LIST="$(bd_wt_list)" || BD_WT_LIST_RC=$?
+    [ "$BD_WT_LIST_RC" -eq 0 ] \
+        || printf 'HELD-SCAN unavailable (git worktree list failed)\n'
     for f in "${files[@]}"; do
         printf 'ledger %s\n' "$(basename "$f")"
         bd_close_ledger "$f" burndown-sweep sweep || any_fail=1
     done
     [ "$any_fail" -eq 0 ]
+}
+
+# bd_cmd_held — read-only: print HELD / HELD-UNKNOWN lines across every ledger and nothing
+# else (no ledger headers, no merges, no closes). Empty output means nothing is held.
+bd_cmd_held() {
+    [ $# -eq 0 ] || bd_die 2 "burndown-held takes no arguments"
+    bd_sweep_cutoff
+    BD_WT_LIST_RC=0
+    BD_WT_LIST="$(bd_wt_list)" || BD_WT_LIST_RC=$?
+    [ "$BD_WT_LIST_RC" -eq 0 ] || bd_die 3 "git worktree list failed"
+    local f item issue_num lines=""
+    for f in "$BD_REPORTS_DIR"/burndown-batch-*.json; do
+        [ -f "$f" ] || continue
+        jq -e '.items | type == "array"' "$f" >/dev/null 2>&1 \
+            || bd_die 3 "malformed ledger $f"
+        while IFS= read -r item; do
+            [ -n "$item" ] || continue
+            issue_num="$(jq -r '.issue_num' <<< "$item")"
+            lines+="$(bd_held_item "$f" "$item" "$issue_num")"$'\n'
+        done < <(jq -c '.items[] | select(.status == "skipped")' "$f")
+    done
+    printf '%s' "$lines" | awk 'NF && !seen[$0]++'
+    return 0
 }
 
 bd_main() {
@@ -1519,6 +1698,7 @@ bd_main() {
         burndown-status)       bd_cmd_status       "$@" ;;
         burndown-close-merged) bd_cmd_close_merged "$@" ;;
         burndown-sweep)        bd_cmd_sweep        "$@" ;;
+        burndown-held)         bd_cmd_held         "$@" ;;
         burndown-launch)       bd_cmd_launch       "$@" ;;
         *)                     bd_die 2 "unknown burndown subcommand: $cmd" ;;
     esac

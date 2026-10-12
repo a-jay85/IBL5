@@ -211,7 +211,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-06-15');
 
         if ($expectsDate) {
-            $this->assertNotEmpty($result);
+            $this->assertNotSame('', $result);
             $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $result);
         } else {
             $this->assertSame('', $result);

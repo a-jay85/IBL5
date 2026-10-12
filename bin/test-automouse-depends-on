@@ -13,17 +13,17 @@
 # Run: bin/test-automouse-depends-on  (exit 0 = all pass, 1 = any case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-FAILED=0
+h_tmp TMP
 
 # ── Assertion helpers ─────────────────────────────────────────────────────────
 
-ok()   { echo "ok: $1"; }
-fail() { echo "FAIL: $1"; FAILED=1; }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 assert_eq() {
     local desc="$1" got="$2" expected="$3"
@@ -342,6 +342,12 @@ echo ""
 echo "# Section 3: self-heal cases"
 
 SELF_HEAL="$REPO_ROOT/bin/automouse/self-heal"
+# Never let these runs sweep orphan watchers: the default knobs match any
+# reparented bin/automouse/run, including bin/test-automouse-self-heal's
+# fixtures when the CI runner runs both tests in parallel.
+export AUTOMOUSE_ORPHAN_ARGV_RE='^no-orphan-sweep-in-this-test$'
+# Phase 3 seam: skip the real bin/check-plan; these fixtures carry no Verification Matrix.
+export AUTOMOUSE_CHECK_PLAN=/usr/bin/true
 
 heal_setup() {
     rm -rf "$TMP/heal"
@@ -431,8 +437,7 @@ if [ "$(uname)" != "Darwin" ]; then
     echo "# Section 2: skipping macOS-only run-loop cases (uname=$(uname))"
     echo "SKIP: run-loop cases skipped on non-Darwin"
     echo ""
-    echo "# Results: $FAILED failed"
-    exit "$FAILED"
+    exit "$((H_FAIL > 0 ? 1 : 0))"
 fi
 
 echo ""
@@ -704,8 +709,9 @@ assert_eq "P1: post-plan-now invoked exactly once (loop stopped, no re-claim)" \
 assert_present "P1: fast failure → plan stays in queue/" "$E2_NDIR/queue/ppfast.md"
 assert_absent  "P1: fast failure → plan NOT moved to done/" "$E2_NDIR/done/ppfast.md"
 assert_absent  "P1: fast failure → plan NOT moved to skipped/" "$E2_NDIR/skipped/ppfast.md"
-# run:2204 already cleared .attempts at impl handoff, so this absence alone does
-# not prove a refund. The "Refunding attempt, stopping loop" want below pins it.
+# Impl handoff seeds .attempts to 1, so this absence proves refund_attempt ran
+# (a refund of 1 removes the file). The "Refunding attempt, stopping loop" want
+# below pins the log side of the same refund.
 assert_absent  "P1: fast failure → no .attempts counter left behind" \
     "$E2_NDIR/queue/ppfast.md.attempts"
 P1_REPORT="$(ls "$E2_NDIR/reports"/*-env-stop-*ppfast*.md 2>/dev/null | head -1)"
@@ -768,11 +774,11 @@ assert_eq "P2: post-plan-now invoked exactly once (single-plan mode, no retry)" 
 assert_present "P2: genuine failure → plan stays in queue/ for retry" "$E2_NDIR/queue/ppslow.md"
 assert_absent  "P2: genuine failure → plan NOT filed to done/" "$E2_NDIR/done/ppslow.md"
 assert_absent  "P2: genuine failure → plan NOT moved to skipped/" "$E2_NDIR/skipped/ppslow.md"
-# The runner clears .attempts when impl writes its handoff (run:2204), before
-# postplan starts, so a postplan failure leaves no counter. The env-stop report
-# and Environmental line below are what separate this path from the breaker.
-assert_absent  "P2: genuine failure → impl-success reset left no .attempts counter" \
-    "$E2_NDIR/queue/ppslow.md.attempts"
+# Impl handoff seeds .attempts to 1 (the impl run's post-plan is attempt 1), so
+# a genuine post-plan failure leaves the counter at 1, never absent. The env-stop
+# report and Environmental line below separate this path from the breaker.
+assert_eq "P2: genuine failure → impl run's post-plan counted as attempt 1" \
+    "$(cat "$E2_NDIR/queue/ppslow.md.attempts" 2>/dev/null)" "1"
 P2_REPORT="$(ls "$E2_NDIR/reports"/*-env-stop-*ppslow*.md 2>/dev/null | head -1)"
 if [ -z "$P2_REPORT" ]; then
     ok "P2: no env-stop report for a genuine failure"
@@ -798,8 +804,33 @@ GOT_P3="$( export NIGHTLY_DIR="$E2_NDIR" GH="$E2_GH"
            plan_depends_on_status "$E2_NDIR/queue/ppdep.md" )"
 assert_eq "P3: dependent of a failed post-plan resolves unmet:ppslow" "$GOT_P3" "unmet:ppslow"
 
+# P4 — multi-run cap over P2's real state: ppslow sits in queue/ with its
+# handoff and .attempts=1 after P2. Each `plan ppslow` resumes (impl skipped)
+# and runs post-plan once. MAX_ATTEMPTS=3 must give post-plan exactly 3 runs in
+# total: P2's run, then resumes 2 and 3; the 4th claim files it to skipped/.
+# $E2_TRACE is not reset here, so its postplan-fail count is cumulative.
+rm -f "$E2_NDIR/queue/ppdep.md"
+p4_resume() {
+    GH="$E2_GH" NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+    timeout 30 "$E2_RUNNER_SF" plan ppslow > /dev/null 2>&1 || true
+}
+p4_resume
+assert_eq "P4: resume 1 → .attempts reads 2" \
+    "$(cat "$E2_NDIR/queue/ppslow.md.attempts" 2>/dev/null)" "2"
+assert_eq "P4: resume 1 → post-plan invoked 2 times in total" \
+    "$(grep -c 'ppslow.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "2"
+p4_resume
+assert_eq "P4: resume 2 → .attempts reads 3" \
+    "$(cat "$E2_NDIR/queue/ppslow.md.attempts" 2>/dev/null)" "3"
+assert_present "P4: resume 2 → plan still in queue/" "$E2_NDIR/queue/ppslow.md"
+p4_resume
+assert_present "P4: claim at cap → plan moved to skipped/" "$E2_NDIR/skipped/ppslow.md"
+assert_absent  "P4: claim at cap → plan gone from queue/" "$E2_NDIR/queue/ppslow.md"
+assert_eq "P4: post-plan invoked exactly MAX_ATTEMPTS=3 times across all runs" \
+    "$(grep -c 'ppslow.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "3"
+
 # ── Final summary ─────────────────────────────────────────────────────────────
 
 echo ""
-echo "# Results: $FAILED failed"
-exit "$FAILED"
+h_done

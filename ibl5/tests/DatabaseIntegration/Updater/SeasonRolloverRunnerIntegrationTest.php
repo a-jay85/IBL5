@@ -31,11 +31,11 @@ class SeasonRolloverRunnerIntegrationTest extends DatabaseTestCase
 
         // DatabaseTestCase::tearDown() rolls the transaction back, restoring these rows.
         $this->db->query(
-            "UPDATE `ibl_settings` SET value = '2026'"
+            "UPDATE `ibl_settings` SET setting_value = '2026'"
             . " WHERE setting_key = 'Current Season Ending Year' AND league = 'ibl'"
         );
         $this->db->query(
-            "UPDATE `ibl_settings` SET value = 'Regular Season'"
+            "UPDATE `ibl_settings` SET setting_value = 'Regular Season'"
             . " WHERE setting_key = 'Current Season Phase' AND league = 'ibl'"
         );
 
@@ -100,7 +100,7 @@ class SeasonRolloverRunnerIntegrationTest extends DatabaseTestCase
 
         // Reset only the season year; the cash marker stays at 2027.
         $this->db->query(
-            "UPDATE `ibl_settings` SET value = '2026'"
+            "UPDATE `ibl_settings` SET setting_value = '2026'"
             . " WHERE setting_key = 'Current Season Ending Year' AND league = 'ibl'"
         );
 
@@ -138,8 +138,8 @@ class SeasonRolloverRunnerIntegrationTest extends DatabaseTestCase
         // Guarantee both Olympics rows exist so the comparison is never null-vs-null.
         foreach (['Current Season Ending Year', self::MARKER_KEY] as $key) {
             $stmt = $this->db->prepare(
-                "INSERT INTO `ibl_settings` (setting_key, value, league) VALUES (?, '2003', 'olympics')"
-                . " ON DUPLICATE KEY UPDATE value = '2003'"
+                "INSERT INTO `ibl_settings` (setting_key, setting_value, league) VALUES (?, '2003', 'olympics')"
+                . " ON DUPLICATE KEY UPDATE setting_value = '2003'"
             );
             self::assertNotFalse($stmt, 'Failed to prepare Olympics seed: ' . $this->db->error);
             $stmt->bind_param('s', $key);
@@ -267,7 +267,7 @@ class SeasonRolloverRunnerIntegrationTest extends DatabaseTestCase
     private function readLeagueSetting(string $key, string $league): ?string
     {
         $stmt = $this->db->prepare(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ?"
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ?"
         );
         self::assertNotFalse($stmt, 'Failed to prepare readLeagueSetting: ' . $this->db->error);
         $stmt->bind_param('ss', $key, $league);
@@ -275,13 +275,13 @@ class SeasonRolloverRunnerIntegrationTest extends DatabaseTestCase
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        return is_array($row) ? (string) $row['value'] : null;
+        return is_array($row) ? (string) $row['setting_value'] : null;
     }
 
     private function setMarker(string $year): void
     {
         $stmt = $this->db->prepare(
-            "UPDATE `ibl_settings` SET value = ?"
+            "UPDATE `ibl_settings` SET setting_value = ?"
             . " WHERE setting_key = 'Cash Considerations Last Advanced Year' AND league = 'ibl'"
         );
         self::assertNotFalse($stmt, 'Failed to prepare setMarker: ' . $this->db->error);
@@ -293,7 +293,7 @@ class SeasonRolloverRunnerIntegrationTest extends DatabaseTestCase
     private function readMarker(): ?string
     {
         $stmt = $this->db->prepare(
-            "SELECT value FROM `ibl_settings`"
+            "SELECT setting_value FROM `ibl_settings`"
             . " WHERE setting_key = 'Cash Considerations Last Advanced Year' AND league = 'ibl'"
         );
         self::assertNotFalse($stmt, 'Failed to prepare readMarker: ' . $this->db->error);
@@ -301,7 +301,7 @@ class SeasonRolloverRunnerIntegrationTest extends DatabaseTestCase
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        return is_array($row) ? (string) $row['value'] : null;
+        return is_array($row) ? (string) $row['setting_value'] : null;
     }
 
     private function readCy(string $label): int

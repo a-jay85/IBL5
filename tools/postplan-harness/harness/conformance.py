@@ -214,6 +214,18 @@ def _touched(tok: str, changed_files: list[str]) -> bool:
     return False
 
 
+def _rooted_match(tok: str, files: list[str]) -> bool:
+    """Exact, path-suffix, or directory-prefix match only. Used for a citation that was
+    written with a leading `/`: `/ibl5/modules.php` and `/modules.php` match tracked
+    `ibl5/modules.php`; `/post-plan` does NOT match `.claude/skills/post-plan/SKILL.md`
+    (a parent-dir-name hit is what _touched accepts and what made a slash command look
+    like a repo path)."""
+    tok = tok.strip().lstrip("/").rstrip("/")
+    if not tok:
+        return False
+    return any(f == tok or f.endswith("/" + tok) or f.startswith(tok + "/") for f in files)
+
+
 @functools.lru_cache(maxsize=4)
 def _tracked_files(repo_root: str = _HARNESS_REPO_ROOT) -> tuple[str, ...] | None:
     """`git ls-files` of repo_root, or None when git is unavailable (fail closed upstream)."""
@@ -225,18 +237,54 @@ def _tracked_files(repo_root: str = _HARNESS_REPO_ROOT) -> tuple[str, ...] | Non
 
 
 def _repo_path_candidates(evidence: list[str], changed_files: list[str],
-                          tracked: tuple[str, ...] | list[str] | None) -> list[str]:
+                          tracked: tuple[str, ...] | list[str] | None,
+                          dropped: list[str] | None = None) -> list[str]:
     """Citations that could name a repo path. tracked=None keeps every citation (fail closed)."""
     if tracked is None:
         return list(evidence)
     tracked_list = list(tracked)
-    return [p for p in evidence
-            if _touched(p, changed_files) or _touched(p, tracked_list)]
+    out: list[str] = []
+    for p in evidence:
+        if p.startswith("~/"):
+            if dropped is not None:
+                dropped.append(p)
+            continue
+        if p.startswith("/"):
+            if _rooted_match(p, changed_files) or _rooted_match(p, tracked_list):
+                out.append(p)
+            elif dropped is not None:
+                dropped.append(p)
+            continue
+        if _touched(p, changed_files) or _touched(p, tracked_list):
+            out.append(p)
+    return out
 
 
 def _note(notes: list[str] | None, line: str) -> None:
     if notes is not None:
         notes.append(line)
+
+
+def _heading_named_change(words: list[str], changed_files: list[str],
+                          tracked: tuple[str, ...] | list[str] | None) -> tuple[str, str] | None:
+    """(word, tracked_path) when a heading word names a file by a basename that is unique in
+    `tracked` and that unique path is in the diff; else None. A word qualifies only when it
+    carries a `.` or equals a repo-root tracked file name (`Dockerfile`, `Makefile`), so a
+    plain word never names a file. tracked=None (git unavailable) never clears."""
+    if tracked is None or not words:
+        return None
+    by_base: dict[str, list[str]] = {}
+    for f in tracked:
+        by_base.setdefault(PurePosixPath(f).name, []).append(f)
+    root_files = {f for f in tracked if "/" not in f}
+    changed = set(changed_files)
+    for w in words:
+        if "." not in w and w not in root_files:
+            continue
+        paths = by_base.get(w, [])
+        if len(paths) == 1 and paths[0] in changed:
+            return (w, paths[0])
+    return None
 
 
 def phase_omission_items(plan: PlanInfo, changed_files: list[str],
@@ -250,7 +298,9 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
     path at all (no evidence = cannot verify = skip), and a phase none of whose citations
     can name a repo path (uncheckable). A citation is a repo-path candidate when `_touched`
     matches it against the diff or against `git ls-files`; a mixed phase is checked on its
-    candidates alone. `tracked_files=None` reads `_tracked_files()` and, when that is
+    candidates alone. A phase that would hold is cleared when a bare word in its HEADING
+    names a tracked file by a basename unique in `git ls-files` and that file is in the
+    diff (`HEADING-NAMED-PHASE:` note); the word must carry a `.` or be a repo-root file name. `tracked_files=None` reads `_tracked_files()` and, when that is
     unavailable, keeps every citation a candidate (fail closed, today's behaviour); an
     explicit empty list means nothing is tracked. Empty when the plan was not found or has
     no parsed phases, so a plan-blind run and every pre-existing PlanInfo literal produce
@@ -258,7 +308,7 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
     fidelity.build_work_list excludes them from the fixer loop.
 
     `notes` is an out-param like `resolutions` on `check`. Each exemption appends one
-    `NO-DIFF-PHASE:` / `UNCHECKABLE-PHASE:` line, and a rejected marker appends
+    `NO-DIFF-PHASE:` / `UNCHECKABLE-PHASE:` / `NON-REPO-CITATION:` line, and a rejected marker appends
     `NO-DIFF-IGNORED:`. Notes are never returned as items, so they never hold a PR.
     """
     if not plan.found or not plan.phases:
@@ -278,7 +328,11 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
         if not ph.evidence_paths:
             continue
         tracked = tracked_files if tracked_files is not None else _tracked_files()
-        cands = _repo_path_candidates(ph.evidence_paths, changed_files, tracked)
+        dropped: list[str] = []
+        cands = _repo_path_candidates(ph.evidence_paths, changed_files, tracked, dropped)
+        for tok in dropped:
+            _note(notes, f"NON-REPO-CITATION: {ph.number} — {tok[:80]} "
+                         f"(leading / or ~/ and no exact, suffix, or directory match)")
         if not cands:
             sample = ", ".join(ph.evidence_paths[:3])
             more = f" (+{len(ph.evidence_paths) - 3} more)" if len(ph.evidence_paths) > 3 else ""
@@ -286,6 +340,11 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
                          f"(no repo-path citation among {sample}{more})")
             continue
         if any(_touched(p, changed_files) for p in cands):
+            continue
+        named = _heading_named_change(ph.heading_words, changed_files, tracked)
+        if named:
+            _note(notes, f"HEADING-NAMED-PHASE: {ph.number} — {ph.heading[:80]} "
+                         f"(heading names {named[0]}, changed as {named[1]})")
             continue
         sample = ", ".join(cands[:3])
         more = f" (+{len(cands) - 3} more)" if len(cands) > 3 else ""
@@ -345,10 +404,26 @@ def _method_declared(name: str, text: str) -> bool:
     ) is not None
 
 
+def _label_present(name: str, text: str) -> bool:
+    """True when the hyphenated test-case label `name` appears whole in `text`.
+
+    A bash test-case label (`step67-skipped-no-plan`) is never a `function`/`def`
+    declaration; it shows up as a `case` arm, a `run_case` argument, or a fixture name.
+    The match is bounded on both sides by a non-label character so `step67-clean` does
+    not satisfy `step67-clean-extended` and a dash-segment prefix never counts."""
+    return re.search(
+        rf"(?<![A-Za-z0-9_-]){re.escape(name)}(?![A-Za-z0-9_-])", text) is not None
+
+
+def _required_name_present(name: str, text: str) -> bool:
+    """Dispatch: a hyphenated label is checked by literal presence, anything else by declaration."""
+    return _label_present(name, text) if "-" in name else _method_declared(name, text)
+
+
 def _method_in_changed_tree(name: str, changed_files: list[str],
                             read_file: Callable[[str], str | None],
                             cache: dict[str, str | None]) -> str | None:
-    """The first changed path whose PR-tree text declares `name`, else None.
+    """The first changed path whose PR-tree text declares `name` (or, for a hyphenated label, whose text contains it whole), else None.
 
     Reads ONLY paths from `changed_files`: a method that exists untouched elsewhere in
     the repo must still be MISSING-METHOD, or "write new test X" passes when X was never
@@ -362,9 +437,21 @@ def _method_in_changed_tree(name: str, changed_files: list[str],
             except Exception:
                 cache[path] = None
         text = cache[path]
-        if text and _method_declared(name, text):
+        if text and _required_name_present(name, text):
             return path
     return None
+
+
+def _run_only_tracked(tok: str, tracked: set[str]) -> bool:
+    """True when a `(run-only)` token names a tracked file, or a tracked directory
+    (a `-snapshots` dir is a token; `git ls-files` lists only the files inside it).
+    Exact repo-relative match on purpose: bin/check-plan gate [RO] already demands the
+    base-branch path, so a suffix or basename tolerance here would only widen the
+    arming-condition-(3) exemption past what the authoring gate checked."""
+    if tok in tracked:
+        return True
+    prefix = tok.rstrip("/") + "/"
+    return any(p.startswith(prefix) for p in tracked)
 
 
 def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
@@ -379,6 +466,10 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
 
     A planned token listed in `plan.no_change_test_paths` (every planning row is a
     Visual-regression row marked `(no-change)`) never yields `MISSING:`.
+
+    A planned token listed in `plan.run_only_test_paths` (every planning row marked
+    `(run-only)`) is skipped only when it names a tracked file or directory; otherwise
+    MISSING is kept and a `RUN-ONLY-REFUSED:` note records why.
 
     `UNMET-CONTRACT:` items are produced even when the plan has no Verification
     Matrix — a matrix-less doc/tooling plan is exactly what `evidence-present`
@@ -395,12 +486,17 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     each token that matched by suffix or basename rather than exactly.
 
     tracked_files and notes are forwarded to phase_omission_items (see there); notes,
-    when a list is passed, collects the phase exemption lines.
+    when a list is passed, collects the phase exemption lines (including one
+    NON-REPO-CITATION: line per dropped citation).
 
     read_file, when given, is called with each path in changed_files to fetch that file's
     text from the PR tree; a required method the diff hunks never show but a changed file
     declares is then present (PRs #2708, #2772, #2707). None (the default) disables the
     fallback. Only changed files are read, never the whole repo.
+
+    A required name containing `-` (a bash test-case label from a hyphenated Required Test
+    Methods bullet) is satisfied by its whole-token literal presence in the diff or a
+    changed file; a `function`/`def` declaration is required for every other name.
     """
     if not plan.found:
         return []
@@ -410,6 +506,7 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     items.extend(phase_omission_items(plan, changed_files, tracked_files, notes))
     if not plan.has_matrix:
         return items
+    _tracked: set[str] | None = None  # lazy; only a (run-only) miss pays for git ls-files
     for t in plan.planned_test_paths:
         if t in plan.no_change_test_paths:
             # Every row planning this token is a Visual-regression row marked
@@ -420,6 +517,18 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
             continue
         hit = _resolve(t, changed_files)
         if hit is None:
+            if t in plan.run_only_test_paths:
+                # Every row planning this token is marked `(run-only)`: the plan
+                # runs an existing test and writes nothing, so an absent diff entry
+                # is the pass condition. Honored only for a file tracked in the PR
+                # tree; git unavailable (tracked None) keeps MISSING (fail closed).
+                if _tracked is None:
+                    _tr = tracked_files if tracked_files is not None else _tracked_files()
+                    _tracked = set(_tr) if _tr is not None else set()
+                if _run_only_tracked(t, _tracked):
+                    _note(notes, f"RUN-ONLY: {t} — every planning row marked (run-only) and the file is tracked; MISSING skipped")
+                    continue
+                _note(notes, f"RUN-ONLY-REFUSED: {t} — marked (run-only) but not a tracked file; MISSING kept")
             items.append(f"MISSING: {t} (matrix planned a test the diff never wrote)")
         elif resolutions is not None and hit != t:
             resolutions[t] = hit
@@ -434,7 +543,7 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     if diff_body:
         tree_cache: dict[str, str | None] = {}
         for m in plan.required_test_methods:
-            if _method_declared(m, diff_body):
+            if _required_name_present(m, diff_body):
                 continue
             if read_file is not None:
                 where = _method_in_changed_tree(m, changed_files, read_file, tree_cache)
@@ -483,6 +592,19 @@ def _changed_files(repo_root: str) -> list[str]:
             if path not in seen:
                 seen.append(path)
     return seen
+
+
+def early_missing_items(plan: PlanInfo, changed_files: list[str]) -> list[str]:
+    """The LLM-free, diff-content-free slice of condition 3.
+
+    Runs `check()` with no diff body and no Phase 5 status, then keeps only
+    `MISSING:` and `MISSING-FILE:` items. `MISSING-METHOD:`, `UNMET-CONTRACT`,
+    `UNREALISED-ASSERTION` and `MISSING-PHASE` need inputs that exist only
+    later in a run, so they are excluded by construction.
+    """
+    raw = check(plan, changed_files, diff_body="", phase5_status=None)
+    return [i for i in raw
+            if i.startswith("MISSING:") or i.startswith("MISSING-FILE:")]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -539,9 +661,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"conformance: plan not readable as a plan file: {plan_path}",
               file=sys.stderr)
         return 2
-    raw = check(plan, _changed_files(repo_root), diff_body="", phase5_status=None)
-    items = [i for i in raw
-             if i.startswith("MISSING:") or i.startswith("MISSING-FILE:")]
+    items = early_missing_items(plan, _changed_files(repo_root))
     for item in items:
         print(item)
     return 1 if items else 0

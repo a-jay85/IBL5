@@ -33,9 +33,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
         int $maxYearOneSalary,
         ?string $cardHtml = null
     ): string {
-        $playerName = HtmlSanitizer::e($player->getName() ?? '');
         $playerID = $player->getPlayerID() ?? 0;
-        $teamName = HtmlSanitizer::e($player->getTeamName() ?? '');
 
         // Check if player demands exceed max
         $demandsExceedMax = $demands['year1'] >= $maxYearOneSalary;
@@ -89,8 +87,8 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
             <input type="hidden" name="maxyr1" value="<?= HtmlSanitizer::e($maxYearOneSalary) ?>">
             <input type="hidden" name="demandsTotal" value="<?= HtmlSanitizer::e($demands['total']) ?>">
             <input type="hidden" name="demandsYears" value="<?= HtmlSanitizer::e($demands['years']) ?>">
-            <input type="hidden" name="teamName" value="<?= HtmlSanitizer::trusted($teamName) ?>">
-            <input type="hidden" name="playerName" value="<?= HtmlSanitizer::trusted($playerName) ?>">
+            <input type="hidden" name="teamName" value="<?= HtmlSanitizer::safeHtmlOutput($player->getTeamName() ?? '') ?>">
+            <input type="hidden" name="playerName" value="<?= HtmlSanitizer::safeHtmlOutput($player->getName() ?? '') ?>">
             <input type="hidden" name="playerID" value="<?= HtmlSanitizer::e($playerID) ?>">
 
             <button type="submit" class="ibl-btn ibl-btn--danger">Offer Extension</button>

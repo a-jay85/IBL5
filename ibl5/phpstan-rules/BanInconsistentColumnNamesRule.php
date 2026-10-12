@@ -15,13 +15,15 @@ use PHPStan\Rules\RuleErrorBuilder;
  * unified by migration 114 (Tier 2 cross-table column-naming unification).
  * Prevents the columns from being re-introduced by future PRs.
  *
- * Three concept families covered:
+ * Four concept families covered:
  *   - Turnovers: `stats_to` → `stats_tvr` (live layer)
  *   - 3-pointer ratings: `r_tga`/`r_tgp` (live + olympics_plr) and `tga`/`tgp`
  *     (ibl_draft_class) → `r_3ga`/`r_3gp`
  *   - Team-id: `tid`, `teamID`, `TeamID`, `team_id`, `homeTID`/`visitorTID`,
  *     `homeTeamID`/`visitorTeamID`, `owner_tid`/`teampick_tid` → `teamid` /
  *     `home_teamid` / `visitor_teamid` / `owner_teamid` / `teampick_teamid`
+ *   - Awards tables (migration 120): `Award` → `award`, `table_ID` →
+ *     `table_id`, and `ID` → `id` (ibl_team_awards)
  *
  * @implements Rule<String_>
  */
@@ -63,6 +65,11 @@ final class BanInconsistentColumnNamesRule implements Rule
         '`visitorTeamID`' => 'Rename to `visitor_teamid`; migration 114 unified compound team-id columns.',
         '`owner_tid`' => 'Rename to `owner_teamid`; migration 114 unified `*_tid` to `*_teamid`.',
         '`teampick_tid`' => 'Rename to `teampick_teamid`; migration 114 unified `*_tid` to `*_teamid`.',
+
+        // Awards tables (ibl_awards, ibl_gm_awards, ibl_team_awards) — migration 120.
+        '`Award`' => 'Rename to `award`; migration 120 snake_cased the awards-table column.',
+        '`table_ID`' => 'Rename to `table_id`; migration 120 snake_cased the awards-table column.',
+        '`ID`' => 'Rename to `id` (ibl_team_awards); migration 120 snake_cased the column.',
     ];
 
     public function getNodeType(): string

@@ -1,6 +1,6 @@
 ---
 description: Why IBL5 local dev is Docker-only, with MAMP sunset and native PHP stacks rejected.
-last_verified: 2026-09-21
+last_verified: 2026-10-05
 ---
 
 # ADR-0004: Docker-only development environment
@@ -42,3 +42,14 @@ Local development uses Docker Compose only. `docker compose up -d` starts PHP-Ap
 - `bin/wt-new`, `bin/wt-up`, `bin/wt-down` — worktree lifecycle commands that assume Docker.
 - `docker/Dockerfile.tailwind` — the Tailwind CSS watcher sidecar image.
 - `.claude/rules/workflow-continuity.md` — the agent-facing worktree rule (cites this ADR).
+
+## Addendum (2026-10-05): DB credentials moved to config.local.php
+
+The Decision above says `config.php` reads `DB_HOST` from the environment with a `127.0.0.1` fallback. That described the tracked template at the time. PR #2369 (merged 2026-09-25, IBL5-backlog #179, recorded in the 2026-09-22 addendum of `ibl5/docs/decisions/0034-secret-scanning-gate.md`) changed the template:
+
+- `ibl5/config.php.example` now requires the gitignored `ibl5/config.local.php` for `$dbhost`, `$dbuname`, `$dbpass`, and `$dbname`. It has no `getenv()` fallback and exits 1 when that file is missing.
+- `ibl5/config.local.php.example` is the tracked template. Its defaults (`mariadb` / `root` / `root` / `iblhoops_ibl5`) match `docker-compose.yml`.
+- CI writes `config.local.php` from the job's `DB_*` variables in `.github/actions/setup-php-env/action.yml`. Worktrees receive a copy through `materialize_worktree_config_local()` in `bin/lib/git-helpers.sh`.
+- Portability between Docker and CI now comes from each environment supplying its own `config.local.php`. The compose files still export `DB_HOST`/`DB_USER`/`DB_PASS`/`DB_NAME` into the PHP container for `docker/entrypoint.sh` and for the DatabaseIntegration PHPUnit tests, which call `getenv()` directly.
+
+The main checkout's untracked `ibl5/config.php` may still carry the older `getenv('DB_*')` fallback lines, and `bin/wt-new` copies that file into worktrees. `.claude/rules/database-access.md` describes both shapes. The Docker-only decision itself is unchanged.

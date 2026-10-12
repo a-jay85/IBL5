@@ -11,6 +11,12 @@ RewriteRule ^(setup\.cgi|geoserver/|rdweb/) - [R=410,L]
 RewriteRule ^(wp|wordpress|blog|backup|old|new)/? - [R=410,L]
 RewriteRule ^(app-ads\.txt|sellers\.json)$ - [R=410,L]
 
+# Legacy PHP-Nuke entry point. Old external links still hit /modules.php at
+# the web root; send them to the live front controller with the query kept.
+# Deliberately no RewriteCond !-f: a stale untracked modules.php on the server
+# must not shadow this rule.
+RewriteRule ^modules\.php$ /ibl5/modules.php [R=301,L,QSA]
+
 # Redirect bare domain to /ibl5/
 RewriteCond %{REQUEST_URI} ^/?$
 RewriteRule ^$ /ibl5/index.php [R=301,L]

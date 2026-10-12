@@ -27,6 +27,7 @@ if (PHP_SAPI !== 'cli') {
 require __DIR__ . '/../../mainfile.php';
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 $dryRun = in_array('--dry-run', $argv ?? [], true);
 
@@ -87,15 +88,11 @@ function parseHtmlBoxscore(string $html): ?array
     $attendance = 0;
     $capacity = 0;
 
-    $seenSecondHeader = false; // Second header row separates visitor from home
     $seenVisitorTotal = false;
 
     foreach ($rows as $row) {
         // Skip header rows (contain <th> tags)
         if (str_contains($row, '<th>')) {
-            if ($seenVisitorTotal) {
-                $seenSecondHeader = true;
-            }
             continue;
         }
 
@@ -184,7 +181,7 @@ function parseHtmlBoxscore(string $html): ?array
             } else {
                 $homePlayers[] = $player;
             }
-        } elseif ($position === '' && !$hasLink && count($cells) >= 16) {
+        } elseif ($position === '' && count($cells) >= 16) {
             // Team total row
             $teamName = trim(strip_tags($cells[1]));
 
@@ -268,10 +265,13 @@ if ($stmt === false) {
 }
 $stmt->execute();
 $result = $stmt->get_result();
+if ($result === false) {
+    throw new RuntimeException('Failed to read schedule query result');
+}
 
 /** @var list<array{id: int, box_id: int, game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int}> $scheduleRows */
 $scheduleRows = [];
-while ($row = $result->fetch_assoc()) {
+while (is_array($row = $result->fetch_assoc())) {
     /** @var array{id: int, box_id: int, game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int} $row */
     $scheduleRows[] = $row;
 }

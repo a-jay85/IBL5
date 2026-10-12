@@ -40,9 +40,9 @@ class NewsService implements NewsServiceInterface
     /**
      * @see NewsServiceInterface::getCategoryPageStories()
      */
-    public function getCategoryPageStories(int $catId, int $limit, string $langClause): array
+    public function getCategoryPageStories(int $catId, int $limit, ?string $language): array
     {
-        return $this->repository->getStoriesByCategory($catId, $limit, $langClause);
+        return $this->repository->getStoriesByCategory($catId, $limit, $language);
     }
 
     /**

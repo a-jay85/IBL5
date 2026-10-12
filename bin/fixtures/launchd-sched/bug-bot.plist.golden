@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.bug-bot</string>
+	<!-- ProgramArguments, not Program: the bot is `node <script>`, not an executable. -->
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/lsched-golden/bin/node</string>
+		<string>@MAIN_WT@/ibl5/IBLbot/dist/bug-bot/index.js</string>
+	</array>
+	<!-- WorkingDirectory is LOAD-BEARING, not cosmetic: src/bug-bot/config.ts resolves
+	     its dotenv file against process.cwd(). Point this anywhere else and every
+	     requireEnv() throws at boot. It is also WHY no secret appears in this plist —
+	     the bot reads its own token from that file, so the plist stays committable. -->
+	<key>WorkingDirectory</key>
+	<string>@MAIN_WT@/ibl5/IBLbot</string>
+	<!-- The bot holds a long-lived Discord gateway connection; it is not a poll, so it
+	     takes RunAtLoad+KeepAlive rather than the cron's StartInterval. Do NOT "unify"
+	     these two jobs onto one key — they are different launchd shapes on purpose. -->
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<!-- 10s respawn floor, matching the retired ecosystem.bugbot.config.cjs min_uptime.
+	     Unlike pm2's max_restarts: 10, launchd retries FOREVER, deliberately: the
+	     2026-09-14 outage diagnosis found a supervisor that had given up and a dead bot
+	     that nothing noticed for ~4 weeks. Giving up is the failure mode, not the fix. -->
+	<key>ThrottleInterval</key>
+	<integer>10</integer>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- node is exec'd by absolute path above; this keeps PATH sane for anything
+		     the bot spawns. launchd agents otherwise start with Homebrew missing. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/logs/bug-bot-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/logs/bug-bot-stderr.log</string>
+</dict>
+</plist>

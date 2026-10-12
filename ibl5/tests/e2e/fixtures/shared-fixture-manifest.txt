@@ -37,4 +37,4 @@ ibl_plr | pid,teamid,cy,cyt,salary_yr1,salary_yr2,salary_yr3,salary_yr4,salary_y
 ibl_fa_offers | pid,teamid,offer1,offer2,offer3,offer4,offer5,offer6,offer_type | pid,offer_type,offer1,teamid | 1=1
 ibl_trade_info | tradeofferid,itemid,itemtype,trade_from,trade_to,approval | tradeofferid,itemid,itemtype | tradeofferid IN (7,8)
 ibl_schedule | uuid,visitor_score,home_score,box_id | uuid | uuid LIKE 'c0000000-%'
-ibl_settings | setting_key,value | setting_key | league = 'ibl' AND setting_key IN ('Current Season Phase','Allow Trades','Allow Waiver Moves','Show Draft Link','Free Agency Notifications','Sim Length in Days','Current Season Ending Year')
+ibl_settings | setting_key,setting_value | setting_key | league = 'ibl' AND setting_key IN ('Current Season Phase','Allow Trades','Allow Waiver Moves','Show Draft Link','Free Agency Notifications','Sim Length in Days','Current Season Ending Year')

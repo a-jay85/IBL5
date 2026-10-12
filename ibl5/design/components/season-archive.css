@@ -14,7 +14,7 @@
 .season-archive-nav a {
     color: var(--accent-500);
     text-decoration: none;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-family: var(--font-display);
 }
 
@@ -30,7 +30,7 @@
 .season-archive-section h3 {
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--navy-900);
     margin-bottom: var(--space-3);
 }
@@ -51,7 +51,7 @@
 .season-archive-section h4 {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--navy-800);
     margin-bottom: var(--space-2);
 }

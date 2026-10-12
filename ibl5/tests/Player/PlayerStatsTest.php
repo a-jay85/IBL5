@@ -190,6 +190,22 @@ class PlayerStatsTest extends TestCase
         $this->assertSame(0, $this->stats->seasonHighPoints);
     }
 
+    // --- withPlayerID() / loadByID() tests ---
+
+    public function testLoadByIdWithMissingRowInitializesZeroStats(): void
+    {
+        $repo = self::createStub(PlayerStatsRepositoryInterface::class);
+        $repo->method('getPlayerStats')->willReturn(null);
+        $stats = new TestablePlayerStats($repo);
+
+        $stats->exposedLoadByID(4040404);
+
+        $this->assertSame(4040404, $stats->playerID);
+        $this->assertSame(0, $stats->seasonGamesPlayed);
+        $this->assertSame(0, $stats->seasonPoints);
+        $this->assertSame(0, $stats->careerGamesPlayed);
+    }
+
     // --- fillHistorical() tests ---
 
     public function testFillHistoricalUsesShortColumnNames(): void
@@ -435,6 +451,11 @@ class TestablePlayerStats extends \Player\Stats\PlayerStats
     public function exposedFillHistorical(array $plrRow): void
     {
         $this->fillHistorical($plrRow);
+    }
+
+    public function exposedLoadByID(int $playerID): void
+    {
+        $this->loadByID($playerID);
     }
 
     public function exposedFillBoxscoreStats(string $playerInfoLine): void

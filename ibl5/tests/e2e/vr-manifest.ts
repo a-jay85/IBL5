@@ -97,9 +97,10 @@ export const VR_MANIFEST: VrRow[] = [
     anchor: '.ibl-title', extraMask: ['article time'], viewports: ['desktop', 'mobile'] },
   { name: 'player', auth: 'public', url: 'modules.php?name=Player&pa=showpage&pid=1',
     anchor: '.stats-grid', viewports: ['desktop', 'mobile'] },
-  { name: 'player-database', auth: 'public', url: 'modules.php?name=PlayerDatabase',
-    anchor: 'form[action*="PlayerDatabase"]', viewports: ['desktop', 'mobile'] },
-  { name: 'player-movement', auth: 'public', url: 'modules.php?name=PlayerMovement',
+  // Baselines are keyed by name, so player-database and player-movement keep their names (not season-roster-changes).
+  { name: 'player-database', auth: 'public', url: 'modules.php?name=PlayerSearch',
+    anchor: 'form[action*="PlayerSearch"]', viewports: ['desktop', 'mobile'] },
+  { name: 'player-movement', auth: 'public', url: 'modules.php?name=SeasonRosterChanges',
     anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'],
     states: [
       { name: 'default', appState: {} },
@@ -223,6 +224,10 @@ export const VR_MANIFEST: VrRow[] = [
   { name: 'training-camp-ratings-diff', auth: 'auth', url: 'modules.php?name=TrainingCampRatingsDiff',
     anchor: '.ratings-diff-page', viewports: ['desktop', 'mobile'],
     notes: 'Admin-only; renders the diff table against the CI seed 2025 finals snapshot.' },
+  { name: 'league-control-panel', auth: 'auth', url: 'modules.php?name=LeagueControlPanel',
+    anchor: '.updater-section__label', viewports: ['desktop', 'mobile'],
+    sourceGlobs: ['ibl5/modules/LeagueControlPanel/**', 'ibl5/classes/LeagueControlPanel/**'],
+    notes: 'Admin-only standalone page (own <head>, no theme wrapper). Reads phase settings from the DB, not appState, so no states; the VR job DB is freshly seeded (Free Agency, Trivia Off). Anchor is the recolored section label. Requires update-baselines on first run.' },
   { name: 'voting', auth: 'auth', url: 'modules.php?name=Voting',
     anchor: '.voting-form-container', viewports: ['desktop', 'mobile'],
     states: [

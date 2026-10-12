@@ -394,4 +394,16 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
 
         self::assertNull($service->getBaselinePhase(2019));
     }
+
+    public function test_baseline_phase_query_runs_once_across_year_phase_and_diffs(): void
+    {
+        $repo = $this->createMock(TrainingCampRatingsDiffRepositoryInterface::class);
+        $repo->expects($this->once())->method('getBaselinePhase')->with(2008)->willReturn('end-of-season');
+        $repo->method('getDiffRows')->willReturn([]);
+        $service = new TrainingCampRatingsDiffService($repo, 2009);
+
+        self::assertSame(2008, $service->getBaselineYear());
+        self::assertSame('end-of-season', $service->getBaselinePhase());
+        self::assertSame([], $service->getDiffs());
+    }
 }

@@ -1,6 +1,6 @@
 ---
 description: Scheduled pr-cycle watcher tick, its retry and in-flight guards, and the post-plan race fix in both directions.
-last_verified: 2026-10-03
+last_verified: 2026-10-08
 ---
 
 # ADR-0167: Schedule bin/pr-cycle on a launchd tick
@@ -57,3 +57,7 @@ Expected: `Installed com.ibl5.watch-pr-cycle (StartInterval 1800s)`, a `launchct
 - `bin/post-plan-now`: now-side race fix
 - `bin/lib/launchd-job.sh`: `ljob_safe_slug` and `ljob_postplan_now_live`
 - `bin/wt-sync-cron-setup`: the installer precedent
+
+## Addendum 2026-10-07: attempts are counted after the worker finishes
+
+`bin/pr-cycle --go` detaches a launchd worker and returns at once. A launch therefore says nothing about the outcome. The tick writes a `pending/<id>` entry and passes `PR_CYCLE_RESULT_FILE` to the worker. The worker writes a `# pr-cycle-result v1` TSV (`<pr> <status> <outcome> <reason>`) when it finishes. A later tick with no live worker reconciles each PR from that file. Only a PR whose post-plan run actually started records the one-rescue-per-head attempt. A holdrepeat decline is not an attempt: it is remembered in `declined/` per head, with its own DM (`dm-declined/`). A rescue that never reached post-plan is a strike in `strikes/` (`<sha> <n>`), capped at 2 per head, with one DM (`dm-strikes/`). A usage-gate `paused` outcome burns nothing. A new push changes the SHA and clears all three. `--allow-test-only` lets a test-only rescue reach post-plan; it skips only the exit-5 guard.

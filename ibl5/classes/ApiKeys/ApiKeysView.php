@@ -88,7 +88,7 @@ GS;
         ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
-        <h2 class="ibl-card__title">API Key</h2>
+        <h1 class="ibl-card__title">API Key</h1>
     </div>
     <div class="ibl-card__body">
         <p class="mb-4">You don't have an API key yet. Generate one to use the Player Export feature with Google Sheets.</p>
@@ -114,7 +114,7 @@ GS;
         ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
-        <h2 class="ibl-card__title">API Key Generated</h2>
+        <h1 class="ibl-card__title">API Key Generated</h1>
     </div>
     <div class="ibl-card__body">
         <div class="ibl-alert ibl-alert--warning mb-4">
@@ -150,7 +150,7 @@ GS;
         ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
-        <h2 class="ibl-card__title">API Key</h2>
+        <h1 class="ibl-card__title">API Key</h1>
     </div>
     <div class="ibl-card__body">
         <table class="ibl-data-table mb-6">

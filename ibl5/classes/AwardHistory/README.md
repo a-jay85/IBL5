@@ -1,6 +1,6 @@
 ---
 description: Player awards history search and display following interface-driven Repository/Service/View architecture.
-last_verified: 2026-09-22
+last_verified: 2026-10-03
 ---
 
 # AwardHistory Module
@@ -89,6 +89,6 @@ vendor/bin/phpunit tests/AwardHistory/
 
 ## Related Modules
 
-- [PlayerDatabase](../PlayerDatabase/README.md) - Similar search pattern
+- [PlayerSearch](../PlayerSearch/README.md) - Similar search pattern
 - [Leaderboards](../Leaderboards/) - Similar table display pattern
 - [Player](../Player/) - Reference implementation for interface-driven architecture

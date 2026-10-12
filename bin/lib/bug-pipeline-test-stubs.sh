@@ -11,10 +11,12 @@
 BPT_DRIVER="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bug-pipeline-tick"
 
 # FAILED / BPT_RC are read by the sourcing harnesses (shellcheck can't see that).
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/harness.sh"
 FAILED=0
-bpt_ok()   { echo "ok: $1"; }
+bpt_ok()   { h_pass "$1"; }
 # shellcheck disable=SC2034  # FAILED consumed by the sourcing harness
-bpt_fail() { echo "FAIL: $1"; FAILED=1; }
+bpt_fail() { h_fail "$1"; FAILED=1; }
 
 # bpt_expect_eq <name> <want> <got>
 bpt_expect_eq() { if [ "$2" = "$3" ]; then bpt_ok "$1"; else bpt_fail "$1 — want [$2] got [$3]"; fi; }

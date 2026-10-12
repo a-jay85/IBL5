@@ -62,12 +62,7 @@ final class StandingsRowView
         $awayGames = $team['awayGames'];
 
         // Build CSS class for row highlighting
-        $rowClass = '';
-        if ($isBottomLocked) {
-            $rowClass = 'bottom-locked';
-        } else {
-            $rowClass = self::getClinchTierClass($team);
-        }
+        $rowClass = $isBottomLocked ? 'bottom-locked' : self::getClinchTierClass($team);
 
         ob_start();
         ?>

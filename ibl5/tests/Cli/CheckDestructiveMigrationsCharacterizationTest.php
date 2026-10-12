@@ -166,6 +166,19 @@ final class CheckDestructiveMigrationsCharacterizationTest extends TestCase
         );
     }
 
+    public function testCharPreparedDropColumnFlagged(): void
+    {
+        $this->assertFlags(
+            "SET @s = IF(@n = 1, 'ALTER TABLE ibl_x DROP COLUMN old_col', 'SELECT 1');\nPREPARE st FROM @s;\n",
+            'drop-column',
+        );
+    }
+
+    public function testCharPreparedSelectOnlyIsClean(): void
+    {
+        $this->assertClean("SET @s = IF(@n = 1, 'SELECT 1', 'SELECT 2');\nPREPARE st FROM @s;\n");
+    }
+
     /**
      * Stages $sql as its own migration file and asserts the script exits 1
      * and prints the bracketed $tag.

@@ -52,15 +52,6 @@ class LeagueContextIntegrationTest extends TestCase
         $this->assertIsString(LeagueContext::COOKIE_NAME);
     }
 
-    /**
-     * Test constants are lowercase
-     */
-    public function testConstantValuesAreLowercase(): void
-    {
-        $this->assertSame(strtolower(LeagueContext::LEAGUE_IBL), LeagueContext::LEAGUE_IBL);
-        $this->assertSame(strtolower(LeagueContext::LEAGUE_OLYMPICS), LeagueContext::LEAGUE_OLYMPICS);
-    }
-
     // ============================================
     // CONFIG STRUCTURE TESTS
     // ============================================
@@ -105,7 +96,7 @@ class LeagueContextIntegrationTest extends TestCase
         $config = $this->leagueContext->getConfig();
 
         foreach ($config as $key => $value) {
-            $this->assertNotEmpty($value, "Config value for '{$key}' should not be empty");
+            $this->assertNotSame('', $value, "Config value for '{$key}' should not be empty");
         }
     }
 
@@ -119,7 +110,7 @@ class LeagueContextIntegrationTest extends TestCase
         $config = $this->leagueContext->getConfig();
 
         foreach ($config as $key => $value) {
-            $this->assertNotEmpty($value, "Config value for '{$key}' should not be empty");
+            $this->assertNotSame('', $value, "Config value for '{$key}' should not be empty");
         }
     }
 

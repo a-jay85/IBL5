@@ -257,8 +257,9 @@ def test_refusal_reason_lockfile(tmp_path):
 
 
 def test_refusal_reason_delete_modify(tmp_path):
+    # A modify/delete conflict is resolvable now; the probe predicts no refusal.
     _, g, _ = _probed(tmp_path, conflict=True, dirty=True, path="c.txt", master_deletes=True)
-    assert g.resolver_refusal_reason().startswith(conflict.UNRESOLVABLE_STAGES)
+    assert g.resolver_refusal_reason() is None
 
 
 def test_refusal_reason_none_for_resolvable_text_conflict(tmp_path):
@@ -292,7 +293,7 @@ def test_refusal_reason_first_sorted_refusable_path_wins(tmp_path):
     g.last_conflict_stages = {
         "b.txt": frozenset({1, 2, 3}),
         "ibl5/migrations/002_y.sql": frozenset({1, 2, 3}),
-        "a.txt": frozenset({1, 3}),
+        "a.txt": frozenset({2, 3}),
     }
     reason = g.resolver_refusal_reason()
     assert reason.startswith(conflict.UNRESOLVABLE_STAGES)
@@ -409,11 +410,14 @@ def test_runner_refusable_migration_conflict_fails_closed_with_llm(tmp_path, mon
         tmp_path, monkeypatch, wt, path, conflict.UNRESOLVABLE_MIGRATION)
 
 
-def test_runner_delete_modify_conflict_fails_closed_with_llm(tmp_path, monkeypatch):
+def test_runner_delete_modify_conflict_is_advisory_with_llm(tmp_path, monkeypatch):
+    """A modify/delete conflict is resolvable, so with an LLM configured the probe is
+    advisory and the run reaches the body check instead of a fail-closed exit 3."""
     wt = _plain_scenario(tmp_path, conflict=True, dirty=True, path="c.txt",
                          master_deletes=True)
-    _assert_refused_before_body_check(
-        tmp_path, monkeypatch, wt, "c.txt", conflict.UNRESOLVABLE_STAGES)
+    audit_text = _assert_advisory_fall_through(tmp_path, monkeypatch, wt)
+    assert "merge-tree probe predicted" in audit_text
+    assert "would refuse" not in audit_text
 
 
 def _assert_advisory_fall_through(tmp_path, monkeypatch, wt):

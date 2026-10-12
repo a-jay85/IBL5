@@ -76,6 +76,16 @@ func (s *FTASide) AddTeamGame(fta, ftm, pf, fga, tov, orb, points float64, isHom
 	s.BucketGames[b]++
 }
 
+// isDegenerateFTAGame reports whether a simulated game is an all-zero box
+// that must be excluded from the FTA decomposition: both teams scored 0
+// points AND both teams attempted 0 free throws. A real tie with points, or a
+// 0-0 game that still shows FTA, is NOT degenerate. The 2026-10-01 archive
+// pass held 78 such games (all 0-0 preseason boxes with no activity); they
+// counted as team-games and diluted engine FTA/g and PF/g (ADR-0158 addendum).
+func isDegenerateFTAGame(pts0, pts1, fta0, fta1 int) bool {
+	return pts0 == 0 && pts1 == 0 && fta0 == 0 && fta1 == 0
+}
+
 // marginBucket maps an absolute final margin to 0 close (<=5), 1 mid (6..15),
 // 2 blowout (>=16). A negative input is treated as its absolute value.
 func marginBucket(absMargin int) int {

@@ -41,7 +41,9 @@ if [ -z "$PROMPT" ] || [ ! -f "$PROMPT" ]; then
 fi
 
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
-: "${PLANS_DIR:=$HOME/claude-plans}"
+# shellcheck source=bin/lib/plan-resolve.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/plan-resolve.sh"
+PLANS_DIR="$(plans_dir PLANS_DIR)"
 
 # Kept deliberately identical to run_slug() in the generated runner heredoc
 # inside bin/plan-now (search: "run_slug()"). If one changes, change both.

@@ -333,6 +333,24 @@ run_filtered_step() {
 
 BIN="$ROOT/bin"
 
+# run_pr_bypass_gate <name> <filter-key> <hard|advisory> <defer-without-pr: 1|0> <cmd...>
+# Rows 14-15: the PR-body-bypass gates (adr-check, refactor-flag).
+run_pr_bypass_gate() {
+    local name="$1" key="$2" severity="$3" defer="$4"
+    shift 4
+    if [ "$(_fmap "$key")" != "true" ]; then
+        printf 'SKIP  %s (filter %s=false)\n' "$name" "$key"
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+        return 0
+    fi
+    if [ "$defer" = "1" ] && [ -z "$PR" ]; then
+        printf 'DEFER %s (deferred to post-pr for PR bypass check)\n' "$name"
+        DEFERRED="$DEFERRED $name"
+        return 0
+    fi
+    run_step "$name" "$severity" "$@"
+}
+
 # ─── Pre-push step table ──────────────────────────────────────────────────────
 if [ "$STAGE" = "pre-push" ]; then
     # Unconditional hard gates (rows 1-6)
@@ -342,6 +360,8 @@ if [ "$STAGE" = "pre-push" ]; then
     run_step "check-prose-self-test"         hard "$BIN/check-prose" --self-test
     run_step "check-prose-since"             hard "$BIN/check-prose" "--since=$BASE"
     run_step "check-registry-trigger-rows"   hard "$BIN/check-registry-trigger-rows"
+    run_step "check-model-pins"              hard "$BIN/check-model-pins"
+    run_step "test-check-model-pins"         hard "$BIN/test-check-model-pins"
 
     # Row 7: pre-push form of manual-testing check
     if [ -n "$BODY_FILE" ]; then
@@ -370,28 +390,8 @@ if [ "$STAGE" = "pre-push" ]; then
     run_filtered_step "check-orphan-css" advisory "orphancss" "$BIN/check-orphan-css"
 
     # Rows 14-15: advisory pre-push (hard post-pr); deferred when no PR number.
-    if [ "$(_fmap adr)" = "true" ]; then
-        if [ -n "$PR" ]; then
-            run_step "adr-check" advisory "$BIN/adr-check" --pr "--base=$BASE"
-        else
-            printf 'DEFER adr-check (deferred to post-pr for PR bypass check)\n'
-            DEFERRED="$DEFERRED adr-check"
-        fi
-    else
-        printf 'SKIP  adr-check (filter adr=false)\n'
-        SKIP_COUNT=$((SKIP_COUNT + 1))
-    fi
-    if [ "$(_fmap refactor)" = "true" ]; then
-        if [ -n "$PR" ]; then
-            run_step "refactor-flag" advisory "$BIN/refactor-flag" --pr
-        else
-            printf 'DEFER refactor-flag (deferred to post-pr for PR bypass check)\n'
-            DEFERRED="$DEFERRED refactor-flag"
-        fi
-    else
-        printf 'SKIP  refactor-flag (filter refactor=false)\n'
-        SKIP_COUNT=$((SKIP_COUNT + 1))
-    fi
+    run_pr_bypass_gate "adr-check"     adr      advisory 1 "$BIN/adr-check" --pr "--base=$BASE"
+    run_pr_bypass_gate "refactor-flag" refactor advisory 1 "$BIN/refactor-flag" --pr
 fi
 
 # ─── Post-pr step table ───────────────────────────────────────────────────────
@@ -406,18 +406,8 @@ if [ "$STAGE" = "post-pr" ]; then
     run_filtered_step "check-pr-collisions" advisory "prcollisions" "$BIN/check-pr-collisions" --pr "$PR"
 
     # Rows 14-15: hard in post-pr stage
-    if [ "$(_fmap adr)" = "true" ]; then
-        run_step "adr-check" hard "$BIN/adr-check" --pr "--base=$BASE"
-    else
-        printf 'SKIP  adr-check (filter adr=false)\n'
-        SKIP_COUNT=$((SKIP_COUNT + 1))
-    fi
-    if [ "$(_fmap refactor)" = "true" ]; then
-        run_step "refactor-flag" hard "$BIN/refactor-flag" --pr
-    else
-        printf 'SKIP  refactor-flag (filter refactor=false)\n'
-        SKIP_COUNT=$((SKIP_COUNT + 1))
-    fi
+    run_pr_bypass_gate "adr-check"     adr      hard 0 "$BIN/adr-check" --pr "--base=$BASE"
+    run_pr_bypass_gate "refactor-flag" refactor hard 0 "$BIN/refactor-flag" --pr
 
     # Write state file for the Phase 6.5 arming condition to read.
     printf '%s\n' "${FAILED:+FAILED:${FAILED# }}" > "/tmp/ibl5-meta-checks-${PR}.status"

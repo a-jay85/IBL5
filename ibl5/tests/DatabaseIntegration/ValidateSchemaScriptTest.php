@@ -226,22 +226,23 @@ final class ValidateSchemaScriptTest extends TestCase
     }
 
     /**
-     * On PHP 8.1+ the default mysqli report mode throws on a failed connect, so the script's
-     * `exit(2)` branch is unreachable and the process exits 255. Adding
-     * `mysqli_report(MYSQLI_REPORT_OFF);` before the connect revives that branch, and the
-     * regex below accepts either message.
+     * A failed connect must exit 2 with one clean stderr line. The script wraps only the
+     * real_connect() call in a try/catch for mysqli_sql_exception, which PHP 8.1+ throws under
+     * the default report mode. Exit 2 stays distinct from 1 (drift) and 0 (pass), and no PHP
+     * fatal or stack trace reaches the caller.
      */
     #[Test]
-    public function testConnectFailureExitsNonZeroAndDistinctFromDrift(): void
+    public function testConnectFailureExitsTwoWithCleanMessage(): void
     {
         $result = $this->runScript('ibl_no_such_user_' . bin2hex(random_bytes(4)));
+        $combined = $result['stdout'] . $result['stderr'];
 
-        self::assertNotSame(0, $result['code']);
-        self::assertNotSame(1, $result['code']);
+        self::assertSame(2, $result['code'], $combined);
+        self::assertStringContainsString('Failed to connect to MariaDB (', $result['stderr']);
         self::assertStringNotContainsString('Schema validation passed', $result['stdout']);
-        self::assertMatchesRegularExpression(
-            '/mysqli_sql_exception|Failed to connect to MariaDB/',
-            $result['stdout'] . $result['stderr']
-        );
+        self::assertStringNotContainsString('SCHEMA VALIDATION FAILED', $result['stdout']);
+        self::assertStringNotContainsString('mysqli_sql_exception', $combined);
+        self::assertStringNotContainsString('Stack trace', $combined);
+        self::assertStringNotContainsString('Fatal error', $combined);
     }
 }

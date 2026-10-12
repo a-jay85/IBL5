@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ContractList;
 
 use ContractList\Contracts\ContractListRepositoryInterface;
+use Repositories\PlayerTeamJoinQuery;
 
 /**
  * ContractListRepository - Data access layer for player contracts
@@ -18,6 +19,8 @@ use ContractList\Contracts\ContractListRepositoryInterface;
  */
 class ContractListRepository extends \Database\BaseMysqliRepository implements ContractListRepositoryInterface
 {
+    use PlayerTeamJoinQuery;
+
     /**
      * @see ContractListRepositoryInterface::getActivePlayerContracts()
      */
@@ -26,9 +29,9 @@ class ContractListRepository extends \Database\BaseMysqliRepository implements C
         $query = "SELECT p.pid, p.name, p.pos, t.team_name AS teamname, p.teamid, p.cy, p.cyt, p.salary_yr1, p.salary_yr2, p.salary_yr3, p.salary_yr4, p.salary_yr5, p.salary_yr6, p.bird,
                          t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
-            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            " . $this->playerTeamLeftJoin() . "
             WHERE p.retired = 0
-            ORDER BY p.ordinal ASC";
+            ORDER BY p.ordinal ASC, p.pid ASC";
 
         /** @var list<array{name: string, pos: string, teamname: string, cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, bird: string, pid: int, teamid: int, team_city: string|null, color1: string|null, color2: string|null}> */
         return $this->fetchAll($query);

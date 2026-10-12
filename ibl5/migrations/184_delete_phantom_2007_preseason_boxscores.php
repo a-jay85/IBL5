@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-use Boxscore\Phantom2007BoxscoreRepair as Repair;
+use Boxscore\Legacy\Phantom2007BoxscoreRepair as Repair;
 
 /**
  * Migration 184: delete the phantom 2007 preseason and HEAT box-score rows.
  *
  * A 2026-09-18 import batch wrote Nov 2007 games shifted to Sep 2007 and Dec
  * 2007 games shifted to Oct 2007. This migration backs up and deletes the
- * phantom rows only via Boxscore\Phantom2007BoxscoreRepair. Backup tables are
+ * phantom rows only via Boxscore\Legacy\Phantom2007BoxscoreRepair. Backup tables are
  * created by migration 183. MigrationFileResolver sorts with strnatcasecmp,
  * so 183_*.sql always applies before 184_*.php and the backups exist before
  * the repair runs.

@@ -106,7 +106,7 @@ trait RolloverArchiveFixtures
     private function readSetting(string $key): ?string
     {
         $stmt = $this->db->prepare(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = 'ibl'"
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = 'ibl'"
         );
         self::assertNotFalse($stmt, 'Failed to prepare readSetting: ' . $this->db->error);
         $stmt->bind_param('s', $key);
@@ -115,7 +115,7 @@ trait RolloverArchiveFixtures
         $row    = $result->fetch_assoc();
         $stmt->close();
 
-        return is_array($row) ? (string) $row['value'] : null;
+        return is_array($row) ? (string) $row['setting_value'] : null;
     }
 
     /**

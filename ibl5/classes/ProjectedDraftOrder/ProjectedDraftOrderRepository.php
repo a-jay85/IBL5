@@ -76,10 +76,10 @@ class ProjectedDraftOrderRepository extends \Database\BaseMysqliRepository imple
     public function isDraftOrderFinalized(): bool
     {
         $row = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
         );
 
-        return $row !== null && $row['value'] === 'Yes';
+        return $row !== null && $row['setting_value'] === 'Yes';
     }
 
     /**
@@ -122,7 +122,7 @@ class ProjectedDraftOrderRepository extends \Database\BaseMysqliRepository imple
             }
 
             $this->execute(
-                "UPDATE `ibl_settings` SET value = 'Yes' WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
+                "UPDATE `ibl_settings` SET setting_value = 'Yes' WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
             );
         });
     }
@@ -132,9 +132,10 @@ class ProjectedDraftOrderRepository extends \Database\BaseMysqliRepository imple
     {
         /** @var list<array{pick: int, team: string, teamid: int, player: string}> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (draft_id is the ibl_draft primary key; not on the rule allowlist)
             "SELECT pick, team, teamid, player FROM `ibl_draft`
              WHERE year = ? AND round = ?
-             ORDER BY pick",
+             ORDER BY pick, draft_id ASC",
             "ii",
             $year,
             $round,

@@ -190,17 +190,40 @@ def test_behind_once_then_clean(monkeypatch):
 
 
 def test_behind_three_times_cap(monkeypatch):
+    """At the cap the PR stays armed: no disarm, no retry_cap, three re-rebases,
+    and the hand-off line naming update-behind-prs / ADR-0081 is logged."""
     git = FakeGit(head_shas=["sha" + "0" * 37] * 4)
     gh = FakeGh(states=["BEHIND"] * 10, strict=True)
     res = RunResult(terminal=TerminalState.SHIPPED_ARMED)
     _make_ci_patches(monkeypatch, outcomes=[CiOutcome(0, [])] * 4)
     initial_outcome = CiOutcome(0, [])
+    logs = []
     runner._resolve_behind(
-        git, gh, _noop_log, res, "/wt", 1, "sha" + "0" * 37, initial_outcome, "/out"
+        git, gh, logs.append, res, "/wt", 1, "sha" + "0" * 37, initial_outcome, "/out"
     )
     assert git.rebases == 3
-    assert res.retry_cap == "behind-retry-cap"
-    assert gh.disarms == 1
+    assert gh.disarms == 0
+    assert res.retry_cap is None
+    assert ("phase7: BEHIND cap hit after 3 re-rebases — leaving auto-merge armed; "
+            ".github/workflows/update-behind-prs.yml (ADR-0081) carries the PR to merge"
+            ) in logs
+
+
+def test_behind_cap_terminal_is_shipped_armed(monkeypatch):
+    """A run that spent the BEHIND cap still resolves to SHIPPED_ARMED and its
+    verdict line reports the PR as armed, never BLOCKED."""
+    git = FakeGit(head_shas=["sha" + "0" * 37] * 4)
+    gh = FakeGh(states=["BEHIND"] * 10, strict=True)
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED, arm=ArmDecision(armed=True))
+    _make_ci_patches(monkeypatch, outcomes=[CiOutcome(0, [])] * 4)
+    runner._resolve_behind(
+        git, gh, _noop_log, res, "/wt", 1, "sha" + "0" * 37, CiOutcome(0, []), "/out"
+    )
+    assert runner._compute_terminal(res, armed=True) == TerminalState.SHIPPED_ARMED
+    res.terminal = runner._compute_terminal(res, armed=True)
+    line = runner.verdict_line(res, rc=0)
+    assert "BLOCKED" not in line
+    assert "auto-merge=armed" in line
 
 
 def test_behind_non_strict_no_rebase(monkeypatch):
@@ -313,21 +336,10 @@ def test_verdict_push_retry_cap():
     assert "push retry cap reached" in line
 
 
-def test_verdict_behind_retry_cap():
-    res = RunResult(
-        terminal=TerminalState.SHIPPED_HELD,
-        retry_cap="behind-retry-cap",
-        findings=[],
-    )
-    line = runner.verdict_line(res, rc=0)
-    assert "BLOCKED" in line
-    assert "BEHIND retry cap reached" in line
-    assert "auto-merge=armed" not in line
-
-
 def test_retry_cap_beats_armed():
-    """_compute_terminal returns SHIPPED_HELD when retry_cap is set, even when armed=True."""
-    res = RunResult(terminal=TerminalState.SHIPPED_ARMED, retry_cap="behind-retry-cap")
+    """_compute_terminal returns SHIPPED_HELD when retry_cap is set, even when armed=True.
+    retry_cap has no production writer today; this pins the reserved fail-closed seam."""
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED, retry_cap="push-retry-cap")
     assert runner._compute_terminal(res, armed=True) == TerminalState.SHIPPED_HELD
     res_no_cap = RunResult(terminal=TerminalState.SHIPPED_ARMED)
     assert runner._compute_terminal(res_no_cap, armed=True) == TerminalState.SHIPPED_ARMED

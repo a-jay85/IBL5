@@ -66,7 +66,7 @@ class DraftValidatorTest extends TestCase
     public function testResultsAreIndependentAcrossCalls(): void
     {
         $errorResult = $this->validator->validateDraftSelection(null, null);
-        $this->assertNotEmpty($errorResult->getErrors());
+        $this->assertNotSame([], $errorResult->getErrors());
 
         $successResult = $this->validator->validateDraftSelection('John Doe', null);
         $this->assertSame([], $successResult->getErrors());
@@ -76,7 +76,7 @@ class DraftValidatorTest extends TestCase
     {
         // First validation should fail
         $failedResult = $this->validator->validateDraftSelection(null, null);
-        $this->assertNotEmpty($failedResult->getErrors());
+        $this->assertNotSame([], $failedResult->getErrors());
 
         // Second validation should succeed — independent result
         $result = $this->validator->validateDraftSelection('John Doe', null);
@@ -442,7 +442,7 @@ class DraftValidatorTest extends TestCase
     {
         // Generate an error
         $errorResult = $this->validator->validateDraftSelection(null, null);
-        $this->assertNotEmpty($errorResult->getErrors());
+        $this->assertNotSame([], $errorResult->getErrors());
 
         // Successful validation — independent result
         $successResult = $this->validator->validateDraftSelection('John Doe', null);

@@ -23,6 +23,14 @@ use League\LeagueContext;
  */
 class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgencyAdminRepositoryInterface
 {
+    private \Clock\ClockInterface $clock;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null, ?\Clock\ClockInterface $clock = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->clock = $clock ?? new \Clock\SystemClock();
+    }
+
     /**
      * @see FreeAgencyAdminRepositoryInterface::getAllOffersWithBirdYears()
      *
@@ -32,10 +40,11 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     {
         /** @var list<OfferRow> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (primary_key is the ibl_fa_offers primary key; not on the rule allowlist)
             "SELECT `ibl_fa_offers`.*, `ibl_plr`.`bird`
              FROM `ibl_fa_offers`
              JOIN `ibl_plr` ON `ibl_fa_offers`.`pid` = `ibl_plr`.`pid`
-             ORDER BY `ibl_fa_offers`.`name` ASC, `ibl_fa_offers`.`perceivedvalue` DESC",
+             ORDER BY `ibl_fa_offers`.`name` ASC, `ibl_fa_offers`.`perceivedvalue` DESC, `ibl_fa_offers`.`primary_key` ASC",
             ""
         );
     }
@@ -139,7 +148,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
      */
     public function insertNewsStory(string $title, string $homeText, string $bodyText): int
     {
-        $currentTime = date('Y-m-d H:i:s');
+        $currentTime = date('Y-m-d H:i:s', $this->clock->now());
 
         $affected = $this->execute(
             "INSERT INTO nuke_stories
@@ -180,7 +189,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     {
         $league = $this->resolveLeague();
         $row = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ?",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ?",
             "ss",
             'Current Season Ending Year',
             $league
@@ -192,7 +201,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
             );
         }
 
-        $value = $row['value'];
+        $value = $row['setting_value'];
         if (!is_numeric($value)) {
             // D8: fail closed. A non-numeric setting would key the marker under a
             // value no later run reproduces, silently disabling the guard.

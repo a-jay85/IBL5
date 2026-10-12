@@ -306,7 +306,7 @@ Otherwise (there are commits ahead or a dirty tree), proceed to Step 6.6.
 Run the Phase 5.0 conformance check now, before writing the handoff, to catch a dropped Critical File or matrix-declared test while you can still fix it.
 
 ```bash
-MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')
 HARNESS="$MAIN_CHECKOUT/tools/postplan-harness"
 CONF_ERR=$(mktemp -t conformance-err)
 CONF_OUT=$(PYTHONPATH="$HARNESS" python3 -m harness.conformance "$PLAN_PATH" "$(git rev-parse --show-toplevel)" 2>"$CONF_ERR")
@@ -337,7 +337,7 @@ Step 6.6 does not evaluate Verification Matrix assertions. This step does, so a 
 Commit a checkpoint first. The check reads the committed branch diff and refuses a dirty tree.
 
 ```bash
-MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')
 MATRIX_SCRIPT="${MATRIX_SCRIPT:-$MAIN_CHECKOUT/bin/lib/plan-matrix-assertions}"
 if [ -z "${PLAN_PATH:-}" ] || [ ! -f "$PLAN_PATH" ]; then
     MATRIX_VERDICT=skipped

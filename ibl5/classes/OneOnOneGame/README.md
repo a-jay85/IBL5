@@ -1,6 +1,6 @@
 ---
 description: Fan-created one-on-one basketball mini-game (first to 21) with simulation engine, Discord result posting, and game replay support.
-last_verified: 2026-09-27
+last_verified: 2026-09-26
 ---
 
 # One-on-One Module

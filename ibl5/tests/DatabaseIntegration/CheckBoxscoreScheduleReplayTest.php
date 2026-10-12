@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use Boxscore\BoxscoreAuditRepository;
 use Boxscore\BoxscoreRepository;
 use Boxscore\ScheduleAuditReport;
 use Boxscore\ScheduleMembershipGuard;
@@ -215,7 +216,10 @@ final class CheckBoxscoreScheduleReplayTest extends DatabaseTestCase
 
     private function buildAudit(): ScheduleReconciliationAudit
     {
-        return new ScheduleReconciliationAudit(new BoxscoreRepository($this->db));
+        return new ScheduleReconciliationAudit(
+            new BoxscoreRepository($this->db),
+            new BoxscoreAuditRepository($this->db)
+        );
     }
 
     /**

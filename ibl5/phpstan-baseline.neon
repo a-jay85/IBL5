@@ -61,54 +61,16 @@ parameters:
 			path: bin/refresh-team-season-records
 
 		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Api/Controller/HealthController.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 4
 			path: classes/Api/Repository/ApiGameRepository.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "injured" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Api/Repository/ApiInjuriesRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 2
 			path: classes/Api/Repository/ApiLeadersRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Api/Repository/ApiPlayerRepository.php
-
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Api/Repository/ApiPlayerStatsRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "full_team_name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/Api/Repository/ApiStandingsRepository.php
-
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 2
-			path: classes/Api/Response/JsonResponder.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -125,20 +87,8 @@ parameters:
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/BasketballStats/TeamStatsCalculator.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
 			count: 1
 			path: classes/Bootstrap/ConfigBootstrap.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/Boxscore/Boxscore.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -147,46 +97,16 @@ parameters:
 			path: classes/BugPipeline/BugReportClaimRepository.php
 
 		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Cli/LighthouseAuditReportFormatter.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/ComparePlayers/ComparePlayersRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/ContractList/ContractListRepository.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 2
-			path: classes/Debug/DebugSession.php
-
-		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
 			path: classes/Debug/DebugSession.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/DepthChartEntry/DepthChartEntryRepository.php
-
-		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
 			count: 1
-			path: classes/DepthChartEntry/DepthChartEntryView.php
+			path: classes/DepthChart/DepthChartView.php
 
 		-
 			rawMessage: 'Parameter #3 $pickOwner of method Draft\Contracts\DraftViewInterface::renderDraftInterface() expects string, string|null given.'
@@ -207,24 +127,6 @@ parameters:
 			path: classes/Draft/DraftController.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Draft/DraftRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "draftpickno" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/DraftHistory/DraftHistoryRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "round" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/DraftPickLocator/DraftPickLocatorRepository.php
-
-		-
 			rawMessage: Hardcoded environment string "127.0.0.1" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
@@ -237,40 +139,16 @@ parameters:
 			path: classes/Extension/ExtensionService.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ranking" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 3
-			path: classes/FranchiseRecordBook/FranchiseRecordBookRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 3
 			path: classes/FranchiseRecordBook/FranchiseRecordBookRepository.php
 
 		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/FreeAgency/Admin/FreeAgencyAdminRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "perceivedvalue" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/FreeAgency/Admin/FreeAgencyAdminRepository.php
-
-		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
 			count: 4
 			path: classes/FreeAgency/FreeAgencyOfferView.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/FreeAgency/FreeAgencyRepository.php
 
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
@@ -285,76 +163,16 @@ parameters:
 			path: classes/FreeAgency/FreeAgencyUnderContractSectionView.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/FreeAgencyPreview/FreeAgencyPreviewRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_city" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/GMContactList/GMContactListRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 4
-			path: classes/JsbParser/PlayerIdResolver.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "injury_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/LastSimRecap/LastSimRecapRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 2
 			path: classes/LastSimRecap/LastSimRecapRepository.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 6
-			path: classes/League/League.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/League/League.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "owner_name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/League/League.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 1
 			path: classes/League/League.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/League/LeagueContext.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "franchise_id" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/LeagueConfig/LeagueConfigRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_slot" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/LeagueConfig/LeagueConfigRepository.php
 
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
@@ -369,12 +187,6 @@ parameters:
 			path: classes/LeagueSchedule/LeagueScheduleRepository.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Maintenance/MaintenanceRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 1
@@ -385,12 +197,6 @@ parameters:
 			identifier: ibl.directHeader
 			count: 3
 			path: classes/Module/ModuleRedirect.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_city" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Navigation/NavigationRepository.php
 
 		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
@@ -425,26 +231,8 @@ parameters:
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 6
+			count: 4
 			path: classes/Negotiation/NegotiationOfferView.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 2
-			path: classes/Negotiation/NegotiationRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/OneOnOneGame/OneOnOneGameRepository.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/PageLayout/PageLayout.php
 
 		-
 			rawMessage: Hardcoded environment string "www.iblhoops.net" is banned. Inject an environment/config flag instead of branching on a literal host name.
@@ -453,70 +241,16 @@ parameters:
 			path: classes/PageLayout/PageLayout.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "gameid" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/Player/PlayerRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "time" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Player/PlayerRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Player/PlayerRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Player/Stats/PlayerStatsRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "sim" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Player/Stats/PlayerStatsRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/Player/Stats/PlayerStatsRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 4
 			path: classes/Player/Stats/PlayerStatsRepository.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 1
-			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/PlayerMovement/PlayerMovementRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "sim" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/PlrParser/PlrBoxScoreRepository.php
+			path: classes/PlayerSearch/PlayerSearchRepository.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -531,52 +265,10 @@ parameters:
 			path: classes/PlrParser/PlrParserRepository.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "pick" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 1
 			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "'')" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/RecordHolders/FranchiseRecordRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/RecordHolders/PlayerRecordRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "value" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/RecordHolders/PlayerRecordRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/RecordHolders/RecordAnnouncementRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "value" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/RecordHolders/TeamRecordRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "wins" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/RecordHolders/TeamRecordRepository.php
 
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
@@ -585,106 +277,10 @@ parameters:
 			path: classes/RookieOption/RookieOptionView.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/SavedDepthChart/SavedDepthChartRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "time" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Search/SearchRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "title" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Search/SearchRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "topictext" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Search/SearchRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "username" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Search/SearchRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 7
-			path: classes/Search/SearchRepository.php
-
-		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 72
+			count: 3
 			path: classes/Search/SearchView.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Season/Season.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Season/SeasonQueryRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_of_that_day" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "losses" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "start_season_year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "table_id" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "winner" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/SeasonHighs/SeasonHighsRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ranking" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonHighs/SeasonHighsRepository.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -699,130 +295,10 @@ parameters:
 			path: classes/SeasonLeaderboards/SeasonLeaderboardsRepository.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Standings/StandingsRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 6
-			path: classes/Standings/StandingsRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Standings/StandingsUpdaterRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "losses" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Standings/StandingsUpdaterRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "pct" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Standings/StandingsUpdaterRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "wins" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 3
-			path: classes/Standings/StandingsUpdaterRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/Standings/StandingsUpdaterRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 3
 			path: classes/Team/SplitStatsRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "draftpickno" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Team/TeamQueryRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 5
-			path: classes/Team/TeamQueryRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Team/TeamQueryRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "teampick" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Team/TeamQueryRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/Team/TeamQueryRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "conf_gb" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Team/TeamRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "div_gb" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Team/TeamRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_of_that_day" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Team/TeamRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 3
-			path: classes/Team/TeamRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 3
-			path: classes/Team/TeamRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "season_year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Team/TeamRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "start_season_year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Team/TeamRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 4
-			path: classes/Team/TeamRepository.php
 
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
@@ -831,52 +307,10 @@ parameters:
 			path: classes/Team/TeamView.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_city" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/TeamOffDefStats/TeamOffDefStatsRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 12
-			path: classes/TeamOffDefStats/TeamOffDefStatsRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/TeamSchedule/TeamScheduleRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 1
 			path: classes/TeamSchedule/TeamScheduleRepository.php
-
-		-
-			rawMessage: 'Binary operation "." between ''&amp;mode='' and mixed results in an error.'
-			identifier: binaryOp.invalid
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Binary operation "." between ''&amp;order='' and mixed results in an error.'
-			identifier: binaryOp.invalid
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Binary operation "." between ''&amp;thold='' and mixed results in an error.'
-			identifier: binaryOp.invalid
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Binary operation "." between non-falsy-string and mixed results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: classes/Topics/News/NewsController.php
 
 		-
 			rawMessage: '''
@@ -901,280 +335,10 @@ parameters:
 			path: classes/Topics/News/NewsController.php
 
 		-
-			rawMessage: Cannot access offset 'storynum' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Cannot access offset 'thold' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Cannot access offset 'umode' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Cannot access offset 'uorder' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Cannot access offset 'username' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Cannot call method getUserInfo() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 3
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 2
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Casting to int something that''s already int<min, -1>|int<1, max>.'
-			identifier: cast.useless
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Constant _COMMENTS not found.
-			identifier: constant.notFound
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Direct instantiation of PlayerLookupRepository is banned in class files. Inject the corresponding interface via the constructor instead.
-			identifier: ibl.directRepoInstantiation
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Direct instantiation of TeamIdentityRepository is banned in class files. Inject the corresponding interface via the constructor instead.
-			identifier: ibl.directRepoInstantiation
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 2
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Loose comparison via "!=" between int and int is not allowed.'
-			identifier: notEqual.notAllowed
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between int and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 5
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between int<min, -1>|int<1, max> and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between mixed and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 4
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Only booleans are allowed in an if condition, int given.'
-			identifier: if.condNotBoolean
-			count: 2
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class LastSimRecap\LastSimRecapRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\PlayerLookupRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Topics\News\NewsService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $time of method Topics\News\NewsService::normalizeStoryTime() expects int|string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $username of method Repositories\TeamIdentityRepository::getTeamnameFromUsername() expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Parameter #1 $value of function intval expects array|bool|float|GMP|int|resource|SimpleXMLElement|string|null, mixed given.'
-			identifier: argument.type
-			count: 7
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Part $currentlang (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Part $sitename (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 2
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $articlecomm;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $authService;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $currentlang;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $db;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $multilingual;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $mysqli_db;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $prefix;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $sitename;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $storyhome;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $topicimage;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $topicname;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $topictext;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $user;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $user_news;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '`global $userinfo;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
-			identifier: ibl.globalKeyword
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
 			identifier: ibl.echoInNonView
 			count: 6
 			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'intval() is banned. Use (int) cast instead. PHPStan can narrow types through casts but not through these functions, and intval(''08'') silently returns 0 (octal radix surprise).'
-			identifier: ibl.castFunction
-			count: 8
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Topics/News/NewsRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "sid" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Topics/TopicsRepository.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -1183,38 +347,14 @@ parameters:
 			path: classes/Topics/TopicsRepository.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "label" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/Trading/BuyoutLedgerRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Trading/TradeFormRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "round" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Trading/TradeFormRepository.php
-
-		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 18
+			count: 5
 			path: classes/Trading/TradeOfferFormView.php
 
 		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
-			count: 1
-			path: classes/Trading/TradeOfferRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "tradeofferid" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
 			count: 1
 			path: classes/Trading/TradeOfferRepository.php
 
@@ -1233,7 +373,7 @@ parameters:
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 5
+			count: 1
 			path: classes/Trading/TradeReviewView.php
 
 		-
@@ -1243,58 +383,16 @@ parameters:
 			path: classes/Trading/TradingController.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "sid" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/TransactionHistory/TransactionHistoryRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/TransactionHistory/TransactionHistoryRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 1
 			path: classes/TransactionHistory/TransactionHistoryRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/Updater/PowerRankingsUpdater.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_slot" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Updater/Steps/AutoSeedOlympicsTeamInfoStep.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 2
 			path: classes/Voting/VotingRepository.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Waivers/WaiversProcessor.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Waivers/WaiversService.php
 
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
@@ -1435,252 +533,6 @@ parameters:
 			path: modules/DebugMenu/index.php
 
 		-
-			rawMessage: 'Cannot call method getTeamnameFromUsername() on mixed.'
-			identifier: method.nonObject
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Cannot call method getTidFromTeamname() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Cannot call method getUsername() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 3
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 3
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function api() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function api() has parameter $user with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function main() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function main() has parameter $user with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function nextSimApi() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function submit() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function submit() has parameter $user with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function tabApi() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function userinfo() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Function userinfo() has parameter $username with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 3
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $action of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntryApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntryController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntrySubmissionHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class NextSim\NextSimTabApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class SavedDepthChart\SavedDepthChartApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamTableService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $leagueContext of class DepthChartEntry\DepthChartEntryView constructor expects League\LeagueContext, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $postData of method DepthChartEntry\DepthChartEntryController::handleSubmit() expects array<string, mixed>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #1 $username of method DepthChartEntry\DepthChartEntryController::displayForm() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepo of class DepthChartEntry\DepthChartEntryApiHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepo of class DepthChartEntry\DepthChartEntrySubmissionHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepo of class SavedDepthChart\SavedDepthChartApiHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepository of class DepthChartEntry\DepthChartEntryController constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $sessionUsername of method DepthChartEntry\DepthChartEntryController::handleSubmit() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #2 $teamid of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects int, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #3 $leagueContext of class DepthChartEntry\DepthChartEntryApiHandler constructor expects League\LeagueContext, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #3 $username of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Parameter #4 $params of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects array<string, mixed>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: Variable $user might not be defined.
-			identifier: variable.undefined
-			count: 3
-			path: modules/DepthChartEntry/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class Draft\DraftController constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -1723,12 +575,6 @@ parameters:
 			path: modules/Draft/index.php
 
 		-
-			rawMessage: Cannot access property $name on mixed.
-			identifier: property.nonObject
-			count: 2
-			path: modules/DraftHistory/index.php
-
-		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
 			count: 2
@@ -1750,30 +596,6 @@ parameters:
 			rawMessage: 'Parameter #1 $db of static method Team\Team::initialize() expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $team of method DraftHistory\DraftHistoryView::renderTeamHistory() expects Team\Team, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $teamName of method DraftHistory\DraftHistoryRepository::getDraftPicksByTeam() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Part $team->name (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: Variable $team might not be defined.
-			identifier: variable.undefined
-			count: 3
 			path: modules/DraftHistory/index.php
 
 		-
@@ -1969,276 +791,6 @@ parameters:
 			path: modules/LeagueStarters/index.php
 
 		-
-			rawMessage: Binary operation "." between "\n\n<b>" and mixed results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Call to function header() with incorrect case: Header'
-			identifier: function.nameCase
-			count: 4
-			path: modules/News/article.php
-
-		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 6
-			path: modules/News/article.php
-
-		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: Constant _DATESTRING not found.
-			identifier: constant.notFound
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: Constant _NOTE not found.
-			identifier: constant.notFound
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
-			identifier: empty.notAllowed
-			count: 4
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between mixed and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Only booleans are allowed in an if condition, string|false given.'
-			identifier: if.condNotBoolean
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Topics\News\NewsService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Parameter #1 $format of function date expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stristr expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Parameter #1 $time of method Topics\News\NewsService::normalizeStoryTime() expects int|string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Part $bodytext (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Part $currentlang (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Part $hometext (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 2
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Binary operation "." between ''&amp;mode='' and mixed results in an error.'
-			identifier: binaryOp.invalid
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Binary operation "." between ''&amp;order='' and mixed results in an error.'
-			identifier: binaryOp.invalid
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Binary operation "." between ''&amp;thold='' and mixed results in an error.'
-			identifier: binaryOp.invalid
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: Binary operation "." between non-falsy-string and mixed results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Call to function header() with incorrect case: Header'
-			identifier: function.nameCase
-			count: 2
-			path: modules/News/categories.php
-
-		-
-			rawMessage: Cannot access offset 'storynum' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: Cannot access offset 'thold' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: Cannot access offset 'umode' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: Cannot access offset 'uorder' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Cannot call method getUserInfo() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 2
-			path: modules/News/categories.php
-
-		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 2
-			path: modules/News/categories.php
-
-		-
-			rawMessage: Constant _COMMENTS not found.
-			identifier: constant.notFound
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: Constant _DATESTRING not found.
-			identifier: constant.notFound
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Function theindex() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Function theindex() has parameter $catid with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Loose comparison using == between int<min, -1>|int<1, max> and '''' will always evaluate to false.'
-			identifier: equal.alwaysFalse
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between int and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 4
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between int<min, -1>|int<1, max> and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between int<min, -1>|int<1, max> and string is not allowed.'
-			identifier: equal.notAllowed
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between mixed and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 3
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Only booleans are allowed in an if condition, int given.'
-			identifier: if.condNotBoolean
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Topics\News\NewsService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Parameter #1 $format of function date expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Parameter #1 $time of method Topics\News\NewsService::normalizeStoryTime() expects int|string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Parameter #1 $value of function intval expects array|bool|float|GMP|int|resource|SimpleXMLElement|string|null, mixed given.'
-			identifier: argument.type
-			count: 6
-			path: modules/News/categories.php
-
-		-
-			rawMessage: 'Part $currentlang (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: modules/News/categories.php
-
-		-
 			rawMessage: 'Cannot call method getUsername() on mixed.'
 			identifier: method.nonObject
 			count: 1
@@ -2341,96 +893,6 @@ parameters:
 			path: modules/OneOnOneGame/index.php
 
 		-
-			rawMessage: Cannot access offset 'sid' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: Cannot access offset 'time' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: Cannot access offset 'title' on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method bind_param() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method close() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method execute() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method fetch_assoc() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method get_result() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method prepare() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
-			identifier: empty.notAllowed
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Parameter #1 $string of function htmlspecialchars expects string, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Parameter #1 $string of function trim expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method getUsername() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/extension.php
-
-		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 6
-			path: modules/Player/extension.php
-
-		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
@@ -2452,64 +914,10 @@ parameters:
 			path: modules/Player/extension.php
 
 		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Extension\ExtensionProcessor constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Parameter #1 $extensionData of method Extension\ExtensionService::processExtension() expects array{playerID?: int, player?: Player\Player, teamName?: string, team?: Team\Team, offer: array{year1: int, year2: int, year3: int, year4: int, year5: int}, demands?: array{total: int, years: int}|array{year1: int, year2: int, year3: int, year4: int, year5: int}|null}, array{teamName: non-empty-string, playerID: int, playerName: string, offer: array{year1: int, year2: int, year3: int, year4: int, year5: int}, demands: array{total: mixed, years: mixed}} given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Parameter #1 $username of method Repositories\TeamIdentityRepository::getTeamnameFromUsername() expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/extension.php
-
-		-
 			rawMessage: 'Parameter #2 $serverName of class Extension\ExtensionProcessor constructor expects string, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Cannot call method getTeamnameFromUsername() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Cannot call method getUsername() on mixed.'
-			identifier: method.nonObject
-			count: 5
-			path: modules/Player/index.php
-
-		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 6
-			path: modules/Player/index.php
-
-		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 2
-			path: modules/Player/index.php
 
 		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
@@ -2530,199 +938,7 @@ parameters:
 			path: modules/Player/index.php
 
 		-
-			rawMessage: 'Function negotiate() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Function negotiate() has parameter $playerID with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Function processrookieoption() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Function rookieoption() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Function rookieoption() has parameter $pid with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Offset ''error'' might not exist on array{valid: false, error?: string, finalYearSalary?: int}.'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Offset ''finalYearSalary'' might not exist on array{valid: true, error?: string, finalYearSalary?: int}.'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in &&, int|false given on the right side.'
-			identifier: booleanAnd.rightNotBoolean
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Negotiation\ExtensionContractDemandCalculator constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationValidator constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Player\PlayerPageService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Player\PlayerRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\SalaryCapRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class RookieOption\RookieOptionController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class RookieOption\RookieOptionRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Topics\News\NewsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of static method Player\Player::withPlayerID() expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of static method Player\Stats\PlayerStats::withPlayerID() expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $mysqliDb of class Player\PlayerPageController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $string of function rawurlencode expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $username of class Debug\DebugSession constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #1 $value of function intval expects array|bool|float|GMP|int|resource|SimpleXMLElement|string|null, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepo of class Player\PlayerPageController constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepo of class Player\PlayerPageService constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #2 $commonRepository of class RookieOption\RookieOptionController constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #2 $salaryCapRepo of class Negotiation\ExtensionContractDemandCalculator constructor expects Repositories\Contracts\SalaryCapRepositoryInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #2 $salaryCapRepo of class Negotiation\NegotiationRepository constructor expects Repositories\Contracts\SalaryCapRepositoryInterface, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Player/index.php
@@ -2734,74 +950,8 @@ parameters:
 			path: modules/Player/index.php
 
 		-
-			rawMessage: 'Parameter #2 $teamName of method RookieOption\RookieOptionView::renderForm() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #2 $userTeamName of method Negotiation\NegotiationService::processNegotiation() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #2 $userTeamName of method RookieOption\RookieOptionValidator::validatePlayerOwnership() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
 			rawMessage: 'Parameter #3 $cookieValue of class Debug\DebugSession constructor expects string|null, mixed given.'
 			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #3 $prefix of method Negotiation\NegotiationService::processNegotiation() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #3 $username of method Player\PlayerPageController::renderPage() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #4 $error of method RookieOption\RookieOptionView::renderForm() expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #4 $request of class Player\PlayerPageController constructor expects Http\HttpRequest, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #5 $result of method RookieOption\RookieOptionView::renderForm() expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #6 $from of method RookieOption\RookieOptionView::renderForm() expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Parameter #9 $db of static method Player\Views\PlayerTradingCardFlipView::render() expects mysqli|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: Unreachable statement - code above always terminates.
-			identifier: deadCode.unreachable
 			count: 1
 			path: modules/Player/index.php
 
@@ -2809,37 +959,25 @@ parameters:
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
 			count: 1
-			path: modules/PlayerDatabase/index.php
+			path: modules/PlayerSearch/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class PlayerDatabase\PlayerDatabaseRepository constructor expects mysqli, mixed given.'
+			rawMessage: 'Parameter #1 $db of class PlayerSearch\PlayerSearchRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
-			path: modules/PlayerDatabase/index.php
+			path: modules/PlayerSearch/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class Player\PlayerRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
-			path: modules/PlayerDatabase/index.php
+			path: modules/PlayerSearch/index.php
 
 		-
-			rawMessage: 'Parameter #1 $rawParams of method PlayerDatabase\PlayerDatabaseService::search() expects array<string, mixed>, array<mixed> given.'
+			rawMessage: 'Parameter #1 $rawParams of method PlayerSearch\PlayerSearchService::search() expects array<string, mixed>, array<mixed> given.'
 			identifier: argument.type
 			count: 1
-			path: modules/PlayerDatabase/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class PlayerMovement\PlayerMovementRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerMovement/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerMovement/index.php
+			path: modules/PlayerSearch/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class Auth\AuthRepository constructor expects mysqli, mixed given.'
@@ -3112,6 +1250,18 @@ parameters:
 			path: modules/SeasonLeaderboards/index.php
 
 		-
+			rawMessage: 'Parameter #1 $db of class SeasonRosterChanges\SeasonRosterChangesRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonRosterChanges/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonRosterChanges/index.php
+
+		-
 			rawMessage: 'Cannot call method isOlympics() on mixed.'
 			identifier: method.nonObject
 			count: 1
@@ -3272,114 +1422,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\SalaryCapRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeAssetRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeCashRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeFormRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeOffer constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeOfferRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeProcessor constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeValidator constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #4 $mysqli_db of class Trading\TradingService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #7 $db of class Trading\TradingController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/index.php
-
-		-
-			rawMessage: Variable $user might not be defined.
-			identifier: variable.undefined
-			count: 4
-			path: modules/Trading/index.php
 
 		-
 			rawMessage: 'Parameter #2 $post of method Trading\TradingController::submitTradeOffer() expects array<string, mixed>, array<mixed> given.'
@@ -3682,7 +1724,7 @@ parameters:
 			path: scripts/allStarRename.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, mixed given.'
+			rawMessage: 'Parameter #1 $db of class Boxscore\AllStarTeamRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: scripts/allStarRename.php
@@ -3692,72 +1734,6 @@ parameters:
 			identifier: variable.undefined
 			count: 1
 			path: scripts/allStarRename.php
-
-		-
-			rawMessage: Cannot access property $affected_rows on mixed.
-			identifier: property.nonObject
-			count: 2
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: 'Cannot call method bind_param() on mixed.'
-			identifier: method.nonObject
-			count: 2
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: 'Cannot call method close() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: 'Cannot call method execute() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: 'Cannot call method fetch_assoc() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: 'Cannot call method get_result() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: 'Cannot call method prepare() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: Negated boolean expression is always true.
-			identifier: booleanNot.alwaysTrue
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: 'Part $playerRowsAffected (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: 'Part $teamRowsAffected (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
 
 		-
 			rawMessage: 'Function parseBxsHeader() has parameter $teamNameToId with no value type specified in iterable type array.'
@@ -3826,96 +1802,6 @@ parameters:
 			path: scripts/archive/plrScratchpad.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/bug-pipeline/claim-next.php
-
-		-
-			rawMessage: 'Strict comparison using === between non-empty-string and false will always evaluate to false.'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: scripts/bug-pipeline/claim-next.php
-
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/bug-pipeline/claim-next.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/bug-pipeline/claim-next.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/bug-pipeline/get-reporter-tech-level.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/bug-pipeline/get-reporter-tech-level.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/bug-pipeline/list-active-conversations.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/bug-pipeline/list-active-conversations.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/bug-pipeline/list-pr-open.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/bug-pipeline/list-pr-open.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/bug-pipeline/set-reporter-tech-level.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/bug-pipeline/set-reporter-tech-level.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/bug-pipeline/transition.php
-
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/bug-pipeline/transition.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/bug-pipeline/transition.php
-
-		-
 			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
 			identifier: ibl.unknownCliOption
 			count: 1
@@ -3926,60 +1812,6 @@ parameters:
 			identifier: variable.undefined
 			count: 3
 			path: scripts/bulkJsbImport.php
-
-		-
-			rawMessage: Casting to string something that's already string.
-			identifier: cast.useless
-			count: 1
-			path: scripts/engParser.php
-
-		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: scripts/engParser.php
-
-		-
-			rawMessage: 'Only booleans are allowed in an if condition, int|false given.'
-			identifier: if.condNotBoolean
-			count: 1
-			path: scripts/engParser.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Maintenance\MaintenanceRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/engParser.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function strpos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/engParser.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/engParser.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/engParser.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/engParser.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/engParser.php
 
 		-
 			rawMessage: Variable $argc might not be defined.
@@ -4010,84 +1842,6 @@ parameters:
 			identifier: variable.undefined
 			count: 2
 			path: scripts/jsbExport.php
-
-		-
-			rawMessage: Binary operation "-" between mixed and mixed results in an error.
-			identifier: binaryOp.invalid
-			count: 9
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: 'Cannot access offset ''name'' on array<string, float|int|string|null>|false.'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: 'Cannot call method bind_param() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: 'Cannot call method close() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: 'Cannot call method execute() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: 'Cannot call method fetch_assoc() on mysqli_result|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: 'Cannot call method get_result() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: Cannot use array destructuring on mixed.
-			identifier: offsetAccess.nonArray
-			count: 3
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: 'Parameter #1 $pid of closure expects int, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: 'Parameter #1 $players of closure expects array, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: 'Parameter #1 $risingStars of static method JsbParser\ScoFileWriter::buildAllStarHeaderBlock() expects array{visitor_name: string, home_name: string, visitor_q: list<int>, home_q: list<int>, visitor_teamid: int, home_teamid: int, attendance: int, capacity: int, ...}, array{visitor_name: mixed, home_name: mixed, visitor_q: mixed, home_q: mixed, visitor_teamid: mixed, home_teamid: mixed, attendance: 5244, capacity: 20000, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: 'Parameter #2 $allStar of static method JsbParser\ScoFileWriter::buildAllStarHeaderBlock() expects array{visitor_name: string, home_name: string, visitor_q: list<int>, home_q: list<int>, visitor_teamid: int, home_teamid: int, attendance: int, capacity: int, ...}, array{visitor_name: mixed, home_name: mixed, visitor_q: mixed, home_q: mixed, visitor_teamid: mixed, home_teamid: mixed, attendance: 5244, capacity: 20000, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
-
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/patch_2007_asg_sco.php
 
 		-
 			rawMessage: 'Loose comparison via "!=" between int and int is not allowed.'
@@ -4306,48 +2060,6 @@ parameters:
 			path: scripts/reconstructPlr.php
 
 		-
-			rawMessage: 'Cannot access offset ''name'' on array<string, float|int|string|null>|false.'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
-
-		-
-			rawMessage: 'Cannot call method bind_param() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
-
-		-
-			rawMessage: 'Cannot call method close() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
-
-		-
-			rawMessage: 'Cannot call method execute() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
-
-		-
-			rawMessage: 'Cannot call method fetch_assoc() on mysqli_result|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
-
-		-
-			rawMessage: 'Cannot call method get_result() on mysqli_stmt|false.'
-			identifier: method.nonObject
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
-
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/reconstruct_2007_asg_boxscores.php
-
-		-
 			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
 			identifier: ibl.unknownCliOption
 			count: 1
@@ -4468,18 +2180,6 @@ parameters:
 			path: scripts/updateAllTheThings.php
 
 		-
-			rawMessage: Binary operation "." between "</div>\n        …" and mixed results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Binary operation "." between ''<div class="news…'' and mixed results in an error.'
-			identifier: binaryOp.invalid
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
 			rawMessage: 'Binary operation "." between ''<p class="news…'' and mixed results in an error.'
 			identifier: binaryOp.invalid
 			count: 1
@@ -4494,31 +2194,7 @@ parameters:
 		-
 			rawMessage: Binary operation "." between non-falsy-string and mixed results in an error.
 			identifier: binaryOp.invalid
-			count: 3
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Cannot call method getCurrentLeague() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Cannot call method getUsername() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 5
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: Constant _NOTE not found.
-			identifier: constant.notFound
-			count: 1
+			count: 2
 			path: themes/IBL/theme.php
 
 		-
@@ -4564,176 +2240,14 @@ parameters:
 			path: themes/IBL/theme.php
 
 		-
-			rawMessage: 'Function CloseTable() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Function themearticle() has an unused parameter $topicname.'
+			identifier: function.unusedParameter
 			count: 1
 			path: themes/IBL/theme.php
 
 		-
-			rawMessage: 'Function OpenTable() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function OpenTable2() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $aid with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $datetime with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $informant with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $thetext with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $title with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $topic with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $topicimage with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $topicname with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themearticle() has parameter $topictext with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themecenterbox() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themefooter() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeheader() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $aid with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $counter with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $informant with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $morelink with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $notes with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $thetext with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $time with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $title with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $topic with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $topicimage with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $topicname with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Function themeindex() has parameter $topictext with no type specified.'
-			identifier: missingType.parameter
+			rawMessage: 'Function themeindex() has an unused parameter $topicname.'
+			identifier: function.unusedParameter
 			count: 1
 			path: themes/IBL/theme.php
 
@@ -4750,129 +2264,9 @@ parameters:
 			path: themes/IBL/theme.php
 
 		-
-			rawMessage: 'Only booleans are allowed in &&, int given on the left side.'
-			identifier: booleanAnd.leftNotBoolean
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
 			rawMessage: 'Only booleans are allowed in a ternary operator condition, int|null given.'
 			identifier: ternary.condNotBoolean
 			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Only booleans are allowed in an if condition, int given.'
-			identifier: if.condNotBoolean
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Navigation\NavigationRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ProjectedDraftOrder\ProjectedDraftOrderRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 4
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $timestamp of method Utilities\NukeCompat::formatLocalTime() expects int|string, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $username of class Debug\DebugSession constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 $username of method Navigation\NavigationRepository::resolveTeamId() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #1 (mixed) of echo cannot be converted to string.'
-			identifier: echo.nonString
-			count: 2
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class Season\Season constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Debug\DebugSession constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #3 $cookieValue of class Debug\DebugSession constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter #3 $subject of function str_replace expects array<string>|string, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter $currentLeague of class Navigation\NavigationConfig constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter $isLoggedIn of class Navigation\NavigationConfig constructor expects bool, int given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter $requestUri of class Navigation\NavigationConfig constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter $serverName of class Navigation\NavigationConfig constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Parameter $username of class Navigation\NavigationConfig constructor expects string|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Part $aid (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 2
 			path: themes/IBL/theme.php
 
 		-
@@ -4888,19 +2282,8 @@ parameters:
 			path: themes/IBL/theme.php
 
 		-
-			rawMessage: 'Part $informant (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 2
-			path: themes/IBL/theme.php
-
-		-
 			rawMessage: 'Part $tipath (mixed) of encapsed string cannot be cast to string.'
 			identifier: encapsedStringPart.nonString
 			count: 2
 			path: themes/IBL/theme.php
 
-		-
-			rawMessage: 'Part $topicimage (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 6
-			path: themes/IBL/theme.php

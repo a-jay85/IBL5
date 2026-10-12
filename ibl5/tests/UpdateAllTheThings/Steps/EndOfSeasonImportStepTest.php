@@ -84,7 +84,7 @@ class EndOfSeasonImportStepTest extends TestCase
         $result = $this->createStep()->execute();
 
         $this->assertTrue($result->success);
-        $this->assertNotEmpty($result->messages);
+        $this->assertNotSame([], $result->messages);
     }
 
     public function testSkipsIndividualImportWhenResolverReturnsNull(): void
@@ -127,7 +127,6 @@ class EndOfSeasonImportStepTest extends TestCase
     {
         $this->stubRepo->method('hasChampionForSeason')->willReturn(true);
 
-        $jsbResult = new JsbImportResult();
 
         $this->stubResolver->method('getContents')->willReturnMap([
             ['dra', null],

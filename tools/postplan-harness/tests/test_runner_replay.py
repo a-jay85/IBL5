@@ -121,7 +121,7 @@ def _fixture(**over):
         "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
         "pr_number": 9999,
         "pr_meta": {"number": 9999, "title": "fix: synthetic",
-                    "body": "## Manual Testing\n\nNo manual testing needed\n",
+                    "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
                     "headRefOid": "deadbeef"},
         "labels": [],
         "final_state": "OPEN",
@@ -1809,12 +1809,23 @@ def _run_live_shaped_with(monkeypatch, out, *, git_cls, fixture, canned_extra=No
 
 
 def test_phase7_green_ci_makes_no_ci_fix_call(monkeypatch, tmp_path):
-    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    class _RecordingLiveShapedGit(_LiveShapedGit):
+        instances: list = []
+
+        def __init__(self, fixture):
+            super().__init__(fixture)
+            type(self).instances.append(self)
+
     out = str(tmp_path / "out")
-    _run_live_shaped(monkeypatch, out)
+    _run_live_shaped_with(monkeypatch, out, git_cls=_RecordingLiveShapedGit,
+                          fixture=_INLINE_FIXTURE)
     audit = _audit(out)
     assert "phase7 ci-fix" not in audit
     assert "fix: address Phase 7 CI failures" not in audit
+    assert len(_RecordingLiveShapedGit.instances) == 1
+    commits = _RecordingLiveShapedGit.instances[0].commit_messages
+    assert commits, "ReplayGit recorded no commits; the check below would be vacuous"
+    assert not any("fix: address Phase 7 CI failures" in m for m in commits)
 
 
 def test_phase7_red_ci_without_rewatch_script_passes_through(monkeypatch, tmp_path):
@@ -1957,6 +1968,10 @@ def test_phase7_rerun_probe_runs_at_most_once(monkeypatch, tmp_path):
     )
     audit = _audit(out)
     assert audit.count("rerun probe") == 1
+    for attempt in (1, 2):
+        assert re.search(
+            rf"phase7 ci-fix attempt {attempt}: .*outcome=no-change", audit), \
+            f"attempt {attempt} did not log outcome=no-change"
     acts = _actions(out)
     rerun_count = sum(1 for a in acts if a.get("action") == "run_rerun_failed")
     assert rerun_count == 2
@@ -2254,3 +2269,54 @@ def test_replay_runner_missing_method_stays_held(tmp_path):
                      FixtureLlm(UsageLedger(), CANNED), mode="replay")
     assert any(i.startswith("MISSING-METHOD: test_never_declared_anywhere")
                for i in res.unresolved_conformance)
+
+
+_PHASE2_STARTS = ("phase2: starting scope check",
+                  "phase2: starting commit ADR gate",
+                  "phase2: starting commit (pre-commit hook)")
+
+
+def test_phase2_logs_step_starts_in_order(tmp_path):
+    """audit.log names each Phase 2 step before it runs, in execution order, so a hang
+    is attributable to the last `phase2: starting` line.
+
+    Mutation caught: delete or reorder any of the three `log(...)` calls in runner.run.
+    """
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    audit = _audit(out)
+    positions = [audit.find(line) for line in _PHASE2_STARTS]
+    assert all(p >= 0 for p in positions), (positions, audit)
+    assert positions == sorted(positions), positions
+    # REBASE= is not an audit.log line in replay mode; the PR-exists/create line is the
+    # first later Phase 2 log, so the three starts must precede whichever of these exist.
+    later = [p for p in (audit.find("REBASE="), audit.find("phase2: PR #")) if p >= 0]
+    assert all(p > positions[-1] for p in later), (positions, later)
+
+
+def test_scope_check_timeout_fails_run_closed_with_named_step(tmp_path, monkeypatch):
+    """A scope-check hang fails the run closed (exit 3), and audit.log's last
+    `phase2: starting` line names the scope check.
+
+    Mutation caught: drop SUBPROCESS_TIMEOUT from _FAIL_CLOSED_KINDS (exit 1), or swallow
+    the error in _inject_scope_notes (the run proceeds and the terminal is not FAILED).
+    """
+    def _hang(*a, **kw):
+        raise HarnessError(runner.SUBPROCESS_TIMEOUT,
+                           "step 'scope-check' timed out after 120s",
+                           cmd="bin/lib/plan-scope-conformance")
+
+    monkeypatch.setattr(runner.scope_conformance, "scope_notes", _hang)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == runner.SUBPROCESS_TIMEOUT
+    assert runner.exit_code_for(res) == 3
+    assert "scope-check" in runner.verdict_line(res, 3)
+    starts = [ln for ln in _audit(out).splitlines() if "phase2: starting" in ln]
+    assert starts, "no phase2 step-start line was logged"
+    assert starts[-1].endswith("phase2: starting scope check"), starts
+    assert not any("phase2: starting commit" in ln for ln in starts), starts

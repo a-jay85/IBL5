@@ -26,6 +26,7 @@ class RookieOptionController implements RookieOptionControllerInterface
     private const ROOKIE_EXTENSION_CATEGORY = 'Rookie Extension';
     private const OWNERSHIP_ERROR_MESSAGE = 'You can only exercise options for your own team.';
     private const MISSING_PARAMS_MESSAGE = 'Invalid request. Missing required parameters.';
+    private const CSRF_ERROR_MESSAGE = 'Invalid or expired form submission. Please reload and try again.';
 
     private \mysqli $db;
     private RookieOptionRepositoryInterface $repository;
@@ -56,6 +57,45 @@ class RookieOptionController implements RookieOptionControllerInterface
         $this->commonRepository = $commonRepository;
         $this->appLogger = $appLogger ?? \Logging\LoggerFactory::getChannel('app');
         $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
+    }
+
+    /**
+     * @see RookieOptionControllerInterface::handleSubmission()
+     */
+    public function handleSubmission(\Closure $isUser, \Closure $csrfValid, \Closure $resolveUsername, array $post): ?string
+    {
+        if (!$isUser()) {
+            return null;
+        }
+
+        if (!$csrfValid()) {
+            return 'modules.php?name=Player&error=' . rawurlencode(self::CSRF_ERROR_MESSAGE);
+        }
+
+        $username = $resolveUsername();
+
+        $teamName = is_string($post['teamname'] ?? null) ? $post['teamname'] : '';
+        $playerID = is_string($post['playerID'] ?? null) ? (int) $post['playerID'] : 0;
+        $extensionAmount = is_string($post['rookieOptionValue'] ?? null) ? (int) $post['rookieOptionValue'] : 0;
+        $from = is_string($post['from'] ?? null) ? $post['from'] : '';
+
+        $sessionTeam = $this->commonRepository->getTeamnameFromUsername($username);
+        $sessionTeam = is_string($sessionTeam) ? $sessionTeam : null;
+
+        $result = $this->processRookieOption($teamName, $playerID, $extensionAmount, $sessionTeam);
+
+        if (!$result['success']) {
+            return 'modules.php?name=Player&pa=rookieoption&pid=' . $playerID
+                . '&from=' . rawurlencode($from) . '&error=' . rawurlencode($result['message']);
+        }
+
+        $resultParam = ($result['emailSuccess'] ?? true) ? 'rookie_option_success' : 'email_failed';
+
+        if ($from === 'fa') {
+            return 'modules.php?name=FreeAgency&result=' . $resultParam;
+        }
+
+        return 'modules.php?name=Player&pa=showpage&pid=' . $playerID . '&result=' . $resultParam;
     }
 
     /**

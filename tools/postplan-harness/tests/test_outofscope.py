@@ -163,7 +163,10 @@ def test_every_hit_files_none_dropped(tmp_path):
     gh = _TitlesGh(tmp_path)
     logs: list[str] = []
     nums = file_deferral_issues(gh, _make_hits(7), SLUG, 77, log=logs.append)
-    assert len(nums) == 7
+    # 3 issues + 1 roll-up that the 4 over-cap hits fold into; roll-up number is reported once
+    assert len(nums) == 3
+    assert len(set(nums)) == len(nums)
+    assert len(_creates(gh)) == 7
     assert not any("over cap" in m for m in logs)
     bodies = "\n".join(a["body"] for a in _creates(gh))
     for h in _make_hits(7):

@@ -79,6 +79,8 @@ Known tags: `drop-column`, `drop-table`, `truncate`, `rename-column`, `add-not-n
 
 An untagged marker (`-- destructive-migration: <reason>`) is rejected in `--staged` and `--since` modes. `bin/check-destructive-migrations --full-scan` audits every tracked migration and still honours untagged markers, so historical files scan the same as before.
 
+DDL run through a prepared statement is scanned too. For `PREPARE n FROM @v` the scanner takes the nearest preceding `SET @v = ...`, and scans each string literal in it that starts with `ALTER`, `CREATE`, `DROP`, `RENAME`, `TRUNCATE`, `DELETE` or `UPDATE` as a statement of its own. A hit is reported at the SET's line, so put any bypass marker on an added line of the same file as usual. The `'SELECT 1'` no-op branch of the usual `IF(<guard>, '<DDL>', 'SELECT 1')` idiom is skipped. SQL assembled with `CONCAT(...)` or bound by `SELECT ... INTO @v` is not scanned.
+
 ## Automated Migration Runner
 
 Migrations are applied automatically during deployment via `ibl5/bin/migrate`. The runner:

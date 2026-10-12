@@ -23,6 +23,39 @@ function solidPng(width: number, height: number, rgb: [number, number, number]):
 const RED: [number, number, number] = [255, 0, 0];
 const BLUE: [number, number, number] = [0, 0, 255];
 
+function hexRgb(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+// A white canvas with one solid, fully-opaque rectangle. A solid block keeps
+// pixelmatch's anti-alias detector from excluding any block pixel, so the
+// changed-pixel counts stay deterministic. Default: 50 px of 20000 (0.0025).
+function blockPng(
+  fg: string,
+  block = { x: 10, y: 10, w: 10, h: 5 },
+  width = 200,
+  height = 100,
+): Buffer {
+  const png = new PNG({ width, height });
+  const [r, g, b] = hexRgb(fg);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4;
+      const inside =
+        x >= block.x && x < block.x + block.w && y >= block.y && y < block.y + block.h;
+      png.data[o] = inside ? r : 255;
+      png.data[o + 1] = inside ? g : 255;
+      png.data[o + 2] = inside ? b : 255;
+      png.data[o + 3] = 255;
+    }
+  }
+  return PNG.sync.write(png);
+}
+
 describe('triageCell', () => {
   it('V3a: afterA missing → infra', () => {
     const res = triageCell({
@@ -132,6 +165,150 @@ describe('triageCell', () => {
     expect(
       triageCell({ before, afterA: afterBuf, afterB: afterBuf }).verdict,
     ).toBe('changed');
+  });
+});
+
+describe('triageCell: #2599 gate-parity characterization', () => {
+  it('C1: gray-400→gray-500 text recolor is invisible to gate-parity triage even at T=0', () => {
+    const res = triageCell({
+      before: blockPng('#9ca3af'),
+      afterA: blockPng('#6b7280'),
+      afterB: blockPng('#6b7280'),
+      maxDiffPixelRatio: 0,
+    });
+    expect(res.verdict).toBe('unchanged');
+  });
+
+  it('C2: accent-500→accent-700 recolor is invisible to gate-parity triage even at T=0', () => {
+    const res = triageCell({
+      before: blockPng('#f97316'),
+      afterA: blockPng('#c2410c'),
+      afterB: blockPng('#c2410c'),
+      maxDiffPixelRatio: 0,
+    });
+    expect(res.verdict).toBe('unchanged');
+  });
+
+  it('C3: accent-600→accent-800 hover pair clears 0.2 but the 0.005 ratio still swallows a small run', () => {
+    const input = {
+      before: blockPng('#ea580c'),
+      afterA: blockPng('#9a3412'),
+      afterB: blockPng('#9a3412'),
+    };
+    const strictRatio = triageCell({ ...input, maxDiffPixelRatio: 0 });
+    expect(strictRatio.verdict).toBe('changed');
+    expect(strictRatio.changedRatio).toBeCloseTo(0.0025, 6);
+    expect(triageCell({ ...input, maxDiffPixelRatio: 0.005 }).verdict).toBe('unchanged');
+  });
+});
+
+describe('triageCell: strict review pass', () => {
+  const strictInput = (fromHex: string, toHex: string, block?: { x: number; y: number; w: number; h: number }) => ({
+    before: blockPng(fromHex, block),
+    afterA: blockPng(toHex, block),
+    afterB: blockPng(toHex, block),
+    maxDiffPixelRatio: 0.005,
+    strictReview: true,
+  });
+
+  it('S1: gray-400→gray-500 recolor upgrades to changed', () => {
+    const res = triageCell(strictInput('#9ca3af', '#6b7280'));
+    expect(res.verdict).toBe('changed');
+    expect(res.strict).toBe(true);
+    expect(res.diff).toBeInstanceOf(Buffer);
+    expect(res.changedRatio).toBeCloseTo(0.0025, 6);
+  });
+
+  it('S2: accent-500→accent-700 recolor upgrades to changed', () => {
+    const res = triageCell(strictInput('#f97316', '#c2410c'));
+    expect(res.verdict).toBe('changed');
+    expect(res.strict).toBe(true);
+  });
+
+  it('S3: accent-600→accent-800 small run swallowed by the ratio upgrades to changed', () => {
+    const res = triageCell(strictInput('#ea580c', '#9a3412'));
+    expect(res.verdict).toBe('changed');
+    expect(res.strict).toBe(true);
+  });
+
+  it('S4: strict pass is off by default', () => {
+    const { strictReview: _strictReview, ...input } = strictInput('#9ca3af', '#6b7280');
+    const res = triageCell(input);
+    expect(res.verdict).toBe('unchanged');
+    expect(res.strict).toBeUndefined();
+  });
+
+  it('S5: half-coverage anti-alias pair is caught', () => {
+    expect(triageCell(strictInput('#ced1d7', '#b5b9c0')).verdict).toBe('changed');
+  });
+
+  it('S6: quarter-coverage fringe stays below the strict threshold', () => {
+    expect(triageCell(strictInput('#e6e8eb', '#dadcdf')).verdict).toBe('unchanged');
+  });
+
+  it('S7: sub-threshold jitter stays unchanged', () => {
+    expect(triageCell(strictInput('#9ca3af', '#9ba2ae')).verdict).toBe('unchanged');
+  });
+
+  it('S8: absolute floor boundary', () => {
+    const below = triageCell(strictInput('#9ca3af', '#6b7280', { x: 10, y: 10, w: 4, h: 6 }));
+    expect(below.verdict).toBe('unchanged');
+    const at = triageCell(strictInput('#9ca3af', '#6b7280', { x: 10, y: 10, w: 5, h: 5 }));
+    expect(at.verdict).toBe('changed');
+  });
+
+  it('S9: strict-unstable A-vs-B keeps the loose verdict and never becomes flake', () => {
+    const res = triageCell({
+      before: blockPng('#9ca3af'),
+      afterA: blockPng('#6b7280'),
+      afterB: blockPng('#9ca3af'),
+      maxDiffPixelRatio: 0.005,
+      strictReview: true,
+    });
+    expect(res.verdict).toBe('unchanged');
+    expect(res.strict).toBeUndefined();
+  });
+
+  it('S10: no second render means no strict upgrade', () => {
+    const res = triageCell({ ...strictInput('#9ca3af', '#6b7280'), afterB: null });
+    expect(res.verdict).toBe('unchanged');
+  });
+
+  it('S11: strict never rewrites a loose changed or flake', () => {
+    const changed = triageCell({
+      before: solidPng(4, 4, RED),
+      afterA: solidPng(4, 4, BLUE),
+      afterB: solidPng(4, 4, BLUE),
+      strictReview: true,
+    });
+    expect(changed.verdict).toBe('changed');
+    expect(changed.strict).toBeUndefined();
+    expect(changed.changedRatio).toBeCloseTo(1, 5);
+
+    expect(
+      triageCell({
+        before: solidPng(4, 4, RED),
+        afterA: solidPng(4, 4, RED),
+        afterB: solidPng(4, 4, BLUE),
+        strictReview: true,
+      }).verdict,
+    ).toBe('flake');
+    expect(
+      triageCell({
+        before: solidPng(4, 4, RED),
+        afterA: solidPng(4, 4, RED),
+        afterB: solidPng(8, 8, RED),
+        strictReview: true,
+      }).verdict,
+    ).toBe('flake');
+    expect(
+      triageCell({
+        before: solidPng(4, 4, RED),
+        afterA: solidPng(4, 4, BLUE),
+        afterB: null,
+        strictReview: true,
+      }).verdict,
+    ).toBe('infra');
   });
 });
 

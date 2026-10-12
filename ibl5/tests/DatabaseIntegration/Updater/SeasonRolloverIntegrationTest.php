@@ -24,15 +24,15 @@ class SeasonRolloverIntegrationTest extends DatabaseTestCase
         // $this->db->rollback(), which automatically restores these rows — no manual
         // tearDown() restore needed for the DB side.
         $this->db->query(
-            "UPDATE `ibl_settings` SET value = '2026'"
+            "UPDATE `ibl_settings` SET setting_value = '2026'"
             . " WHERE setting_key = 'Current Season Ending Year' AND league = 'ibl'"
         );
         $this->db->query(
-            "UPDATE `ibl_settings` SET value = 'Regular Season'"
+            "UPDATE `ibl_settings` SET setting_value = 'Regular Season'"
             . " WHERE setting_key = 'Current Season Phase' AND league = 'ibl'"
         );
         $this->db->query(
-            "UPDATE `ibl_settings` SET value = 'Off'"
+            "UPDATE `ibl_settings` SET setting_value = 'Off'"
             . " WHERE setting_key = 'Show Draft Link' AND league = 'ibl'"
         );
 
@@ -99,7 +99,7 @@ class SeasonRolloverIntegrationTest extends DatabaseTestCase
     public function testPreseasonAdvanceForcesShowDraftLinkOff(): void
     {
         $this->db->query(
-            "UPDATE `ibl_settings` SET value = 'On'"
+            "UPDATE `ibl_settings` SET setting_value = 'On'"
             . " WHERE setting_key = 'Show Draft Link' AND league = 'ibl'"
         );
 

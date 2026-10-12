@@ -169,7 +169,7 @@ class TradeExecutionService implements TradeExecutionServiceInterface
         $capResult = $this->validator->validateSalaryCapsForParties($capDeltas);
         $rosterResult = $this->validator->validateRosterLimitsForParties($rosterDeltas);
 
-        $errors = array_merge($capResult['errors'], $rosterResult['errors']);
+        $errors = array_merge($capResult->getErrorMessages(), $rosterResult->getErrorMessages());
 
         return ['valid' => $errors === [], 'errors' => $errors];
     }

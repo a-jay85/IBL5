@@ -12,6 +12,8 @@ declare(strict_types=1);
  * without either resolution. Exits 2 on usage error.
  */
 
+require_once __DIR__ . '/lib/gate-common.php';
+
 const TRIGGER_DESCRIPTIONS = [
     'phpstan-rule' => 'new PHPStan custom rule (mechanical enforcement is a decision)',
     'agent-rule' => 'new .claude/rules/*.md file (operational convention for agents)',
@@ -48,19 +50,16 @@ Modes:
 Options:
   --bypass-from-stdin   Read the PR body from stdin (for local testing).
                         Overrides any automatic fetch.
+  --exclude-from=<file> Drop every path listed in <file> (one repo-relative path per
+                        line, as git diff --name-only prints it; blank lines ignored)
+                        before trigger detection, in every mode. Equals form only;
+                        an unreadable <file> exits 2. bin/pre-commit-hook passes the
+                        paths a merge commit stages byte-identical to origin/master.
   --help, -h            Show this message.
 
 Exit 0 on pass, 1 on failure, 2 on usage error.
 
 USAGE;
-}
-
-function runCmd(string $cmd): array
-{
-    $output = [];
-    $exit = 0;
-    exec($cmd . ' 2>/dev/null', $output, $exit);
-    return [$output, $exit];
 }
 
 function adrBaseRef(?string $set = null): string
@@ -103,11 +102,24 @@ function gitDiffArgs(string $mode): string
     return implode(' ', array_map('escapeshellarg', gitDiffRange($mode)));
 }
 
+/**
+ * Paths named by --exclude-from, as a set. Set once from main; every diff-name
+ * enumeration drops them, so an excluded path never counts toward a trigger.
+ *
+ * @param array<string, true>|null $set
+ * @return array<string, true>
+ */
+function excludedPaths(?array $set = null): array
+{
+    static $excluded = [];
+    if ($set !== null) { $excluded = $set; }
+    return $excluded;
+}
+
 /** @return list<string> */
 function diffNames(string $mode, string $filter): array
 {
-    [$lines] = runCmd(sprintf('git diff %s --name-only --diff-filter=%s', gitDiffArgs($mode), escapeshellarg($filter)));
-    return array_values(array_filter($lines, static fn (string $line): bool => $line !== ''));
+    return gateDiffNames(gitDiffArgs($mode), $filter, excludedPaths());
 }
 
 /** @return list<string> */
@@ -244,51 +256,16 @@ function hasAddedAdr(string $mode): bool
     return false;
 }
 
-function fetchPrBody(string $mode, bool $fromStdin): ?string
-{
-    if ($fromStdin) {
-        $body = stream_get_contents(STDIN);
-        return $body === false ? null : $body;
-    }
-    if ($mode !== 'pr') {
-        return null;
-    }
-    // GitHub Actions checks out a detached merge commit for pull_request events, so
-    // `gh pr view` without arguments cannot infer the PR. The workflow passes the
-    // number via PR_NUMBER env. Fall back to inference when PR_NUMBER is absent
-    // (local `--pr` usage on a branch checkout).
-    $prNumber = getenv('PR_NUMBER');
-    $cmd = 'gh pr view';
-    if (is_string($prNumber) && $prNumber !== '') {
-        $cmd .= ' ' . escapeshellarg($prNumber);
-    }
-    $cmd .= ' --json body --jq .body';
-    [$lines, $exit] = runCmd($cmd);
-    if ($exit !== 0 || $lines === []) {
-        return null;
-    }
-    return implode("\n", $lines);
-}
-
 function extractBypassReason(?string $body): ?string
 {
-    if ($body === null || $body === '' || $body === 'null') {
-        return null;
-    }
-    if (preg_match(BYPASS_REGEX, $body, $m) !== 1) {
-        return null;
-    }
-    $reason = trim($m[1]);
-    if (strlen($reason) < BYPASS_MIN_LENGTH) {
-        return null;
-    }
-    return $reason;
+    return gateExtractBypassReason($body, BYPASS_REGEX, BYPASS_MIN_LENGTH);
 }
 
 // --- main ---
 
 $opts = ['mode' => 'staged', 'bypass_from_stdin' => false];
 $baseArg = null;
+$excludeFromArg = null;
 foreach (array_slice($argv, 1) as $arg) {
     switch ($arg) {
         case '--staged':
@@ -309,10 +286,31 @@ foreach (array_slice($argv, 1) as $arg) {
             exit(0);
         default:
             if (strncmp($arg, '--base=', 7) === 0) { $baseArg = substr($arg, 7); break; }
+            if (str_starts_with($arg, '--exclude-from=')) {
+                $excludeFromArg = substr($arg, strlen('--exclude-from='));
+                break;
+            }
             fwrite(STDERR, "unknown flag: {$arg}\n");
             fwrite(STDERR, usage());
             exit(2);
     }
+}
+if ($excludeFromArg !== null) {
+    $excludeLines = ($excludeFromArg !== '' && !is_dir($excludeFromArg) && is_readable($excludeFromArg))
+        ? @file($excludeFromArg, FILE_IGNORE_NEW_LINES)
+        : false;
+    if ($excludeLines === false) {
+        fwrite(STDERR, "cannot read --exclude-from file: {$excludeFromArg}\n");
+        exit(2);
+    }
+    $excludeSet = [];
+    foreach ($excludeLines as $line) {
+        $line = trim($line);
+        if ($line !== '') {
+            $excludeSet[$line] = true;
+        }
+    }
+    excludedPaths($excludeSet);
 }
 if ($baseArg !== null) {
     if ($opts['mode'] === 'staged') {

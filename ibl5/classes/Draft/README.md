@@ -1,6 +1,6 @@
 ---
 description: Annual IBL draft process — repository, validator, processor, view, service, and controller with interface-driven architecture.
-last_verified: 2026-09-22
+last_verified: 2026-10-06
 ---
 
 # Draft Module Architecture
@@ -26,8 +26,8 @@ Draft Module (Interface-Driven Architecture)
 │   └── DraftControllerInterface
 ├── Dto/
 │   └── DraftBoardData
+├── DraftPick (row-mapping value object, no interface; used by Team page data preparation)
 └── Implementation Classes
-    ├── DraftPick
     ├── DraftRepository (implements DraftRepositoryInterface)
     ├── DraftValidator (implements DraftValidatorInterface)
     ├── DraftProcessor (implements DraftProcessorInterface)

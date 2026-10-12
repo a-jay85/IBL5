@@ -1,0 +1,71 @@
+{
+ "source": "harvested 2026-10-11 from tools/postplan-harness/out raw-*-attempt*.txt plus synthetic edge cases",
+ "entries": [
+  {
+   "id": "out-live-rules-audit-quick-fixes-20261008-161549-93884-raw-manual-classify-attempt0.txt",
+   "reply": "Failed to authenticate: OAuth session expired and could not be refreshed",
+   "kind_before": "llm-invalid-output",
+   "kind_after": "llm-auth-expired"
+  },
+  {
+   "id": "out-live-matrix-assertions-false-stop-classes-20261008-190240-61800-raw-review-agent-a-attempt0.txt",
+   "reply": "Failed to authenticate: OAuth token revoked. Please log in again or contact your administrator.",
+   "kind_before": "llm-invalid-output",
+   "kind_after": "llm-auth-expired"
+  },
+  {
+   "id": "out-live-postplan-llm-invalid-output-retry-20261010-033634-14031-raw-review-agent-a-attempt0.txt",
+   "reply": "[{\"path\": \"tools/postplan-harness/harness/adapters/llm.py\", \"line\": 275, \"body\": \"auth_reply is set once and never cleared, so one auth-failure attempt labels the final error auth-expired even when the last attempt failed for another reason. Example: attempt 1 returns 'Failed to authenticate', attempt 2 returns schema-invalid JSON. The raised detail then says 'auth-expired' with the stale reply, and last_err (the real schema error) is dropped. An operator would be sent to re-login the CLI for a different failure. Reset auth_reply = '' at the top of each loop iteration, or set it from the current attempt in both branches, so the label follows only the last reply. Add a test for auth then bad JSON.\"}]",
+   "kind_before": "ok",
+   "kind_after": "ok"
+  },
+  {
+   "id": "out-live-postplan-llm-invalid-output-retry-20261010-033634-14031-raw-plan-fidelity-review-attempt0.txt",
+   "reply": "REVIEW-COVERAGE: CURRENT\n\n4. The PR body states the cause of past failures and cites no evidence for it.\nPassed: 1, 2, 3, 5, 6.\n\n## FINDINGS\n- [BLOCKING] Cite evidence for the OAuth-expiry claim in the PR body. The `## Summary` bullet in the PR body says \"The earlier failures were OAuth expiry, which a JSON re-ask cannot fix.\" That claim is about past runs, and the diff cannot show it. The body gives no source and does not hedge it, so it matches the check 4c clause. The claim is true: `tools/postplan-harness/out/live-redact-result-error-1288-20261008-161439-65307/raw-safety-verdict-attempt1.txt` holds `Failed to authenticate: OAuth session expired and could not be refreshed`. The same reply appears on both attempts of three 2026-10-08 runs: `redact-result-error-1288` (safety-verdict), `vr-pr-body-changed-screens` (score-findings) and `rules-audit-quick-fixes` (manual-classify). Next action: edit the PR body so that sentence names those three runs' `raw-*-attempt{0,1}.txt` files. The other fix is to rewrite it as uncertainty.\n\nNOT READY\n\n## DIGEST\n**What changed:** The post-plan harness now marks an expired Claude login as `auth-expired` in its failure detail. It also retries the base fetch once after a short network blip.\n**Why:** The 2026-10-08 `llm-invalid-output` failures were expired OAuth logins, and the old `no parseable JSON` detail sent readers toward a JSON repair.\n**Watch:** An `auth-expired` failure still exits 1, so `bin/post-plan-now` falls back to the skill and hits the same expired login. The plan records exit-3 routing for it as a follow-up.\n**Touches:** `tools/postplan-harness/harness/adapters/llm.py`, `tools/postplan-harness/harness/adapters/gitad.py`, `tools/postplan-harness/tests/`, `tools/postplan-harness/README.md`\n**Machine-authored fixes:** pending \u2014 Phase 6.5 has not run",
+   "kind_before": "llm-invalid-output",
+   "kind_after": "llm-invalid-output"
+  },
+  {
+   "id": "out-live-postplan-llm-invalid-output-retry-20261010-033634-14031-raw-body-check-attempt1.txt",
+   "reply": "{\"corrected_body\": \"## Summary\\n- `ClaudeCli.call` in `harness/adapters/llm.py` now spots `Failed to authenticate` and `OAuth session expired` replies. The final `llm-invalid-output` detail reads `<purpose>: auth-expired: <reply>`. The kind and exit code stay the same.\\n- `LiveGit.fetch_base` in `harness/adapters/gitad.py` retries once after `FETCH_TRANSIENT_DELAY` (3s) on a network blip. Blips are `kex_exchange_identification`, `Operation timed out`, `Connection timed out` and `Connection reset by peer`.\\n- `Could not read from remote repository` and `Could not resolve host` alone are not retried. The `cannot lock ref` retry keeps its own budget.\\n- The existing re-ask already worked. The earlier failures were OAuth expiry, which a JSON re-ask cannot fix.\\n- New tests pin the re-ask loop in `tests/test_llm_reask_retry.py`. They check that the schema rides along on the re-ask and that a safety verdict never defaults to `{\\\"holds\\\": []}`.\\n- New tests cover the fetch retry with a stubbed `_run` and with real git behind a fake ssh shim.\\n- `tools/postplan-harness/README.md` has a new section on both retries.\\n\\n## Test plan\\n- Run the three new test files under `tools/postplan-harness/tests/`.\", \"findings\": []}",
+   "kind_before": "ok",
+   "kind_after": "ok"
+  },
+  {
+   "id": "synthetic-auth",
+   "reply": "Failed to authenticate: OAuth session expired and could not be refreshed",
+   "kind_before": "llm-invalid-output",
+   "kind_after": "llm-auth-expired"
+  },
+  {
+   "id": "synthetic-prose",
+   "reply": "I think it is fine.",
+   "kind_before": "llm-invalid-output",
+   "kind_after": "llm-invalid-output"
+  },
+  {
+   "id": "synthetic-valid",
+   "reply": "{\"holds\": []}",
+   "kind_before": "ok",
+   "kind_after": "ok"
+  },
+  {
+   "id": "synthetic-valid-quoting-auth",
+   "reply": "{\"holds\": [\"log said: OAuth session expired\"]}",
+   "kind_before": "ok",
+   "kind_after": "ok"
+  },
+  {
+   "id": "synthetic-usage-limit",
+   "reply": "You've hit your limit",
+   "kind_before": "llm-usage-limit",
+   "kind_after": "llm-usage-limit"
+  },
+  {
+   "id": "synthetic-usage-and-auth",
+   "reply": "You've hit your limit. Failed to authenticate",
+   "kind_before": "llm-usage-limit",
+   "kind_after": "llm-usage-limit"
+  }
+ ]
+}

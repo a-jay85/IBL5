@@ -1,0 +1,407 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/plan-matrix-assertions — Verification Matrix assertion-footprint checker.
+#
+# Usage:
+#   bin/lib/plan-matrix-assertions <plan-file> [<diff-file>|-] [<pr-body-file>]
+#     $2 absent or "-"   -> read the unified diff from stdin
+#     $3 absent or ""    -> no waivers
+#     env MATRIX_ASSERT_ROOT (optional) -> tree root for the tree-grep arm;
+#         set-but-empty disables the arm; unset -> `git rev-parse --show-toplevel`
+#         of the cwd, or no tree arm when that fails or git is not on PATH
+#   stdout: one `UNREALISED-ASSERTION: row <id> -- <What-to-verify cell>` line per unresolved row
+#   stderr: one `  missing: <tok> <tok>...` line after each stdout report line
+#   exit 0 -> ran (with or without report lines; the caller decides severity)
+#   exit 2 -> usage error: $1 empty or unreadable, $2 not "-" and unreadable,
+#             $3 non-empty and unreadable
+#   no Verification Matrix header in the plan -> exit 0, no output
+#
+# Token classification (five arms, checked in order):
+#   A single-word backtick token from the "What to verify" cell is evaluated as:
+#   1. present in a diff `+` line (excluding `+++` headers)  -> realised
+#   2. present in a diff context line (leading space or `-`)  -> pre-existing, skip
+#   2b. a `deleted file mode` header's path equals the token, ends with
+#       `/`+token, starts with token+`/`, or holds `/`+token+`/`  -> realised
+#       (a trailing `/` on the token is dropped first)
+#       (a deleted binary has no body lines; the header is the footprint;
+#       quoted-path headers are skipped fail-closed)
+#   2c. a path-shaped token (holds `/` or `.` after a trailing `/` is dropped) that
+#       equals, or is a `/`-aligned suffix of, a `diff --git` header path or a
+#       `git ls-files` entry                                   -> realised
+#       (file names never appear in file contents; `Chunk_Leaders.php` does not
+#       match `block-Chunk_Leaders.php`, and a bare word never enters this arm)
+#   3. present in a tracked file via `git grep -F`            -> pre-existing, skip
+#   4. otherwise                                               -> missing
+#   A row is flagged UNREALISED-ASSERTION when any qualifying token is missing.
+#   Qualifying tokens: single-word (no whitespace), no `...` or `<word>` spans,
+#   no `*` (glob notation names a set of paths and has no literal footprint, so
+#   it is skipped and never reported missing), not already in a tracked file
+#   (arm 3 above — tokens found in the tree are pre-existing). A row with zero
+#   qualifying tokens is skipped entirely.
+#   Scenario notation `name=value` (`current_tree=T2`, `VAR=1`) is cut at the
+#   first `=` and only `name` is checked; a token starting with `=` is dropped.
+#   Mutation clause: tokens whose every occurrence lies between a `Mutation:` label
+#   (also `mutation:`, `**Mutation:**`) and the first `⇒` `→` `=>` `->`, sentence-ending
+#   `.`, or cell end outside backticks are not checked; the clause names the wrong code
+#   a correct diff never contains. A token also present outside the clause, or after
+#   the arrow, is still checked.
+#
+#   Prefix fallbacks (same three arms, run on a prefix of the token):
+#   - call token `name(a)`    -> after arms 1-3 miss, retry with the trailing `)`
+#                                stripped, so `name(a, b)` in the code realises it
+#   - expansion `${VAR}`      -> after arms 1-3 miss, retry with the trailing `}`
+#                                stripped, so `${VAR:-}` in the code realises it
+#
+# Waiver format: `WAIVE-MATRIX-ROW: <id>` on any line in the PR body file.
+#
+# One-time-check tag: a row whose "What to verify" cell ENDS with
+#   (one-time-check: <reason>)
+# is skipped, and `ONE-TIME-CHECK: row <id> -- skipped (<reason>)` is printed on stdout.
+# Honored only when: the tag is the last text in the cell, <reason> is >= 15 chars with
+# no `(` `)` `|` or backtick, and the row's Test type cell reads exactly CLI-executable.
+# Any other mention of `one-time-check` in the cell is ignored fail-closed: the row is
+# checked as untagged and `ONE-TIME-CHECK-IGNORED: row <id> -- <why>` goes to stderr.
+# Neither line starts with `UNREALISED-ASSERTION:`, which every caller greps for.
+# bin/check-plan gate Z requires the tag at plan time on a CLI-executable row whose
+# location cell runs only outside the repo (~/, $HOME, /tmp) or against a post-PR CI
+# run (gh run|pr|api); such a row has no footprint a diff can carry.
+
+set -euo pipefail
+set -f
+# Force the C locale — deterministic byte-wise matching across locales.
+export LC_ALL=C
+
+# --- argument checks (exit 2 on usage error) ---
+PLAN_FILE="${1:-}"
+DIFF_ARG="${2:-}"
+BODY_ARG="${3:-}"
+
+if [ -z "$PLAN_FILE" ] || [ ! -r "$PLAN_FILE" ]; then
+    echo "Usage: bin/lib/plan-matrix-assertions <plan-file> [<diff-file>|-] [<pr-body-file>]" >&2
+    exit 2
+fi
+if [ -n "$DIFF_ARG" ] && [ "$DIFF_ARG" != "-" ] && [ ! -r "$DIFF_ARG" ]; then
+    echo "plan-matrix-assertions: diff file not readable: $DIFF_ARG" >&2
+    exit 2
+fi
+if [ -n "$BODY_ARG" ] && [ ! -r "$BODY_ARG" ]; then
+    echo "plan-matrix-assertions: body file not readable: $BODY_ARG" >&2
+    exit 2
+fi
+
+# --- check for Verification Matrix header ---
+grep -qiE '\|[[:space:]]*What to verify[[:space:]]*\|' "$PLAN_FILE" || exit 0
+
+# --- working directory ---
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+# --- diff -> $TMP/diff ---
+if [ -z "$DIFF_ARG" ] || [ "$DIFF_ARG" = "-" ]; then
+    cat > "$TMP/diff"
+else
+    cp "$DIFF_ARG" "$TMP/diff"
+fi
+
+# --- PLUS set: added lines (strip leading +, exclude +++ headers) ---
+grep -E '^\+' "$TMP/diff" | grep -vE '^\+\+\+' | sed 's/^+//' > "$TMP/plus" || true
+
+# --- CTX set: context/removed lines (strip leading space or -, exclude --- headers) ---
+grep -E '^[ -]' "$TMP/diff" | grep -vE '^---' | sed 's/^[ -]//' > "$TMP/ctx" || true
+
+# --- DELETED set: paths from `deleted file mode` headers ---
+# `git diff` renders a deletion as `diff --git a/<p> b/<p>` followed by
+# `deleted file mode <mode>`; both halves name the same path. The path is
+# recovered by length: after `diff --git a/` the rest is `<p> b/<p>`, so
+# len(p) = (len(rest) - 3) / 2, and both halves must agree. A header whose path
+# is quoted (core.quotePath escaping) starts with `"` and is skipped
+# fail-closed; a spaced path is unquoted by git and parses through the
+# arithmetic. Any other line between the two headers resets the pairing, so a
+# modification header never enters the set.
+awk '
+/^diff --git / { hdr = $0; next }
+/^deleted file mode / && hdr != "" {
+    r = substr(hdr, 12);
+    if (substr(r, 1, 1) == "\"" || substr(r, 1, 2) != "a/") { hdr = ""; next }
+    r = substr(r, 3);
+    n = length(r);
+    if (n < 4 || (n - 3) % 2 != 0) { hdr = ""; next }
+    len = (n - 3) / 2;
+    p = substr(r, 1, len);
+    if (substr(r, len + 1, 3) == " b/" && substr(r, len + 4) == p) print p;
+    hdr = "";
+    next
+}
+{ hdr = "" }
+' "$TMP/diff" > "$TMP/deleted"
+
+# --- PATHS set: every `diff --git` header path, plus the index when a root is active ---
+# Same length-split as the DELETED set, without the `deleted file mode` pairing, so a
+# modified binary (a regenerated png baseline) whose diff has no body lines still names
+# its path. Quoted headers are skipped fail-closed. `ls-files` is appended after the
+# tree-grep root resolves (see below); a path listed there is pre-existing, like arm 3.
+awk '
+/^diff --git / {
+    r = substr($0, 12);
+    if (substr(r, 1, 1) == "\"" || substr(r, 1, 2) != "a/") next;
+    r = substr(r, 3);
+    n = length(r);
+    if (n < 4 || (n - 3) % 2 != 0) next;
+    len = (n - 3) / 2;
+    p = substr(r, 1, len);
+    if (substr(r, len + 1, 3) == " b/" && substr(r, len + 4) == p) print p;
+}
+' "$TMP/diff" > "$TMP/paths"
+
+# --- WAIVERS ---
+if [ -n "$BODY_ARG" ]; then
+    grep -oE 'WAIVE-MATRIX-ROW:[[:space:]]*[0-9A-Za-z.-]+' "$BODY_ARG" \
+        | sed -E 's/^WAIVE-MATRIX-ROW:[[:space:]]*//' > "$TMP/waived" || true
+else
+    : > "$TMP/waived"
+fi
+
+# --- tree-grep root ---
+if [ "${MATRIX_ASSERT_ROOT+set}" = "set" ]; then
+    # Variable is set (possibly empty): use as-is; empty disables the arm
+    ROOT="$MATRIX_ASSERT_ROOT"
+else
+    # Variable unset: try to resolve from cwd
+    ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
+fi
+if [ -n "$ROOT" ]; then
+    git -C "$ROOT" -c core.quotePath=false ls-files >> "$TMP/paths" 2>/dev/null || true
+fi
+
+# --- extract rows from the Verification Matrix (awk, BSD-awk safe) ---
+# Skips rows inside fenced blocks (``` or ~~~).
+# Skips duplicate row ids (same row can appear multiple times in the plan).
+# Output: id TAB tag TAB cell TAB space-joined qualifying tokens
+# tag is "none", "skip:<reason>" or "warn:<why>" (one-time-check tag, see header).
+# Rows with zero qualifying tokens and no tag are not printed.
+awk -F'|' '
+BEGIN { fence=0; inm=0; }
+/^[[:space:]]*(```|~~~)/ {
+    fence = !fence;
+    inm = 0;
+    next;
+}
+fence { next; }
+/\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
+inm && /^[[:space:]]*\|/ {
+    # escape literal \| so it does not split a cell
+    line = $0;
+    gsub(/\\\|/, "\001", line);
+    n = split(line, f, "|");
+    if (n < 3) { next; }
+    id = f[2]; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id);
+    cell = f[3]; gsub(/\001/, "|", cell); gsub(/\t/, " ", cell);
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", cell);
+    # skip separator row
+    if (cell ~ /^[[:space:]:-]*$/) next;
+    # skip already-seen id
+    if (seen[id]) next;
+    seen[id] = 1;
+    # one-time-check tag: fourth output field, "skip:<reason>" | "warn:<why>" | ""
+    tag = "";
+    if (cell ~ /one-time-check/) {
+        typ = (n >= 4) ? f[4] : ""; gsub(/^[[:space:]]+|[[:space:]]+$/, "", typ);
+        if (match(cell, /\(one-time-check: [^()|`]*\)$/)) {
+            reason = substr(cell, RSTART + 17, RLENGTH - 18);
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", reason);
+            if (length(reason) < 15) {
+                tag = "warn:reason shorter than 15 chars; row checked";
+            } else if (typ != "CLI-executable") {
+                tag = "warn:test type is " typ ", tag honored only on CLI-executable; row checked";
+            } else {
+                tag = "skip:" reason;
+            }
+        } else {
+            tag = "warn:malformed tag (expected trailing \"(one-time-check: <reason>)\"); row checked";
+        }
+    }
+    # Mutation clause: blank the text between a `Mutation:` label and its closing
+    # arrow / sentence end / cell end, outside backtick spans, so the wrong code the
+    # clause names is never a token the diff must carry. The label and the closer stay;
+    # text after the closer (the consequence) is still tokenized. Multibyte arrows are
+    # compared as bytes; LC_ALL=C above keeps substr() byte-wise on BSD and GNU awk.
+    chk = ""; rest = cell;
+    while (match(rest, /(^|[^A-Za-z])(\*\*)?[Mm]utation:(\*\*)?/)) {
+        chk = chk substr(rest, 1, RSTART + RLENGTH - 1) " ";
+        body = substr(rest, RSTART + RLENGTH);
+        L = length(body); tick = 0; stop = L;
+        for (k = 1; k <= L; k++) {
+            c = substr(body, k, 1);
+            if (c == "`") { tick = !tick; continue; }
+            if (tick) continue;
+            if (substr(body, k, 3) == "⇒" || substr(body, k, 3) == "→") { stop = k - 1; break; }
+            if (substr(body, k, 2) == "=>" || substr(body, k, 2) == "->") { stop = k - 1; break; }
+            if (c == "." && (k == L || substr(body, k + 1, 1) == " ")) { stop = k - 1; break; }
+        }
+        rest = substr(body, stop + 1);
+    }
+    chk = chk rest;
+    # extract closed single-word backtick tokens
+    toks = "";
+    n2 = split(chk, parts, "`");
+    for (i = 2; i < n2; i += 2) {
+        t = parts[i];
+        if (t == "") continue;
+        # single-word: no whitespace
+        if (t ~ /[[:space:]]/) continue;
+        # scenario notation (name=value): check only the name
+        sub(/=.*/, "", t);
+        if (t == "") continue;
+        toks = (toks == "") ? t : toks " " t;
+    }
+    # tag is never empty on the wire ("none"): tab is IFS whitespace, so an empty
+    # field would collapse in `read` and shift the later fields left.
+    if (toks != "" || tag != "") print id "\t" (tag == "" ? "none" : tag) "\t" cell "\t" toks;
+    next;
+}
+inm && !/^[[:space:]]*\|/ { inm=0; }
+' "$PLAN_FILE" > "$TMP/rows"
+
+# --- prefix ladder: the same three arms, run on a prefix of a token ---
+# File operands and git-grep only: no pipe into grep -q, so no SIGPIPE under pipefail.
+_prefix_realised() {
+    local p="$1"
+    if grep -qF -e "$p" "$TMP/plus" 2>/dev/null; then return 0; fi
+    if grep -qF -e "$p" "$TMP/ctx" 2>/dev/null; then return 0; fi
+    if [ -n "$ROOT" ]; then
+        if git -C "$ROOT" grep -qF -e "$p" -- 2>/dev/null; then return 0; fi
+    fi
+    return 1
+}
+
+# --- deleted-file arm: a token realised by a deletion header ---
+# Match is path-component aligned: equal, `/`+tok at the end, tok+`/` at the
+# start, or `/`+tok+`/` inside. A trailing `/` on the token is dropped first, so
+# a directory token (`ibl5/images/hof/`) matches the files beneath it. A quoted "$t" in a case pattern is literal;
+# the bare `*` is the only glob, and `set -f` never touches case patterns.
+_deleted_realised() {
+    local t="${1%/}" p
+    [ -n "$t" ] || return 1
+    [ -s "$TMP/deleted" ] || return 1
+    while IFS= read -r p; do
+        case "$p" in
+            "$t" | */"$t" | "$t"/* | */"$t"/* ) return 0 ;;
+        esac
+    done < "$TMP/deleted"
+    return 1
+}
+
+# --- path arm (2c): a path-shaped token realised by the diff's file list or the index ---
+# Shape gate first: after one trailing `/` is dropped the token must hold `/` or `.`;
+# a bare word never enters. Match is `/`-aligned: equal, or `/`+tok at the end. No
+# tok+`/` prefix form (ls-files lists files, so a directory token stays unrealised).
+_path_realised() {
+    local t="${1%/}" p
+    [ -n "$t" ] || return 1
+    case "$t" in
+        */* | *.* ) ;;
+        * ) return 1 ;;
+    esac
+    [ -s "$TMP/paths" ] || return 1
+    while IFS= read -r p; do
+        case "$p" in
+            "$t" | */"$t" ) return 0 ;;
+        esac
+    done < "$TMP/paths"
+    return 1
+}
+
+# --- per-row check ---
+while IFS=$'\t' read -r id tag cell toks; do
+    # check waiver
+    if grep -qxF -e "$id" "$TMP/waived" 2>/dev/null; then
+        continue
+    fi
+
+    # one-time-check tag (see header): skip, or warn and fall through fail-closed
+    case "$tag" in
+        skip:*)
+            printf $'ONE-TIME-CHECK: row %s \xe2\x80\x94 skipped (%s)\n' "$id" "${tag#skip:}"
+            continue
+            ;;
+        warn:*)
+            printf $'ONE-TIME-CHECK-IGNORED: row %s \xe2\x80\x94 %s\n' "$id" "${tag#warn:}" >&2
+            ;;
+    esac
+    [ -n "$toks" ] || continue
+
+    missing=""
+    for tok in $toks; do
+        # filter: drop tokens with placeholder chars (... or <word>)
+        case "$tok" in
+            *...* | *\<*\>* ) continue ;;
+        esac
+
+        # class 3: glob notation. A token holding `*` names a set of paths and
+        # has no literal footprint grep -F could find in a diff or the tree, so
+        # it is neither realised nor missing. Skip it; plain tokens in the same
+        # cell are still checked. (Replaces the prefix-glob arm; see header.)
+        case "$tok" in
+            *\** ) continue ;;
+        esac
+
+        # arm 1: present in a plus line -> realised
+        if grep -qF -e "$tok" "$TMP/plus" 2>/dev/null; then
+            continue
+        fi
+
+        # arm 2: present in a context line -> pre-existing
+        if grep -qF -e "$tok" "$TMP/ctx" 2>/dev/null; then
+            continue
+        fi
+
+        # arm 2b: named by a `deleted file mode` header -> realised. A deleted
+        # binary leaves no body lines, so the header is the only footprint.
+        if _deleted_realised "$tok"; then
+            continue
+        fi
+
+        # arm 2c: a path-shaped token names a file in the diff's header list or
+        # the index. File names never appear in file contents, so arms 1-3 miss
+        # a png baseline or a tracked .php path cited by its path.
+        if _path_realised "$tok"; then
+            continue
+        fi
+
+        # arm 3: tree-grep -> pre-existing if found
+        if [ -n "$ROOT" ]; then
+            if git -C "$ROOT" grep -qF -e "$tok" -- 2>/dev/null; then
+                continue
+            fi
+        fi
+
+        # class 1: multi-arg call. `name(a)` is realised by `name(a, b)`;
+        # retry the three arms with the trailing `)` stripped.
+        case "$tok" in
+            ?*\(*\) )
+                if _prefix_realised "${tok%\)}"; then
+                    continue
+                fi
+                ;;
+        esac
+
+        # class 2: shell default operator. `${VAR}` is realised by `${VAR:-}`;
+        # retry the three arms with the trailing `}` stripped.
+        case "$tok" in
+            \$\{*\} )
+                if _prefix_realised "${tok%\}}"; then
+                    continue
+                fi
+                ;;
+        esac
+
+        # arm 4: missing
+        missing="$missing $tok"
+    done
+
+    if [ -n "$missing" ]; then
+        printf $'UNREALISED-ASSERTION: row %s \xe2\x80\x94 %s\n' "$id" "$cell"
+        printf '  missing:%s\n' "$missing" >&2
+    fi
+done < "$TMP/rows"

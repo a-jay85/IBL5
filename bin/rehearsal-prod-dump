@@ -27,6 +27,27 @@
 # `bin/migrate` and `bin/validate-schema` exercise no stored routines, and prod's
 # mysql.proc is under a server-side lock that hangs `--routines` (reference_prod_mysql_proc_lock).
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: REMOTE_DATABASE=<db> bin/rehearsal-prod-dump
+
+Emit a filtered logical dump of the production database to stdout.
+Intended to run on the prod host via SSH for the Deploy Rehearsal CI job.
+READ-ONLY: issues only mariadb-dump --single-transaction and SELECT queries.
+
+Four large tables (ibl_box_scores, ibl_box_scores_teams, ibl_plr_snapshots,
+ibl_plb_snapshots) are sampled to the two most recent seasons to limit size.
+
+Env:
+  REMOTE_DATABASE  Database name to dump (default: iblhoops_ibl5)
+
+Exit codes:
+  0  Dump written to stdout
+  1  mariadb-dump/mysqldump not found, or season threshold could not be read
+EOF
+    exit 0
+fi
+
 set -euo pipefail
 
 DB="${REMOTE_DATABASE:-iblhoops_ibl5}"

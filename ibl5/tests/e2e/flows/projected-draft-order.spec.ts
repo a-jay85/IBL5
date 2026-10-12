@@ -62,7 +62,7 @@ test.describe('Projected Draft Order flow', () => {
 
   test('round separator rows exist for multiple rounds', async ({ page }) => {
     // CI seed has round 1 and round 2 picks
-    const separators = page.locator('.projected-draft-order-separator, .ibl-table-subheading');
+    const separators = page.locator('.projected-draft-order-separator');
     const count = await separators.count();
     expect(count).toBeGreaterThanOrEqual(1);
     await expect(separators.first()).toBeVisible();

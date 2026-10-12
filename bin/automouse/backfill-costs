@@ -131,11 +131,32 @@ def load_index():
 
 
 def log_paths(date):
+    """Every runner log for `date`, sorted: the legacy shared `<date>.log` plus
+    each per-runner `<date>-<pid>.log` (bin/automouse/run names its log by $$),
+    gathered from both logs/ and logs.archive/ because archive_stale can move
+    one runner's file and not another's. The dir is the first of the two holding
+    any match (logs/ when none do), unchanged from the single-file version."""
+    paths, logdir = [], None
     for sub in ("logs", "logs.archive"):
-        p = os.path.join(NIGHTLY, sub, date + ".log")
-        if os.path.exists(p):
-            return p, os.path.join(NIGHTLY, sub)
-    return None, os.path.join(NIGHTLY, "logs")
+        d = os.path.join(NIGHTLY, sub)
+        found = [os.path.join(d, date + ".log")] + glob.glob(
+            os.path.join(d, glob.escape(date) + "-[0-9]*.log"))
+        found = [p for p in found if os.path.isfile(p)]
+        if found and logdir is None:
+            logdir = d
+        paths.extend(found)
+    return sorted(paths), logdir or os.path.join(NIGHTLY, "logs")
+
+
+def parse_day(date):
+    """Merge parse_log() over every runner log for `date` (see log_paths).
+    Returns (phases, logdir). A (plan, phase) key seen in two runners' files
+    keeps the later file's window in sorted-path order."""
+    paths, logdir = log_paths(date)
+    phases = {}
+    for p in paths:
+        phases.update(parse_log(p, date))
+    return phases, logdir
 
 
 def parse_log(path, date):
@@ -316,8 +337,7 @@ for report in reports:
     date = os.path.basename(report)[: len("0000-00-00")]
     if SINCE and date < SINCE:
         continue
-    logpath, logdir = log_paths(date)
-    phases = parse_log(logpath, date) if logpath else {}
+    phases, logdir = parse_day(date)
 
     lines = open(report, encoding="utf-8").read().splitlines()
     out_lines = []

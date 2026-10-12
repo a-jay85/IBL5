@@ -33,10 +33,10 @@ class TrainingCampRatingsDiffEntryPointTest extends ModuleEntryPointTestCase
         parent::setUp();
         $this->authenticateAs('testgm');
         $this->mockDb->onQuery('ibl_settings', [
-            ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
-            ['name' => 'Current Season Ending Year', 'value' => '2026'],
-            ['name' => 'Allow Trades', 'value' => 'Yes'],
-            ['name' => 'Allow Waiver Moves', 'value' => 'Yes'],
+            ['name' => 'Current Season Phase', 'setting_value' => 'Regular Season'],
+            ['name' => 'Current Season Ending Year', 'setting_value' => '2026'],
+            ['name' => 'Allow Trades', 'setting_value' => 'Yes'],
+            ['name' => 'Allow Waiver Moves', 'setting_value' => 'Yes'],
         ]);
         $this->mockDb->onQuery('ibl_sim_dates', [
             ['sim' => 1, 'start_date' => '2025-11-01', 'end_date' => '2025-11-07'],
@@ -48,41 +48,41 @@ class TrainingCampRatingsDiffEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('TrainingCampRatingsDiff', [], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testWithYearFilterAppliesYear(): void
     {
         $output = $this->runModule('TrainingCampRatingsDiff', ['year' => '2024'], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testRejectsNonDigitYear(): void
     {
         $output = $this->runModule('TrainingCampRatingsDiff', ['year' => 'garbage'], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testWithTidFilterAppliesTeam(): void
     {
         $output = $this->runModule('TrainingCampRatingsDiff', ['tid' => '1'], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testWithStatusFilterAppliesStatus(): void
     {
         $output = $this->runModule('TrainingCampRatingsDiff', ['status' => 'signed'], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testRejectsInvalidStatus(): void
     {
         $output = $this->runModule('TrainingCampRatingsDiff', ['status' => 'garbage'], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

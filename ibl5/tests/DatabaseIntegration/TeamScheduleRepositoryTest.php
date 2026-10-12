@@ -195,6 +195,36 @@ class TeamScheduleRepositoryTest extends DatabaseTestCase
         self::assertLessThan($pos1, $pos2);
     }
 
+    public function testGetScheduleBreaksSameDateTiesByScheduleIdAscending(): void
+    {
+        [$idA, $idB, $idC, $idD] = $this->insertSameDateTieFixture();
+
+        $results = $this->repo->getSchedule(5, 2090);
+
+        $fixtureIds = [$idA, $idB, $idC, $idD];
+        $ids = array_values(array_filter(
+            array_column($results, 'id'),
+            static fn (mixed $id): bool => in_array($id, $fixtureIds, true),
+        ));
+        // Date is primary (D, C), then the same-date pair follows schedule id (A, B).
+        self::assertSame([$idD, $idC, $idA, $idB], $ids);
+    }
+
+    public function testGetProjectedGamesNextSimResultBreaksSameDateTiesByScheduleIdAscending(): void
+    {
+        [$idA, $idB, $idC, $idD] = $this->insertSameDateTieFixture();
+
+        $results = $this->repo->getProjectedGamesNextSimResult(5, '2090-01-08', '2090-01-12', 2090);
+
+        $fixtureIds = [$idA, $idB, $idC, $idD];
+        $ids = array_values(array_filter(
+            array_column($results, 'id'),
+            static fn (mixed $id): bool => in_array($id, $fixtureIds, true),
+        ));
+        // $idD (2090-01-08) is the lastSimEndDate itself and falls outside the window.
+        self::assertSame([$idC, $idA, $idB], $ids);
+    }
+
     public function testGetScheduleFiltersBySeasonYear(): void
     {
         $currentSeason = $this->insertScheduleRow(2090, '2090-01-10', 5, 100, 6, 95);
@@ -219,6 +249,25 @@ class TeamScheduleRepositoryTest extends DatabaseTestCase
         $foundOther = $this->findBySchedId($results, $otherSeason);
         self::assertNotNull($foundCurrent, 'Current season game should appear');
         self::assertNull($foundOther, 'Other season game should be filtered out');
+    }
+
+    /**
+     * Inserts four team-5 games in plan order (A, B, C, D) and returns their ids.
+     *
+     * The same-date pair A/B deliberately breaks the no-doubleheaders domain fact
+     * (a team plays at most once per date). The fixture exists only to pin
+     * deterministic tie ordering by schedule id.
+     *
+     * @return array{0: int, 1: int, 2: int, 3: int}
+     */
+    private function insertSameDateTieFixture(): array
+    {
+        $idA = $this->insertScheduleRow(2090, '2090-01-10', 5, 0, 6, 0);
+        $idB = $this->insertScheduleRow(2090, '2090-01-10', 5, 0, 7, 0);
+        $idC = $this->insertScheduleRow(2090, '2090-01-09', 5, 0, 8, 0);
+        $idD = $this->insertScheduleRow(2090, '2090-01-08', 5, 0, 6, 0);
+
+        return [$idA, $idB, $idC, $idD];
     }
 
     /**

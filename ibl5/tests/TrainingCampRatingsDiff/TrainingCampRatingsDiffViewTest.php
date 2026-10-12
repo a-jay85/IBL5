@@ -157,6 +157,11 @@ class TrainingCampRatingsDiffViewTest extends TestCase
             'finals'        => ['finals', 'last playoffs ratings'],
             'playoffs'      => ['playoffs', 'last playoffs ratings'],
             'rd1 archive'   => ['playoffs-rd1-gm1-3', 'last playoffs ratings'],
+            'conf-finals gm4-7' => ['conf-finals-gm4-7', 'last playoffs ratings'],
+            'conf-finals gm1-3' => ['conf-finals-gm1-3', 'last playoffs ratings'],
+            'rd2 gm4-7'     => ['playoffs-rd2-gm4-7', 'last playoffs ratings'],
+            'rd2 gm1-3'     => ['playoffs-rd2-gm1-3', 'last playoffs ratings'],
+            'rd1 gm4-7'     => ['playoffs-rd1-gm4-7', 'last playoffs ratings'],
             'end-of-season' => ['end-of-season', 'end-of-season ratings'],
             'mid-season'    => ['mid-season', 'mid-season ratings'],
         ];
@@ -169,6 +174,16 @@ class TrainingCampRatingsDiffViewTest extends TestCase
         $html = $this->view->render(2025, $phase, [$row]);
 
         self::assertStringContainsString('Live player ratings vs their ' . $expectedLabel . ' from 2025', $html);
+    }
+
+    public function test_unknown_baseline_phase_gets_generic_label_not_playoffs(): void
+    {
+        $row  = $this->buildRatingRow(1, 'Player A', 5);
+        $html = $this->view->render(2025, 'preseason', [$row]);
+
+        self::assertStringContainsString('Live player ratings vs their last season ratings from 2025', $html);
+        self::assertStringNotContainsString('playoffs', $html);
+        self::assertStringNotContainsString('preseason', $html);
     }
 
     public function test_empty_state_mentions_every_fallback_phase(): void

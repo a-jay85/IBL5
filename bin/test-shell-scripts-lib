@@ -8,19 +8,19 @@
 #
 # Run: bin/test-shell-scripts-lib   (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 HELPER="$SCRIPT_DIR/lib/shell-scripts.sh"
-FAILED=0
 
-pass() { echo "ok: $1"; }
-fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$1" "$2"; }
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+h_tmp TMP_DIR
 
 ENV_BASH_FILE="$TMP_DIR/env_bash_script"
 printf '#!/usr/bin/env bash\necho hello\n' > "$ENV_BASH_FILE"
@@ -95,16 +95,16 @@ else
          "expected '$ENV_SH_FILE', got '$out'"
 fi
 
-# ── case 7: full-corpus count ────────────────────────────────────────────────
-# Baseline was 256; bin/lib/shell-scripts.sh and bin/test-shell-scripts-lib
-# added 2 (251); retiring .claude/skills/pr-ready removed 7 scripts (251);
-# bin/test-automouse-measure-delegate-cost added 1 (252).
+# ── case 7: full-corpus floor ────────────────────────────────────────────────
+# A floor, not an exact count: adding a script must not break CI. The floor
+# catches a discovery regression that silently drops most of the corpus
+# (260 scripts when this became a floor).
 count=$("$HELPER" --full | wc -l | tr -d ' ')
-if [ "$count" = "252" ]; then
-    pass "case 7: full-corpus count is 252"
+if [ "$count" -ge 200 ] 2>/dev/null; then
+    pass "case 7: full-corpus count >= 200 (got $count)"
 else
-    fail "case 7: full-corpus count is 252" \
-         "got $count (expected 252)"
+    fail "case 7: full-corpus count >= 200" \
+         "got $count (expected >= 200)"
 fi
 
 # ── case 8: unknown flag exits non-zero and prints to stderr ─────────────────
@@ -125,11 +125,11 @@ fi
 system_bash="/bin/bash"
 if [ -x "$system_bash" ]; then
     compat_count=$(BASH="$system_bash" "$system_bash" "$HELPER" --full | wc -l | tr -d ' ')
-    if [ "$compat_count" = "252" ]; then
+    if [ "$compat_count" = "$count" ]; then
         pass "case 9: bash 3.2 compat — count matches ($compat_count)"
     else
         fail "case 9: bash 3.2 compat" \
-             "got $compat_count under /bin/bash (expected 252)"
+             "got $compat_count under /bin/bash (expected $count)"
     fi
 else
     pass "case 9: /bin/bash not available — skipped"
@@ -157,9 +157,7 @@ else
     # can resolve "$REPO_ROOT/bin/lib/shell-scripts.sh" correctly when git
     # rev-parse --show-toplevel returns the temp repo root.
     TMP_REPO="$(mktemp -d)"
-    git init -q "$TMP_REPO"
-    git -C "$TMP_REPO" config user.email "test@test.com"
-    git -C "$TMP_REPO" config user.name "Test"
+    h_git_repo "$TMP_REPO" --no-commit
     # Make an initial commit so HEAD exists
     touch "$TMP_REPO/.gitkeep"
     git -C "$TMP_REPO" add .gitkeep
@@ -230,11 +228,4 @@ else
     rm -rf "$TMP_REPO"
 fi
 
-# ── summary ───────────────────────────────────────────────────────────────────
-
-if [ "$FAILED" -eq 0 ]; then
-    echo "all cases passed"
-else
-    echo "one or more cases FAILED"
-fi
-exit "$FAILED"
+h_done

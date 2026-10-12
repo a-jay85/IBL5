@@ -22,6 +22,7 @@ import time
 
 from pathlib import Path
 
+from .. import followcap, netretry
 from ..state import HarnessError
 
 # bin/lib/pr-sticky.sh in the harness's own checkout. Not under pr-ready/,
@@ -30,8 +31,8 @@ STICKY_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-sticky.sh
 # bin/lib/pr-armable.sh, pinned the same way: condition (11) must never read the helper
 # from the worktree it is judging, or a branch could edit it to clear its own hold.
 ARMABLE_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-armable.sh"
+PRF_LIB = ARMABLE_LIB.parent / "post-review-findings.sh"
 
-POSTPLAN_BADGE_MARKER = "<!-- postplan-status -->"
 # Duplicated from fidelity.STICKY_MARKER on purpose: adapters must not import the core
 # phase modules. tests/test_fidelity_carryforward.py asserts the two stay equal.
 PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
@@ -39,8 +40,11 @@ PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
 
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
-                 "pr_merge_auto", "label_add", "pr_status_badge",
-                 "pr_sticky_verdict", "issue_create", "pr_disable_auto_merge")
+                 "pr_merge_auto", "label_add", "pr_status_label",
+                 "pr_sticky_verdict", "issue_create", "followup_create",
+                 "pr_disable_auto_merge",
+                 "pr_checks_json", "run_log_failed", "run_rerun_failed",
+                 "pr_resolve_thread", "label_remove")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
@@ -51,6 +55,10 @@ class RecordingGh:
         # so two long records never interleave into an unparseable line.
         self._actions_lock = threading.Lock()
         self._body_override: str | None = None
+        # Stands in for GitHub's backlog repo: a test seeds prior state through the
+        # fixture key `backlog_issues`, the way a retry sees issues an earlier run filed.
+        self._followup_store = followcap.MemoryStore(
+            [followcap.Issue(**i) for i in self.fixture.get("backlog_issues", [])])
 
     # -- side-effect intents (recorded, never executed) -----------------
     def record(self, action: str, **payload) -> None:
@@ -65,6 +73,15 @@ class RecordingGh:
 
     def unresolved_findings(self, pr: int) -> list[str]:
         return []
+
+    def pr_thread_ids(self, pr: int) -> set[int]:
+        return {int(x) for x in self.fixture.get("thread_ids", [])}
+
+    def trusted_open_threads(self, pr: int) -> list[dict] | None:
+        return self.fixture.get("trusted_threads", [])
+
+    def resolve_review_thread(self, pr: int, comment_id: int, body: str) -> None:
+        self.record("pr_resolve_thread", pr=pr, comment_id=int(comment_id), body=body[:2000])
 
     def pr_sticky_body(self, pr: int) -> str | None:
         """Prior Phase 5.5 sticky body from the replay fixture, or None.
@@ -96,18 +113,33 @@ class RecordingGh:
     def post_review_summary(self, pr: int, title: str, body: str) -> None:
         self.record("pr_comment", pr=pr, title=title, body=body[:4000])
 
-    def pr_status_badge(self, pr: int, body: str) -> None:
-        self.record("pr_status_badge", pr=pr, body=body[:4000])
+    def pr_status_label(self, pr: int, label: str) -> None:
+        self.record("pr_status_label", pr=pr, label=label)
 
     def issue_create(self, title: str, body: str, label: str) -> int | None:
         existing = sum(1 for a in self.actions() if a.get("action") == "issue_create")
         self.record("issue_create", title=title, label=label)
         return existing + 1
 
-    def issue_titles(self, label: str) -> list[str]:
+    def issue_titles(self, label: str | None, *, strict: bool = False) -> list[str]:
         return []
 
+    def followup_create(self, title: str, body: str, label: str) -> int | None:
+        """File one PR follow-up under the per-PR cap (harness/followcap.py)."""
+        try:
+            kind, n = followcap.file_followup(self._followup_store, label, title, body)
+        except followcap.FollowcapError as exc:
+            raise HarnessError("gh", f"followup: {exc}") from exc
+        self.record("followup_create", title=title, body=body, label=label, kind=kind, number=n)
+        return n
+
     # -- reads (fixture-backed) ------------------------------------------
+    def merged_pr(self) -> dict | None:
+        """{"number", "url"} of this branch's most recent MERGED PR, else None.
+        Read-only: the run-end `already-shipped` check, never a mutation."""
+        m = self.fixture.get("merged_pr")
+        return dict(m) if m else None
+
     def pr_exists(self) -> bool:
         return bool(self.fixture.get("pr_number"))
 
@@ -155,8 +187,54 @@ class RecordingGh:
     def branch_protection_strict(self) -> bool:
         return bool((self.fixture or {}).get("protection_strict", False))
 
+    def aggregator_required(self, context: str) -> bool:
+        return context in ((self.fixture or {}).get("protection_contexts") or [])
+
     def merge_state_status(self, pr: int | None = None) -> str:
         return str((self.fixture or {}).get("merge_state_status", "CLEAN"))
+
+    def pr_checks_json(self, pr) -> list:
+        self.record("pr_checks_json", pr=pr)
+        return list(self.fixture.get("ci_checks") or [])
+
+    def run_log_failed(self, run_id, job_id, dest) -> bool:
+        self.record("run_log_failed", run_id=run_id, job_id=job_id)
+        try:
+            with open(dest, "w") as fh:
+                fh.write("(replay log)\n")
+        except OSError:
+            pass
+        return True
+
+    def run_rerun_failed(self, run_id) -> bool:
+        self.record("run_rerun_failed", run_id=run_id)
+        return True
+
+    # -- baseline guard (harness/baseline_guard.py): fresh reads, never the cached meta --
+    def pr_has_label_fresh(self, pr: int, label: str) -> bool:
+        if self.fixture.get("fresh_labels_error"):
+            raise HarnessError("gh", "replay: fresh label read failed")
+        return label in (self.fixture.get("fresh_labels") or [])
+
+    def e2e_runs_for_sha(self, sha: str) -> list[dict]:
+        if self.fixture.get("e2e_runs_error"):
+            raise HarnessError("gh", "replay: e2e run read failed")
+        return list(self.fixture.get("e2e_runs") or [])
+
+    def pr_comments_text(self, pr: int) -> str:
+        return "\n".join(self.fixture.get("pr_comments") or [])
+
+    def pr_label_remove(self, pr: int, label: str) -> bool:
+        self.record("label_remove", pr=pr, label=label)
+        return True
+
+    def pr_label_add_checked(self, pr: int, label: str) -> bool:
+        failures = int(self.fixture.get("label_add_failures") or 0)
+        if failures > 0:
+            self.fixture["label_add_failures"] = failures - 1
+            return False
+        self.record("label_add", pr=pr, label=label)
+        return True
 
     def pr_disable_auto_merge(self, pr: int) -> None:
         self.record("pr_disable_auto_merge", pr=pr)
@@ -176,7 +254,7 @@ class RecordingGh:
 
 
 class LiveGh(RecordingGh):
-    """Installed live adapter. Each of the ten MUTATIONS maps to one fixed `gh`
+    """Installed live adapter. Each MUTATION maps to one fixed `gh`
     invocation built inside its method — the allowlist IS the method set.
     Reads come from live `gh pr view` state. Merge deliberately omits
     --delete-branch: in a multi-worktree clone it errors benignly, and a parent
@@ -190,6 +268,15 @@ class LiveGh(RecordingGh):
         self._meta: dict | None = None
 
     def _gh(self, *args: str, input_text: str | None = None) -> str:
+        """Every gh call. Retries network-transient failures only for argv on
+        netretry's read-only/idempotent allowlist; everything else is one attempt.
+        Non-idempotent sites opt in through _gh_landed with a landed check."""
+        if not netretry.gh_retry_safe(args):
+            return self._gh_once(*args, input_text=input_text)
+        return netretry.call(lambda: self._gh_once(*args, input_text=input_text),
+                             label=f"gh {' '.join(args[:2])}")
+
+    def _gh_once(self, *args: str, input_text: str | None = None) -> str:
         try:
             proc = subprocess.run(["gh", *args], cwd=self.worktree, input=input_text,
                                   capture_output=True, text=True, timeout=self.timeout)
@@ -198,6 +285,36 @@ class LiveGh(RecordingGh):
         if proc.returncode != 0:
             raise HarnessError("gh", f"gh {' '.join(args[:3])}: {proc.stderr.strip()[:400]}")
         return proc.stdout
+
+    def _gh_landed(self, argv: tuple[str, ...], *, label: str,
+                   landed, input_text: str | None = None) -> str:
+        """A non-idempotent call. No landed check means one attempt (today)."""
+        if landed is None:
+            return self._gh(*argv, input_text=input_text)
+        return netretry.call(lambda: self._gh(*argv, input_text=input_text),
+                             label=label, landed=landed)
+
+    @staticmethod
+    def _count_increase_landed(count_fn):
+        """Snapshot count_fn() now. landed() is True once the count grows, so an
+        identical earlier comment or review never counts as the retried one.
+        A failed snapshot returns None: single attempt."""
+        try:
+            before = count_fn()
+        except Exception:
+            return None
+        return lambda: ((True, "") if count_fn() > before else (False, None))
+
+    def _open_prs_for_branch(self) -> list:
+        return json.loads(self._gh("pr", "list", "--head", self.branch, "--state",
+                                   "open", "--json", "number,url"))
+
+    def _matching_count(self, pr: int, field: str, body: str) -> int:
+        """Count comments (field="comments") or reviews (field="reviews") on the
+        PR whose body equals `body` after CRLF/whitespace normalisation."""
+        norm = lambda s: (s or "").replace("\r\n", "\n").strip()
+        data = json.loads(self._gh("pr", "view", str(pr), "--json", field))
+        return sum(1 for item in data.get(field, []) if norm(item.get("body")) == norm(body))
 
     def record(self, action: str, **payload) -> None:
         super().record(action, executed=True, **payload)
@@ -208,8 +325,18 @@ class LiveGh(RecordingGh):
 
     # -- mutations: executed, then recorded ------------------------------
     def pr_create(self, title: str, body: str, base: str) -> int:
-        out = self._gh("pr", "create", "--title", title, "--body", body,
-                       "--base", base, "--head", self.branch)
+        landed = None
+        try:
+            before = self._open_prs_for_branch()
+        except Exception:
+            before = None
+        if before == []:  # the runner calls pr_create only when no PR exists
+            def landed():
+                rows = self._open_prs_for_branch()
+                return (True, rows[0]["url"]) if rows else (False, None)
+        out = self._gh_landed(("pr", "create", "--title", title, "--body", body,
+                               "--base", base, "--head", self.branch),
+                              label="gh pr create", landed=landed)
         m = re.search(r"/pull/(\d+)", out)
         if not m:
             raise HarnessError("gh", f"pr create returned no PR URL: {out[:200]}")
@@ -219,7 +346,7 @@ class LiveGh(RecordingGh):
         return int(m.group(1))
 
     def unresolved_findings(self, pr: int) -> list[str]:
-        """Condition (11) — unresolved review threads scored >= 80.
+        """Condition (11) — every unresolved review thread (scored or `-`).
 
         GH_CMD and REPO_SLUG are STRIPPED from the child env so bin/lib/pr-armable.sh
         falls back to its own defaults (`gh` and the repo slug). env=None would INHERIT
@@ -247,6 +374,68 @@ class LiveGh(RecordingGh):
         if proc.returncode != 0:
             return ["unresolved-findings-api-error"]
         return proc.stdout.split()
+
+    def pr_thread_ids(self, pr: int) -> set[int]:
+        from .llm import _run_reaped
+        if not PRF_LIB.exists():
+            return set()
+        argv = ["bash", "-c", "source \"$1\"; prf_review_threads \"$2\" | jq -r '.commentId // empty'", "_",
+                str(PRF_LIB), str(pr)]
+        env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
+        try:
+            proc = _run_reaped(argv, None, self.timeout, self.worktree, env)
+        except Exception:
+            return set()
+        if proc.returncode != 0:
+            return set()
+        result: set[int] = set()
+        for line in proc.stdout.splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    result.add(int(line))
+                except ValueError:
+                    pass
+        return result
+
+    def trusted_open_threads(self, pr: int) -> list[dict] | None:
+        from .llm import _run_reaped
+        if not PRF_LIB.exists():
+            return None
+        argv = ["bash", "-c", 'source "$1"; list_trusted_open_threads "$2"', "_",
+                str(PRF_LIB), str(pr)]
+        env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
+        try:
+            proc = _run_reaped(argv, None, self.timeout, self.worktree, env)
+        except Exception:
+            return None
+        if proc.returncode != 0:
+            return None
+        rows = []
+        for line in proc.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+        return rows
+
+    def resolve_review_thread(self, pr: int, comment_id: int, body: str) -> None:
+        from .llm import _run_reaped
+        if not PRF_LIB.exists():
+            raise HarnessError("thread-resolve-failed", "PRF_LIB missing")
+        argv = ["bash", "-c", 'source "$1"; resolve_review_finding "$2" "$3" "$4"', "_",
+                str(PRF_LIB), str(pr), str(comment_id), body[:2000]]
+        env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
+        try:
+            proc = _run_reaped(argv, None, self.timeout, self.worktree, env)
+        except Exception as e:
+            raise HarnessError("thread-resolve-failed", str(e))
+        if proc.returncode != 0:
+            raise HarnessError("thread-resolve-failed", proc.stderr.strip()[-400:])
+        self.record("pr_resolve_thread", pr=pr, comment_id=int(comment_id), body=body[:2000])
 
     def pr_edit_body(self, pr: int, body: str) -> None:
         self._gh("pr", "edit", str(pr), "--body", body)
@@ -316,14 +505,25 @@ class LiveGh(RecordingGh):
         self.record("issue_create", title=title, label=label, issue=n)
         return n
 
-    def issue_titles(self, label: str) -> list[str]:
+    def followup_create(self, title: str, body: str, label: str) -> int | None:
         try:
-            out = self._gh("issue", "list", "--repo", "a-jay85/IBL5-backlog",
-                           "--label", label, "--state", "all", "--limit", "3000",
-                           "--json", "title")
-            items = json.loads(out)
+            kind, n = followcap.file_followup(followcap.GhStore(self._gh), label, title, body)
+        except followcap.FollowcapError as exc:
+            raise HarnessError("gh", f"followup: {exc}") from exc
+        self.record("followup_create", title=title, label=label, kind=kind, number=n)
+        return n
+
+    def issue_titles(self, label: str | None, *, strict: bool = False) -> list[str]:
+        argv = ["issue", "list", "--repo", "a-jay85/IBL5-backlog",
+                "--state", "all", "--limit", "3000", "--json", "title"]
+        if label is not None:
+            argv += ["--label", label]
+        try:
+            items = json.loads(self._gh(*argv))
             return [i.get("title", "") for i in items if i.get("title")]
-        except (HarnessError, json.JSONDecodeError):
+        except (HarnessError, json.JSONDecodeError) as exc:
+            if strict:
+                raise HarnessError("gh", f"issue list failed: {exc}") from exc
             return []
 
     def post_review_findings(self, pr: int, head_sha: str, title: str, findings: list) -> None:
@@ -331,50 +531,48 @@ class LiveGh(RecordingGh):
                    "comments": [{"path": f.path, "line": f.line, "side": "RIGHT",
                                  "body": f.body[:1000]} for f in findings]}
         try:
-            self._gh("api", f"repos/{self._repo()}/pulls/{pr}/reviews",
-                     "--method", "POST", "--input", "-",
-                     input_text=json.dumps(payload))
+            self._gh_landed(("api", f"repos/{self._repo()}/pulls/{pr}/reviews",
+                             "--method", "POST", "--input", "-"),
+                            label="gh api reviews POST",
+                            landed=self._count_increase_landed(
+                                lambda: self._matching_count(pr, "reviews", title)),
+                            input_text=json.dumps(payload))
         except HarnessError:
             # one out-of-diff line anchor 422s the whole review — degrade to a
             # summary comment; findings still hold arming from memory regardless
             body = "\n".join(f"- `{f.path}:{f.line}` — {f.body}" for f in findings)
-            self._gh("pr", "comment", str(pr), "--body", f"## {title}\n\n{body}")
+            comment = f"## {title}\n\n{body}"
+            self._gh_landed(("pr", "comment", str(pr), "--body", comment),
+                            label="gh pr comment",
+                            landed=self._count_increase_landed(
+                                lambda: self._matching_count(pr, "comments", comment)))
         self.record("pr_review_findings", pr=pr, head_sha=head_sha, title=title,
                     findings=[{"path": f.path, "line": f.line, "body": f.body[:1000],
                                "score": f.score} for f in findings])
 
     def post_review_summary(self, pr: int, title: str, body: str) -> None:
-        self._gh("pr", "comment", str(pr), "--body", f"## {title}\n\n{body}")
+        comment = f"## {title}\n\n{body}"
+        self._gh_landed(("pr", "comment", str(pr), "--body", comment),
+                        label="gh pr comment",
+                        landed=self._count_increase_landed(
+                            lambda: self._matching_count(pr, "comments", comment)))
         self.record("pr_comment", pr=pr, title=title, body=body[:4000])
 
-    def pr_status_badge(self, pr: int, body: str) -> None:
+    def pr_status_label(self, pr: int, label: str) -> None:
+        """Best-effort: mark the PR with the yellow in-flight label."""
         try:
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
-                f.write(body)
-                fname = f.name
-            try:
-                existing = self._gh(
-                    "api", f"repos/{{owner}}/{{repo}}/issues/{pr}/comments",
-                    "--paginate", "--jq",
-                    f'.[] | select(.body | contains("{POSTPLAN_BADGE_MARKER}")) | .id',
-                )
-                existing_id = existing.strip().splitlines()[0] if existing.strip() else ""
-            except HarnessError:
-                existing_id = ""
-            if existing_id:
-                self._gh("api", "--method", "PATCH",
-                         f"repos/{{owner}}/{{repo}}/issues/comments/{existing_id}",
-                         "-F", f"body=@{fname}")
-            else:
-                self._gh("pr", "comment", str(pr), "--body-file", fname)
-            self.record("pr_status_badge", pr=pr, body=body[:4000])
+            self._gh("label", "create", label, "--color", "FBCA04",
+                     "--description",
+                     "post-plan is running on this PR; removed when the run ends")
         except HarnessError:
             pass
-        finally:
-            try:
-                os.unlink(fname)
-            except Exception:
-                pass
+        try:
+            self._gh("api", "--method", "POST",
+                     f"repos/{{owner}}/{{repo}}/issues/{pr}/labels",
+                     "-f", f"labels[]={label}")
+        except HarnessError:
+            pass
+        self.record("pr_status_label", pr=pr, label=label)
 
     def branch_protection_strict(self) -> bool:
         """Fail closed: an unreadable or null protection config is treated as strict."""
@@ -388,6 +586,15 @@ class LiveGh(RecordingGh):
             return val == "true"
         return True
 
+    def aggregator_required(self, context: str) -> bool:
+        """Fail closed: unreadable protection or a missing context -> False (condition 15 keeps blocking)."""
+        try:
+            out = self._gh("api", f"repos/{self._repo()}/branches/master",
+                           "--jq", ".protection.required_status_checks.contexts[]?")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return False
+        return context in (out or "").splitlines()
+
     def merge_state_status(self, pr: int | None = None) -> str:
         """Fail open with "": an unreadable merge state must not trigger a rebase storm."""
         try:
@@ -396,6 +603,80 @@ class LiveGh(RecordingGh):
         except (HarnessError, OSError, subprocess.SubprocessError):
             return ""
         return (out or "").strip()
+
+    def pr_checks_json(self, pr) -> list:
+        try:
+            proc = subprocess.run(
+                ["gh", "pr", "checks", str(pr), "--json", "name,state,link"],
+                cwd=self.worktree, capture_output=True, text=True, timeout=self.timeout,
+            )
+            if proc.returncode in (0, 8):
+                return json.loads(proc.stdout)
+        except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError, ValueError):
+            pass
+        return []
+
+    def run_log_failed(self, run_id, job_id, dest) -> bool:
+        try:
+            proc = subprocess.run(
+                ["gh", "run", "view", str(run_id), "--job", str(job_id), "--log-failed"],
+                cwd=self.worktree, capture_output=True, text=True, timeout=self.timeout,
+            )
+            with open(dest, "w") as fh:
+                if proc.returncode == 0:
+                    fh.write(proc.stdout)
+                else:
+                    fh.write(proc.stderr or proc.stdout)
+            return proc.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            try:
+                with open(dest, "w") as fh:
+                    fh.write("(log unavailable)\n")
+            except OSError:
+                pass
+            return False
+
+    def run_rerun_failed(self, run_id) -> bool:
+        try:
+            self._gh("run", "rerun", str(run_id), "--failed")
+            return True
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return False
+
+    # -- baseline guard (harness/baseline_guard.py) ------------------------
+    def pr_has_label_fresh(self, pr: int, label: str) -> bool:
+        """Live label read. Bypasses `_fetch_meta`: the label changes during the run."""
+        out = self._gh("api", f"repos/{{owner}}/{{repo}}/issues/{pr}/labels",
+                       "--jq", ".[].name")
+        return any(line.strip() == label for line in out.splitlines())
+
+    def e2e_runs_for_sha(self, sha: str) -> list[dict]:
+        return json.loads(self._gh(
+            "run", "list", "--workflow", "e2e-tests.yml", "--commit", sha,
+            "--json", "databaseId,status,conclusion,event,createdAt", "--limit", "20"))
+
+    def pr_comments_text(self, pr: int) -> str:
+        return self._gh("api", "--paginate", f"repos/{{owner}}/{{repo}}/issues/{pr}/comments",
+                        "--jq", ".[].body")
+
+    def pr_label_remove(self, pr: int, label: str) -> bool:
+        try:
+            self._gh("api", "--method", "DELETE",
+                     f"repos/{{owner}}/{{repo}}/issues/{pr}/labels/{label}")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return False
+        self.record("label_remove", pr=pr, label=label)
+        return True
+
+    def pr_label_add_checked(self, pr: int, label: str) -> bool:
+        try:
+            self._gh("api", "--method", "POST",
+                     f"repos/{{owner}}/{{repo}}/issues/{pr}/labels",
+                     "-f", f"labels[]={label}")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return False
+        self.record("label_add", pr=pr, label=label)
+        return True
 
     def pr_disable_auto_merge(self, pr: int) -> None:
         try:
@@ -414,6 +695,17 @@ class LiveGh(RecordingGh):
             except (HarnessError, json.JSONDecodeError):
                 self._meta = {}
         return self._meta
+
+    def merged_pr(self) -> dict | None:
+        try:
+            out = self._gh("pr", "list", "--head", self.branch, "--state", "merged",
+                           "--json", "number,url", "--limit", "1")
+            rows = json.loads(out or "[]")
+        except (HarnessError, json.JSONDecodeError):
+            return None                             # unknown: keep the failure
+        if isinstance(rows, list) and rows and isinstance(rows[0], dict) and rows[0].get("number"):
+            return {"number": int(rows[0]["number"]), "url": rows[0].get("url") or ""}
+        return None
 
     def pr_exists(self) -> bool:
         return self._fetch_meta().get("state") == "OPEN"

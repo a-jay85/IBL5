@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tests\Standings;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Standings\StandingsRepository;
 use Standings\Contracts\StandingsRepositoryInterface;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * StandingsRepositoryTest - Tests for StandingsRepository data access
@@ -46,6 +48,78 @@ class StandingsRepositoryTest extends TestCase
         $result = $repository->getStandingsByRegion('Atlantic');
 
         $this->assertIsArray($result);
+    }
+
+    /**
+     * Literal copy of the conference names (independent oracle).
+     *
+     * @return array<string, array{string}>
+     */
+    public static function conferenceNameProvider(): array
+    {
+        return [
+            'Eastern' => ['Eastern'],
+            'Western' => ['Western'],
+        ];
+    }
+
+    /**
+     * Literal copy of the division names (independent oracle).
+     *
+     * @return array<string, array{string}>
+     */
+    public static function divisionNameProvider(): array
+    {
+        return [
+            'Atlantic' => ['Atlantic'],
+            'Central' => ['Central'],
+            'Midwest' => ['Midwest'],
+            'Pacific' => ['Pacific'],
+        ];
+    }
+
+    /**
+     * Raw prepared SQL text (backticks intact) for the region query.
+     */
+    private function preparedRegionSql(string $region): string
+    {
+        $mockDb = new MockDatabase();
+        $repository = new StandingsRepository($mockDb);
+
+        $repository->getStandingsByRegion($region);
+
+        $prepared = $mockDb->getPreparedQueries();
+        $this->assertCount(1, $prepared);
+
+        return $prepared[0];
+    }
+
+    #[DataProvider('conferenceNameProvider')]
+    public function testGetStandingsByRegionUsesConferenceColumnsForEachConference(string $conference): void
+    {
+        $sql = $this->preparedRegionSql($conference);
+
+        $this->assertStringContainsString('WHERE s.`conference` = ?', $sql);
+        $this->assertStringContainsString('s.`conf_gb` AS gamesBack', $sql);
+        $this->assertStringContainsString('s.`conf_magic_number` AS magicNumber', $sql);
+        $this->assertStringContainsString('ORDER BY s.`conf_gb` ASC', $sql);
+        $this->assertStringNotContainsString('`division`', $sql);
+        $this->assertStringNotContainsString('div_gb', $sql);
+        $this->assertStringNotContainsString('div_magic_number', $sql);
+    }
+
+    #[DataProvider('divisionNameProvider')]
+    public function testGetStandingsByRegionUsesDivisionColumnsForEachDivision(string $division): void
+    {
+        $sql = $this->preparedRegionSql($division);
+
+        $this->assertStringContainsString('WHERE s.`division` = ?', $sql);
+        $this->assertStringContainsString('s.`div_gb` AS gamesBack', $sql);
+        $this->assertStringContainsString('s.`div_magic_number` AS magicNumber', $sql);
+        $this->assertStringContainsString('ORDER BY s.`div_gb` ASC', $sql);
+        $this->assertStringNotContainsString('`conference`', $sql);
+        $this->assertStringNotContainsString('conf_gb', $sql);
+        $this->assertStringNotContainsString('conf_magic_number', $sql);
     }
 
     public function testGetTeamStreakDataReturnsNullWhenNotFound(): void

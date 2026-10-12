@@ -1,6 +1,6 @@
 ---
 description: The Go sim engine defers home-court advantage until play-outcome bucket EVs are corpus-calibrated; ASG mode is an in-engine no-op until then.
-last_verified: 2026-07-31
+last_verified: 2026-09-30
 ---
 
 # ADR-0036: Engine defers home-court advantage pending bucket-EV calibration

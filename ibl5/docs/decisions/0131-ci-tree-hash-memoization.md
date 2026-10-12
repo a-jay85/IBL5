@@ -1,6 +1,6 @@
 ---
 description: Heavy jobs in the two required CI contexts, plus the Visual Regression and Lighthouse PR jobs, skip when the HEAD tree over a declared input path set already passed, keyed by `bin/ci-memo` and stored in `actions/cache`.
-last_verified: 2026-09-19
+last_verified: 2026-10-08
 ---
 
 # ADR-0131: CI tree-hash memoization of heavy jobs
@@ -62,7 +62,7 @@ The Decision above says the Visual Regression job (`e2e`) is never memo-gated. T
 What changed:
 
 - `e2e` (Visual Regression) in `.github/workflows/e2e-tests.yml` now lists `ci-memo-check` in `needs`, and its condition reads `(src == 'true' && hit != 'true') || baseline == 'true'`. The memo skip applies only through the `src` arm. The `baseline` arm (the `update-baselines` label) is unchanged, and a `labeled` event computes an empty key in any case.
-- `.github/workflows/lighthouse.yml` gained its own `ci-memo-check` job under the scope `lighthouse`. It reuses `.github/ci-memo/e2e.paths` through `--manifest`, and the digest folds `job=lighthouse`, so the key never collides with the e2e key. `bin/ci-memo` folds the php-apache image digest for this scope as well, since `lighthouse-setup` boots the same image. The memo is saved at the end of the `lighthouse` job, guarded on the audit step's `conclusion == 'success'` and on a non-empty hash. A failed audit never saves.
+- `.github/workflows/lighthouse.yml` (example) gained its own `ci-memo-check` job under the scope `lighthouse`. It reuses `.github/ci-memo/e2e.paths` through `--manifest`, and the digest folds `job=lighthouse`, so the key never collides with the e2e key. `bin/ci-memo` folds the php-apache image digest for this scope as well, since `lighthouse-setup` boots the same image. The memo is saved at the end of the `lighthouse` job, guarded on the audit step's `conclusion == 'success'` and on a non-empty hash. A failed audit never saves.
 
 Accepted consequences:
 
@@ -74,3 +74,7 @@ Accepted consequences:
 Unchanged from the Decision: PR-only scope, the bypass on re-runs, pushes, dispatches and `labeled` events, the empty key on an unreadable image manifest, and the rejection of `DIGEST_UNAVAILABLE` as a key input.
 
 Guarded by `bin/test-ci-memo`: case `lighthouse-scope-fold`, gate-topology assertions 6 through 8, case `gate-topology-mutants`, and `manifest-coverage[vr]` / `manifest-coverage[lighthouse]`.
+
+## Addendum (2026-10-08): the tests memo is the only PR skip gate
+
+ADR-0186 removes the path-filter clause from every test and analysis job in `.github/workflows/tests.yml`, so on a memo miss those jobs always run. A skipped need still counts as clean in `MEMO_WRITE`, but no miss-run can skip `test` or `harness-tests` any more. The tests key now carries `--extra gating=memo-only`, which retires memos stored under the old gating. The e2e and lighthouse scopes are unchanged. Guarded by `bin/test-ci-memo` gate-topology assertion 7 and case `memo-only-salt`.

@@ -1,0 +1,9 @@
+# Plan whose only matrix is fenced
+
+## Appendix
+
+```markdown
+| # | What to verify | Test type | Timing | Test file / location |
+|---|----------------|-----------|--------|----------------------|
+| 1 | Thing works | PHPUnit | pre-impl | `ibl5/tests/Foo/FooTest.php` |
+```

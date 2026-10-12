@@ -77,7 +77,7 @@ test.describe('Head-to-Head Records flow', () => {
     // ibl_franchise_era_branding row. No live team is named Hornets, so this label
     // identifies the era row unambiguously and its colour must come from the
     // branding table rather than from ibl_team_info.
-    const hornetsRow = page.locator('td.h2h-row-label', { hasText: 'Hornets' });
+    const hornetsRow = page.locator('th.h2h-row-label', { hasText: 'Hornets' });
     await expect(hornetsRow).toHaveCount(1);
     await expect(hornetsRow).toHaveAttribute('style', /--team-cell-bg:\s*#00788C/i);
   });

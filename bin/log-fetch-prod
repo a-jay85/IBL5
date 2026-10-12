@@ -12,7 +12,29 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/log-fetch-prod [options]
+
+Fetch and aggregate production logs into a compact digest (~500-2000 tokens).
+Runs all aggregation server-side via SSH to minimize data transfer.
+
+Options:
+  --all-levels              Include all log levels (default: WARNING+ only).
+  --days <n>                Number of days to look back (default: 7).
+  --ssh-host <user@host>    SSH host (default: PROD_SSH_HOST from .env).
+  --ssh-port <port>         SSH port.
+  --ssh-key <path>          SSH private key path.
+
+Environment (for local use, read from .env):
+  PROD_SSH_HOST   SSH host string.
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/git-helpers.sh disable=SC1091
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
 DAYS=7
 ALL_LEVELS=false
 SSH_HOST=""
@@ -33,10 +55,10 @@ done
 
 # Fall back to .env for local use
 if [ -z "$SSH_HOST" ]; then
-  # Try repo root first, then git toplevel (worktrees resolve to main repo)
+  # Try repo root first, then the main checkout (worktrees have no .env)
   ENV_FILE="${REPO_ROOT}/.env"
   if [ ! -f "$ENV_FILE" ]; then
-    GIT_ROOT="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')" || true
+    GIT_ROOT="$(main_checkout_root "$REPO_ROOT")" || GIT_ROOT=""
     if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.env" ]; then
       ENV_FILE="$GIT_ROOT/.env"
     else

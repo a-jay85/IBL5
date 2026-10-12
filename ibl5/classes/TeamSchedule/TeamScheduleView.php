@@ -75,7 +75,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $html .= $this->renderTeamBanner($teamId, $teamName);
         $html .= $this->renderHeader($simLengthInDays, $firstUpcomingId);
         $html .= $this->renderMonthNav($gamesByMonth, $isPlayoffPhase, $playoffMonthKey);
-        $html .= $this->renderGamesByMonth($gamesByMonth, $games, $teamId, $team->name, $isPlayoffPhase, $playoffMonthKey);
+        $html .= $this->renderGamesByMonth($gamesByMonth, $teamId, $team->name, $isPlayoffPhase, $playoffMonthKey);
         $html .= '</div>';
         $html .= $this->renderScrollScripts($firstUpcomingId);
 
@@ -164,9 +164,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
      * Render all games organized by month using same layout as Schedule module
      *
      * @param array<string, MonthData> $gamesByMonth
-     * @param list<ScheduleGameRow> $allGames
      */
-    private function renderGamesByMonth(array $gamesByMonth, array $allGames, int $userTeamId, string $userTeamName, bool $isPlayoffPhase, ?string $playoffMonthKey): string
+    private function renderGamesByMonth(array $gamesByMonth, int $userTeamId, string $userTeamName, bool $isPlayoffPhase, ?string $playoffMonthKey): string
     {
         $html = '';
         foreach ($gamesByMonth as $monthKey => $data) {

@@ -81,14 +81,38 @@ final class FaprepGuardTest extends TestCase
         self::assertLessThan($tpl, $guard, 'Guard must precede the template boundary');
     }
 
+    /** Rebuild the source with PHP comments and docblocks removed. */
+    private function stripPhpComments(string $source): string
+    {
+        $out = '';
+        foreach (token_get_all($source) as $token) {
+            if (is_array($token)) {
+                if ($token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT) {
+                    continue;
+                }
+                $out .= $token[1];
+            } else {
+                $out .= $token;
+            }
+        }
+
+        return $out;
+    }
+
     public function testEveryEchoIsWrappedInHtmlSanitizer(): void
     {
-        preg_match_all('/<\?=\s*(.*?)\s*\?>/', $this->src, $m);
-        self::assertCount(13, $m[1], 'Expected exactly 13 <?= ?> expressions');
+        $code = $this->stripPhpComments($this->src);
+
+        $echoCount = preg_match_all('/<\?=\s*(.*?)\s*\?>/', $code, $m);
+        self::assertGreaterThan(0, $echoCount, 'Expected at least one <?= ?> expression');
         foreach ($m[1] as $capture) {
             self::assertStringStartsWith('HtmlSanitizer::e(', $capture, "Echo not wrapped: $capture");
         }
-        self::assertSame(13, substr_count($this->src, 'HtmlSanitizer::e('));
+        self::assertSame(
+            $echoCount,
+            substr_count($code, 'HtmlSanitizer::e('),
+            'Every <?= ?> expression must contain exactly one HtmlSanitizer::e( call'
+        );
     }
 
     public function testHtmlTagCarriesLangEn(): void

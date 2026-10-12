@@ -111,4 +111,69 @@ class DraftProcessorTest extends TestCase
 
         $this->assertStringContainsString("D'Angelo Russell", $message);
     }
+
+    public function testCreateDraftAnnouncementExactFormat(): void
+    {
+        $this->assertSame(
+            'With pick #5 in round 1 of the 2024 IBL Draft, the **Chicago Bulls** select **John Doe!**',
+            $this->processor->createDraftAnnouncement(5, 1, 2024, 'Chicago Bulls', 'John Doe')
+        );
+    }
+
+    public function testCreateDraftAnnouncementZeroPickAndMarkdownNamesPassThroughVerbatim(): void
+    {
+        $this->assertSame(
+            'With pick #0 in round 0 of the 2024 IBL Draft, the **A*B Club** select **_Under_ Score!**',
+            $this->processor->createDraftAnnouncement(0, 0, 2024, 'A*B Club', '_Under_ Score')
+        );
+    }
+
+    public function testCreateNextTeamMessageOnClockExactFormat(): void
+    {
+        $this->assertSame(
+            "Base\n    **<@!123456789>** is on the clock!\nhttps://www.iblhoops.net/ibl5/modules.php?name=Draft",
+            $this->processor->createNextTeamMessage('Base', 123456789, 2024)
+        );
+    }
+
+    public function testCreateNextTeamMessageWithZeroDiscordIdStaysOnClockBranch(): void
+    {
+        $this->assertSame(
+            "Base\n    **<@!0>** is on the clock!\nhttps://www.iblhoops.net/ibl5/modules.php?name=Draft",
+            $this->processor->createNextTeamMessage('Base', 0, 2024)
+        );
+    }
+
+    public function testCreateNextTeamMessageConcludedExactFormat(): void
+    {
+        $this->assertSame(
+            "Base\n    **🏁 __The 2024 IBL Draft has officially concluded!__ 🏁**",
+            $this->processor->createNextTeamMessage('Base', null, 2024)
+        );
+    }
+
+    public function testCreateNextTeamMessageConcludedWithNullSeasonYear(): void
+    {
+        $this->assertSame(
+            "Base\n    **🏁 __The  IBL Draft has officially concluded!__ 🏁**",
+            $this->processor->createNextTeamMessage('Base', null, null)
+        );
+    }
+
+    public function testGetSuccessMessageExactFormat(): void
+    {
+        $this->assertSame(
+            "Announcement<p>\n        <a href=\"/ibl5/modules.php?name=Draft\">Go back to the Draft module</a>",
+            $this->processor->getSuccessMessage('Announcement')
+        );
+    }
+
+    public function testGetDatabaseErrorMessageNamesAdministratorAndEndsWithLink(): void
+    {
+        $message = $this->processor->getDatabaseErrorMessage();
+
+        $this->assertStringStartsWith("Oops, something went wrong, and at least one of the draft database tables wasn't updated.<p>\n", $message);
+        $this->assertStringContainsString("\n            Let the administrator know what happened and they'll look into it.<p>\n", $message);
+        $this->assertStringEndsWith('<a href="/ibl5/modules.php?name=Draft">Go back to the Draft module</a>', $message);
+    }
 }

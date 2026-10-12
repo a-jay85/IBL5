@@ -14,6 +14,21 @@
 # Echoes e.g. the Microsoft Playwright image ref tagged with the installed version.
 set -eu
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/playwright-image-tag <path-to-package.json>
+
+Derive the pinned Playwright Docker image ref from the installed
+@playwright/test version (node_modules), falling back to the declared
+version in package.json. Echoes the full Microsoft Playwright image ref.
+
+Arguments:
+  <path-to-package.json>  Path to the package.json whose sibling
+                          node_modules/@playwright/test is checked.
+EOF
+    exit 0
+fi
+
 pkg="${1:?usage: playwright-image-tag <path-to-package.json>}"
 if [ ! -f "$pkg" ]; then
   echo "playwright-image-tag: no such file: $pkg" >&2

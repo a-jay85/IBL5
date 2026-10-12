@@ -19,7 +19,7 @@ class RecordHoldersEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('RecordHolders');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Regular Season', $output);
         $this->assertStringContainsString('Playoffs', $output);
         $this->assertStringContainsString('H.E.A.T.', $output);
@@ -29,7 +29,7 @@ class RecordHoldersEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('RecordHolders');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_awards');
     }
 

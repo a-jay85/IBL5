@@ -423,7 +423,7 @@ class FreeAgencyAdminAssignTest extends DatabaseTestCase
     {
         $key = 'Current Season Ending Year';
         $league = LeagueContext::LEAGUE_IBL;
-        $stmt = $this->db->prepare("SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ?");
+        $stmt = $this->db->prepare("SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ?");
         self::assertNotFalse($stmt);
         $stmt->bind_param('ss', $key, $league);
         $stmt->execute();
@@ -432,7 +432,7 @@ class FreeAgencyAdminAssignTest extends DatabaseTestCase
 
         self::assertNotNull($row, "the test database must carry a '{$key}' row for '{$league}'");
 
-        return (int) $row['value'];
+        return (int) $row['setting_value'];
     }
 
     private function setSeasonEndingYear(int $year): void
@@ -440,7 +440,7 @@ class FreeAgencyAdminAssignTest extends DatabaseTestCase
         $value = (string) $year;
         $key = 'Current Season Ending Year';
         $league = LeagueContext::LEAGUE_IBL;
-        $stmt = $this->db->prepare("UPDATE `ibl_settings` SET value = ? WHERE setting_key = ? AND league = ?");
+        $stmt = $this->db->prepare("UPDATE `ibl_settings` SET setting_value = ? WHERE setting_key = ? AND league = ?");
         self::assertNotFalse($stmt);
         $stmt->bind_param('sss', $value, $key, $league);
         $stmt->execute();
@@ -452,8 +452,8 @@ class FreeAgencyAdminAssignTest extends DatabaseTestCase
         $key = 'Current Season Ending Year';
         $value = (string) $year;
         $stmt = $this->db->prepare(
-            "INSERT INTO `ibl_settings` (setting_key, value, league) VALUES (?, ?, ?)
-             ON DUPLICATE KEY UPDATE value = VALUES(value)"
+            "INSERT INTO `ibl_settings` (setting_key, setting_value, league) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
         );
         self::assertNotFalse($stmt);
         $stmt->bind_param('sss', $key, $value, $league);

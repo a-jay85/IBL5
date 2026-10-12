@@ -22,6 +22,25 @@
 #
 # Overridable for the self-test via E2E_MUTATOR_CONFIG / E2E_MUTATOR_SPECS_DIR.
 # Exits 0 (clean) or 1 (an updater-firing spec is outside the mutators project).
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-e2e-mutator-isolation
+
+CI gate: verifies that every e2e spec firing the updater pipeline
+(triggerUpdater/runUpdater or POST to updateAllTheThings.php) lives in the
+Playwright 'mutators' project (ADR-0052).
+
+Env:
+  E2E_MUTATOR_CONFIG    Path to playwright.config.ts (default: ibl5/playwright.config.ts)
+  E2E_MUTATOR_SPECS_DIR Path to e2e spec directory (default: ibl5/tests/e2e)
+
+Exit codes:
+  0  All updater-firing specs are in the mutators project
+  1  One or more specs fire the updater but are not in the mutators project
+EOF
+    exit 0
+fi
+
 set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)

@@ -23,7 +23,6 @@ if (!defined('MODULE_FILE')) {
 }
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 $pagetitle = "- $module_name";
 
 // Initialize components

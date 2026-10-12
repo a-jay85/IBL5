@@ -1,6 +1,6 @@
 ---
 description: Headless `claude -p` runners — where a machine-parsed marker must be printed, because text-mode `-p` emits only the model's final message. Path-scoped to `bin/**`, loads when authoring or editing any runner. Companion with full historical rationale and `bin/plan-now` recovery internals (Leg A/Leg B): `.claude/rules/headless-marker-contract-detail.md` (scoped to the two runners it documents).
-last_verified: 2026-08-08
+last_verified: 2026-09-28
 paths: "bin/**"
 ---
 
@@ -41,5 +41,7 @@ never a false green.
 Choosing text mode is usually right — the transcript stays readable and the log can
 `cat` it. Just put the marker requirement in the final message, and make the prompt say
 *why*, so the next editor does not "improve" it back to an early print.
+
+List every legitimate way the run can end: it wrote the artifact, it halted by design, or it had nothing to do. Each one needs its own legal last-line marker and its own verdict branch, placed before any recovery or guess logic. A runner whose only marker is the success artifact reports a correct halt as a failure. `bin/plan-now`'s `NO_PLAN:` marker is the example.
 
 For the history of the failure this rule closes and `bin/plan-now`'s draft-recovery fallback logic, see `.claude/rules/headless-marker-contract-detail.md` (attaches when you touch `bin/plan-now` or `bin/test-plan-now`; Read it directly when debugging a missing marker or modifying recovery logic).

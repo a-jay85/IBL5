@@ -1,0 +1,52 @@
+# Tests that read production source as text, checked by the source-text-read
+# check in bin/check-phpunit-hygiene. Prefer executing the code
+# (.claude/rules/phpunit-tests.md). Add an entry only with a comment naming
+# the property the source guard protects. One path per line.
+
+# ── Audited by backlog#1437: class (b), no behavior seam exists ─────────────
+# updateAllTheThings.php registers the QueueSimSummary step; the script requires mainfile.php with inline addStep calls, so there is no seam to execute
+ibl5/tests/Updater/QueueSimSummaryStepTest.php
+# CLI guard runs first, web gets 403, no SQL composed, sim is int-cast, no argv/env credential, no own DB connection, scripts/.htaccess denies web
+ibl5/tests/WideUnit/Scripts/SimRecapContextGuardTest.php
+# login guard and admin 403 run before any repository use; the page requires mainfile.php and exits, so it cannot be included
+ibl5/tests/WideUnit/Scripts/SimSummariesGuardTest.php
+# every echo in faprep.php is wrapped in HtmlSanitizer; template tail is sliced from source because render() has no seam
+ibl5/tests/WideUnit/Scripts/FaprepGuardTest.php
+# CLI guard is the first statement, no SQL composed, no hardcoded snowflake, write before post, only --sim is int-cast, scripts/.htaccess denies only storeSimRecap.php
+ibl5/tests/WideUnit/Scripts/StoreSimRecapGuardTest.php
+# CLI guard, no SQL, scripts/.htaccess denial in Apache 2.4 syntax; top-level require/exit leaves no seam
+ibl5/tests/WideUnit/Scripts/SimRecapQueueGuardTest.php
+# Discord::init receives the canonical host (Discord short-circuits under PHPUnit, so no behavior seam) and no hostname is hardcoded
+ibl5/tests/WideUnit/Scripts/StoreSimRecapHostSeamTest.php
+
+# ── Unaudited baseline, grandfathered by backlog#1451 ───────────────────────
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/DepthChart/SavedDepthChartScriptTeamGuardLockTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/Extension/ExtensionViewTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/Player/TeamLookupSqlLocalityTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/Security/TrustedArgumentShapeTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/Trading/TradingControllerSubmitOfferTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/Waivers/WaiversControllerTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/WideUnit/Scripts/BugPipelineWrapperAnnotationWiringTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/WideUnit/Scripts/CliScriptsBehaviorPinTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/WideUnit/Scripts/EngParserFopenGuardTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/WideUnit/Scripts/HtaccessCanonicalDomainGuardTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/WideUnit/Scripts/ImportBoxscoresResultGuardTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/WideUnit/Scripts/PatchAsgNameLookupGuardTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/WideUnit/Scripts/ReconstructAsgNameLookupGuardTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/WideUnit/Scripts/RootHtaccessLegacyModulesRedirectGuardTest.php
+# grandfathered: unaudited baseline (backlog#1451)
+ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsRolloverWiringTest.php

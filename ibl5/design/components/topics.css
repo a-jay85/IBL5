@@ -43,7 +43,7 @@
 
 /* Topic Card */
 .topic-card {
-    background: white;
+    background: var(--white);
     border-radius: var(--radius-xl);
     overflow: hidden;
     box-shadow: var(--shadow-sm);
@@ -88,13 +88,13 @@
     justify-content: center;
     width: 44px;
     height: 44px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--white-alpha-10);
     border-radius: var(--radius-lg);
     transition: background var(--transition-fast);
 }
 
 .topic-card__image-link:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--white-alpha-20);
 }
 
 .topic-card__image {
@@ -111,10 +111,10 @@
 .topic-card__title {
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
-    line-height: 1.2;
+    line-height: var(--leading-tight);
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -147,14 +147,14 @@
 
 .topic-card__stat strong {
     color: var(--accent-400);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 .topic-card__stat-separator {
     width: 3px;
     height: 3px;
     border-radius: var(--radius-full);
-    background: rgba(255, 255, 255, 0.3);
+    background: var(--white-alpha-30);
     flex-shrink: 0;
 }
 
@@ -178,7 +178,7 @@
     padding: var(--space-2) 0;
     border-bottom: 1px solid var(--gray-100);
     font-size: 1rem;
-    line-height: 1.4;
+    line-height: var(--leading-normal);
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
@@ -192,7 +192,7 @@
 .topic-card__cat {
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
     color: var(--accent-600);
@@ -235,7 +235,7 @@
 .topic-card__more a {
     font-family: var(--font-display);
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
     color: var(--accent-500);

@@ -1,4 +1,4 @@
-import glob, os, pathlib, re, shlex, shutil, subprocess
+import os, pathlib, re, shlex, shutil, subprocess
 import pytest
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -13,28 +13,16 @@ _LAUNCHCTL_OTHER_SLUG = (
     'printf "%s\\t%s\\t%s\\n" 12345 0 com.ibl5.postplan-now-wt-feature-extra-20260916-144924-99\n'
 )
 
-_TMP_SIDECAR_GLOBS = [
-    "/tmp/post-plan-now-wt-feature-*.session",
-    "/tmp/post-plan-now-wt-feature-*.log",
-]
-
-
-def _tmp_sidecars() -> set[str]:
-    found: set[str] = set()
-    for pattern in _TMP_SIDECAR_GLOBS:
-        found.update(glob.glob(pattern))
-    return found
-
-
 @pytest.fixture(autouse=True)
-def _reap_tmp_sidecars():
-    before = _tmp_sidecars()
-    yield
-    for path in _tmp_sidecars() - before:
-        try:
-            os.remove(path)
-        except OSError:
-            pass
+def _private_log_dir(tmp_path, monkeypatch):
+    """Point post-plan-now's $LOG and .session sidecar at a per-test dir. A reaper that
+    deleted new /tmp/post-plan-now-wt-feature-* files after each test also deleted the
+    logs of a second pytest run going at the same time (another worktree, or a
+    post-plan run's own suite), and that run's test then failed on a missing log."""
+    d = tmp_path / "ppn-logs"
+    d.mkdir()
+    monkeypatch.setenv("POSTPLAN_LOG_DIR", str(d))
+    return d
 
 
 def _fb(code):
@@ -46,6 +34,7 @@ def _fb(code):
 def test_success_and_sentinel_do_not_fall_back():
     assert _fb(0) == "1"   # success → should_fallback returns 1 (false) → no skill fallback
     assert _fb(3) == "1"   # rebase-conflict sentinel → NO fallback (the fix)
+    assert _fb(7) == "1"   # main-checkout refusal → NO fallback (nothing ran)
 
 def test_generic_failures_fall_back():            # negative path: real failures still degrade
     assert _fb(1) == "0"
@@ -106,7 +95,10 @@ def test_plan_blind_prompt_reaches_the_model_intact():
 
 def test_embed_sites_are_shell_quoted():
     src = open(PPN).read()
-    assert 'claude -p $(shq "$PROMPT")' in src      # not \"$PROMPT\" — see shq() header
+    # The prompt is shq()'d into SKILL_PROMPT_ARG, which the claude call splices in
+    # (usage gate resume swaps it); it must never be interpolated inside \"...\".
+    assert 'SKILL_PROMPT_ARG="$(shq "$PROMPT")"' in src   # see shq() header
+    assert 'claude -p ${SKILL_PROMPT_ARG}' in src
     assert r'claude -p \"$PROMPT\"' not in src
     assert '--plan $(shq "$PLAN_OVERRIDE")' in src
 
@@ -120,7 +112,7 @@ def test_plist_wiring_regression():
     # New wiring assertions
     assert "PLAN_ARG" in src
     assert "--live${PLAN_ARG}" in src
-    assert "${PLAN_OVERRIDE:-$HOME/claude-plans/$SLUG.md}" in src
+    assert "${PLAN_OVERRIDE:-$(plans_dir)/$SLUG.md}" in src
     assert "do NOT derive the plan from the branch slug" in src
 
 
@@ -357,10 +349,10 @@ def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None, launchctl_stub=None)
     return subprocess.run(["bash", PPN, *args], cwd=repo, env=env,
                           capture_output=True, text=True)
 
-def _generate_cmd(tmp_path, extra_env=None):
+def _generate_cmd(tmp_path, extra_env=None, args=()):
     """Run bin/post-plan-now with launchctl stubbed and HOME redirected; return $CMD."""
     home = tmp_path / "home"
-    r = _run_ppn(tmp_path, extra_env=extra_env)
+    r = _run_ppn(tmp_path, args=args, extra_env=extra_env)
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
 
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
@@ -372,7 +364,7 @@ def _generate_cmd(tmp_path, extra_env=None):
 def test_generated_cmd_has_no_rc4_arm(tmp_path):
     cmd = _generate_cmd(tmp_path)
     assert '[ "$rc" = 4 ]' not in cmd, "rc=4 arm must be gone after the full-port"
-    assert cmd.index('if should_fallback "$rc"; then') < cmd.index('elif [ "$rc" = 3 ]; then')
+    assert cmd.index('should_fallback "$rc" && ! usage_postrun_pause') < cmd.index('elif [ "$rc" = 3 ]; then')
 
 def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     cmd = _generate_cmd(tmp_path)
@@ -381,18 +373,48 @@ def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     assert "then execute every phase" in cmd
 
 
-def _rc3_gate(tmp_path, log_text=""):
-    """The generated gate chain with the claude call stubbed and $LOG repointed
-    at a fixture this test controls. Returns (gate_source, fixture_path)."""
+def _rc3_gate(tmp_path, log_text="", block=None):
+    """The generated gate chain with the claude call stubbed, $LOG repointed at a
+    fixture this test controls, and the harness run dir repointed at a tmp dir.
+    `block` sets what the harness left there: None = no run dir at all, "" = an empty
+    blocked-ship.txt, any other string = that file's text.
+    Returns (gate_source, fixture_path)."""
     cmd = _generate_cmd(tmp_path)
     gate = cmd.split("rc=$?; ", 1)[1].split("; }; pp_rc=", 1)[0]
     gate = re.sub(r'CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0.*?--name "[^"]*"',
                   'echo "RAN-SKILL"', gate)
     real_log = re.search(r"grep -m1 '\^RESULT:' \"([^\"]+)\"", gate).group(1)
-    fixture = tmp_path / "harness-run.log"
+    fixture = tmp_path / "ship-run.log"
     fixture.write_text(log_text)
-    gate = gate.replace(real_log, str(fixture))   # rewrites the grep AND the "See ..." suffix
+    gate = gate.replace(real_log, str(fixture))   # rewrites the grep AND the "Log: ..." arg
+    real_dir = re.search(r'blocked_ship_block "([^"]+)"', gate).group(1)
+    run_dir = tmp_path / "ship-run-dir"
+    if block is not None:
+        run_dir.mkdir()
+        (run_dir / "blocked-ship.txt").write_text(block)
+    gate = gate.replace(real_dir, str(run_dir))
     return gate, fixture
+
+
+def _gate_args(gate):
+    """(slug, root) the generated gate hands to blocked_ship_block."""
+    m = re.search(r'blocked_ship_block "[^"]+" "([^"]+)" "([^"]+)"', gate)
+    return m.group(1), m.group(2)
+
+
+def _gate_fix_root(gate):
+    """The main-checkout root the generated gate hands to blocked_ship_block as its 5th arg."""
+    m = re.search(r'blocked_ship_block "[^"]+" "[^"]+" "[^"]+" "[^"]+" "([^"]+)"', gate)
+    assert m, "gate does not pass a 5th (main-root) arg to blocked_ship_block"
+    return m.group(1)
+
+
+def _marker_section(stdout):
+    """Text between the two marker lines bin/post-plan-now prints around the block."""
+    m = re.search(r"^=== post-plan blocked ship ===\n(.*?)\n=== end blocked ship ===$",
+                  stdout, re.S | re.M)
+    assert m, f"no marker pair in {stdout!r}"
+    return m.group(1)
 
 def _run_gate(gate, rc=3):
     return subprocess.run(
@@ -427,15 +449,51 @@ def test_gate_selects_the_right_arm_per_rc(tmp_path):
         else:
             assert "RAN-" not in r.stdout, f"rc={rc} must launch no session: {r.stdout!r}"
         if rc == 3:
-            assert "fail-closed sentinel" in r.stdout, "rc=3 lost its notice"
+            assert "=== post-plan blocked ship ===" in r.stdout, "rc=3 lost its notice"
+            assert "did not ship. No PR opened." in r.stdout
+
+
+def test_every_other_failure_dms_with_the_rerun_command(tmp_path):
+    """A failed run DMs on any exit but 0, 3 (already DM'd) and 143 (deliberate SIGTERM).
+
+    Runs the GENERATED segment with post-plan-fail-dm and $LOG repointed at fixtures.
+    The usage-limit line in the log fixture is the case that sent no DM before.
+    """
+    cmd = _generate_cmd(tmp_path)
+    seg = cmd.split("pp_rc=3; fi; ", 1)[1].split("conclude_status_badge", 1)[0]
+    real_dm = re.search(r'"([^"]+/bin/post-plan-fail-dm)"', seg).group(1)
+    real_log = re.search(r'tail -n 3 "([^"]+)"', seg).group(1)
+    root = real_dm[: -len("/bin/post-plan-fail-dm")]
+    log = tmp_path / "run.log"
+    log.write_text("harness: failed\n$(touch pwned) `id`\nYou've hit your session limit\n")
+    calls = tmp_path / "dm-calls.txt"
+    stub = tmp_path / "fail-dm-stub"
+    stub.write_text(f'#!/bin/sh\nprintf "%s\\n" "$4" >> "{calls}"\n')
+    stub.chmod(0o755)
+    seg = seg.replace(real_dm, str(stub)).replace(real_log, str(log))
+
+    for pp_rc, dms in ((1, True), (2, True), (0, False), (3, False), (143, False)):
+        if calls.exists():
+            calls.unlink()
+        r = subprocess.run(["bash", "-c", f"pp_rc={pp_rc}; {seg}"],
+                           cwd=tmp_path, capture_output=True, text=True)
+        assert r.returncode == 0, f"pp_rc={pp_rc}: {r.stderr!r}"
+        assert calls.exists() == dms, f"pp_rc={pp_rc}: dm sent={calls.exists()}"
+        if dms:
+            msg = calls.read_text()
+            assert f"exit {pp_rc}" in msg
+            assert "You've hit your session limit" in msg
+            assert f"Re-run: cd {root} && bin/post-plan-now." in msg
+            assert "$(touch pwned)" in msg      # log text stays inert data
+    assert not (tmp_path / "pwned").exists()
 
 
 def test_generated_cmd_captures_the_harness_result_line(tmp_path):
     cmd = _generate_cmd(tmp_path)
     assert "HARNESS_RESULT=$(grep -m1 '^RESULT:'" in cmd
-    assert "HARNESS_RESULT=${HARNESS_RESULT:0:1400}" in cmd
+    assert "HARNESS_RESULT=${HARNESS_RESULT:0:1200}" in cmd
     assert (cmd.index("rc=$?; ") < cmd.index("HARNESS_RESULT=$(grep")
-            < cmd.index('if should_fallback "$rc"; then'))
+            < cmd.index('should_fallback "$rc" && ! usage_postrun_pause'))
 
 
 def test_skill_only_cmd_has_no_harness_result_capture(tmp_path):
@@ -457,23 +515,38 @@ _ADR_HOOK_RESULT_LINE = (
 )
 
 
-def test_exit3_message_names_the_specific_gate_denial(tmp_path):
-    gate, fixture = _rc3_gate(tmp_path, _ADR_HOOK_RESULT_LINE + "\n")
+def _harness_block(error, log, **extra):
+    """A block from the real renderer, so these tests follow runner.human_block."""
+    runner = _runner_module()
+    from harness.state import RunResult, TerminalState
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.error_kind = "local-gate"
+    res.error = error
+    res.slug = "feat/x"
+    for k, v in extra.items():
+        setattr(res, k, v)
+    return runner.human_block(res, 3, "/wt/feat-x", str(log))
+
+
+def test_exit3_prints_the_block_file_verbatim(tmp_path):
+    adr_error = ("pre-push-adr-hook: Decision-trigger surfaces detected:\n"
+                 "  - [bin-script] bin/foo — Tool script")
+    block = _harness_block(adr_error, tmp_path / "harness-run.log")
+    gate, fixture = _rc3_gate(tmp_path, _ADR_HOOK_RESULT_LINE + "\n", block=block + "\n")
     r = _run_gate(gate)
     assert r.returncode == 0, r.stderr
-    assert "pre-push-adr-hook" in r.stdout
+    assert _marker_section(r.stdout) == block
     assert "bin/next-adr" in r.stdout
-    assert "fail-closed sentinel" in r.stdout
-    assert f"See {fixture}." in r.stdout
     assert "RAN-" not in r.stdout
 
 
-def test_exit3_result_line_is_inert_data_not_shell(tmp_path):
+def test_exit3_block_file_is_inert_data_not_shell(tmp_path):
     # Use non-overlapping sentinel tokens so count() checks prove no execution.
     # (PWNED / PWNED2 would overlap: "PWNED" appears in both, giving count == 2
     # even when no command ran.)
-    log_text = 'RESULT: gate denied: run bin/next-adr "kebab-title" $(echo INJECT1) `echo INJECT2`\n'
-    gate, fixture = _rc3_gate(tmp_path, log_text)
+    block = ('x did not ship. No PR opened.\n\nWhy: run bin/next-adr "kebab-title" '
+             '$(echo INJECT1) `echo INJECT2`\n\nLog: /tmp/x.log\n')
+    gate, fixture = _rc3_gate(tmp_path, "", block=block)
     r = _run_gate(gate)
     assert r.returncode == 0, r.stderr
     assert '$(echo INJECT1)' in r.stdout
@@ -482,49 +555,102 @@ def test_exit3_result_line_is_inert_data_not_shell(tmp_path):
     assert r.stdout.count("INJECT2") == 1
 
 
-def test_exit3_message_falls_back_when_no_result_line(tmp_path):
-    for i, log_text in enumerate(["", "harness: starting\nharness: done\n"]):
-        sub = tmp_path / str(i)
-        sub.mkdir()
-        gate, fixture = _rc3_gate(sub, log_text)
-        r = _run_gate(gate)
-        assert r.returncode == 0, f"case {i}: {r.stderr!r}"
-        assert "rebase conflict" in r.stdout, f"case {i}: {r.stdout!r}"
-        assert "gate denial" in r.stdout, f"case {i}: {r.stdout!r}"
-        assert "fail-closed sentinel" in r.stdout, f"case {i}: {r.stdout!r}"
-        assert "Cause: ." not in r.stdout, f"case {i}: {r.stdout!r}"
-
-
-def test_exit3_message_stays_under_the_discord_cap_worst_case(tmp_path):
-    gate, fixture = _rc3_gate(tmp_path, "RESULT: " + "x" * 2000 + "\n")
+@pytest.mark.parametrize("block", [None, "", "-dir-only"], ids=["no-run-dir", "empty-file", "run-dir-no-file"])
+@pytest.mark.parametrize("log_text", ["", "harness: starting\n"], ids=["empty-log", "noise-log"])
+def test_exit3_prints_plain_block_when_no_block_file(tmp_path, block, log_text):
+    if block == "-dir-only":
+        gate, fixture = _rc3_gate(tmp_path, log_text, block="")
+        (tmp_path / "ship-run-dir" / "blocked-ship.txt").unlink()   # dir exists, file does not
+    else:
+        gate, fixture = _rc3_gate(tmp_path, log_text, block=block)
     r = _run_gate(gate)
     assert r.returncode == 0, r.stderr
-    msg = r.stdout.rstrip("\n")
-    assert "x" * 1300 in msg and "x" * 1450 not in msg      # the 1400 cap fired
-    slug = re.search(r"on branch (.*?)\. SKIPPING", gate).group(1)
-    fixed = len(msg) - 1400 - len(slug) - len(str(fixture))
-    WORST_SLUG, WORST_LOG = 80, 120
-    assert fixed + 1400 + WORST_SLUG + WORST_LOG < 1900, (
-        "assembled rc=3 msg can exceed bin/discord-dm's 1900-char cap; "
-        f"fixed={fixed}")
+    slug, root = _gate_args(gate)
+    section = _marker_section(r.stdout)
+    assert "did not ship. No PR opened." in section
+    assert "Why: the ship step stopped and the log has the reason." in section
+    assert f"  1. cd {root}" in section
+    assert "  3. bin/post-plan-now" in section
+    assert section.endswith(f"Log: {fixture}\nOr paste this to have Claude fix it:\n"
+                            f"{_gate_fix_root(gate)}/bin/postplan-fix {slug}")
+    assert "Or open Claude in that folder" not in section
+    for word in ("harness", "sentinel", "fallback", "terminal", "rc="):
+        assert word not in section.lower(), word
+    assert "RAN-" not in r.stdout
 
 
-def test_badge_banner_rc3_carries_the_captured_result():
+def _deferred_dm_prefix():
+    """The literal prefix bin/post-plan-fail-dm puts before $MSG on the deferred path."""
+    src = open(os.path.join(REPO, "bin", "post-plan-fail-dm")).read()
+    m = re.search(r'send_dm "(Nobody re-ran it[^"]*?)\$MSG"', src)
+    assert m, "deferred send_dm line not found in bin/post-plan-fail-dm"
+    return re.sub(r"\$\(\( DELAY / 60 \)\)", "9999", m.group(1))
+
+
+def test_exit3_dm_keeps_log_line_under_discord_cap(tmp_path):
+    prefix = _deferred_dm_prefix()
+    # (i) worst-case harness block
+    runner = _runner_module()
+    from harness.state import RunResult, TerminalState
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.error_kind = "rebase-conflict"
+    res.slug = "z" * 200
+    res.error = ("n" * 5000) + "\n" + "\n".join(f"Merge conflict in {'p' * 200}{i}" for i in range(20))
+    harness_block = runner.human_block(res, 3, "w" * 200, "l" * 200)
+    assert len(prefix) + len(harness_block) < 1900
+    assert harness_block.split("\n")[-1] in (prefix + harness_block)[:1900]
+    # (ii) worst-case plain block: 80-char slug, 120-char root and log
+    slug, root = "s" * 80, "r" * 120
+    long_log = "l" * 120
+    fn = subprocess.run(
+        ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; blocked_ship_block "{tmp_path}/none" '
+                       f'"{slug}" "{root}" "{long_log}" "{root}"'],
+        capture_output=True, text=True).stdout.rstrip("\n")
+    assert len(prefix) + len(fn) < 1900
+    assert f"Log: {long_log}" in (prefix + fn)[:1900]
+
+
+def test_harness_seg_exports_log_path(tmp_path):
+    bg = _generate_cmd(tmp_path)
+    m = re.search(r'POSTPLAN_LOG_PATH="([^"]+)" caffeinate', bg)
+    assert m, "background HARNESS_SEG lost POSTPLAN_LOG_PATH"
+    assert m.group(1).endswith(".log")
+    assert "blocked_ship_block ()" in bg,"blocked_ship_block not shipped into the detached job"
+    src = open(PPN).read()
+    segs = [ln for ln in src.splitlines() if ln.lstrip().lstrip("&").lstrip().startswith("HARNESS_SEG=\"CLAUDE_HEADLESS=1")]
+    assert len(segs) == 2, "expected the background and foreground HARNESS_SEG lines"
+    for ln in segs:
+        assert 'POSTPLAN_LOG_PATH=\\"$LOG\\" caffeinate' in ln
+
+
+def test_failure_body_rc3_carries_the_captured_result():
     r = subprocess.run(["bash", "-c",
         f'source "{PPN}" >/dev/null 2>&1; '
         'HARNESS_RESULT="RESULT: pre-push-adr-hook denied the push"; '
-        'postplan_badge_banner_body 3 lbl "some time"'],
+        'postplan_failure_body 3 lbl "some time"'],
         capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert "pre-push-adr-hook denied the push" in r.stdout
 
 
-def test_badge_banner_rc3_percent_is_safe_and_falls_back():
+def test_failure_body_rc3_unset_result_names_every_cause():
+    r = subprocess.run(["bash", "-c",
+        f'source "{PPN}" >/dev/null 2>&1; unset HARNESS_RESULT; '
+        'postplan_failure_body 3 lbl "some time"'],
+        capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert ("The harness hit a fail-closed wall and deliberately did not fall back. "
+            "Cause: a rebase conflict, a local pre-commit/pre-push gate denial, a Claude "
+            "usage limit, or an expired Claude login; the RESULT line in the log names "
+            "which\n") in r.stdout
+
+
+def test_failure_body_rc3_percent_is_safe_and_falls_back():
     # (a) percent characters in RESULT must not cause printf format-string confusion
     r = subprocess.run(["bash", "-c",
         f'source "{PPN}" >/dev/null 2>&1; '
         "HARNESS_RESULT='RESULT: 100% of gates %s %d denied'; "
-        'postplan_badge_banner_body 3 lbl "some time"'],
+        'postplan_failure_body 3 lbl "some time"'],
         capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert "100% of gates %s %d denied" in r.stdout
@@ -534,7 +660,7 @@ def test_badge_banner_rc3_percent_is_safe_and_falls_back():
     r2 = subprocess.run(["bash", "-c",
         f'source "{PPN}" >/dev/null 2>&1; '
         'unset HARNESS_RESULT; '
-        'postplan_badge_banner_body 3 lbl "some time"'],
+        'postplan_failure_body 3 lbl "some time"'],
         capture_output=True, text=True)
     assert r2.returncode == 0, r2.stderr
     assert "rebase conflict" in r2.stdout
@@ -551,8 +677,10 @@ def test_prompt_assignment_count_is_still_two():
 
 def test_should_fallback_body_unchanged():
     src = open(PPN).read()
-    assert 'should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }' in src
+    assert 'should_fallback() { case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }' in src
     assert _fb(4) == "0"     # 4 escalates to the full skill like any other non-0/3 code
+    assert _fb(6) == "0"     # neighbours of 7 still escalate: the arm is exact, not a range
+    assert _fb(8) == "0"
 
 def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     """Bare invocation (no --pr) must not inject PLAN_SLUG into $CMD."""
@@ -572,7 +700,7 @@ def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     assert "PLAN_SLUG" not in cmd3, f"ambient PLAN_SLUG must not be injected on bare path; got {cmd3!r}"
 
 
-def test_foreground_exit3_message_quotes_the_harness_result(tmp_path):
+def test_foreground_exit3_message_quotes_the_harness_result(tmp_path, _private_log_dir):
     """--foreground (the automouse path) runs with no plist, so nothing sent the harness's
     stdout to $LOG. The RESULT capture then read a file that never existed, and the rc=3
     DM said only "the RESULT line above names it" plus "See <missing file>". Runs the real
@@ -594,15 +722,29 @@ def test_foreground_exit3_message_quotes_the_harness_result(tmp_path):
                GH_CMD=str(shim / "gh"), PATH=f"{shim}:{os.environ['PATH']}")
     env.pop("POST_PLAN_SKILL", None)
     repo = _fixture_repo(tmp_path)
+    # $ROOT is `git rev-parse --show-toplevel` of the cwd, i.e. the linked worktree `repo`.
+    # On rc=3 post-plan-now runs "$ROOT/bin/post-plan-fail-dm" "$ROOT" "$SAFE_SLUG" "$LOG" "$msg";
+    # the fixture ships no such file, so record its 4th argument to observe the DM payload.
+    dm_msg = tmp_path / "fail-dm-msg.txt"
+    dm_stub = repo / "bin" / "post-plan-fail-dm"
+    dm_stub.write_text(f'#!/bin/sh\nprintf \'%s\' "$4" > "{dm_msg}"\n')
+    dm_stub.chmod(0o755)
     r = subprocess.run(["bash", PPN, "--foreground", "--plan", str(plan)], cwd=repo,
                        env=env, capture_output=True, text=True, timeout=120)
-    log = re.search(r"See (/tmp/post-plan-now-\S+\.log)\.", r.stdout)
+    log = re.search(rf"^Log: ({re.escape(str(_private_log_dir))}/post-plan-now-\S+\.log)$",
+                    r.stdout, re.M)
     try:
         assert r.returncode == 3, f"stdout={r.stdout!r} stderr={r.stderr!r}"
-        assert "fail-closed sentinel" in r.stdout
-        assert f"Cause: {result}." in r.stdout, r.stdout
+        assert dm_msg.exists(), f"post-plan-fail-dm stub was never called: {r.stdout!r}"
+        dm_text = dm_msg.read_text()
+        # The DM body is the generic blocked-ship block (no blocked-ship.txt in the fake
+        # harness): the RESULT line lives in the log, and the DM must name THAT log.
+        assert "did not ship. No PR opened." in dm_text
+        assert log and f"Log: {log.group(1)}" in dm_text, f"DM does not name the log: {dm_text!r}"
+        assert "the RESULT line above names it" not in dm_text
+        assert "did not ship. No PR opened." in r.stdout
         assert "the RESULT line above names it" not in r.stdout
-        assert log, f"no 'See <log>.' pointer: {r.stdout!r}"
+        assert log, f"no 'Log: <log>' line: {r.stdout!r}"
         assert result in pathlib.Path(log.group(1)).read_text(), "the named log lacks RESULT"
     finally:
         if log:
@@ -662,7 +804,8 @@ def test_harness_run_dir_artifacts_are_gitignored():
 # Rows 1-7: --foreground mode (Verification Matrix, Phase 5)
 # ---------------------------------------------------------------------------
 
-def _run_foreground(tmp_path, harness_rc, with_claude_stub=False):
+def _run_foreground(tmp_path, harness_rc, with_claude_stub=False, extra_args=(),
+                    harness_body=None):
     """Run post-plan-now --foreground with a fake harness exiting harness_rc.
 
     Stubs placed in HOME/.bun/bin/ land at position 3 of the CMD-exported PATH
@@ -684,7 +827,8 @@ def _run_foreground(tmp_path, harness_rc, with_claude_stub=False):
     # fake harness: ignore all args, exit with the requested code.
     harness = tmp_path / "fake-harness"
     harness.mkdir(exist_ok=True)
-    (harness / "run").write_text(f"#!/bin/sh\nexit {harness_rc}\n")
+    (harness / "run").write_text(
+        harness_body if harness_body is not None else f"#!/bin/sh\nexit {harness_rc}\n")
     (harness / "run").chmod(0o755)
 
     env = dict(os.environ, HOME=str(home), HARNESS=str(harness))
@@ -700,7 +844,7 @@ def _run_foreground(tmp_path, harness_rc, with_claude_stub=False):
 
     repo = _fixture_repo(tmp_path)
     return subprocess.run(
-        ["bash", PPN, "--foreground"],
+        ["bash", PPN, "--foreground", *extra_args],
         cwd=repo, env=env, capture_output=True, text=True
     )
 
@@ -990,7 +1134,7 @@ def test_pr_flag_plan_blind_when_no_plan_file_exists(tmp_path):
 
 
 def test_refuses_to_run_in_the_main_checkout(tmp_path):
-    """post-plan-now exits 1 with ADR-0062 message when run from main checkout."""
+    """post-plan-now exits 7 with ADR-0062 message when run from main checkout."""
     main_root, _ = _fixture_worktree(tmp_path, "some-branch")
     home = tmp_path / "home"
     (home / "Library" / "LaunchAgents").mkdir(parents=True)
@@ -1004,11 +1148,13 @@ def test_refuses_to_run_in_the_main_checkout(tmp_path):
     r = subprocess.run(["bash", PPN],
                        capture_output=True, text=True,
                        cwd=str(main_root), env=env)
-    assert r.returncode == 1
+    assert r.returncode == 7
     assert "refusing to run in the main checkout" in r.stderr
     assert "ADR-0062" in r.stderr
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
     assert plists == [], "no plist should be written when refusing"
+    src = open(PPN).read()
+    assert len(re.findall(r'^\s*exit 7\b', src, re.M)) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1157,6 +1303,65 @@ def test_guard_force_flag_overrides_exit_5(tmp_path):
     r = _run_ppn(tmp_path, args=("--force",),
                  extra_env={"FAKE_PR_NUMBER": "2186"}, dirty=_TEST_ONLY_DIRTY)
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+
+
+def _holdrepeat_harness(tmp_path):
+    """A stub HARNESS whose `harness.holdrepeat check` exits 10 (decline). Also carries `run`."""
+    h = tmp_path / "hr-harness"
+    (h / "harness").mkdir(parents=True)
+    (h / "harness" / "__init__.py").write_text("")
+    (h / "harness" / "holdrepeat.py").write_text(
+        "import sys\n"
+        "if sys.argv[1:2] == ['check']:\n"
+        "    print('held on the same reason; nothing changed')\n"
+        "    sys.exit(10)\n")
+    (h / "run").write_text("#!/bin/sh\nexit 0\n")
+    (h / "run").chmod(0o755)
+    return h
+
+
+def test_char_unknown_argument_rejected_loudly(tmp_path):
+    """Characterization: an unrecognised flag exits nonzero and names the flag. Catches
+    deleting the `*)` arm's exit."""
+    r = _run_ppn(tmp_path, args=("--bogus",))
+    assert r.returncode != 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "unknown argument '--bogus'" in r.stderr, f"stderr={r.stderr!r}"
+
+
+def test_char_force_bypasses_holdrepeat_decline(tmp_path):
+    """Characterization: --force skips the exit-8 holdrepeat decline, which is why it is too
+    broad for the rescue caller. Catches --force starting to respect the decline."""
+    h = _holdrepeat_harness(tmp_path)
+    plain = _run_ppn(tmp_path / "plain", extra_env={"HARNESS": str(h)})
+    assert plain.returncode == 8, f"stdout={plain.stdout!r} stderr={plain.stderr!r}"
+    assert "post-plan DECLINED" in plain.stdout
+    forced = _run_ppn(tmp_path / "forced", args=("--force",), extra_env={"HARNESS": str(h)})
+    assert forced.returncode != 8, f"stdout={forced.stdout!r} stderr={forced.stderr!r}"
+
+
+def test_guard_allow_test_only_skips_exit_5(tmp_path):
+    """Catches: dropping the ALLOW_TEST_ONLY branch from the exit-5 guard."""
+    r = _run_ppn(tmp_path, args=("--allow-test-only",),
+                 extra_env={"FAKE_PR_NUMBER": "2186"}, dirty=_TEST_ONLY_DIRTY)
+    assert r.returncode != 5, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "--allow-test-only: PR #" in r.stderr
+
+
+def test_guard_allow_test_only_rejects_value_form(tmp_path):
+    """--allow-test-only is a BARE flag. Catches a permissive `--allow-test-only=*)` arm."""
+    r = _run_ppn(tmp_path, args=("--allow-test-only=1",),
+                 extra_env={"FAKE_PR_NUMBER": "2186"}, dirty=_TEST_ONLY_DIRTY)
+    assert r.returncode != 0
+    assert "unknown argument '--allow-test-only=1'" in r.stderr, f"got {r.stderr!r}"
+
+
+def test_guard_allow_test_only_does_not_bypass_holdrepeat_decline(tmp_path):
+    """Catches the flag also setting FORCE=1, which would skip the exit-8 decline."""
+    h = _holdrepeat_harness(tmp_path)
+    r = _run_ppn(tmp_path, args=("--allow-test-only",), extra_env={"HARNESS": str(h)})
+    assert r.returncode == 8, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "post-plan DECLINED" in r.stdout
 
 
 def test_guard_proceeds_when_no_pr_exists(tmp_path):
@@ -1313,20 +1518,22 @@ def test_skill_only_leg_also_carries_a_session_id(tmp_path):
     assert len(matches) == 1, f"expected one --session-id in skill-only cmd, got {matches}"
 
 
-def test_exit3_message_is_shell_safe_and_names_both_causes():
+def test_exit3_message_is_shell_safe_and_reads_the_block():
     """GATE_CLOSE is re-parsed by /bin/bash -lc on the far side of the launchd plist:
-    a backtick or $( ) there silently mangles the message (see the file's own comments).
-    It must also no longer claim rebase conflict is the only cause of exit 3."""
+    a backtick there silently mangles the message (see the file's own comments). Its one
+    command substitution must be the escaped call to blocked_ship_block, and it must
+    no longer carry the old fixed wording."""
     src = open(PPN).read()
     line = [l for l in src.splitlines() if l.strip().startswith("GATE_CLOSE=\"; elif")]
     assert len(line) == 1, f"expected one populated GATE_CLOSE, got {len(line)}"
     body = line[0]
     assert "`" not in body, "backtick in GATE_CLOSE survives to a second shell parse"
-    assert "$(" not in body, "command substitution in GATE_CLOSE"
-    assert "gate denial" in body and "rebase conflict" in body
+    assert body.count("$(") == 1 and "\\$(blocked_ship_block " in body, \
+        "the only command substitution must be the far-side blocked_ship_block call"
+    assert "fail-closed sentinel" not in body and "SKIPPING" not in body
 
 
-def test_badge_banner_rc3_names_both_fail_closed_causes():
+def test_failure_body_rc3_names_both_fail_closed_causes():
     """The PR badge must not blame a rebase for a gate denial.
 
     Exit 3 carries two kinds since #2259; a banner naming only one sends the operator
@@ -1341,14 +1548,15 @@ def test_badge_banner_rc3_names_both_fail_closed_causes():
 
 
 def test_exit3_dm_and_echo_send_the_same_single_string():
-    """Pins the single-string invariant: echo and discord-dm both receive the same $msg,
-    assigned exactly once. Tests 3-6 rely on stdout as a valid proxy for the DM text."""
+    """Pins the single-string invariant: echo and post-plan-fail-dm (which owns the DM)
+    both receive the same $msg, assigned exactly once. Tests 3-6 rely on stdout as a
+    valid proxy for the DM text."""
     src = open(PPN).read()
     line = [l for l in src.splitlines() if l.strip().startswith("GATE_CLOSE=\"; elif")]
     assert len(line) == 1, f"expected one populated GATE_CLOSE, got {len(line)}"
     body = line[0]
-    assert 'echo \\"\\$msg\\"' in body
-    assert '--quiet --attempts 2 \\"\\$msg\\"' in body
+    assert "'=== post-plan blocked ship ===' \\\"\\$msg\\\" '=== end blocked ship ==='" in body
+    assert 'bin/post-plan-fail-dm\\" ' in body and body.rstrip('"').endswith('\\"\\$msg\\" || true; fi')
     assert body.count("msg=") == 1
 
 
@@ -1413,6 +1621,13 @@ def test_guard_force_flag_overrides_inflight_refusal(tmp_path):
     assert "already in flight" not in r.stdout
 
 
+def test_guard_allow_test_only_does_not_bypass_inflight_refusal(tmp_path):
+    """Catches the flag also setting FORCE=1, which would skip the in-flight refusal."""
+    r = _run_ppn(tmp_path, args=("--allow-test-only",), launchctl_stub=_LAUNCHCTL_LIVE)
+    assert r.returncode == 6, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "already in flight" in r.stdout
+
+
 def test_guard_slug_prefix_does_not_match_a_longer_slug(tmp_path):
     r = _run_ppn(tmp_path, launchctl_stub=_LAUNCHCTL_OTHER_SLUG)
     assert r.returncode != 6
@@ -1446,7 +1661,7 @@ def test_gate_denial_fails_closed_then_allows_a_refire(tmp_path):
     assert re.search(
         r"^post-plan-now: postplan-rc=3 harness-rc=3 harness-run-dir=\S+$",
         r.stdout, re.M), r.stdout
-    assert "fail-closed sentinel" in r.stdout
+    assert "did not ship. No PR opened." in r.stdout
     assert not (tmp_path / "claude-log.txt").exists(), \
         "rc=3 must NOT spawn a /post-plan skill session"
     # Leg 2 -- job B at 14:49:24: job A is gone, so its label is gone, so a re-fire is
@@ -1454,3 +1669,68 @@ def test_gate_denial_fails_closed_then_allows_a_refire(tmp_path):
     r2 = _run_ppn(tmp_path / "leg2")  # default launchctl stub: silent, no live job
     assert r2.returncode != 6, r2.stdout
     assert "already in flight" not in r2.stdout
+
+
+# ── Bug 2: SIGTERM reported as success ────────────────────────────────────────
+
+def test_generated_cmd_guards_gate_open_with_sigterm_flag(tmp_path):
+    """GATE_OPEN must check _sigterm_received so a SIGTERM'd run cannot launch claude.
+
+    Without the guard, a harness that exits non-zero (e.g. rc=1) after SIGTERM would
+    satisfy should_fallback(), spawning a full /post-plan skill session on a killed run.
+    """
+    cmd = _generate_cmd(tmp_path)
+    # The guard appears before should_fallback in the gate expression
+    gate_pos = cmd.index('should_fallback "$rc" && ! usage_postrun_pause')
+    sigterm_guard = '_sigterm_received'
+    assert sigterm_guard in cmd[:gate_pos], (
+        "GATE_OPEN must check _sigterm_received BEFORE calling should_fallback"
+    )
+
+
+def test_generated_cmd_overrides_pp_rc_to_143_on_sigterm(tmp_path):
+    """After the compound command, the pp_rc line must override to 143 when the flag is set.
+
+    Without this, a run where the harness exits 0 then SIGTERM fires would report
+    postplan-rc=0 (success) instead of the correct 143 (killed).
+    """
+    cmd = _generate_cmd(tmp_path)
+    assert "pp_rc=143" in cmd, (
+        "CMD must override pp_rc to 143 when _sigterm_received flag is set"
+    )
+    # The override must come AFTER the compound command exits (after pp_rc=$?)
+    pp_rc_pos = cmd.index("pp_rc=$?")
+    override_pos = cmd.index("pp_rc=143")
+    assert override_pos > pp_rc_pos, "pp_rc=143 override must appear after pp_rc=$?"
+
+
+_FORCE_PROBE_HARNESS = (
+    '#!/bin/sh\nprintf \'%s\' "${POSTPLAN_FORCE-unset}" > "$FORCE_PROBE"\nexit 0\n')
+
+
+def test_force_threads_postplan_force_to_harness(tmp_path, monkeypatch):
+    """--force reaches the harness process as POSTPLAN_FORCE=1 (foreground path)."""
+    probe = tmp_path / "force-probe.txt"
+    monkeypatch.setenv("FORCE_PROBE", str(probe))
+    monkeypatch.delenv("POSTPLAN_FORCE", raising=False)
+    _run_foreground(tmp_path, 0, with_claude_stub=True, extra_args=("--force",),
+                    harness_body=_FORCE_PROBE_HARNESS)
+    assert probe.read_text() == "1"
+
+
+def test_no_force_passes_postplan_force_zero(tmp_path, monkeypatch):
+    """Without --force the harness sees POSTPLAN_FORCE=0 even if the caller exported 1."""
+    probe = tmp_path / "force-probe.txt"
+    monkeypatch.setenv("FORCE_PROBE", str(probe))
+    monkeypatch.setenv("POSTPLAN_FORCE", "1")
+    _run_foreground(tmp_path, 0, with_claude_stub=True,
+                    harness_body=_FORCE_PROBE_HARNESS)
+    assert probe.read_text() == "0"
+
+
+def test_detached_cmd_carries_postplan_force(tmp_path):
+    """The detached HARNESS_SEG carries POSTPLAN_FORCE too, not only the foreground one."""
+    cmd = _generate_cmd(tmp_path, args=("--force",))
+    assert "POSTPLAN_FORCE=1 POSTPLAN_LOG_PATH=" in cmd
+    plain = _generate_cmd(tmp_path / "plain")
+    assert "POSTPLAN_FORCE=0 POSTPLAN_LOG_PATH=" in plain

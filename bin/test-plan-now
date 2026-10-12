@@ -20,21 +20,24 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PLAN_NOW="$ROOT/bin/plan-now"
 # Read the cap out of the script under test, so bumping RUN_TIMEOUT there cannot
 # leave this fixture asserting a retired number.
 RUN_TIMEOUT=$(sed -n 's/^RUN_TIMEOUT=\([0-9][0-9]*\)$/\1/p' "$PLAN_NOW" | head -1)
 [ -n "$RUN_TIMEOUT" ] || { echo "test-plan-now: could not read RUN_TIMEOUT from $PLAN_NOW" >&2; exit 1; }
-FAILS=0
+REPO_ROOT_GATE=$(cd "$(dirname "$PLAN_NOW")" && pwd)
 
-ok()   { printf '  ok   %s\n' "$1"; }
-fail() { printf '  FAIL %s\n' "$1"; FAILS=$((FAILS + 1)); }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 # A full template, not `mktemp -d -t <prefix>`: GNU mktemp rejects a -t argument
 # with too few X's, so the BSD spelling would fail on the Linux CI runner.
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-plan-now.XXXXXX")
-trap 'rm -rf "$TMP"; rm -f /tmp/plan-now-19700101-000000-$$.*' EXIT
+trap 'rm -rf "$TMP"' EXIT
 
 PLANS="$TMP/plans"
 mkdir -p "$PLANS"
@@ -48,6 +51,14 @@ NDIR="$TMP/automouse"
 mkdir -p "$NDIR/queue" "$NDIR/done" "$NDIR/skipped"
 export NIGHTLY_DIR="$NDIR"
 export PLANS_DIR="$PLANS"
+# Runner artifacts (log, prompt, runner, transcript, sidecar) go to a private
+# dir under $TMP, never the shared /tmp that fleet-status and live runs read.
+RL="$TMP/runlog"
+mkdir -p "$RL"
+export PLAN_NOW_LOG_DIR="$RL" POSTPLAN_LOG_DIR="$RL"
+# The runner probes the Claude login before every model call. Every pre-existing case
+# must never reach the real `claude`, so the probe is stubbed to a healthy login here.
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo ok'
 
 # `caffeinate` is macOS-only and the runner wraps the model call in it. Unshimmed,
 # this test cannot run on Linux CI: command-not-found → rc != 0 → every
@@ -63,6 +74,14 @@ while [ $# -gt 0 ]; do case "$1" in -*) shift ;; *) break ;; esac; done
 exec "$@"
 SHIM_EOF
 chmod +x "$SHIM/caffeinate"
+# Usage gate (ADR-0143): plan-now now asks the gate before every model call. Point it at a
+# private state dir and shadow `security` so the real keychain, network and cache are never
+# read; no token means no usage data, which fails open (the run starts as before).
+GATE_DIR="$TMP/usage-gate"
+mkdir -p "$GATE_DIR"
+export IBL5_USAGE_GATE_STATE_DIR="$GATE_DIR"
+printf '#!/bin/sh\nexit 1\n' > "$SHIM/security"
+chmod +x "$SHIM/security"
 export PATH="$SHIM:$PATH"
 
 # ── The DM + queue stubs ─────────────────────────────────────────────────────
@@ -154,6 +173,12 @@ if [ -n "${STUB_DRAFT:-}" ]; then
     mkdir -p "$(dirname "$STUB_DRAFT")"
     cat "$STUB_DRAFT_SRC" > "$STUB_DRAFT"
 fi
+# A second draft for the precedence case. Written after STUB_DRAFT, so it is
+# already past the one-second sleep above and reads as fresh too.
+if [ -n "${STUB_DRAFT2:-}" ]; then
+    mkdir -p "$(dirname "$STUB_DRAFT2")"
+    cat "$STUB_DRAFT2_SRC" > "$STUB_DRAFT2"
+fi
 # Leg B (marker omitted from a successful run): the stub creates plan files in
 # $PLANS_DIR directly and leaves no draft. No sleep is needed for the first —
 # leg B gates on the plan-dir diff, not mtime — but the SECOND file must be
@@ -165,6 +190,17 @@ fi
 if [ -n "${STUB_PLANFILE2:-}" ]; then
     sleep 1
     cat "$STUB_PLANFILE2_SRC" > "$STUB_PLANFILE2"
+fi
+if [ -n "${STUB_MARKER:-}" ]; then
+    sid=""; prev=""
+    for a in "$@"; do [ "$prev" = "--session-id" ] && sid="$a"; prev="$a"; done
+    . "$STUB_GATE_LIB"
+    usage_marker_write "$sid" plan-now "$STUB_RESUME_BIN" usage-pause drain 94 five_hour ""
+fi
+if [ -n "${STUB_HOLDER_OUT:-}" ]; then
+    read -r _hs _hp _ha < "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d/holder"
+    if kill -0 "$_hp" 2>/dev/null; then _alive=yes; else _alive=no; fi
+    printf '%s %s %s\n' "$_hs" "$_hp" "$_alive" > "$STUB_HOLDER_OUT"
 fi
 printf 'Done — the plan is written and check-plan is clean.\n'
 [ -n "${STUB_TAIL:-}" ] && printf '%s\n' "$STUB_TAIL"
@@ -189,7 +225,10 @@ run_case() {
     [ -x "$runner" ] || { printf 'could not get a runner out of plan-now:\n%s\n' "$dry"; return 1; }
     STUB_PLAN="$plan_path" STUB_TAIL="$tail_line" STUB_NO_PLAN="${STUB_NO_PLAN:-}" \
         STUB_PLAN_SRC="${STUB_PLAN_SRC:-}" STUB_RC="${STUB_RC:-0}" \
+        STUB_PLANFILE="${STUB_PLANFILE:-}" STUB_PLANFILE_SRC="${STUB_PLANFILE_SRC:-}" \
         QUEUE_FAIL="${QUEUE_FAIL:-}" QUEUE_ALREADY="${QUEUE_ALREADY:-}" DM_FAIL="${DM_FAIL:-}" \
+        STUB_MARKER="${STUB_MARKER:-}" STUB_GATE_LIB="$REPO_ROOT_GATE/lib/usage-gate.sh" \
+        STUB_RESUME_BIN="$PLAN_NOW" \
         bash "$runner" 2>&1
     rm -f "$runner"
 }
@@ -224,12 +263,20 @@ ndir_reset() {
 # run_case_recovery <draft-src-or-empty> <draft-slug> [stale] → transcript
 # Fires plan-now with the slug-bearing prompt, no PLAN_FILE: tail, and (unless
 # empty) a draft the stub writes mid-run under $PLANS/.drafts/<slug>.draft.md.
+# Env prefixes: DRAFT_AT=root writes that draft at $PLANS/<slug>.draft.md instead;
+# ALSO_ROOT_SRC=<file> additionally writes a fresh root draft (precedence case).
 run_case_recovery() {
     local src="$1" slug="$2" stale="${3:-}"
     plans_reset
     : > "$DM_LOG"
     local dry runner draft=""
-    [ -n "$src" ] && draft="$PLANS/.drafts/$slug.draft.md"
+    # $DRAFT_AT=root puts the draft at the plans-dir root instead of .drafts/.
+    if [ -n "$src" ]; then
+        case "${DRAFT_AT:-drafts}" in
+            root) draft="$PLANS/$slug.draft.md" ;;
+            *)    draft="$PLANS/.drafts/$slug.draft.md" ;;
+        esac
+    fi
     dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
               PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
               "$PLAN_NOW" "${DISP:---implement}" "$RECOVERY_PROMPT" 2>&1)
@@ -241,7 +288,9 @@ run_case_recovery() {
         touch -t 202001010000 "$draft"
         STUB_NO_PLAN=1 STUB_TAIL="" bash "$runner" 2>&1
     else
-        STUB_NO_PLAN=1 STUB_TAIL="" STUB_DRAFT="$draft" STUB_DRAFT_SRC="$src" \
+        STUB_NO_PLAN=1 STUB_TAIL="${REC_TAIL:-}" STUB_DRAFT="$draft" STUB_DRAFT_SRC="$src" \
+            STUB_DRAFT2="${ALSO_ROOT_SRC:+$PLANS/$slug.draft.md}" \
+            STUB_DRAFT2_SRC="${ALSO_ROOT_SRC:-}" \
             QUEUE_FAIL="${QUEUE_FAIL:-}" QUEUE_ALREADY="${QUEUE_ALREADY:-}" bash "$runner" 2>&1
     fi
     rm -f "$runner"
@@ -296,23 +345,24 @@ want()    { case "$2" in *"$3"*) ok "$1" ;; *) fail "$1 — expected to see: $3"
 want_no() { case "$2" in *"$3"*) fail "$1 — should NOT have seen: $3" ;; *) ok "$1" ;; esac; }
 
 # ── --resume fixtures ────────────────────────────────────────────────────────
-# A fake failed run's /tmp artifacts, under a TS no real run can collide with.
-# bin/plan-now hard-codes /tmp for its artifacts, so the fixture lives there too.
+# A fake failed run's artifacts, under a TS no real run can collide with.
+# They live in $RL because bin/plan-now --resume reads $PLAN_NOW_LOG_DIR.
 RES_TS="19700101-000000-$$"
 RES_UUID="0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f"
-resume_fixture() {   # resume_fixture [nosession|norunner|nolog|oklog|noverdict]
-    rm -f /tmp/plan-now-"$RES_TS".*
-    printf 'MODEL=claude-opus-4-1\nDISPOSITION=implement\n' > "/tmp/plan-now-$RES_TS.sh"
-    printf '%s\n' "$RES_UUID" > "/tmp/plan-now-$RES_TS.session"
-    printf -- '- Branch slug: `demo-slug`. Base: `master`.\n' > "/tmp/plan-now-$RES_TS.prompt"
+resume_fixture() {   # resume_fixture [nosession|norunner|nolog|oklog|noverdict|parkedlog]
+    rm -f "$RL"/plan-now-"$RES_TS".*
+    printf 'MODEL=claude-opus-4-1\nDISPOSITION=implement\n' > "$RL/plan-now-$RES_TS.sh"
+    printf '%s\n' "$RES_UUID" > "$RL/plan-now-$RES_TS.session"
+    printf -- '- Branch slug: `demo-slug`. Base: `master`.\n' > "$RL/plan-now-$RES_TS.prompt"
     printf 'transcript line\nplan-now: claude exited 1 after 5s\nplan-now: RESULT failed — the run did not exit cleanly.\n' \
-        > "/tmp/plan-now-$RES_TS.log"
+        > "$RL/plan-now-$RES_TS.log"
     case "${1:-}" in
-        nosession) rm -f "/tmp/plan-now-$RES_TS.session" ;;
-        norunner)  rm -f "/tmp/plan-now-$RES_TS.sh" ;;
-        nolog)     rm -f "/tmp/plan-now-$RES_TS.log" ;;
-        oklog)     printf 'plan-now: RESULT ok — plan written and check-plan PASSED.\n' > "/tmp/plan-now-$RES_TS.log" ;;
-        noverdict) printf 'transcript only\n' > "/tmp/plan-now-$RES_TS.log" ;;
+        nosession) rm -f "$RL/plan-now-$RES_TS.session" ;;
+        norunner)  rm -f "$RL/plan-now-$RES_TS.sh" ;;
+        nolog)     rm -f "$RL/plan-now-$RES_TS.log" ;;
+        oklog)     printf 'plan-now: RESULT ok — plan written and check-plan PASSED.\n' > "$RL/plan-now-$RES_TS.log" ;;
+        noverdict) printf 'transcript only\n' > "$RL/plan-now-$RES_TS.log" ;;
+        parkedlog) printf 'plan-now: RESULT parked — Claude login expired; no model call was made.\n' > "$RL/plan-now-$RES_TS.log" ;;
     esac
 }
 # run_resume <plan-now args...> → RES_RC, RES_OUT, RES_RUNNER (dry run; nothing launched)
@@ -431,6 +481,53 @@ out=$(STUB_NO_PLAN=1 run_case "$P" "PLAN_FILE: $P")
 want "marker naming a nonexistent file is rejected" "$out" "named a file that does not exist"
 want "marker naming a nonexistent file → unconfirmed" "$out" "RESULT unconfirmed"
 
+echo "── NO_PLAN: a run that halts by design (work already done) is not 'unconfirmed' ──"
+
+# ★ THE REGRESSION (2026-09-26, trading-reject-verdict-shim). /plan Step 2.1 found
+# the work already merged and halted, correctly. The coda offered no legal last line
+# for that outcome, so the DM read ❓ unconfirmed and named an unrelated peer plan
+# as its "best-effort guess".
+out=$(STUB_ARGV="$TMP/noplan_argv.txt" STUB_NO_PLAN=1 run_case "$P" "NO_PLAN: already merged as #1957 and #1958")
+want    "NO_PLAN marker → no-plan verdict"            "$out" "RESULT no-plan"
+want    "NO_PLAN verdict carries the run's reason"    "$out" "RESULT no-plan — already merged as #1957 and #1958"
+want_no "NO_PLAN is not reported unconfirmed"         "$out" "RESULT unconfirmed"
+# The prompt half of the contract: without the coda offering NO_PLAN:, a halting
+# model never prints it and the bug returns with every runner-side test green.
+want    "the coda offers NO_PLAN: as a legal last line" "$(cat "$TMP/noplan_argv.txt")" "NO_PLAN: <one line"
+want    "NO_PLAN DMs the halt icon"                   "$(dm)" "⏹️ plan-now:"
+want    "NO_PLAN DMs its verdict"                     "$(dm)" "RESULT no-plan — "
+want    "NO_PLAN DM carries the reason"               "$(dm)" "already merged as #1957 and #1958"
+want_no "NO_PLAN DM offers no review buttons"         "$(dm)" "--route"
+
+# The real bug's guess named a PEER's plan that appeared mid-run. The slugless
+# prompt keeps both recovery legs out, so only the guess branch could name it.
+out=$(run_case "$PLANS/peer-plan.md" "NO_PLAN: already done")
+want_no "NO_PLAN never names a best-effort guess"   "$out" "best-effort guess"
+want_no "NO_PLAN never names a peer's fresh plan"   "$out" "peer-plan.md"
+
+out=$(STUB_NO_PLAN=1 run_case "$P" "**NO_PLAN:** \`already done\`")
+want "bold-wrapped NO_PLAN is still recognised" "$out" "RESULT no-plan"
+want "decoration is stripped from the reason"   "$out" "no-plan — already done"
+
+out=$(STUB_NO_PLAN=1 DISP=--queue run_case "$P" "NO_PLAN: already done")
+want_no "NO_PLAN under --queue never queues" "$out" "automouse-queue (stub): queued"
+
+out=$(STUB_NO_PLAN=1 STUB_RC=1 run_case "$P" "NO_PLAN: already done")
+want "NO_PLAN on a nonzero exit is still RESULT failed" "$out" "RESULT failed"
+
+# A real plan wins over a halt marker: the plan exists and must reach check-plan.
+out=$(run_case "$P" "NO_PLAN: already done
+PLAN_FILE: $P")
+want    "PLAN_FILE beats NO_PLAN"          "$out" "plan-now: new plan -> $P"
+want_no "PLAN_FILE beats NO_PLAN (verdict)" "$out" "RESULT no-plan"
+
+# A halted run must never have a slug-matched fresh draft adopted and queued behind
+# its back — NO_PLAN sits before recovery in the verdict chain.
+out=$(REC_TAIL="NO_PLAN: already done" DISP=--queue run_case_recovery "$GOOD_DRAFT" demo-slug)
+want    "NO_PLAN skips draft recovery"          "$out" "RESULT no-plan"
+want_no "NO_PLAN never promotes a fresh draft"  "$out" "recovery A"
+want_no "NO_PLAN + fresh draft never queues"    "$out" "automouse-queue (stub): queued"
+
 echo "── draft recovery: a backgrounded architect must not cost the whole run ──"
 
 # 1. Recovery success.
@@ -539,6 +636,56 @@ want    "a failing adopted plan reports an attempt" "$out" "RESULT degraded (rec
 want    "a failing adopted plan is not queued"      "$out" "NOT queued"
 want_no "leg B claims no draft it never had"        "$out" "The draft is kept at"
 
+echo "── root-draft recovery: a draft written at the plans-dir root, not .drafts/ ──"
+RD="$PLANS/demo-slug.draft.md"
+
+# R1. A fresh root draft under this run's slug is recovered.
+out=$(DRAFT_AT=root run_case_recovery "$GOOD_DRAFT" demo-slug)
+want    "root-draft: fresh root draft is recovered"      "$out" "RESULT degraded (recovered)"
+want    "root-draft: recovery names the root source"     "$out" "recovered from: $RD"
+want    "root-draft: promoted plan is announced"         "$out" "plan -> $P"
+want_no "root-draft guard: leg B never adopts a draft"   "$out" "recovery B —"
+[ -f "$P" ] && ok "root-draft: promoted plan exists on disk" \
+    || fail "root-draft: promoted plan missing at $P"
+grep -q '^---$' <(head -1 "$P" 2>/dev/null) \
+    && ok "root-draft: frontmatter hoisted to line 1" \
+    || fail "root-draft: line 1 of $P is not '---'"
+[ -f "$RD" ] && fail "root-draft: root draft should be deleted after a passing check-plan" \
+    || ok "root-draft: root draft removed once check-plan passed"
+
+# R2. Stale root draft: same slug, back-dated. The mtime gate covers the root too.
+out=$(DRAFT_AT=root run_case_recovery "$GOOD_DRAFT" demo-slug stale)
+want    "root-draft guard: stale root draft is not adopted"   "$out" "RESULT unconfirmed"
+want_no "root-draft guard: stale root draft is not recovered" "$out" "degraded (recovered)"
+[ -f "$P" ] && fail "root-draft guard: stale root draft must not be promoted" \
+    || ok "root-draft guard: stale root draft left unpromoted"
+
+# R3. Peer slug at the root: never adopted, but reported like a .drafts/ peer.
+out=$(DRAFT_AT=root run_case_recovery "$GOOD_DRAFT" other-slug)
+want    "root-draft guard: peer root draft is never adopted"  "$out" "RESULT unconfirmed"
+want_no "root-draft guard: peer root draft is not recovered"  "$out" "degraded (recovered)"
+want    "root-draft: peer root draft is reported"             "$out" "cannot be attributed to it"
+want    "root-draft: the report names the root path"          "$out" "$PLANS/other-slug.draft.md"
+[ -f "$PLANS/other-slug.md" ] && fail "root-draft guard: peer root draft must not be promoted" \
+    || ok "root-draft guard: peer root draft left untouched"
+
+# R4. Precedence: fresh drafts in BOTH places. .drafts/ holds the good one, the
+#     root holds the partial one. .drafts/ must win and the root file is untouched.
+out=$(ALSO_ROOT_SRC="$PARTIAL_DRAFT" run_case_recovery "$GOOD_DRAFT" demo-slug)
+want    "root-draft guard: .drafts/ wins over the root"       "$out" "recovered from: $PLANS/.drafts/demo-slug.draft.md"
+want    "root-draft guard: precedence case recovers"          "$out" "RESULT degraded (recovered)"
+want_no "root-draft guard: the root partial is not promoted"  "$out" "recovery attempted"
+[ -f "$RD" ] && ok "root-draft guard: losing root draft is left in place" \
+    || fail "root-draft guard: the root draft was deleted though .drafts/ won"
+
+# R5. Partial root draft: promotion is attempted, check-plan fails, draft kept.
+out=$(DRAFT_AT=root run_case_recovery "$PARTIAL_DRAFT" demo-slug)
+want    "root-draft: partial root draft reports an attempt"   "$out" "RESULT degraded (recovery attempted)"
+want    "root-draft: the kept draft is the root path"         "$out" "The draft is kept at $RD"
+want_no "root-draft guard: a failed root recovery is not recovered" "$out" "RESULT degraded (recovered)"
+[ -f "$RD" ] && ok "root-draft guard: failed root recovery keeps its draft" \
+    || fail "root-draft guard: root draft deleted despite a failing check-plan"
+
 # ── staleness gate: check-plan can pass on a plan whose paths are dead ─────────
 # The guard's other callers live inside the automouse implementation run, which a
 # queued plan reaches only AFTER queueing — so the job must refuse it here.
@@ -551,6 +698,31 @@ out=$(STUB_PLAN_SRC="$STALE_PLAN" DISP=--queue run_case "$P" "PLAN_FILE: $P")
 want    "a stale-path plan is named in the log"   "$out" "check-plan-staleness FAILED"
 want    "a stale-path plan is not queued"         "$out" "NOT queued"
 want_no "a stale-path plan never reaches queue"   "$out" "queued for automouse"
+
+# ── split siblings: a run that writes two plans queues one and names the other ──
+# The 2026-09-28 css-tokens-sweep run wrote parts 1 and 2 and printed PLAN_FILE:
+# for part 2 only. Part 1 was never queued, and nothing said so.
+SIB="$PLANS/demo-slug-1-base.md"
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" STUB_PLANFILE="$SIB" STUB_PLANFILE_SRC="$GOOD_PLAN" \
+          run_case "$P" "Also wrote $SIB
+PLAN_FILE: $P")
+want    "split: the named plan still queues"        "$out" "queued for automouse"
+want    "split: the sibling is reported unqueued"   "$out" "did NOT queue: demo-slug-1-base.md"
+want    "split: the DM names the sibling"           "$(dm)" "ALSO wrote, NOT queued: demo-slug-1-base.md"
+want    "split: the DM downgrades the ok icon"      "$(dm)" "⚠️ plan-now"
+# A new plan the transcript never names is a concurrent run's, not a sibling.
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" STUB_PLANFILE="$SIB" STUB_PLANFILE_SRC="$GOOD_PLAN" \
+          run_case "$P" "PLAN_FILE: $P")
+want_no "split: an unnamed new plan is not a sibling" "$out" "did NOT queue"
+# The transcript may name the sibling in a non-absolute form; basename matching catches both.
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" STUB_PLANFILE="$SIB" STUB_PLANFILE_SRC="$GOOD_PLAN" \
+          run_case "$P" "Also wrote ~/claude-plans/demo-slug-1-base.md
+PLAN_FILE: $P")
+want    "split: a ~/claude-plans/ sibling is reported"  "$out" "did NOT queue: demo-slug-1-base.md"
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" STUB_PLANFILE="$SIB" STUB_PLANFILE_SRC="$GOOD_PLAN" \
+          run_case "$P" "Also wrote demo-slug-1-base.md
+PLAN_FILE: $P")
+want    "split: a bare-filename sibling is reported"    "$out" "did NOT queue: demo-slug-1-base.md"
 
 echo "── the finish DM: every terminal outcome pings, and says what to do next ──"
 
@@ -567,7 +739,7 @@ want "queued run DMs the ok icon"        "$(dm)" "✅ plan-now: demo-slug"
 want "queued run DMs the verdict"        "$(dm)" "RESULT ok — check-plan PASSED"
 want "queued run DMs the next action"    "$(dm)" "queued for automouse"
 want "queued run DMs the plan path"      "$(dm)" "$P"
-want "queued run DMs the log path"       "$(dm)" "log: /tmp/plan-now-"
+want "queued run DMs the log path"       "$(dm)" "log: $RL/plan-now-"
 want "queued run DMs the elapsed time"   "$(dm)" "s · "
 
 # 2. ok + --implement: the case the user called out by name. It succeeded, and it
@@ -649,6 +821,8 @@ want    "--no-dm leaves the verdict alone" "$out" "RESULT ok"
 #     would be strictly worse than the tail -f this replaces.
 out=$(DM_FAIL=1 STUB_PLAN_SRC="$GOOD_PLAN" run_case "$P" "PLAN_FILE: $P")
 want "an undeliverable DM is reported in the log" "$out" "DM UNDELIVERED"
+want "an undeliverable DM prints the exact UNDELIVERED line" "$out" \
+    "plan-now: DM UNDELIVERED (spooled by discord-dm) — the verdict above stands."
 want "an undeliverable DM does not change the verdict" "$out" "RESULT ok"
 
 # 11. Every terminal branch sets a verdict. The fallback text exists so a seventh
@@ -1153,6 +1327,75 @@ echo "── the coda still tells the model where to put it ──"
 dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
           "$PLAN_NOW" --implement "$PROMPT" 2>&1)
 coda=$(cat "$(printf '%s\n' "$dry" | sed -n 's/^  prompt: //p')" 2>/dev/null)
+echo "── the generated plist (ljob_write_runner_plist layout) ──"
+
+gen_plist=$(printf '%s\n' "$dry" | sed -n 's/^  plist:  //p')
+gen_runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+plist_report=$(python3 -I - "$gen_plist" "$gen_runner" "$HOME" <<'PLIST_PY'
+import os
+import plistlib
+import re
+import sys
+
+plist_path, runner, home = sys.argv[1:4]
+with open(plist_path, "rb") as fh:
+    d = plistlib.load(fh)
+
+
+def strings(v):
+    if isinstance(v, str):
+        yield v
+    elif isinstance(v, list):
+        for x in v:
+            yield from strings(x)
+    elif isinstance(v, dict):
+        for x in v.values():
+            yield from strings(x)
+
+
+def check(label, cond):
+    print(("ok   " if cond else "FAIL ") + label)
+
+
+path_dirs = d.get("EnvironmentVariables", {}).get("PATH", "").split(":")
+vals = list(strings(d))
+check("exec form is the helper's unquoted 'exec <runner>'",
+      d.get("ProgramArguments") == ["/bin/bash", "-lc", "exec " + runner])
+check("KeepAlive is False and RunAtLoad is True",
+      d.get("KeepAlive") is False and d.get("RunAtLoad") is True)
+check("EnvironmentVariables.PATH holds /usr/bin, /bin, /opt/homebrew/bin and ~/.local/bin",
+      all(p in path_dirs for p in ("/usr/bin", "/bin", "/opt/homebrew/bin", home + "/.local/bin")))
+check("no string value contains an unexpanded $", not any("$" in v for v in vals))
+check("no string value is empty", all(v != "" for v in vals))
+check("Label matches the plist filename",
+      d.get("Label", "") + ".plist" == os.path.basename(plist_path))
+check("stdout and stderr share the log path",
+      d.get("StandardOutPath") and d.get("StandardOutPath") == d.get("StandardErrorPath"))
+check("WorkingDirectory is an existing directory",
+      os.path.isdir(d.get("WorkingDirectory", "")))
+check("runner path is $PLAN_NOW_LOG_DIR/plan-now-<ts>.sh with no whitespace (unquoted exec depends on it)",
+      re.match("^" + re.escape(os.environ["PLAN_NOW_LOG_DIR"]) + r"/plan-now-[0-9A-Za-z._-]+\.sh$", runner) is not None
+      and not any(c.isspace() for c in runner))
+PLIST_PY
+)
+while IFS= read -r line; do
+    case "$line" in
+        "ok   "*) ok "${line#ok   }" ;;
+        *) fail "${line#FAIL }" ;;
+    esac
+done <<< "$plist_report"
+if [ "$(grep -c '<string></string>' "$gen_plist")" = "0" ]; then
+    ok "raw plist has no empty <string></string>"
+else
+    fail "raw plist has an empty <string></string>"
+fi
+if command -v plutil >/dev/null 2>&1; then
+    if plutil -lint "$gen_plist" >/dev/null 2>&1; then
+        ok "plutil -lint accepts the generated plist"
+    else
+        fail "plutil -lint rejects the generated plist"
+    fi
+fi
 # This dry-run's runner is never executed, and the runner is what deletes the plist.
 # Without this, every test run leaves a RunAtLoad plist in ~/Library/LaunchAgents
 # pointing at a /tmp runner that no longer exists.
@@ -1222,7 +1465,14 @@ want    "R-5 no runner message" "$RES_OUT" "no runner at"
 resume_fixture oklog
 run_resume --resume "$RES_TS"
 [ "$RES_RC" = 2 ] && ok "R-6 oklog rc 2" || fail "R-6 oklog rc 2 (got $RES_RC)"
-want    "R-6 oklog: only failed is resumable" "$RES_OUT" "only a failed run is resumable"
+want    "R-6 oklog: only failed is resumable" "$RES_OUT" "only a failed, paused, or parked run is resumable"
+
+# R-park a parked run never started its session, so it resumes fresh.
+resume_fixture parkedlog
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "R-park parked run resumes (rc 0)" || fail "R-park parked run resumes (got $RES_RC: $RES_OUT)"
+want    "R-park parked run resumes fresh" "$(cat "$RES_RUNNER" 2>/dev/null)" "RESUME_FRESH=1"
+preflight_cleanup "$RES_OUT"
 
 resume_fixture noverdict
 run_resume --resume "$RES_TS"
@@ -1310,6 +1560,7 @@ want_no "R-10 argv no --session-id"       "$R10_ARGV" "--session-id"
 R10_P_LINE=$(grep -A1 -x -- '-p' "$TMP/r10_argv.txt" 2>/dev/null | tail -1)
 want    "R-10 -p has cut off before it finished" "$R10_P_LINE" "cut off before it finished"
 want_no "R-10 -p no Headless run constraints"    "$R10_P_LINE" "Headless run constraints"
+want    "R-10 -p still offers the NO_PLAN: ending" "$R10_P_LINE" "exactly: NO_PLAN:"
 # runner stdout confirms session/run identity
 want    "R-10 runner out: resuming session" "$R10_OUT" "resuming session $RES_UUID from run $RES_TS"
 rm -f "$RES_RUNNER" "$TMP/r10_argv.txt" "$TMP/r10.out"
@@ -1341,8 +1592,8 @@ run_resume --implement "$RECOVERY_PROMPT"
 RUNNER1="$RES_RUNNER"
 TS1=$(basename "${RUNNER1%.sh}"); TS1="${TS1#plan-now-}"
 : > "$DM_LOG"
-STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER1" > "/tmp/plan-now-$TS1.log" 2>&1
-R12_LOG1=$(cat "/tmp/plan-now-$TS1.log" 2>/dev/null)
+STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER1" > "$RL/plan-now-$TS1.log" 2>&1
+R12_LOG1=$(cat "$RL/plan-now-$TS1.log" 2>/dev/null)
 want    "R-12 failure log has resume hint for TS1"  "$R12_LOG1"  "bin/plan-now --resume $TS1"
 want    "R-12 DM has resume hint for TS1"           "$(dm)"      "resume: bin/plan-now --resume $TS1"
 # Now resume TS1
@@ -1350,7 +1601,7 @@ run_resume --resume "$TS1"
 [ "$RES_RC" = 0 ] && ok "R-12 resume TS1 rc 0" || fail "R-12 resume TS1 rc 0 (got $RES_RC)"
 RUNNER2="$RES_RUNNER"
 TS2=$(basename "${RUNNER2%.sh}"); TS2="${TS2#plan-now-}"
-TS1_SESSION=$(cat "/tmp/plan-now-$TS1.session" 2>/dev/null | tr -d '[:space:]')
+TS1_SESSION=$(cat "$RL/plan-now-$TS1.session" 2>/dev/null | tr -d '[:space:]')
 R2_SIDECAR=$(cat "${RUNNER2%.sh}.session" 2>/dev/null | tr -d '[:space:]')
 [ "$TS1_SESSION" = "$R2_SIDECAR" ] && ok "R-12 RUNNER2 sidecar matches TS1 session" || \
     fail "R-12 RUNNER2 sidecar matches TS1 session (ts1=$TS1_SESSION, r2=$R2_SIDECAR)"
@@ -1359,11 +1610,11 @@ want    "R-12 RUNNER2 has RESUME_FROM TS1"  "$RUNNER2_CONTENT"  "RESUME_FROM=$TS
 want    "R-12 RUNNER2 has DISPOSITION implement" "$RUNNER2_CONTENT" "DISPOSITION=implement"
 # Run RUNNER2 with failure → resume hint mentions TS2, not TS1
 : > "$DM_LOG"
-STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER2" > "/tmp/plan-now-$TS2.log" 2>&1
-R12_LOG2=$(cat "/tmp/plan-now-$TS2.log" 2>/dev/null)
+STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER2" > "$RL/plan-now-$TS2.log" 2>&1
+R12_LOG2=$(cat "$RL/plan-now-$TS2.log" 2>/dev/null)
 want    "R-12 chain: second log mentions TS2"        "$R12_LOG2"  "bin/plan-now --resume $TS2"
 want_no "R-12 chain: second log omits TS1"           "$R12_LOG2"  "--resume $TS1"
-rm -f /tmp/plan-now-"$TS1".* /tmp/plan-now-"$TS2".*
+rm -f "$RL"/plan-now-"$TS1".* "$RL"/plan-now-"$TS2".*
 
 # R-13 unknown flag still loud.
 run_resume --resum "$RES_TS"
@@ -1390,10 +1641,216 @@ want    "R-14 failing plan: RESULT degraded"   "$R14_OUT2" "RESULT degraded"
 want    "R-14 failing plan: NOT queued"        "$R14_OUT2" "NOT queued"
 preflight_cleanup "$RES_OUT"
 
-echo
-if [ "$FAILS" -eq 0 ]; then
-    echo "test-plan-now: all cases passed"
+echo "── usage gate: a paused or limit-hit run is 'paused', never 'failed' ──"
+
+gate_reset() { rm -rf "$GATE_DIR"; mkdir -p "$GATE_DIR/markers"; }
+gate_markers() { find "$GATE_DIR/markers" -name '*.json' 2>/dev/null | wc -l | tr -d ' '; }
+
+# G-1 the hook wrote a marker and the run exited 0: paused, no finish DM, nothing queued.
+gate_reset
+out=$(DISP=--queue STUB_MARKER=1 STUB_PLAN="$P" STUB_TAIL="PLAN_FILE: $P" run_case "$P" "PLAN_FILE: $P")
+want    "G-1 marker → RESULT paused"        "$out" "RESULT paused"
+want_no "G-1 marker → not failed"           "$out" "RESULT failed"
+want_no "G-1 marker → not queued"           "$out" "queued for automouse"
+[ ! -s "$DM_LOG" ] && ok "G-1 marker → no finish DM" || fail "G-1 marker → no finish DM (got: $(dm))"
+[ "$(gate_markers)" = 1 ] && ok "G-1 marker survives for the coordinator" || fail "G-1 marker survives for the coordinator"
+
+# G-2 a weekly-limit message on a failing exit: paused, with a limit-hit marker.
+gate_reset
+out=$(DISP=--queue STUB_RC=1 run_case "$P" "You've hit your weekly limit")
+want    "G-2 limit hit → RESULT paused"     "$out" "RESULT paused"
+want_no "G-2 limit hit → not failed"        "$out" "RESULT failed"
+[ ! -s "$DM_LOG" ] && ok "G-2 limit hit → no finish DM" || fail "G-2 limit hit → no finish DM (got: $(dm))"
+want    "G-2 marker reason=limit-hit"       "$(cat "$GATE_DIR"/markers/*.json 2>/dev/null)" '"reason": "limit-hit"'
+
+# G-3 an auth error is an environment failure: still RESULT failed, DM still fires.
+gate_reset
+out=$(DISP=--queue STUB_RC=1 run_case "$P" "API Error: 401")
+want    "G-3 401 → RESULT failed"           "$out" "RESULT failed"
+want_no "G-3 401 → not paused"              "$out" "RESULT paused"
+want    "G-3 401 → the DM fires"            "$(dm)" "RESULT failed"
+[ "$(gate_markers)" = 0 ] && ok "G-3 401 writes no marker" || fail "G-3 401 writes no marker"
+
+# G-4 --resume against a paused log passes pre-flight and clears the marker.
+gate_reset
+resume_fixture
+printf 'plan-now: RESULT paused — usage gate; auto-resumes after reset.\n' > "$RL/plan-now-$RES_TS.log"
+( . "$REPO_ROOT_GATE/lib/usage-gate.sh"; usage_marker_write "$RES_UUID" plan-now "$PLAN_NOW" usage-pause drain 94 five_hour "" )
+[ "$(gate_markers)" = 1 ] && ok "G-4 fixture marker written" || fail "G-4 fixture marker written"
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "G-4 paused log resumes (rc 0)" || fail "G-4 paused log resumes (got $RES_RC: $RES_OUT)"
+[ "$(gate_markers)" = 0 ] && ok "G-4 resume clears the marker" || fail "G-4 resume clears the marker"
+# The fixture session has no transcript, so it paused before its first turn: start fresh.
+want    "G-4 no transcript → RESUME_FRESH=1" "$(cat "$RES_RUNNER" 2>/dev/null)" "RESUME_FRESH=1"
+preflight_cleanup "$RES_OUT"
+
+# G-5 --resume-paused takes exactly one session id.
+gate_reset
+run_resume --resume-paused
+[ "$RES_RC" = 2 ] && ok "G-5 no id: rc 2" || fail "G-5 no id: rc 2 (got $RES_RC)"
+want    "G-5 no id: names the rule"         "$RES_OUT" "--resume-paused takes exactly one session id"
+run_resume --resume-paused a b
+[ "$RES_RC" = 2 ] && ok "G-5 two ids: rc 2" || fail "G-5 two ids: rc 2 (got $RES_RC)"
+run_resume --queue --resume-paused "$RES_UUID"
+[ "$RES_RC" = 2 ] && ok "G-5 not first: rc 2" || fail "G-5 not first: rc 2 (got $RES_RC)"
+want    "G-5 not first: names the rule"     "$RES_OUT" "--resume-paused must be the only argument"
+
+# G-6 a coordinator-granted token names the launcher's (now dead) pid. The runner must
+# re-record its own pid before the model call, or usage_token_reclaim_dead drops it.
+gate_reset
+rm -f "$PLANS"/*.md
+dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+          PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+          "$PLAN_NOW" --queue --no-dm "$PROMPT" 2>&1)
+g6_runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+g6_sid=$(sed -n "s/^SESSION_ID=//p" "$g6_runner" | tr -d "'")
+sh -c 'exit 0' & g6_dead=$!; wait "$g6_dead" 2>/dev/null
+( . "$REPO_ROOT_GATE/lib/usage-gate.sh"; usage_token_acquire "$g6_sid" "$g6_dead" )
+g6_out="$TMP/g6-holder"
+rm -f "$g6_out"
+STUB_PLAN="$P" STUB_TAIL="PLAN_FILE: $P" STUB_HOLDER_OUT="$g6_out" \
+    STUB_GATE_LIB="$REPO_ROOT_GATE/lib/usage-gate.sh" STUB_RESUME_BIN="$PLAN_NOW" \
+    bash "$g6_runner" >/dev/null 2>&1
+rm -f "$g6_runner"
+read -r g6_hs g6_hp g6_alive < "$g6_out" 2>/dev/null || true
+[ "$g6_hs" = "$g6_sid" ] && ok "G-6 token still names the session" || fail "G-6 token still names the session (got '$g6_hs', want '$g6_sid')"
+[ -n "$g6_hp" ] && [ "$g6_hp" != "$g6_dead" ] && [ "$g6_alive" = yes ] \
+    && ok "G-6 runner re-recorded a live holder pid" \
+    || fail "G-6 runner re-recorded a live holder pid (got pid '$g6_hp' alive=$g6_alive, dead launcher pid $g6_dead)"
+[ ! -d "$GATE_DIR/drain-token.d" ] && ok "G-6 runner releases the token at exit" || fail "G-6 runner releases the token at exit"
+
+# 14. runner notify(): seam resolution, PAUSED silence, no-binary line
+dry14=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+            PLAN_NOW_DISCORD_DM='' PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+            "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+runner14=$(printf '%s\n' "$dry14" | sed -n 's/^  runner: //p')
+if grep -qE '^DISCORD_DM=.*/bin/discord-dm$' "$runner14"; then
+    ok "14a empty PLAN_NOW_DISCORD_DM falls back to bin/discord-dm"
 else
-    echo "test-plan-now: $FAILS case(s) FAILED"
+    fail "14a empty PLAN_NOW_DISCORD_DM falls back to bin/discord-dm"
 fi
-exit $(( FAILS > 0 ? 1 : 0 ))
+rm -f "$runner14"
+dry14=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+            PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+            "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+runner14=$(printf '%s\n' "$dry14" | sed -n 's/^  runner: //p')
+if grep -qxF "DISCORD_DM=$DM_STUB" "$runner14"; then
+    ok "14b seam path lands in the runner"
+else
+    fail "14b seam path lands in the runner"
+fi
+if [ "$(grep -c '^notify() {' "$runner14")" = 1 ]; then
+    ok "14c notify() anchor is unique in the runner"
+else
+    fail "14c notify() anchor is unique in the runner"
+fi
+fns14=$(awk '/^(notify|ljob_dm_ready|ljob_dm_send) ?\(\)/{f=1} f{print} f&&/^}$/{f=0}' "$runner14")
+o14=$(NOTIFY=1 PAUSED=1 DISCORD_DM="$TMP/no-such-dm" bash -c "$fns14"$'\n''notify' 2>&1); rc14=$?
+if [ "$rc14" -eq 0 ] && [ -z "$o14" ]; then
+    ok "14d PAUSED=1 with a missing binary stays silent"
+else
+    fail "14d PAUSED=1 with a missing binary stays silent (rc=$rc14 out=$o14)"
+fi
+o14=$(NOTIFY=1 PAUSED=0 DISCORD_DM="$TMP/no-such-dm" bash -c "$fns14"$'\n''notify' 2>&1); rc14=$?
+if [ "$rc14" -eq 0 ] && [ "$o14" = "plan-now: no executable discord-dm at $TMP/no-such-dm — not notifying." ]; then
+    ok "14e missing binary prints the exact not-notifying line"
+else
+    fail "14e missing binary prints the exact not-notifying line (rc=$rc14 out=$o14)"
+fi
+o14=$(NOTIFY=0 PAUSED=0 DISCORD_DM="$TMP/no-such-dm" bash -c "$fns14"$'\n''notify' 2>&1); rc14=$?
+if [ "$rc14" -eq 0 ] && [ -z "$o14" ]; then
+    ok "14f NOTIFY=0 stays silent"
+else
+    fail "14f NOTIFY=0 stays silent (rc=$rc14 out=$o14)"
+fi
+rm -f "$runner14"
+
+printf '\n--login probe\n'
+
+# The model stub for these cases records that it was called. It prints no PLAN_FILE: line.
+SPY="$TMP/claude-spy"
+cat > "$SPY" <<SPY_EOF
+#!/usr/bin/env bash
+touch "$TMP/model-called"
+echo "spy ran"
+exit 0
+SPY_EOF
+chmod +x "$SPY"
+# A claude whose `auth status` says logged out; the real probe's Tier 1 parks on it.
+AUTH_OUT="$TMP/auth-out"
+printf '#!/bin/sh\necho '"'"'{"loggedIn": false}'"'"'\nexit 1\n' > "$AUTH_OUT"
+chmod +x "$AUTH_OUT"
+
+login_reset() {
+    rm -f "$TMP/model-called" "$NDIR/login-expired.alerted"
+    rm -rf "$NDIR/reports"
+}
+# Unanchored: a DM body has no trailing newline, so the next stub call's ARGV: line
+# lands mid-line after it.
+dm_count() { grep -c 'ARGV:' "$DM_ALL" 2>/dev/null || true; }
+TODAY_L=$(date +%F)
+STUB_SAVE="$STUB"
+STUB="$SPY"
+
+# L-1 an expired login parks before the spawn.
+login_reset
+dm_before=$(dm_count)
+out=$(AUTOMOUSE_LOGIN_PROBE_CMD='echo expired:session-401' run_case "$P" "")
+want    "L-1 expired parks: full RESULT line" "$out" "plan-now: RESULT parked — Claude login expired; no model call was made."
+want    "L-1 expired parks: resume hint" "$out" "bin/plan-now --resume"
+[ ! -e "$TMP/model-called" ] && ok "L-1 no model call" || fail "L-1 no model call"
+want    "L-1 DM names the park" "$(dm)" "parked — Claude login expired"
+[ "$(( $(dm_count) - dm_before ))" = 1 ] && ok "L-1 exactly one DM" || fail "L-1 exactly one DM (got $(( $(dm_count) - dm_before )))"
+want    "L-1 plan-now report" "$(cat "$NDIR/reports/$TODAY_L-login-expired.md" 2>/dev/null)" "plan-now parked"
+[ -e "$NDIR/login-expired.alerted" ] && ok "L-1 marker written" || fail "L-1 marker written"
+want_no "L-1 not failed" "$out" "RESULT failed"
+want_no "L-1 not queued" "$out" "queued for automouse"
+[ "$(printf '%s\n' "$out" | grep -c '^plan-now: RESULT ')" = 1 ] && ok "L-1 exactly one RESULT line" || fail "L-1 exactly one RESULT line"
+
+# L-2 an inconclusive probe fails open.
+login_reset
+out=$(AUTOMOUSE_LOGIN_PROBE_CMD='echo unknown:session-429' run_case "$P" "")
+[ -e "$TMP/model-called" ] && ok "L-2 unknown still spawns" || fail "L-2 unknown still spawns"
+want_no "L-2 unknown does not park" "$out" "RESULT parked"
+want    "L-2 inconclusive report" "$(cat "$NDIR/reports/$TODAY_L-login-probe-inconclusive.md" 2>/dev/null)" "The plan-now run started anyway (fail open)."
+
+# L-3 a healthy login spawns and writes no login report.
+login_reset
+out=$(AUTOMOUSE_LOGIN_PROBE_CMD='echo ok' run_case "$P" "")
+[ -e "$TMP/model-called" ] && ok "L-3 ok spawns" || fail "L-3 ok spawns"
+[ ! -e "$NDIR/reports/$TODAY_L-login-expired.md" ] && [ ! -e "$NDIR/reports/$TODAY_L-login-probe-inconclusive.md" ] \
+    && ok "L-3 no login report" || fail "L-3 no login report"
+
+# L-4 / L-5 an empty or unset seam reaches the real probe through the baked bin seam.
+login_reset
+out=$(AUTOMOUSE_LOGIN_PROBE_CMD='' LOGIN_PROBE_CLAUDE_BIN="$AUTH_OUT" run_case "$P" "")
+want    "L-4 empty seam: parked" "$out" "RESULT parked"
+want    "L-4 empty seam: reason" "$(cat "$NDIR/reports/$TODAY_L-login-expired.md" 2>/dev/null)" "(not-logged-in)"
+[ ! -e "$TMP/model-called" ] && ok "L-4 no model call" || fail "L-4 no model call"
+login_reset
+out=$( unset AUTOMOUSE_LOGIN_PROBE_CMD; LOGIN_PROBE_CLAUDE_BIN="$AUTH_OUT" run_case "$P" "" )
+want    "L-5 unset seam: parked" "$out" "RESULT parked"
+want    "L-5 unset seam: reason" "$(cat "$NDIR/reports/$TODAY_L-login-expired.md" 2>/dev/null)" "(not-logged-in)"
+
+STUB="$STUB_SAVE"
+
+# L-6 the runner bakes the probe.
+l6_out=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+l6_runner=$(printf '%s\n' "$l6_out" | sed -n 's/^  runner: //p')
+l6_text=$(cat "$l6_runner" 2>/dev/null)
+want    "L-6 runner bakes LOGIN_PREFLIGHT_LIB" "$l6_text" "LOGIN_PREFLIGHT_LIB="
+want    "L-6 runner bakes LOGIN_NIGHTLY_DIR" "$l6_text" "LOGIN_NIGHTLY_DIR=$NDIR"
+preflight_cleanup "$l6_out"
+
+# L-7 the probe precedes the spawn in the generated runner.
+l7_probe=$(grep -nF 'if ! login_preflight "$LOGIN_NIGHTLY_DIR"' "$PLAN_NOW" | head -1 | cut -d: -f1)
+l7_spawn=$(grep -nF 'timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p' "$PLAN_NOW" | head -1 | cut -d: -f1)
+if [ -n "$l7_probe" ] && [ -n "$l7_spawn" ] && [ "$l7_probe" -lt "$l7_spawn" ]; then
+    ok "L-7 probe precedes the spawn"
+else
+    fail "L-7 probe precedes the spawn (probe=$l7_probe spawn=$l7_spawn)"
+fi
+
+h_done

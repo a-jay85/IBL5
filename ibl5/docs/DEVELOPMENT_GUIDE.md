@@ -1,6 +1,6 @@
 ---
 description: Development standards, priorities, and workflow for IBL5.
-last_verified: 2026-09-20
+last_verified: 2026-10-03
 ---
 
 # Development Guide
@@ -16,7 +16,7 @@ last_verified: 2026-09-20
 ### 🎯 All Modules Refactored ✅ (31/31 Complete)
 
 **Modules Included:**
-- 22 Core IBL modules (Player, Statistics, Team, Draft, Waivers, Extension, RookieOption, Trading, Negotiation, DepthChart, Voting, Schedule, Season Leaders, Free Agency, PlayerDatabase, Compare_Players, Leaderboards, Standings, League_Stats, AwardHistory, Series_Records, One-on-One)
+- 22 Core IBL modules (Player, Statistics, Team, Draft, Waivers, Extension, RookieOption, Trading, Negotiation, DepthChart, Voting, Schedule, Season Leaders, Free Agency, PlayerSearch, Compare_Players, Leaderboards, Standings, League_Stats, AwardHistory, Series_Records, One-on-One)
 - 7 Display modules (CapSpace, Draft_Pick_Locator, Franchise_History, Injuries, League_Starters, Next_Sim, Team_Schedule)
 - 1 Admin module (LeagueControlPanel)
 
@@ -418,7 +418,7 @@ last_verified: 2026-09-20
 
 ## Completed Modules (31/31) ✅
 
-**Core Modules (22):** Player • Statistics • Team • Draft • Waivers • Extension • RookieOption • Trading • Negotiation • DepthChart • Voting • Schedule • Season Leaders • Free Agency • PlayerDatabase • Compare_Players • Leaderboards • Standings • League_Stats • AwardHistory • Series_Records • One-on-One
+**Core Modules (22):** Player • Statistics • Team • Draft • Waivers • Extension • RookieOption • Trading • Negotiation • DepthChart • Voting • Schedule • Season Leaders • Free Agency • PlayerSearch • Compare_Players • Leaderboards • Standings • League_Stats • AwardHistory • Series_Records • One-on-One
 
 **Display Modules (7):** CapSpace • Draft_Pick_Locator • Franchise_History • Injuries • League_Starters • Next_Sim • Team_Schedule
 

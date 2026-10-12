@@ -56,12 +56,12 @@ class LoggerFactoryTest extends TestCase
 
     public function testResetClearsSingleton(): void
     {
-        $factory1 = LoggerFactory::forTests();
+        LoggerFactory::forTests();
         $logger1 = LoggerFactory::getChannel('test');
 
         LoggerFactory::reset();
 
-        $factory2 = LoggerFactory::forTests();
+        LoggerFactory::forTests();
         $logger2 = LoggerFactory::getChannel('test');
 
         $this->assertNotSame($logger1, $logger2);

@@ -48,7 +48,7 @@ class PreseasonCleanupRepositoryTest extends DatabaseTestCase
         $rows = $result->fetch_all(MYSQLI_ASSOC);
         $result->free();
 
-        self::assertEmpty($rows, 'September-only sim date should be deleted');
+        self::assertSame([], $rows, 'September-only sim date should be deleted');
     }
 
     public function testDeletePreseasonSimDatesPreservesOctoberRows(): void
@@ -66,7 +66,7 @@ class PreseasonCleanupRepositoryTest extends DatabaseTestCase
         $rows = $result->fetch_all(MYSQLI_ASSOC);
         $result->free();
 
-        self::assertNotEmpty($rows, 'October sim date should be preserved');
+        self::assertNotSame([], $rows, 'October sim date should be preserved');
     }
 
     public function testDeletePreseasonSimDatesPreservesSeptemberStartOctoberEndRows(): void
@@ -84,6 +84,6 @@ class PreseasonCleanupRepositoryTest extends DatabaseTestCase
         $rows = $result->fetch_all(MYSQLI_ASSOC);
         $result->free();
 
-        self::assertNotEmpty($rows, 'Sim date spanning Sep-Oct should be preserved');
+        self::assertNotSame([], $rows, 'Sim date spanning Sep-Oct should be preserved');
     }
 }

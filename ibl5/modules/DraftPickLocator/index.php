@@ -23,7 +23,6 @@ use DraftPickLocator\DraftPickLocatorService;
 use DraftPickLocator\DraftPickLocatorView;
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 global $mysqli_db;
 

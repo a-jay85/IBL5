@@ -9,7 +9,7 @@ class CapSpaceEntryPointTest extends ModuleEntryPointTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
     }
 
@@ -20,6 +20,6 @@ class CapSpaceEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('ibl_plr', []);
         $output = $this->runModule('CapSpace');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

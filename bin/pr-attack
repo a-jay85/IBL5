@@ -5,7 +5,8 @@
 # Mechanizes the deterministic steps of .claude/skills/pr-attack/SKILL.md.
 # STRICTLY READ-ONLY against GitHub and git: it never merges, never arms
 # auto-merge, never edits or opens a PR, never pushes, and never invokes
-# bin/pr-triage --arm. Its only write is a dated markdown file under $HOME.
+# bin/pr-triage --arm. Its only write is a dated markdown file under
+# $HOME/claude-plans/_reports/ibl5/pr-attack/.
 # Two invocations, because gate judgment is an INPUT to the sort:
 #   1. bin/pr-attack --gate-candidates          -> nominations + $WORK dir
 #      (no nominations => falls through to 2 automatically)
@@ -61,7 +62,8 @@ Invocation 1 (--gate-candidates): fetch triage + PR metadata, emit gate
   If there are NO gate nominees there is nothing to judge, so it falls
   through to invocation 2 automatically and prints the ordered plan.
 Invocation 2 (--work <dir>): ingest gate-edge judgments, Kahn sort, emit
-  the ordered plan to stdout and $HOME/IBL5-pr-attack-<date>.md.
+  the ordered plan to stdout and
+  $HOME/claude-plans/_reports/ibl5/pr-attack/IBL5-pr-attack-<date>.md.
 
 --gate-edges /dev/null  judged-empty case; succeeds with no gate edges.
 
@@ -551,7 +553,7 @@ emit_order() {
 
     local REPO_ROOT OUT
     REPO_ROOT="$(git rev-parse --show-toplevel)"
-    OUT="$HOME/IBL5-pr-attack-$(cat "$WORK/date").md"
+    OUT="$HOME/claude-plans/_reports/ibl5/pr-attack/IBL5-pr-attack-$(cat "$WORK/date").md"
     case "$OUT" in
         "$HOME"/*) ;;
         *) echo "bin/pr-attack: refusing to write outside \$HOME: $OUT" >&2; rm -f "$tmp_doc"; exit 1 ;;
@@ -559,6 +561,7 @@ emit_order() {
     case "$OUT" in
         "$REPO_ROOT"/*) echo "bin/pr-attack: refusing to write inside the repo: $OUT" >&2; rm -f "$tmp_doc"; exit 1 ;;
     esac
+    mkdir -p "$(dirname "$OUT")"
     cp "$tmp_doc" "$OUT"
     rm -f "$tmp_doc"
 }

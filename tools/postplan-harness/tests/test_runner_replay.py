@@ -6,6 +6,8 @@ import subprocess
 import sys
 import tempfile
 import types
+import pathlib
+import time as time_mod
 
 import pytest
 
@@ -14,7 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
 from harness.adapters.llm import FixtureLlm, extract_json
 from harness.state import HarnessError, TerminalState, UsageLedger
-from harness import ciwatch, schemas
+from harness import cifix, ciwatch, schemas
+from harness.armable import manual_testing_clearance
+from harness.classify import MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC, classify
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -117,7 +121,7 @@ def _fixture(**over):
         "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
         "pr_number": 9999,
         "pr_meta": {"number": 9999, "title": "fix: synthetic",
-                    "body": "## Manual Testing\n\nNo manual testing needed\n",
+                    "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
                     "headRefOid": "deadbeef"},
         "labels": [],
         "final_state": "OPEN",
@@ -212,6 +216,65 @@ def test_bad_pr_copy_json_without_subject_opens_feat_pr():
     creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
     assert creates and creates[-1]["title"] == "feat: synthetic-degrade"
     assert not res.arm.armed
+
+
+_TOOLING_DIFF = "diff --git a/bin/fleet-status b/bin/fleet-status\n+echo 1\n"
+
+
+def _feat_pr_copy_canned():
+    canned = dict(CANNED)
+    canned["pr-copy"] = {"type": "feat", "title": "feat: synthetic",
+                         "commit_subject": "feat: synthetic", "summary_md": "## Summary\n- x\n"}
+    return canned
+
+
+def test_model_feat_copy_on_tooling_diff_opens_chore_pr_and_clears_condition_8():
+    out = tempfile.mkdtemp()
+    llm = FixtureLlm(UsageLedger(), _feat_pr_copy_canned())
+    res = runner.run(_fixture(pr_number=None, pr_meta=None, diff=_TOOLING_DIFF), out, llm,
+                     mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates and creates[-1]["title"] == "chore: synthetic"
+    assert 8 not in {c.number for c in res.arm.holds}
+    assert res.terminal != TerminalState.FAILED
+
+
+def test_model_feat_copy_on_runtime_diff_still_opens_feat_pr_and_holds_condition_8():
+    out = tempfile.mkdtemp()
+    llm = FixtureLlm(UsageLedger(), _feat_pr_copy_canned())
+    res = runner.run(_fixture(pr_number=None, pr_meta=None), out, llm, mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates and creates[-1]["title"] == "feat: synthetic"
+    assert 8 in {c.number for c in res.arm.holds}
+
+
+def test_bad_pr_copy_json_without_subject_on_tooling_diff_opens_chore_pr_and_stays_held():
+    out = tempfile.mkdtemp()
+    llm = DegradingLlm(UsageLedger(), CANNED, {"pr-copy"})
+    res = runner.run(_fixture(pr_number=None, pr_meta=None, diff=_TOOLING_DIFF), out, llm,
+                     mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates and creates[-1]["title"] == "chore: synthetic-degrade"
+    assert not res.arm.armed
+    assert res.terminal == TerminalState.DEGRADED
+    assert "pr-copy" in res.degraded_agents
+    assert 8 not in {c.number for c in res.arm.holds}
+
+
+def test_clean_rerun_live_feat_title_on_tooling_diff_is_not_retyped():
+    class _Gh:
+        def pr_exists(self): return True
+        def pr_title(self): return "feat: x"
+
+    class _Git:
+        def has_changes_to_commit(self): return False
+        def branch_head_subject(self): return "chore: last commit"
+
+    cls = classify(["bin/fleet-status"], "")
+    copy, degraded = runner._pr_copy(None, _Git(), _Gh(), None, "slug", cls, None,
+                                     lambda m: None)
+    assert copy["title"] == "feat: x"
+    assert degraded is False
 
 
 def test_other_pr_copy_errors_still_fail():
@@ -400,6 +463,32 @@ def test_red_ci_checks_fixture_holds_condition_15(tmp_path):
     assert "pytest (stdlib harness)" in c15["reason"]
 
 
+def test_red_ci_checks_warns_not_blocks_when_aggregator_required(tmp_path):
+    """Condition (15) demotes to a warning when master requires the aggregator context."""
+    out = str(tmp_path / "out")
+    res = runner.run(
+        _fixture(red_ci_checks=["pytest (stdlib harness)"], aggregator_required=True), out,
+        FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert 15 not in {c.number for c in res.arm.holds}
+    with open(os.path.join(out, "result.json")) as fh:
+        blob = json.load(fh)
+    c15 = [c for c in blob["arm"]["conditions"] if c["number"] == 15][0]
+    assert c15["blocked"] is False
+    c15_live = [c for c in res.arm.conditions if c.number == 15][0]
+    assert "pytest (stdlib harness)" in c15_live.warning
+    assert "All checks green" in c15_live.warning
+
+
+def test_red_ci_checks_no_warning_when_green(tmp_path):
+    out = str(tmp_path / "out")
+    res = runner.run(
+        _fixture(red_ci_checks=[], aggregator_required=True), out,
+        FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    c15 = [c for c in res.arm.conditions if c.number == 15][0]
+    assert c15.blocked is False
+    assert c15.warning == ""
+
+
 def test_conformance_handoff_clean_run_writes_empty_bridge(tmp_path):
     out = str(tmp_path / "out")
     res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
@@ -477,6 +566,26 @@ _INLINE_PLAN = """\
 | 2 | Confirm the page loads | Truly-manual | post-impl | none |
 """
 
+_AUTOMATED_PLAN = """\
+## Verification Matrix
+
+| # | What | Test type | Timing | Location |
+|---|------|-----------|--------|----------|
+| 1 | Unit behaviour | PHPUnit | pre-impl | tests/FooTest.php |
+| 2 | Command output | CLI-executable | post-impl | bin/test-foo |
+"""
+
+_STATIC_PLAN = """\
+## Verification Matrix
+
+| # | What | Test type | Timing | Location |
+|---|------|-----------|--------|----------|
+| 1 | Read the doc | Doc review | post-impl | docs/foo.md |
+| 2 | Wording check | Static | post-impl | docs/bar.md |
+"""
+
+_NO_MATRIX_PLAN = "## Phase 1: edit a doc\n\nBody text.\n"
+
 _INLINE_FIXTURE = {
     "slug": "inline-phase6-test",
     "diff": _INLINE_DIFF,
@@ -525,10 +634,12 @@ def test_replay_commit_subject_is_not_the_pr_title(monkeypatch):
         assert creates[-1].get("title") == CANNED["pr-copy"]["title"]
 
 
-def _run_inline(canned_extra=None, probes=None):
+def _run_inline(canned_extra=None, probes=None, plan_content=None):
     fixture = dict(_INLINE_FIXTURE)
     if probes is not None:
         fixture = dict(fixture, probes=probes)
+    if plan_content is not None:
+        fixture = dict(fixture, plan_content=plan_content)
     canned = dict(CANNED)
     if canned_extra:
         canned.update(canned_extra)
@@ -538,6 +649,18 @@ def _run_inline(canned_extra=None, probes=None):
     llm = FixtureLlm(UsageLedger(), canned)
     res = runner.run(fixture, out, llm, mode="replay", headless=True, probe=probe)
     return res, out
+
+
+def _phase6_body(out):
+    """Body of the last pr_edit_body action; asserts one exists (no vacuous pass)."""
+    body_edits = [a for a in _actions(out) if a.get("action") == "pr_edit_body"]
+    assert body_edits, "no pr_edit_body action was recorded"
+    return body_edits[-1]["body"]
+
+
+def _audit(out):
+    with open(os.path.join(out, "audit.log")) as fh:
+        return fh.read()
 
 
 def test_phase6_all_rows_demoted_clears():
@@ -563,12 +686,50 @@ def test_phase6_all_rows_demoted_clears():
         assert dem["exit_ok"] is True
         assert "argv" in dem
     # PR body should contain sentinel, no checkbox line
-    actions = _actions(out)
-    body_edits = [a for a in actions if a.get("action") == "pr_edit_body"]
-    if body_edits:
-        body = body_edits[-1].get("body", "")
-        assert "No manual testing needed" in body
-        assert "- [ ]" not in body
+    body = _phase6_body(out)
+    assert "No manual testing needed" in body
+    assert "- [ ]" not in body
+    # Zero executable rows here, but demoted rows keep the covered-by sentinel.
+    assert MANUAL_TESTING_SENTINEL in body
+    assert MANUAL_TESTING_SENTINEL_STATIC not in body
+
+
+def test_phase6_all_automated_keeps_covered_sentinel():
+    """Row 12: a matrix with executable rows keeps the covered-by sentinel."""
+    res, out = _run_inline(plan_content=_AUTOMATED_PLAN)
+    body = _phase6_body(out)
+    assert MANUAL_TESTING_SENTINEL in body
+    assert MANUAL_TESTING_SENTINEL_STATIC not in body
+    assert "plan matrix fully automated" in _audit(out)
+
+
+def test_phase6_no_matrix_plan_keeps_covered_sentinel():
+    """Row 13: a found plan with no matrix must not claim a matrix exists."""
+    res, out = _run_inline(plan_content=_NO_MATRIX_PLAN)
+    body = _phase6_body(out)
+    assert MANUAL_TESTING_SENTINEL in body
+    assert MANUAL_TESTING_SENTINEL_STATIC not in body
+
+
+def test_phase6_plan_blind_keeps_covered_sentinel(monkeypatch, tmp_path):
+    """Row 14: plan-blind run with no manual items keeps the covered-by sentinel."""
+    monkeypatch.setenv("PLANS_DIR", str(tmp_path))
+    res, out = _run_inline(plan_content="")
+    body = _phase6_body(out)
+    assert MANUAL_TESTING_SENTINEL in body
+    assert MANUAL_TESTING_SENTINEL_STATIC not in body
+    assert "phase6 (plan-blind)" in _audit(out)
+
+
+def test_phase6_zero_executable_rows_writes_static_wording():
+    """Row 11: zero executable rows -> static wording, one heading, CLEARED, audit line."""
+    res, out = _run_inline(plan_content=_STATIC_PLAN)
+    body = _phase6_body(out)
+    assert MANUAL_TESTING_SENTINEL_STATIC in body
+    assert MANUAL_TESTING_SENTINEL not in body
+    assert body.count("## Manual Testing") == 1
+    assert manual_testing_clearance(body) == "CLEARED"
+    assert "zero executable rows" in _audit(out)
 
 
 def test_phase6_one_hold_stays_held():
@@ -967,7 +1128,7 @@ class _FakePopen:
         return self.returncode
 
 
-def _run_live_shaped(monkeypatch, out, canned_extra=None):
+def _run_live_shaped(monkeypatch, out, canned_extra=None, fixture=None):
     """Replay fixtures driven down the live-shaped arm of runner.run.
 
     mode="replay" keeps git/gh fake (no network, no pushes) while live=True turns
@@ -976,13 +1137,14 @@ def _run_live_shaped(monkeypatch, out, canned_extra=None):
     """
     from harness.adapters.probe import FixtureProbe
 
+    fx = fixture if fixture is not None else _INLINE_FIXTURE
     monkeypatch.setattr(runner, "ReplayGit", _LiveShapedGit)
     canned = dict(CANNED)
     if canned_extra:
         canned.update(canned_extra)
     llm = FixtureLlm(UsageLedger(), canned)
-    return runner.run(_INLINE_FIXTURE, out, llm, mode="replay", headless=True,
-                      live=True, probe=FixtureProbe(_INLINE_FIXTURE))
+    return runner.run(fx, out, llm, mode="replay", headless=True,
+                      live=True, probe=FixtureProbe(fx))
 
 
 def _ci_files(out):
@@ -1046,6 +1208,22 @@ def test_live_probe_failure_holds_condition_15(monkeypatch, tmp_path):
     c15 = _live_arm_c15(monkeypatch, tmp_path, ["pytest (stdlib harness)"])
     assert c15.blocked is True
     assert "pytest (stdlib harness)" in c15.reason
+
+
+def test_live_arm_consults_aggregator_required(monkeypatch, tmp_path):
+    """The live arm reads master protection once, for the exact aggregator context."""
+    from harness.adapters.ghad import RecordingGh
+    calls = []
+
+    def _fake(self, context):
+        calls.append(context)
+        return True
+
+    monkeypatch.setattr(RecordingGh, "aggregator_required", _fake)
+    c15 = _live_arm_c15(monkeypatch, tmp_path, ["pytest (stdlib harness)"])
+    assert calls == ["All checks green"]
+    assert c15.blocked is False
+    assert "pytest (stdlib harness)" in c15.warning
 
 
 def test_live_probe_clean_clears_condition_15(monkeypatch, tmp_path):
@@ -1293,9 +1471,19 @@ def _patch_two_call_git(monkeypatch, first_files, second_files):
     call_count = [0]
 
     class _TwoCallGit(runner.ReplayGit):
+        _last: list[str] = []
+
         def changed_files(self, base="origin/master"):
             call_count[0] += 1
-            return first_files if call_count[0] == 1 else second_files
+            self._last = first_files if call_count[0] == 1 else second_files
+            return self._last
+
+        def conformance_files(self, base="origin/master"):
+            # The runner reads conformance_files right after each changed_files, so
+            # it sees the same snapshot. Not counted: the call count tracks snapshots.
+            # The fakes in test_fidelity_remediation.py and test_fidelity_rounds.py
+            # override only `changed_files` and stay untouched: ReplayGit delegates.
+            return list(self._last)
 
     monkeypatch.setattr(runner, "ReplayGit", _TwoCallGit)
     return call_count
@@ -1322,6 +1510,83 @@ def test_conformance_rerun_clears_hold_when_remediation_adds_planned_file(tmp_pa
     bridge = os.path.join(out, runner.CONFORMANCE_BRIDGE_NAME)
     assert os.path.exists(bridge) and os.path.getsize(bridge) == 0
     assert "phase5.0 conformance (post-remediation): clean" in "\n".join(res.audit)
+
+
+_PLAN_RENAMED_AGENT = (
+    "# Synthetic rename-source conformance plan\n\n"
+    "## Critical Files\n\n"
+    "- `.claude/agents/sonnet-4-6.md` — renamed to sonnet-5-5.md\n"
+)
+
+_PLAN_RENAME_TARGET_ONLY = (
+    "# Synthetic scope-conformance plan\n\n"
+    "## Critical Files\n\n"
+    "- `.claude/agents/sonnet-5-5.md` — the rename target\n"
+)
+
+
+class _RenameGit(runner.ReplayGit):
+    """changed_files lists only the rename target; conformance_files adds the source."""
+    def changed_files(self, base="origin/master"):
+        return [".claude/agents/sonnet-5-5.md"]
+
+    def conformance_files(self, base="origin/master"):
+        return [".claude/agents/sonnet-5-5.md", ".claude/agents/sonnet-4-6.md"]
+
+
+def test_conformance_reads_rename_sources_not_changed_files(tmp_path, monkeypatch):
+    """PR #2514 shape: the plan names the rename source as a Critical File, only the
+    target is in `changed_files`. The conformance check must read `conformance_files`.
+
+    Mutation caught: revert either `conformance.check(plan, conf_files, ...)` or
+    `_inject_residual_phases(copy, plan, conf_files, log)` to `files` and
+    `MISSING-FILE: .claude/agents/sonnet-4-6.md` reappears.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None)
+    monkeypatch.setattr(runner, "ReplayGit", _RenameGit)
+    seen: list[list[str]] = []
+    real_inject = runner._inject_residual_phases
+
+    def _spy(copy, plan, files, log):
+        seen.append(list(files))
+        return real_inject(copy, plan, files, log)
+
+    monkeypatch.setattr(runner, "_inject_residual_phases", _spy)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    fx = _fixture(plan_content=_PLAN_RENAMED_AGENT)
+    res = runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert res.unresolved_conformance == []
+    assert not any("MISSING-FILE" in line for line in res.audit)
+    assert seen and ".claude/agents/sonnet-4-6.md" in seen[0]
+
+
+def test_scope_conformance_still_reads_changed_files_not_rename_sources(tmp_path, monkeypatch):
+    """Scope conformance keeps `changed_files`, so a rename source never shows up as
+    an unplanned file and creates a new hold.
+
+    Mutation caught: pass `conf_files` to `scope_conformance.scope_notes` and the old
+    path is handed to the unplanned-file check.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None)
+    monkeypatch.setattr(runner, "ReplayGit", _RenameGit)
+    seen: list[list[str]] = []
+    real_notes = runner.scope_conformance.scope_notes
+
+    def _spy(plan, changed_files, diff_body, pr_body, *a, **kw):
+        seen.append(list(changed_files))
+        return real_notes(plan, changed_files, diff_body, pr_body, *a, **kw)
+
+    monkeypatch.setattr(runner.scope_conformance, "scope_notes", _spy)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    fx = _fixture(plan_content=_PLAN_RENAME_TARGET_ONLY)
+    runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert seen, "scope_notes was never called"
+    assert all(".claude/agents/sonnet-4-6.md" not in files for files in seen)
+    assert ".claude/agents/sonnet-5-5.md" in seen[0]
 
 
 def test_conformance_hold_stays_when_remediation_does_not_add_file(tmp_path, monkeypatch):
@@ -1482,3 +1747,576 @@ def test_replay_review_unavailable_append_keeps_phase6_writes(tmp_path):
     final = [a for a in _actions(out) if a["action"] == "pr_edit_body"][-1]["body"]
     assert "No manual testing needed" in final
     assert "## Review Unavailable" in final
+
+
+# ---- Phase 7 CI fix loop ----
+
+_INCIDENT_FAILED = ["Shell harness regression tests", "Tests and Analysis"]
+_CHECKS = [{"name": n, "state": "FAILURE",
+            "link": f"https://github.com/o/r/actions/runs/9{i}/job/8{i}"}
+           for i, n in enumerate(_INCIDENT_FAILED)]
+
+
+def _red_fixture(**extra):
+    fx = json.loads(json.dumps(_INLINE_FIXTURE))
+    fx["checks_outcome"] = {"exit": 8, "failed": list(_INCIDENT_FAILED)}
+    fx.update(extra)
+    return fx
+
+
+def _audit(out):
+    with open(os.path.join(out, "audit.log")) as f:
+        return f.read()
+
+
+class _TwoShaLiveGit(_LiveShapedGit):
+    instances: list = []
+
+    def __init__(self, fixture):
+        super().__init__(fixture)
+        _TwoShaLiveGit.instances.append(self)
+
+    def commit_all(self, message):
+        super(_LiveShapedGit, self).commit_all(message)
+        return f"replay-sha-{len(self.commit_messages)}"
+
+
+class _NoEditLiveGit(_LiveShapedGit):
+    """_LiveShapedGit whose fix-commit path records the message but returns '' (no change)."""
+
+    def commit_all(self, message):
+        if message.startswith("fix: address Phase 7 CI failures"):
+            self.commit_messages.append(message)
+            return ""
+        return super(_LiveShapedGit, self).commit_all(message)
+
+
+def _run_live_shaped_with(monkeypatch, out, *, git_cls, fixture, canned_extra=None, llm=None):
+    from harness.adapters.probe import FixtureProbe
+    if hasattr(git_cls, "instances"):
+        git_cls.instances.clear()
+    monkeypatch.setattr(runner, "ReplayGit", git_cls)
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    canned = dict(CANNED)
+    if canned_extra:
+        canned.update(canned_extra)
+    if llm is None:
+        llm = FixtureLlm(UsageLedger(), canned)
+    fx = fixture if fixture is not None else _INLINE_FIXTURE
+    res = runner.run(fx, out, llm, mode="replay", headless=True,
+                     live=True, probe=FixtureProbe(fx))
+    return res, llm
+
+
+def test_phase7_green_ci_makes_no_ci_fix_call(monkeypatch, tmp_path):
+    class _RecordingLiveShapedGit(_LiveShapedGit):
+        instances: list = []
+
+        def __init__(self, fixture):
+            super().__init__(fixture)
+            type(self).instances.append(self)
+
+    out = str(tmp_path / "out")
+    _run_live_shaped_with(monkeypatch, out, git_cls=_RecordingLiveShapedGit,
+                          fixture=_INLINE_FIXTURE)
+    audit = _audit(out)
+    assert "phase7 ci-fix" not in audit
+    assert "fix: address Phase 7 CI failures" not in audit
+    assert len(_RecordingLiveShapedGit.instances) == 1
+    commits = _RecordingLiveShapedGit.instances[0].commit_messages
+    assert commits, "ReplayGit recorded no commits; the check below would be vacuous"
+    assert not any("fix: address Phase 7 CI failures" in m for m in commits)
+
+
+def test_phase7_red_ci_without_rewatch_script_passes_through(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    res = _run_live_shaped(monkeypatch, out, fixture=_red_fixture())
+    assert res.ci_outcome == "failed"
+    assert "phase7 ci-fix" not in _audit(out)
+
+
+def test_phase7_red_ci_leaves_arming_unchanged(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    out_green = str(tmp_path / "out_green")
+    out_red = str(tmp_path / "out_red")
+    _run_live_shaped(monkeypatch, out_green)
+    _run_live_shaped(monkeypatch, out_red,
+                     canned_extra={"ci-fix": ["edits made"]},
+                     fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]))
+    green_merges = [a["action"] for a in _actions(out_green)].count("pr_merge_auto")
+    red_merges = [a["action"] for a in _actions(out_red)].count("pr_merge_auto")
+    assert green_merges == red_merges
+    assert "pr_disable_auto_merge" not in [a["action"] for a in _actions(out_red)]
+
+
+def test_phase7_incident_red_ci_is_fixed_and_rewatched(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+    )
+    assert res.ci_outcome == "green"
+    assert res.ci_head == "replay-sha-2"
+    audit = _audit(out)
+    assert "phase7 ci-fix attempt 1: model=claude-opus-5-5 outcome=fixed" in audit
+    git = _TwoShaLiveGit.instances[-1]
+    assert any(m.startswith("fix: address Phase 7 CI failures (attempt 1)")
+               for m in git.commit_messages)
+
+
+def test_phase7_signoff_only_red_is_green(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    fx = _red_fixture(
+        checks_outcome={"exit": 8, "failed": ["human-signoff"]},
+        ci_fix_rewatch=[],
+    )
+    res = _run_live_shaped(monkeypatch, out, fixture=fx)
+    assert res.ci_outcome == "green"
+    audit = _audit(out)
+    assert "only human-signoff failed" in audit
+    assert "ci-fix attempt" not in audit
+
+
+def test_phase7_exit8_without_names_is_not_washed_green(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    fx = _red_fixture(
+        checks_outcome={"exit": 8, "failed": []},
+        ci_fix_rewatch=[],
+    )
+    res = _run_live_shaped(monkeypatch, out, fixture=fx)
+    assert res.ci_outcome == "failed"
+
+
+def test_phase7_rollup_only_never_calls_fixer(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    fx = _red_fixture(
+        checks_outcome={"exit": 8, "failed": ["Tests and Analysis"]},
+        ci_checks=_CHECKS,
+        ci_fix_rewatch=[{"exit": 8, "failed": ["Tests and Analysis"]}],
+    )
+    res = _run_live_shaped(monkeypatch, out, fixture=fx)
+    acts = _actions(out)
+    assert sum(1 for a in acts if a.get("action") == "run_rerun_failed") == 1
+    audit = _audit(out)
+    assert "ci-fix attempt" not in audit
+    assert any(a.get("action") == "pr_comment" and a.get("title") == cifix.SURVIVOR_TITLE
+               for a in acts)
+
+
+def test_phase7_ceiling_is_three_attempts_then_survivor_comment(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    incident_red = {"exit": 8, "failed": list(_INCIDENT_FAILED)}
+    fx = _red_fixture(ci_checks=_CHECKS,
+                      ci_fix_rewatch=[incident_red, incident_red, incident_red])
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=fx,
+    )
+    audit = _audit(out)
+    assert "ci-fix attempt 1:" in audit and "outcome=still-red" in audit
+    assert "ci-fix attempt 2:" in audit
+    assert "ci-fix attempt 3:" in audit
+    assert "ci-fix attempt 4:" not in audit
+    acts = _actions(out)
+    survivor_acts = [a for a in acts if a.get("action") == "pr_comment"
+                     and a.get("title") == cifix.SURVIVOR_TITLE]
+    assert len(survivor_acts) == 1
+    assert "Shell harness regression tests" in survivor_acts[0].get("body", "")
+    assert res.ci_outcome == "failed"
+
+
+def test_phase7_no_change_probes_rerun_and_clears_flaky(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    fx = _red_fixture(
+        ci_checks=_CHECKS,
+        ci_fix_rewatch=[{"exit": 0, "failed": []}],
+    )
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_NoEditLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=fx,
+    )
+    audit = _audit(out)
+    assert "attempt 1: model=claude-opus-5-5 outcome=no-change" in audit
+    assert "rerun probe: outcome=flaky-green" in audit
+    acts = _actions(out)
+    rerun_ids = {a.get("run_id") for a in acts if a.get("action") == "run_rerun_failed"}
+    assert rerun_ids == {"90", "91"}
+    assert any(a.get("action") == "pr_comment" and a.get("title") == cifix.FLAKY_TITLE
+               for a in acts)
+    assert res.ci_outcome == "green"
+
+
+def test_phase7_rerun_probe_runs_at_most_once(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    incident_red = {"exit": 8, "failed": list(_INCIDENT_FAILED)}
+    fx = _red_fixture(ci_checks=_CHECKS, ci_fix_rewatch=[incident_red])
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_NoEditLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=fx,
+    )
+    audit = _audit(out)
+    assert audit.count("rerun probe") == 1
+    for attempt in (1, 2):
+        assert re.search(
+            rf"phase7 ci-fix attempt {attempt}: .*outcome=no-change", audit), \
+            f"attempt {attempt} did not log outcome=no-change"
+    acts = _actions(out)
+    rerun_count = sum(1 for a in acts if a.get("action") == "run_rerun_failed")
+    assert rerun_count == 2
+    assert any(a.get("action") == "pr_comment" and a.get("title") == cifix.SURVIVOR_TITLE
+               for a in acts)
+
+
+def test_phase7_fix_call_uses_opus_5_5(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    llm = FixtureLlm(UsageLedger(), dict(CANNED, **{"ci-fix": ["edits made"]}))
+    _, llm_out = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+        llm=llm,
+    )
+    ci_fix_argvs = [argv for purpose, argv in llm_out.tooled_argvs if purpose == "ci-fix"]
+    assert ci_fix_argvs, "no ci-fix call was made"
+    for argv in ci_fix_argvs:
+        assert "claude-opus-5-5" in argv
+        assert all("claude-sonnet" not in a for a in argv)
+
+
+def test_phase7_fix_push_is_one_lease_push(monkeypatch, tmp_path):
+    green_out = str(tmp_path / "green")
+    red_out = str(tmp_path / "red")
+    _run_live_shaped_with(
+        monkeypatch, green_out,
+        git_cls=_TwoShaLiveGit,
+        fixture=_INLINE_FIXTURE,
+    )
+    green_git = _TwoShaLiveGit.instances[-1]
+    _run_live_shaped_with(
+        monkeypatch, red_out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+    )
+    incident_git = _TwoShaLiveGit.instances[-1]
+    # The ci-fix push goes through the lease push (stale-base catch-up), never push_ff.
+    assert incident_git.ff_pushes == 0
+    assert incident_git.pushes == green_git.pushes + 1
+
+
+def test_phase7_fix_loop_error_does_not_fail_run(monkeypatch, tmp_path):
+    from harness.state import TerminalState as TS
+    out = str(tmp_path / "out")
+
+    real_push = runner._push_with_adr_draft
+
+    def _boom_phase7_push(git, log, phase, **kw):
+        if phase == "phase7":
+            raise HarnessError("local-gate", "pre-push denied")
+        return real_push(git, log, phase, **kw)
+
+    monkeypatch.setattr(runner, "_push_with_adr_draft", _boom_phase7_push)
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=_red_fixture(ci_checks=_CHECKS,
+                             ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+    )
+    assert res.terminal != TS.FAILED
+    audit = _audit(out)
+    assert "outcome=error:local-gate" in audit
+    assert "ci-fix commit is LOCAL and unpushed" in audit
+    acts = _actions(out)
+    assert any(a.get("action") == "pr_comment" and a.get("title") == cifix.SURVIVOR_TITLE
+               for a in acts)
+
+
+def test_phase7_budget_exhausted_makes_no_attempt(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    monkeypatch.setattr(runner, "_CI_FIX_WALL_BUDGET_SECS", 0)
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        fixture=_red_fixture(ci_checks=_CHECKS,
+                             ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+    )
+    audit = _audit(out)
+    assert "wall-clock budget exhausted" in audit
+    assert "ci-fix attempt" not in audit
+    acts = _actions(out)
+    assert any(a.get("action") == "pr_comment" and a.get("title") == cifix.SURVIVOR_TITLE
+               for a in acts)
+
+
+def test_ci_fix_budget_below_max_pp_secs():
+    test_dir = pathlib.Path(__file__).resolve().parent
+    repo_root = test_dir
+    for _ in range(10):
+        candidate = repo_root / "bin" / "automouse" / "run"
+        if candidate.exists():
+            break
+        repo_root = repo_root.parent
+    else:
+        pytest.fail("Could not locate bin/automouse/run from test file location")
+    import re as _re
+    text = candidate.read_text()
+    m = _re.search(r"^MAX_PP_SECS=(\d+)", text, _re.MULTILINE)
+    assert m, "MAX_PP_SECS not found in bin/automouse/run"
+    max_pp = int(m.group(1))
+    assert runner._CI_FIX_WALL_BUDGET_SECS < max_pp
+    assert max_pp - runner._CI_FIX_WALL_BUDGET_SECS >= 600
+
+
+def test_phase7_fix_loop_divergence_fails_closed(monkeypatch, tmp_path):
+    from harness.adapters.ghad import RecordingGh
+    out = str(tmp_path / "out")
+    os.makedirs(out, exist_ok=True)
+    monkeypatch.setattr(
+        runner.gitutil, "reconcile_remote_head",
+        lambda *a, **k: types.SimpleNamespace(action="diverged",
+                                               evidence="remote moved", remote_sha=""),
+    )
+    _TwoShaLiveGit.instances.clear()
+    git = _TwoShaLiveGit(_INLINE_FIXTURE)
+    gh = RecordingGh(out)
+    llm = FixtureLlm(UsageLedger(), dict(CANNED, **{"ci-fix": ["edits made"]}))
+    res = types.SimpleNamespace(ci_head=None)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._ci_fix_loop(
+            git, gh, llm, lambda *a: None, res,
+            worktree=".", pr=_INLINE_FIXTURE["pr_number"],
+            sha="sha0",
+            outcome=ciwatch.CiOutcome(8, list(_INCIDENT_FAILED), "t"),
+            out_dir=out, mode="live", fixture=_INLINE_FIXTURE,
+            run_started=time_mod.time(),
+        )
+    assert exc_info.value.kind == "remote-head-diverged"
+    acts = gh.actions()
+    assert any(a.get("action") == "pr_disable_auto_merge" for a in acts)
+
+
+def test_phase7_watch_timeout_uses_fresh_remaining(monkeypatch, tmp_path):
+    from harness.adapters.ghad import RecordingGh
+    out = str(tmp_path / "out")
+    os.makedirs(out, exist_ok=True)
+    monkeypatch.setattr(
+        runner.gitutil, "reconcile_remote_head",
+        lambda *a, **k: types.SimpleNamespace(action="ok"),
+    )
+    recorded_timeouts = []
+
+    def fake_watch_or_reuse(*a, timeout=0, **k):
+        recorded_timeouts.append(timeout)
+        return ciwatch.CiOutcome(0, [], "stub")
+
+    monkeypatch.setattr(ciwatch, "watch_or_reuse", fake_watch_or_reuse)
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    monkeypatch.setattr(ciwatch, "reap_background_watch", lambda *a, **k: None)
+
+    call_count = [0]
+    fake_time_values = [0.0, 0.0, 0.0, 600.0, 600.0, 600.0]
+
+    def fake_time():
+        idx = min(call_count[0], len(fake_time_values) - 1)
+        call_count[0] += 1
+        return fake_time_values[idx]
+
+    monkeypatch.setattr(runner.time, "time", fake_time)
+
+    _TwoShaLiveGit.instances.clear()
+    git = _TwoShaLiveGit(_INLINE_FIXTURE)
+    gh = RecordingGh(out)
+    llm = FixtureLlm(UsageLedger(), dict(CANNED, **{"ci-fix": ["edits made"]}))
+    res = types.SimpleNamespace(ci_head=None)
+
+    runner._ci_fix_loop(
+        git, gh, llm, lambda *a: None, res,
+        worktree=".", pr=_INLINE_FIXTURE["pr_number"],
+        sha="sha0",
+        outcome=ciwatch.CiOutcome(8, list(_INCIDENT_FAILED), "t"),
+        out_dir=out, mode="live", fixture=None,
+        run_started=0.0,
+    )
+
+    assert recorded_timeouts, "watch_or_reuse was not called"
+    assert recorded_timeouts[0] <= runner._CI_FIX_WALL_BUDGET_SECS - 600
+
+
+def test_phase7_rewatch_timeout_is_indeterminate_not_green(monkeypatch, tmp_path):
+    """A re-watch timeout (exit -1, failed=[]) must not be washed green.
+
+    The fix: the loop checks outcome.exit_code != 8 before the triage-green path,
+    so a timeout with no failed names returns (sha, outcome) unchanged instead of
+    synthesizing a CiOutcome(0, ...) green.
+    """
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    fx = _red_fixture(
+        ci_checks=_CHECKS,
+        ci_fix_rewatch=[{"exit": -1, "failed": []}],
+    )
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=fx,
+    )
+    assert res.ci_outcome == "indeterminate"
+    acts = _actions(out)
+    assert not any(a.get("action") == "pr_comment" and a.get("title") == cifix.FLAKY_TITLE
+                   for a in acts), "flaky comment must not be posted on a timeout"
+
+
+# ---- merge digest in the PR body ----
+
+def _digest_rows(unavailable=False):
+    from harness import fidelity
+    if unavailable:
+        return fidelity._digest_degraded()
+    return [fidelity.linkify_refs(f"{lbl} row backlog#1169 PR #2559")
+            for lbl in fidelity.LABELS]
+
+
+def test_merge_digest_prepended_to_body_with_remediation_suffix(tmp_path, monkeypatch):
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha="abc1234")
+    monkeypatch.setattr(runner.fidelity, "digest_lines", lambda *a, **k: _digest_rows())
+    out = str(tmp_path / "out")
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    edits = [a for a in _actions(out) if a["action"] == "pr_edit_body"]
+    digest_edits = [a for a in edits if "<!-- merge-digest:begin -->" in a["body"]]
+    assert len(digest_edits) == 1
+    body = digest_edits[0]["body"]
+    assert body.startswith("<!-- merge-digest:begin -->\n## Merge digest\n")
+    assert "(post-plan remediation: abc1234)" in body
+    assert "[backlog#1169](<https://github.com/a-jay85/IBL5-backlog/issues/1169>)" in body
+    assert body.count("<!-- merge-digest:begin -->") == 1
+
+
+def test_all_degraded_digest_writes_no_body_block(tmp_path, monkeypatch):
+    _patch_fidelity_with_remediation(monkeypatch)
+    monkeypatch.setattr(runner.fidelity, "digest_lines",
+                        lambda *a, **k: _digest_rows(unavailable=True))
+    out = str(tmp_path / "out")
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    edits = [a for a in _actions(out) if a["action"] == "pr_edit_body"]
+    assert not any("<!-- merge-digest:begin -->" in a["body"] for a in edits)
+
+
+# ---------------------------------------------------------------------------
+# MISSING-METHOD changed-file reader seam
+# ---------------------------------------------------------------------------
+
+_PLAN_REQUIRES_METHOD = (
+    _PLAN_WITH_TEST_FOO
+    + "\n## Required Test Methods\n\n- `test_never_declared_anywhere`\n"
+)
+
+
+def test_runner_conformance_reader_is_worktree_read_at_both_sites(tmp_path, monkeypatch):
+    """Both `conformance.check(` calls get the adapter's bound `read_worktree_file`.
+
+    Mutation caught: dropping `read_file=` at either call site fails the key lookup;
+    a lambda wrapper has no `__self__` and fails the bound-method check.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha="fake-remediation-sha")
+    _patch_two_call_git(
+        monkeypatch,
+        first_files=["runner.py"],
+        second_files=["runner.py", "tools/postplan-harness/tests/test_foo.py"],
+    )
+    calls: list[dict] = []
+    real = runner.conformance.check
+
+    def _spy(*a, **kw):
+        calls.append(kw)
+        return real(*a, **kw)
+
+    monkeypatch.setattr(runner.conformance, "check", _spy)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    runner.run(_fixture(plan_content=_PLAN_WITH_TEST_FOO), out,
+               FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert len(calls) == 2
+    for kw in calls:
+        reader = kw["read_file"]
+        assert isinstance(reader.__self__, runner.ReplayGit)
+        assert reader.__func__ is runner.ReplayGit.read_worktree_file
+    assert calls[0]["read_file"].__self__ is calls[1]["read_file"].__self__
+
+
+def test_replay_runner_missing_method_stays_held(tmp_path):
+    """Replay has no tree, so an undeclared required method stays MISSING-METHOD.
+
+    Mutation caught: a ReplayGit reader that returns a stub declaration.
+    """
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    res = runner.run(_fixture(plan_content=_PLAN_REQUIRES_METHOD), out,
+                     FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert any(i.startswith("MISSING-METHOD: test_never_declared_anywhere")
+               for i in res.unresolved_conformance)
+
+
+_PHASE2_STARTS = ("phase2: starting scope check",
+                  "phase2: starting commit ADR gate",
+                  "phase2: starting commit (pre-commit hook)")
+
+
+def test_phase2_logs_step_starts_in_order(tmp_path):
+    """audit.log names each Phase 2 step before it runs, in execution order, so a hang
+    is attributable to the last `phase2: starting` line.
+
+    Mutation caught: delete or reorder any of the three `log(...)` calls in runner.run.
+    """
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    audit = _audit(out)
+    positions = [audit.find(line) for line in _PHASE2_STARTS]
+    assert all(p >= 0 for p in positions), (positions, audit)
+    assert positions == sorted(positions), positions
+    # REBASE= is not an audit.log line in replay mode; the PR-exists/create line is the
+    # first later Phase 2 log, so the three starts must precede whichever of these exist.
+    later = [p for p in (audit.find("REBASE="), audit.find("phase2: PR #")) if p >= 0]
+    assert all(p > positions[-1] for p in later), (positions, later)
+
+
+def test_scope_check_timeout_fails_run_closed_with_named_step(tmp_path, monkeypatch):
+    """A scope-check hang fails the run closed (exit 3), and audit.log's last
+    `phase2: starting` line names the scope check.
+
+    Mutation caught: drop SUBPROCESS_TIMEOUT from _FAIL_CLOSED_KINDS (exit 1), or swallow
+    the error in _inject_scope_notes (the run proceeds and the terminal is not FAILED).
+    """
+    def _hang(*a, **kw):
+        raise HarnessError(runner.SUBPROCESS_TIMEOUT,
+                           "step 'scope-check' timed out after 120s",
+                           cmd="bin/lib/plan-scope-conformance")
+
+    monkeypatch.setattr(runner.scope_conformance, "scope_notes", _hang)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == runner.SUBPROCESS_TIMEOUT
+    assert runner.exit_code_for(res) == 3
+    assert "scope-check" in runner.verdict_line(res, 3)
+    starts = [ln for ln in _audit(out).splitlines() if "phase2: starting" in ln]
+    assert starts, "no phase2 step-start line was logged"
+    assert starts[-1].endswith("phase2: starting scope check"), starts
+    assert not any("phase2: starting commit" in ln for ln in starts), starts

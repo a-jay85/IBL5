@@ -1,6 +1,8 @@
 import contextlib
 import io
+import itertools
 import os
+import pathlib
 import pytest
 import re
 import subprocess
@@ -9,11 +11,15 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
-from harness.planfile import (EXEMPT_RE, _strip_fenced, frontmatter_auto_merge_false,
+from harness.planfile import (EXEMPT_RE, _ABS_PREFIX_RE, _normalise_cf_path,
+                              _strip_fenced,
+                              count_executable_matrix_rows,
+                              frontmatter_auto_merge_false,
                               frontmatter_autonomy_contract, locate_plan,
                               parse_critical_files, parse_matrix,
+                              parse_deferred_phase_numbers, parse_phases,
                               parse_required_test_methods)
-from harness.state import PlanInfo, RunResult
+from harness.state import PhaseInfo, PlanInfo, RunResult
 
 PLAN = """---
 status: ready
@@ -100,6 +106,112 @@ def test_matrix_ignores_fenced_rows():
     assert len(manual) == len(parse_matrix(PLAN)[1])
     assert "tests/X.php" not in planned
     assert not any("eyeball it" in row.raw for row in manual)
+
+
+_MATRIX_HEAD = (
+    "| # | What to verify | Test type | Timing | Test file / location |\n"
+    "|---|----------------|-----------|--------|----------------------|\n"
+)
+
+_DOCS_ONLY_MATRIX = (
+    "# Docs only\n\n## Verification Matrix\n\n" + _MATRIX_HEAD
+    + "| 1 | Wording reads correctly | Doc review | post-impl | `docs/x.md` |\n"
+    "| 2 | Links resolve | Static | post-impl | `bin/check-links` |\n"
+)
+
+_MIXED_MATRIX = (
+    "# Mixed\n\n## Verification Matrix\n\n" + _MATRIX_HEAD
+    + "| 1 | Service returns the row | PHPUnit | pre-impl "
+    "| `ibl5/tests/Foo/FooServiceTest.php` |\n"
+    "| 2 | Page renders the row | E2E | post-impl "
+    "| `ibl5/tests/e2e/tests/foo.spec.ts` |\n"
+    "| 3 | Lint stays clean | CLI-executable | post-impl | `grep -c x f \\| wc -l` |\n"
+    "| 4 | Layout feels right | Truly-manual | post-impl | open the page and look |\n"
+    "| 5 | Wording reads correctly | Doc review | post-impl | `docs/x.md` |\n"
+    "\n## Notes\n\n"
+    "| Item | Detail |\n|------|--------|\n"
+    "| Coverage | E2E is deferred to a later plan |\n"
+)
+
+_NO_MATRIX = (
+    "# No matrix\n\n## Critical Files\n\n- `ibl5/classes/Foo/FooService.php`\n\n"
+    "## Notes\n\n| Item | Detail |\n|------|--------|\n| Scope | One service |\n"
+)
+
+
+def test_executable_count_docs_only_matrix_is_zero():
+    # A real matrix with only non-taxonomy types is 0, never None.
+    count = count_executable_matrix_rows(_DOCS_ONLY_MATRIX)
+    assert count == 0
+    assert count is not None
+
+
+def test_executable_count_ignores_critical_files_table():
+    content = (
+        _DOCS_ONLY_MATRIX
+        + "\n## Critical Files\n\n"
+        "| File | Why |\n|------|-----|\n"
+        "| `ibl5/tests/Foo/FooTest.php` | PHPUnit coverage for Foo |\n"
+    )
+    assert count_executable_matrix_rows(content) == 0
+
+
+def test_executable_count_ignores_fenced_matrix():
+    fenced_block = (
+        "\n## Appendix\n\n```markdown\n" + _MATRIX_HEAD
+        + "| 1 | Thing works | PHPUnit | pre-impl | `ibl5/tests/Foo/FooTest.php` |\n```\n"
+    )
+    assert count_executable_matrix_rows(_DOCS_ONLY_MATRIX + fenced_block) == 0
+    # Only header is inside a fence: no real matrix at all.
+    fenced_only = "# Plan\n" + fenced_block
+    assert count_executable_matrix_rows(fenced_only) is None
+
+
+def test_executable_count_mixed_matrix():
+    # PHPUnit + E2E + CLI-executable (escaped-pipe location) = 3; Truly-manual and
+    # Doc review add nothing, and the later Notes table naming E2E is out of scope.
+    assert count_executable_matrix_rows(_MIXED_MATRIX) == 3
+
+
+def test_executable_count_visual_regression_counts():
+    content = (
+        "# Visual\n\n## Verification Matrix\n\n" + _MATRIX_HEAD
+        + "| 1 | Roster page pixels unchanged | Visual-regression | post-impl "
+        "| `ibl5/tests/e2e/visual/roster.spec.ts` |\n"
+    )
+    assert count_executable_matrix_rows(content) == 1
+
+
+def test_executable_count_none_without_matrix():
+    assert count_executable_matrix_rows(_NO_MATRIX) is None
+
+
+# Committed corpus: tests/fixtures/matrix_count/ (one .plan.txt per counter shape).
+_FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures" / "matrix_count"
+
+
+@pytest.mark.parametrize("name,expected", [
+    ("docs_only.plan.txt", 0),
+    ("critical_files_phpunit.plan.txt", 0),
+    ("fenced_matrix.plan.txt", 0),
+    ("fenced_only.plan.txt", None),
+    ("mixed.plan.txt", 3),
+    ("visual_regression_only.plan.txt", 1),
+    ("misaligned_columns.plan.txt", 1),
+    ("no_matrix.plan.txt", None),
+])
+def test_executable_count_fixture_corpus(name, expected):
+    content = (_FIXTURE_DIR / name).read_text(encoding="utf-8")
+    assert count_executable_matrix_rows(content) == expected
+
+
+def test_locate_plan_sets_executable_row_count():
+    info = locate_plan("x", content_override=_MIXED_MATRIX)
+    assert info.has_matrix is True
+    assert info.executable_row_count == 3
+    blind = locate_plan("x", content_override=_NO_MATRIX)
+    assert blind.has_matrix is False
+    assert blind.executable_row_count is None
 
 
 def test_matrix_fence_width_awareness():
@@ -250,6 +362,133 @@ def test_lib_sync(tmp_path):
         "parser divergence\n python: %s\n shell:  %s" % (_classify(AGREEMENT_PLAN), shell))
     assert sum(1 for ln in shell if ln.startswith("EXEMPT:")) == 17
     assert sum(1 for ln in shell if ln.startswith("MUST_APPEAR:")) == 11
+
+
+# backlog#1211: absolute-path parity. Each entry is (path-as-written, expected
+# repo-relative form). The shell lib and _normalise_cf_path must agree on every
+# one. Relative paths are covered by AGREEMENT_PLAN / test_lib_sync.
+ABS_PARITY_CASES = [
+    ("/Users/x/GitHub/IBL5/ibl5/classes/Foo.php", "ibl5/classes/Foo.php"),
+    ("/Users/x/GitHub/IBL5-worktrees/my-slug/bin/check-plan", "bin/check-plan"),
+    ("/a/IBL5/b/IBL5/c", "c"),                      # greedy: LAST root wins
+    ("/a/IBL5-worktrees/slug/IBL5/d", "d"),         # worktree then plain root
+    ("/a/IBL5/IBL5-worktrees/slug/e", "e"),         # plain root then worktree
+    ("/a/IBL5-worktrees/x", "/a/IBL5-worktrees/x"),  # no slash after slug
+    ("/a/IBL5", "/a/IBL5"),                         # no trailing slash
+    ("/a/ibl5/y", "/a/ibl5/y"),                     # case-sensitive
+    ("/Users/x/claude-plans/z.md", "/Users/x/claude-plans/z.md"),  # out-of-repo
+    ("docs/IBL5/rel.md", "docs/IBL5/rel.md"),       # relative: untouched
+]
+
+
+def _abs_plan(cases):
+    body = "".join("- `%s`%s\n" % (p, " (reference)" if i % 2 else "")
+                   for i, (p, _e) in enumerate(cases))
+    return "## Critical Files\n\n" + body
+
+
+def _shell_parse(planfile_path, fn="cf_parse_section"):
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$1" && %s "$2"' % fn, "_", LIB, str(planfile_path)],
+        capture_output=True, text=True, check=True)
+    return [ln for ln in proc.stdout.splitlines() if ln.strip()]
+
+
+def test_lib_sync_absolute_paths(tmp_path):
+    """backlog#1211: shell cf_parse_section strips the same IBL5 prefix _normalise_cf_path does."""
+    plan = _abs_plan(ABS_PARITY_CASES)
+    f = tmp_path / "abs.md"
+    f.write_text(plan)
+    shell = _shell_parse(f)
+    python = _classify(plan)
+    assert python == shell, "parser divergence\n python: %s\n shell:  %s" % (python, shell)
+    # Agreement on the RIGHT answer, not merely mutual agreement.
+    want = [("EXEMPT:" if i % 2 else "MUST_APPEAR:") + e
+            for i, (_p, e) in enumerate(ABS_PARITY_CASES)]
+    assert shell == want
+    for p, e in ABS_PARITY_CASES:
+        assert _normalise_cf_path(p) == e
+    # The raw entry point is the pre-#1211 parser: paths exactly as written.
+    raw = _shell_parse(f, "cf_parse_section_raw")
+    assert raw == [("EXEMPT:" if i % 2 else "MUST_APPEAR:") + p
+                   for i, (p, _e) in enumerate(ABS_PARITY_CASES)]
+
+
+def test_lib_empty_normalisation_divergence_pinned(tmp_path):
+    """A bare root entry: Python yields "", the shell keeps the path as written.
+
+    Deliberate and confined to a plan-authoring defect that gate [F] rejects at
+    plan time. An empty MUST_APPEAR row would be skipped by Phase 5.0 (dropping a
+    hold), so the shell fails closed by leaving the entry unchanged.
+    """
+    root = "/Users/x/GitHub/IBL5/"
+    assert _normalise_cf_path(root) == ""
+    f = tmp_path / "root.md"
+    f.write_text("## Critical Files\n\n- `%s`\n" % root)
+    assert _shell_parse(f) == ["MUST_APPEAR:" + root]
+
+
+def test_lib_abs_prefix_pattern_sync():
+    """Byte-level drift guard for the prefix regex, sibling of test_lib_pattern_sync."""
+    m = re.search(r"^CF_ABS_PREFIX_ERE='([^']+)'", open(LIB).read(), re.M)
+    assert m, "CF_ABS_PREFIX_ERE not found in " + LIB
+    assert _ABS_PREFIX_RE.pattern.replace("(?:", "(") == m.group(1)
+
+
+_CORPUS_SNAP = r'''
+source "$1"
+for f in "$HOME"/claude-plans/*.md; do
+    cf_parse_section_raw "$f" | awk -v p="$(basename "$f")" '{ print p "\t" $0 }' >> "$2"
+    cf_parse_section "$f" | awk -v p="$(basename "$f")" '{ print p "\t" $0 }' >> "$3"
+done
+'''
+
+
+@pytest.mark.skipif(not os.path.isdir(os.path.expanduser("~/claude-plans")),
+                    reason="needs the machine-local ~/claude-plans corpus")
+def test_lib_corpus_normalisation_diff(tmp_path):
+    """backlog#1211: over every real plan, only in-repo absolute rows move, and each
+    moves to exactly what _normalise_cf_path yields.
+
+    cf_parse_section_raw is byte-identical to the pre-#1211 parser, so it is the
+    stable "before" side and the test stays valid after this change merges.
+    """
+    before_tsv = tmp_path / "before.tsv"
+    after_tsv = tmp_path / "after.tsv"
+    before_tsv.write_text("")
+    after_tsv.write_text("")
+    subprocess.run(["bash", "-c", _CORPUS_SNAP, "_", LIB, str(before_tsv), str(after_tsv)],
+                   check=True, capture_output=True, text=True)
+    before = before_tsv.read_text().splitlines()
+    after = after_tsv.read_text().splitlines()
+    # Row 1: the baseline really contains the legacy absolute rows under test.
+    assert len(before) >= 5807, len(before)
+    n_abs = sum(1 for ln in before
+                if ln.split("\t", 1)[1].split(":", 1)[1].startswith("/"))
+    assert n_abs >= 117, n_abs
+    # Row 15: per-row comparison.
+    assert len(after) == len(before)
+    changed = out_of_repo = 0
+    for old_row, new_row in zip(before, after):
+        plan, old_entry = old_row.split("\t", 1)
+        plan2, new_entry = new_row.split("\t", 1)
+        old_kind, old = old_entry.split(":", 1)
+        new_kind, new = new_entry.split(":", 1)
+        assert (plan, old_kind) == (plan2, new_kind), (old_row, new_row)
+        assert new != "", "empty path emitted: " + old_row
+        if not old.startswith("/"):
+            assert new == old, ("relative row changed", old_row, new_row)
+            continue
+        exp = _normalise_cf_path(old)
+        if exp == "":
+            assert new == old, ("bare-root row must pass through", old_row, new_row)
+        elif exp == old:
+            assert new == old, ("out-of-repo row changed", old_row, new_row)
+            out_of_repo += 1
+        else:
+            assert new == exp, ("differs from _normalise_cf_path(old)", old_row, new_row)
+            changed += 1
+    assert changed >= 103 and out_of_repo >= 14, (changed, out_of_repo)
 
 
 def test_lib_pattern_sync():
@@ -857,6 +1096,133 @@ def test_conformance_empty_diff_body_is_noop():
 
 
 # ---------------------------------------------------------------------------
+# Phase 7b — false-positive MISSING-METHOD guards (backlog#1133)
+# ---------------------------------------------------------------------------
+
+def test_required_test_methods_accepts_backtick_with_parens():
+    """A backtick-wrapped method with '()' before the closing backtick is accepted.
+
+    Reproduces the regression introduced by the first pass-1 fix: plans write
+    entries like '- `testSumsSalariesAcrossPlayersForEachFutureYear()` — two rows'
+    and the pure-identifier-only match dropped them (backlog#1133, corpus fix).
+    """
+    content = """
+## Required Test Methods
+
+- `testSumsSalariesAcrossPlayersForEachFutureYear()` — two rows at `cy: 1`
+- `testCountsHoldsOnlyForNonZeroSalaries()` — mixed zero/non-zero
+- `testValidateAddCapOutcomeFollowsSalaryBasis(): void` — cap branch
+"""
+    methods = parse_required_test_methods(content)
+    assert "testSumsSalariesAcrossPlayersForEachFutureYear" in methods
+    assert "testCountsHoldsOnlyForNonZeroSalaries" in methods
+    assert "testValidateAddCapOutcomeFollowsSalaryBasis" in methods
+
+
+def test_required_test_methods_accepts_bare_identifier_with_emdash():
+    """A bare identifier followed by an em-dash description is accepted.
+
+    Reproduces the regression introduced by the first pass-2 fix: plans write
+    entries like '- testBuildDiscordChunksShortTextProducesOneChunk — three signing
+    lines...' and the colon/EOL-only check dropped them (backlog#1133, corpus fix).
+    """
+    content = """
+## Required Test Methods
+
+- testBuildDiscordChunksShortTextProducesOneChunk — three signing lines produce one message
+- testBuildDiscordChunksLongTextSplitsOnLineBoundaries — text over 2000 chars yields two
+- testInsertNewsStoryReturnsZeroWhenNoRowsAffected — against MockDatabase returns 0
+"""
+    methods = parse_required_test_methods(content)
+    assert "testBuildDiscordChunksShortTextProducesOneChunk" in methods
+    assert "testBuildDiscordChunksLongTextSplitsOnLineBoundaries" in methods
+    assert "testInsertNewsStoryReturnsZeroWhenNoRowsAffected" in methods
+
+
+def test_required_test_methods_skips_path_bullet():
+    """A backtick-wrapped path bullet (containing /) is not captured as a method name.
+
+    Reproduces MISSING-METHOD: ibl5 / MISSING-METHOD: bin from real PRs
+    (#2441, #2432): the plan's Required Test Methods section uses file-path
+    bullets like '- `ibl5/tests/SearchViewTest.php` (extend existing class)'
+    as context lines, and the old regex captured the first identifier before
+    the slash ('ibl5') as a required method name.
+
+    After the fix the path bullet is silently skipped and only the real
+    method on the indented sub-bullet is returned.
+    """
+    content = """
+## Required Test Methods
+
+- `ibl5/tests/Search/SearchViewTest.php` (extend existing class)
+  - `testRenderLabels`
+- `bin/test-harness` — test script
+  - `testHarnessBoots`
+"""
+    methods = parse_required_test_methods(content)
+    assert "ibl5" not in methods, (
+        f"path prefix 'ibl5' must not be captured as a method name; got {methods!r}"
+    )
+    assert "bin" not in methods, (
+        f"path prefix 'bin' must not be captured as a method name; got {methods!r}"
+    )
+    assert "testRenderLabels" in methods
+    assert "testHarnessBoots" in methods
+
+
+def test_required_test_methods_skips_label_phrase():
+    """A bullet starting with a prose label phrase is not captured as a method name.
+
+    Reproduces MISSING-METHOD: Static from PR #2432: the plan entry
+    '- Static guards in `bin/test-pr-cycle`: `g_no_merge`, ...' caused
+    'Static' to be captured as a required method because the regex grabbed
+    the first identifier on any bullet line regardless of context.
+    """
+    content = """
+## Required Test Methods
+
+- Static guards in `bin/test-pr-cycle`: `g_no_merge`, `g_one_arm`
+- `testRealMethod`
+"""
+    methods = parse_required_test_methods(content)
+    assert "Static" not in methods, (
+        f"category label 'Static' must not be a method name; got {methods!r}"
+    )
+    assert "testRealMethod" in methods
+
+
+def test_conformance_accepts_bash_function_declaration():
+    """No MISSING-METHOD: when the diff uses bare 'name() {' bash function syntax.
+
+    Reproduces the false-positive for 'present methods' (backlog#1133): a shell
+    guard like 'g_no_merge() {' exists in the diff but the conformance check only
+    matched '(function|def) name', missing the bash declaration form.
+    """
+    plan = PlanInfo(found=True, has_matrix=True, required_test_methods=["g_no_merge"])
+    diff_body = "+g_no_merge() {\n+    return 1\n+}\n"
+    items = conformance.check(plan, [], diff_body=diff_body)
+    method_items = [i for i in items if i.startswith("MISSING-METHOD:")]
+    assert method_items == [], (
+        f"g_no_merge declared as 'g_no_merge() {{' must not be flagged missing; got {method_items!r}"
+    )
+
+
+def test_conformance_still_flags_truly_absent_method():
+    """A method genuinely absent from the diff is still reported as MISSING-METHOD:.
+
+    Regression guard: the false-positive fixes must not suppress detection of
+    methods the diff never wrote.
+    """
+    plan = PlanInfo(found=True, has_matrix=True, required_test_methods=["testAbsent"])
+    diff_body = "function testPresent() {}\ng_other() {\n    return 0\n}\n"
+    items = conformance.check(plan, [], diff_body=diff_body)
+    missing = [i for i in items if i.startswith("MISSING-METHOD:") and "testAbsent" in i]
+    assert missing, (
+        f"Expected MISSING-METHOD: testAbsent in items; got {items!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Phase 5 - D5: shell-command token rejection in parse_matrix
 # ---------------------------------------------------------------------------
 
@@ -944,6 +1310,35 @@ _CONTRACT_SYNC_FIXTURES = [
      "empty-evidence", "", "empty"),
 ]
 
+# Evidence-token grammar cases: (evidence value, label, expect_reject).
+# The first block diverged between shell and Python before this fix; the
+# second block always agreed and pins the edges the fix must not move.
+_TOKEN_GRAMMAR_CASES = [
+    ("a,,b", "interior-empty", True),
+    (",a", "leading-empty", True),
+    ("a,  ,b", "whitespace-only-token", True),
+    ("a..b", "dotdot-inside-token", True),
+    ("...", "triple-dot", True),
+    ("a,", "single-trailing-comma", False),
+    ("a,b,", "list-trailing-comma", False),
+    (".", "single-dot", False),
+    ("./a", "dot-slash", False),
+    ("a/", "trailing-slash", False),
+    ("a/../b", "dotdot-segment", True),
+    ("..", "bare-dotdot", True),
+]
+
+
+def _grammar_plan(ev):
+    return f"---\nstop_condition: evidence-present\nevidence: {ev}\n---\n# Plan\n"
+
+
+_CONTRACT_SYNC_FIXTURES += [
+    (_grammar_plan(ev), f"grammar-{label}",
+     "" if rej else "evidence-present", "rejected" if rej else None)
+    for ev, label, rej in _TOKEN_GRAMMAR_CASES
+]
+
 
 # sect-7a -- Parser unit tests
 
@@ -1015,7 +1410,13 @@ def test_contract_malformed_evidence_token_flagged(content, label):
 
 
 def test_contract_lib_sync(tmp_path):
-    """Python parser and bin/lib/plan-autonomy-contract classify identically."""
+    """Python parser and bin/lib/plan-autonomy-contract classify every fixture
+    identically (accept vs reject).
+
+    _TOKEN_GRAMMAR_CASES and test_contract_token_grammar_sweep cover the token
+    grammar. The sibling semantic pin is the "Phase 5.0d TWO-WAY AGREEMENT"
+    section of bin/test-postplan-arm-conditions.
+    """
     if not os.path.isfile(AUTONOMY_CONTRACT_LIB):
         pytest.skip("plan-autonomy-contract lib not found: " + AUTONOMY_CONTRACT_LIB)
     if not os.access(AUTONOMY_CONTRACT_LIB, os.X_OK):
@@ -1035,6 +1436,56 @@ def test_contract_lib_sync(tmp_path):
         py_ok = py_err == ""
         assert shell_ok == py_ok, (
             f"classification divergence on '{label}': "
+            f"shell rc={proc.returncode}, python err={py_err!r}")
+
+
+def _skip_without_contract_lib():
+    if not os.path.isfile(AUTONOMY_CONTRACT_LIB):
+        pytest.skip("plan-autonomy-contract lib not found: " + AUTONOMY_CONTRACT_LIB)
+    if not os.access(AUTONOMY_CONTRACT_LIB, os.X_OK):
+        pytest.skip("plan-autonomy-contract not executable: " + AUTONOMY_CONTRACT_LIB)
+
+
+@pytest.mark.parametrize("ev,label,expect_reject", _TOKEN_GRAMMAR_CASES)
+def test_contract_token_grammar_direction(tmp_path, ev, label, expect_reject):
+    """Both parsers reject/accept each grammar case in the stated direction.
+
+    Parity alone would pass if both sides drifted to accept together.
+    """
+    _skip_without_contract_lib()
+    content = _grammar_plan(ev)
+    f = tmp_path / f"{label}.md"
+    f.write_text(content)
+    proc = subprocess.run(
+        [AUTONOMY_CONTRACT_LIB, str(f)], capture_output=True, text=True)
+    assert proc.returncode == (1 if expect_reject else 0), (
+        f"shell rc={proc.returncode} for '{label}' ({ev!r}): stderr={proc.stderr!r}")
+    _, _, py_err = frontmatter_autonomy_contract(content)
+    assert (py_err != "") == expect_reject, (
+        f"python err={py_err!r} for '{label}' ({ev!r}), expect_reject={expect_reject}")
+
+
+def test_contract_token_grammar_sweep(tmp_path):
+    """Every 1-3 field comma list over a small alphabet classifies identically."""
+    _skip_without_contract_lib()
+    alphabet = ["a", "", "..", "a..b"]
+    values = [
+        ",".join(combo)
+        for n in (1, 2, 3)
+        for combo in itertools.product(alphabet, repeat=n)
+    ]
+    assert len(values) == 84, f"sweep generator produced {len(values)} values"
+    for i, value in enumerate(values):
+        content = _grammar_plan(value)
+        f = tmp_path / f"sweep-{i}.md"
+        f.write_text(content)
+        proc = subprocess.run(
+            [AUTONOMY_CONTRACT_LIB, str(f)], capture_output=True, text=True)
+        assert proc.returncode in (0, 1), (
+            f"unexpected rc={proc.returncode} for {value!r}: stderr={proc.stderr!r}")
+        _, _, py_err = frontmatter_autonomy_contract(content)
+        assert (proc.returncode == 0) == (py_err == ""), (
+            f"classification divergence on evidence {value!r}: "
             f"shell rc={proc.returncode}, python err={py_err!r}")
 
 
@@ -1121,3 +1572,239 @@ def test_conformance_malformed_contract_single_item():
     assert items[0].startswith("UNMET-CONTRACT: malformed")
     # Pin that the evidence loop did not execute alongside the malformed item.
     assert not any("never appeared in the diff" in i for i in items)
+
+
+def test_parse_phases_extracts_numbers_headings_and_backtick_paths():
+    plan = """
+## Phase 1: Foo
+
+Edit `harness/a.py` and add `tests/test_a.py::test_x`.
+
+## Phase 2: Bar
+
+Update `bin/b` accordingly.
+"""
+    phases = parse_phases(plan)
+    assert len(phases) == 2
+    assert [p.number for p in phases] == [1, 2]
+    assert phases[0].evidence_paths == ["harness/a.py", "tests/test_a.py"]
+    assert phases[1].evidence_paths == ["bin/b"]
+
+
+def test_parse_phases_counts_heading_paths_as_evidence():
+    """backlog#1253 / PR #2580 shape: the heading names the target file, the body cites
+    only a fixture string. Heading paths come first, then body paths.
+
+    Mutation caught: dropping the heading seed leaves ["docs/IBL5/rel.md"] only, and
+    conformance.phase_omission_items then reports a phase that shipped as MISSING-PHASE.
+    """
+    plan = """
+## Phase 3: Absolute-path parity tests in `tools/postplan-harness/tests/test_planfile.py`
+
+Assert the parser turns `/Users/x/IBL5/docs/IBL5/rel.md` into `docs/IBL5/rel.md`.
+
+## Phase 3: Duplicate heading in `bin/extra`
+
+More.
+"""
+    phases = parse_phases(plan)
+    assert len(phases) == 1
+    assert phases[0].evidence_paths[0] == "tools/postplan-harness/tests/test_planfile.py"
+    assert "docs/IBL5/rel.md" in phases[0].evidence_paths
+    assert "bin/extra" in phases[0].evidence_paths
+
+    info = PlanInfo(found=True, has_matrix=True, phases=phases)
+    assert conformance.phase_omission_items(info,["tools/postplan-harness/tests/test_planfile.py"]) == []
+
+
+def test_parse_phases_strips_line_suffix_from_evidence_paths():
+    plan = """
+## Phase 1: Foo
+
+See `bin/check-prose:438-457` and `harness/a.py:120`, also `docs/x.md#L12-L20`.
+
+## Phase 2: Bar
+
+Edit `harness/c.py:10-20` then `harness/c.py:300` again.
+"""
+    phases = parse_phases(plan)
+    assert phases[0].evidence_paths == ["bin/check-prose", "harness/a.py", "docs/x.md"]
+    assert phases[1].evidence_paths == ["harness/c.py"]
+
+
+def test_parse_phases_skips_fenced_blocks_and_example_tokens():
+    plan = """
+## Phase 1: Real
+
+No paths here except `(example)` one: `tools/fake.py` (example).
+
+```
+## Phase 9: Phantom inside fence
+
+Edit `harness/phantom.py`.
+```
+"""
+    phases = parse_phases(plan)
+    assert len(phases) == 1
+    assert phases[0].number == 1
+    assert phases[0].evidence_paths == []
+
+
+def test_parse_phases_marks_all_s_marker_bookkeeping():
+    plan = """
+## Phase 3: X [phases: S]
+
+Close backlog issue.
+
+## Phase 4: Y [phases: S/S]
+
+Bump doc date.
+
+## Phase 5: Z [phases: S/B]
+
+Mixed work.
+
+## Phase 6: W [phases: B]
+
+Build-only.
+"""
+    phases = parse_phases(plan)
+    by_num = {p.number: p for p in phases}
+    assert by_num[3].bookkeeping is True
+    assert by_num[4].bookkeeping is True
+    assert by_num[5].bookkeeping is False
+    assert by_num[6].bookkeeping is False
+
+
+def test_parse_phases_ignores_subphase_and_h3_headings():
+    plan = """
+## Phase 5: Main
+
+Edit `harness/main.py`.
+
+### Delegate — part of phase 5
+
+Scope: `tests/test_delegate.py`.
+
+## Phase 5.5: fidelity
+
+Edit `harness/fidelity.py`.
+
+## Phase 2: Dup first
+
+Edit `harness/dup.py`.
+
+## Phase 2: Dup second
+
+Also `harness/dup2.py`.
+"""
+    phases = parse_phases(plan)
+    numbers = [p.number for p in phases]
+    assert 5 in numbers
+    # Phase 5.5 heading must not produce a separate entry (sub-phase rejected by (?!\.\d))
+    assert len([p for p in phases if p.number == 5]) == 1
+    # ### Delegate paths accrue to the enclosing h2 phase (5)
+    phase5 = next(p for p in phases if p.number == 5)
+    assert "tests/test_delegate.py" in phase5.evidence_paths
+    # Phase 5.5 paths must not leak into phase 5 (catches a dropped (?!\.\d))
+    assert "harness/fidelity.py" not in phase5.evidence_paths
+    # Duplicate Phase 2 merges into one entry
+    assert len([p for p in phases if p.number == 2]) == 1
+    phase2 = next(p for p in phases if p.number == 2)
+    assert "harness/dup.py" in phase2.evidence_paths
+    assert "harness/dup2.py" in phase2.evidence_paths
+
+
+def test_parse_deferred_phase_numbers_from_out_of_scope():
+    plan = """
+## Approach
+
+Phase 3 is handled elsewhere.
+
+## Out of Scope
+
+- Phase 5 (deferred to a follow-up PR)
+- phase 7 and Step 7 again
+"""
+    result = parse_deferred_phase_numbers(plan)
+    assert result == [5, 7]
+
+
+def test_parse_deferred_phase_numbers_absent_section_is_empty():
+    plan = """
+## Phase 1: Foo
+
+No out of scope section.
+"""
+    assert parse_deferred_phase_numbers(plan) == []
+
+
+def test_locate_plan_populates_phases(tmp_path):
+    plan_text = """---
+auto_merge: true
+---
+
+# My Plan
+
+## Phase 1: Do the thing
+
+Edit `harness/x.py`.
+
+## Out of Scope
+
+- Phase 2 (future work)
+"""
+    plan_file = tmp_path / "my-plan.md"
+    plan_file.write_text(plan_text)
+    info = locate_plan("my-plan", plans_dir=str(tmp_path))
+    assert info.found
+    assert len(info.phases) >= 1
+    assert info.phases[0].number == 1
+    assert info.deferred_phase_numbers == [2]
+
+
+# ---------------------------------------------------------------------------
+# Tests for _normalise_cf_path and parse_critical_files absolute-path handling
+# ---------------------------------------------------------------------------
+
+def test_normalise_cf_path_relative_unchanged():
+    assert _normalise_cf_path("ibl5/classes/Foo.php") == "ibl5/classes/Foo.php"
+    assert _normalise_cf_path("bin/check-plan") == "bin/check-plan"
+
+
+def test_normalise_cf_path_ibL5_prefix_stripped():
+    p = "/Users/ajaynicolas/GitHub/IBL5/ibl5/classes/Foo.php"
+    assert _normalise_cf_path(p) == "ibl5/classes/Foo.php"
+
+
+def test_normalise_cf_path_worktree_prefix_stripped():
+    p = "/Users/ajaynicolas/GitHub/IBL5-worktrees/my-branch/ibl5/classes/Foo.php"
+    assert _normalise_cf_path(p) == "ibl5/classes/Foo.php"
+
+
+def test_normalise_cf_path_case_sensitive_no_strip():
+    # IBL5 is always uppercase; lowercase does not match.
+    p = "/Users/ajaynicolas/GitHub/ibl5/ibl5/classes/Foo.php"
+    assert _normalise_cf_path(p) == p
+
+
+def test_parse_critical_files_normalises_absolute_path():
+    plan = (
+        "## Critical Files\n\n"
+        "- `/Users/ajaynicolas/GitHub/IBL5/ibl5/classes/Foo.php`\n"
+        "- `/Users/ajaynicolas/GitHub/IBL5-worktrees/slug/bin/check-plan`\n"
+    )
+    cf = parse_critical_files(plan)
+    paths = [p for p, _ann, _ex in cf]
+    assert paths == ["ibl5/classes/Foo.php", "bin/check-plan"]
+
+
+def test_parse_critical_files_relative_paths_unchanged():
+    plan = (
+        "## Critical Files\n\n"
+        "- `ibl5/classes/Foo.php`\n"
+        "- `bin/check-plan`\n"
+    )
+    cf = parse_critical_files(plan)
+    paths = [p for p, _ann, _ex in cf]
+    assert paths == ["ibl5/classes/Foo.php", "bin/check-plan"]

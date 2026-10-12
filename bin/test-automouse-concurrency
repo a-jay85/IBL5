@@ -15,8 +15,15 @@
 # sleep guarantees the two runners' phases overlap in wall-clock time, so this
 # exercises real concurrent claiming, not accidental serialization.
 #
-# macOS-only: the automouse pipeline is built on macOS launchd + BSD coreutils
-# (the runner uses `caffeinate`, `stat -f`, BSD `date`). On Linux CI it skips.
+# Platform split: the log-isolation and day-reader blocks below are portable and
+# run on Linux CI (tests.yml job harness-tests). Everything after the
+# `uname != Darwin` check (paused-held locks, the two-runner concurrent run,
+# assertions 1-9) is macOS-only, because automouse-run uses `caffeinate`,
+# `stat -f` and BSD `date`. On Linux the script prints SKIP there and exits 0.
+#
+# Hermetic: the concurrent run exports AUTOMOUSE_SKIP_CANARY=1, so the runner's
+# between-plans canary never consults live master CI, gh auth or main.localhost.
+# Assertion 9 fails if that export is removed (IBL5-backlog#1375).
 #
 # Run: bin/test-automouse-concurrency  (exit 0 = pass/skip, 1 = a safety property failed)
 #
@@ -28,14 +35,144 @@
 
 set -u
 
+RUN_SRC="${AUTOMOUSE_RUN_SRC:-$(cd "$(dirname "$0")/.." && pwd)/bin/automouse/run}"
+GATE_LIB="$(cd "$(dirname "$0")/.." && pwd)/bin/lib/usage-gate.sh"
+
+# --- Per-runner log isolation (portable: runs on Linux CI too) --------------
+# Two probe processes each eval the REAL runner's `LOG=` line (distinct $$),
+# plus the real phase_stalled / phase_env_error bodies. Runner B writes a
+# stall-kill and a limit error to ITS log. Runner A must not see them, then
+# must see its own. On a shared-day-log runner, A reads B's lines and fails.
+ISO="$(mktemp -d)"; ISO_FAIL=0
+iso_fail() { echo "FAIL: log isolation: $*" >&2; ISO_FAIL=1; }  # stderr: iso_region runs inside the probe.sh redirect
+iso_region() { # $1 = function name; prints `name() {` through the first `}` line.
+    # Literal index() match: awk -v strips regex backslashes on GNU awk (CI).
+    local n; n=$(awk -v f="$1" 'index($0, f "() {")==1 {c++} END {print c+0}' "$RUN_SRC")
+    [ "$n" -eq 1 ] || { iso_fail "anchor '$1() {' matched $n times in $RUN_SRC (want 1)"; return 0; }
+    awk -v f="$1" 'index($0, f "() {")==1 {on=1} on {print} on && /^\}/ {exit}' "$RUN_SRC"
+}
+n=$(grep -cE '^LOG="\$LOG_DIR/' "$RUN_SRC")
+[ "$n" -eq 1 ] || iso_fail "anchor /^LOG=\"\$LOG_DIR\// matched $n times (want 1)"
+{
+    echo 'set -u'; echo 'LOG_DIR="$1"'
+    # phase_env_error delegates to the usage gate's predicate (ADR-0143).
+    printf '. "%s"\n' "$GATE_LIB"
+    grep -E '^LOG="\$LOG_DIR/' "$RUN_SRC"
+    iso_region phase_stalled
+    iso_region phase_env_error
+    cat <<'PROBE'
+type phase_stalled >/dev/null 2>&1 && type phase_env_error >/dev/null 2>&1 \
+    || { echo PROBE-MISSING-FN; exit 3; }
+mkdir -p "$LOG_DIR"
+case "$2" in
+  b) printf '[00:00:01] STALL-KILL (runner B)\n[00:00:02] API Error: 429 (runner B)\n' >> "$LOG" ;;
+  a) phase_stalled 0 && echo "STALL-BEFORE hit" || echo "STALL-BEFORE clean"
+     phase_env_error 0 && echo "ENV-BEFORE hit" || echo "ENV-BEFORE clean"
+     printf '[00:00:03] STALL-KILL (runner A)\n[00:00:04] API Error: 429 (runner A)\n' >> "$LOG"
+     phase_stalled 0 && echo "STALL-AFTER hit" || echo "STALL-AFTER clean"
+     phase_env_error 0 && echo "ENV-AFTER hit" || echo "ENV-AFTER clean" ;;
+esac
+echo "PATH $LOG"
+PROBE
+} > "$ISO/probe.sh"
+B_OUT=$(bash "$ISO/probe.sh" "$ISO/logs" b 2>&1)
+A_OUT=$(bash "$ISO/probe.sh" "$ISO/logs" a 2>&1)
+A_PATH=$(sed -n 's/^PATH //p' <<< "$A_OUT"); B_PATH=$(sed -n 's/^PATH //p' <<< "$B_OUT")
+pid_re='/[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+\.log$'
+grep -q PROBE-MISSING-FN <<< "$A_OUT$B_OUT" && iso_fail "probe could not load phase_stalled/phase_env_error"
+if [ -n "$A_PATH" ] && [ "$A_PATH" != "$B_PATH" ] && grep -qE "$pid_re" <<< "$A_PATH" && grep -qE "$pid_re" <<< "$B_PATH"; then
+    echo "PASS: log isolation: each runner gets its own <date>-<pid>.log"
+else iso_fail "runners share a log or path is not <date>-<pid>.log (A=$A_PATH B=$B_PATH)"; fi
+grep -qx 'STALL-BEFORE clean' <<< "$A_OUT" && echo "PASS: log isolation: B's STALL-KILL invisible to A" \
+    || iso_fail "phase_stalled in runner A saw runner B's STALL-KILL"
+grep -qx 'ENV-BEFORE clean' <<< "$A_OUT" && echo "PASS: log isolation: B's API error invisible to A" \
+    || iso_fail "phase_env_error in runner A saw runner B's API error"
+grep -qx 'STALL-AFTER hit' <<< "$A_OUT" && grep -qx 'ENV-AFTER hit' <<< "$A_OUT" \
+    && echo "PASS: log isolation: A's own STALL-KILL and API error are seen" \
+    || iso_fail "runner A missed its own STALL-KILL or API error"
+
+# day_logs / day_exit_lines: the day-level readers merge legacy + per-pid files.
+eval "$(iso_region day_logs)"; eval "$(iso_region day_exit_lines)"
+type day_logs >/dev/null 2>&1 && type day_exit_lines >/dev/null 2>&1 \
+    || iso_fail "day_logs/day_exit_lines not loaded from $RUN_SRC"
+DL="$ISO/day"; mkdir -p "$DL"
+printf 'a/impl exit: 0\nnoise\n' > "$DL/2026-09-10.log"
+printf 'b/impl exit: 0\nc/impl exit: 0\n' > "$DL/2026-09-10-111.log"
+printf 'd/impl exit: 0\n' > "$DL/2026-09-10-222.log"
+printf 'e/impl exit: 0\n' > "$DL/2026-09-11-333.log"
+printf 'f/impl exit: 0\n' > "$DL/2026-09-12.log"
+c=$(day_exit_lines "$DL" 2026-09-10 | wc -l | tr -d ' '); f=$(day_logs "$DL" 2026-09-10 | wc -l | tr -d ' ')
+[ "$c" = 4 ] && [ "$f" = 3 ] && echo "PASS: day readers merge legacy + per-pid logs" \
+    || iso_fail "day readers: want 4 exit lines / 3 files for 2026-09-10, got $c / $f"
+c=$(day_exit_lines "$DL" 2026-09-12 | wc -l | tr -d ' ')
+[ "$c" = 1 ] && echo "PASS: day readers keep legacy-only days" || iso_fail "legacy-only day: want 1, got $c"
+out=$(day_logs "$DL" 2026-09-13); rc=$?
+[ -z "$out" ] && [ "$rc" -eq 0 ] && echo "PASS: day readers: empty day is empty + rc 0" \
+    || iso_fail "empty day: out='$out' rc=$rc"
+rm -rf "$ISO"
+if [ "$ISO_FAIL" -ne 0 ]; then echo "RESULT: FAILED (log isolation)"; exit 1; fi
+
 if [ "$(uname)" != "Darwin" ]; then
-    echo "SKIP: test-automouse-concurrency is macOS-only (automouse-run depends on launchd/BSD tools)."
+    echo "SKIP: test-automouse-concurrency is macOS-only (automouse-run depends on launchd/BSD tools). On Linux CI only the portable log-isolation block above ran."
     exit 0
 fi
+
+# --- Paused-held locks (ADR-0143) -------------------------------------------
+# A claim lock whose owner pid is dead and whose mtime is past LOCK_TTL_SECS is normally
+# stolen. A `paused-held` breadcrumb naming a session that still has a pause marker
+# (or was cleared inside the TTL) keeps the lock: the usage gate will resume that session.
+PH="$(mktemp -d)"
+PH_SID="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
+ph_probe() { # $1 = setup snippet; prints "claimed=<plan> rc=<n>"
+    (
+        set -u
+        export IBL5_USAGE_GATE_STATE_DIR="$PH/state"
+        rm -rf "$PH/state"
+        mkdir -p "$PH/state/markers" "$PH/state/cleared"
+        # These are read by the claim_next_plan body eval'd below.
+        # shellcheck disable=SC2034
+        QUEUE_DIR="$PH/queue"; LOG="$PH/log"; LOCK_TTL_SECS=60
+        # shellcheck disable=SC2034
+        CAP_DEFERRED=" "; DEPENDS_HELD=" "; SINGLE_PLAN=""; RESUME_PLAN=""; RESUME_SID=""
+        # shellcheck source=/dev/null
+        . "$GATE_LIB"
+        # claim_next_plan iterates queue_entries_ordered from lib-queue-order.
+        # shellcheck source=bin/automouse/lib-queue-order
+        . "$(dirname "$GATE_LIB")/../automouse/lib-queue-order"
+        eval "$(iso_region claim_next_plan)"
+        rm -rf "$QUEUE_DIR"; mkdir -p "$QUEUE_DIR"
+        : > "$QUEUE_DIR/held.md"
+        mkdir "$QUEUE_DIR/held.md.lock"
+        echo 999999 > "$QUEUE_DIR/held.md.lock/pid"
+        printf '%s\n' "$PH_SID" > "$QUEUE_DIR/held.md.lock/paused-held"
+        touch -t 202001010000 "$QUEUE_DIR/held.md.lock"
+        eval "$1"
+        out=$(claim_next_plan); rc=$?
+        printf 'claimed=%s rc=%s\n' "$(basename "$out")" "$rc"
+    )
+}
+out=$(ph_probe 'printf "{}" > "$IBL5_USAGE_GATE_STATE_DIR/markers/$PH_SID.json"')
+[ "$out" = "claimed= rc=1" ] && echo "PASS: paused-held lock with a live marker is not stolen" \
+    || { echo "FAIL: paused-held + marker: got '$out'"; exit 1; }
+out=$(ph_probe 'date +%s > "$IBL5_USAGE_GATE_STATE_DIR/cleared/$PH_SID"')
+[ "$out" = "claimed= rc=1" ] && echo "PASS: paused-held lock cleared inside the TTL is not stolen" \
+    || { echo "FAIL: paused-held + fresh cleared stamp: got '$out'"; exit 1; }
+out=$(ph_probe 'echo 1577836800 > "$IBL5_USAGE_GATE_STATE_DIR/cleared/$PH_SID"')
+[ "$out" = "claimed=held.md rc=0" ] && echo "PASS: paused-held lock cleared past the TTL is stolen" \
+    || { echo "FAIL: paused-held + old cleared stamp: got '$out'"; exit 1; }
+rm -rf "$PH"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT="$(mktemp -d)"
 trap 'rm -rf "$ROOT"' EXIT
+# Never touch the real usage cache, keychain or markers: no token means fail-open.
+export IBL5_USAGE_GATE_STATE_DIR="$ROOT/usage-gate"
+mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
+# Never consult live master CI, gh auth or main.localhost: the between-plans
+# canary would otherwise park a runner after its first plan whenever master CI
+# is red or the main Docker stack is down (IBL5-backlog#1375). Assertion 9 below
+# fails if this export is removed.
+export AUTOMOUSE_SKIP_CANARY=1
 
 NDIR="$ROOT/automouse"
 PLANS="$ROOT/plans"
@@ -120,13 +257,18 @@ sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
     -e "s#^REPO=.*#REPO=\"$REPO\"#" \
     -e "s#^export PATH=.*#export PATH=\"$STUBDIR:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
     -e "s#^PLANS_DIR=.*#PLANS_DIR=\"$PLANS\"#" \
-    "$REPO/bin/automouse/run" > "$RUNNER"
+    "$RUN_SRC" > "$RUNNER"
 chmod +x "$RUNNER"
+printf '#!/bin/sh\nexit 1\n' > "$STUBDIR/security"
+chmod +x "$STUBDIR/security"
 # The runner reads its impl prompt from $SELF_DIR/prompt-impl (same dir as the
 # run script). Copy the real prompt so `cat "$SELF_DIR/prompt-impl"` succeeds;
 # the stub claude ignores the content and only reads PLAN_FILE= from its args.
 cp "$REPO/bin/automouse/prompt-impl" "$ROOT/automouse/prompt-impl"
+# The runner also sources $SELF_DIR/lib-queue-order (queue_entries_ordered).
+cp "$REPO/bin/automouse/lib-queue-order" "$ROOT/automouse/lib-queue-order"
 
+RUN_DAY=$(date +%Y-%m-%d)
 echo "Seeded $N_PLANS plans. Launching two concurrent runners..."
 "$RUNNER" > "$ROOT/runA.out" 2>&1 &
 A=$!
@@ -209,6 +351,37 @@ if [ -f "$REPORT" ]; then
         echo "FAIL assertion 6: expected exactly 1 '## Weekly aggregate' section, got $WEEKLY_COUNT"; FAIL=1
         cat "$REPORT"
     fi
+fi
+
+# 7. Each runner wrote its own per-pid log, and no shared day log exists.
+LA="$NDIR/logs/$RUN_DAY-$A.log"; LB="$NDIR/logs/$RUN_DAY-$B.log"
+if [ -f "$LA" ] && [ -f "$LB" ] && [ ! -e "$NDIR/logs/$RUN_DAY.log" ]; then
+    echo "PASS: each runner wrote its own logs/$RUN_DAY-<pid>.log."
+else
+    echo "FAIL: per-runner logs missing or a shared day log exists:"; ls -1 "$NDIR/logs"; FAIL=1
+fi
+
+# 8. Those logs are disjoint: no plan's impl exit line lands in both, and
+#    together they cover every plan (guards a vacuous pass on empty sets).
+a_set=$(grep -ohE 'fake-plan-[0-9]+/impl exit:' "$LA" 2>/dev/null | sort -u)
+b_set=$(grep -ohE 'fake-plan-[0-9]+/impl exit:' "$LB" 2>/dev/null | sort -u)
+both=$(comm -12 <(printf '%s\n' "$a_set") <(printf '%s\n' "$b_set") | grep -c . || true)
+union=$(printf '%s\n%s\n' "$a_set" "$b_set" | grep . | sort -u | wc -l | tr -d ' ')
+if [ "$both" -eq 0 ] && [ "$union" -eq "$N_PLANS" ]; then
+    echo "PASS: runner logs are disjoint and cover all $N_PLANS plans."
+else
+    echo "FAIL: log overlap=$both union=$union (want 0 / $N_PLANS)."; FAIL=1
+fi
+
+# 9. Hermeticity tripwire: the canary ran its skip path. The skip line exists
+#    only when AUTOMOUSE_SKIP_CANARY is set, so removing the export fails this
+#    even on a healthy network where the live canary would pass silently.
+#    The first plan to finish leaves at least two plans in queue/, so at least
+#    one runner always reaches the canary dispatch.
+if grep -qF 'canary: skipped (AUTOMOUSE_SKIP_CANARY=1)' "$LA" "$LB" 2>/dev/null; then
+    echo "PASS assertion 9: canary skipped via AUTOMOUSE_SKIP_CANARY (test is hermetic)."
+else
+    echo "FAIL assertion 9: no 'canary: skipped (AUTOMOUSE_SKIP_CANARY=1)' line in either runner log."; FAIL=1
 fi
 
 echo "==============================================================="

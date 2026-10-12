@@ -322,8 +322,8 @@ CREATE TABLE `ibl_box_scores` (
   `home_wins` smallint(5) unsigned DEFAULT NULL COMMENT 'Home team wins before this game',
   `home_losses` smallint(5) unsigned DEFAULT NULL COMMENT 'Home team losses before this game',
   `teamid` int(11) DEFAULT NULL COMMENT 'Player''s team ID (visitor or home)',
-  `game_type` tinyint(3) unsigned GENERATED ALWAYS AS (case when month(`game_date`) = 6 then 2 when month(`game_date`) = 10 then 3 when month(`game_date`) = 0 then 0 else 1 end) STORED,
-  `season_year` smallint(5) unsigned GENERATED ALWAYS AS (case when year(`game_date`) = 0 then 0 when month(`game_date`) >= 10 then year(`game_date`) + 1 else year(`game_date`) end) STORED,
+  `game_type` tinyint(3) unsigned GENERATED ALWAYS AS (case when month(`game_date`) = 6 then 2 when month(`game_date`) = 10 then 3 when month(`game_date`) = 9 then 4 when month(`game_date`) = 0 then 0 else 1 end) STORED,
+  `season_year` smallint(5) unsigned GENERATED ALWAYS AS (case when year(`game_date`) = 0 then 0 when month(`game_date`) >= 9 then year(`game_date`) + 1 else year(`game_date`) end) STORED,
   `calc_points` smallint(5) unsigned GENERATED ALWAYS AS (`game_2gm` * 2 + `game_ftm` + `game_3gm` * 3) STORED,
   `calc_rebounds` tinyint(3) unsigned GENERATED ALWAYS AS (`game_orb` + `game_drb`) STORED,
   `calc_fg_made` tinyint(3) unsigned GENERATED ALWAYS AS (`game_2gm` + `game_3gm`) STORED,
@@ -337,6 +337,7 @@ CREATE TABLE `ibl_box_scores` (
   KEY `idx_date_pid` (`game_date`,`pid`),
   KEY `idx_date_home_visitor` (`game_date`,`home_teamid`,`visitor_teamid`),
   KEY `idx_team_id` (`teamid`),
+  KEY `idx_pid_date` (`pid`,`game_date`),
   KEY `idx_gt_points` (`game_type`,`calc_points`),
   KEY `idx_gt_rebounds` (`game_type`,`calc_rebounds`),
   KEY `idx_gt_fg_made` (`game_type`,`calc_fg_made`),
@@ -348,7 +349,6 @@ CREATE TABLE `ibl_box_scores` (
   KEY `idx_gt_3gm` (`game_type`,`game_3gm`),
   KEY `idx_gt_pid` (`game_type`,`pid`),
   KEY `idx_gt_pid_season` (`game_type`,`pid`,`season_year`),
-  KEY `idx_pid_date` (`pid`,`game_date`),
   CONSTRAINT `fk_boxscore_home` FOREIGN KEY (`home_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscore_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscore_team` FOREIGN KEY (`teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
@@ -734,8 +734,8 @@ CREATE TABLE `ibl_box_scores_teams` (
   `game_pf` int(11) DEFAULT NULL COMMENT 'Personal fouls',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `game_type` tinyint(3) unsigned GENERATED ALWAYS AS (case when month(`game_date`) = 6 then 2 when month(`game_date`) = 10 then 3 when month(`game_date`) = 0 then 0 else 1 end) STORED,
-  `season_year` smallint(5) unsigned GENERATED ALWAYS AS (case when year(`game_date`) = 0 then 0 when month(`game_date`) >= 10 then year(`game_date`) + 1 else year(`game_date`) end) STORED,
+  `game_type` tinyint(3) unsigned GENERATED ALWAYS AS (case when month(`game_date`) = 6 then 2 when month(`game_date`) = 10 then 3 when month(`game_date`) = 9 then 4 when month(`game_date`) = 0 then 0 else 1 end) STORED,
+  `season_year` smallint(5) unsigned GENERATED ALWAYS AS (case when year(`game_date`) = 0 then 0 when month(`game_date`) >= 9 then year(`game_date`) + 1 else year(`game_date`) end) STORED,
   `calc_points` smallint(5) unsigned GENERATED ALWAYS AS (`game_2gm` * 2 + `game_ftm` + `game_3gm` * 3) STORED,
   `calc_rebounds` smallint(5) unsigned GENERATED ALWAYS AS (`game_orb` + `game_drb`) STORED,
   `calc_fg_made` smallint(5) unsigned GENERATED ALWAYS AS (`game_2gm` + `game_3gm`) STORED,
@@ -745,6 +745,7 @@ CREATE TABLE `ibl_box_scores_teams` (
   KEY `idx_visitor_team` (`visitor_teamid`),
   KEY `idx_home_team` (`home_teamid`),
   KEY `idx_name` (`name`),
+  KEY `idx_date_visitor_home_gotd` (`game_date`,`visitor_teamid`,`home_teamid`,`game_of_that_day`),
   KEY `idx_gt_points` (`game_type`,`calc_points`),
   KEY `idx_gt_rebounds` (`game_type`,`calc_rebounds`),
   KEY `idx_gt_fg_made` (`game_type`,`calc_fg_made`),
@@ -756,7 +757,6 @@ CREATE TABLE `ibl_box_scores_teams` (
   KEY `idx_gt_3gm` (`game_type`,`game_3gm`),
   KEY `idx_gt_date_teams` (`game_type`,`game_date`,`visitor_teamid`,`home_teamid`),
   KEY `idx_gt_name_season` (`game_type`,`name`,`season_year`),
-  KEY `idx_date_visitor_home_gotd` (`game_date`,`visitor_teamid`,`home_teamid`,`game_of_that_day`),
   CONSTRAINT `fk_boxscoreteam_home` FOREIGN KEY (`home_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscoreteam_visitor` FOREIGN KEY (`visitor_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1845,7 +1845,7 @@ DROP TABLE IF EXISTS `ibl_olympics_career_avgs`;
 CREATE TABLE `ibl_olympics_career_avgs` (
   `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'Player ID (FK to ibl_plr)',
   `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (denormalized)',
-  `games` int(11) NOT NULL DEFAULT 0 COMMENT 'Olympic games played',
+  `games` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Olympic games played',
   `minutes` decimal(8,2) NOT NULL DEFAULT 0.00 COMMENT 'Avg minutes per game',
   `fgm` decimal(8,2) NOT NULL COMMENT 'Avg field goals made',
   `fga` decimal(8,2) NOT NULL COMMENT 'Avg field goals attempted',
@@ -1874,22 +1874,22 @@ DROP TABLE IF EXISTS `ibl_olympics_career_totals`;
 CREATE TABLE `ibl_olympics_career_totals` (
   `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'Player ID (FK to ibl_plr)',
   `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (denormalized)',
-  `games` int(11) NOT NULL DEFAULT 0 COMMENT 'Total Olympic games played',
-  `minutes` int(11) NOT NULL DEFAULT 0 COMMENT 'Total minutes played',
-  `fgm` int(11) NOT NULL DEFAULT 0 COMMENT 'Total field goals made',
-  `fga` int(11) NOT NULL DEFAULT 0 COMMENT 'Total field goals attempted',
-  `ftm` int(11) NOT NULL DEFAULT 0 COMMENT 'Total free throws made',
-  `fta` int(11) NOT NULL DEFAULT 0 COMMENT 'Total free throws attempted',
-  `tgm` int(11) NOT NULL DEFAULT 0 COMMENT 'Total three pointers made',
-  `tga` int(11) NOT NULL DEFAULT 0 COMMENT 'Total three pointers attempted',
-  `orb` int(11) NOT NULL DEFAULT 0 COMMENT 'Total offensive rebounds',
-  `reb` int(11) NOT NULL DEFAULT 0 COMMENT 'Total rebounds',
-  `ast` int(11) NOT NULL DEFAULT 0 COMMENT 'Total assists',
-  `stl` int(11) NOT NULL DEFAULT 0 COMMENT 'Total steals',
-  `tvr` int(11) NOT NULL DEFAULT 0 COMMENT 'Total turnovers',
-  `blk` int(11) NOT NULL DEFAULT 0 COMMENT 'Total blocks',
-  `pf` int(11) NOT NULL DEFAULT 0 COMMENT 'Total personal fouls',
-  `pts` int(11) NOT NULL DEFAULT 0 COMMENT 'Total points',
+  `games` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Total Olympic games played',
+  `minutes` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total minutes played',
+  `fgm` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total field goals made',
+  `fga` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total field goals attempted',
+  `ftm` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total free throws made',
+  `fta` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total free throws attempted',
+  `tgm` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total three pointers made',
+  `tga` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total three pointers attempted',
+  `orb` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total offensive rebounds',
+  `reb` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total rebounds',
+  `ast` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total assists',
+  `stl` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total steals',
+  `tvr` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total turnovers',
+  `blk` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total blocks',
+  `pf` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total personal fouls',
+  `pts` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total points',
   `retired` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1=retired from league',
   PRIMARY KEY (`pid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -3453,7 +3453,7 @@ DROP TABLE IF EXISTS `ibl_settings`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ibl_settings` (
   `setting_key` varchar(128) NOT NULL COMMENT 'Setting key',
-  `value` varchar(128) NOT NULL COMMENT 'Setting value',
+  `setting_value` varchar(128) NOT NULL COMMENT 'Setting value',
   `league` varchar(16) NOT NULL DEFAULT 'ibl',
   PRIMARY KEY (`setting_key`,`league`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -3801,18 +3801,6 @@ DROP TABLE IF EXISTS `ibl_trade_offers`;
 CREATE TABLE `ibl_trade_offers` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `ibl_trade_queue`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `ibl_trade_queue` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `operation_type` varchar(50) NOT NULL DEFAULT '' COMMENT 'Type: player_transfer, pick_transfer',
-  `params` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'JSON-encoded operation parameters',
-  `tradeline` text DEFAULT NULL COMMENT 'Human-readable trade summary line',
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

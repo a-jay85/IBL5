@@ -28,11 +28,37 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/wt-status [--stalled-only] [--min-idle-hours N]
+
+Classify every linked worktree's shipping state.
+
+Classifications (mutually exclusive, first-match wins):
+  PROTECTED  master / main / production branch (excluded from output)
+  MERGED     confirmed merged to master (safe to reap)
+  OPEN-PR    has an open pull request (in-flight / healthy)
+  UNPUSHED   >=1 own-commit not on master; no PR (committed work, never shipped)
+  STALLED    0 own-commits, dirty tree, no PR (work exists but never committed)
+  EMPTY      0 own-commits, clean tree, no PR (harmless scaffold)
+
+Options:
+  --stalled-only        Print only STALLED/UNPUSHED rows; exit 1 if any exist.
+  --min-idle-hours N    When N>0, suppress worktrees whose newest dirty/untracked
+                        file is newer than N hours (likely still in progress).
+
+Note: does NOT run git fetch. Relies on cached refs.
+EOF
+    exit 0
+fi
+
 # shellcheck source=bin/lib/wt-guards.sh
 source "$(dirname "$0")/lib/wt-guards.sh"
-REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+# shellcheck source=bin/lib/gh-pr.sh
+source "$(dirname "$0")/lib/gh-pr.sh"
 # shellcheck source=bin/lib/git-helpers.sh
 source "$(dirname "$0")/lib/git-helpers.sh"
+REPO_ROOT="$(main_checkout_root .)" || REPO_ROOT=""
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
 STALLED_ONLY=false
@@ -121,9 +147,11 @@ classify_worktree() {
     # ---- compute signals ----
 
     # PR state (requires gh)
-    local pr_state=""
+    local pr_state="" pr_num=""
     if command -v gh &>/dev/null; then
-        pr_state="$(cd "$REPO_ROOT" && gh pr view "$branch" --json state -q .state 2>/dev/null || true)"
+        pr_info "$branch" "$REPO_ROOT" || true
+        pr_state="$PR_STATE"
+        pr_num="$PR_NUM"
     fi
 
     # Remote tracking config
@@ -182,10 +210,6 @@ classify_worktree() {
 
     # OPEN-PR
     if [ "$pr_state" = "OPEN" ]; then
-        local pr_num=""
-        if command -v gh &>/dev/null; then
-            pr_num="$(cd "$REPO_ROOT" && gh pr view "$branch" --json number -q .number 2>/dev/null || true)"
-        fi
         if [ -n "$pr_num" ]; then
             echo "OPEN-PR $wt_name (PR #$pr_num)"
         else

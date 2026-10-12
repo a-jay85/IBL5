@@ -8,6 +8,22 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/pr-wt-resolve <pr-number|branch-name>
+
+Resolve a PR number or branch name to that branch's git worktree path.
+Prints exactly one absolute path on stdout.
+
+Arguments:
+  <pr-number|branch-name>   PR number or branch name to resolve
+
+Exit codes: 0 = path printed, 1 = not found or no worktree,
+            2 = missing argument, 3 = already inside a linked worktree
+EOF
+    exit 0
+fi
+
 arg="${1:-}"
 if [ -z "$arg" ]; then
     echo "Usage: bin/pr-wt-resolve <pr-number|branch-name>" >&2
@@ -42,13 +58,13 @@ fi
 # names, so the directory slug and the branch name can diverge.
 path="$(git worktree list --porcelain | awk -v b="refs/heads/$branch" '
     /^worktree / { p = substr($0, 10) }
-    /^branch /   { if (substr($0, 8) == b) { print p; exit } }
+    /^branch /   { if (substr($0, 8) == b && !f) { print p; f=1 } }
 ')"
 
 # Fallback: a detached-HEAD worktree has no branch line, so match its directory name.
 if [ -z "$path" ]; then
     path="$(git worktree list --porcelain | awk -v b="$branch" '
-        /^worktree / { p = substr($0, 10); if (p ~ ("/" b "$")) { print p; exit } }
+        /^worktree / { p = substr($0, 10); if (p ~ ("/" b "$") && !f) { print p; f = 1 } }
     ')"
 fi
 

@@ -14,7 +14,7 @@ use Maintenance\Contracts\MaintenanceRepositoryInterface;
  *
  * @see MaintenanceRepositoryInterface
  */
-class MaintenanceRepository extends \BaseMysqliRepository implements MaintenanceRepositoryInterface
+class MaintenanceRepository extends \Database\BaseMysqliRepository implements MaintenanceRepositoryInterface
 {
     /**
      * @see MaintenanceRepositoryInterface::getAllTeams()
@@ -51,6 +51,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     {
         /** @var array<int, array{year: int, wins: int, losses: int}> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (ibl_team_win_loss is a view grouped per team and year, so year is unique for one currentname)
             "SELECT year, wins, losses FROM `ibl_team_win_loss`
              WHERE currentname = ? AND year <= ?
              ORDER BY year DESC
@@ -84,7 +85,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     public function getSetting(string $name): ?string
     {
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = 'ibl'",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = 'ibl'",
             "s",
             $name
         );
@@ -94,7 +95,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
         }
 
         /** @var string $value */
-        $value = $result['value'];
+        $value = $result['setting_value'];
         return $value;
     }
 }

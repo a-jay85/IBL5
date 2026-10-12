@@ -1,13 +1,13 @@
 ---
-description: Full Phase 5 how-to for plan-to-test, plan-to-file, and diff-to-plan conformance checks run during post-plan.
-last_verified: 2026-09-22
+description: Full Phase 5 how-to for plan-to-test, plan-to-file, diff-to-plan and plan-gap scope, and assertion-footprint conformance checks run during post-plan.
+last_verified: 2026-10-11
 ---
 
 # Phase 5 — Final Verification (post-plan reference)
 
 Purpose: the full Phase 5 final-verification how-to (all prose steps + all bash blocks).
 
-### Phase 5.0: Plan→test, Plan→file & autonomy-contract conformance — skip if `PLAN_FOUND=none`; the matrix-derived sub-checks additionally skip if `! $HAS_MATRIX`
+### Phase 5.0: Plan→test, Plan→file, diff→plan, assertion-footprint & autonomy-contract conformance. Skip if `PLAN_FOUND=none`; the matrix-derived sub-checks additionally skip if `! $HAS_MATRIX`
 
 At Phase 5.0 START, clear the conformance bridge file AND remove the done-marker, so each run begins from a clean slate. An empty bridge file alone is **not** enough to mean "nothing unresolved" — it is byte-identical to "5.0 died before writing anything", which is why the separate done-marker exists (Phase 6.5 condition (3) treats a missing marker as indeterminate → BLOCKED):
 
@@ -25,6 +25,8 @@ grep -qF "$T" /tmp/post-plan-changed-$PPID || echo "MISSING: $T (matrix planned 
 ```
 
 For each `MISSING:` test the impl silently dropped planned coverage — now likelier to matter, since the matrix carries the negative-path and security rows `/plan` gates 9 and 12 require. Write the missing test, run it green, and checkpoint (same as Phase 6 test authoring). Skip a planned test **only** if its target behavior was cut from the implementation; note that in a PR comment rather than writing a hollow test.
+
+Two matrix markers suppress this item for a token: `(no-change)` on a Visual-regression row whose baseline is meant to stay untouched, and `(run-only)` on any test row that runs a file already tracked on master without editing it. Both require every row naming the token to be marked, and neither touches `MISSING-FILE:` or `MISSING-METHOD:`.
 
 A `MISSING:` item is **resolved** when its test was authored-and-run-green OR was explicitly cut-from-implementation with a PR comment noting the cut. An item that is neither — a planned test the diff never wrote and which you did not author or explicitly cut — is **unresolved**. A `MISSING-METHOD:` item resolves identically — the named method is authored and run green, **or** explicitly cut with a PR comment stating why the plan-named assertion was dropped; anything else is **unresolved** and holds the arm. Renaming the method in the plan after the fact is not a resolution.
 
@@ -98,46 +100,45 @@ done
 
 For each `MISSING-FILE:`, the impl dropped a planned change. Either (a) make the change now — the plan's implementation steps describe it (this is the #923 remedy: finish the work), run any relevant check, and checkpoint (commit + push) — or (b) if the file was legitimately cut from scope, or is a reference the plan author forgot to annotate, note that in a PR comment. A `MISSING-FILE:` item is **resolved** by (a) or (b); otherwise **unresolved**.
 
-**Diff→plan conformance.** The check above runs plan→diff. This one runs diff→plan over the `.claude/` surface, and catches the opposite failure: an impl agent edits a skill, rule, or agent definition the plan never named, so a governance change ships that no reviewer signed up for. Five merge blockers were caught by hand this way before it was mechanized. A `.claude/` path in the diff is **planned** when it appears in the plan's `## Critical Files` section under either parse verdict. Both `MUST_APPEAR:` and `EXEMPT:` count as planned, because an entry annotated `(reference)` was still named by the plan author; filtering on `cf_is_exempt` here would invert the polarity and report every reference entry as unplanned. A path the plan never named is **declared** when the PR body carries a `## Declared scope` section listing it (format: `.claude/skills/post-plan/_pr-body-claims.md`). Everything else yields an `UNPLANNED-FILE:` item.
+**Diff→plan conformance.** The check above runs plan→diff. This one runs diff→plan over every changed path, and catches the opposite failure: an impl agent edits a file the plan never named, so a change ships that no reviewer signed up for. Five merge blockers were caught by hand on the `.claude/` surface before it was mechanized, and PR #1996 shipped an unplanned `ibl5/classes/` edit the same way. A path in the diff is **planned** when it is a `## Critical Files` entry under either parse verdict, or a Verification Matrix test path. Both `MUST_APPEAR:` and `EXEMPT:` count as planned, because an entry annotated `(reference)` was still named by the plan author; filtering on `cf_is_exempt` here would invert the polarity and report every reference entry as unplanned. An entry carrying `*` is a shell glob and plans every path it matches, except a `.claude/` path. A path the plan never named is **declared** when a PR-body `## Declared scope` bullet names it, either as a full-path substring or through a directory token of two or more segments ending in `/` (format: `.claude/skills/post-plan/_pr-body-claims.md`). A file the diff ADDED that matches `bin/lib/plan-scope-exempt.txt` is exempt, and nothing under `.claude/` ever is. Generated `<!-- name:begin -->` / `<!-- name:end -->` spans are stripped before the section is read, so the files-changed block never declares the paths it lists. An unaccounted `.claude/` path yields an `UNPLANNED-FILE:` item, which holds. Any other unaccounted path yields a `SCOPE-NOTE: unplanned` line. In the other direction, a must-appear Critical File absent from the diff yields a `SCOPE-NOTE: gap` line unless a PR-body `## Plan gaps` bullet names it. A plan that names no Critical File and no matrix test path prints no `SCOPE-NOTE:` lines, since every path would be unplanned. `SCOPE-NOTE:` lines are advisory and never hold.
 
 ```bash
-# Diff→plan conformance. Mirror of the plan→file check above, run in the
-# opposite direction and scoped to `.claude/`. Reuses /tmp/post-plan-changed-$PPID.
-# Source IN-BLOCK — this block runs in its own shell (pr-armable.sh discipline).
+# Diff→plan conformance, plus the plan→diff gap check. Both directions live in
+# bin/lib/plan-scope-conformance; this block only wires the inputs in.
+# Isolated shell: regenerate every input here. Reuses /tmp/post-plan-changed-$PPID.
 if [ "${PLAN_FOUND:-none}" = "none" ]; then
   : # no plan -> no planned paths -> nothing to compare against; skip entirely
 else
-  source "$(git rev-parse --show-toplevel)/bin/lib/critical-files.sh"
-  PLANNED="/tmp/post-plan-planned-claude-$PPID"
-  DECLARED="/tmp/post-plan-declared-scope-$PPID"
-  # BOTH verdicts are planned. Using cf_is_exempt here would invert the polarity.
-  cf_parse_section "$PLAN_FILE" \
-    | sed -E 's/^(MUST_APPEAR|EXEMPT)://' \
-    | sed -E 's#^IBL5-worktrees/[^/]*/##' \
-    | sort -u > "$PLANNED"
-  # Section-bounded extraction of the PR body's `## Declared scope` bullets.
-  # gh failing (no PR yet on a first run) leaves this empty, which is fail-closed.
-  gh pr view --json body --jq '.body' 2>/dev/null \
-    | awk '/^##[[:space:]]+Declared scope[[:space:]]*$/ {f=1; next}
-           /^##[[:space:]]/ {f=0}
-           f' > "$DECLARED"
-  sed -E 's#^IBL5-worktrees/[^/]*/##' "/tmp/post-plan-changed-$PPID" \
-    | grep -E '^\.claude/' | sort -u | while IFS= read -r D; do
-        grep -qxF "$D" "$PLANNED"  && continue
-        grep -qF  "$D" "$DECLARED" && continue
-        echo "UNPLANNED-FILE: $D (.claude/ path in the diff that no plan Critical File and no PR-body '## Declared scope' bullet accounts for)"
-      done
-  rm -f "$PLANNED" "$DECLARED"
+  ROOT="$(git rev-parse --show-toplevel)"
+  BODY="/tmp/post-plan-scope-body-$PPID"
+  ADDED="/tmp/post-plan-added-$PPID"
+  # No PR yet -> empty body -> nothing declared, nothing explained (fail-closed).
+  gh pr view --json body --jq '.body' > "$BODY" 2>/dev/null || : > "$BODY"
+  # Status-A paths only: the exempt list applies to ADDED test files, never edits.
+  git diff --name-status --diff-filter=A origin/master...HEAD 2>/dev/null \
+    | cut -f2- > "$ADDED" || : > "$ADDED"
+  OUT=$("$ROOT/bin/lib/plan-scope-conformance" "$PLAN_FILE" \
+        "/tmp/post-plan-changed-$PPID" "$BODY" "$ADDED" 2>&1)
+  rc=$?
+  printf '%s\n' "$OUT" | grep -E '^(UNPLANNED-FILE|SCOPE-NOTE):' || true
+  if [ "$rc" -ge 2 ]; then
+    # A usage or parse error is indeterminate. Surface it so condition (3)
+    # holds; a silent skip would fail OPEN.
+    echo "UNPLANNED-FILE: helper exited $rc (indeterminate): $(printf '%s\n' "$OUT" | tail -n 1)"
+  fi
+  rm -f "$BODY" "$ADDED"
 fi
 ```
 
-Three shell details are load-bearing. `grep -qxF` against `$PLANNED` is a whole-line match so a planned `.claude/rules/a.md.bak` (example) cannot swallow a diff path `.claude/rules/a.md` (example); `grep -qF` against `$DECLARED` is a substring match because that file holds prose bullets. Both greps read a file rather than a pipe, which keeps them clear of the `set -o pipefail` plus `grep -q` SIGPIPE trap in `.claude/rules/shell-pipefail-grep.md`. The `IBL5-worktrees/[^/]*/` strip runs before the `^\.claude/` filter on the diff side; running it after would let a worktree-prefixed path fall out of the filter and vanish silently.
+The matching rules live in the header of `bin/lib/plan-scope-conformance`: a whole-line match against the planned set, a substring match against body prose, file-backed greps that stay clear of the SIGPIPE trap in `.claude/rules/shell-pipefail-grep.md`, and the `IBL5-worktrees/[^/]*/` strip before any match. The S-cases in `bin/test-postplan-arm-conditions` pin each one.
 
-For each `UNPLANNED-FILE:`, an edit landed on the governance surface outside the plan's declared blast radius. Resolve it one of three ways: (a) revert the edit when it was incidental scope creep; (b) add the path to the PR body's `## Declared scope` section and re-run `/post-plan`, when the edit is intended and the plan author did not foresee it; or (c) add the path to the plan's `## Critical Files` section, when the plan is still the live document. An item resolved by (a), (b) or (c) is **resolved**; anything else is **unresolved** and reaches the bridge at 5.0 END through the existing append step. Writing the bridge file inline here would be wrong, for the same reason it is wrong above: an item you then resolve would still block arming.
+For each `UNPLANNED-FILE:` (only `.claude/` paths), an edit landed on the PR outside the plan's declared blast radius. Resolve it one of three ways: (a) revert the edit when it was incidental scope creep; (b) add the path to the PR body's `## Declared scope` section and re-run `/post-plan`, when the edit is intended and the plan author did not foresee it; or (c) add the path to the plan's `## Critical Files` section, when the plan is still the live document. An item resolved this way is **resolved**; anything else is **unresolved** and reaches the bridge at 5.0 END through the existing append step.
 
-On a first `/post-plan` run the PR does not exist yet, so `gh pr view` fails and the declared set is empty. That is fail-closed by design. Path (b) is a re-run clearance; a first run sees only the plan's own `## Critical Files` section, and path (c) works there.
+`SCOPE-NOTE:` lines are advisory. They are never written to the bridge and never hold arming. If the PR body lacks them, reflect each `SCOPE-NOTE: unplanned` path in a `## Declared scope` bullet and each `SCOPE-NOTE: gap` path in a `## Plan gaps` bullet, so the reviewer sees them. A `## Plan gaps` bullet does not clear the `MISSING-FILE:` item for the same path, which keeps its own resolution above. Writing the bridge file inline here would be wrong, for the same reason it is wrong above: an item you then resolve would still block arming.
 
-This check does not replace check 3 of the fidelity reviewer in `.claude/review-shared/_plan-fidelity-review.md`. That check reads intent across the whole diff at judgment level; this one is a mechanical path-set comparison scoped to `.claude/`. They run side by side.
+On a first `/post-plan` run the PR does not exist yet, so `gh pr view` fails and the declared set is empty. That is fail-closed by design. Path (b) is a re-run clearance; a first run sees only the plan's own `## Critical Files` section, and path (c) works there. Phase 2 step 4 of `SKILL.md` now authors both sections when it creates the PR, so the first Phase 5.0 run normally reads them.
+
+This check does not replace check 3 of the fidelity reviewer in `.claude/review-shared/_plan-fidelity-review.md`. That check reads intent across the whole diff at judgment level; this one is a mechanical path-set comparison over every changed path. They run side by side.
 
 **Plan→method conformance.** The path check above proves the *file* landed; this confirms the plan's named methods landed. For each name the plan lists under `## Required Test Methods` (fenced examples stripped width-aware), grep the diff *body* — `git diff --name-only` cannot see declarations:
 
@@ -189,7 +190,35 @@ if [ "$PLAN_FOUND" != "none" ]; then
 fi
 ```
 
-At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:`, `MISSING-FILE:`, `UNPLANNED-FILE:`, `MISSING-METHOD:` and `UNMET-CONTRACT:` item (label + path-or-method-name + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
+**Assertion-footprint conformance (Phase 5.0e).** The test-path check above proves a planned test file landed. It cannot tell whether that file asserts what the matrix row promised. A delegate can write the file with one property where the row named four. This check hands the plan, the diff body and the PR body to `bin/lib/plan-matrix-assertions`. The helper reads each behavioral Verification Matrix row's assertion tokens, looks for each one in the diff body, and prints one `UNREALISED-ASSERTION:` line per token the diff never wrote. It drops any row the PR body waives. Token extraction and the waiver format are defined in the helper's header comment. This block only wires the helper in.
+
+```bash
+# Phase 5.0e: assertion footprint. Isolated shell: regenerate every input here.
+if [ "${PLAN_FOUND:-none}" != "none" ]; then
+  ROOT="$(git rev-parse --show-toplevel)"
+  DIFF="/tmp/post-plan-diff-$PPID"
+  BODY="/tmp/post-plan-pr-body-$PPID"
+  # Regenerate: a fix made earlier in 5.0 may have moved HEAD since 5.0 wrote it.
+  git diff origin/master...HEAD > "$DIFF"
+  # No PR yet on a first run -> empty body -> no waiver applies (fail-closed).
+  gh pr view --json body --jq '.body' > "$BODY" 2>/dev/null || : > "$BODY"
+  OUT=$("$ROOT/bin/lib/plan-matrix-assertions" "$PLAN_FILE" "$DIFF" "$BODY" 2>&1)
+  rc=$?
+  printf '%s\n' "$OUT" | grep '^UNREALISED-ASSERTION:' || true
+  if [ "$rc" -ge 2 ]; then
+    # A parse or usage error is indeterminate. Surface it as an unresolved item
+    # so condition (3) holds; a silent skip would fail OPEN.
+    echo "UNREALISED-ASSERTION: helper exited $rc (indeterminate): $(printf '%s\n' "$OUT" | tail -n 1)"
+  fi
+  rm -f "$BODY"
+fi
+```
+
+For each `UNREALISED-ASSERTION:`, the diff never wrote an assertion a matrix row planned. Resolve it one of three ways: (a) author the missing assertion, run it green, and checkpoint; (b) when the row's behavior was cut from the implementation, add a waiver for that row to the PR body in the format the helper's header comment gives, then re-run `/post-plan`; (c) when the item reads `helper exited`, fix the cause it prints and re-run. An item resolved by (a), (b) or (c) is **resolved**. Anything else is **unresolved** and reaches the bridge at 5.0 END through the append step below. Do not write the bridge file inline here, for the same reason given under Diff→plan conformance above.
+
+On a first run no PR exists, so the body file is empty and no waiver applies. Path (b) is a re-run clearance, the same as `## Declared scope` above. Scope: skill path only. `tools/postplan-harness` computes conformance in-process and does not run this block.
+
+At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:`, `MISSING-FILE:`, `UNPLANNED-FILE:`, `MISSING-METHOD:`, `UNREALISED-ASSERTION:` and `UNMET-CONTRACT:` item (label + path-or-method-name + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
 
 Then — **last action of Phase 5.0, after the appends above** — write the done-marker:
 

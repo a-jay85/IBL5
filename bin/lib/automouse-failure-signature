@@ -1,0 +1,63 @@
+#!/usr/bin/env perl
+# bin/lib/automouse-failure-signature: normalize one failing tool call into a
+# stable one-line signature, so two automouse impl attempts that hit the SAME
+# failure compare equal (see ADR-0160). Fail-open: prints
+# NOTHING when the record has no informative error text; an empty signature
+# never matches.
+#
+# Usage: automouse-failure-signature <raw_record_file>
+# Record (written by bin/lib/automouse-stream-filter.sh):
+#   tool: <name>
+#   command: <first line of input.command, may be empty>
+#   error:
+#   <error text to EOF>
+# Exit: 0 once one argument is given (missing file = empty output); 2 = usage.
+use strict;
+use warnings;
+
+if (@ARGV != 1) {
+    print STDERR "Usage: automouse-failure-signature <raw_record_file>\n";
+    exit 2;
+}
+open(my $fh, '<', $ARGV[0]) or exit 0;
+my ($tool, $cmd, $in_err, @err) = ('', '', 0);
+while (my $l = <$fh>) {
+    chomp $l;
+    if ($in_err) { push @err, $l; next; }
+    if    ($l =~ /^tool: ?(.*)$/)    { $tool = $1; }
+    elsif ($l =~ /^command: ?(.*)$/) { $cmd  = $1; }
+    elsif ($l eq 'error:')           { $in_err = 1; }
+}
+close $fh;
+
+sub norm {
+    my ($s) = @_;
+    $s =~ s/\e\[[0-9;?]*[A-Za-z]//g;                                   # ANSI
+    $s =~ s{(?:/private)?/(?:tmp|var/folders)/\S*}{<TMP>}g;            # tmp paths
+    $s =~ s/\btmp\.[A-Za-z0-9]{6,}\b/<TMP>/g;                          # mktemp names
+    $s =~ s/\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/<TS>/g;
+    $s =~ s/\b\d{4}-\d{2}-\d{2}\b/<DATE>/g;
+    $s =~ s/\b\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\b/<TIME>/g;
+    $s =~ s/\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b/<SHA>/g;                # git SHAs
+    $s =~ s/\b\d{6,}\b/<N>/g;                                         # epochs, pids
+    $s =~ s/\b\d+(?:\.\d+)?\s?(?:ms|s|secs?|seconds|mins?|minutes|h)\b/<DUR>/g;
+    $s =~ s/(?<=[\w.)]):\d+(?::\d+)?\b/:<L>/g;                        # file:line[:col]
+    $s =~ s/\bline \d+\b/line <L>/gi;
+    $s =~ s{(?:[\w.~@+-]*/)+([\w.@+-]+)}{$1}g;                         # basename only
+    $s =~ s/\s+/ /g;
+    $s =~ s/^ | $//g;
+    return substr($s, 0, 300);
+}
+
+shift @err while @err && $err[0] !~ /\S/;
+shift @err if @err && $err[0] =~ /^\s*Exit code \d+\s*$/;
+my @lines = grep { /\S/ } @err;
+my $kw = qr/\b(?:errors?|fail(?:ed|ure|ures|s)?|fatal|exception|denied|not found|no such|cannot|can't|undefined|assert\w*)\b/i;
+my ($idx) = grep { $lines[$_] =~ $kw } 0 .. $#lines;
+my @pick = defined $idx
+    ? @lines[$idx .. ($idx + 2 > $#lines ? $#lines : $idx + 2)]
+    : (@lines ? ($lines[-1]) : ());
+my $e = join(' / ', grep { $_ ne '' } map { norm($_) } @pick);
+exit 0 if $e eq '' || $e =~ /^Exit code \S*$/i;
+print join(' | ', norm($tool), norm($cmd), $e), "\n";
+exit 0;

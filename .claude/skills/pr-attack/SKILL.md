@@ -2,10 +2,10 @@
 name: pr-attack
 description: Compute an optimal merge order for all open PRs — ordered table, excluded set, and hand-resolution forecast — printed to chat and written to a dated file under the home directory.
 disable-model-invocation: true
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
 context: fork
-agent: sonnet-4-6
-last_verified: 2026-09-02
+agent: sonnet-5-5
+last_verified: 2026-09-28
 allowed-tools: Bash(bin/pr-attack --gate-candidates), Bash(bin/pr-attack --work:*), Read
 ---
 
@@ -79,7 +79,7 @@ bin/pr-attack --work <WORK> \
 
 Ingests the gate-edge judgments from Step 3b, runs Kahn's topological sort (with
 hub-last, Needs-you? rank, and ascending-PR# tie-breaks), and emits the ordered
-plan to stdout and to `$HOME/IBL5-pr-attack-<date>.md`.
+plan to stdout and to `$HOME/claude-plans/_reports/ibl5/pr-attack/IBL5-pr-attack-<date>.md`.
 
 If there are no gate nominees this normally happens automatically (see the stop
 condition above), so you should not reach here. The explicit judged-empty form is

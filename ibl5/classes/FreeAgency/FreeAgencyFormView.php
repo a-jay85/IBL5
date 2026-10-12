@@ -159,9 +159,13 @@ class FreeAgencyFormView
     private function renderOfferButtonForm(array $offers, int $finalYear, int $offerType = 0, string $testId = ''): string
     {
         $testIdAttr = $testId !== '' ? ' data-testid="' . HtmlSanitizer::e($testId) . '"' : '';
+        // One tap sends a real offer, so ask first (htmx shows the confirm on boosted submits)
+        $years = count($offers);
+        $confirmMessage = 'Send ' . ($this->player->getName() ?? 'this player') . ' a ' . $years . '-year offer? '
+            . implode(' / ', array_map('strval', $offers));
         ob_start();
         ?>
-<form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+<form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="<?= HtmlSanitizer::e($confirmMessage) ?>">
     <?= HtmlSanitizer::trusted($this->csrfHtml) // @phpstan-ignore ibl.trustedVariable (pre-generated CSRF hidden-input HTML set by the caller via setCsrfHtml(); no request or DB data interpolated) ?>
     <?= HtmlSanitizer::trusted($this->renderHiddenFields($offers, $offerType)) ?>
     <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"<?= HtmlSanitizer::trusted($testIdAttr) // @phpstan-ignore ibl.trustedVariable ($testIdAttr is built above from HtmlSanitizer::e($testId) wrapped in a data-testid attribute; no unescaped data) ?>><?= (int) $offers[$finalYear - 1] ?></button>
@@ -207,12 +211,12 @@ class FreeAgencyFormView
             ];
         }
 
-        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
+        $raisePercentage = \League\ContractRules::getMaxRaisePercentage($birdYears);
         $rawPercentage = $raisePercentage * 100;
         $raisePercentageDisplay = ($rawPercentage === floor($rawPercentage))
             ? (string) (int) $rawPercentage
             : rtrim(rtrim(sprintf('%.1f', $rawPercentage), '0'), '.');
-        $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
+        $hasBirdRights = \League\ContractRules::hasBirdRights($birdYears);
         $birdRightsText = $hasBirdRights ? ' with Bird Rights' : '';
 
         $label = "Max Level Contract {$raisePercentageDisplay}%{$birdRightsText} (click the button that corresponds to the final year you wish to offer):";
@@ -252,7 +256,7 @@ class FreeAgencyFormView
         $contractOfferConfigs = [];
         for ($years = 1; $years <= 6; $years++) {
             $contractOfferConfigs[] = [
-                'offers' => \ContractRules::getMLEOffers($years),
+                'offers' => \League\ContractRules::getMLEOffers($years),
                 'offerType' => (string) $years,
             ];
         }
@@ -273,7 +277,7 @@ class FreeAgencyFormView
     {
         $contractOfferConfigs = [
             [
-                'offers' => [\ContractRules::LLE_OFFER],
+                'offers' => [\League\ContractRules::LLE_OFFER],
                 'offerType' => (string) OfferType::LOWER_LEVEL_EXCEPTION,
             ],
         ];
@@ -294,7 +298,7 @@ class FreeAgencyFormView
     {
         $contractOfferConfigs = [
             [
-                'offers' => [\ContractRules::getVeteranMinimumSalary($this->player->getYearsOfExperience() ?? 0)],
+                'offers' => [\League\ContractRules::getVeteranMinimumSalary($this->player->getYearsOfExperience() ?? 0)],
                 'offerType' => (string) OfferType::VETERAN_MINIMUM,
             ],
         ];

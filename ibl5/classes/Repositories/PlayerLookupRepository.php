@@ -9,7 +9,7 @@ use Repositories\Contracts\PlayerLookupRepositoryInterface;
 /**
  * @phpstan-import-type PlayerRow from PlayerLookupRepositoryInterface
  */
-class PlayerLookupRepository extends \BaseMysqliRepository implements PlayerLookupRepositoryInterface
+class PlayerLookupRepository extends \Database\BaseMysqliRepository implements PlayerLookupRepositoryInterface
 {
     use PlayerTeamJoinQuery;
 

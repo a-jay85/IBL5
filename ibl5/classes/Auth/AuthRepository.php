@@ -6,7 +6,7 @@ namespace Auth;
 
 use Auth\Contracts\AuthRepositoryInterface;
 
-final class AuthRepository extends \BaseMysqliRepository implements AuthRepositoryInterface
+final class AuthRepository extends \Database\BaseMysqliRepository implements AuthRepositoryInterface
 {
     /**
      * @see AuthRepositoryInterface::findUserRolesByUsername()

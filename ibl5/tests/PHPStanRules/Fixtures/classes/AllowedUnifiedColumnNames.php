@@ -9,5 +9,6 @@ $rating = "SELECT `r_3ga`, `r_3gp` FROM ibl_plr";
 $teamId = "SELECT * FROM ibl_plr WHERE `teamid` = 1";
 $compounds = "SELECT `home_teamid`, `visitor_teamid` FROM ibl_box_scores";
 $draftPicks = "SELECT `owner_teamid`, `teampick_teamid` FROM ibl_draft_picks";
+$awards = "SELECT `award`, `table_id`, `id` FROM ibl_team_awards";
 // Backticked but unrelated — still fine.
 $other = "SELECT `pid`, `name` FROM ibl_plr";

@@ -1,11 +1,12 @@
-"""Phase 6.5 — the sixteen ported arming conditions as pure, typed functions.
+"""Phase 6.5 — the seventeen ported arming conditions as pure, typed functions.
 
 The numbers track the SKILL's condition numbers, not this list's position. The set is
-now {1..16} with no gaps: condition (11) shells out to
+now {1..17} with no gaps: condition (11) shells out to
 `bin/lib/pr-armable.sh::pr_unresolved_findings_hold` for unresolved review-thread
 findings, condition (14) reads the run-local conflict-resolved flag, condition (15)
-probes for already-red CI checks at arm time, and condition (16) checks the
-pre-push local meta-check gate.
+probes for already-red CI checks at arm time, condition (16) checks the
+pre-push local meta-check gate, and condition (17) holds when the gate backtest
+flagged clean PRs or could not run.
 
 Faithful port of .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md +
 bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
@@ -20,13 +21,26 @@ import os
 
 import re
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 from .state import ArmDecision, Classification, ConditionResult, Finding
+
+# Required aggregator context (ADR-0149). bin/check-composite-contracts A2 pins this
+# literal to the workflow job name and to bin/lib/pr-armable.sh.
+AGGREGATOR_CONTEXT = "All checks green"
 
 FEAT_RE = re.compile(r"^feat(\([^)]*\))?!?:", re.IGNORECASE)
 GOLDEN_PATH = "engine/internal/sim/testdata/golden.json"
 SENTINEL_RE = re.compile(r"^\s*No manual testing needed", re.IGNORECASE)
+# Tail-clause AND gate (pr_manual_testing_clearance parity, bin/lib/pr-armable.sh).
+# Strips the sentinel prefix plus any hyphen / en-dash / em-dash run to isolate the tail.
+SENTINEL_PREFIX_RE = re.compile(r"^\s*No manual testing needed\s*[—–-]*\s*", re.IGNORECASE)
+# (tail keyword, required changed-file pattern). Each named type needs one matching file.
+TAIL_TYPE_RULES = (
+    (re.compile(r"\b(e2e|playwright)\b", re.IGNORECASE), re.compile(r"^ibl5/tests/e2e/.*\.spec\.ts$")),
+    (re.compile(r"\b(unit|phpunit)\b", re.IGNORECASE), re.compile(r"^ibl5/tests/.*Test\.php$")),
+    (re.compile(r"\bintegration\b", re.IGNORECASE), re.compile(r"^ibl5/tests/DatabaseIntegration/")),
+)
 DEP_LINE = re.compile(r"^\s*depends-on:", re.IGNORECASE)
 
 # The harness's own row shape, shared with manual_rows.render_rows
@@ -61,7 +75,7 @@ def _manual_section(body: str) -> list[str] | None:
     return section
 
 
-def manual_testing_clearance(body: str) -> str:
+def manual_testing_clearance(body: str, changed_files: Sequence[str] = ()) -> str:
     """pr_manual_testing_clearance port: CLEARED / HELD / UNKNOWN.
 
     Scan window: from `^## Manual Testing` to the next `^## ` line. Any body
@@ -69,14 +83,25 @@ def manual_testing_clearance(body: str) -> str:
     emit no `^#`-anchored line; classify.upsert_manual_confirmation does the
     former and classify._neutralize_headings the latter. Pinned by
     tests/test_hold_justification.py.
+
+    Tail clause: when `changed_files` is non-empty, the FIRST sentinel line's
+    tail is scanned for e2e/playwright, unit/phpunit, integration keywords;
+    every named type needs a matching changed file or the result is HELD.
+    Empty `changed_files` skips the check (callers that cannot supply a list).
     """
     section = _manual_section(body)
     if section is None:
         return "UNKNOWN"
-    for l in section:
-        if SENTINEL_RE.match(l):
-            return "CLEARED"
-    return "HELD"
+    sentinel = next((l for l in section if SENTINEL_RE.match(l)), None)
+    if sentinel is None:
+        return "HELD"
+    if not changed_files:
+        return "CLEARED"
+    tail = SENTINEL_PREFIX_RE.sub("", sentinel, count=1)
+    for keyword_re, file_re in TAIL_TYPE_RULES:
+        if keyword_re.search(tail) and not any(file_re.search(f) for f in changed_files):
+            return "HELD"
+    return "CLEARED"
 
 
 def meta_checks_clearance(flag_path: str, post_pr_rc: int) -> str:
@@ -151,7 +176,11 @@ class ArmInputs:
     conflict_resolved: Optional[bool] = None          # None = never consulted -> BLOCKS
     conflict_verdict: Optional[str] = None            # verdict-file line 1; None = ABSENT -> HOLDS
     failed_checks: list[str] = field(default_factory=list)  # checks in gh's fail bucket at arm time
+    aggregator_required: bool = False   # master protection requires AGGREGATOR_CONTEXT; False = (15) blocks
     meta_checks_status: str = "CLEARED"               # pre-push meta-check gate; "HELD"/"UNKNOWN" blocks
+    gate_backtest_status: str = "NOT-APPLICABLE"      # gate replay verdict; "HELD"/"UNKNOWN"/other blocks
+    gate_backtest_reason: str = ""                    # verdict reason, surfaced in the hold line
+    merge_danger_state: str = "MISSING"   # harness/merge_danger.classify_body(pr_body); only "TWO-WAY" arms (fail-closed default)
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -189,7 +218,7 @@ def conflict_verdict_for(branch: str, tmp_dir: str = "/tmp") -> Optional[str]:
 def evaluate(inp: ArmInputs) -> ArmDecision:
     cs: list[ConditionResult] = []
 
-    clearance = manual_testing_clearance(inp.pr_body)
+    clearance = manual_testing_clearance(inp.pr_body, inp.classification.files)
     # Widened for the harness's deterministic tick pass: a section whose every
     # harness-shaped row is ticked clears, alongside the sentinel. Gated on HELD
     # so UNKNOWN (no `## Manual Testing` heading at all) still holds.
@@ -256,8 +285,13 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     cs.append(ConditionResult(10, "pipeline-authored-floor", pipe,
                               "pipeline-authored label present" if pipe else ""))
 
-    # Condition (11) — unresolved review-thread findings scored >= 80. The shell-out
-    # lives in adapters/ghad.py::unresolved_findings; this grades its output.
+    # Condition (11) — any unresolved review thread. The shell-out lives in
+    # adapters/ghad.py::unresolved_findings and returns one `unresolved-finding:N`
+    # entry per scored open thread and `unresolved-finding:-` per unscored one
+    # (human prose, bot note, outdated anchor, deleted root comment). Every entry
+    # holds; the split below is for the reason text only. Trust and authorship are
+    # never consulted here: thread_ingestion.py decides what a run may ACT on,
+    # this decides whether the PR may merge. None / api-error / cap stay fail-closed.
     uf = inp.unresolved_findings
     if uf is None:
         r = "unresolved review-thread state not consulted — fail-closed"
@@ -266,10 +300,13 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     elif "unresolved-findings-cap" in uf:
         r = "review-thread list hit the 100-thread page cap — fail-closed"
     elif uf:
-        r = f"{len(uf)} unresolved review finding(s) scored >= 80: " + " ".join(uf)
+        unscored = sum(1 for x in uf if x == "unresolved-finding:-")
+        scored = len(uf) - unscored
+        r = (f"{len(uf)} unresolved review thread(s) ({scored} scored, {unscored} unscored): "
+             + " ".join(uf))
     else:
         r = ""
-    cs.append(ConditionResult(11, "unresolved-scored-findings", bool(r), r))
+    cs.append(ConditionResult(11, "unresolved-review-threads", bool(r), r))
 
     # Condition (13). The number tracks the skill's condition number, not this list's
     # position: (11) now lives directly above and (12) is plan-intent fidelity. Do not
@@ -324,14 +361,34 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     # `failed_checks` list is a deliberate pass-through, not a green signal: the only
     # correct way to clear a real hold is to fix CI and re-run, never to assume
     # absence of a probe result means success. Additive: can only ADD a hold, never
-    # release one.
-    cs.append(ConditionResult(15, "red-ci-check", bool(inp.failed_checks),
-                              ", ".join(inp.failed_checks)))
+    # release one. The one exception: demotion to a warning happens only when
+    # `aggregator_required` is True, which the runner sets from live branch protection.
+    # The default False keeps the block, so a harness that never consults protection
+    # behaves exactly as before.
+    red = ", ".join(inp.failed_checks)
+    if inp.failed_checks and inp.aggregator_required:
+        c15 = ConditionResult(15, "red-ci-check", False, "")
+        c15.warning = (f"red CI check(s): {red} — arming anyway; the required "
+                       f"'{AGGREGATOR_CONTEXT}' context keeps the merge blocked until green")
+    else:
+        c15 = ConditionResult(15, "red-ci-check", bool(inp.failed_checks), red)
+    cs.append(c15)
 
     # Condition (16) — pre-push meta-check gate flag or post-pr run failure.
     mc = inp.meta_checks_status
     mc_blocked = mc != "CLEARED"
     cs.append(ConditionResult(16, "meta-checks", mc_blocked,
                               f"state={mc}" if mc_blocked else ""))
+
+    # Condition (17) — gate backtest: a changed gate flagged clean PRs, or its replay failed.
+    gb = inp.gate_backtest_status
+    gb_blocked = gb not in ("NOT-APPLICABLE", "CLEARED")
+    gb_reason = f"state={gb}" + (f"; {inp.gate_backtest_reason}" if inp.gate_backtest_reason else "")
+    cs.append(ConditionResult(17, "gate-backtest", gb_blocked, gb_reason if gb_blocked else ""))
+
+    # Condition (18) — merge danger door: only a well-formed two-way line arms.
+    md = inp.merge_danger_state
+    md_blocked = md != "TWO-WAY"
+    cs.append(ConditionResult(18, "merge-danger", md_blocked, f"state={md}" if md_blocked else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

@@ -5,14 +5,15 @@
 #
 # Usage: source "$(dirname "$0")/lib/pr-armable.sh"
 #
-# Covers the seven live-derivable conditions:
+# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>; 18: pr_merge_danger_hold <body>):
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
 #   (8) feat: floor                -> pr_feat_hold <title> <labels_json>
 #   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json> [head_ref]
-#   (11) unresolved scored finding -> pr_unresolved_findings_hold <pr_number>
+#   (11) unresolved review thread  -> pr_unresolved_findings_hold <pr_number>
 #   (15) already-red CI checks     -> pr_red_check_hold <pr_number>
+#        demoted to a warning when  -> pr_aggregator_required  (reads master protection)
 #
 # Conditions (2) review>=80, (3) MISSING-tests, (4) Phase-5 local verify, (7)
 # non-UI auto_merge:false, (9) realized-diff verdict are deliberately NOT here:
@@ -29,12 +30,18 @@
 # Test seam: GH_CMD (default `gh`) is a single-token command (a path to a shim in
 # tests) invoked as `"$GH_CMD" pr view ...` or `"$GH_CMD" pr checks ...`.
 # pr_dep_holds, pr_unresolved_findings_hold, and pr_red_check_hold all touch it.
+# pr_aggregator_required also touches GH_CMD via "$GH_CMD" api repos/$REPO_SLUG/branches/master.
 # REPO_SLUG (default `a-jay85/IBL5`) is the second seam, consumed only by
 # pr_unresolved_findings_hold's GraphQL call; it is the same seam name
 # bin/lib/post-review-findings.sh already uses.
 
 GH_CMD="${GH_CMD:-gh}"
 REPO_SLUG="${REPO_SLUG:-a-jay85/IBL5}"
+
+# The aggregator context name. bin/check-composite-contracts A2 pins this literal to
+# the job name in .github/workflows/all-checks-green.yml and to
+# tools/postplan-harness/harness/armable.py, so the three cannot drift apart.
+PR_ARMABLE_AGGREGATOR_CONTEXT='All checks green'
 
 # pr_manual_testing_clearance <body>
 #   The fail-closed positive-clearance axis (Phase 6.5 condition (1), mechanized).
@@ -80,11 +87,11 @@ pr_manual_testing_clearance() {
     # "- [x] bin/test-check-pr-manual-testing — 19/19 PASS"). Holding on those would block correct
     # PRs. bin/check-pr-manual-testing's shape regex conflates the two on
     # purpose (both shapes are well-formed); this clearance axis must not.
-    if printf '%s\n' "$content" | grep -qE '^[[:space:]]*- \[ \]'; then
+    if grep -qE '^[[:space:]]*- \[ \]' <<< "$content"; then
         echo "HELD"
         return
     fi
-    if ! printf '%s\n' "$content" | grep -qiE '^[[:space:]]*No manual testing needed'; then
+    if ! grep -qiE '^[[:space:]]*No manual testing needed' <<< "$content"; then
         echo "HELD"
         return
     fi
@@ -101,21 +108,18 @@ pr_manual_testing_clearance() {
     # Keyword → required changed-file pattern table (case-insensitive, \b word boundary).
     # AND semantics: each named type must have a matching file; any absent type holds.
     local held=0
-    if printf '%s' "$tail" | grep -qiE '\b(e2e|playwright)\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/e2e/.*\.spec\.ts$'; then
+    if grep -qiE '\b(e2e|playwright)\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/e2e/.*\.spec\.ts$' <<< "$changed_files"; then
             held=1
         fi
     fi
-    if printf '%s' "$tail" | grep -qiE '\b(unit|phpunit)\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/.*Test\.php$'; then
+    if grep -qiE '\b(unit|phpunit)\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/.*Test\.php$' <<< "$changed_files"; then
             held=1
         fi
     fi
-    if printf '%s' "$tail" | grep -qiE '\bintegration\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/DatabaseIntegration/'; then
+    if grep -qiE '\bintegration\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/DatabaseIntegration/' <<< "$changed_files"; then
             held=1
         fi
     fi
@@ -149,13 +153,57 @@ pr_golden_hold() {
 #   Pass the `.labels` array, e.g. `gh pr view N --json labels --jq '.labels'`.
 pr_feat_hold() {
     local title="$1" labels_json="$2"
-    if printf '%s' "$title" | grep -qiE '^feat(\([^)]*\))?!?:'; then
+    if grep -qiE '^feat(\([^)]*\))?!?:' <<< "$title"; then
         if printf '%s' "$labels_json" \
             | jq -e 'any(.[]?; .name == "human-approved")' >/dev/null 2>&1; then
             return  # label flips it — not held
         fi
         echo "feat-awaiting-signoff"
     fi
+}
+
+# pr_gate_backtest_hold <body>
+#   Phase 6.5 condition (17). Mirrors harness/gate_backtest.py parse_gate_backtest_state.
+#   No '<!-- gate-backtest:begin -->' line -> prints nothing (not a gate PR).
+#   Block present: exactly one '<!-- gate-backtest-state: X -->' line between the
+#   markers, X in NOT-APPLICABLE|CLEARED -> prints nothing; X in HELD|UNKNOWN ->
+#   prints 'gate-backtest:X'. Zero or 2+ state lines, or no end marker -> prints
+#   'gate-backtest:UNKNOWN' (fail-closed).
+pr_gate_backtest_hold() {
+    local body="$1" line inside=0 seen_begin=0 seen_end=0 n=0 state=""
+    while IFS= read -r line; do
+        case "$line" in
+            '<!-- gate-backtest:begin -->') seen_begin=1; inside=1 ;;
+            '<!-- gate-backtest:end -->')   [ "$inside" = 1 ] && seen_end=1; inside=0 ;;
+            '<!-- gate-backtest-state: '*' -->')
+                if [ "$inside" = 1 ]; then
+                    n=$((n + 1)); state="${line#<!-- gate-backtest-state: }"; state="${state% -->}"
+                fi ;;
+        esac
+    done <<EOF
+$body
+EOF
+    [ "$seen_begin" = 0 ] && return 0
+    if [ "$seen_end" = 0 ] || [ "$n" != 1 ]; then echo "gate-backtest:UNKNOWN"; return 0; fi
+    case "$state" in
+        NOT-APPLICABLE|CLEARED) ;;
+        HELD|UNKNOWN) echo "gate-backtest:$state" ;;
+        *) echo "gate-backtest:UNKNOWN" ;;
+    esac
+}
+
+# pr_merge_danger_hold <body>
+#   Phase 6.5 condition (18). Mirrors harness/merge_danger.py classify_body.
+#   Prints nothing for exactly one well-formed line with Door two-way; otherwise prints
+#   merge-danger:ONE-WAY | merge-danger:MISSING | merge-danger:MALFORMED (fail-closed).
+pr_merge_danger_hold() {
+    local body="$1" n well
+    n=$(printf '%s\n' "$body" | grep -cE '^\*\*Merge danger:\*\*' || true)
+    [ "$n" = 0 ] && { echo "merge-danger:MISSING"; return 0; }
+    [ "$n" != 1 ] && { echo "merge-danger:MALFORMED"; return 0; }
+    well=$(printf '%s\n' "$body" | grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external) · Why: .{20,}$' || true)
+    [ -z "$well" ] && { echo "merge-danger:MALFORMED"; return 0; }
+    case "$well" in *'Door: one-way'*) echo "merge-danger:ONE-WAY" ;; esac
 }
 
 # pr_dep_holds <body>
@@ -214,19 +262,24 @@ pr_pipeline_authored_hold() {
         | jq -e 'any(.[]?; .name == "pipeline-authored")' >/dev/null 2>&1; then
         echo "pipeline-authored"
     fi
-    if [ -n "$head_ref" ] && printf '%s' "$head_ref" | grep -qE '^bug-[0-9]+(-|$)'; then
+    if [ -n "$head_ref" ] && grep -qE '^bug-[0-9]+(-|$)' <<< "$head_ref"; then
         echo "pipeline-branch"
     fi
 }
 
 # pr_unresolved_findings_hold <pr_number>
-#   Phase 6.5 condition (11), the unresolved-scored-finding floor. An UNRESOLVED review
-#   thread whose first comment embeds `<!-- score: N -->` with N >= 80 holds auto-merge.
-#   Complements (2), which sees only THIS run's scores: (11) reads live GitHub thread
-#   state, so a finding from an earlier run or a standalone /pr-review or /security-audit
-#   still blocks. Human (unscored) threads, scores < 80, and resolved threads NEVER block.
+#   Phase 6.5 condition (11), the unresolved-thread floor. EVERY unresolved review
+#   thread holds auto-merge: scored (`<!-- score: N -->`, any N), unscored (human or
+#   bot prose), outdated, or root-comment-deleted. Author and trust are NOT consulted
+#   here; list_trusted_open_threads decides which threads a run may action, and
+#   this predicate decides whether the PR may merge. Complements (2), which sees only
+#   THIS run's scores: (11) reads live GitHub thread state, so a thread from an
+#   earlier run, a standalone /pr-review or /security-audit, or a human question
+#   still blocks. Resolved threads NEVER block.
 #   FAIL-CLOSED on every error path. Echoes one `unresolved-finding:SCORE` line per
-#   qualifying thread, or one of `unresolved-findings-cap` / `-api-error`, or nothing.
+#   scored unresolved thread, `unresolved-finding:-` per unscored one, or one of
+#   `unresolved-findings-cap` / `-api-error`, or nothing.
+#   History: until 2026-09 only N >= 80 held; the widening is additive.
 pr_unresolved_findings_hold() {
     local pr="$1"
     local owner="${REPO_SLUG%%/*}" repo="${REPO_SLUG##*/}"
@@ -267,14 +320,10 @@ pr_unresolved_findings_hold() {
     findings=$(printf '%s' "$raw" | jq -r '
         .data.repository.pullRequest.reviewThreads.nodes[]
         | select(.isResolved == false)
-        | select(
-            (.comments.nodes[0].body // "")
-            | capture("<!-- score: (?<s>[0-9]+) -->")
-            | .s | tonumber >= 80
-          )
         | "unresolved-finding:" +
-          ((.comments.nodes[0].body // "")
-           | capture("<!-- score: (?<s>[0-9]+) -->") | .s)
+          (((.comments.nodes[0].body // "")
+            | capture("<!-- score: (?<s>[0-9]+) -->") // null)
+           | if . == null then "-" else .s end)
     ' 2>/dev/null) || { echo "unresolved-findings-api-error"; return 0; }
     [ -n "$findings" ] && printf '%s\n' "$findings"
     # REQUIRED: without it the clear path returns 1 and aborts bin/pr-triage
@@ -324,4 +373,19 @@ pr_red_check_hold() {
     printf '%s' "$raw" | jq -r '.[] | select(.bucket == "fail") | select(.name != "human-signoff") | .name' \
         2>/dev/null || true
     return 0
+}
+
+# pr_aggregator_required
+#   Returns 0 iff master's live branch protection lists $PR_ARMABLE_AGGREGATOR_CONTEXT
+#   as a required status check; 1 otherwise. FAIL-CLOSED: any gh error, a missing
+#   .protection object, or an empty contexts list returns 1, which keeps condition
+#   (15) BLOCKING exactly as before this predicate existed. Uses the public
+#   branches endpoint (.protection is populated for the repo owner's token; the
+#   .../protection endpoint needs admin and is deliberately not used).
+#   Boolean predicate: call it in an `if`, never capture it under set -e.
+pr_aggregator_required() {
+    local ctxs
+    ctxs=$("$GH_CMD" api "repos/$REPO_SLUG/branches/master" \
+        --jq '.protection.required_status_checks.contexts[]?' 2>/dev/null) || return 1
+    grep -qxF -- "$PR_ARMABLE_AGGREGATOR_CONTEXT" <<< "$ctxs"
 }

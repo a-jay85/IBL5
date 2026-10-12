@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
-use Boxscore\BoxscoreRepository;
+use Boxscore\BoxscoreAuditRepository;
 use Boxscore\RejectedGame;
 use PHPUnit\Framework\Attributes\Group;
 
 #[Group('database')]
 class ScheduleGuardRejectsTest extends DatabaseTestCase
 {
-    private BoxscoreRepository $repo;
+    private BoxscoreAuditRepository $repo;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repo = new BoxscoreRepository($this->db);
+        $this->repo = new BoxscoreAuditRepository($this->db);
     }
 
     // ── Schema ────────────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ class ScheduleGuardRejectsTest extends DatabaseTestCase
     public function testExceedingMaxRecordedRejectsTruncatesAndStillReturns(): void
     {
         $rejects = [];
-        $max     = BoxscoreRepository::MAX_RECORDED_REJECTS;
+        $max     = BoxscoreAuditRepository::MAX_RECORDED_REJECTS;
         for ($i = 0; $i <= $max; $i++) {
             $rejects[] = new RejectedGame('2008-01-15', 21, 17, $i + 1, RejectedGame::REASON_NOT_IN_SCHEDULE);
         }

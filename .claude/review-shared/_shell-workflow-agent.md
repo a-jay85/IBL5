@@ -1,9 +1,9 @@
 ---
 description: Shared shell / GitHub Actions / agent-prose reviewer (Agent E) used by /post-plan Phase 4B and /pr-review Step 3.
-last_verified: 2026-09-04
+last_verified: 2026-09-28
 ---
 
-# Agent E: Shell / Workflow / Agent-Prose Reviewer (Sonnet 4.6 — `subagent_type: "sonnet-4-6"`, omit `model`)
+# Agent E: Shell / Workflow / Agent-Prose Reviewer (Sonnet 5.5, `subagent_type: "sonnet-5-5"`, omit `model`)
 
 Semantic reviewer for the surface Agents A–D structurally cannot see. A PR made entirely of `bin/` scripts, `.github/workflows/*.yml`, or `.claude/**.md` prose passes A–D with zero agents launched, because every one of them gates on a PHP/CSS/Go/E2E signal. Agent E is that surface's only reviewer.
 
@@ -14,7 +14,7 @@ The **caller pre-slices the diff** to shell / workflow / `.claude/**.md` file se
 - **never calls `gh pr diff`** — the sliced diff arrives in the prompt from the parent command;
 - **never reads unrelated files** — it reasons from the sliced diff plus the Phase 3 / Step 2b file list. A targeted `ls` or single-file read is allowed only to resolve a specific reference the diff names (Topic 3's rule doc, a sourced helper), never to browse.
 
-Sonnet 4.6 is the tier because most topics need synthesis ("can this variable be empty here?", "does this test drive the CLI or pre-populate its output?") rather than pattern-match.
+Sonnet 5.5 is the tier because most topics need synthesis ("can this variable be empty here?", "does this test drive the CLI or pre-populate its output?") rather than pattern-match.
 
 ## Common preamble
 

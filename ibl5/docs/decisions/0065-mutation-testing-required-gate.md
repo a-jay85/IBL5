@@ -1,6 +1,6 @@
 ---
 description: The Infection per-PR diff job (`Infection PHP (per-PR diff)` / `mutation-pr`) becomes a required, green-skip-safe merge gate; the weekly full mutation run gains a Discord failure alert mirroring db-backup's notify job; the branch-protection activation is a post-merge admin API POST recorded here (not performed by this PR).
-last_verified: 2026-08-18
+last_verified: 2026-09-29
 ---
 
 # ADR-0065: Mutation Testing Becomes a Required Merge Gate
@@ -128,3 +128,7 @@ This ADR completes the mutation-coverage chain without superseding either prior 
 
 Those two ADRs made mutation coverage broad; this one turns that coverage into an
 **enforced merge gate** plus a drift alert. Neither prior ADR is superseded.
+
+## Addendum (2026-09-29): per-PR job moved to its own workflow
+
+ADR-0145 supersedes two parts of this record. The `mutation-pr` job moved to `.github/workflows/mutation-pr.yml`, which has no `labeled` trigger. The job-level `labeled` guard re-added by PR #1136 is gone with it. The three-context PUT under `## Activation (post-merge, manual)` must never be run: protection now has four contexts, and a full-replace PUT would drop `Meta checks`. Use the append-only POST and the read-back in ADR-0145. The 2026-06-19 addendum says a skipped job counts as passing. GitHub documents that for a conditional job skip. It does not document which of two same-name check runs decides a required context, and the split removes the second run.

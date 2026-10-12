@@ -12,12 +12,12 @@ use DraftHistory\Contracts\DraftHistoryRepositoryInterface;
  * Retrieves draft pick information from the ibl_plr table.
  *
  * @see DraftHistoryRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  *
  * @phpstan-import-type DraftPickByYearRow from DraftHistoryRepositoryInterface
  * @phpstan-import-type DraftPickByTeamRow from DraftHistoryRepositoryInterface
  */
-class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHistoryRepositoryInterface
+class DraftHistoryRepository extends \Database\BaseMysqliRepository implements DraftHistoryRepositoryInterface
 {
     /**
      * @see DraftHistoryRepositoryInterface::getFirstDraftYear()
@@ -59,7 +59,7 @@ class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHisto
             FROM `ibl_plr` p
             LEFT JOIN `ibl_team_info` t ON p.draftedby = t.team_name
             WHERE p.draftyear = ? AND p.draftround > 0
-            ORDER BY p.draftround ASC, p.draftpickno ASC",
+            ORDER BY p.draftround ASC, p.draftpickno ASC, p.pid ASC",
             "i",
             $year
         );
@@ -77,7 +77,7 @@ class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHisto
             "SELECT p.pid, p.name, p.pos, p.draftround, p.draftpickno, p.draftyear, p.college, p.retired
             FROM `ibl_plr` p
             WHERE p.draftedby = ? AND p.draftround > 0
-            ORDER BY p.draftyear DESC, p.draftround ASC, p.draftpickno ASC",
+            ORDER BY p.draftyear DESC, p.draftround ASC, p.draftpickno ASC, p.pid ASC",
             "s",
             $teamName
         );

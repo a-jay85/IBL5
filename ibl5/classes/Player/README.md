@@ -1,6 +1,6 @@
 ---
 description: Player data facade with specialized classes for contract calculation, validation, name decoration, injury dates, and stats repositories.
-last_verified: 2026-09-05
+last_verified: 2026-09-29
 ---
 
 # Player Module
@@ -113,7 +113,9 @@ Handles all contract-related mathematical calculations. This class:
 - Contains no data persistence logic
 - Uses shared helpers to eliminate duplication
 
-**Constructor**: `__construct(?Season $season = null)` — when `$season` is `null` the calculator is phase-blind and returns the raw `cy` salary (backward-compatible default). Pass a `Season` instance to enable phase-aware pricing: during Playoffs / Draft / Free Agency phases (`Season::advancesContractYears()` returns `true`) the effective contract year shifts +1, so current-season pricing reflects the upcoming year rather than the year whose DB column has not yet advanced.
+**Constructor**: `__construct(?Season $season = null)`. When `$season` is `null` the calculator is phase-blind and returns the raw `cy` salary (backward-compatible default). Pass a `Season` instance to enable phase-aware pricing: during Playoffs / Draft / Free Agency phases (`Season::advancesContractYears()` returns `true`) the effective contract year shifts +1, so current-season pricing reflects the upcoming year rather than the year whose DB column has not yet advanced.
+
+**Phase basis on the cap-space page.** `TeamCapCalculator::getSalaryCapArray()` shifts on `Season::isOffseasonPhase()` (Draft and Free Agency). This calculator shifts on `Season::advancesContractYears()` (Playoffs, Draft and Free Agency). The two predicates disagree in Playoffs by design. The cap-space position totals come from `getNextSeasonSalary()`, so they line up with the `availableSalary` year3 column in Playoffs and the year2 column in every other phase. Extension pricing reads the same next-season basis for `money_committed_at_position`. Tests in `ibl5/tests/CapSpace/CapSpaceServiceTest.php`, `ibl5/tests/Team/TeamCapCalculatorTest.php` and `ibl5/tests/Extension/ExtensionServiceTest.php` pin these offsets.
 
 **Key Methods**:
 - `getCurrentSeasonSalary(PlayerData $playerData): int` - Calculate current season salary; phase-shifts by +1 when Season::advancesContractYears() is true

@@ -9,6 +9,7 @@ use Bootstrap\Contracts\ContainerInterface;
 use EventLog\EventLogger;
 use EventLog\EventLogRepository;
 use EventLog\RouteNameNormalizer;
+use EventLog\SessionIdHasher;
 use EventLog\TrafficClassifier;
 use Logging\LoggerFactory;
 use Repositories\TeamIdentityRepository;
@@ -28,11 +29,19 @@ class RequestEventLoggingBootstrap implements BootstrapStepInterface
     private const MAX_METHOD = 10;
     private const MAX_HEADER = 512;
 
+    /**
+     * @param bool $isCli True when running under the CLI SAPI. Defaults to the
+     *                    real SAPI; tests pass false to exercise the web path.
+     */
+    public function __construct(private readonly bool $isCli = \PHP_SAPI === 'cli')
+    {
+    }
+
     public function boot(ContainerInterface $container): void
     {
         // (1) No-op for CLI and any entry lacking a real request line.
         //     mainfile.php is included by CLI scripts too — do not log junk rows.
-        if (\PHP_SAPI === 'cli' || !isset($_SERVER['REQUEST_URI'])) {
+        if ($this->isCli || !isset($_SERVER['REQUEST_URI'])) {
             return;
         }
 
@@ -66,9 +75,7 @@ class RequestEventLoggingBootstrap implements BootstrapStepInterface
             $sessionId = null;
             if (session_status() === \PHP_SESSION_ACTIVE) {
                 $rawSession = session_id();
-                if (is_string($rawSession) && $rawSession !== '') {
-                    $sessionId = hash('sha256', $rawSession);
-                }
+                $sessionId = SessionIdHasher::hash(is_string($rawSession) ? $rawSession : null);
             }
 
             // (3) Resolve effective user + current team.

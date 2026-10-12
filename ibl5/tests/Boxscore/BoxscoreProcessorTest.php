@@ -92,7 +92,7 @@ class BoxscoreProcessorTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
-            ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
+            ['name' => 'Current Season Phase', 'setting_value' => 'Regular Season'],
             ['sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
@@ -117,7 +117,7 @@ class BoxscoreProcessorTest extends TestCase
 
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
-            ['name' => 'Current Season Phase', 'value' => 'Preseason'],
+            ['name' => 'Current Season Phase', 'setting_value' => 'Preseason'],
             ['sim' => 0, 'start_date' => '', 'end_date' => ''],
         ]);
 
@@ -132,7 +132,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->assertSame(0, $result['gamesSkipped']);
         $this->assertSame(0, $result['linesProcessed']);
         $this->assertIsArray($result['messages']);
-        $this->assertNotEmpty($result['messages']);
+        $this->assertNotSame([], $result['messages']);
     }
 
     public function testProcessScoFileUsesProvidedSeasonParams(): void
@@ -143,7 +143,7 @@ class BoxscoreProcessorTest extends TestCase
 
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
-            ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
+            ['name' => 'Current Season Phase', 'setting_value' => 'Regular Season'],
             ['sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
@@ -164,7 +164,7 @@ class BoxscoreProcessorTest extends TestCase
 
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
-            ['name' => 'Current Season Phase', 'value' => 'Preseason'],
+            ['name' => 'Current Season Phase', 'setting_value' => 'Preseason'],
             ['sim' => 0, 'start_date' => '', 'end_date' => ''],
         ]);
 
@@ -182,7 +182,7 @@ class BoxscoreProcessorTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
-            ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
+            ['name' => 'Current Season Phase', 'setting_value' => 'Regular Season'],
             ['sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
@@ -198,7 +198,7 @@ class BoxscoreProcessorTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
-            ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
+            ['name' => 'Current Season Phase', 'setting_value' => 'Regular Season'],
             ['sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
@@ -334,7 +334,6 @@ class BoxscoreProcessorTest extends TestCase
         // getLastBoxScoreDate() returns lastSimEndDate on the mock, so set it to the new date
         // We need to manipulate this carefully — Mock Season returns lastSimEndDate from getLastBoxScoreDate()
         // So we create two processor instances: one for setup, one after updating lastSimEndDate
-        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $season);
 
         // The mock Season's getLastBoxScoreDate() returns $this->lastSimEndDate
         // We need it to return a *different* date. Override it by changing the property AFTER construction
@@ -958,7 +957,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->assertSame(0, $result['gamesUpdated']);
         $this->assertSame(2, $result['gamesRejected']);
         $this->assertSame('2007-09-20', $result['rejectedGames'][0]->gameDate);
-        $this->assertSame('2007-10-15', $result['rejectedGames'][1]->gameDate);
+        $this->assertSame('2007-09-15', $result['rejectedGames'][1]->gameDate);
         $this->assertSame(RejectedGame::REASON_PRESEASON_SHIFT_NOT_IN_SCHEDULE, $result['rejectedGames'][0]->reason);
         $this->assertSame(RejectedGame::REASON_PRESEASON_SHIFT_NOT_IN_SCHEDULE, $result['rejectedGames'][1]->reason);
         $this->assertSame(2, $result['outOfWindowGames']);
@@ -1170,7 +1169,7 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb1 = new MockDatabase();
         $mockDb1->setReturnTrue(true);
         $mockDb1->setMockData([
-            ['name' => 'Current Season Phase', 'value' => 'Regular Season/Playoffs'],
+            ['name' => 'Current Season Phase', 'setting_value' => 'Regular Season/Playoffs'],
             ['sim' => 1, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07'],
         ]);
         $mockDb1->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []); // new game → insert

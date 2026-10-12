@@ -1,8 +1,9 @@
 """Shared fixtures for the harness test suite.
 
 Opt in per module with `pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")`.
-Nothing here is autouse: `test_fidelity.py` and `test_fidelity_remediation.py` exercise the
-real `_git_show` through a `git` shim on PATH, and a repo-wide patch would defeat them.
+`stub_ambient_git_show` is not autouse: `test_fidelity.py` and `test_fidelity_remediation.py`
+exercise the real `_git_show` through a `git` shim on PATH, and a repo-wide patch would
+defeat them. `no_real_pr_review_now` is the one autouse fixture.
 """
 from __future__ import annotations
 
@@ -36,3 +37,46 @@ def stub_ambient_git_show(monkeypatch):
         return bodies.get(ref_path.split(":", 1)[-1])
 
     monkeypatch.setattr(fidelity, "_git_show", _show)
+
+
+@pytest.fixture(autouse=True)
+def no_real_pr_review_now(monkeypatch):
+    """Keep every test away from the real `bin/pr-review-now`.
+
+    Any `runner.run(..., live=True)` that reaches Phase 6.5 runs review-owed.sh, which
+    fires `bin/pr-review-now <pr>` unless REVIEW_OWED_PR_REVIEW_NOW names another binary.
+    The real one registers a launchd job against the main checkout and DMs the owner, so
+    the replay suites' fixture PR (#999) sent a real DM on every local run. Tests that
+    assert on the fire still set their own logging stub, which overrides this default.
+    """
+    monkeypatch.setenv("REVIEW_OWED_PR_REVIEW_NOW", "/usr/bin/true")
+
+
+@pytest.fixture(autouse=True)
+def _reset_netretry_latch():
+    from harness import netretry
+    netretry.reset_outage_latch()
+    yield
+    netretry.reset_outage_latch()
+
+
+@pytest.fixture(autouse=True)
+def isolate_live_reviewcache(tmp_path, monkeypatch):
+    """Keep live-shaped runs from sharing the harness's real `out/state` review cache.
+
+    A live run keys its state dir to the harness's own `out/state`, so without this a
+    record written by one test (or one local suite run) would turn the next live-shaped
+    run of the same slug into a cache hit.
+    """
+    from harness import reviewcache
+
+    real = os.path.realpath(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "out", "state"))
+    orig = reviewcache.record_path
+
+    def _path(state_dir, slug):
+        if os.path.realpath(state_dir) == real:
+            state_dir = str(tmp_path / "reviewcache-live-state")
+        return orig(state_dir, slug)
+
+    monkeypatch.setattr(reviewcache, "record_path", _path)

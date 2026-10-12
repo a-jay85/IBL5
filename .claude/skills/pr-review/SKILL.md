@@ -5,8 +5,8 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
 name: pr-review
 description: Token-efficient code review for pull requests
 disable-model-invocation: true
-model: claude-sonnet-4-6
-last_verified: 2026-09-23
+model: claude-sonnet-5-5
+last_verified: 2026-09-28
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -69,10 +69,10 @@ Launch applicable agents in parallel. Each agent receives:
 - Directory-specific CLAUDE.md content(s) from Step 2d (if any)
 
 **Model tiers** (see `agent-tiering.md` for rationale):
-- Agent A (Architecture + Bug detection + DB performance): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — skip if no code files; omit DB section if no PHP
-- Agent B (Git history + Code comments): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — skip if no PHP and no code comments in diff
-- Agent C (Previous PRs): **Haiku** — skip if no modified (non-added) files
-- Agent E (Shell / Workflow / Agent-prose): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — skip unless the Step 2b file list contains a file under a `bin/` directory, a `*.sh`, a `.github/workflows/*.yml`, or a `.claude/**.md`
+- Agent A (Architecture + Bug detection + DB performance): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`). Skip if no code files; omit DB section if no PHP.
+- Agent B (Git history + Code comments): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`). Skip if no PHP and no code comments in diff.
+- Agent C (Previous PRs): **Haiku**. Skip if no modified (non-added) files.
+- Agent E (Shell / Workflow / Agent-prose): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`). Skip unless the Step 2b file list contains a file under a `bin/` directory, a `*.sh`, a `.github/workflows/*.yml`, or a `.claude/**.md`.
 
 **CRITICAL: No agent should call `gh pr diff`.** The diff was already fetched in Step 2.
 

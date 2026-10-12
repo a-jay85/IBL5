@@ -1,0 +1,97 @@
+name: Sim recap
+on:
+  repository_dispatch:
+    types: [sim-recap]
+  schedule:
+    - cron: '23 * * * *'        # hourly fallback; an empty tick spawns zero claude
+  workflow_dispatch:
+    inputs:
+      sim: { description: 'Claim this sim (digits) instead of claim-next', required: false, default: '' }
+  pull_request:
+    paths: ['.github/workflows/sim-recap.yml']   # checkout and parse only; Check secrets is skipped
+permissions:
+  contents: read
+concurrency:
+  group: sim-recap
+  cancel-in-progress: false
+jobs:
+  recap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40          # SIM_RECAP_CLAUDE_TIMEOUT 1800s + setup
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check secrets
+        id: secrets
+        if: github.event_name != 'pull_request'
+        env:
+          T1: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          T2: ${{ secrets.SIM_RECAP_SSH_KEY }}
+          T3: ${{ secrets.SIM_RECAP_REMOTE_ROOT }}
+          T4: ${{ secrets.SIM_RECAP_DB_USER }}
+          T5: ${{ secrets.SIM_RECAP_DB_NAME }}
+          T6: ${{ secrets.SIM_RECAP_DB_PASSWORD }}
+          T7: ${{ secrets.HOST }}
+          T8: ${{ secrets.PORT }}
+          T9: ${{ secrets.USERNAME }}
+        run: |
+          if [ -z "$T1$T2$T3$T4$T5$T6$T7$T8$T9" ] \
+             || [ -z "$T1" ] || [ -z "$T2" ] || [ -z "$T3" ] || [ -z "$T4" ] \
+             || [ -z "$T5" ] || [ -z "$T6" ] || [ -z "$T7" ] || [ -z "$T8" ] || [ -z "$T9" ]; then
+            echo "secrets not configured, skipping"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install mysql client, jq, claude CLI
+        if: steps.secrets.outputs.configured == 'true'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client jq >/dev/null
+          curl -fsSL https://claude.ai/install.sh | bash >/dev/null
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: SSH key and ControlMaster config
+        if: steps.secrets.outputs.configured == 'true'
+        uses: ./.github/actions/setup-ssh
+        with: { host: '${{ secrets.HOST }}', port: '${{ secrets.PORT }}', private-key: '${{ secrets.SIM_RECAP_SSH_KEY }}' }
+      - name: Write ssh config
+        if: steps.secrets.outputs.configured == 'true'
+        env: { H: '${{ secrets.HOST }}', P: '${{ secrets.PORT }}', U: '${{ secrets.USERNAME }}' }
+        run: |
+          mkdir -p ~/.ssh/cm && printf 'Host ibl-prod\n  HostName %s\n  Port %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n  ControlMaster auto\n  ControlPath ~/.ssh/cm/%%C\n  ControlPersist 10m\n  ServerAliveInterval 30\n' "$H" "$P" "$U" >> ~/.ssh/config
+      - name: Restore ops-alert edge state
+        if: steps.secrets.outputs.configured == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with: { path: '${{ runner.temp }}/sim-recap-state', key: 'sim-recap-ops-alert-${{ github.run_id }}', restore-keys: 'sim-recap-ops-alert-' }
+      - name: Run tick
+        if: steps.secrets.outputs.configured == 'true'
+        timeout-minutes: 35
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          SIM_RECAP_HOST_MODE: actions
+          SIM_RECAP_SSH_HOST: ibl-prod
+          SIM_RECAP_REMOTE_ROOT: ${{ secrets.SIM_RECAP_REMOTE_ROOT }}
+          SIM_RECAP_DB_USER: ${{ secrets.SIM_RECAP_DB_USER }}
+          SIM_RECAP_DB_NAME: ${{ secrets.SIM_RECAP_DB_NAME }}
+          SIM_RECAP_DB_PASSWORD: ${{ secrets.SIM_RECAP_DB_PASSWORD }}
+          SIM_RECAP_MYSQL_BIN: /usr/bin/mysql
+          SIM_RECAP_OPS_WEBHOOK_URL: ${{ secrets.SIM_RECAP_OPS_WEBHOOK_URL }}
+          SIM_RECAP_OPS_ALERT_THREAD_ID: ${{ secrets.SIM_RECAP_OPS_ALERT_THREAD_ID }}
+          SIM_RECAP_OPS_ALERT_STATE: ${{ runner.temp }}/sim-recap-state/ops-alert.json
+          SIM_INPUT: ${{ github.event.inputs.sim }}
+          DISPATCH_SIM: ${{ github.event.client_payload.sim }}
+        run: |
+          mkdir -p "$(dirname "$SIM_RECAP_OPS_ALERT_STATE")" && touch "$(dirname "$SIM_RECAP_OPS_ALERT_STATE")/.keep"
+          [ -n "$DISPATCH_SIM" ] && echo "dispatched for sim $DISPATCH_SIM (claim-next drains the queue)"
+          sim_arg=""
+          if [ -n "$SIM_INPUT" ]; then
+            case "$SIM_INPUT" in *[!0-9]*|'') echo "invalid sim input"; exit 2 ;; esac
+            sim_arg="--sim=$SIM_INPUT"
+          fi
+          # shellcheck disable=SC2086  # sim_arg is empty or one validated --sim=digits word
+          bin/sim-recap-tick $sim_arg >/dev/null
+      - name: Close ssh master
+        if: always() && steps.secrets.outputs.configured == 'true'
+        run: ssh -O exit ibl-prod 2>/dev/null || true
+      - name: Save ops-alert edge state
+        if: always() && steps.secrets.outputs.configured == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with: { path: '${{ runner.temp }}/sim-recap-state', key: 'sim-recap-ops-alert-${{ github.run_id }}' }

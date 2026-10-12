@@ -1,18 +1,11 @@
 <?php
 
-// PHP-Nuke language constants (loaded at runtime by get_lang() or mainfile.php)
+// PHP-Nuke language constants (loaded at runtime by mainfile.php)
 // Language
 define('_CHARSET', '');
 // Footer
 define('_PAGEGENERATION', '');
 define('_SECONDS', '');
-// Navbar (YourAccount module)
-define('_CHANGEYOURINFO', '');
-define('_CHANGEHOME', '');
-define('_CONFIGCOMMENTS', '');
-define('_SELECTTHETHEME', '');
-define('_LOGOUTEXIT', '');
-define('_RETURNACCOUNT', '');
 // Search
 define('_ALL', '');
 define('_ALLAUTHORS', '');
@@ -45,9 +38,6 @@ define('_UCOMMENT', '');
 define('_UCOMMENTS', '');
 define('_WEEK', '');
 define('_WEEKS', '');
-// SeriesRecords / Waivers
-define('_LOGININCOR', '');
-define('_USERREGLOGIN', '');
 // MySQL.php
 define('END_TRANSACTION', 1);
 
@@ -67,9 +57,6 @@ function is_user(mixed $cookie): int { return 0; }
  */
 function cookiedecode(mixed $cookie): ?array { return null; }
 
-
-/** @return void */
-function get_lang(string $module): void {}
 
 /** @return void */
 function include_secure(string $file): void {}

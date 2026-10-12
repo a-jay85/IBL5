@@ -7,13 +7,12 @@
 #
 # Run: bin/test-check-workflow-checkout  (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$SCRIPT_DIR/check-workflow-checkout"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-FAILED=0
+h_tmp TMP
 
 # write_wf <body>  → echoes the path of a fresh workflow file holding <body>. Uses
 # mktemp (not a counter): this runs in a $(...) subshell, so a counter would not
@@ -29,10 +28,9 @@ write_wf() {
 
 expect() { # name want-exit got-exit
   if [ "$3" -eq "$2" ]; then
-    echo "ok: $1 (exit $3)"
+    h_pass "$1 (exit $3)"
   else
-    echo "FAIL: $1 — expected exit $2, got $3"
-    FAILED=1
+    h_fail "$1" "expected exit $2, got $3"
   fi
 }
 
@@ -106,10 +104,9 @@ jobs:
 out="$("$CHECK" "$f" 2>&1)"; rc=$?
 expect "two-jobs-second-violates" 1 "$rc"
 if printf '%s' "$out" | grep -q '"bravo"' && ! printf '%s' "$out" | grep -q '"alpha"'; then
-  echo "ok: only-violating-job-named"
+  h_pass "only-violating-job-named"
 else
-  echo "FAIL: only-violating-job-named — output: $out"
-  FAILED=1
+  h_fail "only-violating-job-named" "output: $out"
 fi
 
 # --- comment mentioning uses: must not false-trigger ---------------------------
@@ -123,9 +120,4 @@ jobs:
       - uses: actions/checkout@v7')"
 "$CHECK" "$f" >/dev/null 2>&1; expect "commented-uses-ignored" 0 $?
 
-if [ "$FAILED" -ne 0 ]; then
-  echo "RESULT: FAILED"
-  exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

@@ -1,9 +1,11 @@
 name: PR Fast-Canary
 
-# Advisory early-signal: on each master push, trial-merge latest master into every
-# open PR head and run ONLY the cheap checks (PHPStan + default-group PHPUnit), skipping
-# the heavy E2E suite. Reports per-PR via a sticky comment. NOT a required check — each
-# PR's own `gate` job owns the authoritative full-suite gate.
+# Advisory early-signal: on each master push, trial-merge latest master into the head of
+# every auto-merge-armed PR on the merge line (membership comes from
+# `bin/merge-line-select --list`, ADR-0081 Addendum) and run ONLY the cheap checks
+# (PHPStan + default-group PHPUnit), skipping the heavy E2E suite. Reports per-PR via a
+# sticky comment. NOT a required check — each PR's own `gate` job owns the authoritative
+# full-suite gate.
 
 on:
   push:
@@ -19,6 +21,8 @@ on:
       - '.gitignore'
       - '**/.gitignore'
       - '.gitattributes'
+      - 'ibl5/phpstan-baseline-counts.json'
+      - 'ibl5/coverage-baseline.json'
   workflow_dispatch:
 
 permissions:
@@ -31,20 +35,27 @@ concurrency:
 
 jobs:
   enumerate:
-    name: Enumerate open PRs
+    name: Enumerate the armed merge line
     runs-on: ubuntu-latest
+    permissions:
+      contents: read        # checkout, to run bin/merge-line-select
+      pull-requests: read   # list PRs and autoMergeRequest
+      checks: read          # statusCheckRollup CheckRun contexts in the selector query
+      statuses: read        # statusCheckRollup StatusContext contexts
     outputs:
       prs: ${{ steps.list.outputs.prs }}
       count: ${{ steps.list.outputs.count }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: List open PRs as a JSON array
+      - name: List the armed merge line as a JSON array
         id: list
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
-          prs=$(gh pr list --base master --state open --json number --jq '[.[].number]')
+          set -euo pipefail
+          prs=$(bin/merge-line-select --live --repo "$REPO" --list)
           echo "prs=$prs" >> "$GITHUB_OUTPUT"
           echo "count=$(printf '%s' "$prs" | jq 'length')" >> "$GITHUB_OUTPUT"
 

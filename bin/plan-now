@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# bin/plan-now — fire a detached headless Sonnet 4.6 session that RUNS a drafted
+# bin/plan-now — fire a detached headless Sonnet 5.5 session that RUNS a drafted
 # /plan handoff prompt, replacing the manual "paste this into a fresh session" step
 # at the end of the /plan-prompt skill.
 #
@@ -9,7 +9,7 @@
 #                                           #   run exits clean AND check-plan passes
 #   bin/plan-now --implement <prompt-file>  # ... but leave the plan on disk, unqueued
 #   bin/plan-now --queue <prompt-file>      # explicit form of the default
-#   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-4-6)
+#   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-5-5)
 #   bin/plan-now --no-dm <prompt-file>      # ... and skip the finish DM
 #   bin/plan-now --tier-ok "reason" ...     # suppress the tier mismatch gate with a reason
 #   bin/plan-now --resume <run-id>          # continue a FAILED run's own claude session
@@ -60,7 +60,7 @@
 #     `nohup … &` fired from Claude Code's Bash tool shares the tool-shell's
 #     process group and dies with it, so launchd is load-bearing here too.
 #   - headless /plan: the invocation bin/bug-pipeline-tick drive_ready_for_plan()
-#     already runs in production (claude -p "/plan …" --model claude-sonnet-4-6
+#     already runs in production (claude -p "/plan …" --model claude-sonnet-5-5
 #     --dangerously-skip-permissions).
 #
 # The run IDENTIFIES ITS OWN PLAN: the coda tells it to end its FINAL message with
@@ -117,17 +117,46 @@ set -euo pipefail
 # value's rationale live at the timeout call site.
 RUN_TIMEOUT=10800
 
-MODEL="claude-sonnet-4-6"
+MODEL="claude-sonnet-5-5"
 DISPOSITION="queue"
 NOTIFY=1
 PROMPT_SRC=""
 TIER_OK_REASON=""
 RESUME_ID=""        # old run's TS under --resume; empty on a normal fire
+RESUME_FRESH=0      # 1 when the resumed run paused before its first turn: no transcript, start fresh
 MODEL_SET=0         # 1 when --model was given explicitly (resume keeps the old value otherwise)
 DISPOSITION_SET=0   # 1 when --queue/--implement was given explicitly
 
+# Source the usage gate beside THIS script (same reason as session-id.sh below).
+PLAN_NOW_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib"
+# shellcheck source=bin/lib/usage-gate.sh
+. "$PLAN_NOW_LIB_DIR/usage-gate.sh"
+# shellcheck source=bin/lib/dm.sh
+. "$PLAN_NOW_LIB_DIR/dm.sh"
+# shellcheck source=bin/lib/launchd-job.sh
+. "$PLAN_NOW_LIB_DIR/launchd-job.sh"
+
+# --resume-paused <sid>: the coordinator's entry point. Replays the argv saved when the
+# run started (`--resume <TS>`), so the existing --resume pre-flight below does the rest.
+if [ "${1:-}" = "--resume-paused" ]; then
+    if [ $# -ne 2 ]; then
+        echo "plan-now: --resume-paused takes exactly one session id" >&2
+        exit 2
+    fi
+    _saved_file=$(mktemp)
+    if ! usage_resume_paused_args plan-now "$2" > "$_saved_file"; then
+        rm -f "$_saved_file"
+        exit 2
+    fi
+    _saved=()
+    while IFS= read -r -d '' _a; do _saved[${#_saved[@]}]="$_a"; done < "$_saved_file"
+    rm -f "$_saved_file"
+    set -- ${_saved[@]+"${_saved[@]}"}
+fi
+
 while [ $# -gt 0 ]; do
     case "$1" in
+        --resume-paused) echo "plan-now: --resume-paused must be the only argument" >&2; exit 2 ;;
         --queue)     DISPOSITION="queue"; DISPOSITION_SET=1; shift ;;
         --implement) DISPOSITION="implement"; DISPOSITION_SET=1; shift ;;
         --model)     MODEL="${2:?--model needs a value}"; MODEL_SET=1; shift 2 ;;
@@ -183,10 +212,19 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
 # shellcheck source=bin/lib/session-id.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/session-id.sh"
 
+# shellcheck source=bin/lib/plan-resolve.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/plan-resolve.sh"
+
 # Overridable for the smoke test only — ~/claude-plans is the single source of truth
 # (workflow-continuity.md), same shape as bug-pipeline-tick's BUG_PIPELINE_PLANS_DIR.
-PLANS_DIR="${PLAN_NOW_PLANS_DIR:-$HOME/claude-plans}"
+PLANS_DIR="$(plans_dir PLAN_NOW_PLANS_DIR)"
 mkdir -p "$PLANS_DIR"
+
+# Runner-artifact dir (log, prompt, runner, transcript, session sidecar).
+# Production leaves PLAN_NOW_LOG_DIR unset so every path stays /tmp/plan-now-*,
+# where bin/fleet-status, bin/watch-run and bin/post-plan-fail-dm look.
+# bin/test-* set it to a private mktemp -d dir. Unset or empty both mean /tmp.
+RUNLOG_DIR="${PLAN_NOW_LOG_DIR:-/tmp}"
 
 # --- resume resolution (--resume only) ---
 # Everything the old run left in /tmp is read here, before any gate or mint:
@@ -196,8 +234,8 @@ mkdir -p "$PLANS_DIR"
 # skipped below, so the old override has nothing to override.
 if [ -n "$RESUME_ID" ]; then
     OLD_LABEL="com.ibl5.plan-now-$RESUME_ID"
-    OLD_LOG="/tmp/plan-now-$RESUME_ID.log"
-    OLD_RUNNER="/tmp/plan-now-$RESUME_ID.sh"
+    OLD_LOG="$RUNLOG_DIR/plan-now-$RESUME_ID.log"
+    OLD_RUNNER="$RUNLOG_DIR/plan-now-$RESUME_ID.sh"
     OLD_SIDECAR=$(session_sidecar_path "$OLD_LOG")
     resume_refuse() { echo "plan-now: cannot resume $RESUME_ID: $1" >&2; exit 2; }
 
@@ -215,9 +253,16 @@ if [ -n "$RESUME_ID" ]; then
     LAST_VERDICT=$(grep '^plan-now: RESULT ' "$OLD_LOG" | tail -1) || LAST_VERDICT=""
     case "$LAST_VERDICT" in
         "plan-now: RESULT failed"*) ;;
-        "")  resume_refuse "log $OLD_LOG carries no RESULT verdict; only a failed run is resumable." ;;
-        *)   resume_refuse "log $OLD_LOG ends in '$LAST_VERDICT'; only a failed run is resumable." ;;
+        "plan-now: RESULT paused"*) ;;
+        "plan-now: RESULT parked"*) ;;
+        "")  resume_refuse "log $OLD_LOG carries no RESULT verdict; only a failed, paused, or parked run is resumable." ;;
+        *)   resume_refuse "log $OLD_LOG ends in '$LAST_VERDICT'; only a failed, paused, or parked run is resumable." ;;
     esac
+    case "$LAST_VERDICT" in
+        "plan-now: RESULT paused"*) usage_session_started "$RESUME_SESSION" || RESUME_FRESH=1 ;;
+        "plan-now: RESULT parked"*) RESUME_FRESH=1 ;;
+    esac
+    usage_marker_clear "$RESUME_SESSION"
 
     # The runner wrote these with printf %q. Both are plain tokens in practice;
     # anything %q had to escape fails the shape check and is refused rather
@@ -246,7 +291,7 @@ if [ -z "$RESUME_ID" ] && [ "$DISPOSITION" = "queue" ] && [ -n "$PROMPT_SRC" ] &
             echo "$DUP_OUT"
             echo "plan-now: declined before spending a model run (exit 3)."
             if [ "$NOTIFY" = 1 ]; then
-                DISCORD_DM="${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+                DISCORD_DM="$(dm_bin "$ROOT/bin" PLAN_NOW_DISCORD_DM)"
                 if [ -x "$DISCORD_DM" ]; then
                     printf '%s\n%s\n' "**plan-now DECLINED — duplicate**" "$DUP_OUT" \
                         | "$DISCORD_DM" - || true
@@ -297,7 +342,7 @@ if [ -z "$RESUME_ID" ] && [ -x "$TIER_HINT" ]; then
                                         printf 'plan-now: exiting 4 — recheck the tier or pass --tier-ok.\n'
                                     } >&2
                                     if [ "$NOTIFY" = 1 ]; then
-                                        DISCORD_DM="${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+                                        DISCORD_DM="$(dm_bin "$ROOT/bin" PLAN_NOW_DISCORD_DM)"
                                         if [ -x "$DISCORD_DM" ]; then
                                             printf '%s\ndeclared=%s hinted=%s\n%s\n' \
                                                 "**plan-now DECLINED — tier mismatch**" \
@@ -318,10 +363,10 @@ fi
 
 TS=$(date +%Y%m%d-%H%M%S)-$$
 LABEL="com.ibl5.plan-now-$TS"
-LOG="/tmp/plan-now-$TS.log"
-PROMPT="/tmp/plan-now-$TS.prompt"
-RUNNER="/tmp/plan-now-$TS.sh"
-OUT="/tmp/plan-now-$TS.out"     # claude's own transcript, kept separate from $LOG
+LOG="$RUNLOG_DIR/plan-now-$TS.log"
+PROMPT="$RUNLOG_DIR/plan-now-$TS.prompt"
+RUNNER="$RUNLOG_DIR/plan-now-$TS.sh"
+OUT="$RUNLOG_DIR/plan-now-$TS.out"   # claude's own transcript, kept separate from $LOG
                                 # so the PLAN_FILE: grep can't match the runner's echoes.
                                 # Left on disk after the run like $PROMPT and $RUNNER —
                                 # it duplicates $LOG's transcript, but /tmp is the right
@@ -348,6 +393,8 @@ else
 fi
 write_session_sidecar "$LOG" "$SESSION_ID" \
     || { echo "plan-now: could not write the session sidecar next to $LOG." >&2; exit 1; }
+# Usage gate (ADR-0143): the coordinator replays this argv through --resume-paused.
+usage_argv_save "$SESSION_ID" --resume "$(basename "$LOG" .log | sed 's/^plan-now-//')" || true
 
 if [ -n "$RESUME_ID" ]; then
     # The resumed session already holds the original prompt and coda; nothing is
@@ -355,7 +402,7 @@ if [ -n "$RESUME_ID" ]; then
     # draft recovery; point it at the old run's copy. If macOS has cleared that
     # file, run_slug() finds nothing and both recovery legs no-op, which is the
     # existing slugless-prompt behaviour.
-    PROMPT="/tmp/plan-now-$RESUME_ID.prompt"
+    PROMPT="$RUNLOG_DIR/plan-now-$RESUME_ID.prompt"
 else
 # Own a private copy: the caller's mktemp block may be cleaned up long before
 # launchd gets around to running the job.
@@ -385,22 +432,27 @@ cat >> "$PROMPT" <<CODA
 **Headless run constraints (appended by \`bin/plan-now\` — these override any
 conflicting default in the skill):**
 
-- **Announce your plan's path — in your FINAL message.** The **last line** of your
-  final message must be exactly this line, on its own, with nothing after it and no
+- **Announce your plan's path — in your FINAL message.** Unless you halt with no
+  plan (next bullet), the **last line** of your final message must be exactly this line, on its own, with nothing after it and no
   backticks, bullet, bold or fence around it:
   \`\`\`
   PLAN_FILE: $PLANS_DIR/<slug>.md
   \`\`\`
-  (absolute path). This job identifies your plan by that line; without it the
-  check-plan verdict cannot be attributed to your run, because a directory scan is
-  ambiguous whenever another \`plan-now\` run overlaps yours. **The final message is
-  the only placement that works**: this job runs you under \`claude -p\`, which emits
-  only your final assistant message, so a marker printed at any earlier point is
-  discarded before this job can read it. Printing it earlier as well is harmless —
-  the last occurrence wins — but never a substitute. This overrides the skill's
-  Step 5.5 and Step 6: skip the queue step, write the Step 6 report, then end with
-  this line. Runs that followed Step 6 ended on a queue-status sentence
-  ("Queued at position N", "Automouse will pick it up") and lost the line.
+  (absolute path). This job attributes the check-plan verdict to your run by that
+  line, since a directory scan is ambiguous whenever another \`plan-now\` run
+  overlaps yours. **The final message is the only placement that works**: under
+  \`claude -p\` only your final message reaches this job, so an earlier print is
+  discarded (printing it earlier as well is harmless; the last one wins). This
+  overrides the skill's Step 5.5 and Step 6: skip the queue step, write the Step 6
+  report, then end with this line.
+- **Halting with no plan is legal — end it with \`NO_PLAN:\` instead.** If you stop
+  without writing any plan (the skill's Step 2.1 found the work fully done), the
+  last line of your final message must be exactly this, bare, on its own:
+  \`\`\`
+  NO_PLAN: <one line: why, with the evidence — PR #, commit SHA or file path>
+  \`\`\`
+  Use it only when no plan file was written. A run that wrote a plan always ends
+  with \`PLAN_FILE:\`. Without either line the run is reported \`unconfirmed\`.
 - **No human is present.** Never call \`AskUserQuestion\`, never pause for input,
   never end a turn waiting for an answer. The forks a human could answer were
   already resolved by the session that drafted this prompt; they appear above as
@@ -416,13 +468,9 @@ conflicting default in the skill):**
   either one is never queued. Step 5 of the skill has the remediation table.
 - **Run every sub-agent in the FOREGROUND.** Never spawn the plan-architect (or any
   other \`Agent\`) with \`run_in_background: true\`, and never start a long task, end
-  your turn, and expect to collect it afterwards. Under \`claude -p\` there is no
-  afterwards: print mode is a single shot, so the turn you end IS the run, and a
-  background task's completion notification has no next turn to arrive on — its
-  result is discarded exactly the way an early-printed \`PLAN_FILE:\` line is. This
-  job disables the harness's background-task sweep, which stops such a task being
-  killed mid-run; it cannot create a turn for the result to land on. If you have
-  already started one, collect it before you finish.
+  your turn, and expect to collect it afterwards. Under \`claude -p\` the turn you
+  end is the run, so a background result has no next turn to land on and is
+  discarded. If you have already started one, collect it before you finish.
 - $DISPOSITION_LINE
 CODA
 fi
@@ -432,7 +480,7 @@ fi
 # turn loses: where it was, what is already on disk, and the marker contract.
 CONTINUE_MSG=""
 if [ -n "$RESUME_ID" ]; then
-    CONTINUE_MSG="Your previous turn was cut off before it finished (a usage limit or the run timeout). Continue exactly where you stopped. Do not restart exploration and do not re-plan from scratch: any file under $PLANS_DIR (including $PLANS_DIR/.drafts/) that belongs to this task is your own partial work; index it with bin/plan-index, read it by range, and finish it. Every headless run constraint from the original prompt still applies: never ask a question, run every sub-agent in the foreground, never run bin/automouse/queue yourself, and run bin/check-plan then bin/check-plan-staleness on the finished plan before you stop. The last line of your final message must be exactly: PLAN_FILE: $PLANS_DIR/<slug>.md"
+    CONTINUE_MSG="Your previous turn was cut off before it finished (a usage limit or the run timeout). Continue exactly where you stopped. Do not restart exploration and do not re-plan from scratch: any file under $PLANS_DIR (including $PLANS_DIR/.drafts/) that belongs to this task is your own partial work; index it with bin/plan-index, read it by range, and finish it. Every headless run constraint from the original prompt still applies: never ask a question, run every sub-agent in the foreground, never run bin/automouse/queue yourself, and run bin/check-plan then bin/check-plan-staleness on the finished plan before you stop. The last line of your final message must be exactly: PLAN_FILE: $PLANS_DIR/<slug>.md — or, only if you halt having written no plan at all (the work is already done), exactly: NO_PLAN: <one-line reason with the evidence>"
 fi
 
 # ---------------------------------------------------------------------------
@@ -475,15 +523,37 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     # detection + check-plan + notify half of the runner (same shape as
     # bug-pipeline-tick's $CLAUDE_BIN). All three are unset in real use — and the
     # queue seam is what lets bin/test-plan-now reach the queued-vs-not fork at all.
+    # AUTOMOUSE_LOGIN_PROBE_CMD and LOGIN_PROBE_* stub the login probe the same way.
     printf 'AUTOMOUSE_QUEUE=%q\n' "${PLAN_NOW_AUTOMOUSE_QUEUE:-$ROOT/bin/automouse/queue}"
-    printf 'DISCORD_DM=%q\n' "${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+    printf 'DISCORD_DM=%q\n' "$(dm_bin "$ROOT/bin" PLAN_NOW_DISCORD_DM)"
     printf 'CLAUDE_BIN=%q\n' "${PLAN_NOW_CLAUDE:-claude}"
     printf 'PLAN_SLUG_RE=%q\n' "$PLAN_SLUG_RE"
+    printf 'USAGE_GATE_LIB=%q\n' "$PLAN_NOW_LIB_DIR/usage-gate.sh"
+    printf 'LOGIN_PREFLIGHT_LIB=%q\n' "$PLAN_NOW_LIB_DIR/login-preflight.sh"
+    printf 'LOGIN_NIGHTLY_DIR=%q\n' "${NIGHTLY_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
+    # Probe seams, baked so a test's stub survives launchd's empty env. Empty bakes
+    # as empty, which login_probe treats exactly like unset.
+    for _lp_var in AUTOMOUSE_LOGIN_PROBE_CMD LOGIN_PROBE_CLAUDE_BIN LOGIN_PROBE_SECURITY_BIN \
+            LOGIN_PROBE_PERL_BIN LOGIN_PROBE_TIMEOUT_S; do
+        printf '%s=%q\n' "$_lp_var" "${!_lp_var:-}"
+    done
+    printf 'RESUME_BIN=%q\n' "$ROOT/bin/plan-now"
+    printf 'RESUME_FRESH=%q\n' "$RESUME_FRESH"
     printf 'REVIEW_ROUTE=%q\n' "${PLAN_NOW_REVIEW_ROUTE:-$REVIEW_ROUTE_DEFAULT}"
+    declare -f ljob_dm_ready ljob_dm_send
     cat <<'RUNNER_EOF'
 # launchd runs with a minimal env — same PATH prelude bin/automouse/run uses.
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
+# shellcheck source=/dev/null
+. "$USAGE_GATE_LIB"
+# shellcheck source=/dev/null
+. "$LOGIN_PREFLIGHT_LIB"
+# A coordinator-granted drain token names the launcher's pid, which exited after the
+# bootstrap. Re-record this runner's pid so usage_token_reclaim_dead keeps the token.
+if [ "$(usage_token_holder)" = "$SESSION_ID" ]; then
+    usage_token_acquire "$SESSION_ID" $$ 2>/dev/null || true
+fi
 if [ -n "${TIER_OVERRIDE:-}" ]; then echo "plan-now: tier-ok override was active: $TIER_OVERRIDE"; fi
 
 before=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
@@ -495,7 +565,7 @@ started=$(date +%s)
 # because the echo strings are byte-exact fixtures in bin/test-plan-now (and the
 # unconfirmed verdict is two echoes, not one) — an assignment cannot break an
 # assertion the way a rewrapped echo can.
-DM_ICON=""      # ✅ ok · ⚠️ degraded · ❌ failed · ❓ unconfirmed
+DM_ICON=""      # ✅ ok · ⚠️ degraded · ❌ failed · ⏹️ no-plan · ❓ unconfirmed
 DM_VERDICT=""   # the RESULT line, trimmed to what fits a phone notification
 DM_NEXT=""      # what happens next: queued, or waiting on you
 DM_PLAN=""      # the plan this run produced, when it is known
@@ -504,7 +574,8 @@ DM_REVIEW_PLAN=""     # plan path for the review DM; never aliased from DM_PLAN
 DM_RESUME=""          # "bin/plan-now --resume <TS>" on a failed exit, else empty
 
 # Draft recovery. A run whose plan-architect was backgrounded and cut off leaves
-# a complete draft in $PLANS_DIR/.drafts/ while printing no PLAN_FILE: line.
+# a complete draft in $PLANS_DIR/.drafts/ (or, off-contract, at $PLANS_DIR's
+# root) while printing no PLAN_FILE: line.
 # These helpers let the verdict block below adopt THAT draft — and only that one.
 # $PLANS_DIR (not $HOME/claude-plans) so PLAN_NOW_PLANS_DIR stays the test seam.
 DRAFTS_DIR="$PLANS_DIR/.drafts"
@@ -536,6 +607,8 @@ run_slug() {
 }
 
 # Echo the path of a draft that provably belongs to THIS run, or nothing.
+# Two locations are tried, .drafts/<slug>.draft.md then <plans-dir>/<slug>.draft.md;
+# the three conditions below apply to each one independently.
 # Three independent conditions, ALL required — each rules out one wrong adoption:
 #   1. slug present in the prompt  -> never guess from a directory listing;
 #   2. filename == that slug       -> a peer plan-now run's draft is never taken,
@@ -550,12 +623,20 @@ recovery_candidate() {
     case "$slug" in
         *[!A-Za-z0-9._-]* | .*) return 1 ;;
     esac
-    cand="$DRAFTS_DIR/$slug.draft.md"
-    [ -f "$cand" ] && [ -s "$cand" ] || return 1
-    mt=$(draft_mtime "$cand")
-    [ -n "$mt" ] || return 1
-    [ "$mt" -gt "$started" ] || return 1
-    printf '%s\n' "$cand"
+    # .drafts/ first: it is the path /plan Step 3 prescribes. The plans-dir root
+    # is the off-contract fallback some orchestrator runs write to. The first
+    # path that passes every check wins, so a fresh .drafts/ draft is never
+    # displaced by a root one. Order, not recency: two fresh drafts under one
+    # slug came from one run, and mtime cannot say which of them is complete.
+    for cand in "$DRAFTS_DIR/$slug.draft.md" "$PLANS_DIR/$slug.draft.md"; do
+        [ -f "$cand" ] && [ -s "$cand" ] || continue
+        mt=$(draft_mtime "$cand") || continue
+        [ -n "$mt" ] || continue
+        [ "$mt" -gt "$started" ] || continue
+        printf '%s\n' "$cand"
+        return 0
+    done
+    return 1
 }
 
 # Render draft $1 into plan $2: drop the outline scaffold, then hoist a
@@ -612,7 +693,8 @@ promote_draft() {
 # the continue message: the prompt and the coda are already in that session, and
 # re-sending them is how a resumed run restarts from scratch. Same uuid either
 # way, so ${LOG%.log}.session always names the transcript bin/fleet-status wants.
-if [ -n "${RESUME_FROM:-}" ]; then
+# A run paused BEFORE its first turn has no transcript to continue; it starts fresh.
+if [ -n "${RESUME_FROM:-}" ] && [ "${RESUME_FRESH:-0}" != 1 ]; then
     echo "plan-now: resuming session $SESSION_ID from run $RESUME_FROM"
     PROMPT_TEXT="$CONTINUE_MSG"
     SESSION_ARGS=(--resume "$SESSION_ID")
@@ -620,15 +702,35 @@ else
     PROMPT_TEXT=$(cat "$PROMPT")
     SESSION_ARGS=(--session-id "$SESSION_ID")
 fi
-CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
-    CLAUDE_HEADLESS=1 caffeinate -s \
-    timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p "$PROMPT_TEXT" \
-    --dangerously-skip-permissions \
-    --model "$MODEL" \
-    "${SESSION_ARGS[@]}" \
-    --effort high \
-    --name "$LABEL" > "$OUT" 2>&1
-rc=$?
+# Usage gate (ADR-0143): in the drain/stop zone a run without the token pauses before
+# the call; a limit-hit or hook pause after it is classified before any verdict.
+PAUSED=0
+LOGIN_PARKED=0
+# Login probe before the claude spawn: park (no spawn) only on a definite logged-out verdict.
+# unknown:* returns 0 here, so an inconclusive probe never blocks the run.
+if ! login_preflight "$LOGIN_NIGHTLY_DIR" "$LOG" "$DISCORD_DM" plan-now "bin/plan-now --resume $TS"; then
+    LOGIN_PARKED=1
+    rc=0
+    : > "$OUT"
+elif ! usage_prestart_gate plan-now "$SESSION_ID" "$RESUME_BIN"; then
+    PAUSED=1
+    rc=0
+    : > "$OUT"
+else
+    IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_MODEL="$MODEL" \
+        IBL5_USAGE_GATE_RESUME_BIN="$RESUME_BIN" \
+        CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+        CLAUDE_HEADLESS=1 caffeinate -s \
+        timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p "$PROMPT_TEXT" \
+        --dangerously-skip-permissions \
+        --model "$MODEL" \
+        "${SESSION_ARGS[@]}" \
+        --effort high \
+        --name "$LABEL" > "$OUT" 2>&1
+    rc=$?
+    usage_postrun_pause plan-now "$SESSION_ID" "$RESUME_BIN" "$rc" "$OUT" && PAUSED=1
+fi
+usage_token_release "$SESSION_ID" 2>/dev/null || true
 cat "$OUT"
 elapsed=$(( $(date +%s) - started ))
 
@@ -653,13 +755,34 @@ case "$plan" in
     *)    echo "plan-now: ignoring PLAN_FILE outside $PLANS_DIR: $plan"; plan="" ;;
 esac
 
+# The coda's second legal last line: `NO_PLAN: <reason>`, for a run that halted by
+# design with nothing to plan (/plan Step 2.1 found the work already done). Without
+# it that correct outcome landed as `unconfirmed`, beside a "best-effort guess" that
+# named a concurrent run's plan. Same tolerant decoration parse as PLAN_FILE:. It is
+# consulted only when no valid PLAN_FILE was found, and it can never queue.
+no_plan=""
+if grep -qE '^[-*>`[:space:]]*NO_PLAN:' "$OUT" 2>/dev/null; then
+    no_plan=$(grep -E '^[-*>`[:space:]]*NO_PLAN:' "$OUT" | tail -1 \
+              | sed -E 's/^.*NO_PLAN:[[:space:]*`]*//; s/[[:space:]*`]+$//')
+    no_plan="${no_plan:-no reason given}"
+fi
+
 after=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
 newfiles=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep -E '\.md$')
 
 echo "----------------------------------------------------------------"
 echo "plan-now: claude exited $rc after ${elapsed}s"
 
-if [ "$rc" -ne 0 ]; then
+if [ "$LOGIN_PARKED" = 1 ]; then
+    echo "plan-now: RESULT parked — Claude login expired; no model call was made."
+    echo "plan-now: run 'claude auth login' on the Mac, then: bin/plan-now --resume $TS"
+    DM_ICON="🔑"; DM_VERDICT="parked — Claude login expired"
+    DM_NEXT="run 'claude auth login', then resume"
+    DM_RESUME="bin/plan-now --resume $TS"
+elif [ "$PAUSED" = 1 ]; then
+    echo "plan-now: RESULT paused — usage gate; auto-resumes after reset."
+    DM_ICON="⏸️"; DM_VERDICT="paused — usage gate"; DM_NEXT="auto-resumes after reset"
+elif [ "$rc" -ne 0 ]; then
     # A nonzero exit means any file this run wrote may be TRUNCATED mid-plan, and
     # check-plan can pass on a truncated plan. Never green here.
     [ "$rc" -eq 124 ] && echo "plan-now: the ${RUN_TIMEOUT}s timeout killed it."
@@ -719,6 +842,14 @@ elif [ -n "$plan" ]; then
         DM_REVIEW_PLAN="$plan"
         echo "plan-now: NOT queued. A human must fix $plan before it is queued or implemented."
     fi
+elif [ -n "$no_plan" ]; then
+    # Before recovery on purpose: a run that says it wrote nothing must never have a
+    # slug-matched draft adopted and queued behind its back.
+    echo "plan-now: RESULT no-plan — $no_plan"
+    echo "plan-now: the run halted by design and wrote no plan. check-plan was NOT run and nothing was queued."
+    DM_ICON="⏹️"; DM_VERDICT="no-plan — $no_plan"
+    DM_NEXT="nothing queued — act on the reason above"
+    DM_REVIEW_BUTTONS=""; DM_REVIEW_PLAN=""
 else
     # Recovery. Reached only when rc == 0 (the chain's first arm owns nonzero),
     # so "clean exit" — leg 1 of the queue gate — is already structural here.
@@ -728,7 +859,8 @@ else
     # TWO independent recoveries, tried in order, because this arm is reached two
     # distinct ways:
     #   A. the architect was backgrounded and killed at the wait ceiling, so a
-    #      complete draft is orphaned in .drafts/ and no plan file exists;
+    #      complete draft is orphaned in .drafts/ (or the plans-dir root) and no
+    #      plan file exists;
     #   B. the run SUCCEEDED end to end — plan written, draft consumed, full
     #      completion report printed — and the model merely left `PLAN_FILE:` out
     #      of its FINAL message. Per the rejected-alternatives block at the top of
@@ -767,7 +899,7 @@ else
         # something fresh is nonetheless sitting in .drafts/, say so — but never
         # adopt it: without a slug match a peer run's draft is indistinguishable.
         fresh=""
-        for d in "$DRAFTS_DIR"/*.draft.md; do
+        for d in "$DRAFTS_DIR"/*.draft.md "$PLANS_DIR"/*.draft.md; do
             [ -f "$d" ] || continue
             m=$(draft_mtime "$d") || continue
             [ -n "$m" ] || continue
@@ -776,7 +908,7 @@ else
         if [ -n "$fresh" ]; then
             echo "plan-now: a draft newer than this run exists but cannot be attributed to it:$fresh"
             echo 'plan-now: not promoted — the prompt carried no `Branch slug: `-style line, or the draft slug differs.'
-            echo "plan-now: inspect manually: ls -lt $DRAFTS_DIR/*.draft.md"
+            echo "plan-now: inspect manually: ls -lt $DRAFTS_DIR/*.draft.md $PLANS_DIR/*.draft.md"
         fi
     fi
 
@@ -882,6 +1014,30 @@ else
     fi
 fi
 
+# Split siblings. /plan Step 2.5 can split one task into stacked PR-sized plans, but
+# the coda asks for ONE PLAN_FILE: line, so only that plan can reach the queue above.
+# Any other new plan this run wrote AND named in its transcript is reported here.
+# Report-only, never queued: a sibling usually depends on the named plan, and
+# queueing it without depends_on: would let automouse run it first. The transcript
+# match keeps a concurrent run's new plan (same $PLANS_DIR diff) out of the list.
+# It matches by basename, so `~/`-relative and bare names count as well as absolute.
+if [ "$rc" -eq 0 ] && [ -n "$newfiles" ]; then
+    identified="${plan:-${recovered:-}}"
+    split_siblings=""
+    while IFS= read -r f; do
+        [ -n "$f" ] && [ "$f" != "$identified" ] || continue
+        case "$(basename "$f")" in *-shared-context.md | README.md) continue ;; esac
+        grep -qF "$(basename "$f")" "$OUT" 2>/dev/null || continue
+        split_siblings="$split_siblings $(basename "$f")"
+    done <<< "$newfiles"
+    if [ -n "$split_siblings" ]; then
+        echo "plan-now: WARNING — this run also wrote plan(s) this job did NOT queue:$split_siblings"
+        echo "plan-now: likely a stacked split. Add depends_on: to each dependent plan, then queue each: bin/automouse/queue $PLANS_DIR/<name>.md"
+        [ "$DM_ICON" = "✅" ] && DM_ICON="⚠️"
+        DM_NEXT="${DM_NEXT:-read the log} · ALSO wrote, NOT queued:$split_siblings"
+    fi
+fi
+
 # The whole reason this job exists in the background: tell the human it finished.
 # `claude -p` does not stream, so $LOG is empty until this point and there is no
 # earlier moment worth watching — which is what made `tail -f` the only way to
@@ -894,10 +1050,10 @@ fi
 # prod is bouncing.
 notify() {
     [ "$NOTIFY" = 1 ] || return 0
-    if [ ! -x "$DISCORD_DM" ]; then
-        echo "plan-now: no executable discord-dm at $DISCORD_DM — not notifying."
-        return 0
-    fi
+    # The coordinator sends one DM per pause wave; a paused run stays quiet.
+    [ "${PAUSED:-0}" != 1 ] || return 0
+    # Keep the PAUSED return above this call: a paused run with no binary stays silent.
+    ljob_dm_ready plan-now || return 0
     local title msg slug review_body
     if [ -n "$DM_PLAN" ]; then
         title=$(basename "${DM_PLAN%.md}")
@@ -906,7 +1062,7 @@ notify() {
     fi
     [ -n "$title" ] || title="(unidentified)"
 
-    # A verdict this runner never set means someone added a seventh terminal
+    # A verdict this runner never set means someone added an eighth terminal
     # branch and missed it. Say so in the DM rather than sending a blank line.
     msg="${DM_ICON:-❓} plan-now: $title
 RESULT ${DM_VERDICT:-unknown — the runner set no verdict}
@@ -954,11 +1110,9 @@ log: $LOG"
         echo "plan-now: review DM failed — falling back to plain DM."
     fi
 
-    if ! printf '%s' "$msg" | "$DISCORD_DM" -; then
-        # discord-dm already spooled it and raised a macOS notification. The
-        # verdict is in $LOG regardless, so an undeliverable DM is never fatal.
-        echo "plan-now: DM UNDELIVERED (spooled by discord-dm) — the verdict above stands."
-    fi
+    # discord-dm spools an undeliverable DM and raises a macOS notification. The
+    # verdict is in $LOG regardless, so ljob_dm_send only reports the failure.
+    ljob_dm_send plan-now "$msg"
 }
 notify
 
@@ -972,30 +1126,7 @@ chmod +x "$RUNNER"
 # the Linux CI box, where bin/test-plan-now drives this script under PLAN_NOW_DRY_RUN
 # and `set -e` would otherwise abort here before the runner path is printed.
 mkdir -p "$(dirname "$PLIST")"
-cat > "$PLIST" <<PLIST_EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>$LABEL</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/bin/bash</string>
-		<string>-lc</string>
-		<string>exec "$RUNNER"</string>
-	</array>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>WorkingDirectory</key>
-	<string>$ROOT</string>
-	<key>StandardOutPath</key>
-	<string>$LOG</string>
-	<key>StandardErrorPath</key>
-	<string>$LOG</string>
-</dict>
-</plist>
-PLIST_EOF
+ljob_write_runner_plist "$PLIST" "$LABEL" "$RUNNER" "$ROOT" "$LOG"
 
 if [ "${PLAN_NOW_DRY_RUN:-0}" = "1" ]; then
     echo "plan-now: DRY RUN — plist and runner written, not bootstrapped."
@@ -1021,14 +1152,16 @@ else
 fi
 echo "  supervised by launchd — survives closing Claude Code / the terminal"
 if [ "$NOTIFY" = 1 ]; then
-    echo "  notify: Discord DM on finish (every outcome) — no need to watch the log"
+    echo "  notify: Discord DM on finish (every outcome). Do NOT arm a Monitor or"
+    echo "          ScheduleWakeup for this run: the DM is the completion signal."
+    echo "  watch:  $ROOT/bin/watch-run --log $LOG --label $LABEL   (manual use only)"
 else
     echo "  notify: --no-dm — nothing will tell you when this finishes"
+    echo "  watch:  $ROOT/bin/watch-run --log $LOG --label $LABEL"
+    echo "          ^ arm THIS in a Monitor. Self-terminating. Never 'tail -f' the log:"
+    echo "            claude -p does not stream, so the log stays empty until it exits and a"
+    echo "            tail is silent for the whole run and then silent forever."
 fi
-echo "  watch:  $ROOT/bin/watch-run --log $LOG --label $LABEL"
-echo "          ^ arm THIS in a Monitor. Self-terminating. Never 'tail -f' the log:"
-echo "            claude -p does not stream, so the log stays empty until it exits and a"
-echo "            tail is silent for the whole run and then silent forever."
 echo "  log:    $LOG"
 echo "  prompt: $PROMPT"
 echo "  label:  $LABEL   (self-removes when the run finishes)"

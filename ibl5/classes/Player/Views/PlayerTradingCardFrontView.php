@@ -39,13 +39,13 @@ class PlayerTradingCardFrontView
      * @param Player $player The player object
      * @param int $playerID The player's ID
      * @param string $contractDisplay Formatted contract string
-     * @param \mysqli|null $db Optional database connection for team colors
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Prebuilt team color scheme (null = default gold scheme)
      * @return string HTML for trading card front
      */
-    public static function render(Player $player, int $playerID, string $contractDisplay, ?\mysqli $db = null): string
+    public static function render(Player $player, int $playerID, string $contractDisplay, ?array $colorScheme = null): string
     {
         // Get color scheme and prepare player data
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->getTeamid() ?? 0);
+        $colorScheme ??= TeamColorHelper::getDefaultColorScheme();
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
 
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);

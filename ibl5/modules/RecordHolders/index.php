@@ -27,7 +27,6 @@ use RecordHolders\CachedRecordHoldersService;
 use RecordHolders\RecordHoldersView;
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 $rawOp = $_GET['op'] ?? null;
 $op = (is_string($rawOp) && $rawOp === 'allstar') ? 'allstar' : 'records';

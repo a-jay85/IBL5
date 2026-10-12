@@ -27,13 +27,13 @@ final class ErrorHandlerRegistrar
     /** @var callable(int): void */
     private $renderer;
 
-    /** @var callable(): (array{type: int, message: string, file: string, line: int}|null) */
+    /** @var callable(): (array{type: int, message: string, file: string, line: int, ...}|null) */
     private $lastErrorProvider;
 
     /**
      * @param callable(int $statusCode): void|null $renderer Emits a client-facing
      *        response for the given HTTP status. Defaults to a no-op (logging only).
-     * @param callable(): (array{type: int, message: string, file: string, line: int}|null)|null $lastErrorProvider
+     * @param callable(): (array{type: int, message: string, file: string, line: int, ...}|null)|null $lastErrorProvider
      *        Source of the last PHP error for shutdown handling. Defaults to
      *        error_get_last(); overridden in tests to exercise handleShutdown()
      *        without a real fatal.

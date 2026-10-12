@@ -32,7 +32,7 @@
     text-align: center;
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
     color: color-mix(in srgb, var(--team-tab-bg-color) 85%, black);
@@ -59,13 +59,13 @@
 }
 
 .ibl-view-select optgroup {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-style: normal;
     color: var(--gray-700);
 }
 
 .ibl-view-select option {
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     text-transform: none;
     letter-spacing: normal;
     color: var(--gray-800);

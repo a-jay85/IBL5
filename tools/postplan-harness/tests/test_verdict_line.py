@@ -3,10 +3,12 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
-from harness.state import ArmDecision, RunResult, TerminalState
+from harness.state import ArmDecision, ConditionResult, RunResult, TerminalState
 
 
 def _res(terminal, **kw):
@@ -18,6 +20,18 @@ def _res(terminal, **kw):
 
 def _arm(armed=True):
     return ArmDecision(armed=armed)
+
+
+def _held_arm(*blocked_numbers):
+    """A HELD ArmDecision whose blocked conditions carry the given numbers."""
+    return ArmDecision(
+        armed=False,
+        conditions=[ConditionResult(n, f"cond-{n}", True, "held") for n in blocked_numbers],
+    )
+
+
+# Slug chosen so the /tmp auto-resolved-conflict file verdict_line probes never exists.
+_PIN_SLUG = "verdict-line-pin-no-such-autoresolved-file"
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +89,70 @@ def test_shipped_held_is_not_armed():
     line = runner.verdict_line(r, 0)
     # must not claim the merge was armed
     assert "auto-merge=armed" not in line
+
+
+def test_held_other_condition_line_unchanged():
+    """Pin: a run held by condition (8) with no meta-check failures prints this exact line (ending in the hold= reasons)."""
+    r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+             arm=_held_arm(8))
+    line = runner.verdict_line(r, 0)
+    assert line == (
+        "RESULT: post-plan complete — terminal=shipped-held "
+        "auto-merge=HELD (human merges) PR #7 findings=0 hold=(8) held"
+    )
+
+
+_PROSE_FAIL = {"name": "check-prose-since", "output": "x"}
+_DOCS_FAIL = {"name": "check-docs", "output": "y"}
+
+
+def test_prose_hold_names_prose_check():
+    r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+             arm=_held_arm(16), meta_check_failures=[_PROSE_FAIL])
+    line = runner.verdict_line(r, 0)
+    assert line.startswith("RESULT: ")
+    assert "\n" not in line
+    assert "held-by=prose-check (check-prose-since failed pre-push)" in line
+    assert "auto-merge=HELD (human merges)" in line
+    assert "findings=" in line
+
+
+def test_condition16_other_check_no_prose_note():
+    with_docs = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+                     arm=_held_arm(16), meta_check_failures=[_DOCS_FAIL])
+    without = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+                   arm=_held_arm(16))
+    line = runner.verdict_line(with_docs, 0)
+    assert "held-by=" not in line
+    assert line == runner.verdict_line(without, 0)
+
+
+def test_prose_failure_without_condition16_no_note():
+    r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+             arm=_held_arm(8), meta_check_failures=[_PROSE_FAIL])
+    assert "held-by=" not in runner.verdict_line(r, 0)
+    no_arm = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+                  arm=None, meta_check_failures=[_PROSE_FAIL])
+    assert "held-by=" not in runner.verdict_line(no_arm, 0)
+
+
+def test_armed_with_stale_prose_failure_no_note():
+    armed = ArmDecision(armed=True,
+                        conditions=[ConditionResult(16, "meta-checks", True, "stale")])
+    r = _res(TerminalState.SHIPPED_ARMED, pr_number=7, slug=_PIN_SLUG,
+             arm=armed, meta_check_failures=[_PROSE_FAIL])
+    line = runner.verdict_line(r, 0)
+    assert "held-by=" not in line
+    assert "auto-merge=armed" in line
+
+
+def test_prose_and_other_failure_note_once():
+    r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+             arm=_held_arm(16, 8),
+             meta_check_failures=[_DOCS_FAIL, _PROSE_FAIL])
+    line = runner.verdict_line(r, 0)
+    assert line.count("held-by=prose-check") == 1
+    assert "\n" not in line
 
 
 def test_nothing_to_ship_starts_with_result():
@@ -275,6 +353,27 @@ def test_local_gate_contains_result_and_error():
     assert "ERROR" in line
 
 
+def _timeout_res():
+    return _res(TerminalState.FAILED, error_kind="subprocess-timeout",
+                error="subprocess-timeout: step 'scope-check' timed out after 120s",
+                error_cmd="bin/lib/plan-scope-conformance a b c d")
+
+
+def test_subprocess_timeout_verdict_names_step():
+    line = runner.verdict_line(_timeout_res(), 3)
+    assert line.startswith("RESULT: ")
+    assert "scope-check" in line
+    assert "120s" in line
+    assert "hung past its timeout" in line
+    assert "plan-scope-conformance" in line
+
+
+def test_subprocess_timeout_verdict_is_not_gate_denial():
+    line = runner.verdict_line(_timeout_res(), 3)
+    assert "gate denied" not in line
+    assert "[class=" not in line
+
+
 def test_local_gate_empty_error_falls_back_to_generic():
     r = _res(TerminalState.FAILED, error_kind="local-gate", error="")
     line = runner.verdict_line(r, 3)
@@ -427,21 +526,143 @@ def test_autoresolved_files_surfaced(tmp_path):
             os.unlink(autoresolved_path)
 
 
-def test_behind_retry_cap_line_carries_autoresolved_files():
-    """The BEHIND-cap BLOCKED line embeds `tail`, so an auto-resolved conflict must
-    still reach the operator on the blocked path — not only the complete path."""
-    slug = "behind-cap-autoresolved-test"
-    autoresolved_path = f"/tmp/postplan-conflict-files-{slug}-autoresolved.txt"
+def test_autoresolved_files_surfaced_in_sticky_body():
+    """The composed sticky (PR comment) names the auto-resolved files, not just the RESULT line.
+
+    runner.py builds rebase_line with "; auto-resolved conflict in <files>" from the
+    resolver's resolved_files and hands it to fidelity.compose_sticky; a non-clean rebase
+    line is printed in the sticky status block.
+    """
+    from harness import fidelity
+    files = ["harness/conflict.py", "harness/adapters/gitad.py"]
+    rebase_line = ("REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; "
+                   f"manifest=/tmp/m.json; auto-resolved conflict in {', '.join(files)}")
+    fid = {"verdict_1": "READY", "error_kind": None, "reviewed_tree": "t",
+           "remediation_sha": None, "verdict_2": None, "reviewed_tree_2": None}
+    body = fidelity.compose_sticky(
+        rebase_line, "CI: local verification pass; GitHub checks are watched after this comment",
+        fid, _arm(True), ["**What changed:** x"], "finding", "READY")
+    assert "auto-resolved conflict in" in body
+    for f in files:
+        assert f in body
+
+
+def test_autoresolved_files_surfaced_slashed_branch():
+    """A slashed branch (feat/x) writes its sidecar under the dash-flattened key that
+    gitad uses (branch.replace("/", "-")). verdict_line must read that same key, or the
+    RESULT line silently drops the auto-resolved file names."""
+    slug = "foo/bar"
+    flattened = slug.replace("/", "-")
+    autoresolved_path = f"/tmp/postplan-conflict-files-{flattened}-autoresolved.txt"
+    raw_slug_path = f"/tmp/postplan-conflict-files-{slug}-autoresolved.txt"
     try:
         with open(autoresolved_path, "w") as fh:
-            fh.write("harness/conflict.py\n")
-        r = _res(TerminalState.SHIPPED_HELD, pr_number=77, ci_outcome="green",
-                 retry_cap="behind-retry-cap", arm=_arm(False))
+            fh.write("harness/conflict.py\nharness/adapters/gitad.py\n")
+        # The raw-slug path must not exist, or the test would pass for the wrong reason.
+        assert not os.path.exists(raw_slug_path)
+        r = _res(TerminalState.SHIPPED_ARMED, pr_number=101, arm=_arm(True))
         r.slug = slug
         line = runner.verdict_line(r, 0)
-        assert "BEHIND retry cap reached" in line
-        assert "auto-resolved conflict in harness/conflict.py" in line
+        assert "auto-resolved conflict in" in line
+        assert "harness/conflict.py" in line
+        assert "harness/adapters/gitad.py" in line
         assert "\n" not in line
     finally:
         if os.path.exists(autoresolved_path):
             os.unlink(autoresolved_path)
+
+
+# ---------------------------------------------------------------------------
+# rc=3 RESULT lines are byte-frozen. The human block lives beside verdict_line and
+# must never move these strings. Literals are pasted, not computed from _GATE_REMEDY,
+# so a later edit to a remedy fails the test instead of following it.
+# ---------------------------------------------------------------------------
+
+_ADR_ERR = ("pre-push-adr-hook: Decision-trigger surfaces detected:\n"
+            "  - [bin-script] bin/foo — Tool script")
+
+_RC3_CASES = [
+    ("rebase", "rebase-conflict",
+     "predicted by merge-tree probe vs origin/master: a.php, b.php", {},
+     "RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed, "
+     "no PR opened. predicted by merge-tree probe vs origin/master: a.php, b.php "
+     "Resolve the rebase, then re-run bin/post-plan-now."),
+    ("gate-adr", "local-gate", _ADR_ERR, {},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=adr]; ERROR terminal=failed, no PR opened. pre-push-adr-hook: "
+     "Decision-trigger surfaces detected: - [bin-script] bin/foo — Tool script "
+     "The harness's one ADR draft attempt did not clear the hook: write or fix the ADR "
+     "for the decision-trigger surface by hand, then re-run bin/post-plan-now."),
+    ("gate-adr-drafted", "local-gate", _ADR_ERR,
+     {"adr_drafted": True, "adr_path": "ibl5/docs/decisions/0999-x.md",
+      "adr_draft_model": "sonnet"},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=adr]; ERROR terminal=failed, no PR opened. pre-push-adr-hook: "
+     "Decision-trigger surfaces detected: - [bin-script] bin/foo — Tool script "
+     "The harness drafted ibl5/docs/decisions/0999-x.md (sonnet) and the hook still "
+     "denied; the draft is committed locally on the branch for review. "
+     "The harness's one ADR draft attempt did not clear the hook: write or fix the ADR "
+     "for the decision-trigger surface by hand, then re-run bin/post-plan-now."),
+    ("gate-unknown", "local-gate", "One or more checks failed:", {},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=unknown]; ERROR terminal=failed, no PR opened. One or more checks failed: "
+     "Clear the gate then re-run bin/post-plan-now."),
+    ("usage", "llm-usage-limit", "Claude usage limit reached", {},
+     "RESULT: post-plan BLOCKED — Claude usage limit reached (environmental); ERROR "
+     "terminal=failed kind=llm-usage-limit. Claude usage limit reached "
+     "Re-run bin/post-plan-now after the limit resets."),
+    ("auth", "llm-auth-expired", "safety-verdict: auth-expired: Failed to authenticate", {},
+     "RESULT: post-plan BLOCKED — Claude CLI login expired (environmental); ERROR "
+     "terminal=failed kind=llm-auth-expired. "
+     "safety-verdict: auth-expired: Failed to authenticate "
+     "Run `claude` and complete /login, then re-run bin/post-plan-now."),
+    ("diverged", "remote-head-diverged", "phase4: head moved", {},
+     "RESULT: post-plan BLOCKED — remote head diverged at phase4 "
+     "(the PR branch changed on GitHub); ERROR terminal=failed "
+     "kind=remote-head-diverged. phase4: head moved "
+     "Fetch origin and inspect what was pushed, then rebase onto it or "
+     "reset to it, and re-run bin/post-plan-now."),
+    ("none", None, "", {},
+     "RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
+     "llm-usage-limit), cause unknown (stage: unrecorded); ERROR terminal=failed, "
+     "no PR opened. Resolve the cause, then re-run bin/post-plan-now."),
+    ("gate-stale-base", "local-gate", "does not contain origin/master", {},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=stale-base]; ERROR terminal=failed, no PR opened. "
+     "does not contain origin/master "
+     "origin/master moved and the bounded refetch + re-rebase did not catch up: "
+     "run `git fetch origin master && git rebase origin/master`, "
+     "then re-run bin/post-plan-now."),
+    ("gate-byte-budget", "local-gate",
+     "FAIL  .claude/rules/x.md  9000 bytes  cap 8000\nTrim the rule(s) above", {},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=byte-budget]; ERROR terminal=failed, no PR opened. "
+     "FAIL .claude/rules/x.md 9000 bytes cap 8000 Trim the rule(s) above "
+     "The .claude/rules byte budget is over cap and check-rules-byte-budget "
+     "has no --fix flag: trim a rule (or move detail into a path-scoped "
+     "*-detail.md companion), then re-run bin/post-plan-now."),
+    ("gate-doc-staleness", "local-gate", "Bump last_verified on the doc(s) above", {},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=doc-staleness]; ERROR terminal=failed, no PR opened. "
+     "Bump last_verified on the doc(s) above "
+     "Auto-remediation ran and the gate still denied the commit: "
+     "bump last_verified by hand, then re-run bin/post-plan-now."),
+]
+
+
+def _rc3_res(kind, error, extra):
+    return _res(TerminalState.FAILED, error_kind=kind, error=error, **extra)
+
+
+@pytest.mark.parametrize("case_id,kind,error,extra,expected", _RC3_CASES,
+                         ids=[c[0] for c in _RC3_CASES])
+def test_rc3_result_lines_are_frozen(case_id, kind, error, extra, expected):
+    assert runner.verdict_line(_rc3_res(kind, error, extra), 3, "") == expected
+
+
+@pytest.mark.parametrize("case_id,kind,error,extra,expected", _RC3_CASES,
+                         ids=[c[0] for c in _RC3_CASES])
+def test_rc3_result_line_stays_one_line(case_id, kind, error, extra, expected):
+    line = runner.verdict_line(_rc3_res(kind, error, extra), 3, "")
+    assert "\n" not in line
+    assert line.startswith("RESULT: post-plan BLOCKED")

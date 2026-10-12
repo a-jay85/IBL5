@@ -1,6 +1,6 @@
 ---
 description: On-demand single-worktree sync via --only flag on bin/wt-sync-tick, bypassing idle and in-use gates.
-last_verified: 2026-09-20
+last_verified: 2026-09-28
 ---
 
 # ADR-0133: On-Demand Worktree Sync via `--only`
@@ -22,14 +22,16 @@ The two gates exist for good reasons in fleet mode. They are the wrong policy fo
 - The HID-idle presence gate and the in-use gate are skipped.
 - The script waits up to `WT_SYNC_ONDEMAND_LOCK_WAIT` seconds (default 3) for the fleet lock to be free, then proceeds without acquiring it. It never takes the lock.
 - Fetch is bounded by `WT_SYNC_FETCH_TIMEOUT` seconds (default 10).
-- One verdict from a closed nine-token set is printed to stdout: `CURRENT`, `SYNCED <n>`, `MERGED`, `AHEAD-ONLY`, `BEHIND-DIRTY`, `DIVERGED-DIRTY`, `DIVERGED-CONFLICT`, `NO-REMOTE`, `FETCH-FAILED`.
+- One verdict from a closed ten-token set is printed to stdout: `CURRENT`, `SYNCED <n>`, `MERGED`, `RESET-STALE`, `AHEAD-ONLY`, `BEHIND-DIRTY`, `DIVERGED-DIRTY`, `DIVERGED-CONFLICT`, `NO-REMOTE`, `FETCH-FAILED`.
 - Exit code is 0 on any verdict; 2 on invalid input (path is not a worktree directory or HEAD is detached).
 
 A `bin/hooks/wt-sync-session-start.sh` hook invokes `--only` on the current worktree when Claude Code opens a session. `bin/wt-sync-cron-setup --install-hook` installs it as a symlink in `~/.claude/hooks/` and registers it in `~/.claude/settings.json`.
 
 ### Named exception to ADR-0106's never-list
 
-ADR-0106 forbids non-fast-forward writes. `--only` mode permits exactly one: `git merge origin/<branch>` when the worktree is both diverged from origin and clean of uncommitted and untracked changes. The merge is aborted if it produces a conflict; the verdict is `DIVERGED-CONFLICT` and the tree is left clean. Every other entry on ADR-0106's never-list stands unchanged in both modes.
+ADR-0106 forbids non-fast-forward writes. `--only` mode permits one merge: `git merge origin/<branch>` when the worktree is both diverged from origin and clean of uncommitted and untracked changes. The merge is aborted if it produces a conflict; the verdict is `DIVERGED-CONFLICT` and the tree is left clean. The only other exception, in both modes, is the stale-copy reset below. Every remaining entry on ADR-0106's never-list is unchanged.
+
+**Stale-copy case.** When the worktree is diverged (ahead > 0, behind > 0) and clean, and every ahead commit is patch-equivalent to a commit on `origin/<branch>` (`git rev-list --cherry-pick --right-only "origin/<branch>...HEAD"` prints nothing), the local branch is a pre-rebase copy of work the cloud has already landed. A merge here would duplicate every commit. Instead the script calls `backup_and_reset`: it writes `refs/wt-sync-backup/<branch>` pointing at the old HEAD, runs `git reset --hard origin/<branch>`, and prints `RESET-STALE` in place of `MERGED`. If the backup ref cannot be written, nothing is reset and the worktree is reported unchanged. The old HEAD stays recoverable with `git reset --hard refs/wt-sync-backup/<branch>`.
 
 ### Why cron stays fast-forward-only
 

@@ -121,7 +121,7 @@ final class RequireEscapedOutputRule implements Rule
         // Plan C (CareerLeaderboards + 10.16 remainder):
         'Boxscore/BoxscoreView.php',
         'CareerLeaderboards/CareerLeaderboardsView.php',
-        'DepthChartEntry/DepthChartEntryView.php',
+        'DepthChart/DepthChartView.php',
         'FranchiseRecordBook/FranchiseRecordBookView.php',
         'LeagueControlPanel/LeagueControlPanelView.php',
         'NextSim/NextSimView.php',

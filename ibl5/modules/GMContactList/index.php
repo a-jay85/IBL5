@@ -21,7 +21,6 @@ use GMContactList\GMContactListRepository;
 use GMContactList\GMContactListView;
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 $pagetitle = "- IBL GM Contact List";
 

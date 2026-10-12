@@ -60,6 +60,7 @@ interface DraftRepositoryInterface
     /**
      * Get the current draft selection for a specific pick
      *
+     * @param int $draftYear Draft year (Season::endingYear); only rows with this ibl_draft.year are read or written
      * @param int $draftRound The draft round (1-indexed)
      * @param int $draftPick The pick number within the round
      * @return string|null The player name already selected for this pick, or null if pick is available
@@ -72,11 +73,11 @@ interface DraftRepositoryInterface
      *  - Case-sensitive player name comparison
      *
      * Examples:
-     *  $selection = $repo->getCurrentDraftSelection(1, 5);
+     *  $selection = $repo->getCurrentDraftSelection(2025, 1, 5);
      *  // Returns 'John Smith' if pick 5 in round 1 is filled
      *  // Returns null if pick is available
      */
-    public function getCurrentDraftSelection(int $draftRound, int $draftPick): ?string;
+    public function getCurrentDraftSelection(int $draftYear, int $draftRound, int $draftPick): ?string;
 
     /**
      * Update the draft table with a player selection
@@ -85,6 +86,7 @@ interface DraftRepositoryInterface
      *
      * @param string $playerName The name of the drafted player
      * @param string $date The date/time of the selection (format: 'Y-m-d H:i:s')
+     * @param int $draftYear Draft year (Season::endingYear); only rows with this ibl_draft.year are read or written
      * @param int $draftRound The draft round (1-indexed)
      * @param int $draftPick The pick number within the round
      * @return bool True if update succeeded, false otherwise
@@ -99,10 +101,10 @@ interface DraftRepositoryInterface
      *  - Modifies ibl_draft table (single row update)
      *
      * Examples:
-     *  $success = $repo->updateDraftTable('John Smith', '2025-06-15 10:30:00', 1, 5);
+     *  $success = $repo->updateDraftTable('John Smith', '2025-06-15 10:30:00', 2025, 1, 5);
      *  // Returns true on success, false on database error
      */
-    public function updateDraftTable(string $playerName, string $date, int $draftRound, int $draftPick): bool;
+    public function updateDraftTable(string $playerName, string $date, int $draftYear, int $draftRound, int $draftPick): bool;
 
     /**
      * Update the rookie table to mark player as drafted
@@ -223,6 +225,7 @@ interface DraftRepositoryInterface
      * Combines team, round, and pick information for the next selection.
      * Used to determine whose turn it is and what round/pick number.
      *
+     * @param int $draftYear Draft year (Season::endingYear); only rows with this ibl_draft.year are read or written
      * @return DraftPickRow|null Array with team/round/pick info, or null if draft complete
      *
      * IMPORTANT BEHAVIORS:
@@ -238,14 +241,14 @@ interface DraftRepositoryInterface
      *  - pick: int|string – the pick number within the round (1-indexed)
      *
      * Examples:
-     *  $pick = $repo->getCurrentDraftPick();
+     *  $pick = $repo->getCurrentDraftPick(2025);
      *  // Returns ['team' => 'New York', 'round' => '1', 'pick' => '5']
      *  // Used to check whose turn it is
      *
-     *  $pick = $repo->getCurrentDraftPick();
+     *  $pick = $repo->getCurrentDraftPick(2025);
      *  // Returns null if draft complete (all picks filled)
      */
-    public function getCurrentDraftPick(): ?array;
+    public function getCurrentDraftPick(int $draftYear): ?array;
 
     /**
      * @param int $draftYear Draft year
@@ -259,9 +262,10 @@ interface DraftRepositoryInterface
      * Resolve a draft slot to the team that originally owned it (ibl_draft.teamid).
      * Feed the result into getCurrentOwnerOfDraftPick() to find who owns the slot today.
      *
+     * @param int $draftYear Draft year (Season::endingYear); only rows with this ibl_draft.year are read or written
      * @param int $draftRound Draft round number
      * @param int $draftPick Pick number within the round
      * @return int|null Origin team ID, or null when no ibl_draft row matches the slot
      */
-    public function getOriginTeamIdForPick(int $draftRound, int $draftPick): ?int;
+    public function getOriginTeamIdForPick(int $draftYear, int $draftRound, int $draftPick): ?int;
 }

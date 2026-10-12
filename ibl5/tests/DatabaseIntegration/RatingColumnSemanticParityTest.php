@@ -45,7 +45,7 @@ final class RatingColumnSemanticParityTest extends DatabaseTestCase
              LIMIT 50"
         );
 
-        self::assertNotEmpty(
+        self::assertNotSame([], 
             $rows,
             'No snapshot-hist overlap found; CI seed may be empty. This test needs real data to prove parity.',
         );

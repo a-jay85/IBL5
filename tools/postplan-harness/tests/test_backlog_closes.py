@@ -81,13 +81,13 @@ PLAN_FENCED = f"""# Test Plan
 ## Notes
 """
 
-PLAN_STOPS_AT_HEADING = f"""# Test Plan
+PLAN_BULLET_UNDER_OTHER_HEADING = f"""# Test Plan
 
 ## Backlog issues
 
 ## Out of Scope
 
-- closes {REPO}#18 — under wrong heading
+- closes {REPO}#18 — under another heading
 """
 
 PLAN_DEDUPE = f"""# Test Plan
@@ -106,6 +106,54 @@ PLAN_SINGLE_CLOSES = f"""# Test Plan
 ## Backlog issues
 
 - closes {REPO}#11 — only one
+"""
+
+PLAN_PHASE_BODY_ONLY = f"""# Test Plan
+
+## Phase A: Code change
+
+Edit a file.
+
+## Phase B: Bookkeeping [phases: S]
+
+- closes {REPO}#1011 — bookkeeping-only phase
+
+## Verification Matrix
+
+| # | What | Type |
+"""
+
+PLAN_CROSS_SECTION_DEDUPE = f"""# Test Plan
+
+## Phase A: Work
+
+- closes {REPO}#30 — named in a phase body
+
+## Backlog issues
+
+- refs {REPO}#30 — also named as refs
+- refs {REPO}#31 — partial
+"""
+
+PLAN_PHASE_BODY_NON_BULLETS = f"""# Test Plan
+
+## Phase A: Work
+
+This phase closes {REPO}#40 in prose, which is not a bullet.
+
+`- closes {REPO}#41 — inline code span`
+
+> - closes {REPO}#42 — blockquoted example
+
+- closes #43 — bare hash
+- fixes {REPO}#44 — wrong keyword
+
+````markdown
+```
+- closes {REPO}#45 — inside a nested fence
+```
+- closes {REPO}#46 — still inside the outer 4-backtick fence
+````
 """
 
 
@@ -129,14 +177,29 @@ def test_parse_backlog_issues_skips_fenced_examples():
     assert result == []
 
 
-def test_parse_backlog_issues_stops_at_next_heading():
-    result = parse_backlog_issues(PLAN_STOPS_AT_HEADING)
-    assert result == []
+def test_parse_backlog_issues_collects_bullet_under_any_heading():
+    result = parse_backlog_issues(PLAN_BULLET_UNDER_OTHER_HEADING)
+    assert result == [("closes", 18)]
 
 
 def test_parse_backlog_issues_closes_wins_and_dedupes():
     result = parse_backlog_issues(PLAN_DEDUPE)
     assert result == [("closes", 20)]
+
+
+def test_parse_backlog_issues_collects_phase_body_closes():
+    result = parse_backlog_issues(PLAN_PHASE_BODY_ONLY)
+    assert result == [("closes", 1011)]
+
+
+def test_parse_backlog_issues_cross_section_closes_wins():
+    result = parse_backlog_issues(PLAN_CROSS_SECTION_DEDUPE)
+    assert result == [("closes", 30), ("refs", 31)]
+
+
+def test_parse_backlog_issues_phase_body_ignores_non_bullets_and_fences():
+    result = parse_backlog_issues(PLAN_PHASE_BODY_NON_BULLETS)
+    assert result == []
 
 
 def test_locate_plan_populates_backlog_issues():
@@ -456,4 +519,26 @@ def test_skill_snippet_plan_blind_passthrough():
             got = fh.read()
         assert got == original
     finally:
+        os.unlink(body_path)
+
+
+def test_skill_snippet_collects_phase_body_closes():
+    snippet = _snippet()
+    assert snippet
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as pf:
+        pf.write(PLAN_PHASE_BODY_ONLY)
+        plan_path = pf.name
+    original = "Summary\n"
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as bf:
+        bf.write(original)
+        body_path = bf.name
+    try:
+        env = {**os.environ, "PLAN": plan_path, "BODY_FILE": body_path}
+        subprocess.run(["bash", "-c", snippet], cwd=_REPO_ROOT, env=env, check=True)
+        with open(body_path) as fh:
+            got = fh.read()
+        assert got == normalize_backlog_closes(original, [1011], [])
+        assert "Closes a-jay85/IBL5-backlog#1011" in got
+    finally:
+        os.unlink(plan_path)
         os.unlink(body_path)

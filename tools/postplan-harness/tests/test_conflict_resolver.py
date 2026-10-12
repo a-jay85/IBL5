@@ -20,6 +20,7 @@ from harness.conflict import (
     ConflictResolutionResult,
     abort_and_restore,
     inventory_conflicts,
+    parse_verdict,
     purge_verdict_artifacts,
     resolve_all,
     resolve_one,
@@ -53,7 +54,7 @@ class _StubLlm:
         self.calls.append({
             "purpose": purpose, "model": model,
             "allowed_tools": allowed_tools, "denied_tools": denied_tools,
-            "add_dirs": add_dirs,
+            "add_dirs": add_dirs, "prompt": prompt,
         })
         if not self.replies:
             return "FAILED"
@@ -463,6 +464,107 @@ def test_tree_marker_sweep():
 
 # ── Phase 5f: verdict tests ────────────────────────────────────────────────────
 
+# Verbatim model reply from PR #2587 (branch evidence-path-line-suffix), whose
+# verdict file recorded CONFLICT-REVIEW=ABSENT under the old line-1-only parser.
+# Line 1 is a summary sentence containing a non-ASCII en dash; the token is line 3.
+# No trailing newline: the real reply ended on the final period.
+_PR2587_REPLY = (
+    "The new test from the patch is at lines 1620–1632 in the file. "
+    "It matches exactly what the patch added. The assertions are correct. "
+    "Nothing is dropped, duplicated, or invented.\n"
+    "\n"
+    "CONFLICT-REVIEW=CLEAN\n"
+    "\n"
+    "The resolved file has the new test "
+    "(`test_parse_phases_strips_line_suffix_from_evidence_paths`) with the exact "
+    "same plan string, `parse_phases` call, and two assertions as in the pre-rebase "
+    "patch. No content was lost or changed."
+)
+
+
+def test_parse_verdict_line_one_clean():
+    assert parse_verdict("CONFLICT-REVIEW=CLEAN\nLooked good.\n") == "CONFLICT-REVIEW=CLEAN"
+    assert (
+        parse_verdict("CONFLICT-REVIEW=FOUND-PROBLEM\ndropped hunk\n")
+        == "CONFLICT-REVIEW=FOUND-PROBLEM"
+    )
+
+
+def test_parse_verdict_preamble_then_clean():
+    reply = "One summary sentence.\n\nCONFLICT-REVIEW=CLEAN\n\nReasoning.\n"
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=CLEAN"
+
+
+def test_parse_verdict_preamble_then_found_problem():
+    reply = "One summary sentence.\n\nCONFLICT-REVIEW=FOUND-PROBLEM\n\nReasoning.\n"
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=FOUND-PROBLEM"
+
+
+@pytest.mark.parametrize("reply", [
+    "CONFLICT-REVIEW=CLEAN\nbut also\nCONFLICT-REVIEW=FOUND-PROBLEM\n",
+    "CONFLICT-REVIEW=FOUND-PROBLEM\nbut also\nCONFLICT-REVIEW=CLEAN\n",
+    "CONFLICT-REVIEW=CLEAN\nCONFLICT-REVIEW=FOUND-PROBLEM\n",
+    "CONFLICT-REVIEW=FOUND-PROBLEM\nCONFLICT-REVIEW=CLEAN\n",
+])
+def test_parse_verdict_both_tokens_fail_closed(reply):
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=FOUND-PROBLEM"
+
+
+@pytest.mark.parametrize("reply", [
+    "not CONFLICT-REVIEW=CLEAN",
+    "CONFLICT-REVIEW=CLEAN extra",
+    "I would say CONFLICT-REVIEW=CLEAN.",
+    "`CONFLICT-REVIEW=CLEAN`",
+    "- CONFLICT-REVIEW=CLEAN",
+    "CONFLICT-REVIEW=CLEAN CONFLICT-REVIEW=FOUND-PROBLEM",
+])
+def test_parse_verdict_token_inside_prose_is_absent(reply):
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=ABSENT"
+
+
+@pytest.mark.parametrize("reply", [
+    "",
+    "\n\n",
+    "other",
+    "conflict-review=clean",
+    "CONFLICT-REVIEW=ABSENT",
+])
+def test_parse_verdict_empty_and_noise_absent(reply):
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=ABSENT"
+
+
+@pytest.mark.parametrize("reply", [
+    " CONFLICT-REVIEW=CLEAN",
+    "CONFLICT-REVIEW=CLEAN\r\n",
+    "\tCONFLICT-REVIEW=CLEAN  \n",
+    " CONFLICT-REVIEW=CLEAN",
+])
+def test_parse_verdict_whitespace_variants_are_stripped(reply):
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=CLEAN"
+
+
+def test_nbsp_fixture_survives_editor_normalization():
+    """The raw NBSP in the whitespace-variants fixture above must stay a real U+00A0.
+
+    An editor that normalizes it to a plain space leaves the parametrized case green
+    while it stops testing NBSP stripping."""
+    source = open(__file__, encoding="utf-8").read()
+    assert '"\u00a0CONFLICT-REVIEW=CLEAN"' in source
+
+
+def test_parse_verdict_fenced_token_is_not_skipped():
+    assert parse_verdict("```\nCONFLICT-REVIEW=CLEAN\n```\n") == "CONFLICT-REVIEW=CLEAN"
+    fenced_plus_real = "```\nCONFLICT-REVIEW=CLEAN\n```\nCONFLICT-REVIEW=FOUND-PROBLEM\n"
+    assert parse_verdict(fenced_plus_real) == "CONFLICT-REVIEW=FOUND-PROBLEM"
+
+
+def test_parse_verdict_long_reply():
+    filler = ["filler line"] * 10_000
+    assert parse_verdict("\n".join(filler) + "\nCONFLICT-REVIEW=CLEAN") == "CONFLICT-REVIEW=CLEAN"
+    early_clean = ["CONFLICT-REVIEW=CLEAN", *filler, "CONFLICT-REVIEW=FOUND-PROBLEM"]
+    assert parse_verdict("\n".join(early_clean)) == "CONFLICT-REVIEW=FOUND-PROBLEM"
+
+
 def _make_review_run(sha="abc1234"):
     def run(*args, check=True):
         if args[0] == "rev-parse":
@@ -510,9 +612,9 @@ def test_verdict_found_problem(tmp_path):
 
 
 def test_verdict_malformed_is_absent(tmp_path):
-    """Leading space, trailing suffix, and empty reply each record CONFLICT-REVIEW=ABSENT."""
+    """Trailing suffix, empty reply, noise, and a token buried in a prose line each record CONFLICT-REVIEW=ABSENT."""
     sha = "00000000"
-    for bad in [" CONFLICT-REVIEW=CLEAN", "CONFLICT-REVIEW=CLEAN extra", "", "other"]:
+    for bad in ["CONFLICT-REVIEW=CLEAN extra", "", "other", "Looks fine. CONFLICT-REVIEW=CLEAN"]:
         key = f"test-{uuid.uuid4().hex[:8]}"
         llm = _StubLlm([bad])
         run = _make_review_run(sha)
@@ -532,6 +634,99 @@ def test_verdict_outage_is_absent(tmp_path):
                                 resolved_files=(), proof_out="")
     assert verdict == "CONFLICT-REVIEW=ABSENT"
     _cleanup_verdict(key, sha)
+
+
+def test_verdict_leading_space_is_clean(tmp_path):
+    """A leading-space token is accepted and normalized to a bare line 1."""
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    sha = "33333333"
+    llm = _StubLlm([" CONFLICT-REVIEW=CLEAN\n"])
+    run = _make_review_run(sha)
+    try:
+        verdict = review_resolution(llm, run, worktree=str(tmp_path), key=key,
+                                    resolved_files=(), proof_out="")
+        assert verdict == "CONFLICT-REVIEW=CLEAN"
+        verdict_file = f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
+        assert open(verdict_file).readline().rstrip() == "CONFLICT-REVIEW=CLEAN"
+    finally:
+        _cleanup_verdict(key, sha)
+
+
+def test_verdict_preamble_then_clean_writes_normalized_line_one(tmp_path):
+    """Preamble-wrapped CLEAN: line 1 normalized, raw reply follows, armable reads CLEAN."""
+    from harness import armable
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    sha = "44444444"
+    reply = "Summary sentence.\n\nCONFLICT-REVIEW=CLEAN\n\nReasoning.\n"
+    llm = _StubLlm([reply])
+    run = _make_review_run(sha)
+    try:
+        verdict = review_resolution(llm, run, worktree=str(tmp_path), key=key,
+                                    resolved_files=(), proof_out="")
+        assert verdict == "CONFLICT-REVIEW=CLEAN"
+        verdict_file = f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
+        assert open(verdict_file).read() == "CONFLICT-REVIEW=CLEAN\n" + reply
+        assert armable.conflict_verdict_for(key) == "CONFLICT-REVIEW=CLEAN"
+    finally:
+        _cleanup_verdict(key, sha)
+
+
+def test_verdict_both_tokens_end_to_end_fails_closed(tmp_path):
+    """Both tokens in one reply record FOUND-PROBLEM and armable reads FOUND-PROBLEM."""
+    from harness.armable import conflict_verdict_for
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    sha = "55555555"
+    reply = "CONFLICT-REVIEW=CLEAN\nOn reflection:\nCONFLICT-REVIEW=FOUND-PROBLEM\n"
+    llm = _StubLlm([reply])
+    run = _make_review_run(sha)
+    try:
+        verdict = review_resolution(llm, run, worktree=str(tmp_path), key=key,
+                                    resolved_files=(), proof_out="")
+        assert verdict == "CONFLICT-REVIEW=FOUND-PROBLEM"
+        verdict_file = f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
+        assert open(verdict_file).readline().rstrip() == "CONFLICT-REVIEW=FOUND-PROBLEM"
+        assert conflict_verdict_for(key) == "CONFLICT-REVIEW=FOUND-PROBLEM"
+    finally:
+        _cleanup_verdict(key, sha)
+
+
+def test_verdict_replay_pr2587_is_clean(tmp_path):
+    """The exact PR #2587 reply, rejected by the line-1-only parser, now records CLEAN."""
+    from harness.armable import conflict_verdict_for
+    assert "–" in _PR2587_REPLY
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    sha = "d5400802"
+    llm = _StubLlm([_PR2587_REPLY])
+    run = _make_review_run(sha)
+    try:
+        verdict = review_resolution(llm, run, worktree=str(tmp_path), key=key,
+                                    resolved_files=(), proof_out="")
+        assert verdict == "CONFLICT-REVIEW=CLEAN"
+        verdict_file = f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
+        assert open(verdict_file).readline().rstrip() == "CONFLICT-REVIEW=CLEAN"
+        assert conflict_verdict_for(key) == "CONFLICT-REVIEW=CLEAN"
+        assert open(verdict_file).read() == "CONFLICT-REVIEW=CLEAN\n" + _PR2587_REPLY
+    finally:
+        _cleanup_verdict(key, sha)
+
+
+def test_reviewer_prompt_demands_line_one_verdict(tmp_path):
+    """The reviewer prompt asks for the token on line 1, once, and drops the old FIRST-line wording."""
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    sha = "66666666"
+    llm = _StubLlm(["CONFLICT-REVIEW=CLEAN\n"])
+    run = _make_review_run(sha)
+    try:
+        review_resolution(llm, run, worktree=str(tmp_path), key=key,
+                          resolved_files=(), proof_out="")
+        p = llm.calls[0]["prompt"]
+        assert "Line 1 of your reply is exactly" in p
+        assert "`CONFLICT-REVIEW=CLEAN`" in p
+        assert "`CONFLICT-REVIEW=FOUND-PROBLEM`" in p
+        assert "Write the verdict token exactly once" in p
+        assert "Reply with a FIRST line" not in p
+    finally:
+        _cleanup_verdict(key, sha)
 
 
 def test_reviewer_is_read_only(tmp_path):
@@ -589,3 +784,223 @@ def test_purge_spares_flag(tmp_path):
     assert not os.path.exists(verdict_file)
     assert os.path.exists(flag)
     os.unlink(flag)
+
+
+def test_purge_verdict_artifacts_keeps_autoresolved_file():
+    """purge_verdict_artifacts (per-rebase) must NOT remove the autoresolved list."""
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+    with open(autoresolved, "w") as fh:
+        fh.write("earlier.php\n")
+    try:
+        purge_verdict_artifacts(key)
+        assert os.path.exists(autoresolved)
+    finally:
+        if os.path.exists(autoresolved):
+            os.unlink(autoresolved)
+
+
+def test_purge_autoresolved_list_removes_stale_file():
+    """The run-start purge clears a stale autoresolved list from a previous run."""
+    from harness.conflict import purge_autoresolved_list
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+    with open(autoresolved, "w") as fh:
+        fh.write("stale.php\n")
+    try:
+        purge_autoresolved_list(key)
+        assert not os.path.exists(autoresolved)
+        purge_autoresolved_list(key)  # idempotent when absent
+    finally:
+        if os.path.exists(autoresolved):
+            os.unlink(autoresolved)
+
+
+def test_behind_retry_keeps_first_pass_autoresolved_files(tmp_path):
+    """Two rebase passes in one run: pass 1 auto-resolves a.php; pass 2 (BEHIND retry)
+    runs the per-rebase purge and auto-resolves b.php. The list the RESULT line reads must
+    still carry a.php (union, de-duplicated, order preserved). No hand-created list."""
+    import runner
+    from harness.armable import conflict_flag_path
+    from harness.conflict import purge_autoresolved_list
+    from harness.state import RunResult, TerminalState
+
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+    git = LiveGit(str(tmp_path))
+    git._run = lambda *a, **k: "changed.php\n"
+    try:
+        purge_autoresolved_list(key)  # run start
+        git._record_resolution(key, key, "m1", ("a.php",))
+        purge_verdict_artifacts(key)  # BEHIND retry: start of second rebase
+        git._record_resolution(key, key, "m2", ("b.php", "a.php"))
+        with open(autoresolved) as fh:
+            assert fh.read().split() == ["a.php", "b.php"]
+        res = RunResult(terminal=TerminalState.SHIPPED_ARMED, slug=key)
+        res.pr_number = 1
+        line = runner.verdict_line(res, 0)
+        assert "auto-resolved conflict in a.php, b.php" in line
+    finally:
+        for p in (autoresolved, f"/tmp/postplan-conflict-files-{key}.txt",
+                  f"/tmp/postplan-conflict-resolution-{key}.md", conflict_flag_path(key)):
+            if os.path.exists(p):
+                os.unlink(p)
+
+
+# ── Bug 1: _CONFLICT_MARKER_PAT tightness ─────────────────────────────────────
+
+def test_conflict_marker_pat_rejects_80char_separator():
+    """80-char === separator (sim-recap-exemplar.txt) must NOT be detected as a marker.
+
+    The old `l.startswith("=======")` check was True for any line STARTING WITH 7+
+    = signs, so the 80-char separator falsely flagged resolved files as still conflicted.
+    """
+    from harness.conflict import _CONFLICT_MARKER_PAT
+    separator = "=" * 80
+    assert _CONFLICT_MARKER_PAT.match(separator) is None, (
+        f"_CONFLICT_MARKER_PAT should not match 80-char separator: {separator!r}"
+    )
+
+
+def test_conflict_marker_pat_matches_real_conflict_markers():
+    """Real git conflict markers must still be detected as unresolved."""
+    from harness.conflict import _CONFLICT_MARKER_PAT
+    real_markers = [
+        "<<<<<<< HEAD",
+        "<<<<<<< ",
+        "=======",
+        ">>>>>>> branch-name",
+        ">>>>>>> ",
+        "||||||| base",
+    ]
+    for line in real_markers:
+        assert _CONFLICT_MARKER_PAT.match(line) is not None, (
+            f"_CONFLICT_MARKER_PAT should match real marker: {line!r}"
+        )
+
+
+def test_conflict_marker_pat_rejects_long_equals_lines():
+    """Lines with more than 7 = signs are NOT conflict markers (they are separators)."""
+    from harness.conflict import _CONFLICT_MARKER_PAT
+    non_markers = ["=" * 8, "=" * 20, "=" * 79, "=" * 80]
+    for line in non_markers:
+        assert _CONFLICT_MARKER_PAT.match(line) is None, (
+            f"_CONFLICT_MARKER_PAT should not match separator line: {line!r}"
+        )
+
+
+def test_resolve_one_does_not_false_positive_on_separator_line(tmp_path):
+    """After resolution, a file containing an 80-char === separator line must pass
+    the marker check and count as resolved, not as still-conflicted."""
+    from harness.conflict import _CONFLICT_MARKER_PAT
+    # Simulate a resolved file that contains a separator (e.g. sim-recap-exemplar.txt style)
+    content_with_separator = "header\n" + "=" * 80 + "\nfooter\n"
+    marker_lines = [
+        l for l in content_with_separator.splitlines()
+        if _CONFLICT_MARKER_PAT.match(l)
+    ]
+    assert marker_lines == [], (
+        f"Separator line should not be treated as conflict marker, got: {marker_lines}"
+    )
+
+
+# ── Resolver per-line justification (adaptations sink) ───────────────────────
+
+def _adapted(frm, to, old="/tmp/", new='"$RL"/'):
+    import json as _json
+    return "ADAPTED-LINE: " + _json.dumps({"from": frm, "to": to, "old": old, "new": new})
+
+
+def test_resolve_one_prompt_carries_adaptation_instructions(tmp_path):
+    from harness.adaptations import RESOLVER_ADAPTATION_INSTRUCTIONS
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    llm = _StubLlm(["RESOLVED"])
+    resolve_one(llm, _StubRun(worktree), worktree=worktree, key="test-key", path=path)
+    prompt = llm.calls[0]["prompt"]
+    assert RESOLVER_ADAPTATION_INSTRUCTIONS in prompt
+    assert prompt.endswith("exactly `RESOLVED` or exactly `FAILED`.")
+
+
+def test_resolve_one_collects_well_formed_adapted_line_justifications(tmp_path):
+    from harness.adaptations import Justification
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    reply = "\n".join([
+        "Merged.",
+        _adapted("run /tmp/a", 'run "$RL"/a'),
+        _adapted("run /tmp/b", 'run "$RL"/b'),
+        "RESOLVED",
+    ])
+    sink: list = []
+    ok, reason = resolve_one(
+        _StubLlm([reply]), _StubRun(worktree),
+        worktree=worktree, key="test-key", path=path, adaptations=sink,
+    )
+    assert (ok, reason) == (True, "")
+    assert sink == [
+        Justification(path, "run /tmp/a", 'run "$RL"/a', "/tmp/", '"$RL"/'),
+        Justification(path, "run /tmp/b", 'run "$RL"/b', "/tmp/", '"$RL"/'),
+    ]
+
+
+def test_resolve_one_malformed_justification_fails_the_round(tmp_path):
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    llm = _StubLlm(['ADAPTED-LINE: {"from": "x"}\nRESOLVED', "RESOLVED"])
+    run = _StubRun(worktree)
+    sink: list = []
+    result = resolve_one(
+        llm, run, worktree=worktree, key="test-key", path=path, adaptations=sink,
+    )
+    assert result == (True, "")
+    assert len(llm.calls) == 2
+    assert "malformed ADAPTED-LINE justification" in llm.calls[1]["prompt"]
+    assert sink == []
+
+
+def test_resolve_one_ignores_justifications_on_failed_reply(tmp_path):
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    llm = _StubLlm([_adapted("run /tmp/a", 'run "$RL"/a') + "\nFAILED"])
+    sink: list = []
+    result = resolve_one(
+        llm, _StubRun(worktree), worktree=worktree, key="test-key", path=path,
+        adaptations=sink,
+    )
+    assert result == (False, f"resolver declined: {path}")
+    assert sink == []
+
+
+def test_resolve_all_returns_adaptations_across_files(tmp_path):
+    worktree = str(tmp_path)
+    _make_temp_file(worktree, "app/a.py", "resolved a\n")
+    _make_temp_file(worktree, "app/b.py", "resolved b\n")
+    inventory = ConflictInventory(files=("app/a.py", "app/b.py"))
+
+    replies = [
+        _adapted("run /tmp/a", 'run "$RL"/a') + "\nRESOLVED",
+        _adapted("run /tmp/b", 'run "$RL"/b') + "\nRESOLVED",
+    ]
+    result = resolve_all(
+        _StubLlm(replies), _StubRun(worktree),
+        worktree=worktree, key="test-key", inventory=inventory,
+    )
+    assert result.success is True
+    assert [j.path for j in result.adaptations] == ["app/a.py", "app/b.py"]
+    assert [j.original for j in result.adaptations] == ["run /tmp/a", "run /tmp/b"]
+
+    declined = resolve_all(
+        _StubLlm([replies[0], "FAILED"]), _StubRun(worktree),
+        worktree=worktree, key="test-key", inventory=inventory,
+    )
+    assert declined.success is False
+    assert declined.adaptations == ()

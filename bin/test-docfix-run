@@ -7,16 +7,21 @@
 # health predicate (all three ALERT branches + every silent one).
 # Run: bin/test-docfix-run  (exit 0 = all pass).
 set -u
+_USAGE_TMP="$(mktemp -d "${TMPDIR:-/tmp}/usage-iso.XXXXXX")"
+[ -n "$(trap -p EXIT)" ] || trap 'rm -rf "$_USAGE_TMP"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$_USAGE_TMP"
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REAL_DOCFIX="$REPO_ROOT/bin/docfix-run"
 REAL_POLL="$REPO_ROOT/bin/docfix-poll"
 WORKFLOW="$REPO_ROOT/.github/workflows/doc-freshness-audit.yml"
 NOTIFY_WORKFLOW="$REPO_ROOT/.github/workflows/docs-refreshed-notify.yml"
-REAL_VERONLY="$REPO_ROOT/bin/docfix-check-veronly"
-FAILED=0
-ok()   { echo "ok: $1"; }
-bad()  { echo "FAIL: $1"; FAILED=1; }
+HEALTH_WORKFLOW="$REPO_ROOT/.github/workflows/docfix-health.yml"
+REAL_VERONLY="${REAL_VERONLY:-$REPO_ROOT/bin/docfix-check-veronly}"
+ok()   { h_pass "$1"; }
+bad()  { h_fail "$@"; }
 
 # build_sandbox -> prints sandbox path with fake-repo + shims wired.
 # Shim convention: every SHIM_* variable holds POST-jq output — the shims ignore
@@ -42,7 +47,8 @@ W
     printf '#!/usr/bin/env bash\necho "$1" >> "%s/cleanup-calls"\nexit "${SHIM_CLEANUP_RC:-0}"\n' \
         "$SB" > "$SB/bin/cleanup"
     # docfix-run: logs "issue|sig" to docfix-calls.
-    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\n' \
+    # Exits SHIM_DOCFIX_RUN_RC (default 0) so the poll's exit-code passthrough is testable.
+    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\nexit "${SHIM_DOCFIX_RUN_RC:-0}"\n' \
         "$SB" > "$SB/bin/docfix-run"
     chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run"
 
@@ -105,6 +111,8 @@ case "$1 $2" in
             # Distinguish them so both callers get the right post-jq value.
             case "$args" in
               *"--json state"*) printf '%s' "${SHIM_PR_STATE:-NONE}" ;;
+              # health never-ran anchor: newest refresh PR createdAt (post-jq).
+              *createdAt*)      printf '%s' "${SHIM_PR_LAST_CREATED:-}" ;;
               *)                printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
             esac ;;
         *"--state closed"*) printf '%s' "${SHIM_PR_CLOSED:-[]}" ;;
@@ -141,7 +149,9 @@ run_docfix() {
         SHIM_PR_UNARMED="${SHIM_PR_UNARMED:-}" \
         SHIM_GH_FAIL="${SHIM_GH_FAIL:-}" \
         "$REAL_DOCFIX" "$4" "$5" >/dev/null 2>&1
-    echo "rc=$?"
+    local RC=$?
+    runner_of "$SB" >/dev/null 2>&1 || true   # register the runner for exit-time cleanup
+    echo "rc=$RC"
 }
 
 # run_poll: drives the REAL bin/docfix-poll (poll path) with IBL5_MAIN=$SB.
@@ -152,6 +162,14 @@ run_poll() {
       "$REAL_POLL" >/dev/null 2>&1 ) || true
 }
 
+# run_poll_rc: like run_poll but prints the poll's exit code as "rc=N".
+run_poll_rc() {
+    local SB="$1" RC=0
+    ( IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
+      "$REAL_POLL" >/dev/null 2>&1 ) || RC=$?
+    echo "rc=$RC"
+}
+
 # run_health: drives bin/docfix-poll --health-report <issue>; prints output.
 run_health() {
     local SB="$1" ISSUE="${2:-}"
@@ -160,18 +178,73 @@ run_health() {
 }
 
 plist_of() { ls "$1/home/Library/LaunchAgents/"*.plist 2>/dev/null | head -1; }
+# runner_of "$SB" -> path of the runner script the plist execs (ProgramArguments[2] = "exec <path>").
+# Runner files land in real /tmp (LOG is /tmp/...), so every path handed out is logged
+# and removed at exit.
+RUNNERS_SEEN="$(mktemp)"
+trap 'xargs rm -f < "$RUNNERS_SEEN" 2>/dev/null; rm -f "$RUNNERS_SEEN"' EXIT
+runner_of() {
+    local P R
+    P="$(plist_of "$1")"; [ -n "$P" ] || return 1
+    R=$(python3 -I -c 'import plistlib,sys
+a=plistlib.load(open(sys.argv[1],"rb"))["ProgramArguments"]
+assert a[:2]==["/bin/bash","-lc"] and a[2].startswith("exec "), a
+print(a[2][5:])' "$P") || return 1
+    printf '%s\n' "$R" >> "$RUNNERS_SEEN"
+    printf '%s\n' "$R"
+}
 plan_of()  { ls "$1/home/claude-plans/docs-stale-refresh-"*.md 2>/dev/null | head -1; }
 
 # --- Cases 1-5: bin/docfix-run launcher ----------------------------------------
 SB="$(build_sandbox)"
 run_docfix "$SB" "" "" "4242" "ibl5/docs/foo.md,README.md" >/dev/null
-P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"
-{ [ -n "$P" ] && grep -q 'cd "'"$SB"'/wts/docs-stale-refresh-[^/]*"' "$P" \
-    && grep -q 'Closes #4242' "$P" \
-    && grep -q 'ibl5/docs/foo.md,README.md' "$P" \
-    && grep -q 'claude-sonnet-4-6' "$P"; } \
-  && ok "(1) plist carries cd-to-worktree + doc-fix prompt + SIG + Closes #N" \
-  || bad "(1) plist composition"
+P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"; R="$(runner_of "$SB")"
+{ [ -n "$R" ] && grep -q "cd '$SB/wts/docs-stale-refresh-[^/']*' && CLAUDE_HEADLESS=1" "$R" \
+    && grep -q 'Closes #4242' "$R" \
+    && grep -q 'ibl5/docs/foo.md,README.md' "$R" \
+    && grep -q 'claude-sonnet-5-5' "$R"; } \
+  && ok "(1) runner carries cd-to-worktree + doc-fix prompt + SIG + Closes #N" \
+  || bad "(1) runner composition"
+# (1b) the plist is the helper's layout and only execs the runner.
+PLIST_REPORT="$(python3 -I - "$P" "$R" <<'PLIST_PY'
+import os
+import plistlib
+import re
+import sys
+
+plist_path, runner = sys.argv[1:3]
+with open(plist_path, "rb") as fh:
+    d = plistlib.load(fh)
+
+
+def strings(v):
+    if isinstance(v, str):
+        yield v
+    elif isinstance(v, list):
+        for x in v:
+            yield from strings(x)
+    elif isinstance(v, dict):
+        for x in v.values():
+            yield from strings(x)
+
+
+vals = list(strings(d))
+path_dirs = d.get("EnvironmentVariables", {}).get("PATH", "").split(":")
+checks = [
+    d.get("ProgramArguments") == ["/bin/bash", "-lc", "exec " + runner],
+    d.get("KeepAlive") is False,
+    all(p in path_dirs for p in ("/usr/bin", "/bin", "/opt/homebrew/bin")),
+    not any("$" in v for v in vals),
+    all(v != "" for v in vals),
+    re.fullmatch(r"/tmp/docfix-run-[^\s]+\.sh", runner) is not None,
+    os.access(runner, os.X_OK),
+]
+print("ok" if all(checks) else "bad " + repr(checks))
+PLIST_PY
+)"
+{ [ "$PLIST_REPORT" = "ok" ] && [ "$(grep -c '<string></string>' "$P")" = "0" ]; } \
+  && ok "(1b) plist execs the runner: KeepAlive false, PATH set, no \$ or empty values, runner path clean" \
+  || bad "(1b) plist shape: $PLIST_REPORT"
 { [ -n "$PLAN" ] && head -1 "$PLAN" | grep -q '^---$' \
     && grep -q '^auto_merge: false$' "$PLAN" \
     && grep -q '## Automouse Hold Justification' "$PLAN"; } \
@@ -199,10 +272,11 @@ SB="$(build_sandbox)"
     && ! grep -q 'docfix:' "$WORKFLOW" \
     && ! grep -qF 'bin/docfix-run' "$WORKFLOW" \
     && grep -q 'pull-requests: read' "$WORKFLOW" \
-    && grep -qF "steps.health.outputs.alert == 'true'" "$WORKFLOW" \
+    && ! grep -qF 'steps.health.outputs' "$WORKFLOW" \
+    && ! grep -qF -- '--health-report' "$WORKFLOW" \
     && ! grep -qF "notify == 'true'" "$WORKFLOW" \
     && ! grep -q "fail-on-delivery" "$WORKFLOW"; } \
-  && ok "(6) audit: no self-hosted/docfix/docfix-run; health.alert gate; pull-requests:read; no fail-on-delivery" \
+  && ok "(6) audit: no self-hosted/docfix/docfix-run; no health steps; pull-requests:read; no fail-on-delivery" \
   || bad "(6) audit static assertions"
 
 # --- Case 7: docs-refreshed-notify.yml static assertion -----------------------
@@ -212,6 +286,27 @@ SB="$(build_sandbox)"
     && [ -f "$REPO_ROOT/bin/lib/docfix-dm.sh" ]; } \
   && ok "(7) docs-refreshed-notify: workflow_dispatch+pr_number; guard moved to docfix-dm.sh" \
   || bad "(7) docs-refreshed-notify static assertion"
+
+# --- Cases H9-H10: docfix-health.yml static assertions ------------------------
+{ grep -qF 'workflow_dispatch' "$HEALTH_WORKFLOW" \
+    && grep -qE '^      alert:' "$HEALTH_WORKFLOW" \
+    && grep -qE '^      kind:' "$HEALTH_WORKFLOW" \
+    && grep -qE '^      detail:' "$HEALTH_WORKFLOW" \
+    && grep -qF "cron: '0 12 * * *'" "$HEALTH_WORKFLOW" \
+    && grep -qF -e '--event workflow_dispatch' "$HEALTH_WORKFLOW" \
+    && grep -qF 'actions: read' "$HEALTH_WORKFLOW" \
+    && grep -qF 'issues: read' "$HEALTH_WORKFLOW" \
+    && grep -qF 'source bin/lib/docfix-health.sh' "$HEALTH_WORKFLOW" \
+    && grep -qF "if: steps.build.outputs.alert == 'true'" "$HEALTH_WORKFLOW" \
+    && grep -qF "if: steps.check.outputs.alert == 'true'" "$HEALTH_WORKFLOW"; } \
+  && ok "(H9) docfix-health.yml: dispatch inputs, 12:00Z cron, dispatch-only heartbeat, perms, lib, alert gates" \
+  || bad "(H9) docfix-health.yml static structure"
+
+H10_ALL="$(grep -nE '\$\{\{ *inputs\.' "$HEALTH_WORKFLOW")"
+H10_BAD="$(grep -vE '^[0-9]+: +[A-Z_]+: \$\{\{ *inputs\.[a-z_]+ *\}\}$' <<<"$H10_ALL")"
+{ [ -n "$H10_ALL" ] && [ -z "$H10_BAD" ]; } \
+  && ok "(H10) docfix-health.yml: every inputs.* reference is an env: entry (no run: interpolation)" \
+  || bad "(H10) docfix-health.yml: inputs interpolated outside env: [$H10_BAD]"
 
 # --- Case 8: carry-forward — bin/docfix-run still has auto_merge:false --------
 { grep -q '^auto_merge: false$' "$REAL_DOCFIX" \
@@ -379,7 +474,11 @@ OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
   && ok "(17c) health: ALERT died on orphan branch with no PR" \
   || bad "(17c) health died"
 
-# Case 17d: ALERT never-ran — no PR, no branch, stale-since 40h ago
+# Case 17d: ALERT never-ran — no PR, no branch, stale-since 40h ago.
+# This is also the CI shape of a pre-push death: the runner has no local
+# refresh branches and no launchctl, so the `wedged` arm can never fire there.
+# The detail must name both causes (not installed / died before pushing) and
+# stay one line, since the workflow appends it to $GITHUB_OUTPUT as key=value.
 SB="$(build_sandbox)"
 BODY="<!-- stale-since: $TS_40H -->"
 OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
@@ -387,7 +486,10 @@ OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
     run_health "$SB" 77)"
 { echo "$OUT" | grep -q 'alert=true' \
     && echo "$OUT" | grep -q 'kind=never-ran' \
-    && echo "$OUT" | grep -q 'install-schedule'; } \
+    && echo "$OUT" | grep -q 'install-schedule' \
+    && echo "$OUT" | grep -q 'died before pushing' \
+    && echo "$OUT" | grep -q 'docfix-run-\*\.log' \
+    && [ "$(echo "$OUT" | wc -l | tr -d ' ')" -eq 3 ]; } \
   && ok "(17d) health: ALERT never-ran after 36h grace (40h marker)" \
   || bad "(17d) health never-ran"
 
@@ -400,6 +502,26 @@ OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
 { echo "$OUT" | grep -q 'alert=false'; } \
   && ok "(17e) health: no alert within 36h grace (20h marker)" \
   || bad "(17e) health grace"
+
+# Case 17f: NEGATIVE — 40h episode but a refresh PR opened 20h ago → healthy poll
+# (the 2026-09-26 false alarm: issue open 48h while the poll merged a PR daily).
+SB="$(build_sandbox)"
+BODY="<!-- stale-since: $TS_40H -->"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY" SHIM_PR_LAST_CREATED="$TS_20H" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=false'; } \
+  && ok "(17f) health: recent refresh PR (20h) beats 40h episode — no false never-ran" \
+  || bad "(17f) health last-PR anchor"
+
+# Case 17g: ALERT — 40h episode and the newest refresh PR is older (40h+) → still fires
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY" SHIM_PR_LAST_CREATED="$TS_30D" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=true' && echo "$OUT" | grep -q 'kind=never-ran'; } \
+  && ok "(17g) health: ALERT never-ran when newest refresh PR predates the episode" \
+  || bad "(17g) health old last-PR must not mask"
 
 # --- Cases 18a-18d: false-alarm negatives -------------------------------------
 
@@ -511,10 +633,8 @@ SB="$(build_sandbox)"
 run_docfix "$SB" "" "" "9999" "probe.md" >/dev/null
 PLIST_F20="$(plist_of "$SB")"
 if [ -n "$PLIST_F20" ]; then
-    # Extract the <string> element bearing the bash command; XML-unescape (&amp; LAST
-    # to avoid double-unescaping e.g. &amp;lt; → <).
-    CMD_LINE20=$(grep 'claude -p' "$PLIST_F20" \
-        | sed 's/&lt;/</g; s/&gt;/>/g; s/&amp;/\&/g')
+    # The claude -p line lives in the runner script the plist execs; no XML layer.
+    CMD_LINE20=$(grep 'claude -p' "$(runner_of "$SB")")
     # Pull the claude -p token (single-quoted after fix; double-quoted in old script).
     PROMPT_TOKEN20=$(printf '%s' "$CMD_LINE20" \
         | sed -n 's/.*claude -p \(.*\) --dangerously.*/\1/p')
@@ -530,15 +650,16 @@ if [ -n "$PLIST_F20" ]; then
             && printf '%s' "$ROUND_TRIP20" | grep -qF '`bin/check-docs --staleness-report`'; } \
           && ok "(20) prompt-fidelity: backticks survive bash second-parse (no stderr; literal text present)" \
           || bad "(20) prompt-fidelity: backticks corrupted at bash second parse"
-        # Sub-check 20.1: --session-id appears in the raw plist as a bare (unquoted,
-        # unescaped) UUID — [0-9a-f-] only so shq() must NOT wrap it in single-quotes.
-        grep -qE -- '--session-id [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$PLIST_F20" \
-          && ok "(20.1) session-id: uuid is bare and unescaped in the plist" \
-          || bad "(20.1) session-id: --session-id missing or UUID is quoted/XML-escaped in plist"
+        # Sub-check 20.1: --session-id appears in the runner as a bare (unquoted)
+        # UUID — [0-9a-f-] only so shq() must NOT wrap it in single-quotes.
+        grep -qE -- '--session-id [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$(runner_of "$SB")" \
+          && ok "(20.1) session-id: uuid is bare and unquoted in the runner" \
+          || bad "(20.1) session-id: --session-id missing or UUID is quoted in the runner"
         # Sub-check 20.1 sidecar: docfix-run writes a .session sidecar whose content
         # equals the UUID embedded in the plist command line.
         UUID20=$(printf '%s' "$CMD_LINE20" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
-        LOG20=$(grep -A1 'StandardOutPath' "$PLIST_F20" | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+        LOG20=$(python3 -I -c 'import plistlib,sys
+print(plistlib.load(open(sys.argv[1],"rb"))["StandardOutPath"])' "$PLIST_F20")
         SIDECAR20="${LOG20%.log}.session"
         { [ -n "$UUID20" ] && [ -f "$SIDECAR20" ] && [ "$(cat "$SIDECAR20")" = "$UUID20" ]; } \
           && ok "(20.1) session-id: sidecar exists and uuid matches plist" \
@@ -605,10 +726,7 @@ build_veronly_repo() {
     SLUG="docs-stale-refresh-veronly-test"
     PLAN_DIR="$SB2/home/claude-plans"
     mkdir -p "$R" "$PLAN_DIR"
-    git -C "$R" init -b master >/dev/null 2>&1
-    git -C "$R" config user.email "test@example.com"
-    git -C "$R" config user.name "Test"
-    git -C "$R" config commit.gpgsign false
+    h_git_repo "$R" --no-commit
     mkdir -p "$R/ibl5/docs"
     printf 'last_verified: 2026-01-01\n' > "$R/ibl5/docs/x.md"
     git -C "$R" add ibl5/docs/x.md
@@ -763,7 +881,7 @@ SB="$(build_sandbox)"
 CALLS33="$SB/gh-calls"
 SHIM_PR_DM="" SHIM_GH_CALLS="$CALLS33" SHIM_STALE_JSON='[]' run_poll "$SB"
 MARKER33="$(dm_marker_of "$SB" 4242)"
-{ [ ! -e "$MARKER33" ] && { [ ! -e "$CALLS33" ] || [ ! -s "$CALLS33" ]; }; } \
+{ [ ! -e "$MARKER33" ] && ! grep -qF 'workflow run docs-refreshed-notify.yml' "$CALLS33" 2>/dev/null; } \
   && ok "(33) poll: no DM when no unarmed PRs" \
   || bad "(33) poll: DM should not fire for empty PR_DM"
 
@@ -774,7 +892,7 @@ MARKER34="$(dm_marker_of "$SB" 4242)"
 mkdir -p "$(dirname "$MARKER34")"
 : > "$MARKER34"
 SHIM_PR_DM="4242" SHIM_GH_CALLS="$CALLS34" SHIM_STALE_JSON='[]' run_poll "$SB"
-{ [ ! -e "$CALLS34" ] || [ ! -s "$CALLS34" ]; } \
+{ ! grep -qF 'workflow run docs-refreshed-notify.yml' "$CALLS34" 2>/dev/null; } \
   && ok "(34) poll: no DM re-dispatch when marker pre-exists" \
   || bad "(34) poll: DM re-dispatch with existing marker"
 
@@ -796,6 +914,56 @@ MARKER36="$(dm_marker_of "$SB" 4242)"
     && [ -e "$MARKER36" ]; } \
   && ok "(36) poll: DM fires before stale-count exit (proves Step 6.1 placement)" \
   || bad "(36) poll: DM should fire even on empty stale set"
+
+# --- Cases H11-H16: poll health heartbeat dispatch ---------------------------
+_hcount() { if [ -f "$1" ]; then grep -cF 'workflow run docfix-health.yml' "$1" || true; else echo 0; fi; }
+
+# (H11) no stale docs: exactly one alert=false heartbeat, rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON='[]' run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ] \
+    && grep -qF 'workflow run docfix-health.yml -f alert=false -f kind= -f detail=' "$C"; } \
+  && ok "(H11) poll: no-stale exit dispatches exactly one alert=false heartbeat, rc 0" \
+  || bad "(H11) poll: no-stale heartbeat ($RC, $(_hcount "$C") dispatches)"
+
+# (H12) stale docs, no open issue: exactly one alert=false heartbeat, rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="" SHIM_PR_CLOSED='[]' \
+    run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ] \
+    && grep -qF 'docfix-health.yml -f alert=false' "$C"; } \
+  && ok "(H12) poll: no-issue exit dispatches exactly one alert=false heartbeat, rc 0" \
+  || bad "(H12) poll: no-issue heartbeat ($RC, $(_hcount "$C") dispatches)"
+
+# (H13) tail path, docfix-run rc 0: exactly one dispatch, rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+    SHIM_DOCFIX_RUN_RC=0 run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ] && [ -f "$SB/docfix-calls" ]; } \
+  && ok "(H13) poll: tail path dispatches exactly once after docfix-run, rc 0" \
+  || bad "(H13) poll: tail heartbeat ($RC, $(_hcount "$C") dispatches)"
+
+# (H14) tail path, docfix-run rc 3: poll rc is 3, still exactly one dispatch.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+    SHIM_DOCFIX_RUN_RC=3 run_poll_rc "$SB")"
+{ [ "$RC" = "rc=3" ] && [ "$(_hcount "$C")" -eq 1 ]; } \
+  && ok "(H14) poll: docfix-run rc 3 becomes poll rc 3, one dispatch still sent" \
+  || bad "(H14) poll: docfix-run rc passthrough ($RC, $(_hcount "$C") dispatches)"
+
+# (H15) failed dispatch is fail-quiet: rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON='[]' SHIM_WFRUN_RC=1 run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ]; } \
+  && ok "(H15) poll: failed gh workflow run stays fail-quiet (rc 0)" \
+  || bad "(H15) poll: dispatch failure should not fail the poll ($RC)"
+
+# (H16) crash path: check-docs failing leaves NO heartbeat (no EXIT-trap dispatch).
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_CHECKDOCS_RC=1 run_poll_rc "$SB")"
+{ [ "$RC" != "rc=0" ] && [ "$(_hcount "$C")" -eq 0 ]; } \
+  && ok "(H16) poll: crashed poll exits nonzero and sends zero heartbeats" \
+  || bad "(H16) poll: crash must not heartbeat ($RC, $(_hcount "$C") dispatches)"
 
 # --- Cases 37-40: bin/lib/docfix-dm.sh compose function ----------------------
 
@@ -841,6 +1009,113 @@ SHIM_GH_CALLS="$CALLS40" run_dm_compose "$SB" '12; rm -rf /' "$OUTF40" && DRC=0 
     && { [ ! -e "$CALLS40" ] || [ ! -s "$CALLS40" ]; }; } \
   && ok "(40) lib: non-numeric PR refused (rc 1, no gh call)" \
   || bad "(40) lib: non-numeric PR should be refused"
+
+# --- Cases H1-H8: bin/lib/docfix-health.sh -----------------------------------
+HEALTH_LIB="$REPO_ROOT/bin/lib/docfix-health.sh"
+
+# _hl <function> [args...]: run one lib function in a subshell (no set -e leak).
+_hl() {
+    (
+        # shellcheck source=bin/lib/docfix-health.sh
+        source "$HEALTH_LIB"
+        "$@"
+    )
+}
+
+# (H1) validate: only true+known-kind and false+empty-kind pass.
+H1OK=1
+_hl docfix_health_validate true never-ran 2>/dev/null || H1OK=0
+_hl docfix_health_validate false '' 2>/dev/null || H1OK=0
+_hl docfix_health_validate true '' 2>/dev/null && H1OK=0
+_hl docfix_health_validate false never-ran 2>/dev/null && H1OK=0
+_hl docfix_health_validate maybe '' 2>/dev/null && H1OK=0
+_hl docfix_health_validate true 'never-ran;x' 2>/dev/null && H1OK=0
+[ "$H1OK" -eq 1 ] \
+  && ok "(H1) health lib: validate accepts only valid alert/kind pairs" \
+  || bad "(H1) health lib: validate allow-list"
+
+# (H2) compose: 2 lines; heading names the kind; embedded newline collapsed.
+SBH="$(mktemp -d)"
+_hl docfix_health_compose never-ran $'part one\npart two' "$SBH/out2" && HRC=0 || HRC=$?
+{ [ "$HRC" -eq 0 ] && [ "$(grep -c '^' "$SBH/out2")" -eq 2 ] \
+    && sed -n 1p "$SBH/out2" | grep -qF '(never-ran)' \
+    && sed -n 2p "$SBH/out2" | grep -qF 'part one' \
+    && sed -n 2p "$SBH/out2" | grep -qF 'part two'; } \
+  && ok "(H2) health lib: compose writes 2 lines, kind in heading, detail collapsed" \
+  || bad "(H2) health lib: compose shape"
+
+# (H3) compose refusals: unknown kind, empty detail → rc 1, no out-file.
+_hl docfix_health_compose evil 'detail' "$SBH/out3a" && HRC3A=0 || HRC3A=$?
+_hl docfix_health_compose never-ran '' "$SBH/out3b" && HRC3B=0 || HRC3B=$?
+{ [ "$HRC3A" -eq 1 ] && [ ! -e "$SBH/out3a" ] && [ "$HRC3B" -eq 1 ] && [ ! -e "$SBH/out3b" ]; } \
+  && ok "(H3) health lib: compose refuses unknown kind and empty detail (rc 1, no out-file)" \
+  || bad "(H3) health lib: compose refusals"
+
+# (H4) compose truncates a 3000-char detail to at most 1500 chars.
+LONG="$(head -c 3000 /dev/zero | tr '\0' 'x')"
+_hl docfix_health_compose died "$LONG" "$SBH/out4" && HRC=0 || HRC=$?
+L2LEN="$(sed -n 2p "$SBH/out4" | tr -d '\n' | wc -c | tr -d ' ')"
+{ [ "$HRC" -eq 0 ] && [ "$L2LEN" -le 1500 ] && [ "$L2LEN" -gt 0 ]; } \
+  && ok "(H4) health lib: compose cuts detail to <=1500 chars" \
+  || bad "(H4) health lib: compose truncation (line 2 = $L2LEN chars)"
+
+# (H5) poll_detail: names both launchd logs and the newest run log; none when empty.
+RUNDIR="$SBH/runlogs"; mkdir -p "$RUNDIR"
+touch -t 202609270000 "$RUNDIR/docfix-run-a.log"
+touch -t 202609280000 "$RUNDIR/docfix-run-b.log"
+H5A="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$RUNDIR")"; H5ARC=$?
+mkdir -p "$SBH/emptyrun"
+H5B="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$SBH/emptyrun")"; H5BRC=$?
+{ [ "$H5ARC" -eq 0 ] && [ "$H5BRC" -eq 0 ] \
+    && printf '%s' "$H5A" | grep -qF '/logs/launchd-stdout.log' \
+    && printf '%s' "$H5A" | grep -qF '/logs/launchd-stderr.log' \
+    && printf '%s' "$H5A" | grep -qF 'docfix-run-b.log' \
+    && ! printf '%s' "$H5A" | grep -qF 'docfix-run-a.log' \
+    && printf '%s' "$H5B" | grep -qF 'Run log: none'; } \
+  && ok "(H5) health lib: poll_detail names launchd logs + newest run log; none when empty" \
+  || bad "(H5) health lib: poll_detail"
+
+# (H5b) poll_detail: a session-limit line in the newest run log is appended; a log
+# without one leaves the output identical to the no-limit shape.
+RUNDIR5B="$SBH/runlogs-limit"; mkdir -p "$RUNDIR5B"
+printf 'working...\n  You'"'"'ve hit your session limit · resets 12am  \n' > "$RUNDIR5B/docfix-run-c.log"
+RUNDIR5C="$SBH/runlogs-nolimit"; mkdir -p "$RUNDIR5C"
+printf 'working...\nall quiet\n' > "$RUNDIR5C/docfix-run-d.log"
+H5BL="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$RUNDIR5B")"
+H5CL="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$RUNDIR5C")"
+H5CWANT="base detail | Poll logs: /logs/launchd-stdout.log, /logs/launchd-stderr.log | Run log: $RUNDIR5C/docfix-run-d.log"
+_hl docfix_health_compose wedged "$H5BL" "$SBH/out5b" >/dev/null
+{ printf '%s' "$H5BL" | grep -qF "| Limit: You've hit your session limit · resets 12am" \
+    && sed -n 2p "$SBH/out5b" | grep -qF "resets 12am" \
+    && [ "$H5CL" = "$H5CWANT" ]; } \
+  && ok "(H5b) health lib: poll_detail appends the session-limit line; unchanged without one" \
+  || bad "(H5b) health lib: poll_detail session-limit line"
+
+# (H6) verdict boundaries.
+_epoch() { jq -rn --arg t "$1" '$t | fromdateiso8601'; }
+V6A="$(_hl docfix_health_heartbeat_verdict 2026-09-29T04:05:00Z "$(_epoch 2026-09-29T21:47:00Z)")"
+V6B="$(_hl docfix_health_heartbeat_verdict 2026-09-28T06:15:00Z "$(_epoch 2026-09-29T12:00:00Z)")"
+BASE6="$(_epoch 2026-09-28T00:00:00Z)"
+V6C="$(_hl docfix_health_heartbeat_verdict 2026-09-28T00:00:00Z $(( BASE6 + 86400 )))"
+V6D="$(_hl docfix_health_heartbeat_verdict 2026-09-28T00:00:00Z $(( BASE6 + 86399 )))"
+{ [ "$V6A" = "fresh 17" ] && [ "$V6B" = "stale 29" ] && [ "$V6C" = "stale 24" ] && [ "$V6D" = "fresh 23" ]; } \
+  && ok "(H6) health lib: verdict boundaries (fresh 17, stale 29, stale 24, fresh 23)" \
+  || bad "(H6) health lib: verdict got [$V6A] [$V6B] [$V6C] [$V6D]"
+
+# (H7) verdict prints none for empty / unparseable input and exits 0.
+V7A="$(_hl docfix_health_heartbeat_verdict '' 1000)"; V7ARC=$?
+V7B="$(_hl docfix_health_heartbeat_verdict 'not-a-date' 1000)"; V7BRC=$?
+{ [ "$V7A" = "none" ] && [ "$V7B" = "none" ] && [ "$V7ARC" -eq 0 ] && [ "$V7BRC" -eq 0 ]; } \
+  && ok "(H7) health lib: verdict none for empty/unparseable timestamp, exit 0" \
+  || bad "(H7) health lib: verdict none got [$V7A] [$V7B]"
+
+# (H8) empty-env source: the lib works under env -i with a minimal PATH.
+V8="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH="/usr/bin:/bin:$(dirname "$(command -v jq)")" REPO_ROOT="$REPO_ROOT" \
+    bash -c 'source "$REPO_ROOT/bin/lib/docfix-health.sh" && docfix_health_heartbeat_verdict "" 0')"; V8RC=$?
+{ [ "$V8" = "none" ] && [ "$V8RC" -eq 0 ]; } \
+  && ok "(H8) health lib: sources and runs under env -i (empty environment)" \
+  || bad "(H8) health lib: empty-env got [$V8]"
+rm -rf "$SBH"
 
 # --- Cases 41-47: bin/docfix-check-veronly boundaries ------------------------
 # Verification Matrix rows 11-14, 18, 19: the fail-open holes the predicate is
@@ -950,11 +1225,11 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
 SB="$(build_sandbox)"
 SIG13='ibl5/docs/foo.md,$(touch /tmp/pr13-pwned-backtick)'
 run_docfix "$SB" "" "" "13p" "$SIG13" >/dev/null
-P_INJ="$(plist_of "$SB")"
+R_INJ="$(runner_of "$SB")"
 { [ ! -f /tmp/pr13-pwned-backtick ] \
-    && [ -n "$P_INJ" ] \
-    && grep -qF '$(touch /tmp/pr13-pwned-backtick)' "$P_INJ"; } \
-  && ok "(20a/plan13) injection chars in SIG written literally to plist, not executed" \
+    && [ -n "$R_INJ" ] \
+    && grep -qF '$(touch /tmp/pr13-pwned-backtick)' "$R_INJ"; } \
+  && ok "(20a/plan13) injection chars in SIG written literally to runner, not executed" \
   || bad "(20a/plan13) prompt injection guard"
 
 # Case 20b (plan #14): malicious $SIG — not executed during plist construction.
@@ -977,6 +1252,12 @@ PLIST22="$(plist_of "$SB")"
 { [ -n "$PLIST22" ] && python3 -c "import xml.etree.ElementTree as ET; ET.parse('$PLIST22')" >/dev/null 2>&1; } \
   && ok "(22/plan15) SIG with & and < yields a python3-ET-parse-clean plist" \
   || bad "(22/plan15) XML metacharacters broke plist"
+# The prompt never crosses the XML layer now, so the runner holds & raw.
+R22="$(runner_of "$SB")"
+{ [ -n "$R22" ] && grep -qF 'foo.md &amp; <tag>' "$R22" && ! grep -qF '&amp;amp;' "$R22" \
+    && ! grep -qF '&lt;tag' "$R22"; } \
+  && ok "(22/plan15) runner holds SIG's & and < raw (no XML escaping)" \
+  || bad "(22/plan15) runner prompt was XML-escaped"
 
 # Case 23: gh API failure → fail-closed guard (upstream guard from PR #1861, bin/docfix-run:50-55).
 # That guard emits "could not query open PRs (gh failed) — skipping this cycle (fail-closed)."
@@ -998,9 +1279,205 @@ RC23=$?
     && grep -qF 'NEVER SWAP A FIGURE WITHOUT RE-READING ITS SENTENCE' "$REAL_DOCFIX" \
     && grep -qF '## Addendum' "$REAL_DOCFIX" \
     && grep -qF '## Content rewritten' "$REAL_DOCFIX" \
-    && grep -qF 'ibl5/classes/*/README.md' "$REAL_DOCFIX"; } \
-  && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure + allowlist clauses present" \
+    && grep -qF 'ibl5/classes/*/README.md' "$REAL_DOCFIX" \
+    && grep -qF 'Tier 2 is agent-steering markdown' "$REAL_DOCFIX"; } \
+  && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure + allowlist + Tier 2 clauses present" \
   || bad "(48) prompt: an append-only/disclosure clause was dropped from \$PROMPT"
+
+# --- Case 48b: static — launch keeps --effort low and the prompt demands a real check
+{ grep -qF -- '--effort low' "$REAL_DOCFIX" \
+    && grep -qF 'run a real check that exercises it' "$REAL_DOCFIX"; } \
+  && ok "(48b) launch passes --effort low and prompt requires a real verification check" \
+  || bad "(48b) --effort low or the real-check verification paragraph missing from bin/docfix-run"
+
+# --- Case 48c: static — TODAY is the local date (launchd-shaped env has no TZ surprise)
+{ grep -qF 'TODAY="$(date +%Y-%m-%d)"' "$REAL_DOCFIX" \
+    && ! grep -q 'date -u' "$REAL_DOCFIX"; } \
+  && ok "(48c) TODAY uses the local date, not UTC" \
+  || bad "(48c) bin/docfix-run TODAY must be local date +%Y-%m-%d with no date -u"
+
+# --- Cases 48d-48g: emitted prompt keeps the bin/check-docs verification contract
+# 48b greps the SOURCE of bin/docfix-run. These cases check the prompt the model
+# actually receives (after the shq/XML round-trip) and that every bin/check-docs
+# command it names is real. A live agent skipping the check is caught after the
+# fact by pr-meta-checks.yml (bin/check-docs --since=<base> on every PR).
+CHECK_DOCS_HELP="$("$REPO_ROOT/bin/check-docs" --help 2>&1)"
+VERIF_OPEN='Before reporting any fix done, run a real check that exercises it:'
+VERIF_CLOSE='instead of reporting the fix as done.'
+
+# emitted_prompt_of "$SB" -> prints the prompt text claude -p receives (Case 20 recipe).
+emitted_prompt_of() {
+    local P CMD TOKEN RT RC=0
+    P="$(runner_of "$1")"; [ -n "$P" ] || return 1
+    CMD=$(grep 'claude -p' "$P")
+    TOKEN=$(printf '%s' "$CMD" | sed -n 's/.*claude -p \(.*\) --dangerously.*/\1/p')
+    [ -n "$TOKEN" ] || return 1
+    RT="$(mktemp -d)"
+    ( cd "$RT" && bash -c "printf '%s' $TOKEN" ) 2>/dev/null || RC=$?
+    rmdir "$RT" 2>/dev/null || true
+    return "$RC"
+}
+
+# prompt_check_contract "$TEXT" -> 0 when the verification contract holds, else 1.
+prompt_check_contract() {
+    local T="$1" REST PARA CMDS FLAG N
+    [ -n "$CHECK_DOCS_HELP" ] || return 1
+    case "$T" in *"$VERIF_OPEN"*"$VERIF_CLOSE"*) ;; *) return 1 ;; esac
+    REST="${T#*"$VERIF_OPEN"}"
+    PARA="${REST%%"$VERIF_CLOSE"*}"
+    # (a) the verification paragraph itself names the tool and the anti-skip clauses
+    case "$PARA" in *'`bin/check-docs`'*) ;; *) return 1 ;; esac
+    case "$PARA" in *'reading their output'*) ;; *) return 1 ;; esac
+    case "$PARA" in *'failed to start does not count'*) ;; *) return 1 ;; esac
+    case "$PARA" in *'which one you did not run'*) ;; *) return 1 ;; esac
+    # (b) the concrete commands: staleness report before AND after, plus fix-dates
+    N=$(( $(printf '%s' "$T" | grep -oF '`bin/check-docs --staleness-report`' | wc -l) ))
+    [ "$N" -ge 2 ] || return 1
+    case "$T" in *'`bin/check-docs --fix-dates --since=master`'*) ;; *) return 1 ;; esac
+    # (c) every --flag in every backticked bin/check-docs command is a real option
+    CMDS=$(printf '%s' "$T" | grep -oE '`bin/check-docs --[^`]*`')
+    [ -n "$CMDS" ] || return 1
+    for FLAG in $(printf '%s\n' "$CMDS" | grep -oE -- '--[a-z][a-z-]*'); do
+        printf '%s\n' "$CHECK_DOCS_HELP" \
+            | grep -qE -- "^[[:space:]]+${FLAG}([[:space:]=]|\$)" || return 1
+    done
+    return 0
+}
+
+# plist_field <plist> <key> -> prints one top-level string value of the plist.
+plist_field() { python3 -I -c 'import plistlib,sys
+print(plistlib.load(open(sys.argv[1],"rb"))[sys.argv[2]])' "$1" "$2"; }
+
+# exec_runner <runner> <outdir> -> runs the generated runner under exported-function stubs.
+# Functions win over every PATH lookup; the runner prepends /usr/local/bin and
+# /opt/homebrew/bin, so a PATH stub could lose to a real `claude` and launch a live session.
+exec_runner() {
+    (
+        OUT="$2"; mkdir -p "$OUT"; export OUT
+        claude()     { pwd -P > "$OUT/cwd"; printf '%s' "$2" > "$OUT/prompt"
+                       printf '%s\n' "$@" > "$OUT/args"; printf '%s' "${CLAUDE_HEADLESS:-}" > "$OUT/headless"; }
+        caffeinate() { [ "$1" = "-s" ] && shift; "$@"; }
+        launchctl()  { printf '%s\n' "$*" >> "$OUT/launchctl"; }
+        export -f claude caffeinate launchctl
+        HOME="$SB/home" bash "$1" >/dev/null 2>&1
+    )
+}
+
+# Case 20c: the generated runner, executed under stubs, delivers the prompt byte-for-byte,
+# runs from the worktree, boots the job out, and removes the plist and itself.
+SB="$(build_sandbox)"
+SIG20C='ibl5/docs/foo.md,$(touch /tmp/pr20c-pwned) `touch /tmp/pr20c-pwned-bt`'
+run_docfix "$SB" "" "" "20c" "$SIG20C" >/dev/null
+P20C="$(plist_of "$SB")"; R20C="$(runner_of "$SB")"
+WD20C="$(plist_field "$P20C" WorkingDirectory)"; LABEL20C="$(plist_field "$P20C" Label)"
+mkdir -p "$WD20C"
+EXPECT20C="$SB/expect20c"; emitted_prompt_of "$SB" > "$EXPECT20C"
+exec_runner "$R20C" "$SB/run20c"
+{ cmp -s "$EXPECT20C" "$SB/run20c/prompt" \
+    && prompt_check_contract "$(cat "$SB/run20c/prompt")" \
+    && grep -qF '$(touch /tmp/pr20c-pwned)' "$SB/run20c/prompt" \
+    && [ ! -e /tmp/pr20c-pwned ] && [ ! -e /tmp/pr20c-pwned-bt ]; } \
+  && ok "(20c) runner execution: claude receives the emitted prompt byte-identical, injection inert" \
+  || bad "(20c) runner execution: prompt delivery"
+{ [ "$(cat "$SB/run20c/cwd" 2>/dev/null)" = "$(cd "$WD20C" && pwd -P)" ] \
+    && [ "$(cat "$SB/run20c/headless" 2>/dev/null)" = "1" ] \
+    && grep -qxF -- '--model' "$SB/run20c/args" && grep -qxF 'claude-sonnet-5-5' "$SB/run20c/args" \
+    && grep -qxF -- '--session-id' "$SB/run20c/args" \
+    && grep -qxF -- '--name' "$SB/run20c/args" && grep -qxF "$LABEL20C" "$SB/run20c/args"; } \
+  && ok "(20c) runner execution: cwd = worktree, CLAUDE_HEADLESS=1, model/session-id/name flags" \
+  || bad "(20c) runner execution: cwd or flags"
+{ grep -qxF "bootout gui/$(id -u)/$LABEL20C" "$SB/run20c/launchctl" 2>/dev/null \
+    && [ ! -e "$P20C" ] && [ ! -e "$R20C" ]; } \
+  && ok "(20c) runner execution: launchctl bootout fired; plist and runner removed" \
+  || bad "(20c) runner execution: cleanup"
+
+# Case 20d (negative): a missing worktree dir means claude never runs, but the job still
+# boots itself out and removes the plist and runner.
+SB="$(build_sandbox)"
+run_docfix "$SB" "" "" "20d" "probe.md" >/dev/null
+P20D="$(plist_of "$SB")"; R20D="$(runner_of "$SB")"
+LABEL20D="$(plist_field "$P20D" Label)"
+rm -rf "$(plist_field "$P20D" WorkingDirectory)"
+exec_runner "$R20D" "$SB/run20d"
+{ [ ! -e "$SB/run20d/prompt" ] \
+    && grep -qxF "bootout gui/$(id -u)/$LABEL20D" "$SB/run20d/launchctl" 2>/dev/null \
+    && [ ! -e "$P20D" ] && [ ! -e "$R20D" ]; } \
+  && ok "(20d) failed cd skips claude but the job still boots out and cleans up" \
+  || bad "(20d) failed cd: claude ran or cleanup skipped"
+
+# Case 48d: the real emitted prompt satisfies the contract.
+SB="$(build_sandbox)"
+run_docfix "$SB" "" "" "1225" "probe.md" >/dev/null
+PROMPT48="$(emitted_prompt_of "$SB")" || PROMPT48=""
+rm -rf "$SB"
+{ [ -n "$PROMPT48" ] && prompt_check_contract "$PROMPT48"; } \
+  && ok "(48d) emitted prompt: verification paragraph requires bin/check-docs and every named flag exists" \
+  || bad "(48d) emitted docfix prompt breaks the bin/check-docs verification contract"
+
+# Case 48e: the command the prompt starts with really runs, read-only, and emits the
+# JSON shape the prompt tells the agent to split on (reason in {stale, dead-glob}).
+# The jq predicate fails if the 'reason' => 'stale' merge in bin/check-docs:1826
+# (line as of authoring; grep for it if it moves) is removed.
+GS48_BEFORE="$(git -C "$REPO_ROOT" status --porcelain)"
+SR48_RC=0
+SR48_OUT="$(cd "$REPO_ROOT" && bin/check-docs --staleness-report 2>/dev/null)" || SR48_RC=$?
+GS48_AFTER="$(git -C "$REPO_ROOT" status --porcelain)"
+{ [ "$SR48_RC" -eq 0 ] \
+    && [ "$GS48_BEFORE" = "$GS48_AFTER" ] \
+    && printf '%s' "$SR48_OUT" \
+        | jq -e 'type == "array" and all(.[]; .reason == "stale" or .reason == "dead-glob")' >/dev/null \
+    && grep -qF "'reason' => 'dead-glob'" "$REPO_ROOT/bin/check-docs"; } \
+  && ok "(48e) bin/check-docs --staleness-report exits 0, read-only, emits a stale/dead-glob JSON array" \
+  || bad "(48e) bin/check-docs --staleness-report failed, wrote to the tree, or changed its JSON shape"
+
+# Cases 48f/48g: the contract must REJECT each broken variant of the real prompt.
+# Each mutation removes exactly one property; a mutation that leaves the prompt
+# unchanged is itself a failure (its anchor text drifted out of bin/docfix-run).
+M48_FAIL=0
+_m48() {   # _m48 CASE LABEL MUTATED_TEXT
+    if [ "$3" = "$PROMPT48" ]; then
+        bad "($1) mutation '$2' did not change the prompt (anchor drifted)"; M48_FAIL=1
+    elif prompt_check_contract "$3"; then
+        bad "($1) contract accepted mutated prompt: $2"; M48_FAIL=1
+    fi
+}
+if [ -z "$PROMPT48" ]; then
+    bad "(48f) no emitted prompt to mutate (48d extraction failed)"
+    bad "(48g) no emitted prompt to mutate (48d extraction failed)"
+else
+    # 48f: verification-paragraph mutations (contract clause a)
+    S_CD='the `bin/check-docs` commands named below, '
+    S_READ='reading their output'
+    S_START='A check command that failed to start does not count. '
+    S_WHICH='say which one you did not run and why'
+    M48_FAIL=0
+    _m48 48f "paragraph no longer names bin/check-docs" "${PROMPT48/"$S_CD"/}"
+    _m48 48f "reading-their-output clause dropped" "${PROMPT48/"$S_READ"/skimming them}"
+    _m48 48f "failed-to-start clause dropped" "${PROMPT48/"$S_START"/}"
+    _m48 48f "which-one-not-run clause dropped" "${PROMPT48/"$S_WHICH"/explain}"
+    _m48 48f "paragraph closing marker removed" "${PROMPT48/"$VERIF_CLOSE"/}"
+    [ "$M48_FAIL" -eq 0 ] \
+      && ok "(48f) contract rejects all 5 verification-paragraph mutations"
+
+    # 48g: command and flag mutations (contract clauses b and c), plus empty --help
+    S_SR='`bin/check-docs --staleness-report`'
+    S_FD='`bin/check-docs --fix-dates --since=master`'
+    M48_FAIL=0
+    _m48 48g "flag renamed to --staleness-reprot" \
+        "${PROMPT48//--staleness-report/--staleness-reprot}"
+    _m48 48g "closing re-run of the staleness report dropped" \
+        "${PROMPT48/"re-run $S_SR"/re-run the report}"
+    _m48 48g "fix-dates command dropped" "${PROMPT48/"$S_FD"/the date fixer}"
+    _m48 48g "unknown flag injected in an extra command" \
+        "$PROMPT48 Also run \`bin/check-docs --staleness-reprot\`."
+    HELP48_SAVED="$CHECK_DOCS_HELP"; CHECK_DOCS_HELP=""
+    if prompt_check_contract "$PROMPT48"; then
+        bad "(48g) contract accepted the real prompt with an empty bin/check-docs --help"; M48_FAIL=1
+    fi
+    CHECK_DOCS_HELP="$HELP48_SAVED"
+    [ "$M48_FAIL" -eq 0 ] \
+      && ok "(48g) contract rejects all 5 command/flag mutations"
+fi
 
 # --- Cases 49-64: bin/docfix-check-veronly numeric-pass + boundary cases ------
 
@@ -1015,6 +1492,19 @@ veronly_add_master() {
     git -C "$R" commit -qm "add $RELPATH" >/dev/null 2>&1
     git -C "$R" branch -f "$VR_SLUG" master
     git -C "$R" checkout -q "$VR_SLUG"
+}
+
+# Frontmatter fixture: line 1 ---, 2 description, 3 paths, 4 last_verified, 5 ---, body from 6.
+veronly_seed_fm() {   # veronly_seed_fm "$R" relpath date body...   (commits to master, re-points branch)
+    local R="$1" RELPATH="$2" D="$3"; shift 3
+    veronly_add_master "$R" "$RELPATH" '---' 'description: fixture' 'paths: "ibl5/**"' "last_verified: $D" '---' "$@"
+}
+write_fm() {          # write_fm "$R" relpath date body...           (working-tree edit only)
+    local R="$1" RELPATH="$2" D="$3"; shift 3
+    printf '%s\n' '---' 'description: fixture' 'paths: "ibl5/**"' "last_verified: $D" '---' "$@" > "$R/$RELPATH"
+}
+veronly_run() {       # veronly_run "$R" "$SB2" → sets VOUT, VRC
+    VOUT="$( cd "$1" && HOME="$2/home" DOCFIX_BASE_REF=master "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
 }
 
 # Case 49: date-only bump in ibl5/docs/decisions/0002.md (PR #2059 shape) → PASS
@@ -1319,66 +1809,67 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
   && ok "(66) veronly: class README date bump + numeric swap arms the plan (rc 0)" \
   || bad "(66) veronly: ibl5/classes/*/README.md should PASS and arm"
 
-# Case 67: .claude/rules/x.md date-bump-only → HOLD, path outside docfix allowlist
-SB2="$(build_veronly_repo)"
-R="$SB2/repo"
-PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-veronly_add_master "$R" ".claude/rules/x.md" 'last_verified: 2026-01-01'
-printf 'last_verified: 2026-09-24\n' > "$R/.claude/rules/x.md"
-VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
-    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
-{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && grep -q '## Automouse Hold Justification' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF 'path outside docfix allowlist' \
-    && printf '%s' "$VOUT" | grep -qF '.claude/rules/x.md'; } \
-  && ok "(67) veronly: .claude/rules date-only bump holds (rc 1, path guard fires)" \
-  || bad "(67) veronly: .claude/rules/x.md should HOLD"
+# Assertion helpers for the tier-2 cases (read VRC, VOUT, PLAN_V from the caller).
+# expect_pass "label"            → rc 0, 'PASS — armed', auto_merge: true, no hold section
+# expect_hold "label" "token"    → rc 1, auto_merge: false, hold section present, token in VOUT
+expect_pass() {
+    { [ "$VRC" -eq 0 ] \
+        && grep -qF -- 'PASS — armed' <<< "$VOUT" \
+        && grep -q '^auto_merge: true$' "$PLAN_V" \
+        && ! grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
+      && ok "$1" || bad "$1 (rc=$VRC: $VOUT)"
+}
+expect_hold() {
+    { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+        && grep -q '## Automouse Hold Justification' "$PLAN_V" \
+        && grep -qF -- "$2" <<< "$VOUT"; } \
+      && ok "$1" || bad "$1 (rc=$VRC: $VOUT)"
+}
 
-# Case 68a: mixed diff — allowed class README + .claude/rules/x.md (PR #2383 shape) → HOLD
+# Case 67: .claude/rules/x.md frontmatter date-bump-only → PASS (tier 2: agent-steering markdown)
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-veronly_add_master "$R" "ibl5/classes/EventLog/README.md" 'last_verified: 2026-01-01'
-veronly_add_master "$R" ".claude/rules/x.md" 'last_verified: 2026-01-01'
-printf 'last_verified: 2026-09-24\n' > "$R/ibl5/classes/EventLog/README.md"
-printf 'last_verified: 2026-09-24\n' > "$R/.claude/rules/x.md"
-VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
-    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
-{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF 'path outside docfix allowlist' \
-    && printf '%s' "$VOUT" | grep -qF '.claude/rules/x.md'; } \
-  && ok "(68a) veronly: mixed allowed README + .claude/rules diff holds (rc 1)" \
-  || bad "(68a) veronly: mixed diff should HOLD"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 'body'
+write_fm "$R" .claude/rules/x.md 2026-09-30 'body'
+veronly_run "$R" "$SB2"
+expect_pass "(67) veronly: .claude/rules date-only bump arms the plan (tier 2)"
 
-# Case 68b: same mixed shape with the disallowed path sorting AFTER the allowed one
-# (git name-status is path-sorted; 'R' < 'n' so README.md is row 1) → still HOLD.
+# Case 68a: mixed diff — allowed class README + .claude/rules/x.md (PR #2383 shape) → PASS.
+# Row-order note: every tier-2 path (.claude/, AGENTS.md, CLAUDE.md) sorts before ibl5/ in
+# git's byte order, so a tier-1-first mixed diff cannot be fabricated; both failing-row
+# positions are instead covered by 78a/78b below.
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 'body'
 veronly_add_master "$R" "ibl5/classes/EventLog/README.md" 'last_verified: 2026-01-01'
+write_fm "$R" .claude/rules/x.md 2026-09-30 'body'
+printf 'last_verified: 2026-09-30\n' > "$R/ibl5/classes/EventLog/README.md"
+veronly_run "$R" "$SB2"
+expect_pass "(68a) veronly: mixed .claude/rules + class README date bumps arm the plan"
+
+# Case 68b: same mixed shape but the second path is ibl5/classes/EventLog/notes.md
+# (not README.md, outside the allowlist) → HOLD
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 'body'
 veronly_add_master "$R" "ibl5/classes/EventLog/notes.md" 'last_verified: 2026-01-01'
-printf 'last_verified: 2026-09-24\n' > "$R/ibl5/classes/EventLog/README.md"
-printf 'last_verified: 2026-09-24\n' > "$R/ibl5/classes/EventLog/notes.md"
-VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
-    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
-{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF 'path outside docfix allowlist' \
-    && printf '%s' "$VOUT" | grep -qF 'ibl5/classes/EventLog/notes.md'; } \
-  && ok "(68b) veronly: mixed diff holds when the allowed path is row 1 (rc 1)" \
-  || bad "(68b) veronly: mixed diff (allowed first) should HOLD"
+write_fm "$R" .claude/rules/x.md 2026-09-30 'body'
+printf 'last_verified: 2026-09-30\n' > "$R/ibl5/classes/EventLog/notes.md"
+veronly_run "$R" "$SB2"
+expect_hold "(68b) veronly: tier-2 date bump plus notes.md holds (rc 1)" \
+    "path outside docfix allowlist: 'ibl5/classes/EventLog/notes.md'"
 
-# Case 69: repo-root CLAUDE.md date-bump-only → HOLD
+# Case 69: repo-root CLAUDE.md frontmatter date-bump-only → PASS
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-veronly_add_master "$R" "CLAUDE.md" 'last_verified: 2026-01-01'
-printf 'last_verified: 2026-09-24\n' > "$R/CLAUDE.md"
-VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
-    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
-{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF "path outside docfix allowlist: 'CLAUDE.md'"; } \
-  && ok "(69) veronly: CLAUDE.md date-only bump holds (rc 1)" \
-  || bad "(69) veronly: CLAUDE.md should HOLD"
+veronly_seed_fm "$R" CLAUDE.md 2026-01-01 'body'
+write_fm "$R" CLAUDE.md 2026-09-30 'body'
+veronly_run "$R" "$SB2"
+expect_pass "(69) veronly: CLAUDE.md date-only bump arms the plan"
 
 # Case 70: ibl5/foo/README.md date-bump-only (README outside the allowlist) → HOLD
 SB2="$(build_veronly_repo)"
@@ -1393,5 +1884,183 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
   && ok "(70) veronly: README outside ibl5/classes/*/ holds (rc 1)" \
   || bad "(70) veronly: ibl5/foo/README.md should HOLD"
 
-if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
-exit "$FAILED"
+# --- Cases 71-80: tier-2 (agent-steering markdown) frontmatter date-bump guard ---
+BODY157='Logged from 157 call sites.'
+
+# Case 71: date bump + body numeric swap → 2 hunks → HOLD (steering files take the date-only path)
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+write_fm "$R" .claude/rules/x.md 2026-09-30 'Logged from 159 call sites.'
+veronly_run "$R" "$SB2"
+expect_hold "(71) veronly: steering date + body numeric swap holds (2 hunks)" \
+    "steering file '.claude/rules/x.md': expected exactly 1 hunk, found 2"
+
+# Case 72: date bump + adjacent paths: edit → 1 hunk, 2 pairs → HOLD. The -U0 header
+# '@@ -3,2 +3,2 @@' trips the one-line-replacement guard before the -/+ pair-count check runs
+# (that count check is defensive; a 1-line header can only carry one pair).
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+printf '%s\n' '---' 'description: fixture' 'paths: "bin/**"' 'last_verified: 2026-09-30' '---' "$BODY157" \
+    > "$R/.claude/rules/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(72) veronly: steering date + adjacent paths edit holds (2 pairs)" \
+    "steering file '.claude/rules/x.md': hunk is not a one-line replacement: @@ -3,2 +3,2 @@"
+
+# Case 72b: the -/+ pair-count guard in check_steering_date_only. Case 72 stops at the
+# hunk-header check, and a one-line '@@ -N +N @@' header from real git output always
+# carries 1 removed / 1 added, so the guard is only reachable when the line counter
+# drops a row: a removed body line '-- old' renders as '--- old', which the
+# diff-header skip pattern ("--- "*) swallows. Result: 1 hunk, 0 removed / 1 added.
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 '-- old'
+write_fm "$R" .claude/rules/x.md 2026-01-01 'new'
+veronly_run "$R" "$SB2"
+expect_hold "(72b) veronly: steering unpaired -/+ count holds (0 removed / 1 added)" \
+    "steering file '.claude/rules/x.md': expected exactly one -/+ line pair, found 0 removed / 1 added"
+
+# Case 73b: backwards date → HOLD
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+write_fm "$R" .claude/rules/x.md 2025-12-31 "$BODY157"
+veronly_run "$R" "$SB2"
+expect_hold "(73b) veronly: steering backwards date holds" \
+    "date not strictly advancing '2026-01-01' → '2025-12-31'"
+
+# Case 73c: CRLF on the date line → new line fails DATE_RE → HOLD
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+{ printf '%s\n' '---' 'description: fixture' 'paths: "ibl5/**"'
+  printf 'last_verified: 2026-01-01\r\n'
+  printf '%s\n' '---' "$BODY157"; } > "$R/.claude/rules/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(73c) veronly: steering CRLF date line holds" "change line is not a last_verified date"
+
+# Case 74a: fenced last_verified on line 7 (inside body) bumped → HOLD outside frontmatter
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 '```yaml' 'last_verified: 2026-01-01' '```'
+write_fm "$R" .claude/rules/x.md 2026-01-01 '```yaml' 'last_verified: 2026-09-30' '```'
+veronly_run "$R" "$SB2"
+expect_hold "(74a) veronly: steering fenced last_verified outside frontmatter holds" \
+    "last_verified line 7 is outside the frontmatter (closing --- at line 5)"
+
+# Case 74b: base blob has no frontmatter → HOLD
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" .claude/rules/x.md 'last_verified: 2026-01-01'
+printf 'last_verified: 2026-09-30\n' > "$R/.claude/rules/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(74b) veronly: steering file without frontmatter holds" \
+    "base blob has no closed YAML frontmatter"
+
+# Case 75: .claude/hooks/x.sh (not markdown) → HOLD outside allowlist
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" .claude/hooks/x.sh 'last_verified: 2026-01-01'
+printf 'last_verified: 2026-09-30\n' > "$R/.claude/hooks/x.sh"
+veronly_run "$R" "$SB2"
+expect_hold "(75) veronly: .claude/hooks/x.sh holds (only .claude/*.md is tier 2)" \
+    "path outside docfix allowlist: '.claude/hooks/x.sh'"
+
+# Case 76a: AGENTS.md date-only → PASS
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" AGENTS.md 2026-01-01 'body'
+write_fm "$R" AGENTS.md 2026-09-30 'body'
+veronly_run "$R" "$SB2"
+expect_pass "(76a) veronly: AGENTS.md date-only bump arms the plan"
+
+# Case 76b: AGENTS.md date bump + body edit → HOLD 2 hunks
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" AGENTS.md 2026-01-01 'body'
+write_fm "$R" AGENTS.md 2026-09-30 'body two'
+veronly_run "$R" "$SB2"
+expect_hold "(76b) veronly: AGENTS.md date + body edit holds" \
+    "steering file 'AGENTS.md': expected exactly 1 hunk, found 2"
+
+# Case 76c: ibl5/CLAUDE.md (not repo-root) → HOLD outside allowlist
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" ibl5/CLAUDE.md 2026-01-01 'body'
+write_fm "$R" ibl5/CLAUDE.md 2026-09-30 'body'
+veronly_run "$R" "$SB2"
+expect_hold "(76c) veronly: ibl5/CLAUDE.md holds (only repo-root CLAUDE.md is tier 2)" \
+    "path outside docfix allowlist: 'ibl5/CLAUDE.md'"
+
+# Case 77a: mode change 100644 → 100755 with unchanged content → HOLD
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 'body'
+git -C "$R" config core.fileMode true
+chmod 755 "$R/.claude/rules/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(77a) veronly: steering mode change holds" \
+    "mode/type is not a regular 100644 file on both sides (100644 → 100755)"
+
+# Case 77b: symlink retarget (120000 → 120000) → HOLD
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+git -C "$R" checkout -q master
+mkdir -p "$R/.claude/rules"
+printf 'last_verified: 2026-01-01\n' > "$R/.claude/rules/y.md"
+printf 'last_verified: 2026-01-01\n' > "$R/.claude/rules/y2.md"
+ln -s y.md "$R/.claude/rules/x.md"
+git -C "$R" add .claude/rules
+git -C "$R" commit -qm "add symlink fixture" >/dev/null 2>&1
+git -C "$R" branch -f "$VR_SLUG" master
+git -C "$R" checkout -q "$VR_SLUG"
+ln -sfn y2.md "$R/.claude/rules/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(77b) veronly: steering symlink retarget holds" "(120000 → 120000)"
+
+# Case 78a: tier-2 body-only edit + a tier-1 date bump → HOLD on the steering file
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+veronly_add_master "$R" ibl5/docs/x.md 'last_verified: 2026-01-01'
+write_fm "$R" .claude/rules/x.md 2026-01-01 'Logged from 157 sites now.'
+printf 'last_verified: 2026-09-30\n' > "$R/ibl5/docs/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(78a) veronly: steering body edit holds even beside a clean tier-1 bump" \
+    "steering file '.claude/rules/x.md'"
+
+# Case 78b: clean tier-2 date bump + a tier-1 file with an unpaired line → HOLD on the tier-1 file
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+veronly_add_master "$R" ibl5/docs/x.md 'last_verified: 2026-01-01'
+write_fm "$R" .claude/rules/x.md 2026-09-30 "$BODY157"
+printf '%s\n' 'last_verified: 2026-09-30' 'new prose' > "$R/ibl5/docs/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(78b) veronly: clean steering bump does not mask a later unpaired tier-1 file" \
+    "unpaired change lines in 'ibl5/docs/x.md'"
+
+# Case 79: PR #2559 replay — environment.md (list-style paths) + ADR date bumps → PASS
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" .claude/rules/environment.md '---' 'description: env' 'paths:' \
+    '  - "ibl5/**"' 'last_verified: 2026-07-31' '---' '# Environment' 'body'
+veronly_add_master "$R" ibl5/docs/decisions/0036-x.md 'last_verified: 2026-01-01'
+printf '%s\n' '---' 'description: env' 'paths:' '  - "ibl5/**"' 'last_verified: 2026-09-30' '---' \
+    '# Environment' 'body' > "$R/.claude/rules/environment.md"
+printf 'last_verified: 2026-09-30\n' > "$R/ibl5/docs/decisions/0036-x.md"
+veronly_run "$R" "$SB2"
+expect_pass "(79) veronly: PR #2559 replay (environment.md + ADR date bumps) arms the plan"
+
+# Case 80: .claude/skills/plan/SKILL.md (nested) date-only → PASS
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/skills/plan/SKILL.md 2026-01-01 'body'
+write_fm "$R" .claude/skills/plan/SKILL.md 2026-09-30 'body'
+veronly_run "$R" "$SB2"
+expect_pass "(80) veronly: nested .claude/skills/plan/SKILL.md date-only bump arms the plan"
+
+# Case 81: arming strips the stale " Held for human merge." sentence, keeps the
+# rest of the line, and a second run is a no-op
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+printf '%s\n' '---' 'auto_merge: false' '---' '' \
+    'Refreshes flagged docs (issue #965). Held for human merge.' \
+    '' '## Automouse Hold Justification' '' 'auto_merge: false — hold.' > "$PLAN_V"
+printf 'last_verified: 2026-08-13\n' > "$R/ibl5/docs/x.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+cp "$PLAN_V" "$SB2/after1.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC2=0 || VRC2=$?
+{ [ "$VRC" -eq 0 ] && [ "$VRC2" -eq 0 ] \
+    && ! grep -q 'Held for human merge' "$PLAN_V" \
+    && grep -qF 'flagged docs (issue #965).' "$PLAN_V" \
+    && cmp -s "$PLAN_V" "$SB2/after1.md"; } \
+  && ok "(81) veronly: arming strips 'Held for human merge', second run is a no-op" \
+  || bad "(81) veronly: stale 'Held for human merge' sentence"
+
+h_done

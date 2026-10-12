@@ -21,8 +21,8 @@ materially smaller than 75 by design.
 | tests/Team/TeamViewXssTest.php | 1 | **DEFER (fixable follow-up)** | Same `stdClass`-team root cause; XSS coverage must be preserved during the conversion. Pairs with TeamViewTest. |
 | tests/Search/SearchViewTest.php | 1 (6 occ) | **DEFER (fixable follow-up)** | Helper already has a precise `@return`; only gap is `results: list<mixed>|null` vs prod union `list<StoryResult>|list<CommentResult>|list<UserResult>|null`. Faithful narrow needs importing the three result aliases + confirming each result-bearing test builds a conforming row — deferred to avoid a "trust-me" `@var` that doesn't reflect the data. |
 | tests/Extension/ExtensionOfferEvaluatorTest.php | 8 | **RETAIN** | Empty `array{}` deliberately exercises `?? default` coalescing in each modifier calc. Author intent comments already present (`:146-148`, `:594`, `:604`, `:615`, `:625`, `:634`). |
-| tests/DepthChartEntry/DepthChartEntryValidatorTest.php | 8 | **RETAIN** | Fixtures omit `playerData` to validate the structural/count rules independent of the player list — the missing key is the point. |
-| tests/DepthChartEntry/DepthChartEntryProcessorTest.php | 7 | **RETAIN** | Partial player rows + string-coerced `pg: '1'` (mirrors `$_POST`) + comma-name CSV edge. Each exercises a degenerate-input branch. |
+| tests/DepthChart/DepthChartValidatorTest.php | 8 | **RETAIN** | Fixtures omit `playerData` to validate the structural/count rules independent of the player list. The missing key is the point. |
+| tests/DepthChart/DepthChartProcessorTest.php | 7 | **RETAIN** | Partial player rows + string-coerced `pg: '1'` (mirrors `$_POST`) + comma-name CSV edge. Each exercises a degenerate-input branch. |
 | tests/FreeAgency/CommonContractValidatorTest.php | 5 | **RETAIN** | Empty `array{}` offers exercise missing-year validation; `:731-733` documented. |
 | tests/Waivers/WaiversProcessorTest.php | 4 | **RETAIN** | Partial player rows (`salary_yr1`/`exp` only) exercise `determineContractData` defaulting. |
 | tests/Trading/TradeValidatorTest.php | 3 | **RETAIN** | Empty/partial trade-cap arrays exercise missing-key cap validation. |
@@ -35,7 +35,7 @@ materially smaller than 75 by design.
 | tests/Negotiation/NegotiationDemandCalculatorTest.php | 1 | **RETAIN** | Empty `array{}` teamFactors → `?? default` path. |
 | tests/Player/PlayerImageHelperTest.php | 1 | **RETAIN** | `float` input proves coercion handling; documented `:189-191`. |
 | tests/AwardHistory/AwardHistoryViewTest.php | 1 | **RETAIN** | `array{year:null,...}` null-row; documented `:177-179`. |
-| tests/DepthChartEntry/DepthChartEntryRepositoryTest.php | 1 | **RETAIN** | String depth values mirror `$_POST`; documented `:141-143`. |
+| tests/DepthChart/DepthChartRepositoryTest.php | 1 | **RETAIN** | String depth values mirror `$_POST`; documented `:141-143`. |
 | tests/DraftPickLocator/DraftPickLocatorViewTest.php | 1 | **RETAIN** | `'Team&Name'`/`Test<script>` XSS-sanitization edge. |
 | tests/CapSpace/CapSpaceViewTest.php | 1 | **RETAIN** | `'Test<script>'`/`'Team&Name'` XSS-sanitization edge. |
 | tests/FreeAgency/FreeAgencyAdminProcessorTest.php | 1 | **RETAIN** | Fixture carries extra `offerTotal` key vs sealed param; dropping it is marginal — deferred. |

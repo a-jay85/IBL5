@@ -16,6 +16,11 @@ final class ModuleRegistryTest extends TestCase
         self::assertTrue(ModuleRegistry::isValid('YourAccount'));
     }
 
+    public function testLeagueControlPanelIsRegistered(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('LeagueControlPanel'));
+    }
+
     public function testUnknownModuleIsInvalid(): void
     {
         self::assertFalse(ModuleRegistry::isValid('NotAModule'));
@@ -72,5 +77,17 @@ final class ModuleRegistryTest extends TestCase
                 "Module directory '$dir' exists on disk but is not in ModuleRegistry::VALID_MODULES"
             );
         }
+    }
+
+    public function testRenamedModulesAreValid(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('PlayerSearch'));
+        self::assertTrue(ModuleRegistry::isValid('SeasonRosterChanges'));
+    }
+
+    public function testRetiredModuleNamesAreRejected(): void
+    {
+        self::assertFalse(ModuleRegistry::isValid('PlayerDatabase'));
+        self::assertFalse(ModuleRegistry::isValid('PlayerMovement'));
     }
 }

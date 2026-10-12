@@ -55,7 +55,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('NEW IBL RECORD', $result[0]);
         $this->assertStringContainsString('New Star', $result[0]);
         $this->assertStringContainsString('85', $result[0]);
@@ -72,7 +72,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     public function testNoDetectionWhenNoRecordsExist(): void
@@ -82,7 +82,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     public function testDetectsPlayoffPlayerRecord(): void
@@ -95,7 +95,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-06-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('playoff', $result[0]);
     }
 
@@ -126,7 +126,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2006-10-10']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('HEAT', $result[0]);
     }
 
@@ -140,7 +140,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('IBL RECORD TIED', $result[0]);
         $this->assertStringContainsString('tying', $result[0]);
         $this->assertStringContainsString('New Star', $result[0]);
@@ -156,7 +156,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('breaking', $result[0]);
         $this->assertStringNotContainsString('tying', $result[0]);
         $this->assertStringNotContainsString('TIED', $result[0]);
@@ -188,7 +188,7 @@ final class RecordBreakingDetectorTest extends TestCase
         // Sim batch spans multiple dates; the record is on 2007-02-26, not the latest date
         $result = $this->detector->detectAndAnnounce(['2007-02-18', '2007-02-26', '2007-03-02']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('IBL RECORD TIED', $result[0]);
         $this->assertStringContainsString('Stephen Curry', $result[0]);
     }
@@ -212,7 +212,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('IBL TEAM RECORD', $result[0]);
         $this->assertStringContainsString('Heat', $result[0]);
         $this->assertStringContainsString('most points', $result[0]);
@@ -229,7 +229,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('TEAM RECORD TIED', $result[0]);
         $this->assertStringContainsString('tying', $result[0]);
     }
@@ -249,7 +249,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('NEW IBL TEAM RECORD', $result[0]);
         $this->assertStringContainsString('fewest points', $result[0]);
         $this->assertStringContainsString('Knicks', $result[0]);
@@ -283,7 +283,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-02-21']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('QUADRUPLE DOUBLE', $result[0]);
         $this->assertStringContainsString('Brandon Tomyoy', $result[0]);
         $this->assertStringContainsString('18pts/10reb/10ast/10stl', $result[0]);
@@ -344,7 +344,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     // --- Canonical stat-definition characterization ---
@@ -498,7 +498,7 @@ final class RecordBreakingDetectorTest extends TestCase
         $detector = new RecordBreakingDetector($this->mockRepository, $spy);
         $result = $detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertSame($result, $spy->captured, 'Each announcement must be dispatched exactly once, in order');
     }
 

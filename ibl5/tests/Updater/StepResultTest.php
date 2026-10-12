@@ -19,6 +19,11 @@ class StepResultTest extends TestCase
         $this->assertTrue($result->success);
     }
 
+    public function testSuccessFactorySetsSkippedFalse(): void
+    {
+        $this->assertFalse(StepResult::success('Import players')->skipped);
+    }
+
     public function testSuccessFactoryStoresLabel(): void
     {
         $result = StepResult::success('Import players');
@@ -64,6 +69,11 @@ class StepResultTest extends TestCase
         $this->assertFalse($result->success);
     }
 
+    public function testFailureFactorySetsSkippedFalse(): void
+    {
+        $this->assertFalse(StepResult::failure('Import players', 'File not found')->skipped);
+    }
+
     public function testFailureFactoryStoresLabelAndErrorMessage(): void
     {
         $result = StepResult::failure('Import players', 'File not found');
@@ -89,6 +99,11 @@ class StepResultTest extends TestCase
         $result = StepResult::skipped('Import players', 'Already imported');
 
         $this->assertTrue($result->success);
+    }
+
+    public function testSkippedFactorySetsSkippedTrue(): void
+    {
+        $this->assertTrue(StepResult::skipped('Import players', 'Already imported')->skipped);
     }
 
     public function testSkippedFactoryStoresReasonAsDetail(): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Negotiation;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Negotiation\NegotiationValidator;
 use Player\Player;
@@ -372,6 +373,107 @@ class NegotiationValidatorTest extends TestCase
 
         // contractCurrentYear 0 → next year salary check uses year 1 (0) → eligible
         $this->assertTrue($result->isValid());
+    }
+
+    /**
+     * @return array<string, array{array<string, int>, bool}>
+     */
+    public static function nullContractFieldProvider(): array
+    {
+        return [
+            'contractCurrentYear null reads year 1 salary' => [['getContractYear2Salary' => 500], true],
+            'year 1 salary null counts as zero' => [[], true],
+            'year 2 salary null counts as zero' => [['getContractCurrentYear' => 1], true],
+            'year 3 salary null counts as zero' => [['getContractCurrentYear' => 2], true],
+            'year 4 salary null counts as zero' => [['getContractCurrentYear' => 3], true],
+            'year 5 salary null counts as zero' => [['getContractCurrentYear' => 4], true],
+            'year 6 salary null counts as zero' => [['getContractCurrentYear' => 5], true],
+            'draftRound null is not a first-round option year' => [
+                ['getContractCurrentYear' => 4, 'getYearsOfExperience' => 4, 'getContractYear3Salary' => 369, 'getContractYear4Salary' => 738],
+                true,
+            ],
+            'yearsOfExperience null is not option-year experience' => [
+                ['getContractCurrentYear' => 4, 'getDraftRound' => 1, 'getContractYear3Salary' => 369, 'getContractYear4Salary' => 738],
+                true,
+            ],
+            'control: next-year salary present is ineligible' => [['getContractCurrentYear' => 1, 'getContractYear2Salary' => 500], false],
+        ];
+    }
+
+    /**
+     * @param array<string, int> $getterValues
+     */
+    #[DataProvider('nullContractFieldProvider')]
+    public function testNullContractFieldCoalescesToZero(array $getterValues, bool $expectedValid): void
+    {
+        $player = self::createStub(Player::class);
+        foreach ([
+            'getContractCurrentYear',
+            'getContractYear1Salary',
+            'getContractYear2Salary',
+            'getContractYear3Salary',
+            'getContractYear4Salary',
+            'getContractYear5Salary',
+            'getContractYear6Salary',
+            'getDraftRound',
+            'getYearsOfExperience',
+        ] as $getter) {
+            $player->method($getter)->willReturn($getterValues[$getter] ?? null);
+        }
+
+        $this->assertSame($expectedValid, $this->validator->validateRenegotiationEligibility($player)->isValid());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function nonFreeAgencyPhaseProvider(): array
+    {
+        return [
+            'Preseason' => ['Preseason'],
+            'HEAT' => ['HEAT'],
+            'Draft' => ['Draft'],
+            'Playoffs' => ['Playoffs'],
+        ];
+    }
+
+    #[DataProvider('nonFreeAgencyPhaseProvider')]
+    public function testFreeAgencyCheckPassesInEveryOtherPhase(string $phase): void
+    {
+        $this->mockSeason->phase = $phase;
+
+        $this->assertTrue($this->validator->validateFreeAgencyNotActive()->isValid());
+    }
+
+    public function testIneligibleContractFailureMessageIsExactForBothEntryPoints(): void
+    {
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Ineligible Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 2,
+            'salary_yr1' => 0,
+            'salary_yr2' => 0,
+            'salary_yr3' => 1000,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5,
+        ]));
+        $expected = 'Sorry, this player is not eligible for a contract extension at this time.';
+
+        $this->assertSame($expected, $this->validator->validateNegotiationEligibility($player, 'Seattle Supersonics')->getError());
+        $this->assertSame($expected, $this->validator->validateRenegotiationEligibility($player)->getError());
+    }
+
+    public function testFreeAgencyFailureMessageIsExact(): void
+    {
+        $this->mockSeason->phase = 'Free Agency';
+
+        $this->assertSame(
+            'Sorry, the contract extension feature is not available during free agency.',
+            $this->validator->validateFreeAgencyNotActive()->getError()
+        );
     }
 
     /**

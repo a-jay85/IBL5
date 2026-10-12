@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
-use Boxscore\Season1993PhantomRepair;
+use Boxscore\Legacy\Season1993PhantomRepair;
 use PHPUnit\Framework\Attributes\Group;
 
 /**

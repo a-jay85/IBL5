@@ -212,7 +212,7 @@ class FreeAgencyDayRerunGuardTest extends DatabaseTestCase
     {
         $key = 'Current Season Ending Year';
         $league = LeagueContext::LEAGUE_IBL;
-        $stmt = $this->db->prepare('SELECT value FROM ibl_settings WHERE setting_key = ? AND league = ?');
+        $stmt = $this->db->prepare('SELECT setting_value FROM ibl_settings WHERE setting_key = ? AND league = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('ss', $key, $league);
         $stmt->execute();
@@ -221,7 +221,7 @@ class FreeAgencyDayRerunGuardTest extends DatabaseTestCase
 
         self::assertNotNull($row, "the test database must carry a '{$key}' row for '{$league}'");
 
-        return (int) $row['value'];
+        return (int) $row['setting_value'];
     }
 
     private function countMarkers(string $league, int $year, int $day): int

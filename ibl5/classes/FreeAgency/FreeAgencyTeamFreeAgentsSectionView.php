@@ -55,7 +55,7 @@ final class FreeAgencyTeamFreeAgentsSectionView implements FreeAgencyTeamFreeAge
             </td>
             <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
             <?php $resolved = PlayerImageHelper::resolvePlayerDisplay($player->getPlayerID() ?? 0, $player->getName() ?? ''); ?>
-            <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= HtmlSanitizer::e($player->getPlayerID() ?? 0) ?>">
+            <td class="ibl-player-cell sticky-col"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= HtmlSanitizer::e($player->getPlayerID() ?? 0) ?>">
                 <?= HtmlSanitizer::trusted($resolved['thumbnail']) ?>
                 <?php if (($player->getBirdYears() ?? 0) >= 3): ?>
                     *<em><?= HtmlSanitizer::e($resolved['name']) ?></em>*

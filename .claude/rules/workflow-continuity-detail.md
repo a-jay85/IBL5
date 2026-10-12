@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-09-24
+last_verified: 2026-10-11
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -22,23 +22,64 @@ branch; it survives you closing Claude Code. Engine selection:
 - **Compiled post-plan harness** (`tools/postplan-harness`) when present — a
   deterministic sequencer with bounded LLM calls. `bin/post-plan-now` pins the MAIN-CHECKOUT
   copy, never the worktree's (ADR-0092).
-- **Fallback:** a fresh **Sonnet 4.6** `/post-plan` skill session, used if the harness
+- **Fallback:** a fresh **Sonnet 5.5** `/post-plan` skill session, used if the harness
   fails or is absent. `POST_PLAN_SKILL=1` forces the skill path.
 - **No partial resume.** The harness runs Phase 5.5's plan-intent review itself
   (`harness/fidelity.py`), posts the sticky `<!-- pr-ready-verdict -->` comment, and feeds the
   verdict to arming condition (12). It exits **0**, **1** or **3** only. There is no exit 4 and
   no Phase-5.5 re-entry. Any harness failure outside exit 3 re-runs the **full** skill from
   Phase 0. Exit **3** is the fail-closed sentinel and suppresses the skill fallback entirely.
-  Three kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
-  rewritten on GitHub with different content), and a **local gate denial** (a `bin/pre-commit-hook`
-  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget). All three are
-  deterministic, so a skill re-run would hit the same wall; the run DMs you and stops for a human.
+  Five kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
+  rewritten on GitHub with different content), a **local gate denial** (a `bin/pre-commit-hook`
+  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget), a
+  **usage limit** (`llm-usage-limit`: a model call returned a session, rate, or API limit
+  message), and an **expired login** (`llm-auth-expired`: the Claude CLI login expired).
+  A skill re-run would hit the same wall on each one, so the run stops for a human.
+  For a usage limit, re-run `bin/post-plan-now` after the limit resets. For an expired
+  login, run `claude`, complete `/login`, then re-run it.
+  Before a rebase conflict reaches exit 3, a first resolution that fails the lost-work proof
+  goes through the conflict ladder in `tools/postplan-harness/harness/conflict_ladder.py`.
+  Rung 1 takes master's copy of each generated file and reruns its generator, with no model
+  call. Rung 2 retries the resolver once on Opus with the exact LOST lines. Rung 3 runs one
+  headless `claude -p` session capped at $5, 20 minutes and 80 turns. The harness re-runs the
+  unchanged proof after every rung, and `result.json` records the outcome in `conflict_rung`.
+  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped. The block ends with a paste line, `<main checkout>/bin/postplan-fix <PR|slug>`, which opens an interactive Claude session in the worktree with the failing stage, the error text, and the log paths in its opening prompt. It does not ship. The post-plan-fleet failure DMs and the pr-cycle-tick retry-cap DM end with the same line.
+  `bin/post-plan-fail-dm` sends the DM. With no live interactive Claude session in the
+  worktree it DMs at once. Headless `claude -p` sessions do not count. With an interactive
+  one, it holds the DM 15 min and sends it only if nobody re-fired the branch.
 
 On the commit path that detection is structural: any non-zero `git commit` is treated as a
 gate denial, so a hook message nobody enumerated in `_LOCAL_GATE_MARKERS` is still caught.
 `bin/post-plan-now` additionally exits **6** from its own in-flight duplicate-run guard.
 That code is caller-side and has no harness meaning: it refuses to start a second
 supervised run for a slug whose launchd job is still loaded, and `--force` bypasses it.
+It also exits **7** when run from the main checkout (ADR-0062). Nothing was fired and the
+skill fallback is suppressed. `cd` into the target worktree and re-run.
+It exits **8** when it declines a repeat hold: the last run for this slug held on the same
+structural reasons, the repeat DM was already sent, and plan, diff and harness are unchanged
+(`harness/holdrepeat.py`). Nothing was fired. `--force` overrides.
+The harness also declines inside a run, after the conflict probe and before its first LLM
+call, when the diff changed but condition (3)'s `MISSING:` and `MISSING-FILE:` items equal
+the ones the last hold recorded. A diff that never adds the missing files cannot clear that
+hold, so a fresh review would only spend tokens. The run ends with terminal
+`hold-repeat-declined`, exits **0** so no skill fallback starts, and opens no PR.
+It prints `RESULT: post-plan DECLINED` with this phrase:
+`declined: same hold as last run (<reason>), no tokens spent`.
+It DMs once per recorded hold. A strict subset (some files added) or a new
+missing item runs normally, and so do holds on conditions (7), (8) and (13).
+`bin/post-plan-now --force` passes `POSTPLAN_FORCE=1` to the harness and skips this check
+too; every other launch passes `POSTPLAN_FORCE=0`.
+The in-run decline also writes a held-unfixable marker through `harness/heldmarker.py`:
+`tools/postplan-harness/out/state/<slug>.held-unfixable.json` in the main checkout, which
+`.gitignore` already covers. It stores a hash of condition (3)'s missing set and the plan
+file's mtime. While both still match the live hold record, `bin/post-plan-now` exits **8**
+before launching anything, and `bin/pr-cycle` Stage 1 skips the PR so its `--max-ready`
+slot goes to the next one. The decline DM names the marker. Editing the plan makes it
+stale, and so does a later run that arms or holds on a different reason. To clear it by
+hand, delete the file. `--force` and `--state-changed` bypass it for one run, and a forced
+run that holds on the same reason keeps it. Automouse treats exit **8** as terminal, so a
+decline in its resume path never trips the postplan env-breaker. The marker only
+suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming condition.
 
 ## What `--auto` adds
 
@@ -60,10 +101,18 @@ human signoff.
 
 The per-branch arming marker is `$(git rev-parse --absolute-git-dir)/postplan-ready`. Only
 `~/.claude/hooks/auto-commit-reminder.sh` reads it, using it to decide which nudge to show
-at turn-end: unarmed shows commit-only; armed shows `bin/post-plan-now --auto`. Nothing else
+at turn-end: unarmed tells the model to commit and, if the work verified clean, end its reply with the `cd <worktree> && bin/post-plan-now` paste line; the model must not run `bin/post-plan-now` or /post-plan, as the branch is unarmed (unless the creator-session marker below matches); armed shows `bin/post-plan-now --auto`. Nothing else
 watches the marker or fires post-plan when it appears. The arming requirement was added after
 PR [#2340](https://github.com/a-jay85/IBL5/pull/2340) (2026-09-22), where a post-plan nudge
 caused a model to ship half-done ad-hoc work.
+
+The creator-session marker is `$(git rev-parse --absolute-git-dir)/wt-new-session`. `bin/wt-new`
+writes `$CLAUDE_CODE_SESSION_ID` into it when it creates a new branch. It writes nothing for a
+human run or for `--existing`, whose branch can carry earlier work. The same hook reads it: when
+the marker matches the Stop payload's `session_id`, the nudge says ship with
+`bin/post-plan-now --auto` once the whole task verified clean. Any other session gets the hold
+text. The marker is session-scoped by content, so a later session in the same worktree never
+inherits the ship default the way it would inherit `postplan-ready`. Added 2026-09-25.
 
 ## No deadlock
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Trading;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 use Trading\TradeCapCalculator;
@@ -132,6 +133,134 @@ class TradeCapCalculatorTest extends TestCase
         $this->assertSame(
             ['userCurrentSeasonCapTotal' => 800, 'partnerCurrentSeasonCapTotal' => 900, 'userCapSentToPartner' => 300, 'partnerCapSentToUser' => 400],
             $calculator->calculateSalaryCapData($tradeData)
+        );
+    }
+
+    /**
+     * @return array<string, array{bool, int}>
+     */
+    public static function advancesContractYearsProvider(): array
+    {
+        return [
+            'offseason: advancesContractYears true' => [true, 500],
+            'in-season: advancesContractYears false' => [false, 100],
+        ];
+    }
+
+    #[DataProvider('advancesContractYearsProvider')]
+    public function testCashConsiderationsAdjustTotalsInOppositeDirections(bool $advances, int $cashRecordBase): void
+    {
+        $userSendsCash = [1 => 200, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
+        $partnerSendsCash = [1 => 50, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
+
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashConsiderationRepo = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        $cashConsiderationRepo->method('getTeamCashForSalary')->willReturn([$this->makeDiscriminatorRow()]);
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn($advances);
+        $validator = self::createMock(TradeValidator::class);
+        $validator->expects(self::once())
+            ->method('getCurrentSeasonCashConsiderations')
+            ->with($userSendsCash, $partnerSendsCash)
+            ->willReturn(['cashSentToThem' => 200, 'cashSentToMe' => 50]);
+
+        $calculator = new TradeCapCalculator($commonRepo, $cashConsiderationRepo, $season, $validator);
+        $tradeData = $this->makeTradeData();
+        $tradeData['userSendsCash'] = $userSendsCash;
+        $tradeData['partnerSendsCash'] = $partnerSendsCash;
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => $cashRecordBase + 150, 'partnerCurrentSeasonCapTotal' => $cashRecordBase - 150, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $calculator->calculateSalaryCapData($tradeData)
+        );
+    }
+
+    public function testUncheckedRowsCountInTotalButNotInSent(): void
+    {
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashConsiderationRepo = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        $cashConsiderationRepo->method('getTeamCashForSalary')->willReturn([]);
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn(false);
+        $validator = self::createStub(TradeValidator::class);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn(['cashSentToThem' => 0, 'cashSentToMe' => 0]);
+
+        $calculator = new TradeCapCalculator($commonRepo, $cashConsiderationRepo, $season, $validator);
+        $tradeData = $this->makeTradeData(3, 6);
+        $tradeData['check'] = [0 => 'on', 1 => 'off', 3 => 'on', 4 => 'off'];
+        $tradeData['contract'] = [0 => '100', 1 => '200', 2 => '400', 3 => '1000', 4 => '2000', 5 => '4000', 6 => '9999'];
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 700, 'partnerCurrentSeasonCapTotal' => 7000, 'userCapSentToPartner' => 100, 'partnerCapSentToUser' => 1000],
+            $calculator->calculateSalaryCapData($tradeData)
+        );
+    }
+
+    public function testMissingContractIndexCountsAsZeroSalary(): void
+    {
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashConsiderationRepo = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        $cashConsiderationRepo->method('getTeamCashForSalary')->willReturn([]);
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn(false);
+        $validator = self::createStub(TradeValidator::class);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn(['cashSentToThem' => 0, 'cashSentToMe' => 0]);
+
+        $calculator = new TradeCapCalculator($commonRepo, $cashConsiderationRepo, $season, $validator);
+        $tradeData = $this->makeTradeData(1, 2);
+        $tradeData['check'] = [0 => 'on', 1 => 'on'];
+        $tradeData['contract'] = [];
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 0, 'partnerCurrentSeasonCapTotal' => 0, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $calculator->calculateSalaryCapData($tradeData)
+        );
+    }
+
+    public function testNullTeamIdFallsBackToZeroForCashLookup(): void
+    {
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturn(null);
+        $cashConsiderationRepo = self::createMock(BuyoutLedgerRepositoryInterface::class);
+        $cashConsiderationRepo->expects(self::exactly(2))
+            ->method('getTeamCashForSalary')
+            ->with(0)
+            ->willReturn([]);
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn(false);
+        $validator = self::createStub(TradeValidator::class);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn(['cashSentToThem' => 0, 'cashSentToMe' => 0]);
+
+        $calculator = new TradeCapCalculator($commonRepo, $cashConsiderationRepo, $season, $validator);
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 0, 'partnerCurrentSeasonCapTotal' => 0, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $calculator->calculateSalaryCapData($this->makeTradeData())
+        );
+    }
+
+    public function testCashRecordsAttributedToEachSideByTeamId(): void
+    {
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturnMap([['Lakers', 7], ['Celtics', 9]]);
+        $userRow = $this->makeDiscriminatorRow();
+        $partnerRow = array_replace($this->makeDiscriminatorRow(), ['salary_yr1' => 300]);
+        $cashConsiderationRepo = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        $cashConsiderationRepo->method('getTeamCashForSalary')
+            ->willReturnCallback(static fn (int $tid): array => $tid === 7 ? [$userRow] : [$partnerRow]);
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn(false);
+        $validator = self::createStub(TradeValidator::class);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn(['cashSentToThem' => 0, 'cashSentToMe' => 0]);
+
+        $calculator = new TradeCapCalculator($commonRepo, $cashConsiderationRepo, $season, $validator);
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 100, 'partnerCurrentSeasonCapTotal' => 300, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $calculator->calculateSalaryCapData($this->makeTradeData())
         );
     }
 }

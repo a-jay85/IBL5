@@ -48,7 +48,7 @@ class TradingRepositoryTest extends TestCase
     public function testTradeOfferRepositoryExtendsBaseMysqliRepository(): void
     {
         self::assertContains(
-            \BaseMysqliRepository::class,
+            \Database\BaseMysqliRepository::class,
             (array) class_parents(TradeOfferRepository::class)
         );
     }
@@ -68,7 +68,7 @@ class TradingRepositoryTest extends TestCase
     public function testTradeAssetRepositoryExtendsBaseMysqliRepository(): void
     {
         self::assertContains(
-            \BaseMysqliRepository::class,
+            \Database\BaseMysqliRepository::class,
             (array) class_parents(TradeAssetRepository::class)
         );
     }
@@ -88,7 +88,7 @@ class TradingRepositoryTest extends TestCase
     public function testTradeFormRepositoryExtendsBaseMysqliRepository(): void
     {
         self::assertContains(
-            \BaseMysqliRepository::class,
+            \Database\BaseMysqliRepository::class,
             (array) class_parents(TradeFormRepository::class)
         );
     }
@@ -149,7 +149,7 @@ class TradingRepositoryTest extends TestCase
         $result = $repository->getTeamPlayersForTrading(99);
 
         $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     public function testGetTeamDraftPicksForTradingReturnsDraftPicks(): void
@@ -174,6 +174,6 @@ class TradingRepositoryTest extends TestCase
         $result = $repository->getTeamDraftPicksForTrading(99);
 
         $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 }

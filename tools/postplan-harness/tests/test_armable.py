@@ -23,7 +23,7 @@ def inputs(**kw):
                 classification=Classification(), findings=[], unresolved_conformance=[],
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
-                unresolved_findings=[], conflict_resolved=False)
+                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY")
     base.update(kw)
     return ArmInputs(**base)
 
@@ -146,13 +146,14 @@ def test_fidelity_default_is_fail_closed():
 
 
 def test_condition_set_is_skill_numbered():
-    """The set is {1..16} with no gaps. The numbers track the SKILL's condition numbers,
+    """The set is {1..17} with no gaps. The numbers track the SKILL's condition numbers,
     not this list's position: (11) shells out to bin/lib/pr-armable.sh for unresolved
     review-thread findings, (14) reads the conflict-resolved flag, (15) checks for
     already-red CI checks on the PR head at arm time, and (16) checks the pre-push
-    local meta-check gate."""
+    local meta-check gate. (17) holds when the gate backtest flagged clean PRs or could
+    not run. (18) holds unless the body's Merge danger line is well-formed and two-way."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
 
 
 def test_fidelity_is_additive_and_releases_nothing():
@@ -164,6 +165,68 @@ def test_fidelity_is_additive_and_releases_nothing():
     cleared = inputs(pr_title="feat: shiny new GM power", fidelity_verdict="READY")
     assert 8 in {c.number for c in evaluate(cleared).holds}      # (12) did not release (8)
     assert not evaluate(cleared).armed
+
+
+@pytest.mark.parametrize("status,expected", [
+    ("NOT-APPLICABLE", True), ("CLEARED", True), ("HELD", False), ("UNKNOWN", False),
+    ("", False), ("cleared", False),
+])
+def test_gate_backtest_condition_states(status, expected):
+    d = evaluate(inputs(gate_backtest_status=status))
+    assert d.armed is expected
+    if not expected:
+        assert {c.number for c in d.holds} == {17}
+
+
+def test_gate_backtest_reason_surfaces():
+    d = evaluate(inputs(gate_backtest_status="HELD",
+                        gate_backtest_reason="bin/check-foo flagged 3 clean PRs"))
+    c17 = next(c for c in d.conditions if c.number == 17)
+    assert "state=HELD" in c17.reason and "bin/check-foo" in c17.reason
+
+
+def test_gate_backtest_is_additive_and_releases_nothing():
+    """(17) may add a hold; it may never clear one."""
+    feat = "feat: shiny new GM power"
+    assert {c.number for c in evaluate(inputs(pr_title=feat, gate_backtest_status="CLEARED")).holds} == {8}
+    assert {c.number for c in evaluate(inputs(pr_title=feat, gate_backtest_status="HELD")).holds} == {8, 17}
+    both = inputs(meta_checks_status="HELD", gate_backtest_status="CLEARED")
+    assert {c.number for c in evaluate(both).holds} == {16}
+
+
+# Frozen from the evaluate() on master before condition (17) existed. A new condition that
+# blocks on its default flips all-pass; one that releases another hold flips feat-plus-meta-held.
+_CHARACTERIZATION_FIXTURES = [
+    ("all-pass", {}, True, set()),
+    ("pr-body-held", dict(pr_body=BODY_HELD), False, {1}),
+    ("finding-85", dict(findings=[Finding("code-review", "A", "f.php", 1, "bug", 85)]), False, {2}),
+    ("unresolved-conformance", dict(unresolved_conformance=["MISSING: t.php"]), False, {3}),
+    ("phase5-fail", dict(phase5_status="fail"), False, {4}),
+    ("golden-headless", dict(classification=Classification(golden_changed=True)), False, {5}),
+    ("dep-open", dict(dep_state_lookup=lambda n: "OPEN",
+                      pr_body=BODY_CLEARED + "\nDepends-on: #1400\n"), False, {6}),
+    ("plan-auto-merge-false", dict(plan_auto_merge_false=True), False, {7}),
+    ("feat-title", dict(pr_title="feat: shiny new GM power"), False, {8}),
+    ("llm-safety", dict(llm_safety_holds=["new UI needs visual judgment"]), False, {9}),
+    ("pipeline-authored", dict(pr_labels=["pipeline-authored"]), False, {10}),
+    ("fidelity-none", dict(fidelity_verdict=None), False, {12}),
+    ("unresolved-findings-none", dict(unresolved_findings=None), False, {11}),
+    ("slug-drift", dict(plan_slug_drift="other-slug"), False, {13}),
+    ("conflict-none", dict(conflict_resolved=None), False, {14}),
+    ("red-check", dict(failed_checks=["php-tests"]), False, {15}),
+    ("meta-held", dict(meta_checks_status="HELD"), False, {16}),
+    ("meta-unknown", dict(meta_checks_status="UNKNOWN"), False, {16}),
+    ("feat-plus-meta-held", dict(pr_title="feat: shiny new GM power",
+                                 meta_checks_status="HELD"), False, {8, 16}),
+]
+
+
+@pytest.mark.parametrize("label,kwargs,expected_armed,expected_holds", _CHARACTERIZATION_FIXTURES,
+                         ids=[f[0] for f in _CHARACTERIZATION_FIXTURES])
+def test_arm_outcomes_characterization(label, kwargs, expected_armed, expected_holds):
+    d = evaluate(inputs(**kwargs))
+    assert d.armed is expected_armed
+    assert {c.number for c in d.holds} == expected_holds
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +286,22 @@ def test_red_ci_check_empty_does_not_block():
     d = evaluate(inputs(failed_checks=[]))
     assert d.armed
     assert not any(c.number == 15 and c.blocked for c in d.conditions)
+
+
+def test_red_ci_check_aggregator_required_false_blocks():
+    """(15) explicit aggregator_required=False keeps the hold."""
+    d = evaluate(inputs(failed_checks=["x"], aggregator_required=False))
+    assert not d.armed
+    assert any(c.number == 15 and c.blocked for c in d.conditions)
+
+
+def test_red_ci_check_aggregator_required_true_warns():
+    """(15) aggregator_required=True demotes the hold to a warning."""
+    d = evaluate(inputs(failed_checks=["x"], aggregator_required=True))
+    c15 = next(c for c in d.conditions if c.number == 15)
+    assert not c15.blocked
+    assert "x" in c15.warning
+    assert "All checks green" in c15.warning
 
 
 def test_red_ci_check_reason_lists_names():
@@ -437,3 +516,75 @@ def test_auto_merge_false_plan_with_clean_loop_still_holds():
                         plan_auto_merge_false=True))
     assert d.armed is False
     assert any(c.number == 7 for c in d.holds)
+
+
+def _sentinel_body(tail: str) -> str:
+    return f"## Summary\nx\n\n## Manual Testing\n\nNo manual testing needed — {tail}\n"
+
+
+def test_manual_testing_clearance_keyword_clears_with_file():
+    body = _sentinel_body("covered by the Playwright e2e spec.")
+    assert manual_testing_clearance(body, ["ibl5/tests/e2e/trade.spec.ts"]) == "CLEARED"
+
+
+def test_manual_testing_clearance_keyword_held_without_file():
+    body = _sentinel_body("covered by the Playwright e2e spec.")
+    assert manual_testing_clearance(body, ["ibl5/classes/Trade/TradeService.php"]) == "HELD"
+    # boundary: a spec path outside tests/e2e/ does not satisfy the pattern
+    assert manual_testing_clearance(body, ["ibl5/e2e/trade.spec.ts"]) == "HELD"  # (example)
+
+
+def test_manual_testing_clearance_no_keyword_always_clears():
+    body = _sentinel_body("internal refactor, behavior pinned elsewhere.")
+    assert manual_testing_clearance(body, []) == "CLEARED"
+    assert manual_testing_clearance(body) == "CLEARED"
+    # no keyword + non-empty files still clears
+    assert manual_testing_clearance(body, ["ibl5/classes/Foo.php"]) == "CLEARED"
+    # empty list skips the tail check even when a keyword is present
+    assert manual_testing_clearance(_sentinel_body("covered by e2e."), []) == "CLEARED"
+
+
+def test_manual_testing_clearance_and_semantics_and_word_boundary():
+    body = _sentinel_body("covered by unit and integration tests.")
+    assert manual_testing_clearance(body, ["ibl5/tests/Trade/TradeServiceTest.php"]) == "HELD"
+    assert manual_testing_clearance(body, [
+        "ibl5/tests/Trade/TradeServiceTest.php",
+        "ibl5/tests/DatabaseIntegration/TradeRepoTest.php",
+    ]) == "CLEARED"
+    # `community` must not match the `unit` keyword
+    assert manual_testing_clearance(_sentinel_body("community page copy only."),
+                                    ["ibl5/classes/Foo.php"]) == "CLEARED"
+
+
+def test_evaluate_passes_files_to_clearance():
+    body = _sentinel_body("covered by the e2e spec.")
+    d = evaluate(inputs(pr_body=body,
+                        classification=Classification(files=["ibl5/classes/Foo.php"])))
+    assert not d.armed and any(c.number == 1 for c in d.holds)
+    ok = evaluate(inputs(pr_body=body,
+                         classification=Classification(files=["ibl5/tests/e2e/foo.spec.ts"])))
+    assert ok.armed and not ok.holds
+
+
+def test_condition_3_blocks_on_missing_phase_item():
+    """MISSING-PHASE: entry in unresolved_conformance → condition (3) blocked.
+
+    Mutation caught: a future filter that only counts MISSING:/MISSING-FILE: prefixes
+    fails the block assertion.
+    """
+    # Build a minimal ArmInputs with a MISSING-PHASE entry — copy keyword pattern from a
+    # neighbouring condition-(3) test, changing only unresolved_conformance.
+    blocked_inputs = inputs(
+        unresolved_conformance=[
+            "MISSING-PHASE: 2 — B (phase cites harness/b.py; none appeared in the diff)"
+        ],
+    )
+    result_blocked = evaluate(blocked_inputs)
+    cond3 = next(c for c in result_blocked.conditions if c.number == 3)
+    assert cond3.blocked is True
+    assert "MISSING-PHASE: 2" in cond3.reason
+
+    clean_inputs = inputs(unresolved_conformance=[])
+    result_clean = evaluate(clean_inputs)
+    cond3_clean = next(c for c in result_clean.conditions if c.number == 3)
+    assert cond3_clean.blocked is False

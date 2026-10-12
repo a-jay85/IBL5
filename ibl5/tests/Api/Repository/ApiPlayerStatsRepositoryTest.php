@@ -78,4 +78,13 @@ class ApiPlayerStatsRepositoryTest extends WideUnitTestCase
 
         $this->assertQueryExecuted('ibl_hist');
     }
+
+    public function testGetSeasonHistoryOrdersByYearThenPid(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getSeasonHistory('uuid-test');
+
+        $this->assertQueryExecuted('ORDER BY h.year DESC, h.pid ASC');
+    }
 }

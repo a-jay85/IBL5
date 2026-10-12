@@ -18,12 +18,14 @@ declare(strict_types=1);
  */
 
 require __DIR__ . '/_bootstrap.php';
+/** @var \mysqli $mysqli_db */
 
 use BugPipeline\BugReportRepository;
 
 /** Lease TTL — how long a claim is held before reclaimStaleLease may steal it. */
 const LEASE_TTL_MINUTES = 10;
 
+/** @var list<string> $argv */
 $args = array_slice($argv, 1);
 $owner = gethostname() . ':' . getmypid();
 $resumeId = null;
@@ -37,7 +39,7 @@ foreach ($args as $arg) {
         $resumeId = substr($arg, strlen('--resume='));
     }
 }
-if ($owner === '' || $owner === false) {
+if ($owner === '') {
     $owner = 'unknown:' . getmypid();
 }
 

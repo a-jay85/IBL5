@@ -58,6 +58,8 @@ class Season
     const IBL_OLYMPICS_MONTH = 8;
     const IBL_PRESEASON_MONTH = 9;
     const IBL_HEAT_MONTH = 10;
+    /** ibl_box_scores[_teams].game_type for September (preseason) rows; migration 188. */
+    const IBL_PRESEASON_GAME_TYPE = 4;
     const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
     const IBL_ALL_STAR_MONTH = 02;
     const IBL_REGULAR_SEASON_ENDING_MONTH = 05;
@@ -77,7 +79,7 @@ class Season
      *
      * @param \mysqli $db Active mysqli connection
      */
-    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null, ?\Clock\ClockInterface $clock = null)
     {
         $this->db = $db;
         $this->queryRepo = new SeasonQueryRepository($db, $leagueContext);
@@ -102,7 +104,7 @@ class Season
 
         $this->endingYear = (int)($settings['Current Season Ending Year'] ?? '0');
         if ($this->endingYear <= 0) {
-            $this->endingYear = (int)date('Y') + 1;
+            $this->endingYear = (int)date('Y', ($clock ?? new \Clock\SystemClock())->now()) + 1;
         }
         $this->beginningYear = $this->endingYear - 1;
 
@@ -187,7 +189,7 @@ class Season
      *
      * During Playoffs, Draft, and Free Agency the contract years have
      * effectively rolled over, so trade-related calculations (roster counting,
-     * queueing, cash considerations, cash-record sums) shift to the next
+     * cash considerations, cash-record sums) shift to the next
      * season's contracts.
      *
      * NOTE: This is a wider set than {@see isOffseasonPhase()} — it INCLUDES

@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 
 import pytest
 
@@ -37,6 +38,59 @@ def test_dirty_commit_and_changed_files(repo):
     sha = g.commit_all("chore: add b")
     assert sha and not g.is_dirty()
     assert g.commit_all("noop") == ""      # nothing staged -> no empty commit
+
+
+def _rename_repo(repo):
+    """Feature branch where a.txt was `git mv`ed to c.txt and committed; rename
+    detection is forced on so the test does not depend on the runner's git config."""
+    def sh(*a):
+        subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True)
+    sh("config", "diff.renames", "true")
+    sh("checkout", "-b", "feature")
+    sh("mv", "a.txt", "c.txt")
+    sh("commit", "-m", "rename a to c")
+    return repo
+
+
+def test_changed_files_lists_only_rename_target(repo):
+    """Characterization (pre-impl): `changed_files` keeps git's rename-detected shape
+    and lists only the NEW path. Phase 2 must not widen this list, because it feeds
+    classify(), scope conformance and denied_gate_edits.
+
+    Mutation caught: add `--no-renames` to `LiveGit.changed_files` and `a.txt`
+    appears; the equality fails.
+    """
+    _rename_repo(repo)
+    g = LiveGit(repo)
+    assert g.changed_files(base="master") == ["c.txt"]
+
+
+def test_conformance_files_includes_rename_source_and_target(repo):
+    """Mutation caught: drop `--no-renames` from `conformance_files`."""
+    _rename_repo(repo)
+    g = LiveGit(repo)
+    got = g.conformance_files(base="master")
+    assert "a.txt" in got and "c.txt" in got
+    assert set(g.changed_files(base="master")) <= set(got)
+
+
+def test_conformance_files_counts_deleted_file(repo):
+    """Mutation caught: filter `D` status out of the no-renames output."""
+    def sh(*a):
+        subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True)
+    sh("checkout", "-b", "feature")
+    sh("rm", "a.txt")
+    sh("commit", "-m", "delete a")
+    g = LiveGit(repo)
+    assert "a.txt" in g.conformance_files(base="master")
+    assert "a.txt" in g.changed_files(base="master")
+
+
+def test_conformance_files_includes_untracked(repo):
+    """Mutation caught: drop the `ls-files --others` arm."""
+    open(os.path.join(repo, "d.php"), "w").write("<?php\n")
+    g = LiveGit(repo)
+    assert "d.php" in g.conformance_files(base="HEAD")
 
 
 def test_changes_to_commit_and_branch_head_subject(repo):
@@ -333,6 +387,56 @@ def test_commit_all_still_returns_a_sha_when_no_hook_rejects(repo):
     assert len(sha) == 40, f"expected a full sha, got {sha!r}"
 
 
+def test_commit_all_timeout_raises_subprocess_timeout_and_reaps(repo, tmp_path, monkeypatch):
+    """A pre-commit hook that hangs is bounded: typed subprocess-timeout (not local-gate),
+    the hook's process group is reaped, and the index.lock git left behind is cleared.
+
+    Mutation caught: drop _clear_stale_index_lock() and the lock assertion fails; drop
+    the run_bounded swap and the elapsed assertion fails (bare run blocks 300s).
+    """
+    _install_reject_hook(repo, f"#!/bin/bash\nsleep 300 &\necho $! > {tmp_path}/grandchild.pid\nsleep 300\n")
+    monkeypatch.setattr(gitad, "COMMIT_HOOK_TIMEOUT", 1)
+    g = LiveGit(repo)
+    with open(os.path.join(repo, "slow.txt"), "w") as fh:
+        fh.write("hangs\n")
+    start = time.monotonic()
+    with pytest.raises(HarnessError) as ei:
+        g.commit_all("chore: hook hangs")
+    assert time.monotonic() - start < 15
+    assert ei.value.kind == "subprocess-timeout", f"kind was {ei.value.kind!r}"
+    assert "commit" in ei.value.detail
+    grandchild = int((tmp_path / "grandchild.pid").read_text().strip())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(grandchild, 0)
+            time.sleep(0.1)
+        except ProcessLookupError:
+            break
+    else:
+        pytest.fail("grandchild survived the process-group reap")
+    rel = subprocess.run(["git", "-C", repo, "rev-parse", "--git-path", "index.lock"],
+                         check=True, capture_output=True, text=True).stdout.strip()
+    lock = rel if os.path.isabs(rel) else os.path.join(repo, rel)
+    assert not os.path.exists(lock), "a reaped commit must not leave index.lock behind"
+
+
+def test_commit_all_hook_denial_stays_local_gate_under_bounded_run(repo):
+    """Negative path -- the timeout wiring does not swallow an ordinary hook denial.
+
+    Mutation caught: treating every HarnessError as a timeout, or raising
+    subprocess-timeout on a nonzero rc, turns kind into something other than local-gate.
+    """
+    _install_reject_hook(repo, "#!/bin/sh\necho nope\nexit 1\n")
+    g = LiveGit(repo)
+    with open(os.path.join(repo, "denied.txt"), "w") as fh:
+        fh.write("denied\n")
+    with pytest.raises(HarnessError) as ei:
+        g.commit_all("chore: denied")
+    assert ei.value.kind == "local-gate", f"kind was {ei.value.kind!r}"
+    assert "nope" in ei.value.detail
+
+
 # ---------------------------------------------------------------------------
 # Phase 1: real-git push() contract tests
 # ---------------------------------------------------------------------------
@@ -454,3 +558,27 @@ def test_push_raises_push_failed_in_detached_head(tmp_path):
         g.push()
     assert exc_info.value.kind == "push-failed"
     assert "detached HEAD" in exc_info.value.detail
+
+
+@pytest.mark.parametrize("script,expected_ok", [
+    ("echo TREE-EQUIVALENT\nexit 0\n", True),
+    ("echo TREE-EQUIVALENT\nexit 1\n", False),   # marker without a zero exit
+    ("echo all good\nexit 0\n", False),           # zero exit without the marker
+    (None, False),                                # lostwork.sh absent at pinned master
+])
+def test_prove_lostwork_conjunctive_gate(repo, script, expected_ok):
+    """#828: prove_lostwork passes only when stdout has TREE-EQUIVALENT AND the exit is 0."""
+    if script is not None:
+        path = os.path.join(repo, ".claude", "review-shared", "scripts")
+        os.makedirs(path)
+        open(os.path.join(path, "lostwork.sh"), "w").write("#!/bin/sh\n" + script)
+        subprocess.run(["git", "-C", repo, "add", "-f", ".claude"], check=True,
+                       capture_output=True)
+        subprocess.run(["git", "-C", repo, "commit", "-m", "lostwork"], check=True,
+                       capture_output=True, env=_git_env())
+    subprocess.run(["git", "-C", repo, "update-ref", "refs/remotes/origin/master", "HEAD"],
+                   check=True, capture_output=True)
+    ok, evidence = LiveGit(repo).prove_lostwork(f"gate-test-{os.path.basename(repo)}")
+    assert ok is expected_ok, evidence
+    if script is None:
+        assert "lostwork.sh not found" in evidence

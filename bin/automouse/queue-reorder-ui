@@ -11,21 +11,42 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/automouse/queue-reorder-ui
+
+Open a local drag-and-drop page to reorder the automouse plan queue.
+
+Spawns an ephemeral php -S server bound to 127.0.0.1, opens the browser,
+and waits for a Save action (which calls bin/automouse/queue reorder) or
+for Ctrl-C / a timeout. The server is torn down on exit.
+
+Requirements:
+  php must be on PATH.
+
+Arguments: none
+Exit codes: 0 success, 1 php not found or router missing
+EOF
+    exit 0
+fi
+
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 : "${PLANS_DIR:=$HOME/claude-plans}"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=bin/automouse/lib-queue-order
+source "$SCRIPT_DIR/lib-queue-order"
 QUEUE_CMD="$SCRIPT_DIR/queue"                # sibling engine
 ROUTER="$SCRIPT_DIR/../lib/automouse-reorder-router.php"  # sibling router + page
 
 command -v php >/dev/null 2>&1 || { echo "Error: php not found on PATH." >&2; exit 1; }
 [ -f "$ROUTER" ] || { echo "Error: router not found: $ROUTER" >&2; exit 1; }
 
-# Current run order (ls -1tr = target mtime, oldest-first = runs-first).
-# `|| true`: an empty queue makes `ls *.md` error, which pipefail + set -e would
-# otherwise abort on before the empty-check below.
-order="$(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null | while IFS= read -r f; do basename "$f"; done || true)"
+# Current run order (symlink lstat mtime, oldest-first = runs-first).
+# queue_entries_ordered from lib-queue-order returns full paths; basename each.
+# `|| true`: an empty queue prints nothing without error.
+order="$(queue_entries_ordered | while IFS= read -r f; do basename "$f"; done || true)"
 if [ -z "$order" ]; then
     echo "Queue empty, nothing to reorder."
     exit 0
@@ -99,4 +120,4 @@ i=1
 while IFS= read -r f; do
     printf "  %2d. %s\n" "$i" "$(basename "$f")"
     i=$((i + 1))
-done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
+done < <(queue_entries_ordered)

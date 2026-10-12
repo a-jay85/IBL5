@@ -51,7 +51,7 @@ test.describe('Team page expiring-player fade', () => {
     test('Depth Chart never marks expiring rows', async ({ page }) => {
       await page.goto(DEPTH_CHART_URL);
 
-      // DepthChartEntryController shares the render path but never passes the
+      // DepthChartController shares the render path but never passes the
       // flag, so the class must not appear on any of its rows.
       await expect(page.locator('tr.player-fa-expiring-row')).toHaveCount(0);
 

@@ -6,6 +6,22 @@
 #
 # Usage: bin/dev-up
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/dev-up
+
+Boot the main Docker stack with a live production DB sync.
+Canonical local-dev entry point: runs docker compose up, waits for MariaDB to be
+healthy, then calls bin/db-sync-prod to stream a full copy of production data.
+Requires REMOTE_* credentials in .env for the prod sync.
+
+Exit codes:
+  0  Stack is up and DB is synced
+  1  MariaDB did not become healthy, or db-sync-prod failed
+EOF
+    exit 0
+fi
+
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

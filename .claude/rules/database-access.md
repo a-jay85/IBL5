@@ -1,6 +1,6 @@
 ---
 description: Docker MariaDB connection details, query patterns, schema verification, and migration authoring rules.
-last_verified: 2026-09-24
+last_verified: 2026-10-06
 paths:
   - "**/*Repository.php"
   - "**/migrations/000_baseline_schema.sql"
@@ -112,15 +112,6 @@ All repositories extend `BaseMysqliRepository`. Its data-access helpers are **`p
 **Type-spec characters:** `i` (INT), `s` (VARCHAR/TEXT), `d` (FLOAT/DOUBLE), `b` (BLOB).
 
 **Error codes:** 1001 = type/param count mismatch, 1002 = prepare failed (bad SQL — also thrown by the constructor on an invalid or closed connection), 1003 = execute failed (constraint violation).
-
-## Multiple Claude Instances Protocol
-
-Other Claude instances may be working in this directory simultaneously.
-
-1. **Before editing a file:** Run `git status`. If the file has unstaged changes you didn't make, alert the user before proceeding.
-2. **Scope discipline:** Only modify files directly related to your task. If you need to change a shared file, confirm with the user first.
-3. **Before staging:** Run `git diff --name-only` and only stage files you personally modified. Never use `git add .` or `git add -A`.
-4. **Testing:** Always run the full test suite, even if other instances may have partial work in progress. If another instance's in-progress changes cause failures in files you did not touch, note them but do not suppress them.
 
 ## Migration Authoring Gotchas
 

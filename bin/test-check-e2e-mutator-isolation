@@ -8,13 +8,12 @@
 #
 # Run: bin/test-check-e2e-mutator-isolation  (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$SCRIPT_DIR/check-e2e-mutator-isolation"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-FAILED=0
+h_tmp TMP
 
 # A mutators testMatch line allowlisting exactly updater-awards + admin-pages,
 # mirroring the real playwright.config.ts regex-escaped form (\.spec\.ts).
@@ -48,10 +47,9 @@ run_check() { # config, specsdir  -> sets RC
 
 expect() { # name want got
   if [ "$3" -eq "$2" ]; then
-    echo "ok: $1 (exit $3)"
+    h_pass "$1 (exit $3)"
   else
-    echo "FAIL: $1 — expected exit $2, got $3"
-    FAILED=1
+    h_fail "$1" "expected exit $2, got $3"
   fi
 }
 
@@ -96,9 +94,4 @@ put_spec "$dir" 'admin-pages.spec.ts' "await triggerUpdater(request);"
 run_check "$TMP/nonexistent-config.ts" "$dir"
 expect "missing allowlist config errors" 1 "$RC"
 
-if [ "$FAILED" -eq 0 ]; then
-  echo "All test-check-e2e-mutator-isolation cases passed."
-else
-  echo "test-check-e2e-mutator-isolation: one or more cases FAILED." >&2
-fi
-exit "$FAILED"
+h_done

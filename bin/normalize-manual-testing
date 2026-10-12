@@ -4,6 +4,17 @@
 # same module, so there is no second implementation to drift.
 set -eu
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/normalize-manual-testing [args...]
+
+Render manual-testing checkboxes for the /post-plan skill. Delegates to
+the Python module harness.manual_rows in tools/postplan-harness. All
+arguments are passed through to the module.
+EOF
+    exit 0
+fi
+
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PYTHONPATH="$ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}"
 export PYTHONPATH

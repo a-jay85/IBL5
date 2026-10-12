@@ -237,11 +237,15 @@ describe('sweepOnce — Row 17: re-entrant sweepOnce and startStaleSweeper', () 
         let sweepCalls = 0;
         const countClient = { users: { fetch: vi.fn(async () => { sweepCalls++; throw new Error('count only'); }), send: vi.fn() } } as unknown as Client;
         const handle = startStaleSweeper(countClient, tmp);
+
+        // Positive half: the sweeper actually fires after one interval
+        await vi.advanceTimersByTimeAsync(SWEEP_INTERVAL_MS);
+        expect(sweepCalls).toBeGreaterThanOrEqual(1);
+
+        // Negative half: after clearInterval, no further sweeps fire
         clearInterval(handle);
-
-        // Advance time past multiple intervals — no sweeps should have fired
+        const callsAtClear = sweepCalls;
         await vi.advanceTimersByTimeAsync(SWEEP_INTERVAL_MS * 3);
-
-        expect(sweepCalls).toBe(0);
+        expect(sweepCalls).toBe(callsAtClear);
     });
 });

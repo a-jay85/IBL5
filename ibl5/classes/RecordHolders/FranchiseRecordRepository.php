@@ -14,7 +14,7 @@ use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
  * @phpstan-import-type FranchiseTitleRecord from RecordHoldersRepositoryInterface
  * @phpstan-import-type PlayoffAppearanceRecord from RecordHoldersRepositoryInterface
  */
-final class FranchiseRecordRepository extends \BaseMysqliRepository
+final class FranchiseRecordRepository extends \Database\BaseMysqliRepository
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
@@ -28,6 +28,7 @@ final class FranchiseRecordRepository extends \BaseMysqliRepository
      */
     public function getMostPlayoffAppearances(): array
     {
+        // @phpstan-ignore ibl.orderByMissingTiebreaker (the flagged ORDER BY is GROUP_CONCAT's per-group year list; the outer ORDER BY count DESC, t.team_name ASC over GROUP BY t.team_name is total)
         $query = "SELECT
                 t.team_name,
                 COUNT(DISTINCT pr.year) AS count,

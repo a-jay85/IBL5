@@ -12,8 +12,23 @@
 #   2. _phase-5-final-verification.md Phase 5.0 conformance block
 #   3. tools/postplan-harness/harness/planfile.py
 # (1) and (2) source THIS file, so they are one implementation, not two copies.
-# (3) cannot source shell; it mirrors the two patterns below and is pinned to
-# them byte-for-byte by tests/test_planfile.py::test_lib_pattern_sync.
+# (3) cannot source shell; it mirrors the three patterns below and is pinned to
+# them byte-for-byte by tests/test_planfile.py::test_lib_pattern_sync and
+# ::test_lib_abs_prefix_pattern_sync.
+#
+# Two parse entry points (backlog#1211):
+#   cf_parse_section_raw  -- paths exactly as written in the plan. Used ONLY by
+#                            bin/check-plan gate [F], which must still see an
+#                            absolute path in order to reject it at plan time.
+#   cf_parse_section      -- raw output with any /.../IBL5/ or
+#                            /.../IBL5-worktrees/<slug>/ prefix stripped, the
+#                            same normalisation planfile.py::_normalise_cf_path
+#                            applies. Every other consumer (Phase 5.0
+#                            conformance, CF_PRINT_ONLY, gate [C] counting)
+#                            uses this one, so a legacy plan authored with an
+#                            absolute path now matches `git diff --name-only`
+#                            at Phase 5.0 instead of holding arming
+#                            condition (3) forever.
 #
 # History: before #927-followup these were three divergent parsers. The two
 # unanchored keyword EREs matched their tokens anywhere in the annotation
@@ -25,6 +40,33 @@
 # Leading whitespace is tolerated — bin/check-plan's old `^- ` awk was not, and
 # that silent fourth divergence made an indented entry invisible to it alone.
 CF_LINE_PATTERN='^[[:space:]]*-[[:space:]]*`'
+
+# Absolute-prefix pattern: everything up to and including the LAST
+# /IBL5/ or /IBL5-worktrees/<slug>/ root. Case-sensitive (IBL5 is always caps).
+# Mirrors planfile.py _ABS_PREFIX_RE with `(?:` written as `(`; pinned by
+# tests/test_planfile.py::test_lib_abs_prefix_pattern_sync.
+CF_ABS_PREFIX_ERE='^.*/IBL5(-worktrees/[^/]+)?/'
+
+# cf_normalise_path <path> -> the path with its absolute repo/worktree prefix
+# stripped, or unchanged when: it is relative; it is absolute but outside any
+# IBL5 root; or stripping would leave an empty string (a bare root directory
+# entry). The empty case deliberately diverges from planfile.py, which returns
+# "" there: an empty MUST_APPEAR row is skipped by Phase 5.0 (dropping a hold)
+# and still counted by gate [C], so the lib keeps the entry as written and
+# lets it hold, exactly as it did before #1211.
+cf_normalise_path() {
+    local stripped
+    case "$1" in
+        /*) ;;
+        *)  printf '%s\n' "$1"; return ;;
+    esac
+    stripped=$(printf '%s\n' "$1" | sed -E "s#${CF_ABS_PREFIX_ERE}##")
+    if [ -z "$stripped" ]; then
+        printf '%s\n' "$1"
+    else
+        printf '%s\n' "$stripped"
+    fi
+}
 
 # Exempt marker: a parenthesized group whose CONTENTS include a canonical token
 # as a WHOLE WORD. Canonical set: reference, read-only, read-only reference,
@@ -183,9 +225,11 @@ cf_fence_unbalanced() {
     ' "$1"
 }
 
-# cf_parse_section <planfile> -> one `MUST_APPEAR:<path>` or `EXEMPT:<path>`
-# line per entry, in source order. Emits nothing when the section is absent.
-cf_parse_section() {
+# cf_parse_section_raw <planfile> -> one `MUST_APPEAR:<path>` or `EXEMPT:<path>`
+# line per entry, in source order, paths exactly as written. Emits nothing when
+# the section is absent. Consumers other than bin/check-plan gate [F] must call
+# cf_parse_section (below), which normalises absolute paths.
+cf_parse_section_raw() {
     cf_section "$1" | grep -E "$CF_LINE_PATTERN" | while IFS= read -r line; do
         path=$(printf '%s\n' "$line" | grep -oE '`[^`]+`' | head -1 | tr -d '`')
         [ -z "$path" ] && continue
@@ -195,5 +239,13 @@ cf_parse_section() {
         else
             printf 'MUST_APPEAR:%s\n' "$path"
         fi
+    done
+}
+
+# cf_parse_section <planfile> -> cf_parse_section_raw with every path passed
+# through cf_normalise_path. Same line count, same order, same KIND per line.
+cf_parse_section() {
+    cf_parse_section_raw "$1" | while IFS= read -r entry; do
+        printf '%s:%s\n' "${entry%%:*}" "$(cf_normalise_path "${entry#*:}")"
     done
 }

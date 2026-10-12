@@ -17,7 +17,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Schedule');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_schedule');
     }
 
@@ -26,7 +26,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Schedule', ['teamid' => '0']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // teamid=0 fails the > 0 guard — no Team::initialize call
         $this->assertQueryExecuted('ibl_schedule');
     }
@@ -37,7 +37,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Schedule', ['teamid' => '5']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_team_info');
     }
 
@@ -46,7 +46,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Schedule', ['teamid' => '-1']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // (int)'-1' === -1, fails > 0 guard
         $this->assertQueryExecuted('ibl_schedule');
     }
@@ -56,7 +56,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Schedule', ['teamid' => 'abc']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // (int)'abc' === 0, fails > 0 guard
         $this->assertQueryExecuted('ibl_schedule');
     }
@@ -67,7 +67,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Schedule', ['teamid' => '5.9']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // (int)'5.9' === 5 — queries team 5
         $this->assertQueryExecuted('ibl_team_info');
     }

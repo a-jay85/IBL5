@@ -1,0 +1,48 @@
+#!/bin/bash
+# bin/automouse/lib-queue-order — shared queue ordering helper.
+# Source this file; do not execute it directly.
+#
+# Provides:
+#   lstat_mtime <path>          — epoch mtime of <path> via lstat (never
+#                                  dereferences symlinks)
+#   queue_entries_ordered [dir] — print queue *.md entries oldest-first by the
+#                                  SYMLINK's own lstat mtime, safe on BSD and GNU.
+#
+# Used by: bin/automouse/queue, bin/automouse/queue-reorder-ui,
+#          bin/automouse/run.
+#
+# Portability: GNU stat uses -c, BSD stat uses -f. We detect once at source
+# time to avoid a per-file try/fall-back that blows up when a file vanishes
+# mid-scan (the runner can claim a plan concurrently — GNU's -f means
+# "filesystem mode", so a fallback to it prints garbage, not an error).
+
+if stat -c '%Y' / >/dev/null 2>&1; then
+    _LIB_STAT_FMT=gnu
+else
+    _LIB_STAT_FMT=bsd
+fi
+
+# lstat_mtime <path> — epoch of path's own mtime, never dereferences.
+lstat_mtime() {
+    if [ "$_LIB_STAT_FMT" = gnu ]; then
+        stat -c '%Y' "$1" 2>/dev/null
+    else
+        stat -f '%m' "$1" 2>/dev/null
+    fi
+}
+
+# queue_entries_ordered [dir] — full paths of *.md queue entries, oldest
+# SYMLINK lstat mtime first (never the target's mtime). Empty queue prints
+# nothing. Output is a drop-in for `ls -1tr "$QUEUE_DIR"/*.md` but uses
+# lstat so editing a queued plan's target file does not change run order.
+queue_entries_ordered() {
+    local dir="${1:-$QUEUE_DIR}"
+    local f mtime
+    for f in "$dir"/*.md; do
+        { [ -L "$f" ] || [ -e "$f" ]; } || continue
+        mtime=$(lstat_mtime "$f") || continue
+        printf '%s %s\n' "$mtime" "$f"
+    done | sort -n | while IFS= read -r line; do
+        printf '%s\n' "${line#* }"
+    done
+}

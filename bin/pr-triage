@@ -17,12 +17,15 @@
 #
 # Bucket precedence (first match wins):
 #   1. DIRTY                  merge conflict (mergeStateStatus == DIRTY)
-#   2. NOT-MERGEABLE          GitHub will not merge this head as-is —
-#                             mergeStateStatus is BEHIND / DRAFT / UNKNOWN (or an
-#                             unrecognised value). BEHIND is the load-bearing one:
-#                             master's protection is strict, so a behind PR's green
-#                             checks ran on a SHA GitHub will not merge — green but
-#                             NOT current, which must never arm
+#   2. NOT-MERGEABLE          DRAFT / UNKNOWN (or an unrecognised or empty value) —
+#                             GitHub will not merge this head and no update fixes
+#                             that. BEHIND is NOT in this bucket since 2026-09: it
+#                             falls through, and when every lower bucket clears it
+#                             lands in ARMABLE with action "arm auto-merge (update
+#                             branch first)"; --arm then arms it, and one
+#                             merge-line pass updates only the head of the line,
+#                             so the green checks are re-run on the updated head
+#                             before auto-merge can fire
 #   3. BLOCKED-CHECK          a required Tests/E2E check is failing/pending/
 #                             cancelled/absent, or body declares an expected-red
 #   4. HELD                   Manual-Testing real rows, golden touched, or a
@@ -32,11 +35,21 @@
 #                             `bug-<id>` branch name); UNCONDITIONAL — no label
 #                             clears it, so it is never armed
 #   7. FEAT-AWAITING-SIGNOFF  feat: title without the human-approved label
-#   8. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
-#   9. ARMABLE                CLEARED + a mergeable merge-state + all required
-#                             checks green-and-current
+#   8. PAUSED                 post-plan paused by the usage gate (ADR-0143) in this PR's
+#                             worktree; the coordinator resumes it, so nothing to do and
+#                             --arm skips it
+#   9. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
+#  10. ARMABLE                CLEARED + an armable merge-state (mergeable, or
+#                             BEHIND) + all required checks green on the current
+#                             head
 #
-# Exit codes: 0 = report generated; 1 = an attempted --arm merge failed;
+# --held lists only MY open, non-draft PRs with auto-merge NOT enabled, one line
+# each: number, URL, title, and every hold reason. Recorded reasons come first
+# (the pr-ready-verdict sticky comment's "Auto-merge held:" block), then live
+# state (merge conflict, red/pending checks, HOLDS tokens), de-duplicated.
+# "unknown" when nothing explains the hold. Read-only; cannot combine with --arm.
+#
+# Exit codes: 0 = report generated; 1 = an attempted --arm merge or merge-line pass failed;
 #             2 = usage error or gh not authenticated.
 
 set -euo pipefail
@@ -45,41 +58,67 @@ GH_CMD="${GH_CMD:-gh}"
 GH_API_CMD="${GH_API_CMD:-gh api}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MERGE_LINE_CMD="${PR_TRIAGE_MERGE_LINE_CMD:-$SCRIPT_DIR/merge-line-watch}"
 # shellcheck source=bin/lib/pr-armable.sh
 source "$SCRIPT_DIR/lib/pr-armable.sh"
+# shellcheck source=bin/lib/usage-gate.sh
+source "$SCRIPT_DIR/lib/usage-gate.sh"
+# shellcheck source=bin/lib/held-prs.sh
+source "$SCRIPT_DIR/lib/held-prs.sh"
 
 usage() {
     cat <<'EOF'
-Usage: bin/pr-triage [--arm] [--help|-h]
+Usage: bin/pr-triage [--arm | --held] [--help|-h]
 
 Classifies every OPEN PR into one bucket (first-match-wins) and prints a report.
 
 Options:
   --arm        Arm `gh pr merge --squash --auto` on ONLY the ARMABLE bucket.
-               Without it, the tool is read-only (report only).
+               Without it, the tool is read-only (report only). When a BEHIND
+               PR is armed, one merge-line pass (bin/merge-line-watch --once)
+               runs after the arm loop. It calls update-branch on the head of
+               the merge line only, never on every BEHIND PR. A failed pass is
+               reported and exits 1.
+  --held       List only my open, non-draft PRs without auto-merge enabled:
+               number, URL, title, and every hold reason (the pr-ready-verdict
+               sticky's "Auto-merge held:" block, then live state: merge
+               conflict, red/pending checks, HOLDS tokens). Prints "unknown"
+               when nothing explains the hold. Read-only; cannot be combined
+               with --arm (exit 2).
   --help, -h   Show this message.
 
 Environment (test seams):
   GH_CMD        Override the gh command (default: "gh").
   GH_API_CMD    Override the gh api command (default: "gh api").
+  PR_TRIAGE_MERGE_LINE_CMD  Override the merge-line pass command
+                (default: bin/merge-line-watch).
+  PR_TRIAGE_WTL Read `git worktree list --porcelain` output from this file instead of git.
+  IBL5_USAGE_GATE_STATE_DIR  Where the usage-gate pause markers live.
+
+A PR whose worktree holds a post-plan session paused by the usage gate is bucketed
+PAUSED (no action; the coordinator resumes it) and --arm never touches it.
 
 ARMABLE is fail-closed: a PR is armed only with a positive Manual-Testing
 clearance ("No manual testing needed"), all required checks green-and-current,
-no merge-state hold (DIRTY/BEHIND/DRAFT/UNKNOWN — BEHIND is what enforces
-"current", since master requires branches to be up to date), and no
-HELD/dep/feat hold. A PR with no `## Manual Testing` section is
+no merge-state hold (DIRTY/DRAFT/UNKNOWN; BEHIND arms, and the merge line's
+update-branch on its head re-runs checks under master's strict protection), and
+no HELD/dep/feat hold. A PR with no `## Manual Testing` section is
 UNCLEARED and routed to a human. Reads one page (200 PRs / 100 check-runs).
 
-Exit codes: 0 = report generated; 1 = an attempted --arm merge failed;
+Exit codes: 0 = report generated; 1 = an attempted --arm merge or merge-line pass failed;
             2 = usage error / gh not authenticated.
 EOF
 }
 
 ARM=0
+HELD=0
 for arg in "$@"; do
     case "$arg" in
         --arm)
             ARM=1
+            ;;
+        --held)
+            HELD=1
             ;;
         --help|-h)
             usage
@@ -98,6 +137,12 @@ for arg in "$@"; do
     esac
 done
 
+if [ "$ARM" = "1" ] && [ "$HELD" = "1" ]; then
+    echo "--held and --arm are mutually exclusive (--held is read-only)" >&2
+    usage >&2
+    exit 2
+fi
+
 if ! gh auth status >/dev/null 2>&1; then
     echo "ERROR: GitHub CLI is not authenticated." >&2
     echo "Run 'gh auth login' to authenticate, then retry." >&2
@@ -112,6 +157,17 @@ SLUG="$(echo "$REMOTE_URL" | sed -E 's#^(https://github\.com/|ssh://git@github\.
 if [ -z "$SLUG" ]; then
     echo "ERROR: cannot parse repo slug from origin URL: $REMOTE_URL" >&2
     exit 2
+fi
+
+# --held keeps only the viewer's PRs. An unresolved login would silently filter
+# every PR out and read as "nothing held", so it is a hard error instead.
+ME=""
+if [ "$HELD" = "1" ]; then
+    ME="$($GH_API_CMD user 2>/dev/null | jq -r '.login // ""' 2>/dev/null || true)"
+    if [ -z "$ME" ]; then
+        echo "ERROR: cannot resolve your GitHub login (gh api user); --held needs it." >&2
+        exit 2
+    fi
 fi
 
 # --- required contexts (decision 5): protection API, else hardcoded fallback ---
@@ -157,7 +213,7 @@ EXPECTED_RED_RE='expected[ -]?red|will be RED|Expected CI check.*RED'
 HELD_BODY_RE='auto_merge:[[:space:]]*false|auto_postplan:[[:space:]]*false|human reviewer|human authz|requires human review|do NOT auto-merge|DNM'
 
 PRS_JSON="$("$GH_CMD" pr list --state open --limit 200 \
-    --json number,title,body,labels,mergeStateStatus,headRefOid,headRefName,files 2>/dev/null || echo '[]')"
+    --json number,title,body,labels,mergeStateStatus,headRefOid,headRefName,files,author,isDraft,autoMergeRequest,url 2>/dev/null || echo '[]')"
 
 PR_COUNT="$(echo "$PRS_JSON" | jq 'length')"
 
@@ -169,10 +225,10 @@ PR_COUNT="$(echo "$PRS_JSON" | jq 'length')"
 # consumers to anchor on `clearance=` instead.)
 #
 # Widths are >= the longest value each CLOSED enum can emit, so nothing overflows
-# in practice: BUCKET <= 21 ("FEAT-AWAITING-SIGNOFF"), NEXT-ACTION <= 31
-# ("human review (checks not green)"), MSS <= 9 ("HAS_HOOKS"), CLEARANCE <= 7
+# in practice: BUCKET <= 21 ("FEAT-AWAITING-SIGNOFF"), NEXT-ACTION <= 36
+# ("arm auto-merge (update branch first)"), MSS <= 9 ("HAS_HOOKS"), CLEARANCE <= 7
 # ("CLEARED"), a check state <= 9 ("cancelled"). HOLDS is last and unbounded.
-W_PR=7; W_BUCKET=22; W_ACTION=32; W_MSS=9; W_CLEAR=9; W_CHECK=9
+W_PR=7; W_BUCKET=22; W_ACTION=37; W_MSS=9; W_CLEAR=9; W_CHECK=9
 
 # ctx_header <required-check-context> -> its short column header. REQUIRED comes
 # from the live branch-protection API, so an unrecognised context must still get
@@ -200,12 +256,16 @@ for ctx in "${REQUIRED[@]}"; do
 done
 ROW_FMT="%-${W_PR}s  %-${W_BUCKET}s  %-${W_ACTION}s  %-${W_MSS}s  %-${W_CLEAR}s  ${CHECK_FMT}%s\n"
 
-# shellcheck disable=SC2059  # ROW_FMT is built above from constants, never from input
-printf "$ROW_FMT" "PR#" "BUCKET" "NEXT-ACTION" "MSS" "CLEARANCE" \
-    "${CHECK_HDRS[@]}" "HOLDS"
-# shellcheck disable=SC2059
-printf "$ROW_FMT" "$(dashes "$W_PR")" "$(dashes "$W_BUCKET")" "$(dashes "$W_ACTION")" \
-    "$(dashes "$W_MSS")" "$(dashes "$W_CLEAR")" "${CHECK_RULES[@]}" "-----"
+if [ "$HELD" = "0" ]; then
+    # shellcheck disable=SC2059  # ROW_FMT is built above from constants, never from input
+    printf "$ROW_FMT" "PR#" "BUCKET" "NEXT-ACTION" "MSS" "CLEARANCE" \
+        "${CHECK_HDRS[@]}" "HOLDS"
+    # shellcheck disable=SC2059
+    printf "$ROW_FMT" "$(dashes "$W_PR")" "$(dashes "$W_BUCKET")" "$(dashes "$W_ACTION")" \
+        "$(dashes "$W_MSS")" "$(dashes "$W_CLEAR")" "${CHECK_RULES[@]}" "-----"
+else
+    printf '%s\n' "PR#  URL  TITLE  REASONS"
+fi
 
 # mss_blocks_merge <mergeStateStatus>  -> 0 (true) when GitHub will NOT merge this
 # head as-is, whatever the check-runs say.
@@ -230,17 +290,47 @@ mss_blocks_merge() {
     esac
 }
 
+# mss_armable <mergeStateStatus> -> 0 (true) when auto-merge may be ARMED on this
+# head: the four states mss_blocks_merge allows, plus BEHIND. A BEHIND head still
+# cannot merge as-is (master's protection is strict), so arming it is safe ONLY
+# because the merge line updates armed PRs one at a time (--arm runs one pass;
+# update-behind-prs.yml runs the rest) and GitHub re-runs the required checks on the updated head before the
+# armed auto-merge fires. DRAFT, UNKNOWN and every unrecognised value stay
+# blocked: those are not "green but stale", they are "not a mergeable PR".
+mss_armable() {
+    case "$1" in
+        BEHIND) return 0 ;;
+        *) ! mss_blocks_merge "$1" ;;
+    esac
+}
+
 # mss_action <mergeStateStatus> -> the NEXT-ACTION text for a NOT-MERGEABLE row.
 mss_action() {
     case "$1" in
-        BEHIND)  echo "update branch onto master" ;;
         DRAFT)   echo "mark ready for review" ;;
         UNKNOWN) echo "re-check (state unknown)" ;;
         *)       echo "re-check merge state" ;;
     esac
 }
 
+# --- PAUSED support: PR head branch -> worktree path --------------------------------------
+# One `git worktree list --porcelain` read up front (or the PR_TRIAGE_WTL test seam).
+if [ -n "${PR_TRIAGE_WTL:-}" ]; then
+    WT_PORCELAIN="$(cat "$PR_TRIAGE_WTL" 2>/dev/null || true)"
+else
+    WT_PORCELAIN="$(git -C "$SCRIPT_DIR" worktree list --porcelain 2>/dev/null || true)"
+fi
+
+# wt_for_branch <branch> -> the worktree path checked out on that branch, or nothing.
+wt_for_branch() {
+    [ -n "${1:-}" ] || return 0
+    printf '%s\n' "$WT_PORCELAIN" | awk -v b="refs/heads/$1" '
+        /^worktree / { path = substr($0, 10) }
+        $1 == "branch" && $2 == b { print path; exit }'
+}
+
 EXIT=0
+ARMED_BEHIND=0
 RERUN_HINTS=""
 ROWS=0
 SWEEPING=0
@@ -277,6 +367,12 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     labels="$(echo "$PR" | jq -c '.labels // []')"
     files="$(echo "$PR" | jq -c '.files // []')"
     head_ref="$(echo "$PR" | jq -r '.headRefName // ""')"
+    if [ "$HELD" = "1" ] && ! hp_is_held "$PR" "$ME"; then
+        # Counted as reported: the post-loop guard compares ROWS to PR_COUNT.
+        ROWS=$((ROWS + 1))
+        continue
+    fi
+    url="$(echo "$PR" | jq -r '.url // ""')"
 
     # --- live check-runs for this PR's head SHA (dedupe: latest run per name) ---
     CR_JSON="$($GH_API_CMD "repos/$SLUG/commits/$sha/check-runs?per_page=100" 2>/dev/null \
@@ -285,7 +381,8 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         | sort_by(.completed_at // .started_at) | last]')"
 
     # --- compute signals ---
-    clearance="$(pr_manual_testing_clearance "$body")"
+    changed_paths="$(printf '%s' "$files" | jq -r '.[].path')"
+    clearance="$(pr_manual_testing_clearance "$body" "$changed_paths")"
     golden="$(pr_golden_hold "$files")"
     feat="$(pr_feat_hold "$title" "$labels")"
     # `| tr` like deps/unresolved below: both axes can fire, and the predicate
@@ -323,10 +420,10 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     action=""
     if [ "$mss" = "DIRTY" ]; then
         bucket="DIRTY"; action="rebase onto master"
-    elif mss_blocks_merge "$mss"; then
-        # Ranked here, beside DIRTY, because it is the same fact: GitHub will not
-        # merge this head. The per-check columns still print every required check's
-        # state, so nothing a lower bucket would have said is lost.
+    elif ! mss_armable "$mss"; then
+        # Ranked beside DIRTY: GitHub will not merge this head and no update fixes that.
+        # BEHIND is NOT here since 2026-09: it falls through and, if every lower bucket
+        # clears, arms and waits for the merge line to update it.
         bucket="NOT-MERGEABLE"; action="$(mss_action "$mss")"
     elif [ "$blocked_check" = "1" ]; then
         bucket="BLOCKED-CHECK"; action="fix / re-run CI"
@@ -346,10 +443,18 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         bucket="PIPELINE-HELD"; action="human merge (never arms)"
     elif [ -n "$feat" ]; then
         bucket="FEAT-AWAITING-SIGNOFF"; action="human sign-off + label"
+    elif usage_worktree_paused "$(wt_for_branch "$head_ref")"; then
+        # The coordinator resumes the paused post-plan run; a merge decision now would race it.
+        bucket="PAUSED"; action="none — post-plan paused by usage gate"
     elif [ "$clearance" = "UNKNOWN" ]; then
         bucket="UNCLEARED"; action="human review (no clearance)"
-    elif [ "$clearance" = "CLEARED" ] && ! mss_blocks_merge "$mss" && [ "$armable_checks_green" = "1" ]; then
-        bucket="ARMABLE"; action="arm auto-merge"
+    elif [ "$clearance" = "CLEARED" ] && mss_armable "$mss" && [ "$armable_checks_green" = "1" ]; then
+        bucket="ARMABLE"
+        if [ "$mss" = "BEHIND" ]; then
+            action="arm auto-merge (update branch first)"
+        else
+            action="arm auto-merge"
+        fi
     else
         # Defensive: cleared but a check is not green yet (race) -> not armable.
         bucket="UNCLEARED"; action="human review (checks not green)"
@@ -371,12 +476,24 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     holds="${holds% }"
     if [ -z "$holds" ]; then holds="-"; fi
 
+    if [ "$HELD" = "1" ]; then
+        # A failed comments read loses only the recorded reasons; live ones still print.
+        sticky="$($GH_API_CMD "repos/$SLUG/issues/$num/comments" --paginate 2>/dev/null \
+            | hp_pick_sticky || true)"
+        reasons="$(hp_sticky_reasons "$sticky"; \
+            hp_live_reasons "$mss" "$clearance" "$holds" "$CR_JSON")"
+        hp_format_line "$num" "${url:--}" "$title" "$reasons"
+        ROWS=$((ROWS + 1))
+        continue
+    fi
+
     # shellcheck disable=SC2059
     printf "$ROW_FMT" "#$num" "$bucket" "$action" "${mss:-?}" "$clearance" \
         "${check_states[@]}" "$holds"
     ROWS=$((ROWS + 1))
 
     # --- --arm side-effect: ONLY the ARMABLE bucket ---
+    # A BEHIND row only arms here. The merge-line pass after the loop updates it.
     # No --delete-branch, deliberately: the repo already sets deleteBranchOnMerge,
     # so GitHub deletes the head branch itself. Carrying the flag only added harm —
     # the local delete fails in a multi-worktree clone (gh can exit non-zero and
@@ -386,6 +503,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     if [ "$ARM" = "1" ] && [ "$bucket" = "ARMABLE" ]; then
         if "$GH_CMD" pr merge "$num" --squash --auto >/dev/null 2>&1; then
             echo "  armed auto-merge on #$num"
+            [ "$mss" = "BEHIND" ] && ARMED_BEHIND=1
         else
             echo "  ARM FAILED on #$num (gh pr merge exited non-zero)" >&2
             EXIT=1
@@ -393,6 +511,19 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     fi
 done
 SWEEPING=0
+
+# Updating every armed BEHIND PR at once starts a full CI round on each, and all
+# but the merge-line head go BEHIND again before their turn (~80 wasted rounds on
+# 2026-10-10). One head-of-line pass keeps the arm from waiting on
+# update-behind-prs.yml's cron, which GitHub delays 6-12h under load.
+if [ "$ARM" = "1" ] && [ "$ARMED_BEHIND" = "1" ]; then
+    if "$MERGE_LINE_CMD" --once --repo "$SLUG" 2>&1 | sed 's/^/  merge-line: /'; then
+        :
+    else
+        echo "  MERGE-LINE PASS FAILED (PRs stay armed; update-behind-prs.yml retries on the next master push)" >&2
+        EXIT=1
+    fi
+fi
 
 if [ "$ROWS" -ne "$PR_COUNT" ]; then
     echo "ERROR: reported $ROWS of $PR_COUNT open PRs without aborting." >&2

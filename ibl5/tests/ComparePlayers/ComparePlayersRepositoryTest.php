@@ -10,7 +10,7 @@ use Tests\WideUnit\Mocks\MockDatabase;
 
 class ComparePlayersRepositoryTest extends TestCase
 {
-    private object $mockDb;
+    private MockDatabase $mockDb;
     private ComparePlayersRepository $repository;
 
     protected function setUp(): void
@@ -29,24 +29,11 @@ class ComparePlayersRepositoryTest extends TestCase
         }
     }
 
-    public function testGetAllPlayerNamesOrdersAlphabetically(): void
+    public function testGetAllPlayerNamesOrdersByNameThenPid(): void
     {
-        $result = $this->repository->getAllPlayerNames();
+        $this->repository->getAllPlayerNames();
 
-        // Mock database returns empty — verify that empty array is returned correctly
-        $this->assertSame([], $result);
-    }
-
-    public function testGetAllPlayerNamesExcludesInactivePlayers(): void
-    {
-        $result = $this->repository->getAllPlayerNames();
-
-        // The query filters ordinal != 0; mock database returns empty array
-        $this->assertIsArray($result);
-        // Each returned player name is a string (verifies item type when present)
-        foreach ($result as $name) {
-            $this->assertIsString($name);
-        }
+        self::assertStringContainsString('ORDER BY name ASC, pid ASC', implode("\n", $this->mockDb->getExecutedQueries()));
     }
 
     public function testGetPlayerByNameReturnsPlayerData(): void
@@ -99,9 +86,8 @@ class ComparePlayersRepositoryTest extends TestCase
         $this->assertNull($result);
     }
 
-    private function createMockDatabase(): object
+    private function createMockDatabase(): MockDatabase
     {
-        // Use the centralized MockDatabase that supports both legacy and mysqli interfaces
         return new MockDatabase();
     }
 }

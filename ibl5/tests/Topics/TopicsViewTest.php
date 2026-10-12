@@ -156,7 +156,7 @@ class TopicsViewTest extends TestCase
 
         $html = $this->view->render($topics, 'themes/IBL/images/topics/', $this->searchFilters);
 
-        $this->assertStringContainsString('No news yet', $html);
+        $this->assertStringContainsString('any news yet for this topic', $html);
     }
 
     public function testRenderPopulatesFilterDropdownOptions(): void

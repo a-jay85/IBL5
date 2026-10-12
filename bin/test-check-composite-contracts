@@ -2,20 +2,23 @@
 # shellcheck shell=bash
 #
 # bin/test-check-composite-contracts — regression test for the composite-contract
-# gate. Builds throwaway .github/actions trees and asserts the check's exit code and
+# gate. Builds throwaway .github/actions and .github/workflows trees and asserts the check's exit code and
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
-# is sound the moment the composites land).
+# is sound the moment the composites land). Also covers the mutation-pr.yml
+# invariants (M1-M4) and the all-checks-green.yml invariants (A1-A5), the
+# step-scoped DB env invariant (D1) with a throwaway setup-php-env composite,
+# with throwaway workflow + ADR fixtures, and the read-only --protection-readback
+# mode (R0-R4, default and --context=) with generated protection JSON fixtures.
 #
 # Run: bin/test-check-composite-contracts  (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$SCRIPT_DIR/check-composite-contracts"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-FAILED=0
+h_tmp TMP
 
 # fresh_actions → echoes a new empty actions dir. Uses mktemp (not a counter): this
 # runs in a $(...) subshell at the call site, so a counter increment would not
@@ -26,6 +29,10 @@ fresh_actions() {
 
 fresh_workflows() {
   mktemp -d "$TMP/workflows.XXXXXX"
+}
+
+fresh_decisions() {
+  mktemp -d "$TMP/decisions.XXXXXX"
 }
 
 put_ssh() { # dir, guarded(1|0)
@@ -158,12 +165,90 @@ put_merge() {
   printf 'SKIP_CHECKS="%s" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
 }
 
+# put_mutation_pr <wf-dir> <variant>
+# Writes a minimal mutation-pr.yml to <wf-dir>. The base ("good") satisfies M1-M4
+# and deliberately carries a step-level `if:` and a sticky-step `continue-on-error`,
+# so M3/M4 are shown not to over-match. Each variant mutates exactly one invariant.
+put_mutation_pr() {
+  mkdir -p "$1"
+  local f="$1/mutation-pr.yml"
+  local tmp
+  # shellcheck disable=SC2016
+  cat > "$f" << 'MPEOF'
+name: Mutation Testing (per-PR diff)
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  mutation-pr:
+    name: Infection PHP (per-PR diff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - name: Detect covered changes
+      id: changes
+      if: github.event_name == 'pull_request'
+      run: echo skip=false
+    - name: Run Infection on diff
+      run: |
+        vendor/bin/infection \
+          --min-msi=100 \
+          --ignore-msi-with-no-mutations
+    - name: Post sticky mutation comment
+      uses: marocchino/sticky-pull-request-comment@abc
+      continue-on-error: true
+MPEOF
+  case "${2:-good}" in
+    good) ;;
+    m1-paths)
+      tmp="$(mktemp)"
+      awk '{print} /^  pull_request:$/{print "    paths: [\047ibl5/**\047]"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m1-branches-ignore)
+      tmp="$(mktemp)"
+      awk '{print} /^  pull_request:$/{print "    branches-ignore: [production]"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m1-labeled)
+      tmp="$(mktemp)"
+      sed 's/types: \[opened, synchronize, reopened\]/types: [opened, synchronize, reopened, labeled]/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m2-name-drift)
+      tmp="$(mktemp)"
+      sed 's/^    name: Infection PHP (per-PR diff)$/    name: Infection PHP (per-PR)/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m3-job-if)
+      tmp="$(mktemp)"
+      awk '{print} /^    runs-on:/{print "    if: github.event.action != \047labeled\047"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m3-job-coe)
+      tmp="$(mktemp)"
+      awk '{print} /^    runs-on:/{print "    continue-on-error: true"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m4-msi-99)
+      tmp="$(mktemp)"
+      sed 's/--min-msi=100/--min-msi=99/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m4-msi-extra)
+      tmp="$(mktemp)"
+      awk '{print} /--min-msi=100/{print "          --min-msi=90 \\"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m4-msi-missing)
+      tmp="$(mktemp)"
+      sed '/--min-msi=100/d' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m4-coe-infection)
+      tmp="$(mktemp)"
+      awk '{print} /^    - name: Run Infection on diff$/{print "      continue-on-error: true"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    *)
+      echo "put_mutation_pr: unknown variant '${2:-}'" >&2; return 1 ;;
+  esac
+}
+
+# put_mut_adr <dir> <literal>
+# Writes the ADR fixture M2 resolves by glob; <literal> is the context it carries.
+put_mut_adr() {
+  mkdir -p "$1"
+  printf '# ADR-0999\n\n## Activation\n\nRequired context: %s\n' "$2" > "$1/0999-mutation-pr-required-own-workflow.md"
+}
+
 expect() { # name want got
   if [ "$3" -eq "$2" ]; then
-    echo "ok: $1 (exit $3)"
+    h_pass "$1 (exit $3)"
   else
-    echo "FAIL: $1 — expected exit $2, got $3"
-    FAILED=1
+    h_fail "$1" "expected exit $2, got $3"
   fi
 }
 
@@ -173,9 +258,9 @@ out="$("$CHECK" "$d" 2>&1)"; rc=$?
 expect "both-absent-pass" 0 "$rc"
 if printf '%s' "$out" | grep -q 'setup-ssh absent — skipped' \
    && printf '%s' "$out" | grep -q 'notify-discord absent — skipped'; then
-  echo "ok: absent-skips-are-visible"
+  h_pass "absent-skips-are-visible"
 else
-  echo "FAIL: absent-skips-are-visible — output: $out"; FAILED=1
+  h_fail "absent-skips-are-visible" "output: $out"
 fi
 
 # --- setup-ssh guarded → pass --------------------------------------------------
@@ -308,9 +393,9 @@ d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
 out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
 expect "pp-absent-skips" 0 "$rc"
 if printf '%s' "$out" | grep -q 'promote-to-production absent — skipped'; then
-  echo "ok: pp-absent-skips-skip-visible"
+  h_pass "pp-absent-skips-skip-visible"
 else
-  echo "FAIL: pp-absent-skips — no skip line in output; output: $out"; FAILED=1
+  h_fail "pp-absent-skips" "no skip line in output; output: $out"
 fi
 
 # pp-merge-script-absent: absent merge script → exit 0 with visible P8 skip line
@@ -318,14 +403,555 @@ d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
 out="$("$CHECK" "$d_a" "$d_wf" "$TMP/no-such-merge" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
 expect "pp-merge-script-absent" 0 "$rc"
 if printf '%s' "$out" | grep -q 'P8 skipped'; then
-  echo "ok: pp-merge-script-absent-skip-visible"
+  h_pass "pp-merge-script-absent-skip-visible"
 else
-  echo "FAIL: pp-merge-script-absent — no visible P8 skipped line; output: $out"; FAILED=1
+  h_fail "pp-merge-script-absent" "no visible P8 skipped line; output: $out"
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-  echo "RESULT: FAILED"
-  exit 1
+# put_required_wf <dir> <file> <variant>
+# Writes a minimal workflow under <dir>/<file>. Variants:
+#   push-paths           push.paths before pull_request (tests.yml shape)
+#   pr-first-push-paths  pull_request first, push.paths after (e2e-tests.yml shape)
+#   pr-paths             paths: under pull_request
+#   pr-ignore            paths-ignore: under pull_request
+#   no-pr                no pull_request trigger
+put_required_wf() {
+  local f="$1/$2"
+  {
+    echo "name: fixture"
+    echo "on:"
+    case "$3" in
+      push-paths)
+        printf "  push:\n    branches: [master]\n    paths:\n      - '**.php'\n  pull_request:\n    branches: [master]\n    types: [opened, synchronize]\n" ;;
+      pr-first-push-paths)
+        printf "  pull_request:\n    branches: [master]\n  push:\n    branches: [master]\n    paths:\n      - '**.php'\n" ;;
+      pr-paths)
+        printf "  pull_request:\n    branches: [master]\n    paths:\n      - '**.php'\n" ;;
+      pr-ignore)
+        printf "  pull_request:\n    branches: [master]\n    paths-ignore:\n      - 'docs/**'\n" ;;
+      no-pr)
+        printf "  push:\n    branches: [master]\n" ;;
+    esac
+    printf "jobs:\n  noop:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n"
+  } > "$f"
+}
+
+# r1-push-paths-passes: push.paths ahead of pull_request is legal → exit 0
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" tests.yml push-paths
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-push-paths-passes" 0 $?
+
+# r1-pr-first-push-paths-passes: push.paths after pull_request is legal → exit 0
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" e2e-tests.yml pr-first-push-paths
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-pr-first-push-paths-passes" 0 $?
+
+# r1-pr-paths-fails: paths under pull_request → exit 1, message names R1
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" tests.yml pr-paths
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "r1-pr-paths-fails" 1 "$rc"
+if printf '%s' "$out" | grep -q 'tests.yml (R1)'; then
+  h_pass "r1-pr-paths-fails-names-file"
+else
+  h_fail "r1-pr-paths-fails" "no 'tests.yml (R1)' line; output: $out"
 fi
-echo "RESULT: all passed"
-exit 0
+
+# r1-pr-ignore-fails: paths-ignore under pull_request → exit 1
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" human-signoff.yml pr-ignore
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-pr-ignore-fails" 1 $?
+
+# r1-no-pr-fails: required workflow lost its pull_request trigger → exit 1
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" pr-meta-checks.yml no-pr
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-no-pr-fails" 1 $?
+
+# r1-absent-skips: no required workflows present → exit 0 with visible skip lines
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "r1-absent-skips" 0 "$rc"
+if printf '%s' "$out" | grep -q 'mutation.yml absent — R1 skipped'; then
+  h_pass "r1-absent-skips-skip-visible"
+else
+  h_fail "r1-absent-skips" "no visible R1 skip line; output: $out"
+fi
+
+# r1-real-files-pass: the five real required workflows pass R1 → exit 0
+REAL_WF="$SCRIPT_DIR/../.github/workflows"
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
+for n in tests.yml e2e-tests.yml human-signoff.yml pr-meta-checks.yml mutation.yml; do
+  cp "$REAL_WF/$n" "$d_wf/$n"
+done
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-real-files-pass" 0 $?
+
+# r1-real-tests-yml-mutant-fails: inject paths: under the real tests.yml
+# pull_request key → exit 1. cmp proves the injection anchor hit.
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
+awk '{ print } /^  pull_request:/ { print "    paths:"; print "      - \"**.php\"" }' \
+  "$REAL_WF/tests.yml" > "$d_wf/tests.yml"
+if cmp -s "$d_wf/tests.yml" "$REAL_WF/tests.yml"; then
+  h_fail "r1-real-tests-yml-mutant" "injection anchor missed (mutant identical)"
+fi
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-real-tests-yml-mutant-fails" 1 $?
+
+# ---------------------------------------------------------------------------
+# mutation-pr invariants (M1-M4)
+# ---------------------------------------------------------------------------
+
+MUT_LITERAL='Infection PHP (per-PR diff)'
+
+# run_mut <case-name> <want-exit> <variant> [adr-literal|-none-]
+# Fresh actions/workflows/decisions dirs, one mutation-pr.yml variant, one ADR.
+run_mut() {
+  local name="$1" want="$2" variant="$3" adr="${4:-$MUT_LITERAL}"
+  local d_a d_wf d_dec
+  d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+  put_mutation_pr "$d_wf" "$variant"
+  if [ "$adr" != "-none-" ]; then put_mut_adr "$d_dec" "$adr"; fi
+  "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+  expect "$name" "$want" $?
+}
+
+run_mut "mut-good" 0 good
+run_mut "mut-m1-paths" 1 m1-paths
+run_mut "mut-m1-branches-ignore" 1 m1-branches-ignore
+run_mut "mut-m1-labeled" 1 m1-labeled
+run_mut "mut-m2-name-drift" 1 m2-name-drift
+run_mut "mut-m2-adr-drift" 1 good 'Infection PHP (per PR diff)'
+run_mut "mut-m2-adr-absent" 1 good -none-
+run_mut "mut-m3-job-if" 1 m3-job-if
+run_mut "mut-m3-job-coe" 1 m3-job-coe
+run_mut "mut-m4-msi-99" 1 m4-msi-99
+run_mut "mut-m4-msi-extra" 1 m4-msi-extra
+run_mut "mut-m4-msi-missing" 1 m4-msi-missing
+run_mut "mut-m4-coe-infection" 1 m4-coe-infection
+
+# mut-m2-duplicate-name: a second workflow names a job with the same context
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+put_mutation_pr "$d_wf" good; put_mut_adr "$d_dec" "$MUT_LITERAL"
+printf 'name: Mutation Testing\njobs:\n  mutation:\n    name: Infection PHP (per-PR diff)\n' > "$d_wf/mutation.yml"
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+expect "mut-m2-duplicate-name" 1 $?
+
+# mut-absent-skips: no mutation-pr.yml → exit 0 with a visible skip line
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
+expect "mut-absent-skips" 0 "$rc"
+if printf '%s' "$out" | grep -q 'mutation-pr absent — skipped'; then
+  h_pass "mut-absent-skips-skip-visible"
+else
+  h_fail "mut-absent-skips" "no skip line in output; output: $out"
+fi
+
+# ---------------------------------------------------------------------------
+# all-checks-green invariants (A1-A5)
+# ---------------------------------------------------------------------------
+
+AGG_LITERAL='All checks green'
+
+# put_agg <workflows-dir> <variant> — writes all-checks-green.yml, good or one defect.
+put_agg() {
+  local on_extra="" types="[opened, reopened, synchronize, ready_for_review, edited, labeled, unlabeled]"
+  local job_name="All checks green" job_if="" timeout="    timeout-minutes: 45" wait="--wait "
+  # shellcheck disable=SC2016  # literal fixture YAML and shell text
+  local base_env='        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}' base_flag='--base-ref="$BASE_REF" '
+  local perms="  contents: read
+  checks: read
+  actions: read
+  pull-requests: read"
+  case "$2" in
+    good) ;;
+    a1-paths) on_extra="    paths: ['ibl5/**']" ;;
+    a1-branches) on_extra="    branches: [master]" ;;
+    a1-types) types="[opened, reopened, synchronize]" ;;
+    a2-name) job_name="All checks green!" ;;
+    a3-if) job_if="    if: github.event.pull_request.draft == false" ;;
+    a4-timeout) timeout="" ;;
+    a4-wait) wait="" ;;
+    a4-write) perms="  contents: read
+  checks: write" ;;
+    a4-inject)
+      # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
+      wait='--wait --title="${{ github.event.pull_request.title }}" ' ;;
+    a5-no-flag) base_flag="" ;;
+    a5-no-env) base_env="" ;;
+    a5-inline)
+      # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
+      base_flag='--base-ref="${{ github.event.pull_request.base.ref }}" ' ;;
+    a5-comment)
+      # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
+      wait='--wait # ${{ github.event.pull_request.base.ref }} ' ;;
+    *) echo "put_agg: unknown variant $2" >&2; return 1 ;;
+  esac
+  {
+    printf 'name: All checks green\n\non:\n  pull_request:\n'
+    [ -n "$on_extra" ] && printf '%s\n' "$on_extra"
+    printf '    types: %s\n\npermissions:\n%s\n\n' "$types" "$perms"
+    printf 'jobs:\n  all-checks-green:\n    name: %s\n    runs-on: ubuntu-latest\n' "$job_name"
+    [ -n "$job_if" ] && printf '%s\n' "$job_if"
+    [ -n "$timeout" ] && printf '%s\n' "$timeout"
+    printf '    steps:\n      - name: Wait\n'
+    [ -n "$base_env" ] && printf '%s\n' "$base_env"
+    printf '        run: |\n'
+    printf "          bin/check-pr-checks-green --sha=x %s%s--self='All checks green' --timeout-seconds=2400\n" "$base_flag" "$wait"
+  } > "$1/all-checks-green.yml"
+}
+
+put_agg_adr() {
+  mkdir -p "$1"
+  printf '# ADR-0998\n\nRequired context: %s\n' "$2" > "$1/0998-required-ci-aggregator-all-checks-green.md"
+}
+
+# run_agg <case-name> <want-exit> <variant> [adr-literal|-none-]
+run_agg() {
+  local name="$1" want="$2" variant="$3" adr="${4:-$AGG_LITERAL}"
+  local d_a d_wf d_dec
+  d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+  put_agg "$d_wf" "$variant"
+  if [ "$adr" != "-none-" ]; then put_agg_adr "$d_dec" "$adr"; fi
+  "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+  expect "$name" "$want" $?
+}
+
+run_agg "agg-good" 0 good
+run_agg "agg-a1-paths" 1 a1-paths
+run_agg "agg-a1-branches" 1 a1-branches
+run_agg "agg-a1-types" 1 a1-types
+run_agg "agg-a2-name" 1 a2-name
+run_agg "agg-a2-adr-drift" 1 good 'All checks pass'
+run_agg "agg-a2-adr-absent" 1 good -none-
+run_agg "agg-a3-if" 1 a3-if
+run_agg "agg-a4-timeout" 1 a4-timeout
+run_agg "agg-a4-wait" 1 a4-wait
+run_agg "agg-a4-write" 1 a4-write
+run_agg "agg-a4-inject" 1 a4-inject
+run_agg "agg-a5-no-flag" 1 a5-no-flag
+run_agg "agg-a5-no-env" 1 a5-no-env
+run_agg "agg-a5-inline" 1 a5-inline
+run_agg "agg-a5-comment" 1 a5-comment
+
+# agg-a2-duplicate-name: a second workflow names a job with the same context
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+put_agg "$d_wf" good; put_agg_adr "$d_dec" "$AGG_LITERAL"
+printf 'name: Other\njobs:\n  other:\n    name: All checks green\n' > "$d_wf/other.yml"
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+expect "agg-a2-duplicate-name" 1 $?
+
+# agg-a2-lib-drift: the check reads pr-armable.sh and armable.py from its own
+# repo root, so run a copy of it in a throwaway tree whose shell literal drifted.
+LD="$TMP/libdrift"
+mkdir -p "$LD/bin/lib" "$LD/tools/postplan-harness/harness"
+cp "$CHECK" "$LD/bin/check-composite-contracts"
+printf "PR_ARMABLE_AGGREGATOR_CONTEXT='All checks'\n" > "$LD/bin/lib/pr-armable.sh"
+printf 'AGGREGATOR_CONTEXT = "All checks green"\n' > "$LD/tools/postplan-harness/harness/armable.py"
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+put_agg "$d_wf" good; put_agg_adr "$d_dec" "$AGG_LITERAL"
+out="$("$LD/bin/check-composite-contracts" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
+expect "agg-a2-lib-drift" 1 "$rc"
+if printf '%s' "$out" | grep -qF 'pr-armable.sh does not set'; then
+  h_pass "agg-a2-lib-drift-names-lib"
+else
+  h_fail "agg-a2-lib-drift" "output does not name pr-armable.sh: $out"
+fi
+# Same tree with the shell literal fixed passes, so the case above failed on the drift.
+printf "PR_ARMABLE_AGGREGATOR_CONTEXT='All checks green'\n" > "$LD/bin/lib/pr-armable.sh"
+"$LD/bin/check-composite-contracts" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+expect "agg-a2-lib-aligned" 0 $?
+printf 'AGGREGATOR_CONTEXT = "All checks"\n' > "$LD/tools/postplan-harness/harness/armable.py"
+"$LD/bin/check-composite-contracts" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+expect "agg-a2-harness-drift" 1 $?
+
+# agg-absent-skips: no all-checks-green.yml → exit 0 with a visible skip line
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
+expect "agg-absent-skips" 0 "$rc"
+if printf '%s' "$out" | grep -q 'all-checks-green absent — skipped'; then
+  h_pass "agg-absent-skips-skip-visible"
+else
+  h_fail "agg-absent-skips" "no skip line in output; output: $out"
+fi
+
+# ---------------------------------------------------------------------------
+# --protection-readback mode (R0-R4) — fixtures shaped like the live
+# `gh api .../branches/master/protection` response.
+# ---------------------------------------------------------------------------
+
+RB_PRE="$TMP/rb-pre4.json"
+cat > "$RB_PRE" << 'RBEOF'
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": ["Tests and Analysis", "E2E Tests", "human-signoff", "Meta checks"],
+    "checks": [
+      {"context": "Tests and Analysis", "app_id": null},
+      {"context": "E2E Tests", "app_id": null},
+      {"context": "human-signoff", "app_id": 15368},
+      {"context": "Meta checks", "app_id": 15368}
+    ]
+  },
+  "enforce_admins": {"enabled": false},
+  "required_linear_history": {"enabled": false}
+}
+RBEOF
+
+# rb_post <name> <jq-filter> — writes $TMP/rb-<name>.json = pre4 with one jq edit.
+rb_post() {
+  jq --arg m "$MUT_LITERAL" "$2" "$RB_PRE" > "$TMP/rb-$1.json"
+}
+
+RB_PASS_FILTER='.required_status_checks.contexts += [$m] | .required_status_checks.checks += [{"context": $m, "app_id": 15368}]'
+rb_post pass5 "$RB_PASS_FILTER"
+rb_post swapped "$RB_PASS_FILTER | .required_status_checks.contexts |= map(if . == \"Meta checks\" then \"Some other check\" else . end)"
+rb_post replaceput '.required_status_checks.contexts = ["Tests and Analysis", "E2E Tests", "human-signoff", $m] | .required_status_checks.checks = (.required_status_checks.checks | map(select(.context != "Meta checks")) + [{"context": $m, "app_id": 15368}])'
+rb_post strictfalse "$RB_PASS_FILTER | .required_status_checks.strict = false"
+rb_post otherkey "$RB_PASS_FILTER | .enforce_admins.enabled = true"
+rb_post appid "$RB_PASS_FILTER | .required_status_checks.checks |= map(if .context == \"human-signoff\" then .app_id = null else . end)"
+
+# rb-pass-5: exit 0, output names the count the operator reads on the live run
+out="$("$CHECK" "--protection-readback=$TMP/rb-pass5.json" "--pre-image=$RB_PRE" 2>&1)"; rc=$?
+expect "rb-pass-5" 0 "$rc"
+if printf '%s' "$out" | grep -qF 'protection-readback: OK — 5 contexts'; then
+  h_pass "rb-pass-5-count-visible"
+else
+  h_fail "rb-pass-5" "no 'OK — 5 contexts' line; output: $out"
+fi
+
+# rb-fail-4-unchanged: post == pre (the POST never landed) → exit 1 via R1
+out="$("$CHECK" "--protection-readback=$RB_PRE" "--pre-image=$RB_PRE" 2>&1)"; rc=$?
+expect "rb-fail-4-unchanged" 1 "$rc"
+if printf '%s' "$out" | grep -qF '(R1)'; then
+  h_pass "rb-fail-4-unchanged-names-R1"
+else
+  h_fail "rb-fail-4-unchanged" "output lacks (R1): $out"
+fi
+
+"$CHECK" "--protection-readback=$TMP/rb-swapped.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-fail-swapped" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-replaceput.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-fail-replace-put" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-strictfalse.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-fail-strict-false" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-otherkey.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-fail-other-key" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-appid.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-fail-appid-changed" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-pass5.json" "--pre-image=$TMP/rb-pass5.json" >/dev/null 2>&1
+expect "rb-fail-pre-has-it" 1 $?
+
+# --context=<name>: the ADR-0149 activation adds `All checks green` to a 5-context
+# pre-image. The default (no --context) stays the mutation context (rb-pass-5 above).
+RB_PRE5="$TMP/rb-pre5.json"
+jq --arg m "$MUT_LITERAL" '.required_status_checks.contexts += [$m] | .required_status_checks.checks += [{"context": $m, "app_id": 15368}]' \
+  "$RB_PRE" > "$RB_PRE5"
+jq --arg a "$AGG_LITERAL" '.required_status_checks.contexts += [$a] | .required_status_checks.checks += [{"context": $a, "app_id": 15368}]' \
+  "$RB_PRE5" > "$TMP/rb-agg6.json"
+
+out="$("$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" "--context=$AGG_LITERAL" 2>&1)"; rc=$?
+expect "rb-context-pass-6" 0 "$rc"
+if printf '%s' "$out" | grep -qF "protection-readback: OK — 6 contexts (pre 5 + \"$AGG_LITERAL\")"; then
+  h_pass "rb-context-pass-6-count-visible"
+else
+  h_fail "rb-context-pass-6" "no 'OK — 6 contexts (pre 5 + \"$AGG_LITERAL\")' line; output: $out"
+fi
+
+# rb-context-missing: the POST never landed → R1 names the requested context
+out="$("$CHECK" "--protection-readback=$RB_PRE5" "--pre-image=$RB_PRE5" "--context=$AGG_LITERAL" 2>&1)"; rc=$?
+expect "rb-context-missing" 1 "$rc"
+if printf '%s' "$out" | grep -qF '(R1)' && printf '%s' "$out" | grep -qF "$AGG_LITERAL"; then
+  h_pass "rb-context-missing-names-context"
+else
+  h_fail "rb-context-missing" "output lacks (R1) or the context: $out"
+fi
+
+# rb-context-default: the agg post read without --context checks the mutation
+# context, which the pre5 image already has → R0 fails.
+"$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" >/dev/null 2>&1
+expect "rb-context-default-is-mutation" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" "--context=" >/dev/null 2>&1
+expect "rb-usage-empty-context" 2 $?
+"$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" "--ctx=x" >/dev/null 2>&1
+expect "rb-usage-bad-third-flag" 2 $?
+"$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" "--context=$AGG_LITERAL" extra >/dev/null 2>&1
+expect "rb-usage-four-args" 2 $?
+
+# usage errors and unreadable input → exit 2
+"$CHECK" --protection-readback "$TMP/rb-pass5.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-usage-space-form" 2 $?
+"$CHECK" "--protection-readback=$TMP/rb-pass5.json" >/dev/null 2>&1
+expect "rb-usage-missing-pre" 2 $?
+"$CHECK" "--readback=$TMP/rb-pass5.json" >/dev/null 2>&1
+expect "rb-usage-unknown-flag" 2 $?
+printf 'not json\n' > "$TMP/rb-badjson.json"
+"$CHECK" "--protection-readback=$TMP/rb-badjson.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-bad-json" 2 $?
+
+# --- D1: step-scoped DB_* env pinned to setup-php-env defaults -----------------
+
+# put_php_env <actions-dir> <host> <user> <pass> <name>: minimal setup-php-env
+# composite whose Create config.php step carries ${DB_<KEY>:-<default>} per key.
+# "-" writes that key as a bare literal with no default expression (unparseable).
+put_php_env() {
+  mkdir -p "$1/setup-php-env"
+  local e="" kv k v
+  for kv in "HOST=$2" "USER=$3" "PASS=$4" "NAME=$5"; do
+    k="${kv%%=*}"; v="${kv#*=}"
+    if [ "$v" = "-" ]; then e="$e \"'x'\""; else e="$e \"'\${DB_$k:-$v}'\""; fi
+  done
+  {
+    printf 'name: setup-php-env\nruns:\n  using: composite\n  steps:\n'
+    printf '    - name: Create config.php\n      shell: bash\n      run: |\n'
+    printf '        printf %s%s > config.local.php\n' "'<?php'" "$e"
+  } > "$1/setup-php-env/action.yml"
+}
+
+# db_env_step <host> <user> <pass> <name> [quoted]: one step (4-space list item,
+# the repo's style) with a step-scoped env block. "-" omits that key; all four
+# "-" omits the env block entirely.
+db_env_step() {
+  printf '    - name: Run database integration tests\n      working-directory: ibl5\n'
+  if [ "$1$2$3$4" != "----" ]; then
+    printf '      env:\n'
+    local kv k v
+    for kv in "HOST=$1" "USER=$2" "PASS=$3" "NAME=$4"; do
+      k="${kv%%=*}"; v="${kv#*=}"
+      [ "$v" = "-" ] && continue
+      if [ "${5:-}" = quoted ]; then printf '        DB_%s: "%s"\n' "$k" "$v"
+      else printf '        DB_%s: %s\n' "$k" "$v"; fi
+    done
+  fi
+  printf '      run: vendor/bin/phpunit --group database\n'
+}
+
+# put_db_wf <wf-dir> <file> <host> <user> <pass> <name> [plain|quoted|crlf|joblevel]
+# mutation-pr.yml is built on put_mutation_pr's passing base so M1-M4 stay green.
+# joblevel adds job-level DB_* env and service-container DB_* env that differ
+# from the defaults; D1 must ignore both. crlf rewrites every line ending to \r\n.
+put_db_wf() {
+  mkdir -p "$1"
+  local f="$1/$2" mode="${7:-plain}" q="" tmp
+  [ "$mode" = quoted ] && q=quoted
+  if [ "$2" = mutation-pr.yml ]; then
+    put_mutation_pr "$1" good
+    db_env_step "$3" "$4" "$5" "$6" "$q" >> "$f"
+  else
+    {
+      printf 'name: fixture\non:\n  pull_request:\n    branches: [master]\n'
+      printf 'jobs:\n  db:\n    runs-on: ubuntu-latest\n'
+      if [ "$mode" = joblevel ]; then
+        printf '    env:\n      DB_NAME: ibl5_override\n      DB_PASS: other\n'
+        printf '    services:\n      mariadb:\n        image: mariadb:11\n'
+        printf '        env:\n          DB_NAME: other\n'
+      fi
+      printf '    steps:\n'
+      db_env_step "$3" "$4" "$5" "$6" "$q"
+    } > "$f"
+  fi
+  if [ "$mode" = crlf ]; then
+    tmp="$(mktemp)"; awk '{printf "%s\r\n", $0}' "$f" > "$tmp" && mv "$tmp" "$f"
+  fi
+}
+
+d1_trio() { # wf-dir: the three required workflows, all aligned to the defaults
+  put_db_wf "$1" tests.yml 127.0.0.1 root root ibl5
+  put_db_wf "$1" mutation.yml 127.0.0.1 root root ibl5
+  put_db_wf "$1" mutation-pr.yml 127.0.0.1 root root ibl5
+}
+
+d1_has() { # name fixed-string output
+  h_contains "$1" "$3" "$2"
+}
+
+d1_lacks() { # name fixed-string output
+  h_not_contains "$1" "$3" "$2"
+}
+
+d1_dec="$(fresh_decisions)"; put_mut_adr "$d1_dec" "$MUT_LITERAL"
+d1_run() { "$CHECK" "$1" "$2" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d1_dec" 2>&1; }
+
+# d1-aligned-passes: composite + three aligned workflows → exit 0, three D1 passes
+d_a="$(fresh_actions)"; put_php_env "$d_a" 127.0.0.1 root root ibl5
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-aligned-passes" 0 "$rc"
+n=$(printf '%s\n' "$out" | grep -c 'matches setup-php-env defaults (1 block(s)) (D1)')
+expect "d1-aligned-three-pass-lines" 3 "$n"
+
+# d1-drift-<key>-fails: one key drifted in one required workflow → exit 1, key named
+for spec in "HOST tests.yml localhost root root ibl5 localhost" \
+            "USER mutation.yml 127.0.0.1 app root ibl5 app" \
+            "PASS mutation-pr.yml 127.0.0.1 root secret ibl5 secret" \
+            "NAME tests.yml 127.0.0.1 root root ibl5_test ibl5_test"; do
+  # shellcheck disable=SC2086
+  set -- $spec
+  d_wf="$(fresh_workflows)"; d1_trio "$d_wf"; put_db_wf "$d_wf" "$2" "$3" "$4" "$5" "$6"
+  out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+  expect "d1-drift-$1-fails" 1 "$rc"
+  d1_has "d1-drift-$1-names-key" "(D1) — step-scoped DB_$1 is '$7'" "$out"
+done
+
+# d1-missing-block-fails: a required workflow with zero step DB_* blocks → exit 1
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"; put_db_wf "$d_wf" mutation.yml - - - -
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-missing-block-fails" 1 "$rc"
+d1_has "d1-missing-block-named" "mutation.yml (D1) — no step-scoped DB_* env block found" "$out"
+
+# d1-partial-block-fails: a step block omitting DB_NAME → exit 1, key named
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"; put_db_wf "$d_wf" mutation-pr.yml 127.0.0.1 root root -
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-partial-block-fails" 1 "$rc"
+d1_has "d1-partial-block-names-key" "omits DB_NAME" "$out"
+
+# d1-composite-absent-skips: no setup-php-env, drifted workflows → exit 0, visible skip
+d_none="$(fresh_actions)"
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"; put_db_wf "$d_wf" tests.yml localhost root root ibl5
+out="$(d1_run "$d_none" "$d_wf")"; rc=$?
+expect "d1-composite-absent-skips" 0 "$rc"
+d1_has "d1-composite-absent-visible" "setup-php-env absent — D1 skipped" "$out"
+
+# d1-required-absent-skips: only tests.yml present → exit 0, the other two skipped visibly
+d_wf="$(fresh_workflows)"; put_db_wf "$d_wf" tests.yml 127.0.0.1 root root ibl5
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-required-absent-skips" 0 "$rc"
+d1_has "d1-required-absent-visible" "mutation.yml absent — D1 skipped" "$out"
+
+# d1-joblevel-not-flagged: job-level and service DB_* env that differ → exit 0
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
+put_db_wf "$d_wf" tests.yml 127.0.0.1 root root ibl5 joblevel
+put_db_wf "$d_wf" migration-safety.yml - - - - joblevel
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-joblevel-not-flagged" 0 "$rc"
+d1_has "d1-joblevel-listed-na" "D1 n/a (no step-scoped DB_* env): migration-safety.yml" "$out"
+d1_lacks "d1-joblevel-no-override-value" "ibl5_override" "$out"
+
+# d1-extra-workflow-drift-fails: a 4th workflow's step block is scanned too → exit 1
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"; put_db_wf "$d_wf" extra.yml 127.0.0.1 root root other_db
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-extra-workflow-drift-fails" 1 "$rc"
+d1_has "d1-extra-workflow-named" "extra.yml:" "$out"
+
+# d1-quoted-and-crlf-pass: quoted values and CRLF endings normalize → exit 0
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
+put_db_wf "$d_wf" tests.yml 127.0.0.1 root root ibl5 quoted
+put_db_wf "$d_wf" extra.yml 127.0.0.1 root root ibl5 crlf
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-quoted-and-crlf-pass" 0 "$rc"
+d1_has "d1-crlf-extra-passes" "extra.yml step-scoped DB_* env matches" "$out"
+
+# d1-composite-default-changed-fails: composite default moves, steps unchanged → exit 1
+d_chg="$(fresh_actions)"; put_php_env "$d_chg" 127.0.0.1 root root ibl5_ci
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
+out="$(d1_run "$d_chg" "$d_wf")"; rc=$?
+expect "d1-composite-default-changed-fails" 1 "$rc"
+d1_has "d1-composite-default-named" "with default 'ibl5_ci'" "$out"
+
+# d1-unparseable-composite-fails: no ${DB_PASS:-...} in the composite → exit 1
+d_bad="$(fresh_actions)"; put_php_env "$d_bad" 127.0.0.1 root - ibl5
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
+out="$(d1_run "$d_bad" "$d_wf")"; rc=$?
+expect "d1-unparseable-composite-fails" 1 "$rc"
+d1_has "d1-unparseable-composite-named" "expected exactly one \${DB_PASS:-default}" "$out"
+
+h_done

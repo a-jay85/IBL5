@@ -7,15 +7,24 @@ from __future__ import annotations
 
 import re
 
-from .adapters.probe import _validate as _probe_validate
 from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
 FILES_CHANGED_END = "<!-- files-changed:end -->"
+MERGE_DIGEST_BEGIN = "<!-- merge-digest:begin -->"
+MERGE_DIGEST_END = "<!-- merge-digest:end -->"
+TESTS_CHANGED_BEGIN = "<!-- tests-changed:begin -->"
+TESTS_CHANGED_END = "<!-- tests-changed:end -->"
+RESIDUAL_PHASES_BEGIN = "<!-- residual-phases:begin -->"
+RESIDUAL_PHASES_END = "<!-- residual-phases:end -->"
+SCOPE_NOTES_BEGIN = "<!-- scope-notes:begin -->"
+SCOPE_NOTES_END = "<!-- scope-notes:end -->"
 MANUAL_CONFIRMATION_BEGIN = "<!-- manual-confirmation:begin -->"
 MANUAL_CONFIRMATION_END = "<!-- manual-confirmation:end -->"
 REVIEWER_VERIFICATION_BEGIN = "<!-- reviewer-verification:begin -->"
 REVIEWER_VERIFICATION_END = "<!-- reviewer-verification:end -->"
+GATE_FIX_BEGIN = "<!-- gate-fix:begin -->"
+GATE_FIX_END = "<!-- gate-fix:end -->"
 
 STRIP_RE = re.compile(r"(migrations/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__/|\.snap$)")
 _PHP = re.compile(r"\.php$")
@@ -23,6 +32,16 @@ _CSS = re.compile(r"\.css$|^ibl5/design/")
 _MD = re.compile(r"\.md$")
 _MIGRATION = re.compile(r"^ibl5/migrations/.*\.sql$")
 _TEST = re.compile(r"^ibl5/tests/|\.test\.(ts|js|php)$|\.spec\.(ts|js)$")
+# Test files outside ibl5/ that _TEST does not cover: Go engine tests,
+# the harness's own pytest files, and bin/ shell test harnesses.
+_TEST_EXTRA = re.compile(r"_test\.go$|(^|/)test_[^/]*\.py$|^bin/test-")
+
+
+def is_test_path(p: str) -> bool:
+    """True when ``p`` is a test file for the tests-changed PR-body block."""
+    return bool(_TEST.search(p)) or bool(_TEST_EXTRA.search(p))
+
+
 _E2E = re.compile(r"^ibl5/tests/e2e/.*\.ts$")
 _LOCK = re.compile(r"(composer|package|bun)\.lock$")
 _SNAP = re.compile(r"__snapshots__/|\.snap$")
@@ -39,6 +58,30 @@ _SHELL_INC = re.compile(r"(^|/)bin/|\.sh$")
 _SHELL_EXC = re.compile(r"\.(php|md|json|py|ts|tsx|css|sql|ya?ml|lock|txt|neon)$")
 _WORKFLOW = re.compile(r"^\.github/workflows/.*\.ya?ml$")
 _SKILL_PROSE = re.compile(r"^\.claude/.*\.md$")
+# Paths a league GM can never see change: dev tooling, docs, tests, build config.
+# FAIL-SAFE DENYLIST: a path that matches nothing here counts as GM-visible, so an
+# unknown new directory keeps whatever type the model chose (never retyped).
+_NON_RUNTIME = re.compile(
+    r"^(bin|tools|\.claude|\.github)/"        # repo-level tooling roots
+    r"|^[^/]+$"                               # root-level files: README.md, CLAUDE.md, .gitignore
+    r"|^ibl5/(tests|docs|bin|node_modules|vendor|worktrees)/"
+    r"|^ibl5/(phpstan|phpunit|playwright|vitest|coverage|infection|test-results|tmp)"  # stem match: files and dirs
+    r"|^ibl5/(eslint\.config\.js|package\.json|composer\.(json|lock)|bun\.lock|[^/]*\.neon)$"
+    r"|\.md$"                                 # markdown anywhere (the app renders PHP, never markdown)
+    r"|_test\.go$"                            # Go engine tests
+)
+
+
+def is_gm_visible_path(p: str) -> bool:
+    """True when ``p`` is a runtime file whose change a league GM could notice.
+
+    Not GM-visible: `bin/`, `tools/`, `.claude/`, `.github/`, root-level files, markdown
+    anywhere, `ibl5/tests/`, `ibl5/docs/`, `ibl5/bin/`, ibl5 build/lint/test config, and
+    Go `_test.go` files. Everything else under `ibl5/` and `engine/` (and any unknown root)
+    is GM-visible.
+    """
+    p = p.strip()
+    return bool(p) and not _NON_RUNTIME.search(p)
 
 def is_shell_path(p: str) -> bool:
     return bool(_SHELL_INC.search(p)) and not _SHELL_EXC.search(p)
@@ -58,6 +101,24 @@ def files_from_diff(diff_text: str) -> list[str]:
                 if path not in files:
                     files.append(path)
     return files
+
+
+def rename_sources_from_diff(diff_text: str) -> list[str]:
+    """OLD paths of every rename in a unified diff, diff order, de-duplicated.
+
+    Keys on the `rename from ` extended header, which git emits only for a detected
+    rename, so a copy (`copy from `) or a plain add/delete pair contributes nothing.
+    Companion of `files_from_diff` (b-side paths): the union of the two is the set the
+    conformance check reads (`ReplayGit.conformance_files`), while `files_from_diff`
+    alone stays the set classify() and scope conformance read.
+    """
+    out: list[str] = []
+    for line in diff_text.splitlines():
+        if line.startswith("rename from "):
+            src = line[len("rename from "):]
+            if src and src not in out:
+                out.append(src)
+    return out
 
 
 def modified_files_from_diff(diff_text: str) -> list[str]:
@@ -160,6 +221,7 @@ def numstat_text(diff_text: str) -> str:
     current_path: str | None = None
     added = deleted = 0
     is_binary = False
+    in_hunk = False  # '---'/'+++' are file headers only before the first '@@'
 
     def flush() -> None:
         if current_path is None:
@@ -177,62 +239,234 @@ def numstat_text(diff_text: str) -> str:
             current_path = parts[1] if len(parts) > 1 else line.split()[-1]
             added = deleted = 0
             is_binary = False
+            in_hunk = False
+        elif not in_hunk and line.startswith("@@"):
+            in_hunk = True
         elif line.startswith("Binary files") and "differ" in line:
             is_binary = True
-        elif line.startswith("+") and not line.startswith("+++"):
+        elif in_hunk and line.startswith("+"):
             added += 1
-        elif line.startswith("-") and not line.startswith("---"):
+        elif in_hunk and line.startswith("-"):
             deleted += 1
 
     flush()
     return "\n".join(result)
 
 
-def render_files_changed(diff_text: str) -> str:
-    """Marker-delimited files-changed block derived from diff text.
+def strip_change_blocks(body: str) -> str:
+    """Remove the retired files-changed and tests-changed blocks from a PR body.
 
-    Returns a string bounded by FILES_CHANGED_BEGIN / FILES_CHANGED_END with one
-    ``- `<status>` `<path>``` bullet per file.  Empty diff yields the two markers
-    and the header line with no bullets and no trailing blank line inside the block.
+    Exists to clean bodies written before the harness stopped generating those blocks.
+    For each marker pair, when BEGIN and END are both present with BEGIN first, the span
+    BEGIN..END inclusive is removed and the whitespace left behind collapses so no run of
+    three or more newlines remains there. A body that ended with a block ends with a single
+    newline. An orphan or out-of-order marker leaves that pair untouched (never surgery on
+    a half-corrupt body). None or empty input returns "".
     """
-    pairs = name_status_from_diff(diff_text)
-    header = ("**Files changed** (generated from "
-              "`git diff --name-status origin/master...HEAD` — do not edit by hand):")
-    parts: list[str] = [FILES_CHANGED_BEGIN, header]
-    if pairs:
-        parts.append("")
-        for status, path in pairs:
-            parts.append(f"- `{status}` `{path}`")
-    parts.append(FILES_CHANGED_END)
-    return "\n".join(parts)
+    body = body or ""
+    for begin, end in ((FILES_CHANGED_BEGIN, FILES_CHANGED_END),
+                       (TESTS_CHANGED_BEGIN, TESTS_CHANGED_END)):
+        b = body.find(begin)
+        e = body.find(end)
+        if b == -1 or e == -1 or b > e:
+            continue
+        head = body[:b]
+        tail = body[e + len(end):]
+        if not tail.strip():
+            body = head.rstrip("\n") + "\n" if head.strip() else ""
+            continue
+        head = head.rstrip("\n")
+        tail = tail.lstrip("\n")
+        body = head + "\n\n" + tail if head.strip() else tail
+    return body
 
 
-def upsert_files_changed(body: str, block: str) -> str:
-    """Insert or replace the files-changed block in a PR body.
+def render_merge_digest(rows: list[str]) -> str:
+    """Marker-bounded `## Merge digest` block for the top of a PR body.
+
+    One paragraph per row (blank line between rows) so GitHub renders each bold label
+    on its own line. The rows are the exact ones the sticky comment prints.
+    """
+    return "\n".join([MERGE_DIGEST_BEGIN, "## Merge digest", "",
+                      "\n\n".join(rows), MERGE_DIGEST_END])
+
+
+def upsert_merge_digest(body: str, block: str) -> str:
+    """Insert or replace the merge-digest block in a PR body.
 
     Both markers present, BEGIN before END:
         Replace everything from BEGIN through END inclusive with ``block``;
         surrounding text is left byte-identical.
     Neither marker present:
-        Strip trailing whitespace from ``body``, then append ``"\\n\\n" + block + "\\n"``.
+        PREPEND ``block + "\\n\\n" + body.lstrip("\\n")`` (the digest sits at the TOP of
+        the body, unlike the appended blocks).
     Exactly one marker, or END before BEGIN:
-        Do not attempt surgery on the body.  Append a fresh block exactly as in
+        Do not attempt surgery on the body.  Prepend a fresh block exactly as in
         the neither-present case, leaving the orphan marker untouched.
     Empty/None body:
-        Return ``block`` alone.
+        Return ``block + "\\n"``.
     """
     body = body or ""
     if not body.strip():
-        return block
+        return block + "\n"
 
-    begin_idx = body.find(FILES_CHANGED_BEGIN)
-    end_idx = body.find(FILES_CHANGED_END)
+    begin_idx = body.find(MERGE_DIGEST_BEGIN)
+    end_idx = body.find(MERGE_DIGEST_END)
 
     if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
-        after_end = end_idx + len(FILES_CHANGED_END)
+        after_end = end_idx + len(MERGE_DIGEST_END)
         return body[:begin_idx] + block + body[after_end:]
 
-    # Neither both present and in order: append fresh, leave any orphan in place.
+    return block + "\n\n" + body.lstrip("\n")
+
+
+def render_residual_phases(items: list[str]) -> str:
+    """The `## Residual Phases` block for a PR body, or "" when there are no items.
+
+    `items` are conformance `MISSING-PHASE: N — heading (...)` strings. The block tells
+    the reader which plan phases the diff shows no evidence of and that arming condition
+    (3) holds auto-merge until they ship or the plan's `## Out of Scope` names them.
+    """
+    if not items:
+        return ""
+    parts = [RESIDUAL_PHASES_BEGIN, "## Residual Phases",
+             "The diff carries no evidence for these plan phases. Auto-merge is held "
+             "(arming condition 3) until they ship or the plan's `## Out of Scope` "
+             "section names them as deferred."]
+    for it in items:
+        parts.append(f"- {it.removeprefix('MISSING-PHASE: ').strip()}")
+    parts.append(RESIDUAL_PHASES_END)
+    return "\n".join(parts)
+
+
+def upsert_residual_phases(body: str, block: str) -> str:
+    """Insert, replace, or remove the residual-phases block in a PR body.
+
+    For a non-empty block: replace a well-formed pair in place, else append. An EMPTY block removes an
+    existing well-formed marker pair (plus one surrounding blank line) so a re-run after the
+    phases ship clears the notice; with no markers and an empty block the body is returned
+    unchanged. An orphan or reversed marker pair is left untouched and a non-empty block is
+    appended after it.
+    """
+    body = body or ""
+    begin_idx = body.find(RESIDUAL_PHASES_BEGIN)
+    end_idx = body.find(RESIDUAL_PHASES_END)
+    well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
+    if well_formed:
+        after_end = end_idx + len(RESIDUAL_PHASES_END)
+        if not block:
+            head = body[:begin_idx].rstrip("\n")
+            tail = body[after_end:].lstrip("\n")
+            return head + ("\n\n" + tail if tail else "\n") if head else tail
+        return body[:begin_idx] + block + body[after_end:]
+    if not block:
+        return body
+    if not body.strip():
+        return block
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def render_scope_notes(notes: list[str]) -> str:
+    """The `## Unplanned changes` block for a PR body, or "" when there are no notes.
+
+    `notes` are `unplanned <path> (...)` / `gap <path> (...)` texts from
+    scope_conformance.scope_notes. The block is advisory: it never holds auto-merge.
+    """
+    if not notes:
+        return ""
+    parts = [SCOPE_NOTES_BEGIN, "## Unplanned changes",
+             "The plan did not name these changes, or the diff lacks a planned file. "
+             "Auto-merge is not held on them. Check each one."]
+    for n in notes:
+        m = re.match(r"^(unplanned|gap) (\S+)(.*)$", n)
+        if m:
+            parts.append(f"- {m.group(1)} `{m.group(2)}`{m.group(3)}")
+        else:
+            parts.append(f"- {n.strip()}")
+    parts.append(SCOPE_NOTES_END)
+    return "\n".join(parts)
+
+
+def upsert_scope_notes(body: str, block: str) -> str:
+    """Insert, replace, or remove the scope-notes block in a PR body.
+
+    For a non-empty block: replace a well-formed pair in place, else append. An EMPTY block removes an
+    existing well-formed marker pair (plus one surrounding blank line) so a re-run after the
+    notes clear removes the notice; with no markers and an empty block the body is returned
+    unchanged. An orphan or reversed marker pair is left untouched and a non-empty block is
+    appended after it.
+    """
+    body = body or ""
+    begin_idx = body.find(SCOPE_NOTES_BEGIN)
+    end_idx = body.find(SCOPE_NOTES_END)
+    well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
+    if well_formed:
+        after_end = end_idx + len(SCOPE_NOTES_END)
+        if not block:
+            head = body[:begin_idx].rstrip("\n")
+            tail = body[after_end:].lstrip("\n")
+            return head + ("\n\n" + tail if tail else "\n") if head else tail
+        return body[:begin_idx] + block + body[after_end:]
+    if not block:
+        return body
+    if not body.strip():
+        return block
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def render_gate_fix(rec: dict) -> str:
+    """The `## Local gate auto-fix` block for a PR body, or "" unless a fix shipped.
+
+    Rendered only for a `fixed` outcome whose retry passed. Any other record stays in
+    result.json and audit.log.
+    """
+    if not rec or rec.get("status") != "fixed" or rec.get("retry") != "passed":
+        return ""
+    cost = rec.get("cost_usd")
+    shown = "unknown" if cost is None else f"${cost:.2f}"
+    files = ", ".join(f"`{f}`" for f in rec.get("files") or [])
+    excerpt = (rec.get("gate_excerpt") or "").replace("~~~~", "~ ~ ~ ~")
+    return "\n".join([
+        GATE_FIX_BEGIN,
+        "## Local gate auto-fix",
+        "",
+        f"A local `{rec.get('failed_cmd', '')}` gate denied this branch. The harness ran "
+        "one headless fixer and the retry passed.",
+        "",
+        f"- Model: `{rec.get('model_id', '')}`, cost: {shown}",
+        f"- Gate class: `{rec.get('gate_class', '')}`",
+        f"- Files touched: {files}",
+        "",
+        "<details><summary>Gate output</summary>",
+        "",
+        "~~~~text",
+        excerpt,
+        "~~~~",
+        "</details>",
+        GATE_FIX_END,
+    ])
+
+
+def upsert_gate_fix(body: str, block: str) -> str:
+    """Insert, replace, or remove the gate-fix block in a PR body.
+
+    Same contract as upsert_scope_notes with the GATE_FIX markers.
+    """
+    body = body or ""
+    begin_idx = body.find(GATE_FIX_BEGIN)
+    end_idx = body.find(GATE_FIX_END)
+    well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
+    if well_formed:
+        after_end = end_idx + len(GATE_FIX_END)
+        if not block:
+            head = body[:begin_idx].rstrip("\n")
+            tail = body[after_end:].lstrip("\n")
+            return head + ("\n\n" + tail if tail else "\n") if head else tail
+        return body[:begin_idx] + block + body[after_end:]
+    if not block:
+        return body
+    if not body.strip():
+        return block
     return body.rstrip() + "\n\n" + block + "\n"
 
 
@@ -256,16 +490,51 @@ def render_manual_confirmation(justification: str) -> str:
     Empty/whitespace-only input returns "" — never an empty heading. Every line
     of the justification is emitted as a blockquote so no line of plan prose can
     present as a markdown heading in the PR body (see _neutralize_headings).
+    The block carries one heading and no bold header line.
     """
     text = (justification or "").strip()
     if not text:
         return ""
-    header = ("**Manual confirmation needed** (from the plan's "
-              "`## Automouse Hold Justification` — auto-merge is held):")
-    parts = [MANUAL_CONFIRMATION_BEGIN, "## Manual confirmation needed", "", header, ""]
+    parts = [MANUAL_CONFIRMATION_BEGIN, "## Manual confirmation needed", ""]
     parts.extend(_neutralize_headings(text))
     parts.append(MANUAL_CONFIRMATION_END)
     return "\n".join(parts)
+
+
+def decision_paragraphs(justification: str) -> str:
+    """Raw `**Decision:**` paragraph(s) of a hold justification body.
+
+    Byte-identical to `bin/lib/hold-check.sh::hold_decision_paragraphs` run on
+    the same plan (pinned by tests/test_decision_render_parity.py): blocks
+    joined by one empty line, no trailing newline, "" when there is none.
+    """
+    # Local import: keeps classify.py free of a module-level planfile import.
+    from harness.planfile import split_hold_justification
+    decision_block, _ = split_hold_justification(justification or "")
+    return decision_block.rstrip("\n")
+
+
+def manual_confirmation_text(justification: str) -> str:
+    """What the merger reads: the Decision paragraph(s), else the full text.
+
+    Category, `Discharged by matrix rows`, and the why-line are plan-gate
+    bookkeeping and never reach the PR body. A section with no Decision line
+    falls back to the whole justification so a held PR never loses its notice.
+    """
+    decision = decision_paragraphs(justification)
+    return decision if decision.strip() else (justification or "")
+
+
+def upsert_hold_notice(body: str, justification: str) -> str:
+    """Phase 6 hold-notice composition, one call for the runner.
+
+    Upserts the Decision-only manual-confirmation block (positioned before
+    `## Manual Testing` by upsert_manual_confirmation), then clears any
+    `## Reviewer verification` block an earlier run left behind.
+    """
+    body = upsert_manual_confirmation(
+        body, render_manual_confirmation(manual_confirmation_text(justification)))
+    return upsert_reviewer_verification(body, "")
 
 
 def upsert_manual_confirmation(body: str, block: str) -> str:
@@ -277,7 +546,7 @@ def upsert_manual_confirmation(body: str, block: str) -> str:
     before the first `^#{2,6}\\s*Manual\\s+Testing\\b` heading when one exists,
     else append at the end. Exactly one marker, or END before BEGIN: insert a
     fresh block by the same rule and leave the orphan (mirrors
-    upsert_files_changed — never silently rewrite a half-corrupt body).
+    the other upserts: never silently rewrite a half-corrupt body).
     Empty body: return `block`.
     """
     body = body or ""
@@ -313,54 +582,6 @@ def _neutralize_checkboxes(text: str) -> str:
     def _replace(m: re.Match) -> str:
         return "- ( )" if m.group(1) == " " else "- (x)"
     return _CB_RE.sub(_replace, text)
-
-
-def render_reviewer_verification(discharged: list) -> str:
-    """Marker-delimited `## Reviewer verification` block, or "" when empty.
-
-    Each discharged entry is a dict with keys `text`, `category`, and
-    optionally `probe` (list[str]) and `rationale` (str).  For cli-executable
-    entries the probe is included in the bullet only when it passes the probe
-    allowlist; an invalid probe is silently omitted rather than rendered.
-
-    No emitted line starts with `#` (headings are not injected by this block),
-    and source text containing `- [ ]` or `- [x]` is rewritten to `- ( )` /
-    `- (x)` so clearance scanners cannot be confused.
-    """
-    if not discharged:
-        return ""
-    parts = [REVIEWER_VERIFICATION_BEGIN, "## Reviewer verification", ""]
-    parts.append("These claims came from the plan's hold justification and are settleable without you.")
-    parts.append("Each names its instrument; nothing here needs a human at the merge button.")
-    parts.append("")
-    for entry in discharged:
-        cat = entry.get("category", "unknown")
-        raw_text = _neutralize_checkboxes(entry.get("text", ""))
-        # Arming-gate defense: neutralize any line in the text that starts with
-        # '#' so no emitted line can be misread as a markdown heading by the
-        # clearance scanners.
-        text = "\n".join(
-            ("> " + ln) if ln.startswith("#") else ln
-            for ln in raw_text.splitlines()
-        )
-        probe = entry.get("probe")
-        rationale = entry.get("rationale", "")
-        if cat == "cli-executable" and probe:
-            rejection = _probe_validate(probe)
-            if rejection is None:
-                probe_str = " ".join(probe)
-                bullet = f'- "{text}" — `{cat}`: `{probe_str}`'
-            elif rationale:
-                bullet = f'- "{text}" — `{cat}`: {rationale}'
-            else:
-                bullet = f'- "{text}" — `{cat}`'
-        elif rationale:
-            bullet = f'- "{text}" — `{cat}`: {rationale}'
-        else:
-            bullet = f'- "{text}" — `{cat}`'
-        parts.append(bullet)
-    parts.append(REVIEWER_VERIFICATION_END)
-    return "\n".join(parts)
 
 
 def upsert_reviewer_verification(body: str, block: str) -> str:
@@ -468,6 +689,7 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
     c.has_shell = c.count_shell > 0
     c.has_workflow = c.count_workflow > 0
     c.has_skill_prose = any(_SKILL_PROSE.match(f) for f in files)
+    c.has_gm_visible = any(is_gm_visible_path(f) for f in files)
 
     t = c.count_total
     c.docs_only = t > 0 and c.count_md == t
@@ -527,6 +749,12 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
 
 _MANUAL_HEADING_RE = re.compile(r"^#{2,6}\s*Manual\s+Testing\b", re.I | re.M)
 _NEXT_HEADING_RE = re.compile(r"^#{1,6}\s", re.M)
+# Gate parity. armable._manual_section, bin/lib/pr-armable.sh and
+# bin/check-pr-manual-testing end the `## Manual Testing` window at the next
+# `^## ` line only; a `###` line is inside the window. The restore protects
+# exactly that window (backlog#1188), so its end regex is this one, never
+# _NEXT_HEADING_RE.
+_NEXT_SECTION_RE = re.compile(r"^## ", re.M)
 
 
 def strip_manual_testing_section(body: str) -> tuple[str, bool]:
@@ -552,12 +780,126 @@ def strip_manual_testing_section(body: str) -> tuple[str, bool]:
     return new_body, True
 
 
+# The runner's CLEARED sentinel. "covered by", never "verified by": the fidelity
+# reviewer's check 4c reads "verified by" as an unevidenced claim that a test run
+# happened, and its remediator then rewrote the line and dropped the sentinel (#2489).
+MANUAL_TESTING_SENTINEL = (
+    "No manual testing needed — all changes are covered by automated tests.")
+
+# Written instead of MANUAL_TESTING_SENTINEL when the located plan's Verification
+# Matrix has zero executable rows (.claude/rules/pr-body-test-claim.md mandates this
+# text). Same `No manual testing needed` prefix, so armable.SENTINEL_RE and the shell
+# twins (bin/lib/pr-armable.sh, bin/check-pr-manual-testing) read it as CLEARED; the
+# tail carries no e2e/unit/integration keyword, so the diff-coverage scan stays quiet.
+# Never "verified by" (#2489).
+MANUAL_TESTING_SENTINEL_STATIC = (
+    "No manual testing needed — verification is static; "
+    "the plan's Verification Matrix has no executable rows.")
+
+# Written by manual_testing.run() after Phase 6.7 confirms every `- [ ]` row in the
+# gate window is ticked. Same `No manual testing needed` prefix, so armable.SENTINEL_RE,
+# bin/lib/pr-armable.sh and bin/check-pr-manual-testing all read it as CLEARED; the
+# tail names no e2e/playwright/unit/phpunit/integration class, so armable.TAIL_TYPE_RULES
+# demands no matching changed file. "covered by", never "verified by" (#2489).
+MANUAL_TESTING_SENTINEL_TICKED = (
+    "No manual testing needed — every row below was ticked by the harness in "
+    "Phase 6.7; each is covered by an automated check that passed.")
+
+
+def _manual_testing_span(body: str) -> tuple[int, int] | None:
+    """`(start, end)` of the arming gate's window: the first `_MANUAL_HEADING_RE`
+    line to the next `^## ` line or EOF. Restore-only; strip_manual_testing_section
+    keeps its own `_NEXT_HEADING_RE` end.
+    """
+    m = _MANUAL_HEADING_RE.search(body)
+    if not m:
+        return None
+    next_m = _NEXT_SECTION_RE.search(body, m.end())
+    return m.start(), (next_m.start() if next_m else len(body))
+
+
+_GATE_HEADING_RE = re.compile(r"^## Manual Testing")
+
+
+def _drop_gate_heading_sections(rest: str, snapshot_rest: str) -> str:
+    """Drop `## Manual Testing` sections a fixer added after the protected span.
+
+    armable._manual_section does not end its window at a second
+    `^## Manual Testing` line, so a duplicate heading plus a sentinel line would
+    read as clearance. When the snapshot's own remainder carries no such
+    heading, every one in `rest` is counterfeit and its section (heading down to
+    the next other `^## ` line) is removed.
+    """
+    lines = rest.splitlines(keepends=True)
+    if not any(_GATE_HEADING_RE.match(l) for l in lines):
+        return rest
+    if any(_GATE_HEADING_RE.match(l) for l in snapshot_rest.splitlines()):
+        return rest
+    kept: list[str] = []
+    dropping = False
+    for l in lines:
+        if _GATE_HEADING_RE.match(l):
+            dropping = True
+            continue
+        if dropping and l.startswith("## "):
+            dropping = False
+        if not dropping:
+            kept.append(l)
+    return "".join(kept)
+
+
+def restore_manual_testing_section(after: str, before: str) -> tuple[str, bool]:
+    """Put back the runner-owned `## Manual Testing` section an LLM fixer rewrote.
+
+    `before` is the body snapshot taken just ahead of the fixer; `after` is the live
+    body it left. The section is the arming gate's input, so no model edit to it
+    survives: the gate window of the returned body equals the snapshot's byte for
+    byte. A section the fixer deleted is re-appended.
+
+    When the section was the LAST section of the snapshot, bytes the fixer added
+    after it (a 4c evidence line, a `Closes` trailer) sit inside the live window.
+    They are moved ABOVE the heading, the same placement upsert_manual_confirmation
+    uses, so they survive without becoming gate input. A tail that carries any
+    heading-shaped line is dropped instead: relocated, a `##Manual Testing`
+    counterfeit would be the first span match on the next round, and a `###` line
+    plus sentinel would read as clearance. Any other edit inside the window, and
+    any edit-plus-append, is reverted whole. Returns `(body, restored)`.
+    """
+    b = _manual_testing_span(before)
+    if b is None:
+        return after, False
+    section = before[b[0]:b[1]]
+    a = _manual_testing_span(after)
+    if a is None:
+        return after.rstrip("\n") + "\n\n" + section.rstrip("\n") + "\n", True
+    live = after[a[0]:a[1]]
+    rest = after[a[1]:]
+    clean_rest = _drop_gate_heading_sections(rest, before[b[1]:])
+    if live == section and clean_rest == rest:
+        return after, False
+    rest = clean_rest
+    if rest and not section.endswith("\n"):
+        # A snapshot that ended without a newline must not glue the next
+        # `## ` heading onto the sentinel line (the gate would miss the break).
+        rest = "\n" + rest
+    if b[1] == len(before) and live.startswith(section):
+        tail = live[len(section):]
+        if tail.strip() and not (_MANUAL_HEADING_RE.search(tail)
+                                 or _NEXT_HEADING_RE.search(tail)):
+            head = after[:a[0]].rstrip("\n")
+            moved = tail.strip("\n")
+            lead = (head + "\n\n" if head else "") + moved + "\n\n"
+            return lead + section + rest, True
+    return after[:a[0]] + section + rest, True
+
+
 BACKLOG_REPO = "a-jay85/IBL5-backlog"
 
-# "backlog issue #160", "backlog items #12 and #13", "Backlog #7, #8". A bare `#N`
+# "backlog issue #160", "backlog items #12 and #13", "Backlog #7, #8",
+# "backlog: #160", "(backlog) #5", "backlog - #7". A bare `#N`
 # autolinks to IBL5's own PR/issue N, so backlog refs must carry the repo prefix.
 _BACKLOG_REF_RE = re.compile(
-    r"(\bbacklog(?:\s+(?:issues?|items?|entry|entries))?\s+)"
+    r"(\bbacklog(?:\s+(?:issues?|items?|entry|entries))?(?:\s*[:)\-\u2013\u2014]\s*|\s+))"
     r"(#\d+(?:(?:\s*,\s*|\s*/\s*|,?\s+(?:and|or)\s+)#\d+)*)",
     re.I,
 )

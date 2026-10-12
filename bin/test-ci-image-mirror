@@ -1,0 +1,120 @@
+#!/bin/bash
+# bin/test-ci-image-mirror — self-test for bin/ci-image-mirror. Stub `docker` and
+# `sleep` shadow the real ones, so no Docker daemon or network is needed.
+#
+# Run: bin/test-ci-image-mirror  (exit 0 = all pass, 1 = a case failed)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TOOL="$SCRIPT_DIR/ci-image-mirror"
+REAL_MANIFEST="$SCRIPT_DIR/../.github/ci-image-mirror.txt"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+STUBS="$TMP/stubs"
+LOG="$TMP/docker.log"
+mkdir -p "$STUBS"
+
+# docker stub: logs argv. `inspect` exits 0 for mariadb refs, 1 otherwise.
+# `create` exits 1 while $TMP/create-fail holds a count > 0 (decrementing), or
+# always when it holds "always".
+cat > "$STUBS/docker" <<EOF
+#!/bin/bash
+echo "\$*" >> "$LOG"
+case "\$*" in
+    *" inspect "*)
+        case "\$*" in *mirror/mariadb*) exit 0 ;; *) exit 1 ;; esac ;;
+    *" create "*)
+        f="$TMP/create-fail"
+        [ -f "\$f" ] || exit 0
+        n=\$(cat "\$f")
+        if [ "\$n" = "always" ]; then exit 1; fi
+        if [ "\$n" -gt 0 ]; then echo \$((n - 1)) > "\$f"; exit 1; fi
+        exit 0 ;;
+esac
+exit 0
+EOF
+printf '#!/bin/bash\nexit 0\n' > "$STUBS/sleep"
+chmod +x "$STUBS/docker" "$STUBS/sleep"
+
+FAILED=0
+expect_eq() { # name want got
+    if [ "$3" = "$2" ]; then echo "ok: $1"
+    else echo "FAIL: $1 — expected [$2], got [$3]"; FAILED=1; fi
+}
+expect_exit() { # name want-code got-code
+    if [ "$3" -eq "$2" ]; then echo "ok: $1 (exit $3)"
+    else echo "FAIL: $1 — expected exit $2, got $3"; FAILED=1; fi
+}
+reset() { : > "$LOG"; rm -f "$TMP/create-fail"; }
+run() { # runs the tool with stubs first on PATH; sets OUT, ERR, RC
+    local rc=0
+    PATH="$STUBS:$PATH" "$TOOL" "$@" >"$TMP/out" 2>"$TMP/err" || rc=$?
+    OUT=$(cat "$TMP/out"); ERR=$(cat "$TMP/err"); RC=$rc
+}
+
+# 1. dry-run on the real manifest: three would-copy lines, no docker call
+reset
+run --dry-run --manifest="$REAL_MANIFEST"
+expect_exit "dry-run exits 0" 0 "$RC"
+expect_eq "dry-run prints three would-copy lines" 3 "$(printf '%s\n' "$OUT" | grep -c '^would copy ')"
+expect_eq "dry-run maps mariadb" 1 \
+    "$(printf '%s\n' "$OUT" | grep -cF 'mariadb:10.11 -> ghcr.io/a-jay85/mirror/mariadb:10.11')"
+expect_eq "dry-run runs no docker command" 0 "$(wc -l < "$LOG" | tr -d ' ')"
+
+# 2. docker.io/library/ prefix is dropped
+reset
+printf 'docker.io/library/golang:1.27\n' > "$TMP/m-prefix.txt"
+run --dry-run --manifest="$TMP/m-prefix.txt"
+expect_eq "docker.io/library/ maps to the bare name" 1 \
+    "$(printf '%s\n' "$OUT" | grep -cF -- '-> ghcr.io/a-jay85/mirror/golang:1.27')"
+
+# 3. --only-missing skips the present ref and copies the rest
+reset
+run --only-missing --manifest="$REAL_MANIFEST"
+expect_exit "only-missing exits 0" 0 "$RC"
+expect_eq "only-missing does not create mariadb" 0 \
+    "$(grep ' create ' "$LOG" | grep -cF 'mirror/mariadb' || true)"
+expect_eq "only-missing creates php" 1 "$(grep ' create ' "$LOG" | grep -cF 'mirror/php' || true)"
+expect_eq "only-missing creates golang" 1 "$(grep ' create ' "$LOG" | grep -cF 'mirror/golang' || true)"
+expect_eq "only-missing reports the present ref" 1 \
+    "$(printf '%s\n' "$OUT" | grep -cF 'present ghcr.io/a-jay85/mirror/mariadb:10.11')"
+
+# 4. retry: create fails twice, then succeeds
+reset
+echo 2 > "$TMP/create-fail"
+printf 'mariadb:10.11\n' > "$TMP/m-one.txt"
+run --manifest="$TMP/m-one.txt"
+expect_exit "retry succeeds on the 3rd attempt" 0 "$RC"
+expect_eq "retry runs create three times" 3 "$(grep -c ' create ' "$LOG" || true)"
+
+# 5. exhausted retries
+reset
+echo always > "$TMP/create-fail"
+run --manifest="$TMP/m-one.txt"
+expect_exit "exhausted retries exit 1" 1 "$RC"
+expect_eq "exhausted retries name FAILED to mirror" 1 "$(printf '%s\n' "$ERR" | grep -cF 'FAILED to mirror')"
+
+# 6. rejected forms, each exit 2
+reset
+run --bogus --manifest="$REAL_MANIFEST"
+expect_exit "unknown flag" 2 "$RC"
+run --manifest /x
+expect_exit "space-form --manifest" 2 "$RC"
+printf 'mariadb\n' > "$TMP/m-tagless.txt"
+run --dry-run --manifest="$TMP/m-tagless.txt"
+expect_exit "tagless manifest line" 2 "$RC"
+printf 'mariadb@sha256:abc\n' > "$TMP/m-digest.txt"
+run --dry-run --manifest="$TMP/m-digest.txt"
+expect_exit "digest manifest line" 2 "$RC"
+printf '# only a comment\n\n' > "$TMP/m-empty.txt"
+run --dry-run --manifest="$TMP/m-empty.txt"
+expect_exit "empty manifest" 2 "$RC"
+run --dry-run --manifest="$TMP/does-not-exist.txt"
+expect_exit "missing manifest" 2 "$RC"
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "test-ci-image-mirror: FAILED"
+    exit 1
+fi
+echo "test-ci-image-mirror: all passed"

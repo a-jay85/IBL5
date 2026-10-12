@@ -13,6 +13,7 @@ use Player\Player;
  * using market-based analysis to determine fair contract values.
  *
  * @phpstan-type TeamFactors array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}
+ * @phpstan-type TeamFactorsInput array{wins?: int, losses?: int, tradition_wins?: int, tradition_losses?: int, money_committed_at_position?: int}
  * @phpstan-type DemandResult array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, modifier: float}
  * @phpstan-type RatingBreakdown array{name: string, playerValue: int, marketMax: int, rawScore: int}
  * @phpstan-type ModifierBreakdown array{name: string, formula: string, inputs: string, result: float}
@@ -27,7 +28,7 @@ interface ExtensionContractDemandCalculatorInterface
      * fair contract demands including yearly amounts and modifiers.
      *
      * @param Player $player The player object with ratings and stats
-     * @param TeamFactors $teamFactors Team factors affecting demands
+     * @param TeamFactorsInput $teamFactors Team factors affecting demands
      * @return DemandResult Demand information
      *
      * **Calculation Overview:**
@@ -53,7 +54,7 @@ interface ExtensionContractDemandCalculatorInterface
      * Calculate demands with full intermediate breakdown for debugging.
      *
      * @param Player $player The player object with ratings and stats
-     * @param TeamFactors $teamFactors Team factors affecting demands
+     * @param TeamFactorsInput $teamFactors Team factors affecting demands
      * @return DemandsBreakdown Full breakdown of the calculation
      */
     public function calculateDemandsWithBreakdown(Player $player, array $teamFactors): array;

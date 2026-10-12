@@ -17,7 +17,7 @@ use League\League;
  *
  * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discord_id?: ?int, used_extension_this_chunk?: int, used_extension_this_season?: ?int, has_mle?: int, has_lle?: int, league_record?: ?string, ...<string, mixed>}
  */
-class Team extends \BaseMysqliRepository
+class Team extends \Database\BaseMysqliRepository
 {
     public int $teamid;
 
@@ -80,9 +80,7 @@ class Team extends \BaseMysqliRepository
      */
     protected function load(int|string|array $identifier): void
     {
-        if (is_int($identifier) && $identifier === 0) {
-            $identifier = League::FREE_AGENTS_TEAMID;
-        } elseif (is_string($identifier) && $identifier === '') {
+        if (is_string($identifier) && $identifier === '') {
             $identifier = League::FREE_AGENTS_TEAMID;
         }
 

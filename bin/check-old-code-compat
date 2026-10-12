@@ -1,0 +1,398 @@
+#!/bin/bash
+
+# Old-code compatibility gate: runs production's PHP tests against the PR-head
+# schema, which is the state auto-rollback leaves behind. The verdict engine
+# lives in verdict(); the pipeline builds the DB and runs the old tree's tests.
+#
+# Exit codes: 0 = pass, 1 = old code broke, 2 = usage error,
+#             3 = false-green guard tripped.
+
+set -euo pipefail
+
+BYPASS_MIN_LENGTH=20
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-old-code-compat --since=<sha> --old-tree=<dir> [options]
+       bin/check-old-code-compat --since=<sha> --verdict-only --junit=<file> --phpunit-exit=<int> [options]
+
+Runs the old tree's (origin/production) database PHPUnit suite against the
+PR-head schema and reports whether production PHP still works on it. A drop or
+rename that production still reads breaks that suite, and this gate fails.
+
+Required:
+  --since=<sha>             Diff base for "changed migrations". The range is
+                            <sha>...HEAD. Never derived inside the script.
+
+Pipeline mode (default; needs a MariaDB server):
+  --old-tree=<dir>          An ibl5/ dir holding vendor/bin/phpunit and
+                            tests/DatabaseIntegration/Fixtures/db-seed.sql.
+  --db-name=<name>          Scratch database. Default ibl5_oldcompat. Dropped and
+                            recreated, and dropped again on exit.
+  --phpunit-args=<string>   Extra phpunit args, split on spaces. No quote handling.
+  Environment: DB_HOST and DB_USER are required and must be non-empty. DB_PASS
+  may be empty. The password reaches mysql through MYSQL_PWD, never argv.
+
+Verdict-only mode (no DB work; the inputs below stand in for the pipeline):
+  --verdict-only            Skip all DB work.
+  --junit=<file>            PHPUnit JUnit XML from the old-tree run (required).
+  --phpunit-exit=<int>      Old-tree phpunit exit code (required).
+  --seed-exit=<int>         Seed-import exit code (default 0).
+  --seed-log=<file>         Seed-import stderr, read when --seed-exit is nonzero.
+
+Options:
+  --migrations-dir=<dir>    Default ibl5/migrations.
+  --min-tests=<int>         Minimum executed tests (tests - skipped). Default 1.
+  --bypass-from-stdin       Read the PR body from stdin for the per-PR marker.
+  --help, -h                Show this message.
+
+All flags take the --name=value form. A bare "--name value" is an unknown flag.
+
+Bypass markers (distinct from destructive-migration:, which accepts data loss):
+  Per-file (SQL comment on an added line of a changed migration):
+    -- rollback-incompatible: <reason at least 20 chars>
+  Per-PR (HTML comment in the PR body, via --bypass-from-stdin):
+    <!-- rollback-incompatible: <reason at least 20 chars> -->
+
+The marker waives a real break. It never waives the false-green guard.
+
+Limits:
+  .php data migrations are not applied by run-migrations-ci, so they are not
+  part of the PR-head schema this gate tests.
+
+Exit codes:
+  0  pass
+  1  old code broke on the PR-head schema
+  2  usage error
+  3  false-green guard tripped (empty run, DB short of PR-head); not bypassable
+EOF
+}
+
+die_usage() {
+    echo "ERROR: $1" >&2
+    echo "Usage: bin/check-old-code-compat --since=<sha> --old-tree=<dir> [options] (--help for more)" >&2
+    exit 2
+}
+
+require_int() {
+    case "$2" in
+        ''|*[!0-9]*) die_usage "$1 needs a non-negative integer, got: $2" ;;
+    esac
+}
+
+VERDICT_ONLY=0
+JUNIT=""
+PHPUNIT_EXIT=""
+SEED_EXIT=0
+SEED_LOG=""
+SINCE=""
+MIGRATIONS_DIR="ibl5/migrations"
+MIN_TESTS=1
+BYPASS_STDIN=0
+OLD_TREE=""
+DB="ibl5_oldcompat"
+PHPUNIT_ARGS=""
+
+for arg in "$@"; do
+    case "$arg" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --verdict-only)
+            VERDICT_ONLY=1
+            ;;
+        --junit=*)
+            JUNIT="${arg#--junit=}"
+            ;;
+        --phpunit-exit=*)
+            PHPUNIT_EXIT="${arg#--phpunit-exit=}"
+            require_int "--phpunit-exit" "$PHPUNIT_EXIT"
+            ;;
+        --seed-exit=*)
+            SEED_EXIT="${arg#--seed-exit=}"
+            require_int "--seed-exit" "$SEED_EXIT"
+            ;;
+        --seed-log=*)
+            SEED_LOG="${arg#--seed-log=}"
+            ;;
+        --since=*)
+            SINCE="${arg#--since=}"
+            ;;
+        --migrations-dir=*)
+            MIGRATIONS_DIR="${arg#--migrations-dir=}"
+            ;;
+        --min-tests=*)
+            MIN_TESTS="${arg#--min-tests=}"
+            require_int "--min-tests" "$MIN_TESTS"
+            ;;
+        --bypass-from-stdin)
+            BYPASS_STDIN=1
+            ;;
+        --old-tree=*)
+            OLD_TREE="${arg#--old-tree=}"
+            ;;
+        --db-name=*)
+            DB="${arg#--db-name=}"
+            ;;
+        --phpunit-args=*)
+            PHPUNIT_ARGS="${arg#--phpunit-args=}"
+            ;;
+        *)
+            die_usage "unknown argument: $arg"
+            ;;
+    esac
+done
+
+[ -n "$SINCE" ] || die_usage "--since=<sha> is required"
+
+if [ "$VERDICT_ONLY" = "1" ]; then
+    # A seed break never reaches phpunit, so the junit inputs are optional then.
+    if [ "$SEED_EXIT" = "0" ]; then
+        [ -n "$JUNIT" ] || die_usage "--junit=<file> is required with --verdict-only"
+        [ -n "$PHPUNIT_EXIT" ] || die_usage "--phpunit-exit=<int> is required with --verdict-only"
+    fi
+else
+    [ -n "${DB_HOST:-}" ] || die_usage "DB_HOST is required in pipeline mode"
+    [ -n "${DB_USER:-}" ] || die_usage "DB_USER is required in pipeline mode"
+    [ -n "$OLD_TREE" ] || die_usage "--old-tree=<dir> is required in pipeline mode"
+    [ -f "$OLD_TREE/vendor/bin/phpunit" ] || die_usage "--old-tree has no vendor/bin/phpunit: $OLD_TREE"
+    [ -f "$OLD_TREE/tests/DatabaseIntegration/Fixtures/db-seed.sql" ] \
+        || die_usage "--old-tree has no tests/DatabaseIntegration/Fixtures/db-seed.sql: $OLD_TREE"
+    case "$DB" in
+        ''|*[!A-Za-z0-9_]*) die_usage "--db-name must match ^[A-Za-z0-9_]+\$, got: $DB" ;;
+    esac
+fi
+
+[ -d "$MIGRATIONS_DIR" ] || die_usage "--migrations-dir is not a directory: $MIGRATIONS_DIR"
+if ! git -C "$MIGRATIONS_DIR" rev-parse --verify --quiet "${SINCE}^{commit}" >/dev/null 2>&1; then
+    die_usage "--since=$SINCE is not a commit in $MIGRATIONS_DIR"
+fi
+
+trim() {
+    echo "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+# Changed migrations, relative to the migrations dir so the same code reads the
+# real repo and a throwaway test repo. The baseline is a recreate template.
+changed_migrations() {
+    git -C "$MIGRATIONS_DIR" diff --relative --name-only --diff-filter=AM \
+        "$SINCE"...HEAD -- '*.sql' | grep -v '^000_baseline_schema\.sql$' || true
+}
+
+added_lines() {
+    git -C "$MIGRATIONS_DIR" diff --relative "$SINCE"...HEAD -- "$1" \
+        | grep '^+' | grep -v '^+++' | sed 's/^+//' || true
+}
+
+# Identifiers a migration drops, renames, or retypes: the names old code could
+# still be reading. Advisory only, so a miss degrades to candidate: lines.
+removed_identifiers() {
+    local ident upper
+    sed 's/--.*$//' \
+        | { grep -oiE '(DROP[[:space:]]+(COLUMN[[:space:]]+)?|CHANGE[[:space:]]+(COLUMN[[:space:]]+)?|MODIFY[[:space:]]+(COLUMN[[:space:]]+)?|RENAME[[:space:]]+(COLUMN|TABLE|TO)[[:space:]]+|DROP[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+EXISTS[[:space:]]+)?)`?[A-Za-z0-9_]+' || true; } \
+        | sed -E 's/.*[[:space:]`]//' | sort -u \
+        | while IFS= read -r ident; do
+            [ "${#ident}" -ge 3 ] || continue
+            upper="$(echo "$ident" | tr '[:lower:]' '[:upper:]')"
+            case "$upper" in
+                IF|EXISTS|COLUMN|TABLE|INDEX|KEY|CONSTRAINT|FOREIGN|PRIMARY|TO) continue ;;
+            esac
+            echo "$ident"
+        done
+}
+
+junit_attr() {
+    local line
+    line="$(grep -m1 '<testsuite ' "$JUNIT" || true)"
+    echo "$line" | sed -nE "s/.* $1=\"([0-9]+)\".*/\\1/p"
+}
+
+# Renders the verdict from JUNIT, PHPUNIT_EXIT, SEED_EXIT, and SEED_LOG. Always exits.
+verdict() {
+    local changed f ident reason tests skipped executed
+    local failure_text="" offenders="" bypass_reason=""
+    changed="$(changed_migrations)"
+
+    # 1. Seed break: a seed that cannot import into the new schema is a real break.
+    if [ "$SEED_EXIT" != "0" ]; then
+        if [ -n "$SEED_LOG" ] && [ -r "$SEED_LOG" ]; then
+            failure_text="$(cat "$SEED_LOG")"
+        fi
+    else
+        # 2. False-green guard. No marker is consulted before this exit.
+        if [ ! -r "$JUNIT" ]; then
+            echo "OLD-CODE-COMPAT: FALSE-GREEN: junit file missing or unreadable: $JUNIT"
+            exit 3
+        fi
+        tests="$(junit_attr tests)"
+        if [ -z "$tests" ]; then
+            echo "OLD-CODE-COMPAT: FALSE-GREEN: no tests=\"N\" on the first <testsuite> line of $JUNIT"
+            exit 3
+        fi
+        skipped="$(junit_attr skipped)"
+        skipped="${skipped:-0}"
+        executed=$((tests - skipped))
+        if [ "$executed" -lt "$MIN_TESTS" ]; then
+            echo "OLD-CODE-COMPAT: FALSE-GREEN: $executed tests executed ($tests total, $skipped skipped), need at least $MIN_TESTS"
+            exit 3
+        fi
+
+        # 3. Pass.
+        if [ "$PHPUNIT_EXIT" = "0" ]; then
+            echo "OLD-CODE-COMPAT: PASS ($executed tests executed)"
+            exit 0
+        fi
+        failure_text="$(sed -n '/<failure/,/<\/failure>/p;/<error/,/<\/error>/p' "$JUNIT")"
+    fi
+
+    # 4. Name the offender.
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        while IFS= read -r ident; do
+            [ -n "$ident" ] || continue
+            if grep -qiF -- "$ident" <<< "$failure_text"; then
+                offenders="${offenders}likely: ${f} (matched: ${ident})
+"
+            fi
+        done <<< "$(added_lines "$f" | removed_identifiers)"
+    done <<< "$changed"
+
+    if [ -z "$offenders" ]; then
+        if [ -z "$changed" ]; then
+            offenders="candidate: (no changed .sql migrations in --since range)
+"
+        else
+            while IFS= read -r f; do
+                [ -n "$f" ] || continue
+                offenders="${offenders}candidate: ${f}
+"
+            done <<< "$changed"
+        fi
+    fi
+
+    # 5. Bypass. Per-file markers count only on added lines of changed migrations.
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        reason="$(added_lines "$f" | sed -n 's/^[[:space:]]*--[[:space:]]*rollback-incompatible:[[:space:]]*\(.\{1,\}\)/\1/p' | head -1 || true)"
+        reason="$(trim "$reason")"
+        if [ "${#reason}" -ge "$BYPASS_MIN_LENGTH" ]; then
+            bypass_reason="$reason"
+            break
+        fi
+    done <<< "$changed"
+
+    if [ -z "$bypass_reason" ] && [ "$BYPASS_STDIN" = "1" ]; then
+        reason="$(sed -n 's/.*<!--[[:space:]]*rollback-incompatible:[[:space:]]*\(.\{1,\}\)[[:space:]]*-->.*/\1/p' | head -1 || true)"
+        reason="$(trim "$reason")"
+        if [ "${#reason}" -ge "$BYPASS_MIN_LENGTH" ]; then
+            bypass_reason="$reason"
+        fi
+    fi
+
+    if [ -n "$bypass_reason" ]; then
+        echo "OLD-CODE-COMPAT: PASS (bypass) reason: $bypass_reason"
+        exit 0
+    fi
+
+    # 6. Fail.
+    echo "OLD-CODE-COMPAT: FAIL: production PHP breaks on the PR-head schema"
+    printf '%s' "$offenders"
+    echo ""
+    printf '%s\n' "$failure_text" | sed -n '1,40p'
+    echo ""
+    echo "If the break is intended (a contract phase, prod no longer reads it), add one of:"
+    echo "  Per-file (SQL comment in the migration):"
+    echo "    -- rollback-incompatible: <reason, 20+ chars>"
+    echo "  Per-PR (HTML comment in the PR body):"
+    echo "    <!-- rollback-incompatible: <reason, 20+ chars> -->"
+    echo "See ibl5/migrations/README.md (Auto-Rollback Compatibility)."
+    exit 1
+}
+
+if [ "$VERDICT_ONLY" = "1" ]; then
+    verdict
+fi
+
+# --- Pipeline mode -----------------------------------------------------------
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+MIGRATIONS_DIR="$(cd "$MIGRATIONS_DIR" && pwd)"
+OLD_TREE="$(cd "$OLD_TREE" && pwd)"
+
+WORK="$(mktemp -d)"
+DB_CREATED=0
+export MYSQL_PWD="${DB_PASS:-}"
+
+cleanup() {
+    if [ "$DB_CREATED" = "1" ]; then
+        printf 'DROP DATABASE IF EXISTS `%s`;\n' "$DB" \
+            | mysql -h "$DB_HOST" -u "$DB_USER" >/dev/null 2>&1 || true
+    fi
+    rm -rf "$WORK"
+}
+trap cleanup EXIT
+
+# 1. Count guard, before any DB call. This is the runner's own filter and it
+# includes 000_baseline_schema.sql.
+EXPECTED=0
+for f in "$MIGRATIONS_DIR"/*.sql; do
+    [ -e "$f" ] || continue
+    if [[ "$(basename "$f")" =~ ^[0-9]{1,3}[a-z]?_ ]]; then
+        EXPECTED=$((EXPECTED + 1))
+    fi
+done
+if [ "$EXPECTED" = "0" ]; then
+    echo "OLD-CODE-COMPAT: FALSE-GREEN: no numbered .sql migrations in $MIGRATIONS_DIR"
+    exit 3
+fi
+
+# 2. Scratch DB. SQL goes on stdin, never -e.
+DB_CREATED=1
+printf 'DROP DATABASE IF EXISTS `%s`;\nCREATE DATABASE `%s`;\n' "$DB" "$DB" \
+    | mysql -h "$DB_HOST" -u "$DB_USER"
+
+# 3. Apply the PR-head schema with the PR tree's own runner.
+if ! RUN_MIGRATIONS_CI_DIR="$MIGRATIONS_DIR" "$SCRIPT_DIR/../ibl5/bin/run-migrations-ci" \
+        -h "$DB_HOST" -u "$DB_USER" "$DB" >"$WORK/migrate.log" 2>&1; then
+    tail -20 "$WORK/migrate.log"
+    echo "OLD-CODE-COMPAT: FALSE-GREEN: migrations failed to apply; DB is not at PR-head schema"
+    exit 3
+fi
+
+# 4. At-head guard.
+APPLIED="$(sed -nE 's/^Applying ([0-9]+) migrations.*/\1/p' "$WORK/migrate.log" | head -1 || true)"
+if [ -z "$APPLIED" ]; then
+    echo "OLD-CODE-COMPAT: FALSE-GREEN: runner printed no 'Applying N migrations' line"
+    exit 3
+fi
+if [ "$APPLIED" = "0" ] || [ "$APPLIED" != "$EXPECTED" ]; then
+    echo "OLD-CODE-COMPAT: FALSE-GREEN: runner applied $APPLIED migrations, expected $EXPECTED"
+    exit 3
+fi
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if ! grep -qxF -- "  -> $f" "$WORK/migrate.log"; then
+        echo "OLD-CODE-COMPAT: FALSE-GREEN: changed migration $f was not applied (runner skips names outside ^[0-9]{1,3}[a-z]?_)"
+        exit 3
+    fi
+done <<< "$(changed_migrations)"
+
+# 5. Seed from the old tree. A failure is a real break, handled by verdict().
+SEED_EXIT=0
+SEED_LOG="$WORK/seed.log"
+mysql -h "$DB_HOST" -u "$DB_USER" "$DB" \
+    < "$OLD_TREE/tests/DatabaseIntegration/Fixtures/db-seed.sql" 2>"$SEED_LOG" || SEED_EXIT=$?
+
+# 6. Old-tree phpunit. Strict sql_mode stays on, so this errs conservative.
+JUNIT="$WORK/junit.xml"
+PHPUNIT_EXIT=0
+if [ "$SEED_EXIT" = "0" ]; then
+    # shellcheck disable=SC2086
+    (cd "$OLD_TREE" && DB_HOST="$DB_HOST" DB_USER="$DB_USER" DB_PASS="${DB_PASS:-}" DB_NAME="$DB" \
+        vendor/bin/phpunit --group database --no-progress --log-junit "$JUNIT" $PHPUNIT_ARGS) \
+        || PHPUNIT_EXIT=$?
+fi
+
+# 7. Verdict.
+verdict

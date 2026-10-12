@@ -27,6 +27,6 @@ class NextSimEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

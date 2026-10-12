@@ -291,7 +291,7 @@ unset STUB_CI_AUTOFIX_MODE STUB_CI_AUTOFIX_RESULT
 bpt_expect_eq "r-apply-1: exit 0" 0 "$BPT_RC"
 bpt_log_has "$STUB" ci-autofix.log "no_change at attempt 1" "r-apply-1: no_change logged"
 bpt_log_has "$STUB" gh.log "pr comment" "r-apply-1: gh comment posted"
-bpt_log_has "$STUB" claude.log "--model claude-sonnet-4-6" "r-apply-1: Sonnet used on attempt 1"
+bpt_log_has "$STUB" claude.log "--model claude-sonnet-5-5" "r-apply-1: Sonnet used on attempt 1"
 
 # r-apply-2 — no result file (agent crash/timeout) → abort path, comment posted
 bpt_reset
@@ -397,8 +397,7 @@ export GIT_TERMINAL_PROMPT=0
 source "$DRIVER"
 
 R_TRUST="$(mktemp -d)"
-git -C "$R_TRUST" init -q
-git -C "$R_TRUST" config user.email t@t; git -C "$R_TRUST" config user.name t
+h_git_repo "$R_TRUST" --no-commit
 printf 'x\n' > "$R_TRUST/f"; git -C "$R_TRUST" add -A; git -C "$R_TRUST" commit -qm x
 
 tok="$(run_under_starved_env "$R_TRUST" sh -c 'printf %s "$GH_TOKEN$GITHUB_TOKEN"')"
@@ -433,4 +432,4 @@ rm -rf "$R_TRUST"
 
 echo "----"
 if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "SOME FAILED"; fi
-exit "$FAILED"
+h_done

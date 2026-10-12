@@ -21,7 +21,6 @@ if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
 }
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module

@@ -7,8 +7,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.conformance import check
-from harness.state import PlanInfo
+from harness.conformance import check, phase_omission_items
+from harness.planfile import parse_phases
+from harness.state import PhaseInfo, PlanInfo
 
 
 def _plan_with_test(path: str) -> PlanInfo:
@@ -140,3 +141,465 @@ def test_empty_token_is_missing():
     plan = _plan_with_test("/")
     items = check(plan, ["any/file.py"])
     assert any("MISSING" in i for i in items)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: phase_omission_items / check integration (post-impl)
+# ---------------------------------------------------------------------------
+
+def _plan_with_phases(phases, deferred=()):
+    return PlanInfo(found=True, has_matrix=True,
+                    phases=list(phases),
+                    deferred_phase_numbers=list(deferred))
+
+
+def test_phase_with_untouched_evidence_is_missing():
+    """Untouched evidence path → one MISSING-PHASE item naming the path.
+
+    Mutation caught: inverting `if any(...)` to `if not any(...)` yields zero items.
+    """
+    ph = PhaseInfo(number=2, heading="Phase 2: Do stuff", evidence_paths=["harness/x.py"])
+    plan = _plan_with_phases([ph])
+    items = phase_omission_items(plan, ["harness/y.py"],
+                                 tracked_files=("harness/x.py", "harness/y.py"))
+    assert len(items) == 1
+    assert items[0].startswith("MISSING-PHASE: 2 —")
+    assert "harness/x.py" in items[0]
+
+
+def test_phase_with_any_touched_evidence_ships():
+    """Suffix match on ANY evidence path → no item.
+
+    Mutation caught: requiring all() instead of any() emits an item.
+    """
+    ph = PhaseInfo(number=2, heading="Phase 2: Do stuff",
+                   evidence_paths=["harness/x.py", "harness/z.py"])
+    plan = _plan_with_phases([ph])
+    items = phase_omission_items(
+        plan, ["tools/postplan-harness/harness/z.py"],
+        tracked_files=("harness/x.py", "tools/postplan-harness/harness/z.py"))
+    assert items == []
+
+
+def test_phase_basename_ambiguous_hit_counts_as_shipped():
+    """2+ files with same basename → shipped (contrast _resolve's unique-hit rule).
+
+    Mutation caught: replacing _touched with _resolve(...) is not None emits an item.
+    """
+    ph = PhaseInfo(number=3, heading="Phase 3: A", evidence_paths=["tests/test_a.py"])
+    plan = _plan_with_phases([ph])
+    items = phase_omission_items(plan, ["a/tests/test_a.py", "b/tests/test_a.py"],
+                                 tracked_files=("a/tests/test_a.py", "b/tests/test_a.py"))
+    assert items == []
+
+
+def test_bookkeeping_phase_is_exempt():
+    """bookkeeping=True → no item even with untouched evidence.
+
+    Mutation caught: dropping `ph.bookkeeping or` emits an item.
+    """
+    ph = PhaseInfo(number=4, heading="Close backlog [phases: S]",
+                   evidence_paths=["docs/x.md"], bookkeeping=True)
+    plan = _plan_with_phases([ph])
+    items = phase_omission_items(plan, [])
+    assert items == []
+
+
+def test_deferred_phase_is_exempt():
+    """Phase number in deferred_phase_numbers → no item; different number is not exempt.
+
+    Mutation caught: dropping `ph.number in deferred` fails the first assertion.
+    """
+    ph = PhaseInfo(number=5, heading="Phase 5: Defer me", evidence_paths=["bin/x"])
+    plan_deferred = _plan_with_phases([ph], deferred=[5])
+    assert phase_omission_items(plan_deferred, [], tracked_files=("bin/x",)) == []
+
+    plan_other = _plan_with_phases([ph], deferred=[6])
+    items = phase_omission_items(plan_other, [], tracked_files=("bin/x",))
+    assert len(items) == 1
+
+
+def test_phase_without_evidence_is_exempt():
+    """evidence_paths=[] → no item (cannot verify = skip).
+
+    Mutation caught: dropping `not ph.evidence_paths` emits an item.
+    """
+    ph = PhaseInfo(number=7, heading="ADR", evidence_paths=[])
+    plan = _plan_with_phases([ph])
+    assert phase_omission_items(plan, []) == []
+
+
+def test_check_includes_phase_items_for_matrixless_plan():
+    """has_matrix=False plan still gets MISSING-PHASE items from check().
+
+    Mutation caught: moving items.extend(...) below the has_matrix early return drops it.
+    """
+    ph = PhaseInfo(number=2, heading="Phase 2: B", evidence_paths=["bin/b"])
+    plan = PlanInfo(found=True, has_matrix=False, phases=[ph])
+    items = check(plan, [], tracked_files=("bin/b",))
+    assert any(i.startswith("MISSING-PHASE: 2") for i in items)
+
+
+def test_check_not_found_plan_yields_nothing():
+    """found=False → check returns [] even with untouched phases.
+
+    Mutation caught: removing the plan.found guard in phase_omission_items emits an item.
+    """
+    ph = PhaseInfo(number=3, heading="Phase 3: C", evidence_paths=["harness/c.py"])
+    plan = PlanInfo(found=False, phases=[ph])
+    assert check(plan, []) == []
+
+
+def test_pytest_node_id_token_resolves_to_file():
+    """A `path/to/file.py::test_name` pytest node-id token resolves when the file is in the diff.
+
+    Mutation caught: removing the `::` split in _resolve makes the token unmatchable against
+    real filesystem paths and produces a spurious MISSING item for a test that was shipped.
+    """
+    tok = "tools/postplan-harness/tests/test_armable.py::test_manual_testing_clearance_keyword_clears_with_file"
+    plan = _plan_with_test(tok)
+    items = check(plan, ["tools/postplan-harness/tests/test_armable.py"])
+    assert items == [], f"expected no MISSING, got: {items}"
+
+
+def test_pytest_node_id_token_missing_when_file_absent():
+    """A `path/to/file.py::test_name` token still reports MISSING when the file is not in the diff.
+
+    Mutation caught: stripping `::` unconditionally and then matching against an empty
+    changed_files list would mask a missing test rather than surface it.
+    """
+    tok = "tools/postplan-harness/tests/test_armable.py::test_some_new_test"
+    plan = _plan_with_test(tok)
+    items = check(plan, [])
+    assert any(i.startswith("MISSING:") for i in items)
+
+
+def test_node_id_tokens_resolve_through_real_plan_parse(tmp_path):
+    """A `test_armable.py::test_name` token cited in a phase body and a PHPUnit matrix row
+    resolves through the real parse path, and stays MISSING when the file is absent.
+
+    Mutation caught: A) dropping the `::` strip in `_resolve` leaves the matrix token
+    unmatchable (spurious MISSING:). B) dropping the `.split("::", 1)[0]` in
+    `planfile._phase_evidence_paths` keeps `::test_fixture_case` on the phase evidence
+    path, so the evidence_paths assertion fails and the negative half reports no MISSING-PHASE:. Resolving unconditionally on `::` fails the negative
+    half, which must report both items for a diff that lacks the file.
+
+    Real-plan evidence (2026-10-07, backlog#1103): Phase 5.0 `conformance.check` on
+    manual-testing-clearance-pass-files @ 61cbd8aec and postplan-phase-omission-hold @
+    d23913ac1 both returned RESOLVES; neither plan printed NOT-EXERCISED or
+    DOES-NOT-RESOLVE. Those plans cite the node id only in phase bodies (CLI-executable
+    matrix rows never reach `planned_test_paths`), so this fixture adds the PHPUnit row
+    that routes the same token through `_resolve` as well.
+    """
+    from harness.planfile import locate_plan
+
+    node = "tools/postplan-harness/tests/test_armable.py::test_fixture_case"
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text(
+        "# Fixture plan\n"
+        "\n"
+        "## Phase 1: Add armable test\n"
+        "\n"
+        f"Add `{node}` to cover the armable path.\n"
+        "\n"
+        "## Verification Matrix\n"
+        "\n"
+        "| # | What to verify | Test type | Timing | Test file / location |\n"
+        "|---|---------------|-----------|--------|---------------------|\n"
+        f"| 1 | The fixture case passes | PHPUnit | post-impl | `{node}` |\n"
+    )
+    plan = locate_plan("fixture", explicit_path=str(plan_file))
+    assert plan.found
+    assert node in plan.planned_test_paths
+    assert "tools/postplan-harness/tests/test_armable.py" in plan.phases[0].evidence_paths
+
+    tracked = ("tools/postplan-harness/tests/test_armable.py",
+               "tools/postplan-harness/tests/test_other.py")
+    assert check(plan, ["tools/postplan-harness/tests/test_armable.py"],
+                 tracked_files=tracked) == []
+
+    items = check(plan, ["tools/postplan-harness/tests/test_other.py"],
+                  tracked_files=tracked)
+    assert any(i.startswith("MISSING:") for i in items), items
+    assert any(i.startswith("MISSING-PHASE:") for i in items), items
+
+
+# ---------------------------------------------------------------------------
+# Migration renumber tolerance (backlog#937) — Tier 3 of _resolve
+# ---------------------------------------------------------------------------
+
+def test_migration_renumber_resolves_when_suffix_unique():
+    """Plan names 179_<suffix>; diff carries 180_<suffix> and nothing else with
+    that suffix → resolves, no MISSING-FILE, and the resolution is logged.
+
+    Mutation caught: delete Tier 3 (or its return) and the token falls through
+    basename matching — `179_x.sql` != `180_x.sql` — producing MISSING-FILE.
+    """
+    tok = "ibl5/migrations/179_create_season1993_phantom_backup_tables.sql"
+    hit = "ibl5/migrations/180_create_season1993_phantom_backup_tables.sql"
+    plan = _plan_with_critical(tok)
+    resolutions: dict[str, str] = {}
+    items = check(plan, [hit], resolutions=resolutions)
+    assert items == [], f"expected no MISSING-FILE, got: {items}"
+    assert resolutions.get(tok) == hit
+
+
+def test_migration_missing_when_no_suffix_match():
+    """Plan names 179_<suffix>; diff carries a migration with a DIFFERENT
+    suffix → MISSING-FILE survives.
+
+    Mutation caught: match Tier 3 on the `ibl5/migrations/\\d+_` prefix alone
+    (drop the suffix equality) and any added migration would discharge any
+    planned migration, clearing the item.
+    """
+    tok = "ibl5/migrations/179_create_season1993_phantom_backup_tables.sql"
+    plan = _plan_with_critical(tok)
+    items = check(plan, ["ibl5/migrations/180_add_unrelated_column.sql"])
+    assert any("MISSING-FILE" in i and "179_create_season1993" in i for i in items)
+
+
+def test_migration_two_suffix_matches_stay_missing():
+    """Two added migrations share the planned suffix → ambiguous → MISSING-FILE.
+
+    Mutation caught: return the first suffix hit (`cands[0]`) instead of
+    requiring exactly one, and the item is cleared on an ambiguous diff.
+    """
+    tok = "ibl5/migrations/179_create_season1993_phantom_backup_tables.sql"
+    plan = _plan_with_critical(tok)
+    items = check(plan, [
+        "ibl5/migrations/180_create_season1993_phantom_backup_tables.sql",
+        "ibl5/migrations/181_create_season1993_phantom_backup_tables.sql",
+    ])
+    assert any("MISSING-FILE" in i and "179_create_season1993" in i for i in items)
+
+
+def test_non_migration_renumber_gets_no_tolerance():
+    """Same NNN_<suffix> shape OUTSIDE ibl5/migrations/ → no Tier 3 → MISSING-FILE.
+
+    Mutation caught: anchor the Tier 3 regex on the basename only (drop the
+    `ibl5/migrations/` directory prefix) and a renumbered fixture file would
+    resolve, widening the tolerance beyond migrations.
+    """
+    tok = "tools/postplan-harness/fixtures/179_sample_plan.md"
+    plan = _plan_with_critical(tok)
+    items = check(plan, ["tools/postplan-harness/fixtures/180_sample_plan.md"])
+    assert any("MISSING-FILE" in i and "179_sample_plan.md" in i for i in items)
+
+
+def test_migration_exact_match_wins_over_renumber():
+    """Diff carries BOTH the planned 179_<suffix> and a 180_<suffix> sibling →
+    Tier 1 exact match resolves to 179; Tier 3 never runs, so the sibling does
+    not make the set ambiguous.
+
+    Mutation caught: run Tier 3 before Tier 1 (or unconditionally) and the two
+    suffix hits produce None, emitting a MISSING-FILE for a file that IS in
+    the diff.
+    """
+    tok = "ibl5/migrations/179_create_season1993_phantom_backup_tables.sql"
+    plan = _plan_with_critical(tok)
+    resolutions: dict[str, str] = {}
+    items = check(plan, [
+        tok,
+        "ibl5/migrations/180_create_season1993_phantom_backup_tables.sql",
+    ], resolutions=resolutions)
+    assert items == []
+    # Exact match (Tier 1) does not write to resolutions; key absent confirms
+    # Tier 3 was never consulted and did not make the two suffix hits ambiguous.
+    assert resolutions.get(tok) is None
+
+
+# ---------------------------------------------------------------------------
+# ADR renumber tolerance (backlog#1169) — Tier 3 of _resolve, ADR sibling
+# ---------------------------------------------------------------------------
+
+_ADR_TOK = "ibl5/docs/decisions/0070-harness-adr-tier.md"
+_ADR_HIT = "ibl5/docs/decisions/0072-harness-adr-tier.md"
+
+
+def test_adr_renumber_resolves_when_suffix_unique():
+    """Plan names 0070-<suffix>; diff carries 0072-<suffix> and nothing else with
+    that suffix → resolves, no MISSING-FILE, and the resolution is logged.
+
+    Mutation caught: delete `_renumbered_adr` (or drop it from the Tier 3 return
+    in `_resolve`) and the token falls through basename matching —
+    `0070-x.md` != `0072-x.md` — producing MISSING-FILE.
+    """
+    plan = _plan_with_critical(_ADR_TOK)
+    resolutions: dict[str, str] = {}
+    items = check(plan, [_ADR_HIT], resolutions=resolutions)
+    assert items == [], f"expected no MISSING-FILE, got: {items}"
+    assert resolutions.get(_ADR_TOK) == _ADR_HIT
+
+
+def test_adr_missing_when_no_suffix_match():
+    """Plan names 0070-<suffix>; diff carries an ADR with a DIFFERENT suffix →
+    MISSING-FILE survives.
+
+    Mutation caught: match `_ADR_RENUMBER` on the `ibl5/docs/decisions/\\d{4}-`
+    prefix alone (drop the suffix equality) and any added ADR would discharge any
+    planned ADR, clearing the item.
+    """
+    plan = _plan_with_critical(_ADR_TOK)
+    items = check(plan, ["ibl5/docs/decisions/0072-unrelated-decision.md"])
+    assert any("MISSING-FILE" in i and "0070-harness-adr-tier.md" in i for i in items)
+
+
+def test_adr_two_suffix_matches_stay_missing():
+    """Two added ADRs share the planned suffix → ambiguous → MISSING-FILE.
+
+    Mutation caught: return the first suffix hit (`hits[0]` without the
+    `len(hits) == 1` guard) and the item is cleared on an ambiguous diff.
+    """
+    plan = _plan_with_critical(_ADR_TOK)
+    items = check(plan, [
+        _ADR_HIT,
+        "ibl5/docs/decisions/0073-harness-adr-tier.md",
+    ])
+    assert any("MISSING-FILE" in i and "0070-harness-adr-tier.md" in i for i in items)
+
+
+def test_adr_exact_match_wins_over_renumber():
+    """Diff carries BOTH the planned 0070-<suffix> and a 0072-<suffix> sibling →
+    Tier 1 exact match resolves to 0070; Tier 3 never runs, so the sibling does
+    not make the set ambiguous.
+
+    Mutation caught: call `_renumbered_adr` before Tier 1 (or unconditionally)
+    and the two suffix hits produce None, emitting a MISSING-FILE for a file
+    that IS in the diff.
+    """
+    plan = _plan_with_critical(_ADR_TOK)
+    resolutions: dict[str, str] = {}
+    items = check(plan, [_ADR_TOK, _ADR_HIT], resolutions=resolutions)
+    assert items == []
+    # Exact match (Tier 1) does not write to resolutions; key absent confirms
+    # Tier 3 was never consulted.
+    assert resolutions.get(_ADR_TOK) is None
+
+
+def test_non_adr_renumber_gets_no_tolerance():
+    """Same NNNN-<suffix> shape OUTSIDE ibl5/docs/decisions/ → no ADR tier →
+    MISSING-FILE.
+
+    Mutation caught: anchor `_ADR_RENUMBER` on the basename only (drop the
+    `ibl5/docs/decisions/` directory prefix) and a renumbered doc elsewhere
+    would resolve, widening the tolerance beyond ADRs.
+    """
+    tok = "ibl5/docs/runbooks/0070-harness-adr-tier.md"
+    plan = _plan_with_critical(tok)
+    items = check(plan, ["ibl5/docs/runbooks/0072-harness-adr-tier.md"])
+    assert any("MISSING-FILE" in i and "0070-harness-adr-tier.md" in i for i in items)
+
+
+def test_adr_readme_never_counts_as_suffix_hit():
+    """Diff carries only `ibl5/docs/decisions/README.md` (the index every ADR
+    PR touches) → it is not a NNNN-<suffix> path → MISSING-FILE survives.
+
+    Mutation caught: loosen `_ADR_RENUMBER` to `^ibl5/docs/decisions/(?:\\d{4}-)?(?P<suffix>.+)$`
+    (optional number) and README.md would match with suffix `README.md`; the
+    suffix still differs from the token's, so this test additionally pins the
+    suffix equality against a diff that only touched the index. Delete the
+    `n.group("suffix") == suffix` clause together with the optional-number
+    loosening and the item clears; this assertion turns red.
+    """
+    plan = _plan_with_critical(_ADR_TOK)
+    items = check(plan, ["ibl5/docs/decisions/README.md"])
+    assert any("MISSING-FILE" in i and "0070-harness-adr-tier.md" in i for i in items)
+
+
+def test_adr_glob_token_gets_no_tolerance():
+    """Real corpus shape `ibl5/docs/decisions/0134-*.md` (a glob the plan wrote
+    instead of a slug) → suffix `*.md` matches no real file suffix → MISSING-FILE.
+
+    Mutation caught: treat the token suffix as a glob/regex (e.g. `fnmatch`
+    instead of `==` in `_renumbered_adr`) and `*.md` would match any changed ADR,
+    clearing the item.
+    """
+    tok = "ibl5/docs/decisions/0134-*.md"
+    plan = _plan_with_critical(tok)
+    items = check(plan, ["ibl5/docs/decisions/0135-harness-adr-draft-on-denial.md"])
+    assert any("MISSING-FILE" in i and "0134-*.md" in i for i in items)
+
+
+def test_adr_placeholder_token_resolves_to_single_numbered_file():
+    """Real corpus shape `ibl5/docs/decisions/NNNN-<slug>.md` (the number
+    placeholder the architect contract prescribes, PR #2549) → `_ADR_TOKEN`
+    accepts the literal `NNNN` on the token side → resolves to the one changed
+    `0140-<slug>.md` → no MISSING-FILE.
+
+    Mutation caught: revert `_renumbered_adr` to match the token with
+    `_ADR_RENUMBER` (`\\d{4}` only) and the placeholder never resolves; the
+    empty-items assertion turns red.
+    """
+    tok = "ibl5/docs/decisions/NNNN-discord-dev-webhook-notify.md"
+    plan = _plan_with_critical(tok)
+    resolutions: dict[str, str] = {}
+    items = check(plan, ["ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"],
+                  resolutions=resolutions)
+    assert items == []
+    assert resolutions[tok] == "ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"
+
+
+def test_phase_omission_end_to_end_positive_and_negative():
+    """locate_plan + check: exactly one MISSING-PHASE: 2 on negative diff, zero on positive.
+
+    Exemptions tested: phase 3 bookkeeping, phase 4 deferred, phase 5 no evidence.
+    Mutation caught: any one exemption dropped raises the negative count above one;
+    dropping the locate_plan wiring drops it to zero.
+    """
+    from harness.planfile import locate_plan
+
+    plan_text = """---
+impl_model: sonnet
+---
+
+# Test plan
+
+## Phase 1: A
+
+`harness/a.py`
+
+## Phase 2: B
+
+`harness/b.py`
+
+## Phase 3: Close backlog [phases: S]
+
+`docs/x.md`
+
+## Phase 4: D
+
+`bin/d`
+
+## Phase 5: E
+
+No backticked path here.
+
+## Out of Scope
+
+- Phase 4 is deferred.
+"""
+    plan_info = locate_plan("x", content_override=plan_text)
+
+    # negative: only phase 1 shipped → phase 2 is missing (3=bookkeeping, 4=deferred, 5=no evidence)
+    tracked = ("harness/a.py", "harness/b.py", "docs/x.md", "bin/d")
+    items_neg = check(plan_info, ["tools/postplan-harness/harness/a.py"],
+                      tracked_files=tracked)
+    missing_phase = [i for i in items_neg if i.startswith("MISSING-PHASE:")]
+    assert len(missing_phase) == 1
+    assert missing_phase[0].startswith("MISSING-PHASE: 2 —")
+
+    # positive: both phases shipped → no MISSING-PHASE items
+    items_pos = check(plan_info, ["harness/a.py", "harness/b.py"], tracked_files=tracked)
+    assert not any(i.startswith("MISSING-PHASE:") for i in items_pos)
+
+
+def test_line_suffixed_evidence_citation_matches_changed_file():
+    """A plan citing `bin/check-prose:438-457` must not yield MISSING-PHASE when the file changed.
+
+    Mutation caught: dropping the line-suffix strip in _phase_evidence_paths.
+    """
+    phases = parse_phases("## Phase 1: Foo\n\nEdit `bin/check-prose:438-457`.\n")
+    plan = _plan_with_phases(phases)
+    assert "bin/check-prose" in phases[0].evidence_paths
+    assert phase_omission_items(plan, ["bin/check-prose"],
+                                tracked_files=("bin/check-prose",)) == []

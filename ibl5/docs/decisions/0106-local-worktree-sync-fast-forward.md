@@ -1,6 +1,6 @@
 ---
 description: Local worktree sync driver — fast-forward-only, HID-idle-gated, straggler-logging.
-last_verified: 2026-09-20
+last_verified: 2026-09-28
 ---
 
 # ADR-0106: Local Worktree Sync via Fast-Forward Only
@@ -15,10 +15,10 @@ The cloud `update-behind-prs.yml` workflow (PR #1924) keeps open PRs current wit
 
 ## Decision
 
-`bin/wt-sync-tick` is a poll-only bash driver, fired every 900 seconds by a launchd LaunchAgent installed via `bin/wt-sync-cron-setup`. It may only fast-forward (`git merge --ff-only`). It never pushes, never rebases, never resets, never calls `gh`, and never creates or deletes worktrees. Three non-negotiable gates guard every worktree before it is touched:
+`bin/wt-sync-tick` is a poll-only bash driver, fired every 900 seconds by a launchd LaunchAgent installed via `bin/wt-sync-cron-setup`. It may only fast-forward (`git merge --ff-only`). It never pushes, never rebases, never calls `gh`, and never creates or deletes worktrees. It never resets, with one exception: the stale-copy reset described under the ahead-of-origin skip below. Three non-negotiable gates guard every worktree before it is touched:
 
 1. **HID-idle presence gate.** `ioreg -c IOHIDSystem` is read to obtain the system HID idle time. If the value is missing, non-numeric, or below `WT_SYNC_IDLE_SECS` (default 600 s), the tick exits 0 without touching anything. This is fail-closed: an unreadable idle value is treated as operator present.
-2. **Ahead-of-origin skip.** If `git rev-list --left-right --count "origin/<branch>...HEAD"` shows any commits in HEAD not in `origin/<branch>` (i.e., ahead > 0), the worktree is skipped and logged as a STRAGGLER with reason `ahead`. This gate is load-bearing: the cloud workflow owns `origin/<branch>` via merge commits, and a local rebase or reset on a branch with unpushed commits would diverge from the cloud's canonical history, creating conflicts.
+2. **Ahead-of-origin skip.** If `git rev-list --left-right --count "origin/<branch>...HEAD"` shows any commits in HEAD not in `origin/<branch>` (i.e., ahead > 0), the worktree is skipped and logged as a STRAGGLER with reason `ahead`. This gate is load-bearing: the cloud workflow owns `origin/<branch>` via merge commits, and a local rebase or reset on a branch with unpushed commits would diverge from the cloud's canonical history, creating conflicts. Exception: when every ahead commit is patch-equivalent to a commit on `origin/<branch>` (detected via `git rev-list --cherry-pick --right-only`), the worktree's local HEAD is a stale pre-rebase copy with nothing unique to lose. In this case the tick writes a backup ref (`refs/wt-sync-backup/<branch>`), then resets the worktree to `origin/<branch>` and logs `RESET-STALE` instead of `STRAGGLER`. A dirty tree, or any ahead commit without a patch-equivalent on origin, keeps the original skip.
 3. **Dirty/in-use skips.** Uncommitted or staged changes (`git diff`/`git diff --cached`) and active lsof-detected CWD processes skip the worktree without touching it.
 
 Failed fast-forward attempts (e.g., an untracked working-tree file that the incoming commit would overwrite) are counted as `cannot-ff` and logged as STRAGGLER with reason `cannot-ff`. The straggler log (appended to `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-sync/wt-sync.log`) is the evidence base for deciding later whether a smarter conflict-resolution tool is worth building.
@@ -57,4 +57,4 @@ ADR-0133 (`ibl5/docs/decisions/0133-on-demand-worktree-sync.md`) adds a `--only 
 mode to `bin/wt-sync-tick`. On-demand mode bypasses the HID-idle and in-use gates, waits up to 3 s
 for the fleet lock without acquiring it, and permits exactly one write this ADR forbids: a
 `git merge origin/<branch>` when the worktree is diverged and clean of uncommitted and untracked
-changes. All other entries on the never-list above are unchanged in both modes.
+changes. Apart from that merge and the stale-copy reset named under the ahead-of-origin skip, the never-list above is unchanged in both modes.

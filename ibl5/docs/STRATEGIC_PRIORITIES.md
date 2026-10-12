@@ -1,6 +1,6 @@
 ---
 description: Post-refactoring roadmap and priority queue.
-last_verified: 2026-09-08
+last_verified: 2026-09-29
 ---
 
 # Strategic Development Priorities for IBL5
@@ -26,7 +26,7 @@ IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an i
 - Coverage threshold — 80% floor (`ibl5/bin/check-coverage`), plus a no-regression check against `ibl5/coverage-baseline.json` (actual 84.26%)
 - Mutation testing — 100% MSI / 100% Covered MSI (weekly + on-demand)
 - Playwright E2E — single shard (was 4; collapsed to fit free-tier runner caps), visual regression baselines
-- Lighthouse — performance audits on every PR
+- Lighthouse: performance audits on each master push, plus a weekly full-site audit
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: fix-and-prevent
 description: "Fix a reported bug/breakage AND land the prevention for its whole defect class in one pass — use whenever the user says something is broken, wrong, failing, or asks to fix a bug; the fix alone is never the finished unit of work."
-last_verified: 2026-09-24
+last_verified: 2026-09-28
 ---
 
 # /fix-and-prevent — Fix it, then make it not happen again
@@ -60,7 +60,7 @@ Grep/LSP the repo for the class. Produce a **per-occurrence table with a status 
 - Fix the reported occurrence (Phase A), then file the prevention backlog item (step 4).
 - Paste the occurrence table into that same entry and mark the unfixed rows `not fixed — filed` — do not open a second item for the remainder.
 - Say so in the PR body.
-- If a bounded sweep genuinely belongs in this PR and is design-resolved + machine-verifiable, route it to **one** `subagent_type: "sonnet-4-6"` sub-agent (omit `model`) per `.claude/rules/work-triage.md` § Execution routing — before the 5th edit, not after the denial.
+- If a bounded sweep genuinely belongs in this PR and is design-resolved + machine-verifiable, route it to **one** `subagent_type: "sonnet-5-5"` sub-agent (omit `model`) per `.claude/rules/work-triage.md` § Execution routing. Route before the 5th edit rather than waiting for the gate denial.
 
 ### 3. Two artifacts, not one
 

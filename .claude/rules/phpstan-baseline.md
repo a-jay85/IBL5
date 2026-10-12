@@ -1,9 +1,9 @@
 ---
-description: PHPStan baseline rules — the two-step regen (neon + counts JSON) the check-baseline-drift gate requires, entries vs. occurrences when auditing a baseline, the constant() dynamic-access false positive, and the analyse:tests merge gate.
+description: PHPStan baseline rules — when a baseline change needs the counts JSON (growth raises it; shrink leaves it to master), entries vs. occurrences when auditing a baseline, the constant() dynamic-access false positive, and the analyse:tests merge gate.
 paths:
   - "ibl5/phpstan*.neon"
   - "ibl5/phpstan-baseline-counts.json"
-last_verified: 2026-09-16
+last_verified: 2026-09-29
 ---
 
 # PHPStan Baseline Rules
@@ -21,7 +21,7 @@ steps, both files committed (run from `ibl5/`, the cwd the CI job uses):
 
 ```bash
 composer run analyse:tests:baseline -- --no-progress   # regenerates phpstan-tests-baseline.neon
-php bin/check-baseline-drift --update                  # updates phpstan-baseline-counts.json
+php bin/check-baseline-drift --update                  # raises phpstan-baseline-counts.json (raise-only)
 ```
 
 Committing only the `.neon` produces:
@@ -30,9 +30,22 @@ Committing only the `.neon` produces:
 INCREASE: [phpstan-tests-baseline.neon] classConstant.unused: new (42 entries)
 ```
 
-`phpstan-baseline-counts.json` tracks counts per identifier per baseline file;
-`ibl5/bin/check-baseline-drift` (a required check) fails when a baseline grew without
-`--update`. It is a separate gate from PHPStan analysis itself.
+`phpstan-baseline-counts.json` tracks counts per identifier per baseline file.
+`ibl5/bin/check-baseline-drift` (a required check) fails when a neon count rises above
+the counts JSON. It also fails when a neon count rises above the neon count at the PR's
+merge-base without a matching raise of the JSON in the same PR. `--update` only raises
+the JSON and never lowers it. The gate is separate from PHPStan analysis itself.
+
+## Shrinking a baseline is a ONE-file change
+
+A PR that fixes errors, or moves or deletes a file with baselined errors, must shrink the
+`.neon` to keep its own PHPStan green (`ignore.unmatched` is on and stays on). Commit only
+the `.neon`. Leave `phpstan-baseline-counts.json` alone: `bin/regen-baselines` leaves it
+unchanged, and master's `update-baselines` job lowers it with `--sync` after merge. Never
+run `--sync` on a branch.
+
+On a merge or rebase conflict in `phpstan-baseline-counts.json`, take the base branch's side,
+then run `bin/regen-baselines`.
 
 Do **not** blind full-regen — it sprawls unrelated drift into the diff. And a burndown
 PR's final regen must *fix* genuine new errors, not re-baseline them.

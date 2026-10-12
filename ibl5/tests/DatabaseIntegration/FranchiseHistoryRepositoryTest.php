@@ -37,7 +37,7 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
         // and team boxscores are not strictly required — vw_franchise_summary works with zero games
         $result = $this->repo->getAllFranchiseHistory(2024);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
 
         $first = $result[0];
         $expectedKeys = [
@@ -183,15 +183,13 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllFranchiseHistory(9999);
 
-        $foundZeroGamesTeam = false;
         foreach ($result as $row) {
             if ($row['totalgames'] === 0) {
                 self::assertNull($row['five_season_winpct']);
-                $foundZeroGamesTeam = true;
                 break;
             }
         }
         // Assert the result set is non-empty (structural check)
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
     }
 }

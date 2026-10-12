@@ -6,6 +6,28 @@
 # Usage: bin/jsb-ref <pattern> [context-lines]   (env: JSB_DECOMPILE_DIR)
 set -uo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/jsb-ref <pattern> [context-lines]
+
+Locate a JSB symbol, address, or topic in the master reference and the
+decompile, printing only excerpts (ref) and match line-numbers (decompile)
+to avoid full-reading large files.
+
+Arguments:
+  <pattern>       Search pattern (grep -i, case-insensitive).
+  [context-lines] Lines of context around each match (default 12, capped at 120
+                  for the reference, 40 line-numbers for the decompile).
+
+Env vars:
+  JSB_DECOMPILE_DIR  Directory containing 00_MASTER_REFERENCE.md and
+                     jsb560_decompiled.c (default ~/Downloads/jsb_560/decompiled).
+
+Workflow: bin/jsb-ref FUN_004e1ba0 -> Read ±ctx at the decompile line reported.
+EOF
+    exit 0
+fi
+
 pat="${1:-}"
 [ -n "$pat" ] || { echo "usage: bin/jsb-ref <pattern> [context-lines]" >&2; exit 2; }
 ctx="${2:-12}"

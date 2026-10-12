@@ -1,0 +1,8 @@
+# Docs only plan
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|----------------|-----------|--------|----------------------|
+| 1 | Wording reads correctly | Doc review | post-impl | `docs/x.md` |
+| 2 | Links resolve | Static | post-impl | `bin/check-links` |

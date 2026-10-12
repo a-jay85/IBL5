@@ -3,6 +3,25 @@
 # WITHOUT full-reading it. Array indices are collapsed to [] and numeric leaves
 # aggregated (n/min/max/mean), so per-row arrays become one summary line.
 # A ~100K-token Read becomes ~40 lines. Usage: bin/jsb-verdict <artifact.json> [key-regex]
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/jsb-verdict <artifact.json> [key-regex]
+
+Collapse a JSB calibration JSON artifact to its verdict metrics without full-reading it.
+Array indices are collapsed to [] and numeric leaves are aggregated (n/min/max/mean),
+turning ~400 KB / ~100K tokens into ~40 summary lines.
+
+  artifact.json  Path to the JSB JSON artifact file
+  key-regex      Filter output to keys matching this regex (default: . = all keys)
+
+Exit codes:
+  0  Success
+  1  File not found
+  2  No argument given
+EOF
+    exit 0
+fi
+
 set -uo pipefail
 
 f="${1:-}"

@@ -3,7 +3,7 @@ description: Environment setup: CSS build, IBLbot, and environment-specific gotc
 paths:
   - "**/design/**/*.css"
   - "**/IBLbot/**/*"
-last_verified: 2026-07-31
+last_verified: 2026-09-30
 ---
 
 # Environment Commands

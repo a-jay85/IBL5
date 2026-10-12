@@ -7,6 +7,7 @@
 # merges both files cleanly: no conflict, no CI failure, nothing to notice. This
 # gate is the PR-time backstop for that (bin/next-adr / bin/next-migration prevent
 # it at allocation time).
+# The key grammar lives in bin/lib/numbering.sh, shared with bin/next-number.
 #
 # Three checks:
 #   1. Duplicate within the diff   — two added files sharing one key.
@@ -36,8 +37,10 @@
 
 set -euo pipefail
 
-ADR_DIR="ibl5/docs/decisions"
-MIGRATION_DIR="ibl5/migrations"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/numbering.sh"
+
+ADR_DIR="$NUMBERING_ADR_DIR"
+MIGRATION_DIR="$NUMBERING_MIGRATION_DIR"
 ADR_INDEX="$ADR_DIR/README.md"
 
 # Duplicate numbers that predate this gate. Renumbering them is not an option:
@@ -120,13 +123,10 @@ key_for() {
     base="${path##*/}"
     case "$path" in
         "$ADR_DIR"/*)
-            case "$base" in
-                0000-*) return 0 ;;
-            esac
-            printf '%s\n' "$base" | grep -oE '^[0-9]{4}' || true
+            numbering_adr_key "$base"
             ;;
         "$MIGRATION_DIR"/*)
-            printf '%s\n' "$base" | grep -oE '^[0-9]{1,3}[a-z]?_' | sed 's/_$//' || true
+            numbering_migration_key "$base"
             ;;
     esac
     return 0

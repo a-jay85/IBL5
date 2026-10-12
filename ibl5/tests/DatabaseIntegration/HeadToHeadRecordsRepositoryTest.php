@@ -112,27 +112,6 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
         $this->insertRow('ibl_box_scores_teams', array_merge($commonCols, ['name' => 'Supersonics']));
         $this->insertRow('ibl_box_scores_teams', array_merge($commonCols, ['name' => 'Spurs']));
 
-        // Seed the era branding rows that migration 182 plants in production.
-        // The migration's INSERT IGNORE may have been skipped in the test DB when
-        // ibl_team_info wasn't yet populated (FK ordering), so we insert them here
-        // inside the transaction (rolls back with the rest of the test fixture).
-        foreach ([
-            [4,  'Brooklyn',      'Nets',        '000000', 'FFFFFF'],
-            [10, 'Charlotte',     'Hornets',     '00788C', '1D1160'],
-            [16, 'Oklahoma City', 'Thunder',     '007AC1', 'EF6F31'],
-            [16, 'Las Vegas',     'Thunder',     '1C1C1C', 'F5C518'],
-            [17, 'San Antonio',   'Spurs',       'C4CED4', '000000'],
-            [22, 'Seattle',       'Supersonics', '00653A', 'FFC200'],
-        ] as [$fid, $city, $name, $c1, $c2]) {
-            $this->insertRow('ibl_franchise_era_branding', [
-                'franchise_id' => $fid,
-                'team_city'    => $city,
-                'team_name'    => $name,
-                'color1'       => $c1,
-                'color2'       => $c2,
-            ]);
-        }
-
         // Repository with explicit current season year 1901 so scope='current' hits only
         // our fixture (real data has no season_year=1901 games).
         $this->repo = new HeadToHeadRecordsRepository($this->db, 1901);
@@ -144,21 +123,8 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
 
     public function testEraBrandingTableIsSeededWithSixRetiredEras(): void
     {
-        // Remove setUp rows so this test exercises only what migration 182 seeds.
-        $this->db->query('DELETE FROM `ibl_franchise_era_branding`');
-
-        // Execute the migration's INSERT IGNORE verbatim.
-        $this->db->query(
-            "INSERT IGNORE INTO `ibl_franchise_era_branding`
-               (`franchise_id`, `team_city`, `team_name`, `color1`, `color2`) VALUES
-               (4,  'Brooklyn',      'Nets',        '000000', 'FFFFFF'),
-               (10, 'Charlotte',     'Hornets',     '00788C', '1D1160'),
-               (16, 'Oklahoma City', 'Thunder',     '007AC1', 'EF6F31'),
-               (16, 'Las Vegas',     'Thunder',     '1C1C1C', 'F5C518'),
-               (17, 'San Antonio',   'Spurs',       'C4CED4', '000000'),
-               (22, 'Seattle',       'Supersonics', '00653A', 'FFC200')",
-        );
-
+        // Reads the rows the fixture seed (db-seed.sql) plants after ibl_team_info is
+        // populated. No DELETE/INSERT here: the test must observe the seeded state.
         $stmt = $this->db->prepare(
             'SELECT franchise_id, team_city, team_name, color1, color2
              FROM `ibl_franchise_era_branding` ORDER BY id',

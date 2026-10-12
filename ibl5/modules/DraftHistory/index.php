@@ -22,7 +22,6 @@ use DraftHistory\DraftHistoryRepository;
 use DraftHistory\DraftHistoryView;
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 global $mysqli_db;
 

@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger) — explains why /post-plan Phase 6.5 condition (9) may run on Sonnet rather than Opus: it is bounded hold-enumeration against a named trigger list, not open-ended diff-triage. Includes the tripwire for when to revisit. The always-loaded agent-tiering.md names this file in the Opus row, so it stays one Read away from every session.
-last_verified: 2026-09-17
+last_verified: 2026-10-08
 paths: ".claude/rules/agent-tiering-bounded-checklist.md"
 ---
 
@@ -10,7 +10,7 @@ Read-on-demand companion to `agent-tiering.md` § Tiers (Opus row, "open-ended d
 
 The Opus row's "open-ended diff-triage" means: read a diff you have no checklist for, reason
 from scratch about what could be wrong, and decide what matters. That stays Opus — the
-failure mode is missing what you didn't know to look for (`feedback_sonnet_proving_negatives`).
+failure mode is missing what you didn't know to look for (`feedback_sonnet_proving_negatives`, re-tested 2026-10-08 on Sonnet 5.5: INCONCLUSIVE).
 
 **`/post-plan` Phase 6.5 condition (9) is not that.** It is *bounded* hold-enumeration: read
 the realized diff plus the carried Phase-3 flags (`HAS_MIGRATION`, `GOLDEN_CHANGED`,
@@ -29,8 +29,8 @@ own analysis of the diff.
 
 This is a **scope correction, not a capability argument**: bounded checklist enumeration was
 never the diff-triage the Opus row meant. `/pr-review` and `/security-audit` do open-ended
-triage and run on Sonnet 4.6 by deliberate def/frontmatter pin (`agent-tiering.md`
-§ Sonnet 4.6 pins) — sanctioned pins, not exceptions this section carves out.
+triage and run on Sonnet 5.5 by deliberate def/frontmatter pin (`agent-tiering.md`
+§ Sonnet 5.5 pins). Sanctioned pins, not exceptions this section carves out.
 
 **Tripwire to revisit:** a *measured* miss where a shipped diff was unsafe for a reason
 **not** on condition (9)'s trigger list (a listed trigger that a run simply failed to spot is

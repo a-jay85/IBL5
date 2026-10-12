@@ -1,6 +1,6 @@
 ---
 description: PHPStan/Infection tooling — always use composer scripts; baseline management; infection exclude staleness; constant() false positives.
-last_verified: 2026-09-16
+last_verified: 2026-09-29
 paths:
   - "**/*.php"
   - "ibl5/composer.json"
@@ -31,9 +31,9 @@ composer run analyse -- --no-progress
 ```bash
 composer run analyse:baseline          # regenerates phpstan-baseline.neon
 composer run analyse:tests:baseline   # regenerates phpstan-tests-baseline.neon (tests only)
-php ibl5/bin/check-baseline-drift --update   # syncs phpstan-baseline-counts.json
+php ibl5/bin/check-baseline-drift --update   # raises phpstan-baseline-counts.json (growth only)
 ```
-CI's "Check baseline drift" compares live counts against `ibl5/phpstan-baseline-counts.json`. A new rule identifier shows as `INCREASE: ibl.<rule>: new (N entries)` → exit 1. Both steps are required; committing only one fails CI.
+CI's "Check baseline drift" compares live counts against `ibl5/phpstan-baseline-counts.json` and against the neon counts at the PR's merge-base. A new identifier still shows as `INCREASE: ibl.<rule>: new (N entries)` and exits 1. A growth PR commits both files. A shrink PR commits only the neon. See `.claude/rules/phpstan-baseline.md`.
 
 **After method renames that touch test files:** run `analyse:tests:baseline` in addition to `analyse:baseline` — they maintain separate files; renaming a method makes old entries "not matched" in `ibl5/phpstan-tests-baseline.neon`.
 

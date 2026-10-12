@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Trading;
 
+use EventLog\EventLogger;
+use EventLog\EventLogRepository;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
@@ -14,6 +16,26 @@ use Trading\TradeExecutionService;
 
 class TradeDecisionServiceTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        EventLogger::reset();
+    }
+
+    protected function tearDown(): void
+    {
+        EventLogger::reset();
+    }
+
+    private function flushedAction(?string $expected): void
+    {
+        $repo = $this->createMock(EventLogRepository::class);
+        $repo->expects($this->once())
+             ->method('updateOutcome')
+             ->with(self::anything(), self::anything(), $expected);
+
+        EventLogger::flush($repo);
+    }
+
     private function buildService(
         ?TradeOfferRepositoryInterface $offerRepo = null,
         ?TradeExecutionServiceInterface $executionService = null,
@@ -166,5 +188,33 @@ class TradeDecisionServiceTest extends TestCase
             tradeLogger: $tradeLogger2,
         );
         $service2->reject(7, 'Metros', 'Metros', 'Stars');
+    }
+
+    public function testRejectSuccessRecordsTradeOfferRejectedEvent(): void
+    {
+        $offerRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $offerRepo->method('getTradesByOfferId')->willReturn([['tradeofferid' => 42]]);
+        $executionService = self::createStub(TradeExecutionServiceInterface::class);
+        $executionService->method('assertActingTeamIsParty')->willReturn(true);
+
+        EventLogger::arm(1, self::createStub(\mysqli::class));
+        $this->buildService(offerRepo: $offerRepo, executionService: $executionService)
+            ->reject(42, 'Metros', 'Metros', 'Stars');
+
+        $this->flushedAction('trade_offer_rejected');
+    }
+
+    public function testRejectNonPartyDoesNotRecordEvent(): void
+    {
+        $offerRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $offerRepo->method('getTradesByOfferId')->willReturn([['tradeofferid' => 1]]);
+        $executionService = self::createStub(TradeExecutionServiceInterface::class);
+        $executionService->method('assertActingTeamIsParty')->willReturn(false);
+
+        EventLogger::arm(1, self::createStub(\mysqli::class));
+        $this->buildService(offerRepo: $offerRepo, executionService: $executionService)
+            ->reject(1, 'Non Party Team', 'Metros', 'Stars');
+
+        $this->flushedAction(null);
     }
 }

@@ -94,6 +94,21 @@ final class WebsiteAffectingCliTest extends TestCase
         self::assertSame(1, $result['exit'], $result['stderr']);
     }
 
+    public function testToolsOnlyDiffExitsOne(): void
+    {
+        // Host-side dev tooling (tools/postplan-harness, Python) → SKIP. Never in the
+        // app image or run by E2E; python-tests.yml covers it.
+        $result = $this->runPredicate("tools/postplan-harness/runner.py\ntools/postplan-harness/harness/ciwatch.py\n");
+        self::assertSame(1, $result['exit'], $result['stderr']);
+    }
+
+    public function testNestedToolsDirIsWebsite(): void
+    {
+        // ^tools/ is anchored: an ibl5/tools/ path stays website-side.
+        $result = $this->runPredicate("ibl5/tools/foo.php\n");
+        self::assertSame(0, $result['exit'], $result['stderr']);
+    }
+
     public function testTestsCliDirDiffExitsOne(): void
     {
         // PHPUnit Cli test .php → SKIP (^ibl5/tests/ deny; never run by app-under-test)
@@ -260,6 +275,7 @@ final class WebsiteAffectingCliTest extends TestCase
         self::assertStringContainsString('^docs/', $result['output']);
         self::assertStringContainsString('^\.claude/', $result['output']);
         self::assertStringContainsString('^engine/', $result['output']);
+        self::assertStringContainsString('^tools/', $result['output']);
         self::assertStringContainsString('^ibl5/tests/', $result['output']);
         self::assertStringContainsString('bin/website-affecting', $result['output']);
     }

@@ -1,0 +1,7 @@
+# Misaligned columns plan
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|----------------|-----------|--------|----------------------|
+| 1 | CLI-executable | `bin/check-links docs` | post-impl | exits 0 |

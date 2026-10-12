@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import re
 import subprocess
 import time
@@ -22,6 +23,11 @@ from . import llm_calls
 # first so "READY WITH NOTES" is never truncated to "READY".
 VERDICT_RE = re.compile(r"^(READY WITH NOTES|NOT READY|READY)[ \t]*$", re.M)
 DIGEST_CUT = "## DIGEST"
+# Output contract item 2a (.claude/agents/pr-ready-phase6.md) puts every real finding
+# under this exact heading; per-check disposition lines sit above it. Case-sensitive on
+# purpose: the Sept 17-18 legacy shape used "## Findings" and must stay on the
+# all-bullets path.
+FINDINGS_HEADING = "## FINDINGS"
 
 # Bare hash only. Anything after the hash on that line is NOT a valid record — the
 # skill's condition (12) parser has the same property, and prose there silently
@@ -88,6 +94,10 @@ HOLD_LABELS = {
     "2": "review finding scored >= 80",
 }
 _FINDING_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
+# Output contract item 2a (.claude/agents/pr-ready-phase6.md): exactly `[BLOCKING]` or
+# `[NOTE]`, upper case, right after the bullet prefix. Anything else is unmarked, and an
+# unmarked bullet is blocking (fail-closed).
+_FINDING_MARKER_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\[(BLOCKING|NOTE)\](?=\s|$)")
 _WORK_LIST_OPEN = "=== WORK LIST (each item names the arming hold it clears) ==="
 _WORK_LIST_CLOSE = "=== END WORK LIST ==="
 
@@ -113,18 +123,115 @@ def denied_gate_edits(paths) -> list[str]:
             if any(str(p).startswith(prefix) for prefix in GATE_OWNING_PREFIXES)]
 
 
-def _verdict_findings(verdict_path: str) -> list[str]:
-    """Hold (12): the blocking findings under a NOT READY verdict, one per bullet.
+# Local-gate fixer (harness/gatefix.py) deny list. A superset of GATE_OWNING_PREFIXES:
+# the fixer runs at a pre-commit/pre-push denial, so the hook bodies, their installer,
+# their config, the Phase 6.5 arming files, and the whole harness are gate paths too.
+LOCAL_GATE_PATH_PREFIXES = GATE_OWNING_PREFIXES + (
+    ".githooks/",                        # absent today; listed defensively
+    ".claude/hooks/",                    # project-scoped hooks, absent today
+    ".claude/settings",                  # settings.json, settings.local.json
+    ".claude/skills/post-plan/",         # includes _phase-6.5-arm-auto-merge.md
+    "bin/pre-commit-hook",
+    "bin/pre-push-adr-hook",
+    "bin/run-meta-checks-local",
+    "bin/install-git-hooks",
+    "bin/adr-check",
+    "bin/lib/",                          # includes bin/lib/pr-armable.sh
+    "bin/test-postplan-arm-conditions",
+    "bin/post-plan-",                    # post-plan-now, post-plan-fail-dm launchers
+    "tools/postplan-harness/",           # runner.py and every harness module
+)
 
-    A verdict that is not NOT READY contributes nothing -- the loop only ever fixes a
-    verdict it is still held on. A NOT READY verdict whose findings are prose rather
-    than bullets contributes its whole pre-digest body, so a shape the bullet regex
-    does not recognise is never silently dropped.
+
+def _norm_repo_path(p) -> str:
+    s = posixpath.normpath(str(p).replace("\\", "/"))
+    return s[2:] if s.startswith("./") else s
+
+
+def denied_local_gate_edits(paths) -> list[str]:
+    """The subset of `paths` (as given) that normalizes under a local-gate prefix."""
+    return [p for p in (paths or [])
+            if any(_norm_repo_path(p).startswith(prefix)
+                   for prefix in LOCAL_GATE_PATH_PREFIXES)]
+
+
+def _findings_section(lines: list[str]) -> list[str] | None:
+    """Lines under every `## FINDINGS` heading, or None when the heading is absent.
+
+    The heading matches only at column 0, exactly, after a right-strip. A section runs
+    to the next line starting `## `; a `### ` subsection stays inside it. Repeated
+    headings each contribute their section.
+    """
+    if not any(ln.rstrip() == FINDINGS_HEADING for ln in lines):
+        return None
+    section: list[str] = []
+    inside = False
+    for ln in lines:
+        if ln.rstrip() == FINDINGS_HEADING:
+            inside = True
+            continue
+        if ln.startswith("## "):
+            inside = False
+            continue
+        if inside:
+            section.append(ln)
+    return section
+
+
+def _group_findings(scope: list[str]) -> list[tuple[str | None, str]]:
+    """Bullet lines of `scope` as (marker, text) items, marker None when unmarked.
+
+    A marked bullet opens a group: every later bullet line indented strictly deeper
+    than it joins the group's text after a newline, stripped, until a bullet at the
+    same or a shallower indent. Bullets nested under an UNMARKED bullet stay separate
+    unmarked items and their own markers are ignored, so a scope with no marker yields
+    exactly the legacy one-item-per-bullet list. Non-bullet lines are skipped.
+    """
+    items: list[tuple[str | None, str]] = []
+    group_indent: int | None = None
+    unmarked_indent: int | None = None
+    for ln in scope:
+        if not _FINDING_BULLET_RE.match(ln):
+            continue
+        indent = len(ln) - len(ln.lstrip())
+        if group_indent is not None and indent > group_indent:
+            marker, text = items[-1]
+            items[-1] = (marker, text + "\n" + ln.strip())
+            continue
+        if unmarked_indent is not None and indent > unmarked_indent:
+            items.append((None, ln.strip()))
+            continue
+        m = _FINDING_MARKER_RE.match(ln)
+        if m:
+            group_indent, unmarked_indent = indent, None
+            items.append((m.group(1), ln.strip()))
+        else:
+            group_indent, unmarked_indent = None, indent
+            items.append((None, ln.strip()))
+    return items
+
+
+def _verdict_findings(verdict_path: str) -> list[str]:
+    """Hold (12): the blocking findings under a NOT READY verdict, one per finding.
+
+    A verdict that is not NOT READY, or a missing verdict file, contributes nothing --
+    the loop only ever fixes a verdict it is still held on.
 
     The body is everything ABOVE the digest cut bar the verdict word lines themselves.
     A real verdict states its 6d checks and their findings first and puts the 6e word
     last, so reading only below the word would make every real verdict contribute
     nothing and skip a remediation the loop is held on.
+
+    When the body carries a `## FINDINGS` heading, only the bullets under it count, so
+    the per-check disposition lines above it (Passes / Not assessable / No finding /
+    Does not fire) never reach the fixer. With no heading, every bullet in the body
+    counts (the legacy shape). When the chosen scope has no bullets, the whole body is
+    one item, so a finding written as prose is never silently dropped.
+
+    Severity markers (item 2a of .claude/agents/pr-ready-phase6.md): a `[BLOCKING]` or
+    `[NOTE]` bullet carries its nested bullet lines as one item (see `_group_findings`).
+    `[NOTE]` items are dropped; `[BLOCKING]` and unmarked bullets are kept. When every
+    item is `[NOTE]`, all of them are returned so a held verdict never yields no work.
     """
     if parse_verdict(verdict_path) != "NOT READY":
         return []
@@ -135,9 +242,14 @@ def _verdict_findings(verdict_path: str) -> list[str]:
             lines = lines[:i]
             break
     body = [ln for ln in lines if not VERDICT_RE.match(ln)]
-    bullets = [ln.strip() for ln in body if _FINDING_BULLET_RE.match(ln)]
-    if bullets:
-        return bullets
+    section = _findings_section(body)
+    scope = body if section is None else section
+    grouped = _group_findings(scope)
+    if grouped:
+        kept = [text for marker, text in grouped if marker != "NOTE"]
+        # An all-[NOTE] NOT READY verdict breaks the item-2a agreement rule. Hand the
+        # fixer every group rather than an empty list, so the held verdict still gets work.
+        return kept or [text for _, text in grouped]
     whole = "\n".join(body).strip()
     return [whole] if whole else []
 
@@ -166,9 +278,12 @@ def build_work_list(verdict_path: str,
     # UNMET-CONTRACT entries are deliberately excluded: they name evidence the plan
     # declared, and a fixer that "adds" such evidence is the fabrication conformance
     # exists to catch.
+    # MISSING-PHASE is excluded for the same reason: the fix is a whole plan phase, which
+    # is human work, and the item still holds arming through condition (3).
     for entry in (unresolved_conformance or []):
-        if str(entry).startswith("MISSING"):
-            items.append({"hold": "3", "text": str(entry)})
+        text = str(entry)
+        if text.startswith("MISSING") and not text.startswith("MISSING-PHASE"):
+            items.append({"hold": "3", "text": text})
     for fail in (meta_check_failures or []):
         items.append({"hold": "16",
                       "text": f"{fail.get('name', 'unknown')}\n{fail.get('output', '')}"})
@@ -219,7 +334,13 @@ OVERRIDE = (
     "Emit the COMPLETE verdict document as your final message: the full 6d checks, the "
     "6e verdict word on a line of its own (exactly one of `READY`, `READY WITH NOTES`, "
     "or `NOT READY`), and the 6e(b) digest below a `## DIGEST` line. Read your inputs "
-    "from the packet files named in the prompt."
+    "from the packet files named in the prompt. `plan-index.txt` in the packet is the "
+    "`bin/plan-index` output for the plan; use it as the authoritative phase roster and "
+    "read `plan.md` by those line ranges. `bin/check-digest-prose` does not run on this "
+    "path, so apply `.claude/review-shared/_prose-voice-contract.md` to the digest by "
+    "hand. These are the designed tool budget, not gaps: never list the missing Write "
+    "or Bash tools, the verdict-file save, plan indexing, or the digest linter under a "
+    "\"Couldn't do\" heading or anywhere else in the verdict."
 )
 
 PLAN_BLIND_MARKER = (
@@ -304,10 +425,41 @@ def _find_procedure(worktree: str, master_sha: str, paths, kind: str) -> str:
     raise HarnessError(kind, f"{master_sha}: none of {', '.join(paths)}")
 
 
+PLAN_INDEX_BLIND = "(plan-blind run: no plan, so no index)\n"
+PLAN_INDEX_TIMEOUT = 30
+
+
+def _plan_index(worktree: str, plan_path: str, timeout: float | None = None) -> str:
+    """`bin/plan-index` output for the packet's plan copy.
+
+    The reviewer has no Bash, so the harness runs the index for it. Any failure becomes a
+    marker telling the reviewer to find `## ` headings with Grep instead; it never
+    aborts the packet. A hung script is cut off after `timeout` seconds (default
+    PLAN_INDEX_TIMEOUT); non-UTF-8 output is a marker too.
+    """
+    script = os.path.join(worktree, "bin", "plan-index")
+    limit = PLAN_INDEX_TIMEOUT if timeout is None else timeout
+    try:
+        proc = subprocess.run([script, plan_path], cwd=worktree,
+                              capture_output=True, text=True, timeout=limit)
+    except subprocess.TimeoutExpired:
+        return (f"(bin/plan-index timed out after {limit}s; "
+                "Grep plan.md for '^## ' instead)\n")
+    except UnicodeDecodeError as e:
+        return (f"(bin/plan-index output was not valid UTF-8: {e}; "
+                "Grep plan.md for '^## ' instead)\n")
+    except OSError as e:
+        return f"(bin/plan-index unavailable: {e}; Grep plan.md for '^## ' instead)\n"
+    if proc.returncode != 0:
+        return (f"(bin/plan-index exited {proc.returncode}: {proc.stderr.strip()}; "
+                "Grep plan.md for '^## ' instead)\n")
+    return proc.stdout
+
+
 def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: str,
                  pr_body: str, pr_number: int | str, phase4b_ran: bool, *,
                  worktree: str = ".", packet_name: str = "fidelity-packet",
-                 extra_context: str = "") -> str:
+                 extra_context: str = "", review_findings: str = "") -> str:
     """Write the seven `_phase-5.5-fidelity.md` Step-2 inputs as files. Returns the dir."""
     packet = os.path.join(out_dir, packet_name)
     os.makedirs(packet, exist_ok=True)
@@ -327,17 +479,30 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
                 _write("plan.md", fh.read())
         except OSError:
             _write("plan.md", PLAN_BLIND_MARKER)
+            _write("plan-index.txt", PLAN_INDEX_BLIND)
+        else:
+            # plan.md is on disk and intact; an index failure must not blind it.
+            try:
+                _write("plan-index.txt",
+                       _plan_index(worktree, os.path.join(packet, "plan.md")))
+            except OSError:
+                _write("plan-index.txt", PLAN_INDEX_BLIND)
     else:
         _write("plan.md", PLAN_BLIND_MARKER)
+        _write("plan-index.txt", PLAN_INDEX_BLIND)
 
     _write("diff.patch", diff or "")
     _write("pr-body.md", pr_body or "")
+    findings_block = (
+        f"PHASE_4B_FINDINGS:\n{review_findings}\n" if review_findings else ""
+    )
     _write("context.md",
            "# Context\n\n"
            "CONFLICT_RESOLVED_PATHS: (none — the harness path rebases cleanly or fails "
            "closed before reaching Phase 5.5)\n"
            f"PHASE_4B_RAN: {'yes' if phase4b_ran else 'no'}\n"
-           f"REVIEW_TIMESTAMP: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
+           + findings_block
+           + f"REVIEW_TIMESTAMP: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
            f"MASTER_SHA: {master_sha}\n"
            f"REVIEWED_TREE: {reviewed_tree}\n"
            f"PR_NUMBER: {pr_number}\n"
@@ -353,6 +518,7 @@ def _pointer_prompt(packet_dir: str, pr_number: int | str) -> str:
         "Every input is already on disk. Read these files:\n"
         f"  - {os.path.join(packet_dir, 'procedure.md')}  — the 6b-6e procedure; follow it exactly\n"
         f"  - {os.path.join(packet_dir, 'plan.md')}       — the plan (or a plan-blind marker)\n"
+        f"  - {os.path.join(packet_dir, 'plan-index.txt')} — `bin/plan-index` output for plan.md\n"
         f"  - {os.path.join(packet_dir, 'diff.patch')}    — the post-rebase diff under review\n"
         f"  - {os.path.join(packet_dir, 'pr-body.md')}    — the PR body\n"
         f"  - {os.path.join(packet_dir, 'context.md')}    — run context\n\n"
@@ -470,6 +636,8 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
                      "offset/limit if a finding points past this cut]\n")
     pr_note = (f"\nPR body findings: when a blocking finding is about the PR body, "
                f"fix it with `gh pr edit {pr_number} --body-file <path>`.\n"
+               "Never edit the `## Manual Testing` section. The runner owns it and reverts\n"
+               "any change to it.\n"
                if pr_number is not None else "")
     prompt = (
         "Remediate the blocking findings from the plan-intent fidelity review.\n\n"
@@ -616,9 +784,14 @@ _NEGATED_RE = re.compile(r"(?:\bnot|\bnever|n't)(?:\s+\w+)?\s*$", re.IGNORECASE)
 # "Update Verification Matrix row 11" and "Fix test matrix rows 22-24". A bare "matrix
 # row" stays filable because the head-to-head records page is a matrix. Titles only: a
 # real followup's detail often cites the matrix row that exposed it.
+#
+# "Critical Files" alone is too broad: "Add tests for critical files in X" is real work.
+# Only the plan-document forms are dropped: "plan's Critical Files", "Critical Files
+# list/section" (the section heading in the plan template), and bare "plan Critical Files".
 _PLAN_ARTIFACT_RE = re.compile(
     r"\bverification\s+matrix\b|\btest\s+matrix\s+rows?\b"
-    r"|\bcritical\s+files\b|\bplan\s+(?:step|phase|row)\s+\d",
+    r"|\bplan'?s?\s+critical\s+files\b|\bcritical\s+files\s+(?:list|section)\b"
+    r"|\bplan\s+(?:step|phase|row)\s+\d",
     re.IGNORECASE)
 
 
@@ -632,11 +805,16 @@ def _is_plan_artifact(title: str) -> bool:
 # comment in bin/plan-review-drain", "Move doc comment back to regenerate_weekly_section"
 # and "Remove hard-wrap from Step 5 paragraph". A PR, sticky, review or issue comment is
 # a feature, so those stay filable. The verb anchor keeps "Add a comment explaining X"
-# out, since that names missing context rather than wording. The comment must sit in
-# the title's first clause, so a list title like "Fix stale artifacts: a test name, a
-# comment, ..." stays filable, and "code-comment agent" names a tool.
+# and "Add a docstring to X" out, since those name missing context rather than wording.
+# The comment/docstring word must sit in the title's first clause, so a list title like
+# "Fix stale artifacts: a test name, a comment, ..." stays filable, and
+# "code-comment agent" names a tool.
+#
+# Both branches share the same verb set so that additive notes ("Add a docstring to X",
+# "Write a docblock for Y") are never filtered — "add" and "write" are absent by design.
 _COMMENT_NIT_RE = re.compile(
-    r"\b(?:docstring|docblock|doc[\s-]?comment|hard[\s-]?wrap)s?\b"
+    r"^(?:update|fix|rewrite|reword|clarify|correct|move|remove|place|verify)\b[^:,]{0,60}"
+    r"(?:docstring|docblock|doc[\s-]?comment|hard[\s-]?wrap)s?\b"
     r"|^(?:update|fix|rewrite|reword|clarify|correct|move|remove|place|verify)\b[^:,]{0,60}"
     r"(?<!pr )(?<!sticky )(?<!review )(?<!issue )(?<![-\w])comments?\b(?!-)",
     re.IGNORECASE)
@@ -725,6 +903,9 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
     the verdict opens with the reviewer's process narration, so a fixed-length cut of it
     was always off-topic and ended mid-sentence. The full verdict is the PR's sticky
     comment, one click from the link.
+
+    Notes carry no severity, so they file in the order the reviewer listed them. Past the
+    per-PR cap of 3 they fold into one roll-up issue (`harness/followcap.py`).
     """
     log = log or _noop_log
     if not notes:
@@ -745,13 +926,14 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
             continue
         body = f"{pr_link}\n\n{detail}"
         try:
-            n = gh.issue_create(title, body, "maintenance")
+            n = gh.followup_create(title, body, "maintenance")
             if n is not None:
-                nums.append(n)
+                if n not in nums:
+                    nums.append(n)
                 seen.add(key)
                 log(f"phase5.5 notes: filed issue #{n} '{title[:50]}'")
         except (HarnessError, OSError) as exc:
-            log(f"phase5.5 notes: issue_create failed ({exc})")
+            log(f"phase5.5 notes: followup_create failed ({exc})")
     return nums
 
 
@@ -772,6 +954,15 @@ DIGEST_SCRIPT_PATHS = (
     ".claude/review-shared/scripts/digest.sh",
 )
 
+REVIEW_OWED_SCRIPT_PATHS = (
+    ".claude/review-shared/scripts/review-owed.sh",
+)
+# bin/pr-review-now may wait_for_slot before it returns; the launch itself is sub-second.
+REVIEW_OWED_TIMEOUT = 300
+# The script's last stdout line. Exactly one verdict token, reason or tree after it.
+REVIEW_OWED_VERDICT_RE = re.compile(r"^(REVIEW-OWED|REVIEW-CURRENT) (\S+)$")
+_HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
+
 DIGEST_UNAVAILABLE = "digest script did not produce output"
 MAX_FIDELITY_ROUNDS = 3  # round 1 is the historical single remediation
 STICKY_MARKER = "<!-- pr-ready-verdict -->"
@@ -785,6 +976,7 @@ EXCERPT_LIMIT = 30000
 # `REVIEWED_TREE=<sha>` line and is unchanged by this PR.
 STICKY_REVIEWED_DIFF_RE = re.compile(r"^\*\*Reviewed diff:\*\* ([0-9a-f]{40})$", re.M)
 STICKY_PLAN_HASH_RE = re.compile(r"^\*\*Plan hash:\*\* ([0-9a-f]{64})$", re.M)
+STICKY_REUSED_FROM_RE = re.compile(r"^\*\*Reused from:\*\* (\S+) \(([a-z-]+(?:, [a-z-]+)*)\)$", re.M)
 CARRY_FORWARD_VERDICTS = ("READY", "READY WITH NOTES")
 
 _MERGE_DIGEST_HEADING_RE = re.compile(r"^#{1,6}[ \t]+Merge digest")
@@ -833,6 +1025,18 @@ def findings_excerpt(path: str, verdict_present: bool) -> str:
     return text
 
 
+def verdict_file_usable(path: str) -> bool:
+    """True when the verdict file would put a non-empty findings excerpt in the sticky.
+
+    Carry-forward reuses a prior verdict without re-running the reviewer, but the sticky
+    the runner then composes still quotes this file. A file gone from /tmp (a reboot),
+    unreadable, blank, or holding nothing above the digest cut would print an empty
+    excerpt and placeholder digest rows over a sticky that already had real ones. Same
+    definition as the sticky's own excerpt, so the two can never disagree.
+    """
+    return bool(findings_excerpt(path, True))
+
+
 def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed) -> str:
     """The last prose line of the sticky comment. First matching row wins.
 
@@ -845,8 +1049,7 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
     if v1 == "READY":
         return "READY"
     if v1 == "READY WITH NOTES":
-        return ("READY WITH NOTES — notes left for the merging reviewer; "
-                "the compiled harness remediates only NOT READY")
+        return "READY WITH NOTES"
     if not remediation_sha:
         return ("NOT READY — the blocking findings listed above remain; "
                 "remediate and re-run /post-plan")
@@ -865,10 +1068,11 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
 def _sticky_prior_verdict(sticky_body: str) -> str | None:
     """The carry-forwardable verdict word from a prior sticky's terminal line.
 
-    Prefix matching, never substring: terminal_line's READY WITH NOTES text ends with
-    "... the compiled harness remediates only NOT READY", so a `"NOT READY" in last`
-    test would reject a perfectly valid carry-forward. Order matters too — the longest
-    alternative is checked first, the same property VERDICT_RE encodes.
+    Prefix matching, never substring: terminal_line now emits a bare READY WITH NOTES,
+    but stickies posted before that change still end in "... the compiled harness
+    remediates only NOT READY", so a `"NOT READY" in last` test would reject a valid
+    carry-forward from one of them. Order matters too: the longest alternative is
+    checked first, the same property VERDICT_RE encodes.
 
     A remediated run is deliberately excluded. terminal_line emits "READY (re-review) —
     ..." when a remediation round produced the passing verdict, and that verdict belongs
@@ -948,18 +1152,133 @@ def carry_forward_predicate(sticky_body, diff_id: str,
     return verdict, ""
 
 
+# Status lines the runner builds on every clean run. The composer prints only a line that
+# deviates from these, so a clean sticky carries no REBASE= or CI: line at all.
+_EXPECTED_REBASE = ("REBASE=clean (HEAD already contains origin/master)",
+                    "REBASE=merged origin/master")
+_EXPECTED_CI_RE = re.compile(
+    r"^CI: local verification pass; GitHub checks are watched after this comment"
+    r"(; remediation commit [0-9a-f]+ is inside that watch)?$")
+
+
+def _shape_excerpt(excerpt: str) -> tuple[str, list[str]]:
+    """Split the reviewer's excerpt into (visible text, REVIEW-COVERAGE: lines).
+
+    Coverage lines are lifted byte-identical so the audit trail can carry them; every one
+    is lifted, so a reviewer that emits two never leaks one. The bare verdict word is
+    dropped because the banner and the terminal line already carry it. An `## FINDINGS`
+    heading with nothing under it becomes `Findings: none.`; a non-empty section is kept
+    verbatim, heading included.
+    """
+    if not excerpt:
+        return "", []
+    coverage: list[str] = []
+    kept: list[str] = []
+    for line in excerpt.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("REVIEW-COVERAGE:"):
+            coverage.append(line.rstrip())
+            continue
+        if VERDICT_RE.match(stripped):
+            continue
+        kept.append(line)
+
+    shaped: list[str] = []
+    i = 0
+    while i < len(kept):
+        if kept[i].strip() == "## FINDINGS":
+            j = i + 1
+            while j < len(kept) and not kept[j].startswith("#") and not kept[j].strip():
+                j += 1
+            if j == len(kept) or kept[j].startswith("#"):
+                shaped.extend(["Findings: none.", ""])
+                i = j
+                continue
+        shaped.append(kept[i])
+        i += 1
+
+    collapsed: list[str] = []
+    for line in shaped:
+        if not line.strip() and collapsed and not collapsed[-1].strip():
+            continue
+        collapsed.append(line)
+    return "\n".join(collapsed).strip("\n"), coverage
+
+
+BACKLOG_ISSUES_URL = "https://github.com/a-jay85/IBL5-backlog/issues/"
+PR_URL = "https://github.com/a-jay85/IBL5/pull/"
+
+_BACKLOG_REF = r"(?:a-jay85/)?(?:IBL5-)?backlog#(\d+)(?!\d)"
+_REF_RE = re.compile(
+    r"(?<![\w/])" + _BACKLOG_REF
+    + r"|(?<![\w/&\[#-])#(\d{3,})(?!\d)",
+    re.IGNORECASE)
+_WHOLE_BACKLOG_RE = re.compile(_BACKLOG_REF, re.IGNORECASE)
+# Existing markdown links and code spans are opaque: the leftmost match wins, so a ref
+# inside either is never seen by _REF_RE.
+_OPAQUE_RE = re.compile(r"\[[^\]\n]*\]\([^)\n]*\)|`[^`\n]*`")
+
+
+def _backlog_link(text: str, n) -> str:
+    return f"[{text}](<{BACKLOG_ISSUES_URL}{n}>)"
+
+
+def _link_plain(seg: str) -> str:
+    def repl(m):
+        if m.group(1):
+            return _backlog_link(m.group(0), m.group(1))
+        return f"[#{m.group(2)}](<{PR_URL}{m.group(2)}>)"
+    return _REF_RE.sub(repl, seg)
+
+
+def linkify_refs(text: str) -> str:
+    """Turn backlog and PR refs in digest prose into explicit markdown links.
+
+    Backlog refs never autolink on GitHub and nothing autolinks in the Discord DM, so the
+    links are spelled out; the URL sits in `<>` (valid CommonMark, and Discord skips the
+    embed, as bin/digest-dm-build does). Backlog forms run in the same leftmost pass as
+    bare `#N` (3+ digits, same bar as bin/check-prose), so `backlog#12` is not re-matched.
+    Text inside an existing link or a code span is left alone, except a code span whose
+    whole content is one backlog ref, which is unwrapped. Idempotent.
+    """
+    out: list[str] = []
+    pos = 0
+    for m in _OPAQUE_RE.finditer(text):
+        out.append(_link_plain(text[pos:m.start()]))
+        tok = m.group(0)
+        inner = tok[1:-1] if tok.startswith("`") else None
+        wm = _WHOLE_BACKLOG_RE.fullmatch(inner) if inner is not None else None
+        out.append(_backlog_link(inner, wm.group(1)) if wm else tok)
+        pos = m.end()
+    out.append(_link_plain(text[pos:]))
+    return "".join(out)
+
+
+def digest_rows_for_display(digest: list, fid: dict) -> list:
+    """The five digest rows exactly as the sticky prints them, remediation suffix included.
+
+    Shared by compose_sticky and the runner's PR-body write so the two cannot disagree.
+    """
+    rows = list(digest)[:5]
+    sha = (fid or {}).get("remediation_sha")
+    if sha and len(rows) == 5:
+        rows[4] = rows[4] + f" (post-plan remediation: {sha})"
+    return rows
+
+
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
                    digest: list, excerpt: str, terminal: str, *,
                    diff_id: str = "", plan_hash: str = "",
-                   posted_at: str = "") -> str:
+                   posted_at: str = "", reused_from: dict | None = None) -> str:
     """The full sticky comment body, marker last.
 
-    Ordering is a contract, not a style: every line the DM parser must NOT read as a digest
-    label sits ABOVE `### Merge digest`, and the marker is the final line.
+    Ordering is a contract, not a style: every non-label line sits above `### Merge digest`
+    or after the `---` that ends it. The machine-read audit trail sits after `---`, so
+    `_digest_labels` never folds it into the fifth label, and the marker is the final line.
+    Expected lines are not printed: a clean rebase, a passing CI line, and an armed
+    decision leave no trace beyond the banner.
 
-    `posted_at` — when non-empty, adds a top banner, timestamps the verdict line, and adds
-    an italic timestamp line immediately above the terminal line. When empty, the output is
-    identical to the pre-timestamp shape so existing callers are unaffected.
+    `posted_at` adds a timestamp to the banner and changes nothing else.
     """
     fid = fid or {}
 
@@ -975,32 +1294,75 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     else:
         verdict_word = fid.get("verdict_1") or "missing"
 
-    out = []
-    if posted_at:
-        out.append(f"**LATEST VERDICT: {verdict_word}** — posted {posted_at}")
-        out.append("")
-    out.extend([rebase_line, ci_line, ""])
-
-    # The timestamp is inserted before "reviewer findings follow" so the line reads:
-    # "Plan-fidelity verdict: NOT READY — posted <ts> — reviewer findings follow"
-    ts_mid = f"posted {posted_at} — " if posted_at else ""
+    armed = decision is not None and getattr(decision, "armed", False)
+    banner = f"**{verdict_word}**"
     if findings_round and findings_round <= len(rounds):
-        out.append(f"Plan-fidelity verdict: {verdict_word} (re-review after "
-                   f"remediation round {findings_round}) — {ts_mid}reviewer findings follow")
-    else:
-        out.append(f"Plan-fidelity verdict: {verdict_word} — {ts_mid}"
-                   "reviewer findings follow")
-    out.append(excerpt if excerpt else f"(no verdict file: {fid.get('error_kind')})")
+        banner += f" (re-review, round {findings_round})"
+    if posted_at:
+        banner += f" — {posted_at}"
+    banner += " · auto-merge armed" if armed else " · auto-merge held"
+    out = [banner, ""]
+
+    status = []
+    if rebase_line and rebase_line not in _EXPECTED_REBASE:
+        status.append(rebase_line)
+    if ci_line and not _EXPECTED_CI_RE.match(ci_line):
+        status.append(ci_line)
+    if not armed:
+        status.append("Auto-merge held:")
+        holds = list(getattr(decision, "holds", []) or []) if decision is not None else []
+        if holds:
+            status.extend(f"- ({c.number}) {c.name} — {c.reason}" for c in holds)
+        else:
+            status.append("- no arming decision recorded")
+    if status:
+        out.extend(status)
+        out.append("")
+
+    visible, coverage = _shape_excerpt(excerpt)
+    if visible:
+        out.append(visible)
+    elif not excerpt:
+        out.append(f"(no verdict file: {fid.get('error_kind')})")
+    nums = fid.get("backlog_issue_numbers") or []
+    if nums:
+        out.append("**Backlog issues filed:** " + ", ".join(
+            _backlog_link(f"a-jay85/IBL5-backlog#{n}", n) for n in nums))
 
     out.append("")
+    out.append(MERGE_DIGEST_HEADING)
+    out.extend(digest_rows_for_display(digest, fid))
+
+    # The digest block must END here. `_digest_labels` in bin/digest-dm-build folds every
+    # later non-label, non-blank line into the LAST label's value until it hits a heading
+    # or a horizontal rule, so without this terminator the audit trail, the terminal
+    # verdict line and the marker all land inside the Discord DM's
+    # `**Machine-authored fixes:**` value. The awk already treats `---` as an end-of-block
+    # token for exactly this reason, and /pr-ready emits the same one after its digest.
+    out.append("")
+    out.append("---")
+
+    # Audit trail: machine-read lines, collapsed for humans. Each stays at column 0 so the
+    # line-anchored carry-forward regexes and bin/pr-cycle's Path 2 still match them.
+    out.extend(["", "<details><summary>Audit trail</summary>", ""])
+    out.extend(coverage)
     out.append(f"**Reviewed tree:** {fid.get('reviewed_tree') or 'unrecorded'}")
     if diff_id:
         out.append(f"**Reviewed diff:** {diff_id}")
     if plan_hash:
         out.append(f"**Plan hash:** {plan_hash}")
+    by_run: dict = {}
+    for arm, run_id in (reused_from or {}).items():
+        by_run.setdefault(run_id, []).append(arm)
+    for run_id, arms in by_run.items():
+        out.append(f"**Reused from:** {run_id} ({', '.join(sorted(arms))})")
     if fid.get("carried_forward"):
-        out.append("**Carried forward:** prior review reused; branch diff (patch-id) and "
-                   "plan unchanged since the recorded verdict")
+        if fid.get("carry_reason") == "conflict-only-delta":
+            out.append("**Carried forward:** prior review reused; branch diff changed only in "
+                       "conflict-resolved files reviewed this run (conflict-only delta)")
+        else:
+            out.append("**Carried forward:** prior review reused; branch diff (patch-id) and "
+                       "plan unchanged since the recorded verdict")
     if fid.get("verdict_2") is not None:
         out.append(f"**Re-reviewed tree:** {fid.get('reviewed_tree_2') or 'unrecorded'} "
                    f"({fid.get('verdict_2')})")
@@ -1009,59 +1371,9 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
             f"{i + 1}. {(r.get('remediation_sha') or '')[:12]} "
             f"→ {r.get('verdict') or 'INDETERMINATE'}"
             for i, r in enumerate(rounds)))
-    nums = fid.get("backlog_issue_numbers") or []
-    if nums:
-        out.append("**Backlog issues filed:** " + ", ".join(
-            f"a-jay85/IBL5-backlog#{n}" for n in nums))
+    out.extend(["", "</details>"])
 
     out.append("")
-    if decision is not None and getattr(decision, "armed", False):
-        out.append("Arming decision (Phase 6.5): ARM — auto-merge is requested right after "
-                   "this comment")
-    else:
-        out.append("Arming decision (Phase 6.5): HOLD — auto-merge not armed")
-    holds = list(getattr(decision, "holds", []) or []) if decision is not None else []
-    if holds:
-        out.extend(f"- ({c.number}) {c.name} — {c.reason}" for c in holds)
-    else:
-        out.append("- all fourteen conditions clear")
-
-    out.append("")
-    out.append(MERGE_DIGEST_HEADING)
-    rows = list(digest)[:5]
-    sha = fid.get("remediation_sha")
-    if sha and len(rows) == 5:
-        rows[4] = rows[4] + f" (post-plan remediation: {sha})"
-    out.extend(rows)
-
-    # The digest block must END here. `_digest_labels` in bin/digest-dm-build folds every
-    # later non-label, non-blank line into the LAST label's value until it hits a heading
-    # or a horizontal rule, so without this terminator the remediation note, the posted-at
-    # line, the terminal verdict line and the marker all land inside the Discord DM's
-    # `**Machine-authored fixes:**` value. The awk already treats `---` as an end-of-block
-    # token for exactly this reason, and /pr-ready emits the same one after its digest.
-    out.append("")
-    out.append("---")
-
-    if sha:
-        out.append("")
-        if findings_round:
-            # NOT `sha`: remediation_sha is the LAST commit the harness authored, which
-            # Phase 7 needs for the CI watch. A trailing ungraded round moves it past the
-            # round the excerpt came from, and naming it here would pair a commit with a
-            # re-review that never saw it.
-            graded_sha = rounds[findings_round - 1].get("remediation_sha") or sha
-            out.append(f"Remediation: commit {graded_sha} closed remediation round "
-                       f"{findings_round}. The findings above come from the re-review "
-                       "that graded it.")
-        else:
-            out.append(f"Remediation: commit {sha} addresses the verdict-1 NOT READY "
-                       "findings. Every re-review round was indeterminate, so the "
-                       "findings above are verdict 1's.")
-
-    out.append("")
-    if posted_at:
-        out.append(f"*Verdict posted {posted_at}.*")
     out.append(terminal)
     out.append(STICKY_MARKER)
     return "\n".join(out) + "\n"
@@ -1071,9 +1383,11 @@ def _digest_degraded(reason: str = DIGEST_UNAVAILABLE) -> list:
     return [f"{lbl} unavailable — {reason}" for lbl in LABELS]
 
 
-def _digest_source(worktree, master_sha: str) -> str | None:
-    """First either-location path that yields a non-empty script body."""
-    for rel in DIGEST_SCRIPT_PATHS:
+def _script_source(worktree, master_sha: str, paths) -> str | None:
+    """First path in `paths` with a non-empty body: `master_sha`'s copy when a worktree is
+    given (the harness runs master's scripts, never the branch's), else the harness's own
+    checkout (replay and pytest, where there is no worktree)."""
+    for rel in paths:
         if worktree:
             body = _git_show(worktree, f"{master_sha}:{rel}")
         else:
@@ -1086,6 +1400,11 @@ def _digest_source(worktree, master_sha: str) -> str | None:
         if body:
             return body
     return None
+
+
+def _digest_source(worktree, master_sha: str) -> str | None:
+    """First either-location path that yields a non-empty script body."""
+    return _script_source(worktree, master_sha, DIGEST_SCRIPT_PATHS)
 
 
 def digest_lines(worktree, master_sha: str, verdict_path: str, out_dir: str,
@@ -1122,4 +1441,63 @@ def digest_lines(worktree, master_sha: str, verdict_path: str, out_dir: str,
     # digest.sh's own `<label> unavailable — <reason>` degrades pass this shape test and are
     # used verbatim, exactly as the skill pastes them. The tree-line strip runs AFTER the
     # shape test, so a label reduced to just its label still degrades the same way.
-    return [_REVIEWED_TREE_TAIL_RE.sub("", ln) for ln in lines]
+    return [linkify_refs(_REVIEWED_TREE_TAIL_RE.sub("", ln)) for ln in lines]
+
+
+def _review_owed_result(verdict: str, reason: str, *, fired: bool = False,
+                        command: str = "") -> dict:
+    return {"verdict": verdict, "reason": reason, "fired": fired, "command": command}
+
+
+def fire_review_owed(worktree, master_sha: str, pr_number, sticky_body: str,
+                     current_tree, out_dir: str, *, live: bool = True,
+                     log=_noop_log) -> dict:
+    """Run review-owed.sh against the sticky the harness just posted. Never raises.
+
+    Returns {"verdict": "REVIEW-OWED" | "REVIEW-CURRENT" | "unavailable" | "skipped",
+             "reason": <token>, "fired": bool, "command": <FIRED/DRY-RUN/FIRE-FAILED line>}.
+    `fired` is True only on a literal `FIRED:` line: a FIRE-FAILED run still reports
+    REVIEW-OWED so the log says the review is owed and was not launched. `live=False`
+    passes --dry-run: the decision runs, nothing launches. "unavailable" means the script
+    could not decide; nothing was fired and the caller only logs it. Arming is unchanged
+    on every path, the same contract as sticky-post-failed.
+    """
+    if not pr_number:
+        return _review_owed_result("skipped", "no-pr")
+    body = _script_source(worktree, master_sha, REVIEW_OWED_SCRIPT_PATHS)
+    if not body:
+        log("phase6.5 review-owed: script unavailable at master; nothing fired")
+        return _review_owed_result("unavailable", "script-unavailable")
+    script = os.path.join(out_dir, "review-owed.sh")
+    sticky_path = os.path.join(out_dir, "review-owed-sticky.md")
+    try:
+        with open(script, "w") as fh:
+            fh.write(body)
+        with open(sticky_path, "w") as fh:
+            fh.write(sticky_body or "")
+    except OSError as e:
+        return _review_owed_result("unavailable", f"write-failed:{e.__class__.__name__}")
+    argv = ["bash", script, str(pr_number), "--sticky-file", sticky_path]
+    if current_tree and _HEX40_RE.match(str(current_tree)):
+        argv += ["--current-tree", str(current_tree)]
+    if not live:
+        argv.append("--dry-run")
+    from .adapters.llm import _run_reaped
+    try:
+        proc = _run_reaped(argv, None, REVIEW_OWED_TIMEOUT, worktree, os.environ)
+    except subprocess.TimeoutExpired:
+        log("phase6.5 review-owed: timed out; nothing confirmed fired")
+        return _review_owed_result("unavailable", "timeout")
+    except Exception as e:
+        return _review_owed_result("unavailable", f"exec-failed:{e.__class__.__name__}")
+    if proc.returncode == 2:
+        return _review_owed_result("unavailable", "usage-error")
+    lines = [ln for ln in (proc.stdout or "").splitlines() if ln.strip()]
+    m = REVIEW_OWED_VERDICT_RE.match(lines[-1]) if lines else None
+    if proc.returncode != 0 or not m:
+        return _review_owed_result("unavailable", f"no-verdict-line:rc={proc.returncode}")
+    command = next((ln for ln in lines
+                    if ln.startswith(("FIRED: ", "DRY-RUN: ", "FIRE-FAILED: "))), "")
+    log(f"phase6.5 review-owed: {lines[-1]}" + (f" ({command})" if command else ""))
+    return _review_owed_result(m.group(1), m.group(2),
+                               fired=command.startswith("FIRED: "), command=command)

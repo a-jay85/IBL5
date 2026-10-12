@@ -181,7 +181,7 @@ class EngineBundleRepositoryTest extends DatabaseTestCase
     public function testGetTeamsConcatenatesCityAndName(): void
     {
         $teams = $this->repo->getTeams();
-        self::assertNotEmpty($teams, 'seed provides real teams 1..28');
+        self::assertNotSame([], $teams, 'seed provides real teams 1..28');
 
         // Cross-check the CONCAT against a direct column read (seed-independent).
         $first = $teams[0];

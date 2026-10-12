@@ -26,27 +26,27 @@ class LeagueStartersEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('LeagueStarters');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpApiReturnsHtmlFragment(): void
     {
         $output = $this->runModule('LeagueStarters', ['op' => 'api', 'display' => 'ratings']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testDisplayParamValidatesAgainstWhitelist(): void
     {
         $output = $this->runModule('LeagueStarters', ['display' => 'total_s']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testInvalidDisplayParamDefaultsToRatings(): void
     {
         $output = $this->runModule('LeagueStarters', ['display' => 'bogus']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

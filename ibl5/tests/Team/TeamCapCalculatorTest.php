@@ -61,6 +61,14 @@ class TeamCapCalculatorTest extends TestCase
         return $season;
     }
 
+    private function playoffsSeason(): Season
+    {
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(false);
+        $season->method('advancesContractYears')->willReturn(true);
+        return $season;
+    }
+
     // ── canAddContractWithoutGoingOverHardCap (boundary) ──────────
 
     public function testCanAddContractRejectsOverHardCap(): void
@@ -257,6 +265,34 @@ class TeamCapCalculatorTest extends TestCase
         self::assertSame(0, $this->buildCalculator()->getTotalNextSeasonSalaries([]));
     }
 
+    // The calculator sums row-wise by design and does not de-duplicate. Unique
+    // pids are guaranteed by the feeding queries and pinned by
+    // testUnderContractQueriesReturnEachPidOnce in
+    // ibl5/tests/DatabaseIntegration/TeamQueryRepositoryTest.php. A caller that
+    // passes a repeated pid gets it counted twice.
+
+    public function testGetTotalCurrentSeasonSalariesSumsEveryRowIncludingRepeatedPid(): void
+    {
+        $rows = [
+            TestDataFactory::createPlayer(['pid' => 7, 'cy' => 1, 'salary_yr1' => 500]),
+            TestDataFactory::createPlayer(['pid' => 7, 'cy' => 1, 'salary_yr1' => 500]),
+            TestDataFactory::createPlayer(['pid' => 8, 'cy' => 1, 'salary_yr1' => 300]),
+        ];
+
+        self::assertSame(1300, $this->buildCalculator()->getTotalCurrentSeasonSalaries($rows));
+    }
+
+    public function testGetTotalNextSeasonSalariesSumsEveryRowIncludingRepeatedPid(): void
+    {
+        $rows = [
+            TestDataFactory::createPlayer(['pid' => 7, 'cy' => 1, 'salary_yr2' => 600]),
+            TestDataFactory::createPlayer(['pid' => 7, 'cy' => 1, 'salary_yr2' => 600]),
+            TestDataFactory::createPlayer(['pid' => 8, 'cy' => 1, 'salary_yr2' => 400]),
+        ];
+
+        self::assertSame(1600, $this->buildCalculator()->getTotalNextSeasonSalaries($rows));
+    }
+
     // ── Phase-aware aggregates (advances=true) ─────────────────────
 
     public function testGetTotalCurrentSeasonSalariesUsesPhaseAwareSalaryWhenAdvancing(): void
@@ -295,6 +331,34 @@ class TeamCapCalculatorTest extends TestCase
         self::assertSame(900, $current);
         self::assertSame(1200, $next);
         self::assertGreaterThan($current, $next);
+    }
+
+    public function testGetSalaryCapArrayInPlayoffsKeepsYear1AtRawContractYear(): void
+    {
+        $row = TestDataFactory::createPlayer(['pid' => 1, 'cy' => 1, 'cyt' => 3, 'salary_yr1' => 500, 'salary_yr2' => 550, 'salary_yr3' => 600]);
+        $this->stubRepo->method('getRosterUnderContractOrderedByName')->willReturn([$row]);
+        $this->stubCash->method('getTeamCashForSalary')->willReturn([]);
+        $season = $this->playoffsSeason();
+        $calc = new TeamCapCalculator($this->mockDb, $this->stubRepo, $this->stubCash, $season);
+
+        // Playoffs: isOffseasonPhase() is false, so the cap array is unshifted (year1 = salary_yr(cy)).
+        self::assertSame(['year1' => 500, 'year2' => 550, 'year3' => 600], $calc->getSalaryCapArray('Test Team', 1, $season));
+    }
+
+    public function testGetSalaryCapArrayInPlayoffsDivergesFromAdvancedCurrentSeasonTotal(): void
+    {
+        $row = TestDataFactory::createPlayer(['pid' => 1, 'cy' => 1, 'cyt' => 3, 'salary_yr1' => 500, 'salary_yr2' => 550, 'salary_yr3' => 600]);
+        $this->stubRepo->method('getRosterUnderContractOrderedByName')->willReturn([$row]);
+        $this->stubCash->method('getTeamCashForSalary')->willReturn([]);
+        $season = $this->playoffsSeason();
+        $calc = new TeamCapCalculator($this->mockDb, $this->stubRepo, $this->stubCash, $season);
+
+        // Intentional split: the cap array keys off isOffseasonPhase(), the per-player basis keys off advancesContractYears(). Playoffs is the one phase where they differ.
+        self::assertSame(550, $calc->getTotalCurrentSeasonSalaries([$row]));
+        self::assertNotSame(
+            $calc->getTotalCurrentSeasonSalaries([$row]),
+            $calc->getSalaryCapArray('Test Team', 1, $season)['year1']
+        );
     }
 
     public function testCanAddContractHardCapVerdictFlipsBetweenPhases(): void

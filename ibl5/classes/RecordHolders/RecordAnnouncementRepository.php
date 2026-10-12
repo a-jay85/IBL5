@@ -9,7 +9,7 @@ use League\LeagueContext;
 /**
  * Manages announcement pipeline state: last-processed date and unannounced game discovery.
  */
-final class RecordAnnouncementRepository extends \BaseMysqliRepository
+final class RecordAnnouncementRepository extends \Database\BaseMysqliRepository
 {
     private const ANNOUNCEMENT_CACHE_KEY = 'record_announcements_last_date';
 
@@ -83,6 +83,7 @@ final class RecordAnnouncementRepository extends \BaseMysqliRepository
 
         /** @var list<array{game_date: string}> $rows */
         $rows = $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (SELECT DISTINCT game_date makes game_date unique, so the order is total)
             "SELECT DISTINCT game_date FROM `ibl_box_scores` WHERE game_date > ? AND game_date <= ? ORDER BY game_date ASC",
             'ss',
             $floor,

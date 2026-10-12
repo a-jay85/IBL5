@@ -120,4 +120,40 @@ final class RecapPanelRendererTest extends RecapTestCase
         $html = (new RecapPanelRenderer())->render($this->makeSlate(), $this->makeGame(home: true, margin: 4), 0);
         $this->assertSame(1, substr_count($html, 'last-sim-recap__final-row--win'));
     }
+
+    public function testTeamLogoLinksCarryAwayThenHomeAriaLabels(): void
+    {
+        $html = (new RecapPanelRenderer())->render($this->makeSlate(), $this->makeGame(home: true), 0);
+
+        self::assertStringContainsString('class="last-sim-recap__team-link" aria-label="Pistons"><img', $html);
+        self::assertStringContainsString('class="last-sim-recap__team-link" aria-label="Cavaliers"><img', $html);
+        self::assertLessThan(
+            strpos($html, 'aria-label="Cavaliers"><img'),
+            strpos($html, 'aria-label="Pistons"><img'),
+        );
+        self::assertSame(2, substr_count($html, 'last-sim-recap__team-link" aria-label='));
+        self::assertSame(2, substr_count($html, 'alt="" class="last-sim-recap__team-mark"'));
+    }
+
+    public function testTeamLogoLinkAriaLabelsFlipWhenSlateTeamIsAway(): void
+    {
+        $html = (new RecapPanelRenderer())->render($this->makeSlate(), $this->makeGame(home: false), 0);
+
+        self::assertLessThan(
+            strpos($html, 'aria-label="Pistons"><img'),
+            strpos($html, 'aria-label="Cavaliers"><img'),
+        );
+    }
+
+    public function testTeamLogoLinkAriaLabelEscapesTeamName(): void
+    {
+        $html = (new RecapPanelRenderer())->render(
+            $this->makeSlate(teamName: 'Bulls & "Bears" <x>'),
+            $this->makeGame(home: true),
+            0,
+        );
+
+        self::assertStringContainsString('aria-label="Bulls &amp; &quot;Bears&quot; &lt;x&gt;"><img', $html);
+        self::assertStringNotContainsString('aria-label="Bulls & "', $html);
+    }
 }

@@ -7,15 +7,29 @@ from __future__ import annotations
 
 from .state import ArmDecision, Classification, PlanInfo
 
-# Probe allowlist sentence — shared by both re-check prompts so the allowlist
-# cannot drift between Mode A (manual_recheck_prompt) and Mode B
-# (hold_discharge_prompt).  Keep `at most 8 elements` on its own source line.
+# Probe allowlist sentence for manual_recheck_prompt.  Keep `at most 8 elements`
+# on its own source line.
 PROBE_ALLOWLIST_TEXT = (
     "`pytest`, `grep`, or `bin/(check|test)-<name>` — "
     "no interpreters (bash, python3, sh, env, node), no absolute paths, no `..`, "
     "no flags starting with -c/-e/--eval/--exec/-p/--plugin, "
     "and at most 8 elements."
 )
+
+
+def _gm_visible_rubric(cls: Classification) -> str:
+    """One sentence the model can act on. Derived from Classification.has_gm_visible
+    (classify._NON_RUNTIME denylist): the prompt states the verdict, the model never
+    re-derives path rules. The harness retypes feat -> chore deterministically on a
+    no-GM-visible diff (schemas.retype_tooling_feat), so this is copy quality, not the guard."""
+    if cls.has_gm_visible:
+        return ("GM-VISIBLE FILES: yes (HAS_GM_VISIBLE=True). At least one changed path is app "
+                "or sim runtime code under ibl5/ or engine/. Apply the GM test above.\n")
+    return ("GM-VISIBLE FILES: none (HAS_GM_VISIBLE=False). Every changed path is dev tooling, "
+            "docs, tests, or build config (bin/, tools/, .claude/, .github/, ibl5/tests/, "
+            "ibl5/docs/, markdown). The type MUST NOT be feat. Use chore, or fix/refactor/"
+            "docs/test/ci when the diff is exactly that. The harness retypes feat to chore "
+            "on this diff anyway.\n")
 
 
 def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt: str) -> str:
@@ -47,8 +61,9 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         "TYPE RUBRIC — decision test: \"Would a league GM notice a new ability they "
         "didn't have before?\" Yes -> feat. Invisible to a GM (dev tooling, internal "
         "refactor, docs, tests, CI, dep bump) -> chore/fix/refactor/docs/test/perf/ci. "
-        "Classify by what the diff IS, never by desired merge outcome.\n\n"
-        f"BRANCH: {slug}\n"
+        "Classify by what the diff IS, never by desired merge outcome.\n"
+        + _gm_visible_rubric(cls)
+        + f"\nBRANCH: {slug}\n"
         f"CLASSIFICATION:\n{cls.summary()}\n"
         + retro_block
         + (f"\nPLAN EXCERPT (intent):\n{plan_excerpt[:4000]}\n" if plan.found else "")
@@ -56,6 +71,11 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         + '\n\nNEVER write a "## Manual Testing" heading or any manual-testing checklist '
         'inside summary_md. The runner owns that section and appends it after you; '
         'duplicating it corrupts the arming gate.'
+        + '\n\nEnd summary_md with exactly one line: **Merge danger:** Door: <one-way|two-way> '
+        '· Blast radius: <localized|module|site-wide|external> · Why: <20-200 chars naming '
+        'what would be hard to reverse>. The runner derives Door and Blast radius mechanically '
+        'and only ever raises them; your contribution is the Why text. Never write a second '
+        'Merge danger line.'
         + '\n\nA bare `#N` links to IBL5 PR/issue N. Cite a backlog issue as '
         '`a-jay85/IBL5-backlog#N`, never as a bare `#N`.'
         + '\n\nReturn ONLY JSON with exactly these four keys: {"type": "chore", '
@@ -88,6 +108,9 @@ def pr_body_check_prompt(body: str, name_status: str) -> str:
         "so it is generated data reconciled by construction, not a claim — a drift there "
         "is a Phase 5.9 defect, never a body finding, and reporting it is a false "
         "`NOT READY`. "
+        "Also exclude the machine-generated merge-digest block delimited by "
+        "`<!-- merge-digest:begin -->` / `<!-- merge-digest:end -->`: the runner writes "
+        "it from the previous run's sticky verdict, so it is not a claim. "
         "The block has already been removed from the text you are shown, so never "
         "re-emit it.\n\n"
         "**Named-constant volumes.** Within this same check, and **inheriting its "
@@ -179,44 +202,6 @@ def manual_recheck_prompt(rows: list, cls: "Classification") -> str:
         f"ROWS:\n{numbered}\n\n"
         'Return ONLY JSON: [{"n": 1, "hold": true}, {"n": 2, "probe": ["bin/test-x"]}].'
         " One entry per row, in order."
-    )
-
-
-def hold_discharge_prompt(sentences: list[str]) -> str:
-    """Mode B — ask the model to classify each hold-justification sentence.
-
-    Mirrors manual_recheck_prompt but operates on individual prose sentences
-    from the plan's `## Automouse Hold Justification` section rather than
-    checklist rows.  Uses the same probe allowlist constant to prevent drift.
-
-    Categories: decision, cli-executable, phpunit, api-test, e2e,
-    visual-regression, truly-manual.  `probe` is required for cli-executable
-    and forbidden for all others.
-    """
-    numbered = "\n".join(f"{i}. {s}" for i, s in enumerate(sentences, 1))
-    return (
-        "You are reviewing sentences from a plan's Automouse Hold Justification "
-        "section (Mode B — hold sentences).  Classify each sentence into exactly "
-        "one category:\n\n"
-        "  decision            — the sentence states a judgment the human renders; "
-        "nothing an agent can run settles it (e.g. 'is this tradeoff acceptable').\n"
-        "  cli-executable      — verifiable now by a concrete shell command that "
-        "already exists in the repo.\n"
-        "  phpunit             — a PHPUnit test can assert the behaviour.\n"
-        "  api-test            — an HTTP request/response can verify it.\n"
-        "  e2e                 — a browser interaction is needed (Playwright).\n"
-        "  visual-regression   — screenshot/visual diff can verify it.\n"
-        "  truly-manual        — requires subjective human judgment on new/redesigned "
-        "UI/UX.\n\n"
-        "Default to `decision` when genuinely torn — a wrongly discharged judgment "
-        "deletes a check the human was supposed to make at the merge button.\n\n"
-        "For cli-executable entries, provide the argv as a JSON list.  argv[0] must "
-        f"match the allowlist: {PROBE_ALLOWLIST_TEXT} If you cannot express the check "
-        "within that allowlist, pick the matching replaceable category or `truly-manual`.\n\n"
-        f"SENTENCES:\n{numbered}\n\n"
-        'Return ONLY JSON: [{"n": 1, "category": "decision"}, '
-        '{"n": 2, "category": "cli-executable", "probe": ["bin/check-docs"], "rationale": "..."}].'
-        " One object per sentence, in order."
     )
 
 

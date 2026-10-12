@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Boxscore;
 
+use Boxscore\Contracts\BoxscoreAuditRepositoryInterface;
 use Boxscore\Contracts\BoxscoreRepositoryInterface;
 
 /**
@@ -26,6 +27,7 @@ final class ScheduleReconciliationAudit
 {
     public function __construct(
         private readonly BoxscoreRepositoryInterface $repository,
+        private readonly BoxscoreAuditRepositoryInterface $auditRepository,
     ) {
     }
 
@@ -54,7 +56,7 @@ final class ScheduleReconciliationAudit
 
         if ($isEnabled) {
             // Orphan direction: boxscore games with no matching schedule row (error).
-            foreach ($this->repository->findOrphanBoxscoreGames($seasonYear) as $row) {
+            foreach ($this->auditRepository->findOrphanBoxscoreGames($seasonYear) as $row) {
                 $findings[] = new AuditFinding(
                     AuditFinding::KIND_ORPHAN,
                     AuditFinding::SEVERITY_ERROR,
@@ -78,7 +80,7 @@ final class ScheduleReconciliationAudit
         // matchup twice on one date in any game type, so a repeated triple in a
         // playoff or HEAT month is a double-entered schedule row simmed twice,
         // exactly the 1993-06-04 case (ADR-0109, amended).
-        foreach ($this->repository->findDuplicateTripleGames($seasonYear) as $row) {
+        foreach ($this->auditRepository->findDuplicateTripleGames($seasonYear) as $row) {
             $findings[] = new AuditFinding(
                 AuditFinding::KIND_DUPLICATE_TRIPLE,
                 AuditFinding::SEVERITY_ERROR,
@@ -95,7 +97,7 @@ final class ScheduleReconciliationAudit
 
         // Missing direction: scheduled and played games with no boxscore (warning).
         // This runs even when the schedule is empty (returns 0 rows — safe).
-        $missingRows = $this->repository->findScheduledGamesWithoutBoxscores($seasonYear);
+        $missingRows = $this->auditRepository->findScheduledGamesWithoutBoxscores($seasonYear);
         foreach ($missingRows as $row) {
             $findings[] = new AuditFinding(
                 AuditFinding::KIND_MISSING_BOXSCORE,

@@ -10,8 +10,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 // SECURITY: Redirect logged-out users to login
 if (!function_exists('is_user') || !is_user($user ?? '')) {
-    $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php'
-        . (isset($_GET['league']) && $_GET['league'] === League\LeagueContext::LEAGUE_OLYMPICS ? '?league=olympics' : '');
+    $_SESSION['redirect_after_login'] = 'name=LeagueControlPanel'
+        . (isset($_GET['league']) && $_GET['league'] === League\LeagueContext::LEAGUE_OLYMPICS ? '&league=olympics' : '');
     header('Location: ../modules.php?name=YourAccount');
     exit;
 }
@@ -26,7 +26,7 @@ if (!is_admin()) {
 // GET-based CSRF vector (e.g. <img src=".../updateAllTheThings.php">). A GET
 // from a stale link/bookmark bounces back to the control panel.
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../leagueControlPanel.php');
+    header('Location: ../modules.php?name=LeagueControlPanel');
     exit;
 }
 
@@ -64,6 +64,7 @@ if (!headers_sent()) {
     header('Cache-Control: no-cache');         // prevent proxy caching
 }
 
+/** @var \mysqli $mysqli_db */
 global $mysqli_db;
 
 // Determine league context from the explicit POST parameter only (not cookie/session);
@@ -138,23 +139,31 @@ try {
     // Skipped entirely for a historical-import override (the operator has already
     // stated the season) and for Olympics (separate `league` row, different cadence).
     if ($seasonYearOverride === null && !$isOlympics) {
-        $rolloverDetector = new Updater\SeasonRollover\SeasonRolloverDetector(
-            $backupLocator, $archiveExtractor, $basePath, $filePrefix,
-        );
-        $rolloverResult = $rolloverDetector->detect($season->beginningYear, $season->endingYear);
-
-        if ($rolloverResult->shouldWrite()) {
-            $rolloverApplier = new Updater\SeasonRollover\SeasonRolloverApplier(
+        $rolloverRunner = new Updater\SeasonRollover\SeasonRolloverRunner(
+            new Updater\SeasonRollover\SeasonRolloverDetector(
+                $backupLocator, $archiveExtractor, $basePath, $filePrefix,
+            ),
+            new Updater\SeasonRollover\SeasonRolloverApplier(
                 new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db, $leagueContext),
+            ),
+            new Updater\SeasonRollover\CashConsiderationsYearAdvancer(
+                new Trading\BuyoutLedgerRepository($mysqli_db),
+                new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db, $leagueContext),
+            ),
+        );
+        $rolloverRun = $rolloverRunner->run($season->beginningYear, $season->endingYear);
+
+        if ($rolloverRun->rolledOver()) {
+            echo $view->renderInitStatus(
+                'Cash considerations advanced: ' . (int) $rolloverRun->cashRowsAdvanced . ' row(s)'
             );
-            $rolloverApplier->apply($rolloverResult);
 
             // Rebuild so every downstream step, backup dir and label reads the new season.
             $season = new \Season\Season($mysqli_db);
         }
 
         echo $view->renderInitStatus(
-            'Season rollover: ' . \Security\HtmlSanitizer::safeHtmlOutput($rolloverResult->reason)
+            'Season rollover: ' . \Security\HtmlSanitizer::safeHtmlOutput($rolloverRun->decision->reason)
         );
         flush();
     }
@@ -174,9 +183,10 @@ try {
 
     $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db, $leagueContext);
     $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db, $boxscoreRepo, $season, $leagueContext);
+    $allStarTeamRepo = new Boxscore\AllStarTeamRepository($mysqli_db, $leagueContext);
     $boxscoreView = new Boxscore\BoxscoreView();
 
-    $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db, $leagueContext);
+    $savedDcRepo = new DepthChartSnapshot\DepthChartSnapshotRepository($mysqli_db, $leagueContext);
 
     $jsbRepo = new JsbParser\JsbImportRepository($mysqli_db, $leagueContext);
     $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db, $leagueContext);
@@ -253,10 +263,9 @@ try {
 
     // IBL-only: Head-to-Head Records, All-Star games, and related steps don't apply to Olympics
     if (!$isOlympics) {
-        /** @phpstan-ignore argument.type */
         $updaterService->addStep(new Updater\Steps\RefreshHeadToHeadRecordsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
-            $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $sourceResolver,
+            $boxscoreProcessor, $allStarTeamRepo, $boxscoreView, $sourceResolver,
         ));
         $updaterService->addStep(new Updater\Steps\RefreshPlayoffSeriesResultsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\RefreshTeamSeasonRecordsStep($mysqli_db));
@@ -305,6 +314,7 @@ try {
         $updaterService->addStep(new Updater\Steps\QueueSimSummaryStep(
             new \SimRecap\SimSummaryRepository($mysqli_db),
             new \Season\SeasonQueryRepository($mysqli_db),
+            \SimRecap\GitHubDispatchClient::fromConfig(),
         ));
     }
 

@@ -8,6 +8,12 @@ on:
   # choice does not reach it.
   schedule:
     - cron: '0 0 * * *'
+  # A merged doc refresh closes the open stale-docs issue within minutes,
+  # without waiting for the nightly run or a correct closing keyword in the PR
+  # body (#3108's body cited the issue in the wrong repo, so its merge closed nothing).
+  push:
+    branches: [master]
+    paths: ['**.md']
   workflow_dispatch: {}
 
 permissions:
@@ -102,7 +108,15 @@ jobs:
           CUR_SIG: ${{ steps.report.outputs.sig }}
           STALE_COUNT: ${{ steps.report.outputs.stale-count }}
           GLOB_COUNT: ${{ steps.report.outputs.glob-count }}
+          EVENT: ${{ github.event_name }}
         run: |
+          # A push to master only closes a now-fresh issue. Filing and editing
+          # stay with the nightly run, which owns the stale-since episode clock.
+          if [ "$EVENT" = "push" ] && [ "$COUNT" -gt 0 ]; then
+            echo "Push run: $COUNT doc issue(s) remain; leaving the issue to the nightly audit."
+            echo "notify=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           NUM=$(gh issue list --label stale-docs --state open --json number --jq '.[0].number // empty')
           PREV_SIG=""
           PREV_SINCE=""
@@ -156,38 +170,3 @@ jobs:
           else
             echo "No doc issues — every in-scope doc is within the 60-day window and every paths: glob resolves." >> "$GITHUB_STEP_SUMMARY"
           fi
-
-      - name: Evaluate refresh-pipeline health
-        id: health
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUM: ${{ steps.issue.outputs.issue-num }}
-        run: |
-          bin/docfix-poll --health-report "$ISSUE_NUM" | tee -a "$GITHUB_OUTPUT"
-
-      - name: Setup SSH
-        if: steps.health.outputs.alert == 'true'
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
-      - name: Build Discord message
-        if: steps.health.outputs.alert == 'true'
-        env:
-          COUNT: ${{ steps.report.outputs.count }}
-          DETAIL: ${{ steps.health.outputs.detail }}
-        run: |
-          MSG=$(printf 'Doc refresh needs you: %s doc issue(s) (stale dates or dead paths: globs) and the pipeline could not clear them on its own.\n%s\nRun: https://github.com/%s/actions/runs/%s' \
-            "$COUNT" "$DETAIL" "${{ github.repository }}" "${{ github.run_id }}")
-          printf '%s' "$MSG" > /tmp/discord-msg.txt
-
-      - name: Send Discord DM
-        if: steps.health.outputs.alert == 'true'
-        uses: ./.github/actions/notify-discord
-        with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}

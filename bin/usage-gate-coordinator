@@ -1,0 +1,395 @@
+#!/usr/bin/env bash
+# usage-gate-coordinator — one stateless tick of the usage-limit drain/resume loop.
+#
+# Fired every 60 s by launchd (bin/usage-gate-cron-setup). Grants the drain token by
+# priority, resumes paused sessions through their runner's --resume-paused entry,
+# and sends one DM per wave. It never pauses anything; the PreToolUse hook does that.
+# See ADR-0143.
+#
+# Usage:
+#   usage-gate-coordinator --once [--dry-run]
+#   usage-gate-coordinator --help
+#
+# --dry-run prints "ACTION <verb> <args>" lines (after a first "ZONE ..." line) and
+# mutates nothing: no token write, no marker bump, no launch, no DM, no dm-seen update.
+
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=/dev/null
+. "$ROOT/bin/lib/usage-gate.sh"
+# shellcheck source=/dev/null
+. "$ROOT/bin/lib/launchd-job.sh"
+
+NOTIFY="${NOTIFY:-1}"
+DISCORD_DM="${DISCORD_DM:-$ROOT/bin/discord-dm}"
+
+usage() {
+    cat <<'EOF'
+Usage: usage-gate-coordinator --once [--dry-run]
+       usage-gate-coordinator --help
+
+  --once      run one coordinator tick (required; the launchd plist passes it)
+  --dry-run   with --once: print planned actions, mutate nothing
+EOF
+}
+
+ONCE=0
+DRY=0
+for arg in "$@"; do
+    case "$arg" in
+        --once) ONCE=1 ;;
+        --dry-run) DRY=1 ;;
+        --help) usage; exit 0 ;;
+        *) usage >&2; exit 2 ;;
+    esac
+done
+if [ "$ONCE" -ne 1 ]; then
+    usage >&2
+    exit 2
+fi
+
+STATE=$(usage_state_dir)
+NOW=$(date +%s)
+
+# ---------------------------------------------------------------- helpers
+
+send_dm() {  # <msg>
+    if [ "$DRY" -eq 1 ]; then
+        printf 'ACTION dm %s\n' "$1"
+        return 0
+    fi
+    if ljob_dm_ready usage-gate; then
+        ljob_dm_send usage-gate "$1"
+    fi
+    return 0
+}
+
+fmt_epoch() {  # epoch -> "Mon 4:20 PM" (macOS); falls back to the raw epoch
+    date -r "$1" '+%a %-I:%M %p' 2>/dev/null || printf 'epoch %s' "$1"
+}
+
+marker_field() {  # <sid> <jq-expr>
+    usage_marker_read "$1" | jq -r "$2" 2>/dev/null
+}
+
+# launch_resume <sid>: bump the counter, start the runner's --resume-paused entry
+# detached, record its pid. Returns 0 when launched (or planned in dry-run).
+launch_resume() {
+    local sid="$1" cwd argv0 pid logf line
+    argv0=$(marker_field "$sid" '.resume_argv[0]')
+    if [ ! -x "$argv0" ]; then
+        retire_missing_bin "$sid" "$argv0"
+        return 1
+    fi
+    if [ "$DRY" -eq 1 ]; then
+        printf 'ACTION resume %s\n' "$sid"
+        return 0
+    fi
+    cwd=$(marker_field "$sid" '.resume_cwd')
+    [ -d "$cwd" ] || cwd="$ROOT"
+    mkdir -p "$STATE/resume-logs" 2>/dev/null
+    logf="$STATE/resume-logs/$sid.log"
+    local argv=()
+    while IFS= read -r line; do argv[${#argv[@]}]="$line"; done < <(marker_field "$sid" '.resume_argv[]')
+    usage_marker_bump_resume "$sid"
+    pid=$(LOGF="$logf" bash -c 'cd "$1" || exit 1; shift; nohup "$@" >> "$LOGF" 2>&1 </dev/null & echo $!' _ "$cwd" "${argv[@]}")
+    case "$pid" in
+        ''|*[!0-9]*) usage_log "resume-launch-failed sid=$sid"; return 1 ;;
+    esac
+    usage_marker_set_resuming "$sid" "$pid"
+    usage_log "resumed sid=$sid pid=$pid"
+    return 0
+}
+
+# retire_missing_bin <sid> <bin>: the resume binary is gone, usually because its
+# worktree was removed after the PR merged. Nothing can resume it, so clear the
+# marker. A stuck marker would hold the runner's queue lock forever
+# (usage_paused_hold_live); a cleared one lets the runner reclaim the plan.
+retire_missing_bin() {
+    if [ "$DRY" -eq 1 ]; then
+        printf 'ACTION clear %s resume-bin-missing\n' "$1"
+        return 0
+    fi
+    usage_marker_clear "$1"
+    usage_log "marker-retired sid=$1 reason=resume-bin-missing bin=$2"
+    send_dm "usage-gate: session $1 resume binary missing ($2); marker cleared, its plan is released."
+}
+
+# check_runaway <sid>: a marker paused 5+ times is marked stuck with one DM.
+# A marker whose resume binary is gone is retired instead (retire_missing_bin).
+# Returns 0 when the marker is stuck or retired and must be skipped.
+check_runaway() {
+    local sid="$1" stuck count resets runner cwd argv bin macct racct
+    bin=$(marker_field "$sid" '.resume_argv[0] // empty')
+    if [ -n "$bin" ] && [ ! -x "$bin" ]; then
+        retire_missing_bin "$sid" "$bin"
+        return 0
+    fi
+    stuck=$(marker_field "$sid" '.stuck // false')
+    count=$(marker_field "$sid" '.resume_count // 0')
+    case "$count" in ''|*[!0-9]*) count=0 ;; esac
+    # The 5-pause cap counts within one usage window. Once the marker's window has
+    # reset, those pauses were the limit doing its job, so the count starts over.
+    resets=$(marker_field "$sid" '.resets_at // empty')
+    case "$resets" in ''|*[!0-9]*) resets="" ;; esac
+    if [ -n "$resets" ] && [ "$resets" -le "$NOW" ] \
+        && { [ "$count" -ge 5 ] || [ "$(marker_field "$sid" '.stuck_reason // ""')" = "paused-5-times" ]; }; then
+        if [ "$DRY" -eq 1 ]; then
+            printf 'ACTION unstick %s window-reset\n' "$sid"
+            return 1
+        fi
+        usage_marker_reset_runaway "$sid" || return 0
+        usage_log "runaway-reset sid=$sid reason=window-reset resets_at=$resets"
+        send_dm "usage-gate: session $sid ($(marker_field "$sid" '.runner')) usage window reset; pause count cleared, it resumes on its own."
+        return 1
+    fi
+    # A login switch is a new account with its own limits, so the old account's
+    # pauses no longer count. The reset records the current account as reset_acct, so
+    # it fires once per switch even if the resumed run exits without pausing.
+    macct=$(marker_field "$sid" '.acct_fp // empty')
+    racct=$(marker_field "$sid" '.reset_acct // empty')
+    if [ -n "$macct" ] && [ -n "$CUR_ACCT" ] && [ "$macct" != "$CUR_ACCT" ] \
+        && [ "$racct" != "$CUR_ACCT" ] \
+        && { [ "$count" -ge 5 ] || [ "$stuck" = "true" ]; }; then
+        if [ "$DRY" -eq 1 ]; then
+            printf 'ACTION unstick %s account-switch\n' "$sid"
+            return 1
+        fi
+        usage_marker_reset_runaway "$sid" "$CUR_ACCT" || return 0
+        usage_log "runaway-reset sid=$sid reason=account-switch"
+        send_dm "usage-gate: session $sid ($(marker_field "$sid" '.runner')) was stuck under another account; login switch detected, pause count cleared, it resumes on its own."
+        return 1
+    fi
+    [ "$stuck" = "true" ] && return 0
+    if [ "$count" -ge 5 ]; then
+        if [ "$DRY" -eq 1 ]; then
+            printf 'ACTION stuck %s paused-5-times\n' "$sid"
+        else
+            runner=$(marker_field "$sid" '.runner')
+            cwd=$(marker_field "$sid" '.resume_cwd')
+            argv=$(marker_field "$sid" '.resume_argv | join(" ")')
+            usage_marker_set_stuck "$sid" "paused-5-times"
+            send_dm "usage-gate: session $sid ($runner) paused 5 times; left paused, resume by hand with: cd $cwd && $argv"
+        fi
+        return 0
+    fi
+    return 1
+}
+
+# switch_fast_key <sid>: echoes a switch key and returns 0 when this marker paused under
+# a login the user has since switched away from. Primary test: the marker's acct_fp
+# differs from CUR_ACCT. A match vetoes, because a token refresh keeps the account.
+# Fallback when either account is unknown: an active cred-switch signal (SWITCH_AT)
+# and the marker paused before it, or its cred_fp differs from CUR_FP. Returns 1 when
+# the marker already took its fast resume for this same key.
+switch_fast_key() {
+    local sid="$1" macct key paused mfp done_for
+    macct=$(marker_field "$sid" '.acct_fp // empty')
+    if [ -n "$macct" ] && [ -n "$CUR_ACCT" ]; then
+        [ "$macct" != "$CUR_ACCT" ] || return 1
+        key="acct:$CUR_ACCT"
+    elif [ -n "$SWITCH_AT" ]; then
+        paused=$(marker_field "$sid" '.paused_at // 0')
+        case "$paused" in ''|*[!0-9]*) paused=0 ;; esac
+        mfp=$(marker_field "$sid" '.cred_fp // empty')
+        if [ "$paused" -lt "$SWITCH_AT" ] \
+            || { [ -n "$mfp" ] && [ -n "$CUR_FP" ] && [ "$mfp" != "$CUR_FP" ]; }; then
+            key="sig:$SWITCH_AT"
+        else
+            return 1
+        fi
+    else
+        return 1
+    fi
+    done_for=$(marker_field "$sid" '.switch_resumed_for // empty')
+    [ "$done_for" != "$key" ] || return 1
+    printf '%s\n' "$key"
+}
+
+# pause_wave_dm <zone> <pct>: ONE DM for markers whose sid is not yet in dm-seen.
+pause_wave_dm() {
+    local zone="$1" pct="$2" sid n=0 weekly="" resets="" seen="$STATE/dm-seen" new="" w r when="unknown"
+    for sid in $(usage_markers_sorted); do
+        if [ -f "$seen" ] && grep -qxF "$sid" "$seen"; then
+            continue
+        fi
+        new="$new $sid"
+        n=$((n + 1))
+        w=$(marker_field "$sid" '.window // ""')
+        [ "$w" = "seven_day" ] && weekly="WEEKLY "
+        r=$(marker_field "$sid" '.resets_at // empty')
+        case "$r" in ''|*[!0-9]*) r="" ;; esac
+        if [ -n "$r" ] && { [ -z "$resets" ] || [ "$r" -gt "$resets" ]; }; then
+            resets="$r"
+        fi
+    done
+    [ "$n" -gt 0 ] || return 0
+    [ -n "$resets" ] && when=$(fmt_epoch "$resets")
+    send_dm "usage-gate: ${weekly}$n session(s) paused (zone=$zone pct=$pct); resets $when."
+    if [ "$DRY" -ne 1 ]; then
+        for sid in $new; do printf '%s\n' "$sid" >> "$seen"; done
+    fi
+    return 0
+}
+
+# ---------------------------------------------------------------- tick lock
+
+LOCK="$STATE/coordinator.lock.d"
+if [ "$DRY" -ne 1 ]; then
+    if ! mkdir "$LOCK" 2>/dev/null; then
+        lock_at=$(cat "$LOCK/at" 2>/dev/null || echo "$NOW")
+        case "$lock_at" in ''|*[!0-9]*) lock_at=$NOW ;; esac
+        if [ $(( NOW - lock_at )) -gt 300 ]; then
+            rm -rf "$LOCK"
+            mkdir "$LOCK" 2>/dev/null || { usage_log "tick-busy"; exit 0; }
+        else
+            usage_log "tick-busy"
+            exit 0
+        fi
+    fi
+    printf '%s\n' "$NOW" > "$LOCK/at"
+    trap 'rm -rf "$LOCK"' EXIT
+    usage_token_reclaim_dead
+fi
+
+# ---------------------------------------------------------------- tick
+
+MARKERS=$(usage_markers_sorted)
+if [ -z "$MARKERS" ] && [ ! -d "$(usage_token_dir)" ]; then
+    if [ "$DRY" -eq 1 ]; then
+        printf 'ZONE unknown PCT 0 CACHE_AGE %s\n' "$(usage_cache_age)"
+        printf 'ACTION idle\n'
+    fi
+    exit 0
+fi
+
+# Login-switch detection (ADR-0143, 2026-10-08 addendum). The account check reads
+# ~/.claude.json and needs no keychain. usage_fetch signals a switch it sees at its
+# cred-switch drop site, in this process or in any earlier caller.
+if [ "$DRY" -ne 1 ]; then usage_account_switch_check; fi
+CUR_ACCT=$(_usage_acct_fp)
+body=$(usage_fetch 60); rc=$?
+SWITCH_AT=$(usage_switch_active "$NOW")
+age=$(usage_cache_age)
+stale=0
+if [ "$rc" -eq 1 ] || [ -z "$body" ]; then
+    stale=1
+elif [ "$rc" -eq 2 ] && { [ "$age" -lt 0 ] || [ "$age" -ge 300 ]; }; then
+    stale=1
+fi
+
+if [ "$stale" -eq 1 ]; then
+    if [ "$DRY" -eq 1 ]; then printf 'ZONE unknown PCT 0 CACHE_AGE %s\n' "$age"; fi
+    usage_log "coordinator-stale-usage age=$age"
+    CUR_FP=""
+    [ -n "$SWITCH_AT" ] && CUR_FP=$(_usage_cred_fp)
+    FAST=0
+    SLOW=0
+    # A login switch passes through a dead login (no keychain login, or a 401), and a
+    # run resumed then fails at its first call. Hold switch resumes until a usage
+    # check succeeds; the normal zone then resumes them.
+    AUTH_DEAD=$(usage_auth_dead "$NOW")
+    HELD=0
+    for sid in $MARKERS; do
+        check_runaway "$sid" && continue
+        usage_marker_eligible "$sid" "$NOW" || continue
+        if key=$(switch_fast_key "$sid"); then
+            if [ -n "$AUTH_DEAD" ]; then
+                HELD=$((HELD + 1))
+                if [ "$DRY" -eq 1 ]; then printf 'ACTION hold %s auth-%s\n' "$sid" "$AUTH_DEAD"; fi
+                usage_log "switch-resume-held sid=$sid reason=auth-$AUTH_DEAD"
+                continue
+            fi
+            if [ "$DRY" -ne 1 ]; then usage_marker_set_switch_resumed "$sid" "$key" || continue; fi
+            if launch_resume "$sid"; then
+                FAST=$((FAST + 1))
+                usage_log "switch-resume sid=$sid via=${key%%:*}"
+            fi
+            continue
+        fi
+        resets=$(marker_field "$sid" '.resets_at // empty')
+        case "$resets" in ''|*[!0-9]*) continue ;; esac
+        [ "$resets" -le $(( NOW - 60 )) ] || continue
+        launch_resume "$sid" && SLOW=$((SLOW + 1))
+    done
+    if [ "$FAST" -gt 0 ]; then
+        sw_key="${SWITCH_AT:-acct:$CUR_ACCT}"
+        sw_f="$STATE/dm-switch-for"
+        if [ "$(cat "$sw_f" 2>/dev/null)" != "$sw_key" ]; then
+            send_dm "usage-gate: login switch detected; resumed $FAST session(s) paused under the previous account, without a fresh usage reading. The pause hook stops them again if this account is near its limit too."
+            if [ "$DRY" -ne 1 ]; then printf '%s\n' "$sw_key" > "$sw_f"; fi
+        fi
+    fi
+    pending=$(usage_markers_sorted | wc -l | tr -d ' ')
+    waiting=$(( pending - FAST - SLOW ))
+    if [ "$waiting" -gt 0 ]; then
+        stale_at_f="$STATE/dm-stale-at"
+        last=0
+        [ -f "$stale_at_f" ] && last=$(cat "$stale_at_f" 2>/dev/null)
+        case "$last" in ''|*[!0-9]*) last=0 ;; esac
+        if [ $(( NOW - last )) -gt 1800 ]; then
+            if [ "$age" -lt 0 ]; then reading="no usage reading"; else reading="usage reading ${age}s old"; fi
+            sw_note=""
+            [ -n "$SWITCH_AT" ] && sw_note="login switch detected at $(fmt_epoch "$SWITCH_AT"); "
+            bo=$(_usage_fetch_backoff_read "$STATE/fetch-backoff"); bo_until=${bo% *}
+            if [ "$HELD" -gt 0 ]; then
+                advice="The Claude login is missing or rejected ($AUTH_DEAD), so $HELD login-switch resume(s) wait until a usage check succeeds. Run claude and sign in."
+            elif [ "$NOW" -lt "$bo_until" ]; then
+                advice="Usage fetch is backing off after a 429 until $(fmt_epoch "$bo_until"); the cache refreshes on the first fetch after that."
+            else
+                advice="Run any interactive claude prompt to refresh the cache."
+            fi
+            send_dm "usage-gate: ${sw_note}${reading}; $waiting session(s) waiting. $advice"
+            if [ "$DRY" -ne 1 ]; then printf '%s\n' "$NOW" > "$stale_at_f"; fi
+        fi
+    fi
+    exit 0
+fi
+
+zone=$(usage_zone "$body")
+pct=$(usage_zone_pct "$body")
+if [ "$DRY" -eq 1 ]; then printf 'ZONE %s PCT %s CACHE_AGE %s\n' "$zone" "$pct" "$age"; fi
+
+case "$zone" in
+    normal)
+        if [ "$DRY" -eq 1 ]; then printf 'ACTION token-clear\n'; else usage_token_clear; fi
+        resumed=0
+        for sid in $MARKERS; do
+            check_runaway "$sid" && continue
+            usage_marker_eligible "$sid" "$NOW" || continue
+            if launch_resume "$sid"; then
+                resumed=$((resumed + 1))
+                if [ "$DRY" -ne 1 ]; then printf '%s\n' "$sid" >> "$STATE/dm-seen"; fi
+            fi
+        done
+        if [ "$resumed" -gt 0 ]; then
+            send_dm "usage-gate: usage back to normal (pct=$pct); resumed $resumed paused session(s)."
+        fi
+        ;;
+    drain)
+        if [ -z "$(usage_token_holder)" ]; then
+            for sid in $MARKERS; do
+                check_runaway "$sid" && continue
+                usage_marker_eligible "$sid" "$NOW" || continue
+                if [ "$DRY" -eq 1 ]; then
+                    printf 'ACTION grant %s\n' "$sid"
+                    launch_resume "$sid"
+                    break
+                fi
+                usage_token_acquire "$sid"
+                if launch_resume "$sid"; then
+                    usage_token_acquire "$sid" "$(marker_field "$sid" '.resuming_pid // empty')"
+                    break
+                fi
+                usage_token_release "$sid"
+            done
+        fi
+        pause_wave_dm "$zone" "$pct"
+        ;;
+    stop)
+        for sid in $MARKERS; do check_runaway "$sid"; done
+        pause_wave_dm "$zone" "$pct"
+        ;;
+esac
+exit 0

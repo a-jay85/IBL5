@@ -32,7 +32,7 @@ class ContractsTest extends TestCase
      * @param int $cy contractCurrentYear (maps to PlayerData::$contractCurrentYear)
      * @param int $cyt contractTotalYears (maps to PlayerData::$contractTotalYears)
      * @param int $teamid Team ID — must be > 0 for getNameStatusClass() to return a non-empty string
-     * @param int $ordinal Roster ordinal — must be <= JSB::WAIVERS_ORDINAL (960) to avoid 'player-waived'
+     * @param int $ordinal Roster ordinal — must be <= JsbConstants::WAIVERS_ORDINAL (960) to avoid 'player-waived'
      * @return array<string, mixed>
      */
     private function buildPlayerRow(

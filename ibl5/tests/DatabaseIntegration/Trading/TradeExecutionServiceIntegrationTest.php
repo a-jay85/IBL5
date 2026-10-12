@@ -66,7 +66,6 @@ class TradeExecutionServiceIntegrationTest extends DatabaseTestCase
             return;
         }
 
-        $this->db->query("DELETE FROM ibl_trade_queue");
         $this->db->query("DELETE FROM nuke_stories WHERE sid > 2");
 
         foreach ($this->createdOfferIds as $offerId) {

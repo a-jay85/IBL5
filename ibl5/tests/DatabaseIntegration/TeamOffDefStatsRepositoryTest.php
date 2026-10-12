@@ -62,7 +62,7 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
         // Season 9999 has no boxscore data
         $stats = $this->repo->getAllTeamStats(9999);
 
-        self::assertNotEmpty($stats);
+        self::assertNotSame([], $stats);
         // The first row should have null offense/defense columns
         $first = $stats[0];
         self::assertNull($first['offense_games']);
@@ -215,6 +215,17 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
 
         self::assertNotNull($metros);
         self::assertSame(1, $metros['offense_games']);
+    }
+
+    public function testGetAllTeamStatsBreaksTeamCityTiesByTeamidAscending(): void
+    {
+        // Higher teamid listed first in the IN list so the order is not an accident of the UPDATE.
+        $this->db->query("UPDATE ibl_team_info SET team_city = 'Aaa Tie' WHERE teamid IN (12, 3)");
+        $this->db->query("UPDATE ibl_team_info SET team_city = 'Aaa Lead' WHERE teamid = 20");
+
+        $stats = $this->repo->getAllTeamStats(2099);
+
+        self::assertSame([20, 3, 12], array_slice(array_column($stats, 'teamid'), 0, 3));
     }
 
     public function testGetTeamBothStatsForDateRangeReturnsNullWhenNoData(): void

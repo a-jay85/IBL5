@@ -23,11 +23,16 @@ class RecapPhasePolicyTest extends TestCase
         self::assertTrue(RecapPhasePolicy::isEnabled('Regular Season'));
     }
 
+    public function testHeatIsEnabled(): void
+    {
+        self::assertTrue(RecapPhasePolicy::isEnabled('HEAT'));
+    }
+
     /**
      * @param non-empty-string $phase
      */
     #[DataProvider('disabledPhaseProvider')]
-    public function testNonRegularSeasonPhasesAreDisabled(string $phase): void
+    public function testOtherPhasesAreDisabled(string $phase): void
     {
         self::assertFalse(RecapPhasePolicy::isEnabled($phase));
     }
@@ -39,7 +44,6 @@ class RecapPhasePolicyTest extends TestCase
     {
         return [
             'Preseason'   => ['Preseason'],
-            'HEAT'        => ['HEAT'],
             'Playoffs'    => ['Playoffs'],
             'Draft'       => ['Draft'],
             'Free Agency' => ['Free Agency'],

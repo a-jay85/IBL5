@@ -46,7 +46,6 @@ class TradingControllerRejectOfferTest extends TestCase
     private function buildController(
         ?TradeOfferRepositoryInterface $offerRepo = null,
         ?\Utilities\NukeCompat $nukeCompat = null,
-        ?TradeDecisionServiceInterface $decisionService = null,
     ): TradingController {
         return new TradingController(
             self::createStub(TradingServiceInterface::class),
@@ -60,7 +59,7 @@ class TradingControllerRejectOfferTest extends TestCase
             self::createStub(AuthServiceInterface::class),
             null,
             null,
-            $decisionService,
+            null,
         );
     }
 

@@ -60,6 +60,7 @@ def _git(dirty=False, head_trees=None):
 class _Res:
     def __init__(self):
         self.fidelity = {}
+        self.reused_from = {}
 
 
 def _drive(tmp_path, canned, git_obj=None, plan_obj=None):
@@ -239,3 +240,83 @@ def test_no_remediation_leaves_the_source_on_verdict_1(tmp_path, git_shim):
         assert res.fidelity["verdict_path"] == fidelity.verdict_path(99)
     finally:
         _cleanup(99)
+
+
+def test_before_remediation_called_once_not_twice(tmp_path, git_shim):
+    """Early join sets before_remediation=None; the old NOT READY guard is a no-op."""
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "READY\n",
+    }
+    call_count = [0]
+
+    def _before():
+        call_count[0] += 1
+
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _git(), gh, _plan(),
+            "diff", "body", 99, "dead" * 10, TREE_1, False, lambda m: None, res,
+            before_remediation=_before,
+        )
+    finally:
+        _cleanup(99, "99-2")
+    assert call_count[0] == 1
+
+
+_FULL_KEYS = {
+    "verdict_1", "error_kind", "reviewed_tree", "verdict_path",
+    "remediation_sha", "verdict_2", "reviewed_tree_2",
+    "findings_round", "rounds", "rounds_completed",
+    "backlog_issue_numbers", "diff_id", "plan_hash", "models",
+}
+
+
+def _call(tmp_path, canned, live=False, gh=None):
+    llm = FixtureLlm(UsageLedger(), canned)
+    res = _Res()
+    out = runner._run_fidelity(
+        llm, str(tmp_path), str(tmp_path), _git(), gh or RecordingGh(str(tmp_path)),
+        _plan(), "diff", "body", 99, "dead" * 10, TREE_1, live, lambda m: None, res,
+    )
+    return res, out
+
+
+def test_synthetic_ready_early_return_has_full_schema(tmp_path, git_shim):
+    """Replay fixture with no canned plan-fidelity-review: synthetic READY literal."""
+    res, out = _call(tmp_path, {})
+    assert out == ("READY", "")
+    assert set(res.fidelity) == _FULL_KEYS
+    assert res.fidelity["models"] == []
+
+
+def test_carry_forward_early_return_has_full_schema(tmp_path, git_shim, monkeypatch):
+    """Carry-forward literal: full key set plus carried_forward."""
+    monkeypatch.setattr(runner.fidelity, "carry_forward_predicate",
+                        lambda *a, **kw: ("READY", ""))
+    monkeypatch.setattr(runner.reviewcache, "fidelity_reusable",
+                        lambda *a, **kw: "live-prior")
+    vfile = tmp_path / "verdict-99.md"
+    vfile.write_text("6d checks\n\nREADY\n")
+    monkeypatch.setattr(runner.fidelity, "verdict_path", lambda pr: str(vfile))
+    gh = types.SimpleNamespace(pr_sticky_body=lambda pr: "sticky")
+    res, out = _call(tmp_path, {"plan-fidelity-review": "x"}, live=True, gh=gh)
+    assert out == ("READY", "")
+    assert set(res.fidelity) == _FULL_KEYS | {"carried_forward"}
+    assert res.fidelity["models"] == []
+
+
+def test_build_packet_failure_early_return_has_full_schema(tmp_path, git_shim, monkeypatch):
+    """HarnessError from build_packet: indeterminate literal keeps the full key set."""
+    def _boom(*a, **kw):
+        raise HarnessError("packet-failed", "test")
+
+    monkeypatch.setattr(runner.fidelity, "build_packet", _boom)
+    res, out = _call(tmp_path, {"plan-fidelity-review": "x"})
+    assert out == (None, "packet-failed")
+    assert set(res.fidelity) == _FULL_KEYS
+    assert res.fidelity["models"] == []

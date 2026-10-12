@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Boxscore;
 
 use Boxscore\AuditFinding;
+use Boxscore\Contracts\BoxscoreAuditRepositoryInterface;
 use Boxscore\Contracts\BoxscoreRepositoryInterface;
 use Boxscore\ScheduleAuditReport;
 use Boxscore\ScheduleReconciliationAudit;
@@ -33,30 +34,13 @@ final class ScheduleReconciliationAuditTest extends TestCase
         array $duplicates = [],
         array $missing = [],
     ): ScheduleAuditReport {
-        $repo = new class($scheduleIndex, $orphans, $duplicates, $missing) implements BoxscoreRepositoryInterface {
+        $repo = new class($scheduleIndex) implements BoxscoreRepositoryInterface {
             /**
-             * @param array<string, array<int, array<int, true>>>                                                               $scheduleIndex
-             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, name: string}> $orphans
-             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, occurrences: int, gotds: string}>     $duplicates
-             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int}> $missing
+             * @param array<string, array<int, array<int, true>>> $scheduleIndex
              */
-            public function __construct(
-                private array $scheduleIndex,
-                private array $orphans,
-                private array $duplicates,
-                private array $missing,
-            ) {}
+            public function __construct(private array $scheduleIndex) {}
 
             public function fetchScheduledGameIndex(int $seasonYear): array { return $this->scheduleIndex; }
-            public function findOrphanBoxscoreGames(int $seasonYear): array { return $this->orphans; }
-            public function findDuplicateTripleGames(?int $seasonYear = null, ?int $gameType = null): array
-            {
-                if ($gameType !== null) {
-                    throw new \LogicException('audit must query duplicate triples unscoped by game type');
-                }
-                return $this->duplicates;
-            }
-            public function findScheduledGamesWithoutBoxscores(int $seasonYear): array { return $this->missing; }
 
             // Unused methods — throw to catch accidental calls
             public function fetchBoxscoreGameOfThatDayIndex(int $seasonYear): array { throw new \RuntimeException('not implemented'); }
@@ -68,10 +52,6 @@ final class ScheduleReconciliationAuditTest extends TestCase
             public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): int { throw new \RuntimeException('not implemented'); }
             public function insertTeamBoxscore(array $row): int { throw new \RuntimeException('not implemented'); }
             public function hasNullTeamIdPlayerBoxscores(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): bool { throw new \RuntimeException('not implemented'); }
-            public function findAllStarTeamNames(string $date): ?array { throw new \RuntimeException('not implemented'); }
-            public function findAllStarGamesWithDefaultNames(): array { throw new \RuntimeException('not implemented'); }
-            public function getPlayersForAllStarTeam(string $date, int $teamid): array { throw new \RuntimeException('not implemented'); }
-            public function renameAllStarTeam(int $recordId, string $newName): int { throw new \RuntimeException('not implemented'); }
             public function insertPlayerBoxscore(
                 string $date, string $uuid, string $name, string $position,
                 int $playerID, int $visitor_teamid, int $home_teamid, int $game_of_that_day,
@@ -84,7 +64,33 @@ final class ScheduleReconciliationAuditTest extends TestCase
             ): int { throw new \RuntimeException('not implemented'); }
         };
 
-        return (new ScheduleReconciliationAudit($repo))->run(2008);
+        $auditRepo = new class($orphans, $duplicates, $missing) implements BoxscoreAuditRepositoryInterface {
+            /**
+             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, name: string}> $orphans
+             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, occurrences: int, gotds: string}>     $duplicates
+             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int}> $missing
+             */
+            public function __construct(
+                private array $orphans,
+                private array $duplicates,
+                private array $missing,
+            ) {}
+
+            public function findOrphanBoxscoreGames(int $seasonYear): array { return $this->orphans; }
+            public function findDuplicateTripleGames(?int $seasonYear = null, ?int $gameType = null): array
+            {
+                if ($gameType !== null) {
+                    throw new \LogicException('audit must query duplicate triples unscoped by game type');
+                }
+                return $this->duplicates;
+            }
+            public function findScheduledGamesWithoutBoxscores(int $seasonYear): array { return $this->missing; }
+
+            // Unused method — throws to catch accidental calls
+            public function recordRejectedGames(int $seasonYear, array $rejects, ?string $sourceArchive): int { throw new \RuntimeException('not implemented'); }
+        };
+
+        return (new ScheduleReconciliationAudit($repo, $auditRepo))->run(2008);
     }
 
     /**

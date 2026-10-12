@@ -15,6 +15,7 @@ Contract for a retained call:
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -22,18 +23,43 @@ import shutil
 import signal
 import subprocess
 import tempfile
+import threading
 
-from ..state import HarnessError, LlmCallRecord, UsageLedger
+from .. import usage_pause
+from ..state import SUBPROCESS_TIMEOUT, HarnessError, LlmCallRecord, UsageLedger
+from ..usage_pause import UsagePause
 
 MAX_PROMPT_BYTES = 120_000        # hard cap on any single call's input packet
-DEFAULT_TIMEOUT = 1500            # sonnet 4.6 thinks long on large diffs; observed >600s
+DEFAULT_TIMEOUT = 1500            # sonnet thinks long on large diffs; observed >600s
 TOOLED_TIMEOUT = 2400             # a repo-reading reviewer needs many turns of tool I/O
 TOOLED_MAX_TURNS = 60             # NEVER 1: a tool-enabled call must be able to iterate
 ENVELOPE_ERROR_TEXT_CAP = 600     # bound result text in error details for diagnosis
 
+# Twin of bin/automouse/run:1047 — same runtime-error signature set.  Keep the two
+# in sync when extending either.  Patterns are anchored to Claude-runtime error
+# vocabulary so a review that discusses rate-limiting in source code does NOT match.
+_USAGE_LIMIT_RE = re.compile(
+    r"hit your [a-z0-9 -]*limit"
+    r"|usage limit reached"
+    r"|api error:\s*(401|403|429|529)"
+    r"|overloaded_error"
+    r"|rate_limit_error",
+    re.IGNORECASE,
+)
+
+# The CLI's reply when its OAuth login has lapsed. It is not malformed JSON, and a
+# re-ask cannot fix it, so the final llm-invalid-output detail names it plainly.
+_AUTH_FAILURE_RE = re.compile(r"Failed to authenticate|OAuth session expired", re.IGNORECASE)
+_AUTH_REPLY_MAX = 400   # same bound as the call_tooled usage-limit guard
+
+
+def _is_auth_failure(text: str) -> bool:
+    """An expired-login reply from the CLI: short, and naming the auth failure."""
+    return len(text.strip()) < _AUTH_REPLY_MAX and bool(_AUTH_FAILURE_RE.search(text))
+
 MODEL_MAP = {
-    "haiku": "claude-haiku-4-5-20251001",
-    "sonnet": "claude-sonnet-4-6",     # matches the historical review-agent tier
+    "haiku": "claude-haiku-5-5",
+    "sonnet": "claude-sonnet-5-5",
     "opus": "claude-opus-5-5",
 }
 
@@ -60,7 +86,15 @@ def extract_json(text: str):
     raise ValueError("no parseable JSON in model reply")
 
 
-def _run_reaped(argv, stdin_text, timeout, cwd, env):
+def _extractor_for(purpose: str):
+    """pr-copy gets its own tolerant extractor; every other purpose keeps extract_json."""
+    from ..schemas import PR_COPY_PURPOSE, extract_pr_copy_json  # function-local: no import cycle
+    if purpose == PR_COPY_PURPOSE:
+        return extract_pr_copy_json
+    return extract_json
+
+
+def _run_reaped(argv, stdin_text, timeout, cwd, env, errors=None):
     """Run argv with its own process group, always reaping the group on exit.
 
     `claude -p` spawns children that a plain subprocess timeout never touches, so the
@@ -69,7 +103,7 @@ def _run_reaped(argv, stdin_text, timeout, cwd, env):
     """
     proc = subprocess.Popen(
         argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, cwd=cwd, env=env, start_new_session=True,
+        text=True, cwd=cwd, env=env, start_new_session=True, errors=errors,
     )
     try:
         out, err = proc.communicate(stdin_text, timeout=timeout)
@@ -81,6 +115,26 @@ def _run_reaped(argv, stdin_text, timeout, cwd, env):
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
             pass
+
+
+def run_bounded(argv, *, step, timeout, cwd=None, stdin_text=None, env=None, errors=None):
+    """_run_reaped plus the typed timeout contract for deterministic phase-2 steps.
+
+    Returns the CompletedProcess unchanged (a nonzero rc is the caller's business).
+    A hang past `timeout` reaps the whole process group (via _run_reaped's finally)
+    and raises HarnessError(SUBPROCESS_TIMEOUT) naming the step, so runner.run exits 3.
+    OSError (missing binary) propagates unchanged; callers keep their own handling.
+    """
+    try:
+        return _run_reaped(list(argv), stdin_text, timeout, cwd, env, errors)
+    except subprocess.TimeoutExpired as e:
+        partial = e.output if isinstance(e.output, str) else ""
+        raise HarnessError(
+            SUBPROCESS_TIMEOUT,
+            f"step '{step}' timed out after {timeout}s",
+            cmd=" ".join(str(a) for a in argv),
+            output=partial,
+        ) from None
 
 
 # Tools that let a session persist a file. A tooled call granted none of them cannot
@@ -103,12 +157,15 @@ def _tooled_env(allowed_tools, denied_tools) -> dict:
 
 
 def _tooled_argv(model, *, agent, allowed_tools, denied_tools, add_dirs,
-                 append_system_prompt, setting_sources, max_turns) -> list[str]:
+                 append_system_prompt, setting_sources, max_turns,
+                 max_budget_usd: float | None = None) -> list[str]:
     """Pure argv builder so replay can record a live run's exact command line."""
     argv = ["claude", "-p", "--output-format", "json",
             "--max-turns", str(max_turns),
             "--permission-prompts", "none",
             "--setting-sources", setting_sources]
+    if max_budget_usd is not None:
+        argv += ["--max-budget-usd", f"{max_budget_usd:.2f}"]
     if agent:
         # no --model: the agent def's own `model:` pin wins, mirroring the skill's spawn
         argv += ["--agent", agent]
@@ -143,6 +200,28 @@ class ClaudeCli:
         self._owns_workdir = workdir is None
         self.workdir = workdir or tempfile.mkdtemp(prefix="postplan-llm-")
         self.out_dir = out_dir      # None => raw-attempt persistence disabled
+        self.gate, self.gate_reason = usage_pause.context_from_env()
+        self.paused = threading.Event()   # one pause stops every thread's next call
+        # Two write-capable calls in flight at once share one worktree, so a pause
+        # record cannot say which call made which edit; the runner then refuses it.
+        self._write_inflight = 0
+        self._write_lock = threading.Lock()
+        self.write_overlap = False
+
+    @contextlib.contextmanager
+    def _write_call(self, can_write: bool):
+        if not can_write:
+            yield
+            return
+        with self._write_lock:
+            self._write_inflight += 1
+            if self._write_inflight >= 2:
+                self.write_overlap = True
+        try:
+            yield
+        finally:
+            with self._write_lock:
+                self._write_inflight -= 1
 
     def close(self) -> None:
         """Phase 11: remove the temp cwd this adapter created. Idempotent; never raises."""
@@ -161,6 +240,31 @@ class ClaudeCli:
         except OSError:
             pass
 
+    def _child_env(self, base: dict, model_label: str) -> dict:
+        env = dict(base)
+        if self.gate is None:
+            env.pop("IBL5_USAGE_GATE", None)   # no valid context: children run ungated
+            return env
+        env["IBL5_USAGE_GATE"] = "1"
+        env["IBL5_USAGE_GATE_MODEL"] = model_label
+        return env
+
+    def _gate_before_spawn(self, purpose: str, cwd: str) -> None:
+        if self.paused.is_set():
+            raise UsagePause(purpose)
+        if self.gate is not None and usage_pause.prespawn_decide(self.gate, cwd):
+            self.paused.set()
+            raise UsagePause(purpose)
+
+    def _usage_limit_pause(self, purpose: str, cwd=None, pre=None, can_write=False) -> None:
+        """Limit text seen: pause only if a limit-hit marker lands on disk; else return
+        so the caller's existing HarnessError('llm-usage-limit') (exit 3) stands."""
+        if self.gate is None or not usage_pause.limit_hit_marker(self.gate):
+            return
+        self.paused.set()
+        dirty = cwd is not None and can_write and usage_pause.edit_since(cwd, pre)
+        raise UsagePause(purpose, dirty=dirty, prespawn=pre, cwd=cwd)
+
     def call(self, purpose: str, model: str, prompt: str, validate,
              max_retries: int = 1, normalizer=None):
         if len(prompt.encode()) > MAX_PROMPT_BYTES:
@@ -169,21 +273,35 @@ class ClaudeCli:
         rec = LlmCallRecord(purpose=purpose, model=model_id)
         attempt_prompt = prompt
         last_err = ""
+        auth_reply = ""
         for attempt in range(max_retries + 1):
             try:
+                self._gate_before_spawn(purpose, self.workdir)
                 proc = _run_reaped(
                     ["claude", "-p", "--model", model_id, "--output-format", "json",
                      "--max-turns", "1", "--tools", ""],
                     attempt_prompt, DEFAULT_TIMEOUT, self.workdir,
-                    {**os.environ, "CLAUDE_HEADLESS": "1"},
+                    self._child_env({**os.environ, "CLAUDE_HEADLESS": "1"}, model_id),
                 )
+                if self.paused.is_set():
+                    raise UsagePause(purpose)   # a sibling paused while this ran: discard
             except subprocess.TimeoutExpired:
                 last_err = f"call exceeded {DEFAULT_TIMEOUT}s wall clock"
+                auth_reply = ""
                 rec.retries = attempt
                 continue
             try:
                 envelope = json.loads(proc.stdout)
             except json.JSONDecodeError:
+                raw = f"{proc.stdout} {proc.stderr}"
+                if _USAGE_LIMIT_RE.search(raw):
+                    rec.ok = False
+                    rec.retries = attempt
+                    self.ledger.add(rec)
+                    self._usage_limit_pause(purpose)
+                    raise HarnessError("llm-usage-limit",
+                                       f"{purpose}: {raw[:200].strip()}")
+                auth_reply = raw[:200].strip() if _is_auth_failure(raw) else ""
                 last_err = f"CLI non-JSON output (rc={proc.returncode}): {proc.stdout[:200]} {proc.stderr[:200]}"
                 rec.retries = attempt
                 continue
@@ -197,7 +315,7 @@ class ClaudeCli:
             result_text = envelope.get("result", "") or ""
             self._persist_raw(purpose, attempt, result_text)
             try:
-                data = extract_json(result_text)
+                data = _extractor_for(purpose)(result_text)
                 if normalizer is not None:
                     data = normalizer(data)
                 validate(data)
@@ -205,12 +323,27 @@ class ClaudeCli:
                 self.ledger.add(rec)
                 return data
             except (ValueError, HarnessError) as e:
+                # When extract_json/validate fails, check whether the model
+                # returned a usage-limit message rather than a JSON reply.
+                # Only raise here (inside the retry loop) — valid JSON that
+                # happens to mention "rate_limit_error" in a field value will
+                # have already returned above, so no false-positive risk.
+                if _USAGE_LIMIT_RE.search(result_text):
+                    rec.ok = False
+                    rec.retries = attempt
+                    self.ledger.add(rec)
+                    self._usage_limit_pause(purpose)
+                    raise HarnessError("llm-usage-limit",
+                                       f"{purpose}: {result_text[:200].strip()}")
+                auth_reply = result_text[:200].strip() if _is_auth_failure(result_text) else ""
                 last_err = str(e)
                 attempt_prompt = (prompt + "\n\nYour previous reply was not valid per the "
                                   f"required JSON schema ({e}). Reply with ONLY the JSON.")
         rec.ok = False
         rec.retries = max_retries
         self.ledger.add(rec)
+        if auth_reply:
+            raise HarnessError("llm-auth-expired", f"{purpose}: auth-expired: {auth_reply}")
         raise HarnessError("llm-invalid-output", f"{purpose}: {last_err}")
 
     def call_tooled(self, purpose: str, model: str, prompt: str, *, cwd: str,
@@ -220,7 +353,8 @@ class ClaudeCli:
                     setting_sources: str = "user,project",
                     timeout: int = TOOLED_TIMEOUT,
                     max_turns: int = TOOLED_MAX_TURNS,
-                    max_retries: int = 1) -> str:
+                    max_retries: int = 1,
+                    max_budget_usd: float | None = None) -> str:
         """Bounded, tool-enabled call. Returns the envelope's RAW `result` text.
 
         The verdict this exists to fetch is a prose document, so parsing belongs to the
@@ -238,20 +372,44 @@ class ClaudeCli:
         argv = _tooled_argv(model, agent=agent, allowed_tools=allowed_tools,
                             denied_tools=denied_tools, add_dirs=add_dirs,
                             append_system_prompt=append_system_prompt,
-                            setting_sources=setting_sources, max_turns=max_turns)
+                            setting_sources=setting_sources, max_turns=max_turns,
+                            max_budget_usd=max_budget_usd)
         rec = LlmCallRecord(purpose=purpose, model=MODEL_MAP[model])
+        # A read-only call cannot edit the worktree, so its pause is never dirty.
+        can_write = usage_pause.tools_can_write(allowed_tools, denied_tools)
         last_err = ""
+        auth_reply = ""
         for attempt in range(max_retries + 1):
             try:
-                proc = _run_reaped(argv, prompt, timeout, cwd,
-                                   _tooled_env(allowed_tools, denied_tools))
+                self._gate_before_spawn(purpose, cwd)
+                pre = usage_pause.capture_prespawn(cwd) if (self.gate and can_write) else None
+                with self._write_call(can_write):
+                    proc = _run_reaped(argv, prompt, timeout, cwd,
+                                       self._child_env(_tooled_env(allowed_tools, denied_tools),
+                                                       MODEL_MAP[model]))
+                if self.gate is not None and usage_pause.marker_exists(self.gate):
+                    self.paused.set()   # the hook paused this child (marker keyed on S)
+                if self.paused.is_set():
+                    raise UsagePause(purpose,
+                                     dirty=can_write and usage_pause.edit_since(cwd, pre),
+                                     prespawn=pre, cwd=cwd)
             except subprocess.TimeoutExpired:
                 last_err = f"tooled call exceeded {timeout}s wall clock"
+                auth_reply = ""
                 rec.retries = attempt
                 continue
             try:
                 envelope = json.loads(proc.stdout)
             except json.JSONDecodeError:
+                raw = f"{proc.stdout} {proc.stderr}"
+                if _USAGE_LIMIT_RE.search(raw):
+                    rec.ok = False
+                    rec.retries = attempt
+                    self.ledger.add(rec)
+                    self._usage_limit_pause(purpose, cwd, pre=pre, can_write=can_write)
+                    raise HarnessError("llm-usage-limit",
+                                       f"{purpose}: {raw[:200].strip()}")
+                auth_reply = raw[:200].strip() if _is_auth_failure(raw) else ""
                 last_err = (f"CLI non-JSON output (rc={proc.returncode}): "
                             f"{proc.stdout[:200]} {proc.stderr[:200]}")
                 rec.retries = attempt
@@ -266,6 +424,23 @@ class ClaudeCli:
             result_text = envelope.get("result", "") or ""
             self._persist_raw(purpose, attempt, result_text)
             rec.retries = attempt
+            # Detect usage limits before any other classification.
+            # Error envelopes: result_text is the CLI's own error explanation (always
+            # short — match unconditionally).  Success envelopes: only match when the
+            # whole reply is short; a multi-page verdict quoting the pattern in passing
+            # must never be misclassified (genuine verdict documents are ≥ 1 KB).
+            _is_error_env = (bool(envelope.get("is_error"))
+                             or envelope.get("subtype") not in (None, "success"))
+            if (_is_error_env or len(result_text.strip()) < 400) and _USAGE_LIMIT_RE.search(result_text):
+                rec.ok = False
+                self.ledger.add(rec)
+                self._usage_limit_pause(purpose, cwd, pre=pre, can_write=can_write)
+                raise HarnessError("llm-usage-limit",
+                                   f"{purpose}: {result_text[:200].strip()}")
+            if _is_auth_failure(result_text):
+                rec.ok = False
+                self.ledger.add(rec)
+                raise HarnessError("llm-auth-expired", f"{purpose}: auth-expired: {result_text[:200].strip()}")
             # Content failures are never re-asked: a reviewer that errored out mid-review
             # would only error again, and its partial text must not escape as a verdict.
             subtype = envelope.get("subtype")
@@ -291,8 +466,35 @@ class ClaudeCli:
         rec.ok = False
         rec.retries = max_retries
         self.ledger.add(rec)
+        if auth_reply:
+            raise HarnessError("llm-auth-expired", f"{purpose}: auth-expired: {auth_reply}")
         raise HarnessError("llm-tooled-cli", f"{purpose}: {last_err}")
 
+
+
+def _fake_pause(purpose: str, spec: dict, cwd) -> None:
+    """Raise a fixture pause. With an `edit` spec and a cwd, make a real partial edit
+    first, so the pause carries a real pre-spawn capture. Without one, `dirty` comes
+    straight from the spec and no capture rides along."""
+    edit = spec.get("edit")
+    if not edit or not cwd:
+        raise UsagePause(purpose, dirty=bool(spec.get("dirty")))
+    pre = usage_pause.capture_prespawn(cwd)
+    target = os.path.join(cwd, edit["path"])
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, "w") as fh:
+        fh.write(edit["content"])
+    if spec.get("move_head"):
+        subprocess.run(["git", "commit", "-q", "--allow-empty", "-m", "fake"], cwd=cwd,
+                       check=True, capture_output=True)
+    if spec.get("merge_head"):
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=cwd, check=True,
+                              capture_output=True, text=True).stdout.strip()
+        git_dir = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], cwd=cwd,
+                                 check=True, capture_output=True, text=True).stdout.strip()
+        with open(os.path.join(git_dir, "MERGE_HEAD"), "w") as fh:
+            fh.write(head + "\n")
+    raise UsagePause(purpose, dirty=usage_pause.edit_since(cwd, pre), prespawn=pre, cwd=cwd)
 
 
 class FixtureLlm:
@@ -308,6 +510,8 @@ class FixtureLlm:
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
         data = self.canned[purpose]
+        if isinstance(data, dict) and data.get("kind") == "usage-pause":
+            _fake_pause(purpose, data, None)
         if normalizer is not None:
             data = normalizer(data)
         validate(data)
@@ -321,18 +525,24 @@ class FixtureLlm:
                     setting_sources: str = "user,project",
                     timeout: int = TOOLED_TIMEOUT,
                     max_turns: int = TOOLED_MAX_TURNS,
-                    max_retries: int = 1) -> str:
+                    max_retries: int = 1,
+                    max_budget_usd: float | None = None) -> str:
         if not allowed_tools:
             raise HarnessError("llm-tooled-no-tools", purpose)
         self.tooled_argvs.append((purpose, _tooled_argv(
             model, agent=agent, allowed_tools=allowed_tools, denied_tools=denied_tools,
             add_dirs=add_dirs, append_system_prompt=append_system_prompt,
-            setting_sources=setting_sources, max_turns=max_turns)))
+            setting_sources=setting_sources, max_turns=max_turns,
+            max_budget_usd=max_budget_usd)))
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
         val = self.canned[purpose]
+        if isinstance(val, dict) and val.get("kind") == "usage-pause":
+            _fake_pause(purpose, val, cwd)
         if isinstance(val, dict) and "raise" in val:
             spec = val["raise"]
+            if spec["kind"] == "usage-pause":
+                _fake_pause(purpose, spec, cwd)
             raise HarnessError(spec["kind"], spec.get("detail", ""))
         self.ledger.add(LlmCallRecord(purpose=purpose, model=f"fixture:{model}"))
         return val

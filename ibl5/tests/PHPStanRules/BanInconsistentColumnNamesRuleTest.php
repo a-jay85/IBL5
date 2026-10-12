@@ -103,6 +103,21 @@ final class BanInconsistentColumnNamesRuleTest extends RuleTestCase
                     . 'Rename to `teampick_teamid`; migration 114 unified `*_tid` to `*_teamid`.',
                     20,
                 ],
+                [
+                    'Banned backtick-quoted column reference `Award` in SQL string. '
+                    . 'Rename to `award`; migration 120 snake_cased the awards-table column.',
+                    21,
+                ],
+                [
+                    'Banned backtick-quoted column reference `table_ID` in SQL string. '
+                    . 'Rename to `table_id`; migration 120 snake_cased the awards-table column.',
+                    22,
+                ],
+                [
+                    'Banned backtick-quoted column reference `ID` in SQL string. '
+                    . 'Rename to `id` (ibl_team_awards); migration 120 snake_cased the column.',
+                    23,
+                ],
             ],
         );
     }

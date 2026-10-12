@@ -93,46 +93,6 @@ jobs:
         shell: bash
         run: bin/promote-master-to-production "$PROMOTE_SHA" | tee -a "$GITHUB_OUTPUT"
 
-      - name: Setup SSH
-        if: steps.promote.outputs.outcome == 'promoted' || failure()
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
-      # The DM's Deploy: line must point at the deploy the promotion started, not
-      # at this promoter run. The push above fast-forwards production to
-      # PROMOTE_SHA, which starts main.yml ("Build and Deploy") on branch
-      # production at that same SHA — so that pair identifies the run uniquely.
-      # The run is created a few seconds after the push, hence the poll.
-      # Keyed to the workflow FILE .github/workflows/main.yml: renaming that
-      # file degrades this silently to the checks-URL fallback below.
-      - name: Resolve the Build and Deploy run URL
-        id: deploy_url
-        if: steps.promote.outputs.outcome == 'promoted'
-        env:
-          PROMOTE_SHA: ${{ github.event.workflow_run.head_sha }}
-          GH_TOKEN: ${{ secrets.CI_PAT }}
-          TARGET_REPO: ${{ github.repository }}
-        shell: bash
-        run: |
-          # Deliberately NOT `set -e`: this step is cosmetic. A transient API
-          # error must never turn a promotion that actually succeeded red.
-          set -uo pipefail
-          url=''
-          for attempt in $(seq 1 12); do
-            url="$(gh api \
-              "/repos/$TARGET_REPO/actions/workflows/main.yml/runs?head_sha=$PROMOTE_SHA&branch=production" \
-              --jq '[.workflow_runs[]] | sort_by(.created_at) | last | .html_url' 2>/dev/null || true)"
-            if [ -n "$url" ] && [ "$url" != "null" ]; then
-              break
-            fi
-            url=''
-            [ "$attempt" -lt 12 ] && sleep 5
-          done
-          printf 'deploy_url=%s\n' "$url" >> "$GITHUB_OUTPUT"
-
       - name: Build Discord message
         if: steps.promote.outputs.outcome == 'promoted' || failure()
         env:
@@ -141,11 +101,6 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SERVER_URL: ${{ github.server_url }}
           REPO: ${{ github.repository }}
-          DEPLOY_URL: ${{ steps.deploy_url.outputs.deploy_url }}
-          # Race-free fallback when the poll times out. Never fall back to
-          # RUN_URL here — that is the promoter's own run, i.e. the exact wrong
-          # link this step exists to stop sending.
-          CHECKS_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.event.workflow_run.head_sha }}/checks
         run: |
           set -euo pipefail
           if [ "$OUTCOME" = "promoted" ]; then
@@ -153,7 +108,7 @@ jobs:
             # so the short SHA and any trailing (#NNNN) are clickable in place.
             # Every URL here is wrapped in <> — that is Discord's embed-suppression
             # syntax, and it works inside a masked link too ([text](<url>)). Without
-            # it each link auto-expands into a preview card and a 3-line promote DM
+            # it each link auto-expands into a preview card and a 2-line promote DM
             # renders as a screenful. The <> are NOT stray shell redirects; they are
             # inside single-quoted printf formats and a sed replacement, never
             # interpreted by bash. Keep them on any URL added below.
@@ -164,7 +119,6 @@ jobs:
               printf 'Auto-promoted master to production: [%s](<%s>)\n' \
                      "${PROMOTE_SHA:0:11}" "$SERVER_URL/$REPO/commit/$PROMOTE_SHA"
               printf '%s\n' "$SUBJECT"
-              printf 'Deploy: <%s>\n' "${DEPLOY_URL:-$CHECKS_URL}"
             } > /tmp/discord-msg.txt
           else
             {
@@ -180,10 +134,8 @@ jobs:
         if: steps.promote.outputs.outcome == 'promoted' || failure()
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          ping: ${{ job.status == 'failure' }}
 
   paused-notice:
     # Second and last job in this workflow. Also listed verbatim in SKIP_CHECKS
@@ -203,13 +155,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup SSH
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
       - name: Build Discord message
         env:
           PROMOTE_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -226,7 +171,4 @@ jobs:
       - name: Send Discord DM
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}

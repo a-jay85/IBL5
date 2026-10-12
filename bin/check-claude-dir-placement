@@ -14,6 +14,21 @@
 # flagged — only skills/ and agents/.
 #
 # Usage: bin/check-claude-dir-placement   (scans the repo root, from anywhere)
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-claude-dir-placement
+
+CI gate: scans the repo for .claude/skills/ and .claude/agents/ directories
+placed outside the repo-root .claude/ tree and exits 1 if any are found.
+(Nested .claude/rules/ is allowed — it is directory-scoped context.)
+
+Exit codes:
+  0  No misplaced skill/agent directories found
+  1  One or more directories found outside repo-root .claude/
+EOF
+    exit 0
+fi
+
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

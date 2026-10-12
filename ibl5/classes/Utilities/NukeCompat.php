@@ -79,7 +79,7 @@ class NukeCompat
             }
         }
         $unixTime = (int) $time - (int) date("Z");
-        $format = defined('_DATESTRING') && is_string(_DATESTRING) ? _DATESTRING : 'l, F d, Y @ H:i';
+        $format = defined('_DATESTRING') ? _DATESTRING : 'l, F d, Y @ H:i';
         return ucfirst(date($format, $unixTime));
     }
 
@@ -155,14 +155,6 @@ class NukeCompat
     public function getTheme(): string
     {
         return 'IBL';
-    }
-
-    /**
-     * Load language file for a module.
-     */
-    public function getLang(string $module): void
-    {
-        get_lang($module);
     }
 
     /**

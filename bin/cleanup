@@ -3,15 +3,51 @@
 # Tears down Docker env, removes worktrees, deletes stale branches.
 #
 # Usage: bin/cleanup [<worktree-name>] [--all] [--dry-run]
+#
+# Exit codes: 0 = done (named target cleaned, or --all finished, skips included)
+#             1 = usage error, unknown option, or worktree not found
+#             3 = the named target was SKIPPED (reason printed on stderr)
 
 set -euo pipefail
 
-source "$(dirname "$0")/lib/wt-guards.sh"
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/cleanup <worktree-name> [--dry-run] [--discard-generated]
+                   [--discard-closed] [--drop-merged-stashes]
+       bin/cleanup --all [--dry-run] [--discard-generated]
+                   [--discard-closed] [--drop-merged-stashes]
 
-# Resolve to the main repo root, even when run from a worktree.
-# git worktree list always shows the main checkout first.
-REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+Clean up worktrees, branches, and Docker containers.
+
+Arguments:
+  <worktree-name>      Tear down a specific worktree.
+  --all                Tear down all eligible worktrees.
+  --dry-run            Print what would be done without making changes.
+  --discard-generated  Remove generated files before teardown.
+  --discard-closed     Remove worktrees whose PR is closed (not merged).
+  --drop-merged-stashes  Drop stash entries belonging to merged branches.
+
+Exit codes:
+  0  Done: the named worktree was cleaned, or --all finished (skips included).
+  1  Usage error, unknown option, or worktree not found.
+  3  The named worktree was skipped; the reason is printed on stderr.
+EOF
+    exit 0
+fi
+
+source "$(dirname "$0")/lib/wt-guards.sh"
+source "$(dirname "$0")/lib/gh-pr.sh"
+
+# N days ago as YYYY-MM-DD (BSD date first, GNU fallback). Same helper as bin/automouse/run.
+_date_ago() { date -v-"$1"d +%F 2>/dev/null || date -d "$1 days ago" +%F; }
+
 source "$(dirname "$0")/lib/git-helpers.sh"
+# Resolve to the main repo root, even when run from a worktree. cwd-based on
+# purpose: bin/test-cleanup-safety runs this script inside a fixture repo.
+REPO_ROOT="$(main_checkout_root .)" || {
+    echo "ERROR: not inside a git repository" >&2
+    exit 1
+}
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 TARGET_NAME=""
 ALL=false
@@ -21,6 +57,7 @@ DISCARD_CLOSED=false
 DROP_MERGED_STASHES=false
 CLEANED=0
 SKIPPED=0
+LAST_SKIP_REASON=""
 
 for arg in "$@"; do
     case "$arg" in
@@ -55,8 +92,7 @@ get_branch_for_worktree() {
             # Strip refs/heads/ prefix
             b = substr($0, 8)
             sub(/^refs\/heads\//, "", b)
-            print b
-            exit
+            if (!f) { print b; f = 1 }
         }
     '
 }
@@ -90,6 +126,15 @@ cleanup_worktree() {
     echo "  Done."
 }
 
+# skip_note <wt_name> <reason> — record one check_worktree SKIP: print the
+# stdout line (text unchanged), count it, and keep the reason so named mode
+# can repeat it on stderr before exiting 3.
+skip_note() {
+    echo "  SKIP $1: $2"
+    SKIPPED=$((SKIPPED + 1))
+    LAST_SKIP_REASON="$2"
+}
+
 check_worktree() {
     local wt_path="$1"
     local wt_name
@@ -99,15 +144,13 @@ check_worktree() {
     branch=$(get_branch_for_worktree "$wt_path")
 
     if [ -z "$branch" ] && ! command -v gh &>/dev/null; then
-        echo "  SKIP $wt_name: could not determine branch (detached HEAD?)"
-        SKIPPED=$((SKIPPED + 1))
+        skip_note "$wt_name" "could not determine branch (detached HEAD?)"
         return
     fi
 
     # Never touch protected branches
     if [[ "$branch" == "master" || "$branch" == "main" || "$branch" == "production" ]]; then
-        echo "  SKIP $wt_name: protected branch ($branch)"
-        SKIPPED=$((SKIPPED + 1))
+        skip_note "$wt_name" "protected branch ($branch)"
         return
     fi
 
@@ -117,14 +160,13 @@ check_worktree() {
     lock_reason=$(git -C "$REPO_ROOT" worktree list --porcelain \
         | awk -v wt="$wt_path" '
             /^worktree / { cur = substr($0, 10) }
-            /^locked/ && cur == wt { print substr($0, 8); exit }
+            /^locked/ && cur == wt && !f { print substr($0, 8); f = 1 }
         ')
     if [ -n "$lock_reason" ]; then
         local lock_pid
         lock_pid=$(echo "$lock_reason" | grep -oE 'pid [0-9]+' | awk '{print $2}')
         if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
-            echo "  SKIP $wt_name: locked by active process (pid $lock_pid)"
-            SKIPPED=$((SKIPPED + 1))
+            skip_note "$wt_name" "locked by active process (pid $lock_pid)"
             return
         fi
         # Lock holder is dead — unlock so removal can proceed
@@ -145,8 +187,8 @@ check_worktree() {
         local tip det_state
         tip=$(git -C "$wt_path" rev-parse HEAD 2>/dev/null || true)
         if [ -z "$tip" ]; then
-            echo "  SKIP $wt_name: could not determine branch (detached HEAD?)"
-            SKIPPED=$((SKIPPED + 1)); return
+            skip_note "$wt_name" "could not determine branch (detached HEAD?)"
+            return
         fi
         det_state=$(cd "$REPO_ROOT" && gh pr list --search "$tip" --state all \
             --json headRefOid,state,number \
@@ -156,15 +198,17 @@ check_worktree() {
            || { [ "$det_state" = "CLOSED" ] && [ "$DISCARD_CLOSED" = true ]; }; then
             is_merged=true
         else
-            echo "  SKIP $wt_name: detached HEAD, no merged PR at tip"
-            SKIPPED=$((SKIPPED + 1)); return
+            skip_note "$wt_name" "detached HEAD, no merged PR at tip"
+            return
         fi
     fi
 
     # Check 1: PR state via GitHub CLI (handles squash merges)
     if [ -n "$branch" ] && command -v gh &>/dev/null; then
-        local pr_state
-        pr_state=$(cd "$REPO_ROOT" && gh pr view "$branch" --json state -q .state 2>/dev/null || true)
+        local pr_state pr_num
+        pr_info "$branch" "$REPO_ROOT" || true
+        pr_state="$PR_STATE"
+        pr_num="$PR_NUM"
         if [ "$pr_state" = "MERGED" ]; then
             is_merged=true
         elif [ "$pr_state" = "CLOSED" ]; then
@@ -176,15 +220,11 @@ check_worktree() {
             elif [ "$DISCARD_CLOSED" = true ]; then
                 is_merged=true
             else
-                echo "  SKIP $wt_name: PR closed but remote gone (pass --discard-closed to remove)"
-                SKIPPED=$((SKIPPED + 1))
+                skip_note "$wt_name" "PR closed but remote gone (pass --discard-closed to remove)"
                 return
             fi
         elif [ "$pr_state" = "OPEN" ]; then
-            local pr_num
-            pr_num=$(cd "$REPO_ROOT" && gh pr view "$branch" --json number -q .number 2>/dev/null || true)
-            echo "  SKIP $wt_name: PR #$pr_num still open"
-            SKIPPED=$((SKIPPED + 1))
+            skip_note "$wt_name" "PR #$pr_num still open"
             return
         fi
     fi
@@ -228,8 +268,7 @@ check_worktree() {
     fi
 
     if [ "$is_merged" = false ]; then
-        echo "  SKIP $wt_name: branch '$branch' not merged to master"
-        SKIPPED=$((SKIPPED + 1))
+        skip_note "$wt_name" "branch '$branch' not merged to master"
         return
     fi
 
@@ -239,8 +278,7 @@ check_worktree() {
         kill_infra_processes "$wt_path"
 
         if is_worktree_in_use "$wt_path"; then
-            echo "  SKIP $wt_name: worktree is in active use (processes detected)"
-            SKIPPED=$((SKIPPED + 1))
+            skip_note "$wt_name" "worktree is in active use (processes detected)"
             return
         fi
 
@@ -254,8 +292,7 @@ check_worktree() {
             non_agent=$(printf '%s\n' "$untracked" | grep -v '^$' \
                         | grep -vE '(^|/)AGENT_OUTPUT\..*\.md$' || true)
             if [ -n "$non_agent" ]; then
-                echo "  SKIP $wt_name: has untracked files"
-                SKIPPED=$((SKIPPED + 1))
+                skip_note "$wt_name" "has untracked files"
                 return
             fi
             # Only stray AGENT_OUTPUT.*.md droppings remain — provably not work.
@@ -281,8 +318,7 @@ check_worktree() {
             non_discardable=$(echo "$dirty_files" \
                 | grep -v -E '^(CLAUDE\.md|ibl5/bun\.lock)$' || true)
             if [ -n "$non_discardable" ]; then
-                echo "  SKIP $wt_name: has uncommitted changes"
-                SKIPPED=$((SKIPPED + 1))
+                skip_note "$wt_name" "has uncommitted changes"
                 return
             elif [ "$DISCARD_GENERATED" = true ]; then
                 echo "  Discarding generated files: $dirty_files"
@@ -290,8 +326,7 @@ check_worktree() {
                     git -C "$wt_path" reset --hard HEAD 2>/dev/null || true
                 fi
             else
-                echo "  SKIP $wt_name: has discardable changes (pass --discard-generated to discard)"
-                SKIPPED=$((SKIPPED + 1))
+                skip_note "$wt_name" "has discardable changes (pass --discard-generated to discard)"
                 return
             fi
         fi
@@ -455,7 +490,8 @@ if [ "$ALL" = true ]; then
 
         # Check 1: PR state (most authoritative signal)
         if command -v gh &>/dev/null; then
-            bare_pr_state=$(cd "$REPO_ROOT" && gh pr view "$bare_branch" --json state -q .state 2>/dev/null || true)
+            pr_info "$bare_branch" "$REPO_ROOT" || true
+            bare_pr_state="$PR_STATE"
             case "$bare_pr_state" in
                 MERGED)
                     should_delete=true
@@ -466,7 +502,7 @@ if [ "$ALL" = true ]; then
                     delete_reason="PR closed"
                     ;;
                 OPEN)
-                    bare_pr_num=$(cd "$REPO_ROOT" && gh pr view "$bare_branch" --json number -q .number 2>/dev/null || true)
+                    bare_pr_num="$PR_NUM"
                     echo "  SKIP bare branch $bare_branch: PR #$bare_pr_num still open"
                     SKIPPED=$((SKIPPED + 1))
                     continue
@@ -519,9 +555,10 @@ if [ "$ALL" = true ]; then
         if [ "$should_delete" = false ] && command -v gh &>/dev/null \
            && [[ "$bare_branch" =~ ^pr-?([0-9]+) ]]; then
             num_pr="${BASH_REMATCH[1]}"
-            num_pr_state=$(cd "$REPO_ROOT" && gh pr view "$num_pr" --json state -q .state 2>/dev/null || true)
+            pr_info "$num_pr" "$REPO_ROOT" || true
+            num_pr_state="$PR_STATE"
             if [ "$num_pr_state" = "MERGED" ] || [ "$num_pr_state" = "CLOSED" ]; then
-                num_pr_head=$(cd "$REPO_ROOT" && gh pr view "$num_pr" --json headRefOid -q .headRefOid 2>/dev/null || true)
+                num_pr_head="$PR_OID"
                 bare_tip=$(git -C "$REPO_ROOT" rev-parse "$bare_branch" 2>/dev/null || true)
                 if [ -n "$num_pr_head" ] && [ "$num_pr_head" = "$bare_tip" ]; then
                     should_delete=true
@@ -755,8 +792,10 @@ if [ "$ALL" = true ]; then
         # C3: never running (status filter). C4: any compose label skips (covers ibl5).
         # C5: dry-run non-destructive. C6: explicit-ID removal only.
         STALE_CONTAINER_DAYS=30
-        _cutoff=$(date -v-${STALE_CONTAINER_DAYS}d +%s 2>/dev/null \
-            || date -d "${STALE_CONTAINER_DAYS} days ago" +%s)
+        # Compare ISO calendar dates (YYYY-MM-DD) lexically: no epoch parsing.
+        # _cutoff stays fatal under set -e: _date_ago only fails if BOTH date
+        # flavors fail, which means the host has no usable date at all.
+        _cutoff=$(_date_ago "$STALE_CONTAINER_DAYS")
         while IFS= read -r _line; do
             _proj="${_line%%$'\t'*}"
             _rest="${_line#*$'\t'}"
@@ -764,13 +803,12 @@ if [ "$ALL" = true ]; then
             _cname="${_rest#*$'\t'}"
             [ -n "$_proj" ] && continue    # has compose-project label — skip (covers C4)
             [ -z "$_cid" ] && continue
-            _created=$(docker inspect --format '{{.Created}}' "$_cid" 2>/dev/null)
+            # A failed inspect (container vanished) skips this one container, not the run.
+            _created=$(docker inspect --format '{{.Created}}' "$_cid" 2>/dev/null) || continue
             [ -z "$_created" ] && continue
-            # Cross-platform epoch: macOS date -j first, Linux date -d fallback
-            _epoch=$(date -j -f '%Y-%m-%dT%H:%M:%S' "${_created%%.*}" +%s 2>/dev/null \
-                || date -d "$_created" +%s 2>/dev/null)
-            [ -z "$_epoch" ] && continue
-            [ "$_epoch" -gt "$_cutoff" ] && continue    # too recent
+            _created_day="${_created%%T*}"
+            [[ "$_created_day" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || continue
+            [[ "$_created_day" > "$_cutoff" ]] && continue    # too recent
             if [ "$DRY_RUN" = true ]; then
                 echo "  WOULD remove stale unlabeled container: $_cname"
             else
@@ -875,3 +913,11 @@ fi
 
 echo ""
 echo "Summary: $CLEANED cleaned, $SKIPPED skipped"
+
+# Named mode processes exactly one target, so SKIPPED > 0 means that target was
+# skipped. Exit 3 so a caller chaining `bin/cleanup <name> && ...` sees it
+# (IBL5-backlog#1244). --all never sets TARGET_NAME, so bulk mode still exits 0.
+if [ -n "$TARGET_NAME" ] && [ "$SKIPPED" -gt 0 ]; then
+    echo "bin/cleanup: '$TARGET_NAME' skipped: $LAST_SKIP_REASON" >&2
+    exit 3
+fi

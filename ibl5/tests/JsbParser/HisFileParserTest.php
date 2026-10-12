@@ -46,7 +46,7 @@ class HisFileParserTest extends TestCase
         try {
             $result = HisFileParser::parseFile($tmpFile);
 
-            $this->assertNotEmpty($result);
+            $this->assertNotSame([], $result);
             $this->assertArrayHasKey('year', $result[0]);
             $this->assertArrayHasKey('teams', $result[0]);
         } finally {

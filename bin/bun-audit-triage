@@ -32,6 +32,27 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bun-audit-triage [--level=<high|critical>] [--json] [<file>]
+       bun audit --json | bun-audit-triage [--level=<high|critical>] [--json]
+
+Triage bun audit --json output, selecting high/critical advisories.
+
+Options:
+  --level=high      report high and critical advisories (default)
+  --level=critical  report critical advisories only
+  --json            emit advisories as JSON array instead of text lines
+  <file>            read from file instead of stdin
+
+Exit codes:
+  0  clean (no advisories at or above the selected level)
+  1  one or more advisories found
+  2  usage error or malformed JSON input
+EOF
+    exit 0
+fi
+
 LEVEL="high"
 JSON_MODE=0
 INPUT_FILE=""

@@ -51,7 +51,7 @@ final class FreeAgencyContractOffersSectionView implements FreeAgencyContractOff
         <tr>
             <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->getPlayerID() ?? 0) ?>">Offer</a></td>
             <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
-            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->getPlayerID() ?? 0, $player->getName() ?? '') ?>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->getPlayerID() ?? 0, $player->getName() ?? '', 'sticky-col') ?>
             <td><?= HtmlSanitizer::e($player->getAge() ?? 0) ?></td>
             <?= HtmlSanitizer::trusted($this->tableRenderer->renderPlayerRatings($player)) ?>
             <td class="col-salary"><?= HtmlSanitizer::e($offer['offer1']) ?></td>

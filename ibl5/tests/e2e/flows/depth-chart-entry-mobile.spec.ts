@@ -367,7 +367,7 @@ test.describe('DCE mobile: saved depth chart loading', () => {
     await dropdown.selectOption({ index: 1 });
 
     // Wait for AJAX to complete — loaded_dc_id should update
-    const loadedId = page.locator('#loaded_dc_id, input[name="loaded_dc_id"]');
+    const loadedId = page.locator('#loaded_dc_id');
     await expect(loadedId.first(), 'loaded_dc_id hidden field must exist in form').toBeAttached();
     await expect(async () => {
       const val = await loadedId.first().inputValue();
@@ -418,7 +418,7 @@ isolatedTest.describe('DCE mobile: form submission', () => {
     await expect(firstSelect).not.toHaveValue(valueBeforeMutation);
     // The stepper WRAPS: one step down from the last slot lands on 0 ("No").
     // An unassigned PG puts the roster below the server's 3-non-injured-players-
-    // per-position minimum, so DepthChartEntryValidator rejects the whole submit
+    // per-position minimum, so DepthChartValidator rejects the whole submit
     // and the read-back below fails for a reason unrelated to mobile submission.
     // The restore at the end of this test keeps the baseline at its seed value so
     // this never fires — it is here so a drifted DB fails loudly and legibly.

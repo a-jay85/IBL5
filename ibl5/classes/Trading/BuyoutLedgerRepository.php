@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 
 /**
@@ -64,7 +64,7 @@ class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedge
     {
         /** @var list<CashConsiderationRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_cash_considerations` WHERE teamid = ? ORDER BY label ASC",
+            "SELECT * FROM `ibl_cash_considerations` WHERE teamid = ? ORDER BY label ASC, id ASC",
             "i",
             $teamId
         );
@@ -77,7 +77,7 @@ class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedge
     {
         /** @var list<CashConsiderationRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_cash_considerations` WHERE teamid = ? AND type = 'buyout' ORDER BY label ASC",
+            "SELECT * FROM `ibl_cash_considerations` WHERE teamid = ? AND type = 'buyout' ORDER BY label ASC, id ASC",
             "i",
             $teamId
         );
@@ -174,5 +174,17 @@ class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedge
                AND (cy >= 5 OR salary_yr5 = 0)
                AND (cy >= 6 OR salary_yr6 = 0)"
         );
+    }
+
+    /**
+     * @see BuyoutLedgerRepositoryInterface::advanceAllCy()
+     */
+    public function advanceAllCy(): int
+    {
+        // No WHERE clause and no upper bound on cy by design. Expiry is owned by
+        // deleteExpiredCashConsiderations(), which removes a row once no future
+        // year carries an obligation; clamping cy here would make the two
+        // predicates disagree and strand rows that should have been deleted.
+        return $this->execute("UPDATE `ibl_cash_considerations` SET cy = cy + 1");
     }
 }

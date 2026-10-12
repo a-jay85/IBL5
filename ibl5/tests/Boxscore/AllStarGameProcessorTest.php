@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Boxscore;
 
 use Boxscore\AllStarGameProcessor;
+use Boxscore\AllStarTeamRepository;
 use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreRepository;
 use Boxscore\GameLineWriter;
@@ -25,7 +26,8 @@ class AllStarGameProcessorTest extends TestCase
     {
         // findAllStarTeamNames() returns null → Outcome C
         $repository = self::createStub(BoxscoreRepository::class);
-        $repository->method('findAllStarTeamNames')->willReturn(null);
+        $allStarRepository = self::createStub(AllStarTeamRepository::class);
+        $allStarRepository->method('findAllStarTeamNames')->willReturn(null);
 
         // resolver returns 'insert' so the write path is taken
         $resolver = self::createStub(GameUpsertResolver::class);
@@ -43,7 +45,7 @@ class AllStarGameProcessorTest extends TestCase
             )
             ->willReturn(2);
 
-        $processor = new AllStarGameProcessor($resolver, $writer, $repository);
+        $processor = new AllStarGameProcessor($resolver, $writer, $repository, $allStarRepository);
 
         $line = str_repeat(' ', 2000);
         $result = $processor->process($line, 2026, 'Regular Season/Playoffs', 'ibl');

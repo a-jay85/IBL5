@@ -1,0 +1,76 @@
+name: Auto-mergeable Label
+
+# Mirrors "this PR will merge on its own once CI is green" onto the PR as the
+# `auto-mergeable` label. A PR gets the label when BOTH hold:
+#   1. GitHub auto-merge is armed on it (`gh pr merge --auto`), and
+#   2. the human-signoff gate is cleared — a non-feat: title, or a feat: PR that
+#      already carries `human-approved`. An armed feat: PR without sign-off
+#      never completes, so it does not get the label.
+# The label comes off as soon as either stops holding.
+#
+# Condition 2 sources bin/lib/human-signoff-classifier.sh, the same lib the
+# human-signoff gate uses, so the two cannot drift.
+#
+# The label is advisory. No gate or script reads it. Labels applied with
+# GITHUB_TOKEN do not start new workflow runs, so the toggle cannot loop.
+
+on:
+  pull_request:
+    branches: [ master ]
+    # auto_merge_* track condition 1; edited/labeled/unlabeled track condition 2
+    # (title and human-approved changes).
+    types: [opened, reopened, synchronize, edited, ready_for_review, labeled, unlabeled, auto_merge_enabled, auto_merge_disabled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-mergeable-label-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sync-label:
+    name: auto-mergeable label
+    # A merged PR keeps whatever label it had when it merged.
+    if: github.event.pull_request.merged != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      # Checkout is required so the run step can source the shared classifier lib.
+      - name: Checkout (for the shared classifier lib)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Sync the auto-mergeable label
+        # A label API error must never add a red check that
+        # bin/lib/pr-armable.sh condition (15) would read as a CI failure.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          ARMED: ${{ github.event.pull_request.auto_merge != null }}
+          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'auto-mergeable') }}
+        run: |
+          set -euo pipefail
+          # shellcheck source=bin/lib/human-signoff-classifier.sh
+          source bin/lib/human-signoff-classifier.sh
+
+          want=false
+          if [ "$ARMED" = "true" ] && hs_pr_cleared "$TITLE" "$LABELS"; then
+            want=true
+          fi
+          echo "armed=$ARMED has_label=$HAS_LABEL want=$want"
+
+          if [ "$want" = "true" ] && [ "$HAS_LABEL" != "true" ]; then
+            # Create the label on first use; a no-op once it exists.
+            gh label create auto-mergeable --color A8E063 \
+              --description "Auto-merge is armed and the human-signoff gate is cleared; merges once CI is green" \
+              2>/dev/null || true
+            gh api --method POST "repos/$GH_REPO/issues/$PR/labels" -f 'labels[]=auto-mergeable' >/dev/null
+          elif [ "$want" != "true" ] && [ "$HAS_LABEL" = "true" ]; then
+            gh api --method DELETE "repos/$GH_REPO/issues/$PR/labels/auto-mergeable" >/dev/null
+          fi

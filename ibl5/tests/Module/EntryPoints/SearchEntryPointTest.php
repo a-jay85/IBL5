@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
+
 /**
  * Integration tests for modules/Search/index.php entry point.
  *
@@ -16,12 +19,32 @@ namespace Tests\Module\EntryPoints;
  */
 class SearchEntryPointTest extends ModuleEntryPointTestCase
 {
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testCharacterizationFormRendersAllAuthorsFromModuleConstant(): void
+    {
+        $this->assertFalse(defined('_ALLAUTHORS'), '_ALLAUTHORS leaked in from test scaffolding');
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('Search');
+        $this->assertStringContainsString('All Authors', $output);
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testCharacterizationEmptyResultRendersProductionNoMatchesText(): void
+    {
+        $this->assertFalse(defined('_NOMATCHES'), '_NOMATCHES leaked in from test scaffolding');
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('Search', ['query' => 'test player']);
+        $this->assertStringContainsString('No matches found to your query', $output);
+    }
+
     public function testNoParamsShowsSearchForm(): void
     {
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Search');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // No search query when no query param provided
         $this->assertQueryNotExecuted('LIKE');
     }
@@ -31,7 +54,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Search', ['qlen' => '1']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('3 characters', $output);
     }
 
@@ -40,7 +63,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Search', ['query' => 'test player']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('nuke_stories');
     }
 
@@ -49,7 +72,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Search', ['query' => '']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryNotExecuted('LIKE');
     }
 
@@ -62,7 +85,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
             'days' => 'abc',
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('nuke_stories');
     }
 
@@ -75,7 +98,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
             'topic' => 'invalid',
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('nuke_stories');
     }
 
@@ -87,7 +110,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
             'type' => 'users',
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('auth_users');
     }
 
@@ -100,7 +123,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
             'min' => 'abc',
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('nuke_stories');
     }
 
@@ -109,7 +132,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Search', ['query' => '<script>alert(1)</script>']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringNotContainsString('<script>', $output);
     }
 }

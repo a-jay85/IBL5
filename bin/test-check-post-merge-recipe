@@ -1,0 +1,591 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# test-check-post-merge-recipe — behavioural harness for bin/check-post-merge-recipe.
+#
+# Writes PR-body fixtures to a temp dir and drives the checker with --body-file and
+# --repo-slug, so no gh credential, network, or git remote is needed (the origin-parsing
+# cases build throwaway repos). Each case prints exactly `PASS <name>` or
+# `FAIL <name>: <why>`; the run ends with `N passed, M failed`.
+#
+# Run: bin/test-check-post-merge-recipe  (exit 0 = all pass, exit 1 = any fail)
+
+set -euo pipefail
+
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-post-merge-recipe"
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-check-post-merge-recipe.XXXXXX")"
+trap 'rm -rf "$TMP"' EXIT
+
+PASSED=0
+FAILED=0
+RC=0
+OUT=""
+ERR=""
+
+fx() { cat > "$TMP/$1.md"; }
+
+# run_raw <cmd...>: run a command in ${RUN_DIR:-$PWD}, capture exit code, stdout, stderr.
+run_raw() {
+    RC=0
+    OUT="$(cd "${RUN_DIR:-$PWD}" && env -u GIT_DIR -u GIT_WORK_TREE "$@" 2>"$TMP/err")" || RC=$?
+    ERR="$(cat "$TMP/err")"
+}
+
+# run_case <fixture-name> [extra args...]
+run_case() {
+    local name="$1"
+    shift
+    run_raw "$SCRIPT" --body-file "$TMP/$name.md" --repo-slug a-jay85/IBL5 "$@"
+}
+
+# check <name> <want-exit> [stderr-substring] [stdout-substring]
+check() {
+    local name="$1" want="$2" errpat="${3:-}" outpat="${4:-}" why=""
+    if [[ "$RC" != "$want" ]]; then
+        why="exit $RC, want $want (stderr: $ERR)"
+    elif [[ -n "$errpat" ]] && ! grep -qF -- "$errpat" <<< "$ERR"; then
+        why="stderr missing '$errpat' (stderr: $ERR)"
+    elif [[ -n "$outpat" ]] && ! grep -qF -- "$outpat" <<< "$OUT"; then
+        why="stdout missing '$outpat' (stdout: $OUT)"
+    fi
+    if [[ -z "$why" ]]; then
+        echo "PASS $name"
+        PASSED=$((PASSED + 1))
+    else
+        echo "FAIL $name: $why"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Shape 1: wrong repo slug
+# ---------------------------------------------------------------------------
+fx s1-gh-api-wrong-slug <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+gh api repos/ajaynicolas/IBL5/branches/master/protection
+```
+FIXTURE_END
+run_case s1-gh-api-wrong-slug
+check s1-gh-api-wrong-slug 1 "line 4: shape 1"
+
+fx s1-git-url-wrong-slug <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+git clone git@github.com:someone/IBL5.git
+```
+FIXTURE_END
+run_case s1-git-url-wrong-slug
+check s1-git-url-wrong-slug 1 "shape 1"
+
+fx s1-repo-flag-wrong-slug <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+gh pr list -R someone/IBL5
+```
+FIXTURE_END
+run_case s1-repo-flag-wrong-slug
+check s1-repo-flag-wrong-slug 1 "line 4: shape 1"
+
+fx s1-backlog-slug-ok <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+gh issue list --repo a-jay85/IBL5-backlog
+```
+FIXTURE_END
+run_case s1-backlog-slug-ok
+check s1-backlog-slug-ok 0
+
+fx s1-placeholder-ok <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+gh api repos/{owner}/{repo}/branches/master
+gh api "repos/$REPO/branches"
+```
+FIXTURE_END
+run_case s1-placeholder-ok
+check s1-placeholder-ok 0
+
+fx s1-case-insensitive-ok <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+gh api repos/A-Jay85/ibl5/branches
+```
+FIXTURE_END
+run_case s1-case-insensitive-ok
+check s1-case-insensitive-ok 0
+
+fx dash-r-not-slug <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+rm -r tmp/dir
+```
+FIXTURE_END
+run_case dash-r-not-slug
+check dash-r-not-slug 0
+
+# ---------------------------------------------------------------------------
+# Shape 2: contexts-only full-replace protection write
+# ---------------------------------------------------------------------------
+fx s2-contexts-only-put <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+jq '{required_status_checks: {strict: .x.strict, contexts: .x.contexts}}' before.json > put.json
+gh api --method PUT repos/a-jay85/IBL5/branches/master/protection --input put.json
+```
+FIXTURE_END
+run_case s2-contexts-only-put
+check s2-contexts-only-put 1 "line 5: shape 2"
+
+fx s2-continuation-split <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+gh api \
+  -X PUT \
+  repos/a-jay85/IBL5/branches/master/protection/required_status_checks \
+  --input - <<'JSON'
+{"strict": true, "contexts": ["Meta checks"]}
+JSON
+```
+FIXTURE_END
+run_case s2-continuation-split
+check s2-continuation-split 1 "line 4: shape 2"
+
+fx s2-field-form <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+gh api -X PUT repos/a-jay85/IBL5/branches/master/protection -f 'required_status_checks[contexts][]=Meta checks'
+```
+FIXTURE_END
+run_case s2-field-form
+check s2-field-form 1 "line 4: shape 2"
+
+fx s2-with-checks-ok <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+jq '{required_status_checks: {strict: .x.strict, contexts: .x.contexts, checks: .x.checks}}' before.json > put.json
+gh api --method PUT repos/a-jay85/IBL5/branches/master/protection --input put.json
+```
+FIXTURE_END
+run_case s2-with-checks-ok
+check s2-with-checks-ok 0
+
+fx s2-append-only-2586-ok <<'FIXTURE_END'
+## Activation (human, after merge)
+
+1. Append the new context:
+
+   ```bash
+   echo '["Meta checks"]' | gh api -X POST repos/a-jay85/IBL5/branches/master/protection/required_status_checks/contexts --input -
+   ```
+FIXTURE_END
+run_case s2-append-only-2586-ok
+check s2-append-only-2586-ok 0
+
+# ---------------------------------------------------------------------------
+# Shape 3: verification drops checks
+# ---------------------------------------------------------------------------
+fx s3-del-checks <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+jq -S 'del(.required_status_checks.contexts, .required_status_checks.checks)' before.json > a.json
+diff a.json b.json
+```
+FIXTURE_END
+run_case s3-del-checks
+check s3-del-checks 1 "line 4: shape 3"
+
+fx s3-multiline-del <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+jq -S 'del(.url,
+   .required_status_checks.checks)' before.json > a.json
+```
+FIXTURE_END
+run_case s3-multiline-del
+check s3-multiline-del 1 "line 4: shape 3"
+
+fx s3-with-readback-ok <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+jq -S 'del(.required_status_checks.contexts, .required_status_checks.checks)' before.json > a.json
+bin/check-composite-contracts --protection-readback=post.json --pre-image=pre.json
+```
+FIXTURE_END
+run_case s3-with-readback-ok
+check s3-with-readback-ok 0
+
+fx s3-with-checks-compare-ok <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+jq -S 'del(.required_status_checks.contexts, .required_status_checks.checks)' before.json > a.json
+jq '.required_status_checks.checks' post.json
+```
+FIXTURE_END
+run_case s3-with-checks-compare-ok
+check s3-with-checks-compare-ok 0
+
+# ---------------------------------------------------------------------------
+# Extraction: positive and negative paths
+# ---------------------------------------------------------------------------
+fx clean-recipe-ok <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+gh api repos/a-jay85/IBL5/branches/master/protection > before.json
+jq '{required_status_checks: {strict: .required_status_checks.strict, contexts: .required_status_checks.contexts, checks: .required_status_checks.checks}}' before.json > put.json
+gh api --method PUT repos/a-jay85/IBL5/branches/master/protection --input put.json
+jq '.required_status_checks.checks' after.json
+```
+FIXTURE_END
+run_case clean-recipe-ok
+check clean-recipe-ok 0
+
+fx no-section-ok <<'FIXTURE_END'
+## Summary
+
+```bash
+gh api repos/ajaynicolas/IBL5/branches
+```
+
+## Test plan
+
+Nothing to run.
+FIXTURE_END
+run_case no-section-ok
+check no-section-ok 0 "" "no post-merge section"
+
+fx fenced-comment-not-heading <<'FIXTURE_END'
+## Summary
+
+```bash
+# 1. [post-merge] Bot half
+gh api repos/ajaynicolas/IBL5/branches
+```
+FIXTURE_END
+run_case fenced-comment-not-heading
+check fenced-comment-not-heading 0
+
+fx indented-fence-scanned <<'FIXTURE_END'
+## Activation (human, after merge)
+
+1. Run this:
+
+   ```bash
+   gh api repos/wrong/slug/branches
+   ```
+FIXTURE_END
+run_case indented-fence-scanned
+check indented-fence-scanned 1 "shape 1"
+
+fx section-ends-at-sibling <<'FIXTURE_END'
+## Post-merge steps
+
+```bash
+gh api repos/a-jay85/IBL5/branches
+```
+
+## Notes
+
+```bash
+gh api repos/ajaynicolas/IBL5/branches
+```
+FIXTURE_END
+run_case section-ends-at-sibling
+check section-ends-at-sibling 0
+
+fx subheading-stays-in-section <<'FIXTURE_END'
+## Post-merge steps
+
+### Rollback
+
+```bash
+gh api repos/ajaynicolas/IBL5/branches
+```
+FIXTURE_END
+run_case subheading-stays-in-section
+check subheading-stays-in-section 1 "shape 1"
+
+heading_case() { # case-name heading-line
+    fx "$1" <<FIXTURE_END
+$2
+
+\`\`\`bash
+gh api repos/ajaynicolas/IBL5/branches
+\`\`\`
+FIXTURE_END
+    run_case "$1"
+    check "$1" 1 "shape 1"
+}
+heading_case heading-post-merge-setup '## Post-merge setup'
+heading_case heading-follow-ups '### Post-merge follow-ups'
+heading_case heading-install '## Post-merge install (required, run once after merging)'
+heading_case heading-owner-action '## One-time owner action required after merge'
+heading_case heading-verification '## Post-merge verification'
+
+# CRLF body: GitHub returns \r\n; a stray \r must not break heading or fence matching.
+while IFS= read -r l; do printf '%s\r\n' "$l"; done < "$TMP/s1-gh-api-wrong-slug.md" > "$TMP/crlf-body.md"
+run_case crlf-body
+check crlf-body 1 "line 4: shape 1"
+
+# ---------------------------------------------------------------------------
+# Waiver marker
+# ---------------------------------------------------------------------------
+{ cat "$TMP/s1-gh-api-wrong-slug.md"; echo '<!-- post-merge-recipe-ok: recipe targets the fork on purpose -->'; } > "$TMP/marker-valid.md"
+run_case marker-valid
+check marker-valid 0 "WAIVED:" "post-merge-recipe-ok: recipe targets the fork on purpose"
+
+{ cat "$TMP/s1-gh-api-wrong-slug.md"; echo '<!-- post-merge-recipe-ok: fine -->'; } > "$TMP/marker-short.md"
+run_case marker-short
+check marker-short 1 "at least 15 characters"
+
+{ cat "$TMP/clean-recipe-ok.md"; echo '<!-- post-merge-recipe-ok: fine -->'; } > "$TMP/marker-short-clean-body.md"
+run_case marker-short-clean-body
+check marker-short-clean-body 1 "at least 15 characters"
+
+# ---------------------------------------------------------------------------
+# CLI and environment
+# ---------------------------------------------------------------------------
+run_raw "$SCRIPT" --bogus
+check unknown-flag 2
+
+run_raw "$SCRIPT" --body-file "$TMP/clean-recipe-ok.md" --repo-slug=a-jay85/IBL5
+check repo-slug-equals-form 2
+
+run_case clean-recipe-ok --repo-slug nope
+check repo-slug-malformed 2
+
+run_raw "$SCRIPT" --pr 1 --body-file "$TMP/clean-recipe-ok.md" --repo-slug a-jay85/IBL5
+check both-modes 2
+
+run_raw "$SCRIPT" --repo-slug a-jay85/IBL5
+check neither-mode 2
+
+run_raw "$SCRIPT" --body-file "$TMP/absent.md" --repo-slug a-jay85/IBL5
+check missing-body-file 2
+
+run_raw "$SCRIPT" --pr abc --repo-slug a-jay85/IBL5
+check pr-non-numeric 2
+
+printf '%s\n' '#!/usr/bin/env bash' 'exit 1' > "$TMP/gh-fail"
+printf '%s\n' '#!/usr/bin/env bash' "cat '$TMP/s1-gh-api-wrong-slug.md'" > "$TMP/gh-ok"
+mkdir "$TMP/stubbin"
+cp "$TMP/gh-ok" "$TMP/stubbin/gh"
+chmod +x "$TMP/gh-fail" "$TMP/gh-ok" "$TMP/stubbin/gh"
+
+run_raw env GH_CMD="$TMP/gh-fail" "$SCRIPT" --pr 1 --repo-slug a-jay85/IBL5
+check gh-outage 2 "gh pr view failed"
+
+run_raw env GH_CMD="$TMP/gh-ok" "$SCRIPT" --pr 1 --repo-slug a-jay85/IBL5
+check gh-stub-body 1 "shape 1"
+
+run_raw env -u GH_CMD PATH="$TMP/stubbin:$PATH" "$SCRIPT" --pr 1 --repo-slug a-jay85/IBL5
+check gh-cmd-unset 1 "shape 1"
+
+run_raw env GH_CMD= PATH="$TMP/stubbin:$PATH" "$SCRIPT" --pr 1 --repo-slug a-jay85/IBL5
+check gh-cmd-empty 1 "shape 1"
+
+git init -q "$TMP/noorigin"
+RUN_DIR="$TMP/noorigin" run_raw "$SCRIPT" --body-file "$TMP/clean-recipe-ok.md"
+check missing-origin 2 "cannot resolve expected repo slug"
+
+git init -q "$TMP/scp"
+git -C "$TMP/scp" remote add origin git@github.com:a-jay85/IBL5.git
+RUN_DIR="$TMP/scp" run_raw "$SCRIPT" --body-file "$TMP/clean-recipe-ok.md"
+check origin-scp-parsed 0
+
+git init -q "$TMP/https"
+git -C "$TMP/https" remote add origin https://github.com/someone/else
+RUN_DIR="$TMP/https" run_raw "$SCRIPT" --body-file "$TMP/clean-recipe-ok.md"
+check origin-https-mismatch 1 "shape 1"
+
+# ---------------------------------------------------------------------------
+# PR 2144 offline replay: the body that carried all three shapes, captured verbatim.
+# ---------------------------------------------------------------------------
+cat > "$TMP/pr2144.md" <<'PR2144_BODY_END'
+<!-- manual-confirmation:begin -->
+## Manual confirmation needed
+
+> **This PR must be merged by a human. Non-negotiable.**
+>
+> **Reason 1 — bootstrap hazard.** This change rewrites part of the machinery that governs its own merge. It edits `.github/workflows/pr-meta-checks.yml`, the workflow whose job status ("Meta checks") is about to become a required context on `master`, and it ships the ADR authorizing that promotion. A defect in the else-branch's `if:` expression degrades the very signal a reviewer would use to judge the PR: drop `!cancelled()` and the skip message disappears exactly when the job is red; invert `!= 'true'` to `== 'true'` and the message fires on the runs where `adr-check` actually executed. Both mutations still produce a green "Meta checks", so an automated merge gated on rollup status would sail straight through. The pre-merge assertions in Phase 2/3 catch each of these (matrix rows 6–8), but a human reading the four-conjunct `if:` in the diff is the backstop that does not itself depend on the workflow being correct.
+>
+> **Reason 2 — the PR is incomplete at merge.** Phase 5 is a post-merge manual API call, and it is the step that actually closes the free-green hole; the merge is the midpoint of the work, not its end. E57 lands at `◑ Partial` precisely because rungs 1 and 2 are still open at merge time. The merging human is the person who then runs Phase 5 and flips E57 to `✅` in Step 5.4 — a handoff that requires someone to be present.
+>
+> **Three things the human reviewer must confirm before merging:**
+>
+> 1. **The `if:` expression reads correctly as English.** Open the diff on `.github/workflows/pr-meta-checks.yml` and read the new step's `if:` aloud: *not cancelled, and this is a pull request, and the adr filter did not match*. Confirm all four conjuncts are present, that it is `!=` and not `==`, and that it is the exact complement of the "Run bin/adr-check" step directly above it.
+> 2. **`bin/adr-check` itself is untouched.** Run `git diff origin/master --stat` and confirm `bin/adr-check` is absent from the list.
+> 3. **They are willing to own Phase 5.** Merging creates the obligation. Before merging, confirm you can run Phase 5 Steps 5.1–5.4 in the same session — including reading the round-trip `diff` in Step 5.3 with your own eyes and aborting if it is non-empty. If you cannot, do not merge yet.
+<!-- manual-confirmation:end -->
+
+## Scope
+
+Promotes "Meta checks" to a required status check on `master` (post-merge API call — Phase 5) and makes an `adr`-filter skip observable in the job log (else-branch step added to the workflow). Ships ADR-0120 authorizing both decisions, extends `bin/test-adr-check` with 7 new test cases (6 exercising the skip step's `if:` conjuncts, 1 behavioral regression case for the misplaced-rule prefix in `bin/adr-check`), and stamps E57 in the backlog as `◑ Partial`.
+
+<!-- files-changed:begin -->
+- `M` `.github/workflows/pr-meta-checks.yml`
+- `M` `bin/test-adr-check`
+- `M` `ibl5/docs/backlog/dev-efficiency-backlog.md`
+- `A` `ibl5/docs/decisions/0120-meta-checks-required-and-skip-observable.md`
+- `M` `ibl5/docs/decisions/README.md`
+<!-- files-changed:end -->
+
+## What is NOT in this PR
+
+- **`bin/adr-check` is unchanged.** The checker emitted correct FAILs on both incident PRs; only its wiring (enforcement level, skip observability) is being fixed. Read it to judge the change; do not expect it in the diff.
+- **"Meta checks" is not yet required at merge time.** The branch-protection API call is Phase 5 — a post-merge manual step. E57 stays at `◑ Partial` until Step 5.4 flips it.
+- **No other required-status-check context is touched.** Phase 5's jq reconstruction appends exactly one string and the round-trip diff (row 16) asserts nothing else moved.
+
+## Post-merge steps
+
+**⚠️ The person who merges this PR owns these steps. Run them in the same session that merges.**
+
+### Step 5.1 — Read current branch protection (GET)
+
+```bash
+gh api repos/ajaynicolas/IBL5/branches/master/protection > /tmp/master-protection-before.json
+cat /tmp/master-protection-before.json
+```
+
+Expect `required_status_checks.contexts` = `["Tests and Analysis", "E2E Tests", "human-signoff"]` with `strict: true`. If different, stop and re-derive before writing anything.
+
+### Step 5.2 — Reconstruct and apply (PUT)
+
+```bash
+jq '{
+  required_status_checks: (
+    if .required_status_checks == null then null else {
+      strict: .required_status_checks.strict,
+      contexts: (
+        (.required_status_checks.contexts // [])
+        + (if (.required_status_checks.contexts // []) | index("Meta checks") then [] else ["Meta checks"] end)
+      )
+    } end
+  ),
+  enforce_admins: (.enforce_admins.enabled // false),
+  required_pull_request_reviews: (
+    if .required_pull_request_reviews == null then null
+    else (.required_pull_request_reviews | del(.url, .dismissal_restrictions.url, .dismissal_restrictions.users_url, .dismissal_restrictions.teams_url)) end
+  ),
+  restrictions: (
+    if .restrictions == null then null else {
+      users: [.restrictions.users[].login],
+      teams: [.restrictions.teams[].slug],
+      apps:  [.restrictions.apps[].slug]
+    } end
+  ),
+  required_linear_history:          (.required_linear_history.enabled          // false),
+  allow_force_pushes:               (.allow_force_pushes.enabled               // false),
+  allow_deletions:                  (.allow_deletions.enabled                  // false),
+  block_creations:                  (.block_creations.enabled                  // false),
+  required_conversation_resolution: (.required_conversation_resolution.enabled // false),
+  lock_branch:                      (.lock_branch.enabled                      // false),
+  allow_fork_syncing:               (.allow_fork_syncing.enabled               // false)
+}' /tmp/master-protection-before.json > /tmp/master-protection-put.json
+
+# Inspect before sending — only diff should be the added "Meta checks" line:
+diff <(jq -S '.required_status_checks.contexts' /tmp/master-protection-before.json) \
+     <(jq -S '.required_status_checks.contexts' /tmp/master-protection-put.json)
+
+gh api --method PUT repos/ajaynicolas/IBL5/branches/master/protection --input /tmp/master-protection-put.json
+```
+
+### Step 5.3 — Read back and verify
+
+```bash
+gh api repos/ajaynicolas/IBL5/branches/master/protection > /tmp/master-protection-after.json
+
+# Contexts are exactly the prior set plus one:
+jq -e '.required_status_checks.contexts | length == 4 and (index("Meta checks") != null)
+       and (index("Tests and Analysis") != null) and (index("E2E Tests") != null)
+       and (index("human-signoff") != null)' /tmp/master-protection-after.json && echo "contexts OK"
+
+# Nothing else moved (this is the load-bearing check):
+diff <(jq -S 'del(.required_status_checks.contexts, .required_status_checks.checks, .url, .required_status_checks.url, .required_status_checks.contexts_url)' /tmp/master-protection-before.json) \
+     <(jq -S 'del(.required_status_checks.contexts, .required_status_checks.checks, .url, .required_status_checks.url, .required_status_checks.contexts_url)' /tmp/master-protection-after.json) \
+  && echo "everything else unchanged OK"
+```
+
+Empty diff on the second check = pass. If assertion 2 shows a difference, roll back immediately:
+
+```bash
+jq '{required_status_checks: {strict: .required_status_checks.strict, contexts: .required_status_checks.contexts},
+     enforce_admins: (.enforce_admins.enabled // false),
+     required_pull_request_reviews: (if .required_pull_request_reviews == null then null else (.required_pull_request_reviews | del(.url)) end),
+     restrictions: (if .restrictions == null then null else {users: [.restrictions.users[].login], teams: [.restrictions.teams[].slug], apps: [.restrictions.apps[].slug]} end),
+     required_linear_history: (.required_linear_history.enabled // false),
+     allow_force_pushes: (.allow_force_pushes.enabled // false), allow_deletions: (.allow_deletions.enabled // false),
+     block_creations: (.block_creations.enabled // false), required_conversation_resolution: (.required_conversation_resolution.enabled // false),
+     lock_branch: (.lock_branch.enabled // false), allow_fork_syncing: (.allow_fork_syncing.enabled // false)}' \
+  /tmp/master-protection-before.json | gh api --method PUT repos/ajaynicolas/IBL5/branches/master/protection --input -
+```
+
+### Step 5.3b — Confirm the promotion actually gates
+
+Open or refresh any PR against `master` and confirm "Meta checks" appears in its status rollup as a real check run (not an indefinitely pending required context). A hanging pending state means the workflow did not trigger — revert using the rollback above.
+
+### Step 5.4 — Flip E57 from `◑ Partial` to `✅ Implemented`
+
+Only after Step 5.3's assertion 2 passes. Append a second dated status line in `ibl5/docs/backlog/dev-efficiency-backlog.md`, update the summary-table row to `✅ Implemented`, bump `last_verified`, commit directly to `master`.
+
+## Phase 6.5 — Remediation (2026-09-06)
+
+Plan-intent fidelity review (Phase 6) surfaced one blocking finding and four notes; all addressed before push.
+
+- **F1 (fixed):** E57 Status paragraph claimed retroactive `no-adr:` markers were "proposed, not applied" when they had been applied to both PR bodies on 2026-09-05 (PR #2136). Corrected to reflect the closed rung-0 disposition.
+- **E65 (filed):** New backlog entry recording the F1 defect class: stale plan anchor text transcribed into a backlog Status paragraph without live-state verification.
+- **N1 (fixed):** ADR-0120 Decision item 1 referenced "Phase 5 of the plan" for the `gh api` recipe; plan files live outside the repo. Updated to reference this PR's `## Post-merge steps` section (PR #2144).
+- **N2 (fixed):** `bin/test-adr-check`'s `add_misplaced_rule` comment attributed the miss to the workflow's paths-filter glob; the assertion runs `bin/adr-check`'s `preg_match` pattern, not the workflow filter. Comment corrected.
+- **N3 (fixed):** `## Scope` description above updated to accurately characterize the 7 test cases (6 conjunct-exercising + 1 behavioral regression).
+- **N4 (acknowledged):** Verification Matrix row 13 stated the deleted-line count from `ibl5/docs/backlog/dev-efficiency-backlog.md` would be 1; on the final diff it is 0, because master already carried `last_verified: 2026-09-06`. Outcome is correct (`bin/check-docs` passes); the row lives in the plan file (outside the repo) and cannot be corrected in-PR.
+
+## Manual Testing
+
+No manual testing needed — all changes are covered by unit and E2E tests.
+
+PR2144_BODY_END
+
+expected_s1="$(grep -n 'ajaynicolas/IBL5' "$TMP/pr2144.md" | cut -d: -f1 | tr '\n' ' ')"
+run_case pr2144
+got_s1="$(grep -o 'line [0-9]*: shape 1' <<< "$ERR" | cut -d' ' -f2 | tr -d ':' | tr '\n' ' ')"
+first_del="$(grep -n 'del(.required_status_checks.contexts' "$TMP/pr2144.md" | head -1 | cut -d: -f1)"
+got_s3="$(grep -o 'line [0-9]*: shape 3' <<< "$ERR" | cut -d' ' -f2 | tr -d ':' | tr '\n' ' ')"
+n_expected_s1="$(grep -c 'ajaynicolas/IBL5' "$TMP/pr2144.md")"
+why=""
+if [[ "$RC" != 1 ]]; then
+    why="exit $RC, want 1"
+elif [[ "$n_expected_s1" != 4 ]]; then
+    why="fixture has $n_expected_s1 ajaynicolas/IBL5 lines, want 4"
+elif [[ "$got_s1" != "$expected_s1" ]]; then
+    why="shape 1 pointers '$got_s1' != fixture lines '$expected_s1'"
+elif ! grep -q 'shape 2' <<< "$ERR"; then
+    why="no shape 2 finding"
+elif [[ "$got_s3" != "$first_del " ]]; then
+    why="shape 3 pointers '$got_s3' != single del( line '$first_del'"
+fi
+if [[ -z "$why" ]]; then
+    echo "PASS replay-2144"
+    PASSED=$((PASSED + 1))
+else
+    echo "FAIL replay-2144: $why"
+    FAILED=$((FAILED + 1))
+fi
+
+echo "$PASSED passed, $FAILED failed"
+[[ "$FAILED" -eq 0 ]]

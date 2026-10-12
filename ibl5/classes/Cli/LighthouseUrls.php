@@ -37,6 +37,16 @@ final class LighthouseUrls
         'GameBoxscore',
     ];
 
+    /**
+     * Admin-only modules: registered in ModuleRegistry but omitted from the
+     * anonymous full-site crawl entirely (no bare URL, no sub-page), because an
+     * anonymous request is redirected to login and there is no document to
+     * audit. Unlike PARAM_REQUIRED_MODULES, members need no SUB_PAGES entry.
+     *
+     * @var list<string>
+     */
+    public const ADMIN_ONLY_MODULES = ['LeagueControlPanel'];
+
     /** @var list<string> */
     public const REPRESENTATIVE_PATHS = [
         '/ibl5/index.php',
@@ -51,7 +61,8 @@ final class LighthouseUrls
      * module its bare `name=<Module>` URL plus, for sub-paged modules, the
      * additional sub-page variant (two entries for those). Modules listed in
      * PARAM_REQUIRED_MODULES contribute only their sub-page variant — their
-     * bare URL 404s and would hard-fail the Lighthouse run. Otherwise this is
+     * bare URL 404s and would hard-fail the Lighthouse run. Modules listed in
+     * ADMIN_ONLY_MODULES are skipped entirely. Otherwise this is
      * the exact loop the original `bin/lighthouse-audit-urls` ran; do not
      * change its shape without re-pinning the characterization test.
      *
@@ -65,6 +76,10 @@ final class LighthouseUrls
         $urls[] = $baseUrl . '/ibl5/index.php';
 
         foreach (ModuleRegistry::getAllModules() as $module) {
+            if (in_array($module, self::ADMIN_ONLY_MODULES, true)) {
+                continue;
+            }
+
             if (!in_array($module, self::PARAM_REQUIRED_MODULES, true)) {
                 $urls[] = $baseUrl . '/ibl5/modules.php?name=' . $module;
             }

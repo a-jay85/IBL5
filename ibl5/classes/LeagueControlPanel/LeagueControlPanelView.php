@@ -30,13 +30,13 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <link rel="stylesheet" href="/ibl5/themes/IBL/style/style.css">
 </head>
 <body>
-<div class="updater">
+<main class="updater">
     <h1 class="updater__title">League Control Panel</h1>
 
     <?= HtmlSanitizer::trusted($this->renderFlashMessage($resultMessage, $resultSuccess)) ?>
     <?= HtmlSanitizer::trusted($this->renderLeagueSwitcher($leagueConfig, $currentLeague)) ?>
 
-    <form action="leagueControlPanel.php" method="POST">
+    <form action="modules.php?name=LeagueControlPanel" method="POST">
         <input type="hidden" name="current_phase" value="<?= HtmlSanitizer::e($panelData['phase']) ?>">
         <?= \Security\CsrfGuard::generateToken('lcp_update_all') ?>
 <?php if ($currentLeague !== 'ibl'): ?>
@@ -59,7 +59,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     </form>
 
     <a href="/ibl5/index.php" class="updater__return underline">Return to IBL</a>
-</div>
+</main>
 </body>
 </html>
         <?php
@@ -80,8 +80,8 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <span class="league-badge <?= HtmlSanitizer::e($badgeClass) ?>"><?= HtmlSanitizer::e(strtoupper($leagueConfig['short_name'])) ?></span>
     <label>Switch to:</label>
     <select onchange="window.location.href=this.value" aria-label="Switch league" class="ibl-select ibl-select--auto">
-        <option value="leagueControlPanel.php?league=ibl"<?= $currentLeague === 'ibl' ? ' selected' : '' ?>>IBL</option>
-        <option value="leagueControlPanel.php?league=olympics"<?= $currentLeague === 'olympics' ? ' selected' : '' ?>>Olympics</option>
+        <option value="modules.php?name=LeagueControlPanel&amp;league=ibl"<?= $currentLeague === 'ibl' ? ' selected' : '' ?>>IBL</option>
+        <option value="modules.php?name=LeagueControlPanel&amp;league=olympics"<?= $currentLeague === 'olympics' ? ' selected' : '' ?>>Olympics</option>
     </select>
 </div>
         <?php
@@ -140,7 +140,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         return match ($panelData['phase']) {
             'Preseason' => $this->renderPreseasonControls($currentLeague, $panelData),
-            'HEAT' => $this->renderHeatControls($currentLeague, $panelData),
+            'HEAT' => $this->renderHeatControls($panelData),
             'Regular Season' => $this->renderRegularSeasonControls($currentLeague, $panelData),
             'Playoffs' => $this->renderPlayoffsControls($currentLeague, $panelData),
             'Draft' => $this->renderDraftControls($currentLeague, $panelData),
@@ -200,7 +200,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     /**
      * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
-    private function renderHeatControls(string $currentLeague, array $panelData): string
+    private function renderHeatControls(array $panelData): string
     {
         ob_start();
         ?>
@@ -376,7 +376,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         body.append('export', button.dataset.export);
         body.append('_csrf_token', button.dataset.csrfToken);
 
-        fetch('leagueControlPanel.php', {method: 'POST', body: body, credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+        fetch('modules.php?name=LeagueControlPanel', {method: 'POST', body: body, credentials: 'same-origin', headers: {'Accept': 'application/json'}})
             .then(function (response) {
                 return response.json().then(function (data) {
                     if (data.csrfToken) {

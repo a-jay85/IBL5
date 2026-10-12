@@ -1,6 +1,6 @@
 ---
-description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge.
-last_verified: 2026-09-12
+description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges.
+last_verified: 2026-10-11
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -141,3 +141,62 @@ Two corrections were made to the restored script relative to its retired form:
 - `.github/workflows/update-behind-prs.yml` — the workflow this ADR introduces.
 - the eager-rebase workflow (retired; its `paths-ignore` gap was the motivation for this ADR; its `CI_PAT` pattern was adopted here).
 - `.github/workflows/rebase-prs.yml` — the same workflow restored on 2026-09-10 as manual `workflow_dispatch` only, with no auto-trigger. See the 2026-09-10 addendum above.
+
+## Addendum: head-of-line merge line (2026-09-29)
+
+### Context
+
+Measured 2026-09-28. There were 31 open non-draft PRs. After GitHub settled mergeability, 27 were BEHIND, 2 BLOCKED, and 2 DIRTY. Master took 10 to 28 merges on a typical day over the prior 10 days. The repo ran about 2500 Actions runs in about 1.5 days. Each master move sent freshness work to many PRs at once. Those runs competed for the account's concurrent-runner cap with the one PR that was next to land. The churn came from BEHIND updates. Conflicts were rare.
+
+### Decision
+
+The workflow now keeps only the head of the merge line current. The merge line is every PR that has native auto-merge armed, is not a draft, and is based on master. It is ordered by arm time (`autoMergeRequest.enabledAt`), oldest first, with PR number as the tie-break.
+
+- Each pass picks the first line member that is not skipped. If it is BEHIND, the workflow calls update-branch on it and stops. Native auto-merge lands it once CI is green, and that merge push starts the next pass.
+- A member is skipped when it has a merge conflict with master, or when one of the four required checks (`Tests and Analysis`, `E2E Tests`, `human-signoff`, `Meta checks`) is failing on its current head. Pending, in-progress, and cancelled runs do not count as failing. A failing optional check does not count.
+- A skipped PR stays armed. It gets a sticky comment marked `<!-- merge-line-skip -->` that names the reason. The comment is removed once the PR is eligible again.
+- A head that is not BEHIND, or whose mergeability GitHub has not settled, holds the line. The pass does nothing further and never updates a younger PR ahead of it.
+- Selection lives in `bin/merge-line-select`. `bin/test-merge-line-select` tests it against synthetic snapshots and one captured live snapshot.
+- The all-open-PR schedule sweep and the daily 11:30 UTC sweep are removed. The off-quarter-hour cron stays as a head-of-line backstop, because GitHub drops scheduled runs.
+- `workflow_dispatch` takes `pr` and `dry_run`. `pr` updates one named PR even when it is unarmed or red. A conflicted PR is still refused. `dry_run` reports the head, the skips, and the queue length and writes nothing. A dry run uses its own concurrency group, so it cannot cancel a live pass.
+- `pr-canary.yml` covers the armed line only, read from `bin/merge-line-select --list`. Both workflows share one definition of the line.
+
+### Unchanged
+
+Branch protection, `strict: true`, the required checks, and every arming condition stay as they were. The line changes how an approved PR lands. It does not change what gets approved. `bin/pr-triage` still updates a newly armed BEHIND PR once at arm time. That update fires once per arm, so it adds no per-merge fan-out.
+
+### Consequences
+
+- A held or unarmed PR drifts BEHIND until it is armed. That is intended, since it cannot merge before it is armed.
+- A PR whose required check fails only because its base is stale stays skipped until someone updates it. A `workflow_dispatch` run with `pr=<n>` does that in one step.
+- A head whose required checks never finish holds the line. Nothing skips it automatically. A human updates, fixes, or disarms that PR.
+- Log and comment strings in `bin/pr-triage` and `bin/pr-cycle` still say this workflow keeps armed PRs current. That now holds for the head of the line only. The wording is left for a follow-up.
+- The update-branch merge commit can still make a live `bin/post-plan-now` run exit 3. That hazard is tracked in backlog #1064. It now fires at most once per master move.
+
+## Addendum: post-plan BEHIND cap hands off to the merge line (2026-10-04)
+
+**Original behavior.** `/post-plan` Phase 7 re-rebases a strict-protection PR up to three times while `mergeStateStatus` reads `BEHIND`. When the branch was still BEHIND after the third re-rebase, both the compiled harness (`tools/postplan-harness/runner.py`, `_resolve_behind`) and the Sonnet skill fallback (`.claude/skills/post-plan/_phase-7-ci-monitoring.md`, the ceiling block) disabled auto-merge and reported the PR as blocked for a human. The rationale was that an armed PR left BEHIND would wait behind master forever, so the disarm made someone look.
+
+**Live evidence.** On 2026-10-04, during a burndown in which master moved three or more times, #2766 and #2702 both carried READY verdicts and were armed. The cap fired (`phase7: BEHIND cap hit after 3 re-rebases — disarming auto-merge` in each run's `audit.log`), auto-merge was disabled, and both PRs sat open until a human re-armed them by hand. The workflow this ADR describes would have carried both to merge unattended.
+
+**Behavior from today.** At the cap the PR stays armed. The harness logs `phase7: BEHIND cap hit after 3 re-rebases — leaving auto-merge armed; .github/workflows/update-behind-prs.yml (ADR-0081) carries the PR to merge`, leaves `retry_cap` unset, and the run terminates `SHIPPED_ARMED` through the normal path. The skill fallback's ceiling takes the same exit as every other loop exit, so its `On loop exit` re-arm gate runs (prior state `armed` and the conflict flag absent or cleared) and a NOTE names this workflow. The three re-rebases are kept: each one re-watches CI on the rewritten branch.
+
+**Unchanged.** The divergence disarm paths in the harness (`_fail_closed_on_divergence` and the two `disarm=True` call sites inside `_resolve_behind`) still disarm. Phase 6.5 arming conditions are untouched. The skill path still disarms before every rewrite (loop step 2) and re-arms only through the gated `On loop exit`. `_MAX_BEHIND_RETRIES` stays at 3. `RunResult.retry_cap` keeps its `_compute_terminal` precedence as a reserved fail-closed seam with no production writer.
+
+## Addendum: arm-time update goes through the merge line (2026-10-10)
+
+The Unchanged section above says `bin/pr-triage` updates a newly armed BEHIND PR once at arm time, so it adds no per-merge fan-out. That held for a PR armed once. It broke because `bin/pr-cycle` calls `bin/pr-triage --arm` at the end of every run, and the ARMABLE bucket includes PRs that are already armed. Each run re-armed every green PR and called update-branch on every BEHIND one.
+
+**Live evidence.** On 2026-10-10 the pr-cycle runs updated 10, 13, 11, 7, 6, 8 and 12 PRs in single bursts, counted from the `updated branch on` lines in each run's `triage.txt`. The 18:05 PDT burst updated 12 PRs in under a minute. Each update started a full CI round. The head of the line, #3084, then waited behind those runs for runners.
+
+**Behavior from today.** `--arm` arms every ARMABLE PR as before. A BEHIND PR is no longer updated inside the arm loop. When the loop armed at least one BEHIND PR, `bin/pr-triage` runs `bin/merge-line-watch --once` one time after the loop. That pass updates the head of the line only, using the same selector as `.github/workflows/update-behind-prs.yml`. A failed pass exits 1 and leaves every PR armed for the workflow's next run.
+
+## Addendum: post-plan-running skip and stacked update-branch absorption (2026-10-11)
+
+PR #3022 showed two update-branch merges landing on a PR while `bin/post-plan-now` was running on it. The cron line pushed one merge and a later tick or the PR-page button pushed a second on top. Post-plan's remote-head reconcile accepted one update-branch merge on the sha it pushed, so the second left the run diverged and Phase 7 failed closed.
+
+Two changes close the gap.
+
+**Prevention.** `bin/merge-line-select` treats a PR carrying the `post-plan-running` label as skipped with reason `running`. The label marks a live run (`bin/post-plan-now` adds it at start and removes it at exit). Precedence is `running`, then `red`, then `dirty`. In line mode the next PR becomes the head. In `--pr` dispatch mode the selector returns `action=none`. The workflow's notice step logs a `::notice::` for `running` and posts no sticky comment, and a running PR is left out of `clear`. The live query now selects `labels`; a snapshot without labels reads as unlabeled.
+
+**Absorption.** The PR-page "Update branch" button can still push mid-run, so prevention alone is incomplete. `update_branch_merge_equivalent` in `tools/postplan-harness/harness/gitutil.py` now walks first parents from the remote head down to the sha the harness pushed. Every commit on that walk must be a two-parent merge whose second parent is an ancestor of `origin/master` and whose tree equals the clean `git merge-tree --write-tree` result. The walk stops at `UPDATE_BRANCH_MERGE_CHAIN_CAP` (10) merges. Any failing arm, git error, timeout, or an over-cap chain leaves the run diverged. The tree-equivalent and patch-series checks are unchanged.

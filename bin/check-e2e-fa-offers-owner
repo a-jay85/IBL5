@@ -12,6 +12,19 @@
 # Exits 0 (clean) or 1 (a non-owner spec mutates ibl_fa_offers).
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-e2e-fa-offers-owner
+
+Guards the single-owner invariant for the global ibl_fa_offers E2E table.
+Fails if any spec file other than free-agency-submission.spec.ts mutates it.
+
+Arguments: none
+Exit codes: 0 = clean, 1 = a non-owner spec mutates ibl_fa_offers
+EOF
+    exit 0
+fi
+
 ROOT=$(git rev-parse --show-toplevel)
 E2E_FLOWS="$ROOT/ibl5/tests/e2e/flows"
 OWNER="free-agency-submission.spec.ts"

@@ -239,4 +239,29 @@ final class PageCacheTest extends TestCase
 
         self::assertSame(0, PageCache::purge());
     }
+
+    // ── setIfOk ────────────────────────────────────────────────
+
+    public function testSetIfOkStoresBodyFor200(): void
+    {
+        PageCache::setIfOk('k200', '<p>ok</p>', 60, 200);
+
+        self::assertSame('<p>ok</p>', PageCache::get('k200'));
+    }
+
+    public function testSetIfOkSkipsNotFoundStatus(): void
+    {
+        PageCache::setIfOk('k404', '<p>nf</p>', 60, 404);
+
+        self::assertNull(PageCache::get('k404'));
+    }
+
+    public function testSetIfOkSkipsServerErrorAndUnsetStatus(): void
+    {
+        PageCache::setIfOk('k500', '<p>err</p>', 60, 500);
+        PageCache::setIfOk('kfalse', '<p>none</p>', 60, false);
+
+        self::assertNull(PageCache::get('k500'));
+        self::assertNull(PageCache::get('kfalse'));
+    }
 }

@@ -261,14 +261,12 @@ class PlayerContractCalculatorTest extends TestCase
         $playerData->contractYear1Salary = 1000;
         $playerData->contractYear2Salary = 1100;
         $playerData->contractYear3Salary = 1200;
-        $playerData->contractYear4Salary = 0;
-        $playerData->contractYear5Salary = 0;
-        $playerData->contractYear6Salary = 0;
+        // Years 4–6 are intentionally left null to exercise the ?? 0 fallback in getFutureSalaries
 
         $result = $this->calculator->getFutureSalaries($playerData);
 
-        // Offset 0, all 6 years included
-        $this->assertEquals([1000, 1100, 1200, 0, 0, 0], $result);
+        // Offset 0, all 6 years included; years 4–6 default to 0 via null coalescing
+        $this->assertSame([1000, 1100, 1200, 0, 0, 0], $result);
     }
 
     public function testGetFutureSalariesFromYear5(): void
@@ -280,10 +278,8 @@ class PlayerContractCalculatorTest extends TestCase
 
         $result = $this->calculator->getFutureSalaries($playerData);
 
-        // Offset 5, only years 5-6 plus padding
-        $this->assertCount(6, $result);
-        $this->assertSame(5000, $result[0]); // Year 6
-        $this->assertSame(0, $result[1]); // Padding
+        // Offset 5: slice starts at index 5 (year 6 = 5000), padded to 6 elements
+        $this->assertSame([5000, 0, 0, 0, 0, 0], $result);
     }
 
     public function testGetFutureSalariesFromYear6(): void

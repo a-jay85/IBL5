@@ -1,0 +1,12 @@
+# No matrix plan
+
+## Critical Files
+
+- `ibl5/classes/Foo/FooService.php`
+- `ibl5/tests/Foo/FooServiceTest.php`
+
+## Notes
+
+| Item | Detail |
+|------|--------|
+| Scope | One service, one test |

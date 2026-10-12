@@ -21,7 +21,7 @@ class ComparePlayersEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('ComparePlayers');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_plr');
     }
 
@@ -47,7 +47,7 @@ class ComparePlayersEntryPointTest extends ModuleEntryPointTestCase
             ['Player1' => 'Player One', 'Player2' => 'Player Two'],
         );
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_plr');
     }
 
@@ -60,7 +60,7 @@ class ComparePlayersEntryPointTest extends ModuleEntryPointTestCase
             ['Player1' => '', 'Player2' => ''],
         );
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('not found', $output);
     }
 
@@ -74,7 +74,7 @@ class ComparePlayersEntryPointTest extends ModuleEntryPointTestCase
             ['Player1' => $longName, 'Player2' => 'Test'],
         );
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('100 characters', $output);
     }
 }

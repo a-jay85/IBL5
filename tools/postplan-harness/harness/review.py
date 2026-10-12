@@ -198,6 +198,13 @@ def scoring_prompt(findings: list[Finding]) -> str:
     )
 
 
+def _reused_note(reused: list[Finding]) -> str:
+    if not reused:
+        return ""
+    return (f"\n\n{len(reused)} finding(s) on unchanged files reused from a prior run "
+            "(not re-posted).")
+
+
 class ReviewPhase:
     def __init__(self, llm, gh):
         self.llm = llm
@@ -215,8 +222,8 @@ class ReviewPhase:
             "security": cls.has_php,
         }
 
-    def run(self, meta: dict, cls: Classification,
-            plan: PlanInfo) -> tuple[list[Finding], dict, list[dict], list[str]]:
+    def run(self, meta: dict, cls: Classification, plan: PlanInfo,
+            reused: list[Finding] | None = None) -> tuple[list[Finding], dict, list[dict], list[str]]:
         gates = self.gates(cls)
         findings: list[Finding] = []
         degraded_agents: list[str] = []
@@ -236,19 +243,22 @@ class ReviewPhase:
             tasks.append(("D", "code-review", "review-agent-d", "sonnet",
                           agent_d_prompt(meta, cls)))
         if gates["security"]:
-            tasks.append(("security", "security-audit", "security-audit", "haiku",
+            tasks.append(("security", "security-audit", "security-audit", "sonnet",
                           security_prompt(meta, cls, plan)))
 
         def _call_agent(task: tuple[str, str, str, str, str]):
             agent, source, purpose, model, prompt = task
-            try:
-                data = self.llm.call(purpose, model, prompt, schemas.validate_findings,
-                                     normalizer=schemas.unwrap_findings_envelope)
-                return (agent, source, purpose, data, None)
-            except HarnessError as e:
-                if e.kind != "llm-invalid-output":
-                    raise                      # llm-fixture-missing, gh, etc. stay terminal
-                return (agent, source, purpose, [], purpose)  # degraded
+            for attempt in range(2):
+                try:
+                    data = self.llm.call(purpose, model, prompt, schemas.validate_findings,
+                                         normalizer=schemas.unwrap_findings_envelope)
+                    return (agent, source, purpose, data, None)
+                except HarnessError as e:
+                    if e.kind != "llm-invalid-output":
+                        raise                      # llm-fixture-missing, gh, etc. stay terminal
+                    if attempt == 0:
+                        continue  # retry once
+            return (agent, source, purpose, [], purpose)  # degraded after both attempts
 
         # Run all independent agents concurrently; futures list preserves submission order.
         max_workers = max(len(tasks), 1)
@@ -286,12 +296,18 @@ class ReviewPhase:
         code = [f for f in surviving if f.source == "code-review"]
         sec = [f for f in surviving if f.source == "security-audit"]
         code_degraded = [p for p in degraded_agents if p.startswith("review-agent-")]
+        # Interdiff mode: findings on unchanged files were posted by the run that produced
+        # them; they are never re-posted, and their presence rules out "No issues found.".
+        reused_code = [f for f in (reused or []) if f.source == "code-review"]
+        reused_sec = [f for f in (reused or []) if f.source == "security-audit"]
         if code:
             self.gh.post_review_findings(pr, sha, "Code review", code)
         elif code_degraded:
             self.gh.post_review_summary(pr, "Code review",
                                         "Review unavailable - unparseable output from: "
-                                        + ", ".join(code_degraded))
+                                        + ", ".join(code_degraded) + _reused_note(reused_code))
+        elif reused_code:
+            self.gh.post_review_summary(pr, "Code review", _reused_note(reused_code).strip())
         else:
             self.gh.post_review_summary(pr, "Code review", "No issues found.")
         if gates["security"]:
@@ -300,7 +316,9 @@ class ReviewPhase:
             elif "security-audit" in degraded_agents:
                 self.gh.post_review_summary(pr, "Security audit",
                                             "Review unavailable - unparseable output from: "
-                                            "security-audit")
+                                            "security-audit" + _reused_note(reused_sec))
+            elif reused_sec:
+                self.gh.post_review_summary(pr, "Security audit", _reused_note(reused_sec).strip())
             else:
                 self.gh.post_review_summary(
                     pr, "Security audit",

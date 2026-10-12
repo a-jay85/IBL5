@@ -18,6 +18,12 @@ name: Human Sign-off
 # The classifier itself lives in bin/lib/human-signoff-classifier.sh, sourced by
 # BOTH this workflow and bin/test-human-signoff-classifier so the gate's logic
 # cannot drift from its regression test.
+#
+# The `needs-a-human-label` job mirrors the gate's verdict onto the PR as the
+# `needs-a-human` label: added while the gate is red, removed once it passes.
+# It is a separate job so only it holds a write token; the gate job stays
+# read-only. Labels applied with GITHUB_TOKEN do not start new workflow runs,
+# so the label toggle cannot loop back into this workflow.
 
 on:
   pull_request:
@@ -52,3 +58,36 @@ jobs:
           source bin/lib/human-signoff-classifier.sh
 
           hs_eval_pull_request "$TITLE" "$LABELS"
+
+  needs-a-human-label:
+    name: needs-a-human label
+    needs: human-signoff
+    # always() so a red gate still runs this job. A cancelled gate was
+    # superseded by a newer run, which owns the label instead.
+    if: always() && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Sync the needs-a-human label with the gate result
+        # The label is advisory. A label API error must never add a red check
+        # that bin/lib/pr-armable.sh condition (15) would read as a CI failure.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          RESULT: ${{ needs.human-signoff.result }}
+          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'needs-a-human') }}
+        run: |
+          set -euo pipefail
+          if [ "$RESULT" = "failure" ]; then
+            # Create the label on first use; a no-op once it exists.
+            gh label create needs-a-human --color D93F0B \
+              --description "Blocked on the human-signoff check; a maintainer must inspect it and apply human-approved" \
+              2>/dev/null || true
+            gh api --method POST "repos/$GH_REPO/issues/$PR/labels" -f 'labels[]=needs-a-human' >/dev/null
+          elif [ "$HAS_LABEL" = "true" ]; then
+            gh api --method DELETE "repos/$GH_REPO/issues/$PR/labels/needs-a-human" >/dev/null
+          fi

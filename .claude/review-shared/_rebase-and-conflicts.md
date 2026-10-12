@@ -1,6 +1,6 @@
 # /pr-ready runtime Phases 2–3 — rebase onto pinned master, then resolve conflicts
 
-Purpose: the Phase 2 delegation packet (one `sonnet-4-6` sub-agent does the rebase chore against a pinned master SHA) and the Phase 3 three-way conflict-resolution procedure the orchestrator performs itself.
+Purpose: the Phase 2 delegation packet (one `sonnet-5-5` sub-agent does the rebase chore against a pinned master SHA) and the Phase 3 three-way conflict-resolution procedure the orchestrator performs itself.
 
 Read this file at runtime Phase 2 and follow it end-to-end before returning to the spine. Nothing in this file re-resolves `origin/master`.
 
@@ -28,12 +28,12 @@ The recorded tip is a convenience, not a dependency: the guard's reflog arm work
 ````
 ### Delegate — rebase onto pinned master
 - **Tier:** Sonnet
-- **Spawn:** `subagent_type: "sonnet-4-6"`, **omit `model`** — never `model: "sonnet"` (that alias resolves to Sonnet 5). Flat fan-out: this delegate must NOT spawn a sub-agent of its own.
+- **Spawn:** `subagent_type: "sonnet-5-5"`, **omit `model`**. Flat fan-out: this delegate must NOT spawn a sub-agent of its own.
 - **Rules:** run `git show <MASTER_SHA>:.claude/rules/linear-history-squash-merge.md` first and read the printed file. It is path-scoped and its `paths:` list does NOT cover this skill's files, so it will not auto-attach. Load it from the pin, not by path — the tree you are in is behind master by construction (that is why you are rebasing), so a path read can miss it or read a stale copy. If `git show` errors, `Read` it by path and say so in your report line 1.
 - **First returned line, before any other work:** `pwd` and `git rev-parse --show-toplevel`. A mismatch against the expected worktree means the session is not in the PR's tree — the Phase 0.4 `EnterWorktree` did not take and its `ALREADY-IN-TARGET` re-check was skipped, or a `WRONG-WORKTREE` run was let through 0.3b — and everything after it would rebase the wrong tree.
 - **Inputs:** the pinned `<MASTER_SHA>` (use this literal SHA; do NOT resolve `origin/master` yourself, and do NOT reference it as a shell variable), the branch name, the commit count from 2a.
 - **Recipe:** squash (best-effort) then rebase, per 2c/2d below.
-- **Hard limits:** you may run `git rebase`, `git rebase --continue`, `git rebase --abort`, `git merge`, `git cherry`, `git diff`, `git show`. You may NOT run `git commit` or `git push`. The `plan-gate-commit` hook in `~/.claude/hooks/` denies both for sub-agents and will hard-fail the call. Stop at the FIRST conflict; do not attempt to resolve it.
+- **Hard limits:** you may run `git rebase`, `git rebase --continue`, `git rebase --abort`, `git merge`, `git cherry`, `git diff`, `git show`. You may NOT run `git commit` or `git push`. The `bash-guard.sh` Check 22 hook in `~/.claude/hooks/` denies both for sub-agents and will hard-fail the call. Stop at the FIRST conflict; do not attempt to resolve it.
 - **Report back (thin — pointers only, never pasted diffs or file bodies):** line 1 = `pwd` + toplevel; line 2 = the master SHA you rebased onto; line 3 = `clean` or a newline-separated list of conflicted paths from `git diff --name-only --diff-filter=U`; line 4 = `squashed` / `squash-skipped` / `squash-failed`.
 ````
 
@@ -61,7 +61,8 @@ git rebase --onto <MASTER_SHA> <parent-tip-before-merge> <branch>
 
 **2e. Runtime Phase 3 — conflict resolution, on the orchestrator.** The delegate stops at the first conflict and returns; it never resolves. Everything below is the orchestrator's own work.
 
-1. **Always resolve three-way.** For each conflicted path, read all three stages before editing — `git show :1:<path>` (base), `git show :2:<path>` (ours / the rebased-onto master side), `git show :3:<path>` (theirs / the branch side). Reconstruct the intent of both edits, then write the merged file.
+1. **Always resolve three-way.** For each conflicted path, read all three stages before editing: `git show :1:<path>` (base), `git show :2:<path>` (ours), `git show :3:<path>` (theirs). Reconstruct the intent of both edits, then write the merged file. Which side is which depends on the operation: under `git rebase` ours is master and theirs is the branch; under `git merge origin/master` (post-plan Phase 2) ours is the branch and theirs is master. Check `git status` before assuming.
 2. **Never `git checkout --ours <path>` or `--theirs <path>`** unless *every* hunk in that file genuinely takes that side. A whole-file side-take is the single most common way real work disappears in this repo, and it is invisible in the resulting diff.
-3. `git add <path>` each resolved file, then `git rebase --continue` (with `GIT_EDITOR=true` so it does not block on an editor). Repeat until the rebase finishes — or until `git rebase --abort` is the right call, in which case abort, report the conflict set, and stop rather than guessing.
+3. `git add <path>` each resolved file, then `git rebase --continue` (with `GIT_EDITOR=true` so it does not block on an editor), or `git -c core.editor=true commit --no-edit` when the operation was a merge. Repeat until the rebase finishes, or until `git rebase --abort` (or `git merge --abort`) is the right call. In that case abort, report the conflict set, and stop rather than guessing.
 4. **Record the resolved paths in a run note.** Phase 6 must name them explicitly, because conflict-resolution output is **new code that no code review has ever seen**.
+5. **Modify/delete conflicts** (a path with only two stages) are resolvable: keep the deleting side unless the other side's change newly depends on the file. Say which in the run note.

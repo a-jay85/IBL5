@@ -1,7 +1,7 @@
 classes/Trading/CashTransactionHandler.php
-classes/DepthChartEntry/DepthChartEntryApiHandler.php
-classes/DepthChartEntry/DepthChartEntryController.php
-classes/DepthChartEntry/DepthChartEntrySubmissionHandler.php
+classes/DepthChart/DepthChartApiHandler.php
+classes/DepthChart/DepthChartController.php
+classes/DepthChart/DepthChartSubmissionHandler.php
 classes/Logging/DiscordWebhookHandler.php
 classes/DraftHistory/DraftHistoryApiHandler.php
 classes/Draft/DraftController.php
@@ -15,7 +15,7 @@ classes/Api/Controller/LeadersController.php
 classes/LeagueStarters/LeagueStartersApiHandler.php
 classes/Api/Controller/PlayerStatsController.php
 classes/RookieOption/RookieOptionController.php
-classes/SavedDepthChart/SavedDepthChartApiHandler.php
+classes/DepthChartSnapshot/DepthChartSnapshotApiHandler.php
 classes/SeriesRecords/SeriesRecordsController.php
 classes/Api/Controller/StandingsController.php
 classes/Team/TeamController.php

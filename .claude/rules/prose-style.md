@@ -1,6 +1,6 @@
 ---
 description: The AI-tell sentence shapes ("Claude slop") that must not land in repo prose, PR bodies, or chat replies. Lists each tell with its fix, the on-touch policy, and the escape hatches. Enforced by bin/check-prose in CI and by two hooks.
-last_verified: 2026-09-16
+last_verified: 2026-10-05
 paths: "**/*.md"
 ---
 
@@ -45,6 +45,7 @@ Each row is one regex in the script. The fix column is what the deny message pri
 | closing-offer | `let me know if`, `happy to help`, `want me to`, `shall I`. | Stop when the content stops. |
 | sycophant-opener | `Great question`, `Certainly!`, `Absolutely,`. | Delete it. Start with the answer. |
 | lets-opener | A line that opens with `Let's` or `Let me`. Docs only. | State what the section does. |
+| bare-hash-ref | A bare `#N` PR or issue reference not written as a markdown link. Chat only. A one- or two-digit `#N` followed by a ranking word (`seed`, `pick`, `overall`, `ranked`, `in the West`) is league prose and passes. | Link it: PR `[#123](https://github.com/a-jay85/IBL5/pull/123)` or backlog issue `[backlog#45](https://github.com/a-jay85/IBL5-backlog/issues/45)`. |
 
 Two shapes from the same family stay judgment-only because a regex cannot separate them from normal usage: `rather than` and generic three-item lists. Cut them when you see them while editing. Metaphor restatement and narrating your steps are also judgment-only.
 
@@ -56,7 +57,7 @@ Nothing here restricts what goes inside a code span. Quote a tell inside backtic
 
 ## Escape hatches
 
-- A line that carries `<!-- slop-ok -->` is skipped. Use it when a line quotes someone verbatim or shows a tell as an example.
+- `<!-- slop-ok -->` exempts the text up to and including the marker. A marker at the end of a line, or one followed only by a table-cell `|`, skips the whole line. Prose after a mid-line marker is still scanned, so put the marker after the sentence it covers. Use it when a line quotes someone verbatim or shows a tell as an example.
 - The Edit and Write gate accepts a one-shot override. The deny message prints the exact `touch` command. The file is consumed on the next call.
 - The chat gate never blocks twice in one turn. If the rewrite still trips a pattern, the turn ends normally.
 

@@ -27,6 +27,27 @@
 # trip it. Do not "modernize" the binary name.
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ]; then
+    cat <<'EOF'
+Usage: bin/regen-schema-dump [-h HOST] [-u USER] [-p PASS] [-d DB]
+
+Dump the current database schema to a byte-stable reference artifact at
+ibl5/docs/schema/current-schema.sql. Connects to an already-migrated MariaDB
+(all migrations applied), dumps all tables and views (no data), normalizes
+the output so it is byte-identical across runs, and writes it with an
+auto-generated header.
+
+Options:
+  -h HOST  MariaDB host     (default 127.0.0.1)
+  -u USER  MariaDB user     (default root)
+  -p PASS  MariaDB password (default root)
+  -d DB    Scratch DB name  (default ibl5_schema)
+
+Note: -h is for HOST, not --help. Use --help for this message.
+EOF
+    exit 0
+fi
+
 HOST=127.0.0.1
 USER=root
 PASS=root

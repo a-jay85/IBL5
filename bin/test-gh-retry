@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-gh-retry — regression harness for bin/lib/gh-retry.sh (gh_retry).
+#
+# A scripted stub command stands in for `gh`: each invocation consumes the next
+# line of a script file (`<exit-code>|<stderr-text>|<stdout-text>`, last line
+# repeats). A stub `sleep` logs its argument instead of sleeping. No network,
+# no credentials.
+#
+# Run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-gh-retry'
+#      (exit 0 = all pass, exit 1 = a case failed)
+
+set -euo pipefail
+
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+LIB="$REPO_ROOT/bin/lib/gh-retry.sh"
+h_tmp T
+mkdir -p "$T/bin" "$T/tmp"
+
+cat > "$T/bin/fakegh" <<'STUB'
+#!/bin/bash
+n=0
+[ -f "$T/count" ] && n=$(cat "$T/count")
+n=$((n + 1))
+echo "$n" > "$T/count"
+total=$(wc -l < "$T/script")
+line=$n
+[ "$line" -gt "$total" ] && line=$total
+row=$(sed -n "${line}p" "$T/script")
+code=${row%%|*}
+rest=${row#*|}
+errtxt=${rest%%|*}
+outtxt=${rest#*|}
+[ -n "$outtxt" ] && printf '%s' "$outtxt"
+[ -n "$errtxt" ] && printf '%s\n' "$errtxt" >&2
+exit "$code"
+STUB
+cat > "$T/bin/sleep" <<'STUB'
+#!/bin/bash
+echo "$1" >> "$T/sleeps"
+exit 0
+STUB
+chmod +x "$T/bin/fakegh" "$T/bin/sleep"
+
+# reset_case <script-line>... — fresh state for one case.
+reset_case() {
+    rm -rf "$T/count" "$T/sleeps" "$T/o" "$T/e" "$T/rc" "$T/marker" "$T/tmp"
+    mkdir -p "$T/tmp"
+    printf '%s\n' "$@" > "$T/script"
+}
+
+# run_case <delays-mode> — runs gh_retry fakegh in a set -euo pipefail subshell.
+# delays-mode: a literal schedule, "UNSET" to unset the var, or "EMPTY".
+run_case() {
+    local mode="$1"
+    (
+        export T
+        export PATH="$T/bin:/usr/bin:/bin"
+        export TMPDIR="$T/tmp"
+        case "$mode" in
+            UNSET) unset IBL5_GH_RETRY_DELAYS ;;
+            EMPTY) export IBL5_GH_RETRY_DELAYS="" ;;
+            *)     export IBL5_GH_RETRY_DELAYS="$mode" ;;
+        esac
+        export LIB
+        bash -c 'set -euo pipefail; . "$LIB"; rc=0; gh_retry fakegh api x >"$T/o" 2>"$T/e" || rc=$?; echo "$rc" >"$T/rc"; : >"$T/marker"'
+    )
+}
+
+count_of() { if [ -f "$T/count" ]; then cat "$T/count"; else echo absent; fi; }
+slurp()    { if [ -f "$1" ]; then cat "$1"; else echo absent; fi; }
+
+# --- G1 ---
+reset_case '1|HTTP 502: Bad Gateway|partial-1' '1|HTTP 503: Service Unavailable|partial-2' '0||ok-3'
+run_case "0 0 0"
+h_eq "G1-two-5xx-then-ok rc" "0" "$(slurp "$T/rc")"
+h_eq "G1-two-5xx-then-ok stdout is exactly ok-3" "ok-3" "$(slurp "$T/o")"
+h_eq "G1-two-5xx-then-ok attempts" "3" "$(count_of)"
+E="$(slurp "$T/e")"
+h_contains "G1-two-5xx-then-ok replays 502" "$E" "HTTP 502: Bad Gateway"
+h_contains "G1-two-5xx-then-ok replays 503" "$E" "HTTP 503: Service Unavailable"
+h_contains "G1-two-5xx-then-ok notice 1/4" "$E" "gh-retry: attempt 1/4 failed (transient): sleeping 0s"
+h_contains "G1-two-5xx-then-ok notice 2/4" "$E" "gh-retry: attempt 2/4 failed (transient): sleeping 0s"
+h_not_contains "G1-two-5xx-then-ok no partial stdout" "$(slurp "$T/o")" "partial-"
+
+# --- G2 ---
+reset_case '1|HTTP 404: Not Found|'
+run_case "0 0 0"
+h_eq "G2-4xx-fails-at-once rc" "1" "$(slurp "$T/rc")"
+h_eq "G2-4xx-fails-at-once attempts" "1" "$(count_of)"
+h_absent "G2-4xx-fails-at-once no sleep" "$T/sleeps"
+E="$(slurp "$T/e")"
+h_contains "G2-4xx-fails-at-once stderr visible" "$E" "HTTP 404"
+h_not_contains "G2-4xx-fails-at-once no retry notice" "$E" "gh-retry:"
+
+# --- G3 ---
+reset_case '1|HTTP 403: request timed out|'
+run_case "0 0 0"
+h_eq "G3-4xx-beats-timeout-word rc" "1" "$(slurp "$T/rc")"
+h_eq "G3-4xx-beats-timeout-word attempts" "1" "$(count_of)"
+
+# --- G4 ---
+reset_case '7|HTTP 500: Internal Server Error|'
+run_case "0 0 0"
+h_eq "G4-persistent-5xx-fails-closed rc" "7" "$(slurp "$T/rc")"
+h_eq "G4-persistent-5xx-fails-closed attempts" "4" "$(count_of)"
+E="$(slurp "$T/e")"
+h_contains "G4-persistent-5xx-fails-closed notice 1/4" "$E" "gh-retry: attempt 1/4"
+h_contains "G4-persistent-5xx-fails-closed notice 2/4" "$E" "gh-retry: attempt 2/4"
+h_contains "G4-persistent-5xx-fails-closed notice 3/4" "$E" "gh-retry: attempt 3/4"
+h_not_contains "G4-persistent-5xx-fails-closed no 4/4 notice" "$E" "gh-retry: attempt 4/4"
+
+# --- G5 ---
+reset_case '1||'
+run_case "0 0 0"
+h_eq "G5-silent-nonzero-fails-at-once rc" "1" "$(slurp "$T/rc")"
+h_eq "G5-silent-nonzero-fails-at-once attempts" "1" "$(count_of)"
+
+# --- G6 ---
+for pat in 'Gateway Time-out' 'Gateway Timeout' 'connection reset by peer' \
+           'connection refused' 'dial tcp: i/o timeout' 'request timed out'; do
+    reset_case "1|$pat|" '0||ok'
+    run_case "0 0 0"
+    h_eq "G6-transient-patterns [$pat] rc" "0" "$(slurp "$T/rc")"
+    h_eq "G6-transient-patterns [$pat] attempts" "2" "$(count_of)"
+done
+
+# --- G7 ---
+reset_case '1|HTTP 503: Service Unavailable|'
+run_case UNSET
+h_eq "G7-default-delays-unset sleeps" "5 20 60" "$(slurp "$T/sleeps" | tr '\n' ' ' | sed 's/ $//')"
+h_eq "G7-default-delays-unset attempts" "4" "$(count_of)"
+
+# --- G8 ---
+reset_case '1|HTTP 503: Service Unavailable|'
+run_case EMPTY
+h_eq "G8-default-delays-empty sleeps" "5 20 60" "$(slurp "$T/sleeps" | tr '\n' ' ' | sed 's/ $//')"
+h_eq "G8-default-delays-empty attempts" "4" "$(count_of)"
+
+# --- G9 ---
+for bad in "5 x 60" "   "; do
+    reset_case '0||ok'
+    run_case "$bad"
+    h_eq "G9-bad-delays-rejected [$bad] rc" "64" "$(slurp "$T/rc")"
+    h_eq "G9-bad-delays-rejected [$bad] command never ran" "absent" "$(count_of)"
+    h_contains "G9-bad-delays-rejected [$bad] message" "$(slurp "$T/e")" \
+        "gh-retry: IBL5_GH_RETRY_DELAYS must be space-separated non-negative integers"
+done
+
+# --- G10 ---
+reset_case '1|HTTP 502: Bad Gateway|' '0||ok'
+run_case "0 0 0"
+h_eq "G10-tempfiles-cleaned after success" "" "$(ls -A "$T/tmp")"
+reset_case '7|HTTP 500: Internal Server Error|'
+run_case "0 0 0"
+h_eq "G10-tempfiles-cleaned after failure" "" "$(ls -A "$T/tmp")"
+
+# --- G11 ---
+HITS="$(grep -nE '^[[:space:]]*(set|exit)([[:space:]]|$)' "$LIB" || true)"
+h_eq "G11-source-safe no set/exit lines in lib" "" "$HITS"
+reset_case '1|HTTP 404: Not Found|'
+run_case "0 0 0"
+h_exists "G11-source-safe caller continues past failing gh_retry" "$T/marker"
+
+h_done

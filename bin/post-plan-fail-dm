@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/post-plan-fail-dm — send (or hold) the Discord DM for a failed post-plan run.
+#
+# Any failed run lands here. The common one is exit 3, a human-shaped wall: a rebase
+# conflict or a local gate denial. A usage-limit kill is another. Often the
+# Claude session that fired the run is still open in that worktree, reads the same
+# message on stdout, fixes it, and re-fires within minutes. A DM for that case asks
+# nothing of you. So:
+#
+#   - No live interactive Claude session in the worktree -> DM now. Nobody else will fix it.
+#   - A live interactive session in the worktree         -> hold the DM for FAILDM_DELAY seconds
+#     (default 900) in a detached launchd job. When it wakes, a newer
+#     post-plan-now log for the same branch means someone re-fired, so it stays
+#     silent (that newer run DMs on its own if it fails too). No newer log means
+#     the session did not act, so the DM goes out.
+#
+# The session check reads ~/.claude/session-registry/active.json (repo == worktree root,
+# pid alive). An unreadable registry counts as "no session": fail open to DM now.
+# Headless runs do not count: an entry whose pid argv has a -p or --print token is
+# skipped, since no human is there to re-fire. If ps cannot read the argv, the entry
+# counts as live and the DM is held.
+#
+# Usage:
+#   bin/post-plan-fail-dm <root> <safe-slug> <log> <message>
+#   bin/post-plan-fail-dm --deferred <root> <safe-slug> <log> <message>   (the held job)
+#
+# Env (tests): FAILDM_DELAY, FAILDM_REGISTRY, FAILDM_DM_CMD, FAILDM_LAUNCHCTL,
+# FAILDM_PLIST_DIR, FAILDM_LOG_DIR.
+
+if [ "${1:-}" = "--help" ]; then
+    cat <<'EOF'
+Usage: bin/post-plan-fail-dm [--deferred] <root> <safe-slug> <log> <message>
+
+Send (or hold) the Discord DM for a post-plan harness exit 3.
+If a live interactive Claude session is detected in the worktree, holds the
+DM for FAILDM_DELAY seconds via a detached launchd job; sends immediately
+otherwise. Headless sessions (claude -p / --print) do not count.
+
+  --deferred   Run as the held launchd job (wakes after FAILDM_DELAY seconds)
+  root         Worktree root directory
+  safe-slug    Branch slug (safe for filenames)
+  log          Path to the post-plan-now log file
+  message      DM message text
+
+Env:
+  FAILDM_DELAY     Hold delay in seconds (default: 900)
+  FAILDM_REGISTRY  Session registry path
+  FAILDM_DM_CMD    Override discord-dm binary path
+  FAILDM_LAUNCHCTL Override launchctl binary path
+  FAILDM_PLIST_DIR Override LaunchAgents directory
+  FAILDM_LOG_DIR   Override log directory
+
+Exit codes:
+  0  DM sent or hold job scheduled
+  2  Usage error
+EOF
+    exit 0
+fi
+
+set -u
+
+DEFERRED=0
+if [ "${1:-}" = "--deferred" ]; then DEFERRED=1; shift; fi
+if [ $# -ne 4 ]; then
+    echo "usage: bin/post-plan-fail-dm [--deferred] <root> <safe-slug> <log> <message>" >&2
+    exit 2
+fi
+ROOT=$1 SAFE_SLUG=$2 LOG=$3 MSG=$4
+
+SELF=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+# shellcheck source=bin/lib/dm.sh
+. "$(dirname "$SELF")/lib/dm.sh"
+DELAY=${FAILDM_DELAY:-900}
+REGISTRY=${FAILDM_REGISTRY:-$HOME/.claude/session-registry/active.json}
+DM_CMD=$(dm_bin "$ROOT/bin" FAILDM_DM_CMD)
+LAUNCHCTL=${FAILDM_LAUNCHCTL:-launchctl}
+PLIST_DIR=${FAILDM_PLIST_DIR:-$HOME/Library/LaunchAgents}
+LOG_DIR=${FAILDM_LOG_DIR:-$(dirname "$LOG")}
+
+send_dm() {
+    dm_ping "$1" --quiet --attempts 2 >/dev/null 2>&1 || true
+}
+
+# Prints 1 when a live session's repo is $ROOT, else nothing.
+live_session_in_root() {
+    [ -r "$REGISTRY" ] || return 0
+    python3 - "$REGISTRY" "$ROOT" <<'PY' 2>/dev/null || true
+import json, os, subprocess, sys
+reg, root = sys.argv[1], os.path.realpath(sys.argv[2])
+
+def headless(pid):
+    # A headless run was started as `claude -p ...` or `claude --print ...`.
+    # Exact token match only. Anything ps cannot show counts as interactive.
+    try:
+        r = subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(pid)],
+                           capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if r.returncode != 0:
+        return False
+    return any(t in ("-p", "--print") for t in r.stdout.split())
+
+for s in json.load(open(reg)).values():
+    if os.path.realpath(s.get("repo") or "") != root:
+        continue
+    try:
+        pid = int(s.get("pid"))
+        os.kill(pid, 0)
+    except (OSError, TypeError, ValueError):
+        continue
+    if headless(pid):
+        continue
+    print(1)
+    break
+PY
+}
+
+# A post-plan-now log for this branch newer than the stamp means a re-fire. The stamp,
+# not $LOG, is the reference: the held job and the run's own tail both append to $LOG.
+# The date-shaped suffix keeps branch "foo" from matching branch "foo-bar".
+STAMP="$LOG.faildm-stamp"
+newer_run_exists() {
+    local f
+    for f in "$LOG_DIR/post-plan-now-$SAFE_SLUG-"[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-*.log; do
+        [ -e "$f" ] || continue
+        [ "$f" != "$LOG" ] && [ "$f" -nt "$STAMP" ] && return 0
+    done
+    return 1
+}
+
+xml_escape() {
+    local s=$1
+    s=${s//&/&amp;}; s=${s//</&lt;}; s=${s//>/&gt;}
+    printf '%s' "$s"
+}
+
+shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+
+if [ "$DEFERRED" -eq 1 ]; then
+    trap 'rm -f "$STAMP"' EXIT
+    if newer_run_exists; then
+        echo "post-plan-fail-dm: newer run found for $SAFE_SLUG; DM suppressed."
+    else
+        send_dm "Nobody re-ran it within $(( DELAY / 60 )) min, so this one needs you. $MSG"
+        echo "post-plan-fail-dm: no re-run for $SAFE_SLUG; DM sent."
+    fi
+    exit 0
+fi
+
+if [ -z "$(live_session_in_root)" ]; then
+    send_dm "$MSG"
+    echo "post-plan-fail-dm: no live session in $ROOT; DM sent."
+    exit 0
+fi
+
+LOG_BASE=$(basename "$LOG" .log)
+LABEL="com.ibl5.postplan-faildm-${LOG_BASE#post-plan-now-}"
+PLIST="$PLIST_DIR/$LABEL.plist"
+JOB="sleep $DELAY; FAILDM_DELAY=$(shq "$DELAY") FAILDM_DM_CMD=$(shq "$DM_CMD") FAILDM_LOG_DIR=$(shq "$LOG_DIR") $(shq "$SELF") --deferred $(shq "$ROOT") $(shq "$SAFE_SLUG") $(shq "$LOG") $(shq "$MSG"); rm -f $(shq "$PLIST"); launchctl bootout gui/\$(id -u)/$LABEL"
+
+touch "$STAMP"
+mkdir -p "$PLIST_DIR"
+cat > "$PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$(xml_escape "$LABEL")</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-lc</string>
+		<string>$(xml_escape "$JOB")</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>$(xml_escape "$LOG")</string>
+	<key>StandardErrorPath</key>
+	<string>$(xml_escape "$LOG")</string>
+</dict>
+</plist>
+PLIST_EOF
+
+if "$LAUNCHCTL" bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null; then
+    echo "post-plan-fail-dm: a Claude session is live in $ROOT; DM held $(( DELAY / 60 )) min (job $LABEL)."
+else
+    # Could not schedule the hold: fall back to the old behavior rather than lose the alert.
+    rm -f "$PLIST" "$STAMP"
+    send_dm "$MSG"
+    echo "post-plan-fail-dm: could not schedule the hold; DM sent now."
+fi

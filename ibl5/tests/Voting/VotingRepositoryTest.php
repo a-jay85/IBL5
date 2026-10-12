@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Voting;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\WideUnit\WideUnitTestCase;
 use Voting\VotingRepository;
 
@@ -28,6 +29,18 @@ class VotingRepositoryTest extends WideUnitTestCase
         $this->assertSame('LeBron James, Sting', $result[0]['name']);
         $this->assertSame(5, $result[0]['votes']);
         $this->assertSame(99, $result[0]['pid']);
+    }
+
+    public function testFetchAllStarTotalsResolvesPidUsingLastCommaSplit(): void
+    {
+        // Pins VotingRepository::resolvePlayerIds: lookup name is the last-comma split ('Smith, Jr.').
+        $this->mockDb->setVotingResultsQueue([[['name' => 'Smith, Jr., Sting', 'votes' => 3]]]);
+        $this->mockDb->setMockData([['pid' => 77, 'name' => 'Smith, Jr.']]);
+
+        $result = $this->repository->fetchAllStarTotals(['east_f1']);
+
+        $this->assertSame(77, $result[0]['pid']);
+        $this->assertSame('Smith, Jr., Sting', $result[0]['name']);
     }
 
     public function testFetchAllStarTotalsBlankNameUsesPlaceholder(): void
@@ -59,6 +72,76 @@ class VotingRepositoryTest extends WideUnitTestCase
         $this->expectExceptionMessageIsOrContains('Invalid vote column');
 
         $this->repository->fetchAllStarTotals(['east_f1; DROP TABLE']);
+    }
+
+    /**
+     * Literal copy of the vote-column allowlist (independent oracle).
+     *
+     * @return array<string, array{string}>
+     */
+    public static function allowlistedVoteColumnProvider(): array
+    {
+        return [
+            'east_f1' => ['east_f1'],
+            'east_f2' => ['east_f2'],
+            'east_f3' => ['east_f3'],
+            'east_f4' => ['east_f4'],
+            'east_b1' => ['east_b1'],
+            'east_b2' => ['east_b2'],
+            'east_b3' => ['east_b3'],
+            'east_b4' => ['east_b4'],
+            'west_f1' => ['west_f1'],
+            'west_f2' => ['west_f2'],
+            'west_f3' => ['west_f3'],
+            'west_f4' => ['west_f4'],
+            'west_b1' => ['west_b1'],
+            'west_b2' => ['west_b2'],
+            'west_b3' => ['west_b3'],
+            'west_b4' => ['west_b4'],
+            'mvp_1' => ['mvp_1'],
+            'mvp_2' => ['mvp_2'],
+            'mvp_3' => ['mvp_3'],
+            'six_1' => ['six_1'],
+            'six_2' => ['six_2'],
+            'six_3' => ['six_3'],
+            'roy_1' => ['roy_1'],
+            'roy_2' => ['roy_2'],
+            'roy_3' => ['roy_3'],
+            'gm_1' => ['gm_1'],
+            'gm_2' => ['gm_2'],
+            'gm_3' => ['gm_3'],
+        ];
+    }
+
+    #[DataProvider('allowlistedVoteColumnProvider')]
+    public function testFetchAllStarTotalsSplicesEachAllowlistedColumn(string $column): void
+    {
+        $this->mockDb->setVotingResultsQueue([[]]);
+
+        $this->repository->fetchAllStarTotals([$column]);
+
+        $this->assertQueryExecuted('SELECT ' . $column . ' AS name FROM ibl_votes_ASG');
+    }
+
+    #[DataProvider('allowlistedVoteColumnProvider')]
+    public function testFetchEndOfYearTotalsSplicesEachAllowlistedColumn(string $column): void
+    {
+        $this->mockDb->setVotingResultsQueue([[]]);
+
+        $this->repository->fetchEndOfYearTotals([$column => 3]);
+
+        $this->assertQueryExecuted('SELECT ' . $column . ' AS name, 3 AS score FROM ibl_votes_EOY');
+    }
+
+    public function testFetchEndOfYearTotalsRejectsNonAllowlistedColumn(): void
+    {
+        try {
+            $this->repository->fetchEndOfYearTotals(['mvp_1; DROP TABLE x' => 3]);
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('Invalid vote column', $e->getMessage());
+            self::assertSame([], $this->mockDb->getExecutedQueries());
+        }
     }
 
     public function testSaveEoyVoteAndMarkCooldownTargetCorrectTables(): void

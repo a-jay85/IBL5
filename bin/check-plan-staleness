@@ -48,6 +48,21 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-plan-staleness <plan-file>
+
+Checks whether a plan file references repo paths that no longer exist.
+Tokens in fenced code blocks and non-dependency headings are exempt.
+
+Arguments:
+  <plan-file>   path to the plan file (or automouse queue symlink)
+
+Exit codes: 0 = all tokens resolve, 1 = stale tokens found, 2 = usage error
+EOF
+    exit 0
+fi
+
 usage() {
     echo "Usage: bin/check-plan-staleness <plan-file>" >&2
 }

@@ -20,11 +20,12 @@
 #     unmet:<dep>                    <dep> resolved cleanly and has not merged
 #     unresolvable:<dep>:<reason>    <dep> could not be evaluated at all
 #
-#   <reason> is drawn from a closed set: gh-error | bad-value | empty-value | no-done-dir | unreadable-plan
+#   <reason> is drawn from a closed set: gh-error | bad-value | empty-value | no-done-dir | unreadable-plan | closed-unmerged | no-pr
 #
 #   The function is a pure query. It writes no files, mutates no globals, and
 #   MUST NOT touch the attempt counter or any queue/ sidecar. Its only external
-#   effect is a read-only `gh pr view` when a dependency is a PR number.
+#   effect is a read-only gh query: `gh pr view` when a dependency is a PR
+#   number, `gh pr list --head <slug>` when a slug dependency is in done/.
 #
 # Why "always return 0": both call sites run under set -euo pipefail. A function
 # returning non-zero inside RESULT=$(plan_depends_on_status ...) aborts the entire
@@ -133,7 +134,9 @@ plan_depends_on_status() {
             continue
         fi
 
-        # 5c. Plan slug — check done/
+        # 5c. Plan slug — done/ membership is necessary, a MERGED PR is sufficient.
+        # A plan lands in done/ when post-plan finishes, which can be before its
+        # PR merges (auto-merge armed, held for human signoff, or later closed).
         if [ ! -d "$done_dir" ]; then
             printf 'unresolvable:%s:no-done-dir\n' "$dep"
             return 0
@@ -142,6 +145,22 @@ plan_depends_on_status() {
             printf 'unmet:%s\n' "$dep"
             return 0
         fi
+        # The slug is the branch name: handoffs are gone once a plan is in done/,
+        # so this is the same fallback automouse_branch_for_plan uses.
+        local slug_state
+        if ! slug_state=$(cd "$repo_root" && GH_PROMPT_DISABLED=1 "$GH" pr list \
+                          --head "$dep" --state all --limit 1 \
+                          --json state --jq '.[0].state // empty' 2>/dev/null); then
+            printf 'unresolvable:%s:gh-error\n' "$dep"
+            return 0
+        fi
+        case "$slug_state" in
+            MERGED) ;;
+            OPEN)   printf 'unmet:%s\n' "$dep"; return 0 ;;
+            CLOSED) printf 'unresolvable:%s:closed-unmerged\n' "$dep"; return 0 ;;
+            "")     printf 'unresolvable:%s:no-pr\n' "$dep"; return 0 ;;
+            *)      printf 'unresolvable:%s:gh-error\n' "$dep"; return 0 ;;
+        esac
     done
 
     printf 'met\n'

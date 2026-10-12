@@ -1,0 +1,19 @@
+parameters:
+	ignoreErrors:
+		-
+			rawMessage: 'Fixture message for argument.type.'
+			identifier: argument.type
+			count: 1
+			path: classes/Fixture/File0.php
+
+		-
+			rawMessage: 'Fixture message for argument.type.'
+			identifier: argument.type
+			count: 1
+			path: classes/Fixture/File1.php
+
+		-
+			rawMessage: 'Fixture message for method.notFound.'
+			identifier: method.notFound
+			count: 1
+			path: classes/Fixture/Other0.php

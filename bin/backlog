@@ -6,17 +6,74 @@
 # Usage:
 #   bin/backlog search <term>            gh issue list --search "<term>"
 #   bin/backlog open [<label>]           gh issue list --state open [--label <label>]
-#   bin/backlog new <label> <title>      gh issue create --label <label> --title "<title>" --body ""
+#   bin/backlog new <label> <title> <body>
+#                                        files under the per-PR cap of 3 (4th+ fold into one roll-up issue)
+#                                        <body> must start with the origin PR URL, cite a
+#                                        file:line, and exceed 100 characters.
+#   bin/backlog for-pr <pr-url>          open issues whose body starts with <pr-url>
 #   bin/backlog close <n> <reason>       gh issue close <n> -c "<reason>"
+#   bin/backlog burndown-delta           open issues new/updated since the last triage report, plus
+#                                        the first 5 item lines per P section as calibration (JSON)
+#   bin/backlog burndown-refresh <ranks-file>
+#                                        merge re-ranked lines into a new dated triage report
+#   bin/backlog burndown [--pair A,B]... [--after <ledger>]...
+#                                        select units up to 5 (less what the earlier ledgers of
+#                                        this run hold) and write the ledger
+#   bin/backlog burndown-record <ledger> <issue> key=value...
+#                                        update one ledger item (route, slug, status, pr_url, reason)
+#     keys: route= slug= status= pr_url= reason=blocked|out-of-repo blocked_by=<PR> why=<text>
+#     status=skipped needs why= (one line, at most 200 chars) or reason=
+#   bin/backlog burndown-tag <issue> reason=blocked|out-of-repo [blocked_by=<PR>]
+#                                        tag an issue burndown skips, with no ledger
+#   bin/backlog burndown-status [<ledger>]        read-only live status table
+#   bin/backlog burndown-close-merged [<ledger>]  close backlog issues of merged ad-hoc PRs
+#   bin/backlog burndown-sweep                    sweep all ledgers: record merges, close merged ad-hoc issues, flip zombies, report HELD worktrees
+#   bin/backlog burndown-held                     read-only: HELD lines for skipped ad-hoc worktrees with unshipped work
+#   bin/backlog burndown-prompt <ledger> <issue> <slug> [--after <ledger>]... [--evidence <file>]
+#                                        print the bin/plan-now prompt for one ledger item
+#   bin/backlog burndown-launch                   exec claude --model claude-sonnet-5-5 "/burndown" (BURNDOWN_CLAUDE overrides the binary)
 #
 # Flags (must precede subcommand):
 #   --help, -h       Show this help and exit 0
-#   --dry-run        Print the composed gh command; do not execute
+#   --dry-run        Print the composed gh command; do not execute. For `new`, read GitHub and
+#                    print the cap decision (would-create, would-convert, ...) without filing
 #
 # Requires: gh authenticated against the repo.
 set -uo pipefail
 
 REPO="a-jay85/IBL5-backlog"
+GH="${BACKLOG_GH:-gh}"   # test seam: bin/test-backlog Case 9 points this at a stub
+# The per-PR follow-up cap lives in one Python module shared with the post-plan harness.
+HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tools/postplan-harness"
+
+# Origin-PR anchor shared by `new` body validation and `for-pr` lookup.
+PR_URL_RE='^https://github\.com/a-jay85/IBL5/pull/[0-9]+'
+PR_URL_EXACT_RE='^https://github\.com/a-jay85/IBL5/pull/[0-9]+$'
+FILE_LINE_RE='[a-zA-Z0-9_./-]+:[0-9]+'
+BODY_MIN_LEN=101
+
+# validate_body <body>: print the first failed rule to stderr and return 1.
+validate_body() {
+    local body="$1" first
+    if [ -z "${body//[[:space:]]/}" ]; then
+        printf 'new: body is empty; pass <origin PR URL> + file:line + failure scenario\n' >&2
+        return 1
+    fi
+    first="${body%%$'\n'*}"
+    if ! [[ "$first" =~ $PR_URL_RE ]]; then
+        printf 'new: body must start with an origin PR URL (https://github.com/a-jay85/IBL5/pull/N)\n' >&2
+        return 1
+    fi
+    if ! grep -qE -- "$FILE_LINE_RE" <<< "$body"; then
+        printf 'new: body needs a file:line location (e.g. bin/backlog:83)\n' >&2
+        return 1
+    fi
+    if [ "${#body}" -lt "$BODY_MIN_LEN" ]; then
+        printf 'new: body is too short (%d chars; need >100 with a failure scenario)\n' "${#body}" >&2
+        return 1
+    fi
+    return 0
+}
 
 usage() {
     cat <<'USAGE'
@@ -24,12 +81,37 @@ Usage: bin/backlog [--dry-run] <subcommand> [args...]
 
   search <term>         List open issues matching <term>
   open [<label>]        List open issues (optionally filtered by label)
-  new <label> <title>   Create an issue with the given label and title
+  new <label> <title> <body>
+                        File an issue under the per-PR cap of 3 (the 4th and later
+                        fold into one roll-up issue). <body> must start with the
+                        origin PR URL (https://github.com/a-jay85/IBL5/pull/N), cite
+                        a file:line, state a failure scenario, and exceed 100 chars
+  for-pr <pr-url>       List open issues filed from <pr-url> (body starts with it)
   close <n> <reason>    Close issue #<n> with a comment
+  burndown-delta        Issues opened/updated since the last triage report, plus calibration lines (JSON)
+  burndown-refresh <f>  Merge re-ranked lines from <f> into a new dated report
+  burndown [--pair A,B] [--after <ledger>]...
+                        Pick units up to 5, less what the earlier ledgers of this run hold; prints LEDGER: <path> last
+  burndown-record <ledger> <n> key=value...
+                        Set route=, slug=, status=, pr_url=, reason=, blocked_by=, why= on ledger item <n>
+  burndown-tag <n> reason=blocked|out-of-repo [blocked_by=<PR>]
+                        Tag issue <n> so burndown skips it (no ledger needed)
+  burndown-status [<ledger>]
+                        Read-only live status of a batch (default: newest ledger)
+  burndown-close-merged [<ledger>]
+                        Close backlog issues whose ad-hoc PR merged
+  burndown-sweep
+                        Sweep every ledger: record merges and PR URLs, close merged ad-hoc issues, flip zombie plans, report HELD worktrees
+  burndown-held
+                        Print HELD lines for skipped ad-hoc worktrees that are dirty or ahead with no PR (read-only)
+  burndown-prompt <ledger> <n> <slug> [--after <ledger>]... [--evidence <file>]
+                        Print the finished bin/plan-now prompt for ledger item <n>
+  burndown-launch       Start /burndown in claude pinned to Sonnet 5.5 (claude-sonnet-5-5)
 
 Flags:
   --help, -h    Show this help
-  --dry-run     Print the gh command without executing it
+  --dry-run     Print the gh command without executing it. `new --dry-run` reads
+                GitHub and prints the cap decision without filing
 
 Repository: a-jay85/IBL5-backlog
 USAGE
@@ -66,25 +148,41 @@ case "$CMD" in
         if [ $# -eq 0 ]; then
             printf 'search requires a <term>\n' >&2; exit 2
         fi
-        run gh issue list --repo "$REPO" --state open --search "$*"
+        run "$GH" issue list --repo "$REPO" --state open --search "$*"
         ;;
     open)
         if [ $# -eq 0 ]; then
-            run gh issue list --repo "$REPO" --state open
+            run "$GH" issue list --repo "$REPO" --state open
         else
-            run gh issue list --repo "$REPO" --state open --label "$1"
+            run "$GH" issue list --repo "$REPO" --state open --label "$1"
         fi
         ;;
     new)
-        if [ $# -lt 2 ]; then
-            printf 'new requires <label> <title>\n' >&2; exit 2
+        if [ $# -ne 3 ]; then
+            printf 'new requires <label> <title> <body> (quote the title and body)\n' >&2; exit 2
         fi
-        LABEL="$1"; shift
-        TITLE="$*"
-        # --body is mandatory for a non-interactive `gh issue create`; without it
-        # gh aborts with "must provide `--title` and `--body`". The title carries the
-        # finding, so an empty body is the right default.
-        run gh issue create --repo "$REPO" --label "$LABEL" --title "$TITLE" --body ""
+        LABEL="$1"; TITLE="$2"; BODY="$3"
+        validate_body "$BODY" || exit 2
+        SUB="file"
+        [ "$DRY_RUN" -eq 1 ] && SUB="plan"
+        PYTHONPATH="$HARNESS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+            exec python3 -m harness.followcap "$SUB" "$LABEL" "$TITLE" "$BODY"
+        ;;
+    for-pr)
+        if [ $# -ne 1 ]; then
+            printf 'for-pr requires <pr-url>\n' >&2; exit 2
+        fi
+        PR_URL="$1"
+        if ! [[ "$PR_URL" =~ $PR_URL_EXACT_RE ]]; then
+            printf 'for-pr requires a PR URL (https://github.com/a-jay85/IBL5/pull/N)\n' >&2; exit 2
+        fi
+        # startswith alone lets pull/12 match a pull/123 body; the second select
+        # drops a match whose next character is another digit.
+        JQ_FILTER=".[] | select(.body | startswith(\"$PR_URL\"))"
+        JQ_FILTER+=" | select(.body | ltrimstr(\"$PR_URL\") | test(\"^[0-9]\") | not)"
+        JQ_FILTER+=" | \"#\\(.number) \\(.title)\""
+        run "$GH" issue list --repo "$REPO" --state open --limit 1000 \
+            --json number,title,body --jq "$JQ_FILTER"
         ;;
     close)
         if [ $# -lt 2 ]; then
@@ -92,7 +190,17 @@ case "$CMD" in
         fi
         NUM="$1"; shift
         REASON="$*"
-        run gh issue close "$NUM" --repo "$REPO" -c "$REASON"
+        run "$GH" issue close "$NUM" --repo "$REPO" -c "$REASON"
+        ;;
+    burndown|burndown-*)
+        if [ "$DRY_RUN" -eq 1 ]; then
+            printf '%s: --dry-run is not supported; burndown-status is the read-only view\n' "$CMD" >&2
+            exit 2
+        fi
+        # shellcheck source=lib/burndown.sh
+        . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/burndown.sh" || exit 3
+        bd_main "$CMD" "$@"
+        exit $?
         ;;
     *)
         printf 'Unknown subcommand: %s\n' "$CMD" >&2

@@ -58,7 +58,7 @@ class NavigationRepositoryTest extends DatabaseTestCase
         self::assertIsArray($result);
 
         // Should have conference keys
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         foreach ($result as $conference => $divisions) {
             self::assertIsString($conference);
             self::assertIsArray($divisions);
@@ -90,5 +90,49 @@ class NavigationRepositoryTest extends DatabaseTestCase
 
         // Production may have fewer matches than CI seed (team name mismatches)
         self::assertGreaterThanOrEqual(26, $totalTeams);
+    }
+
+    public function testGetTeamsDataBreaksTeamCityTiesByTeamidAscending(): void
+    {
+        $divisionResult = $this->db->query(
+            "SELECT ti.teamid FROM ibl_team_info ti
+             JOIN ibl_standings s ON ti.team_name = s.team_name
+             WHERE s.conference = 'Eastern'
+               AND s.division = (SELECT MIN(division) FROM ibl_standings WHERE conference = 'Eastern')
+             ORDER BY ti.teamid"
+        );
+        self::assertInstanceOf(\mysqli_result::class, $divisionResult);
+        $divisionTeamids = array_map('intval', array_column($divisionResult->fetch_all(MYSQLI_ASSOC), 'teamid'));
+        self::assertGreaterThanOrEqual(2, count($divisionTeamids));
+
+        $this->db->query(
+            "UPDATE ibl_team_info SET team_city = 'Aaa Tie' WHERE teamid IN (" . implode(', ', $divisionTeamids) . ')'
+        );
+
+        $result = $this->repo->getTeamsData();
+
+        self::assertNotNull($result);
+        $teamids = [];
+        $totalTeams = 0;
+        foreach ($result as $divisions) {
+            foreach ($divisions as $teams) {
+                foreach ($teams as $team) {
+                    $totalTeams++;
+                    if (in_array($team['teamid'], $divisionTeamids, true)) {
+                        $teamids[] = $team['teamid'];
+                    }
+                }
+            }
+        }
+
+        self::assertSame($divisionTeamids, $teamids);
+
+        $countResult = $this->db->query(
+            'SELECT COUNT(*) AS n FROM ibl_team_info ti JOIN ibl_standings s ON ti.team_name = s.team_name'
+        );
+        self::assertInstanceOf(\mysqli_result::class, $countResult);
+        $joinCount = $countResult->fetch_assoc();
+        self::assertNotNull($joinCount);
+        self::assertSame((int) $joinCount['n'], $totalTeams);
     }
 }

@@ -187,7 +187,7 @@ final class HttpRequestTest extends TestCase
 
         $violations = $this->statelessnessViolations($stateful);
 
-        self::assertNotEmpty($violations);
+        self::assertNotSame([], $violations);
         self::assertStringContainsString('db', implode("\n", $violations));
     }
 

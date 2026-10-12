@@ -24,7 +24,9 @@
 #                              /post-plan Phase 5.0 now executes every post-impl
 #                              one unattended. A phase pointer, an ellipsis, an
 #                              unbound <placeholder>, a bare file path, bare SQL,
-#                              or "same …"/"re-run …" prose is not runnable.
+#                              or "same …"/"re-run …" prose is not runnable,
+#                              or a cell whose backtick count is odd after
+#                              stripping the outermost pair.
 #                              Silent when the plan has no CLI-executable row.
 #   7  No unresolved decisions — any table row carrying DECIDE / TBD /
 #                              "subject to validation" / "subject to review" is a
@@ -102,7 +104,10 @@
 #   C  Context budget        — a marathon-sized plan (>= 500 lines OR >= 12
 #                              numbered Step/Phase headings) predicts an
 #                              implementation session that breaches the ~150K
-#                              context dumb-zone. Measured 2026-07-07 on the
+#                              context dumb-zone (degradation unmeasured on Opus 5.5
+#                              as of 2026-10-08; method: dz-extract.py drops
+#                              isSidechain lines, dz-score.py bands the rest).
+#                              Measured 2026-07-07 on the
 #                              automouse corpus: Opus implementation runs that
 #                              exceeded 150K peak context executed plans of
 #                              median ~566 lines / ~20 phases, while the runs
@@ -155,8 +160,12 @@
 #                              verbatim) AND every backtick-quoted token in
 #                              that field must appear literally as a substring
 #                              in the packet's **Self-verify:** block. A
-#                              `no-assertions: <reason>` line inside the
-#                              packet clears BOTH sub-checks for that packet
+#                              `no-assertions: <reason>` marker line inside
+#                              the packet clears BOTH sub-checks for that
+#                              packet. The marker must open its line (after
+#                              optional indent, >, a -/* bullet, <!--, or a
+#                              backtick) and carry a non-empty reason; a
+#                              mid-sentence prose mention does not count
 #                              (mirrors no-adr: / context-budget:). Runs for
 #                              ALL plans (not impl_model-gated, unlike gate S).
 #                              Two past PRs were blocked because a delegate
@@ -205,6 +214,41 @@
 #                              Truly-manual rows, or whose manual rows are
 #                              non-visual ("the exported CSV opens in Excel"),
 #                              never reaches it.
+#   X  (no-change) marker    — a `(no-change)` matrix marker sits on a Visual-regression
+#                              row, directly after the backticked test token. The
+#                              post-plan harness honors it nowhere else, so a
+#                              misplaced one is a silent no-op that surfaces only
+#                              after implementation.
+#                              A mention inside a backtick code span, or inside a
+#                              fenced fixture block, is not a marker and is skipped.
+#   RO (run-only) marker     — a `(run-only)` matrix marker (any PHPUnit / API-test /
+#                              E2E / Visual-regression row) sits directly after the
+#                              row's planned test token, names a path that exists on
+#                              the base branch, is not also marked (no-change), and
+#                              is not a must-appear ## Critical Files entry. The
+#                              post-plan harness honors it nowhere else, and a
+#                              misplaced one is a silent no-op that holds arming
+#                              condition (3) after implementation. Warns (never
+#                              fails) when a phase line pairs the token with an
+#                              edit verb, and when an unmarked test row names a
+#                              path that exists on the base branch but no phase
+#                              line or Critical Files entry cites. No resolvable
+#                              base ref fails OPEN for the existence checks only.
+#   ND **No diff:** marker   — a `**No diff:** <reason>` phase marker sits inside a
+#                              `## Phase N:` / `## Step N:` body with a reason of 15+
+#                              characters. The post-plan harness honors it nowhere
+#                              else (planfile.parse_phases), so a short reason or a
+#                              marker outside a phase is a silent no-op.
+#   VR VR snapshots marker   — a `## Critical Files` entry that
+#                              cf_parse_section_raw classifies MUST_APPEAR and
+#                              whose path contains `-snapshots` must carry the
+#                              whole-word token `vr-baseline-change` on its
+#                              line (a deliberate regen or deletion). Otherwise
+#                              mark it `(conditional — only if VR baselines
+#                              change)`, which exempts it. CI changes a
+#                              baseline dir only on a screenshot diff, so an
+#                              unmarked entry holds post-plan forever
+#                              (backlog#1277). Fenced examples never count.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -232,6 +276,24 @@
 # Bash 3.2 / macOS compatible: no mapfile, no declare -A; temp files collect
 # state. `shell=bash` keeps shellcheck's SC3xxx (sh-dialect) warnings quiet on
 # the intentional bashisms.
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-plan [--print-critical-files] [--draft] <plan-file>
+
+Mechanical lint for /plan output (the Step-4 deterministic gates).
+
+  --print-critical-files  Print the parsed critical-files section and exit
+  --draft                 Run only gate [D] (phase-count drift) against a draft plan
+  <plan-file>             Path to the plan file to check
+
+Exit codes:
+  0  All gates passed
+  1  One or more gate violations found
+  2  Usage error (missing or non-existent plan file)
+EOF
+    exit 0
+fi
 
 set -u
 
@@ -393,6 +455,39 @@ awk '
     inm && !/^[[:space:]]*\|/ { inm=0 }
 ' "$PLAN_FILE" > "$MATRIX_FILE"
 
+# Fence-aware body + matrix, shared by gates X and P. $MATRIX_FILE above is
+# deliberately fence-blind (gates 3/V/G/Q read it as-is); gates X and P must NOT
+# see rows that sit inside a fenced fixture block, because a fence-blind read
+# makes a plan that DOCUMENTS a marker read as CARRYING it, and lets a fixture's
+# matrix row clear a real declared artifact. Built once, here, because gate X
+# (below) runs before gate P. Fence logic is gate T's, verbatim: a closing fence
+# is backticks-only AND at least as long as the opener.
+awk '
+    function fence_ticks(s,   t) {
+        if (match(s, /^[ \t]*`+/)) {
+            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+        }
+        return 0
+    }
+    BEGIN { in_fence = 0; fence_len = 0 }
+    {
+        n = fence_ticks($0)
+        # A closing fence is backticks-only AND at least as long as the opener.
+        if (in_fence) { if (n >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { in_fence = 0; fence_len = 0 }; next }
+        if (n >= 3)   { in_fence = 1; fence_len = n; next }
+        print
+    }
+' "$PLAN_FILE" > "$GATEP_BODY"
+
+# [P]'s own matrix parse — same shape as :201-205 but over the fence-stripped
+# body. NOT $MATRIX_FILE, which is built from the raw file and would let a
+# fenced fixture row clear a real artifact.
+awk '
+    /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
+    inm && /^[[:space:]]*\|/ { print; next }
+    inm && !/^[[:space:]]*\|/ { inm=0 }
+' "$GATEP_BODY" > "$GATEP_MATRIX"
+
 # The isolation awk consumes the header row, but gate V needs its column count to
 # tell an escaped pipe from a raw one. Grab it separately; 0 means "unknown, skip
 # that sub-check". A legal trailing `| PR |` column simply raises the number.
@@ -466,6 +561,12 @@ while IFS= read -r row; do
         _probe=$(printf '%s' "$MC_LOC" \
             | sed -E 's#[A-Za-z0-9_/@^~.-]+\.\.\.[A-Za-z0-9_/@^~-]+#RANGE#g' \
             | sed -E 's#(^|[[:space:]])[A-Za-z0-9_./@-]*/\.\.\.#\1WILD#g')
+        # Phase 5.0 strips ONE leading and ONE trailing backtick before `bash -c`.
+        # Mirror that strip, count what is left: an odd count means a stray
+        # backtick survives into the command (`cmd` trailing prose → cmd` trailing
+        # prose → bash exits 2 "unexpected EOF") and Phase 5.0 reports a false MISSING.
+        _stripped=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
+        _bt_ct=$(printf '%s' "$_stripped" | tr -cd '`' | wc -c | tr -d ' ')
         if printf '%s' "$MC_LOC" | grep -qiE '^(phase|step|row)[[:space:]]+[0-9]'; then
             _bad="a phase/step pointer, not a command"
         elif printf '%s' "$_probe" | grep -q '…' || printf '%s' "$_probe" | grep -qF '...'; then
@@ -480,6 +581,8 @@ while IFS= read -r row; do
             _bad="prose referring to another row, not a command"
         elif printf '%s' "$MC_LOC" | grep -qE '(^|[[:space:]])/path/to[/[:space:]]'; then
             _bad="a /path/to placeholder — bind the real path with \$(git rev-parse --show-toplevel) or a \$VAR that has a stated default"
+        elif [ "$(( _bt_ct % 2 ))" -ne 0 ]; then
+            _bad="unbalanced backtick after Phase 5.0 strip — prose after the closing backtick causes bash -c to exit 2 (unexpected EOF); move description outside the backticks or into a shell comment inside them: \`cmd # description\`"
         fi
         if [ -n "$_bad" ]; then
             viol "[V] CLI-executable row (row ${MC_NUM:-?}) has a non-runnable location cell: \"${MC_LOC}\" — ${_bad}. It must be a single shell command. Not accepted: 'Phase N' pointers, '...' ellipsis, '<placeholder>' tokens, bare file paths, bare SQL. Valid examples: bin/check-docs / grep -c 'FunctionName' ibl5/classes/Foo.php / python3 -c \"import sys; sys.exit(0)\""
@@ -529,22 +632,25 @@ done < <(grep -E '^[[:space:]]*\|' "$PLAN_FILE")
 # path ibl5/docs/decisions/NNNN-*.md (NNNN != 0000, mirror hasAddedAdr() — a new ADR
 # is ADDED, not merely cited for context) OR a literal `no-adr:` marker (mirror
 # BYPASS_REGEX intent — the substring suffices at plan-lint granularity).
+# The literal placeholder ibl5/docs/decisions/NNNN-slug.md (example) on a creation-cue line also
+# resolves: plans leave the ADR number to bin/next-adr at impl time (see gate [A]).
 #
 # "Authoring" means the ADR path appears on a line that also carries a creation cue
 # (same regex as gate8_is_created). A bare citation like "per ADR-0062, see
 # ibl5/docs/decisions/0062-x.md" does NOT resolve the gate; a plan step like
 # "author ibl5/docs/decisions/0099-x.md" does. This mirrors hasAddedAdr()'s
 # diff-filter=A intent at plan-lint granularity.
+GATE8_AUTHOR_CUE_RE='([Cc]reate|[Aa]uthor|[Ww]rite|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)'
 GATE8_RESOLVED=0
 while IFS= read -r _adr_path; do
     [ -n "$_adr_path" ] || continue
     printf '%s\n' "$_adr_path" | grep -qvE '/decisions/0000-' || continue
     if grep -F -- "$_adr_path" "$PLAN_FILE" \
-        | grep -qE '([Cc]reate|[Aa]uthor|[Ww]rite|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)'; then
+        | grep -qE "$GATE8_AUTHOR_CUE_RE"; then
         GATE8_RESOLVED=1
         break
     fi
-done < <(grep -oE 'ibl5/docs/decisions/[0-9]{4}-[A-Za-z0-9._/-]*\.md' "$PLAN_FILE" 2>/dev/null)
+done < <(grep -oE 'ibl5/docs/decisions/([0-9]{4}|NNNN)-[A-Za-z0-9._/-]*\.md' "$PLAN_FILE" 2>/dev/null)
 if grep -qF 'no-adr:' "$PLAN_FILE"; then
     GATE8_RESOLVED=1
 fi
@@ -702,6 +808,11 @@ done < <(awk '
 #   (c) patterns live in bin/lib/hold-check-patterns.txt because harness/classify.py
 #       reads the same file; the parity test in bin/test-check-plan keeps them from
 #       drifting between the two languages.
+#   (d) gate H(c): the **Decision:** paragraph is the only hold text /post-plan
+#       renders into the PR body, so it is checked as reader-facing prose:
+#       bin/check-prose tells, an empty body, more than 40 words in total, and
+#       the legacy "The human/reviewer/owner accepts ..." opener all fail. A hold
+#       section without a Decision line gets no H(c) check (unchanged).
 if [ "$FM_HOLD" -eq 1 ]; then
     if ! grep -qiE '^##[[:space:]]+Automouse Hold Justification[[:space:]]*$' "$PLAN_FILE"; then
         viol "[H] plan declares auto_merge: false but has no '## Automouse Hold Justification' section (Step 4.5 — record why the hold is reducible-confirmed or intrinsic)"
@@ -710,6 +821,29 @@ if [ "$FM_HOLD" -eq 1 ]; then
             [ -n "$hb_hit" ] || continue
             viol "[H] hold justification asks the human to run a check an agent can run (line ${hb_hit%%:*}): ${hb_hit#*:} — move the observable check into the Verification Matrix and keep only the irreducible judgment, on a '**Decision:**' line. See /plan Step 4.5 'Record the outcome'."
         done < <(hold_check_violations "$PLAN_FILE")
+        # Gate H(c): Decision paragraph is reader-facing prose (see (d) above).
+        if command -v hold_decision_paragraphs >/dev/null 2>&1; then
+            HD_TEXT=$(hold_decision_paragraphs "$PLAN_FILE")
+            if [ -n "$HD_TEXT" ]; then
+                HD_BODY=$(sed -E 's/^[ ]*\*\*Decision:\*\*[ ]*//' <<< "$HD_TEXT")
+                HD_WORDS=$(wc -w <<< "$HD_BODY" | tr -d '[:space:]')
+                if [ "$HD_WORDS" -eq 0 ]; then
+                    viol "[H] Decision line is empty — write one plain yes/no sentence for the person pressing merge, e.g. \"Merge if you're OK with about 7% more PRs being held until their body declares scope.\""
+                elif [ "$HD_WORDS" -gt 40 ]; then
+                    viol "[H] Decision line is ${HD_WORDS} words (cap 40) — the PR body shows it to the person pressing merge; cut it to one short yes/no sentence"
+                fi
+                if grep -qiE '^[[:space:]]*the[[:space:]]+(human|reviewer|owner)([[:space:]]+[[:alpha:]-]+){0,2}[[:space:]]+accepts?([[:space:]]|$)' <<< "$HD_BODY"; then
+                    viol "[H] Decision line opens with the legacy 'The human accepts ...' shape — address the person pressing merge directly, e.g. \"Merge if you're OK with ...\""
+                fi
+                if [ -x "$SCRIPT_DIR/check-prose" ]; then
+                    HD_PROSE=$("$SCRIPT_DIR/check-prose" --stdin <<< "$HD_BODY" 2>&1)
+                    HD_PROSE_RC=$?
+                    if [ "$HD_PROSE_RC" -eq 1 ]; then
+                        viol "[H] Decision line has a prose tell: $(head -n 1 <<< "$HD_PROSE") — rewrite it as one plain sentence (bin/check-prose)"
+                    fi
+                fi
+            fi
+        fi
     fi
 fi
 
@@ -807,6 +941,7 @@ done < <(awk '
     }
 ' "$PLAN_FILE")
 
+FWD_REF_CUES='create|new (method|class|file)|add(s|ing)? (a )?new|introduce|rename|extract|scaffold'
 # ---------------------------------------------------------------------------
 # Reuse-target existence (new check). PHP Class::method only.
 # ---------------------------------------------------------------------------
@@ -831,7 +966,7 @@ while IFS= read -r token; do
 
     # Forward-reference exemption: the plan creates this symbol itself.
     if grep -F -- "$token" "$PLAN_FILE" \
-        | grep -qiE 'create|new (method|class|file)|add(s|ing)? (a )?new|introduce|rename|extract|scaffold'; then
+        | grep -qiE "$FWD_REF_CUES"; then
         continue
     fi
 
@@ -848,6 +983,205 @@ while IFS= read -r token; do
     fi
 done < <(grep -iE 'reuse' "$PLAN_FILE" \
             | grep -oE '[A-Z][A-Za-z0-9_]*::[a-zA-Z_][A-Za-z0-9_]*')
+
+# ---------------------------------------------------------------------------
+# Gate [L]: literal and symbol provenance (backlog#933). Checks A/B/C.
+# ---------------------------------------------------------------------------
+# A: every `literal-check: <lit-or-range> -> <table>.<column> <sqltype>` citation
+#    must name a column in the checked-in schema dump, cite its exact type, and
+#    fit that type's integer range. Absence of a citation is judgment (gate 18).
+# B: an integer above 2147483647 on a line naming pid/tid/teamid, with no
+#    BIGINT/unsigned cue, no quotes around it, and no passing citation.
+# C: a backticked `name()` on a copy-verbatim line must be defined in a source
+#    file cited by backticked path in the same ##/### section. Silent when the
+#    section cites no existing file. Opt-out for A/B: <!-- literal-ok: <reason> -->.
+# A blocks. B and C are advisory (warn): the corpus diff over ~/claude-plans
+# found false positives for both. The letter is shared with the warn-only
+# line-number-anchor gate [L] further down; the message prefixes differ.
+# Decimal bounds compare as strings (length, then lexical): awk doubles lose
+# precision past 2^53, so a numeric compare on a 19-digit bound can round.
+L_SCHEMA="$REPO_ROOT/ibl5/docs/schema/current-schema.sql"
+L_INPUTS=("$PLAN_FILE")
+L_NOSCHEMA=1
+if [ -f "$L_SCHEMA" ]; then
+    L_INPUTS=("$L_SCHEMA" "$PLAN_FILE")
+    L_NOSCHEMA=0
+fi
+while IFS=$'\t' read -r kind msg; do
+    # Check B is advisory: the Phase 5 corpus diff found Discord ids on lines
+    # that also name teamid (backlog#933).
+    case "$kind" in
+        A) viol "$msg" ;;
+        B) warn "$msg" ;;
+    esac
+done < <(awk -v schema="$L_SCHEMA" -v noschema="$L_NOSCHEMA" -v sq="'" '
+    function strip0(s) { sub(/^0+/, "", s); if (s == "") s = "0"; return s "" }
+    function dcmp(a, b) {
+        a = strip0(a); b = strip0(b)
+        if (length(a) < length(b)) return -1
+        if (length(a) > length(b)) return 1
+        if (a < b) return -1
+        if (a > b) return 1
+        return 0
+    }
+    function fits(v, base, uns,   neg, mag) {
+        neg = (substr(v, 1, 1) == "-")
+        mag = neg ? substr(v, 2) : v
+        if (neg) {
+            if (strip0(mag) == "0") return 1
+            if (uns) return 0
+            return dcmp(mag, MINMAG[base]) <= 0
+        }
+        return dcmp(mag, uns ? UMAX[base] : SMAX[base]) <= 0
+    }
+    BEGIN {
+        SMAX["tinyint"] = "127";   MINMAG["tinyint"] = "128";   UMAX["tinyint"] = "255"
+        SMAX["smallint"] = "32767"; MINMAG["smallint"] = "32768"; UMAX["smallint"] = "65535"
+        SMAX["mediumint"] = "8388607"; MINMAG["mediumint"] = "8388608"; UMAX["mediumint"] = "16777215"
+        SMAX["int"] = "2147483647"; MINMAG["int"] = "2147483648"; UMAX["int"] = "4294967295"
+        SMAX["bigint"] = "9223372036854775807"; MINMAG["bigint"] = "9223372036854775808"
+        UMAX["bigint"] = "18446744073709551615"
+    }
+    !noschema && FILENAME == schema {
+        if ($0 ~ /^CREATE TABLE `/) {
+            t = $0; sub(/^CREATE TABLE `/, "", t); sub(/`.*/, "", t); tbl = tolower(t); next
+        }
+        if ($0 ~ /^\)/) { tbl = ""; next }
+        if (tbl != "" && $0 ~ /^  `[^`]+` /) {
+            rest = substr($0, 4); c = rest; sub(/`.*/, "", c)
+            rest = substr(rest, length(c) + 3)
+            depth = 0; ty = ""
+            for (i = 1; i <= length(rest); i++) {
+                ch = substr(rest, i, 1)
+                if (ch == "(") depth++
+                else if (ch == ")") depth--
+                else if (ch == " " && depth == 0) break
+                ty = ty ch
+            }
+            if (substr(rest, i + 1) ~ /^unsigned/) ty = ty " unsigned"
+            type[tbl "." tolower(c)] = tolower(ty)
+        }
+        next
+    }
+    {
+        if ($0 ~ /^[[:space:]]*(```|~~~)/) { fence = !fence; next }
+        if (fence) next
+        if (index($0, "<!-- literal-ok")) next
+
+        # Check A.
+        line = $0; nc = 0; ok = 1
+        while (match(line, /literal-check:[[:space:]]*-?[0-9]+(\.\.-?[0-9]+)?[[:space:]]*->[[:space:]]*[a-z0-9_]+\.[a-z0-9_]+[[:space:]]+[a-z]+(\([0-9,]+\))?( unsigned)?/)) {
+            hit = substr(line, RSTART, RLENGTH); line = substr(line, RSTART + RLENGTH); nc++
+            sub(/^literal-check:[[:space:]]*/, "", hit)
+            split(hit, lr, "->")
+            lhs = lr[1]; gsub(/[[:space:]]/, "", lhs)
+            rhs = lr[2]; sub(/^[[:space:]]+/, "", rhs)
+            match(rhs, /[[:space:]]+/)
+            tc = substr(rhs, 1, RSTART - 1); cty = substr(rhs, RSTART + RLENGTH)
+            if (noschema) { missing = 1; ok = 0; continue }
+            if (!(tc in type)) {
+                print "A\t[L] literal-check line " FNR ": " tc " not found in ibl5/docs/schema/current-schema.sql"
+                ok = 0; continue
+            }
+            if (type[tc] != cty) {
+                print "A\t[L] literal-check line " FNR ": " tc " is " sq type[tc] sq " in schema, citation says " sq cty sq
+                ok = 0; continue
+            }
+            base = cty; sub(/\(.*/, "", base); uns = (cty ~ / unsigned$/)
+            if (!(base in SMAX)) continue
+            n = split(lhs, ends, /\.\./)
+            for (k = 1; k <= n; k++) {
+                if (fits(ends[k], base, uns)) continue
+                lo = uns ? "0" : "-" MINMAG[base]; hi = uns ? UMAX[base] : SMAX[base]
+                print "A\t[L] literal-check line " FNR ": " ends[k] " does not fit " tc " " cty " (range " lo ".." hi ")"
+                ok = 0
+            }
+        }
+        if (nc > 0 && ok) next
+
+        # Check B.
+        pl = " " $0 " "
+        if (!match(pl, /[^a-z0-9_](pid|pids|tid|tids|teamid|teamids)[^a-z0-9_]/)) next
+        word = substr(pl, RSTART + 1, RLENGTH - 2)
+        if (tolower($0) ~ /bigint|unsigned/) next
+        rest = pl
+        while (match(rest, /[^A-Za-z0-9_][0-9]+[^A-Za-z0-9_]/)) {
+            pre = substr(rest, RSTART, 1); num = substr(rest, RSTART + 1, RLENGTH - 2)
+            post = substr(rest, RSTART + RLENGTH - 1, 1)
+            rest = substr(rest, RSTART + RLENGTH - 1)
+            if ((pre == "\"" || pre == sq) && post == pre) continue
+            if (dcmp(num, "2147483647") > 0) {
+                print "B\t[L] overflow line " FNR ": " num " exceeds int(11) max 2147483647 on a line naming " sq word sq "; add a literal-check: citation or a BIGINT/unsigned cue"
+                break
+            }
+        }
+    }
+    END {
+        if (missing) print "A\t[L] literal-check citations present but ibl5/docs/schema/current-schema.sql is missing"
+    }
+' "${L_INPUTS[@]}")
+
+# Check C: emit one record per copy-verbatim symbol, then resolve in shell.
+while IFS=$'\t' read -r kind lno name paths; do
+    [ "$kind" = "C" ] || continue
+    kept=""
+    for p in $paths; do
+        if [ -f "$REPO_ROOT/$p" ]; then kept="$kept${kept:+ }$p"; fi
+    done
+    [ -n "$kept" ] || continue
+    found=0
+    for p in $kept; do
+        if grep -qE "function[[:space:]]+${name}([^A-Za-z0-9_]|\$)|def[[:space:]]+${name}([^A-Za-z0-9_]|\$)|(^|[[:space:]])${name}[[:space:]]*\(\)" "$REPO_ROOT/$p"; then
+            found=1; break
+        fi
+    done
+    # Advisory: the corpus diff found new helpers and test assertions named on
+    # copy-verbatim lines that the forward-reference cues do not catch.
+    if [ "$found" -eq 0 ]; then
+        warn "[L] copy-verbatim line ${lno}: '${name}()' is defined in none of this section's cited source files (${kept})"
+    fi
+done < <(awk -v cues="$FWD_REF_CUES" '
+    function flush(   i, j, lc, drop, p, paths) {
+        paths = ""
+        for (p in cited) paths = paths (paths == "" ? "" : " ") p
+        for (i = 1; i <= ns; i++) {
+            drop = 0
+            for (j = 1; j <= nl; j++) {
+                lc = tolower(sl[j])
+                if (index(lc, tolower(sname[i])) && lc ~ lcues) { drop = 1; break }
+            }
+            if (!drop) print "C\t" sline[i] "\t" sname[i] "\t" paths
+        }
+        ns = 0; nl = 0; split("", cited)
+    }
+    BEGIN { lcues = tolower(cues) }
+    /^###?[[:space:]]/ { flush() }
+    {
+        sl[++nl] = $0
+        rest = $0
+        while (match(rest, /`[^`]+`/)) {
+            sp = substr(rest, RSTART + 1, RLENGTH - 2); rest = substr(rest, RSTART + RLENGTH)
+            if (sp !~ /^(\.\/)?[A-Za-z0-9_.\/-]+(:[0-9]+(-[0-9]+)?)?$/) continue
+            sub(/^\.\//, "", sp); sub(/:[0-9]+(-[0-9]+)?$/, "", sp)
+            if (sp ~ /\.(php|sh|py|ts|js)$/ || sp ~ /^bin\//) cited[sp] = 1
+        }
+        if ($0 ~ /^[[:space:]]*(```|~~~)/) { fence = !fence; next }
+        if (fence) next
+        l = tolower($0); cand = 0
+        if (index(l, "verbatim from")) cand = 1
+        else if (match(l, /cop(y|ied)[^.]*verbatim/)) {
+            vl = (substr(l, RSTART, 6) == "copied") ? 6 : 4
+            if (RLENGTH - vl - 8 <= 80) cand = 1
+        }
+        if (!cand) next
+        rest = $0
+        while (match(rest, /`[A-Za-z_][A-Za-z0-9_]*\(\)`/)) {
+            sname[++ns] = substr(rest, RSTART + 1, RLENGTH - 4); sline[ns] = FNR
+            rest = substr(rest, RSTART + RLENGTH)
+        }
+    }
+    END { flush() }
+' "$PLAN_FILE")
 
 # ---------------------------------------------------------------------------
 # Gate [F]: Critical Files format — list form only.
@@ -870,7 +1204,50 @@ elif [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
         viol "[F] ## Critical Files section uses table format — use list form: - \`path\` (annotation)"
     elif [ -z "$(cf_parse_section "$PLAN_FILE")" ]; then
         viol "[F] ## Critical Files section has no parseable entries — each entry must be a list bullet whose first token is a backticked path: - \`path\` (annotation)"
+    else
+        # Absolute-path check: a primary backticked path starting with / is not
+        # repo-relative and cannot be matched by `git diff --name-only` at Phase
+        # 5.0 conformance time. Paths like /Users/.../IBL5/ibl5/... or
+        # /Users/.../IBL5-worktrees/<slug>/... must be written as ibl5/... etc.
+        # Gate [F] and gate [VR] are the callers of cf_parse_section_raw: the normalising
+        # cf_parse_section strips exactly these prefixes (so legacy plans can
+        # match at Phase 5.0), which would blind this check. Raw already strips
+        # fenced code blocks.
+        _f_abs=$(cf_parse_section_raw "$PLAN_FILE" | grep -E '^(MUST_APPEAR|EXEMPT):/' | head -1 | sed -E 's/^[A-Z_]+://')
+        if [ -n "$_f_abs" ]; then
+            viol "[F] ## Critical Files entry has an absolute path (\`$_f_abs\`) — paths must be repo-relative (e.g. \`ibl5/...\`, \`bin/...\`) because post-plan's Phase 5.0 compares them to \`git diff --name-only\` output"
+        fi
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [VR]: a VR `-snapshots` Critical File needs an explicit baseline marker.
+# ---------------------------------------------------------------------------
+# A Visual Regression baseline directory changes only when CI sees a screenshot
+# diff, so a plan that leaves rendered output unchanged never touches it. An
+# unmarked (MUST_APPEAR) `-snapshots` entry then holds post-plan arming
+# condition (3) and Phase 6 check 5 forever (a-jay85/IBL5-backlog#1277).
+# Two clears: `(conditional — only if VR baselines change)` makes the entry
+# EXEMPT in cf_parse_section_raw, so this loop never sees it; the whole-word
+# token `vr-baseline-change` on the entry line accepts a deliberate regen or
+# deletion while Phase 5.0 still requires the path in the diff. Additive only:
+# the lib parser and Phase 5.0 are unchanged. Fence-stripped (cf_section and
+# cf_parse_section_raw both strip fences). Skipped on an unbalanced fence,
+# which gate [F] already rejects. Measured 2026-10-01 on the 1050-plan corpus:
+# fires on 3 plans, all shipped. Herestrings, not printf pipes: pipefail +
+# grep (see .claude/rules/shell-pipefail-grep.md).
+if ! cf_fence_unbalanced "$PLAN_FILE"; then
+    _vr_paths=$(cf_parse_section_raw "$PLAN_FILE" \
+        | sed -n 's/^MUST_APPEAR://p' | grep -F -- '-snapshots' || true)
+    _vr_entry_lines=$(grep -E "$CF_LINE_PATTERN" <<<"$CF_SECTION" || true)
+    while IFS= read -r _vr_path; do
+        [ -n "$_vr_path" ] || continue
+        _vr_lines=$(grep -F -- "\`$_vr_path\`" <<<"$_vr_entry_lines" || true)
+        if ! grep -iE '(^|[^[:alnum:]_-])vr-baseline-change([^[:alnum:]_-]|$)' \
+            <<<"$_vr_lines" >/dev/null; then
+            viol "[VR] ## Critical Files entry \`$_vr_path\` is a Visual Regression baseline directory listed as must-appear. CI changes it only when a screenshot diff regenerates baselines, so post-plan hold (3) blocks forever on a green VR run. Mark it (conditional — only if VR baselines change), or (vr-baseline-change: <what changes>) when the plan deliberately regenerates or deletes baselines."
+        fi
+    done <<<"$_vr_paths"
 fi
 
 # ---------------------------------------------------------------------------
@@ -888,6 +1265,274 @@ if grep -qiE '\|[[:space:]]*PHPUnit[[:space:]]*\|' "$MATRIX_FILE"; then
 fi
 
 # ---------------------------------------------------------------------------
+# Gate X: a `(no-change)` matrix marker is honored by the post-plan harness
+# (tools/postplan-harness/harness/planfile.py parse_no_change_test_paths) ONLY
+# on a Visual-regression row and ONLY directly after the row's backticked test
+# token. Anywhere else it is a silent no-op: the row still plans the test,
+# Phase 5.0 emits MISSING, and arming condition (3) holds after implementation.
+# Catch that at authoring time. Rows come from $GATEP_MATRIX (fence-aware), and a
+# `(no-change)` quoted only inside a backtick code span does not count as a marker.
+# Herestrings, not printf pipes: pipefail + grep -q
+# (see .claude/rules/shell-pipefail-grep.md).
+# ---------------------------------------------------------------------------
+while IFS= read -r row; do
+    # Presence test runs on a copy with balanced backtick spans removed: a
+    # `(no-change)` that is only quoted in a code span is a mention, not a marker.
+    # The checks below still read the original row.
+    bare=$(sed 's/`[^`]*`//g' <<< "$row")
+    grep -qiF '(no-change)' <<< "$bare" || continue
+    if ! awk -F'|' '
+        { for (i = 1; i <= NF; i++) { c = tolower($i); gsub(/[[:space:]*]/, "", c)
+          if (c ~ /^visual-?regression$/) found = 1 } }
+        END { exit found ? 0 : 1 }' <<< "$row"; then
+        viol "[X] (no-change) marker on a non-Visual-regression matrix row — the harness honors it only when a whole cell reads Visual-regression; write the test the row plans, or retype the row: ${row}"
+    elif ! grep -qiE '`[[:space:]]*\(no-change\)' <<< "$row"; then
+        viol "[X] (no-change) marker is not directly after the row's backticked test token — the harness honors only the shape \`path\` (no-change): ${row}"
+    fi
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
+# Gate RO: the `(run-only)` matrix marker (tools/postplan-harness/harness/planfile.py
+# parse_run_only_test_paths + conformance.check). It exempts the row's token from the
+# Phase 5.0 `MISSING:` item, so this gate makes sure the marker can only sit on a row
+# that RUNS an existing test. Checks, in order:
+#   1. the row has a whole-cell planning type (PHPUnit / API-test / E2E /
+#      Visual-regression) — a CLI row plans nothing and the marker is a no-op there;
+#   2. the marker is directly after a backticked token, and that token is the row's
+#      planned test token (first backticked test|spec token), so the harness and the
+#      author agree on which path is exempted;
+#   3. the same row does not also carry a bare `(no-change)` — one marker per token;
+#   4. the token exists on the base branch (git cat-file -e <ref>:<path>; dirs pass);
+#   5. the token is not a MUST_APPEAR ## Critical Files entry (that entry says the
+#      diff must touch it; the marker says it will not).
+# Warnings (never violations), because plan prose cannot prove an edit either way:
+#   6. a `## Phase N` / `## Step N` body line cites the token in backticks together
+#      with an edit verb;
+#   7. an UNMARKED planning row names a path that exists on the base branch, and no
+#      phase/step body line or Critical Files entry cites it — the author may have
+#      meant (run-only), or may have forgotten to name the edit in a phase.
+# Reference tree: CHECK_PLAN_MASTER_REF when set (test seam), else the first of
+# origin/master, master, HEAD that resolves (same chain as gate A). No resolvable
+# ref fails OPEN for checks 4 and 7 only; checks 1-3 and 5 still run.
+# ---------------------------------------------------------------------------
+_ro_ref=""
+if [ -n "${CHECK_PLAN_MASTER_REF:-}" ]; then
+    _ro_cands="$CHECK_PLAN_MASTER_REF"
+else
+    _ro_cands="origin/master master HEAD"
+fi
+for _ro_c in $_ro_cands; do
+    if git -C "$REPO_ROOT" rev-parse --verify -q "${_ro_c}^{commit}" >/dev/null 2>&1; then
+        _ro_ref="$_ro_c"
+        break
+    fi
+done
+_ro_on_base() {  # $1 = repo-relative path (file or directory)
+    [ -n "$_ro_ref" ] || return 0   # fail open: nothing to compare against
+    git -C "$REPO_ROOT" cat-file -e "${_ro_ref}:${1%/}" 2>/dev/null
+}
+_ro_must_appear="$(cf_parse_section "$PLAN_FILE" | sed -n 's/^MUST_APPEAR://p')"
+# Phase/step body lines (fence-stripped) for checks 6 and 7.
+_ro_phase_lines="$(awk '
+    /^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]/ { inp = 1; next }
+    /^##[[:space:]]/ { inp = 0 }
+    inp { print }
+' "$GATEP_BODY")"
+_ro_cf_lines="$(cf_section_named "$PLAN_FILE" "Critical Files")"
+_ro_edit_verbs='(edit|extend|modify|modif|update|rewrite|change|append|insert|replace|add|create|write|delete|remove|rename)'
+while IFS= read -r row; do
+    [ -n "$row" ] || continue
+    bare=$(sed 's/`[^`]*`//g' <<< "$row")
+    has_ro=0; grep -qiF '(run-only)' <<< "$bare" && has_ro=1
+    has_nc=0; grep -qiF '(no-change)' <<< "$bare" && has_nc=1
+    # Whole-cell planning type, same awk as gate X but for all four labels.
+    if ! awk -F'|' '
+        { for (i = 1; i <= NF; i++) { c = tolower($i); gsub(/^[[:space:]*`_]+|[[:space:]*`_]+$/, "", c)
+          if (c ~ /^(phpunit|api.?test|e2e|visual-?regression)([[:space:]]*\(|[[:space:]]*[+\/,&]|-analogue|[[:space:]]+db-integration|$)/) found = 1 } }
+        END { exit found ? 0 : 1 }' <<< "$row"; then
+        if [ "$has_ro" -eq 1 ]; then
+            viol "[RO] (run-only) marker on a row with no PHPUnit / API-test / E2E / Visual-regression type cell — the harness plans no test from this row, so the marker is a no-op; drop it: ${row}"
+        fi
+        continue
+    fi
+    planned=$(grep -oE '`[^`]*(test|spec|Test)[^`]*`' <<< "$row" | head -1 | tr -d '`')
+    [ -n "$planned" ] || continue
+    if [ "$has_ro" -eq 1 ]; then
+        if ! grep -qiE '`[[:space:]]*\(run-only\)' <<< "$row"; then
+            viol "[RO] (run-only) marker is not directly after the row's backticked test token — the harness honors only the shape \`path\` (run-only): ${row}"
+            continue
+        fi
+        marked=$(sed -nE 's/.*`([^`]+)`[[:space:]]*\([Rr][Uu][Nn]-[Oo][Nn][Ll][Yy]\).*/\1/p' <<< "$row")
+        if [ "$marked" != "$planned" ]; then
+            viol "[RO] (run-only) follows \`${marked}\` but the row's planned test token is \`${planned}\` — the harness exempts only the first test|spec token; move the marker: ${row}"
+            continue
+        fi
+        if [ "$has_nc" -eq 1 ]; then
+            viol "[RO] row carries both (run-only) and (no-change) — one marker per token; keep (no-change) for an untouched Visual-regression baseline, (run-only) for a test that is run but not written: ${row}"
+            continue
+        fi
+        if ! _ro_on_base "$planned"; then
+            viol "[RO] (run-only) path \`${planned}\` does not exist on ${_ro_ref} — a run-only row can only run a test that already exists; write the test (drop the marker) or fix the path: ${row}"
+            continue
+        fi
+        if grep -qxF -- "$planned" <<< "$_ro_must_appear"; then
+            viol "[RO] (run-only) path \`${planned}\` is a must-appear ## Critical Files entry — the entry says the diff must touch it, the marker says it will not; mark the entry (reference) or drop (run-only): ${row}"
+            continue
+        fi
+        if grep -iE "\`${planned}\`" <<< "$_ro_phase_lines" | grep -qiE "\\b${_ro_edit_verbs}" ; then
+            warn "[RO] warning: (run-only) path \`${planned}\` appears on a phase line with an edit verb — if that phase edits the file, drop (run-only); if it only runs it, reword the line"
+        fi
+        continue
+    fi
+    # Unmarked planning row (check 7): existing-on-base path that nothing else cites.
+    [ "$has_nc" -eq 1 ] && continue
+    [ -n "$_ro_ref" ] || continue
+    _ro_on_base "$planned" || continue
+    if ! grep -qF -- "\`${planned}\`" <<< "$_ro_phase_lines" \
+       && ! grep -qF -- "\`${planned}\`" <<< "$_ro_cf_lines"; then
+        warn "[RO] warning: unmarked test row names \`${planned}\`, which exists on ${_ro_ref}, and no phase line or Critical Files entry cites it — Phase 5.0 will emit MISSING unless the diff touches it; add (run-only) if the plan only runs it, or cite the edit in a phase"
+    fi
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
+# Gate Y: the `(one-time-check: <reason>)` matrix tag. bin/lib/plan-matrix-assertions
+# skips a tagged row instead of reporting UNREALISED-ASSERTION, and ignores the tag
+# fail-closed when it is malformed, so a bad tag silently re-arms the gate the author
+# meant to release. Reject the bad shapes here, and cap the tagged share at one third
+# of the matrix: a one-shot check is evidence that cannot be pinned, and a plan that
+# cannot pin more than a third of its rows needs regression tests, not tags.
+# The helper honors the tag only as the TRAILING text of the What-to-verify cell, only
+# with a reason >= 15 chars free of ( ) | and backtick, and only on a CLI-executable row.
+# ---------------------------------------------------------------------------
+_y_total=0; _y_tagged=0
+_y_shape='\(one-time-check: [^()|`]*\)$'
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    _y_total=$((_y_total + 1))
+    grep -qF 'one-time-check' <<< "$row" || continue
+    _y_what="${MC_WHAT//$MSEN/|}"
+    if ! grep -qE "$_y_shape" <<< "$_y_what"; then
+        viol "[Y] one-time-check tag is not the trailing text of the What-to-verify cell, or its reason holds ( ) | or a backtick — the helper ignores it fail-closed and the row is still checked; write the cell as '<what> (one-time-check: <reason>)': ${row}"
+        continue
+    fi
+    _y_reason=$(sed -E 's/.*\(one-time-check: ([^()|`]*)\)$/\1/' <<< "$_y_what")
+    _y_reason=$(mtrim "$_y_reason")
+    if [ "${#_y_reason}" -lt 15 ]; then
+        viol "[Y] one-time-check reason is under 15 characters — say what was run and what it printed: ${row}"
+        continue
+    fi
+    if [ "$MC_TYPE" != "CLI-executable" ]; then
+        viol "[Y] one-time-check tag on a ${MC_TYPE} row — the helper honors it only when the Test type cell reads exactly CLI-executable; a regression test or a human judgment is never a one-shot run: ${row}"
+        continue
+    fi
+    _y_tagged=$((_y_tagged + 1))
+done < "$MATRIX_FILE"
+if [ "$_y_tagged" -gt 0 ] && [ $((_y_tagged * 3)) -gt "$_y_total" ]; then
+    viol "[Y] ${_y_tagged} of ${_y_total} matrix rows carry (one-time-check: ...) — more than one third of the matrix is unpinned; a one-time check is for evidence no regression test can hold, so convert rows to tests or split the plan"
+fi
+
+# ---------------------------------------------------------------------------
+# Gate Z: an untagged CLI-executable row whose command runs only outside the repo
+# (~/, $HOME, /tmp) or against a post-PR CI run (gh run|pr|api). The diff cannot carry
+# such a row's tokens, so bin/lib/plan-matrix-assertions reports UNREALISED-ASSERTION
+# at Step 6.7 and the implementation never hands off. The (one-time-check: ...) tag is
+# the release; make the planner write it now. A row that also runs a repo path or a
+# repo-exercising command (composer, php, npx, docker, curl) is in-repo and exempt. Tag
+# shape, reason length, and type mismatches stay with gate Y above.
+# ---------------------------------------------------------------------------
+_z_b='(^|[^A-Za-z0-9_./~-])'
+_z_out="${_z_b}(~/|\\\$HOME/|\\\$\\{HOME\\}|/tmp/|/private/tmp/)"
+_z_gh="${_z_b}gh[[:space:]]+(run|pr|api)([[:space:]]|\$)"
+_z_in="${_z_b}(bin|ibl5|tools|\\.claude|\\.github|vendor|e2e|tests)/|(^|/)IBL5(-worktrees)?/|${_z_b}(composer|php|npx|docker|curl)([[:space:]]|\$)"
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    [ "$MC_TYPE" = "CLI-executable" ] || continue
+    _z_what="${MC_WHAT//$MSEN/|}"
+    grep -qE '`[^`[:space:]]+`' <<< "$_z_what" || continue
+    grep -qE "$_z_out|$_z_gh" <<< "$MC_LOC" || continue
+    grep -qE "$_z_in" <<< "$MC_LOC" && continue
+    grep -qE "$_y_shape" <<< "$_z_what" && continue
+    viol "[Z] row runs only outside the repo (~/, \$HOME, /tmp) or against a post-PR CI run (gh run|pr|api) and carries no one-time-check tag; the diff cannot carry its tokens and Step 6.7 stops on it. End the What-to-verify cell with '(one-time-check: <what was run and what it printed>)', or make the command also run a repo bin/ script or test: ${row}"
+done < "$MATRIX_FILE"
+
+# ---------------------------------------------------------------------------
+# Gate MT: a What-to-verify backtick token bin/lib/plan-matrix-assertions can never
+# realise, so Step 6.7 stops with UNREALISED-ASSERTION after implementation.
+#  (1) `<path>:NN` / `<path>:NN-NN`: arm 2c (_path_realised) needs a whole path or a
+#      /-aligned suffix, so the :LINE suffix makes the token unmatchable. Host:port
+#      tokens (`<name>.localhost:8080`, `iblhoops.net:443`) are exempt by extension.
+#  (2) a bare word equal to the stem of a tracked *-snapshots/*.png: it never enters
+#      arm 2c, and arm 3 saves it only when git grep finds it in tracked text, so it is
+#      rejected only when that grep finds nothing.
+# Rows come from $GATEP_MATRIX (fence-aware). A row ending in the one-time-check tag is
+# skipped, as the helper skips it. Text from the first `Mutation:` label on is ignored,
+# mirroring the helper's blanking (it under-rejects; accepted). A `name=value` token is
+# cut at `=`, as the helper cuts it. CHECK_PLAN_MT_GIT_ROOT is a test seam naming the
+# repo whose snapshots and tracked text rule (2) reads; unset or empty means $REPO_ROOT.
+# Outside a git repo the snapshot list is empty and rule (2) is skipped; rule (1) needs
+# no git and always runs.
+# ---------------------------------------------------------------------------
+_mt_root="${CHECK_PLAN_MT_GIT_ROOT:-$REPO_ROOT}"
+_mt_line_re='^[A-Za-z0-9_./-]+\.([A-Za-z][A-Za-z0-9]*):[0-9]+(-[0-9]+)?$'
+_mt_host_ext_re='^(localhost|local|test|com|net|org|io|dev)$'
+_mt_stem_re='^[A-Za-z0-9_-]+$'
+_mt_snaps=$(git -C "$_mt_root" ls-files 2>/dev/null | grep -E -- '-snapshots/.*\.png$' || true)
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    _mt_what="${MC_WHAT//$MSEN/|}"
+    grep -qE "$_y_shape" <<< "$_mt_what" && continue
+    _mt_what="${_mt_what%%Mutation:*}"
+    while IFS= read -r _mt_tok; do
+        _mt_tok="${_mt_tok#\`}"; _mt_tok="${_mt_tok%\`}"; _mt_tok="${_mt_tok%%=*}"
+        [ -n "$_mt_tok" ] || continue
+        if [[ "$_mt_tok" =~ $_mt_line_re ]]; then
+            [[ "${BASH_REMATCH[1]}" =~ $_mt_host_ext_re ]] && continue
+            viol "[MT] matrix token \`${_mt_tok}\` ends in a :LINE suffix; bin/lib/plan-matrix-assertions matches only a whole path or a /-aligned path suffix, so the row stays UNREALISED and Step 6.7 stops. Cite the bare path \`${_mt_tok%:*}\` and put the line number in prose outside backticks: ${row}"
+            continue
+        fi
+        [ -n "$_mt_snaps" ] || continue
+        [[ "$_mt_tok" =~ $_mt_stem_re ]] || continue
+        _mt_snap=$(grep -E -- "/${_mt_tok}\.png\$" <<< "$_mt_snaps" | head -n 1 || true)
+        [ -n "$_mt_snap" ] || continue
+        git -C "$_mt_root" grep -qF -e "$_mt_tok" -- ':(exclude)*.png' 2>/dev/null && continue
+        viol "[MT] matrix token \`${_mt_tok}\` is the stem of ${_mt_snap} and appears in no tracked text file, so bin/lib/plan-matrix-assertions can never realise it and Step 6.7 stops. Cite the snapshot path \`${_mt_snap}\` or the name of the test that writes it: ${row}"
+    done < <(grep -oE '`[^`[:space:]]+`' <<< "$_mt_what" || true)
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
+# Gate ND: a `**No diff:** <reason>` phase marker. The post-plan harness reads it only
+# from a `## Phase N:` / `## Step N:` body (planfile.parse_phases) and honors it only
+# with a reason of NO_DIFF_MIN_REASON (15) characters or more; anything else is a silent
+# no-op that holds arming condition (3) after implementation. Reads the fence-stripped
+# $GATEP_BODY, so a fenced example never counts; a code-span mention never starts the
+# line, so it never matches. Case-sensitive, like the harness.
+# ---------------------------------------------------------------------------
+_nd_in_phase=0
+_nd_marker_re='^[[:space:]]*([-*][[:space:]]+)?\*\*No diff:\*\*'
+_nd_h2_re='^##[[:space:]]'
+_nd_phase_re='^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]+'
+while IFS= read -r line; do
+    if [[ "$line" =~ $_nd_h2_re ]]; then
+        if [[ "$line" =~ $_nd_phase_re ]]; then _nd_in_phase=1; else _nd_in_phase=0; fi
+        continue
+    fi
+    [[ "$line" =~ $_nd_marker_re ]] || continue
+    if [ "$_nd_in_phase" -eq 0 ]; then
+        viol "[ND] **No diff:** marker outside a ## Phase N / ## Step N section — the harness reads it only from a phase body; move it into the phase it exempts: ${line}"
+        continue
+    fi
+    _nd_reason=$(sed -E 's/^[[:space:]]*([-*][[:space:]]+)?\*\*No diff:\*\*//' <<< "$line")
+    _nd_reason=$(mtrim "$_nd_reason")
+    # 15 mirrors NO_DIFF_MIN_REASON in tools/postplan-harness/harness/planfile.py
+    if [ "${#_nd_reason}" -lt 15 ]; then
+        viol "[ND] **No diff:** reason is under 15 characters — say what the phase delivers instead of a diff (issue closed, plan queued, post-merge step): ${line}"
+    fi
+done < "$GATEP_BODY"
+
+# ---------------------------------------------------------------------------
 # Gate G: a matrix row naming a bin/test-* / bin/check-* script must name one CI
 # actually runs. Narrow by design — most CLI-executable rows are legitimately
 # one-shots (curl, bin/db-query), and a gate that taxes them gets ignored.
@@ -898,7 +1543,7 @@ while IFS= read -r row; do
     case "$cell" in *'(one-shot)'*|*'(wired in this PR)'*) continue ;; esac
     for n in $(printf '%s' "$cell" | grep -oE 'bin/(test|check)-[A-Za-z0-9_.-]+'); do
         grep -rqF "$n" "$GH_WF" 2>/dev/null && continue
-        viol "[G] matrix row names $n but no .github/workflows/*.yml runs it — wire it (and list that workflow in ## Critical Files), or annotate the cell (one-shot) or (wired in this PR)"
+        viol "[G] matrix row names $n but no .github/workflows/*.yml runs it — wire it (and list that workflow in ## Critical Files), or annotate it as a shell comment inside the backticks: \`cmd # (one-shot)\` or \`cmd # (wired in this PR)\` (a note after the closing backtick fails gate [V])"
     done
 done < "$MATRIX_FILE"
 
@@ -1135,7 +1780,7 @@ packet_scan() {
                 print "[S] delegation packet " q pname q " lacks a **Self-verify:** line (required for impl_model: sonnet plans)"
             if (!has_no_assertions) {
                 if (!has_assertions)
-                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a " q "no-assertions: <reason>" q " line)"
+                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a line that opens with " q "no-assertions: <reason>" q ")"
                 else {
                     s = assert_text
                     while (match(s, /`[^`]+`/)) {
@@ -1162,7 +1807,19 @@ packet_scan() {
                 if (pname == "") pname = "(unnamed)"
             }
             if (in_packet) {
-                if ($0 ~ /no-assertions:/) has_no_assertions=1
+                # Gate E escape. Anchored like the gate T **Tier:** match: the
+                # marker must OPEN its line, after optional indent, an optional
+                # blockquote `>`, an optional `-`/`*` bullet, an optional `<!--`,
+                # and an optional backtick. It must also carry a non-empty reason
+                # once a closing `-->`, backticks, and whitespace are stripped.
+                # An unanchored match let a mid-sentence prose mention clear the
+                # gate (#947).
+                if (match($0, /^[ \t]*>?[ \t]*([-*][ \t]+)?(<!--[ \t]*)?`?no-assertions:/)) {
+                    na_reason = substr($0, RSTART + RLENGTH)
+                    gsub(/-->/, "", na_reason)
+                    gsub(/[` \t]/, "", na_reason)
+                    if (na_reason != "") has_no_assertions=1
+                }
                 if ($0 ~ /\*\*Self-verify:\*\*/) { has_sv=1; in_block="sv" }
                 if ($0 ~ /\*\*Assertions:\*\*/) { has_assertions=1; in_block="assertions" }
                 if ($0 ~ /^[ \t]*[-*][ \t]*\*\*[A-Za-z]/) {
@@ -1225,8 +1882,10 @@ esac
 # ---------------------------------------------------------------------------
 # Every ### Delegate packet must (a) carry an **Assertions:** field and
 # (b) name every backtick-quoted token from that field somewhere in the
-# packet's **Self-verify:** block. A `no-assertions: <reason>` line anywhere
-# inside the packet clears BOTH sub-checks for that packet. Uses the
+# packet's **Self-verify:** block. A `no-assertions: <reason>` marker line
+# inside the packet clears BOTH sub-checks for that packet. The marker must
+# open its line (optional indent, >, -/* bullet, <!--, or backtick) and carry
+# a non-empty reason; a mid-sentence prose mention does not clear it. Uses the
 # _PACKET_SCAN cache populated above.
 while IFS= read -r eviol; do
     [ -n "$eviol" ] && viol "$eviol"
@@ -1239,35 +1898,7 @@ done < <(printf '%s\n' "$_PACKET_SCAN" | grep '^\[E\]')
 # only; the only clears are an exercising matrix row and a line-anchored
 # pre-prod-exception: marker.
 
-# Every [P] read is ````-AWARE. This plan file (and the two docs it edits)
-# embed complete plan fixtures inside fences; a fence-blind read makes a plan
-# that DOCUMENTS the marker read as CARRYING it, and lets a fixture's matrix row
-# clear a real declared artifact. Fence logic is gate T's, verbatim.
-awk '
-    function fence_ticks(s,   t) {
-        if (match(s, /^[ \t]*`+/)) {
-            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
-        }
-        return 0
-    }
-    BEGIN { in_fence = 0; fence_len = 0 }
-    {
-        n = fence_ticks($0)
-        # A closing fence is backticks-only AND at least as long as the opener.
-        if (in_fence) { if (n >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { in_fence = 0; fence_len = 0 }; next }
-        if (n >= 3)   { in_fence = 1; fence_len = n; next }
-        print
-    }
-' "$PLAN_FILE" > "$GATEP_BODY"
-
-# [P]'s own matrix parse — same shape as :201-205 but over the fence-stripped
-# body. NOT $MATRIX_FILE, which is built from the raw file and would let a
-# fenced fixture row clear a real artifact.
-awk '
-    /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
-    inm && /^[[:space:]]*\|/ { print; next }
-    inm && !/^[[:space:]]*\|/ { inm=0 }
-' "$GATEP_BODY" > "$GATEP_MATRIX"
+# $GATEP_BODY / $GATEP_MATRIX are built once, next to $MATRIX_FILE above (shared with gate X).
 
 # Marker: line-anchored HTML-comment form ONLY (see header) — a bare grep -qF
 # would be cleared by any plan that merely quotes the token in prose.
@@ -1348,24 +1979,78 @@ if [ "$GATEP_MARKER" -eq 0 ] && [ -s "$GATEP_MATRIX" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Gate [A]: Migration-number literal detector (hard-fail).
+# Gate [A]: New-number detector for migrations and ADRs (hard-fail).
 # ---------------------------------------------------------------------------
-# A plan that names a specific migration number (e.g. "migration 171",
-# "171_dedup_key.sql") will break when the actual assigned number differs.
-# Migration numbers are not known at planning time — they are assigned by
-# bin/next-migration at implementation time.
-# Escape: include the phrase "run bin/next-migration at impl time" anywhere
-# in the plan (mirrors no-adr: / context-budget: pattern).
-# Fence-aware: skips lines inside ```...``` and ````...```` blocks.
-if ! grep -qF 'run bin/next-migration at impl time' "$PLAN_FILE"; then
-    _a_hits=$(awk '
+# A plan that CREATES a migration or ADR under a hardcoded number breaks when a
+# parallel branch claims that number first. Numbers are assigned at impl time by
+# bin/next-migration and bin/next-adr, so a new file is written as the placeholder
+# ibl5/migrations/NNN_slug.sql (example) or ibl5/docs/decisions/NNNN-slug.md (example).
+# A placeholder carries no digits, so the token regex below never matches it.
+#
+# A numbered token is "new" when BOTH hold:
+#   1. it sits on a line with a creation cue (gate8_is_created, or the gate 8
+#      author cues in GATE8_AUTHOR_CUE_RE, which add Author/Write);
+#   2. it is absent from the reference tree.
+# Citing an existing migration or ADR by its real number passes.
+#
+# Reference tree: $CHECK_PLAN_MASTER_REF when set (test seam), else the first of
+# origin/master, master, HEAD that resolves. HEAD keeps the gate live in the
+# default-depth CI checkout, which has no origin/master. No resolvable ref, or a
+# failing ls-tree, fails OPEN: the gate reports nothing.
+#
+# There is no escape phrase. Fence-aware: skips lines inside ```...``` and
+# ````...```` blocks.
+_a_ref=""
+if [ -n "${CHECK_PLAN_MASTER_REF:-}" ]; then
+    _a_cands="$CHECK_PLAN_MASTER_REF"
+else
+    _a_cands="origin/master master HEAD"
+fi
+for _a_c in $_a_cands; do
+    if git -C "$REPO_ROOT" rev-parse --verify -q "${_a_c}^{commit}" >/dev/null 2>&1; then
+        _a_ref="$_a_c"
+        break
+    fi
+done
+_a_tree=""
+if [ -n "$_a_ref" ]; then
+    if ! _a_tree="$(git -C "$REPO_ROOT" ls-tree -r --name-only "$_a_ref" \
+            -- ibl5/migrations ibl5/docs/decisions 2>/dev/null)"; then
+        _a_ref=""
+    fi
+fi
+if [ -n "$_a_ref" ]; then
+    _a_mig=""
+    _a_adr=""
+    while IFS= read -r _a_tok; do
+        [ -n "$_a_tok" ] || continue
+        # Present in the reference tree => an existing file being cited, not a new one.
+        case "$_a_tok" in
+            decisions/*)
+                if printf '%s\n' "$_a_tree" | grep -qxF "ibl5/docs/$_a_tok"; then continue; fi ;;
+            *.sql)
+                if printf '%s\n' "$_a_tree" | grep -qxF "ibl5/migrations/$_a_tok"; then continue; fi ;;
+            *)
+                _a_num="$(printf '%s' "$_a_tok" | grep -oE '[0-9]+$')"
+                if printf '%s\n' "$_a_tree" | grep -qE "^ibl5/migrations/${_a_num}_"; then continue; fi ;;
+        esac
+        # Creation context only.
+        if ! gate8_is_created "$_a_tok" \
+            && ! { grep -F -- "$_a_tok" "$PLAN_FILE" | grep -qE "$GATE8_AUTHOR_CUE_RE"; }; then
+            continue
+        fi
+        case "$_a_tok" in
+            decisions/*) _a_adr="${_a_adr:+$_a_adr, }ibl5/docs/$_a_tok" ;;
+            *)           _a_mig="${_a_mig:+$_a_mig, }$_a_tok" ;;
+        esac
+    done < <(awk '
         function fence_ticks(s,   t) {
             if (match(s, /^[ \t]*`+/)) {
                 t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
             }
             return 0
         }
-        BEGIN { infence=0; fence_len=0; count=0 }
+        BEGIN { infence=0; fence_len=0 }
         {
             nt = fence_ticks($0)
             if (infence) {
@@ -1373,12 +2058,18 @@ if ! grep -qF 'run bin/next-migration at impl time' "$PLAN_FILE"; then
                 next
             }
             if (nt >= 3) { infence=1; fence_len=nt; next }
-            if (/migration[_ -]*[0-9]{3,}|[0-9]{3,}[_-][a-zA-Z][A-Za-z0-9_-]*\.sql/) count++
+            line = $0
+            while (match(line, /migration[_ -]*[0-9][0-9][0-9]+|[0-9][0-9][0-9]+[_-][a-zA-Z][A-Za-z0-9_-]*\.sql|decisions\/[0-9][0-9][0-9][0-9]-[A-Za-z0-9._\/-]*\.md/)) {
+                print substr(line, RSTART, RLENGTH)
+                line = substr(line, RSTART + RLENGTH)
+            }
         }
-        END { print count+0 }
-    ' "$PLAN_FILE")
-    if [ "${_a_hits:-0}" -gt 0 ]; then
-        viol "[A] plan names ${_a_hits} migration-number literal(s) outside fences — migration numbers are assigned at impl time and conflict when parallel branches claim the same number; use bin/next-migration at impl time, or add the phrase 'run bin/next-migration at impl time' anywhere in the plan to acknowledge this"
+    ' "$PLAN_FILE" | sort -u)
+    if [ -n "$_a_mig" ]; then
+        viol "[A] plan creates a new migration with a hardcoded number (${_a_mig}) — migration numbers are assigned at impl time; use ibl5/migrations/NNN_slug.sql as a placeholder and tell the builder to use whatever bin/next-migration prints and continue"
+    fi
+    if [ -n "$_a_adr" ]; then
+        viol "[A] plan creates a new ADR with a hardcoded number (${_a_adr}) — ADR numbers are assigned at impl time; use ibl5/docs/decisions/NNNN-slug.md as a placeholder and tell the builder to use whatever bin/next-adr prints and continue"
     fi
 fi
 
@@ -1391,7 +2082,7 @@ fi
 # Scope: location cell ($MC_LOC) only — full-row scan has >20% FP rate.
 # Implementation: uses matrix_split() to handle escaped-pipe rows correctly.
 # Excludes: tilde-prefixed approximations (~line N), ranges (line N-M /
-# lines N-M), and rows already annotated (one-shot) or (wired in this PR).
+# lines N-M), and rows already annotated "# (one-shot)" or "# (wired in this PR)".
 while IFS= read -r row; do
     if ! matrix_split "$row"; then continue; fi
     case "$MC_LOC" in *'(one-shot)'*|*'(wired in this PR)'*) continue ;; esac
@@ -1464,6 +2155,66 @@ if [ "${_j_new_class:-0}" -gt 0 ]; then
     if ! grep -qiE 'infection|mutation|coverage' "$MATRIX_FILE"; then
         warn "[J] plan introduces a new ibl5/classes/*.php file but the VM has no Infection/mutation/coverage row — consider adding one (Infection is label-gated; suppress with a comment if deliberately omitted)"
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [O]: "Hub" in module/class names (hard-fail).
+# ---------------------------------------------------------------------------
+# Merged IBL5 modules must never carry "Hub" in their name (user preference,
+# first recorded in memory/feedback_no_hub_in_module_names.md). Fire on:
+#   1. PascalCase identifiers containing Hub: e.g. RecordsHub, HubDraft, DataHub
+#   2. Bare capitalized "Hub" used as a label, e.g. "Records Hub", "Draft Hub"
+#   3. Paths under ibl5/modules/ or ibl5/classes/ whose filename contains Hub
+# Exempt (removed before matching):
+#   - GitHub / github (explicit per-task exemption)
+#   - .github/ paths
+#   - Inline code spans (already exempted by fence-stripping)
+#   - URLs (https?://)
+#   - "Docker Hub", and any line carrying <!-- hub-ok --> (e.g. a non-name use
+#     like a graph label)
+# Fence-aware (tracks open/close of backtick blocks).
+_o_hub_hits=$(awk '
+    function fence_ticks(s,   t) {
+        if (match(s, /^[ \t]*`+/)) {
+            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+        }
+        return 0
+    }
+    BEGIN { infence=0; fence_len=0; hits=0 }
+    {
+        nt = fence_ticks($0)
+        if (infence) {
+            if (nt >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { infence=0; fence_len=0 }
+            next
+        }
+        if (nt >= 3) { infence=1; fence_len=nt; next }
+        line = $0
+        # Strip exempt patterns before Hub-scanning.
+        # Note: inline code spans (single backticks) are NOT exempt — only fenced
+        # blocks are. A plan naming `RecordsHub` in a backtick span still refers to
+        # a Hub-named identifier.
+        if (line ~ /<!-- hub-ok -->/) next
+        gsub(/[Gg]it[Hh]ub/, "", line)
+        gsub(/Docker Hub/, "", line)
+        gsub(/\.github\/[^ \t]*/, "", line)
+        gsub(/https?:\/\/[^ \t]*/, "", line)
+        # Pattern 1a: PascalCase with Hub as suffix/middle: RecordsHub, DataHubStore.
+        if (match(line, /[A-Z][A-Za-z0-9]*Hub[A-Za-z0-9]*/)) { if (!hits) first=NR ": " $0; hits++; next }
+        # Pattern 1b: PascalCase with Hub as prefix: HubDraft, HubManager.
+        if (match(line, /[^A-Za-z0-9]Hub[A-Za-z0-9]+/)) { if (!hits) first=NR ": " $0; hits++; next }
+        if (match(line, /^Hub[A-Za-z0-9]+/))             { if (!hits) first=NR ": " $0; hits++; next }
+        # Pattern 2: Hub as standalone capitalized word (not glued to alnum on left)
+        if (match(line, /[^A-Za-z0-9]Hub([^A-Za-z0-9]|$)/)) { if (!hits) first=NR ": " $0; hits++; next }
+        if (match(line, /^Hub([^A-Za-z0-9]|$)/))             { if (!hits) first=NR ": " $0; hits++; next }
+        # Pattern 3: path under ibl5/modules/ or ibl5/classes/ containing Hub
+        if (match(line, /ibl5\/(modules|classes)\/[^ \t]*Hub/)) { if (!hits) first=NR ": " $0; hits++; next }
+    }
+    END { print hits+0; if (hits) print first }
+' "$PLAN_FILE")
+_o_first=$(printf '%s\n' "$_o_hub_hits" | sed -n 2p)
+_o_hub_hits=$(printf '%s\n' "$_o_hub_hits" | head -1)
+if [ "${_o_hub_hits:-0}" -gt 0 ]; then
+    viol "[O] plan names ${_o_hub_hits} Hub identifier(s) (first at line ${_o_first}) — mark a non-name use with <!-- hub-ok -->, otherwise — rename to a plain noun (e.g. DraftInfo, Records, Leaderboards); \"Hub\" in a module or class name is banned by project convention"
 fi
 
 # ---------------------------------------------------------------------------

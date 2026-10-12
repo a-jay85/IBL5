@@ -13,7 +13,7 @@ class TeamOlympicsLoadTest extends DatabaseTestCase
 {
     protected function tearDown(): void
     {
-        \BaseMysqliRepository::clearSharedLeagueContext();
+        \Database\BaseMysqliRepository::clearSharedLeagueContext();
         parent::tearDown();
     }
 
@@ -41,7 +41,7 @@ class TeamOlympicsLoadTest extends DatabaseTestCase
 
         $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
-        \BaseMysqliRepository::setSharedLeagueContext($context);
+        \Database\BaseMysqliRepository::setSharedLeagueContext($context);
 
         // Must not throw — this is the exact path that fataled in CI.
         $team = Team::initialize($this->db, 99);

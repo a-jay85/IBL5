@@ -87,10 +87,10 @@ final class SimRecapQueueMentionMapCliTest extends DatabaseTestCase
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     /**
-     * Launch simRecapContext.php as a child process via a bootstrap tmpfile.
+     * Launch simRecapQueue.php as a child process via a bootstrap tmpfile.
      *
      * The bootstrap prepends define('PHPUNIT_RUNNING', true) before requiring
-     * the script, mirroring the pattern established in StoreSimRecapCliTest.
+     * the script, mirroring the pattern established in SimRecapContextCliTest.
      * Using a tmpfile keeps $argv indexing predictable (no json_encode escaping
      * that php -r introduces).
      *

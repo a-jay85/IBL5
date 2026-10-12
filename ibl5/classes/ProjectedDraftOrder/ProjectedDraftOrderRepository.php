@@ -102,22 +102,15 @@ class ProjectedDraftOrderRepository extends \Database\BaseMysqliRepository imple
                 $year,
             );
 
-            foreach (array_chunk($picks, 500) as $chunk) {
-                $placeholders = implode(',', array_fill(0, count($chunk), '(?, ?, ?, ?, ?, \'\', UUID())'));
-                $types = str_repeat('iiisi', count($chunk));
-                $params = [];
-                foreach ($chunk as $pick) {
-                    $params[] = $year;
-                    $params[] = $pick['round'];
-                    $params[] = $pick['pick'];
-                    $params[] = $pick['team'];
-                    $params[] = $pick['teamid'];
-                }
+            foreach ($picks as $pick) {
                 $this->execute(
-                    "INSERT INTO `ibl_draft` (`year`, `round`, `pick`, `team`, `teamid`, `player`, `uuid`)
-                     VALUES " . $placeholders,
-                    $types,
-                    ...$params,
+                    "INSERT INTO `ibl_draft` (`year`, `round`, `pick`, `team`, `teamid`, `player`, `uuid`) VALUES (?, ?, ?, ?, ?, '', UUID())",
+                    'iiisi',
+                    $year,
+                    $pick['round'],
+                    $pick['pick'],
+                    $pick['team'],
+                    $pick['teamid'],
                 );
             }
 

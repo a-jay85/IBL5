@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\BasketballStats\Tables;
 
 use BasketballStats\Tables\PeriodAverages;
+use Database\SqlPlaceholders;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -238,8 +239,11 @@ final class PeriodAveragesTest extends TestCase
 
         $this->renderWithDefaultRows($db, null, null, [], [101, 102, 103]);
 
-        $this->assertStringContainsString(' AND bs.pid IN (?,?,?)', $this->mainPreparedQuery($db));
-        $this->assertSame(['2025-01-10', '2025-01-20', 7, 7, 7, 101, 102, 103], $db->getLastBoundParams());
+        $this->assertStringContainsString(' AND bs.pid IN (' . SqlPlaceholders::PID_LIST . ')', $this->mainPreparedQuery($db));
+        $this->assertSame(
+            ['2025-01-10', '2025-01-20', 7, 7, 7, ...SqlPlaceholders::padPidList([101, 102, 103])],
+            $db->getLastBoundParams()
+        );
     }
 
     public function testEmptyPidFilterAddsNoInClause(): void

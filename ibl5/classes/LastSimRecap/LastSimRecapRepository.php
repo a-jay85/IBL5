@@ -157,12 +157,32 @@ class LastSimRecapRepository extends \Database\BaseMysqliRepository implements L
             return [];
         }
 
-        $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
+        $chunks = array_chunk($playerIds, \Database\SqlPlaceholders::PID_LIST_WIDTH);
+        if (count($chunks) === 1) {
+            return $this->fetchActiveInjuriesChunk($chunks[0], $date);
+        }
+
+        // The query binds a fixed-width pid list, so a larger roster runs in
+        // groups; restore the single-query ordering (new first, newest first).
+        $out = [];
+        foreach ($chunks as $chunk) {
+            array_push($out, ...$this->fetchActiveInjuriesChunk($chunk, $date));
+        }
+        usort($out, static fn (array $a, array $b): int => [$b['isNew'], $b['date']] <=> [$a['isNew'], $a['date']]);
+
+        return $out;
+    }
+
+    /**
+     * @param non-empty-list<int> $playerIds at most PID_LIST_WIDTH ids
+     * @return list<InjuryRow>
+     */
+    private function fetchActiveInjuriesChunk(array $playerIds, string $date): array
+    {
         $dateExpr = self::TRANSACTION_DATE_SQL;
 
         // $dateExpr is a fixed SQL fragment built in-class above from column refs and
-        // constants (no user input); $placeholders is a count-derived run of bound `?`
-        // markers. Concatenate both validated fragments rather than interpolating.
+        // constants (no user input); PID_LIST is a literal run of bound `?` markers.
         $sql = "SELECT t.pid,
                        p.name,
                        p.pos,
@@ -175,15 +195,15 @@ class LastSimRecapRepository extends \Database\BaseMysqliRepository implements L
                 FROM `ibl_jsb_transactions` t
                 JOIN `ibl_plr` p ON p.pid = t.pid
                 WHERE t.transaction_type = 1
-                  AND t.pid IN (" . $placeholders . ")
+                  AND t.pid IN (" . \Database\SqlPlaceholders::PID_LIST . ")
                   AND t.injury_games_missed IS NOT NULL
                   AND " . $dateExpr . " <= ?
                   AND DATE_ADD(" . $dateExpr . ", INTERVAL t.injury_games_missed DAY) > ?
                 ORDER BY is_new DESC, injury_date DESC, t.id DESC";
 
         // Build types/params: ss (date for days_remaining + is_new), pids (i...), ss (date <= + date <)
-        $types = 'ss' . str_repeat('i', count($playerIds)) . 'ss';
-        $params = array_merge([$date, $date], $playerIds, [$date, $date]);
+        $types = 'ss' . \Database\SqlPlaceholders::PID_LIST_TYPES . 'ss';
+        $params = array_merge([$date, $date], \Database\SqlPlaceholders::padPidList($playerIds), [$date, $date]);
 
         /** @var list<array{pid:int,name:string,pos:string,injury_date:string,injury_description:string|null,injury_games_missed:int,days_remaining:int,return_date:string,is_new:int}> $rows */
         $rows = $this->fetchAll($sql, $types, ...$params);

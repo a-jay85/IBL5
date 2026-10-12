@@ -35,16 +35,30 @@ class SeasonLeaderboardsRepository extends \Database\BaseMysqliRepository implem
      */
     public function getSeasonLeaders(array $filters, int $limit = 0): array
     {
-        $where = new \Validation\QueryConditions(["h.name IS NOT NULL"]);
+        $types = '';
+        $params = [];
 
         $yearFilter = (string) ($filters['year'] ?? '');
+        $yearClause = '';
         if ($yearFilter !== '') {
-            $where->add('h.year = ?', 's', $yearFilter);
+            $yearClause = ' AND h.year = ?';
+            $types .= 's';
+            $params[] = $yearFilter;
         }
 
         $teamId = (int) ($filters['team'] ?? 0);
+        $teamClause = '';
         if ($teamId !== 0) {
-            $where->add('h.teamid = ?', 'i', $teamId);
+            $teamClause = ' AND h.teamid = ?';
+            $types .= 'i';
+            $params[] = $teamId;
+        }
+
+        $limitClause = '';
+        if ($limit > 0) {
+            $limitClause = ' LIMIT ?';
+            $types .= 'i';
+            $params[] = $limit;
         }
 
         $sortBy = $this->getSortColumn((string) ($filters['sortby'] ?? 'PPG'));
@@ -61,11 +75,11 @@ class SeasonLeaderboardsRepository extends \Database\BaseMysqliRepository implem
                 t.team_city, t.color1, t.color2
             FROM `ibl_hist` h
             LEFT JOIN `ibl_team_info` t ON h.teamid = t.teamid
-            WHERE " . $where->toWhereClause() . " ORDER BY " . $sortBy . " DESC, h.pid ASC"
-            . ($limit > 0 ? " LIMIT " . $limit : "");
+            WHERE h.name IS NOT NULL" . $yearClause . $teamClause . " ORDER BY " . $sortBy . " DESC, h.pid ASC"
+            . $limitClause;
 
         /** @var list<HistRow> $rows */
-        $rows = $this->fetchAll($query, $where->getTypes(), ...$where->getParams());
+        $rows = $this->fetchAll($query, $types, ...$params);
 
         return [
             'results' => $rows,

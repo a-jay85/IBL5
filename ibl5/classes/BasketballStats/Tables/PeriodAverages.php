@@ -56,10 +56,9 @@ class PeriodAverages
         $pidFilterTypes = '';
         $pidFilterParams = [];
         if ($pidFilter !== []) {
-            $placeholders = implode(',', array_fill(0, count($pidFilter), '?'));
-            $pidFilterClause = " AND bs.pid IN ({$placeholders})";
-            $pidFilterTypes = str_repeat('i', count($pidFilter));
-            $pidFilterParams = $pidFilter;
+            $pidFilterClause = " AND bs.pid IN (" . \Database\SqlPlaceholders::PID_LIST . ")";
+            $pidFilterTypes = \Database\SqlPlaceholders::PID_LIST_TYPES;
+            $pidFilterParams = \Database\SqlPlaceholders::padPidList($pidFilter);
         }
 
         $query = "SELECT p.name,

@@ -33,7 +33,7 @@ class TeamScheduleRepository extends \Database\BaseMysqliRepository implements T
         return $this->fetchAll(
             "SELECT s.*, bst.game_of_that_day
             FROM `ibl_schedule` s
-            LEFT JOIN " . $this->gameOfThatDaySubquery() . " bst ON bst.game_date = s.game_date AND bst.visitor_teamid = s.visitor_teamid AND bst.home_teamid = s.home_teamid
+            LEFT JOIN " . self::GAME_OF_THAT_DAY_SUBQUERY . " bst ON bst.game_date = s.game_date AND bst.visitor_teamid = s.visitor_teamid AND bst.home_teamid = s.home_teamid
             WHERE s.season_year = ? AND (s.visitor_teamid = ? OR s.home_teamid = ?)
             ORDER BY s.game_date ASC, s.id ASC",
             'iii',

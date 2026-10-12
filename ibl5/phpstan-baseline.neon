@@ -67,12 +67,6 @@ parameters:
 			path: classes/Debug/DebugSession.php
 
 		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/DepthChart/DepthChartView.php
-
-		-
 			rawMessage: 'Parameter #3 $pickOwner of method Draft\Contracts\DraftViewInterface::renderDraftInterface() expects string, string|null given.'
 			identifier: argument.type
 			count: 1
@@ -103,30 +97,6 @@ parameters:
 			path: classes/Extension/ExtensionService.php
 
 		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 4
-			path: classes/FreeAgency/FreeAgencyOfferView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/FreeAgency/FreeAgencyTeamFreeAgentsSectionView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/FreeAgency/FreeAgencyUnderContractSectionView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/LeagueControlPanel/LeagueControlPanelView.php
-
-		-
 			rawMessage: 'header() is banned outside Bootstrap classes, Responders, and HTMX ApiHandlers. Route response headers through a Responder (composed by the Controller/ApiHandler).'
 			identifier: ibl.directHeader
 			count: 3
@@ -139,58 +109,10 @@ parameters:
 			path: classes/Navigation/Views/DesktopNavView.php
 
 		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 3
-			path: classes/Navigation/Views/DesktopNavView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/Navigation/Views/LoginFormView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 7
-			path: classes/Navigation/Views/MobileNavView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 2
-			path: classes/Navigation/Views/TeamsDropdownView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 4
-			path: classes/Negotiation/NegotiationOfferView.php
-
-		-
 			rawMessage: Hardcoded environment string "www.iblhoops.net" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
 			path: classes/PageLayout/PageLayout.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/RookieOption/RookieOptionView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 3
-			path: classes/Search/SearchView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 14
-			path: classes/Team/TeamView.php
 
 		-
 			rawMessage: '''
@@ -221,12 +143,6 @@ parameters:
 			path: classes/Topics/News/NewsController.php
 
 		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 5
-			path: classes/Trading/TradeOfferFormView.php
-
-		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
@@ -245,28 +161,10 @@ parameters:
 			path: classes/Trading/TradeProcessor.php
 
 		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/Trading/TradeReviewView.php
-
-		-
 			rawMessage: 'header() is banned outside Bootstrap classes, Responders, and HTMX ApiHandlers. Route response headers through a Responder (composed by the Controller/ApiHandler).'
 			identifier: ibl.directHeader
 			count: 1
 			path: classes/Trading/TradingController.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/Waivers/WaiversView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/YourAccount/LoginView.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class ActivityTracker\ActivityTrackerRepository constructor expects mysqli, mixed given.'

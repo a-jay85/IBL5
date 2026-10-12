@@ -73,6 +73,26 @@ class TradeReviewViewTest extends TestCase
         $this->assertStringNotContainsString('&amp;lt;', $html);
     }
 
+    public function testHostileTeamCityEscapedExactlyOnceInTeamCell(): void
+    {
+        $pageData = [
+            'userTeam' => 'Lakers',
+            'userTeamId' => 1,
+            'tradeOffers' => [],
+            'teams' => [
+                ['name' => self::HOSTILE, 'city' => 'C ' . self::HOSTILE, 'fullName' => 'Full Name', 'teamid' => 5, 'color1' => '552583', 'color2' => 'FDB927', 'mobileOrder' => 2],
+            ],
+            'result' => null,
+            'error' => null,
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        $this->assertStringContainsString('<span class="ibl-team-cell__city">C ' . self::ESCAPED . ' </span>', $html);
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
+    }
+
     /**
      * @param array<string, mixed> $overrides
      * @return array<string, mixed>

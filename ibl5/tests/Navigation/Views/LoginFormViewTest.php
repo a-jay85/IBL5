@@ -58,4 +58,13 @@ class LoginFormViewTest extends TestCase
         $this->assertStringContainsString('name="redirect_query"', $html);
         $this->assertStringContainsString('name=Standings', $html);
     }
+
+    public function testHostileRedirectQueryEscapedExactlyOnce(): void
+    {
+        $html = $this->view->render('desktop', '/x?a="><script>');
+
+        $this->assertStringContainsString('name="redirect_query" value="a=&quot;&gt;&lt;script&gt;"', $html);
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringNotContainsString('&amp;quot;', $html);
+    }
 }

@@ -57,7 +57,7 @@ interface NegotiationOfferViewInterface
      * - Calculates max raise based on bird years (>= 3 = 12.5%, else 10%)
      * - Form submits to modules/Player/extension.php
      */
-    public static function renderNegotiationForm(
+    public function renderNegotiationForm(
         Player $player,
         array $demands,
         int $capSpace,

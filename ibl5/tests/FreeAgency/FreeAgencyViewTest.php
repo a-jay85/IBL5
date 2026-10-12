@@ -135,6 +135,66 @@ class FreeAgencyViewTest extends TestCase
         $this->assertStringNotContainsString('pa=rookieoption', $html);
     }
 
+    public function testHostileFreeAgentNameEscapedExactlyOnceNextToThumbnail(): void
+    {
+        $row = $this->getBasePlayerData();
+        $row['pid'] = 403;
+        $row['name'] = 'O\'Neal <xss>&"q"';
+        $row['cy'] = 0;
+        $row['salary_yr1'] = 0;
+
+        $html = $this->makeView()->render($this->buildMainPageData([$row]));
+
+        $this->assertSame(1, preg_match('/<a href="modules\.php\?name=Player&amp;pa=showpage&amp;pid=403">\s*<img [^>]*>\s*O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;\s*<\/a>/', $html));
+        $this->assertStringNotContainsString('<xss>', $html);
+        $this->assertStringNotContainsString('&amp;lt;', $html);
+    }
+
+    public function testBirdYearsPlayerNameWrappedInEm(): void
+    {
+        $bird = $this->getBasePlayerData();
+        $bird['pid'] = 404;
+        $bird['name'] = 'Bird Player';
+        $bird['cy'] = 0;
+        $bird['salary_yr1'] = 0;
+        $bird['bird'] = 3;
+        $bird['bird_years'] = 3;
+        $plain = $this->getBasePlayerData();
+        $plain['pid'] = 405;
+        $plain['name'] = 'Plain Player';
+        $plain['cy'] = 0;
+        $plain['salary_yr1'] = 0;
+
+        $html = $this->makeView()->render($this->buildMainPageData([$bird, $plain]));
+
+        $this->assertStringContainsString('*<em>Bird Player</em>*', $html);
+        $this->assertStringContainsString('Plain Player', $html);
+        $this->assertStringNotContainsString('<em>Plain Player', $html);
+    }
+
+    public function testContractActionHrefEncodesAmpersandOnce(): void
+    {
+        $row = $this->getBasePlayerData();
+        $row['pid'] = 7;
+        $row['name'] = 'Contract Player';
+        $row['cy'] = 3;
+        foreach (['salary_yr1', 'salary_yr2', 'salary_yr3', 'salary_yr4', 'salary_yr5', 'salary_yr6'] as $key) {
+            $row[$key] = 600;
+        }
+        $mainPageData = $this->buildMainPageData([$row]);
+        $player = $mainPageData['playersUnderContract'][0]['player'];
+
+        $mainPageData['playersUnderContract'] = [['player' => $player, 'contractAction' => 'rookie_option']];
+        $html = $this->makeView()->render($mainPageData);
+        $this->assertStringContainsString('href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=7&amp;from=fa"', $html);
+        $this->assertStringNotContainsString('&amp;amp;', $html);
+
+        $mainPageData['playersUnderContract'] = [['player' => $player, 'contractAction' => 'extension']];
+        $html = $this->makeView()->render($mainPageData);
+        $this->assertStringContainsString('href="modules.php?name=Player&amp;pa=negotiate&amp;pid=7"', $html);
+        $this->assertStringNotContainsString('&amp;amp;', $html);
+    }
+
     public function testContractOffersTableGoldenUnchanged(): void
     {
         $p301 = array_merge($this->getBasePlayerData(), ['pid' => 301, 'name' => 'Offer Player One', 'firstname' => 'Offer', 'lastname' => 'One']);

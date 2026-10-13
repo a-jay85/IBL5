@@ -780,6 +780,7 @@ class ScheduleUpdaterTest extends TestCase
 
     public function testPlayedPlayoffGameWithoutBoxLinkUsesUnplayedBoxId(): void
     {
+        // The visitor score links to game1.htm, not boxN.htm, so no box id is parsed.
         $html = "<table>\n<tr><th>Post 2 2025</th></tr>\n"
             . '<tr><td><a href="t1.htm">Metros</a></td><td><a href="game1.htm">101</a></td>'
             . '<td><a href="t2.htm">Stars</a></td><td><a href="game2.htm">95</a></td></tr>'

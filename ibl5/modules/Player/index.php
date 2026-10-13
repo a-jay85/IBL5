@@ -10,6 +10,7 @@ use Repositories\TeamIdentityRepository;
 use Repositories\SalaryCapRepository;
 
 global $mysqli_db, $commonRepository, $salaryCapRepo, $httpRequest, $authService, $prefix, $user;
+$nukeCompat = new \Utilities\NukeCompat();
 /** @var \mysqli $mysqli_db */
 /** @var \Auth\AuthService $authService */
 
@@ -77,16 +78,16 @@ switch ($pa) {
             new \Topics\News\NewsRepository($mysqli_db),
         );
         $redirectUrl = $rookieController->handleSubmission(
-            static fn (): bool => is_user($user) === 1,
+            static fn (): bool => $nukeCompat->isUser($user),
             static fn (): bool => \Security\CsrfGuard::validateSubmittedToken('rookie_option'),
-            static function () use ($user, $authService): string {
-                cookiedecode($user);
+            static function () use ($user, $authService, $nukeCompat): string {
+                $nukeCompat->cookieDecode($user);
                 return $authService->getUsername() ?? '';
             },
             $_POST,
         );
         if ($redirectUrl === null) {
-            loginbox();
+            $nukeCompat->loginBox();
         } else {
             \Utilities\HtmxHelper::redirect($redirectUrl);
         }

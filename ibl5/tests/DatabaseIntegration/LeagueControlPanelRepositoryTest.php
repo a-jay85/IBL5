@@ -345,6 +345,71 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
         self::assertFalse($this->repo->hasGeneratedAwardsForYear(2099));
     }
 
+    // ── upsertAward ────────────────────────────────────────────────
+
+    public function testUpsertAwardInsertsNewRow(): void
+    {
+        $affected = $this->repo->upsertAward(2098, 'LCP Pin Award', 'LCP Pin Player');
+
+        self::assertSame(1, $affected);
+        self::assertSame(1, $this->countAwardRows(2098, 'LCP Pin Award', 'LCP Pin Player'));
+    }
+
+    public function testUpsertAwardSameTripleDoesNotDuplicateRow(): void
+    {
+        $this->repo->upsertAward(2098, 'LCP Dup Award', 'LCP Dup Player');
+        $this->repo->upsertAward(2098, 'LCP Dup Award', 'LCP Dup Player');
+
+        self::assertSame(1, $this->countAwardRows(2098, 'LCP Dup Award', 'LCP Dup Player'));
+    }
+
+    public function testUpsertAwardDifferentNameSameYearAwardCreatesSecondRow(): void
+    {
+        $this->repo->upsertAward(2098, 'LCP Boundary Award', 'LCP Player One');
+        $this->repo->upsertAward(2098, 'LCP Boundary Award', 'LCP Player Two');
+
+        self::assertSame(2, $this->countAwardRows(2098, 'LCP Boundary Award'));
+    }
+
+    public function testUpsertAwardStoresApostropheNameVerbatim(): void
+    {
+        $this->repo->upsertAward(2098, 'LCP Quote Award', "D'Angelo Pin");
+
+        self::assertSame(1, $this->countAwardRows(2098, 'LCP Quote Award', "D'Angelo Pin"));
+
+        $year = 2098;
+        $award = 'LCP Quote Award';
+        $stmt = $this->db->prepare('SELECT name FROM ibl_awards WHERE year = ? AND award = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('is', $year, $award);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertIsArray($row);
+        self::assertSame("D'Angelo Pin", $row['name']);
+    }
+
+    private function countAwardRows(int $year, string $award, ?string $name = null): int
+    {
+        if ($name === null) {
+            $stmt = $this->db->prepare('SELECT COUNT(*) AS cnt FROM ibl_awards WHERE year = ? AND award = ?');
+            self::assertNotFalse($stmt);
+            $stmt->bind_param('is', $year, $award);
+        } else {
+            $stmt = $this->db->prepare('SELECT COUNT(*) AS cnt FROM ibl_awards WHERE year = ? AND award = ? AND name = ?');
+            self::assertNotFalse($stmt);
+            $stmt->bind_param('iss', $year, $award, $name);
+        }
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertIsArray($row);
+
+        return (int) $row['cnt'];
+    }
+
     // ── getEoyVotesCastCount ───────────────────────────────────────
 
     public function testGetEoyVotesCastCountReturnsCorrectCount(): void

@@ -208,6 +208,7 @@ class WaiversViewTest extends TestCase
         $this->assertStringContainsString('<option value="42">Jane Doe 103</option>', $output);
         // Numeric values only: excludes the empty-value "Select player..." placeholder.
         $this->assertSame(2, preg_match_all('/<option value="\d+">/', $output));
+        $this->assertStringNotContainsString('&lt;option', $output);
     }
 
     public function testRenderWaiverFormAppendsWaitTimeWhenPresent(): void

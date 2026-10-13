@@ -109,6 +109,60 @@ class TradeOfferFormViewTest extends TestCase
         $this->assertStringNotContainsString('name="index5"', $html);
     }
 
+    public function testPopulatedRenderMatchesGolden(): void
+    {
+        $html = $this->view->renderTradeOfferForm($this->createPopulatedTradeOfferPageData());
+        $this->assertGolden(__DIR__ . '/fixtures/trade-offer-form-populated.golden.html', $html);
+    }
+
+    public function testCsrfInputRendersExactlyOnceDirectlyAfterFormOpen(): void
+    {
+        $html = $this->view->renderTradeOfferForm($this->createPopulatedTradeOfferPageData());
+
+        $this->assertSame(1, substr_count($html, 'name="_csrf_token"'));
+        $this->assertSame(1, preg_match(
+            '/<form name="Trade_Offer" method="post" action="\/ibl5\/modules\/Trading\/maketradeoffer\.php">\n[ \t]*<input type="hidden" name="_csrf_token" value="[0-9a-f]{64}">\s*<input type="hidden" name="offeringTeam" value="/',
+            $html
+        ));
+    }
+
+    public function testHiddenFieldsKeepOfferingSwitchListeningFieldsOrder(): void
+    {
+        $html = $this->view->renderTradeOfferForm($this->createPopulatedTradeOfferPageData());
+
+        $offering = strpos($html, 'name="offeringTeam" value="Lakers &amp; Co"');
+        $switch = strpos($html, 'name="switchCounter" value="5"');
+        $listening = strpos($html, 'name="listeningTeam" value="Celtics"');
+        $fields = strpos($html, 'name="fieldsCounter" value="7"');
+        $this->assertNotFalse($offering);
+        $this->assertNotFalse($switch);
+        $this->assertNotFalse($listening);
+        $this->assertNotFalse($fields);
+        $this->assertLessThan($switch, $offering);
+        $this->assertLessThan($listening, $switch);
+        $this->assertLessThan($fields, $listening);
+        foreach (['offeringTeam', 'switchCounter', 'listeningTeam', 'fieldsCounter'] as $name) {
+            $this->assertSame(1, substr_count($html, 'name="' . $name . '"'), $name);
+        }
+        $this->assertSame(3, substr_count($html, ' checked>'));
+        $this->assertSame(3, preg_match_all('/<input type="hidden" name="check\d+">/', $html));
+    }
+
+    public function testViewIsStateFreeAndTakesNoCollaborators(): void
+    {
+        $reflection = new \ReflectionClass(TradeOfferFormView::class);
+
+        $this->assertSame([], $reflection->getProperties());
+        $this->assertNull($reflection->getConstructor());
+        foreach ($reflection->getMethods() as $method) {
+            foreach ($method->getParameters() as $parameter) {
+                $type = $parameter->getType();
+                $typeName = $type instanceof \ReflectionNamedType ? $type->getName() : '';
+                $this->assertNotSame('mysqli', ltrim($typeName, '\\'), $method->getName() . '::$' . $parameter->getName());
+            }
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -144,5 +198,62 @@ class TradeOfferFormViewTest extends TestCase
             'result' => null,
             'error' => null,
         ];
+    }
+
+    private static function normalizeCsrf(string $html): string
+    {
+        return preg_replace(
+            '/name="_csrf_token" value="[0-9a-f]{64}"/',
+            'name="_csrf_token" value="__CSRF__"',
+            $html
+        ) ?? $html;
+    }
+
+    private function assertGolden(string $path, string $html): void
+    {
+        if (getenv('IBL_GOLDEN_CAPTURE') === '1') {
+            file_put_contents($path, self::normalizeCsrf($html));
+        }
+        $this->assertStringEqualsFile($path, self::normalizeCsrf($html));
+    }
+
+    /**
+     * Every branch the empty-roster golden leaves unpinned: both teams populated,
+     * offseason phase (cy advances), checked rows, hidden-check rows (waived and
+     * zero-contract), picks with and without notes, prefilled cash on both sides,
+     * and a result/error alert.
+     *
+     * @return array<string, mixed>
+     */
+    private function createPopulatedTradeOfferPageData(): array
+    {
+        $pageData = $this->createTradeOfferPageData();
+        $pageData['seasonPhase'] = 'Playoffs';
+        $pageData['userTeam'] = 'Lakers & Co';
+        $pageData['userPlayers'] = [
+            ['pos' => 'G', 'name' => 'Kobe & Bryant', 'pid' => 999001, 'ordinal' => 1, 'cy' => 1, 'salary_yr1' => 500, 'salary_yr2' => 750, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+            ['pos' => 'F', 'name' => 'Waived Forward', 'pid' => 999002, 'ordinal' => \League\JsbConstants::WAIVERS_ORDINAL + 1, 'cy' => 1, 'salary_yr1' => 500, 'salary_yr2' => 400, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+            ['pos' => 'C', 'name' => 'Zero Deal', 'pid' => 999003, 'ordinal' => 2, 'cy' => 1, 'salary_yr1' => 0, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+        ];
+        $pageData['userPicks'] = [
+            ['pickid' => 7, 'ownerofpick' => 'Lakers', 'teampick' => 'Lakers', 'teampick_id' => 1, 'year' => '2026', 'round' => '1', 'notes' => 'Via <Nets> & "swap"', 'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00'],
+            ['pickid' => 8, 'ownerofpick' => 'Lakers', 'teampick' => 'Knicks', 'teampick_id' => 5, 'year' => '2027', 'round' => '2', 'notes' => null, 'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00'],
+        ];
+        $pageData['partnerPlayers'] = [
+            ['pos' => 'F', 'name' => 'Paul "Pierce"', 'pid' => 999004, 'ordinal' => 1, 'cy' => 6, 'salary_yr1' => 0, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 900],
+            ['pos' => 'G', 'name' => 'Rookie|Pipe', 'pid' => 999005, 'ordinal' => 2, 'cy' => 0, 'salary_yr1' => 600, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+        ];
+        $pageData['partnerPicks'] = [
+            ['pickid' => 9, 'ownerofpick' => 'Celtics', 'teampick' => 'Celtics', 'teampick_id' => 2, 'year' => '2026', 'round' => '2', 'notes' => '', 'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00'],
+        ];
+        $pageData['previousFormData'] = [
+            'checkedItems' => ['1:999001' => true, '0:7' => true, '1:999005' => true],
+            'userSendsCash' => [1 => 100, 3 => 250],
+            'partnerSendsCash' => [6 => 50],
+        ];
+        $pageData['result'] = array_key_first(\Trading\TradeAlertMap::MAP);
+        $pageData['error'] = 'Oops <b>& "quoted"</b>';
+
+        return $pageData;
     }
 }

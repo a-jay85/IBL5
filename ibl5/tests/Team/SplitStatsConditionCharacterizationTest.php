@@ -14,6 +14,14 @@ use Tests\WideUnit\Mocks\MockDatabase;
  *
  * The SQL fragments below are test-local literals on purpose: the pin must fail if a production constant changes.
  * They are never concatenated into a query.
+ *
+ * Bound-param lists pinned for the unpinned keys (query order, teamid 5, season 2026):
+ * road [2026,5,5,5,5]; losses [2026,5,5,5,5,5]; pre_allstar [2026,5,5,5,'2026-02-01'];
+ * post_allstar [2026,5,5,5,'2026-02-05']; month_3 [2026,5,5,5,3]; div_ATLANTIC [5,2026,5,5,5,''].
+ * Prefix-shaped hostile keys: vs_7 OR 1=1 binds [2026,5,5,5,5,7]; month_3; -- binds [2026,5,5,5,3].
+ *
+ * Production side: BanSqlStringConcatenationRule (`composer run analyse`) checks the two concatenation
+ * sites at SplitStatsRepository.php:81,88; the map in SPLIT_DEFINITIONS keeps their operands constant strings.
  */
 class SplitStatsConditionCharacterizationTest extends TestCase
 {

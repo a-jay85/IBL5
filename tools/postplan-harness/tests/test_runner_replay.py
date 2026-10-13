@@ -405,6 +405,20 @@ def test_clean_run_still_arms(tmp_path):
     assert any(a["action"] == "pr_merge_auto" for a in acts)
 
 
+def test_retrospective_usage_pause_keeps_shipped_armed(tmp_path):
+    out = str(tmp_path / "out")
+    llm = FixtureLlm(UsageLedger(), dict(CANNED, retrospective={"kind": "usage-pause"}))
+    res = runner.run(_fixture(), out, llm, mode="replay")
+    assert res.terminal == TerminalState.SHIPPED_ARMED
+    assert res.error is None and res.error_kind is None
+    assert runner.exit_code_for(res) == 0
+    assert "pr_merge_auto" in [a["action"] for a in _actions(out)]
+    audit = _audit(out)
+    assert audit.count("phase9: retrospective skipped (usage-pause)") == 1
+    assert "phase9: no durable lesson" not in audit
+    assert "PAUSED:" not in audit
+
+
 def test_conflict_resolved_fixture_holds_condition_14(tmp_path):
     """4f replay hold — a branch carrying an auto-resolved rebase conflict never arms.
 
@@ -1865,6 +1879,24 @@ def test_phase7_incident_red_ci_is_fixed_and_rewatched(monkeypatch, tmp_path):
     git = _TwoShaLiveGit.instances[-1]
     assert any(m.startswith("fix: address Phase 7 CI failures (attempt 1)")
                for m in git.commit_messages)
+
+
+def test_phase7_ci_fix_usage_pause_still_fails_run(monkeypatch, tmp_path):
+    """The Phase 9 carve-out must not reach ci-fix: a pause there stays FAILED/75."""
+    out = str(tmp_path / "out")
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": {"kind": "usage-pause"}},
+        fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+    )
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == "usage-pause"
+    assert res.error == "usage-pause: ci-fix"
+    assert runner.exit_code_for(res) == 75
+    audit = _audit(out)
+    assert "PAUSED: usage-pause: ci-fix" in audit
+    assert "phase9: retrospective skipped" not in audit
 
 
 def test_phase7_signoff_only_red_is_green(monkeypatch, tmp_path):

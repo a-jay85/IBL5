@@ -16,6 +16,7 @@ use UI\Contracts\ContractsTableInterface;
  * Contracts - Displays team contracts table
  *
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-type ContractRow array{player: Player, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int, isCashRow: bool}
  */
 class Contracts implements ContractsTableInterface
 {
@@ -46,7 +47,7 @@ class Contracts implements ContractsTableInterface
         }
 
         $cap1 = $cap2 = $cap3 = $cap4 = $cap5 = $cap6 = 0;
-        /** @var list<array{player: Player, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int, isCashRow: bool}> $playerRows */
+        /** @var list<ContractRow> $playerRows */
         $playerRows = [];
 
         foreach ($result as $plrRow) {
@@ -108,6 +109,26 @@ class Contracts implements ContractsTableInterface
         ob_start();
         ?>
 <table class="ibl-data-table team-table responsive-table contracts-table sortable" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
+<?= self::renderHeader($season) ?>
+    <tbody>
+<?php foreach ($playerRows as $row): ?>
+<?= self::renderPlayerRow($row, $season, $starterPids, $showActionLinks, $markExpiringRows, $isExtensionActionablePhase) ?>
+<?php endforeach; ?>
+    </tbody>
+<?= self::renderFooter($cap1, $cap2, $cap3, $cap4, $cap5, $cap6) ?>
+</table>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Header row. Reads $season->endingYear AFTER render() has applied the
+     * offseason bump, so the year labels shift forward during Draft / Free Agency.
+     */
+    private static function renderHeader(Season $season): string
+    {
+        ob_start();
+        ?>
     <thead>
         <tr>
             <th>Pos</th>
@@ -131,27 +152,39 @@ class Contracts implements ContractsTableInterface
             <th>Trd</th>
         </tr>
     </thead>
-    <tbody>
-<?php foreach ($playerRows as $row):
-    $player = $row['player'];
-    $isCashPlayer = $row['isCashRow'] || str_contains($player->getName() ?? '', '|');
-    $hasRookieOption = !$isCashPlayer && $player->canRookieOption($season->phase);
-    // Pass $season so eligibility reflects the incoming season's state during Draft / Free Agency.
-    $hasExtension = !$isCashPlayer && !$hasRookieOption && $player->canRenegotiateContract($season);
-
-    $hintActionUrl = '';
-    $hintActionLabel = '';
-    $renderHintAsLink = false;
-    if ($hasRookieOption) {
-        $hintActionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->getPlayerID() . '&amp;from=team';
-        $hintActionLabel = 'Rookie Option';
-        $renderHintAsLink = $showActionLinks;
-    } elseif ($hasExtension) {
-        $hintActionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->getPlayerID();
-        $hintActionLabel = 'Contract Extension';
-        $renderHintAsLink = $showActionLinks && $isExtensionActionablePhase;
+<?php
+        return (string) ob_get_clean();
     }
-?>
+
+    /**
+     * One <tr> for a player or cash-considerations row.
+     *
+     * @param ContractRow $row
+     * @param list<int> $starterPids
+     */
+    private static function renderPlayerRow(array $row, Season $season, array $starterPids, bool $showActionLinks, bool $markExpiringRows, bool $isExtensionActionablePhase): string
+    {
+        $player = $row['player'];
+        $isCashPlayer = $row['isCashRow'] || str_contains($player->getName() ?? '', '|');
+        $hasRookieOption = !$isCashPlayer && $player->canRookieOption($season->phase);
+        // Pass $season so eligibility reflects the incoming season's state during Draft / Free Agency.
+        $hasExtension = !$isCashPlayer && !$hasRookieOption && $player->canRenegotiateContract($season);
+
+        $hintActionUrl = '';
+        $hintActionLabel = '';
+        $renderHintAsLink = false;
+        if ($hasRookieOption) {
+            $hintActionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->getPlayerID() . '&amp;from=team';
+            $hintActionLabel = 'Rookie Option';
+            $renderHintAsLink = $showActionLinks;
+        } elseif ($hasExtension) {
+            $hintActionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->getPlayerID();
+            $hintActionLabel = 'Contract Extension';
+            $renderHintAsLink = $showActionLinks && $isExtensionActionablePhase;
+        }
+
+        ob_start();
+        ?>
         <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?><?= (!$row['isCashRow'] && $markExpiringRows && $player->getNameStatusClass() === 'player-expiring') ? ' class="player-fa-expiring-row"' : '' ?>>
             <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->getPlayerID(), $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass()) ?>
@@ -159,7 +192,32 @@ class Contracts implements ContractsTableInterface
             <td><?= (int)$player->getYearsOfExperience() ?></td>
             <td class="sep-r-team"><?= (int)$player->getBirdYears() ?></td>
             <td class="col-salary"><?= $row['con1'] ?></td>
-            <?php if ($hasRookieOption || $hasExtension): ?>
+<?= self::renderSalaryCells($row, $hasRookieOption || $hasExtension, $renderHintAsLink, $hintActionUrl, $hintActionLabel) ?>
+            <td><?= (int)$player->getRatingTalent() ?></td>
+            <td><?= (int)$player->getRatingSkill() ?></td>
+            <td class="sep-r-team"><?= (int)$player->getRatingIntangibles() ?></td>
+            <td><?= (int)$player->getFreeAgencyLoyalty() ?></td>
+            <td><?= (int)$player->getFreeAgencyPlayForWinner() ?></td>
+            <td><?= (int)$player->getFreeAgencyPlayingTime() ?></td>
+            <td><?= (int)$player->getFreeAgencySecurity() ?></td>
+            <td><?= (int)$player->getFreeAgencyTradition() ?></td>
+        </tr>
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Salary cells for contract years 2-6. The twelve spaces before the opening
+     * <?php if ?> and before the endif are emitted in both branches and are part
+     * of the pinned output; keep them.
+     *
+     * @param ContractRow $row
+     */
+    private static function renderSalaryCells(array $row, bool $hasHint, bool $renderHintAsLink, string $hintActionUrl, string $hintActionLabel): string
+    {
+        ob_start();
+        ?>
+            <?php if ($hasHint): ?>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] === 0 ? '0*' : $row['con2'] ?><?php if ($renderHintAsLink): ?><a href="<?= $hintActionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $hintActionLabel ?></a><?php else: ?><span class="contract-hint-link" data-no-abbreviate><?= $hintActionLabel ?></span><?php endif; ?></td>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] ?></td>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] ?></td>
@@ -171,20 +229,19 @@ class Contracts implements ContractsTableInterface
             <td class="col-salary"><?= $row['con4'] ?></td>
             <td class="col-salary"><?= $row['con5'] ?></td>
             <td class="col-salary sep-r-team"><?= $row['con6'] ?></td>
-            <?php endif; ?>
-            <td><?= (int)$player->getRatingTalent() ?></td>
-            <td><?= (int)$player->getRatingSkill() ?></td>
-            <td class="sep-r-team"><?= (int)$player->getRatingIntangibles() ?></td>
-            <td><?= (int)$player->getFreeAgencyLoyalty() ?></td>
-            <td><?= (int)$player->getFreeAgencyPlayForWinner() ?></td>
-            <td><?= (int)$player->getFreeAgencyPlayingTime() ?></td>
-            <td><?= (int)$player->getFreeAgencySecurity() ?></td>
-            <td><?= (int)$player->getFreeAgencyTradition() ?></td>
-        </tr>
-<?php endforeach; ?>
-    </tbody>
+            <?php endif;
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Cap totals row plus the legend row.
+     */
+    private static function renderFooter(int $cap1, int $cap2, int $cap3, int $cap4, int $cap5, int $cap6): string
+    {
+        $hardCapMax = League::HARD_CAP_MAX;
+        ob_start();
+        ?>
     <tfoot>
-<?php $hardCapMax = League::HARD_CAP_MAX; ?>
         <tr>
             <td></td>
             <td class="sticky-col">Cap Totals</td>
@@ -212,8 +269,7 @@ class Contracts implements ContractsTableInterface
             </td>
         </tr>
     </tfoot>
-</table>
-        <?php
+<?php
         return (string) ob_get_clean();
     }
 }

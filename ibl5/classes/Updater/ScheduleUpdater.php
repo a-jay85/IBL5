@@ -148,26 +148,18 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
     }
 
     /**
-     * Insert playoff schedule entries from Schedule.htm.
+     * Parse step: read Schedule.htm and return its playoff rows.
      *
-     * Playoff games are NOT stored in the .sch file — they exist only in
-     * JSB's Schedule.htm HTML export. This parses both played games (with
-     * scores) and upcoming/unplayed games (no scores yet).
+     * Returns the skip-log string instead of rows when the file is missing or
+     * unreadable outside the Playoffs phase, so the caller's early return keeps
+     * its exact wording.
      *
-     * During the Playoffs phase an unreadable Schedule.htm is fatal: the postseason
-     * rows have no other source, so continuing would commit a playoff-less schedule.
+     * @return list<array{date_label: string, visitor: string, home: string, visitor_score: int, home_score: int, box_id: int|null, played: bool}>|string
      *
-     * @return string Log of inserted playoff games
-     *
-     * @throws \RuntimeException When Schedule.htm cannot be read, or contains only stale
-     *                             rows from another season, during the Playoffs phase
+     * @throws \RuntimeException When Schedule.htm cannot be read during the Playoffs phase
      */
-    private function insertPlayoffGamesFromScheduleHtm(): string
+    private function parsePlayoffGamesFromScheduleHtm(string $scheduleHtmPath, string $leagueDir): array|string
     {
-        $ibl5Root = $this->basePath;
-        $leagueDir = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'IBL';
-        $scheduleHtmPath = $ibl5Root . '/ibl/' . $leagueDir . '/Schedule.htm';
-
         if (!file_exists($scheduleHtmPath)) {
             $this->channelLogger->warning('ScheduleUpdater could not read Schedule.htm — no playoff games imported', [
                 'path' => $scheduleHtmPath,
@@ -211,7 +203,34 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
             return "Failed to read Schedule.htm — skipping playoff games<br>";
         }
 
-        $playoffGames = ScheduleHtmParser::parsePlayoffGames($html);
+        return ScheduleHtmParser::parsePlayoffGames($html);
+    }
+
+    /**
+     * Insert playoff schedule entries from Schedule.htm.
+     *
+     * Playoff games are NOT stored in the .sch file — they exist only in
+     * JSB's Schedule.htm HTML export. This parses both played games (with
+     * scores) and upcoming/unplayed games (no scores yet).
+     *
+     * During the Playoffs phase an unreadable Schedule.htm is fatal: the postseason
+     * rows have no other source, so continuing would commit a playoff-less schedule.
+     *
+     * @return string Log of inserted playoff games
+     *
+     * @throws \RuntimeException When Schedule.htm cannot be read, or contains only stale
+     *                             rows from another season, during the Playoffs phase
+     */
+    private function insertPlayoffGamesFromScheduleHtm(): string
+    {
+        $ibl5Root = $this->basePath;
+        $leagueDir = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'IBL';
+        $scheduleHtmPath = $ibl5Root . '/ibl/' . $leagueDir . '/Schedule.htm';
+
+        $playoffGames = $this->parsePlayoffGamesFromScheduleHtm($scheduleHtmPath, $leagueDir);
+        if (is_string($playoffGames)) {
+            return $playoffGames;
+        }
 
         $log = '';
         $skippedCount = 0;

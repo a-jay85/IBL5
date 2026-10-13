@@ -207,6 +207,25 @@ final class BackupArchiveLocatorSelectionTest extends TestCase
         $locator->describeSelection($this->tmpDir);
     }
 
+    public function testEqualSequenceArchivesKeepFirstSortedHighestAndNeverSelfPredecessor(): void
+    {
+        $t = time() - 1000;
+        $rar = $this->writeArchive($this->tmpDir, '25-26_10_reg-sim10.rar', 100, $t);
+        $this->writeArchive($this->tmpDir, '25-26_10_reg-sim10.zip', 100, $t);
+        $parsed = ['season' => '25-26', 'seq' => 10, 'phase' => 'reg-sim10', 'ending_year' => 2026];
+        $this->stubParseMap([
+            '25-26_10_reg-sim10.rar' => $parsed,
+            '25-26_10_reg-sim10.zip' => $parsed,
+        ]);
+
+        $selection = $this->locator()->describeSelection($this->tmpDir);
+
+        $this->assertSame($rar, $selection->path);
+        $this->assertSame('25-26_10_reg-sim10.rar', $selection->highestSeqName);
+        $this->assertNull($selection->predecessorName);
+        $this->assertNull($selection->predecessorSize);
+    }
+
     private function writeArchive(string $dir, string $name, int $bytes, int $mtime): string
     {
         $path = $dir . '/' . $name;

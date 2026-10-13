@@ -266,6 +266,39 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
     }
 
     /**
+     * Insert step: write one classified playoff row to ibl_schedule.
+     *
+     * Argument order matches the column order of the INSERT and the
+     * "iisiiiis" bind string: season_year(i) box_id(i) game_date(s)
+     * visitor_teamid(i) visitor_score(i) home_teamid(i) home_score(i) uuid(s).
+     */
+    private function insertPlayoffGame(
+        int $boxId,
+        string $gameDate,
+        int $visitorTeamId,
+        int $visitorScore,
+        int $homeTeamId,
+        int $homeScore,
+    ): void {
+        $uuid = UuidGenerator::generateUuid();
+
+        $this->execute(
+            "INSERT INTO `ibl_schedule` (
+                season_year, box_id, game_date, visitor_teamid, visitor_score, home_teamid, home_score, uuid
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "iisiiiis",
+            $this->season->endingYear,
+            $boxId,
+            $gameDate,
+            $visitorTeamId,
+            $visitorScore,
+            $homeTeamId,
+            $homeScore,
+            $uuid
+        );
+    }
+
+    /**
      * Insert playoff schedule entries from Schedule.htm.
      *
      * Playoff games are NOT stored in the .sch file — they exist only in
@@ -315,21 +348,13 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
                 continue;
             }
 
-            $uuid = UuidGenerator::generateUuid();
-
-            $this->execute(
-                "INSERT INTO `ibl_schedule` (
-                    season_year, box_id, game_date, visitor_teamid, visitor_score, home_teamid, home_score, uuid
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                "iisiiiis",
-                $this->season->endingYear,
+            $this->insertPlayoffGame(
                 $classification['box_id'],
                 $classification['game_date'],
                 $classification['visitor_teamid'],
                 $game['visitor_score'],
                 $classification['home_teamid'],
                 $game['home_score'],
-                $uuid
             );
             $insertedCount++;
             $log .= "Inserted playoff game: {$game['visitor']} @ {$game['home']} on {$classification['game_date']}<br>";

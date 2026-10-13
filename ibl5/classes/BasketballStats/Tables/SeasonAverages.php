@@ -8,12 +8,10 @@ use BasketballStats\StatsFormatter;
 use Player\Player;
 use Player\PlayerImageHelper;
 use Player\Stats\PlayerStats;
-use TeamOffDefStats\TeamOffDefStatsRepository;
 use UI\Tables\PlayerRowTransformer;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 use Team\Team;
-use Season\Season;
 
 /**
  * SeasonAverages - Displays season averages statistics table
@@ -39,15 +37,13 @@ class SeasonAverages
     {
         $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 
-        $season = new Season($db);
-        $seasonYear = ($yr !== '') ? (int) $yr : $season->endingYear;
-        $offDefRepo = new TeamOffDefStatsRepository($db);
-        $bothStats = $offDefRepo->getTeamBothStats($team->name, $seasonYear)
-            ?? $offDefRepo->getTeamBothStats($team->name, $seasonYear, false);
+        $bothStats = TeamStatsTableContext::resolveBothStats($db, $team, $yr);
 
         ob_start();
+        // "\n" restores the template line break: PHP swallows the newline right after the closing PHP tag.
+        // @phpstan-ignore ibl.trustedVariable (openTag() escapes the aria-label and sanitizes the colors)
+        echo HtmlSanitizer::trusted(TeamStatsTableContext::openTag($team, $ariaLabel)), "\n";
         ?>
-<table class="ibl-data-table team-table responsive-table sortable"<?= $ariaLabel !== '' ? ' aria-label="' . \Security\HtmlSanitizer::e($ariaLabel) . '"' : '' ?> style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
 <?php if ($moduleName === "LeagueStarters"): ?>

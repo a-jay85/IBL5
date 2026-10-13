@@ -19,6 +19,21 @@ final class ModuleDirectAccessGuardTest extends TestCase
         'modules/index.php',
     ];
 
+    /** Files where $_SERVER['SERVER_NAME'] was replaced by HttpRequest::server() (Phase 3). */
+    private const SERVER_NAME_FILES = [
+        'modules/Trading/maketradeoffer.php',
+        'modules/Trading/accepttradeoffer.php',
+        'modules/Trading/rejecttradeoffer.php',
+        'modules/Player/extension.php',
+    ];
+
+    /** Standalone POST handlers that pass the request body to the controller. */
+    private const POST_HANDLER_FILES = [
+        'modules/Trading/maketradeoffer.php',
+        'modules/Trading/accepttradeoffer.php',
+        'modules/Trading/rejecttradeoffer.php',
+    ];
+
     /**
      * Runs the module file in a fresh php process with $_SERVER['PHP_SELF']
      * prepared by $setup, and returns combined stdout+stderr.
@@ -56,9 +71,8 @@ final class ModuleDirectAccessGuardTest extends TestCase
     {
         foreach (['unset($_SERVER["PHP_SELF"]);', '$_SERVER["PHP_SELF"] = ["x"];'] as $setup) {
             $out = $this->runModuleFile($relPath, $setup);
-            $refused = str_contains($out, self::DIE_MESSAGE)
-                || str_contains($out, 'stripos(): Argument #1 ($haystack) must be of type string');
-            self::assertTrue($refused, "guard fell through for $relPath with setup: $setup\n$out");
+            self::assertStringContainsString(self::DIE_MESSAGE, $out, "setup: $setup for $relPath");
+            self::assertStringNotContainsString('must be of type string', $out, "setup: $setup for $relPath");
         }
     }
 
@@ -71,6 +85,31 @@ final class ModuleDirectAccessGuardTest extends TestCase
         foreach (array_slice(self::GUARDED_FILES, 0, 3) as $relPath) {
             $out = $this->runModuleFile($relPath, '$_SERVER["PHP_SELF"] = "/ibl5/modules.php";');
             self::assertStringNotContainsString(self::DIE_MESSAGE, $out, $relPath);
+        }
+    }
+
+    public function testServerNameIsReadThroughHttpRequestWithStringFallback(): void
+    {
+        foreach (self::SERVER_NAME_FILES as $relPath) {
+            // phpunit-hygiene-allow: page script sits behind mainfile.php and cannot be executed in-process
+            $src = (string) file_get_contents(dirname(__DIR__, 2) . '/' . $relPath);
+            self::assertStringNotContainsString("\$_SERVER['SERVER_NAME']", $src, $relPath);
+            self::assertStringContainsString("->server('SERVER_NAME')", $src, $relPath);
+            self::assertStringContainsString(
+                "is_string(\$serverNameRaw) ? \$serverNameRaw : ''",
+                $src,
+                $relPath
+            );
+        }
+    }
+
+    public function testTradingPostHandlersPassAllPostFromHttpRequest(): void
+    {
+        foreach (self::POST_HANDLER_FILES as $relPath) {
+            // phpunit-hygiene-allow: page script sits behind mainfile.php and cannot be executed in-process
+            $src = (string) file_get_contents(dirname(__DIR__, 2) . '/' . $relPath);
+            self::assertStringNotContainsString('$_POST', $src, $relPath);
+            self::assertStringContainsString('$httpRequest->allPost()', $src, $relPath);
         }
     }
 }

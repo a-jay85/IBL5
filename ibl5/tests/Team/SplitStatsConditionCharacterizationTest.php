@@ -122,7 +122,7 @@ class SplitStatsConditionCharacterizationTest extends TestCase
         $sql = $queries[0];
         $normalized = (string) preg_replace('/\s+/', ' ', trim($sql));
 
-        self::assertSame(substr_count($sql, '?'), count($db->getLastBoundParams()));
+        self::assertCount(substr_count($sql, '?'), $db->getLastBoundParams());
         self::assertStringContainsString($expectedWhere, $normalized);
         self::assertSame($expectedParams, $db->getLastBoundParams());
 
@@ -166,9 +166,150 @@ class SplitStatsConditionCharacterizationTest extends TestCase
             $queries = $db->getPreparedQueries();
             self::assertCount(1, $queries);
             self::assertSame($expectedParams, $db->getLastBoundParams());
-            self::assertSame(substr_count($queries[0], '?'), count($expectedParams));
+            self::assertCount(substr_count($queries[0], '?'), $expectedParams);
             self::assertStringNotContainsString('1=1', $queries[0]);
             self::assertStringNotContainsString('DROP', $queries[0]);
         }
+    }
+
+    public function testEverySplitDefinitionReferencesADeclaredSqlConstant(): void
+    {
+        $definitions = $this->classConstantArray('SPLIT_DEFINITIONS');
+        $splitWhere = $this->classConstantArray('SPLIT_WHERE');
+        $joinSchedule = (new \ReflectionClassConstant(SplitStatsRepository::class, 'JOIN_SCHEDULE'))->getValue();
+        $joinOpp = (new \ReflectionClassConstant(SplitStatsRepository::class, 'JOIN_OPPONENT_STANDINGS'))->getValue();
+        $allowedTokens = ['teamid', 'cutoff_pre', 'cutoff_post', 'month', 'opponent', 'division', 'conference'];
+
+        self::assertSame(
+            ['home', 'road', 'wins', 'losses', 'pre_allstar', 'post_allstar', 'month_', 'div_', 'conf_', 'vs_'],
+            array_keys($definitions),
+        );
+
+        $wheres = [];
+        foreach ($definitions as $key => $entry) {
+            self::assertIsArray($entry);
+            self::assertSame(['joins', 'where', 'types', 'params', 'joinTypes', 'joinParams'], array_keys($entry));
+
+            $where = $entry['where'];
+            $joins = $entry['joins'];
+            $params = $entry['params'];
+            $joinParams = $entry['joinParams'];
+            self::assertIsString($where);
+            self::assertIsString($joins);
+            self::assertIsString($entry['types']);
+            self::assertIsString($entry['joinTypes']);
+            self::assertIsArray($params);
+            self::assertIsArray($joinParams);
+
+            self::assertContains($where, $splitWhere);
+            self::assertContains($joins, ['', $joinSchedule, $joinOpp]);
+            self::assertSame($splitWhere[rtrim((string) $key, '_')], $where, "{$key} must use its own fragment");
+
+            self::assertCount(substr_count($where, '?'), $params);
+            self::assertSame(count($params), strlen($entry['types']));
+            self::assertCount(substr_count($joins, '?'), $joinParams);
+            self::assertSame(count($joinParams), strlen($entry['joinTypes']));
+
+            foreach ($params as $token) {
+                self::assertContains($token, $allowedTokens);
+            }
+            foreach ($joinParams as $token) {
+                self::assertSame('teamid', $token);
+            }
+
+            $wheres[] = $where;
+        }
+
+        self::assertCount(count($splitWhere), array_unique($wheres));
+    }
+
+    public function testSplitDefinitionsSourceUsesOnlyConstantReferences(): void
+    {
+        $fileName = (new \ReflectionClass(SplitStatsRepository::class))->getFileName();
+        self::assertIsString($fileName);
+        // phpunit-hygiene-allow: the property under test is the map's source shape; a literal that equals a constant passes at runtime
+        $source = file_get_contents($fileName);
+        self::assertIsString($source);
+
+        $start = strpos($source, 'private const SPLIT_DEFINITIONS = [');
+        self::assertNotFalse($start);
+        $end = strpos($source, "\n    ];", $start);
+        self::assertNotFalse($end);
+        $block = substr($source, $start, $end - $start);
+
+        preg_match_all("/'where' => ([^,]+),/", $block, $wheres);
+        self::assertCount(10, $wheres[1]);
+        foreach ($wheres[1] as $reference) {
+            self::assertMatchesRegularExpression('/^self::SPLIT_WHERE\[\'[a-z_]+\'\]$/', $reference);
+        }
+
+        preg_match_all("/'joins' => ([^,]+),/", $block, $joins);
+        self::assertCount(10, $joins[1]);
+        foreach ($joins[1] as $reference) {
+            self::assertMatchesRegularExpression('/^(\'\'|self::JOIN_SCHEDULE|self::JOIN_OPPONENT_STANDINGS)$/', $reference);
+        }
+
+        self::assertStringNotContainsString('"', $block);
+        self::assertStringNotContainsString(' . ', $block);
+    }
+
+    public function testConditionBuilderBuildsNoSqlText(): void
+    {
+        foreach (['buildSplitCondition', 'resolveBindValue', 'matchName'] as $name) {
+            $tokens = token_get_all('<?php ' . $this->methodSource($name));
+            $sqlConstants = ['SPLIT_WHERE', 'JOIN_SCHEDULE', 'JOIN_OPPONENT_STANDINGS'];
+            $definitionProbes = 0;
+
+            foreach ($tokens as $token) {
+                if (is_string($token)) {
+                    self::assertNotSame('.', $token, "{$name} must not concatenate");
+                    self::assertNotSame('"', $token, "{$name} must not build interpolated strings");
+                    continue;
+                }
+
+                self::assertNotSame(T_CONCAT_EQUAL, $token[0], "{$name} must not use .=");
+                self::assertNotSame(T_ENCAPSED_AND_WHITESPACE, $token[0], "{$name} must not interpolate");
+                self::assertNotSame(T_START_HEREDOC, $token[0], "{$name} must not use heredoc");
+
+                if ($token[0] === T_STRING && $name !== 'matchName') {
+                    self::assertNotContains($token[1], $sqlConstants, "{$name} must not reference SQL constants directly");
+                }
+                if ($token[0] === T_STRING && $token[1] === 'SPLIT_DEFINITIONS') {
+                    $definitionProbes++;
+                }
+            }
+
+            if ($name === 'buildSplitCondition') {
+                self::assertSame(2, $definitionProbes);
+            }
+        }
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    private function classConstantArray(string $name): array
+    {
+        $value = (new \ReflectionClassConstant(SplitStatsRepository::class, $name))->getValue();
+        self::assertIsArray($value);
+
+        return $value;
+    }
+
+    private function methodSource(string $name): string
+    {
+        $method = new \ReflectionMethod(SplitStatsRepository::class, $name);
+        $fileName = $method->getFileName();
+        self::assertIsString($fileName);
+        // phpunit-hygiene-allow: tokenizing the method body is the only way to assert it builds no SQL text
+        $lines = file($fileName);
+        self::assertIsArray($lines);
+
+        $start = $method->getStartLine();
+        $end = $method->getEndLine();
+        self::assertIsInt($start);
+        self::assertIsInt($end);
+
+        return implode('', array_slice($lines, $start - 1, $end - $start + 1));
     }
 }

@@ -134,61 +134,14 @@ final class DraftClassCsvParser
                 continue;
             }
 
-            $count = count($record);
-
-            // Field-count rule.
-            if ($count < 27) {
-                $errors[] = "Line {$lineNumber}: this row has {$count} columns but the "
-                    . 'importer needs at least 27. Send the file to A-Jay before retrying.';
+            $decoded = $this->decodeRecord($record, $lineNumber);
+            $errors  = array_merge($errors, $decoded['errors']);
+            if ($decoded['row'] === null) {
                 continue;
             }
 
-            // Extra-column check: any field at 1-based index >= 28 must be blank.
-            for ($i = 28; $i <= $count; $i++) {
-                $value = trim($record[$i - 1] ?? '');
-                if ($value !== '') {
-                    $errors[] = "Line {$lineNumber}, field {$i} contains '{$value}'. "
-                        . 'This importer reads only the first 27 columns — your export '
-                        . 'format may have changed. Send the file to A-Jay before retrying.';
-                    // Report only the first non-blank extra column.
-                    break;
-                }
-            }
-
-            // Build a raw string map for the first 27 columns (cast null to '').
-            /** @var array<string, string> $rawRow */
-            $rawRow = [];
-            foreach (self::COLUMNS as $index => $column) {
-                $rawRow[$column] = $record[$index - 1] ?? '';
-            }
-
-            // Per-field validation (raw strings, helper casts internally).
-            $fieldErrors = $this->validateFields($rawRow, $lineNumber);
-            $errors      = array_merge($errors, $fieldErrors);
-
-            // Build the typed row from the raw string map.
-            /** @var array<string, int|string> $row */
-            $row = [
-                'name' => trim($rawRow['name']),
-                'pos'  => trim($rawRow['pos']),
-                'team' => trim($rawRow['team']),
-                'age'  => (int) trim($rawRow['age']),
-            ];
-            foreach (self::TINYINT_FIELDS as $fieldIndex) {
-                $column       = self::COLUMNS[$fieldIndex];
-                $row[$column] = (int) trim($rawRow[$column]);
-            }
-            foreach (self::UNBOUNDED_INT_FIELDS as $fieldIndex) {
-                if ($fieldIndex === 3) {
-                    // age is already set above.
-                    continue;
-                }
-                $column       = self::COLUMNS[$fieldIndex];
-                $row[$column] = (int) trim($rawRow[$column]);
-            }
-
             $rowLineNumbers[] = $lineNumber;
-            $rows[]           = $row;
+            $rows[]           = $decoded['row'];
         }
 
         fclose($handle);
@@ -270,6 +223,75 @@ final class DraftClassCsvParser
         rewind($handle);
 
         return ['handle' => $handle, 'delimiter' => $delimiter];
+    }
+
+    /**
+     * Decode one fgetcsv record into its typed row and that record's errors.
+     *
+     * A record with fewer than 27 fields returns row => null so the caller does
+     * not collect it. A record that carries field errors is still returned as a
+     * row; the caller stores it and the errors travel back separately, in the
+     * order the original loop produced them (extra-column first, then fields).
+     *
+     * @param array<int, string|null> $record
+     * @return array{row: array<string, int|string>|null, errors: list<string>}
+     */
+    private function decodeRecord(array $record, int $lineNumber): array
+    {
+        $errors = [];
+        $count  = count($record);
+
+        // Field-count rule.
+        if ($count < 27) {
+            $errors[] = "Line {$lineNumber}: this row has {$count} columns but the "
+                . 'importer needs at least 27. Send the file to A-Jay before retrying.';
+            return ['row' => null, 'errors' => $errors];
+        }
+
+        // Extra-column check: any field at 1-based index >= 28 must be blank.
+        for ($i = 28; $i <= $count; $i++) {
+            $value = trim($record[$i - 1] ?? '');
+            if ($value !== '') {
+                $errors[] = "Line {$lineNumber}, field {$i} contains '{$value}'. "
+                    . 'This importer reads only the first 27 columns — your export '
+                    . 'format may have changed. Send the file to A-Jay before retrying.';
+                // Report only the first non-blank extra column.
+                break;
+            }
+        }
+
+        // Build a raw string map for the first 27 columns (cast null to '').
+        /** @var array<string, string> $rawRow */
+        $rawRow = [];
+        foreach (self::COLUMNS as $index => $column) {
+            $rawRow[$column] = $record[$index - 1] ?? '';
+        }
+
+        // Per-field validation (raw strings, helper casts internally).
+        $errors = array_merge($errors, $this->validateFields($rawRow, $lineNumber));
+
+        // Build the typed row from the raw string map.
+        /** @var array<string, int|string> $row */
+        $row = [
+            'name' => trim($rawRow['name']),
+            'pos'  => trim($rawRow['pos']),
+            'team' => trim($rawRow['team']),
+            'age'  => (int) trim($rawRow['age']),
+        ];
+        foreach (self::TINYINT_FIELDS as $fieldIndex) {
+            $column       = self::COLUMNS[$fieldIndex];
+            $row[$column] = (int) trim($rawRow[$column]);
+        }
+        foreach (self::UNBOUNDED_INT_FIELDS as $fieldIndex) {
+            if ($fieldIndex === 3) {
+                // age is already set above.
+                continue;
+            }
+            $column       = self::COLUMNS[$fieldIndex];
+            $row[$column] = (int) trim($rawRow[$column]);
+        }
+
+        return ['row' => $row, 'errors' => $errors];
     }
 
     /**

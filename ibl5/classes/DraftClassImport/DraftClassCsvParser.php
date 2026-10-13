@@ -107,34 +107,12 @@ final class DraftClassCsvParser
      */
     public function parse(string $raw): array
     {
-        // Step 1: encoding check.
-        if (mb_check_encoding($raw, 'UTF-8') === false) {
-            return [
-                'rows'   => [],
-                'errors' => [
-                    'This file is not saved as UTF-8. Re-export it as UTF-8 '
-                    . '(in Excel: Save As → CSV UTF-8) and try again.',
-                ],
-            ];
+        $input = $this->openCsvStream($raw);
+        if (isset($input['errors'])) {
+            return ['rows' => [], 'errors' => $input['errors']];
         }
-
-        // Step 2: strip BOM.
-        if (str_starts_with($raw, "\xEF\xBB\xBF")) {
-            $raw = substr($raw, 3);
-        }
-
-        // Step 3: delimiter auto-detect.
-        $firstNewline = strpos($raw, "\n");
-        $firstLine    = $firstNewline !== false ? substr($raw, 0, $firstNewline) : $raw;
-        $delimiter    = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
-
-        // Step 4: write to memory handle.
-        $handle = fopen('php://memory', 'r+');
-        if ($handle === false) {
-            return ['rows' => [], 'errors' => ['Failed to open memory buffer.']];
-        }
-        fwrite($handle, $raw);
-        rewind($handle);
+        $handle    = $input['handle'];
+        $delimiter = $input['delimiter'];
 
         $errors = [];
         /** @var list<array<string, int|string>> $rows */
@@ -253,6 +231,45 @@ final class DraftClassCsvParser
         $errors          = array_merge($errors, $duplicateErrors);
 
         return $errors;
+    }
+
+    /**
+     * File-level input preparation: UTF-8 check, BOM strip, delimiter auto-detect
+     * (';' only when it outnumbers ',' on the first line), memory handle.
+     *
+     * @return array{handle: resource, delimiter: string}|array{errors: list<string>}
+     */
+    private function openCsvStream(string $raw): array
+    {
+        // Step 1: encoding check.
+        if (mb_check_encoding($raw, 'UTF-8') === false) {
+            return [
+                'errors' => [
+                    'This file is not saved as UTF-8. Re-export it as UTF-8 '
+                    . '(in Excel: Save As → CSV UTF-8) and try again.',
+                ],
+            ];
+        }
+
+        // Step 2: strip BOM.
+        if (str_starts_with($raw, "\xEF\xBB\xBF")) {
+            $raw = substr($raw, 3);
+        }
+
+        // Step 3: delimiter auto-detect.
+        $firstNewline = strpos($raw, "\n");
+        $firstLine    = $firstNewline !== false ? substr($raw, 0, $firstNewline) : $raw;
+        $delimiter    = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
+
+        // Step 4: write to memory handle.
+        $handle = fopen('php://memory', 'r+');
+        if ($handle === false) {
+            return ['errors' => ['Failed to open memory buffer.']];
+        }
+        fwrite($handle, $raw);
+        rewind($handle);
+
+        return ['handle' => $handle, 'delimiter' => $delimiter];
     }
 
     /**

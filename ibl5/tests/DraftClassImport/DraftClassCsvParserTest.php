@@ -612,6 +612,7 @@ class DraftClassCsvParserTest extends TestCase
 
     public function testDuplicateNameErrorUsesFileLineNumbersNotRowPositions(): void
     {
+        // Fails if checkDuplicateNames receives array_keys($rows) mapped +1 instead of file line numbers.
         $raw = implode(';', array_fill(0, 26, '"x"')) . "\n"
             . $this->buildSemiRow(['name' => 'Dup']) . "\n"
             . $this->buildSemiRow(['name' => 'Dup']);
@@ -637,6 +638,7 @@ class DraftClassCsvParserTest extends TestCase
 
     public function testTypedRowHasExactKeyOrderTrimmedStringsAndIntegerCasts(): void
     {
+        // Key order: name,pos,team,age,fga…td,talent,skill,intangibles
         $raw = $this->buildSemiRow([
             'name'   => ' Pad Player ',
             'pos'    => ' SF ',

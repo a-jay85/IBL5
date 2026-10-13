@@ -98,6 +98,9 @@ final class BackupArchiveLocatorSelectionTest extends TestCase
         $this->assertNull($selection->predecessorName);
     }
 
+    /**
+     * Equal seq on an mtime tie keeps the incumbent; `>=` in outranksOnTie would select …10b.zip.
+     */
     public function testTieWithEqualSequenceKeepsEarlierSortedArchive(): void
     {
         $t = time() - 1000;

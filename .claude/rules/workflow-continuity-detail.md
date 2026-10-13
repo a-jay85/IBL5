@@ -89,6 +89,21 @@ run that holds on the same reason keeps it. Automouse treats exit **8** as termi
 decline in its resume path never trips the postplan env-breaker. The marker only
 suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming condition.
 
+**Rebase-only mode.** `bin/pr-cycle` fires a DIRTY PR with `--rebase-only-prs=<N>` when the
+PR's last hold record names only conditions (3), (7) and (8) and its patch-id still equals the
+sticky `**Reviewed diff:**`. `PR_CYCLE_REBASE_ONLY_HELD=0` turns this off. The flag reaches the
+harness as `--rebase-only` through `bin/post-plan-fleet` and `bin/post-plan-now`, where it also
+implies `--state-changed`. The harness re-checks the record with
+`python3 -m harness.holdrepeat rebase-eligible` and runs the full path when the record is
+absent or names any other condition. An eligible run merges `origin/master` with the usual
+conflict resolver and lost-work proof, pushes, and ends with terminal `rebased-held` and exit
+**0**. It runs no review, fidelity or manual-test call, never posts the sticky verdict and never
+arms. A failed proof stops before the push. When the patch-id is unchanged, the run refreshes
+the hold record's fingerprint so the next cycle still declines. A changed patch-id leaves the
+record alone, and the next cycle reviews the new tree. A failed rebase-only run never falls
+back to the skill. The fleet outcome word is `rebased`, and `bin/pr-cycle-tick` logs it
+without charging an attempt.
+
 ## What `--auto` adds
 
 `--auto` adds exactly one safety gate; a bare `bin/post-plan-now` skips it, because running it by

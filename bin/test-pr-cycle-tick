@@ -609,6 +609,21 @@ out_has 'paused by usage gate, retry later' || fail "paused-no-burn: no paused l
 [[ "$(launch_count)" == "2" ]] || fail "paused-no-burn: want a retry on tick 2, got $(launch_count) launches"
 end_case paused-no-burn
 
+# A rebase-only run merged master and stays held for a human: log it, charge nothing.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+set_result "101\tfired\trebased\trebase-only"
+run_tick
+run_tick
+[[ "$(attempt 101)" == "" ]] || fail "rebased-no-attempt-no-strike: a rebase-only run was charged an attempt"
+no_file "$STATE_DIR/attempts/101" || fail "rebased-no-attempt-no-strike: attempts/101 exists"
+no_file "$STATE_DIR/declined/101" || fail "rebased-no-attempt-no-strike: declined/101 exists"
+no_file "$STATE_DIR/strikes/101" || fail "rebased-no-attempt-no-strike: a rebase-only run was struck"
+[[ "$(dm_count)" == "0" ]] || fail "rebased-no-attempt-no-strike: want 0 DMs, got $(dm_count)"
+out_has 'rebase-only ran (merged master, still held for a human)' \
+    || fail "rebased-no-attempt-no-strike: no rebase-only log line: $OUT"
+end_case rebased-no-attempt-no-strike
+
 reset; begin_case
 set_prs "$RED101"; set_checks aaa1111 red
 set_result "101\tfired\tfailed\tno-result"

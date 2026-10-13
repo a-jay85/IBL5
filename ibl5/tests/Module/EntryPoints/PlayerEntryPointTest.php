@@ -153,6 +153,23 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->assertQueryNotExecuted('ibl_team_info');
     }
 
+    public function testProcessRookieOptionAuthenticatedDecodesCookieBeforeUsername(): void
+    {
+        $this->authenticateWithSentinel('testuser', true, 'getCookieArray');
+        $this->assertSentinelThrown('getCookieArray', function (): void {
+            $this->runModule(
+                'Player',
+                ['pa' => 'processrookieoption'],
+                [
+                    '_csrf_token' => \Security\CsrfGuard::generateRawToken('rookie_option'),
+                    'teamname' => 'Boston',
+                    'playerID' => '1',
+                ],
+                ['user' => $GLOBALS['user']],
+            );
+        });
+    }
+
     private function seedTeamlessUser(): void
     {
         $this->authenticateWithUsername('testuser');

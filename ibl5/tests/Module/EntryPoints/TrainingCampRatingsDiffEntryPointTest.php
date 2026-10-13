@@ -85,4 +85,13 @@ class TrainingCampRatingsDiffEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotSame('', $output);
     }
+
+    public function testUnauthenticatedReachesLoginBox(): void
+    {
+        // Call 1 is the gate's is_user() (answers false); call 2 is loginbox()'s own check.
+        $this->authenticateWithSentinel('', false, 'isAuthenticated', 2);
+        $this->assertSentinelThrown('isAuthenticated', function (): void {
+            $this->runModule('TrainingCampRatingsDiff', [], [], $this->tcGlobals());
+        });
+    }
 }

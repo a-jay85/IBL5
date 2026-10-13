@@ -238,4 +238,64 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         $GLOBALS['user'] = base64_encode("{$username}:{$username}:");
         $GLOBALS['cookie'] = [$username, $username, ''];
     }
+
+    /**
+     * Auth stub whose Nth call to $throwOn throws a known sentinel exception.
+     *
+     * Gate branches often end in die()/exit, which kills the PHPUnit process.
+     * Throwing from the first auth call after the gate proves which branch ran
+     * (runModule() rethrows any Throwable) and stops everything after it.
+     */
+    protected function authenticateWithSentinel(
+        string $username,
+        bool $authenticated,
+        string $throwOn,
+        int $throwOnCall = 1,
+    ): void {
+        /** @var array<string, int> $calls */
+        $calls = [];
+        $respond = static function (string $method, mixed $value) use (&$calls, $throwOn, $throwOnCall): mixed {
+            $calls[$method] = ($calls[$method] ?? 0) + 1;
+            if ($method === $throwOn && $calls[$method] === $throwOnCall) {
+                throw new \RuntimeException('sentinel:' . $throwOn);
+            }
+            return $value;
+        };
+
+        $authStub = self::createStub(\Auth\Contracts\AuthServiceInterface::class);
+        $authStub->method('isAuthenticated')->willReturnCallback(
+            static fn (): mixed => $respond('isAuthenticated', $authenticated),
+        );
+        $authStub->method('getCookieArray')->willReturnCallback(
+            static fn (): mixed => $respond('getCookieArray', $authenticated ? [$username, $username, ''] : null),
+        );
+        $authStub->method('getUsername')->willReturnCallback(
+            static fn (): mixed => $respond('getUsername', $authenticated ? $username : null),
+        );
+        $authStub->method('isAdmin')->willReturnCallback(
+            static fn (): mixed => $respond('isAdmin', false),
+        );
+
+        $GLOBALS['authService'] = $authStub;
+        $GLOBALS['user'] = base64_encode("{$username}:{$username}:");
+        unset($GLOBALS['cookie']);
+    }
+
+    /**
+     * Run $run and assert it throws the sentinel raised by authenticateWithSentinel().
+     *
+     * @param \Closure(): mixed $run
+     */
+    protected function assertSentinelThrown(string $method, \Closure $run): void
+    {
+        try {
+            $run();
+        } catch (\RuntimeException $e) {
+            self::assertSame('sentinel:' . $method, $e->getMessage());
+
+            return;
+        }
+
+        self::fail('Expected sentinel:' . $method . ' to be thrown, but the module ran to completion.');
+    }
 }

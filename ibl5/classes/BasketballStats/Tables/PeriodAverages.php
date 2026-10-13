@@ -150,8 +150,10 @@ class PeriodAverages
         }
 
         ob_start();
+        // "\n" restores the template line break: PHP swallows the newline right after the closing PHP tag.
+        // @phpstan-ignore ibl.trustedVariable (openTag() escapes the aria-label and sanitizes the colors)
+        echo HtmlSanitizer::trusted(TeamStatsTableContext::openTag($team)), "\n";
         ?>
-<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
             <th>Pos</th>

@@ -298,4 +298,22 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
 
         self::fail('Expected sentinel:' . $method . ' to be thrown, but the module ran to completion.');
     }
+
+    /**
+     * Neutralise mainfile.php's boot for a module file that requires it.
+     *
+     * Defines FORUM_ADMIN (skips mainfile's language and theme includes) and aliases
+     * Bootstrap\WebApplicationFactory to a no-op factory. Call it in a test that runs
+     * in a separate process, before runModule(): the constant and the alias are
+     * process-wide and cannot be undone.
+     */
+    protected function skipWebBoot(): void
+    {
+        if (!defined('FORUM_ADMIN')) {
+            define('FORUM_ADMIN', true);
+        }
+        if (!class_exists(\Bootstrap\WebApplicationFactory::class, false)) {
+            class_alias(NoopWebApplicationFactory::class, \Bootstrap\WebApplicationFactory::class);
+        }
+    }
 }

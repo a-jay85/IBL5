@@ -170,6 +170,40 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         });
     }
 
+    public function testExtensionChecksUserAfterCsrf(): void
+    {
+        $this->skipWebBoot();
+        $this->authenticateWithSentinel('', false, 'isAuthenticated');
+        $this->mockDb->setMockData([]);
+
+        $this->assertSentinelThrown('isAuthenticated', function (): void {
+            $this->runModule(
+                'Player',
+                [],
+                ['_csrf_token' => \Security\CsrfGuard::generateRawToken('extension')],
+                array_merge($this->dbGlobals(), ['user' => $GLOBALS['user']]),
+                'extension.php',
+            );
+        });
+    }
+
+    public function testExtensionAuthenticatedDecodesCookieBeforeUsername(): void
+    {
+        $this->skipWebBoot();
+        $this->authenticateWithSentinel('testuser', true, 'getCookieArray');
+        $this->mockDb->setMockData([]);
+
+        $this->assertSentinelThrown('getCookieArray', function (): void {
+            $this->runModule(
+                'Player',
+                [],
+                ['_csrf_token' => \Security\CsrfGuard::generateRawToken('extension')],
+                array_merge($this->dbGlobals(), ['user' => $GLOBALS['user']]),
+                'extension.php',
+            );
+        });
+    }
+
     private function seedTeamlessUser(): void
     {
         $this->authenticateWithUsername('testuser');

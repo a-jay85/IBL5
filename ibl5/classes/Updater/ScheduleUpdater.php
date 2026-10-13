@@ -207,6 +207,65 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
     }
 
     /**
+     * Classify step: decide what the orchestrator does with one parsed row.
+     *
+     * Pure with respect to the database and the log: it reads the season, the
+     * team map and the league context, and writes nothing.
+     *
+     * @param array{date_label: string, visitor: string, home: string, visitor_score: int, home_score: int, box_id: int|null, played: bool} $game
+     * @return array{outcome: 'stale', post_year: int|null}
+     *       |array{outcome: 'skip'}
+     *       |array{outcome: 'unknown_team'}
+     *       |array{outcome: 'insert', visitor_teamid: int, home_teamid: int, game_date: string, box_id: int}
+     */
+    private function classifyPlayoffGame(array $game): array
+    {
+        // Season guard: Schedule.htm is a JSB export that can be left over
+        // from a prior season. Every row in a given export carries that
+        // season's ENDING year in its "Post N YYYY" header, so a year
+        // mismatch means the whole file is stale and its rows must not be
+        // relabelled into the current season. This must run before
+        // extractDate(), which discards the label's year by design
+        // (required for regular-season rows).
+        $postYear = null;
+        if (preg_match('/(\d{4})\s*$/', $game['date_label'], $yearMatch) === 1) {
+            $postYear = (int) $yearMatch[1];
+        }
+
+        if ($postYear !== $this->season->endingYear) {
+            return ['outcome' => 'stale', 'post_year' => $postYear];
+        }
+
+        $fullDate = $this->extractDate($game['date_label']);
+        if ($fullDate === null) {
+            return ['outcome' => 'skip'];
+        }
+
+        $visitor_teamid = $this->teamNameToIdMap[$game['visitor']] ?? null;
+        $home_teamid = $this->teamNameToIdMap[$game['home']] ?? null;
+
+        if ($visitor_teamid === null || $home_teamid === null) {
+            return ['outcome' => 'unknown_team'];
+        }
+
+        if (!$this->isRealTeamGame($visitor_teamid, $home_teamid)) {
+            return ['outcome' => 'skip'];
+        }
+
+        $boxId = $game['played'] && $game['box_id'] !== null
+            ? $game['box_id']
+            : self::UNPLAYED_BOX_ID;
+
+        return [
+            'outcome' => 'insert',
+            'visitor_teamid' => $visitor_teamid,
+            'home_teamid' => $home_teamid,
+            'game_date' => $fullDate['date'],
+            'box_id' => $boxId,
+        ];
+    }
+
+    /**
      * Insert playoff schedule entries from Schedule.htm.
      *
      * Playoff games are NOT stored in the .sch file — they exist only in
@@ -239,44 +298,22 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
         $skippedYears = [];
 
         foreach ($playoffGames as $game) {
-            // Season guard: Schedule.htm is a JSB export that can be left over
-            // from a prior season. Every row in a given export carries that
-            // season's ENDING year in its "Post N YYYY" header, so a year
-            // mismatch means the whole file is stale and its rows must not be
-            // relabelled into the current season. This must run before
-            // extractDate(), which discards the label's year by design
-            // (required for regular-season rows).
-            $postYear = null;
-            if (preg_match('/(\d{4})\s*$/', $game['date_label'], $yearMatch) === 1) {
-                $postYear = (int) $yearMatch[1];
-            }
+            $classification = $this->classifyPlayoffGame($game);
 
-            if ($postYear !== $this->season->endingYear) {
+            if ($classification['outcome'] === 'stale') {
                 $skippedCount++;
-                $skippedYears[$postYear ?? 'unparseable'] = true;
+                $skippedYears[$classification['post_year'] ?? 'unparseable'] = true;
                 continue;
             }
 
-            $fullDate = $this->extractDate($game['date_label']);
-            if ($fullDate === null) {
+            if ($classification['outcome'] === 'skip') {
                 continue;
             }
 
-            $visitor_teamid = $this->teamNameToIdMap[$game['visitor']] ?? null;
-            $home_teamid = $this->teamNameToIdMap[$game['home']] ?? null;
-
-            if ($visitor_teamid === null || $home_teamid === null) {
+            if ($classification['outcome'] === 'unknown_team') {
                 $log .= "Unknown team in playoff game: {$game['visitor']} @ {$game['home']}<br>";
                 continue;
             }
-
-            if (!$this->isRealTeamGame($visitor_teamid, $home_teamid)) {
-                continue;
-            }
-
-            $boxId = $game['played'] && $game['box_id'] !== null
-                ? $game['box_id']
-                : self::UNPLAYED_BOX_ID;
 
             $uuid = UuidGenerator::generateUuid();
 
@@ -286,16 +323,16 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 "iisiiiis",
                 $this->season->endingYear,
-                $boxId,
-                $fullDate['date'],
-                $visitor_teamid,
+                $classification['box_id'],
+                $classification['game_date'],
+                $classification['visitor_teamid'],
                 $game['visitor_score'],
-                $home_teamid,
+                $classification['home_teamid'],
                 $game['home_score'],
                 $uuid
             );
             $insertedCount++;
-            $log .= "Inserted playoff game: {$game['visitor']} @ {$game['home']} on {$fullDate['date']}<br>";
+            $log .= "Inserted playoff game: {$game['visitor']} @ {$game['home']} on {$classification['game_date']}<br>";
         }
 
         if ($skippedCount > 0) {

@@ -58,15 +58,7 @@ class TradeOfferFormView
         <div class="team-cards-row">
             <div class="trading-layout__card">
                 <details class="trading-roster-details" open>
-                    <summary class="trading-roster-details__summary" style="<?= TableStyles::inlineTeamVars($userColor1, $userColor2) ?>">
-                        <img src="images/logo/<?= HtmlSanitizer::e($userTeamId) ?>.jpg" alt="<?= HtmlSanitizer::safeHtmlOutput($userTeam) ?>" class="trading-roster-details__logo">
-                        <span class="trading-roster-details__chevron"></span>
-                    </summary>
-                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($userColor1, $userColor1) ?>">
-                        <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
-                        <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
-                        <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
-                    </div>
+<?= HtmlSanitizer::trusted($this->renderCardHeader($userTeamId, $userTeam, $userColor1, $userColor2)) ?>
                     <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
                         <table class="ibl-data-table trading-roster team-table" data-team-id="<?= HtmlSanitizer::e($userTeamId) ?>" style="<?= TableStyles::inlineTeamVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
                             <colgroup>
@@ -105,15 +97,7 @@ class TradeOfferFormView
                 <input type="hidden" name="switchCounter" value="<?= HtmlSanitizer::e($switchCounter) ?>">
                 <input type="hidden" name="listeningTeam" value="<?= HtmlSanitizer::safeHtmlOutput($partnerTeam) ?>">
                 <details class="trading-roster-details" open>
-                    <summary class="trading-roster-details__summary" style="<?= TableStyles::inlineTeamVars($partnerColor1, $partnerColor2) ?>">
-                        <img src="images/logo/<?= HtmlSanitizer::e($partnerTeamId) ?>.jpg" alt="<?= HtmlSanitizer::safeHtmlOutput($partnerTeam) ?>" class="trading-roster-details__logo">
-                        <span class="trading-roster-details__chevron"></span>
-                    </summary>
-                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($partnerColor1, $partnerColor1) ?>">
-                        <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
-                        <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
-                        <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
-                    </div>
+<?= HtmlSanitizer::trusted($this->renderCardHeader($partnerTeamId, $partnerTeam, $partnerColor1, $partnerColor2)) ?>
                     <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
                         <table class="ibl-data-table trading-roster team-table" data-team-id="<?= HtmlSanitizer::e($partnerTeamId) ?>" style="<?= TableStyles::inlineTeamVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
                             <colgroup>
@@ -181,6 +165,27 @@ $tradeConfig = [
 <script src="jslib/contract-hint.js"></script>
 </form>
         <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render one team card's header: the logo summary and the panel tabs.
+     * Both colors are already sanitized by the caller.
+     */
+    private function renderCardHeader(int $teamId, string $teamName, string $color1, string $color2): string
+    {
+        ob_start();
+        ?>
+                    <summary class="trading-roster-details__summary" style="<?= TableStyles::inlineTeamVars($color1, $color2) ?>">
+                        <img src="images/logo/<?= HtmlSanitizer::e($teamId) ?>.jpg" alt="<?= HtmlSanitizer::safeHtmlOutput($teamName) ?>" class="trading-roster-details__logo">
+                        <span class="trading-roster-details__chevron"></span>
+                    </summary>
+                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($color1, $color1) ?>">
+                        <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
+                        <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
+                        <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
+                    </div>
+<?php
         return (string) ob_get_clean();
     }
 

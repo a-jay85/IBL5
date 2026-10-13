@@ -1,6 +1,6 @@
 ---
 description: Admin control panel for managing season phases, league toggles, and system-wide settings via the `modules/LeagueControlPanel/index.php` entry point.
-last_verified: 2026-10-03
+last_verified: 2026-10-13
 ---
 
 # LeagueControlPanel Module
@@ -11,7 +11,7 @@ Admin control panel for managing league settings, season phases, and system-wide
 
 | Class | Role |
 |-------|------|
-| `LeagueControlPanelRepository` | All database operations via `BaseMysqliRepository` |
+| `LeagueControlPanelRepository` | All database operations via `BaseMysqliRepository`; `upsertAward()` delegates to `JsbParser\Repositories\AwaRepository`, the single `ibl_awards` upsert site |
 | `LeagueControlPanelService` | Read-only panel data assembly for GET requests |
 | `LeagueControlPanelProcessor` | POST mutation dispatch with input validation |
 | `LeagueControlPanelView` | XSS-safe HTML rendering |

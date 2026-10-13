@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use JsbParser\JsbImportRepository;
 use League\LeagueContext;
 use PHPUnit\Framework\Attributes\Group;
 
@@ -388,6 +389,32 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
 
         self::assertIsArray($row);
         self::assertSame("D'Angelo Pin", $row['name']);
+    }
+
+    public function testUpsertAwardWritesSameRowAsJsbImportRepository(): void
+    {
+        $jsb = new JsbImportRepository($this->db);
+
+        // Direction 1: LCP first, importer second. Same triple must collide on uk_year_award_name.
+        $this->repo->upsertAward(2098, 'Parity Award A', 'Parity Player');
+        $jsb->upsertAward(2098, 'Parity Award A', 'Parity Player');
+        self::assertSame(1, $this->countAwardRows(2098, 'Parity Award A', 'Parity Player'));
+
+        // Direction 2: importer first, LCP second.
+        $jsb->upsertAward(2098, 'Parity Award B', 'Parity Player');
+        $this->repo->upsertAward(2098, 'Parity Award B', 'Parity Player');
+        self::assertSame(1, $this->countAwardRows(2098, 'Parity Award B', 'Parity Player'));
+
+        // Exact stored tuple for the LCP-written row.
+        $year = 2098;
+        $award = 'Parity Award A';
+        $stmt = $this->db->prepare('SELECT year, award, name FROM ibl_awards WHERE year = ? AND award = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('is', $year, $award);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        self::assertSame(['year' => 2098, 'award' => 'Parity Award A', 'name' => 'Parity Player'], $row);
     }
 
     private function countAwardRows(int $year, string $award, ?string $name = null): int

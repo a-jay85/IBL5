@@ -758,6 +758,11 @@ class DraftClassCsvParserTest extends TestCase
         );
     }
 
+    public function testValidateRowsWithNoRowsReturnsNoErrors(): void
+    {
+        $this->assertSame([], $this->parser->validateRows([]));
+    }
+
     public function testEmptyStringInputIsRejectedWithOnlyTheZeroRowError(): void
     {
         $this->assertSame(

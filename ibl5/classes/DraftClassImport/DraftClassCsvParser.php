@@ -146,17 +146,7 @@ final class DraftClassCsvParser
 
         fclose($handle);
 
-        // Step 6: zero data rows.
-        if ($rows === []) {
-            $errors[] = 'This file contains no data rows.';
-            return ['rows' => [], 'errors' => $errors];
-        }
-
-        // Step 7: duplicate-name pass.
-        $duplicateErrors = $this->checkDuplicateNames($rows, $rowLineNumbers);
-        $errors          = array_merge($errors, $duplicateErrors);
-
-        return ['rows' => $rows, 'errors' => $errors];
+        return ['rows' => $rows, 'errors' => $this->finishErrors($errors, $rows, $rowLineNumbers)];
     }
 
     /**
@@ -292,6 +282,28 @@ final class DraftClassCsvParser
         }
 
         return ['row' => $row, 'errors' => $errors];
+    }
+
+    /**
+     * Error aggregation after the record loop: the zero-row error is appended to
+     * whatever per-row errors accumulated, and the duplicate-name pass runs only
+     * when at least one row was collected, its errors appended last.
+     *
+     * @param list<string>                    $errors         Per-row errors in file order.
+     * @param list<array<string, int|string>> $rows
+     * @param list<int>                       $rowLineNumbers 1-based line number for each row (parallel array).
+     * @return list<string>
+     */
+    private function finishErrors(array $errors, array $rows, array $rowLineNumbers): array
+    {
+        // Step 6: zero data rows.
+        if ($rows === []) {
+            $errors[] = 'This file contains no data rows.';
+            return $errors;
+        }
+
+        // Step 7: duplicate-name pass.
+        return array_merge($errors, $this->checkDuplicateNames($rows, $rowLineNumbers));
     }
 
     /**

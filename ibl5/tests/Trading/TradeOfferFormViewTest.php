@@ -145,7 +145,7 @@ class TradeOfferFormViewTest extends TestCase
             $this->assertSame(1, substr_count($html, 'name="' . $name . '"'), $name);
         }
         $this->assertSame(3, substr_count($html, ' checked>'));
-        $this->assertSame(3, preg_match_all('/<input type="hidden" name="check\d+">/', $html));
+        $this->assertSame(3, preg_match_all('/<input type="hidden" name="check\d+">/', $html), 'hidden checkN inputs');
     }
 
     public function testViewIsStateFreeAndTakesNoCollaborators(): void

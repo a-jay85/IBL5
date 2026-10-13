@@ -269,7 +269,7 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
      * Insert step: write one classified playoff row to ibl_schedule.
      *
      * Argument order matches the column order of the INSERT and the
-     * "iisiiiis" bind string: season_year(i) box_id(i) game_date(s)
+     * iisiiiis bind string: season_year(i) box_id(i) game_date(s)
      * visitor_teamid(i) visitor_score(i) home_teamid(i) home_score(i) uuid(s).
      */
     private function insertPlayoffGame(

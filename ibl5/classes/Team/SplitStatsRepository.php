@@ -89,8 +89,10 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
         GROUP BY p.name, bs.pos, bs.pid
         ORDER BY p.name ASC";
 
-        $types = 'iiii' . $splitCondition['types'];
+        // The opponent-join placeholder precedes the WHERE placeholders in the SQL text.
+        $types = $splitCondition['joinTypes'] . 'iiii' . $splitCondition['types'];
         $params = array_merge(
+            $splitCondition['joinParams'],
             [$seasonEndingYear, $teamid, $teamid, $teamid],
             $splitCondition['params']
         );
@@ -180,25 +182,48 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
         return $splitKey;
     }
 
+    private const JOIN_SCHEDULE = 'JOIN `ibl_schedule` sch ON bs.`game_date` = sch.`game_date` AND ((sch.home_teamid = bs.home_teamid AND sch.visitor_teamid = bs.visitor_teamid) OR (sch.home_teamid = bs.visitor_teamid AND sch.visitor_teamid = bs.home_teamid))';
+
+    private const JOIN_OPPONENT_STANDINGS = 'JOIN `ibl_standings` opp_s ON opp_s.teamid = CASE WHEN bs.home_teamid = ? THEN bs.visitor_teamid ELSE bs.home_teamid END';
+
+    /**
+     * WHERE fragments keyed by split type; every value is a constant with `?` placeholders only.
+     */
+    private const SPLIT_WHERE = [
+        'home' => 'AND bs.home_teamid = ?',
+        'road' => 'AND bs.visitor_teamid = ?',
+        'wins' => 'AND ((sch.home_teamid = ? AND sch.home_score > sch.visitor_score) OR (sch.visitor_teamid = ? AND sch.visitor_score > sch.home_score))',
+        'losses' => 'AND ((sch.home_teamid = ? AND sch.home_score < sch.visitor_score) OR (sch.visitor_teamid = ? AND sch.visitor_score < sch.home_score))',
+        'pre_allstar' => 'AND bs.`game_date` < ?',
+        'post_allstar' => 'AND bs.`game_date` >= ?',
+        'month' => 'AND MONTH(bs.`game_date`) = ?',
+        'div' => 'AND opp_s.division = ?',
+        'conf' => 'AND opp_s.conference = ?',
+        'vs' => 'AND CASE WHEN bs.home_teamid = ? THEN bs.visitor_teamid ELSE bs.home_teamid END = ?',
+    ];
+
     /**
      * Build the WHERE additions, extra JOINs, types, and params for a split condition
      *
-     * @return array{joins: string, where: string, types: string, params: list<mixed>}
+     * The opponent-standings join binds the team id (joinTypes/joinParams); its placeholder
+     * precedes every WHERE placeholder in the SQL text, so getSplitStats() binds it first.
+     *
+     * @return array{joins: ''|self::JOIN_SCHEDULE|self::JOIN_OPPONENT_STANDINGS, where: ''|value-of<self::SPLIT_WHERE>, types: string, params: list<int|string>, joinTypes: ''|'i', joinParams: list<int>}
      */
     private function buildSplitCondition(string $splitKey, int $teamid, int $seasonEndingYear): array
     {
-        $result = ['joins' => '', 'where' => '', 'types' => '', 'params' => []];
+        $result = ['joins' => '', 'where' => '', 'types' => '', 'params' => [], 'joinTypes' => '', 'joinParams' => []];
 
         // Location splits
         if ($splitKey === 'home') {
-            $result['where'] = 'AND bs.home_teamid = ?';
+            $result['where'] = self::SPLIT_WHERE['home'];
             $result['types'] = 'i';
             $result['params'] = [$teamid];
             return $result;
         }
 
         if ($splitKey === 'road') {
-            $result['where'] = 'AND bs.visitor_teamid = ?';
+            $result['where'] = self::SPLIT_WHERE['road'];
             $result['types'] = 'i';
             $result['params'] = [$teamid];
             return $result;
@@ -206,16 +231,16 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
 
         // Result splits
         if ($splitKey === 'wins') {
-            $result['joins'] = 'JOIN `ibl_schedule` sch ON bs.`game_date` = sch.`game_date` AND ((sch.home_teamid = bs.home_teamid AND sch.visitor_teamid = bs.visitor_teamid) OR (sch.home_teamid = bs.visitor_teamid AND sch.visitor_teamid = bs.home_teamid))';
-            $result['where'] = 'AND ((sch.home_teamid = ? AND sch.home_score > sch.visitor_score) OR (sch.visitor_teamid = ? AND sch.visitor_score > sch.home_score))';
+            $result['joins'] = self::JOIN_SCHEDULE;
+            $result['where'] = self::SPLIT_WHERE['wins'];
             $result['types'] = 'ii';
             $result['params'] = [$teamid, $teamid];
             return $result;
         }
 
         if ($splitKey === 'losses') {
-            $result['joins'] = 'JOIN `ibl_schedule` sch ON bs.`game_date` = sch.`game_date` AND ((sch.home_teamid = bs.home_teamid AND sch.visitor_teamid = bs.visitor_teamid) OR (sch.home_teamid = bs.visitor_teamid AND sch.visitor_teamid = bs.home_teamid))';
-            $result['where'] = 'AND ((sch.home_teamid = ? AND sch.home_score < sch.visitor_score) OR (sch.visitor_teamid = ? AND sch.visitor_score < sch.home_score))';
+            $result['joins'] = self::JOIN_SCHEDULE;
+            $result['where'] = self::SPLIT_WHERE['losses'];
             $result['types'] = 'ii';
             $result['params'] = [$teamid, $teamid];
             return $result;
@@ -224,7 +249,7 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
         // Season half splits
         if ($splitKey === 'pre_allstar') {
             $cutoffDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_ALL_STAR_BREAK_START_DAY);
-            $result['where'] = 'AND bs.`game_date` < ?';
+            $result['where'] = self::SPLIT_WHERE['pre_allstar'];
             $result['types'] = 's';
             $result['params'] = [$cutoffDate];
             return $result;
@@ -232,7 +257,7 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
 
         if ($splitKey === 'post_allstar') {
             $cutoffDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_POST_ALL_STAR_FIRST_DAY);
-            $result['where'] = 'AND bs.`game_date` >= ?';
+            $result['where'] = self::SPLIT_WHERE['post_allstar'];
             $result['types'] = 's';
             $result['params'] = [$cutoffDate];
             return $result;
@@ -241,7 +266,7 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
         // Month splits
         if (str_starts_with($splitKey, 'month_')) {
             $month = (int) substr($splitKey, 6);
-            $result['where'] = 'AND MONTH(bs.`game_date`) = ?';
+            $result['where'] = self::SPLIT_WHERE['month'];
             $result['types'] = 'i';
             $result['params'] = [$month];
             return $result;
@@ -257,8 +282,10 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
                     break;
                 }
             }
-            $result['joins'] = 'JOIN `ibl_standings` opp_s ON opp_s.teamid = CASE WHEN bs.home_teamid = ' . $teamid . ' THEN bs.visitor_teamid ELSE bs.home_teamid END';
-            $result['where'] = 'AND opp_s.division = ?';
+            $result['joins'] = self::JOIN_OPPONENT_STANDINGS;
+            $result['joinTypes'] = 'i';
+            $result['joinParams'] = [$teamid];
+            $result['where'] = self::SPLIT_WHERE['div'];
             $result['types'] = 's';
             $result['params'] = [$divisionName];
             return $result;
@@ -274,8 +301,10 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
                     break;
                 }
             }
-            $result['joins'] = 'JOIN `ibl_standings` opp_s ON opp_s.teamid = CASE WHEN bs.home_teamid = ' . $teamid . ' THEN bs.visitor_teamid ELSE bs.home_teamid END';
-            $result['where'] = 'AND opp_s.conference = ?';
+            $result['joins'] = self::JOIN_OPPONENT_STANDINGS;
+            $result['joinTypes'] = 'i';
+            $result['joinParams'] = [$teamid];
+            $result['where'] = self::SPLIT_WHERE['conf'];
             $result['types'] = 's';
             $result['params'] = [$conferenceName];
             return $result;
@@ -284,7 +313,7 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
         // vs. Team splits
         if (str_starts_with($splitKey, 'vs_')) {
             $opponentTid = (int) substr($splitKey, 3);
-            $result['where'] = 'AND CASE WHEN bs.home_teamid = ? THEN bs.visitor_teamid ELSE bs.home_teamid END = ?';
+            $result['where'] = self::SPLIT_WHERE['vs'];
             $result['types'] = 'ii';
             $result['params'] = [$teamid, $opponentTid];
             return $result;

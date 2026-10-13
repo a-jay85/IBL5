@@ -85,7 +85,7 @@ class NegotiationService implements NegotiationServiceInterface
             \Player\TeamColorSchemeResolver::forTeam($this->teamRepo, $player->getTeamid() ?? 0)
         );
 
-        $output .= NegotiationOfferView::renderNegotiationForm(
+        $output .= (new NegotiationOfferView())->renderNegotiationForm(
             $player,
             $demands,
             $capSpace,

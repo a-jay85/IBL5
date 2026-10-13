@@ -1,9 +1,9 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 208,
+        "argument.type": 165,
         "binaryOp.invalid": 6,
         "booleanNot.exprNotBoolean": 7,
-        "cast.int": 7,
+        "cast.int": 6,
         "cast.string": 2,
         "cast.useless": 1,
         "constant.notFound": 3,
@@ -19,11 +19,9 @@
         "ibl.directHeader": 2,
         "ibl.echoInNonView": 1,
         "ibl.hardcodedEnvString": 8,
-        "ibl.sqlStringConcatenation": 23,
-        "ibl.trustedVariable": 17,
         "ibl.unknownCliOption": 2,
         "if.condNotBoolean": 1,
-        "method.nonObject": 5,
+        "method.nonObject": 3,
         "missingType.iterableValue": 1,
         "new.deprecatedClass": 1,
         "notEqual.notAllowed": 8,
@@ -34,7 +32,7 @@
         "varTag.misplaced": 2,
         "varTag.nativeType": 1,
         "varTag.type": 1,
-        "variable.undefined": 26
+        "variable.undefined": 24
     },
     "phpstan-tests-baseline.neon": {
         "argument.type": 1,

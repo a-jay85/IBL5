@@ -14,6 +14,9 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 DRIVER="$SCRIPT_DIR/pr-cycle"
 [[ -x "$DRIVER" ]] || { echo "FAIL: $DRIVER missing or not executable" >&2; exit 1; }
@@ -32,16 +35,15 @@ SCRATCH="$(mktemp -d)"
 # delete this run's directories out from under it, which is the exact failure being fixed.
 TSBASE="tpc$$"
 
-_cleanup() { rm -rf "$SCRATCH" "/tmp/pr-cycle-$TSBASE"* ; }
+_cleanup() { rm -rf "$SCRATCH" "/tmp/pr-cycle-$TSBASE"* ; h_cleanup; }
 trap _cleanup EXIT
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$SCRATCH/usage"
 
-FAILED=0
 CASE_BASE=0
-fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
-begin_case() { CASE_BASE=$FAILED; }
+fail() { h_fail "$*"; }
+begin_case() { CASE_BASE=$H_FAIL; }
 end_case() {  # $1 = case name; prints "<name> OK" only if the case added no failures
-    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+    if [[ $H_FAIL -eq $CASE_BASE ]]; then h_pass "$1"; else echo "$1 FAILED" >&2; fi
 }
 
 BIN="$SCRATCH/.local/bin"
@@ -619,7 +621,7 @@ echo 'post-plan-fleet: outcome=held'    > "$SCRATCH/fleetlogs/post-plan-fleet-10
 # 103 has no log at all: it counts as failed.
 run --worker
 [[ $RC -eq 0 ]] || fail "case 11b: exit $RC, want 0"
-_want11b='fired 3 (shipped 1, held 1, declined 0, paused 0, conflict 0, failed 1, timed out 0)'
+_want11b='fired 3 (shipped 1, held 1, rebased 0, declined 0, paused 0, conflict 0, failed 1, timed out 0)'
 grep -qF "$_want11b" <<< "$OUT" || fail "case 11b: finish line lacks '$_want11b'"
 grep -qF "$_want11b" "$SCRATCH/dm.argv" || fail "case 11b: DM lacks '$_want11b'"
 grep -qF 'readied' <<< "$OUT" && fail "case 11b: finish line still says readied"
@@ -659,7 +661,7 @@ _fl11c 107 outcome=blocked
 _fl11c 109 outcome=timed-out reason=timeout
 run --worker --max-ready 9
 [[ $RC -eq 0 ]] || fail "case 11c: exit $RC, want 0"
-_want11c='fired 9 (shipped 1, held 1, declined 1, paused 1, conflict 1, failed 3, timed out 1)'
+_want11c='fired 9 (shipped 1, held 1, rebased 0, declined 1, paused 1, conflict 1, failed 3, timed out 1)'
 grep -qF "$_want11c" <<< "$OUT" || fail "case 11c: finish line lacks '$_want11c' (out: $OUT)"
 grep -qF "$_want11c" "$SCRATCH/dm.argv" || fail "case 11c: DM lacks '$_want11c'"
 for _l in '#101 shipped PR #101' '#102 held PR #102' '#103 declined holdrepeat' \
@@ -979,6 +981,8 @@ grep -qE '^export PR_CYCLE_SKIP_READY_WHEN_ARMABLE=' "$RUNNER" \
     || fail "runner does not export the ARMABLE-skip seam"
 grep -qE '^export PR_CYCLE_SKIP_HELD_UNCHANGED=' "$RUNNER" \
     || fail "runner does not export the SKIP_HELD_UNCHANGED seam"
+grep -qE '^export PR_CYCLE_REBASE_ONLY_HELD=' "$RUNNER" \
+    || fail "rebase-only-env-forwarded: runner does not export the REBASE_ONLY_HELD seam"
 _rv_maxready="$(bash -c "$(grep -m1 '^MAX_READY=' "$RUNNER"); printf '%s' \"\$MAX_READY\"")"
 [[ "$_rv_maxready" == "10" ]] || fail "runner MAX_READY='$_rv_maxready', want 10"
 _rv_jobs="$(bash -c "$(grep -m1 '^JOBS=' "$RUNNER"); printf '%s' \"\$JOBS\"")"
@@ -1044,7 +1048,7 @@ grep -qF -- '--only 102' <<< "$OUT" || fail "worker did not announce its scope"
 # Stage 1 is the only caller that exempts the fleet from the test-only exit-5 refusal.
 grep -qF -- '--allow-test-only' "$SCRATCH/ready.argv" \
     || fail "stage1-passes-allow-test-only: fleet argv lacks --allow-test-only: $(sed -n 1p "$SCRATCH/ready.argv")"
-echo "stage1-passes-allow-test-only OK"
+h_pass "stage1-passes-allow-test-only"
 
 # The hash form is the same set: normalization happens at parse time, not at match time.
 reset_state
@@ -2355,6 +2359,140 @@ unset HRHARNESS HRSTATE
 end_case "case holdrepeat pre-fire skip"
 
 # ==========================================================================================
+# Rebase-only mode: a DIRTY PR whose last hold was human-only and whose diff is unchanged
+# ==========================================================================================
+# A stub harness answers `rebase-eligible` with $RO_STUB_RC (10 = eligible) and every other
+# subcommand with 0, so the holdrepeat pre-fire skip never declines.
+RO_STUB="$SCRATCH/ro-stub"
+mkdir -p "$RO_STUB/harness"
+: > "$RO_STUB/harness/__init__.py"
+cat > "$RO_STUB/harness/holdrepeat.py" <<'PY'
+import os
+import sys
+if len(sys.argv) > 1 and sys.argv[1] == "rebase-eligible":
+    sys.exit(int(os.environ.get("RO_STUB_RC", "10")))
+sys.exit(0)
+PY
+
+# ro_setup <pr> <branch> <bucket> [actual-diff] — one PR in <bucket>, a sticky whose
+# **Reviewed diff:** is $DIFF_A, and a current patch-id of [actual-diff] (default $DIFF_A).
+ro_setup() {
+    local n="$1" branch="$2" bucket="$3" adiff="${4:-$DIFF_A}"
+    reset_state
+    triage_report "$n $bucket rebase" > "$SCRATCH/triage-out"
+    install_harness_verdict "$n" "$DIFF_A" "$adiff"
+    install_harness_result "$n" "$branch" shipped-held "7,8" DIRTY
+}
+ro_argv() { sed -n 1p "$SCRATCH/ready.argv"; }
+
+begin_case
+ro_setup 101 first-slug DIRTY
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker
+[[ $RC -eq 0 ]] || fail "rebase-only-selected: exit $RC, want 0"
+grep -qF -- '--rebase-only-prs=101' <<< "$(ro_argv)" || fail "rebase-only-selected: argv lacks --rebase-only-prs=101: $(ro_argv)"
+grep -qF -- '--state-changed-prs=101' <<< "$(ro_argv)" || fail "rebase-only-selected: argv lacks --state-changed-prs=101: $(ro_argv)"
+grep -qF '#101 — DIRTY, last hold was human-only and the diff is unchanged: rebase-only' <<< "$OUT" \
+    || fail "rebase-only-selected: stdout lacks the rebase-only line (out: $OUT)"
+end_case "rebase-only-selected"
+
+begin_case
+ro_setup 101 first-slug DIRTY
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+RO_STUB_RC=0 HRHARNESS="$RO_STUB" run --worker
+grep -qF -- '--rebase-only-prs' <<< "$(ro_argv)" && fail "rebase-only-not-eligible: argv carries --rebase-only-prs: $(ro_argv)"
+grep -qF -- '--state-changed-prs=101' <<< "$(ro_argv)" || fail "rebase-only-not-eligible: argv lacks --state-changed-prs=101: $(ro_argv)"
+end_case "rebase-only-not-eligible"
+
+begin_case
+ro_setup 101 first-slug DIRTY "$DIFF_B"
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "rebase-only-patch-id-moved: ready calls $(calls ready), want 1"
+grep -qF -- '--rebase-only-prs' <<< "$(ro_argv)" && fail "rebase-only-patch-id-moved: argv carries --rebase-only-prs: $(ro_argv)"
+end_case "rebase-only-patch-id-moved"
+
+begin_case
+ro_setup 101 first-slug BLOCKED-CHECK
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker
+grep -qF -- '--state-changed-prs=101' <<< "$(ro_argv)" || fail "rebase-only-blocked-check-stays: argv lacks --state-changed-prs=101: $(ro_argv)"
+grep -qF -- '--rebase-only-prs' <<< "$(ro_argv)" && fail "rebase-only-blocked-check-stays: argv carries --rebase-only-prs: $(ro_argv)"
+end_case "rebase-only-blocked-check-stays"
+
+# The PR reaches Stage 1 only through the excluded-DIRTY rescue loop.
+begin_case
+ro_setup 201 dirty-slug DIRTY
+printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
+RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker
+grep -qF '201' <<< "$(ro_argv)" || fail "rebase-only-rescue-path: 201 was not rescued: $(ro_argv)"
+grep -qF -- '--rebase-only-prs=201' <<< "$(ro_argv)" || fail "rebase-only-rescue-path: argv lacks --rebase-only-prs=201: $(ro_argv)"
+end_case "rebase-only-rescue-path"
+
+# Unset and empty both mean enabled; only 0 disables. The seam default is `${VAR:-1}`. Under
+# `${VAR-1}` an empty value stays empty, so the empty run pins that the `!= "0"` check still
+# selects it; a `= "1"` check fails that run.
+begin_case
+for _ro_mode in unset empty zero; do
+    ro_setup 101 first-slug DIRTY
+    printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+    case "$_ro_mode" in
+        unset) RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker ;;
+        empty) PR_CYCLE_REBASE_ONLY_HELD="" RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker ;;
+        zero)  PR_CYCLE_REBASE_ONLY_HELD=0 RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker ;;
+    esac
+    if [[ "$_ro_mode" == zero ]]; then
+        grep -qF -- '--rebase-only-prs' <<< "$(ro_argv)" && fail "rebase-only-env-seam: 0 still selected: $(ro_argv)"
+        grep -qF -- '--state-changed-prs=101' <<< "$(ro_argv)" || fail "rebase-only-env-seam: 0 dropped --state-changed-prs: $(ro_argv)"
+    else
+        grep -qF -- '--rebase-only-prs=101' <<< "$(ro_argv)" || fail "rebase-only-env-seam: $_ro_mode did not select: $(ro_argv)"
+    fi
+done
+end_case "rebase-only-env-seam"
+
+begin_case
+ro_setup 101 first-slug DIRTY
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --dry-run
+[[ "$(calls ready)" == "0" ]] || fail "rebase-only-dry-run-echo: dry run fired $(calls ready) ready calls"
+grep -E '^would run: post-plan-fleet ' <<< "$OUT" | grep -qF -- '--rebase-only-prs=101' \
+    || fail "rebase-only-dry-run-echo: would-run line lacks --rebase-only-prs=101 (out: $OUT)"
+end_case "rebase-only-dry-run-echo"
+
+# A newer rebased-held run keeps the earlier hold, so the held-unchanged skip still applies.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A"
+install_harness_result 101 "first-slug" "shipped-held" "3,7" "CLEAN"
+mkdir -p "$SCRATCH/harness-out/live-first-slug-20260902-120000-99999"
+printf '{"terminal":"rebased-held","pr_number":101}\n' \
+    > "$SCRATCH/harness-out/live-first-slug-20260902-120000-99999/result.json"
+run --worker
+[[ "$(calls ready)" == "0" ]] || fail "held-unchanged-survives-rebased-held: fleet ran $(calls ready) time(s), want 0"
+grep -qF 'held it for' <<< "$OUT" || fail "held-unchanged-survives-rebased-held: held-skip line missing (out: $OUT)"
+rm -rf "$SCRATCH/harness-out/live-first-slug-20260902-120000-99999"
+end_case "held-unchanged-survives-rebased-held"
+
+begin_case
+reset_state
+rm -rf "$SCRATCH/res"
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+rm -rf "$SCRATCH/fleetlogs"; mkdir -p "$SCRATCH/fleetlogs"
+printf 'post-plan-fleet: %s\n' outcome=rebased reason=rebase-only > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
+PR_CYCLE_RESULT_FILE="$SCRATCH/res/result.tsv" run --worker --only 101
+[[ $RC -eq 0 ]] || fail "rebased-outcome-accounting: exit $RC, want 0"
+grep -qF 'fired 1 (shipped 0, held 0, rebased 1, declined 0,' <<< "$OUT" \
+    || fail "rebased-outcome-accounting: summary lacks rebased 1 (out: $OUT)"
+grep -qxF '#101 rebased rebase-only' <<< "$OUT" || fail "rebased-outcome-accounting: result line missing (out: $OUT)"
+[[ "$(sed -n 2p "$SCRATCH/res/result.tsv" 2>/dev/null)" == "$(printf '101\tfired\trebased\trebase-only')" ]] \
+    || fail "rebased-outcome-accounting: TSV row is '$(sed -n 2p "$SCRATCH/res/result.tsv" 2>/dev/null)'"
+rm -rf "$SCRATCH/res" "$SCRATCH/fleetlogs"
+end_case "rebased-outcome-accounting"
+
+# ==========================================================================================
 # Pre-fire held-unfixable marker skip
 # ==========================================================================================
 # The marker is keyed by slug and needs no worktree. HRH is a real copy of this tree's harness
@@ -2985,9 +3123,4 @@ run --dry-run --only 101,abc --max-ready 2
 end_case "tick-argv-contract"
 
 # --- summary --------------------------------------------------------------------------------
-if [[ $FAILED -eq 0 ]]; then
-    echo "test-pr-cycle: ALL PASS"
-    exit 0
-fi
-echo "test-pr-cycle: $FAILED failure(s)" >&2
-exit 1
+h_done

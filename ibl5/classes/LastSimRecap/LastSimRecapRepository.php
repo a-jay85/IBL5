@@ -157,13 +157,39 @@ class LastSimRecapRepository extends \Database\BaseMysqliRepository implements L
             return [];
         }
 
-        $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
+        // The query binds a fixed-width pid list, so a larger roster runs in
+        // groups; restore the single-query ordering (new first, newest first,
+        // then highest transaction id first, matching `t.id DESC`).
+        $rows = [];
+        foreach (array_chunk($playerIds, \Database\SqlPlaceholders::PID_LIST_WIDTH) as $chunk) {
+            array_push($rows, ...$this->fetchActiveInjuriesChunk($chunk, $date));
+        }
+        usort($rows, static fn (array $a, array $b): int => [$b['isNew'], $b['date'], $b['id']] <=> [$a['isNew'], $a['date'], $a['id']]);
+
+        $out = [];
+        foreach ($rows as $row) {
+            unset($row['id']);
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Rows carry the transaction id (`id`) as the final ordering tiebreak; the
+     * caller strips it before returning InjuryRow.
+     *
+     * @param non-empty-list<int> $playerIds at most PID_LIST_WIDTH ids
+     * @return list<array{id:int,pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,returnDate:string,isNew:bool}>
+     */
+    private function fetchActiveInjuriesChunk(array $playerIds, string $date): array
+    {
         $dateExpr = self::TRANSACTION_DATE_SQL;
 
         // $dateExpr is a fixed SQL fragment built in-class above from column refs and
-        // constants (no user input); $placeholders is a count-derived run of bound `?`
-        // markers. Concatenate both validated fragments rather than interpolating.
-        $sql = "SELECT t.pid,
+        // constants (no user input); PID_LIST is a literal run of bound `?` markers.
+        $sql = "SELECT t.id,
+                       t.pid,
                        p.name,
                        p.pos,
                        " . $dateExpr . " AS injury_date,
@@ -175,22 +201,23 @@ class LastSimRecapRepository extends \Database\BaseMysqliRepository implements L
                 FROM `ibl_jsb_transactions` t
                 JOIN `ibl_plr` p ON p.pid = t.pid
                 WHERE t.transaction_type = 1
-                  AND t.pid IN (" . $placeholders . ")
+                  AND t.pid IN (" . \Database\SqlPlaceholders::PID_LIST . ")
                   AND t.injury_games_missed IS NOT NULL
                   AND " . $dateExpr . " <= ?
                   AND DATE_ADD(" . $dateExpr . ", INTERVAL t.injury_games_missed DAY) > ?
                 ORDER BY is_new DESC, injury_date DESC, t.id DESC";
 
         // Build types/params: ss (date for days_remaining + is_new), pids (i...), ss (date <= + date <)
-        $types = 'ss' . str_repeat('i', count($playerIds)) . 'ss';
-        $params = array_merge([$date, $date], $playerIds, [$date, $date]);
+        $types = 'ss' . \Database\SqlPlaceholders::PID_LIST_TYPES . 'ss';
+        $params = array_merge([$date, $date], \Database\SqlPlaceholders::padPidList($playerIds), [$date, $date]);
 
-        /** @var list<array{pid:int,name:string,pos:string,injury_date:string,injury_description:string|null,injury_games_missed:int,days_remaining:int,return_date:string,is_new:int}> $rows */
+        /** @var list<array{id:int,pid:int,name:string,pos:string,injury_date:string,injury_description:string|null,injury_games_missed:int,days_remaining:int,return_date:string,is_new:int}> $rows */
         $rows = $this->fetchAll($sql, $types, ...$params);
 
         $out = [];
         foreach ($rows as $row) {
             $out[] = [
+                'id' => $row['id'],
                 'pid' => $row['pid'],
                 'name' => $row['name'],
                 'pos' => $row['pos'],

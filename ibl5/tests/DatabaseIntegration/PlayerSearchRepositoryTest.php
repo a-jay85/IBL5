@@ -269,6 +269,54 @@ class PlayerSearchRepositoryTest extends DatabaseTestCase
         self::assertNull($stanford);
     }
 
+    public function testGreaterThanFilterReturnsOnlyRowsMeetingThreshold(): void
+    {
+        $this->insertTestPlayer(200100021, 'PDB GtAlpha', ['oo' => 70, 'r_tvr' => 50]);
+        $this->insertTestPlayer(200100022, 'PDB GtBravo', ['oo' => 60, 'r_tvr' => 90]);
+        $this->insertTestPlayer(200100023, 'PDB GtCharlie', ['oo' => 80, 'r_tvr' => 10]);
+
+        $oneFilter = $this->repo->searchPlayers($this->buildParams(['search_name' => 'PDB Gt', 'oo' => 70]));
+        $twoFilters = $this->repo->searchPlayers($this->buildParams(['search_name' => 'PDB Gt', 'oo' => 70, 'r_to' => 40]));
+
+        self::assertNotNull($this->findByPid($oneFilter['results'], 200100021));
+        self::assertNull($this->findByPid($oneFilter['results'], 200100022));
+        self::assertNotNull($this->findByPid($oneFilter['results'], 200100023));
+        self::assertSame($this->countPlayers("name LIKE 'PDB Gt%' AND oo >= 70 AND retired = 0"), $oneFilter['count']);
+
+        // The r_to form field filters the r_tvr column.
+        self::assertNotNull($this->findByPid($twoFilters['results'], 200100021));
+        self::assertNull($this->findByPid($twoFilters['results'], 200100022));
+        self::assertNull($this->findByPid($twoFilters['results'], 200100023));
+        self::assertSame($this->countPlayers("name LIKE 'PDB Gt%' AND oo >= 70 AND r_tvr >= 40 AND retired = 0"), $twoFilters['count']);
+    }
+
+    public function testNoFiltersReturnsEveryActivePlayer(): void
+    {
+        $this->insertTestPlayer(200100031, 'PDB NfActive', ['retired' => 0]);
+        $this->insertTestPlayer(200100032, 'PDB NfRetired', ['retired' => 1]);
+
+        $result = $this->repo->searchPlayers($this->buildParams());
+
+        self::assertNotNull($this->findByPid($result['results'], 200100031));
+        self::assertNull($this->findByPid($result['results'], 200100032));
+        self::assertSame($this->countPlayers('pid > 0 AND retired = 0'), $result['count']);
+        self::assertCount($result['count'], $result['results']);
+    }
+
+    /**
+     * Independent count straight from the base table; $where is a test-owned literal.
+     */
+    private function countPlayers(string $where): int
+    {
+        $result = $this->db->query('SELECT COUNT(*) AS n FROM `ibl_plr` WHERE ' . $where);
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertIsScalar($row['n']);
+
+        return (int) $row['n'];
+    }
+
     public function testCountMatchesResultsArrayLength(): void
     {
         $this->insertTestPlayer(200100001, 'PDB CntTest');

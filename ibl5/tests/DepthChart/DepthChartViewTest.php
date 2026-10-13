@@ -803,4 +803,19 @@ class DepthChartViewTest extends TestCase
         $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
     }
+
+    public function testHostilePlayerNameEscapedExactlyOnceNextToThumbnail(): void
+    {
+        $player = $this->buildTestPlayer(77, 'O\'Neal <xss>&"q"');
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        $this->assertMatchesRegularExpression(
+            '#<a href="\./modules\.php\?name=Player&amp;pa=showpage&amp;pid=77"><img src="[^"]*" alt="" class="ibl-player-photo"[^>]*>O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;</a>#',
+            $output
+        );
+        $this->assertStringNotContainsString('&amp;lt;', $output);
+    }
 }

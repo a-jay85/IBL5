@@ -7,6 +7,9 @@
 # ~/Library/LaunchAgents.  Runs on macOS and Linux CI.
 
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+H_FAIL_FD=2  # FAIL: lines stay on stderr, as before migration
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 LIB="$SCRIPT_DIR/lib/launchd-job.sh"
@@ -18,7 +21,7 @@ LIB="$SCRIPT_DIR/lib/launchd-job.sh"
 # ---------------------------------------------------------------------------
 T="$(mktemp -d)"
 export T
-_cleanup() { rm -rf "$T"; }
+_cleanup() { rm -rf "$T"; h_cleanup; }
 trap _cleanup EXIT
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
 
@@ -127,11 +130,8 @@ MIN_PATH="$T/min:/usr/bin:/bin:/usr/sbin:/sbin"
 # ---------------------------------------------------------------------------
 # Test framework
 # ---------------------------------------------------------------------------
-PASSED=0
-FAILED=0
-
-pass() { printf 'PASS %s\n' "$1"; PASSED=$((PASSED + 1)); }
-fail() { printf 'FAIL %s: %s\n' "$1" "$2" >&2; FAILED=$((FAILED + 1)); }
+pass() { h_pass "$1"; }
+fail() { h_fail "$1: $2"; }
 
 # reset_ctl — clear per-test control state
 reset_ctl() {
@@ -974,6 +974,4 @@ fi
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-TOTAL=$((PASSED + FAILED))
-printf 'launchd-job: %d passed, %d failed\n' "$PASSED" "$FAILED"
-[[ $FAILED -eq 0 ]] && exit 0 || exit 1
+h_done

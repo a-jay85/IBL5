@@ -346,15 +346,20 @@ def _canned_run_fixture():
 
 
 @pytest.mark.usefixtures("stub_ambient_git_show")
-def test_runner_retrospective_site_propagates_pause(tmp_path, monkeypatch):
+def test_runner_retrospective_site_swallows_pause(tmp_path, monkeypatch):
+    """Phase 9 is the one runner site that swallows a pause: the run keeps its real
+    terminal (degraded for this fixture) and exits 0 (ADR-0143 addendum)."""
     monkeypatch.setattr(usage_pause, "marker_exists", lambda ctx: True)
     canned = dict(_CANNED_RUN, retrospective={"kind": "usage-pause"})
-    res = runner.run(_canned_run_fixture(), str(tmp_path / "out"),
+    out = tmp_path / "out"
+    res = runner.run(_canned_run_fixture(), str(out),
                      FixtureLlm(UsageLedger(), canned), mode="replay")
-    assert res.terminal == TerminalState.FAILED
-    assert res.error_kind == "usage-pause"
-    assert "retrospective" in res.error
-    assert runner.exit_code_for(res) == 75
+    assert res.terminal == TerminalState.DEGRADED
+    assert res.error is None and res.error_kind is None
+    assert res.retrospective == {"save": False, "skipped": "usage-pause"}
+    assert runner.exit_code_for(res) == 0
+    audit = (out / "audit.log").read_text()
+    assert "phase9: no durable lesson" not in audit
 
 
 def test_runner_thread_ingestion_wrapper_propagates_pause(tmp_path):
@@ -406,4 +411,7 @@ def test_usage_pause_handlers_are_only_the_known_sites():
                 and "UsagePause" in _type_names(node.type))
         if n:
             counts[str(path.relative_to(ROOT))] = n
-    assert counts == {"runner.py": 2, os.path.join("harness", "adr_draft.py"): 1}
+    # runner.py: the Phase 9 retrospective swallow (ADR-0143 addendum), the outer run()
+    # handler, and the background-review join in run()'s finally. A fourth site needs
+    # the same review.
+    assert counts == {"runner.py": 3, os.path.join("harness", "adr_draft.py"): 1}

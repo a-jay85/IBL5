@@ -10,7 +10,6 @@ use Season\Season;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Tests\Clock\FixedClock;
 use Waivers\Contracts\WaiversProcessorInterface;
-use Waivers\Contracts\WaiversViewInterface;
 use Waivers\WaiversService;
 
 /**
@@ -36,13 +35,9 @@ class WaiversServiceClockTest extends TestCase
             ->with($dropTime, $pinnedNow)
             ->willReturn('(Clears in 0 h, 0 m, 1 s)');
 
-        $view = self::createStub(WaiversViewInterface::class);
-        $view->method('buildPlayerOption')->willReturn('<option>');
-
         $service = new WaiversService(
             self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class),
             $processor,
-            $view,
             self::createStub(TeamQueryRepositoryInterface::class),
             self::createStub(\mysqli::class),
             null,
@@ -52,6 +47,8 @@ class WaiversServiceClockTest extends TestCase
         $method = new \ReflectionMethod($service, 'buildPlayerOptions');
         $options = $method->invoke($service, [$player], 'add', self::createStub(Season::class));
 
-        self::assertSame(['<option>'], $options);
+        self::assertSame([
+            ['playerID' => 7, 'playerName' => 'Test Player', 'contract' => '100', 'waitTime' => '(Clears in 0 h, 0 m, 1 s)'],
+        ], $options);
     }
 }

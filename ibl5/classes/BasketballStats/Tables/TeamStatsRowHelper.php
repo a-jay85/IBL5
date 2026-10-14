@@ -54,7 +54,7 @@ final class TeamStatsRowHelper
         return "        <tr>\n"
             . $teamCell
             . '            <td>' . HtmlSanitizer::e($player->getPosition() ?? '') . "</td>\n"
-            . '            ' . PlayerImageHelper::renderPlayerCell($player->getPlayerID() ?? 0, $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass()) . "\n"
+            . '            ' . PlayerImageHelper::renderPlayerCell($player->getPlayerID() ?? 0, $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass())
             . '            <td>' . $playerStats->seasonGamesPlayed . "</td>\n"
             . '            <td>' . $playerStats->seasonGamesStarted . "</td>\n";
     }

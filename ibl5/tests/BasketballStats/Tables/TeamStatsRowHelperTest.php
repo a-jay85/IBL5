@@ -126,6 +126,7 @@ final class TeamStatsRowHelperTest extends TestCase
         $this->assertStringStartsWith("        <tr>\n            <td>&lt;b&gt;PG&lt;/b&gt;</td>\n            <td class=\"sticky-col", $html);
         $this->assertStringNotContainsString('<b>PG</b>', $html);
         $this->assertStringEndsWith("            <td>20</td>\n            <td>15</td>\n", $html);
+        $this->assertStringContainsString('</a></td>            <td>20</td>', $html);
         $this->assertStringContainsString(' is-starter', $html);
     }
 

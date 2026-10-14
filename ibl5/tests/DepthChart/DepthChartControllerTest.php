@@ -263,4 +263,111 @@ class DepthChartControllerTest extends WideUnitTestCase
         self::assertSame('ratings', $captured[0]);
         self::assertNull($captured[6]);
     }
+
+    /**
+     * DepthChartController::displayForm passes a valid split key through to renderTableForDisplay.
+     */
+    public function testDisplayFormHonorsValidSplitKey(): void
+    {
+        $request = new HttpRequest(request: ['display' => 'split', 'split' => 'home']);
+        /** @var list<mixed>|null $captured */
+        $captured = null;
+        $mockTeamTableService = $this->createMock(TeamTableServiceInterface::class);
+        $mockTeamTableService->method('getRosterAndStarters')->willReturn(['roster' => [], 'starterPids' => []]);
+        $mockTeamTableService->method('buildDropdownGroups')->willReturn([]);
+        $mockTeamTableService->expects($this->once())
+            ->method('renderTableForDisplay')
+            ->willReturnCallback(function (mixed ...$args) use (&$captured): never {
+                $captured = array_values($args);
+                throw new \RuntimeException('short-circuit');
+            });
+
+        try {
+            $this->runDisplayForm($this->buildDceController($mockTeamTableService, $request));
+        } catch (\RuntimeException $e) {
+            self::assertSame('short-circuit', $e->getMessage());
+        }
+
+        $this->assertIsArray($captured);
+        self::assertSame('split', $captured[0]);
+        self::assertSame('home', $captured[6]);
+    }
+
+    public function testDisplayFormFallsBackToRatingsForInvalidSplitKey(): void
+    {
+        $request = new HttpRequest(request: ['display' => 'split', 'split' => 'bogus_key']);
+        /** @var list<mixed>|null $captured */
+        $captured = null;
+        $mockTeamTableService = $this->createMock(TeamTableServiceInterface::class);
+        $mockTeamTableService->method('getRosterAndStarters')->willReturn(['roster' => [], 'starterPids' => []]);
+        $mockTeamTableService->method('buildDropdownGroups')->willReturn([]);
+        $mockTeamTableService->expects($this->once())
+            ->method('renderTableForDisplay')
+            ->willReturnCallback(function (mixed ...$args) use (&$captured): never {
+                $captured = array_values($args);
+                throw new \RuntimeException('short-circuit');
+            });
+
+        try {
+            $this->runDisplayForm($this->buildDceController($mockTeamTableService, $request));
+        } catch (\RuntimeException $e) {
+            self::assertSame('short-circuit', $e->getMessage());
+        }
+
+        $this->assertIsArray($captured);
+        self::assertSame('ratings', $captured[0]);
+        self::assertNull($captured[6]);
+    }
+
+    public function testDisplayFormFallsBackToRatingsForArrayValuedSplit(): void
+    {
+        $request = new HttpRequest(request: ['display' => 'split', 'split' => ['home']]);
+        /** @var list<mixed>|null $captured */
+        $captured = null;
+        $mockTeamTableService = $this->createMock(TeamTableServiceInterface::class);
+        $mockTeamTableService->method('getRosterAndStarters')->willReturn(['roster' => [], 'starterPids' => []]);
+        $mockTeamTableService->method('buildDropdownGroups')->willReturn([]);
+        $mockTeamTableService->expects($this->once())
+            ->method('renderTableForDisplay')
+            ->willReturnCallback(function (mixed ...$args) use (&$captured): never {
+                $captured = array_values($args);
+                throw new \RuntimeException('short-circuit');
+            });
+
+        try {
+            $this->runDisplayForm($this->buildDceController($mockTeamTableService, $request));
+        } catch (\RuntimeException $e) {
+            self::assertSame('short-circuit', $e->getMessage());
+        }
+
+        $this->assertIsArray($captured);
+        self::assertSame('ratings', $captured[0]);
+        self::assertNull($captured[6]);
+    }
+
+    public function testDisplayFormIgnoresSplitForNonSplitDisplay(): void
+    {
+        $request = new HttpRequest(request: ['display' => 'contracts', 'split' => 'home']);
+        /** @var list<mixed>|null $captured */
+        $captured = null;
+        $mockTeamTableService = $this->createMock(TeamTableServiceInterface::class);
+        $mockTeamTableService->method('getRosterAndStarters')->willReturn(['roster' => [], 'starterPids' => []]);
+        $mockTeamTableService->method('buildDropdownGroups')->willReturn([]);
+        $mockTeamTableService->expects($this->once())
+            ->method('renderTableForDisplay')
+            ->willReturnCallback(function (mixed ...$args) use (&$captured): never {
+                $captured = array_values($args);
+                throw new \RuntimeException('short-circuit');
+            });
+
+        try {
+            $this->runDisplayForm($this->buildDceController($mockTeamTableService, $request));
+        } catch (\RuntimeException $e) {
+            self::assertSame('short-circuit', $e->getMessage());
+        }
+
+        $this->assertIsArray($captured);
+        self::assertSame('contracts', $captured[0]);
+        self::assertNull($captured[6]);
+    }
 }

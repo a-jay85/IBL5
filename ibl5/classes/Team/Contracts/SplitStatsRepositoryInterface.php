@@ -45,6 +45,25 @@ interface SplitStatsRepositoryInterface
     public function getValidSplitKeys(): array;
 
     /**
+     * Resolve the requested display mode and raw split request value into
+     * the (display, split) pair the table renderers accept.
+     *
+     * Truth table (identical at every caller this replaces):
+     * - $display !== 'split': [$display, null], display untouched.
+     * - $display === 'split' and $rawSplit is a string in getValidSplitKeys()
+     *   under strict comparison: ['split', $rawSplit].
+     * - every other case (null, non-string, array, unknown or empty string):
+     *   ['ratings', null].
+     *
+     * Pure: reads no request state and runs no query.
+     *
+     * @param string $display Already-validated display mode (callers validate it)
+     * @param mixed $rawSplit Raw request value for `split`, any type
+     * @return array{string, ?string} [resolved display, validated split key or null]
+     */
+    public function resolveDisplayAndSplit(string $display, mixed $rawSplit): array;
+
+    /**
      * Get a human-readable label for a split key
      *
      * @param string $splitKey A validated split key

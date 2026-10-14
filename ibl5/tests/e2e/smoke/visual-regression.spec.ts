@@ -47,8 +47,8 @@ const STABLE_MAX_ATTEMPTS = 5;
 const STABLE_SETTLE_MS = 250;
 // Two consecutive shots count as "settled" when under 0.5% of pixels differ —
 // the same GATE_MAX_DIFF_PIXEL_RATIO floor the gallery's A/B self-stability
-// check uses (bin/vr-build-gallery). GATE_PIXEL_THRESHOLD 0.2 mirrors the gate's
-// per-pixel YIQ threshold (vr-gallery.ts).
+// check uses (bin/vr-build-gallery). 0.22 matches GATE_PIXEL_THRESHOLD, the
+// pixelmatch-8 (OKLab) equivalent of the gate's YIQ 0.2 (vr-gallery.ts).
 const STABLE_MAX_DIFF_RATIO = 0.005;
 
 function consecutiveDiffRatio(a: Buffer, b: Buffer): number {
@@ -56,7 +56,7 @@ function consecutiveDiffRatio(a: Buffer, b: Buffer): number {
   const pb = PNG.sync.read(b);
   if (pa.width !== pb.width || pa.height !== pb.height) return 1;
   const changed = pixelmatch(pa.data, pb.data, null, pa.width, pa.height, {
-    threshold: 0.2,
+    threshold: 0.22,
   });
   return changed / (pa.width * pa.height);
 }

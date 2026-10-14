@@ -313,6 +313,8 @@ class LastSimRecapServiceTest extends TestCase
         return [
             'visitor-only' => [9, 0, 9],
             'home-only' => [0, 6, -6],
+            'visitor-one-point' => [1, 0, 1],
+            'home-one-point' => [0, 1, -1],
         ];
     }
 
@@ -463,6 +465,9 @@ class LastSimRecapServiceTest extends TestCase
         self::assertSame('', $pg->youName);
         self::assertSame(0, $pg->youPts);
         self::assertSame(0, $pg->youReb);
+        self::assertSame(0, $pg->oppPid);
+        self::assertSame('', $pg->oppName);
+        self::assertSame(0, $pg->oppPts);
     }
 
     public function testPlayerLookupNameTakesPrecedenceOverLineName(): void

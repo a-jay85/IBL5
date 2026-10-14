@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-10-06
+last_verified: 2026-10-14
 ---
 
 # IBL5 Operations Runbook
@@ -474,27 +474,25 @@ Once a few sims have recapped from Actions, remove the Mac backup with `bin/sim-
 
 The sim recap poller is a macOS LaunchAgent (`com.ibl5.sim-recap-poll`, label managed by `bin/sim-recap-cron-setup`) that fires `bin/sim-recap-tick` every 300 s.
 
-### Phase gate — when the poller stops itself
+### Phase gate: the poller stays loaded
 
-Recap generation is gated to **HEAT and Regular Season** (`RecapPhasePolicy::ENABLED_PHASES`). When the season phase is advanced via the League Control Panel admin, `setSeasonPhase()` posts a notice to `#admin-chat` if the new phase is enabled. When the phase changes to a disabled phase (Preseason, or Playoffs onward), the next tick that finds no pending sim and `recaps_enabled: false` will self-unload the LaunchAgent via `launchctl bootout`. The poller logs the reason before unloading.
+Recap generation is gated to **HEAT and Regular Season** (`RecapPhasePolicy::ENABLED_PHASES`). In a disabled phase (Preseason, or Playoffs onward), a tick that finds no pending sim and `recaps_enabled: false` logs the phase and exits 0. It does the same reclaim-stale and claim-next ssh calls as an idle in-season tick, so a disabled tick costs the same. The job is never booted out.
 
-### Resuming the poller after a phase change
+### Resuming after a phase change
 
-When the season phase is set to HEAT or Regular Season, `#admin-chat` receives a notification. To re-arm the poller:
+No action is needed. The first tick after the phase becomes HEAT or Regular Season sees `recaps_enabled: true` and runs normally, within about 5 minutes. When the season phase is advanced via the League Control Panel admin, `setSeasonPhase()` posts an informational notice to `#admin-chat` if the new phase is enabled.
+
+Use `--resume` only to manually re-arm a job that is not loaded, for example after a manual bootout:
 
 ```bash
 bin/sim-recap-cron-setup --resume
 ```
 
-This runs `launchctl bootout` (no-op if not loaded) followed by `launchctl bootstrap` against the existing plist. It refuses with an error if the plist does not exist — run `bin/sim-recap-cron-setup --install-schedule` first if the LaunchAgent was never installed.
+This runs `launchctl bootout` (no-op if not loaded) followed by `launchctl bootstrap` against the existing plist. It refuses with an error if the plist does not exist. Run `bin/sim-recap-cron-setup --install-schedule` first if the LaunchAgent was never installed.
 
-### Manual self-unload guard
+### Manual-run guards
 
-`bin/sim-recap-tick` never self-unloads when:
-- `--dry-run` is passed, or
-- `--sim=N` is passed (a specific sim was requested manually).
-
-This prevents a manual invocation from pulling the rug out during debugging.
+`bin/sim-recap-tick` has no self-unload path. A manual run with `--dry-run` never touches the queue or the DB, and `--sim=N` skips the phase gate so a specific sim can be processed by hand.
 
 ## 9. Free Agent Prep Report (faprep.php)
 

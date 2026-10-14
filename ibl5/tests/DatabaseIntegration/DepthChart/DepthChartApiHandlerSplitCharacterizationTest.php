@@ -104,6 +104,9 @@ final class DepthChartApiHandlerSplitCharacterizationTest extends DatabaseTestCa
         return (string) ob_get_clean();
     }
 
+    /**
+     * DepthChartApiHandler::handle() honors a valid split key instead of rendering ratings.
+     */
     public function testValidSplitKeyRendersDifferentHtmlFromRatings(): void
     {
         $ratings = $this->render(['teamid' => '99', 'display' => 'ratings']);

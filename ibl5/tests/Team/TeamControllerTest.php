@@ -244,6 +244,9 @@ class TeamControllerTest extends WideUnitTestCase
         self::assertNull($captured[4]);
     }
 
+    /**
+     * A `split[]=home` request must not slip past the allow-list.
+     */
     public function testDisplayTeamPageFallsBackToRatingsForArrayValuedSplit(): void
     {
         $request = new HttpRequest(request: ['display' => 'split', 'split' => ['home']]);

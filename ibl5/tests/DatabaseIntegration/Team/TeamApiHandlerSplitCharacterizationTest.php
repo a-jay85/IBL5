@@ -100,6 +100,9 @@ final class TeamApiHandlerSplitCharacterizationTest extends DatabaseTestCase
         return (string) ob_get_clean();
     }
 
+    /**
+     * TeamApiHandler::handle() renders the split table for a valid split key.
+     */
     public function testValidSplitKeyRendersSplitTable(): void
     {
         $ratings = $this->render(['teamid' => '99', 'display' => 'ratings']);

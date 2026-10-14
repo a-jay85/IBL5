@@ -264,6 +264,9 @@ class DepthChartControllerTest extends WideUnitTestCase
         self::assertNull($captured[6]);
     }
 
+    /**
+     * DepthChartController::displayForm passes a valid split key through to renderTableForDisplay.
+     */
     public function testDisplayFormHonorsValidSplitKey(): void
     {
         $request = new HttpRequest(request: ['display' => 'split', 'split' => 'home']);

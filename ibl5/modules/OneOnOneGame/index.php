@@ -34,6 +34,8 @@ oneonone();
 function oneonone(): void
 {
     global $mysqli_db, $user, $authService;
+    /** @var \mysqli $mysqli_db */
+    /** @var \Auth\Contracts\AuthServiceInterface $authService */
 
     PageLayout\PageLayout::header();
     $nukeCompat = new \Utilities\NukeCompat();

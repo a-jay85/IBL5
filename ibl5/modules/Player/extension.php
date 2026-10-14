@@ -9,9 +9,13 @@ $nukeCompat = new \Utilities\NukeCompat();
 /** @var \mysqli $mysqli_db */
 /** @var \Auth\AuthService $authService */
 
+$httpRequest = \Http\HttpRequest::fromGlobals();
+$serverNameRaw = $httpRequest->server('SERVER_NAME');
+$serverName = is_string($serverNameRaw) ? $serverNameRaw : '';
+
 $controller = new \Extension\ExtensionController(
     new \Repositories\TeamIdentityRepository($mysqli_db),
-    new \Extension\ExtensionProcessor($mysqli_db, $_SERVER['SERVER_NAME'] ?? ''),
+    new \Extension\ExtensionProcessor($mysqli_db, $serverName),
 );
 
 // NukeCompat::isUser()/cookieDecode() ignore their argument and read the $authService global

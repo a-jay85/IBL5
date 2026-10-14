@@ -25,6 +25,9 @@ use Search\Contracts\SearchRepositoryInterface;
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db, $prefix, $user_prefix, $tipath, $articlecomm;
+/** @var \mysqli $mysqli_db */
+/** @var string $prefix */
+/** @var string $tipath */
 
 $ThemeSel = 'IBL';
 

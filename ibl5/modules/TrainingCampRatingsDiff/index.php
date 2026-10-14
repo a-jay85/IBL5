@@ -11,6 +11,7 @@ use TrainingCampRatingsDiff\TrainingCampRatingsDiffService;
 use TrainingCampRatingsDiff\TrainingCampRatingsDiffView;
 
 global $mysqli_db, $user;
+/** @var \mysqli $mysqli_db */
 
 if (!is_user($user)) {
     loginbox();

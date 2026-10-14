@@ -45,23 +45,37 @@ class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistor
      */
     public function searchAwards(array $params): array
     {
-        $where = new \Validation\QueryConditions();
-        $where->addIfNotNull('a.year = ?', 'i', $params['year']);
-        if ($params['award'] !== null) {
-            $where->add('a.award LIKE ?', 's', '%' . $params['award'] . '%');
+        $types = '';
+        $bind = [];
+
+        $yearClause = '';
+        if ($params['year'] !== null) {
+            $yearClause = ' AND a.year = ?';
+            $types .= 'i';
+            $bind[] = $params['year'];
         }
+
+        $awardClause = '';
+        if ($params['award'] !== null) {
+            $awardClause = ' AND a.award LIKE ?';
+            $types .= 's';
+            $bind[] = '%' . $params['award'] . '%';
+        }
+
+        $nameClause = '';
         if ($params['name'] !== null) {
-            $where->add('a.name LIKE ?', 's', '%' . $params['name'] . '%');
+            $nameClause = ' AND a.name LIKE ?';
+            $types .= 's';
+            $bind[] = '%' . $params['name'] . '%';
         }
 
         $sortColumn = self::SORT_COLUMN_MAP[$params['sortby']] ?? 'year';
-        $whereClause = $where->toWhereClause();
-        // $whereClause = QueryConditions bound-param builder; $sortColumn = SORT_COLUMN_MAP
-        // allowlist value (?? 'year'). Both validated upstream — concatenate, never bind.
-        $query = "SELECT a.year, a.award, a.name, a.table_id, p.pid FROM `ibl_awards` a LEFT JOIN `ibl_plr` p ON a.name = p.name WHERE " . $whereClause . " ORDER BY " . $sortColumn . " ASC";
+        // Clauses are constant-union literals with values bound; $sortColumn = SORT_COLUMN_MAP
+        // allowlist value (?? 'year').
+        $query = "SELECT a.year, a.award, a.name, a.table_id, p.pid FROM `ibl_awards` a LEFT JOIN `ibl_plr` p ON a.name = p.name WHERE 1=1" . $yearClause . $awardClause . $nameClause . " ORDER BY " . $sortColumn . " ASC";
 
         /** @var array<int, array{year: int, award: string, name: string, table_id: int, pid: int|null}> $results */
-        $results = $this->fetchAll($query, $where->getTypes(), ...$where->getParams());
+        $results = $this->fetchAll($query, $types, ...$bind);
 
         return [
             'results' => $results,

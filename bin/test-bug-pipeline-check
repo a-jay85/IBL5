@@ -12,12 +12,13 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CHECK_BIN="$SCRIPT_DIR/bug-pipeline-check"
 
-PASSED=0
-FAILED=0
 HEARTBEAT_FILE=""
 LAUNCHCTL_STUB=""
 DB_STUB=""
@@ -26,8 +27,11 @@ CHECK_RC=0
 SCRATCH_DB=""
 MAIN_DB="iblhoops_ibl5"
 
-bpt_ok()   { echo "ok: $1";  PASSED=$(( PASSED + 1 )); }
-bpt_fail() { echo "FAIL: $1"; FAILED=$(( FAILED + 1 )); }
+bpt_ok()   { h_pass "$1"; }
+bpt_fail() { h_fail "$1"; }
+# Early exits (real-DB gate, schema-load failure) end the run through this wrapper;
+# the single trailing h_done line stays the file's only bare h_done.
+bpt_finish() { h_done; }
 bpt_expect_eq() {
     if [ "$2" = "$3" ]; then bpt_ok "$1"
     else bpt_fail "$1 — want [$2] got [$3]"
@@ -44,6 +48,7 @@ _cleanup_all() {
             "DROP DATABASE IF EXISTS \`$SCRATCH_DB\`" >/dev/null 2>&1 || true
     fi
     rm -rf "$STUB"
+    h_cleanup
 }
 trap '_cleanup_all' EXIT
 
@@ -539,12 +544,10 @@ REQUIRE_DB="${BUG_PIPELINE_CHECK_REQUIRE_DB:-0}"
 if ! DB_NAME="$MAIN_DB" "$SCRIPT_DIR/db-query" "SELECT 1" >/dev/null 2>&1; then
     if [ "$REQUIRE_DB" = "1" ]; then
         bpt_fail "real-DB cases REQUIRED but MariaDB is unreachable at 127.0.0.1:3306"
-        printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
-        exit 1
+        bpt_finish
     fi
-    printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
     echo "skipping real-DB tests: MariaDB not available on 127.0.0.1:3306"
-    exit "$FAILED"
+    bpt_finish
 fi
 
 # ── Real-DB scratch schema ─────────────────────────────────────────────────────
@@ -555,14 +558,12 @@ DB_NAME="$MAIN_DB" "$SCRIPT_DIR/db-query" \
 if ! DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
         "$(cat "$REPO_ROOT/ibl5/migrations/153_create_bug_pipeline_tables.sql")" >/dev/null 2>&1; then
     bpt_fail "real-DB schema load: migration 153 failed"
-    printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
-    exit 1
+    bpt_finish
 fi
 if ! DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
         "$(cat "$REPO_ROOT/ibl5/migrations/158_create_bug_report_attachments.sql")" >/dev/null 2>&1; then
     bpt_fail "real-DB schema load: migration 158 failed"
-    printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
-    exit 1
+    bpt_finish
 fi
 
 # ── Real-DB wrapper + liveness stubs ──────────────────────────────────────────
@@ -752,8 +753,4 @@ bpt_expect_eq "R11: no writes — scratch DB snapshot unchanged" "$_r11_before" 
 
 
 # ── Summary ───────────────────────────────────────────────────────────────────
-printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
-if [ "$FAILED" -ne 0 ]; then
-    exit 1
-fi
-exit 0
+h_done

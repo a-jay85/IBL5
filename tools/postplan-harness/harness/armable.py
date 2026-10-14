@@ -104,6 +104,17 @@ def manual_testing_clearance(body: str, changed_files: Sequence[str] = ()) -> st
     return "CLEARED"
 
 
+def meta_checks_flag_path(branch: str, tmp_dir: str = "/tmp") -> str:
+    """The pre-push meta-checks failure flag for a branch.
+
+    Spelling must stay byte-identical to the shell side
+    (`/tmp/ibl5-meta-checks-prepush-<branch with / -> ->.failed`): Phase 2 writes it,
+    Phase 6.5 reads it for condition (16), and Phase 7's post-fix re-run deletes it.
+    `tmp_dir` exists so tests never touch the real /tmp.
+    """
+    return os.path.join(tmp_dir, f"ibl5-meta-checks-prepush-{branch.replace('/', '-')}.failed")
+
+
 def meta_checks_clearance(flag_path: str, post_pr_rc: int) -> str:
     """Three-state clearance for condition (16): pre-push flag file or post-pr run.
 

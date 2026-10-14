@@ -1,6 +1,6 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 165,
+        "argument.type": 120,
         "binaryOp.invalid": 6,
         "booleanNot.exprNotBoolean": 7,
         "cast.int": 6,
@@ -19,11 +19,9 @@
         "ibl.directHeader": 2,
         "ibl.echoInNonView": 1,
         "ibl.hardcodedEnvString": 8,
-        "ibl.sqlStringConcatenation": 23,
-        "ibl.trustedVariable": 17,
         "ibl.unknownCliOption": 2,
         "if.condNotBoolean": 1,
-        "method.nonObject": 3,
+        "method.nonObject": 2,
         "missingType.iterableValue": 1,
         "new.deprecatedClass": 1,
         "notEqual.notAllowed": 8,

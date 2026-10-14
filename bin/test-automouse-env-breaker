@@ -25,6 +25,8 @@
 # reads only its five positional args), so eval'ing its definition is safe and
 # does not run the runner's top-level loop.
 #
+# Also pins the plan-defect sentinel (queue/<plan>.plan-defect) contract between prompt-impl and run.
+#
 # Run: bin/test-automouse-env-breaker  (exit 0 = all pass, 1 = a case failed)
 
 set -u
@@ -150,6 +152,32 @@ else
     h_pass "six-arg-default ($got)"
 fi
 
+# assert_pd <name> <handoff> <in_queue> <env_err> <stalled> <fast> <wt_fail> <wt_refused> <plan_defect> <expected>
+assert_pd() {
+    local name=$1 got
+    if should_impl_env_stop "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9"; then got="stop"; else got="continue"; fi
+    if [ "$got" != "${10}" ]; then
+        h_fail "$name" "expected '${10}', got '$got'"
+    else
+        h_pass "$name ($got)"
+    fi
+}
+
+# --- Plan-defect stop: plan STAYS in queue/, valid sentinel → NEVER env-stop ---
+assert_pd "plan-defect-fast"           0 1 0 0 1 0 0 1 continue
+assert_pd "plan-defect-with-env-sig"   0 1 1 0 0 0 0 1 continue   # sentinel is authoritative over a stray env signature
+assert_pd "plan-defect-stalled"        0 1 0 1 0 0 0 1 continue
+# Control: same shape with plan_defect=0 is still a genuine env-stop (guard scoped to plan_defect only)
+assert_pd "no-plan-defect-env-control" 0 1 1 0 0 0 0 0 stop
+# Back-compat: a 7-arg call defaults plan_defect=0 (sub-minute exit still stops).
+# Mutation pin: changing the default to ${8:-1} in should_impl_env_stop makes this case fail.
+if should_impl_env_stop 0 1 0 0 1 0 0; then got="stop"; else got="continue"; fi
+if [ "$got" != "stop" ]; then
+    h_fail "seven-arg-default" "expected 'stop', got '$got' (plan_defect default must be 0)"
+else
+    h_pass "seven-arg-default ($got)"
+fi
+
 # --- Contract: prompt-impl and run agree on the sentinel, and wt-new failure no longer skips ---
 PROMPT="$SCRIPT_DIR/automouse/prompt-impl"
 if grep -qF 'touch "$NIGHTLY_DIR/queue/$PLAN_FILE.wt-fail"' "$PROMPT"; then
@@ -166,6 +194,31 @@ if grep -E 'If bin/wt-new fails' "$PROMPT" | grep -q 'skipped/'; then
     h_fail "contract-no-skip-on-wt-fail" "prompt-impl's wt-new failure line still moves the plan to skipped/"
 else
     h_pass "contract-no-skip-on-wt-fail"
+fi
+
+# --- Contract: prompt-impl and run agree on the plan-defect sentinel path and marker ---
+if grep -qF '} > "$NIGHTLY_DIR/queue/$PLAN_FILE.plan-defect"' "$PROMPT"; then
+    h_pass "contract-prompt-writes-plan-defect"
+else
+    h_fail "contract-prompt-writes-plan-defect" "prompt-impl no longer writes queue/\$PLAN_FILE.plan-defect"
+fi
+if grep -qF 'PLAN_DEFECT_FILE="$QUEUE_DIR/${PLAN_NAME}.plan-defect"' "$RUNNER"; then
+    h_pass "contract-runner-reads-plan-defect"
+else
+    h_fail "contract-runner-reads-plan-defect" "run no longer reads queue/\${PLAN_NAME}.plan-defect"
+fi
+if grep -qF "printf 'automouse-plan-defect: v1" "$PROMPT" \
+    && grep -qF '[ "$_pdm_line" = "automouse-plan-defect: v1" ]' "$RUNNER"; then
+    h_pass "contract-plan-defect-marker-agrees"
+else
+    h_fail "contract-plan-defect-marker-agrees" "prompt-impl and run disagree on the plan-defect marker literal"
+fi
+if grep -qF 'An `unavailable` verdict is never a plan defect' "$PROMPT" \
+    && grep -qF 'you are NOT stopping because of the time budget' "$PROMPT" \
+    && grep -qF 'every test, lint, and static-analysis run you did in this attempt passed on its last run' "$PROMPT"; then
+    h_pass "contract-plan-defect-retry-wins-conditions"
+else
+    h_fail "contract-plan-defect-retry-wins-conditions" "prompt-impl dropped an unavailable/time-budget/red-run exclusion from the plan-defect rule"
 fi
 
 # ── Section 2: run-loop wt-fail cases (macOS-only — requires caffeinate) ─────

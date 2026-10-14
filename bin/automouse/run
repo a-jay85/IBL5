@@ -956,6 +956,18 @@ append_cost_row() {
     # Sibling-relative, never $REPO: a worktree copy of `run` must price with its
     # own checkout's pricer, not the main checkout's.
     local root="${SELF_DIR:-}/.."
+    # cost-row-prestart-skip:begin
+    # A phase the usage gate paused before launch never ran, so it gets no row
+    # (no report row, no sidecar line). Markers: the impl pause printf below in
+    # this file and the pre-start echo in bin/post-plan-now. Fail-safe: a slice
+    # carrying cost= or session_id= ran, and keeps its row.
+    local slice
+    slice=$(tail -n +"$((log_before + 1))" "$LOG") || true
+    if grep -qE 'usage gate paused before the impl started|usage gate .*paused before start' <<< "$slice" \
+            && ! grep -qE 'cost=\$|session_id=' <<< "$slice"; then
+        return 0
+    fi
+    # cost-row-prestart-skip:end
     tier=$(model_tier "$model")
     # `|| true` is load-bearing: under `set -euo pipefail` a killed phase emits no
     # `cost=` line, so grep exits non-zero and would abort the whole automouse loop.
@@ -1138,7 +1150,7 @@ day_exit_lines() {
 
 regenerate_weekly_section() {
     local report=$1 reports_dir logs_dir d f i lf
-    local all_sidecar cost_rows tok_rows tok_stream split_miss unpriced
+    local all_sidecar cost_rows tok_rows tok_stream split_miss unpriced dedup_sidecar
     local floor_raw low_raw high_raw floor_total low_total high_total
     reports_dir=$(dirname "$report")
     logs_dir="$NIGHTLY_DIR/logs"
@@ -1148,6 +1160,25 @@ regenerate_weekly_section() {
         d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"
         if [ -f "$f" ]; then cat "$f" >> "$all_sidecar"; fi
     done
+    # weekly-stub-dedup:begin
+    # Drop a null-cost unknown stub when a priced row (cost != null) shares
+    # (date, plan, phase). Sidecars written before append_cost_row learned to skip
+    # pre-start pauses still hold such stubs. Priced rows and lone stubs survive.
+    # On a jq failure keep the undeduped file: the report degrades to old figures.
+    if [ -s "$all_sidecar" ]; then
+        dedup_sidecar=$(mktemp)
+        if jq -c -s '
+            def key: [.date, .plan, .phase] | tojson;
+            ([.[] | select(.cost != null) | {key: key, value: true}] | from_entries) as $priced
+            | .[]
+            | select(((.cost == null and .provenance == "unknown") and ($priced[key] // false)) | not)
+        ' "$all_sidecar" > "$dedup_sidecar"; then
+            mv "$dedup_sidecar" "$all_sidecar"
+        else
+            rm -f "$dedup_sidecar"
+        fi
+    fi
+    # weekly-stub-dedup:end
     floor_raw="0" low_raw="0" high_raw="0" unpriced=0
     if [ -s "$all_sidecar" ]; then
         unpriced=$(jq -s '[.[] | select(.provenance=="unknown")] | length' "$all_sidecar") || unpriced=0
@@ -1374,13 +1405,20 @@ phase_stalled() {
 # per plan per run (WT_REFUSE_RETRIED), and a second refusal falls through to
 # the genuine-failure branch as a counted attempt, bounded by MAX_ATTEMPTS.
 #
+# The plan_defect guard (8th arg, default 0) covers a no-handoff stop at
+# prompt-impl Step 6.7 where the agent wrote a valid queue/<plan>.plan-defect.
+# The plan stays in queue/, so without this guard a stray env signature or a
+# stall flag would refund the attempt and halt the run. With it, the exit falls
+# through to the PLAN DEFECT branch in the main loop.
+#
 # Safe under `set -e`: only ever called inside an `if` condition.
 should_impl_env_stop() {
-    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5 wt_fail=${6:-0} wt_refused=${7:-0}
+    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5 wt_fail=${6:-0} wt_refused=${7:-0} plan_defect=${8:-0}
     [ "$handoff" -eq 1 ] && return 1     # handoff written → impl succeeded
     [ "$in_queue" -eq 0 ] && return 1    # plan left queue/ → deliberate disposition, not environmental
     [ "$wt_fail" -eq 1 ] && return 1     # agent reported a bin/wt-new failure → counted attempt, not environmental
     [ "$wt_refused" -eq 1 ] && return 1  # Claude Code refused the worktree resume → deterministic; caller retries once, else counted attempt
+    [ "$plan_defect" -eq 1 ] && return 1 # agent reported a plan defect at Step 6.7 → plan-defect stop, not environmental
     [ "$env_err" -eq 1 ] || [ "$stalled" -eq 1 ] || [ "$fast" -eq 1 ]
 }
 
@@ -1483,6 +1521,7 @@ dispose_plan_done() {
           "$QUEUE_DIR/${plan_name}.failure" \
           "$QUEUE_DIR/${plan_name}.cap-refunds" \
           "$QUEUE_DIR/${plan_name}.wt-fail" \
+          "$QUEUE_DIR/${plan_name}.plan-defect" \
           "$HANDOFF_DIR/${plan_name}.json"
     if [ ! -f "$report" ]; then
         {
@@ -1865,6 +1904,38 @@ write_repeat_failure_report() {
     } > "$_rfr_dir/$(date +%Y-%m-%d)-skipped-$_rfr_slug.md"
 }
 
+# Plan-defect sentinel (queue/<plan>.md.plan-defect). The impl agent writes it at
+# prompt-impl Step 6.7 when the plan's Verification Matrix cannot be realised, the
+# stop is not the time-budget wall, and no test or lint run this attempt was red.
+# Line 1 is the fixed marker; lines 2.. are the UNREALISED-ASSERTION: and
+# MISSING-FILE: lines verbatim. Exit 0 iff <file> exists and line 1 is exactly
+# the marker. A garbled or absent line 1 returns 1, so the attempt keeps the
+# normal retry ladder.
+# Args: <sentinel_file>
+plan_defect_marker_present() {
+    local _pdm_line=""
+    [ -f "$1" ] || return 1
+    { IFS= read -r _pdm_line || true; } < "$1"
+    [ "$_pdm_line" = "automouse-plan-defect: v1" ]
+}
+
+# Write the skipped report for a plan stopped on a plan defect. Same path shape
+# as write_repeat_failure_report; morning-digest surfaces it. Carries the
+# sentinel's lines 2..101 verbatim (the marker line itself is never copied).
+# Args: <plan_name> <sentinel_file> <attempt_num>
+write_plan_defect_report() {
+    local _pdr_dir="$NIGHTLY_DIR/reports" _pdr_slug _pdr_rows
+    _pdr_slug=$(basename "$1" .md)
+    _pdr_rows=$(sed -n '2,101p' "$2" 2>/dev/null)
+    [ -n "$_pdr_rows" ] || _pdr_rows="(the sentinel listed no rows; see this attempt's error report)"
+    mkdir -p "$_pdr_dir"
+    {
+        printf 'Plan "%s" stopped after attempt %s: its Verification Matrix could not be realised. That is a plan defect a retry cannot fix, so the remaining attempts were not spent. Fix the rows below in the plan, then requeue.\n\n' \
+            "$_pdr_slug" "$3"
+        printf '## Failing rows\n\n```\n%s\n```\n' "$_pdr_rows"
+    } > "$_pdr_dir/$(date +%Y-%m-%d)-skipped-$_pdr_slug.md"
+}
+
 # Decide whether to feed the prior-failure report to this attempt's impl prompt.
 # YES iff escalation fired (impl model != base model) AND the sidecar is present.
 # DECOUPLED from the escalation trigger (ADR-0085): the report is fed only when
@@ -2118,6 +2189,7 @@ while true; do
     FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0085); lifecycle-tied to ATTEMPT_FILE, except at handoff where it is removed and ATTEMPT_FILE is reseeded to 1
     CAP_REFUND_FILE="$QUEUE_DIR/${PLAN_NAME}.cap-refunds"   # wall-clock refunds granted to this plan; lifecycle-tied to ATTEMPT_FILE, NOT reset by refund_attempt
     WT_FAIL_FILE="$QUEUE_DIR/${PLAN_NAME}.wt-fail"   # sentinel prompt-impl Step 5 drops when bin/wt-new fails; cleared before each attempt and after classification
+    PLAN_DEFECT_FILE="$QUEUE_DIR/${PLAN_NAME}.plan-defect"   # sentinel prompt-impl Step 6.7 writes when the plan's Verification Matrix cannot be realised; line 1 = fixed marker (plan_defect_marker_present); cleared before each attempt and on disposal
     ATTEMPTS=0
     if [ -f "$ATTEMPT_FILE" ]; then
         ATTEMPTS=$(cat "$ATTEMPT_FILE")
@@ -2126,7 +2198,7 @@ while true; do
         echo "Plan $PLAN_NAME failed $ATTEMPTS times — moving to skipped/." >> "$LOG"
         mkdir -p "$NIGHTLY_DIR/skipped"
         mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
-        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
+        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
         SLUG=$(basename "$PLAN_NAME" .md)
@@ -2157,7 +2229,7 @@ while true; do
         echo "Plan $PLAN_NAME declares an unusable impl_model — $BASE_MODEL — moving to skipped/." >> "$LOG"
         mkdir -p "$NIGHTLY_DIR/skipped"
         mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
-        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
+        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
         SLUG=$(basename "$PLAN_NAME" .md)
@@ -2233,8 +2305,8 @@ while true; do
         continue
     fi
 
-    # A sentinel left by a crashed earlier run must not classify THIS attempt.
-    rm -f "$WT_FAIL_FILE"
+    # Sentinels left by a crashed earlier run must not classify THIS attempt.
+    rm -f "$WT_FAIL_FILE" "$PLAN_DEFECT_FILE"
 
     # Increment attempt counter
     echo $(( ATTEMPTS + 1 )) > "$ATTEMPT_FILE"
@@ -2460,6 +2532,9 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # A bin/wt-new failure (the agent dropped $WT_FAIL_FILE, plan still in
         # queue/) is also NOT environmental: it falls through to the WT-NEW
         # FAILURE branch below as a counted, run-deferred attempt.
+        # A plan-defect stop (the agent wrote a valid $PLAN_DEFECT_FILE at Step 6.7,
+        # plan still in queue/) is also NOT environmental: it falls through to the
+        # PLAN DEFECT branch below, which moves the plan to skipped/ after this attempt.
         # A worktree-resume refusal (Claude Code's resume safety check) is also NOT
         # environmental: it is retried once just below, then counted and deferred.
         # EXCEPTION, handled just below: a slow failure that was the wall-clock
@@ -2486,6 +2561,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         IMPL_STALLED=0;  phase_stalled "$IMPL_LOG_BEFORE"   && IMPL_STALLED=1
         IMPL_FAST=0;     [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ] && IMPL_FAST=1
         IMPL_WT_FAIL=0;  [ -f "$WT_FAIL_FILE" ]  && IMPL_WT_FAIL=1
+        IMPL_PLAN_DEFECT=0; plan_defect_marker_present "$PLAN_DEFECT_FILE" && IMPL_PLAN_DEFECT=1
         IMPL_WT_REFUSED=0; usage_is_wt_resume_refused "$LOG" "$IMPL_LOG_BEFORE" && IMPL_WT_REFUSED=1
         # Worktree-resume refusal retry guard: Claude Code's resume safety check
         # refused `--resume` into the session's worktree and cleared the binding
@@ -2511,7 +2587,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             echo "WORKTREE RESUME REFUSED AGAIN — session ${IMPL_SID:-none} for $PLAN_NAME; counted as a genuine attempt ($(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS), deferred to the next run." >> "$LOG"
             CAP_DEFERRED="$CAP_DEFERRED$PLAN_NAME "
         fi
-        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST" "$IMPL_WT_FAIL" "$IMPL_WT_REFUSED"; then
+        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST" "$IMPL_WT_FAIL" "$IMPL_WT_REFUSED" "$IMPL_PLAN_DEFECT"; then
             REASON="usage/rate limit, auth error, or transient"
             if [ "$IMPL_STALLED" -eq 1 ]; then
                 REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
@@ -2576,6 +2652,21 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             rm -f "$WT_FAIL_FILE"
             CAP_DEFERRED="$CAP_DEFERRED$PLAN_NAME "
             note_failure "Could not create a worktree for ${PLAN_NAME%.md} (bin/wt-new failed). It stays queued and tries again next run."
+        elif [ "$IMPL_PLAN_DEFECT" -eq 1 ] && [ "$IMPL_CAP_REFUNDED" -eq 0 ]; then
+            # Plan defect: the agent stopped at prompt-impl Step 6.7 because the
+            # plan's Verification Matrix cannot be realised. It found no red test
+            # or lint run and was not at the time-budget wall, and it wrote a valid
+            # $PLAN_DEFECT_FILE. Retrying the same plan cannot fix that, so the plan
+            # goes to skipped/ now instead of spending attempts 2 and 3. Mirrors the
+            # repeated-failure stop's disposal block. A wall-clock kill
+            # (IMPL_CAP_REFUNDED=1) is excluded: retry wins on a time-budget stop.
+            echo "PLAN DEFECT — $PLAN_NAME: the impl agent reported its Verification Matrix cannot be realised (attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS); moving to skipped/ without retrying." >> "$LOG"
+            mkdir -p "$NIGHTLY_DIR/skipped"
+            mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+            touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
+            write_plan_defect_report "$PLAN_NAME" "$PLAN_DEFECT_FILE" "$(( ATTEMPTS + 1 ))"
+            note_failure "${PLAN_NAME%.md} has a plan defect: its Verification Matrix could not be realised, so it was moved to skipped/ after one try. Fix the plan, then requeue. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-${PLAN_NAME%.md}.md"
+            rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
         elif [ "$IMPL_CAP_REFUNDED" -eq 0 ]; then
             # Genuine (non-environmental) failure: handoff absent, plan STILL in
             # queue/, the env-stop guard did NOT fire (it breaks above), and the
@@ -2604,7 +2695,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
                 write_repeat_failure_report "$PLAN_NAME" "$NEW_FAILSIG" "${PREV_FAILATTEMPT:-?}" "$(( ATTEMPTS + 1 ))"
                 note_failure "${PLAN_NAME%.md} failed the same way twice in a row, so it was moved to skipped/ instead of trying again."
-                rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
+                rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
             fi
         fi
     fi
@@ -2838,7 +2929,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
 
     # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file and failure report
     if [ ! -e "$NEXT_PLAN" ]; then
-        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
+        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
     fi
 
     # Release this plan's claim — done with it for this iteration. A genuine

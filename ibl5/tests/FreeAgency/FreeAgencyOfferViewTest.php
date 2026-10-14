@@ -145,6 +145,47 @@ class FreeAgencyOfferViewTest extends TestCase
         $this->assertStringContainsString('pa=deleteoffer', $html);
     }
 
+    public function testCsrfInputRenderedInBothForms(): void
+    {
+        $html = $this->view->render($this->baseData());
+
+        $total = substr_count($html, 'name="_csrf_token"');
+        $this->assertGreaterThanOrEqual(2, $total);
+        $this->assertSame($total, preg_match_all('/<input type="hidden" name="_csrf_token" value="[0-9a-f]{64}">/', $html));
+        $this->assertStringNotContainsString('&lt;input', $html);
+    }
+
+    public function testBirdRightsNoteRendersStrongTagForBothBranches(): void
+    {
+        $withoutBird = $this->view->render($this->baseData());
+        $this->assertStringContainsString('<li><strong>For Players who do not have Bird Rights with your team:</strong> You may add no more than ', $withoutBird);
+        $this->assertStringNotContainsString('Bird Rights Player on Your Team', $withoutBird);
+
+        $birdPlayer = self::createStub(Player::class);
+        $birdPlayer->method('getName')->willReturn('Bird Player');
+        $birdPlayer->method('getPlayerID')->willReturn(43);
+        $birdPlayer->method('getTeamName')->willReturn('TestTeam');
+        $birdPlayer->method('getBirdYears')->willReturn(3);
+        $birdPlayer->method('getYearsOfExperience')->willReturn(5);
+        $data = $this->baseData();
+        $data['player'] = $birdPlayer;
+        $withBird = (new FreeAgencyOfferView(new FreeAgencyFormView('TestTeam', $birdPlayer)))->render($data);
+        $this->assertStringContainsString('<li><strong>Bird Rights Player on Your Team:</strong> You may add no more than ', $withBird);
+        $this->assertStringNotContainsString('For Players who do not have Bird Rights', $withBird);
+
+        $this->assertStringNotContainsString('&lt;strong&gt;', $withoutBird);
+        $this->assertStringNotContainsString('&lt;strong&gt;', $withBird);
+    }
+
+    public function testPlayerRatingsRenderAsHtml(): void
+    {
+        $html = $this->view->render($this->baseData());
+
+        $this->assertStringContainsString('<table', $html);
+        $this->assertStringNotContainsString('&lt;table', $html);
+        $this->assertStringNotContainsString('&lt;td', $html);
+    }
+
     public function testSharedCsrfTokenReusedAcrossAllForms(): void
     {
         $html = $this->view->render($this->baseData());

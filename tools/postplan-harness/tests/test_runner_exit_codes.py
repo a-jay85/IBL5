@@ -48,17 +48,34 @@ def test_other_typed_failure_exits_1():          # negative path: not everything
 _EXIT_CODE_TABLE = (
     [(TerminalState.FAILED, k, 3) for k in (
         "rebase-conflict", "local-gate", "remote-head-diverged",
-        "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty",
+        "llm-usage-limit", "llm-auth-expired", "usage-pause-unconfirmed", "usage-pause-dirty",
         "subprocess-timeout")]
     + [(TerminalState.FAILED, "usage-pause", 75)]
     + [(TerminalState.FAILED, k, 1) for k in (
         "push-disabled", "push-failed", "push-retry-cap",
-        "lostwork-unproved", "git", None)]
+        "lostwork-unproved", "llm-invalid-output", "git", None)]
     + [(t, None, 0) for t in (
         TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
         TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED,
-        TerminalState.HOLD_REPEAT_DECLINED)]
+        TerminalState.HOLD_REPEAT_DECLINED, TerminalState.REBASED_HELD)]
 )
+
+
+def test_rebased_held_value_pinned():
+    """bin/post-plan-fleet, bin/pr-cycle and bin/pr-cycle-tick key on this literal."""
+    assert TerminalState.REBASED_HELD.value == "rebased-held"
+    assert TerminalState.REBASED_HELD != TerminalState.FAILED
+
+
+def test_verdict_line_rebased_held():
+    res = _res(TerminalState.REBASED_HELD, rebase_only={"noop": False, "hold": "7,8"})
+    line = runner.verdict_line(res, 0)
+    assert "terminal=rebased-held" in line
+    assert "merged origin/master and pushed" in line
+    assert "auto-merge not armed" in line
+    assert "prior hold 7,8" in line
+    noop = _res(TerminalState.REBASED_HELD, rebase_only={"noop": True, "hold": "3"})
+    assert "nothing pushed" in runner.verdict_line(noop, 0)
 
 
 @pytest.mark.parametrize("terminal,error_kind,expected", _EXIT_CODE_TABLE)
@@ -112,11 +129,7 @@ def test_rebase_conflict_after_declined_autoresolve_still_exits_3():
 
 def test_phase2_conflict_arm_guards_on_kind_and_logs_before_resolving():
     """Detection-time flag must be logged before the resolution attempt (fail-closed ordering)."""
-    src = inspect.getsource(runner)
-    # Slice the region between `pre_rebase = git.head()` and `git.push()`
-    start = src.index("pre_rebase = git.head()")
-    end = src.index("git.push()", start)
-    region = src[start:end]
+    region = inspect.getsource(runner._phase2_rebase)   # the extracted Phase 2 rebase block
     assert 'if e.kind != "rebase-conflict"' in region
     assert "CONFLICT_FLAG=set" in region
     assert "autoresolve_stacked_rebase(" in region
@@ -125,10 +138,7 @@ def test_phase2_conflict_arm_guards_on_kind_and_logs_before_resolving():
 
 def test_local_gate_is_not_intercepted_by_the_conflict_arm():
     """The new conflict arm must not swallow local-gate denials."""
-    src = inspect.getsource(runner)
-    start = src.index("pre_rebase = git.head()")
-    end = src.index("git.push()", start)
-    region = src[start:end]
+    region = inspect.getsource(runner._phase2_rebase)   # the extracted Phase 2 rebase block
     assert "local-gate" not in region
 
 

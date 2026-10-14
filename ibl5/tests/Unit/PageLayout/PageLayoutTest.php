@@ -226,6 +226,62 @@ class PageLayoutTest extends TestCase
         self::assertStringNotContainsString('www.iblhoops.net', $head);
     }
 
+    /** @return array<string, array{string, list<string>}> */
+    public static function headHelperProvider(): array
+    {
+        return [
+            'calculateRelativeBasePath' => ['calculateRelativeBasePath', ['currentFile', 'iblRoot']],
+            'renderScriptTags' => ['renderScriptTags', ['iblRootPath']],
+            'renderMetaTags' => ['renderMetaTags', ['sitename', 'slogan']],
+            'renderOpenGraphMetaTags' => ['renderOpenGraphMetaTags', ['requestHost']],
+            'renderStylesheetLink' => ['renderStylesheetLink', ['themeSel']],
+        ];
+    }
+
+    /**
+     * Security-surface discharge: each extracted head helper is a pure string builder.
+     * Structural invariant: private static, returns string, every parameter is a plain non-nullable
+     * string. A helper that grows a \mysqli, session, cookie, or actor-identity parameter, or that
+     * changes a parameter to mixed/array, fails here before any review reads the diff.
+     *
+     * @param list<string> $expectedParams
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('headHelperProvider')]
+    public function testExtractedHeadHelpersArePureStringBuilders(string $method, array $expectedParams): void
+    {
+        $reflection = new \ReflectionMethod(PageLayout::class, $method);
+
+        self::assertTrue($reflection->isPrivate(), "$method must stay private");
+        self::assertTrue($reflection->isStatic(), "$method must stay static");
+
+        $returnType = $reflection->getReturnType();
+        self::assertInstanceOf(\ReflectionNamedType::class, $returnType);
+        self::assertSame('string', $returnType->getName(), "$method must return string");
+
+        $actualParams = [];
+        foreach ($reflection->getParameters() as $parameter) {
+            $type = $parameter->getType();
+            self::assertInstanceOf(\ReflectionNamedType::class, $type, "$method parameter \${$parameter->getName()} must be typed");
+            self::assertSame('string', $type->getName(), "$method parameter \${$parameter->getName()} must be string");
+            self::assertFalse($type->allowsNull(), "$method parameter \${$parameter->getName()} must be non-nullable");
+            $actualParams[] = $parameter->getName();
+        }
+        self::assertSame($expectedParams, $actualParams, "$method parameter list drifted");
+    }
+
+    public function testRenderHeadSignatureIsUnchanged(): void
+    {
+        $reflection = new \ReflectionMethod(PageLayout::class, 'renderHead');
+
+        self::assertTrue($reflection->isPrivate());
+        self::assertTrue($reflection->isStatic());
+        self::assertSame(0, $reflection->getNumberOfParameters());
+
+        $returnType = $reflection->getReturnType();
+        self::assertInstanceOf(\ReflectionNamedType::class, $returnType);
+        self::assertSame('void', $returnType->getName());
+    }
+
     public function testHeaderNonBoostedSkipsRecordHitWhenNoDb(): void
     {
         unset($_SERVER['HTTP_HX_BOOSTED']);

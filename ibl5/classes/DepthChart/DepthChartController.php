@@ -98,19 +98,9 @@ class DepthChartController implements DepthChartControllerInterface
             $display = $rawDisplay;
         }
 
-        // Validate split parameter when display=split
-        $split = null;
-        $rawSplit = $this->request->request('split');
-        if ($display === 'split' && is_string($rawSplit)) {
-            $splitRepo = new \Team\SplitStatsRepository($this->db);
-            if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
-                $split = $rawSplit;
-            } else {
-                $display = 'ratings';
-            }
-        } elseif ($display === 'split') {
-            $display = 'ratings';
-        }
+        // Resolve the split parameter when display=split (shared allow-list gate)
+        $splitRepo = new \Team\SplitStatsRepository($this->db);
+        [$display, $split] = $splitRepo->resolveDisplayAndSplit($display, $this->request->request('split'));
 
         $season = $this->season ?? new Season($this->db);
 

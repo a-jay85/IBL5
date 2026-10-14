@@ -17,6 +17,7 @@
 declare(strict_types=1);
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");

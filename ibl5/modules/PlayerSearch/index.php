@@ -32,6 +32,7 @@ $module_name = basename(dirname(__FILE__));
 $pagetitle = "- $module_name";
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Initialize classes
 $validator = new \PlayerSearch\PlayerSearchValidator();

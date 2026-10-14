@@ -76,21 +76,9 @@ class TeamController implements TeamControllerInterface
             // Invalid display value is silently ignored (falls back to 'ratings')
         }
 
-        // Validate split parameter when display=split
-        $split = null;
-        $rawSplit = $this->request->request('split');
-        if ($display === 'split' && is_string($rawSplit)) {
-            $splitRepo = new SplitStatsRepository($this->db);
-            if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
-                $split = $rawSplit;
-            } else {
-                // Invalid split key falls back to ratings
-                $display = 'ratings';
-            }
-        } elseif ($display === 'split') {
-            // display=split without a split key falls back to ratings
-            $display = 'ratings';
-        }
+        // Resolve the split parameter when display=split (shared allow-list gate)
+        $splitRepo = new SplitStatsRepository($this->db);
+        [$display, $split] = $splitRepo->resolveDisplayAndSplit($display, $this->request->request('split'));
 
         \PageLayout\PageLayout::header();
 

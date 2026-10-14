@@ -11,8 +11,10 @@ use Season\Season;
 /**
  * SplitStatsRepository - Queries per-game averages filtered by game context
  *
- * Reuses the same SQL aggregation pattern as PeriodAverages (SUM/COUNT grouped by player)
- * with additional WHERE clauses or JOINs based on the split type.
+ * getSplitStats() reuses the SUM/COUNT-grouped-by-player aggregation pattern with
+ * additional WHERE clauses or JOINs based on the split type. getPeriodStats() hosts the
+ * date-range query that BasketballStats\Tables\PeriodAverages renders; the two SELECTs
+ * differ (NULLIF guards, season_year/game_type filter) and are kept separate on purpose.
  *
  * @phpstan-import-type SplitStatsRow from Contracts\SplitStatsRepositoryInterface
  *
@@ -96,6 +98,63 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
             [$seasonEndingYear, $teamid, $teamid, $teamid],
             $splitCondition['params']
         );
+
+        /** @var list<SplitStatsRow> */
+        return $this->fetchAll($query, $types, ...$params);
+    }
+
+    /**
+     * @see SplitStatsRepositoryInterface::getPeriodStats()
+     * @param list<int> $pidFilter
+     * @return list<SplitStatsRow>
+     */
+    public function getPeriodStats(int $teamid, ?string $startDate, ?string $endDate, array $pidFilter = []): array
+    {
+        $pidFilterClause = '';
+        $pidFilterTypes = '';
+        $pidFilterParams = [];
+        if ($pidFilter !== []) {
+            $pidFilterClause = " AND bs.pid IN (" . \Database\SqlPlaceholders::PID_LIST . ")";
+            $pidFilterTypes = \Database\SqlPlaceholders::PID_LIST_TYPES;
+            $pidFilterParams = \Database\SqlPlaceholders::padPidList($pidFilter);
+        }
+
+        $query = "SELECT p.name,
+            bs.pos,
+            bs.pid,
+            COUNT(DISTINCT bs.game_date) as games,
+            ROUND(SUM(bs.game_min)/COUNT(DISTINCT bs.game_date), 1) as gameMINavg,
+            ROUND(SUM(bs.game_2gm + bs.game_3gm)/COUNT(DISTINCT bs.game_date), 2) as gameFGMavg,
+            ROUND(SUM(bs.game_2ga + bs.game_3ga)/COUNT(DISTINCT bs.game_date), 2) as gameFGAavg,
+            ROUND((SUM(bs.game_2gm) + SUM(bs.game_3gm)) / (SUM(bs.game_2ga) + SUM(bs.game_3ga)), 3) as gameFGPavg,
+            ROUND(SUM(bs.game_ftm)/COUNT(DISTINCT bs.game_date), 2) as gameFTMavg,
+            ROUND(SUM(bs.game_fta)/COUNT(DISTINCT bs.game_date), 2) as gameFTAavg,
+            ROUND((SUM(bs.game_ftm)) / (SUM(bs.game_fta)), 3) as gameFTPavg,
+            ROUND(SUM(bs.game_3gm)/COUNT(DISTINCT bs.game_date), 2) as game3GMavg,
+            ROUND(SUM(bs.game_3ga)/COUNT(DISTINCT bs.game_date), 2) as game3GAavg,
+            ROUND((SUM(bs.game_3gm)) / (SUM(bs.game_3ga)), 3) as game3GPavg,
+            ROUND(SUM(bs.game_orb)/COUNT(DISTINCT bs.game_date), 1) as gameORBavg,
+            ROUND((SUM(bs.game_orb) + SUM(bs.game_drb))/COUNT(DISTINCT bs.game_date), 1) as gameREBavg,
+            ROUND(SUM(bs.game_ast)/COUNT(DISTINCT bs.game_date), 1) as gameASTavg,
+            ROUND(SUM(bs.game_stl)/COUNT(DISTINCT bs.game_date), 1) as gameSTLavg,
+            ROUND(SUM(bs.game_tov)/COUNT(DISTINCT bs.game_date), 1) as gameTOVavg,
+            ROUND(SUM(bs.game_blk)/COUNT(DISTINCT bs.game_date), 1) as gameBLKavg,
+            ROUND(SUM(bs.game_pf)/COUNT(DISTINCT bs.game_date) , 1) as gamePFavg,
+            ROUND(((2 * SUM(bs.game_2gm)) + SUM(bs.game_ftm) + (3 * SUM(bs.game_3gm)))/COUNT(DISTINCT bs.game_date) , 1) as gamePTSavg
+        FROM `ibl_box_scores` bs
+        JOIN `ibl_plr` p ON bs.pid = p.pid
+        WHERE  bs.game_date BETWEEN ? AND ?
+            AND ( bs.home_teamid = ?
+                OR bs.visitor_teamid = ? )
+            AND bs.game_min > 0
+            AND p.teamid = ?
+            AND p.retired = 0
+            " . $pidFilterClause . "
+        GROUP  BY p.name, bs.pos, bs.pid
+        ORDER  BY p.name ASC";
+
+        $types = 'sssii' . $pidFilterTypes;
+        $params = [$startDate, $endDate, $teamid, $teamid, $teamid, ...$pidFilterParams];
 
         /** @var list<SplitStatsRow> */
         return $this->fetchAll($query, $types, ...$params);

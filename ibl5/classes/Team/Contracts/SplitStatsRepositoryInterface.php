@@ -23,6 +23,21 @@ interface SplitStatsRepositoryInterface
     public function getSplitStats(int $teamid, int $seasonEndingYear, string $splitKey): array;
 
     /**
+     * Get per-game averages for a team's players over an inclusive game_date range.
+     *
+     * Serves BasketballStats\Tables\PeriodAverages. Unlike getSplitStats(), this query has
+     * no season_year/game_type filter and no NULLIF guards, so a 0-attempt player returns
+     * NULL for gameFGPavg / gameFTPavg / game3GPavg.
+     *
+     * @param int $teamid Team ID (must be > 0)
+     * @param string|null $startDate Inclusive lower bound, Y-m-d; null binds SQL NULL (matches no rows)
+     * @param string|null $endDate Inclusive upper bound, Y-m-d; null binds SQL NULL (matches no rows)
+     * @param list<int> $pidFilter Optional pid allow-list; [] means no pid restriction
+     * @return list<SplitStatsRow>
+     */
+    public function getPeriodStats(int $teamid, ?string $startDate, ?string $endDate, array $pidFilter = []): array;
+
+    /**
      * Get all valid split key strings for parameter validation
      *
      * @return list<string>

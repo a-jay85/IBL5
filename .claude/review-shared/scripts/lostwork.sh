@@ -110,18 +110,28 @@ lw_neon() {
     FNR == 1 { if ($0 != "parameters:") bad(); st = 1; next }
     st == 1 { if ($0 != "\tignoreErrors:") bad(); st = 2; next }
     st == 2 { if ($0 != "\t\t-") bad(); n = 1; blk[n] = $0; st = 3; next }
-    st == 3 { if ($0 !~ /^\t\t\trawMessage: ./) bad(); blk[++n] = $0; st = 4; next }
+    st == 3 {
+      if ($0 == "\t\t\trawMessage: '"'''"'") { blk[++n] = $0; st = 31; next }
+      if ($0 !~ /^\t\t\trawMessage: ./) bad()
+      blk[++n] = $0; st = 4; next }
+    st == 31 {
+      if ($0 == "\t\t\t'"'''"'") { blk[++n] = $0; st = 4; next }
+      if ($0 !~ /^\t\t\t\t/) bad()
+      blk[++n] = $0; next }
     st == 4 { if ($0 !~ /^\t\t\tidentifier: ./) bad(); blk[++n] = $0; st = 5; next }
     st == 5 { if ($0 !~ /^\t\t\tcount: [0-9]+$/) bad(); blk[++n] = $0; st = 6; next }
     st == 6 {
       if ($0 !~ /^\t\t\tpath: [A-Za-z0-9_][A-Za-z0-9_.\/-]*$/ || index($0, "..")) bad()
       p = substr($0, 10); blk[++n] = $0; nb++
-      if (mode == "paths") print p
+      if (mode == "paths") pl[nb] = p
       else { out = (p in ex) ? dead : live; for (i = 1; i <= n; i++) print blk[i] > out }
       st = 7; next }
     st == 7 { if ($0 != "") bad(); if (mode == "split") print "" > out; st = 2; next }
     { bad() }
-    END { if (rc) exit 1; if (nb == 0 || (st != 2 && st != 7)) exit 1 }
+    END {
+      if (rc) exit 1
+      if (nb == 0 || (st != 2 && st != 7)) exit 1
+      for (i = 1; i <= nb; i++) print pl[i] }
   ' "$exempt" "$file"
 }
 check_entry() {

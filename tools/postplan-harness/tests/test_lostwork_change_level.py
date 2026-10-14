@@ -552,3 +552,75 @@ def test_non_baseline_neon_is_not_exempt(repo, key):
                         baseline_path="ibl5/phpstan-tests-baseline.neon", rm=["ibl5/modules/Foo/index.php"])
     assert "LOST: ibl5/phpstan-tests-baseline.neon: -\t\t\tpath: modules/Foo/index.php" in out
     assert last_line(out) == DIVERGED
+
+
+LW_NEON = "eval \"$(sed -n '/^lw_neon() {/,/^}/p' \"$1\")\"; shift; lw_neon \"$@\""
+
+
+def lw_neon(*args):
+    """Run the script's parser function alone: `lw_neon paths <file>` or `lw_neon split ...`."""
+    return subprocess.run(["bash", "-c", LW_NEON, "_", str(SCRIPT), *args],
+                          capture_output=True, text=True)
+
+
+def broken(block):
+    """The block with its count line unparseable (`count: one`)."""
+    return block[:3] + ["\t\t\tcount: one"] + block[4:]
+
+
+@pytest.mark.parametrize("side", ["head", "master"])
+def test_malformed_baseline_falls_back_to_strict(repo, key, side):
+    # Foo is deleted, so X would be exempt; the malformed copy disables the exemption.
+    base = [broken(X), Y] if side == "master" else [X, Y]
+    head = [broken(X), Y] if side == "head" else [X, Y]
+    out = baseline_case(repo, key, base=base, branch=[Y], head=head, rm=["ibl5/modules/Foo/index.php"])
+    assert "path: modules/Foo/index.php" in out
+    assert last_line(out) == DIVERGED
+
+
+def test_real_baseline_parses_as_blocks():
+    real = SCRIPT.parents[3] / "ibl5" / "phpstan-baseline.neon"
+    body = real.read_text()
+    r = lw_neon("paths", str(real))
+    assert r.returncode == 0, r.stderr
+    assert len(r.stdout.splitlines()) == sum(1 for l in body.splitlines() if l == "\t\t-") > 0
+
+
+@pytest.mark.parametrize("bad", [
+    "parameters:\n",                                                   # zero blocks
+    "parameters:\n    ignoreErrors:\n" + neon(X)[len("parameters:\n\tignoreErrors:\n"):],  # space indent
+    neon(broken(X)),                                                   # count not digits
+    neon(X[:4] + [""]),                                                # path line missing
+    neon(neon_block("m", "i", 1, "../escape.php")),                    # path with ..
+    neon(X)[:-1] + "\t\t-\n",                                          # trailing opener, no block
+    neon(X).replace("\t\t-\n", "", 1),                                 # block without opener
+], ids=["zero blocks", "space indent", "count not digits", "path missing", "dotdot path",
+        "trailing opener", "missing opener"])
+def test_lw_neon_rejects_malformed_block(tmp_path, bad):
+    f = tmp_path / "b.neon"
+    f.write_text(bad)
+    r = lw_neon("paths", str(f))
+    assert r.returncode == 1 and r.stdout.strip() == ""
+
+
+def test_lw_neon_accepts_multiline_raw_message(tmp_path):
+    # PHPStan writes a multi-line message as a `'''` block; the real baseline has three.
+    ml = [
+        "\t\t-",
+        "\t\t\trawMessage: '''",
+        "\t\t\t\tCall to deprecated function OpenTable():",
+        "\t\t\t\tUse CSS classes directly.",
+        "\t\t\t'''",
+        "\t\t\tidentifier: function.deprecated",
+        "\t\t\tcount: 1",
+        "\t\t\tpath: classes/Foo.php",
+        "",
+    ]
+    f = tmp_path / "b.neon"
+    f.write_text(neon(ml, X))
+    r = lw_neon("paths", str(f))
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == ["classes/Foo.php", "modules/Foo/index.php"]
+    f.write_text(neon(ml[:4] + ml[5:], X))  # unterminated `'''` block swallows the rest
+    r = lw_neon("paths", str(f))
+    assert r.returncode == 1 and r.stdout.strip() == ""

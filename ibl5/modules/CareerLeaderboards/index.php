@@ -11,6 +11,7 @@ $module_name = basename(dirname(__FILE__));
 $pagetitle = "- Player Archives";
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Initialize classes
 $dbCache = new \Cache\DatabaseCache($mysqli_db);

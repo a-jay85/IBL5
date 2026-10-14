@@ -34,6 +34,8 @@ $op = (is_string($rawOp) && $rawOp === 'allstar') ? 'allstar' : 'records';
 $pagetitle = $op === 'allstar' ? '- All-Star Appearances' : '- Record Holders';
 
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext $leagueContext */
 
 PageLayout\PageLayout::header();
 

@@ -179,24 +179,6 @@ parameters:
 			path: modules/AwardHistory/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class CapSpace\CapSpaceRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CapSpace/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CapSpace/index.php
-
-		-
-			rawMessage: 'Parameter #2 $db of class CapSpace\CapSpaceService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CapSpace/index.php
-
-		-
 			rawMessage: 'Call to function array_search() requires parameter #3 to be set.'
 			identifier: function.strict
 			count: 2
@@ -221,24 +203,6 @@ parameters:
 			path: modules/CareerLeaderboards/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CareerLeaderboards/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class CareerLeaderboards\CareerLeaderboardsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CareerLeaderboards/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ComparePlayers\ComparePlayersRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ComparePlayers/index.php
-
-		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -249,36 +213,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/ContractList/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Draft\DraftController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Draft/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Draft\DraftRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Draft/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Draft\DraftService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Draft/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Draft/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Draft/index.php
 
 		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
@@ -296,24 +230,6 @@ parameters:
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
 			count: 2
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DraftHistory\DraftHistoryApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DraftHistory\DraftHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of static method Team\Team::initialize() expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
 			path: modules/DraftHistory/index.php
 
 		-
@@ -506,52 +422,10 @@ parameters:
 			path: modules/PlayerSearch/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Auth\AuthRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/ProjectedDraftOrder/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ProjectedDraftOrder\ProjectedDraftOrderRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/ProjectedDraftOrder/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/ProjectedDraftOrder/index.php
-
-		-
 			rawMessage: 'Parameter #1 $json of function json_decode expects string, string|false given.'
 			identifier: argument.type
 			count: 1
 			path: modules/ProjectedDraftOrder/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class AllStarAppearances\AllStarAppearancesRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/RecordHolders/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/RecordHolders/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class RecordHolders\RecordHoldersRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/RecordHolders/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class RecordHolders\RecordHoldersRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/RecordHolders/index.php
 
 		-
 			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: string, min: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: ''''|''transactions'', min: int, ...} given.'
@@ -602,24 +476,6 @@ parameters:
 			path: modules/SeasonHighs/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class SeasonHighs\SeasonHighsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
 			rawMessage: 'Parameter #1 $seasonPhase of method SeasonHighs\SeasonHighsService::getHomeAwayHighs() expects string, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -639,18 +495,6 @@ parameters:
 
 		-
 			rawMessage: 'Parameter #1 $seasonPhase of method SeasonHighs\SeasonHighsView::renderHomeAwayHighs() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class SeasonHighs\SeasonHighsRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class Season\Season constructor expects League\LeagueContext|null, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/SeasonHighs/index.php
@@ -698,12 +542,6 @@ parameters:
 			path: modules/SeasonLeaderboards/index.php
 
 		-
-			rawMessage: 'Parameter #2 $leagueContext of class SeasonLeaderboards\SeasonLeaderboardsRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonLeaderboards/index.php
-
-		-
 			rawMessage: 'Parameter #3 $currentFilters of method SeasonLeaderboards\SeasonLeaderboardsView::renderFilterForm() expects array{year?: string, team?: int|string, sortby?: string, limit?: int|string}, array{year: mixed, team: int, sortby: mixed, limit: mixed} given.'
 			identifier: argument.type
 			count: 1
@@ -728,44 +566,8 @@ parameters:
 			path: modules/SeasonRosterChanges/index.php
 
 		-
-			rawMessage: 'Cannot call method isOlympics() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Standings/index.php
-
-		-
 			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'
 			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: modules/Standings/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Standings/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Standings\StandingsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Standings/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of static method League\OlympicsTeamFilter::getRealTeamIds() expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Standings/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class Season\Season constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Standings/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class Standings\StandingsRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
 			count: 1
 			path: modules/Standings/index.php
 
@@ -776,49 +578,7 @@ parameters:
 			path: modules/Standings/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #3 $authService of class Team\TeamController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #3 $leagueContext of class Team\TeamService constructor expects League\LeagueContext, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Team/index.php
@@ -860,43 +620,7 @@ parameters:
 			path: modules/TrainingCampRatingsDiff/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Voting\VotingBallotService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Voting\VotingController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Voting\VotingRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #7 $authService of class Voting\VotingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Voting/index.php

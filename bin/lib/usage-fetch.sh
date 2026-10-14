@@ -22,7 +22,6 @@ USAGE_FETCH_LOCK_STALE=15
 USAGE_FETCH_BACKOFF_BASE=30
 USAGE_FETCH_BACKOFF_CAP=480
 USAGE_FETCH_RETRY_AFTER_CAP=900
-USAGE_FETCH_SKIPLOG_EVERY=30
 # A 429 episode stays live until USAGE_FETCH_EPISODE_QUIET seconds pass with no 429.
 # 1800 = 2 x USAGE_FETCH_RETRY_AFTER_CAP: the longest armed wait plus as much again for caller cadence.
 USAGE_FETCH_EPISODE_QUIET=1800
@@ -105,6 +104,34 @@ _usage_log_rotate_locked() {
     local log="$1/usage-gate.log"
     [ "$(_usage_log_size "$log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
     mv -f "$log" "$log.1" 2>/dev/null
+    return 0
+}
+
+# usage_episode_start <name> <msg...>: logs <msg> once per episode of <name>.
+# The O_EXCL create (set -C) of episode-<name> lets exactly one concurrent caller log the open.
+# Always returns 0: a caller's control flow must never depend on whether this call logged.
+usage_episode_start() {
+    local f
+    f="$(usage_state_dir)/episode-$1"
+    shift
+    ( set -C; printf '%s\n' "$(date +%s)" > "$f" ) 2>/dev/null || return 0
+    usage_log "$@"
+    return 0
+}
+
+# usage_episode_end <name> <msg>: closes the open episode of <name> and logs "<msg> duration=<s>".
+# The rename claims the file, as in _usage_fetch_episode_end, so exactly one process logs the close.
+# Duration runs to this call, so an idle gap before the closing read is counted in it.
+usage_episode_end() {
+    local f a now
+    f="$(usage_state_dir)/episode-$1"
+    [ -f "$f" ] || return 0
+    mv "$f" "$f.end.$$" 2>/dev/null || return 0
+    read -r a < "$f.end.$$" 2>/dev/null
+    rm -f "$f.end.$$"
+    now=$(date +%s)
+    case "$a" in ''|*[!0-9]*) a=$now ;; esac
+    usage_log "$2 duration=$((now - a))"
     return 0
 }
 
@@ -427,10 +454,10 @@ usage_fetch() {
     fi
 
     if ! _usage_fetch_lock_acquire "$d"; then
-        _usage_fetch_log_once "$d/fetch-inflight.logged" "$((now / USAGE_FETCH_SKIPLOG_EVERY))" \
-            "fetch-skip reason=in-flight"
+        usage_episode_start fetch-inflight "fetch-skip reason=in-flight"
         _usage_fetch_serve_stale "$age" "$cache"; return $?
     fi
+    usage_episode_end fetch-inflight "in-flight episode end"
 
     # Re-check under the lock: a peer may have refreshed the cache or armed a backoff.
     age=$(usage_cache_age)

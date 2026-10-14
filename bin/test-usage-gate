@@ -2771,6 +2771,92 @@ test_usage_log_concurrent_writers() {
     assert_eq concurrent:no-seeds-in-new 0 "$(grep -cE "$SEED_RE" "$d/usage-gate.log")"
 }
 
+ep() { bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; $*"; }
+
+# hold_fetch_lock: a fresh fetch.lock.d (as test_fetch_fresh_lock_respected seeds it).
+hold_fetch_lock() {
+    mkdir "$IBL5_USAGE_GATE_STATE_DIR/fetch.lock.d"
+    printf '%s\n' "$(date +%s) 999999" > "$IBL5_USAGE_GATE_STATE_DIR/fetch.lock.d/at"
+}
+
+test_inflight_episode_once() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" i out rc
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    hold_fetch_lock
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    for i in 1 2 3; do
+        out=$(fetch_once 45); rc=$?
+        assert_eq "inflight_episode:rc.$i" 2 "$rc"
+        assert_eq "inflight_episode:stale.$i" 41.0 "$(util_of "$out")"
+    done
+    assert_eq inflight_episode:open-once 1 "$(log_re_count "${LOG_PFX}fetch-skip reason=in-flight\$")"
+    assert_file inflight_episode:state "$d/episode-fetch-inflight"
+    rm -rf "$d/fetch.lock.d"
+    out=$(fetch_once 45); rc=$?
+    assert_eq inflight_episode:rc-fresh 0 "$rc"
+    assert_eq inflight_episode:fresh 77.0 "$(util_of "$out")"
+    assert_eq inflight_episode:close-once 1 "$(log_re_count "${LOG_PFX}in-flight episode end duration=[0-9]+\$")"
+    assert_no_file inflight_episode:state-gone "$d/episode-fetch-inflight"
+    hold_fetch_lock
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    fetch_once 45 >/dev/null
+    assert_eq inflight_episode:rearm-open 2 "$(log_re_count "${LOG_PFX}fetch-skip reason=in-flight\$")"
+    assert_eq inflight_episode:rearm-close 1 "$(log_re_count "${LOG_PFX}in-flight episode end duration=[0-9]+\$")"
+}
+
+test_inflight_episode_concurrent_open() {
+    new_env
+    local i
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    hold_fetch_lock
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    fetch_parallel 6 45
+    for i in 1 2 3 4 5 6; do
+        assert_eq "inflight_concurrent:rc.$i" 2 "$(cat "$T/rc.$i")"
+    done
+    assert_eq inflight_concurrent:open-once 1 "$(log_re_count "${LOG_PFX}fetch-skip reason=in-flight\$")"
+    assert_eq inflight_concurrent:no-curl 0 "$(curl_calls "$STUB")"
+}
+
+test_episode_end_concurrent_once() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" i pids="" p
+    ep usage_episode_start probe probe-open
+    for i in 1 2 3 4 5 6; do
+        ep 'usage_episode_end probe "probe episode end"' &
+        pids="$pids $!"
+    done
+    for p in $pids; do wait "$p"; done
+    assert_eq episode_end_concurrent:close-once 1 "$(log_re_count "${LOG_PFX}probe episode end duration=[0-9]+\$")"
+    assert_eq episode_end_concurrent:no-leftovers 0 "$(find "$d" -maxdepth 1 -name 'episode-probe*' | wc -l | tr -d ' ')"
+}
+
+test_episode_end_without_open_silent() {
+    new_env
+    local rc
+    ep 'usage_episode_end probe "probe episode end"'; rc=$?
+    assert_eq episode_end_none:rc 0 "$rc"
+    assert_eq episode_end_none:silent 0 "$(log_re_count 'probe episode end')"
+}
+
+test_episode_end_empty_stamp() {
+    new_env
+    : > "$IBL5_USAGE_GATE_STATE_DIR/episode-probe"
+    ep 'usage_episode_end probe "probe episode end"'
+    assert_eq episode_end_empty:duration-zero 1 "$(log_re_count "${LOG_PFX}probe episode end duration=0\$")"
+}
+
+test_episode_refused_dir_silent() {
+    new_env
+    seed_home ""
+    local real out
+    real=$(real_default_dir)
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; unset IBL5_USAGE_GATE_STATE_DIR; usage_episode_start probe probe-open; echo \"s=\$?\"; usage_episode_end probe 'probe episode end'; echo \"e=\$?\"" 2>/dev/null)
+    assert_eq episode_refused:rcs "s=0 e=0" "$(printf '%s' "$out" | tr '\n' ' ' | sed 's/ $//')"
+    assert_no_file episode_refused:no-dir "$real"
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

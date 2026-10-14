@@ -3,7 +3,7 @@
 # (.claude/rules/phpunit-tests.md). Add an entry only with a comment naming
 # the property the source guard protects. One path per line.
 
-# ── Audited by backlog#1437: class (b), no behavior seam exists ─────────────
+# ── Audited by backlog#1437 / backlog#1451: class (b), no behavior seam exists ─
 # updateAllTheThings.php registers the QueueSimSummary step; the script requires mainfile.php with inline addStep calls, so there is no seam to execute
 ibl5/tests/Updater/QueueSimSummaryStepTest.php
 # CLI guard runs first, web gets 403, no SQL composed, sim is int-cast, no argv/env credential, no own DB connection, scripts/.htaccess denies web
@@ -18,35 +18,29 @@ ibl5/tests/WideUnit/Scripts/StoreSimRecapGuardTest.php
 ibl5/tests/WideUnit/Scripts/SimRecapQueueGuardTest.php
 # Discord::init receives the canonical host (Discord short-circuits under PHPUnit, so no behavior seam) and no hostname is hardcoded
 ibl5/tests/WideUnit/Scripts/StoreSimRecapHostSeamTest.php
-
-# ── Unaudited baseline, grandfathered by backlog#1451 ───────────────────────
-# grandfathered: unaudited baseline (backlog#1451)
-ibl5/tests/DepthChart/SavedDepthChartScriptTeamGuardLockTest.php
-# grandfathered: unaudited baseline (backlog#1451)
-ibl5/tests/Extension/ExtensionViewTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# team-lookup caller classes hold no raw ->prepare/->query/->real_query/->multi_query call text; absence of a call has no execution seam (mysqli-typed members are checked by reflection)
 ibl5/tests/Player/TeamLookupSqlLocalityTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# every HtmlSanitizer::trusted() argument in every classes/**/*View.php is a literal, a cast or $this->m(); token-scan twin of RequireTrustedAnnotationRule that survives PHPStan baseline regen, no execution seam
 ibl5/tests/Security/TrustedArgumentShapeTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# Trading submit guard (null, empty or Free Agents session team) precedes the offeringTeam binding; the refusal calls HtmxHelper::redirect(), which exits, so PHPUnit has no seam (e2e: trade-idor.spec.ts)
 ibl5/tests/Trading/TradingControllerSubmitOfferTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# Waivers controller collapses a Free Agents, null or empty session team to null before submit(); both outcomes exit via HtmxHelper::redirect(), so PHPUnit cannot observe the argument
 ibl5/tests/Waivers/WaiversControllerTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# bug-pipeline wrappers keep their PHPStan @var annotations after the bootstrap require and before first use, and claim-next.php keeps its empty-owner fallback; comment placement has no runtime seam
 ibl5/tests/WideUnit/Scripts/BugPipelineWrapperAnnotationWiringTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# CLI scripts keep their PHP_SAPI guard before the first require and their output/exit/SQL token fingerprint; top-level scripts need a live DB and files, no seam
 ibl5/tests/WideUnit/Scripts/CliScriptsBehaviorPinTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# engParser fopen() failure guard throws RuntimeException and never calls exit/die (exit 255 contract); the failure path is not inducible without a live DB, no seam
 ibl5/tests/WideUnit/Scripts/EngParserFopenGuardTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# ibl5/.htaccess canonical-domain RewriteCond whitelist (apex, www, localhost, main.localhost, loopback; ibl6 removed); Apache never reads it under AllowOverride None, so the file is the property
 ibl5/tests/WideUnit/Scripts/HtaccessCanonicalDomainGuardTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# importBoxscoresFromHtml get_result() failure throws uncaught (exit 255), the script has no catch and never calls exit/die; the failure path is not inducible, no seam
 ibl5/tests/WideUnit/Scripts/ImportBoxscoresResultGuardTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# patch_2007_asg_sco prepare()/get_result() failure guards throw inside the try (the catch exits 1) and never call exit/die; the failure paths are not inducible, no seam
 ibl5/tests/WideUnit/Scripts/PatchAsgNameLookupGuardTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# reconstruct_2007_asg_boxscores prepare()/get_result() failure guards throw inside the try (the catch exits 1) and never call exit/die; the failure paths are not inducible, no seam
 ibl5/tests/WideUnit/Scripts/ReconstructAsgNameLookupGuardTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# repo-root .htaccess legacy /modules.php to /ibl5/modules.php redirect rule (first match, same origin, no RewriteCond); Apache never reads it under AllowOverride None, so the file is the property
 ibl5/tests/WideUnit/Scripts/RootHtaccessLegacyModulesRedirectGuardTest.php
-# grandfathered: unaudited baseline (backlog#1451)
+# updateAllTheThings.php wires its guards above the try and SeasonRolloverRunner in the non-Olympics branch; the script requires mainfile.php at top level, so there is no seam (behavior: SeasonRolloverRunnerIntegrationTest)
 ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsRolloverWiringTest.php

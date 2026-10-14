@@ -119,10 +119,10 @@ class SeasonAveragesTest extends TestCase
     }
 
     /**
-     * Every key PlayerStats::fill() reads from an ibl_plr row. Values are strings, as mysqli returns them.
+     * Every key PlayerStats::fill() reads from an ibl_plr row. Stat values are strings, as mysqli returns them; pid and retired are ints, as the repository row carries them.
      *
-     * @param array<string, string> $overrides
-     * @return array<string, string>
+     * @param array<string, string|int> $overrides
+     * @return array<string, string|int>
      */
     private static function plrStatsRow(int $pid, array $overrides = []): array
     {
@@ -135,7 +135,7 @@ class SeasonAveragesTest extends TestCase
         ];
         $row = array_fill_keys($zeroKeys, '0');
         $row += [
-            'pid' => (string) $pid, 'name' => 'Row ' . $pid, 'pos' => 'G', 'retired' => '0',
+            'pid' => $pid, 'name' => 'Row ' . $pid, 'pos' => 'G', 'retired' => 0,
             'stats_gm' => '20', 'stats_gs' => '15', 'stats_min' => '640',
             'stats_fgm' => '140', 'stats_fga' => '300', 'stats_ftm' => '60', 'stats_fta' => '75',
             'stats_3gm' => '30', 'stats_3ga' => '80', 'stats_orb' => '25', 'stats_drb' => '95',
@@ -189,9 +189,9 @@ class SeasonAveragesTest extends TestCase
     private function makePlayerDb(bool $withFooterStats = true): MockDatabase
     {
         $db = $this->makeDb($withFooterStats ? [self::bothStatsRow(10)] : null, $withFooterStats ? [self::bothStatsRow(11)] : null, 2024);
-        $db->onQuery('FROM `ibl_plr` WHERE pid = 11 LIMIT 1', [self::plrStatsRow(11)]);
-        $db->onQuery('FROM `ibl_plr` WHERE pid = 12 LIMIT 1', [self::plrStatsRow(12, ['stats_gm' => '3', 'stats_gs' => '0', 'stats_min' => '41'])]);
-        $db->onQuery('FROM `ibl_plr` WHERE pid = 13 LIMIT 1', [self::plrStatsRow(13)]);
+        $db->onQuery('FROM ibl_plr WHERE pid = 11 LIMIT 1', [self::plrStatsRow(11)]);
+        $db->onQuery('FROM ibl_plr WHERE pid = 12 LIMIT 1', [self::plrStatsRow(12, ['stats_gm' => '3', 'stats_gs' => '0', 'stats_min' => '41'])]);
+        $db->onQuery('FROM ibl_plr WHERE pid = 13 LIMIT 1', [self::plrStatsRow(13)]);
 
         return $db;
     }

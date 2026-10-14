@@ -18,9 +18,11 @@ if (!preg_match('/modules\.php/i', $_SERVER['PHP_SELF'])) {
 
 // Get database connection from the global context
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext $leagueContext */
 
 // Ensure database connection is available
-if (!isset($mysqli_db) || !$mysqli_db) {
+if (!isset($mysqli_db)) {
     echo '<p>Error: Database connection not available.</p>';
     return;
 }

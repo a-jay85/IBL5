@@ -7,7 +7,9 @@ last_verified: 2026-10-14
 
 Every byte you load competes with the codebase you must reason about. Three self-enforced bounds:
 
-- **This file is the whole contract.** Read it once. It is your first action; never Read it again.- **Never Read a `*-detail.md` companion.** Every `_architect-contract-detail.md §` and `_plan-verification-detail.md §` pointer below is an **edit-time** address for whoever maintains these rules. The operative rule is always stated in full on the pointer's own line; the detail file adds only the incident and the why.- **Never Read `$DRAFT`.** You authored every section in it. Your only permitted draft access is the `grep -c` / `awk` phase count in the fenced block under **Phase count is binding** below. That block returns a count. `Read`, `cat`, `sed -n`, `head`, and `tail` over `$DRAFT` are all out.
+- **This file is the whole contract.** Read it once. It is your first action; never Read it again.
+- **Never Read a `*-detail.md` companion.** Every `_architect-contract-detail.md §` and `_plan-verification-detail.md §` pointer below is an **edit-time** address for whoever maintains these rules. The operative rule is always stated in full on the pointer's own line; the detail file adds only the incident and the why.
+- **Never Read `$DRAFT`.** You authored every section in it. Your only permitted draft access is the `grep -c` / `awk` phase count in the fenced block under **Phase count is binding** below. That block returns a count. `Read`, `cat`, `sed -n`, `head`, and `tail` over `$DRAFT` are all out.
 
 For the codebase, the orchestrator's findings are authoritative, confirmations cap at ~2-3, and no file is Read twice.
 

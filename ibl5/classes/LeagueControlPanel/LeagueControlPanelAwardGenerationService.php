@@ -81,7 +81,9 @@ class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwar
         // 1. Individual awards from votes (MVP, 6th Man, ROY — top 5 each)
         foreach (self::VOTE_AWARD_MAP as $voteTitle => $dbPrefix) {
             $voters = $votesByCategory[$voteTitle] ?? [];
-            $this->insertRankedAwards($year, $dbPrefix, $this->extractNames($voters, 5), $inserted, $skipped);
+            [$i, $s] = $this->insertRankedAwards($year, $dbPrefix, $this->extractNames($voters, 5));
+            $inserted += $i;
+            $skipped += $s;
         }
 
         // 2. GM of the Year from votes (top 1 → ibl_gm_awards)
@@ -98,7 +100,9 @@ class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwar
 
         // 3. DPOY from Leaders.htm (5 players)
         $dpoyNames = $leadersData['individual']['Defensive Player of the Year'] ?? [];
-        $this->insertRankedAwards($year, 'Defensive Player of the Year', $dpoyNames, $inserted, $skipped);
+        [$i, $s] = $this->insertRankedAwards($year, 'Defensive Player of the Year', $dpoyNames);
+        $inserted += $i;
+        $skipped += $s;
 
         // 4. Stat leaders from Leaders.htm (5 categories × 5 ranks)
         foreach ($leadersData['stat_leaders'] as $category => $leaders) {
@@ -106,30 +110,32 @@ class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwar
                 static fn (array $leader): string => $leader['name'],
                 $leaders
             );
-            $this->insertRankedAwards($year, $category, $names, $inserted, $skipped);
+            [$i, $s] = $this->insertRankedAwards($year, $category, $names);
+            $inserted += $i;
+            $skipped += $s;
         }
 
         // 5. All-League Teams (votes + JSB fill)
         $mvpVoters = $votesByCategory['Most Valuable Player'] ?? [];
-        $this->insertTeamAwards(
+        [$i, $s] = $this->insertTeamAwards(
             $year,
             $this->extractNames($mvpVoters, count($mvpVoters)),
             self::TEAM_FROM_VOTES['Most Valuable Player'],
             $leadersData['teams'],
-            $inserted,
-            $skipped,
         );
+        $inserted += $i;
+        $skipped += $s;
 
         // 6. All-Rookie Teams (votes + JSB fill)
         $royVoters = $votesByCategory['Rookie of the Year'] ?? [];
-        $this->insertTeamAwards(
+        [$i, $s] = $this->insertTeamAwards(
             $year,
             $this->extractNames($royVoters, count($royVoters)),
             self::TEAM_FROM_VOTES['Rookie of the Year'],
             $leadersData['teams'],
-            $inserted,
-            $skipped,
         );
+        $inserted += $i;
+        $skipped += $s;
 
         // 7. All-Defensive Teams (entirely from Leaders.htm)
         $defTeamNames = [
@@ -162,9 +168,12 @@ class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwar
      * Insert ranked individual awards (e.g., "MVP (1st)" through "(5th)").
      *
      * @param list<string> $names Player names in rank order
+     * @return array{0: int, 1: int} [inserted, skipped]
      */
-    private function insertRankedAwards(int $year, string $prefix, array $names, int &$inserted, int &$skipped): void
+    private function insertRankedAwards(int $year, string $prefix, array $names): array
     {
+        $inserted = 0;
+        $skipped = 0;
         $maxRanks = min(count($names), 5);
         for ($i = 0; $i < $maxRanks; $i++) {
             $awardName = $prefix . ' ' . self::RANK_SUFFIXES[$i];
@@ -175,6 +184,7 @@ class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwar
                 $skipped++;
             }
         }
+        return [$inserted, $skipped];
     }
 
     /**
@@ -183,15 +193,16 @@ class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwar
      * @param list<string> $voteGetters All vote-getters in ranked order
      * @param list<string> $teamNames DB team award names [1st, 2nd, 3rd]
      * @param array<string, list<string>> $jsbTeams Leaders.htm team data
+     * @return array{0: int, 1: int} [inserted, skipped]
      */
     private function insertTeamAwards(
         int $year,
         array $voteGetters,
         array $teamNames,
         array $jsbTeams,
-        int &$inserted,
-        int &$skipped,
-    ): void {
+    ): array {
+        $inserted = 0;
+        $skipped = 0;
         /** @var array<string, true> $assigned */
         $assigned = [];
         $teamSize = 5;
@@ -242,6 +253,7 @@ class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwar
                 }
             }
         }
+        return [$inserted, $skipped];
     }
 
     /**

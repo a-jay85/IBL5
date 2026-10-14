@@ -1231,6 +1231,36 @@ class BoxscoreProcessorTest extends TestCase
         self::assertSame([1, 2, 3], $spy->counts);
     }
 
+    public function testWindowTallyExcludesGamesOnWindowBoundaryDates(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        // Games dated exactly on the window's first and last day are inside it.
+        $scoFile = $this->buildScoFileWithGames([
+            $this->gameInfoLineForGame('2008-01-10', 1, 1, 2, 2008),
+            $this->gameInfoLineForGame('2008-03-20', 1, 1, 2, 2008),
+        ]);
+        $data = file_get_contents($scoFile);
+        self::assertNotFalse($data);
+
+        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub);
+        $processor->guardOverride = $this->makeGuardWithScheduleDates('2008-01-10', '2008-03-20');
+
+        $result = $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: true);
+
+        self::assertSame(0, $result['gamesRejected']);
+        self::assertSame(2, $result['gamesInserted']);
+        self::assertSame(0, $result['outOfWindowGames'] ?? null);
+        foreach ($result['messages'] as $msg) {
+            self::assertStringNotContainsString('outside the 2008 schedule window', $msg);
+        }
+    }
+
     // --- ProgressReporter seam tests ---
 
     public function testProcessorUsesInjectedProgressReporterAndDoesNotFlushOnNoOp(): void

@@ -115,6 +115,24 @@ class TradeOfferFormViewTest extends TestCase
         $this->assertGolden(__DIR__ . '/fixtures/trade-offer-form-populated.golden.html', $html);
     }
 
+    public function testResultOnlyBannerMatchesGolden(): void
+    {
+        // The populated golden sets both fields, so AlertRenderer::fromCode returns the
+        // error banner early. Only error=null reaches the result-code branch.
+        $pageData = $this->createPopulatedTradeOfferPageData();
+        $pageData['result'] = 'already_processed';
+        $pageData['error'] = null;
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $formStart = strpos($html, '<form name="Trade_Offer"');
+        $this->assertNotFalse($formStart);
+        $banner = substr($html, 0, $formStart);
+        $this->assertStringNotContainsString('ibl-alert--error', $html);
+        $this->assertSame(1, substr_count($html, 'class="ibl-alert '));
+        $this->assertGolden(__DIR__ . '/fixtures/trade-offer-form-result-banner.golden.html', $banner);
+    }
+
     public function testCsrfInputRendersExactlyOnceDirectlyAfterFormOpen(): void
     {
         $html = $this->view->renderTradeOfferForm($this->createPopulatedTradeOfferPageData());

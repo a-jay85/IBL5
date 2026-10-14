@@ -242,7 +242,7 @@ class LastSimRecapServiceTest extends TestCase
         self::assertSame(100, $game->yourScore);
         self::assertSame(90, $game->oppScore);
         self::assertSame(10, $game->margin);
-        self::assertSame([-5, -5, -5, -5], $game->margins);
+        self::assertSame([-5,-5,-5,-5], $game->margins);
         self::assertSame(['Q1', 'Q2', 'Q3', 'Q4'], $game->qLabels);
         self::assertFalse($game->ot);
         self::assertSame(2, $game->oppTid);
@@ -265,7 +265,7 @@ class LastSimRecapServiceTest extends TestCase
         ));
 
         self::assertFalse($game->home);
-        self::assertSame([5, 5, 5, 5], $game->margins);
+        self::assertSame([5,5,5,5], $game->margins);
         self::assertSame(8, $game->oppPreWins);
         self::assertSame(7, $game->oppPreLosses);
         self::assertSame(1, $game->gameOfThatDay);
@@ -398,6 +398,8 @@ class LastSimRecapServiceTest extends TestCase
             ],
             $calls->getArrayCopy(),
         );
+        // Swapped (tid, schedId) args would record this tag instead.
+        self::assertNotContains('boxScores:1|822', $calls->getArrayCopy());
     }
 
     public function testPartialLastSimMapIsUsedWholeWithoutPerPositionMerge(): void
@@ -453,6 +455,7 @@ class LastSimRecapServiceTest extends TestCase
 
     public function testBoxScoreDnpPositionYieldsEmptyStarterWithoutLineLookup(): void
     {
+        // The seeded 0|sched line ('0|832') must never be read for pid 0.
         $game = $this->onlyGame($this->buildRepo(
             games: [$this->makeGameRow(schedId: 832, date: '2030-09-01', visitor: 1, vScore: 100, home: 2, hScore: 90)],
             quarterLines: [832 => $this->makeLines()],

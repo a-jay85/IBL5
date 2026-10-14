@@ -75,37 +75,85 @@ class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwar
             $votesByCategory[$category['title']] = $category['rows'];
         }
 
+        /** @var list<array{0: int, 1: int}> $counts */
+        $counts = [];
+        $counts[] = $this->insertVoteAwards($year, $votesByCategory);
+        $counts[] = $this->insertGmOfTheYear($year, $votesByCategory);
+        $counts[] = $this->insertDefensivePlayerOfTheYear($year, $leadersData['individual']);
+        $counts[] = $this->insertStatLeaders($year, $leadersData['stat_leaders']);
+        $counts[] = $this->insertAllLeagueTeams($year, $votesByCategory, $leadersData['teams']);
+        $counts[] = $this->insertAllRookieTeams($year, $votesByCategory, $leadersData['teams']);
+        $counts[] = $this->insertAllDefensiveTeams($year, $leadersData['teams']);
+
+        $inserted = array_sum(array_column($counts, 0));
+        $skipped = array_sum(array_column($counts, 1));
+        $total = $inserted + $skipped;
+        return [
+            'success' => true,
+            'message' => "Season awards generated: {$inserted} inserted, {$skipped} already existed. Total: {$total}.",
+            'inserted' => $inserted,
+            'skipped' => $skipped,
+        ];
+    }
+
+    /**
+     * Step 1: individual awards from votes (MVP, 6th Man, ROY, top 5 each).
+     *
+     * @param array<string, list<array{name: string, votes: int, pid: int}>> $votesByCategory
+     * @return array{0: int, 1: int} [inserted, skipped]
+     */
+    private function insertVoteAwards(int $year, array $votesByCategory): array
+    {
         $inserted = 0;
         $skipped = 0;
-
-        // 1. Individual awards from votes (MVP, 6th Man, ROY — top 5 each)
         foreach (self::VOTE_AWARD_MAP as $voteTitle => $dbPrefix) {
             $voters = $votesByCategory[$voteTitle] ?? [];
             [$i, $s] = $this->insertRankedAwards($year, $dbPrefix, $this->extractNames($voters, 5));
             $inserted += $i;
             $skipped += $s;
         }
+        return [$inserted, $skipped];
+    }
 
-        // 2. GM of the Year from votes (top 1 → ibl_gm_awards)
+    /**
+     * Step 2: GM of the Year from votes (top 1 into ibl_gm_awards).
+     *
+     * @param array<string, list<array{name: string, votes: int, pid: int}>> $votesByCategory
+     * @return array{0: int, 1: int} [inserted, skipped]
+     */
+    private function insertGmOfTheYear(int $year, array $votesByCategory): array
+    {
         $gmVoters = $votesByCategory['GM of the Year'] ?? [];
-        if ($gmVoters !== []) {
-            $gmName = VotingResultsService::extractPlayerName($gmVoters[0]['name']);
-            $affected = $this->repository->upsertGmAward($year, $gmName);
-            if ($affected === 1) {
-                $inserted++;
-            } else {
-                $skipped++;
-            }
+        if ($gmVoters === []) {
+            return [0, 0];
         }
+        $gmName = VotingResultsService::extractPlayerName($gmVoters[0]['name']);
+        $affected = $this->repository->upsertGmAward($year, $gmName);
+        return $affected === 1 ? [1, 0] : [0, 1];
+    }
 
-        // 3. DPOY from Leaders.htm (5 players)
-        $dpoyNames = $leadersData['individual']['Defensive Player of the Year'] ?? [];
-        [$i, $s] = $this->insertRankedAwards($year, 'Defensive Player of the Year', $dpoyNames);
-        $inserted += $i;
-        $skipped += $s;
+    /**
+     * Step 3: Defensive Player of the Year from Leaders.htm (5 players).
+     *
+     * @param array<string, list<string>> $individual
+     * @return array{0: int, 1: int} [inserted, skipped]
+     */
+    private function insertDefensivePlayerOfTheYear(int $year, array $individual): array
+    {
+        return $this->insertRankedAwards($year, 'Defensive Player of the Year', $individual['Defensive Player of the Year'] ?? []);
+    }
 
-        // 4. Stat leaders from Leaders.htm (5 categories × 5 ranks)
-        foreach ($leadersData['stat_leaders'] as $category => $leaders) {
+    /**
+     * Step 4: stat leaders from Leaders.htm (5 categories x 5 ranks).
+     *
+     * @param array<string, list<array{name: string, stat: string}>> $statLeaders
+     * @return array{0: int, 1: int} [inserted, skipped]
+     */
+    private function insertStatLeaders(int $year, array $statLeaders): array
+    {
+        $inserted = 0;
+        $skipped = 0;
+        foreach ($statLeaders as $category => $leaders) {
             $names = array_map(
                 static fn (array $leader): string => $leader['name'],
                 $leaders
@@ -114,37 +162,62 @@ class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwar
             $inserted += $i;
             $skipped += $s;
         }
+        return [$inserted, $skipped];
+    }
 
-        // 5. All-League Teams (votes + JSB fill)
+    /**
+     * Step 5: All-League Teams (votes + JSB fill).
+     *
+     * @param array<string, list<array{name: string, votes: int, pid: int}>> $votesByCategory
+     * @param array<string, list<string>> $jsbTeams
+     * @return array{0: int, 1: int} [inserted, skipped]
+     */
+    private function insertAllLeagueTeams(int $year, array $votesByCategory, array $jsbTeams): array
+    {
         $mvpVoters = $votesByCategory['Most Valuable Player'] ?? [];
-        [$i, $s] = $this->insertTeamAwards(
+        return $this->insertTeamAwards(
             $year,
             $this->extractNames($mvpVoters, count($mvpVoters)),
             self::TEAM_FROM_VOTES['Most Valuable Player'],
-            $leadersData['teams'],
+            $jsbTeams,
         );
-        $inserted += $i;
-        $skipped += $s;
+    }
 
-        // 6. All-Rookie Teams (votes + JSB fill)
+    /**
+     * Step 6: All-Rookie Teams (votes + JSB fill).
+     *
+     * @param array<string, list<array{name: string, votes: int, pid: int}>> $votesByCategory
+     * @param array<string, list<string>> $jsbTeams
+     * @return array{0: int, 1: int} [inserted, skipped]
+     */
+    private function insertAllRookieTeams(int $year, array $votesByCategory, array $jsbTeams): array
+    {
         $royVoters = $votesByCategory['Rookie of the Year'] ?? [];
-        [$i, $s] = $this->insertTeamAwards(
+        return $this->insertTeamAwards(
             $year,
             $this->extractNames($royVoters, count($royVoters)),
             self::TEAM_FROM_VOTES['Rookie of the Year'],
-            $leadersData['teams'],
+            $jsbTeams,
         );
-        $inserted += $i;
-        $skipped += $s;
+    }
 
-        // 7. All-Defensive Teams (entirely from Leaders.htm)
+    /**
+     * Step 7: All-Defensive Teams (entirely from Leaders.htm).
+     *
+     * @param array<string, list<string>> $jsbTeams
+     * @return array{0: int, 1: int} [inserted, skipped]
+     */
+    private function insertAllDefensiveTeams(int $year, array $jsbTeams): array
+    {
+        $inserted = 0;
+        $skipped = 0;
         $defTeamNames = [
             'All-Defensive Team (1st)',
             'All-Defensive Team (2nd)',
             'All-Defensive Team (3rd)',
         ];
         foreach ($defTeamNames as $teamName) {
-            $players = $leadersData['teams'][$teamName] ?? [];
+            $players = $jsbTeams[$teamName] ?? [];
             foreach ($players as $name) {
                 $affected = $this->repository->upsertAward($year, $teamName, $name);
                 if ($affected === 1) {
@@ -154,14 +227,7 @@ class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwar
                 }
             }
         }
-
-        $total = $inserted + $skipped;
-        return [
-            'success' => true,
-            'message' => "Season awards generated: {$inserted} inserted, {$skipped} already existed. Total: {$total}.",
-            'inserted' => $inserted,
-            'skipped' => $skipped,
-        ];
+        return [$inserted, $skipped];
     }
 
     /**

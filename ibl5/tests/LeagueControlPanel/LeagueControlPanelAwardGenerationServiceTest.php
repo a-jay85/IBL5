@@ -715,6 +715,29 @@ class LeagueControlPanelAwardGenerationServiceTest extends TestCase
         $this->assertTrue($result['success']);
     }
 
+    public function testEmptyVoteCategoriesReportZeroInsertedWhenAllAwardsExist(): void
+    {
+        $this->stubVotingService->method('getEndOfYearResults')->willReturn([
+            ['title' => 'Most Valuable Player', 'rows' => []],
+            ['title' => 'Sixth Man of the Year', 'rows' => []],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            ['title' => 'GM of the Year', 'rows' => []],
+        ]);
+
+        $awardCalls = 0;
+        $this->stubRepository->method('upsertAward')
+            ->willReturnCallback(function () use (&$awardCalls): int {
+                $awardCalls++;
+                return 2;
+            });
+
+        $leadersPath = $this->writeMinimalLeadersHtm();
+        $result = $this->service->generateSeasonAwards(2025, $leadersPath);
+
+        $this->assertSame(0, $result['inserted']);
+        $this->assertSame($awardCalls, $result['skipped']);
+    }
+
     /**
      * Write a minimal Leaders.htm with all required sections (empty players).
      */

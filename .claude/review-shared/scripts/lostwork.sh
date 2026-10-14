@@ -188,7 +188,9 @@ check_entry() {
     [ "$rc" -le 1 ] || { lost "could not compare deleted lines of $OLDP"; return 0; }
     # Second exemption, one key, one file: a deleted line of ibl5/phpstan-baseline.neon
     # whose block names a `path:` absent from the HEAD tree (git cat-file -e
-    # HEAD:ibl5/<path>) is not lost; the ignore entry has nothing left to ignore. Both
+    # HEAD:ibl5/<path>) is not lost; the ignore entry has nothing left to ignore. The
+    # `ibl5/` prefix is load-bearing: a bare `HEAD:$p` is always absent and would exempt
+    # every block. Both
     # copies must parse (lw_neon) or the file stays fully strict. Blocks for absent paths
     # are removed from both copies before counting, and each deleted line is charged to
     # the dead blocks' own lines first, so a `count: 1` shared with a dead block is not

@@ -19,9 +19,10 @@ if (!defined('MODULE_FILE')) {
 
 global $db, $user, $authService;
 /** @var \Auth\Contracts\AuthServiceInterface $authService */
+$nukeCompat = \Module\ModuleServices::current()->nukeCompat();
 
-if (!is_user($user)) {
-    loginbox();
+if (!$nukeCompat->isUser($user)) {
+    $nukeCompat->loginBox();
 } else {
     $factory = \Module\ModuleServices::current()->factory(\Module\Factories\NextSimFactory::class);
     $commonRepository = $factory->teamIdentity();

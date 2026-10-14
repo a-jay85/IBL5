@@ -41,6 +41,8 @@ $offset = 10;
 $max = $min + $offset;
 
 global $prefix, $user_prefix, $module_name, $articlecomm;
+/** @var string $prefix */
+/** @var string $module_name */
 
 // Redirect if query is too short
 if ($preset === '' && $query !== '' && strlen($query) < 3) {

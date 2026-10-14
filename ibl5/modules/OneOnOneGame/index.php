@@ -29,9 +29,11 @@ oneonone();
 function oneonone(): void
 {
     global $user, $authService;
+    /** @var \Auth\Contracts\AuthServiceInterface $authService */
 
     PageLayout\PageLayout::header();
-    cookiedecode($user);
+    $nukeCompat = \Module\ModuleServices::current()->nukeCompat();
+    $nukeCompat->cookieDecode($user);
 
     $ownerplaying = $authService->getUsername() ?? '';
 

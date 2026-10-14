@@ -204,6 +204,37 @@ class ScheduleUpdaterTest extends TestCase
         return $root;
     }
 
+    /** Create a temp dir with ibl/<league>/Schedule.htm containing $html. Returns the root path. */
+    private function makeScheduleHtmForLeague(string $league, string $html): string
+    {
+        $root = sys_get_temp_dir() . '/' . uniqid('sch_test_', true);
+        mkdir($root . '/ibl/' . $league, 0777, true);
+        file_put_contents($root . '/ibl/' . $league . '/Schedule.htm', $html);
+        $this->tempDirs[] = $root;
+        return $root;
+    }
+
+    /**
+     * Run the playoff import against a basePath whose Schedule.htm exists but cannot be
+     * opened. The E_WARNING file_get_contents() emits on open failure is swallowed for the
+     * duration of the call so PHPUnit 13 does not record it as an issue.
+     */
+    private function runAgainstUnreadableScheduleHtm(TestableScheduleUpdater $updater): string
+    {
+        set_error_handler(static fn (): bool => true, E_WARNING);
+        try {
+            return $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+        } finally {
+            restore_error_handler();
+        }
+    }
+
+    private function registerUnreadableWrapper(): string
+    {
+        stream_wrapper_register(UnreadableScheduleHtmStreamWrapper::SCHEME, UnreadableScheduleHtmStreamWrapper::class);
+        return UnreadableScheduleHtmStreamWrapper::SCHEME . '://root';
+    }
+
     public function testUpdateWrapsRebuildInCommittedTransaction(): void
     {
         $updater = $this->createUpdaterForFullRun(
@@ -667,6 +698,288 @@ class ScheduleUpdaterTest extends TestCase
         $this->assertCount(0, $inserts, 'an empty bracket inserts nothing');
         $this->assertStringNotContainsString('Skipped', $log, 'no rows means nothing was skipped');
     }
+
+    // -------------------------------------------------------------------------
+    // Characterization pins for the branches the tests above leave unobserved
+    // -------------------------------------------------------------------------
+
+    public function testPlayoffRowWithUnparseableDateIsSkippedSilently(): void
+    {
+        $html = "<table>\n<tr><th>Post 32 2025</th></tr>\n"
+            . '<tr><td><a href="t1.htm">Metros</a></td><td></td><td><a href="t2.htm">Stars</a></td><td></td></tr>'
+            . "\n</table>";
+        $basePath = $this->makeScheduleHtm($html);
+
+        $logger = self::createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->never())->method('warning');
+
+        $updater = $this->createUpdater('Regular Season', 2025, false, null, $basePath, $logger);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+        $this->mockDb->clearQueries();
+
+        $log = $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $inserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_schedule'));
+
+        $this->assertCount(0, $inserts, 'a row whose date cannot be parsed is not inserted');
+        $this->assertSame('', $log, 'an unparseable date is skipped without any log line');
+    }
+
+    public function testPlayoffGameWithUnknownTeamIsLoggedAndSkipped(): void
+    {
+        $html = $this->playoffHtml(2025, [
+            ['visitor' => 'Nobody', 'home' => 'Stars', 'played' => false],
+            ['visitor' => 'Metros', 'home' => 'Stars', 'played' => false],
+        ]);
+        $basePath = $this->makeScheduleHtm($html);
+
+        $updater = $this->createUpdater('Regular Season', 2025, false, null, $basePath);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+        $this->mockDb->clearQueries();
+
+        $log = $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $inserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_schedule'));
+
+        $this->assertCount(1, $inserts);
+        $this->assertSame(
+            "Unknown team in playoff game: Nobody @ Stars<br>Inserted playoff game: Metros @ Stars on 2025-6-1<br>",
+            $log,
+        );
+    }
+
+    public function testOlympicsPlayoffGameWithFillerTeamIsSkippedSilently(): void
+    {
+        $this->mockDb->setMockData([
+            ['team_name' => 'Eagles', 'teamid' => 1, 'is_real_team' => 1],
+            ['team_name' => 'Maple', 'teamid' => 2, 'is_real_team' => 1],
+            ['team_name' => 'Filler29', 'teamid' => 29, 'is_real_team' => 0],
+        ]);
+        $html = $this->playoffHtml(2025, [
+            ['visitor' => 'Filler29', 'home' => 'Eagles', 'played' => false],
+            ['visitor' => 'Eagles', 'home' => 'Maple', 'played' => false],
+        ]);
+        $basePath = $this->makeScheduleHtmForLeague('olympics', $html);
+
+        $updater = $this->createUpdater('Regular Season', 2025, true, null, $basePath);
+        $updater->exposedPreloadTeamNameMap();
+        $this->mockDb->clearQueries();
+
+        $log = $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $inserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_olympics_schedule') || str_contains($q, 'INSERT INTO ibl_schedule'));
+
+        $this->assertCount(1, $inserts, 'only the row between real teams is inserted');
+        $this->assertSame(1, substr_count($log, 'Inserted playoff game: Eagles @ Maple'));
+        $this->assertStringNotContainsString('Filler29', $log);
+        $this->assertStringNotContainsString('Unknown team', $log);
+    }
+
+    public function testPlayedPlayoffGameWithoutBoxLinkUsesUnplayedBoxId(): void
+    {
+        // The visitor score links to game1.htm, not boxN.htm, so no box id is parsed.
+        $html = "<table>\n<tr><th>Post 2 2025</th></tr>\n"
+            . '<tr><td><a href="t1.htm">Metros</a></td><td><a href="game1.htm">101</a></td>'
+            . '<td><a href="t2.htm">Stars</a></td><td><a href="game2.htm">95</a></td></tr>'
+            . "\n</table>";
+        $basePath = $this->makeScheduleHtm($html);
+
+        $updater = $this->createUpdater('Playoffs', 2025, false, null, $basePath);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+        $this->mockDb->clearQueries();
+
+        $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $inserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_schedule'));
+
+        $this->assertCount(1, $inserts);
+        $bound = $this->mockDb->getLastBoundParams();
+        $this->assertSame(100000, $bound[1], 'a played row with no box link falls back to UNPLAYED_BOX_ID');
+        $this->assertSame(101, $bound[4]);
+        $this->assertSame(95, $bound[6]);
+    }
+
+    public function testUnreadableScheduleHtmReturnsGracefulMessageOutsidePlayoffs(): void
+    {
+        $basePath = $this->registerUnreadableWrapper();
+
+        $logger = self::createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('warning')
+            ->with(
+                self::stringContains('Schedule.htm'),
+                self::callback(static fn (array $context): bool => $context['path'] === $basePath . '/ibl/IBL/Schedule.htm'
+                    && $context['reason'] === 'unreadable'
+                    && $context['league'] === 'IBL'
+                    && $context['season_phase'] === 'Regular Season'
+                    && $context['season_ending_year'] === 2025),
+            );
+
+        $updater = $this->createUpdater('Regular Season', 2025, false, null, $basePath, $logger);
+        $this->mockDb->clearQueries();
+
+        try {
+            $log = $this->runAgainstUnreadableScheduleHtm($updater);
+        } finally {
+            stream_wrapper_unregister(UnreadableScheduleHtmStreamWrapper::SCHEME);
+        }
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $inserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_schedule'));
+
+        $this->assertSame("Failed to read Schedule.htm — skipping playoff games<br>", $log);
+        $this->assertCount(0, $inserts);
+    }
+
+    public function testUnreadableScheduleHtmThrowsDuringPlayoffs(): void
+    {
+        $basePath = $this->registerUnreadableWrapper();
+
+        $logger = self::createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('warning');
+
+        $updater = $this->createUpdater('Playoffs', 2025, false, null, $basePath, $logger);
+        $this->mockDb->clearQueries();
+
+        try {
+            $this->runAgainstUnreadableScheduleHtm($updater);
+            self::fail('an unreadable Schedule.htm during Playoffs must throw');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Failed to read Schedule.htm at', $e->getMessage());
+            $this->assertStringContainsString('Playoffs phase', $e->getMessage());
+        } finally {
+            stream_wrapper_unregister(UnreadableScheduleHtmStreamWrapper::SCHEME);
+        }
+    }
+
+    public function testStaleRowsLogWarningWithFileYearsOutsidePlayoffs(): void
+    {
+        $html = $this->playoffHtml(2007, [
+            ['visitor' => 'Metros', 'home' => 'Stars', 'played' => true, 'box_id' => 6001],
+            ['visitor' => 'Stars', 'home' => 'Metros', 'played' => false],
+        ]);
+        $basePath = $this->makeScheduleHtm($html);
+
+        $logger = self::createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('warning')
+            ->with(
+                'ScheduleUpdater skipped stale playoff rows',
+                self::callback(static fn (array $context): bool => $context['skipped'] === 2
+                    && $context['file_years'] === [2007]
+                    && $context['season_ending_year'] === 2008),
+            );
+
+        $updater = $this->createUpdater('Regular Season', 2008, false, null, $basePath, $logger);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+        $this->mockDb->clearQueries();
+
+        $log = $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+
+        $this->assertSame(
+            "Skipped 2 stale playoff row(s) from Schedule.htm year(s) 2007 — current season ending year is 2008<br>",
+            $log,
+        );
+    }
+
+    public function testInsertBindsPlayoffRowValuesInColumnOrder(): void
+    {
+        // The parser reads a score only from inside a link, so the home score is linked too.
+        $html = "<table>\n<tr><th>Post 1 2025</th></tr>\n"
+            . '<tr><td><a href="t1.htm">Metros</a></td><td><a href="box6001.htm">101</a></td>'
+            . '<td><a href="t2.htm">Stars</a></td><td><a href="game2.htm">95</a></td></tr>'
+            . "\n</table>";
+        $basePath = $this->makeScheduleHtm($html);
+
+        $updater = $this->createUpdater('Playoffs', 2025, false, null, $basePath);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+        $this->mockDb->clearQueries();
+
+        $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+
+        // season_year, box_id, game_date, visitor_teamid, visitor_score, home_teamid, home_score
+        $bound = $this->mockDb->getLastBoundParams();
+        $this->assertCount(8, $bound);
+        $this->assertSame([2025, 6001, '2025-6-1', 1, 101, 2, 95], array_slice($bound, 0, 7));
+        $this->assertIsString($bound[7]);
+        $this->assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $bound[7]);
+
+        $prepared = array_values(array_filter(
+            $this->mockDb->getPreparedQueries(),
+            static fn (string $q): bool => str_contains($q, 'INSERT INTO `ibl_schedule`'),
+        ));
+        $this->assertCount(1, $prepared);
+        $this->assertStringContainsString('VALUES (?, ?, ?, ?, ?, ?, ?, ?)', $prepared[0]);
+        $this->assertStringNotContainsString('6001', $prepared[0], 'no value may reach the SQL text');
+    }
+
+    public function testUnplayedPlayoffRowBindsZeroScoresAndUnplayedBoxId(): void
+    {
+        $html = $this->playoffHtml(2025, [
+            ['visitor' => 'Stars', 'home' => 'Metros', 'played' => false],
+        ]);
+        $basePath = $this->makeScheduleHtm($html);
+
+        $updater = $this->createUpdater('Playoffs', 2025, false, null, $basePath);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+        $this->mockDb->clearQueries();
+
+        $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+
+        $this->assertSame(
+            [2025, 100000, '2025-6-1', 2, 0, 1, 0],
+            array_slice($this->mockDb->getLastBoundParams(), 0, 7),
+        );
+    }
+
+    public function testMissingScheduleHtmWarnsBeforeThrowingDuringPlayoffs(): void
+    {
+        $basePath = $this->makeRootWithoutScheduleHtm('sch_missing_order_');
+
+        $logger = self::createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('warning');
+
+        $updater = $this->createUpdater('Playoffs', 2025, false, null, $basePath, $logger);
+        $this->mockDb->clearQueries();
+
+        try {
+            $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+            self::fail('a missing Schedule.htm during Playoffs must throw');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Schedule.htm not found at', $e->getMessage());
+        }
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $inserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_schedule'));
+        $this->assertCount(0, $inserts);
+    }
+
+    public function testStaleSummaryIsAppendedAfterInsertLines(): void
+    {
+        $current = $this->playoffHtml(2008, [
+            ['visitor' => 'Metros', 'home' => 'Stars', 'played' => true, 'box_id' => 6001],
+        ]);
+        $stale = $this->playoffHtml(2007, [
+            ['visitor' => 'Stars', 'home' => 'Metros', 'played' => false],
+        ]);
+        $basePath = $this->makeScheduleHtm($current . "\n" . $stale);
+
+        $updater = $this->createUpdater('Playoffs', 2008, false, null, $basePath);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+        $this->mockDb->clearQueries();
+
+        $log = $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+
+        $this->assertSame(
+            "Inserted playoff game: Metros @ Stars on 2008-6-1<br>"
+            . "Skipped 1 stale playoff row(s) from Schedule.htm year(s) 2007 — current season ending year is 2008<br>",
+            $log,
+        );
+    }
 }
 
 /**
@@ -708,5 +1021,28 @@ class TestableScheduleUpdater extends \Updater\ScheduleUpdater
     {
         $prop = new \ReflectionProperty(parent::class, 'teamNameToIdMap');
         $prop->setValue($this, $map);
+    }
+}
+
+/**
+ * Stream wrapper whose files exist (url_stat succeeds) but cannot be opened
+ * (stream_open fails), so file_get_contents() returns false deterministically.
+ */
+final class UnreadableScheduleHtmStreamWrapper
+{
+    public const SCHEME = 'schunreadable';
+
+    /** @var resource|null */
+    public $context;
+
+    /** @return array<string, int> */
+    public function url_stat(string $path, int $flags): array
+    {
+        return ['mode' => 0100644, 'size' => 1];
+    }
+
+    public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
+    {
+        return false;
     }
 }

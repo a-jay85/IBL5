@@ -8,6 +8,10 @@ if (!defined('MODULE_FILE')) {
 
 $module_name = basename(dirname(__FILE__));
 
+global $authService, $user;
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
+$nukeCompat = \Module\ModuleServices::current()->nukeCompat();
+
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
 // inputs are now read from $_REQUEST explicitly here.
@@ -20,13 +24,18 @@ if ($username !== '' && preg_match('/[^a-zA-Z0-9_-]/', $username) === 1) {
     die("Illegal username...");
 }
 
+$siteUrl = is_string($nukeurl ?? null) ? $nukeurl : '';
+$siteName = is_string($sitename ?? null) ? $sitename : '';
+$adminMail = is_string($adminmail ?? null) ? $adminmail : '';
+$minPasswordLength = is_numeric($minpass ?? null) ? (int) $minpass : 5;
+
 // Wire dependencies
 $factory = \Module\ModuleServices::current()->factory(\Module\Factories\YourAccountFactory::class);
 $service = $factory->service(
-    (string) ($nukeurl ?? ''),
-    (string) ($sitename ?? ''),
-    (string) ($adminmail ?? ''),
-    (int) ($minpass ?? 5),
+    $siteUrl,
+    $siteName,
+    $adminMail,
+    $minPasswordLength,
 );
 $accountView = $factory->view();
 
@@ -59,7 +68,8 @@ switch ($op) {
             $_SESSION['redirect_after_login'] = $redirectQuery;
         }
         $rememberMe = isset($_POST['remember_me']) && $_POST['remember_me'] === '1';
-        $result = $service->attemptLogin($loginUsername, $loginPassword, $rememberMe, $_SERVER['REMOTE_ADDR']);
+        $clientIp = is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : '';
+        $result = $service->attemptLogin($loginUsername, $loginPassword, $rememberMe, $clientIp);
         if ($result['success']) {
             $redirectUrl = buildRedirectUrl() ?? $service->getTeamRedirectUrl($loginUsername) ?? 'index.php';
             header('Location: ' . $redirectUrl);
@@ -88,7 +98,7 @@ switch ($op) {
         PageLayout\PageLayout::header();
         if ($result['success']) {
             \EventLog\EventLogger::setAction('user_registered');
-            echo $accountView->renderRegistrationCompletePage((string) ($sitename ?? ''));
+            echo $accountView->renderRegistrationCompletePage($siteName);
         } else {
             echo $accountView->renderRegistrationErrorPage((string) $result['error']);
         }
@@ -131,7 +141,7 @@ switch ($op) {
         break;
 
     case 'pass_lost':
-        if (is_user($user)) {
+        if ($nukeCompat->isUser($user)) {
             $redirectUrl = $service->getTeamRedirectUrl($authService->getUsername() ?? '');
             header('Location: ' . ($redirectUrl ?? 'index.php'));
             exit;
@@ -142,7 +152,7 @@ switch ($op) {
         break;
 
     case 'new_user':
-        if (is_user($user)) {
+        if ($nukeCompat->isUser($user)) {
             $redirectUrl = $service->getTeamRedirectUrl($authService->getUsername() ?? '');
             header('Location: ' . ($redirectUrl ?? 'index.php'));
             exit;
@@ -187,7 +197,7 @@ switch ($op) {
         break;
 
     case 'reset_password':
-        if (is_user($user)) {
+        if ($nukeCompat->isUser($user)) {
             header("Location: modules.php?name={$module_name}");
             die();
         }
@@ -203,7 +213,7 @@ switch ($op) {
         break;
 
     default:
-        if (!is_user($user)) {
+        if (!$nukeCompat->isUser($user)) {
             PageLayout\PageLayout::header();
             $errorMessage = null;
             if (isset($_SESSION['login_error']) && is_string($_SESSION['login_error'])) {
@@ -215,7 +225,7 @@ switch ($op) {
             echo $accountView->renderLoginPage($errorMessage);
             PageLayout\PageLayout::footer();
         } else {
-            cookiedecode($user);
+            $nukeCompat->cookieDecode($user);
             $redirectUrl = $service->getTeamRedirectUrl($authService->getUsername() ?? '');
             header('Location: ' . ($redirectUrl ?? 'index.php'));
             exit;

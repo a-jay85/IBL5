@@ -44,9 +44,9 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
      */
     private const GATED_BEFORE_WIRING = [
         'LeagueControlPanel' => ['->isAuthenticated(', '->isAdmin('],
-        'NextSim' => ['loginbox('],
+        'NextSim' => ['->loginBox('],
         'ProjectedDraftOrder' => ['->isAdmin('],
-        'TrainingCampRatingsDiff' => ['loginbox('],
+        'TrainingCampRatingsDiff' => ['->loginBox('],
     ];
 
     /**
@@ -209,16 +209,38 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
             $violations[] = 'MODULE_FILE guard sits below the first ' . self::WIRING_TOKEN . ' token';
         }
 
+        // A login gate is spelled through the NukeCompat adapter, so fetching that
+        // adapter may precede the gate. Every other resolution may not.
+        $gateWiring = self::firstWiringOtherThanGateAdapter($code);
+
         foreach ($gateTokens as $gate) {
             $offset = strpos($code, $gate);
             if ($offset === false) {
                 $violations[] = "gate '{$gate}' missing";
-            } elseif ($offset > $wiring) {
+            } elseif ($gateWiring !== null && $offset > $gateWiring) {
                 $violations[] = "gate '{$gate}' sits below the first " . self::WIRING_TOKEN . ' token';
             }
         }
 
         return $violations;
+    }
+
+    /**
+     * Offset of the first wiring token that resolves anything other than the
+     * stateless NukeCompat gate adapter, or null when there is none.
+     */
+    private static function firstWiringOtherThanGateAdapter(string $code): ?int
+    {
+        $adapter = self::WIRING_TOKEN . ')->nukeCompat()';
+        $offset = 0;
+        while (($found = strpos($code, self::WIRING_TOKEN, $offset)) !== false) {
+            if (substr($code, $found, strlen($adapter)) !== $adapter) {
+                return $found;
+            }
+            $offset = $found + strlen(self::WIRING_TOKEN);
+        }
+
+        return null;
     }
 
     /**
@@ -382,6 +404,30 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
             [],
             self::detectWiringAboveGuard("<?php\n" . $guard . $gate . $wiring, ['->isAdmin(']),
             'guard, gate, then wiring is the accepted order'
+        );
+
+        $adapter = "\$nukeCompat = \\Module\\ModuleServices::current()->nukeCompat();\n";
+        $loginGate = "if (!\$nukeCompat->isUser(\$user)) { \$nukeCompat->loginBox(); }\n";
+        $this->assertSame(
+            [],
+            self::detectWiringAboveGuard("<?php\n" . $guard . $adapter . $loginGate . $wiring, ['->loginBox(']),
+            'fetching the NukeCompat gate adapter above its login gate is allowed'
+        );
+        $this->assertNotSame(
+            [],
+            self::detectWiringAboveGuard("<?php\n" . $guard . $adapter . $wiring . $loginGate, ['->loginBox(']),
+            'a factory call above the login gate must be flagged even after the adapter fetch'
+        );
+        $teamIdentity = "\$repo = \\Module\\ModuleServices::current()->teamIdentity();\n";
+        $this->assertNotSame(
+            [],
+            self::detectWiringAboveGuard("<?php\n" . $guard . $teamIdentity . $loginGate, ['->loginBox(']),
+            'a shared-service resolution above the login gate must be flagged'
+        );
+        $this->assertNotSame(
+            [],
+            self::detectWiringAboveGuard("<?php\n" . $adapter . $guard . $loginGate, ['->loginBox(']),
+            'the adapter fetch may not precede the MODULE_FILE guard'
         );
     }
 

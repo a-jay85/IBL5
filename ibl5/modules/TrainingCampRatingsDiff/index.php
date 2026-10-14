@@ -7,9 +7,10 @@ if (!defined('MODULE_FILE')) {
 }
 
 global $user;
+$nukeCompat = \Module\ModuleServices::current()->nukeCompat();
 
-if (!is_user($user)) {
-    loginbox();
+if (!$nukeCompat->isUser($user)) {
+    $nukeCompat->loginBox();
 }
 
 $overrideYear = null;

@@ -12,7 +12,8 @@ declare(strict_types=1);
  * @see ApiKeys\ApiKeysView For HTML rendering
  */
 
-if (stripos($_SERVER['PHP_SELF'], 'modules.php') === false) {
+$phpSelf = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelf) ? $phpSelf : '', 'modules.php') === false) {
     die("You can't access this file directly...");
 }
 

@@ -10,6 +10,7 @@ if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
 }
 
 $factory = \Module\ModuleServices::current()->factory(\Module\Factories\PlayerFactory::class);
+$nukeCompat = \Module\ModuleServices::current()->nukeCompat();
 
 $module_name = basename(dirname(__FILE__));
 
@@ -27,10 +28,12 @@ switch ($pa) {
     case "negotiate":
         $actionController = $factory->actionController();
         $username = $authService->getUsername() ?? '';
+        $serverName = $_SERVER['SERVER_NAME'] ?? null;
+        $debugCookie = $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null;
         $debugSession = \Debug\DebugSession::forRequest(
             $username,
-            $_SERVER['SERVER_NAME'] ?? null,
-            $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null,
+            is_string($serverName) ? $serverName : null,
+            is_string($debugCookie) ? $debugCookie : null,
         );
         PageLayout\PageLayout::header();
         echo $actionController->renderNegotiation(
@@ -59,16 +62,16 @@ switch ($pa) {
     case "processrookieoption":
         $rookieController = $factory->rookieOptionController();
         $redirectUrl = $rookieController->handleSubmission(
-            static fn (): bool => is_user($user) === 1,
+            static fn (): bool => $nukeCompat->isUser($user),
             static fn (): bool => \Security\CsrfGuard::validateSubmittedToken('rookie_option'),
-            static function () use ($user, $authService): string {
-                cookiedecode($user);
+            static function () use ($user, $authService, $nukeCompat): string {
+                $nukeCompat->cookieDecode($user);
                 return $authService->getUsername() ?? '';
             },
             $_POST,
         );
         if ($redirectUrl === null) {
-            loginbox();
+            $nukeCompat->loginBox();
         } else {
             \Utilities\HtmxHelper::redirect($redirectUrl);
         }

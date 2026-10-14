@@ -8,6 +8,7 @@ use BasketballStats\StatsFormatter;
 use Player\PlayerImageHelper;
 use TeamOffDefStats\TeamOffDefStatsRepository;
 use Security\HtmlSanitizer;
+use Team\SplitStatsRepository;
 use Team\Team;
 use Season\Season;
 
@@ -50,79 +51,13 @@ class PeriodAverages
 
         $teamid = (int)$team->teamid;
 
-        // Use prepared statement for date filtering
-        // Build optional PID filter clause
-        $pidFilterClause = '';
-        $pidFilterTypes = '';
-        $pidFilterParams = [];
-        if ($pidFilter !== []) {
-            $pidFilterClause = " AND bs.pid IN (" . \Database\SqlPlaceholders::PID_LIST . ")";
-            $pidFilterTypes = \Database\SqlPlaceholders::PID_LIST_TYPES;
-            $pidFilterParams = \Database\SqlPlaceholders::padPidList($pidFilter);
-        }
-
-        $query = "SELECT p.name,
-            bs.pos,
-            bs.pid,
-            COUNT(DISTINCT bs.game_date) as games,
-            ROUND(SUM(bs.game_min)/COUNT(DISTINCT bs.game_date), 1) as gameMINavg,
-            ROUND(SUM(bs.game_2gm + bs.game_3gm)/COUNT(DISTINCT bs.game_date), 2) as gameFGMavg,
-            ROUND(SUM(bs.game_2ga + bs.game_3ga)/COUNT(DISTINCT bs.game_date), 2) as gameFGAavg,
-            ROUND((SUM(bs.game_2gm) + SUM(bs.game_3gm)) / (SUM(bs.game_2ga) + SUM(bs.game_3ga)), 3) as gameFGPavg,
-            ROUND(SUM(bs.game_ftm)/COUNT(DISTINCT bs.game_date), 2) as gameFTMavg,
-            ROUND(SUM(bs.game_fta)/COUNT(DISTINCT bs.game_date), 2) as gameFTAavg,
-            ROUND((SUM(bs.game_ftm)) / (SUM(bs.game_fta)), 3) as gameFTPavg,
-            ROUND(SUM(bs.game_3gm)/COUNT(DISTINCT bs.game_date), 2) as game3GMavg,
-            ROUND(SUM(bs.game_3ga)/COUNT(DISTINCT bs.game_date), 2) as game3GAavg,
-            ROUND((SUM(bs.game_3gm)) / (SUM(bs.game_3ga)), 3) as game3GPavg,
-            ROUND(SUM(bs.game_orb)/COUNT(DISTINCT bs.game_date), 1) as gameORBavg,
-            ROUND((SUM(bs.game_orb) + SUM(bs.game_drb))/COUNT(DISTINCT bs.game_date), 1) as gameREBavg,
-            ROUND(SUM(bs.game_ast)/COUNT(DISTINCT bs.game_date), 1) as gameASTavg,
-            ROUND(SUM(bs.game_stl)/COUNT(DISTINCT bs.game_date), 1) as gameSTLavg,
-            ROUND(SUM(bs.game_tov)/COUNT(DISTINCT bs.game_date), 1) as gameTOVavg,
-            ROUND(SUM(bs.game_blk)/COUNT(DISTINCT bs.game_date), 1) as gameBLKavg,
-            ROUND(SUM(bs.game_pf)/COUNT(DISTINCT bs.game_date) , 1) as gamePFavg,
-            ROUND(((2 * SUM(bs.game_2gm)) + SUM(bs.game_ftm) + (3 * SUM(bs.game_3gm)))/COUNT(DISTINCT bs.game_date) , 1) as gamePTSavg
-        FROM `ibl_box_scores` bs
-        JOIN `ibl_plr` p ON bs.pid = p.pid
-        WHERE  bs.game_date BETWEEN ? AND ?
-            AND ( bs.home_teamid = ?
-                OR bs.visitor_teamid = ? )
-            AND bs.game_min > 0
-            AND p.teamid = ?
-            AND p.retired = 0
-            " . $pidFilterClause . "
-        GROUP  BY p.name, bs.pos, bs.pid
-        ORDER  BY p.name ASC";
-
-        // Use mysqli prepared statement directly
-        $stmt = $db->prepare($query);
-        if ($stmt === false) {
-            throw new \Exception('Prepare failed: ' . $db->error);
-        }
-
-        $types = 'sssii' . $pidFilterTypes;
-        $params = [$startDate, $endDate, $teamid, $teamid, $teamid, ...$pidFilterParams];
-        $stmt->bind_param($types, ...$params);
-        if (!$stmt->execute()) {
-            throw new \Exception('Execute failed: ' . $stmt->error);
-        }
-
-        $resultPlayerSimBoxScores = $stmt->get_result();
-        $stmt->close();
-
-        if ($resultPlayerSimBoxScores === false) {
-            throw new \Exception('Failed to get result set');
-        }
+        $splitStatsRepository = new SplitStatsRepository($db);
+        $resultPlayerSimBoxScores = $splitStatsRepository->getPeriodStats($teamid, is_string($startDate) ? $startDate : null, is_string($endDate) ? $endDate : null, $pidFilter);
 
         /** @var list<array{name: string, pos: string, pid: int, games: int, min: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tov: string, blk: string, pf: string, pts: string}> $playerRows */
         $playerRows = [];
 
-        while (true) {
-            $dbRow = $resultPlayerSimBoxScores->fetch_assoc();
-            if (!is_array($dbRow)) {
-                break;
-            }
+        foreach ($resultPlayerSimBoxScores as $dbRow) {
             $playerRows[] = [
                 'name' => (string) ($dbRow['name'] ?? ''),
                 'pos' => (string) $dbRow['pos'],
@@ -150,8 +85,10 @@ class PeriodAverages
         }
 
         ob_start();
+        // "\n" restores the template line break: PHP swallows the newline right after the closing PHP tag.
+        // @phpstan-ignore ibl.trustedVariable (openTag() escapes the aria-label and sanitizes the colors)
+        echo HtmlSanitizer::trusted(TeamStatsTableContext::openTag($team)), "\n";
         ?>
-<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
             <th>Pos</th>

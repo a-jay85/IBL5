@@ -157,25 +157,30 @@ class LastSimRecapRepository extends \Database\BaseMysqliRepository implements L
             return [];
         }
 
-        $chunks = array_chunk($playerIds, \Database\SqlPlaceholders::PID_LIST_WIDTH);
-        if (count($chunks) === 1) {
-            return $this->fetchActiveInjuriesChunk($chunks[0], $date);
-        }
-
         // The query binds a fixed-width pid list, so a larger roster runs in
-        // groups; restore the single-query ordering (new first, newest first).
-        $out = [];
-        foreach ($chunks as $chunk) {
-            array_push($out, ...$this->fetchActiveInjuriesChunk($chunk, $date));
+        // groups; restore the single-query ordering (new first, newest first,
+        // then highest transaction id first, matching `t.id DESC`).
+        $rows = [];
+        foreach (array_chunk($playerIds, \Database\SqlPlaceholders::PID_LIST_WIDTH) as $chunk) {
+            array_push($rows, ...$this->fetchActiveInjuriesChunk($chunk, $date));
         }
-        usort($out, static fn (array $a, array $b): int => [$b['isNew'], $b['date']] <=> [$a['isNew'], $a['date']]);
+        usort($rows, static fn (array $a, array $b): int => [$b['isNew'], $b['date'], $b['id']] <=> [$a['isNew'], $a['date'], $a['id']]);
+
+        $out = [];
+        foreach ($rows as $row) {
+            unset($row['id']);
+            $out[] = $row;
+        }
 
         return $out;
     }
 
     /**
+     * Rows carry the transaction id (`id`) as the final ordering tiebreak; the
+     * caller strips it before returning InjuryRow.
+     *
      * @param non-empty-list<int> $playerIds at most PID_LIST_WIDTH ids
-     * @return list<InjuryRow>
+     * @return list<array{id:int,pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,returnDate:string,isNew:bool}>
      */
     private function fetchActiveInjuriesChunk(array $playerIds, string $date): array
     {
@@ -183,7 +188,8 @@ class LastSimRecapRepository extends \Database\BaseMysqliRepository implements L
 
         // $dateExpr is a fixed SQL fragment built in-class above from column refs and
         // constants (no user input); PID_LIST is a literal run of bound `?` markers.
-        $sql = "SELECT t.pid,
+        $sql = "SELECT t.id,
+                       t.pid,
                        p.name,
                        p.pos,
                        " . $dateExpr . " AS injury_date,
@@ -205,12 +211,13 @@ class LastSimRecapRepository extends \Database\BaseMysqliRepository implements L
         $types = 'ss' . \Database\SqlPlaceholders::PID_LIST_TYPES . 'ss';
         $params = array_merge([$date, $date], \Database\SqlPlaceholders::padPidList($playerIds), [$date, $date]);
 
-        /** @var list<array{pid:int,name:string,pos:string,injury_date:string,injury_description:string|null,injury_games_missed:int,days_remaining:int,return_date:string,is_new:int}> $rows */
+        /** @var list<array{id:int,pid:int,name:string,pos:string,injury_date:string,injury_description:string|null,injury_games_missed:int,days_remaining:int,return_date:string,is_new:int}> $rows */
         $rows = $this->fetchAll($sql, $types, ...$params);
 
         $out = [];
         foreach ($rows as $row) {
             $out[] = [
+                'id' => $row['id'],
                 'pid' => $row['pid'],
                 'name' => $row['name'],
                 'pos' => $row['pos'],

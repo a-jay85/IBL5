@@ -12,7 +12,8 @@ global $user;
 
 $pagetitle = "- Team Pages";
 
-cookiedecode($user);
+$nukeCompat = \Module\ModuleServices::current()->nukeCompat();
+$nukeCompat->cookieDecode($user);
 
 $factory = \Module\ModuleServices::current()->factory(\Module\Factories\WaiversFactory::class);
 $factory->controller()->handleWaiverRequest($user);

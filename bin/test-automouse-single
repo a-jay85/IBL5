@@ -8,7 +8,7 @@
 # self-heal gated OFF in single mode, auto-queue-if-absent, hard-fail on
 # unresolvable slug, and already-queued tolerance.
 #
-# Cases 4, 6, 10, 13, 14, 15 and 16 run on every platform. Cases 1, 2, 3 and 5 drive the run loop,
+# Cases 4, 6, 10, 13, 14, 15 and 16 run on every platform. Cases 1, 2, 3, 5 and 17 drive the run loop,
 # which needs macOS tools inside bin/automouse/run (caffeinate, BSD mktemp,
 # stat -f, BSD date), so off macOS they print a SKIP line and do not run.
 # Case 10 unit-tests write_stop_file (the stop-file writer extracted from the
@@ -576,15 +576,15 @@ else
 fi
 
 # ===========================================================================
-# macOS-only run-loop cases (1, 2, 3, 5)
+# macOS-only run-loop cases (1, 2, 3, 5, 17)
 # ===========================================================================
 if [ "$PLATFORM" != "Darwin" ]; then
     echo ""
-    echo "SKIP: cases 1, 2, 3, 5, 7, 8, 9, 11, 12 (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
+    echo "SKIP: cases 1, 2, 3, 5, 7, 8, 9, 11, 12, 17 (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
     if [ "$H_FAIL" -ne 0 ]; then
         echo "RESULT: FAILED"
     else
-        echo "RESULT: cases 4, 6, 10, 13, 14, 15 and 16 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12 skipped"
+        echo "RESULT: cases 4, 6, 10, 13, 14, 15 and 16 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12, 17 skipped"
     fi
     [ "$H_FAIL" -eq 0 ] || exit 1
     exit 0
@@ -780,6 +780,11 @@ err=$(sed -n "${n}p" "$NDIR/stub-errors")
 printf '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu%d","name":"Bash","input":{"command":"vendor/bin/phpunit --filter FooTest"}}]}}\n' "$n"
 printf '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu%d","is_error":true,"content":"Exit code 1\\n%s"}]}}\n' "$n" "$err"
 printf '{"type":"result","subtype":"error_during_execution","stop_reason":"end_turn","num_turns":2,"duration_ms":2000,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+# Case 17: when $NDIR/stub-plan-defect exists, copy it to this plan's sentinel (cases 7-9 never create it)
+if [ -f "$NDIR/stub-plan-defect" ]; then
+    plan=$(printf '%s\n' "$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)
+    [ -n "$plan" ] && cp "$NDIR/stub-plan-defect" "$NDIR/queue/$plan.plan-defect"
+fi
 exit 0
 STUB
 chmod +x "$STUBDIR/claude"
@@ -856,6 +861,35 @@ check "case9 exactly 3 stub calls" calls_are 3
 check "case9 log records failsig: none" grep -rq 'failsig: none' "$NDIR/logs"
 check "case9 log has no REPEATED FAILURE" ! grep -rq 'REPEATED FAILURE' "$NDIR/logs"
 check_absent  "case9 not skipped" "$NDIR/skipped/plan-none.md"
+
+# Case 17 — plan-defect sentinel stops after attempt 1; absent or garbled keeps the retry
+echo "--- case 17: plan-defect sentinel skips after one attempt ---"
+reset_state; rm -f "$NDIR/stub-calls" "$NDIR/stub-errors" "$NDIR/stub-plan-defect"
+printf '%s\n' 'err one' 'err two' 'err three' > "$NDIR/stub-errors"
+printf 'automouse-plan-defect: v1\nUNREALISED-ASSERTION: row 4 -- testBar\nMISSING-FILE: bin/y\n' > "$NDIR/stub-plan-defect"
+seed_plan_sonnet plan-pd
+drive_attempts plan-pd
+PD_REPORT="$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-pd.md"
+check "case17a exactly 1 stub call" calls_are 1
+check_present "case17a moved to skipped/"       "$NDIR/skipped/plan-pd.md"
+check_absent  "case17a no attempts sidecar"     "$NDIR/queue/plan-pd.md.attempts"
+check_absent  "case17a no plan-defect sidecar"  "$NDIR/queue/plan-pd.md.plan-defect"
+check "case17a report names the failing row" grep -qF 'UNREALISED-ASSERTION: row 4 -- testBar' "$PD_REPORT"
+check "case17a log records PLAN DEFECT" grep -rq 'PLAN DEFECT' "$NDIR/logs"
+
+reset_state; rm -f "$NDIR/stub-calls" "$NDIR/stub-plan-defect"
+seed_plan_sonnet plan-nopd
+run_single_rf plan-nopd || true
+check_present "case17b no sentinel: still queued" "$NDIR/queue/plan-nopd.md"
+check "case17b no sentinel: attempts file is 1" grep -qx 1 "$NDIR/queue/plan-nopd.md.attempts"
+
+reset_state; rm -f "$NDIR/stub-calls"
+printf 'UNREALISED-ASSERTION: row 4\nautomouse-plan-defect: v1\n' > "$NDIR/stub-plan-defect"
+seed_plan_sonnet plan-garbled
+run_single_rf plan-garbled || true
+rm -f "$NDIR/stub-plan-defect"
+check_present "case17c garbled sentinel: still queued" "$NDIR/queue/plan-garbled.md"
+check "case17c garbled sentinel: attempts file is 1" grep -qx 1 "$NDIR/queue/plan-garbled.md.attempts"
 
 # ===========================================================================
 echo ""

@@ -4,8 +4,6 @@ from __future__ import annotations
 import os
 import sys
 
-import pytest
-
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from runner import _inject_residual_phases
@@ -13,12 +11,13 @@ from harness import conformance
 from harness.state import PhaseInfo, PlanInfo
 
 
-@pytest.fixture(autouse=True)
-def _tracked(monkeypatch):
-    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: ("bin/wt-up",))
+def _pin_tracked(monkeypatch, *paths):
+    """Pin conformance's git ls-files lookup to `paths` for this test only."""
+    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: tuple(paths))
 
 
-def test_uncheckable_phase_logs_exempt_line_and_no_residual_block():
+def test_uncheckable_phase_logs_exempt_line_and_no_residual_block(monkeypatch):
+    _pin_tracked(monkeypatch, "bin/wt-up")
     ph = PhaseInfo(number=1, heading="Phase 1: Elsewhere", evidence_paths=["/proc/self/fd/1"])
     copy = {"summary_md": ""}
     logs: list[str] = []
@@ -31,7 +30,8 @@ def test_uncheckable_phase_logs_exempt_line_and_no_residual_block():
     assert "## Residual Phases" not in copy["summary_md"]
 
 
-def test_no_diff_phase_logs_reason():
+def test_no_diff_phase_logs_reason(monkeypatch):
+    _pin_tracked(monkeypatch, "bin/wt-up")
     ph = PhaseInfo(number=1, heading="Phase 1: Queue", evidence_paths=["bin/wt-up"],
                    no_diff_reason="queues the parked plan after merge")
     logs: list[str] = []
@@ -42,7 +42,8 @@ def test_no_diff_phase_logs_reason():
     assert "queues the parked plan after merge" in logs[0]
 
 
-def test_held_phase_still_logs_residual_and_block():
+def test_held_phase_still_logs_residual_and_block(monkeypatch):
+    _pin_tracked(monkeypatch, "bin/wt-up")
     ph = PhaseInfo(number=1, heading="Phase 1: Edit", evidence_paths=["bin/wt-up"])
     copy = {"summary_md": ""}
     logs: list[str] = []

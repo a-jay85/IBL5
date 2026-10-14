@@ -23,6 +23,8 @@ use Search\Contracts\SearchRepositoryInterface;
 $module_name = basename(dirname(__FILE__));
 
 global $prefix,$user_prefix, $tipath, $articlecomm;
+/** @var string $prefix */
+/** @var string $tipath */
 
 $ThemeSel = 'IBL';
 

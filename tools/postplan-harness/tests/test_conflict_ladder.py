@@ -758,3 +758,47 @@ def test_ladder_failure_reason_keeps_proof_prefix():
             run_git=lambda args: (0, ""), run_gh=lambda args: (0, ""))
 
     assert classify(reason).cause == classify(old).cause == CAUSE_TREE_PROOF
+
+
+# --- pre-resolver regen selection (gitad._rebase_onto) ----------------------------
+
+_BASELINE_PATH = "ibl5/phpstan-baseline.neon"
+_REGEN_OUTPUTS = {
+    "ibl5/phpstan-baseline.neon",
+    "ibl5/phpstan-tests-baseline.neon",
+    "ibl5/phpstan-baseline-counts.json",
+}
+
+
+def _with_autoload(tmp_path: Path) -> str:
+    autoload = tmp_path / "ibl5/vendor/autoload.php"
+    autoload.parent.mkdir(parents=True)
+    autoload.write_text("<?php\n")
+    return str(tmp_path)
+
+
+def test_pre_resolve_targets_selects_phpstan_baseline(tmp_path):
+    worktree = _with_autoload(tmp_path)
+    targets = conflict_ladder.pre_resolve_targets((_BASELINE_PATH, "a.php"), worktree=worktree)
+    assert [g.path for g in targets] == [_BASELINE_PATH]
+
+
+def test_pre_resolve_targets_skips_when_requires_missing(tmp_path):
+    targets = conflict_ladder.pre_resolve_targets((_BASELINE_PATH, "a.php"),
+                                                  worktree=str(tmp_path))
+    assert targets == ()
+
+
+def test_pre_resolve_targets_ignores_unflagged_siblings(tmp_path):
+    worktree = _with_autoload(tmp_path)
+    targets = conflict_ladder.pre_resolve_targets(
+        ("ibl5/phpstan-tests-baseline.neon", "ibl5/phpstan-baseline-counts.json"),
+        worktree=worktree)
+    assert targets == ()
+
+
+def test_command_outputs_covers_shared_generator():
+    baseline = next(g for g in GENERATED_FILES if g.path == _BASELINE_PATH)
+    outputs = conflict_ladder.command_outputs((baseline,))
+    assert outputs == _REGEN_OUTPUTS
+    assert ".claude/rules/codebase-map.md" not in outputs

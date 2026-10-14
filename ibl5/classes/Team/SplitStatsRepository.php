@@ -106,7 +106,7 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
      * @param list<int> $pidFilter
      * @return list<SplitStatsRow>
      */
-    public function getPeriodStats(int $teamid, string $startDate, string $endDate, array $pidFilter = []): array
+    public function getPeriodStats(int $teamid, ?string $startDate, ?string $endDate, array $pidFilter = []): array
     {
         $pidFilterClause = '';
         $pidFilterTypes = '';

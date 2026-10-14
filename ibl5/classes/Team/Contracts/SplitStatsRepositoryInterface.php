@@ -30,12 +30,12 @@ interface SplitStatsRepositoryInterface
      * NULL for gameFGPavg / gameFTPavg / game3GPavg.
      *
      * @param int $teamid Team ID (must be > 0)
-     * @param string $startDate Inclusive lower bound, Y-m-d
-     * @param string $endDate Inclusive upper bound, Y-m-d
+     * @param string|null $startDate Inclusive lower bound, Y-m-d; null binds SQL NULL (matches no rows)
+     * @param string|null $endDate Inclusive upper bound, Y-m-d; null binds SQL NULL (matches no rows)
      * @param list<int> $pidFilter Optional pid allow-list; [] means no pid restriction
      * @return list<SplitStatsRow>
      */
-    public function getPeriodStats(int $teamid, string $startDate, string $endDate, array $pidFilter = []): array;
+    public function getPeriodStats(int $teamid, ?string $startDate, ?string $endDate, array $pidFilter = []): array;
 
     /**
      * Get all valid split key strings for parameter validation

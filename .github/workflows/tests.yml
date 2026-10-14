@@ -1058,6 +1058,11 @@ jobs:
       - name: bin/test-wt-pool
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-wt-pool'
 
+      # The batch list runs bin/test-architect-contract-split with no flag, so
+      # this step covers the --self-test (h_rewind rewind-canary) path.
+      - name: bin/test-architect-contract-split --self-test
+        run: bin/test-architect-contract-split --self-test
+
       - name: bin/test-restore-rowcount-compare
         run: bin/test-restore-rowcount-compare
 

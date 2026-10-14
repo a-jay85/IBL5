@@ -13,6 +13,8 @@ use BulkImport\Contracts\BackupArchiveLocatorInterface;
  * Handles both properly-named archives ({season}_{NN}_{phase}.{ext})
  * and mis-named uploads (e.g. IBL2526Sim15.zip) by falling back to
  * modification time when no standardized name is found.
+ *
+ * @phpstan-type ParsedArchiveName array{season: string, seq: int, phase: string, ending_year: int}
  */
 class BackupArchiveLocator implements BackupArchiveLocatorInterface
 {
@@ -75,7 +77,33 @@ class BackupArchiveLocator implements BackupArchiveLocatorInterface
      */
     public function describeSelection(string $seasonBackupDir): ArchiveSelection
     {
-        $empty = new ArchiveSelection(
+        if (!is_dir($seasonBackupDir)) {
+            return $this->emptySelection();
+        }
+
+        $archives = $this->listArchives($seasonBackupDir);
+        if ($archives === []) {
+            return $this->emptySelection();
+        }
+
+        $parsed = $this->parseCandidates($archives);
+        $ranked = $this->rankLatest($archives, $parsed);
+        $selection = $this->assembleSelection(
+            $seasonBackupDir,
+            $archives,
+            $parsed,
+            $ranked['path'],
+            $ranked['mtime'],
+        );
+        $this->logSelectionOnce($seasonBackupDir, $selection);
+
+        return $selection;
+    }
+
+    /** Selection returned for a missing or archive-free directory. */
+    private function emptySelection(): ArchiveSelection
+    {
+        return new ArchiveSelection(
             path: null,
             mtime: 0,
             candidateCount: 0,
@@ -88,37 +116,34 @@ class BackupArchiveLocator implements BackupArchiveLocatorInterface
             predecessorSize: null,
             predecessorName: null,
         );
+    }
 
-        if (!is_dir($seasonBackupDir)) {
-            return $empty;
-        }
-
-        $archives = $this->listArchives($seasonBackupDir);
-        if ($archives === []) {
-            return $empty;
-        }
-
-        // Parse all archive names up front so each file is visited once.
-        /** @var array<string, array{season: string, seq: int, phase: string, ending_year: int}|null> $parsed */
+    /**
+     * Parse every archive name once so each file is visited once.
+     *
+     * @param list<string> $archives
+     * @return array<string, ParsedArchiveName|null>
+     */
+    private function parseCandidates(array $archives): array
+    {
+        /** @var array<string, ParsedArchiveName|null> $parsed */
         $parsed = [];
         foreach ($archives as $path) {
             $parsed[$path] = $this->extractor->parseArchiveName(basename($path));
         }
 
-        // Find the highest sequence number across all properly-named archives.
-        $highestSeq = null;
-        $highestSeqName = null;
-        foreach ($archives as $path) {
-            $p = $parsed[$path];
-            if ($p === null) {
-                continue;
-            }
-            if ($highestSeq === null || $p['seq'] > $highestSeq) {
-                $highestSeq = $p['seq'];
-                $highestSeqName = basename($path);
-            }
-        }
+        return $parsed;
+    }
 
+    /**
+     * Rank archives: primary key = mtime desc, tie-break via outranksOnTie().
+     *
+     * @param list<string> $archives
+     * @param array<string, ParsedArchiveName|null> $parsed
+     * @return array{path: string|null, mtime: int}
+     */
+    private function rankLatest(array $archives, array $parsed): array
+    {
         // Rank archives: primary key = mtime desc, tie-break = seq desc, then basename desc.
         $latest = null;
         $latestMtime = 0;
@@ -140,6 +165,83 @@ class BackupArchiveLocator implements BackupArchiveLocatorInterface
             }
         }
 
+        return ['path' => $latest, 'mtime' => $latestMtime];
+    }
+
+    /**
+     * Highest sequence number across properly-named archives; first-sorted wins on equal seq.
+     *
+     * @param list<string> $archives
+     * @param array<string, ParsedArchiveName|null> $parsed
+     * @return array{seq: int|null, name: string|null}
+     */
+    private function highestSequence(array $archives, array $parsed): array
+    {
+        $highestSeq = null;
+        $highestSeqName = null;
+        foreach ($archives as $path) {
+            $p = $parsed[$path];
+            if ($p === null) {
+                continue;
+            }
+            if ($highestSeq === null || $p['seq'] > $highestSeq) {
+                $highestSeq = $p['seq'];
+                $highestSeqName = basename($path);
+            }
+        }
+
+        return ['seq' => $highestSeq, 'name' => $highestSeqName];
+    }
+
+    /**
+     * Predecessor in the same normalized phase family: highest seq strictly below the selected one.
+     *
+     * @param list<string> $archives
+     * @param array<string, ParsedArchiveName|null> $parsed
+     * @return array{size: int|null, name: string|null}
+     */
+    private function findPredecessor(array $archives, array $parsed, int $selectedSeq, string $selectedPhase): array
+    {
+        $predecessorSize = null;
+        $predecessorName = null;
+        $selectedNorm = $this->normalizePhase($selectedPhase);
+        $predSeq = null;
+        foreach ($archives as $path) {
+            $p = $parsed[$path];
+            if ($p === null) {
+                continue;
+            }
+            if ($p['seq'] >= $selectedSeq) {
+                continue;
+            }
+            if ($this->normalizePhase($p['phase']) !== $selectedNorm) {
+                continue;
+            }
+            if ($predSeq === null || $p['seq'] > $predSeq) {
+                $predSeq = $p['seq'];
+                $predecessorSize = (int) filesize($path);
+                $predecessorName = basename($path);
+            }
+        }
+
+        return ['size' => $predecessorSize, 'name' => $predecessorName];
+    }
+
+    /**
+     * Build the ArchiveSelection value object for a ranked directory.
+     *
+     * @param list<string> $archives
+     * @param array<string, ParsedArchiveName|null> $parsed
+     */
+    private function assembleSelection(
+        string $seasonBackupDir,
+        array $archives,
+        array $parsed,
+        ?string $latest,
+        int $latestMtime,
+    ): ArchiveSelection {
+        $highest = $this->highestSequence($archives, $parsed);
+
         // Derive directory season from the directory basename (must match /^\d{2}-\d{2}$/).
         $dirBasename = basename($seasonBackupDir);
         $directorySeason = preg_match('/^\d{2}-\d{2}$/', $dirBasename) === 1 ? $dirBasename : null;
@@ -152,44 +254,29 @@ class BackupArchiveLocator implements BackupArchiveLocatorInterface
         $selectedSize = $latest !== null ? ((int) filesize($latest)) : 0;
 
         // Find the predecessor in the same normalized phase for the size-regression detector.
-        $predecessorSize = null;
-        $predecessorName = null;
+        $predecessor = ['size' => null, 'name' => null];
         if ($selectedSeq !== null && $selectedPhase !== null) {
-            $selectedNorm = $this->normalizePhase($selectedPhase);
-            $predSeq = null;
-            foreach ($archives as $path) {
-                $p = $parsed[$path];
-                if ($p === null) {
-                    continue;
-                }
-                if ($p['seq'] >= $selectedSeq) {
-                    continue;
-                }
-                if ($this->normalizePhase($p['phase']) !== $selectedNorm) {
-                    continue;
-                }
-                if ($predSeq === null || $p['seq'] > $predSeq) {
-                    $predSeq = $p['seq'];
-                    $predecessorSize = (int) filesize($path);
-                    $predecessorName = basename($path);
-                }
-            }
+            $predecessor = $this->findPredecessor($archives, $parsed, $selectedSeq, $selectedPhase);
         }
 
-        $selection = new ArchiveSelection(
+        return new ArchiveSelection(
             path: $latest,
             mtime: $latestMtime,
             candidateCount: count($archives),
             selectedSeq: $selectedSeq,
-            highestSeq: $highestSeq,
-            highestSeqName: $highestSeqName,
+            highestSeq: $highest['seq'],
+            highestSeqName: $highest['name'],
             declaredSeason: $declaredSeason,
             directorySeason: $directorySeason,
             selectedSize: $selectedSize,
-            predecessorSize: $predecessorSize,
-            predecessorName: $predecessorName,
+            predecessorSize: $predecessor['size'],
+            predecessorName: $predecessor['name'],
         );
+    }
 
+    /** Audit-log a selection once per distinct path; repeated calls in one run stay quiet. */
+    private function logSelectionOnce(string $seasonBackupDir, ArchiveSelection $selection): void
+    {
         // Log once per distinct archive selection; six-plus calls per updater run means
         // an unconditional info() would bury the one line an operator needs to read.
         if ($selection->path !== null && $selection->path !== $this->lastLoggedSelection) {
@@ -214,8 +301,6 @@ class BackupArchiveLocator implements BackupArchiveLocatorInterface
                 ]);
             }
         }
-
-        return $selection;
     }
 
     /**

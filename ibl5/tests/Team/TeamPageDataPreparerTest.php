@@ -785,6 +785,29 @@ class TeamPageDataPreparerTest extends TestCase
         $this->assertSame(2, $result[0]['round']);
     }
 
+    public function testPrepareDraftPicksDataFallsBackWhenOriginalTeamMissingFromLeagueTeams(): void
+    {
+        $preparer = $this->buildPreparer(
+            self::createStub(TeamRepositoryInterface::class),
+            $this->queryRepoWithPicks([self::draftPickRow(15, 'Bulls', 'Ghosts', '2028', '1', 'Defunct')]),
+            $this->leagueWithTeams(self::bullsAndLakersRows()),
+        );
+
+        $result = $preparer->prepareDraftPicksData(self::bullsTeam());
+
+        $this->assertSame(
+            [[
+                'originalTeamID' => 0,
+                'originalTeamCity' => '',
+                'originalTeamName' => 'Ghosts',
+                'year' => '2028',
+                'round' => '1',
+                'notes' => 'Defunct',
+            ]],
+            $result,
+        );
+    }
+
     public function testPrepareDraftPicksDataRequestsPicksForTheTeamId(): void
     {
         $queryRepo = self::createMock(TeamQueryRepositoryInterface::class);

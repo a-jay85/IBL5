@@ -203,6 +203,28 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
     ];
 
     /**
+     * One data-only definition per split. Exact splits are keyed by their key; suffix-bearing splits are keyed
+     * by their prefix, underscore included (`month_`, `div_`, `conf_`, `vs_`), so a bare `month` never resolves.
+     *
+     * Every `joins` / `where` value is a reference to a SQL constant above; this map holds no SQL text.
+     * `params` and `joinParams` list bind-value sources that resolveBindValue() turns into values, in bind order.
+     * No `@var` here on purpose: PHPStan must keep the literal string types so `where` stays
+     * `value-of<self::SPLIT_WHERE>` for BanSqlStringConcatenationRule.
+     */
+    private const SPLIT_DEFINITIONS = [
+        'home' => ['joins' => '', 'where' => self::SPLIT_WHERE['home'], 'types' => 'i', 'params' => ['teamid'], 'joinTypes' => '', 'joinParams' => []],
+        'road' => ['joins' => '', 'where' => self::SPLIT_WHERE['road'], 'types' => 'i', 'params' => ['teamid'], 'joinTypes' => '', 'joinParams' => []],
+        'wins' => ['joins' => self::JOIN_SCHEDULE, 'where' => self::SPLIT_WHERE['wins'], 'types' => 'ii', 'params' => ['teamid', 'teamid'], 'joinTypes' => '', 'joinParams' => []],
+        'losses' => ['joins' => self::JOIN_SCHEDULE, 'where' => self::SPLIT_WHERE['losses'], 'types' => 'ii', 'params' => ['teamid', 'teamid'], 'joinTypes' => '', 'joinParams' => []],
+        'pre_allstar' => ['joins' => '', 'where' => self::SPLIT_WHERE['pre_allstar'], 'types' => 's', 'params' => ['cutoff_pre'], 'joinTypes' => '', 'joinParams' => []],
+        'post_allstar' => ['joins' => '', 'where' => self::SPLIT_WHERE['post_allstar'], 'types' => 's', 'params' => ['cutoff_post'], 'joinTypes' => '', 'joinParams' => []],
+        'month_' => ['joins' => '', 'where' => self::SPLIT_WHERE['month'], 'types' => 'i', 'params' => ['month'], 'joinTypes' => '', 'joinParams' => []],
+        'div_' => ['joins' => self::JOIN_OPPONENT_STANDINGS, 'where' => self::SPLIT_WHERE['div'], 'types' => 's', 'params' => ['division'], 'joinTypes' => 'i', 'joinParams' => ['teamid']],
+        'conf_' => ['joins' => self::JOIN_OPPONENT_STANDINGS, 'where' => self::SPLIT_WHERE['conf'], 'types' => 's', 'params' => ['conference'], 'joinTypes' => 'i', 'joinParams' => ['teamid']],
+        'vs_' => ['joins' => '', 'where' => self::SPLIT_WHERE['vs'], 'types' => 'ii', 'params' => ['teamid', 'opponent'], 'joinTypes' => '', 'joinParams' => []],
+    ];
+
+    /**
      * Build the WHERE additions, extra JOINs, types, and params for a split condition
      *
      * The opponent-standings join binds the team id (joinTypes/joinParams); its placeholder
@@ -212,113 +234,73 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
      */
     private function buildSplitCondition(string $splitKey, int $teamid, int $seasonEndingYear): array
     {
-        $result = ['joins' => '', 'where' => '', 'types' => '', 'params' => [], 'joinTypes' => '', 'joinParams' => []];
+        // Resolve the lookup key: the text up to and including the first underscore when that is a known
+        // prefix entry, otherwise the key itself. One `??` chain, no per-key branch ladder.
+        $underscore = strpos($splitKey, '_');
+        $prefix = $underscore === false ? $splitKey : substr($splitKey, 0, $underscore + 1);
+        $definition = self::SPLIT_DEFINITIONS[$prefix] ?? self::SPLIT_DEFINITIONS[$splitKey] ?? null;
 
-        // Location splits
-        if ($splitKey === 'home') {
-            $result['where'] = self::SPLIT_WHERE['home'];
-            $result['types'] = 'i';
-            $result['params'] = [$teamid];
-            return $result;
+        if ($definition === null) {
+            return ['joins' => '', 'where' => '', 'types' => '', 'params' => [], 'joinTypes' => '', 'joinParams' => []];
         }
 
-        if ($splitKey === 'road') {
-            $result['where'] = self::SPLIT_WHERE['road'];
-            $result['types'] = 'i';
-            $result['params'] = [$teamid];
-            return $result;
+        $suffix = substr($splitKey, strlen($prefix));
+
+        $params = [];
+        foreach ($definition['params'] as $source) {
+            $params[] = $this->resolveBindValue($source, $suffix, $teamid, $seasonEndingYear);
         }
 
-        // Result splits
-        if ($splitKey === 'wins') {
-            $result['joins'] = self::JOIN_SCHEDULE;
-            $result['where'] = self::SPLIT_WHERE['wins'];
-            $result['types'] = 'ii';
-            $result['params'] = [$teamid, $teamid];
-            return $result;
+        $joinParams = [];
+        foreach ($definition['joinParams'] as $source) {
+            $joinParams[] = $this->resolveBindValue($source, $suffix, $teamid, $seasonEndingYear);
         }
 
-        if ($splitKey === 'losses') {
-            $result['joins'] = self::JOIN_SCHEDULE;
-            $result['where'] = self::SPLIT_WHERE['losses'];
-            $result['types'] = 'ii';
-            $result['params'] = [$teamid, $teamid];
-            return $result;
-        }
+        return [
+            'joins' => $definition['joins'],
+            'where' => $definition['where'],
+            'types' => $definition['types'],
+            'params' => $params,
+            'joinTypes' => $definition['joinTypes'],
+            'joinParams' => $joinParams,
+        ];
+    }
 
-        // Season half splits
-        if ($splitKey === 'pre_allstar') {
-            $cutoffDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_ALL_STAR_BREAK_START_DAY);
-            $result['where'] = self::SPLIT_WHERE['pre_allstar'];
-            $result['types'] = 's';
-            $result['params'] = [$cutoffDate];
-            return $result;
-        }
+    /**
+     * Turn a bind-value source token from SPLIT_DEFINITIONS into the value to bind. Produces values only;
+     * no SQL text is built here.
+     *
+     * @param 'teamid'|'cutoff_pre'|'cutoff_post'|'month'|'opponent'|'division'|'conference' $source
+     * @param string $suffix The split key with its prefix removed ('' for exact splits)
+     * @return ($source is 'teamid'|'month'|'opponent' ? int : string)
+     */
+    private function resolveBindValue(string $source, string $suffix, int $teamid, int $seasonEndingYear): int|string
+    {
+        return match ($source) {
+            'teamid' => $teamid,
+            'cutoff_pre' => sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_ALL_STAR_BREAK_START_DAY),
+            'cutoff_post' => sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_POST_ALL_STAR_FIRST_DAY),
+            'month', 'opponent' => (int) $suffix,
+            'division' => self::matchName(League::DIVISION_NAMES, $suffix),
+            'conference' => self::matchName(League::CONFERENCE_NAMES, $suffix),
+        };
+    }
 
-        if ($splitKey === 'post_allstar') {
-            $cutoffDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_POST_ALL_STAR_FIRST_DAY);
-            $result['where'] = self::SPLIT_WHERE['post_allstar'];
-            $result['types'] = 's';
-            $result['params'] = [$cutoffDate];
-            return $result;
-        }
-
-        // Month splits
-        if (str_starts_with($splitKey, 'month_')) {
-            $month = (int) substr($splitKey, 6);
-            $result['where'] = self::SPLIT_WHERE['month'];
-            $result['types'] = 'i';
-            $result['params'] = [$month];
-            return $result;
-        }
-
-        // Division splits
-        if (str_starts_with($splitKey, 'div_')) {
-            $divKey = substr($splitKey, 4);
-            $divisionName = '';
-            foreach (League::DIVISION_NAMES as $division) {
-                if (strtolower($division) === $divKey) {
-                    $divisionName = $division;
-                    break;
-                }
+    /**
+     * First name whose lowercase form equals the suffix exactly, or '' when none does.
+     * The suffix is compared as given (not lowercased), preserving the pre-refactor behavior where
+     * `div_ATLANTIC` binds ''.
+     *
+     * @param list<string> $names
+     */
+    private static function matchName(array $names, string $suffix): string
+    {
+        foreach ($names as $name) {
+            if (strtolower($name) === $suffix) {
+                return $name;
             }
-            $result['joins'] = self::JOIN_OPPONENT_STANDINGS;
-            $result['joinTypes'] = 'i';
-            $result['joinParams'] = [$teamid];
-            $result['where'] = self::SPLIT_WHERE['div'];
-            $result['types'] = 's';
-            $result['params'] = [$divisionName];
-            return $result;
         }
 
-        // Conference splits
-        if (str_starts_with($splitKey, 'conf_')) {
-            $confKey = substr($splitKey, 5);
-            $conferenceName = '';
-            foreach (League::CONFERENCE_NAMES as $conference) {
-                if (strtolower($conference) === $confKey) {
-                    $conferenceName = $conference;
-                    break;
-                }
-            }
-            $result['joins'] = self::JOIN_OPPONENT_STANDINGS;
-            $result['joinTypes'] = 'i';
-            $result['joinParams'] = [$teamid];
-            $result['where'] = self::SPLIT_WHERE['conf'];
-            $result['types'] = 's';
-            $result['params'] = [$conferenceName];
-            return $result;
-        }
-
-        // vs. Team splits
-        if (str_starts_with($splitKey, 'vs_')) {
-            $opponentTid = (int) substr($splitKey, 3);
-            $result['where'] = self::SPLIT_WHERE['vs'];
-            $result['types'] = 'ii';
-            $result['params'] = [$teamid, $opponentTid];
-            return $result;
-        }
-
-        return $result;
+        return '';
     }
 }

@@ -14,6 +14,7 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 
 global $leagueContext;
+/** @var \League\LeagueContext $leagueContext */
 
 $pagetitle = "Season Stats";
 

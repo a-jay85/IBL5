@@ -611,9 +611,11 @@ end_case paused-no-burn
 
 # A rebase-only run merged master and stays held for a human: log it, charge nothing.
 reset; begin_case
-set_prs "$RED101"; set_checks aaa1111 red
+set_prs '101|branch-one|aaa1111|DIRTY|false'
 set_result "101\tfired\trebased\trebase-only"
 run_tick
+# The rebase cleaned the PR, so it no longer qualifies and tick 2 only reconciles.
+set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
 run_tick
 [[ "$(attempt 101)" == "" ]] || fail "rebased-no-attempt-no-strike: a rebase-only run was charged an attempt"
 no_file "$STATE_DIR/attempts/101" || fail "rebased-no-attempt-no-strike: attempts/101 exists"
@@ -622,7 +624,23 @@ no_file "$STATE_DIR/strikes/101" || fail "rebased-no-attempt-no-strike: a rebase
 [[ "$(dm_count)" == "0" ]] || fail "rebased-no-attempt-no-strike: want 0 DMs, got $(dm_count)"
 out_has 'rebase-only ran (merged master, still held for a human)' \
     || fail "rebased-no-attempt-no-strike: no rebase-only log line: $OUT"
+[[ "$(pending_count)" == "0" ]] || fail "rebased-no-attempt-no-strike: want 0 pending entries after reconcile, got $(pending_count)"
 end_case rebased-no-attempt-no-strike
+
+# A result row naming a PR the tick never launched (absent from set_prs) settles nothing.
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_result "101\tfired\trebased\trebase-only" "999\tfired\tshipped\t-"
+run_tick
+set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
+run_tick
+no_file "$STATE_DIR/attempts/999" || fail "unknown-pr-no-attempt: attempts/999 written for a PR the tick never launched"
+no_file "$STATE_DIR/strikes/999" || fail "unknown-pr-no-attempt: strikes/999 written for an unknown PR"
+no_file "$STATE_DIR/declined/999" || fail "unknown-pr-no-attempt: declined/999 written for an unknown PR"
+no_file "$STATE_DIR/attempts/101" || fail "unknown-pr-no-attempt: attempts/101 exists"
+out_has 'PR 999' && fail "unknown-pr-no-attempt: tick logged a settlement for unknown PR 999: $OUT"
+[[ "$(pending_count)" == "0" ]] || fail "unknown-pr-no-attempt: want 0 pending entries after reconcile, got $(pending_count)"
+end_case unknown-pr-no-attempt
 
 reset; begin_case
 set_prs "$RED101"; set_checks aaa1111 red

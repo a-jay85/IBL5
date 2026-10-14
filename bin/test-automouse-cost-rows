@@ -784,7 +784,7 @@ before=$(wc -l < "$LOG")
 printf '%s\n' "$IMPL_MARKER" '[00:09:00] stub-e/impl exit: cost=$0.4200 peak_ctx=50000' >> "$LOG"
 append_cost_row "stub-e.md" impl "$before" "claude-sonnet-5-5"
 assert_eq "$(stub_rows stub-e.md impl)" 1 "marker plus cost=: row kept"
-assert_eq "$(stub_field stub-e.md impl cost)" 0.4200 "marker plus cost=: row is priced"
+assert_near "$(stub_field stub-e.md impl cost)" 0.42 0.0001 "marker plus cost=: row is priced"
 
 # ---------------------------------------------------------------------------
 # Weekly reader dedup (reader-only: sidecar lines are hand-built on purpose).

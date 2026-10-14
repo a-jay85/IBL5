@@ -167,36 +167,6 @@ parameters:
 			path: classes/Trading/TradingController.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class ActivityTracker\ActivityTrackerRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ActivityTracker/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ActivityTracker/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ApiKeys\ApiKeysRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ApiKeys/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ApiKeys/index.php
-
-		-
-			rawMessage: 'Parameter #4 $authService of class ApiKeys\ApiKeysController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ApiKeys/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class AwardHistory\AwardHistoryRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -219,18 +189,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/ContractList/index.php
-
-		-
-			rawMessage: 'Parameter #1 $authService of class Debug\DebugController constructor expects Auth\AuthService, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DebugMenu/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DebugMenu/index.php
 
 		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
@@ -347,30 +305,6 @@ parameters:
 			path: modules/Leaderboards/index.php
 
 		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/NextSim/index.php
-
-		-
-			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/NextSim/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: modules/NextSim/index.php
-
-		-
-			rawMessage: 'Cannot call method getUsername() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/OneOnOneGame/index.php
-
-		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
 			count: 4
@@ -383,36 +317,6 @@ parameters:
 			path: modules/OneOnOneGame/index.php
 
 		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/OneOnOneGame/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class OneOnOneGame\OneOnOneGameRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/OneOnOneGame/index.php
-
-		-
-			rawMessage: 'Parameter #3 $owner of method OneOnOneGame\OneOnOneGameService::playGame() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/OneOnOneGame/index.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/extension.php
-
-		-
 			rawMessage: '''
 				Instantiation of deprecated class Extension\ExtensionProcessor:
 				Use ExtensionService instead
@@ -420,30 +324,6 @@ parameters:
 			identifier: new.deprecatedClass
 			count: 1
 			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Extension\ExtensionProcessor constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/index.php
 
 		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
@@ -614,250 +494,16 @@ parameters:
 			path: modules/TeamOffDefStats/index.php
 
 		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 1
-			path: modules/Topics/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Topics\TopicsService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Topics/index.php
-
-		-
-			rawMessage: 'Parameter #2 $prefix of class Topics\TopicsService constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Topics/index.php
-
-		-
 			rawMessage: 'Parameter #3 $searchFilters of method Topics\TopicsView::render() expects array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, articleComm: bool, preset?: string}, array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: array<int, string>, articleComm: bool, preset: ''''|''transactions''} given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Topics/index.php
 
 		-
-			rawMessage: 'Parameter #2 $post of method Trading\TradingController::acceptTradeOffer() expects array<string, mixed>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #2 $post of method Trading\TradingController::submitTradeOffer() expects array<string, mixed>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/maketradeoffer.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/maketradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/maketradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/maketradeoffer.php
-
-		-
-			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/maketradeoffer.php
-
-		-
-			rawMessage: 'Parameter #2 $post of method Trading\TradingController::rejectTradeOffer() expects array<string, mixed>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/rejecttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/rejecttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/rejecttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/rejecttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/rejecttradeoffer.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
-			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Waivers/index.php
-
-		-
-			rawMessage: 'Cannot call method getUsername() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 4
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 4
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in an if condition, int given.'
-			identifier: if.condNotBoolean
-			count: 3
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Parameter #1 $authService of class YourAccount\YourAccountService constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Parameter #1 $username of method YourAccount\YourAccountService::getTeamRedirectUrl() expects string, mixed given.'
-			identifier: argument.type
-			count: 3
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Parameter #4 $clientIp of method YourAccount\YourAccountService::attemptLogin() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: Variable $authService might not be defined.
-			identifier: variable.undefined
-			count: 4
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: Variable $user might not be defined.
-			identifier: variable.undefined
-			count: 5
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/index.php
 
 		-
 			rawMessage: 'Direct is_admin() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
@@ -1367,24 +1013,6 @@ parameters:
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
 			count: 5
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Direct is_admin() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
 			path: themes/IBL/theme.php
 
 		-

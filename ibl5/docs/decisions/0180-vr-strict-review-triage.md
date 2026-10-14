@@ -1,6 +1,6 @@
 ---
 description: Adds a review-only strict pixel pass to the visual-review gallery triage so sub-gate recolors surface as changed cells, amending ADR-0074.
-last_verified: 2026-10-07
+last_verified: 2026-10-13
 ---
 
 # ADR-0180: Review-only strict triage for the visual-review gallery
@@ -60,3 +60,7 @@ Calibration is pinned by synthetic-PNG unit tests built from the real palette he
 - `bin/vr-build-gallery`
 - `ibl5/tests/e2e/smoke/vr-seed-coverage.spec.ts`
 - `.claude/rules/visual-review-prs.md`
+
+## Addendum: pixelmatch 8 threshold (2026-10-13)
+
+pixelmatch 8 replaced the YIQ colour metric with OKLab HyAB distance. `STRICT_PIXEL_THRESHOLD` moved from 0.05 to 0.065. Under OKLab, quarter-coverage anti-alias fringes of a #2599 recolor sit at 0.0425 to 0.0593, and half-coverage and solid glyph pixels start at 0.0896. The new value keeps the old split: fringes ignored, glyph pixels counted.

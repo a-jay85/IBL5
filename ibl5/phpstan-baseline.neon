@@ -167,12 +167,6 @@ parameters:
 			path: classes/Trading/TradingController.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class AwardHistory\AwardHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/AwardHistory/index.php
-
-		-
 			rawMessage: 'Parameter #1 $rawParams of method AwardHistory\AwardHistoryService::search() expects array<string, mixed>, array<mixed> given.'
 			identifier: argument.type
 			count: 1
@@ -183,12 +177,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/ComparePlayers/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ContractList\ContractListRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ContractList/index.php
 
 		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
@@ -207,78 +195,6 @@ parameters:
 			identifier: cast.int
 			count: 2
 			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DraftPickLocator\DraftPickLocatorRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftPickLocator/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftPickLocator/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FranchiseHistory\FranchiseHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FranchiseRecordBook\FranchiseRecordBookApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseRecordBook/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FranchiseRecordBook\FranchiseRecordBookRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseRecordBook/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FreeAgencyPreview\FreeAgencyPreviewRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FreeAgencyPreview/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FreeAgencyPreview/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class GMContactList\GMContactListRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/GMContactList/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class GameBoxscore\GameBoxscoreRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/GameBoxscore/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class GameBoxscore\GameBoxscoreRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/GameBoxscore/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Injuries\InjuriesService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Injuries/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
@@ -350,18 +266,6 @@ parameters:
 			path: modules/PlayerSearch/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class PlayerSearch\PlayerSearchRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerSearch/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Player\PlayerRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerSearch/index.php
-
-		-
 			rawMessage: 'Parameter #1 $rawParams of method PlayerSearch\PlayerSearchService::search() expects array<string, mixed>, array<mixed> given.'
 			identifier: argument.type
 			count: 1
@@ -380,38 +284,8 @@ parameters:
 			path: modules/Search/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Search\SearchRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Search/index.php
-
-		-
-			rawMessage: 'Parameter #2 $prefix of class Search\SearchRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Search/index.php
-
-		-
-			rawMessage: 'Part $module_name (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: modules/Search/index.php
-
-		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
-			count: 1
-			path: modules/SeasonArchive/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class SeasonArchive\SeasonArchiveRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonArchive/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class SeasonArchive\SeasonArchiveRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
 			count: 1
 			path: modules/SeasonArchive/index.php
 
@@ -452,18 +326,6 @@ parameters:
 			path: modules/SeasonHighs/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class SeasonRosterChanges\SeasonRosterChangesRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonRosterChanges/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonRosterChanges/index.php
-
-		-
 			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'
 			identifier: booleanNot.exprNotBoolean
 			count: 1
@@ -480,18 +342,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TeamOffDefStats/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class TeamOffDefStats\TeamOffDefStatsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TeamOffDefStats/index.php
 
 		-
 			rawMessage: 'Parameter #3 $searchFilters of method Topics\TopicsView::render() expects array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, articleComm: bool, preset?: string}, array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: array<int, string>, articleComm: bool, preset: ''''|''transactions''} given.'

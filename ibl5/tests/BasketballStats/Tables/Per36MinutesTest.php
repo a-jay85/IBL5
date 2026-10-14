@@ -12,7 +12,8 @@ use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Goldens under fixtures/ were captured once from the unmodified class. Never
- * regenerate them to make a failing test pass.
+ * regenerate them to make a failing test pass. The one-off capture method
+ * (testCaptureGoldensOnce) was deleted before the pin commit.
  *
  * @covers \BasketballStats\Tables\Per36Minutes
  */

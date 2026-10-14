@@ -17,9 +17,10 @@ use UI\TeamCellHelper;
  * footer label cells.
  *
  * Holds no state and never receives a database handle or a logged-in identity;
- * TeamStatsRowHelperTest pins that structurally. Every HtmlSanitizer::e() call sits
+ * TeamStatsRowHelperTest pins that structurally. Every HTML-escape call sits
  * on the exact value it guards, in the position the three templates used before
- * the split. Each builder returns the same bytes the template emitted, including
+ * the split. The HtmlSanitizer::trusted(openTag) preamble stays in each table class.
+ * Each builder returns the same bytes the template emitted, including
  * the leading indentation and the trailing newline that PHP's close-tag swallowing
  * produced.
  */

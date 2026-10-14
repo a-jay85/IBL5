@@ -5,17 +5,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pytest
-
-from harness import conformance
 from harness.conformance import check
 from harness.planfile import parse_required_test_methods
 from harness.state import PlanInfo
-
-
-@pytest.fixture(autouse=True)
-def _tracked_files(monkeypatch):
-    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: None)
 
 
 def _methods(*bullets: str) -> list[str]:

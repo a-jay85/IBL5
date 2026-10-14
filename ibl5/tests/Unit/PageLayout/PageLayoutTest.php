@@ -139,6 +139,93 @@ class PageLayoutTest extends TestCase
         self::assertStringNotContainsString('shortcut icon', $output);
     }
 
+    /**
+     * Everything PageLayout::header() emits before themeheader() runs, with cache-busters normalised.
+     * Slicing at the theme marker keeps the pin independent of ADMIN_PHASE_GATE_NOTICE, which another
+     * test in this class defines process-wide and which appends a div AFTER themeheader().
+     */
+    private function renderNormalisedHead(): string
+    {
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        $pos = strpos($output, '<!-- THEMEHEADER_CALLED -->');
+        self::assertNotFalse($pos, 'themeheader() marker missing; head slice would be unbounded');
+        $head = substr($output, 0, $pos);
+
+        $normalised = preg_replace('/\?v=\d*/', '?v=V', $head);
+        self::assertIsString($normalised);
+
+        return $normalised;
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function scriptPathProvider(): array
+    {
+        $root = \Bootstrap\AppPaths::root();
+
+        return [
+            'root index, no base tag' => [$root . '/index.php', ''],
+            'one level deep' => [$root . '/admin/index.php', "<base href=\"../\">\n"],
+            'two levels deep' => [$root . '/modules/Foo/index.php', "<base href=\"../../\">\n"],
+            'outside root, no base tag' => ['/tmp/not-ibl5/modules/Foo/index.php', ''],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('scriptPathProvider')]
+    public function testHeadOutputIsByteIdenticalToGolden(string $scriptFilename, string $baseLine): void
+    {
+        $GLOBALS['sitename'] = 'IBL"><script>alert(1)</script>';
+        $GLOBALS['pagetitle'] = 'Page & <b>Title</b>';
+        $GLOBALS['slogan'] = 'Slo"gan <i>&</i>';
+        unset($_SERVER['HTTP_HOST']);
+        $_SERVER['SCRIPT_FILENAME'] = $scriptFilename;
+
+        $golden = file_get_contents(__DIR__ . '/fixtures/head-golden.html');
+        self::assertIsString($golden);
+        self::assertSame(1, substr_count($golden, "<head>\n"), 'golden must hold exactly one <head> line to splice the base tag after');
+        $expected = str_replace("<head>\n", "<head>\n" . $baseLine, $golden);
+
+        self::assertSame($expected, $this->renderNormalisedHead());
+    }
+
+    public function testHeadEscapesHostileSiteGlobals(): void
+    {
+        $GLOBALS['sitename'] = 'IBL"><script>alert(1)</script>';
+        $GLOBALS['pagetitle'] = 'Page & <b>Title</b>';
+        $GLOBALS['slogan'] = 'Slo"gan <i>&</i>';
+        $_SERVER['SCRIPT_FILENAME'] = \Bootstrap\AppPaths::root() . '/index.php';
+
+        $head = $this->renderNormalisedHead();
+
+        self::assertStringNotContainsString('<script>alert(1)</script>', $head);
+        self::assertStringContainsString('<title>IBL&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt; Page &amp; &lt;b&gt;Title&lt;/b&gt;</title>', $head);
+        self::assertStringContainsString('<META NAME="AUTHOR" CONTENT="IBL&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;">', $head);
+        self::assertStringContainsString('<META NAME="COPYRIGHT" CONTENT="Copyright (c) by IBL&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;">', $head);
+        self::assertStringContainsString('<META NAME="DESCRIPTION" CONTENT="Slo&quot;gan &lt;i&gt;&amp;&lt;/i&gt;">', $head);
+    }
+
+    public function testHeadOpenGraphBlockForPreprodHostIsByteIdentical(): void
+    {
+        $_SERVER['HTTP_HOST'] = 'pre.iblhoops.net';
+        $_SERVER['SCRIPT_FILENAME'] = \Bootstrap\AppPaths::root() . '/index.php';
+
+        $head = $this->renderNormalisedHead();
+
+        $expectedOg = "<meta property=\"og:title\" content=\"IBL \xe2\x80\x94 Internet Basketball League\">\n"
+            . "<meta property=\"og:description\" content=\"The Internet Basketball League (IBL) is an online fantasy basketball league powered by the Jump Shot Basketball simulation engine.\">\n"
+            . "<meta property=\"og:type\" content=\"website\">\n"
+            . "<meta property=\"og:url\" content=\"https://pre.iblhoops.net/ibl5/index.php\">\n"
+            . "<meta property=\"og:image\" content=\"https://pre.iblhoops.net/ibl5/images/ibl/logocorner.jpg\">\n"
+            . "<meta property=\"og:image:width\" content=\"150\">\n"
+            . "<meta property=\"og:image:height\" content=\"150\">\n"
+            . "<meta property=\"og:site_name\" content=\"IBL \xe2\x80\x94 Internet Basketball League\">\n";
+        self::assertStringContainsString($expectedOg, $head);
+        self::assertStringNotContainsString('www.iblhoops.net', $head);
+    }
+
     public function testHeaderNonBoostedSkipsRecordHitWhenNoDb(): void
     {
         unset($_SERVER['HTTP_HX_BOOSTED']);

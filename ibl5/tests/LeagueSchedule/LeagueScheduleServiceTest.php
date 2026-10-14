@@ -301,6 +301,13 @@ class LeagueScheduleServiceTest extends TestCase
             'homeTier' => 'average',
         ], $r['gamesByMonth']['2025-11']['dates']['2025-11-01'][0]);
         $this->assertNull($r['firstUnplayedId']);
+
+        // gameOfThatDay 0 falls back to the box-score file URL
+        $legacy = $this->runPage([self::game(101, '2025-11-01', 1, 100, 2, 95, 0)], 'Regular Season');
+        $this->assertSame(
+            './ibl/IBL/box101.htm',
+            $legacy['gamesByMonth']['2025-11']['dates']['2025-11-01'][0]['boxScoreUrl']
+        );
     }
 
     public function testUnknownTeamsFallBackToEmptyStringsAndBottomTier(): void
@@ -318,6 +325,9 @@ class LeagueScheduleServiceTest extends TestCase
         );
 
         $row = $r['gamesByMonth']['2025-11']['dates']['2025-11-02'][0];
+        // An unranked team falls back to 0.0, which is the bottom tier. The
+        // OneZeroFloat mutant (1.0) is equivalent here, so the fallback lives in
+        // the UNRANKED_POWER_RANKING constant.
         $this->assertSame('', $row['visitorTeam']);
         $this->assertSame('', $row['homeTeam']);
         $this->assertSame('', $row['visitorRecord']);
@@ -358,6 +368,9 @@ class LeagueScheduleServiceTest extends TestCase
             '2025-11-20'
         );
 
+        // Dropping the null guard yields game-203; an OR on isUpcoming yields game-201.
+        $this->assertNotSame('game-203', $r['firstUnplayedId']);
+        $this->assertNotSame('game-201', $r['firstUnplayedId']);
         $this->assertSame('game-202', $r['firstUnplayedId']);
         $this->assertFalse($r['gamesByMonth']['2025-11']['dates']['2025-11-01'][0]['isUpcoming']);
         $this->assertTrue($r['gamesByMonth']['2025-11']['dates']['2025-11-06'][0]['isUpcoming']);
@@ -374,6 +387,7 @@ class LeagueScheduleServiceTest extends TestCase
         $row = $r['gamesByMonth']['2025-11']['dates']['2025-11-10'][0];
         $this->assertTrue($row['isUnplayed']);
         $this->assertFalse($row['isUpcoming']);
+        $this->assertNotSame('game-301', $r['firstUnplayedId']);
         $this->assertNull($r['firstUnplayedId']);
     }
 
@@ -410,6 +424,8 @@ class LeagueScheduleServiceTest extends TestCase
         $this->assertSame(['2025-11'], array_keys($m));
         $this->assertSame('November', $m['2025-11']['label']);
         $this->assertSame(['2025-11-01', '2025-11-05'], array_keys($m['2025-11']['dates']));
+        // Resetting the date list on each game would leave [502].
+        $this->assertNotSame([502], array_column($m['2025-11']['dates']['2025-11-01'], 'boxid'));
         $this->assertSame([501, 502], array_column($m['2025-11']['dates']['2025-11-01'], 'boxid'));
         $this->assertSame([503], array_column($m['2025-11']['dates']['2025-11-05'], 'boxid'));
     }

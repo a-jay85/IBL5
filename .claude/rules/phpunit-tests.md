@@ -1,7 +1,7 @@
 ---
 description: PHPUnit testing rules: output parsing, behavior-focused patterns, PHPStan test-neon suppressions, integration test seeding.
 paths: ibl5/tests/**/*.php
-last_verified: 2026-10-11
+last_verified: 2026-10-14
 ---
 
 # PHPUnit Testing Rules
@@ -9,10 +9,10 @@ last_verified: 2026-10-11
 ## PHPUnit 13+ Syntax (run from `ibl5/`)
 
 ```bash
-vendor/bin/phpunit                          # full suite
-vendor/bin/phpunit --filter testMethodName  # single test
-vendor/bin/phpunit --display-all-issues     # show ALL issues (deprecations/warnings/notices)
-vendor/bin/phpunit | tail -n 3              # token-saving: just the pass/fail summary
+vendor/bin/phpunit # full suite
+vendor/bin/phpunit --filter testMethodName # single test
+vendor/bin/phpunit --display-all-issues # show ALL issues
+vendor/bin/phpunit | tail -n 3 # just the pass/fail summary
 ```
 
 `-v` / `--verbose` do NOT exist in 13.x. By default only summary counts show — use `--display-all-issues` (or `--display-deprecations`/`-warnings`/`-notices`) for details.
@@ -159,6 +159,8 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase {
 3. **On-demand full** — apply the `mutation-test` label.
 
 Thresholds: **100% MSI / 100% Covered MSI** (`ibl5/infection.json5`, `.github/workflows/mutation-pr.yml`). Config: `phpunit-mutation.xml`; per-file deferrals live in `infection.json5`.
+
+**Local run.** `bin/mutation-diff <base-ref>`; details in `.claude/rules/phpstan-invocation.md`.
 
 ## Completion Criteria
 

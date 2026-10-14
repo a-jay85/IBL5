@@ -9,10 +9,10 @@ last_verified: 2026-10-14
 ## PHPUnit 13+ Syntax (run from `ibl5/`)
 
 ```bash
-vendor/bin/phpunit                          # full suite
-vendor/bin/phpunit --filter testMethodName  # single test
-vendor/bin/phpunit --display-all-issues     # show ALL issues
-vendor/bin/phpunit | tail -n 3              # just the pass/fail summary
+vendor/bin/phpunit # full suite
+vendor/bin/phpunit --filter testMethodName # single test
+vendor/bin/phpunit --display-all-issues # show ALL issues
+vendor/bin/phpunit | tail -n 3 # just the pass/fail summary
 ```
 
 `-v` / `--verbose` do NOT exist in 13.x. By default only summary counts show — use `--display-all-issues` (or `--display-deprecations`/`-warnings`/`-notices`) for details.
@@ -150,7 +150,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase {
 ```
 - `runModule('ModuleName', get: [...], post: [...])` includes the module's `index.php` and captures output; `authenticateAs('username')` simulates auth.
 - The class handles double output buffering for `PageLayout::footer()`'s `ob_end_flush()` — do NOT wrap `runModule()` in your own `ob_start()`.
-- **Use the HTML form field name, not the validator output key.** If `AwardHistoryValidator` reads `$params['aw_name']`, POST must use `['aw_name' => ...]`, not `['name' => ...]`. A wrong key hits the `??null` fallback, so the query runs unfiltered and `assertQueryExecuted()` still passes.
+- **Use the HTML form field name, not the validator output key.** If `AwardHistoryValidator` reads `$params['aw_name']`, POST must use `['aw_name' => ...]`, not `['name' => ...]`. Wrong key → the `??null` fallback fires, the query runs unfiltered, and `assertQueryExecuted()` still passes — a false positive hiding the bug.
 
 ## Mutation Testing (Infection)
 

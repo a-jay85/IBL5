@@ -834,6 +834,18 @@ test_decide_blind_normal_allows() {
     assert_eq decide_blind_normal:no-blind-trust 0 "$(log_count blind-trust)"
 }
 
+test_decide_stale_repeat_same_decision() {
+    decide_setup 99
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    local i out rc
+    for i in 1 2 3; do
+        out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A); rc=$?
+        assert_eq "decide_stale_repeat:out.$i" "" "$out"
+        assert_eq "decide_stale_repeat:rc.$i" 0 "$rc"
+        assert_no_file "decide_stale_repeat:no-marker.$i" "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    done
+}
+
 test_decide_blind_drain_pauses() {
     local FUT out m
     FUT=$(( $(date +%s) + 3600 ))
@@ -1568,6 +1580,18 @@ test_prestart_blind_normal_allows() {
     assert_eq prestart_blind_normal:rc 0 "$?"
     assert_no_file prestart_blind_normal:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
     assert_contains prestart_blind_normal:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "prestart-fail-open reason=stale-usage"
+}
+
+test_prestart_stale_repeat_same_decision() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 95 12)"
+    local i rc
+    for i in 1 2 3; do
+        in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"; rc=$?
+        assert_eq "prestart_stale_repeat:rc.$i" 0 "$rc"
+        assert_no_file "prestart_stale_repeat:no-marker.$i" "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    done
 }
 
 test_prestart_blind_drain_pauses() {
@@ -2631,6 +2655,14 @@ test_prod_unset_dir_uses_default() {
     assert_eq prod_default:rc 0 "$rc"
     assert_eq prod_default:out "$(real_default_dir)" "$out"
     assert_file prod_default:markers "$(real_default_dir)/markers"
+}
+
+test_usage_log_line_shape() {
+    new_env
+    local rc
+    bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_log probe a b"; rc=$?
+    assert_eq usage_log_shape:rc 0 "$rc"
+    assert_eq usage_log_shape:line 1 "$(log_re_count "${LOG_PFX}probe a b\$")"
 }
 
 # ---------------------------------------------------------------- runner

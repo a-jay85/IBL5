@@ -30,6 +30,62 @@ class AwardHistoryRepositoryTest extends DatabaseTestCase
         self::assertGreaterThanOrEqual(1, $result['count']);
     }
 
+    public function testNoFiltersReturnsEveryAwardRow(): void
+    {
+        $this->insertAwardRow('AWH Every One', 'MVP', 2092);
+        $this->insertAwardRow('AWH Every Two', 'DPOY', 2092);
+
+        $result = $this->repo->searchAwards($this->buildParams());
+
+        // Independent count: every award row, once per matching player row.
+        $expected = $this->countRows(
+            'SELECT COUNT(*) AS n FROM `ibl_awards` a LEFT JOIN `ibl_plr` p ON a.name = p.name'
+        );
+        self::assertGreaterThanOrEqual(2, $expected);
+        self::assertSame($expected, $result['count']);
+        self::assertCount($expected, $result['results']);
+        self::assertNotNull($this->findByName($result['results'], 'AWH Every One'));
+        self::assertNotNull($this->findByName($result['results'], 'AWH Every Two'));
+    }
+
+    public function testYearAndNameFiltersReturnOnlyMatchingRows(): void
+    {
+        $this->insertAwardRow('AWH YN Alpha', 'MVP', 2094);
+        $this->insertAwardRow('AWH YN Alpha', 'DPOY', 2093);
+        $this->insertAwardRow('AWH YN Beta', 'MVP', 2094);
+
+        $yearAndName = $this->repo->searchAwards($this->buildParams(['year' => 2094, 'name' => 'AWH YN Alpha']));
+        $allThree = $this->repo->searchAwards($this->buildParams(['year' => 2094, 'name' => 'AWH YN', 'award' => 'MVP']));
+
+        self::assertSame(1, $yearAndName['count']);
+        self::assertSame('AWH YN Alpha', $yearAndName['results'][0]['name']);
+        self::assertSame(2094, $yearAndName['results'][0]['year']);
+        self::assertSame(
+            $this->countRows("SELECT COUNT(*) AS n FROM `ibl_awards` a LEFT JOIN `ibl_plr` p ON a.name = p.name WHERE a.year = 2094 AND a.name LIKE '%AWH YN Alpha%'"),
+            $yearAndName['count']
+        );
+
+        self::assertSame(2, $allThree['count']);
+        self::assertSame(
+            $this->countRows("SELECT COUNT(*) AS n FROM `ibl_awards` a LEFT JOIN `ibl_plr` p ON a.name = p.name WHERE a.year = 2094 AND a.name LIKE '%AWH YN%' AND a.award LIKE '%MVP%'"),
+            $allThree['count']
+        );
+    }
+
+    /**
+     * Run a test-owned COUNT query aliased `n`.
+     */
+    private function countRows(string $sql): int
+    {
+        $result = $this->db->query($sql);
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertIsScalar($row['n']);
+
+        return (int) $row['n'];
+    }
+
     public function testFilterByYearExactMatch(): void
     {
         $this->insertAwardRow('AWH YearTest', 'MVP', 2095);

@@ -93,4 +93,16 @@ class TeamsDropdownViewTest extends TestCase
         $this->assertStringContainsString('nav-team-logo-container', $html);
         $this->assertStringContainsString('nav-team-logo-img', $html);
     }
+
+    public function testGlobeIconRendersInDesktopAndMobile(): void
+    {
+        $circle = '<circle cx="12" cy="12" r="10" stroke-width="1.5"/>';
+
+        foreach ([$this->view->renderDesktop($this->teamsData), $this->view->renderMobile($this->teamsData, null)] as $html) {
+            $this->assertMatchesRegularExpression(
+                '#<span class="text-accent-500[^"]*"><svg[^>]*>' . preg_quote($circle, '#') . '#',
+                $html,
+            );
+        }
+    }
 }

@@ -13,21 +13,23 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 DRIVER="$SCRIPT_DIR/post-plan-fleet"
 [[ -x "$DRIVER" ]] || { echo "FAIL: $DRIVER missing or not executable" >&2; exit 1; }
 
 SCRATCH="$(mktemp -d)"
 TMP_LOGS=()
-_cleanup() { rm -rf "$SCRATCH"; [[ ${#TMP_LOGS[@]} -gt 0 ]] && rm -f "${TMP_LOGS[@]}"; }
+_cleanup() { rm -rf "$SCRATCH"; [[ ${#TMP_LOGS[@]} -gt 0 ]] && rm -f "${TMP_LOGS[@]}"; h_cleanup; }
 trap _cleanup EXIT
 
-FAILED=0
 CASE_BASE=0
-fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
-begin_case() { CASE_BASE=$FAILED; }
+fail() { h_fail "$*"; }
+begin_case() { CASE_BASE=$H_FAIL; }
 end_case() {  # $1 = case name; prints "<name> OK" only if the case added no failures
-    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+    if [[ $H_FAIL -eq $CASE_BASE ]]; then h_pass "$1"; else echo "$1 FAILED" >&2; fi
 }
 
 # --- fixtures ----------------------------------------------------------------------------
@@ -248,7 +250,7 @@ end_case plist-shape
 # expands it to zero words.
 begin_case
 if [[ -f /tmp/post-plan-fleet-runner-1901.sh ]]; then
-    grep -qxF 'timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} > "$LOG" 2>&1 || RC=$?' \
+    grep -qxF 'timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?' \
         /tmp/post-plan-fleet-runner-1901.sh \
         || fail "runner-line-hand-started: runner lacks the post-plan-now line"
     grep -qxF "ALLOW_TEST_ONLY_ARG=''" /tmp/post-plan-fleet-runner-1901.sh \
@@ -290,7 +292,7 @@ _allow_stub_run() {  # $1 = runner path, $2 = stub argv output file
     printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" > %q\n' "$out" > "$stub"
     chmod +x "$stub"
     ( ROOT=/tmp PR=1901 LOG=/dev/null RC=0 POST_PLAN_NOW_BIN="$stub"
-      eval "$(grep -E '^(ALLOW_TEST_ONLY_ARG|STATE_CHANGED_ARG)=' "$runner")"
+      eval "$(grep -E '^(ALLOW_TEST_ONLY_ARG|STATE_CHANGED_ARG|REBASE_ONLY_ARG)=' "$runner")"
       eval "$(grep -E '^timeout 5400 ' "$runner" | sed 's/^timeout 5400 //')" ) 2>/dev/null
 }
 begin_case
@@ -361,6 +363,88 @@ for _sc_form in "--state-changed-prs 1901" "--state-changed-prs=" "--state-chang
     [[ ! -e /tmp/post-plan-fleet-runner-1901.sh ]] || fail "state-changed-prs-rejected-forms: '$_sc_form' wrote a runner"
 done
 end_case state-changed-prs-rejected-forms
+
+# --rebase-only-prs=<csv> bakes --rebase-only into only the listed PRs' runners.
+begin_case
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-*.sh
+_ro_prs="$(jq -r '.[].number' "$SCRATCH/two-open.json" | paste -sd, -)"
+_ro_other="$(jq -r '.[].number' "$SCRATCH/two-open.json" | grep -vx 1901 | head -n 1)"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr-list "$_ro_prs" --allow-test-only --rebase-only-prs=1901 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "rebase-only-prs-accepted: --go exited $rc (out: $out)"
+grep -qxF 'REBASE_ONLY_ARG=--rebase-only' /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "rebase-only-prs-accepted: 1901 header lacks REBASE_ONLY_ARG=--rebase-only"
+grep -qxF "REBASE_ONLY_ARG=''" "/tmp/post-plan-fleet-runner-${_ro_other}.sh" 2>/dev/null \
+    || fail "rebase-only-prs-accepted: PR ${_ro_other} header lacks REBASE_ONLY_ARG=''"
+grep -E '^DRY\(invocation\) PR #1901:' <<< "$out" | grep -qE -- '--foreground --allow-test-only --rebase-only$' \
+    || fail "rebase-only-prs-accepted: 1901 dry-run line does not end with the flags: $out"
+grep -E "^DRY\(invocation\) PR #${_ro_other}:" <<< "$out" | grep -qF -- '--rebase-only' \
+    && fail "rebase-only-prs-accepted: PR ${_ro_other} dry-run line carries --rebase-only"
+rm -f /tmp/post-plan-fleet-runner-*.sh
+clean_slots
+end_case rebase-only-prs-accepted
+
+# The baked runner hands --rebase-only to the post-plan-now stub as its own argument.
+begin_case
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 1901 --rebase-only-prs=1901 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "rebase-only-runner-bakes-arg: --go exited $rc (out: $out)"
+_allow_stub_run /tmp/post-plan-fleet-runner-1901.sh "$SCRATCH/ro-argv"
+[[ "$(cat "$SCRATCH/ro-argv" 2>/dev/null)" == "--pr 1901 --foreground --rebase-only" ]] \
+    || fail "rebase-only-runner-bakes-arg: stub saw '$(cat "$SCRATCH/ro-argv" 2>/dev/null)'"
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+clean_slots
+end_case rebase-only-runner-bakes-arg
+
+# Equals form only; a malformed value or the space form exits 2 with ERROR: and writes no runner.
+begin_case
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-*.sh
+for _ro_form in "--rebase-only-prs=abc" "--rebase-only-prs=" "--rebase-only-prs=0" "--rebase-only-prs 1901"; do
+    # shellcheck disable=SC2086
+    out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 1901 $_ro_form 2>&1)"; rc=$?
+    [[ $rc -eq 2 ]] || fail "rebase-only-prs-rejected: '$_ro_form' exit $rc, want 2 (out: $out)"
+    grep -qF 'ERROR:' <<< "$out" || fail "rebase-only-prs-rejected: '$_ro_form' printed no ERROR: $out"
+    grep -qF -- '--rebase-only-prs' <<< "$out" || fail "rebase-only-prs-rejected: '$_ro_form' error does not name the flag: $out"
+    if [[ "$_ro_form" == --rebase-only-prs=* ]]; then
+        grep -qF 'needs a comma list' <<< "$out" \
+            || fail "rebase-only-prs-rejected: '$_ro_form' error lacks 'needs a comma list': $out"
+    fi
+    [[ ! -e /tmp/post-plan-fleet-runner-1901.sh ]] || fail "rebase-only-prs-rejected: '$_ro_form' wrote a runner"
+done
+end_case rebase-only-prs-rejected
+
+# bin/post-plan-now: a rebase-only failure never falls back to the skill, and the harness
+# flag appears only in rebase-only mode.
+begin_case
+_ppn_bin="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/post-plan-now"
+_ppn_probe="$(
+    # shellcheck source=/dev/null
+    . "$_ppn_bin"
+    should_fallback 1 1; printf 'a%s ' "$?"
+    should_fallback 1 0; printf 'b%s ' "$?"
+    should_fallback 1; printf 'c%s ' "$?"
+    should_fallback 3 0; printf 'd%s ' "$?"
+    # Matrix row 18: rebase-only (second arg 1) never falls back, whatever the rc.
+    should_fallback 0 1; printf 'h%s ' "$?"
+    should_fallback 2 1; printf 'i%s ' "$?"
+    should_fallback 3 1; printf 'j%s ' "$?"
+    should_fallback 124 1; printf 'k%s ' "$?"
+    printf 'e[%s] f[%s] g[%s]' "$(rebase_only_harness_arg 1)" "$(rebase_only_harness_arg 0)" "$(rebase_only_harness_arg "")"
+)"
+[[ "$_ppn_probe" == "a1 b0 c0 d1 h1 i1 j1 k1 e[ --rebase-only] f[] g[]" ]] \
+    || fail "post-plan-now-rebase-only-helpers: probe gave '$_ppn_probe'"
+end_case post-plan-now-rebase-only-helpers
+
+# A valued --rebase-only= is an unknown argument. post-plan-now exits 1 for every unknown
+# argument, and tools/postplan-harness/tests/test_post_plan_now_fallback.py pins that code.
+begin_case
+out="$("$_ppn_bin" --rebase-only=yes 2>&1)"; rc=$?
+[[ $rc -eq 1 ]] || fail "post-plan-now-rejects-rebase-only-value: exit $rc, want 1 (out: $out)"
+grep -qF "unknown argument '--rebase-only=yes'" <<< "$out" \
+    || fail "post-plan-now-rejects-rebase-only-value: no unknown-argument error: $out"
+end_case post-plan-now-rejects-rebase-only-value
 
 # --- case 6.5: session re-fire — sidecar holds SECOND uuid, not first (sweep-ordering) ----
 begin_case
@@ -2998,6 +3082,15 @@ HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
 grep -q 'TIMED OUT after 90m' "$_DM_LOG" || fail "fleet-outcome-line: rc 124 log lacks TIMED OUT"
 grep -q 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
     || fail "fleet-outcome-line: rc 124 DM lacks TIMED OUT ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+_dm_result_case 105 'RESULT: post-plan REBASED — terminal=rebased-held PR #2803; merged master and pushed abc1234; held for a human (prior hold 7,8); no review run, auto-merge not armed.' <<< '{"terminal": "rebased-held"}'
+[[ "$(_outcome_of)" == rebased ]] || fail "fleet-outcome-line: rebased-held gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == rebase-only ]] || fail "fleet-outcome-line: rebased-held reason '$(_reason_of)'"
+grep -qF 'REBASED (still held)' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: rebased-held DM lacks REBASED ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+_dm_result_case 106 'RESULT: post-plan REBASED — terminal=rebased-held PR #2804; nothing to merge; held for a human (prior hold 7); no review run, auto-merge not armed.' <<< 'not json'
+[[ "$(_outcome_of)" == rebased ]] || fail "fleet-outcome-line: RESULT-only rebased-held gave '$(_outcome_of)'"
+grep -qF 'REBASED (still held)' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: RESULT-only rebased-held DM lacks REBASED ($(cat "$_DM_CAPTURE" 2>/dev/null))"
 end_case fleet-outcome-line
 
 # --- case 23: usage-gate-paused ----------------------------------------------------------
@@ -3060,8 +3153,4 @@ unset IBL5_USAGE_GATE_STATE_DIR
 end_case usage-gate-paused
 
 # --- verdict -----------------------------------------------------------------------------
-if [[ $FAILED -ne 0 ]]; then
-    echo "test-post-plan-fleet: FAILED ($FAILED assertion failure(s))" >&2
-    exit 1
-fi
-echo "test-post-plan-fleet: all cases passed"
+h_done

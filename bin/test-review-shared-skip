@@ -10,6 +10,9 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SKIP_SCRIPT="$SCRIPT_DIR/../.claude/review-shared/scripts/skip-review.sh"
 test -s "$SKIP_SCRIPT" || { echo "FAIL: skip-review.sh not found at $SKIP_SCRIPT"; exit 1; }
@@ -21,15 +24,15 @@ _cleanup() {
     rm -rf "$SCRATCH"
     rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md" \
           "/tmp/post-plan-delta-diff-9999"
+    h_cleanup
 }
 trap _cleanup EXIT
 
-FAILED=0
 CASE_BASE=0
-fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
-begin_case() { CASE_BASE=$FAILED; }
+fail() { h_fail "$*"; }
+begin_case() { CASE_BASE=$H_FAIL; }
 end_case() {
-    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+    if [[ $H_FAIL -eq $CASE_BASE ]]; then h_pass "$1"; else echo "$1 FAILED" >&2; fi
 }
 
 want() {
@@ -832,8 +835,4 @@ if [[ "${1:-}" != "--skip-mutation" ]]; then
 fi
 
 # --- verdict -----------------------------------------------------------------------------
-if [[ $FAILED -ne 0 ]]; then
-    echo "test-review-shared-skip: FAILED ($FAILED assertion failure(s))" >&2
-    exit 1
-fi
-echo "test-review-shared-skip: all cases passed"
+h_done

@@ -6,12 +6,15 @@
 # C1-C4  run bin/check-master-ci-green end to end against fixture JSON via the
 #        GH_API_CMD seam (a `gh` shim answers `auth status`; a throwaway git repo
 #        supplies the origin remote).
-# L1-L5  source the lib and call its functions directly.
+# L1-L7  source the lib and call its functions directly.
 # P1-P17 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
 #        (the Nth poll serves the Nth fixture; every case uses --interval-seconds=0).
 #
 # Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+H_FAIL_FD=2  # FAIL: lines stay on stderr, as before migration
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     echo "Usage: bin/test-ci-checks-green [--help|-h]"
@@ -23,11 +26,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHECK="$SCRIPT_DIR/check-master-ci-green"
 LIB="$SCRIPT_DIR/lib/ci-checks-green.sh"
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP"; h_cleanup' EXIT
 
-FAILED=0
-ok()   { echo "ok: $1"; }
-fail() { echo "FAIL: $1" >&2; FAILED=1; }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$1"; }
 
 # --- shared fixtures ---------------------------------------------------------
 SHIMD="$TMP/shim"
@@ -103,7 +105,7 @@ else
     fail "C4 latest-per-name wins (rc=$RC err=$(cat "$ERR"))"
 fi
 
-# --- L1-L5: lib unit cases ----------------------------------------------------
+# --- L1-L7: lib unit cases ----------------------------------------------------
 # shellcheck source=bin/lib/ci-checks-green.sh
 if [ -f "$LIB" ]; then
     source "$LIB"
@@ -159,8 +161,30 @@ if [ -f "$LIB" ]; then
     else
         fail "L5 skip csv to json (empty=$e spaced=$s)"
     fi
+
+    DROP_IN='{"check_runs":[
+      {"name":"deploy","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z"},
+      {"name":"deploy","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+      {"name":"deploy-ish","status":"queued"},
+      {"name":"e2e","status":"in_progress"},
+      {"name":"phpunit","status":"completed","conclusion":"success"}]}'
+    got="$(printf '%s' "$DROP_IN" | ccg_drop_pending '["deploy"]' \
+      | jq -c '[.check_runs[] | .name + ":" + .status], .total_count')"
+    want="$(printf '%s\n%s' '["deploy:completed","deploy-ish:queued","e2e:in_progress","phpunit:completed"]' '4')"
+    if [ "$got" = "$want" ]; then
+        ok "L6 drop_pending drops only pending runs of exact listed names"
+    else
+        fail "L6 drop_pending drops only pending runs of exact listed names (got: $got)"
+    fi
+
+    got="$(printf '%s' "$DROP_IN" | ccg_drop_pending '[]' | jq -c '.check_runs | length')"
+    if [ "$got" = "5" ]; then
+        ok "L7 drop_pending with an empty list keeps every run"
+    else
+        fail "L7 drop_pending with an empty list keeps every run (got: $got)"
+    fi
 else
-    fail "L1-L5 cannot run: $LIB is missing"
+    fail "L1-L7 cannot run: $LIB is missing"
 fi
 
 # --- P1-P17: bin/check-pr-checks-green (PR-head poller) ---------------------
@@ -391,5 +415,4 @@ p17_try --startup-grace-seconds=x
 p17_try --base-ref master
 if [ "$p17_ok" -eq 1 ]; then ok "P17 rejected base-ref and grace forms"; else fail "P17 rejected base-ref and grace forms"; fi
 
-
-exit "$FAILED"
+h_done

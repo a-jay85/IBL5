@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\WideUnit\SimRecap;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SimRecap\SimSummariesView;
 
@@ -52,6 +53,60 @@ final class SimSummariesViewTest extends TestCase
             'blocked_until' => null,
             'generated_at'  => '2026-03-01 10:05:00',
         ];
+    }
+
+    /**
+     * The fixed page chrome around every golden body. `$inner` starts at the blank line
+     * that follows the h1 and ends just before the "Return to IBL" link.
+     */
+    private function goldenPage(string $inner): string
+    {
+        return "<!DOCTYPE html>\n"
+            . "<html lang=\"en\">\n"
+            . "<head>\n"
+            . "    <meta charset=\"UTF-8\">\n"
+            . "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+            . "    <title>Sim Recaps</title>\n"
+            . '    ' . \PageLayout\PageLayout::renderFontPreconnectLinks() . "\n"
+            . "    <link rel=\"stylesheet\" href=\"/ibl5/themes/IBL/style/style.css\">\n"
+            . "</head>\n"
+            . "<body>\n"
+            . "<div class=\"updater\">\n"
+            . "    <h1 class=\"updater__title\">Sim Recaps</h1>\n"
+            . "\n"
+            . $inner
+            . "    <a href=\"/ibl5/index.php\" class=\"updater__return underline\">Return to IBL</a>\n"
+            . "</div>\n"
+            . "</body>\n"
+            . "</html>\n"
+            . '        ';
+    }
+
+    /** The index table with `$rowsHtml` as its tbody content; ends after `</table>` and its newline. */
+    private function goldenTable(string $rowsHtml): string
+    {
+        return "    <table class=\"ibl-data-table\">\n"
+            . "        <thead>\n"
+            . "            <tr>\n"
+            . "                <th>Sim</th>\n"
+            . "                <th>Status</th>\n"
+            . "                <th>Attempts</th>\n"
+            . "                <th>Generated</th>\n"
+            . "                <th>Created</th>\n"
+            . "                <th>Body</th>\n"
+            . "            </tr>\n"
+            . "        </thead>\n"
+            . "        <tbody>\n"
+            . $rowsHtml
+            . "        </tbody>\n"
+            . "    </table>\n";
+    }
+
+    private function goldenEmptyRows(): string
+    {
+        return "            <tr>\n"
+            . "                <td colspan=\"6\">No sim recaps have been generated yet.</td>\n"
+            . "            </tr>\n";
     }
 
     public function testRendersEveryRowInTheOrderGiven(): void
@@ -409,5 +464,231 @@ final class SimSummariesViewTest extends TestCase
         $html = $this->view->render([], $this->recapRow('Body.'), [], null, null, [$orphan]);
 
         self::assertStringContainsString('class="recap-orphan"', $html, 'The orphan list item must still render');
+    }
+
+    public function testGoldenEmptyIndexNoRecap(): void
+    {
+        $html = $this->view->render([], null, [], null);
+
+        $expected = $this->goldenPage("\n" . $this->goldenTable($this->goldenEmptyRows()) . "\n\n");
+
+        self::assertSame($expected, $html);
+    }
+
+    /**
+     * @return array<string, array{0: string|null, 1: int|null, 2: string}>
+     */
+    public static function errorNoticeProvider(): array
+    {
+        return [
+            'malformed' => ['malformed', null, 'Invalid sim number.'],
+            'notfound with sim' => ['notfound', 12345, 'No recap stored for sim 12345.'],
+            'notfound with null sim' => ['notfound', null, 'No recap stored for sim .'],
+        ];
+    }
+
+    #[DataProvider('errorNoticeProvider')]
+    public function testGoldenErrorNotice(string $error, ?int $requestedSim, string $message): void
+    {
+        $html = $this->view->render([], null, [], $error, $requestedSim);
+
+        $expected = $this->goldenPage(
+            '    <p class="ibl-card" id="recap-error">' . $message . "</p>\n"
+            . "\n"
+            . $this->goldenTable($this->goldenEmptyRows())
+            . "\n\n"
+        );
+
+        self::assertSame($expected, $html);
+    }
+
+    public function testGoldenFullRecapWithEveryBranchAndHostilePayloads(): void
+    {
+        $rows = [
+            [
+                'sim'          => 689,
+                'status'       => 'done<script>x</script>',
+                'attempts'     => 2,
+                'generated_at' => '2026-03-01 10:05:00',
+                'created_at'   => '2026-03-01 09:00:00',
+                'recap_length' => 1234,
+            ],
+            [
+                'sim'          => 688,
+                'status'       => 'pending',
+                'attempts'     => 1,
+                'generated_at' => null,
+                'created_at'   => null,
+                'recap_length' => null,
+            ],
+        ];
+        $intro = "Intro <b>bold</b> & \"quoted\"";
+        $outro = 'Outro </textarea><script>alert(1)</script>';
+        $body  = "Teaser <script>alert('x')</script>";
+        $recap = [
+            'sim'          => 689,
+            'status'       => 'done"><img src=x onerror=alert(1)>',
+            'attempts'     => 2,
+            'generated_at' => '2026-03-01 10:05:00',
+            'themes_used'  => '["Trade <deadline>","O\'Brien\'s run"]',
+            'intro_text'   => $intro,
+            'outro_text'   => $outro,
+            'recap_text'   => $body,
+        ];
+        $gameRecaps = [
+            [
+                'game_date'      => '2026-02-20',
+                'visitor_teamid' => 5,
+                'home_teamid'    => 12,
+                'recap_text'     => 'Game one <@5> text & more',
+            ],
+            [
+                'game_date'      => null,
+                'visitor_teamid' => 'abc',
+                'home_teamid'    => null,
+                'recap_text'     => 'Game "two"',
+            ],
+        ];
+        $orphanedGames = [
+            [
+                'game_date'        => '2026-02-21',
+                'visitor_teamid'   => 3,
+                'home_teamid'      => 9,
+                'game_of_that_day' => 2,
+            ],
+            [
+                'game_date'        => '<x>',
+                'visitor_teamid'   => null,
+                'home_teamid'      => 'h<',
+                'game_of_that_day' => null,
+            ],
+        ];
+
+        $html = $this->view->render($rows, $recap, $gameRecaps, null, null, $orphanedGames);
+
+        $document = \SimRecap\RecapDocument::postableText($intro, $gameRecaps, $outro, $body);
+
+        $indexRows = <<<'HTML'
+            <tr>
+                <td><a href="simSummaries.php?sim=689">689</a></td>
+                <td>done&lt;script&gt;x&lt;/script&gt;</td>
+                <td>2</td>
+                <td>2026-03-01 10:05:00</td>
+                <td>2026-03-01 09:00:00</td>
+                <td>1234 bytes</td>
+            </tr>
+            <tr>
+                <td><a href="simSummaries.php?sim=688">688</a></td>
+                <td>pending</td>
+                <td>1</td>
+                <td>—</td>
+                <td>—</td>
+                <td>—</td>
+            </tr>
+
+HTML;
+        $section = <<<'HTML'
+    <section class="ibl-card" id="recap-panel">
+        <h2 class="ibl-title">Sim 689</h2>
+        <p>Status: done&quot;&gt;&lt;img src=x onerror=alert(1)&gt; · Attempts: 2 · Generated: 2026-03-01 10:05:00</p>
+        <p id="recap-themes">Themes: Trade &lt;deadline&gt;, O&apos;Brien&apos;s run</p>
+        <div id="recap-orphan-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
+            <p><strong>Warning:</strong> 2 games in this sim recap could not be matched to a box score and are omitted from the postable document. Unresolvable keys:</p>
+            <ul>
+            <li class="recap-orphan">2026-02-21 · team 3 at team 9 · game 2 of that day</li>
+            <li class="recap-orphan">&lt;x&gt; · team  at team h&lt; · game  of that day</li>
+            </ul>
+        </div>
+        <p id="recap-intro" class="whitespace-pre-line">Intro &lt;b&gt;bold&lt;/b&gt; &amp; &quot;quoted&quot;</p>
+        <ol id="recap-games">
+            <li class="recap-game">
+                <span class="recap-game__meta">2026-02-20 · team 5 at team 12</span>
+                <p class="recap-game__text whitespace-pre-line">Game one &lt;@5&gt; text &amp; more</p>
+            </li>
+            <li class="recap-game">
+                <span class="recap-game__meta"> · team abc at team </span>
+                <p class="recap-game__text whitespace-pre-line">Game &quot;two&quot;</p>
+            </li>
+        </ol>
+        <p id="recap-outro" class="whitespace-pre-line">Outro &lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;</p>
+        <textarea id="recap-body" readonly rows="24" cols="100">{{DOC}}</textarea>
+        <p>
+            <button type="button" id="recap-copy">Copy</button>
+            <span id="recap-copied" hidden>Copied</span>
+            <a id="recap-download" href="simSummaries.php?sim=689&amp;format=txt">Download raw text</a>
+        </p>
+        <script>
+            document.getElementById('recap-copy').addEventListener('click', function () {
+                navigator.clipboard.writeText(document.getElementById('recap-body').value);
+                document.getElementById('recap-copied').hidden = false;
+            });
+        </script>
+    </section>
+
+HTML;
+
+        $expected = $this->goldenPage(
+            "\n"
+            . $this->goldenTable($indexRows)
+            . "\n"
+            . str_replace('{{DOC}}', \Security\HtmlSanitizer::e($document), $section)
+            . "\n"
+        );
+
+        self::assertSame($expected, $html);
+    }
+
+    public function testGoldenMissingRecapTextWithSingleOrphan(): void
+    {
+        $orphan = [
+            'game_date'        => '2026-02-21',
+            'visitor_teamid'   => 3,
+            'home_teamid'      => 9,
+            'game_of_that_day' => 1,
+        ];
+
+        $html = $this->view->render([], $this->recapRow(null, '{"not":"a list"'), [], null, null, [$orphan]);
+
+        $section = <<<'HTML'
+    <section class="ibl-card" id="recap-panel">
+        <h2 class="ibl-title">Sim 689</h2>
+        <p>Status: pending · Attempts: 1 · Generated: 2026-03-01 10:05:00</p>
+        <p id="recap-themes">Themes: —</p>
+        <div id="recap-orphan-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
+            <p><strong>Warning:</strong> 1 game in this sim recap could not be matched to a box score and is omitted from the postable document. Unresolvable keys:</p>
+            <ul>
+            <li class="recap-orphan">2026-02-21 · team 3 at team 9 · game 1 of that day</li>
+            </ul>
+        </div>
+        <p id="recap-missing">No recap text stored yet — status: pending.</p>
+    </section>
+
+HTML;
+
+        $expected = $this->goldenPage(
+            "\n"
+            . $this->goldenTable($this->goldenEmptyRows())
+            . "\n"
+            . $section
+            . "\n"
+        );
+
+        self::assertSame($expected, $html);
+    }
+
+    public function testViewHoldsNoStateAndTakesNoCollaborators(): void
+    {
+        $reflection = new \ReflectionClass(SimSummariesView::class);
+
+        self::assertSame([], $reflection->getProperties(), 'A DB handle or session would have to live in a property');
+        self::assertNull($reflection->getConstructor(), 'Nothing can be injected');
+        self::assertSame(
+            ['render'],
+            array_map(
+                static fn (\ReflectionMethod $m): string => $m->getName(),
+                $reflection->getMethods(\ReflectionMethod::IS_PUBLIC)
+            ),
+            'render() is the only public entry point'
+        );
     }
 }

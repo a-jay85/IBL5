@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\BasketballStats\Tables;
 
 use BasketballStats\Tables\PeriodAverages;
+use Database\SqlPlaceholders;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -13,14 +14,16 @@ use Tests\WideUnit\Mocks\MockDatabase;
  * Characterization pins for PeriodAverages::render().
  *
  * What the mock cannot reach, and what this class leaves untested:
- * - The `Prepare failed` exception is unreachable through MockDatabase, because
- *   MockDatabase::prepare() always returns a MockPreparedStatement.
- * - The `Execute failed` and `Failed to get result set` exceptions are not exercised.
- *   A SELECT matched by an onQuery route always yields a MockDatabaseResult, and this
- *   class does not edit the shared mock to inject a failure.
+ * - The aggregate query now lives in Team\SplitStatsRepository::getPeriodStats() and runs
+ *   through Database\BaseMysqliRepository::fetchAll(). Prepare/execute/get_result failures
+ *   surface as \RuntimeException (codes 1001/1002/1003) from BaseMysqliRepository and are
+ *   not exercised here; MockDatabase::prepare() always returns a MockPreparedStatement.
  * - MockPreparedStatement::bind_param records bound values only and discards the type
- *   string, so the `'sssii' . str_repeat('i', n)` bind types are pinned by reading the
- *   source only. The tests pin the bound values and their count.
+ *   string, so the `'sssii' . PID_LIST_TYPES` bind types are pinned by reading
+ *   SplitStatsRepository::getPeriodStats() only. The tests pin the bound values and their
+ *   count through render(); tests/Team/SplitStatsRepositoryGetPeriodStatsTest.php pins the
+ *   same SQL and bindings on the repository directly, and
+ *   tests/DatabaseIntegration/SplitStatsRepositoryTest.php pins the aggregate math in MySQL.
  * - SQL aggregation (ROUND, COUNT(DISTINCT ...), ORDER BY p.name) runs in MySQL, so the
  *   mock returns rows verbatim and these tests do not pin it. The rendered goldens pin
  *   everything render() does with the rows it receives.
@@ -238,8 +241,11 @@ final class PeriodAveragesTest extends TestCase
 
         $this->renderWithDefaultRows($db, null, null, [], [101, 102, 103]);
 
-        $this->assertStringContainsString(' AND bs.pid IN (?,?,?)', $this->mainPreparedQuery($db));
-        $this->assertSame(['2025-01-10', '2025-01-20', 7, 7, 7, 101, 102, 103], $db->getLastBoundParams());
+        $this->assertStringContainsString(' AND bs.pid IN (' . SqlPlaceholders::PID_LIST . ')', $this->mainPreparedQuery($db));
+        $this->assertSame(
+            ['2025-01-10', '2025-01-20', 7, 7, 7, ...SqlPlaceholders::padPidList([101, 102, 103])],
+            $db->getLastBoundParams()
+        );
     }
 
     public function testEmptyPidFilterAddsNoInClause(): void

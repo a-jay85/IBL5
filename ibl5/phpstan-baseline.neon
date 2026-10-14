@@ -61,52 +61,10 @@ parameters:
 			path: bin/refresh-team-season-records
 
 		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 4
-			path: classes/Api/Repository/ApiGameRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/Api/Repository/ApiLeadersRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/AwardHistory/AwardHistoryRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/BasketballStats/Tables/PeriodAverages.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/Bootstrap/ConfigBootstrap.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/BugPipeline/BugReportClaimRepository.php
-
-		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
 			path: classes/Debug/DebugSession.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/DepthChart/DepthChartView.php
 
 		-
 			rawMessage: 'Parameter #3 $pickOwner of method Draft\Contracts\DraftViewInterface::renderDraftInterface() expects string, string|null given.'
@@ -139,60 +97,6 @@ parameters:
 			path: classes/Extension/ExtensionService.php
 
 		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 3
-			path: classes/FranchiseRecordBook/FranchiseRecordBookRepository.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 4
-			path: classes/FreeAgency/FreeAgencyOfferView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/FreeAgency/FreeAgencyTeamFreeAgentsSectionView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/FreeAgency/FreeAgencyUnderContractSectionView.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/LastSimRecap/LastSimRecapRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/League/League.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/LeagueControlPanel/LeagueControlPanelView.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/LeagueSchedule/LeagueScheduleRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/Migration/SchemaValidator.php
-
-		-
 			rawMessage: 'header() is banned outside Bootstrap classes, Responders, and HTMX ApiHandlers. Route response headers through a Responder (composed by the Controller/ApiHandler).'
 			identifier: ibl.directHeader
 			count: 3
@@ -205,112 +109,10 @@ parameters:
 			path: classes/Navigation/Views/DesktopNavView.php
 
 		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 3
-			path: classes/Navigation/Views/DesktopNavView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/Navigation/Views/LoginFormView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 7
-			path: classes/Navigation/Views/MobileNavView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 2
-			path: classes/Navigation/Views/TeamsDropdownView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 4
-			path: classes/Negotiation/NegotiationOfferView.php
-
-		-
 			rawMessage: Hardcoded environment string "www.iblhoops.net" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
 			path: classes/PageLayout/PageLayout.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 4
-			path: classes/Player/Stats/PlayerStatsRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/PlayerSearch/PlayerSearchRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 3
-			path: classes/PlrParser/PlrBoxScoreRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/PlrParser/PlrParserRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/RookieOption/RookieOptionView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 3
-			path: classes/Search/SearchView.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 6
-			path: classes/SeasonHighs/SeasonHighsRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/SeasonLeaderboards/SeasonLeaderboardsRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 3
-			path: classes/Team/SplitStatsRepository.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 14
-			path: classes/Team/TeamView.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/TeamSchedule/TeamScheduleRepository.php
 
 		-
 			rawMessage: '''
@@ -341,18 +143,6 @@ parameters:
 			path: classes/Topics/News/NewsController.php
 
 		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 4
-			path: classes/Topics/TopicsRepository.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 5
-			path: classes/Trading/TradeOfferFormView.php
-
-		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
@@ -371,100 +161,16 @@ parameters:
 			path: classes/Trading/TradeProcessor.php
 
 		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/Trading/TradeReviewView.php
-
-		-
 			rawMessage: 'header() is banned outside Bootstrap classes, Responders, and HTMX ApiHandlers. Route response headers through a Responder (composed by the Controller/ApiHandler).'
 			identifier: ibl.directHeader
 			count: 1
 			path: classes/Trading/TradingController.php
 
 		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/TransactionHistory/TransactionHistoryRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/Voting/VotingRepository.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/Waivers/WaiversView.php
-
-		-
-			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
-			identifier: ibl.trustedVariable
-			count: 1
-			path: classes/YourAccount/LoginView.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ActivityTracker\ActivityTrackerRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ActivityTracker/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ActivityTracker/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ApiKeys\ApiKeysRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ApiKeys/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ApiKeys/index.php
-
-		-
-			rawMessage: 'Parameter #4 $authService of class ApiKeys\ApiKeysController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ApiKeys/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class AwardHistory\AwardHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/AwardHistory/index.php
-
-		-
 			rawMessage: 'Parameter #1 $rawParams of method AwardHistory\AwardHistoryService::search() expects array<string, mixed>, array<mixed> given.'
 			identifier: argument.type
 			count: 1
 			path: modules/AwardHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class CapSpace\CapSpaceRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CapSpace/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CapSpace/index.php
-
-		-
-			rawMessage: 'Parameter #2 $db of class CapSpace\CapSpaceService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CapSpace/index.php
 
 		-
 			rawMessage: 'Call to function array_search() requires parameter #3 to be set.'
@@ -491,76 +197,10 @@ parameters:
 			path: modules/CareerLeaderboards/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CareerLeaderboards/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class CareerLeaderboards\CareerLeaderboardsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CareerLeaderboards/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ComparePlayers\ComparePlayersRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ComparePlayers/index.php
-
-		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/ComparePlayers/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ContractList\ContractListRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ContractList/index.php
-
-		-
-			rawMessage: 'Parameter #1 $authService of class Debug\DebugController constructor expects Auth\AuthService, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DebugMenu/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DebugMenu/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Draft\DraftController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Draft/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Draft\DraftRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Draft/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Draft\DraftService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Draft/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Draft/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Draft/index.php
 
 		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
@@ -581,114 +221,6 @@ parameters:
 			path: modules/DraftHistory/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class DraftHistory\DraftHistoryApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DraftHistory\DraftHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of static method Team\Team::initialize() expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DraftPickLocator\DraftPickLocatorRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftPickLocator/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftPickLocator/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FranchiseHistory\FranchiseHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FranchiseRecordBook\FranchiseRecordBookApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseRecordBook/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FreeAgencyPreview\FreeAgencyPreviewRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FreeAgencyPreview/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FreeAgencyPreview/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class GMContactList\GMContactListRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/GMContactList/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class GameBoxscore\GameBoxscoreRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/GameBoxscore/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class GameBoxscore\GameBoxscoreRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/GameBoxscore/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Injuries\InjuriesService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Injuries/index.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/NextSim/index.php
-
-		-
-			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/NextSim/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: modules/NextSim/index.php
-
-		-
-			rawMessage: 'Cannot call method getUsername() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/OneOnOneGame/index.php
-
-		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
 			count: 4
@@ -701,36 +233,6 @@ parameters:
 			path: modules/OneOnOneGame/index.php
 
 		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/OneOnOneGame/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class OneOnOneGame\OneOnOneGameRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/OneOnOneGame/index.php
-
-		-
-			rawMessage: 'Parameter #3 $owner of method OneOnOneGame\OneOnOneGameService::playGame() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/OneOnOneGame/index.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/extension.php
-
-		-
 			rawMessage: '''
 				Instantiation of deprecated class Extension\ExtensionProcessor:
 				Use ExtensionService instead
@@ -738,30 +240,6 @@ parameters:
 			identifier: new.deprecatedClass
 			count: 1
 			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Extension\ExtensionProcessor constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Player/extension.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/index.php
 
 		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
@@ -788,40 +266,10 @@ parameters:
 			path: modules/PlayerSearch/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class PlayerSearch\PlayerSearchRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerSearch/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Player\PlayerRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerSearch/index.php
-
-		-
 			rawMessage: 'Parameter #1 $rawParams of method PlayerSearch\PlayerSearchService::search() expects array<string, mixed>, array<mixed> given.'
 			identifier: argument.type
 			count: 1
 			path: modules/PlayerSearch/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Auth\AuthRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/ProjectedDraftOrder/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ProjectedDraftOrder\ProjectedDraftOrderRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/ProjectedDraftOrder/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/ProjectedDraftOrder/index.php
 
 		-
 			rawMessage: 'Parameter #1 $json of function json_decode expects string, string|false given.'
@@ -836,62 +284,14 @@ parameters:
 			path: modules/Search/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Search\SearchRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Search/index.php
-
-		-
-			rawMessage: 'Parameter #2 $prefix of class Search\SearchRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Search/index.php
-
-		-
-			rawMessage: 'Part $module_name (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: modules/Search/index.php
-
-		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
 			count: 1
 			path: modules/SeasonArchive/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class SeasonArchive\SeasonArchiveRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonArchive/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class SeasonArchive\SeasonArchiveRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonArchive/index.php
-
-		-
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class SeasonHighs\SeasonHighsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
 			count: 1
 			path: modules/SeasonHighs/index.php
 
@@ -962,12 +362,6 @@ parameters:
 			path: modules/SeasonLeaderboards/index.php
 
 		-
-			rawMessage: 'Parameter #2 $leagueContext of class SeasonLeaderboards\SeasonLeaderboardsRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonLeaderboards/index.php
-
-		-
 			rawMessage: 'Parameter #3 $currentFilters of method SeasonLeaderboards\SeasonLeaderboardsView::renderFilterForm() expects array{year?: string, team?: int|string, sortby?: string, limit?: int|string}, array{year: mixed, team: int, sortby: mixed, limit: mixed} given.'
 			identifier: argument.type
 			count: 1
@@ -980,56 +374,8 @@ parameters:
 			path: modules/SeasonLeaderboards/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class SeasonRosterChanges\SeasonRosterChangesRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonRosterChanges/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonRosterChanges/index.php
-
-		-
-			rawMessage: 'Cannot call method isOlympics() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Standings/index.php
-
-		-
 			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'
 			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: modules/Standings/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Standings/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Standings\StandingsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Standings/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of static method League\OlympicsTeamFilter::getRealTeamIds() expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Standings/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class Season\Season constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Standings/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class Standings\StandingsRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
 			count: 1
 			path: modules/Standings/index.php
 
@@ -1040,82 +386,10 @@ parameters:
 			path: modules/Standings/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #3 $authService of class Team\TeamController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #3 $leagueContext of class Team\TeamService constructor expects League\LeagueContext, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TeamOffDefStats/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class TeamOffDefStats\TeamOffDefStatsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TeamOffDefStats/index.php
-
-		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 1
-			path: modules/Topics/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Topics\TopicsService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Topics/index.php
-
-		-
-			rawMessage: 'Parameter #2 $prefix of class Topics\TopicsService constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Topics/index.php
 
 		-
 			rawMessage: 'Parameter #3 $searchFilters of method Topics\TopicsView::render() expects array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, articleComm: bool, preset?: string}, array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: array<int, string>, articleComm: bool, preset: ''''|''transactions''} given.'
@@ -1124,262 +398,10 @@ parameters:
 			path: modules/Topics/index.php
 
 		-
-			rawMessage: 'Parameter #2 $post of method Trading\TradingController::acceptTradeOffer() expects array<string, mixed>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #2 $post of method Trading\TradingController::submitTradeOffer() expects array<string, mixed>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/maketradeoffer.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/maketradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/maketradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/maketradeoffer.php
-
-		-
-			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/maketradeoffer.php
-
-		-
-			rawMessage: 'Parameter #2 $post of method Trading\TradingController::rejectTradeOffer() expects array<string, mixed>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/rejecttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/rejecttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/rejecttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/rejecttradeoffer.php
-
-		-
-			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Trading/rejecttradeoffer.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
-			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Voting\VotingBallotService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Voting\VotingController constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Voting\VotingRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #7 $authService of class Voting\VotingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Waivers/index.php
-
-		-
-			rawMessage: 'Cannot call method getUsername() on mixed.'
-			identifier: method.nonObject
-			count: 3
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: Cannot cast mixed to string.
-			identifier: cast.string
-			count: 4
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 4
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Only booleans are allowed in an if condition, int given.'
-			identifier: if.condNotBoolean
-			count: 3
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Parameter #1 $authService of class YourAccount\YourAccountService constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Parameter #1 $username of method YourAccount\YourAccountService::getTeamRedirectUrl() expects string, mixed given.'
-			identifier: argument.type
-			count: 3
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Parameter #4 $clientIp of method YourAccount\YourAccountService::attemptLogin() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: Variable $authService might not be defined.
-			identifier: variable.undefined
-			count: 4
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: Variable $user might not be defined.
-			identifier: variable.undefined
-			count: 5
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/index.php
 
 		-
 			rawMessage: 'Direct is_admin() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
@@ -1889,24 +911,6 @@ parameters:
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
 			count: 5
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Direct is_admin() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
 			path: themes/IBL/theme.php
 
 		-

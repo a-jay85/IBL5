@@ -38,6 +38,8 @@ use Voting\VotingSubmissionService;
 use Voting\VotingSubmissionView;
 
 global $mysqli_db, $user, $authService;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 
 $repository        = new VotingRepository($mysqli_db);
 $ballotService     = new VotingBallotService($mysqli_db);

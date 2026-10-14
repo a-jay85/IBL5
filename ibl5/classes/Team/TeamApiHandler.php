@@ -54,18 +54,9 @@ class TeamApiHandler
         $display = self::extractValidatedDisplay($_GET);
         $yr = self::extractValidatedYr($_GET);
 
-        $split = null;
-        if ($display === 'split' && isset($_GET['split']) && is_string($_GET['split'])) {
-            $splitRepo = new SplitStatsRepository($this->db);
-            $rawSplit = $_GET['split'];
-            if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
-                $split = $rawSplit;
-            } else {
-                $display = 'ratings';
-            }
-        } elseif ($display === 'split') {
-            $display = 'ratings';
-        }
+        // Resolve the split parameter when display=split (shared allow-list gate)
+        $splitRepo = new SplitStatsRepository($this->db);
+        [$display, $split] = $splitRepo->resolveDisplayAndSplit($display, $_GET['split'] ?? null);
 
         header('HX-Push-Url: ' . self::buildPushUrl($teamid, $display, $split, $yr));
 

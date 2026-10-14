@@ -5,8 +5,6 @@ import os
 import sys
 from types import SimpleNamespace
 
-import pytest
-
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
@@ -17,11 +15,6 @@ SLUG = "slug"
 ITEM_FILE = "MISSING-FILE: tools/a.py (plan Critical File never appeared in the diff)"
 ITEM_TEST = "MISSING: tests/t.py (matrix planned a test the diff never wrote)"
 ITEM_NEW = "MISSING-FILE: tools/new.py (plan Critical File never appeared in the diff)"
-
-
-@pytest.fixture(autouse=True)
-def _no_tracked_lookup(monkeypatch):
-    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: None)
 
 
 def _cond(number, reason):

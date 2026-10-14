@@ -8,7 +8,7 @@
 # self-heal gated OFF in single mode, auto-queue-if-absent, hard-fail on
 # unresolvable slug, and already-queued tolerance.
 #
-# Cases 4, 6, 10, 13, 14, 15 and 16 run on every platform. Cases 1, 2, 3 and 5 drive the run loop,
+# Cases 4, 6, 10, 13, 14, 15 and 16 run on every platform. Cases 1, 2, 3, 5 and 17 drive the run loop,
 # which needs macOS tools inside bin/automouse/run (caffeinate, BSD mktemp,
 # stat -f, BSD date), so off macOS they print a SKIP line and do not run.
 # Case 10 unit-tests write_stop_file (the stop-file writer extracted from the
@@ -28,7 +28,9 @@ PLATFORM="${AUTOMOUSE_SINGLE_UNAME:-$(uname)}"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT="$(mktemp -d)"
-trap 'rm -rf "$ROOT"' EXIT
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+trap 'rm -rf "$ROOT"; h_cleanup' EXIT
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$ROOT/usage"
 
 NDIR="$ROOT/automouse"
@@ -36,8 +38,6 @@ PDIR="$ROOT/plans"
 STUBDIR="$ROOT/stub"
 mkdir -p "$NDIR/queue" "$NDIR/handoff" "$NDIR/logs" "$NDIR/reports" \
          "$NDIR/done" "$NDIR/skipped" "$PDIR" "$STUBDIR"
-
-FAILED=0
 
 # Hermetic login probe. The real login_preflight probe reads the keychain and
 # calls api.anthropic.com in the foreground, which defers the runner's SIGTERM
@@ -49,21 +49,18 @@ export AUTOMOUSE_CHECK_PLAN=/usr/bin/true
 assert_present() {
     local desc="$1" path="$2"
     if [ ! -e "$path" ] && [ ! -L "$path" ]; then
-        echo "FAIL: $desc — expected present: $path"
-        FAILED=1
+        h_fail "$desc — expected present: $path"
     fi
 }
 
 assert_absent() {
     local desc="$1" path="$2"
     if [ -e "$path" ]; then
-        echo "FAIL: $desc — expected absent (exists): $path"
-        FAILED=1
+        h_fail "$desc — expected absent (exists): $path"
         return
     fi
     if [ -L "$path" ]; then
-        echo "FAIL: $desc — expected absent (dangling symlink): $path"
-        FAILED=1
+        h_fail "$desc — expected absent (dangling symlink): $path"
     fi
 }
 
@@ -77,20 +74,18 @@ check() {
     "$@" >/dev/null 2>&1
     local rc=$?
     if { [ "$want" -eq 0 ] && [ "$rc" -eq 0 ]; } || { [ "$want" -eq 1 ] && [ "$rc" -ne 0 ]; }; then
-        echo "ok: $desc"
+        h_pass "$desc"
     else
-        echo "FAIL: $desc"
-        FAILED=1
+        h_fail "$desc"
     fi
 }
 
 # want <desc> <haystack> <needle>: pass when the haystack contains the fixed string.
 want() {
     if grep -qF -- "$3" <<< "$2"; then
-        echo "ok: $1"
+        h_pass "$1"
     else
-        echo "FAIL: $1 (missing: $3; got: $2)"
-        FAILED=1
+        h_fail "$1 (missing: $3; got: $2)"
     fi
 }
 
@@ -201,9 +196,9 @@ reset_state
 errexit_off
 out=$(PLANS_DIR="$PDIR" "$RUNNER" plan nonexistent-slug 2>&1); exit_code=$?
 errexit_restore
-[ "$exit_code" -ne 0 ] || { echo "FAIL: case4 expected non-zero exit, got 0"; FAILED=1; }
+[ "$exit_code" -ne 0 ] || h_fail "case4 expected non-zero exit, got 0"
 echo "$out" | grep -qi "cannot resolve\|no such plan\|nonexistent-slug" \
-    || { echo "FAIL: case4 expected a loud unresolved-slug message, got: $out"; FAILED=1; }
+    || h_fail "case4 expected a loud unresolved-slug message, got: $out"
 assert_absent "case4 no no-queue report" \
     "$NDIR/reports/$(date +%Y-%m-%d)-no-queue.md"
 
@@ -217,7 +212,7 @@ ln -s "$PDIR/plan-badmodel.md" "$NDIR/queue/plan-badmodel.md"
 errexit_off
 PLANS_DIR="$PDIR" "$RUNNER" plan plan-badmodel > "$ROOT/run.out" 2>&1; rc=$?
 errexit_restore
-[ "$rc" -eq 0 ] || { echo "FAIL: case6 runner aborted (rc=$rc) instead of skipping"; FAILED=1; }
+[ "$rc" -eq 0 ] || h_fail "case6 runner aborted (rc=$rc) instead of skipping"
 assert_present "case6 disposed to skipped/"     "$NDIR/skipped/plan-badmodel.md"
 assert_absent  "case6 left queue"               "$NDIR/queue/plan-badmodel.md"
 assert_absent  "case6 no attempts sidecar"      "$NDIR/queue/plan-badmodel.md.attempts"
@@ -225,7 +220,7 @@ assert_absent  "case6 no handoff (claude never ran)" "$NDIR/handoff/plan-badmode
 assert_absent  "case6 not completed"            "$NDIR/done/plan-badmodel.md"
 assert_present "case6 skipped report written"   "$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-badmodel.md"
 grep -qF 'is not a recognized model' "$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-badmodel.md" \
-    || { echo "FAIL: case6 report lacks the rejection reason"; FAILED=1; }
+    || h_fail "case6 report lacks the rejection reason"
 
 # ===========================================================================
 # Case 10 — write_stop_file records one atomic line per stop cause
@@ -238,7 +233,7 @@ awk '/^# Stop-file writer:/,/^# End stop-file writer\./' "$RUNNER_SRC" > "$WRITE
 c10_open=$(grep -c '^# Stop-file writer:' "$RUNNER_SRC")
 c10_close=$(grep -c '^# End stop-file writer\.' "$RUNNER_SRC")
 if [ "$c10_open" = 1 ] && [ "$c10_close" = 1 ] && grep -qF 'write_stop_file() {' "$WRITER"; then
-    echo "ok: case10 writer anchors unique and extract defines write_stop_file"
+    h_pass "case10 writer anchors unique and extract defines write_stop_file"
     C10_DIR="$ROOT/w"
     C10_STOPS="$C10_DIR/stops"
     C10_FILE="$C10_DIR/stops/2026-10-06-4242.stop"
@@ -266,10 +261,9 @@ if [ "$c10_open" = 1 ] && [ "$c10_close" = 1 ] && grep -qF 'write_stop_file() {'
         local lines
         lines=$(wc -l < "$C10_FILE" 2>/dev/null | tr -d ' ')
         if [ "$lines" = 1 ] && grep -qE "$2" < "$C10_FILE"; then
-            echo "ok: $1"
+            h_pass "$1"
         else
-            echo "FAIL: $1 (lines=${lines:-none}, got: $(cat "$C10_FILE" 2>/dev/null))"
-            FAILED=1
+            h_fail "$1 (lines=${lines:-none}, got: $(cat "$C10_FILE" 2>/dev/null))"
         fi
     }
     TAB="$(printf '\t')"
@@ -303,7 +297,11 @@ if [ "$c10_open" = 1 ] && [ "$c10_close" = 1 ] && grep -qF 'write_stop_file() {'
         write_stop_file 143
     )
     c10_rc=$?
-    if [ "$c10_rc" -eq 0 ]; then echo "ok: case10 unset LOG returns 0"; else echo "FAIL: case10 unset LOG returns 0 (got $c10_rc)"; FAILED=1; fi
+    if [ "$c10_rc" -eq 0 ]; then
+        h_pass "case10 unset LOG returns 0"
+    else
+        h_fail "case10 unset LOG returns 0 (got $c10_rc)"
+    fi
     check "case10 unset LOG creates no stops dir" ! test -e "$C10_STOPS"
 
     # Atomic: a failing mv leaves neither the final file nor a temp file.
@@ -316,7 +314,7 @@ if [ "$c10_open" = 1 ] && [ "$c10_close" = 1 ] && grep -qF 'write_stop_file() {'
         c10_call 143
     )
     c10_rc=$?
-    if [ "$c10_rc" -eq 0 ]; then echo "ok: case10 failing mv returns 0"; else echo "FAIL: case10 failing mv returns 0 (got $c10_rc)"; FAILED=1; fi
+    if [ "$c10_rc" -eq 0 ]; then h_pass "case10 failing mv returns 0"; else h_fail "case10 failing mv returns 0 (got $c10_rc)"; fi
     check "case10 failing mv leaves no .stop and no .stop.tmp.* file" \
         test -z "$(ls -A "$C10_STOPS" 2>/dev/null)"
 
@@ -329,19 +327,18 @@ if [ "$c10_open" = 1 ] && [ "$c10_close" = 1 ] && grep -qF 'write_stop_file() {'
 
     # Unwritable stops dir: returns 0 and leaves no file (root ignores chmod).
     if [ "$(id -u)" = 0 ]; then
-        echo "SKIP: case10 unwritable stops dir (running as root, chmod is not enforced)"
+        h_skip "case10 unwritable stops dir (running as root, chmod is not enforced)"
     else
         rm -rf "$C10_STOPS"; mkdir -p "$C10_STOPS"; chmod 500 "$C10_STOPS"
         c10_call 143
         c10_rc=$?
         chmod 700 "$C10_STOPS"
-        if [ "$c10_rc" -eq 0 ]; then echo "ok: case10 unwritable stops dir returns 0"; else echo "FAIL: case10 unwritable stops dir returns 0 (got $c10_rc)"; FAILED=1; fi
+        if [ "$c10_rc" -eq 0 ]; then h_pass "case10 unwritable stops dir returns 0"; else h_fail "case10 unwritable stops dir returns 0 (got $c10_rc)"; fi
         check "case10 unwritable stops dir leaves no file" \
             test -z "$(ls -A "$C10_STOPS" 2>/dev/null)"
     fi
 else
-    echo "FAIL: case10 writer anchors not unique or extract lacks write_stop_file() (open=$c10_open close=$c10_close)"
-    FAILED=1
+    h_fail "case10 writer anchors not unique or extract lacks write_stop_file() (open=$c10_open close=$c10_close)"
 fi
 
 # ===========================================================================
@@ -354,7 +351,7 @@ awk '/^# Stop-reason printer:/,/^# End stop-reason printer\./' "$RUNNER_SRC" > "
 c13_open=$(grep -c '^# Stop-reason printer:' "$RUNNER_SRC")
 c13_close=$(grep -c '^# End stop-reason printer\.' "$RUNNER_SRC")
 if [ "$c13_open" = 1 ] && [ "$c13_close" = 1 ] && grep -qF 'print_stop_reason() {' "$PRINTER"; then
-    echo "ok: case13 printer anchors unique and extract defines print_stop_reason"
+    h_pass "case13 printer anchors unique and extract defines print_stop_reason"
     # c13_call <rc> <STOP_CLEAN> [note] [FAIL_CMD]: stderr of the printer, stdout dropped.
     # shellcheck disable=SC2069  # on purpose: keep stderr, drop stdout
     c13_call() {
@@ -404,8 +401,7 @@ if [ "$c13_open" = 1 ] && [ "$c13_close" = 1 ] && grep -qF 'print_stop_reason() 
     ) )
     want "case13 closed stderr does not fail the printer" "$c13_out" "rc=0"
 else
-    echo "FAIL: case13 printer anchors not unique or extract lacks print_stop_reason() (open=$c13_open close=$c13_close)"
-    FAILED=1
+    h_fail "case13 printer anchors not unique or extract lacks print_stop_reason() (open=$c13_open close=$c13_close)"
 fi
 
 # ===========================================================================
@@ -431,8 +427,7 @@ if grep -qF 'note_stop() {' "$PRINTER"; then
     )
     check "case14 plain note_failure leaves STOP_DM_CAUSE empty" test "$c14_out" = "[]"
 else
-    echo "FAIL: case14 printer extract lacks note_stop()"
-    FAILED=1
+    h_fail "case14 printer extract lacks note_stop()"
 fi
 
 # ===========================================================================
@@ -460,7 +455,7 @@ awk '/^# Stop-DM sender:/,/^# End stop-DM sender\./' "$RUNNER_SRC" > "$SENDER"
 c16_open=$(grep -c '^# Stop-DM sender:' "$RUNNER_SRC")
 c16_close=$(grep -c '^# End stop-DM sender\.' "$RUNNER_SRC")
 if [ "$c16_open" = 1 ] && [ "$c16_close" = 1 ] && grep -qF 'send_stop_dm() {' "$SENDER"; then
-    echo "ok: case16 sender anchors unique and extract defines send_stop_dm"
+    h_pass "case16 sender anchors unique and extract defines send_stop_dm"
     C16="$ROOT/c16"
     C16_CALLS="$C16/calls"
     mkdir -p "$C16/bin/automouse" "$C16/nobin/automouse"
@@ -546,6 +541,7 @@ C16STUB
     echo 0 > "$C16/stub-rc"
     c16_r=$( : > "$C16_CALLS"; : > "$C16/log"; (
         set -euo pipefail
+        # shellcheck disable=SC2034
         SELF_DIR="$C16/nobin/automouse"
         # shellcheck disable=SC2034
         LOG="$C16/log"
@@ -576,22 +572,22 @@ C16STUB
     check "case16i a sender that returns early fails the 16a check" ! c16_a_passes "$SENDER.mut1"
     check "case16i a sender with --attempts 3 fails the 16a check" ! c16_a_passes "$SENDER.mut2"
 else
-    echo "FAIL: case16 sender anchors not unique or extract lacks send_stop_dm() (open=$c16_open close=$c16_close)"
-    FAILED=1
+    h_fail "case16 sender anchors not unique or extract lacks send_stop_dm() (open=$c16_open close=$c16_close)"
 fi
 
 # ===========================================================================
-# macOS-only run-loop cases (1, 2, 3, 5)
+# macOS-only run-loop cases (1, 2, 3, 5, 17)
 # ===========================================================================
 if [ "$PLATFORM" != "Darwin" ]; then
     echo ""
-    echo "SKIP: cases 1, 2, 3, 5, 7, 8, 9, 11, 12 (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
-    if [ "$FAILED" -ne 0 ]; then
+    echo "SKIP: cases 1, 2, 3, 5, 7, 8, 9, 11, 12, 17 (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
+    if [ "$H_FAIL" -ne 0 ]; then
         echo "RESULT: FAILED"
     else
-        echo "RESULT: cases 4, 6, 10, 13, 14, 15 and 16 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12 skipped"
+        echo "RESULT: cases 4, 6, 10, 13, 14, 15 and 16 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12, 17 skipped"
     fi
-    exit "$FAILED"
+    [ "$H_FAIL" -eq 0 ] || exit 1
+    exit 0
 fi
 
 # ===========================================================================
@@ -621,7 +617,7 @@ done
 echo "--- case 11: single-plan stop file ---"
 c11_stops=("$NDIR"/stops/*.stop)
 if [ "${#c11_stops[@]}" -eq 1 ] && [ -f "${c11_stops[0]}" ]; then
-    echo "ok: case11 exactly one stop file"
+    h_pass "case11 exactly one stop file"
     check "case11 stop file names the finished plan" \
         grep -qE '^[0-9]+	single-plan mode: one attempt of plan-2 finished$' "${c11_stops[0]}"
     c11_log="$NDIR/logs/$(basename "${c11_stops[0]}" .stop).log"
@@ -629,8 +625,7 @@ if [ "${#c11_stops[@]}" -eq 1 ] && [ -f "${c11_stops[0]}" ]; then
         grep -qF '=== Automouse session complete' "$c11_log"
     check "case11 designed single-plan stop sends no DM" test ! -s "$ROOT/dm-calls"
 else
-    echo "FAIL: case11 expected exactly one stop file, got ${#c11_stops[@]} (${c11_stops[*]})"
-    FAILED=1
+    h_fail "case11 expected exactly one stop file, got ${#c11_stops[@]} (${c11_stops[*]})"
 fi
 
 # ===========================================================================
@@ -670,8 +665,7 @@ if [ -f "${c12_stops[0]}" ]; then
     check "case12 SIGTERM sent exactly one stop DM" test "$(grep -c '^STDIN: ' "$ROOT/dm-calls")" = 1
     want "case12 stop DM names the SIGTERM cause" "$(cat "$ROOT/dm-calls")" "ended early: It was stopped by SIGTERM"
 else
-    echo "FAIL: case12 no stop file for runner pid $c12_pid after 40s"
-    FAILED=1
+    h_fail "case12 no stop file for runner pid $c12_pid after 40s"
 fi
 wait "$c12_pid" 2>/dev/null || true
 pkill -f "$STUBDIR/claude" 2>/dev/null || true
@@ -736,7 +730,7 @@ errexit_off
 out=$(PLANS_DIR="$PDIR" "$RUNNER" plan plan-nomark 2>&1); exit_code=$?
 errexit_restore
 [ "$exit_code" -ne 0 ] \
-    || { echo "FAIL: case3b expected non-zero exit, got 0"; FAILED=1; }
+    || h_fail "case3b expected non-zero exit, got 0"
 want "case3b names the missing impl_model marker" "$out" "no usable impl_model"
 assert_absent "case3b plan-nomark not queued" "$NDIR/queue/plan-nomark.md"
 assert_absent "case3b plan-nomark not done"   "$NDIR/done/plan-nomark.md"
@@ -753,7 +747,7 @@ run_single plan-dup           # must NOT abort on the already-queued symlink
 assert_present "case5 plan-dup completed"  "$NDIR/done/plan-dup.md"
 assert_absent  "case5 plan-dup left queue" "$NDIR/queue/plan-dup.md"
 grep -qi "already queued" "$ROOT/run.out" \
-    && { echo "FAIL: case5 leaked an 'already queued' error"; FAILED=1; }
+    && h_fail "case5 leaked an 'already queued' error"
 
 # ---------------------------------------------------------------------------
 # Cases 7-9 — repeated-failure stop (ADR: automouse stop on repeated failure).
@@ -766,7 +760,7 @@ RUNNER_RF="$ROOT/automouse/run-rf"
 sed -e 's#^MIN_VIABLE_SECS=[0-9]*#MIN_VIABLE_SECS=0#' "$RUNNER" > "$RUNNER_RF"
 chmod +x "$RUNNER_RF"
 grep -q '^MIN_VIABLE_SECS=0' "$RUNNER_RF" \
-    || { echo "FAIL: case7-9 setup could not zero MIN_VIABLE_SECS"; FAILED=1; }
+    || h_fail "case7-9 setup could not zero MIN_VIABLE_SECS"
 run_single_rf() {
     PLANS_DIR="$PDIR" "$RUNNER_RF" plan "$1" > "$ROOT/run.out" 2>&1
 }
@@ -786,6 +780,11 @@ err=$(sed -n "${n}p" "$NDIR/stub-errors")
 printf '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu%d","name":"Bash","input":{"command":"vendor/bin/phpunit --filter FooTest"}}]}}\n' "$n"
 printf '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu%d","is_error":true,"content":"Exit code 1\\n%s"}]}}\n' "$n" "$err"
 printf '{"type":"result","subtype":"error_during_execution","stop_reason":"end_turn","num_turns":2,"duration_ms":2000,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+# Case 17: when $NDIR/stub-plan-defect exists, copy it to this plan's sentinel (cases 7-9 never create it)
+if [ -f "$NDIR/stub-plan-defect" ]; then
+    plan=$(printf '%s\n' "$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)
+    [ -n "$plan" ] && cp "$NDIR/stub-plan-defect" "$NDIR/queue/$plan.plan-defect"
+fi
 exit 0
 STUB
 chmod +x "$STUBDIR/claude"
@@ -863,11 +862,35 @@ check "case9 log records failsig: none" grep -rq 'failsig: none' "$NDIR/logs"
 check "case9 log has no REPEATED FAILURE" ! grep -rq 'REPEATED FAILURE' "$NDIR/logs"
 check_absent  "case9 not skipped" "$NDIR/skipped/plan-none.md"
 
+# Case 17 — plan-defect sentinel stops after attempt 1; absent or garbled keeps the retry
+echo "--- case 17: plan-defect sentinel skips after one attempt ---"
+reset_state; rm -f "$NDIR/stub-calls" "$NDIR/stub-errors" "$NDIR/stub-plan-defect"
+printf '%s\n' 'err one' 'err two' 'err three' > "$NDIR/stub-errors"
+printf 'automouse-plan-defect: v1\nUNREALISED-ASSERTION: row 4 -- testBar\nMISSING-FILE: bin/y\n' > "$NDIR/stub-plan-defect"
+seed_plan_sonnet plan-pd
+drive_attempts plan-pd
+PD_REPORT="$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-pd.md"
+check "case17a exactly 1 stub call" calls_are 1
+check_present "case17a moved to skipped/"       "$NDIR/skipped/plan-pd.md"
+check_absent  "case17a no attempts sidecar"     "$NDIR/queue/plan-pd.md.attempts"
+check_absent  "case17a no plan-defect sidecar"  "$NDIR/queue/plan-pd.md.plan-defect"
+check "case17a report names the failing row" grep -qF 'UNREALISED-ASSERTION: row 4 -- testBar' "$PD_REPORT"
+check "case17a log records PLAN DEFECT" grep -rq 'PLAN DEFECT' "$NDIR/logs"
+
+reset_state; rm -f "$NDIR/stub-calls" "$NDIR/stub-plan-defect"
+seed_plan_sonnet plan-nopd
+run_single_rf plan-nopd || true
+check_present "case17b no sentinel: still queued" "$NDIR/queue/plan-nopd.md"
+check "case17b no sentinel: attempts file is 1" grep -qx 1 "$NDIR/queue/plan-nopd.md.attempts"
+
+reset_state; rm -f "$NDIR/stub-calls"
+printf 'UNREALISED-ASSERTION: row 4\nautomouse-plan-defect: v1\n' > "$NDIR/stub-plan-defect"
+seed_plan_sonnet plan-garbled
+run_single_rf plan-garbled || true
+rm -f "$NDIR/stub-plan-defect"
+check_present "case17c garbled sentinel: still queued" "$NDIR/queue/plan-garbled.md"
+check "case17c garbled sentinel: attempts file is 1" grep -qx 1 "$NDIR/queue/plan-garbled.md.attempts"
+
 # ===========================================================================
 echo ""
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

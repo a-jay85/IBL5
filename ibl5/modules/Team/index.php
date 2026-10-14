@@ -17,6 +17,9 @@ $teamid = is_numeric($_REQUEST['teamid'] ?? null) ? (int) $_REQUEST['teamid'] : 
 $pagetitle = "- Team Pages";
 
 global $mysqli_db, $authService, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
+/** @var \League\LeagueContext $leagueContext */
 
 $commonRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
 $teamRepository = new Team\TeamRepository($mysqli_db);

@@ -26,6 +26,8 @@ use SeasonHighs\SeasonHighsView;
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext $leagueContext */
 
 // IBL serves Season Highs from the Records page; Olympics keeps this standalone page.
 if (!($leagueContext instanceof \League\LeagueContext && $leagueContext->isOlympics())) {

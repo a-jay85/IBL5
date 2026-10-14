@@ -107,34 +107,12 @@ final class DraftClassCsvParser
      */
     public function parse(string $raw): array
     {
-        // Step 1: encoding check.
-        if (mb_check_encoding($raw, 'UTF-8') === false) {
-            return [
-                'rows'   => [],
-                'errors' => [
-                    'This file is not saved as UTF-8. Re-export it as UTF-8 '
-                    . '(in Excel: Save As → CSV UTF-8) and try again.',
-                ],
-            ];
+        $input = $this->openCsvStream($raw);
+        if (isset($input['errors'])) {
+            return ['rows' => [], 'errors' => $input['errors']];
         }
-
-        // Step 2: strip BOM.
-        if (str_starts_with($raw, "\xEF\xBB\xBF")) {
-            $raw = substr($raw, 3);
-        }
-
-        // Step 3: delimiter auto-detect.
-        $firstNewline = strpos($raw, "\n");
-        $firstLine    = $firstNewline !== false ? substr($raw, 0, $firstNewline) : $raw;
-        $delimiter    = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
-
-        // Step 4: write to memory handle.
-        $handle = fopen('php://memory', 'r+');
-        if ($handle === false) {
-            return ['rows' => [], 'errors' => ['Failed to open memory buffer.']];
-        }
-        fwrite($handle, $raw);
-        rewind($handle);
+        $handle    = $input['handle'];
+        $delimiter = $input['delimiter'];
 
         $errors = [];
         /** @var list<array<string, int|string>> $rows */
@@ -156,76 +134,19 @@ final class DraftClassCsvParser
                 continue;
             }
 
-            $count = count($record);
-
-            // Field-count rule.
-            if ($count < 27) {
-                $errors[] = "Line {$lineNumber}: this row has {$count} columns but the "
-                    . 'importer needs at least 27. Send the file to A-Jay before retrying.';
+            $decoded = $this->decodeRecord($record, $lineNumber);
+            $errors  = array_merge($errors, $decoded['errors']);
+            if ($decoded['row'] === null) {
                 continue;
             }
 
-            // Extra-column check: any field at 1-based index >= 28 must be blank.
-            for ($i = 28; $i <= $count; $i++) {
-                $value = trim($record[$i - 1] ?? '');
-                if ($value !== '') {
-                    $errors[] = "Line {$lineNumber}, field {$i} contains '{$value}'. "
-                        . 'This importer reads only the first 27 columns — your export '
-                        . 'format may have changed. Send the file to A-Jay before retrying.';
-                    // Report only the first non-blank extra column.
-                    break;
-                }
-            }
-
-            // Build a raw string map for the first 27 columns (cast null to '').
-            /** @var array<string, string> $rawRow */
-            $rawRow = [];
-            foreach (self::COLUMNS as $index => $column) {
-                $rawRow[$column] = $record[$index - 1] ?? '';
-            }
-
-            // Per-field validation (raw strings, helper casts internally).
-            $fieldErrors = $this->validateFields($rawRow, $lineNumber);
-            $errors      = array_merge($errors, $fieldErrors);
-
-            // Build the typed row from the raw string map.
-            /** @var array<string, int|string> $row */
-            $row = [
-                'name' => trim($rawRow['name']),
-                'pos'  => trim($rawRow['pos']),
-                'team' => trim($rawRow['team']),
-                'age'  => (int) trim($rawRow['age']),
-            ];
-            foreach (self::TINYINT_FIELDS as $fieldIndex) {
-                $column       = self::COLUMNS[$fieldIndex];
-                $row[$column] = (int) trim($rawRow[$column]);
-            }
-            foreach (self::UNBOUNDED_INT_FIELDS as $fieldIndex) {
-                if ($fieldIndex === 3) {
-                    // age is already set above.
-                    continue;
-                }
-                $column       = self::COLUMNS[$fieldIndex];
-                $row[$column] = (int) trim($rawRow[$column]);
-            }
-
             $rowLineNumbers[] = $lineNumber;
-            $rows[]           = $row;
+            $rows[]           = $decoded['row'];
         }
 
         fclose($handle);
 
-        // Step 6: zero data rows.
-        if ($rows === []) {
-            $errors[] = 'This file contains no data rows.';
-            return ['rows' => [], 'errors' => $errors];
-        }
-
-        // Step 7: duplicate-name pass.
-        $duplicateErrors = $this->checkDuplicateNames($rows, $rowLineNumbers);
-        $errors          = array_merge($errors, $duplicateErrors);
-
-        return ['rows' => $rows, 'errors' => $errors];
+        return ['rows' => $rows, 'errors' => $this->finishErrors($errors, $rows, $rowLineNumbers)];
     }
 
     /**
@@ -253,6 +174,136 @@ final class DraftClassCsvParser
         $errors          = array_merge($errors, $duplicateErrors);
 
         return $errors;
+    }
+
+    /**
+     * File-level input preparation: UTF-8 check, BOM strip, delimiter auto-detect
+     * (';' only when it outnumbers ',' on the first line), memory handle.
+     *
+     * @return array{handle: resource, delimiter: string}|array{errors: list<string>}
+     */
+    private function openCsvStream(string $raw): array
+    {
+        // Step 1: encoding check.
+        if (mb_check_encoding($raw, 'UTF-8') === false) {
+            return [
+                'errors' => [
+                    'This file is not saved as UTF-8. Re-export it as UTF-8 '
+                    . '(in Excel: Save As → CSV UTF-8) and try again.',
+                ],
+            ];
+        }
+
+        // Step 2: strip BOM.
+        if (str_starts_with($raw, "\xEF\xBB\xBF")) {
+            $raw = substr($raw, 3);
+        }
+
+        // Step 3: delimiter auto-detect.
+        $firstNewline = strpos($raw, "\n");
+        $firstLine    = $firstNewline !== false ? substr($raw, 0, $firstNewline) : $raw;
+        $delimiter    = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
+
+        // Step 4: write to memory handle.
+        $handle = fopen('php://memory', 'r+');
+        if ($handle === false) {
+            return ['errors' => ['Failed to open memory buffer.']];
+        }
+        fwrite($handle, $raw);
+        rewind($handle);
+
+        return ['handle' => $handle, 'delimiter' => $delimiter];
+    }
+
+    /**
+     * Decode one fgetcsv record into its typed row and that record's errors.
+     *
+     * A record with fewer than 27 fields returns row => null so the caller does
+     * not collect it. A record that carries field errors is still returned as a
+     * row; the caller stores it and the errors travel back separately, in the
+     * order the original loop produced them (extra-column first, then fields).
+     *
+     * @param array<int, string|null> $record
+     * @return array{row: array<string, int|string>|null, errors: list<string>}
+     */
+    private function decodeRecord(array $record, int $lineNumber): array
+    {
+        $errors = [];
+        $count  = count($record);
+
+        // Field-count rule.
+        if ($count < 27) {
+            $errors[] = "Line {$lineNumber}: this row has {$count} columns but the "
+                . 'importer needs at least 27. Send the file to A-Jay before retrying.';
+            return ['row' => null, 'errors' => $errors];
+        }
+
+        // Extra-column check: any field at 1-based index >= 28 must be blank.
+        for ($i = 28; $i <= $count; $i++) {
+            $value = trim($record[$i - 1] ?? '');
+            if ($value !== '') {
+                $errors[] = "Line {$lineNumber}, field {$i} contains '{$value}'. "
+                    . 'This importer reads only the first 27 columns — your export '
+                    . 'format may have changed. Send the file to A-Jay before retrying.';
+                // Report only the first non-blank extra column.
+                break;
+            }
+        }
+
+        // Build a raw string map for the first 27 columns (cast null to '').
+        /** @var array<string, string> $rawRow */
+        $rawRow = [];
+        foreach (self::COLUMNS as $index => $column) {
+            $rawRow[$column] = $record[$index - 1] ?? '';
+        }
+
+        // Per-field validation (raw strings, helper casts internally).
+        $errors = array_merge($errors, $this->validateFields($rawRow, $lineNumber));
+
+        // Build the typed row from the raw string map.
+        /** @var array<string, int|string> $row */
+        $row = [
+            'name' => trim($rawRow['name']),
+            'pos'  => trim($rawRow['pos']),
+            'team' => trim($rawRow['team']),
+            'age'  => (int) trim($rawRow['age']),
+        ];
+        foreach (self::TINYINT_FIELDS as $fieldIndex) {
+            $column       = self::COLUMNS[$fieldIndex];
+            $row[$column] = (int) trim($rawRow[$column]);
+        }
+        foreach (self::UNBOUNDED_INT_FIELDS as $fieldIndex) {
+            if ($fieldIndex === 3) {
+                // age is already set above.
+                continue;
+            }
+            $column       = self::COLUMNS[$fieldIndex];
+            $row[$column] = (int) trim($rawRow[$column]);
+        }
+
+        return ['row' => $row, 'errors' => $errors];
+    }
+
+    /**
+     * Error aggregation after the record loop: the zero-row error is appended to
+     * whatever per-row errors accumulated, and the duplicate-name pass runs only
+     * when at least one row was collected, its errors appended last.
+     *
+     * @param list<string>                    $errors         Per-row errors in file order.
+     * @param list<array<string, int|string>> $rows
+     * @param list<int>                       $rowLineNumbers 1-based line number for each row (parallel array).
+     * @return list<string>
+     */
+    private function finishErrors(array $errors, array $rows, array $rowLineNumbers): array
+    {
+        // Step 6: zero data rows.
+        if ($rows === []) {
+            $errors[] = 'This file contains no data rows.';
+            return $errors;
+        }
+
+        // Step 7: duplicate-name pass.
+        return array_merge($errors, $this->checkDuplicateNames($rows, $rowLineNumbers));
     }
 
     /**

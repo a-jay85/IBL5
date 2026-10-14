@@ -73,20 +73,9 @@ class TradeRosterPreviewApiHandler
 
         $display = $this->paramValidator->validateDisplay();
 
-        // Validate split parameter when display is 'split'
-        $split = null;
-        if ($display === 'split') {
-            if (isset($_GET['split']) && is_string($_GET['split'])) {
-                $splitRepo = new \Team\SplitStatsRepository($this->db);
-                if (in_array($_GET['split'], $splitRepo->getValidSplitKeys(), true)) {
-                    $split = $_GET['split'];
-                } else {
-                    $display = 'ratings';
-                }
-            } else {
-                $display = 'ratings';
-            }
-        }
+        // Resolve the split parameter when display is 'split' (shared allow-list gate)
+        $splitRepo = new \Team\SplitStatsRepository($this->db);
+        [$display, $split] = $splitRepo->resolveDisplayAndSplit($display, $_GET['split'] ?? null);
 
         $bufferLevel = ob_get_level();
 

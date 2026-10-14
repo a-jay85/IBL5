@@ -15,6 +15,7 @@ use ProjectedDraftOrder\ProjectedDraftOrderView;
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Module inputs read via the Http\HttpRequest value object (legacy globals are no
 // longer auto-extracted). Only the JSON save_order route branches off $op; every other

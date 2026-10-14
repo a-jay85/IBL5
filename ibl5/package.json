@@ -62,7 +62,7 @@
     "@tailwindcss/cli": "^4.3.3",
     "eslint": "^10.12.0",
     "eslint-plugin-playwright": "^2.12.1",
-    "pixelmatch": "^7.2.0",
+    "pixelmatch": "^8.0.0",
     "pngjs": "^7.0.0",
     "tailwindcss": "^4.3.3",
     "typescript-eslint": "^8.71.1",

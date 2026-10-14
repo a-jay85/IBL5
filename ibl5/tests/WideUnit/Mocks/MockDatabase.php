@@ -52,6 +52,7 @@ class MockDatabase extends \mysqli
 
     /** @var list<mixed> */
     private array $lastBoundParams = [];
+    private string $lastBoundTypes = '';
     /**
      * Ordered log of SQL queries AND transaction lifecycle markers
      * (BEGIN/COMMIT/ROLLBACK), kept separate from $executedQueries so callers
@@ -435,6 +436,7 @@ class MockDatabase extends \mysqli
         $this->insertCount = 0;
         $this->preparedQueries = [];
         $this->lastBoundParams = [];
+        $this->lastBoundTypes = '';
     }
     
     public function sql_escape_string(string $string): string
@@ -519,5 +521,15 @@ class MockDatabase extends \mysqli
     public function getLastBoundParams(): array
     {
         return $this->lastBoundParams;
+    }
+
+    public function recordBoundTypes(string $types): void
+    {
+        $this->lastBoundTypes = $types;
+    }
+
+    public function getLastBoundTypes(): string
+    {
+        return $this->lastBoundTypes;
     }
 }

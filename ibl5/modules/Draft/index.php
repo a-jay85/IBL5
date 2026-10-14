@@ -14,6 +14,7 @@ if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db, $user;
+/** @var \mysqli $mysqli_db */
 
 $httpRequest = \Http\HttpRequest::fromGlobals();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';

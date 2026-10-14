@@ -150,4 +150,16 @@ class MockDatabaseTest extends TestCase
         $this->assertNotNull($row);
         $this->assertSame(42, $row['total']);
     }
+
+    public function testBindParamRecordsTypeString(): void
+    {
+        $this->assertSame('', $this->mockDb->getLastBoundTypes());
+
+        $stmt = $this->mockDb->prepare('SELECT * FROM ibl_plr WHERE teamid = ? AND name = ?');
+        $teamid = 5;
+        $name = 'Test';
+        $stmt->bind_param('is', $teamid, $name);
+
+        $this->assertSame('is', $this->mockDb->getLastBoundTypes());
+    }
 }

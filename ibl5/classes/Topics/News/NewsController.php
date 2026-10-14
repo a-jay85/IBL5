@@ -62,29 +62,8 @@ class NewsController implements NewsControllerInterface
         } else {
             $querylang = "";
         }
-        \PageLayout\PageLayout::header();
-
-        if (defined('HOME_FILE')) {
-            echo '<h1 class="ibl-title">IBL: Internet Basketball League</h1>';
-        } else {
-            echo '<h1 class="ibl-title">News</h1>';
-        }
-
-        if ($this->authService->isAuthenticated()) {
-            $teamRepo = $this->teamIdentityRepository;
-            $username = $userinfo['username'] ?? null;
-            $teamName = $teamRepo->getTeamnameFromUsername(is_string($username) ? $username : null);
-            if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
-                $tid = $teamRepo->getTidFromTeamname($teamName);
-                if ($tid !== null && \League\League::isRealFranchise($tid)) {
-                    $recapService = $this->lastSimRecapService;
-                    $slate = $recapService->buildSlateForTeam($tid);
-                    if ($slate !== null) {
-                        echo $this->lastSimRecapView->render($slate);
-                    }
-                }
-            }
-        }
+        $this->renderHeader();
+        $this->renderSimRecap($userinfo);
 
         if (defined('HOME_FILE')) {
             blocks("Center");
@@ -192,5 +171,38 @@ class NewsController implements NewsControllerInterface
         }
         $this->newsView->renderStories($viewModels);
         \PageLayout\PageLayout::footer();
+    }
+
+    private function renderHeader(): void
+    {
+        \PageLayout\PageLayout::header();
+
+        if (defined('HOME_FILE')) {
+            echo '<h1 class="ibl-title">IBL: Internet Basketball League</h1>';
+        } else {
+            echo '<h1 class="ibl-title">News</h1>';
+        }
+    }
+
+    /**
+     * @param array<string, mixed>|null $userinfo
+     */
+    private function renderSimRecap(?array $userinfo): void
+    {
+        if ($this->authService->isAuthenticated()) {
+            $teamRepo = $this->teamIdentityRepository;
+            $username = $userinfo['username'] ?? null;
+            $teamName = $teamRepo->getTeamnameFromUsername(is_string($username) ? $username : null);
+            if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
+                $tid = $teamRepo->getTidFromTeamname($teamName);
+                if ($tid !== null && \League\League::isRealFranchise($tid)) {
+                    $recapService = $this->lastSimRecapService;
+                    $slate = $recapService->buildSlateForTeam($tid);
+                    if ($slate !== null) {
+                        echo $this->lastSimRecapView->render($slate);
+                    }
+                }
+            }
+        }
     }
 }

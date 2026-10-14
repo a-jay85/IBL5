@@ -22,7 +22,7 @@ The shim resolves `REPO_ROOT` per invocation via `git rev-parse --show-toplevel`
 
 ## Addendum — codebase-map gate moved to CI (2026-10-13) <!-- slop-ok -->
 
-The Context lists four commit-time gates, including codebase-map regeneration. Today `bin/pre-commit-hook` runs three: `gofmt`, `bin/check-docs`, and `bin/check-rules-byte-budget`. The codebase-map is regenerated on master by the `regen-codebase-map` job in `tests.yml`.
+The Context lists four commit-time gates, including codebase-map regeneration. Today `bin/pre-commit-hook` runs six blocks: `gofmt`, `bin/check-docs`, `bin/check-rules-byte-budget`, a staged `shellcheck` pass, `bin/check-destructive-migrations`, and the `bin/adr-check --commit` ADR gate. The codebase-map is regenerated on master by the `regen-codebase-map` job in `tests.yml`.
 
 ## Alternatives Considered
 
@@ -40,7 +40,7 @@ The Context lists four commit-time gates, including codebase-map regeneration. T
 
 ## References
 
-- `bin/pre-commit-hook`: the tracked gate body (gofmt, check-docs, rules byte budget).
+- `bin/pre-commit-hook`: the tracked gate body (gofmt, check-docs, rules byte budget, shellcheck, destructive-migration scan, ADR gate).
 - `bin/install-git-hooks` — the idempotent installer (common-dir target, sentinel, backup-once, fail-closed shim).
 - `bin/check-docs` — the doc gate the hook runs in both `--no-staleness` and `--since` modes.
 - `bin/check-rules-byte-budget` — the always-loaded rules byte cap.

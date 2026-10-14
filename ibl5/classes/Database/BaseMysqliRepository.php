@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database;
 
+use BasketballStats\StatsSanitizer;
 use League\League;
 
 /**
@@ -499,13 +500,7 @@ abstract class BaseMysqliRepository
      */
     protected static function scalarToString(mixed $value): string
     {
-        if (is_string($value)) {
-            return $value;
-        }
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-        return '';
+        return StatsSanitizer::scalarToString($value);
     }
 
     /**
@@ -516,14 +511,11 @@ abstract class BaseMysqliRepository
      * Returns an SQL fragment usable as an inline derived table or CTE body.
      * Callers supply the outer JOIN/alias.
      */
-    protected function gameOfThatDaySubquery(): string
-    {
-        // Backtick `ibl_box_scores_teams` so the executeQuery() rewrite resolves
-        // it to the Olympics table on Olympics pages (stats subquery).
-        return "(SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
+    // Backtick `ibl_box_scores_teams` so the executeQuery() rewrite resolves
+    // it to the Olympics table on Olympics pages (stats subquery).
+    protected const GAME_OF_THAT_DAY_SUBQUERY = "(SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
              FROM `ibl_box_scores_teams`
              GROUP BY game_date, visitor_teamid, home_teamid)";
-    }
 
     /**
      * Canonical "player actually played" predicate for ibl_box_scores rows.
@@ -531,12 +523,15 @@ abstract class BaseMysqliRepository
      * per-game stats must exclude them. Pass the table alias used in the query
      * (e.g. 'bs') or '' for an unaliased column.
      *
-     * @param string $alias Table alias (without trailing dot), or '' for none
+     * @param ''|'bs' $alias Table alias (without trailing dot), or '' for none
+     * @return 'game_min > 0'|'bs.game_min > 0'
      */
     protected function playedCondition(string $alias = ''): string
     {
-        $prefix = $alias === '' ? '' : $alias . '.';
-        return $prefix . 'game_min > 0';
+        return match ($alias) {
+            '' => 'game_min > 0',
+            'bs' => 'bs.game_min > 0',
+        };
     }
 
     /**

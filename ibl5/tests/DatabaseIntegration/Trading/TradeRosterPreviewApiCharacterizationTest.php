@@ -101,7 +101,7 @@ final class TradeRosterPreviewApiCharacterizationTest extends DatabaseTestCase
     /**
      * Set $_GET, capture handle() JSON output, return decoded array.
      *
-     * @param array<string, string> $get
+     * @param array<string, string|list<string>> $get
      * @return array<string, mixed>
      */
     private function invoke(array $get): array
@@ -145,6 +145,38 @@ final class TradeRosterPreviewApiCharacterizationTest extends DatabaseTestCase
         $ratings = $this->invoke(['teamid' => '99', 'display' => 'ratings']);
 
         self::assertSame($ratings['html'], $split['html']);
+    }
+
+    public function testValidSplitKeyRendersDifferentHtmlFromRatings(): void
+    {
+        $split   = $this->invoke(['teamid' => '99', 'display' => 'split', 'split' => 'home']);
+        $ratings = $this->invoke(['teamid' => '99', 'display' => 'ratings']);
+
+        self::assertNotSame($ratings['html'], $split['html']);
+    }
+
+    public function testMissingSplitKeyRendersIdenticalHtmlToRatings(): void
+    {
+        $split   = $this->invoke(['teamid' => '99', 'display' => 'split']);
+        $ratings = $this->invoke(['teamid' => '99', 'display' => 'ratings']);
+
+        self::assertSame($ratings['html'], $split['html']);
+    }
+
+    public function testArrayValuedSplitRendersIdenticalHtmlToRatings(): void
+    {
+        $split   = $this->invoke(['teamid' => '99', 'display' => 'split', 'split' => ['home']]);
+        $ratings = $this->invoke(['teamid' => '99', 'display' => 'ratings']);
+
+        self::assertSame($ratings['html'], $split['html']);
+    }
+
+    public function testSplitIsIgnoredForNonSplitDisplay(): void
+    {
+        $withSplit    = $this->invoke(['teamid' => '99', 'display' => 'total_s', 'split' => 'home']);
+        $withoutSplit = $this->invoke(['teamid' => '99', 'display' => 'total_s']);
+
+        self::assertSame($withoutSplit['html'], $withSplit['html']);
     }
 
     public function testContractsWithCashParamsRendersCashLabel(): void

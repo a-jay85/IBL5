@@ -1,6 +1,6 @@
 ---
 description: Full Phase 5 how-to for plan-to-test, plan-to-file, diff-to-plan and plan-gap scope, and assertion-footprint conformance checks run during post-plan.
-last_verified: 2026-09-29
+last_verified: 2026-10-11
 ---
 
 # Phase 5 — Final Verification (post-plan reference)
@@ -25,6 +25,8 @@ grep -qF "$T" /tmp/post-plan-changed-$PPID || echo "MISSING: $T (matrix planned 
 ```
 
 For each `MISSING:` test the impl silently dropped planned coverage — now likelier to matter, since the matrix carries the negative-path and security rows `/plan` gates 9 and 12 require. Write the missing test, run it green, and checkpoint (same as Phase 6 test authoring). Skip a planned test **only** if its target behavior was cut from the implementation; note that in a PR comment rather than writing a hollow test.
+
+Two matrix markers suppress this item for a token: `(no-change)` on a Visual-regression row whose baseline is meant to stay untouched, and `(run-only)` on any test row that runs a file already tracked on master without editing it. Both require every row naming the token to be marked, and neither touches `MISSING-FILE:` or `MISSING-METHOD:`.
 
 A `MISSING:` item is **resolved** when its test was authored-and-run-green OR was explicitly cut-from-implementation with a PR comment noting the cut. An item that is neither — a planned test the diff never wrote and which you did not author or explicitly cut — is **unresolved**. A `MISSING-METHOD:` item resolves identically — the named method is authored and run green, **or** explicitly cut with a PR comment stating why the plan-named assertion was dropped; anything else is **unresolved** and holds the arm. Renaming the method in the plan after the fact is not a resolution.
 

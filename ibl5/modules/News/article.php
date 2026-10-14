@@ -30,6 +30,17 @@ if (!defined('MODULE_FILE')) {
 
 global $db, $mysqli_db, $prefix, $user_prefix, $user, $multilingual, $currentlang, $anonymous, $articlecomm, $cookieusrtime;
 
+// English UI strings defined in this file.
+if (!defined('_DATESTRING')) {
+    define('_DATESTRING', 'l, F d @ H:i:s T');
+}
+if (!defined('_NOTE')) {
+    define('_NOTE', 'Note:');
+}
+
+assert($mysqli_db instanceof \mysqli);
+$nukeCompat = new \Utilities\NukeCompat();
+
 $optionbox = "";
 $module_name = basename(dirname(__FILE__));
 
@@ -41,13 +52,13 @@ $teamid = is_numeric($_REQUEST['teamid'] ?? null) ? (int) $_REQUEST['teamid'] : 
 
 $newsService = new \Topics\News\NewsService($mysqli_db);
 
-$REQUEST_URI = $_SERVER['REQUEST_URI'] ?? '';
+$REQUEST_URI = is_string($_SERVER['REQUEST_URI'] ?? null) ? $_SERVER['REQUEST_URI'] : '';
 
-if (stristr($REQUEST_URI, "mainfile")) {
-    Header("Location: modules.php?name=$module_name&file=article&sid=$sid");
+if (stristr($REQUEST_URI, "mainfile") !== false) {
+    header("Location: modules.php?name=$module_name&file=article&sid=$sid");
     exit;
 } elseif ($sid === 0 && $teamid === null) {
-    Header("Location: index.php");
+    header("Location: index.php");
     exit;
 }
 
@@ -62,29 +73,27 @@ if (stristr($REQUEST_URI, "mainfile")) {
 // single row returns null here and redirects to index.php.
 $row = $newsService->getStory($sid);
 if ($row === null) {
-    Header("Location: index.php");
+    header("Location: index.php");
     exit;
 }
 
-$catid = (int) ($row['catid'] ?? 0);
+$catid = is_scalar($row['catid'] ?? null) ? (int) $row['catid'] : 0;
 /** @var string $aaid nuke_stories.aid is NOT NULL varchar */
-$aaid = $row['aid'] ?? '';
-$time = $row['time'] ?? '';
+$aaid = is_string($row['aid'] ?? null) ? $row['aid'] : '';
+$time = is_int($row['time'] ?? null) || is_string($row['time'] ?? null) ? $row['time'] : '';
 /** @var string $title */
 $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title'] ?? '');
-$hometext = $row['hometext'] ?? '';
-$bodytext = $row['bodytext'] ?? '';
-$topic = (int) ($row['topic'] ?? 0);
+$hometext = is_string($row['hometext'] ?? null) ? $row['hometext'] : '';
+$bodytext = is_string($row['bodytext'] ?? null) ? $row['bodytext'] : '';
+$topic = is_scalar($row['topic'] ?? null) ? (int) $row['topic'] : 0;
 /** @var string $informant nuke_stories.informant is NOT NULL varchar */
-$informant = $row['informant'] ?? '';
+$informant = is_string($row['informant'] ?? null) ? $row['informant'] : '';
 /** @var string $notes */
 $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes'] ?? '');
-$acomm = (int) ($row['acomm'] ?? 0);
-$haspoll = (int) ($row['haspoll'] ?? 0);
-$pollID = (int) ($row['poll_id'] ?? 0);
+$acomm = is_scalar($row['acomm'] ?? null) ? (int) $row['acomm'] : 0;
 
-if (empty($aaid)) {
-    Header("Location: modules.php?name=$module_name");
+if ($aaid === '' || $aaid === '0') {
+    header("Location: modules.php?name=$module_name");
     exit;
 }
 
@@ -94,30 +103,30 @@ $newsService->bumpStory($sid);
 $artpage = 1;
 $pagetitle = "- $title";
 PageLayout\PageLayout::header();
-echo '<h1 class="ibl-title">' . \Security\HtmlSanitizer::e((string) ($row['title'] ?? '')) . '</h1>';
+echo '<h1 class="ibl-title">' . \Security\HtmlSanitizer::e($row['title'] ?? '') . '</h1>';
 $artpage = 0;
 
 $time = $newsService->normalizeStoryTime($time);
 $datetime = ucfirst(date(_DATESTRING, $time));
-if (!empty($notes)) {
+if ($notes !== '' && $notes !== '0') {
     $notes = "\n\n<b>" . _NOTE . "</b> <i>$notes</i>";
 } else {
     $notes = "";
 }
 
-if (empty($bodytext)) {
+if ($bodytext === '' || $bodytext === '0') {
     $bodytext = "$hometext$notes";
 } else {
     $bodytext = "$hometext\n\n$bodytext$notes";
 }
 
-if (empty($informant)) {
+if ($informant === '' || $informant === '0') {
     /** @var string $informant */
     $informant = $anonymous;
 }
 
 $topicRow = $newsService->getTopicForStory($sid);
-$topicid = (int) ($topicRow['topicid'] ?? 0);
+$topicid = is_scalar($topicRow['topicid'] ?? null) ? (int) $topicRow['topicid'] : 0;
 $topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
 $topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
 $topictext = \Security\HtmlSanitizer::e($topicRow['topictext'] ?? '');
@@ -138,13 +147,7 @@ if ($catid !== 0) {
     'topicimage' => $topicimage, 'topictext' => $topictext,
 ]);
 
-if ($multilingual == 1) {
-    $querylang = "AND (blanguage='$currentlang' OR blanguage='')";
-} else {
-    $querylang = "";
-}
-
-cookiedecode($user);
+$nukeCompat->cookieDecode($user);
 
 // Comment system and associated topics removed — both were deprecated PHP-Nuke features
 

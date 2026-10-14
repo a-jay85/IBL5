@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-09
+last_verified: 2026-10-12
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -29,13 +29,29 @@ branch; it survives you closing Claude Code. Engine selection:
   verdict to arming condition (12). It exits **0**, **1** or **3** only. There is no exit 4 and
   no Phase-5.5 re-entry. Any harness failure outside exit 3 re-runs the **full** skill from
   Phase 0. Exit **3** is the fail-closed sentinel and suppresses the skill fallback entirely.
-  Four kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
+  Five kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
   rewritten on GitHub with different content), a **local gate denial** (a `bin/pre-commit-hook`
-  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget), and a
+  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget), a
   **usage limit** (`llm-usage-limit`: a model call returned a session, rate, or API limit
-  message). A skill re-run would hit the same wall on each one, so the run stops for a human.
-  For a usage limit, re-run `bin/post-plan-now` after the limit resets.
-  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped.
+  message), and an **expired login** (`llm-auth-expired`: the Claude CLI login expired).
+  A skill re-run would hit the same wall on each one, so the run stops for a human.
+  For a usage limit, re-run `bin/post-plan-now` after the limit resets. For an expired
+  login, run `claude`, complete `/login`, then re-run it.
+  A conflict on a generated file flagged `regen_on_conflict` in the ladder's `GENERATED_FILES`
+  registry skips the LLM resolver. Today only `ibl5/phpstan-baseline.neon` carries the flag.
+  Once every other conflicted file resolves, the harness takes master's copy, runs
+  `bin/regen-baselines` on the merged tree and commits the output in the merge commit. It then
+  rewrites that file's section of the lost-work pre-patch to the master-to-merged diff, so the
+  proof checks every other file unchanged. A generator that fails, times out or writes a file
+  outside its registry outputs declines with `resolver declined: <path>`, the same exit-3 reason
+  as before. `conflict_rung` reads `regen` when no file needed the resolver.
+  Before a rebase conflict reaches exit 3, a first resolution that fails the lost-work proof
+  goes through the conflict ladder in `tools/postplan-harness/harness/conflict_ladder.py`.
+  Rung 1 takes master's copy of each generated file and reruns its generator, with no model
+  call. Rung 2 retries the resolver once on Opus with the exact LOST lines. Rung 3 runs one
+  headless `claude -p` session capped at $5, 20 minutes and 80 turns. The harness re-runs the
+  unchanged proof after every rung, and `result.json` records the outcome in `conflict_rung`.
+  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped. The block ends with a paste line, `<main checkout>/bin/postplan-fix <PR|slug>`, which opens an interactive Claude session in the worktree with the failing stage, the error text, and the log paths in its opening prompt. It does not ship. The post-plan-fleet failure DMs and the pr-cycle-tick retry-cap DM end with the same line.
   `bin/post-plan-fail-dm` sends the DM. With no live interactive Claude session in the
   worktree it DMs at once. Headless `claude -p` sessions do not count. With an interactive
   one, it holds the DM 15 min and sends it only if nobody re-fired the branch.
@@ -61,6 +77,32 @@ It DMs once per recorded hold. A strict subset (some files added) or a new
 missing item runs normally, and so do holds on conditions (7), (8) and (13).
 `bin/post-plan-now --force` passes `POSTPLAN_FORCE=1` to the harness and skips this check
 too; every other launch passes `POSTPLAN_FORCE=0`.
+The in-run decline also writes a held-unfixable marker through `harness/heldmarker.py`:
+`tools/postplan-harness/out/state/<slug>.held-unfixable.json` in the main checkout, which
+`.gitignore` already covers. It stores a hash of condition (3)'s missing set and the plan
+file's mtime. While both still match the live hold record, `bin/post-plan-now` exits **8**
+before launching anything, and `bin/pr-cycle` Stage 1 skips the PR so its `--max-ready`
+slot goes to the next one. The decline DM names the marker. Editing the plan makes it
+stale, and so does a later run that arms or holds on a different reason. To clear it by
+hand, delete the file. `--force` and `--state-changed` bypass it for one run, and a forced
+run that holds on the same reason keeps it. Automouse treats exit **8** as terminal, so a
+decline in its resume path never trips the postplan env-breaker. The marker only
+suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming condition.
+
+**Rebase-only mode.** `bin/pr-cycle` fires a DIRTY PR with `--rebase-only-prs=<N>` when the
+PR's last hold record names only conditions (3), (7) and (8) and its patch-id still equals the
+sticky `**Reviewed diff:**`. `PR_CYCLE_REBASE_ONLY_HELD=0` turns this off. The flag reaches the
+harness as `--rebase-only` through `bin/post-plan-fleet` and `bin/post-plan-now`, where it also
+implies `--state-changed`. The harness re-checks the record with
+`python3 -m harness.holdrepeat rebase-eligible` and runs the full path when the record is
+absent or names any other condition. An eligible run merges `origin/master` with the usual
+conflict resolver and lost-work proof, pushes, and ends with terminal `rebased-held` and exit
+**0**. It runs no review, fidelity or manual-test call, never posts the sticky verdict and never
+arms. A failed proof stops before the push. When the patch-id is unchanged, the run refreshes
+the hold record's fingerprint so the next cycle still declines. A changed patch-id leaves the
+record alone, and the next cycle reviews the new tree. A failed rebase-only run never falls
+back to the skill. The fleet outcome word is `rebased`, and `bin/pr-cycle-tick` logs it
+without charging an attempt.
 
 ## What `--auto` adds
 

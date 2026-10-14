@@ -7,19 +7,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pytest
-
-from harness import conformance
 from harness.conformance import check, phase_omission_items
 from harness.planfile import parse_phases
 from harness.state import PhaseInfo, PlanInfo
-
-
-@pytest.fixture(autouse=True)
-def _no_tracked_lookup(monkeypatch):
-    """These tests cite invented paths (`harness/x.py`). Fail closed so every citation
-    stays a repo-path candidate instead of being judged against the real checkout."""
-    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: None)
 
 
 def _plan_with_test(path: str) -> PlanInfo:
@@ -170,7 +160,8 @@ def test_phase_with_untouched_evidence_is_missing():
     """
     ph = PhaseInfo(number=2, heading="Phase 2: Do stuff", evidence_paths=["harness/x.py"])
     plan = _plan_with_phases([ph])
-    items = phase_omission_items(plan, ["harness/y.py"])
+    items = phase_omission_items(plan, ["harness/y.py"],
+                                 tracked_files=("harness/x.py", "harness/y.py"))
     assert len(items) == 1
     assert items[0].startswith("MISSING-PHASE: 2 —")
     assert "harness/x.py" in items[0]
@@ -184,7 +175,9 @@ def test_phase_with_any_touched_evidence_ships():
     ph = PhaseInfo(number=2, heading="Phase 2: Do stuff",
                    evidence_paths=["harness/x.py", "harness/z.py"])
     plan = _plan_with_phases([ph])
-    items = phase_omission_items(plan, ["tools/postplan-harness/harness/z.py"])
+    items = phase_omission_items(
+        plan, ["tools/postplan-harness/harness/z.py"],
+        tracked_files=("harness/x.py", "tools/postplan-harness/harness/z.py"))
     assert items == []
 
 
@@ -195,7 +188,8 @@ def test_phase_basename_ambiguous_hit_counts_as_shipped():
     """
     ph = PhaseInfo(number=3, heading="Phase 3: A", evidence_paths=["tests/test_a.py"])
     plan = _plan_with_phases([ph])
-    items = phase_omission_items(plan, ["a/tests/test_a.py", "b/tests/test_a.py"])
+    items = phase_omission_items(plan, ["a/tests/test_a.py", "b/tests/test_a.py"],
+                                 tracked_files=("a/tests/test_a.py", "b/tests/test_a.py"))
     assert items == []
 
 
@@ -218,10 +212,10 @@ def test_deferred_phase_is_exempt():
     """
     ph = PhaseInfo(number=5, heading="Phase 5: Defer me", evidence_paths=["bin/x"])
     plan_deferred = _plan_with_phases([ph], deferred=[5])
-    assert phase_omission_items(plan_deferred, []) == []
+    assert phase_omission_items(plan_deferred, [], tracked_files=("bin/x",)) == []
 
     plan_other = _plan_with_phases([ph], deferred=[6])
-    items = phase_omission_items(plan_other, [])
+    items = phase_omission_items(plan_other, [], tracked_files=("bin/x",))
     assert len(items) == 1
 
 
@@ -242,7 +236,7 @@ def test_check_includes_phase_items_for_matrixless_plan():
     """
     ph = PhaseInfo(number=2, heading="Phase 2: B", evidence_paths=["bin/b"])
     plan = PlanInfo(found=True, has_matrix=False, phases=[ph])
-    items = check(plan, [])
+    items = check(plan, [], tracked_files=("bin/b",))
     assert any(i.startswith("MISSING-PHASE: 2") for i in items)
 
 
@@ -287,7 +281,7 @@ def test_node_id_tokens_resolve_through_real_plan_parse(tmp_path):
     Mutation caught: A) dropping the `::` strip in `_resolve` leaves the matrix token
     unmatchable (spurious MISSING:). B) dropping the `.split("::", 1)[0]` in
     `planfile._phase_evidence_paths` keeps `::test_fixture_case` on the phase evidence
-    path (spurious MISSING-PHASE:). Resolving unconditionally on `::` fails the negative
+    path, so the evidence_paths assertion fails and the negative half reports no MISSING-PHASE:. Resolving unconditionally on `::` fails the negative
     half, which must report both items for a diff that lacks the file.
 
     Real-plan evidence (2026-10-07, backlog#1103): Phase 5.0 `conformance.check` on
@@ -319,9 +313,13 @@ def test_node_id_tokens_resolve_through_real_plan_parse(tmp_path):
     assert node in plan.planned_test_paths
     assert "tools/postplan-harness/tests/test_armable.py" in plan.phases[0].evidence_paths
 
-    assert check(plan, ["tools/postplan-harness/tests/test_armable.py"]) == []
+    tracked = ("tools/postplan-harness/tests/test_armable.py",
+               "tools/postplan-harness/tests/test_other.py")
+    assert check(plan, ["tools/postplan-harness/tests/test_armable.py"],
+                 tracked_files=tracked) == []
 
-    items = check(plan, ["tools/postplan-harness/tests/test_other.py"])
+    items = check(plan, ["tools/postplan-harness/tests/test_other.py"],
+                  tracked_files=tracked)
     assert any(i.startswith("MISSING:") for i in items), items
     assert any(i.startswith("MISSING-PHASE:") for i in items), items
 
@@ -583,13 +581,15 @@ No backticked path here.
     plan_info = locate_plan("x", content_override=plan_text)
 
     # negative: only phase 1 shipped → phase 2 is missing (3=bookkeeping, 4=deferred, 5=no evidence)
-    items_neg = check(plan_info, ["tools/postplan-harness/harness/a.py"])
+    tracked = ("harness/a.py", "harness/b.py", "docs/x.md", "bin/d")
+    items_neg = check(plan_info, ["tools/postplan-harness/harness/a.py"],
+                      tracked_files=tracked)
     missing_phase = [i for i in items_neg if i.startswith("MISSING-PHASE:")]
     assert len(missing_phase) == 1
     assert missing_phase[0].startswith("MISSING-PHASE: 2 —")
 
     # positive: both phases shipped → no MISSING-PHASE items
-    items_pos = check(plan_info, ["harness/a.py", "harness/b.py"])
+    items_pos = check(plan_info, ["harness/a.py", "harness/b.py"], tracked_files=tracked)
     assert not any(i.startswith("MISSING-PHASE:") for i in items_pos)
 
 
@@ -600,4 +600,6 @@ def test_line_suffixed_evidence_citation_matches_changed_file():
     """
     phases = parse_phases("## Phase 1: Foo\n\nEdit `bin/check-prose:438-457`.\n")
     plan = _plan_with_phases(phases)
-    assert phase_omission_items(plan, ["bin/check-prose"]) == []
+    assert "bin/check-prose" in phases[0].evidence_paths
+    assert phase_omission_items(plan, ["bin/check-prose"],
+                                tracked_files=("bin/check-prose",)) == []

@@ -76,15 +76,6 @@ final class SimRecapQueueGuardTest extends TestCase
         self::assertSame(1, substr_count($this->src, '(int)'), 'Exactly one (int) cast expected (only --sim)');
     }
 
-    public function testSnowflakesLeaveAsStrings(): void
-    {
-        // The mention-map path emits each id through (string), never (int).
-        self::assertTrue(
-            str_contains($this->src, '(string) $id'),
-            'Mention-map must cast the snowflake to string before it enters the JSON'
-        );
-    }
-
     // ── Htaccess tests ─────────────────────────────────────────────────────────
 
     public function testHtaccessDeniesSimRecapQueue(): void

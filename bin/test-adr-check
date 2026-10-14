@@ -55,6 +55,7 @@ new_repo() {
     cp "$SCRIPT_DIR/lib/branch-base.sh" "$REPO/bin/lib/branch-base.sh"
     cp "$SCRIPT_DIR/pre-commit-hook" "$REPO/bin/pre-commit-hook"
     cp "$SCRIPT_DIR/lib/shell-scripts.sh" "$REPO/bin/lib/shell-scripts.sh"
+    cp "$SCRIPT_DIR/lib/gate-common.php" "$REPO/bin/lib/gate-common.php"
     chmod +x "$REPO/bin/adr-check" "$REPO/bin/pre-push-adr-hook" \
              "$REPO/bin/pre-commit-hook" "$REPO/bin/lib/shell-scripts.sh"
     h_git_repo "$REPO" --no-commit
@@ -516,6 +517,62 @@ expect "commit-workflow-bypass-too-short" 1 $?
 new_repo 1; stage_trigger workflow
 run_adr_check_commit_stdin $'<!-- adr: new CI workflow governed by existing ADR-0059 -->\n\n## Summary\n- x\n'
 expect "commit-workflow-bypass-wrong-form" 1 $?
+
+# --- extractBypassReason characterization (pins the shared gate-common.php core) ---
+# Each row: fresh repo, staged bin/ trigger, explicit body on stdin, exit code.
+adr_bypass_row() { # <name> <want-exit> <body>
+    new_repo 1; stage_bin_trigger
+    run_adr_check_commit_stdin "$3"
+    expect "$1" "$2" $?
+}
+adr_bypass_row "adr-bypass-exact-min-length"     0 '<!-- no-adr: abcdefghijklmno -->'
+adr_bypass_row "adr-bypass-one-under-min"        1 '<!-- no-adr: abcdefghijklmn -->'
+adr_bypass_row "adr-bypass-trim-before-length"   1 '<!--    no-adr:     abcdefghijklmn     -->'
+adr_bypass_row "adr-bypass-strlen-counts-bytes"  0 '<!-- no-adr: ééééé12345 -->'
+adr_bypass_row "adr-bypass-first-match-only"     1 $'<!-- no-adr: short -->\n<!-- no-adr: second marker reason long enough -->'
+adr_bypass_row "adr-bypass-literal-null-body"    1 'null'
+adr_bypass_row "adr-bypass-empty-body"           1 ''
+adr_bypass_row "adr-bypass-refactor-marker-rejected" 1 '<!-- no-refactor-tests: a reason that is long enough -->'
+
+# --- fetchPrBody characterization: gh argv, PR_NUMBER set/empty/unset, gh failure ---
+# recording_gh <exit-code> <body> — PATH shim: logs argv one per line to
+# $GH_DIR/argv, prints <body>, exits <exit-code>. Sets $GH_DIR.
+recording_gh() {
+    GH_DIR="$(mktemp -d "$BASE_TMP/rgh.XXXXXX")"
+    printf '%s\n' "$2" > "$GH_DIR/body"
+    { echo '#!/bin/sh'
+      echo 'd="$(dirname "$0")"'
+      echo 'printf "%s\n" "$@" >> "$d/argv"'
+      echo 'cat "$d/body"'
+      echo "exit $1"; } > "$GH_DIR/gh"
+    chmod +x "$GH_DIR/gh"
+}
+ADR_STUB_BODY='<!-- no-adr: stub body reason that is long enough -->'
+
+new_repo 1; add_bin_trigger "add tool"; recording_gh 0 "$ADR_STUB_BODY"
+( cd "$REPO" && env PATH="$GH_DIR:$PATH" PR_NUMBER=4242 \
+    ./bin/adr-check --pr --base=origin/master </dev/null ) >/dev/null 2>&1
+expect "adr-fetch-pr-number-set-bypasses" 0 $?
+printf '%s\n' pr view 4242 --json body --jq .body | cmp -s - "$GH_DIR/argv"
+ok_check "adr-fetch-pr-number-set-argv" $?
+
+new_repo 1; add_bin_trigger "add tool"; recording_gh 0 "$ADR_STUB_BODY"
+( cd "$REPO" && env -u PR_NUMBER PATH="$GH_DIR:$PATH" \
+    ./bin/adr-check --pr --base=origin/master </dev/null ) >/dev/null 2>&1
+expect "adr-fetch-pr-number-unset-bypasses" 0 $?
+printf '%s\n' pr view --json body --jq .body | cmp -s - "$GH_DIR/argv"
+ok_check "adr-fetch-pr-number-unset-argv" $?
+
+new_repo 1; add_bin_trigger "add tool"; recording_gh 0 "$ADR_STUB_BODY"
+( cd "$REPO" && env PATH="$GH_DIR:$PATH" PR_NUMBER= \
+    ./bin/adr-check --pr --base=origin/master </dev/null ) >/dev/null 2>&1
+printf '%s\n' pr view --json body --jq .body | cmp -s - "$GH_DIR/argv"
+ok_check "adr-fetch-pr-number-empty-omits-number" $?
+
+new_repo 1; add_bin_trigger "add tool"; recording_gh 1 "$ADR_STUB_BODY"
+( cd "$REPO" && env PATH="$GH_DIR:$PATH" PR_NUMBER=4242 \
+    ./bin/adr-check --pr --base=origin/master </dev/null ) >/dev/null 2>&1
+expect "adr-fetch-gh-failure-null-body-rejects" 1 $?
 
 # no trigger → pass
 new_repo 1; add_no_trigger

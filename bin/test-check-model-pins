@@ -15,7 +15,7 @@ set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMPROOT="$(mktemp -d)"
-trap 'rm -rf "$TMPROOT"' EXIT
+trap 'rm -rf "$TMPROOT"; h_cleanup' EXIT
 
 ok() { h_pass "$1"; }
 fail() { h_fail "$@"; }

@@ -22,6 +22,7 @@ use FranchiseHistory\FranchiseHistoryService;
 use FranchiseHistory\FranchiseHistoryView;
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 $season = new \Season\Season($mysqli_db);
 

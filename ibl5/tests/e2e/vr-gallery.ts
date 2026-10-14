@@ -14,23 +14,29 @@ import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import type { Viewport } from './vr-manifest';
 
-// Per-pixel YIQ-distance threshold for what counts as a "different" pixel. This
+// Per-pixel colour-distance threshold for what counts as a "different" pixel. This
 // MIRRORS the VR gate: `toHaveScreenshot` in ibl5/playwright.visual.config.ts
 // sets only `maxDiffPixelRatio` and leaves `threshold` at Playwright's default
-// of 0.2 (Playwright drives the same pixelmatch under the hood). Matching it here
+// of 0.2 on its own bundled pixelmatch, which still uses the YIQ metric.
+// Our pixelmatch 8 measures OKLab HyAB distance instead, so 0.2 is no longer
+// the same cutoff: the #2599 pairs' full-coverage cutoffs moved from
+// 0.1848/0.1856/0.2042 (gray/accent/hover) to 0.192/0.206/0.255. 0.22 is the
+// pixelmatch-8 equivalent of the gate's 0.2: it keeps the resting-state
+// recolors under it and the hover pair over it, as under YIQ. Matching it here
 // is the other half of gate parity: with pixelmatch's own stricter 0.1 default
 // the gallery would flag MORE anti-aliasing/font pixels per cell than the gate,
 // inflating the diff ratio above the gate's and re-surfacing sub-gate noise the
 // ratio floor alone can't suppress. See ADR-0074 Consequences for both sync
 // points (this threshold and the ratio floor).
-export const GATE_PIXEL_THRESHOLD = 0.2;
+export const GATE_PIXEL_THRESHOLD = 0.22;
 
 // Review-only strict pass (ADR 0180, amends ADR-0074). Never gates: it only
-// feeds the gallery's changed set. 0.05 sits above the faintest anti-alias
-// fringe of a #2599 recolor (quarter coverage, min-t 0.0455) and well below
-// half-coverage and solid glyph pixels (min-t 0.0917 to 0.2042), so solid
-// and half-covered text pixels of a one-step palette recolor count.
-export const STRICT_PIXEL_THRESHOLD = 0.05;
+// feeds the gallery's changed set. 0.065 sits above the faintest anti-alias
+// fringe of a #2599 recolor (quarter coverage, OKLab min-t 0.0425 to 0.0593)
+// and below half-coverage and solid glyph pixels (min-t 0.0896 to 0.2547), so
+// solid and half-covered text pixels of a one-step palette recolor count.
+// (Retuned from 0.05 for pixelmatch 8's OKLab HyAB metric.)
+export const STRICT_PIXEL_THRESHOLD = 0.065;
 // Absolute floor, replacing the gate's ratio: 0.005 of a 1280x2000 full-page
 // shot is 12800 pixels, far more than one recoloured link or label. 25 pixels
 // is under a single short word's solid-glyph count and above isolated jitter.

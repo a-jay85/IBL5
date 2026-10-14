@@ -6,14 +6,10 @@ namespace BasketballStats\Tables;
 
 use BasketballStats\StatsFormatter;
 use Player\Player;
-use Player\PlayerImageHelper;
 use Player\Stats\PlayerStats;
-use TeamOffDefStats\TeamOffDefStatsRepository;
 use UI\Tables\PlayerRowTransformer;
-use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 use Team\Team;
-use Season\Season;
 
 /**
  * SeasonAverages - Displays season averages statistics table
@@ -39,24 +35,16 @@ class SeasonAverages
     {
         $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 
-        $season = new Season($db);
-        $seasonYear = ($yr !== '') ? (int) $yr : $season->endingYear;
-        $offDefRepo = new TeamOffDefStatsRepository($db);
-        $bothStats = $offDefRepo->getTeamBothStats($team->name, $seasonYear)
-            ?? $offDefRepo->getTeamBothStats($team->name, $seasonYear, false);
+        $bothStats = TeamStatsTableContext::resolveBothStats($db, $team, $yr);
 
         ob_start();
+        // "\n" restores the template line break: PHP swallows the newline right after the closing PHP tag.
+        // @phpstan-ignore ibl.trustedVariable (openTag() escapes the aria-label and sanitizes the colors)
+        echo HtmlSanitizer::trusted(TeamStatsTableContext::openTag($team, $ariaLabel)), "\n";
         ?>
-<table class="ibl-data-table team-table responsive-table sortable"<?= $ariaLabel !== '' ? ' aria-label="' . \Security\HtmlSanitizer::e($ariaLabel) . '"' : '' ?> style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
-<?php if ($moduleName === "LeagueStarters"): ?>
-            <th>Team</th>
-<?php endif; ?>
-            <th>Pos</th>
-            <th class="sticky-col">Player</th>
-            <th>g</th>
-            <th>gs</th>
+<?= TeamStatsRowHelper::headPrefix($moduleName) ?>
             <th class="sep-r-team">min</th>
             <th>fgm</th>
             <th>fga</th>
@@ -79,100 +67,78 @@ class SeasonAverages
     </thead>
     <tbody>
 <?php foreach ($playerRows as $row):
-    /** @var Player $player */
-    $player = $row['player'];
-    /** @var PlayerStats $playerStats */
-    $playerStats = $row['playerStats'];
-?>
-        <tr>
-<?php if ($moduleName === "LeagueStarters"):
-    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->getTeamid() ?? 0, $player->getTeamName() ?? '', $player->getTeamColor1() ?? 'FFFFFF', $player->getTeamColor2() ?? '000000');
-endif; ?>
-            <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
-            <?= PlayerImageHelper::renderPlayerCell($player->getPlayerID() ?? 0, $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass()) ?>
-            <td><?= $playerStats->seasonGamesPlayed ?></td>
-            <td><?= $playerStats->seasonGamesStarted ?></td>
-            <td class="sep-r-team"><?= $playerStats->seasonMinutesPerGame ?></td>
-            <td><?= $playerStats->seasonFieldGoalsMadePerGame ?></td>
-            <td><?= $playerStats->seasonFieldGoalsAttemptedPerGame ?></td>
-            <td class="sep-r-weak"><?= $playerStats->seasonFieldGoalPercentage ?></td>
-            <td><?= $playerStats->seasonFreeThrowsMadePerGame ?></td>
-            <td><?= $playerStats->seasonFreeThrowsAttemptedPerGame ?></td>
-            <td class="sep-r-weak"><?= $playerStats->seasonFreeThrowPercentage ?></td>
-            <td><?= $playerStats->seasonThreePointersMadePerGame ?></td>
-            <td><?= $playerStats->seasonThreePointersAttemptedPerGame ?></td>
-            <td class="sep-r-team"><?= $playerStats->seasonThreePointPercentage ?></td>
-            <td><?= $playerStats->seasonOffensiveReboundsPerGame ?></td>
-            <td><?= $playerStats->seasonTotalReboundsPerGame ?></td>
-            <td><?= $playerStats->seasonAssistsPerGame ?></td>
-            <td><?= $playerStats->seasonStealsPerGame ?></td>
-            <td><?= $playerStats->seasonTurnoversPerGame ?></td>
-            <td><?= $playerStats->seasonBlocksPerGame ?></td>
-            <td><?= $playerStats->seasonPersonalFoulsPerGame ?></td>
-            <td><?= $playerStats->seasonPointsPerGame ?></td>
-        </tr>
-<?php endforeach; ?>
+    echo self::renderPlayerRow($row['player'], $row['playerStats'], $starterPids, $moduleName);
+endforeach; ?>
     </tbody>
     <tfoot>
 <?php if ($bothStats !== null):
-    $labelColspan = ($moduleName === "LeagueStarters") ? 3 : 2;
-    $off = $bothStats['offense'];
-    $def = $bothStats['defense'];
-    $offGames = $off['games'];
-    $defGames = $def['games'];
-    $offPts = StatsFormatter::calculatePoints($off['fgm'], $off['ftm'], $off['tgm']);
-    $defPts = StatsFormatter::calculatePoints($def['fgm'], $def['ftm'], $def['tgm']);
-?>
-        <tr>
-            <td colspan="<?= $labelColspan ?>"><?= HtmlSanitizer::e($team->name) ?> Offense</td>
-            <td><?= $offGames ?></td>
-            <td><?= $offGames ?></td>
-            <td class="sep-r-team"></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['fgm'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['fga'], $offGames) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($off['fgm'], $off['fga']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['ftm'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['fta'], $offGames) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($off['ftm'], $off['fta']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['tgm'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['tga'], $offGames) ?></td>
-            <td class="sep-r-team"><?= StatsFormatter::formatPercentage($off['tgm'], $off['tga']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['orb'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['reb'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['ast'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['stl'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['tvr'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['blk'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['pf'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($offPts, $offGames) ?></td>
-        </tr>
-        <tr>
-            <td colspan="<?= $labelColspan ?>"><?= HtmlSanitizer::e($team->name) ?> Defense</td>
-            <td><?= $defGames ?></td>
-            <td><?= $defGames ?></td>
-            <td class="sep-r-team"></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['fgm'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['fga'], $defGames) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($def['fgm'], $def['fga']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['ftm'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['fta'], $defGames) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($def['ftm'], $def['fta']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['tgm'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['tga'], $defGames) ?></td>
-            <td class="sep-r-team"><?= StatsFormatter::formatPercentage($def['tgm'], $def['tga']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['orb'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['reb'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['ast'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['stl'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['tvr'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['blk'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['pf'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($defPts, $defGames) ?></td>
-        </tr>
-<?php endif; ?>
+    echo self::renderTeamFooterRow($team, 'Offense', $bothStats['offense'], $moduleName);
+    echo self::renderTeamFooterRow($team, 'Defense', $bothStats['defense'], $moduleName);
+endif; ?>
     </tfoot>
 </table>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * One `<tbody>` row: the shared prefix, then the per-game stat cells.
+     *
+     * @param list<int> $starterPids
+     */
+    private static function renderPlayerRow(Player $player, PlayerStats $playerStats, array $starterPids, string $moduleName): string
+    {
+        return TeamStatsRowHelper::playerRowPrefix($player, $playerStats, $starterPids, $moduleName)
+            . '            <td class="sep-r-team">' . $playerStats->seasonMinutesPerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonFieldGoalsMadePerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonFieldGoalsAttemptedPerGame . "</td>\n"
+            . '            <td class="sep-r-weak">' . $playerStats->seasonFieldGoalPercentage . "</td>\n"
+            . '            <td>' . $playerStats->seasonFreeThrowsMadePerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonFreeThrowsAttemptedPerGame . "</td>\n"
+            . '            <td class="sep-r-weak">' . $playerStats->seasonFreeThrowPercentage . "</td>\n"
+            . '            <td>' . $playerStats->seasonThreePointersMadePerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonThreePointersAttemptedPerGame . "</td>\n"
+            . '            <td class="sep-r-team">' . $playerStats->seasonThreePointPercentage . "</td>\n"
+            . '            <td>' . $playerStats->seasonOffensiveReboundsPerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonTotalReboundsPerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonAssistsPerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonStealsPerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonTurnoversPerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonBlocksPerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonPersonalFoulsPerGame . "</td>\n"
+            . '            <td>' . $playerStats->seasonPointsPerGame . "</td>\n"
+            . "        </tr>\n";
+    }
+
+    /**
+     * One `<tfoot>` row: the shared label cells, then the per-game team stat cells.
+     *
+     * @param 'Offense'|'Defense' $label
+     * @param TeamOffenseStatsRow|TeamDefenseStatsRow $stats
+     */
+    private static function renderTeamFooterRow(Team $team, string $label, array $stats, string $moduleName): string
+    {
+        $games = $stats['games'];
+        $pts = StatsFormatter::calculatePoints($stats['fgm'], $stats['ftm'], $stats['tgm']);
+
+        return TeamStatsRowHelper::footerLabelCells($team, $label, $games, $moduleName)
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['fgm'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['fga'], $games) . "</td>\n"
+            . '            <td class="sep-r-weak">' . StatsFormatter::formatPercentage($stats['fgm'], $stats['fga']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['ftm'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['fta'], $games) . "</td>\n"
+            . '            <td class="sep-r-weak">' . StatsFormatter::formatPercentage($stats['ftm'], $stats['fta']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['tgm'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['tga'], $games) . "</td>\n"
+            . '            <td class="sep-r-team">' . StatsFormatter::formatPercentage($stats['tgm'], $stats['tga']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['orb'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['reb'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['ast'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['stl'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['tvr'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['blk'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['pf'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($pts, $games) . "</td>\n"
+            . "        </tr>\n";
     }
 }

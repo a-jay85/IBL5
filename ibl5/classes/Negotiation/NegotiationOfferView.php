@@ -26,16 +26,14 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
      * @param int $maxYearOneSalary Maximum first year salary based on experience
      * @param string|null $cardHtml Pre-rendered flippable trading card HTML (built by the service)
      */
-    public static function renderNegotiationForm(
+    public function renderNegotiationForm(
         Player $player,
         array $demands,
         int $capSpace,
         int $maxYearOneSalary,
         ?string $cardHtml = null
     ): string {
-        $playerName = HtmlSanitizer::e($player->getName() ?? '');
         $playerID = $player->getPlayerID() ?? 0;
-        $teamName = HtmlSanitizer::e($player->getTeamName() ?? '');
 
         // Check if player demands exceed max
         $demandsExceedMax = $demands['year1'] >= $maxYearOneSalary;
@@ -56,7 +54,6 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
 
         // Card 1: Flippable trading card (front: ratings, back: stats)
         ?>
-<?= HtmlSanitizer::trusted($cardHtml ?? '') ?>
 
 <?php // Card 2: Contract Offer ?>
 <div class="ibl-card">
@@ -69,7 +66,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
         <div class="ibl-field-group">
             <span class="ibl-label">Player Demands:</span>
             <div class="ibl-field-group__content">
-                <?= HtmlSanitizer::trusted(self::buildDemandDisplay($demands)) ?>
+                <?= HtmlSanitizer::trusted($this->buildDemandDisplay($demands)) ?>
             </div>
         </div>
 
@@ -79,9 +76,9 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
                 <span class="ibl-label">Your Offer:</span>
                 <div class="ibl-field-group__content">
                     <?php if (!$demandsExceedMax): ?>
-                        <?= HtmlSanitizer::trusted(self::renderEditableOfferFields($demands)) ?>
+                        <?= HtmlSanitizer::trusted($this->renderEditableOfferFields($demands)) ?>
                     <?php else: ?>
-                        <?= HtmlSanitizer::trusted(self::renderMaxSalaryFields($maxYearOneSalary, $maxRaise, $demands)) ?>
+                        <?= HtmlSanitizer::trusted($this->renderMaxSalaryFields($maxYearOneSalary, $maxRaise, $demands)) ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -89,8 +86,8 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
             <input type="hidden" name="maxyr1" value="<?= HtmlSanitizer::e($maxYearOneSalary) ?>">
             <input type="hidden" name="demandsTotal" value="<?= HtmlSanitizer::e($demands['total']) ?>">
             <input type="hidden" name="demandsYears" value="<?= HtmlSanitizer::e($demands['years']) ?>">
-            <input type="hidden" name="teamName" value="<?= HtmlSanitizer::trusted($teamName) ?>">
-            <input type="hidden" name="playerName" value="<?= HtmlSanitizer::trusted($playerName) ?>">
+            <input type="hidden" name="teamName" value="<?= HtmlSanitizer::safeHtmlOutput($player->getTeamName() ?? '') ?>">
+            <input type="hidden" name="playerName" value="<?= HtmlSanitizer::safeHtmlOutput($player->getName() ?? '') ?>">
             <input type="hidden" name="playerID" value="<?= HtmlSanitizer::e($playerID) ?>">
 
             <button type="submit" class="ibl-btn ibl-btn--danger">Offer Extension</button>
@@ -120,7 +117,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
     </div>
 </div>
         <?php
-        return (string) ob_get_clean();
+        return ($cardHtml ?? '') . (string) ob_get_clean();
     }
 
     /**
@@ -129,7 +126,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
      * @param DemandResult $demands Demand amounts
      * @return string HTML formatted demand display
      */
-    private static function buildDemandDisplay(array $demands): string
+    private function buildDemandDisplay(array $demands): string
     {
         $yearKeys = ['year1', 'year2', 'year3', 'year4', 'year5', 'year6'];
 
@@ -155,7 +152,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
      * @param DemandResult $demands Demand amounts
      * @return string HTML for input fields
      */
-    private static function renderEditableOfferFields(array $demands): string
+    private function renderEditableOfferFields(array $demands): string
     {
         ob_start();
         ?>
@@ -179,7 +176,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
      * @param DemandResult $demands Demand amounts (to determine which years to show)
      * @return string HTML for input fields
      */
-    private static function renderMaxSalaryFields(int $maxYear1, int $maxRaise, array $demands): string
+    private function renderMaxSalaryFields(int $maxYear1, int $maxRaise, array $demands): string
     {
         $maxValues = [$maxYear1];
         $maxValues[] = ($demands['year2'] !== 0) ? $maxYear1 + $maxRaise : 0;

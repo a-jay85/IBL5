@@ -109,7 +109,7 @@ class BaseMysqliRepositoryHelpersTest extends DatabaseTestCase
         $query = "SELECT COUNT(*) AS cnt FROM {$subquery} bst";
 
         $stmt = $this->db->prepare($query);
-        self::assertNotFalse($stmt, 'gameOfThatDaySubquery must produce valid SQL: ' . $this->db->error);
+        self::assertNotFalse($stmt, 'GAME_OF_THAT_DAY_SUBQUERY must produce valid SQL: ' . $this->db->error);
         $stmt->execute();
         $result = $stmt->get_result();
         self::assertNotFalse($result);
@@ -152,7 +152,7 @@ class TestableRepository extends \Database\BaseMysqliRepository
 
     public function callGameOfThatDaySubquery(): string
     {
-        return $this->gameOfThatDaySubquery();
+        return self::GAME_OF_THAT_DAY_SUBQUERY;
     }
 }
 

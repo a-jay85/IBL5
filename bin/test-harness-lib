@@ -418,6 +418,104 @@ case_usage_isolation_lib_env_i() {
     fi
 }
 
+case_mark_rewind() {
+    run_scenario mark_rewind 'h_pass a; h_mark M; h_fail x; h_pass y; h_rewind "$M"; h_pass b; h_done'
+    if [ "$RC" -eq 0 ] && has "$OUT" "RESULT: all passed (2 assertions)"; then
+        t_ok "case_mark_rewind"
+    else
+        t_bad "case_mark_rewind (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+}
+
+case_rewind_bad_mark() {
+    local ok=1 body
+    for body in 'h_rewind garbage; echo reached; h_done' 'h_mark 1bad; echo reached; h_done'; do
+        run_scenario rewind_bad "$body"
+        if [ "$RC" -ne 2 ] || ! has "$ERR" "HARNESS-SETUP: h_" || has "$OUT" "reached"; then
+            ok=0
+            t_bad "case_rewind_bad_mark [$body] (rc=$RC out=[$OUT] err=[$ERR])"
+        fi
+    done
+    [ "$ok" -eq 1 ] && t_ok "case_rewind_bad_mark"
+    return 0
+}
+
+case_fail_fd_stderr() {
+    run_scenario fail_fd_stderr 'H_FAIL_FD=2; h_pass a; h_fail b d; h_done'
+    if [ "$RC" -eq 1 ] && has "$OUT" "ok: a" &&
+        has "$OUT" "RESULT: FAILED (1 of 2 assertions failed)" &&
+        ! has "$OUT" "FAIL: b" && has "$ERR" "FAIL: b — d"; then
+        t_ok "case_fail_fd_stderr"
+    else
+        t_bad "case_fail_fd_stderr (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+}
+
+case_fail_fd_default() {
+    run_scenario fail_fd_default 'h_fail b; unset H_FAIL_FD; h_fail c; H_FAIL_FD=; h_fail d; h_done' H_FAIL_FD=2
+    if has "$OUT" "FAIL: b" && has "$OUT" "FAIL: c" && has "$OUT" "FAIL: d" && [ -z "$ERR" ]; then
+        t_ok "case_fail_fd_default"
+    else
+        t_bad "case_fail_fd_default (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+}
+
+case_fail_fd_invalid() {
+    run_scenario fail_fd_invalid 'H_FAIL_FD=3; h_fail b; h_done'
+    if [ "$RC" -eq 2 ] && has "$ERR" "H_FAIL_FD must be 1 or 2"; then
+        t_ok "case_fail_fd_invalid"
+    else
+        t_bad "case_fail_fd_invalid (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+}
+
+case_skip_suffix() {
+    local ok=1
+    run_scenario skip_suffix_a 'h_pass a; h_skip s; h_done'
+    if [ "$RC" -ne 0 ] || ! has "$OUT" "skip: s" ||
+        ! has "$OUT" "RESULT: all passed (1 assertions) (1 skipped)"; then
+        ok=0
+        t_bad "case_skip_suffix passing run (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+    run_scenario skip_suffix_b 'h_fail x; h_skip s; h_done'
+    if [ "$RC" -ne 1 ] || ! has "$OUT" "RESULT: FAILED (1 of 1 assertions failed) (1 skipped)"; then
+        ok=0
+        t_bad "case_skip_suffix failing run (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+    [ "$ok" -eq 1 ] && t_ok "case_skip_suffix"
+    return 0
+}
+
+case_skip_only_fails_by_default() {
+    run_scenario skip_only 'h_skip s; h_done'
+    if [ "$RC" -eq 1 ] && has "$OUT" "RESULT: FAILED (no assertions ran) (1 skipped)"; then
+        t_ok "case_skip_only_fails_by_default"
+    else
+        t_bad "case_skip_only_fails_by_default (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+}
+
+case_skip_ok() {
+    local ok=1
+    run_scenario skip_ok_a 'H_SKIP_OK=1; h_skip s; h_done'
+    if [ "$RC" -ne 0 ] || ! has "$OUT" "RESULT: all skipped (1)"; then
+        ok=0
+        t_bad "case_skip_ok skip-only run (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+    run_scenario skip_ok_b 'H_SKIP_OK=1; h_done'
+    if [ "$RC" -ne 1 ] || ! has "$OUT" "no assertions ran"; then
+        ok=0
+        t_bad "case_skip_ok zero skips (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+    run_scenario skip_ok_c 'h_skip s; h_done' H_SKIP_OK=1
+    if [ "$RC" -ne 1 ]; then
+        ok=0
+        t_bad "case_skip_ok inherited env (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+    [ "$ok" -eq 1 ] && t_ok "case_skip_ok"
+    return 0
+}
+
 # Every bin/test-* that sources harness.sh (directly or through the
 # bug-pipeline stubs lib) must end with exactly one `h_done` and keep no
 # legacy `exit "$FAILED"` tail. A harness that forgets h_done exits 0 even
@@ -527,7 +625,8 @@ case_usage_gate_isolated() {
         [ -f "$f" ] || continue
         nc=$(grep -vE '^[[:space:]]*#' "$f")
         if grep -qE '^[[:space:]]*(\.|source)[[:space:]].*lib/usage-test-isolation\.sh' <<<"$nc" &&
-            ! grep -qF IBL5_USAGE_GATE_STATE_DIR <<<"$nc" && [ "${f##*/}" != test-harness-lib ]; then
+            ! grep -qF IBL5_USAGE_GATE_STATE_DIR <<<"$nc" && [ "${f##*/}" != test-harness-lib ] &&
+            ! grep -qE 'lib/harness\.sh' <<<"$nc"; then
             canary=$f
             break
         fi
@@ -598,6 +697,14 @@ case_usage_isolation_prestart_fail_open
 case_usage_isolation_lib_env_i
 case_consumers_end_with_h_done
 case_usage_gate_isolated
+case_mark_rewind
+case_rewind_bad_mark
+case_fail_fd_stderr
+case_fail_fd_default
+case_fail_fd_invalid
+case_skip_suffix
+case_skip_only_fails_by_default
+case_skip_ok
 
 if [ "$T_FAIL" -eq 0 ]; then
     echo "test-harness-lib: all cases passed"

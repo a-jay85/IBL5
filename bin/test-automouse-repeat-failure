@@ -8,6 +8,7 @@
 #   - bin/lib/automouse-failure-signature: true repeats normalize equal,
 #     different failures do not, no informative error yields empty output
 #   - the run-loop helpers in bin/automouse/run that read and compare signatures
+#   - the plan-defect sentinel helpers: exact line-1 marker read, skipped report content
 #
 # Run: bin/test-automouse-repeat-failure  (exit 0 = all pass, 1 = a case failed)
 
@@ -20,7 +21,7 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 SIG="$REPO/bin/lib/automouse-failure-signature"
 
 TMPS=()
-cleanup() { [ "${#TMPS[@]}" -gt 0 ] && rm -rf "${TMPS[@]}"; return 0; }
+cleanup() { [ "${#TMPS[@]}" -gt 0 ] && rm -rf "${TMPS[@]}"; h_cleanup; return 0; }
 trap cleanup EXIT
 
 WORK=$(mktemp -d)
@@ -124,7 +125,7 @@ fi
 
 # --- run-loop helpers, extracted from bin/automouse/run so the test cannot drift
 RUN="$REPO/bin/automouse/run"
-for fn in write_failure_report read_failure_signature failure_signature_repeats write_repeat_failure_report; do
+for fn in write_failure_report read_failure_signature failure_signature_repeats write_repeat_failure_report plan_defect_marker_present write_plan_defect_report; do
     FN_SRC=$(awk -v f="$fn" '$0 ~ "^"f"\\(\\) \\{" {capture=1} capture {print} capture && /^\}/ {exit}' "$RUN")
     if [ -z "$FN_SRC" ]; then
         fail "extract-$fn" "function not found in bin/automouse/run"
@@ -193,6 +194,67 @@ if grep -q 'attempts 1 and 2' "$REPORT" 2>/dev/null \
     pass "r6-repeat-report-carries-signature"
 else
     fail "r6-repeat-report-carries-signature" "report missing or incomplete: $REPORT"
+fi
+
+# p1: a sentinel whose line 1 is exactly the marker is read as a plan defect.
+# Renaming plan_defect_marker_present in bin/automouse/run fails the extractor loop
+# above as extract-plan_defect_marker_present, before p1 runs.
+PD="$QUEUE_DIR/plan-p.md.plan-defect"
+printf 'automouse-plan-defect: v1\nUNREALISED-ASSERTION: row 3 testFoo\nMISSING-FILE: bin/x\n' > "$PD"
+if plan_defect_marker_present "$PD"; then
+    pass "p1-plan-defect-marker-read"
+else
+    fail "p1-plan-defect-marker-read" "valid marker not recognised"
+fi
+
+# p2: a garbled line 1 (marker pushed to line 2, or a wrong version) is ignored
+P2=ok
+printf 'UNREALISED-ASSERTION: row 3\nautomouse-plan-defect: v1\n' > "$QUEUE_DIR/g1"
+plan_defect_marker_present "$QUEUE_DIR/g1" && P2=bad
+printf 'automouse-plan-defect: v2\n' > "$QUEUE_DIR/g2"
+plan_defect_marker_present "$QUEUE_DIR/g2" && P2=bad
+if [ "$P2" = ok ]; then
+    pass "p2-garbled-marker-ignored"
+else
+    fail "p2-garbled-marker-ignored" "a garbled line 1 was read as a plan defect"
+fi
+
+# p3: an absent or empty sentinel is ignored
+P3=ok
+plan_defect_marker_present "$QUEUE_DIR/does-not-exist" && P3=bad
+: > "$QUEUE_DIR/empty"
+plan_defect_marker_present "$QUEUE_DIR/empty" && P3=bad
+if [ "$P3" = ok ]; then
+    pass "p3-absent-or-empty-sentinel-ignored"
+else
+    fail "p3-absent-or-empty-sentinel-ignored" "absent/empty sentinel read as a plan defect"
+fi
+
+# p4: the plan-defect report names the attempt and carries the failing rows
+write_plan_defect_report plan-p.md "$PD" 1
+PREPORT="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-plan-p.md"
+if head -n 1 "$PREPORT" 2>/dev/null | grep -q 'stopped after attempt 1: its Verification Matrix could not be realised' \
+    && grep -qF 'UNREALISED-ASSERTION: row 3 testFoo' "$PREPORT" \
+    && grep -qF 'MISSING-FILE: bin/x' "$PREPORT"; then
+    pass "p4-plan-defect-report-names-rows"
+else
+    fail "p4-plan-defect-report-names-rows" "report missing or incomplete: $PREPORT"
+fi
+
+# p5: the marker line itself is not copied into the report
+if grep -qF 'automouse-plan-defect: v1' "$PREPORT" 2>/dev/null; then
+    fail "p5-plan-defect-report-omits-marker" "marker line leaked into $PREPORT"
+else
+    pass "p5-plan-defect-report-omits-marker"
+fi
+
+# p6: a marker-only sentinel still yields a report with the placeholder line
+printf 'automouse-plan-defect: v1\n' > "$QUEUE_DIR/plan-q.md.plan-defect"
+write_plan_defect_report plan-q.md "$QUEUE_DIR/plan-q.md.plan-defect" 1
+if grep -qF '(the sentinel listed no rows' "$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-plan-q.md" 2>/dev/null; then
+    pass "p6-plan-defect-report-empty-body"
+else
+    fail "p6-plan-defect-report-empty-body" "placeholder missing for marker-only sentinel"
 fi
 
 h_done

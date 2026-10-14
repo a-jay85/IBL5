@@ -364,7 +364,7 @@ def _generate_cmd(tmp_path, extra_env=None, args=()):
 def test_generated_cmd_has_no_rc4_arm(tmp_path):
     cmd = _generate_cmd(tmp_path)
     assert '[ "$rc" = 4 ]' not in cmd, "rc=4 arm must be gone after the full-port"
-    assert cmd.index('should_fallback "$rc" && ! usage_postrun_pause') < cmd.index('elif [ "$rc" = 3 ]; then')
+    assert cmd.index('should_fallback "$rc" 0 && ! usage_postrun_pause') < cmd.index('elif [ "$rc" = 3 ]; then')
 
 def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     cmd = _generate_cmd(tmp_path)
@@ -400,6 +400,13 @@ def _gate_args(gate):
     """(slug, root) the generated gate hands to blocked_ship_block."""
     m = re.search(r'blocked_ship_block "[^"]+" "([^"]+)" "([^"]+)"', gate)
     return m.group(1), m.group(2)
+
+
+def _gate_fix_root(gate):
+    """The main-checkout root the generated gate hands to blocked_ship_block as its 5th arg."""
+    m = re.search(r'blocked_ship_block "[^"]+" "[^"]+" "[^"]+" "[^"]+" "([^"]+)"', gate)
+    assert m, "gate does not pass a 5th (main-root) arg to blocked_ship_block"
+    return m.group(1)
 
 
 def _marker_section(stdout):
@@ -486,7 +493,7 @@ def test_generated_cmd_captures_the_harness_result_line(tmp_path):
     assert "HARNESS_RESULT=$(grep -m1 '^RESULT:'" in cmd
     assert "HARNESS_RESULT=${HARNESS_RESULT:0:1200}" in cmd
     assert (cmd.index("rc=$?; ") < cmd.index("HARNESS_RESULT=$(grep")
-            < cmd.index('should_fallback "$rc" && ! usage_postrun_pause'))
+            < cmd.index('should_fallback "$rc" 0 && ! usage_postrun_pause'))
 
 
 def test_skill_only_cmd_has_no_harness_result_capture(tmp_path):
@@ -558,13 +565,15 @@ def test_exit3_prints_plain_block_when_no_block_file(tmp_path, block, log_text):
         gate, fixture = _rc3_gate(tmp_path, log_text, block=block)
     r = _run_gate(gate)
     assert r.returncode == 0, r.stderr
-    _slug, root = _gate_args(gate)
+    slug, root = _gate_args(gate)
     section = _marker_section(r.stdout)
     assert "did not ship. No PR opened." in section
     assert "Why: the ship step stopped and the log has the reason." in section
     assert f"  1. cd {root}" in section
     assert "  3. bin/post-plan-now" in section
-    assert section.endswith(f"Log: {fixture}")
+    assert section.endswith(f"Log: {fixture}\nOr paste this to have Claude fix it:\n"
+                            f"{_gate_fix_root(gate)}/bin/postplan-fix {slug}")
+    assert "Or open Claude in that folder" not in section
     for word in ("harness", "sentinel", "fallback", "terminal", "rc="):
         assert word not in section.lower(), word
     assert "RAN-" not in r.stdout
@@ -595,7 +604,7 @@ def test_exit3_dm_keeps_log_line_under_discord_cap(tmp_path):
     long_log = "l" * 120
     fn = subprocess.run(
         ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; blocked_ship_block "{tmp_path}/none" '
-                       f'"{slug}" "{root}" "{long_log}"'],
+                       f'"{slug}" "{root}" "{long_log}" "{root}"'],
         capture_output=True, text=True).stdout.rstrip("\n")
     assert len(prefix) + len(fn) < 1900
     assert f"Log: {long_log}" in (prefix + fn)[:1900]
@@ -622,6 +631,18 @@ def test_failure_body_rc3_carries_the_captured_result():
         capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert "pre-push-adr-hook denied the push" in r.stdout
+
+
+def test_failure_body_rc3_unset_result_names_every_cause():
+    r = subprocess.run(["bash", "-c",
+        f'source "{PPN}" >/dev/null 2>&1; unset HARNESS_RESULT; '
+        'postplan_failure_body 3 lbl "some time"'],
+        capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert ("The harness hit a fail-closed wall and deliberately did not fall back. "
+            "Cause: a rebase conflict, a local pre-commit/pre-push gate denial, a Claude "
+            "usage limit, or an expired Claude login; the RESULT line in the log names "
+            "which\n") in r.stdout
 
 
 def test_failure_body_rc3_percent_is_safe_and_falls_back():
@@ -656,7 +677,7 @@ def test_prompt_assignment_count_is_still_two():
 
 def test_should_fallback_body_unchanged():
     src = open(PPN).read()
-    assert 'should_fallback() { case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }' in src
+    assert 'should_fallback() { [ "${2:-0}" = 1 ] && return 1; case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }' in src
     assert _fb(4) == "0"     # 4 escalates to the full skill like any other non-0/3 code
     assert _fb(6) == "0"     # neighbours of 7 still escalate: the arm is exact, not a range
     assert _fb(8) == "0"
@@ -1660,7 +1681,7 @@ def test_generated_cmd_guards_gate_open_with_sigterm_flag(tmp_path):
     """
     cmd = _generate_cmd(tmp_path)
     # The guard appears before should_fallback in the gate expression
-    gate_pos = cmd.index('should_fallback "$rc" && ! usage_postrun_pause')
+    gate_pos = cmd.index('should_fallback "$rc" 0 && ! usage_postrun_pause')
     sigterm_guard = '_sigterm_received'
     assert sigterm_guard in cmd[:gate_pos], (
         "GATE_OPEN must check _sigterm_received BEFORE calling should_fallback"

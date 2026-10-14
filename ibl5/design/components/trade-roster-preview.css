@@ -23,7 +23,7 @@
     padding: 1rem;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
-    background: white;
+    background: var(--white);
     box-shadow: var(--shadow-sm);
 }
 
@@ -38,7 +38,7 @@
 .trade-roster-preview {
     margin-top: var(--space-4);
     margin-bottom: var(--space-4);
-    background: white;
+    background: var(--white);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);

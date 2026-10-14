@@ -9,15 +9,14 @@
 # launchd or Discord. Named tests run as arguments: bin/test-burndown-loop test_cli_no_args
 
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOOP="$REPO_ROOT/bin/burndown-loop"
-PASS=0
-FAIL=0
-FAILED_NAMES=""
 
-pass() { PASS=$((PASS + 1)); echo "  ok   $1"; }
-fail() { FAIL=$((FAIL + 1)); FAILED_NAMES="$FAILED_NAMES $1"; echo "  FAIL $1${2:+ — $2}"; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 assert_eq() {  # name expected actual
     if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "expected [$2] got [$3]"; fi
@@ -504,11 +503,26 @@ test_batch_abort_cap_fail_closed() {
     run_loop run
     assert_eq abort_cap:rc 1 "$RC"
     assert_eq abort_cap:calls 3 "$(calls "$T/claude.calls")"
-    assert_eq abort_cap:sleeps 2 "$(printf '%s\n' "$OUT" | grep -c 'sleep 600s reason=retry-after-abort')"
+    assert_eq abort_cap:sleeps 2 "$(printf '%s\n' "$OUT" | grep -c 'reason=retry-after-abort')"
+    assert_eq abort_cap:sleep-600 1 "$(printf '%s\n' "$OUT" | grep -c 'sleep 600s reason=retry-after-abort')"
+    assert_eq abort_cap:sleep-1200 1 "$(printf '%s\n' "$OUT" | grep -c 'sleep 1200s reason=retry-after-abort')"
+    assert_eq abort_cap:sleep-order "sleep 600s sleep 1200s" "$(grep -oE 'sleep [0-9]+s reason=retry-after-abort' <<< "$OUT" | sed 's/ reason=retry-after-abort//' | tr '\n' ' ' | sed 's/ $//')"
     assert_contains abort_cap:fails "$OUT" "fails=3/3"
     assert_contains abort_cap:finish "$OUT" "finish reason=fail-closed"
     assert_contains abort_cap:dm "$(cat "$T/dm.calls" 2>/dev/null)" "finished (fail-closed)"
     assert_contains abort_cap:last-fail "$(cat "$T/dm.calls" 2>/dev/null)" "last fail: reason=abort-exit-3"
+}
+
+test_batch_abort_backoff_doubles() {
+    new_env
+    seed_usage 5 0 1
+    queue exit3 exit3 exit3 exit3
+    IBL5_BURNDOWN_MAX_FAILS=4 run_loop run
+    assert_eq abort_doubles:rc 1 "$RC"
+    assert_eq abort_doubles:calls 4 "$(calls "$T/claude.calls")"
+    assert_eq abort_doubles:sleep-order "sleep 600s sleep 1200s sleep 2400s" "$(grep -oE 'sleep [0-9]+s reason=retry-after-abort' <<< "$OUT" | sed 's/ reason=retry-after-abort//' | tr '\n' ' ' | sed 's/ $//')"
+    assert_contains abort_doubles:fails "$OUT" "fails=4/4"
+    assert_contains abort_doubles:finish "$OUT" "finish reason=fail-closed"
 }
 
 test_batch_abort_then_ran_resets() {
@@ -595,7 +609,7 @@ test_zone_pauses_75() {
 
 test_zone_marker_write_fails_no_launch() {
     new_env
-    if [ "$(id -u)" = 0 ]; then echo "  SKIP zone_marker_write_fails (root ignores chmod)"; return 0; fi
+    if [ "$(id -u)" = 0 ]; then h_skip "zone_marker_write_fails (root ignores chmod)"; return 0; fi
     seed_usage 95 10 100
     chmod 555 "$IBL5_USAGE_GATE_STATE_DIR/markers"
     run_loop run --once
@@ -1185,10 +1199,4 @@ for t in $TESTS; do
     "$t"
 done
 
-echo
-echo "passed=$PASS failed=$FAIL"
-if [ "$FAIL" -ne 0 ]; then
-    echo "failed:$FAILED_NAMES"
-    exit 1
-fi
-exit 0
+h_done

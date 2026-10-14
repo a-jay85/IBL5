@@ -579,6 +579,48 @@ EMPTY_GOLDEN;
         ]));
 
         $this->assertStringContainsString('<div class="search-result search-result--compact" style="--anim-delay: 0ms">', $html);
+        // Body is emitted as HTML (tags intact), not double-escaped.
+        $this->assertStringContainsString('<div class="search-result__header"><span class="search-result__title">bob</span>', $html);
+        $this->assertStringNotContainsString('&lt;div class="search-result__header"', $html);
+    }
+
+    public function testResultItemModifierIsEscapedWhileBodyIsPassedThroughAsHtml(): void
+    {
+        $method = new \ReflectionMethod(SearchView::class, 'renderResultList');
+
+        $hostileModifier = ' x"><script>alert(1)</script>';
+        $trustedBody = '<span class="search-result__title">ok</span>';
+        $html = $method->invoke($this->view, [$trustedBody], $hostileModifier);
+        self::assertIsString($html);
+
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringContainsString('&lt;script&gt;', $html);
+        $this->assertStringNotContainsString('x"><', $html);
+        // Body is already-escaped HTML supplied by the caller and must not be re-escaped.
+        $this->assertStringContainsString('>' . $trustedBody . '</div>', $html);
+        $this->assertStringNotContainsString('&lt;span class="search-result__title"', $html);
+    }
+
+    public function testResultItemAnimDelayStepsBy40msAndCapsAt400ms(): void
+    {
+        $results = [];
+        for ($i = 0; $i < 13; $i++) {
+            $results[] = ['userId' => $i + 1, 'username' => 'user' . $i, 'name' => 'Name ' . $i];
+        }
+
+        $html = $this->view->render(self::createPageData([
+            'type' => 'users',
+            'query' => 'x',
+            'results' => $results,
+        ]));
+
+        $this->assertStringContainsString('--anim-delay: 0ms"', $html);
+        $this->assertStringContainsString('--anim-delay: 360ms"', $html);
+        $this->assertStringContainsString('--anim-delay: 400ms"', $html);
+        $this->assertStringNotContainsString('--anim-delay: 440ms"', $html);
+        $this->assertStringNotContainsString('--anim-delay: 480ms"', $html);
+        // Indexes 10, 11 and 12 all cap at 400ms.
+        $this->assertSame(3, substr_count($html, '--anim-delay: 400ms"'));
     }
 
     public function testLocalTimeKeepsTimeElementInStoryAndCommentResults(): void

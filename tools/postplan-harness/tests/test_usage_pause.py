@@ -568,6 +568,18 @@ def test_non_pause_exit_clears_stray_marker(gate, tmp_path, monkeypatch, capsys,
     assert gate.read_text().count(f"clear {S}") == 1
 
 
+def test_retrospective_pause_exits_zero_and_clears_marker(gate, tmp_path, monkeypatch,
+                                                          capsys, ambient):
+    """A pause in the record-only retrospective ends rc 0, so post-plan-now sends no
+    fail DM, and _settle_pause_marker clears the marker the gate wrote."""
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    rc, stdout, _ = _main(tmp_path, monkeypatch, capsys,
+                          {"retrospective": {"kind": "usage-pause"}})
+    assert rc == 0
+    assert "RESULT: post-plan PAUSED" not in stdout
+    assert gate.read_text().count(f"clear {S}") == 1
+
+
 def test_review_thread_pause_exits_75_once(gate, tmp_path, monkeypatch, capsys, ambient):
     """A pause on the review worker reaches the review join; one verdict, rc 75.
 

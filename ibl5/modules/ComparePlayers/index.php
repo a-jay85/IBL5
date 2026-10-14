@@ -24,6 +24,7 @@ $httpRequest = \Http\HttpRequest::fromGlobals();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
 global $mysqli_db, $user;
+/** @var \mysqli $mysqli_db */
 
 $repository = new \ComparePlayers\ComparePlayersRepository($mysqli_db);
 $service    = new \ComparePlayers\ComparePlayersService($repository);

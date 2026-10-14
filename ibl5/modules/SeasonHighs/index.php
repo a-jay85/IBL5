@@ -26,6 +26,8 @@ use SeasonHighs\SeasonHighsView;
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext $leagueContext */
 
 // Get current season info
 $season = new \Season\Season($mysqli_db, $leagueContext);

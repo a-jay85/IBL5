@@ -148,26 +148,18 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
     }
 
     /**
-     * Insert playoff schedule entries from Schedule.htm.
+     * Parse step: read Schedule.htm and return its playoff rows.
      *
-     * Playoff games are NOT stored in the .sch file — they exist only in
-     * JSB's Schedule.htm HTML export. This parses both played games (with
-     * scores) and upcoming/unplayed games (no scores yet).
+     * Returns the skip-log string instead of rows when the file is missing or
+     * unreadable outside the Playoffs phase, so the caller's early return keeps
+     * its exact wording.
      *
-     * During the Playoffs phase an unreadable Schedule.htm is fatal: the postseason
-     * rows have no other source, so continuing would commit a playoff-less schedule.
+     * @return list<array{date_label: string, visitor: string, home: string, visitor_score: int, home_score: int, box_id: int|null, played: bool}>|string
      *
-     * @return string Log of inserted playoff games
-     *
-     * @throws \RuntimeException When Schedule.htm cannot be read, or contains only stale
-     *                             rows from another season, during the Playoffs phase
+     * @throws \RuntimeException When Schedule.htm cannot be read during the Playoffs phase
      */
-    private function insertPlayoffGamesFromScheduleHtm(): string
+    private function parsePlayoffGamesFromScheduleHtm(string $scheduleHtmPath, string $leagueDir): array|string
     {
-        $ibl5Root = $this->basePath;
-        $leagueDir = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'IBL';
-        $scheduleHtmPath = $ibl5Root . '/ibl/' . $leagueDir . '/Schedule.htm';
-
         if (!file_exists($scheduleHtmPath)) {
             $this->channelLogger->warning('ScheduleUpdater could not read Schedule.htm — no playoff games imported', [
                 'path' => $scheduleHtmPath,
@@ -211,7 +203,126 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
             return "Failed to read Schedule.htm — skipping playoff games<br>";
         }
 
-        $playoffGames = ScheduleHtmParser::parsePlayoffGames($html);
+        return ScheduleHtmParser::parsePlayoffGames($html);
+    }
+
+    /**
+     * Classify step: decide what the orchestrator does with one parsed row.
+     *
+     * Pure with respect to the database and the log: it reads the season, the
+     * team map and the league context, and writes nothing.
+     *
+     * @param array{date_label: string, visitor: string, home: string, visitor_score: int, home_score: int, box_id: int|null, played: bool} $game
+     * @return array{outcome: 'stale', post_year: int|null}
+     *       |array{outcome: 'skip'}
+     *       |array{outcome: 'unknown_team'}
+     *       |array{outcome: 'insert', visitor_teamid: int, home_teamid: int, game_date: string, box_id: int}
+     */
+    private function classifyPlayoffGame(array $game): array
+    {
+        // Season guard: Schedule.htm is a JSB export that can be left over
+        // from a prior season. Every row in a given export carries that
+        // season's ENDING year in its "Post N YYYY" header, so a year
+        // mismatch means the whole file is stale and its rows must not be
+        // relabelled into the current season. This must run before
+        // extractDate(), which discards the label's year by design
+        // (required for regular-season rows).
+        $postYear = null;
+        if (preg_match('/(\d{4})\s*$/', $game['date_label'], $yearMatch) === 1) {
+            $postYear = (int) $yearMatch[1];
+        }
+
+        if ($postYear !== $this->season->endingYear) {
+            return ['outcome' => 'stale', 'post_year' => $postYear];
+        }
+
+        $fullDate = $this->extractDate($game['date_label']);
+        if ($fullDate === null) {
+            return ['outcome' => 'skip'];
+        }
+
+        $visitor_teamid = $this->teamNameToIdMap[$game['visitor']] ?? null;
+        $home_teamid = $this->teamNameToIdMap[$game['home']] ?? null;
+
+        if ($visitor_teamid === null || $home_teamid === null) {
+            return ['outcome' => 'unknown_team'];
+        }
+
+        if (!$this->isRealTeamGame($visitor_teamid, $home_teamid)) {
+            return ['outcome' => 'skip'];
+        }
+
+        $boxId = $game['played'] && $game['box_id'] !== null
+            ? $game['box_id']
+            : self::UNPLAYED_BOX_ID;
+
+        return [
+            'outcome' => 'insert',
+            'visitor_teamid' => $visitor_teamid,
+            'home_teamid' => $home_teamid,
+            'game_date' => $fullDate['date'],
+            'box_id' => $boxId,
+        ];
+    }
+
+    /**
+     * Insert step: write one classified playoff row to ibl_schedule.
+     *
+     * Argument order matches the column order of the INSERT and the
+     * iisiiiis bind string: season_year(i) box_id(i) game_date(s)
+     * visitor_teamid(i) visitor_score(i) home_teamid(i) home_score(i) uuid(s).
+     */
+    private function insertPlayoffGame(
+        int $boxId,
+        string $gameDate,
+        int $visitorTeamId,
+        int $visitorScore,
+        int $homeTeamId,
+        int $homeScore,
+    ): void {
+        $uuid = UuidGenerator::generateUuid();
+
+        $this->execute(
+            "INSERT INTO `ibl_schedule` (
+                season_year, box_id, game_date, visitor_teamid, visitor_score, home_teamid, home_score, uuid
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "iisiiiis",
+            $this->season->endingYear,
+            $boxId,
+            $gameDate,
+            $visitorTeamId,
+            $visitorScore,
+            $homeTeamId,
+            $homeScore,
+            $uuid
+        );
+    }
+
+    /**
+     * Insert playoff schedule entries from Schedule.htm.
+     *
+     * Playoff games are NOT stored in the .sch file — they exist only in
+     * JSB's Schedule.htm HTML export. This parses both played games (with
+     * scores) and upcoming/unplayed games (no scores yet).
+     *
+     * During the Playoffs phase an unreadable Schedule.htm is fatal: the postseason
+     * rows have no other source, so continuing would commit a playoff-less schedule.
+     *
+     * @return string Log of inserted playoff games
+     *
+     * @throws \RuntimeException When Schedule.htm cannot be read, or contains only stale
+     *                             rows from another season, during the Playoffs phase
+     */
+    private function insertPlayoffGamesFromScheduleHtm(): string
+    {
+        $ibl5Root = $this->basePath;
+        $leagueDir = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'IBL';
+        $scheduleHtmPath = $ibl5Root . '/ibl/' . $leagueDir . '/Schedule.htm';
+
+        $playoffGames = $this->parsePlayoffGamesFromScheduleHtm($scheduleHtmPath, $leagueDir);
+        if (is_string($playoffGames)) {
+            return $playoffGames;
+        }
 
         $log = '';
         $skippedCount = 0;
@@ -220,63 +331,33 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
         $skippedYears = [];
 
         foreach ($playoffGames as $game) {
-            // Season guard: Schedule.htm is a JSB export that can be left over
-            // from a prior season. Every row in a given export carries that
-            // season's ENDING year in its "Post N YYYY" header, so a year
-            // mismatch means the whole file is stale and its rows must not be
-            // relabelled into the current season. This must run before
-            // extractDate(), which discards the label's year by design
-            // (required for regular-season rows).
-            $postYear = null;
-            if (preg_match('/(\d{4})\s*$/', $game['date_label'], $yearMatch) === 1) {
-                $postYear = (int) $yearMatch[1];
-            }
+            $classification = $this->classifyPlayoffGame($game);
 
-            if ($postYear !== $this->season->endingYear) {
+            if ($classification['outcome'] === 'stale') {
                 $skippedCount++;
-                $skippedYears[$postYear ?? 'unparseable'] = true;
+                $skippedYears[$classification['post_year'] ?? 'unparseable'] = true;
                 continue;
             }
 
-            $fullDate = $this->extractDate($game['date_label']);
-            if ($fullDate === null) {
+            if ($classification['outcome'] === 'skip') {
                 continue;
             }
 
-            $visitor_teamid = $this->teamNameToIdMap[$game['visitor']] ?? null;
-            $home_teamid = $this->teamNameToIdMap[$game['home']] ?? null;
-
-            if ($visitor_teamid === null || $home_teamid === null) {
+            if ($classification['outcome'] === 'unknown_team') {
                 $log .= "Unknown team in playoff game: {$game['visitor']} @ {$game['home']}<br>";
                 continue;
             }
 
-            if (!$this->isRealTeamGame($visitor_teamid, $home_teamid)) {
-                continue;
-            }
-
-            $boxId = $game['played'] && $game['box_id'] !== null
-                ? $game['box_id']
-                : self::UNPLAYED_BOX_ID;
-
-            $uuid = UuidGenerator::generateUuid();
-
-            $this->execute(
-                "INSERT INTO `ibl_schedule` (
-                    season_year, box_id, game_date, visitor_teamid, visitor_score, home_teamid, home_score, uuid
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                "iisiiiis",
-                $this->season->endingYear,
-                $boxId,
-                $fullDate['date'],
-                $visitor_teamid,
+            $this->insertPlayoffGame(
+                $classification['box_id'],
+                $classification['game_date'],
+                $classification['visitor_teamid'],
                 $game['visitor_score'],
-                $home_teamid,
+                $classification['home_teamid'],
                 $game['home_score'],
-                $uuid
             );
             $insertedCount++;
-            $log .= "Inserted playoff game: {$game['visitor']} @ {$game['home']} on {$fullDate['date']}<br>";
+            $log .= "Inserted playoff game: {$game['visitor']} @ {$game['home']} on {$classification['game_date']}<br>";
         }
 
         if ($skippedCount > 0) {

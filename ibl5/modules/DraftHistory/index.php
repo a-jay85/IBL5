@@ -24,6 +24,7 @@ use DraftHistory\DraftHistoryView;
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Route HTMX API requests (no PageLayout, returns HTML fragment only)
 $op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';

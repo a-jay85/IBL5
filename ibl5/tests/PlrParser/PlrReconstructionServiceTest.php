@@ -498,6 +498,294 @@ class PlrReconstructionServiceTest extends TestCase
         $this->assertSame(10, (int) trim(substr($actual, 148, 4)), 'team gp preserved');
     }
 
+    public function testReconstructEmitsExactMessageSequence(): void
+    {
+        $this->writeBaseFile($this->messageSequenceBaseRecords());
+
+        $repo = $this->stubRepo(
+            regular: [self::LEBRON_PID => $this->nonzeroPlayerStats()],
+            playoffs: [self::LEBRON_PID => $this->nonzeroPlayerStats()],
+            regularHighs: [self::LEBRON_PID => $this->highsRow()],
+            teamStats: [1 => $this->nonzeroTeamStats()],
+        );
+
+        $result = (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $this->assertSame([
+            'Loaded base .plr: 1216 bytes, 2 lines',
+            'Loaded box-score aggregates through 2007-05-01: 1 regular / 1 playoff players, 1 / 0 highs rows',
+            'Updated 1 player records',
+            'Left 0 player records unchanged',
+            'Loaded team box-score aggregates: 1 regular / 0 playoff teams',
+            'Updated 1 team rows',
+            'Left 0 team rows unchanged',
+            'Wrote 1216 bytes to ' . $this->outputFile,
+        ], $result->messages);
+        $this->assertSame([], $result->errors);
+    }
+
+    public function testReconstructSetsBytesWrittenToOutputFileSize(): void
+    {
+        $this->writeBaseFile($this->messageSequenceBaseRecords());
+
+        $repo = $this->stubRepo(
+            regular: [self::LEBRON_PID => $this->nonzeroPlayerStats()],
+            playoffs: [self::LEBRON_PID => $this->nonzeroPlayerStats()],
+            regularHighs: [self::LEBRON_PID => $this->highsRow()],
+            teamStats: [1 => $this->nonzeroTeamStats()],
+        );
+
+        $result = (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        clearstatcache();
+        $this->assertSame(1216, $result->bytesWritten);
+        $this->assertSame(1216, filesize($this->outputFile));
+    }
+
+    public function testReconstructWritesPlayoffHighsFromPlayoffMaximums(): void
+    {
+        $this->writeBaseFile([$this->buildPlayerRecord(
+            ordinal: 1,
+            pid: self::LEBRON_PID,
+            name: 'LeBron James',
+            seasonStats: $this->zeroSeasonStats(),
+        )]);
+
+        $repo = $this->stubRepo(
+            regular: [self::LEBRON_PID => $this->nonzeroPlayerStats()],
+            playoffHighs: [self::LEBRON_PID => ['high_pts' => 31, 'high_reb' => 11, 'high_ast' => 9, 'high_stl' => 4, 'high_blk' => 3, 'doubles' => 0, 'triples' => 0]],
+        );
+
+        (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $actual = $this->readPlayerLine($this->outputFile, 0);
+        $this->assertSame(31, (int) trim(substr($actual, 355, 2)), 'seasonPlayoffHighPTS');
+        $this->assertSame(31, (int) trim(substr($actual, 407, 6)), 'careerPlayoffHighPTS');
+    }
+
+    public function testReconstructZeroesHighsAndPlayoffStatsForPidAbsentFromThoseMaps(): void
+    {
+        $record = $this->buildPlayerRecord(
+            ordinal: 1,
+            pid: self::LEBRON_PID,
+            name: 'LeBron James',
+            seasonStats: $this->zeroSeasonStats(),
+        );
+        $record = substr_replace($record, PlrFieldSerializer::formatInt(40, 2), 341, 2);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt(6, 4), 208, 4);
+        $this->writeBaseFile([$record]);
+
+        $repo = $this->stubRepo(regular: [self::LEBRON_PID => $this->nonzeroPlayerStats()]);
+
+        (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $actual = $this->readPlayerLine($this->outputFile, 0);
+        $this->assertSame(0, (int) trim(substr($actual, 341, 2)), 'seasonHighPTS zeroed');
+        $this->assertSame(0, (int) trim(substr($actual, 208, 4)), 'playoffSeasonGP zeroed');
+    }
+
+    public function testReconstructSkipsPlayerLineWithZeroPid(): void
+    {
+        $ghost = $this->buildPlayerRecord(
+            ordinal: 5,
+            pid: 0,
+            name: 'Ghost',
+            seasonStats: $this->nonzeroPlayerStats(),
+        );
+        $this->writeBaseFile([
+            $this->buildPlayerRecord(
+                ordinal: 1,
+                pid: self::LEBRON_PID,
+                name: 'LeBron James',
+                seasonStats: $this->zeroSeasonStats(),
+            ),
+            $ghost,
+        ]);
+
+        $repo = $this->stubRepo(regular: [self::LEBRON_PID => $this->nonzeroPlayerStats()]);
+
+        $result = (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $this->assertSame($ghost, $this->readPlayerLine($this->outputFile, 1));
+        $this->assertSame(1, $result->playersUpdated);
+        $this->assertSame(0, $result->playersUnchanged);
+    }
+
+    public function testReconstructSkipsLinesOutsideRecordLengthBounds(): void
+    {
+        $zeroTeam = $this->zeroTeamStats();
+        $tooShortPlayer = substr($this->buildPlayerRecord(
+            ordinal: 2,
+            pid: self::MCGRADY_PID,
+            name: 'Tracy McGrady',
+            seasonStats: $this->zeroSeasonStats(),
+        ), 0, 100);
+        $tooShortTeam = substr($this->buildTeamRecord(1442, $zeroTeam), 0, 606);
+        $tooLongTeam = $this->buildTeamRecord(1443, $zeroTeam) . '  ';
+        $this->writeBaseFile([
+            $this->buildPlayerRecord(
+                ordinal: 1,
+                pid: self::LEBRON_PID,
+                name: 'LeBron James',
+                seasonStats: $this->zeroSeasonStats(),
+            ),
+            $tooShortPlayer,
+            $tooShortTeam,
+            $tooLongTeam,
+        ]);
+
+        $repo = $this->stubRepo(
+            regular: [
+                self::LEBRON_PID => $this->nonzeroPlayerStats(),
+                self::MCGRADY_PID => $this->nonzeroPlayerStats(),
+            ],
+            teamStats: [2 => $this->nonzeroTeamStats(), 3 => $this->nonzeroTeamStats()],
+        );
+
+        $result = (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $this->assertSame($tooShortPlayer, $this->readPlayerLine($this->outputFile, 1));
+        $this->assertSame($tooShortTeam, $this->readPlayerLine($this->outputFile, 2));
+        $this->assertSame($tooLongTeam, $this->readPlayerLine($this->outputFile, 3));
+        $this->assertSame(1, $result->playersUpdated);
+        $this->assertSame(0, $result->playersUnchanged);
+        $this->assertSame(0, $result->teamsUpdated);
+        $this->assertSame(0, $result->teamsUnchanged);
+    }
+
+    public function testReconstructSkipsTeamLoopRowWithNonFranchiseOrdinal(): void
+    {
+        $row = $this->buildTeamRecord(1469, $this->zeroTeamStats());
+        $this->writeBaseFile([$row]);
+
+        $repo = $this->stubRepo(regular: [], teamStats: [29 => $this->nonzeroTeamStats()]);
+
+        $result = (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $this->assertSame($row, $this->readPlayerLine($this->outputFile, 0));
+        $this->assertSame(0, $result->teamsUpdated);
+        $this->assertSame(0, $result->teamsUnchanged);
+    }
+
+    public function testReconstructUpdatesTeamRowFromPlayoffAggregatesOnly(): void
+    {
+        $row = $this->buildTeamRecord(1441, $this->zeroTeamStats());
+        $this->writeBaseFile([$row]);
+
+        $repo = $this->stubRepo(
+            regular: [],
+            teamStats: [],
+            teamPlayoffStats: [1 => $this->nonzeroTeamStats()],
+        );
+
+        $result = (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $this->assertSame(1, $result->teamsUpdated);
+        $this->assertSame(0, $result->teamsUnchanged);
+        $this->assertNotSame($row, $this->readPlayerLine($this->outputFile, 0));
+    }
+
+    public function testReconstructCountsTeamRowUnchangedWhenStatsAlreadyMatch(): void
+    {
+        $stats = $this->nonzeroTeamStats();
+        $row = $this->buildTeamRecord(1441, $stats);
+        $this->writeBaseFile([$row]);
+
+        $repo = $this->stubRepo(regular: [], teamStats: [1 => $stats]);
+
+        $result = (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $this->assertSame(1, $result->teamsUnchanged);
+        $this->assertSame(0, $result->teamsUpdated);
+        $this->assertSame($row, $this->readPlayerLine($this->outputFile, 0));
+    }
+
+    public function testReconstructThrowsBeforeQueryingRepositoryWhenBaseFileMissing(): void
+    {
+        $repo = self::createMock(PlrBoxScoreRepositoryInterface::class);
+        $repo->expects(self::never())->method('sumStatsByGameTypeThroughDate');
+        $repo->expects(self::never())->method('getSingleGameMaximumsThroughDate');
+        $repo->expects(self::never())->method('sumTeamRegularSeasonStatsThroughDate');
+        $repo->expects(self::never())->method('sumTeamPlayoffStatsThroughDate');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/^PLR file not found: /');
+
+        (new PlrReconstructionService($repo))->reconstruct(
+            sys_get_temp_dir() . '/plr_missing_' . uniqid('', true) . '.plr',
+            2007,
+            '2007-05-01',
+            sys_get_temp_dir() . '/plr_missing_out.plr',
+        );
+    }
+
+    /**
+     * @return list<string> LeBron record + zeroed franchise team row (1216 bytes joined)
+     */
+    private function messageSequenceBaseRecords(): array
+    {
+        return [
+            $this->buildPlayerRecord(
+                ordinal: 1,
+                pid: self::LEBRON_PID,
+                name: 'LeBron James',
+                seasonStats: $this->zeroSeasonStats(),
+            ),
+            $this->buildTeamRecord(1441, $this->zeroTeamStats()),
+        ];
+    }
+
+    /**
+     * @return array{gp: int, min: int, two_gm: int, two_ga: int, ftm: int, fta: int, three_gm: int, three_ga: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}
+     */
+    private function nonzeroPlayerStats(): array
+    {
+        return $this->statsArray(gp: 22, min: 788, twoGm: 201, twoGa: 380, ftm: 87, fta: 120, threeGm: 37, threeGa: 92, orb: 65, drb: 152, ast: 137, stl: 43, tov: 47, blk: 39, pf: 20);
+    }
+
+    /**
+     * @return array{high_pts: int, high_reb: int, high_ast: int, high_stl: int, high_blk: int, doubles: int, triples: int}
+     */
+    private function highsRow(): array
+    {
+        return ['high_pts' => 42, 'high_reb' => 12, 'high_ast' => 14, 'high_stl' => 6, 'high_blk' => 4, 'doubles' => 7, 'triples' => 2];
+    }
+
+    /**
+     * @return array{gp: int, gpAlt: int, twoGM: int, twoGA: int, ftm: int, fta: int, threeGM: int, threeGA: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}
+     */
+    private function zeroTeamStats(): array
+    {
+        return [
+            'gp' => 0, 'gpAlt' => 0, 'twoGM' => 0, 'twoGA' => 0,
+            'ftm' => 0, 'fta' => 0, 'threeGM' => 0, 'threeGA' => 0,
+            'orb' => 0, 'drb' => 0, 'ast' => 0, 'stl' => 0,
+            'tov' => 0, 'blk' => 0, 'pf' => 0,
+        ];
+    }
+
+    /**
+     * @return array{gp: int, gpAlt: int, twoGM: int, twoGA: int, ftm: int, fta: int, threeGM: int, threeGA: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}
+     */
+    private function nonzeroTeamStats(): array
+    {
+        return [
+            'gp' => 18, 'gpAlt' => 18, 'twoGM' => 420, 'twoGA' => 900,
+            'ftm' => 180, 'fta' => 230, 'threeGM' => 100, 'threeGA' => 280,
+            'orb' => 90, 'drb' => 310, 'ast' => 250, 'stl' => 80,
+            'tov' => 120, 'blk' => 50, 'pf' => 200,
+        ];
+    }
+
     /**
      * @param array<string, int> $seasonStats
      * @param array<string, int>|null $careerStats

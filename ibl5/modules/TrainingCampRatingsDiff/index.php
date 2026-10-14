@@ -12,9 +12,10 @@ use TrainingCampRatingsDiff\TrainingCampRatingsDiffView;
 
 global $mysqli_db, $user;
 /** @var \mysqli $mysqli_db */
+$nukeCompat = new \Utilities\NukeCompat();
 
-if (!is_user($user)) {
-    loginbox();
+if (!$nukeCompat->isUser($user)) {
+    $nukeCompat->loginBox();
 }
 
 $overrideYear = null;

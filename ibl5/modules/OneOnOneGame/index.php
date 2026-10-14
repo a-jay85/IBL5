@@ -38,7 +38,8 @@ function oneonone(): void
     /** @var \Auth\Contracts\AuthServiceInterface $authService */
 
     PageLayout\PageLayout::header();
-    cookiedecode($user);
+    $nukeCompat = new \Utilities\NukeCompat();
+    $nukeCompat->cookieDecode($user);
 
     $ownerplaying = $authService->getUsername() ?? '';
 

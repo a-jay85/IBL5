@@ -129,6 +129,23 @@ class SplitStatsRepository extends \Database\BaseMysqliRepository implements Spl
     }
 
     /**
+     * @see SplitStatsRepositoryInterface::resolveDisplayAndSplit()
+     * @return array{string, ?string}
+     */
+    public function resolveDisplayAndSplit(string $display, mixed $rawSplit): array
+    {
+        if ($display !== 'split') {
+            return [$display, null];
+        }
+
+        if (is_string($rawSplit) && in_array($rawSplit, $this->getValidSplitKeys(), true)) {
+            return ['split', $rawSplit];
+        }
+
+        return ['ratings', null];
+    }
+
+    /**
      * @see SplitStatsRepositoryInterface::getSplitLabel()
      */
     public function getSplitLabel(string $splitKey): string

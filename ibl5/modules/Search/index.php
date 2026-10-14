@@ -43,6 +43,9 @@ $offset = 10;
 $max = $min + $offset;
 
 global $prefix, $user_prefix, $mysqli_db, $module_name, $articlecomm;
+/** @var \mysqli $mysqli_db */
+/** @var string $prefix */
+/** @var string $module_name */
 
 // Redirect if query is too short
 if ($preset === '' && $query !== '' && strlen($query) < 3) {

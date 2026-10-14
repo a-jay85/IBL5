@@ -625,6 +625,28 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         );
     }
 
+    public function testControllerOutputSitesAreUnchanged(): void
+    {
+        $tokens = token_get_all($this->controllerSource());
+
+        $echoes = 0;
+        $calls = ['OpenTable' => 0, 'CloseTable' => 0, 'blocks' => 0];
+        foreach ($tokens as $i => $token) {
+            if (!is_array($token)) {
+                continue;
+            }
+            if ($token[0] === T_ECHO) {
+                $echoes++;
+            }
+            if ($token[0] === T_STRING && isset($calls[$token[1]]) && ($tokens[$i + 1] ?? null) === '(') {
+                $calls[$token[1]]++;
+            }
+        }
+
+        $this->assertSame(6, $echoes);
+        $this->assertSame(['OpenTable' => 1, 'CloseTable' => 1, 'blocks' => 1], $calls);
+    }
+
     private function controllerSource(): string
     {
         $file = (new \ReflectionClass(NewsController::class))->getFileName();

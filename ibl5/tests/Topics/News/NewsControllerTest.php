@@ -198,7 +198,7 @@ class NewsControllerTest extends ModuleEntryPointTestCase
             'backslash' => ['en\\', "AND (alanguage='')"],
             'space' => ['en fr', "AND (alanguage='')"],
             'trailing newline' => ["english\n", "AND (alanguage='')"],
-            'non-ascii' => ["fran\u{E7}ais", "AND (alanguage='')"],
+            'non-ascii' => ["français", "AND (alanguage='')"],
             'thirty-one chars' => [str_repeat('a', 31), "AND (alanguage='')"],
         ];
     }

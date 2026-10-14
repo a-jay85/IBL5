@@ -115,6 +115,7 @@ class NewsControllerGoldenTest extends ModuleEntryPointTestCase
             team: $team,
             recapService: $recapService,
             recapView: $recapView,
+            // newsMock pins getHomePageStories(identicalTo(4), identicalTo('')): storynum '4' is cast under userNews=1.
             news: $this->newsMock($rows, 0, 4, ''),
             view: $captured['view'],
         );
@@ -157,6 +158,7 @@ class NewsControllerGoldenTest extends ModuleEntryPointTestCase
         );
 
         $chrome = $this->captureChrome();
+        // main('7') passes a string topic id; newsMock pins it to identicalTo(7), so the (int) cast is observable.
         $output = $this->runMain($controller, '7');
 
         self::assertSame(

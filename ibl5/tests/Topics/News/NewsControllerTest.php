@@ -170,6 +170,51 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         ];
     }
 
+    #[DataProvider('languageClauseGuardProvider')]
+    public function testLanguageClauseGuardsCurrentLang(string $currentLang, string $expectedClause): void
+    {
+        $news = self::createMock(\Topics\News\Contracts\NewsServiceInterface::class);
+        $news->expects($this->once())->method('getHomePageStories')
+            ->with(self::identicalTo(10), self::identicalTo($expectedClause))->willReturn([]);
+        $controller = $this->buildController(
+            config: $this->config(multilingual: 1, currentLang: $currentLang),
+            news: $news,
+        );
+        $this->runMain($controller);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function languageClauseGuardProvider(): array
+    {
+        return [
+            'plain' => ['english', "AND (alanguage='english' OR alanguage='')"],
+            'empty' => ['', "AND (alanguage='' OR alanguage='')"],
+            'dash underscore' => ['pt-BR_1', "AND (alanguage='pt-BR_1' OR alanguage='')"],
+            'thirty chars' => [str_repeat('a', 30), "AND (alanguage='" . str_repeat('a', 30) . "' OR alanguage='')"],
+            'single quote' => ["en'", "AND (alanguage='')"],
+            'injection' => ["en' OR 1=1 -- ", "AND (alanguage='')"],
+            'backslash' => ['en\\', "AND (alanguage='')"],
+            'space' => ['en fr', "AND (alanguage='')"],
+            'trailing newline' => ["english\n", "AND (alanguage='')"],
+            'non-ascii' => ["français", "AND (alanguage='')"],
+            'thirty-one chars' => [str_repeat('a', 31), "AND (alanguage='')"],
+        ];
+    }
+
+    public function testHostileCurrentLangIsInertWhenNotMultilingual(): void
+    {
+        $news = self::createMock(\Topics\News\Contracts\NewsServiceInterface::class);
+        $news->expects($this->once())->method('getHomePageStories')
+            ->with(self::identicalTo(10), self::identicalTo(''))->willReturn([]);
+        $controller = $this->buildController(
+            config: $this->config(multilingual: 0, currentLang: "en' OR 1=1 -- "),
+            news: $news,
+        );
+        $this->runMain($controller);
+    }
+
     public function testUserNewsEnabledUsesUserStoryNum(): void
     {
         $news = self::createMock(\Topics\News\Contracts\NewsServiceInterface::class);
@@ -565,6 +610,41 @@ class NewsControllerTest extends ModuleEntryPointTestCase
             $source,
         );
         $this->assertStringNotContainsString('intval(', $source);
+    }
+
+    public function testLanguageClauseBuilderIsPrivateStaticAndScalar(): void
+    {
+        $method = new \ReflectionMethod(NewsController::class, 'buildLanguageClause');
+
+        $this->assertTrue($method->isPrivate());
+        $this->assertTrue($method->isStatic());
+        $this->assertSame('string', (string) $method->getReturnType());
+        $this->assertSame(
+            ['int', 'string'],
+            array_map(static fn (\ReflectionParameter $p): string => (string) $p->getType(), $method->getParameters()),
+        );
+    }
+
+    public function testControllerOutputSitesAreUnchanged(): void
+    {
+        $tokens = token_get_all($this->controllerSource());
+
+        $echoes = 0;
+        $calls = ['OpenTable' => 0, 'CloseTable' => 0, 'blocks' => 0];
+        foreach ($tokens as $i => $token) {
+            if (!is_array($token)) {
+                continue;
+            }
+            if ($token[0] === T_ECHO) {
+                $echoes++;
+            }
+            if ($token[0] === T_STRING && isset($calls[$token[1]]) && ($tokens[$i + 1] ?? null) === '(') {
+                $calls[$token[1]]++;
+            }
+        }
+
+        $this->assertSame(6, $echoes);
+        $this->assertSame(['OpenTable' => 1, 'CloseTable' => 1, 'blocks' => 1], $calls);
     }
 
     private function controllerSource(): string

@@ -50,41 +50,12 @@ class NewsController implements NewsControllerInterface
     public function main(mixed $new_topic): void
     {
         $storyhome = $this->config->storyHome;
-        $multilingual = $this->config->multilingual;
-        $currentlang = $this->config->currentLang;
-        $articlecomm = $this->config->articleComm;
         $sitename = $this->config->siteName;
         $user_news = $this->config->userNews;
         $userinfo = $this->authService->isAuthenticated() ? $this->authService->getUserInfo() : null;
         $new_topic = is_numeric($new_topic) ? (int) $new_topic : 0;
-        if ($multilingual === 1) {
-            $querylang = "AND (alanguage='$currentlang' OR alanguage='')";
-        } else {
-            $querylang = "";
-        }
-        \PageLayout\PageLayout::header();
-
-        if (defined('HOME_FILE')) {
-            echo '<h1 class="ibl-title">IBL: Internet Basketball League</h1>';
-        } else {
-            echo '<h1 class="ibl-title">News</h1>';
-        }
-
-        if ($this->authService->isAuthenticated()) {
-            $teamRepo = $this->teamIdentityRepository;
-            $username = $userinfo['username'] ?? null;
-            $teamName = $teamRepo->getTeamnameFromUsername(is_string($username) ? $username : null);
-            if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
-                $tid = $teamRepo->getTidFromTeamname($teamName);
-                if ($tid !== null && \League\League::isRealFranchise($tid)) {
-                    $recapService = $this->lastSimRecapService;
-                    $slate = $recapService->buildSlateForTeam($tid);
-                    if ($slate !== null) {
-                        echo $this->lastSimRecapView->render($slate);
-                    }
-                }
-            }
-        }
+        $this->renderHeader();
+        $this->renderSimRecap($userinfo);
 
         if (defined('HOME_FILE')) {
             blocks("Center");
@@ -119,9 +90,81 @@ class NewsController implements NewsControllerInterface
             echo "<br>";
         }
 
-        $stories = ($new_topic === 0)
-            ? $newsService->getHomePageStories($storynum, $querylang)
-            : $newsService->getTopicPageStories($new_topic, $storynum, $querylang);
+        $stories = $this->queryStories($new_topic, $storynum);
+        $this->renderArticles($stories, $userinfo);
+        \PageLayout\PageLayout::footer();
+    }
+
+    private function renderHeader(): void
+    {
+        \PageLayout\PageLayout::header();
+
+        if (defined('HOME_FILE')) {
+            echo '<h1 class="ibl-title">IBL: Internet Basketball League</h1>';
+        } else {
+            echo '<h1 class="ibl-title">News</h1>';
+        }
+    }
+
+    /**
+     * @param array<string, mixed>|null $userinfo
+     */
+    private function renderSimRecap(?array $userinfo): void
+    {
+        if ($this->authService->isAuthenticated()) {
+            $teamRepo = $this->teamIdentityRepository;
+            $username = $userinfo['username'] ?? null;
+            $teamName = $teamRepo->getTeamnameFromUsername(is_string($username) ? $username : null);
+            if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
+                $tid = $teamRepo->getTidFromTeamname($teamName);
+                if ($tid !== null && \League\League::isRealFranchise($tid)) {
+                    $recapService = $this->lastSimRecapService;
+                    $slate = $recapService->buildSlateForTeam($tid);
+                    if ($slate !== null) {
+                        echo $this->lastSimRecapView->render($slate);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Pure SQL-fragment builder. Byte-identical to the historical interpolation for every value the
+     * language-file loader can produce (SecurityBootstrap::includeSafe charset, at most varchar(30)
+     * nuke_stories.alanguage); any other byte sequence fails closed to the empty-language match.
+     */
+    private static function buildLanguageClause(int $multilingual, string $currentlang): string
+    {
+        if ($multilingual !== 1) {
+            return "";
+        }
+        if (preg_match('/^[A-Za-z0-9_-]{0,30}\z/', $currentlang) !== 1) {
+            return "AND (alanguage='')";
+        }
+
+        return "AND (alanguage='$currentlang' OR alanguage='')";
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function queryStories(int $new_topic, int $storynum): array
+    {
+        $querylang = self::buildLanguageClause($this->config->multilingual, $this->config->currentLang);
+
+        return ($new_topic === 0)
+            ? $this->newsService->getHomePageStories($storynum, $querylang)
+            : $this->newsService->getTopicPageStories($new_topic, $storynum, $querylang);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $stories
+     * @param array<string, mixed>|null $userinfo
+     */
+    private function renderArticles(array $stories, ?array $userinfo): void
+    {
+        $articlecomm = $this->config->articleComm;
+        $newsService = $this->newsService;
         $viewModels = [];
         /**
          * nuke_stories row (per ibl5/docs/schema/current-schema.sql): sid int(11) NOT NULL, catid int(11) NOT NULL,
@@ -191,6 +234,5 @@ class NewsController implements NewsControllerInterface
             ];
         }
         $this->newsView->renderStories($viewModels);
-        \PageLayout\PageLayout::footer();
     }
 }

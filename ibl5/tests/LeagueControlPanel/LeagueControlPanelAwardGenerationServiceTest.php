@@ -638,6 +638,83 @@ class LeagueControlPanelAwardGenerationServiceTest extends TestCase
         $this->assertSame('Season awards generated: 2 inserted, 74 already existed. Total: 76.', $result['message']);
     }
 
+    public function testConstructorTakesOnlyRepositoryAndVotingService(): void
+    {
+        $constructor = (new \ReflectionClass(LeagueControlPanelAwardGenerationService::class))->getConstructor();
+        $this->assertNotNull($constructor);
+
+        $typeNames = [];
+        foreach ($constructor->getParameters() as $param) {
+            $type = $param->getType();
+            $this->assertInstanceOf(\ReflectionNamedType::class, $type);
+            $typeNames[] = $type->getName();
+        }
+
+        $this->assertSame(
+            [LeagueControlPanelRepositoryInterface::class, VotingResultsServiceInterface::class],
+            $typeNames
+        );
+    }
+
+    public function testServiceHoldsOnlyRepositoryAndVotingServiceProperties(): void
+    {
+        $propertyTypes = [];
+        foreach ((new \ReflectionClass(LeagueControlPanelAwardGenerationService::class))->getProperties() as $prop) {
+            $type = $prop->getType();
+            $this->assertInstanceOf(\ReflectionNamedType::class, $type);
+            $propertyTypes[$prop->getName()] = $type->getName();
+        }
+
+        $this->assertSame(
+            [
+                'repository' => LeagueControlPanelRepositoryInterface::class,
+                'votingResultsService' => VotingResultsServiceInterface::class,
+            ],
+            $propertyTypes
+        );
+    }
+
+    public function testOnlyPublicMethodIsGenerateSeasonAwards(): void
+    {
+        $names = array_map(
+            static fn (\ReflectionMethod $method): string => $method->getName(),
+            (new \ReflectionClass(LeagueControlPanelAwardGenerationService::class))
+                ->getMethods(\ReflectionMethod::IS_PUBLIC)
+        );
+        sort($names);
+
+        $this->assertSame(['__construct', 'generateSeasonAwards'], $names);
+    }
+
+    public function testServiceCallsOnlyUpsertRepositoryMethods(): void
+    {
+        $mockRepository = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mockRepository->expects($this->never())->method(
+            self::logicalNot(self::logicalOr(self::equalTo('upsertAward'), self::equalTo('upsertGmAward')))
+        );
+        $mockRepository->method('upsertAward')->willReturn(1);
+        $mockRepository->method('upsertGmAward')->willReturn(1);
+
+        $stubVoting = self::createStub(VotingResultsServiceInterface::class);
+        $stubVoting->method('getEndOfYearResults')->willReturn([
+            [
+                'title' => 'Most Valuable Player',
+                'rows' => [['name' => 'Player1, T1', 'votes' => 10, 'pid' => 1]],
+            ],
+            ['title' => 'Sixth Man of the Year', 'rows' => []],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            [
+                'title' => 'GM of the Year',
+                'rows' => [['name' => 'BestGM', 'votes' => 5, 'pid' => 0]],
+            ],
+        ]);
+
+        $service = new LeagueControlPanelAwardGenerationService($mockRepository, $stubVoting);
+        $result = $service->generateSeasonAwards(2025, $this->writeMinimalLeadersHtm());
+
+        $this->assertTrue($result['success']);
+    }
+
     /**
      * Write a minimal Leaders.htm with all required sections (empty players).
      */

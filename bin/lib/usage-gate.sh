@@ -606,7 +606,7 @@ usage_session_started() {
 # rc 0: start. rc 10: paused before start (marker written).
 # No usable usage data fails open.
 usage_prestart_gate() {
-    local runner="${1:-}" sid="${2:-}" rbin="${3:-}" body rc zone w
+    local runner="${1:-}" sid="${2:-}" rbin="${3:-}" body rc zone w blind=0
     body=$(usage_fetch 45); rc=$?
     if [ "$rc" -eq 1 ] || [ -z "$body" ]; then
         usage_log "prestart-fail-open reason=no-usage runner=$runner"
@@ -616,12 +616,16 @@ usage_prestart_gate() {
         local age
         age=$(usage_cache_age)
         if [ "$age" -lt 0 ] || [ "$age" -ge 300 ]; then
-            if ! usage_blind_trust "$body" "$age" "runner=$runner"; then
-                usage_log "prestart-fail-open reason=stale-usage runner=$runner"
+            if usage_blind_trust "$body" "$age" "runner=$runner"; then
+                blind=1
+            else
+                usage_episode_start stale-usage "prestart-fail-open reason=stale-usage runner=$runner"
                 return 0
             fi
         fi
     fi
+    # Fresh data ends a stale-usage episode; a blind pass does not. Before the normal-zone return.
+    [ "$blind" -eq 1 ] || usage_episode_end stale-usage "stale-usage episode end"
     zone=$(usage_zone "$body")
     [ "$zone" = "normal" ] && return 0
     [ "$(usage_token_holder)" = "$sid" ] && return 0
@@ -752,11 +756,14 @@ usage_gate_decide() {
             if usage_blind_trust "$body" "$age"; then
                 blind=1
             else
-                usage_log "fail-open reason=stale-usage age=$age"
+                usage_episode_start stale-usage "fail-open reason=stale-usage age=$age"
                 return 0
             fi
         fi
     fi
+
+    # Fresh data (rc 0, or rc 2 younger than 300 s) ends a stale-usage episode; a blind pass does not.
+    [ "$blind" -eq 1 ] || usage_episode_end stale-usage "stale-usage episode end"
 
     # A blind reading is not a new delta: keep the delta log to fresh data.
     [ "$blind" -eq 1 ] || usage_delta_log "$sid" "$runner" "${IBL5_USAGE_GATE_MODEL:-unknown}" "$body"

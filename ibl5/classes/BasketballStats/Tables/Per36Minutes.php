@@ -7,9 +7,7 @@ namespace BasketballStats\Tables;
 use BasketballStats\StatsFormatter;
 use Player\Stats\PlayerStats;
 use Player\Player;
-use Player\PlayerImageHelper;
 use UI\Tables\PlayerRowTransformer;
-use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 use Team\Team;
 
@@ -32,35 +30,7 @@ class Per36Minutes
      */
     public static function render(\mysqli $db, $result, Team $team, string $yr, array $starterPids = [], string $moduleName = "", string $ariaLabel = ''): string
     {
-        $resolvedRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
-
-        /** @var list<array{player: Player, playerStats: PlayerStats, stats_fgm: string, stats_fga: string, stats_fgp: string, stats_ftm: string, stats_fta: string, stats_ftp: string, stats_tgm: string, stats_tga: string, stats_tgp: string, stats_mpg: string, stats_per36Min: string, stats_opg: string, stats_rpg: string, stats_apg: string, stats_spg: string, stats_tpg: string, stats_bpg: string, stats_fpg: string, stats_ppg: string}> $playerRows */
-        $playerRows = [];
-        foreach ($resolvedRows as $row) {
-            $playerStats = $row['playerStats'];
-            $playerRows[] = [
-                ...$row,
-                'stats_fgm' => StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsMade, $playerStats->seasonMinutes),
-                'stats_fga' => StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsAttempted, $playerStats->seasonMinutes),
-                'stats_fgp' => StatsFormatter::formatPercentage($playerStats->seasonFieldGoalsMade, $playerStats->seasonFieldGoalsAttempted),
-                'stats_ftm' => StatsFormatter::formatPer36Stat($playerStats->seasonFreeThrowsMade, $playerStats->seasonMinutes),
-                'stats_fta' => StatsFormatter::formatPer36Stat($playerStats->seasonFreeThrowsAttempted, $playerStats->seasonMinutes),
-                'stats_ftp' => StatsFormatter::formatPercentage($playerStats->seasonFreeThrowsMade, $playerStats->seasonFreeThrowsAttempted),
-                'stats_tgm' => StatsFormatter::formatPer36Stat($playerStats->seasonThreePointersMade, $playerStats->seasonMinutes),
-                'stats_tga' => StatsFormatter::formatPer36Stat($playerStats->seasonThreePointersAttempted, $playerStats->seasonMinutes),
-                'stats_tgp' => StatsFormatter::formatPercentage($playerStats->seasonThreePointersMade, $playerStats->seasonThreePointersAttempted),
-                'stats_mpg' => StatsFormatter::formatPerGameAverage($playerStats->seasonMinutes, $playerStats->seasonGamesPlayed),
-                'stats_per36Min' => StatsFormatter::formatPer36Stat($playerStats->seasonMinutes, $playerStats->seasonMinutes),
-                'stats_opg' => StatsFormatter::formatPer36Stat($playerStats->seasonOffensiveRebounds, $playerStats->seasonMinutes),
-                'stats_rpg' => StatsFormatter::formatPer36Stat($playerStats->seasonTotalRebounds, $playerStats->seasonMinutes),
-                'stats_apg' => StatsFormatter::formatPer36Stat($playerStats->seasonAssists, $playerStats->seasonMinutes),
-                'stats_spg' => StatsFormatter::formatPer36Stat($playerStats->seasonSteals, $playerStats->seasonMinutes),
-                'stats_tpg' => StatsFormatter::formatPer36Stat($playerStats->seasonTurnovers, $playerStats->seasonMinutes),
-                'stats_bpg' => StatsFormatter::formatPer36Stat($playerStats->seasonBlocks, $playerStats->seasonMinutes),
-                'stats_fpg' => StatsFormatter::formatPer36Stat($playerStats->seasonPersonalFouls, $playerStats->seasonMinutes),
-                'stats_ppg' => StatsFormatter::formatPer36Stat($playerStats->seasonPoints, $playerStats->seasonMinutes),
-            ];
-        }
+        $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 
         ob_start();
         // "\n" restores the template line break: PHP swallows the newline right after the closing PHP tag.
@@ -69,13 +39,7 @@ class Per36Minutes
         ?>
     <thead>
         <tr>
-<?php if ($moduleName === "LeagueStarters"): ?>
-            <th>Team</th>
-<?php endif; ?>
-            <th>Pos</th>
-            <th class="sticky-col">Player</th>
-            <th>g</th>
-            <th>gs</th>
+<?= TeamStatsRowHelper::headPrefix($moduleName) ?>
             <th>mpg</th>
             <th class="sep-r-team">36min</th>
             <th>fgm</th>
@@ -99,43 +63,43 @@ class Per36Minutes
     </thead>
     <tbody>
 <?php foreach ($playerRows as $row):
-    /** @var Player $player */
-    $player = $row['player'];
-    /** @var PlayerStats $playerStats */
-    $playerStats = $row['playerStats'];
-?>
-        <tr>
-<?php if ($moduleName === "LeagueStarters"):
-    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->getTeamid() ?? 0, $player->getTeamName() ?? '', $player->getTeamColor1() ?? 'FFFFFF', $player->getTeamColor2() ?? '000000');
-endif; ?>
-            <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
-            <?= PlayerImageHelper::renderPlayerCell($player->getPlayerID() ?? 0, $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass()) ?>
-            <td><?= $playerStats->seasonGamesPlayed ?></td>
-            <td><?= $playerStats->seasonGamesStarted ?></td>
-            <td><?= $row['stats_mpg'] ?></td>
-            <td class="sep-r-team"><?= $row['stats_per36Min'] ?></td>
-            <td><?= $row['stats_fgm'] ?></td>
-            <td><?= $row['stats_fga'] ?></td>
-            <td class="sep-r-weak"><?= $row['stats_fgp'] ?></td>
-            <td><?= $row['stats_ftm'] ?></td>
-            <td><?= $row['stats_fta'] ?></td>
-            <td class="sep-r-weak"><?= $row['stats_ftp'] ?></td>
-            <td><?= $row['stats_tgm'] ?></td>
-            <td><?= $row['stats_tga'] ?></td>
-            <td class="sep-r-team"><?= $row['stats_tgp'] ?></td>
-            <td><?= $row['stats_opg'] ?></td>
-            <td><?= $row['stats_rpg'] ?></td>
-            <td><?= $row['stats_apg'] ?></td>
-            <td><?= $row['stats_spg'] ?></td>
-            <td><?= $row['stats_tpg'] ?></td>
-            <td><?= $row['stats_bpg'] ?></td>
-            <td><?= $row['stats_fpg'] ?></td>
-            <td><?= $row['stats_ppg'] ?></td>
-        </tr>
-<?php endforeach; ?>
+    echo self::renderPlayerRow($row['player'], $row['playerStats'], $starterPids, $moduleName);
+endforeach; ?>
     </tbody>
 </table>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * One `<tbody>` row: the shared prefix, then minutes per game and the per-36 stat cells.
+     *
+     * @param list<int> $starterPids
+     */
+    private static function renderPlayerRow(Player $player, PlayerStats $playerStats, array $starterPids, string $moduleName): string
+    {
+        $minutes = $playerStats->seasonMinutes;
+
+        return TeamStatsRowHelper::playerRowPrefix($player, $playerStats, $starterPids, $moduleName)
+            . '            <td>' . StatsFormatter::formatPerGameAverage($minutes, $playerStats->seasonGamesPlayed) . "</td>\n"
+            . '            <td class="sep-r-team">' . StatsFormatter::formatPer36Stat($minutes, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsMade, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsAttempted, $minutes) . "</td>\n"
+            . '            <td class="sep-r-weak">' . StatsFormatter::formatPercentage($playerStats->seasonFieldGoalsMade, $playerStats->seasonFieldGoalsAttempted) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonFreeThrowsMade, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonFreeThrowsAttempted, $minutes) . "</td>\n"
+            . '            <td class="sep-r-weak">' . StatsFormatter::formatPercentage($playerStats->seasonFreeThrowsMade, $playerStats->seasonFreeThrowsAttempted) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonThreePointersMade, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonThreePointersAttempted, $minutes) . "</td>\n"
+            . '            <td class="sep-r-team">' . StatsFormatter::formatPercentage($playerStats->seasonThreePointersMade, $playerStats->seasonThreePointersAttempted) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonOffensiveRebounds, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonTotalRebounds, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonAssists, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonSteals, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonTurnovers, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonBlocks, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonPersonalFouls, $minutes) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPer36Stat($playerStats->seasonPoints, $minutes) . "</td>\n"
+            . "        </tr>\n";
     }
 }

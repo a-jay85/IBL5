@@ -2665,6 +2665,112 @@ test_usage_log_line_shape() {
     assert_eq usage_log_shape:line 1 "$(log_re_count "${LOG_PFX}probe a b\$")"
 }
 
+# seed_log <lines> <file>: <lines> well-formed 64-byte log lines (4096 lines = 262144 bytes).
+seed_log() {
+    awk -v n="$1" 'BEGIN { for (i = 1; i <= n; i++) printf "2026-01-01T00:00:00Z 1 seed-%06d-padding-padding-padding-padd\n", i }' > "$2"
+}
+SEED_RE='^2026-01-01T00:00:00Z 1 seed-[0-9]{6}-padding-padding-padding-padd$'
+ulog() { bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_log $*"; }
+
+test_usage_log_rotates_at_limit() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc
+    seed_log 4096 "$d/usage-gate.log"
+    assert_eq rotate_at_limit:seeded 262144 "$(wc -c < "$d/usage-gate.log" | tr -dc 0-9)"
+    ulog after-rotate; rc=$?
+    assert_eq rotate_at_limit:rc 0 "$rc"
+    assert_file rotate_at_limit:old "$d/usage-gate.log.1"
+    assert_eq rotate_at_limit:old-seeds 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    assert_eq rotate_at_limit:new-lines 1 "$(wc -l < "$d/usage-gate.log" | tr -d ' ')"
+    assert_eq rotate_at_limit:new-line 1 "$(log_re_count "${LOG_PFX}after-rotate\$")"
+    if [ "$(wc -c < "$d/usage-gate.log" | tr -dc 0-9)" -lt 1024 ]; then pass rotate_at_limit:new-small; else fail rotate_at_limit:new-small; fi
+}
+
+test_usage_log_below_limit_no_rotate() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc
+    seed_log 4095 "$d/usage-gate.log"
+    ulog below; rc=$?
+    assert_eq below_limit:rc 0 "$rc"
+    assert_no_file below_limit:no-old "$d/usage-gate.log.1"
+    assert_eq below_limit:lines 4096 "$(wc -l < "$d/usage-gate.log" | tr -d ' ')"
+}
+
+test_usage_log_second_rotation_replaces_old() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    printf 'OLD-GEN\n' > "$d/usage-gate.log.1"
+    seed_log 4096 "$d/usage-gate.log"
+    ulog gen2
+    assert_eq gen2:old-gone 0 "$(grep -c OLD-GEN "$d/usage-gate.log.1")"
+    assert_eq gen2:seeds 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    assert_eq gen2:two-files 2 "$(find "$d" -maxdepth 1 -name 'usage-gate.log*' | wc -l | tr -d ' ')"
+}
+
+test_usage_log_rotate_lock_respected() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc
+    mkdir "$d/usage-log-rotate.lock.d"
+    seed_log 4096 "$d/usage-gate.log"
+    ulog held; rc=$?
+    assert_eq lock_held:rc 0 "$rc"
+    assert_no_file lock_held:no-old "$d/usage-gate.log.1"
+    assert_eq lock_held:lines 4097 "$(wc -l < "$d/usage-gate.log" | tr -d ' ')"
+    assert_file lock_held:lock-kept "$d/usage-log-rotate.lock.d"
+}
+
+test_usage_log_rotate_stale_lock_reclaimed() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    mkdir "$d/usage-log-rotate.lock.d"
+    touch -t 202001010000 "$d/usage-log-rotate.lock.d"
+    seed_log 4096 "$d/usage-gate.log"
+    ulog reclaimed
+    assert_file lock_stale:old "$d/usage-gate.log.1"
+    assert_eq lock_stale:seeds 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    assert_eq lock_stale:new-lines 1 "$(wc -l < "$d/usage-gate.log" | tr -d ' ')"
+    assert_no_file lock_stale:lock-gone "$d/usage-log-rotate.lock.d"
+}
+
+test_usage_log_rotate_recheck_under_lock() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    printf 'OLD-GEN\n' > "$d/usage-gate.log.1"
+    printf 'small\n' > "$d/usage-gate.log"
+    bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; _usage_log_rotate_locked '$d'"
+    assert_eq recheck:old OLD-GEN "$(cat "$d/usage-gate.log.1")"
+    assert_eq recheck:log small "$(cat "$d/usage-gate.log")"
+}
+
+test_usage_log_refused_dir_silent() {
+    new_env
+    seed_home ""
+    local real rc
+    real=$(real_default_dir)
+    IBL5_USAGE_GATE_TEST_MODE=1 bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; unset IBL5_USAGE_GATE_STATE_DIR; usage_log probe" 2>"$T/err"; rc=$?
+    assert_eq refused_silent:rc 0 "$rc"
+    assert_no_file refused_silent:no-dir "$real"
+    assert_no_file refused_silent:no-lock /dev/null/usage-gate-refused
+    assert_eq refused_silent:stderr-once 1 "$(grep -c 'usage-gate\.log' "$T/err")"
+}
+
+test_usage_log_concurrent_writers() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" w pids=""
+    seed_log 4096 "$d/usage-gate.log"
+    for w in 1 2 3 4 5 6 7 8; do
+        bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; for i in \$(seq 1 100); do usage_log writer-$w-\$i; done" &
+        pids="$pids $!"
+    done
+    for p in $pids; do wait "$p"; done
+    cat "$d/usage-gate.log" "$d/usage-gate.log.1" > "$T/all"
+    assert_eq concurrent:writer-lines 800 "$(grep -cE "${LOG_PFX}writer-[0-9]+-[0-9]+\$" "$T/all")"
+    assert_eq concurrent:no-malformed 0 "$(grep -cvE "(${LOG_PFX}writer-[0-9]+-[0-9]+\$)|(${SEED_RE#^})" "$T/all")"
+    assert_eq concurrent:no-dupes 0 "$(sort "$T/all" | uniq -d | wc -l | tr -d ' ')"
+    assert_eq concurrent:seeds-in-old 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    assert_eq concurrent:no-seeds-in-new 0 "$(grep -cE "$SEED_RE" "$d/usage-gate.log")"
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

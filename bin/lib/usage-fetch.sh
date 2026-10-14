@@ -35,6 +35,9 @@ USAGE_SWITCH_RETRY_MAX=3
 # A live fetch that finds no login in the keychain, or gets a 401, marks the login dead for
 # USAGE_AUTH_DEAD_TTL seconds. The coordinator holds login-switch resumes while it is set.
 USAGE_AUTH_DEAD_TTL=900
+# usage-gate.log moves to usage-gate.log.1 once it reaches USAGE_LOG_MAX_BYTES (one old file kept).
+# Plain assignment like the tunables above: tests drive rotation by seeding an oversized log.
+USAGE_LOG_MAX_BYTES=262144
 
 # usage_state_dir
 # Echoes the state dir (creating it and markers/). Honors IBL5_USAGE_GATE_STATE_DIR;
@@ -60,11 +63,48 @@ usage_state_dir() {
 }
 
 # usage_log <msg...>
-# Appends "<ISO-UTC> <pid> <msg>" to usage-gate.log. Never fails the caller.
+# Appends "<ISO-UTC> <pid> <msg>" to usage-gate.log, rotating it first once it has reached
+# USAGE_LOG_MAX_BYTES. Never fails the caller.
 usage_log() {
     local d
     d=$(usage_state_dir)
+    _usage_log_rotate "$d"
     printf '%s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$$" "$*" >> "$d/usage-gate.log" 2>/dev/null
+    return 0
+}
+
+# _usage_log_size <file>: echoes its byte size, or 0 when it is missing or unreadable.
+# The group puts the `<` redirection itself under 2>/dev/null; BSD wc pads with spaces.
+_usage_log_size() {
+    local n
+    n=$( { wc -c < "$1"; } 2>/dev/null )
+    n=${n//[!0-9]/}
+    printf '%s\n' "${n:-0}"
+}
+
+# _usage_log_rotate <state_dir>: moves usage-gate.log to usage-gate.log.1 once it reaches
+# USAGE_LOG_MAX_BYTES. Never waits and never fails. usage-log-rotate.lock.d serializes
+# rotators; a lock dir more than a minute old is an orphan from a killed rotator and is reclaimed.
+_usage_log_rotate() {
+    local lock="$1/usage-log-rotate.lock.d"
+    [ "$(_usage_log_size "$1/usage-gate.log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
+    if ! mkdir "$lock" 2>/dev/null; then
+        [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] || return 0
+        rmdir "$lock" 2>/dev/null
+        mkdir "$lock" 2>/dev/null || return 0
+    fi
+    _usage_log_rotate_locked "$1"
+    rmdir "$lock" 2>/dev/null
+    return 0
+}
+
+# _usage_log_rotate_locked <state_dir>: the caller holds usage-log-rotate.lock.d. The size is
+# re-checked under the lock: a peer that saw the same oversized log before this process rotated
+# it finds the fresh log here and leaves usage-gate.log.1 alone.
+_usage_log_rotate_locked() {
+    local log="$1/usage-gate.log"
+    [ "$(_usage_log_size "$log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
+    mv -f "$log" "$log.1" 2>/dev/null
     return 0
 }
 

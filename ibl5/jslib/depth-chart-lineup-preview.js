@@ -238,6 +238,11 @@
             var jsbProduction = parseInt(row.getAttribute('data-jsb-production') || '0', 10);
             var qualityScore = parseFloat(row.getAttribute('data-quality-score') || '0');
 
+            // Server-resolved photo URL from PlayerImageHelper::getImageUrl():
+            // the player photo path when the file exists, else a
+            // transparent placeholder data URI. Never build the path here.
+            var photoUrl = row.getAttribute('data-photo-url') || '';
+
             // Read player name from the hidden Name input
             var nameInput = row.querySelector('input[name^="Name"]');
             var name = nameInput ? nameInput.value : '?';
@@ -270,6 +275,7 @@
                 dc: dcValues,
                 jsbProduction: jsbProduction,
                 qualityScore: qualityScore,
+                photoUrl: photoUrl,
                 index: idx
             });
         }
@@ -889,7 +895,9 @@
         }
         return '<td class="' + cellClass + '"' + cellExtra + '>'
             + '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' + opts.player.pid + '">'
-            + '<img src="./images/player/' + opts.player.pid + '.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy" onerror="this.style.display=\'none\'">'
+            + (opts.player.photoUrl
+                ? '<img src="' + escapeAttr(opts.player.photoUrl) + '" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy" onerror="this.style.display=\'none\'">'
+                : '')
             + escapeHtml(opts.displayName)
             + renderMinutes(opts.mins)
             + '</a></td>';
@@ -971,6 +979,14 @@
     /**
      * Simple HTML escape.
      */
+    /**
+     * Escape a string for use inside a double-quoted HTML attribute.
+     * escapeHtml() alone leaves quotes intact (text-node serialization).
+     */
+    function escapeAttr(str) {
+        return escapeHtml(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     function escapeHtml(str) {
         var div = document.createElement('div');
         div.appendChild(document.createTextNode(str));

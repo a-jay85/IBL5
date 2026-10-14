@@ -12,6 +12,8 @@ declare(strict_types=1);
  * without either resolution. Exits 2 on usage error.
  */
 
+require_once __DIR__ . '/lib/gate-common.php';
+
 const TRIGGER_DESCRIPTIONS = [
     'phpstan-rule' => 'new PHPStan custom rule (mechanical enforcement is a decision)',
     'agent-rule' => 'new .claude/rules/*.md file (operational convention for agents)',
@@ -58,14 +60,6 @@ Options:
 Exit 0 on pass, 1 on failure, 2 on usage error.
 
 USAGE;
-}
-
-function runCmd(string $cmd): array
-{
-    $output = [];
-    $exit = 0;
-    exec($cmd . ' 2>/dev/null', $output, $exit);
-    return [$output, $exit];
 }
 
 function adrBaseRef(?string $set = null): string
@@ -125,12 +119,7 @@ function excludedPaths(?array $set = null): array
 /** @return list<string> */
 function diffNames(string $mode, string $filter): array
 {
-    [$lines] = runCmd(sprintf('git diff %s --name-only --diff-filter=%s', gitDiffArgs($mode), escapeshellarg($filter)));
-    $excluded = excludedPaths();
-    return array_values(array_filter(
-        $lines,
-        static fn (string $line): bool => $line !== '' && !isset($excluded[$line])
-    ));
+    return gateDiffNames(gitDiffArgs($mode), $filter, excludedPaths());
 }
 
 /** @return list<string> */
@@ -267,45 +256,9 @@ function hasAddedAdr(string $mode): bool
     return false;
 }
 
-function fetchPrBody(string $mode, bool $fromStdin): ?string
-{
-    if ($fromStdin) {
-        $body = stream_get_contents(STDIN);
-        return $body === false ? null : $body;
-    }
-    if ($mode !== 'pr') {
-        return null;
-    }
-    // GitHub Actions checks out a detached merge commit for pull_request events, so
-    // `gh pr view` without arguments cannot infer the PR. The workflow passes the
-    // number via PR_NUMBER env. Fall back to inference when PR_NUMBER is absent
-    // (local `--pr` usage on a branch checkout).
-    $prNumber = getenv('PR_NUMBER');
-    $cmd = 'gh pr view';
-    if (is_string($prNumber) && $prNumber !== '') {
-        $cmd .= ' ' . escapeshellarg($prNumber);
-    }
-    $cmd .= ' --json body --jq .body';
-    [$lines, $exit] = runCmd($cmd);
-    if ($exit !== 0 || $lines === []) {
-        return null;
-    }
-    return implode("\n", $lines);
-}
-
 function extractBypassReason(?string $body): ?string
 {
-    if ($body === null || $body === '' || $body === 'null') {
-        return null;
-    }
-    if (preg_match(BYPASS_REGEX, $body, $m) !== 1) {
-        return null;
-    }
-    $reason = trim($m[1]);
-    if (strlen($reason) < BYPASS_MIN_LENGTH) {
-        return null;
-    }
-    return $reason;
+    return gateExtractBypassReason($body, BYPASS_REGEX, BYPASS_MIN_LENGTH);
 }
 
 // --- main ---

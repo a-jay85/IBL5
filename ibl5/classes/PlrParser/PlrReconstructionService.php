@@ -119,11 +119,41 @@ class PlrReconstructionService implements PlrReconstructionServiceInterface
     ): PlrReconstructionResult {
         $result = new PlrReconstructionResult();
 
+        [$lines, $inputSize] = $this->loadBaseLines($basePlrPath, $result);
+        $lines = $this->applyPlayerStats($lines, $seasonYear, $targetEndDate, $result);
+        $lines = $this->applyTeamRows($lines, $seasonYear, $targetEndDate, $result);
+        $this->writeOutput($lines, $inputSize, $outputPlrPath, $result);
+
+        return $result;
+    }
+
+    /**
+     * Read the base .plr and split it into lines.
+     *
+     * @return array{list<string>, int} Base lines and the raw input size in bytes
+     */
+    private function loadBaseLines(string $basePlrPath, PlrReconstructionResult $result): array
+    {
         $content = PlrFileWriter::readFile($basePlrPath);
         $inputSize = strlen($content);
         $lines = PlrFileWriter::splitIntoLines($content);
         $result->addMessage('Loaded base .plr: ' . $inputSize . ' bytes, ' . count($lines) . ' lines');
 
+        return [$lines, $inputSize];
+    }
+
+    /**
+     * Passes 1-3: load player aggregates, rewrite player records, report counts.
+     *
+     * @param list<string> $lines
+     * @return list<string>
+     */
+    private function applyPlayerStats(
+        array $lines,
+        int $seasonYear,
+        string $targetEndDate,
+        PlrReconstructionResult $result,
+    ): array {
         $regularStatsByPid = $this->boxScoreRepository->sumStatsByGameTypeThroughDate(
             $seasonYear,
             PlrBoxScoreRepositoryInterface::GAME_TYPE_REGULAR_SEASON,
@@ -215,6 +245,21 @@ class PlrReconstructionService implements PlrReconstructionServiceInterface
         $result->addMessage('Updated ' . $result->playersUpdated . ' player records');
         $result->addMessage('Left ' . $result->playersUnchanged . ' player records unchanged');
 
+        return $lines;
+    }
+
+    /**
+     * Pass 4: load team aggregates, rewrite franchise team rows, report counts.
+     *
+     * @param list<string> $lines
+     * @return list<string>
+     */
+    private function applyTeamRows(
+        array $lines,
+        int $seasonYear,
+        string $targetEndDate,
+        PlrReconstructionResult $result,
+    ): array {
         // Pass 4 — franchise team-row reconstruction (regular-season + playoff totals)
         $teamRegularByTid = $this->boxScoreRepository->sumTeamRegularSeasonStatsThroughDate(
             $seasonYear,
@@ -271,18 +316,30 @@ class PlrReconstructionService implements PlrReconstructionServiceInterface
         $result->addMessage('Updated ' . $result->teamsUpdated . ' team rows');
         $result->addMessage('Left ' . $result->teamsUnchanged . ' team rows unchanged');
 
+        return $lines;
+    }
+
+    /**
+     * Assemble, guard the byte count, write, and record bytes written.
+     *
+     * @param list<string> $lines
+     */
+    private function writeOutput(
+        array $lines,
+        int $inputSize,
+        string $outputPlrPath,
+        PlrReconstructionResult $result,
+    ): void {
         $output = PlrFileWriter::assembleFile($lines);
         if (strlen($output) !== $inputSize) {
             $result->addError('Output size (' . strlen($output)
                 . ') does not match input size (' . $inputSize . ')');
-            return $result;
+            return;
         }
 
         PlrFileWriter::writeFile($output, $outputPlrPath);
         $result->bytesWritten = strlen($output);
         $result->addMessage('Wrote ' . $result->bytesWritten . ' bytes to ' . $outputPlrPath);
-
-        return $result;
     }
 
     /**

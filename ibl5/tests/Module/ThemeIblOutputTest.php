@@ -331,5 +331,22 @@ namespace Tests\Module {
 
             $this->assertGolden('header-logged-out', $output);
         }
+
+        public function testThemeheaderLoggedInDecodesCookieAndRendersLogout(): void
+        {
+            $this->primeHeaderGlobals();
+            $authStub = self::createStub(AuthServiceInterface::class);
+            $authStub->method('isAuthenticated')->willReturn(true);
+            $authStub->method('isAdmin')->willReturn(false);
+            $authStub->method('getUsername')->willReturn('testgm');
+            $authStub->method('getCookieArray')->willReturn(['testgm', 'testgm', '']);
+            $GLOBALS['authService'] = $authStub;
+            unset($GLOBALS['cookie']);
+
+            $output = $this->captureHeader();
+
+            $this->assertSame(['testgm', 'testgm', ''], $GLOBALS['cookie']);
+            $this->assertStringContainsString('op=logout', $output);
+        }
     }
 }

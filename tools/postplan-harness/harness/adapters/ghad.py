@@ -22,7 +22,7 @@ import time
 
 from pathlib import Path
 
-from .. import followcap
+from .. import followcap, netretry
 from ..state import HarnessError
 
 # bin/lib/pr-sticky.sh in the harness's own checkout. Not under pr-ready/,
@@ -268,6 +268,15 @@ class LiveGh(RecordingGh):
         self._meta: dict | None = None
 
     def _gh(self, *args: str, input_text: str | None = None) -> str:
+        """Every gh call. Retries network-transient failures only for argv on
+        netretry's read-only/idempotent allowlist; everything else is one attempt.
+        Non-idempotent sites opt in through _gh_landed with a landed check."""
+        if not netretry.gh_retry_safe(args):
+            return self._gh_once(*args, input_text=input_text)
+        return netretry.call(lambda: self._gh_once(*args, input_text=input_text),
+                             label=f"gh {' '.join(args[:2])}")
+
+    def _gh_once(self, *args: str, input_text: str | None = None) -> str:
         try:
             proc = subprocess.run(["gh", *args], cwd=self.worktree, input=input_text,
                                   capture_output=True, text=True, timeout=self.timeout)
@@ -276,6 +285,36 @@ class LiveGh(RecordingGh):
         if proc.returncode != 0:
             raise HarnessError("gh", f"gh {' '.join(args[:3])}: {proc.stderr.strip()[:400]}")
         return proc.stdout
+
+    def _gh_landed(self, argv: tuple[str, ...], *, label: str,
+                   landed, input_text: str | None = None) -> str:
+        """A non-idempotent call. No landed check means one attempt (today)."""
+        if landed is None:
+            return self._gh(*argv, input_text=input_text)
+        return netretry.call(lambda: self._gh(*argv, input_text=input_text),
+                             label=label, landed=landed)
+
+    @staticmethod
+    def _count_increase_landed(count_fn):
+        """Snapshot count_fn() now. landed() is True once the count grows, so an
+        identical earlier comment or review never counts as the retried one.
+        A failed snapshot returns None: single attempt."""
+        try:
+            before = count_fn()
+        except Exception:
+            return None
+        return lambda: ((True, "") if count_fn() > before else (False, None))
+
+    def _open_prs_for_branch(self) -> list:
+        return json.loads(self._gh("pr", "list", "--head", self.branch, "--state",
+                                   "open", "--json", "number,url"))
+
+    def _matching_count(self, pr: int, field: str, body: str) -> int:
+        """Count comments (field="comments") or reviews (field="reviews") on the
+        PR whose body equals `body` after CRLF/whitespace normalisation."""
+        norm = lambda s: (s or "").replace("\r\n", "\n").strip()
+        data = json.loads(self._gh("pr", "view", str(pr), "--json", field))
+        return sum(1 for item in data.get(field, []) if norm(item.get("body")) == norm(body))
 
     def record(self, action: str, **payload) -> None:
         super().record(action, executed=True, **payload)
@@ -286,8 +325,18 @@ class LiveGh(RecordingGh):
 
     # -- mutations: executed, then recorded ------------------------------
     def pr_create(self, title: str, body: str, base: str) -> int:
-        out = self._gh("pr", "create", "--title", title, "--body", body,
-                       "--base", base, "--head", self.branch)
+        landed = None
+        try:
+            before = self._open_prs_for_branch()
+        except Exception:
+            before = None
+        if before == []:  # the runner calls pr_create only when no PR exists
+            def landed():
+                rows = self._open_prs_for_branch()
+                return (True, rows[0]["url"]) if rows else (False, None)
+        out = self._gh_landed(("pr", "create", "--title", title, "--body", body,
+                               "--base", base, "--head", self.branch),
+                              label="gh pr create", landed=landed)
         m = re.search(r"/pull/(\d+)", out)
         if not m:
             raise HarnessError("gh", f"pr create returned no PR URL: {out[:200]}")
@@ -482,20 +531,31 @@ class LiveGh(RecordingGh):
                    "comments": [{"path": f.path, "line": f.line, "side": "RIGHT",
                                  "body": f.body[:1000]} for f in findings]}
         try:
-            self._gh("api", f"repos/{self._repo()}/pulls/{pr}/reviews",
-                     "--method", "POST", "--input", "-",
-                     input_text=json.dumps(payload))
+            self._gh_landed(("api", f"repos/{self._repo()}/pulls/{pr}/reviews",
+                             "--method", "POST", "--input", "-"),
+                            label="gh api reviews POST",
+                            landed=self._count_increase_landed(
+                                lambda: self._matching_count(pr, "reviews", title)),
+                            input_text=json.dumps(payload))
         except HarnessError:
             # one out-of-diff line anchor 422s the whole review — degrade to a
             # summary comment; findings still hold arming from memory regardless
             body = "\n".join(f"- `{f.path}:{f.line}` — {f.body}" for f in findings)
-            self._gh("pr", "comment", str(pr), "--body", f"## {title}\n\n{body}")
+            comment = f"## {title}\n\n{body}"
+            self._gh_landed(("pr", "comment", str(pr), "--body", comment),
+                            label="gh pr comment",
+                            landed=self._count_increase_landed(
+                                lambda: self._matching_count(pr, "comments", comment)))
         self.record("pr_review_findings", pr=pr, head_sha=head_sha, title=title,
                     findings=[{"path": f.path, "line": f.line, "body": f.body[:1000],
                                "score": f.score} for f in findings])
 
     def post_review_summary(self, pr: int, title: str, body: str) -> None:
-        self._gh("pr", "comment", str(pr), "--body", f"## {title}\n\n{body}")
+        comment = f"## {title}\n\n{body}"
+        self._gh_landed(("pr", "comment", str(pr), "--body", comment),
+                        label="gh pr comment",
+                        landed=self._count_increase_landed(
+                            lambda: self._matching_count(pr, "comments", comment)))
         self.record("pr_comment", pr=pr, title=title, body=body[:4000])
 
     def pr_status_label(self, pr: int, label: str) -> None:

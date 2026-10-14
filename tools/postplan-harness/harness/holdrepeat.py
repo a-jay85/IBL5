@@ -34,6 +34,11 @@ DECLINE_EXIT = 10
 # PRs are held by design and fired once), 12 fidelity verdict (LLM),
 # 15 red CI, 16 meta-checks. All of these can clear on a re-run.
 STRUCTURAL_CONDITIONS = frozenset({3, 7, 8, 13})
+# Conditions only a human can clear (3 = plan files missing, 7 = plan
+# auto_merge: false, 8 = feat signoff floor). A DIRTY PR whose last hold is
+# a non-empty subset of these only needs a rebase, never a fresh review.
+REBASE_ONLY_CONDITIONS = frozenset({3, 7, 8})
+ELIGIBLE_EXIT = 10
 
 _RUN_DIR = re.compile(r"live-\S*?-\d{8}-\d{6}-\d+")
 _WT_PATH = re.compile(r"/(?:[^\s/]+/)*IBL5-worktrees/[^\s/]+/")
@@ -194,6 +199,24 @@ def mark_dm_sent(state_dir, slug, key: str) -> None:
     _save_record(state_dir, slug, record)
 
 
+def refresh_fingerprint(state_dir, slug, fp: str, now: str) -> bool:
+    """Replace only `fingerprint` (and `updated_at`) on an existing record.
+
+    Used after a rebase-only run whose net diff (patch-id) did not change, so the
+    next cycle still sees "same hold". Never creates a record, never touches
+    hold_set, structural, structural_key, repeat_count or dm_sent_key.
+    """
+    if not fp:
+        return False
+    record = load_record(state_dir, slug)
+    if record is None:
+        return False
+    record["fingerprint"] = fp
+    record["updated_at"] = now
+    _save_record(state_dir, slug, record)
+    return True
+
+
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -301,6 +324,28 @@ def should_decline(state_dir, slug, current_fp: str):
     return True, f"unchanged plan+diff+harness; held again on {key} (DM already sent)"
 
 
+def rebase_only_eligible(state_dir, slug) -> bool:
+    """True when the stored hold set is non-empty and every number is in {3,7,8}.
+
+    Reads the record's full `hold_set` (every blocked condition, structural or
+    not), so a hold that also carried 12, 14, 15 or 16 is NOT eligible. Any
+    absent, unreadable or malformed record returns False (fail toward the
+    normal full path).
+    """
+    rec = load_record(state_dir, slug)
+    if not rec:
+        return False
+    entries = rec.get("hold_set")
+    if not isinstance(entries, list) or not entries:
+        return False
+    nums = set()
+    for e in entries:
+        if not isinstance(e, list) or not e or not isinstance(e[0], int):
+            return False
+        nums.add(e[0])
+    return nums <= REBASE_ONLY_CONDITIONS
+
+
 def _build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="harness.holdrepeat")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -309,11 +354,26 @@ def _build_parser() -> argparse.ArgumentParser:
     chk.add_argument("--slug", required=True)
     chk.add_argument("--plan", default="")  # explicit override path only; "" = resolve via locate_plan
     chk.add_argument("--worktree", required=True)
+    elig = sub.add_parser("rebase-eligible",
+                          help="exit 10 when the last hold is a subset of {3,7,8}")
+    elig.add_argument("--state-dir", required=True)
+    elig.add_argument("--slug", required=True)
     return ap
 
 
 def main(argv=None) -> int:
     args = _build_parser().parse_args(argv)
+    if args.cmd == "rebase-eligible":
+        try:
+            ok = rebase_only_eligible(args.state_dir, args.slug)
+        except Exception as e:  # noqa: BLE001 - fail open to "not eligible"
+            print(f"holdrepeat: rebase-eligible failed ({e}); not eligible",
+                  file=sys.stderr)
+            return 0
+        if ok:
+            print("holdrepeat: REBASE-ONLY eligible")
+            return ELIGIBLE_EXIT
+        return 0
     try:
         from harness.planfile import locate_plan
         plan_info = locate_plan(args.slug, explicit_path=args.plan or None)

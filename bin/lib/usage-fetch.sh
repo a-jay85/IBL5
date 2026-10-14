@@ -22,7 +22,6 @@ USAGE_FETCH_LOCK_STALE=15
 USAGE_FETCH_BACKOFF_BASE=30
 USAGE_FETCH_BACKOFF_CAP=480
 USAGE_FETCH_RETRY_AFTER_CAP=900
-USAGE_FETCH_SKIPLOG_EVERY=30
 # A 429 episode stays live until USAGE_FETCH_EPISODE_QUIET seconds pass with no 429.
 # 1800 = 2 x USAGE_FETCH_RETRY_AFTER_CAP: the longest armed wait plus as much again for caller cadence.
 USAGE_FETCH_EPISODE_QUIET=1800
@@ -32,6 +31,12 @@ USAGE_FETCH_EPISODE_QUIET=1800
 USAGE_SWITCH_WINDOW=1800
 USAGE_SWITCH_RETRY_CAP=45
 USAGE_SWITCH_RETRY_MAX=3
+# A live fetch that finds no login in the keychain, or gets a 401, marks the login dead for
+# USAGE_AUTH_DEAD_TTL seconds. The coordinator holds login-switch resumes while it is set.
+USAGE_AUTH_DEAD_TTL=900
+# usage-gate.log moves to usage-gate.log.1 once it reaches USAGE_LOG_MAX_BYTES (one old file kept).
+# Plain assignment like the tunables above: tests drive rotation by seeding an oversized log.
+USAGE_LOG_MAX_BYTES=262144
 
 # usage_state_dir
 # Echoes the state dir (creating it and markers/). Honors IBL5_USAGE_GATE_STATE_DIR;
@@ -57,11 +62,76 @@ usage_state_dir() {
 }
 
 # usage_log <msg...>
-# Appends "<ISO-UTC> <pid> <msg>" to usage-gate.log. Never fails the caller.
+# Appends "<ISO-UTC> <pid> <msg>" to usage-gate.log, rotating it first once it has reached
+# USAGE_LOG_MAX_BYTES. Never fails the caller.
 usage_log() {
     local d
     d=$(usage_state_dir)
+    _usage_log_rotate "$d"
     printf '%s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$$" "$*" >> "$d/usage-gate.log" 2>/dev/null
+    return 0
+}
+
+# _usage_log_size <file>: echoes its byte size, or 0 when it is missing or unreadable.
+# The group puts the `<` redirection itself under 2>/dev/null; BSD wc pads with spaces.
+_usage_log_size() {
+    local n
+    n=$( { wc -c < "$1"; } 2>/dev/null )
+    n=${n//[!0-9]/}
+    printf '%s\n' "${n:-0}"
+}
+
+# _usage_log_rotate <state_dir>: moves usage-gate.log to usage-gate.log.1 once it reaches
+# USAGE_LOG_MAX_BYTES. Never waits and never fails. usage-log-rotate.lock.d serializes
+# rotators; a lock dir more than a minute old is an orphan from a killed rotator and is reclaimed.
+_usage_log_rotate() {
+    local lock="$1/usage-log-rotate.lock.d"
+    [ "$(_usage_log_size "$1/usage-gate.log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
+    if ! mkdir "$lock" 2>/dev/null; then
+        [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] || return 0
+        rmdir "$lock" 2>/dev/null
+        mkdir "$lock" 2>/dev/null || return 0
+    fi
+    _usage_log_rotate_locked "$1"
+    rmdir "$lock" 2>/dev/null
+    return 0
+}
+
+# _usage_log_rotate_locked <state_dir>: the caller holds usage-log-rotate.lock.d. The size is
+# re-checked under the lock: a peer that saw the same oversized log before this process rotated
+# it finds the fresh log here and leaves usage-gate.log.1 alone.
+_usage_log_rotate_locked() {
+    local log="$1/usage-gate.log"
+    [ "$(_usage_log_size "$log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
+    mv -f "$log" "$log.1" 2>/dev/null
+    return 0
+}
+
+# usage_episode_start <name> <msg...>: logs <msg> once per episode of <name>.
+# The O_EXCL create (set -C) of episode-<name> lets exactly one concurrent caller log the open.
+# Always returns 0: a caller's control flow must never depend on whether this call logged.
+usage_episode_start() {
+    local f
+    f="$(usage_state_dir)/episode-$1"
+    shift
+    ( set -C; printf '%s\n' "$(date +%s)" > "$f" ) 2>/dev/null || return 0
+    usage_log "$@"
+    return 0
+}
+
+# usage_episode_end <name> <msg>: closes the open episode of <name> and logs "<msg> duration=<s>".
+# The rename claims the file, as in _usage_fetch_episode_end, so exactly one process logs the close.
+# Duration runs to this call, so an idle gap before the closing read is counted in it.
+usage_episode_end() {
+    local f a now
+    f="$(usage_state_dir)/episode-$1"
+    [ -f "$f" ] || return 0
+    mv "$f" "$f.end.$$" 2>/dev/null || return 0
+    read -r a < "$f.end.$$" 2>/dev/null
+    rm -f "$f.end.$$"
+    now=$(date +%s)
+    case "$a" in ''|*[!0-9]*) a=$now ;; esac
+    usage_log "$2 duration=$((now - a))"
     return 0
 }
 
@@ -135,6 +205,20 @@ _usage_switch_short_retry() {
     { printf '%s %s %s %s\n' "$at" "$sfp" "$n" "${kind:--}" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; } 2>/dev/null \
         || rm -f "$f.tmp.$$"
     printf '%s %s\n' "$ra" "$n"
+}
+
+# usage_auth_dead [now]: echoes the reason (no-token or http-401) and returns 0 when
+# the last live fetch, under USAGE_AUTH_DEAD_TTL seconds ago, found the login missing
+# or rejected. A later successful fetch clears it. Returns 1 otherwise.
+usage_auth_dead() {
+    local f now at reason
+    f="$(usage_state_dir)/fetch-auth-dead"
+    [ -f "$f" ] || return 1
+    read -r at reason < "$f" 2>/dev/null
+    case "$at" in ''|*[!0-9]*) return 1 ;; esac
+    now="${1:-$(date +%s)}"
+    [ $((now - at)) -lt "$USAGE_AUTH_DEAD_TTL" ] || return 1
+    printf '%s\n' "${reason:-unknown}"
 }
 
 # usage_account_switch_check: keychain-free detection for the coordinator. When the
@@ -370,10 +454,10 @@ usage_fetch() {
     fi
 
     if ! _usage_fetch_lock_acquire "$d"; then
-        _usage_fetch_log_once "$d/fetch-inflight.logged" "$((now / USAGE_FETCH_SKIPLOG_EVERY))" \
-            "fetch-skip reason=in-flight"
+        usage_episode_start fetch-inflight "fetch-skip reason=in-flight"
         _usage_fetch_serve_stale "$age" "$cache"; return $?
     fi
+    usage_episode_end fetch-inflight "in-flight episode end"
 
     # Re-check under the lock: a peer may have refreshed the cache or armed a backoff.
     age=$(usage_cache_age)
@@ -388,11 +472,15 @@ usage_fetch() {
         _usage_fetch_serve_stale "$age" "$cache"; return $?
     fi
 
-    local reason="" tok="" body="" hdr="$d/fetch.hdr.$$" crc=0 status="" ra=""
-    tok=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
-        | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+    local reason="" tok="" body="" hdr="$d/fetch.hdr.$$" crc=0 status="" ra="" raw="" src=0 dead=""
+    raw=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null); src=$?
+    tok=$(printf '%s' "$raw" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+    raw=""
     if [ -z "$tok" ]; then
         reason="no-token"
+        # 44 is item-not-found and rc 0 is an item with no token: no login. Any other
+        # rc (locked keychain, no UI access under launchd) says nothing about the login.
+        if [ "$src" -eq 44 ] || [ "$src" -eq 0 ]; then dead="no-token"; fi
     else
         rm -f "$hdr"
         body=$(curl -s -m 4 -D "$hdr" https://api.anthropic.com/api/oauth/usage \
@@ -416,7 +504,7 @@ usage_fetch() {
         local tmp="$cache.tmp.$$"
         if printf '%s' "$body" | jq --argjson t "$(date +%s)" --arg fp "$fp" '. + {fetched_at:$t, cred_fp:$fp}' > "$tmp" 2>/dev/null \
             && mv "$tmp" "$cache"; then
-            rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.*
+            rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.* "$d/fetch-auth-dead"
             _usage_fetch_episode_end "$d" stale
             local acct
             acct=$(_usage_acct_fp)
@@ -429,6 +517,8 @@ usage_fetch() {
         reason="bad-body"
     fi
 
+    [ "$reason" = http-401 ] && dead="http-401"
+    if [ -n "$dead" ]; then printf '%s %s\n' "$(date +%s)" "$dead" > "$d/fetch-auth-dead" 2>/dev/null; fi
     if [ "$reason" = "rate-limited" ]; then
         local delay sr ep
         if sr=$(_usage_switch_short_retry "$d" "$fp" "$ra"); then

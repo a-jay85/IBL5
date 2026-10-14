@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use HeadToHeadRecords\Contracts\HeadToHeadRecordsRepositoryInterface;
 use HeadToHeadRecords\HeadToHeadRecordsRepository;
 use League\League;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -16,6 +17,8 @@ use PHPUnit\Framework\Attributes\Group;
  * ibl_franchise_seasons rows are inserted with season_year=1900, season_ending_year=1901
  * (= the 1901 season in the IBL convention: season_ending_year = box_scores.season_year).
  * Game date '1901-03-15': MONTH=3 < 10 → season_year=1901, MONTH≠6/10 → game_type=1.
+ *
+ * @phpstan-import-type AxisEntry from HeadToHeadRecordsRepositoryInterface
  */
 #[Group('database')]
 class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
@@ -322,6 +325,216 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
     }
 
     // -------------------------------------------------------------------------
+    // GM axis: colors, logos, tenure selection (characterization, pre-split)
+    // -------------------------------------------------------------------------
+
+    public function testCurrentGmAxisEntryUsesTeamInfoColorsAndNewLogo(): void
+    {
+        $ti = $this->teamInfoRow(17);
+        self::assertNotSame('', $ti['color1']);
+
+        $axis = $this->axisByKey($this->repo->buildGmsMatrix('regular', 'all')['axis']);
+
+        self::assertArrayHasKey('H2HBeta', $axis);
+        self::assertSame($ti['color1'], $axis['H2HBeta']['color1']);
+        self::assertSame($ti['color2'], $axis['H2HBeta']['color2']);
+        self::assertSame('new17.png', $axis['H2HBeta']['logo']);
+        self::assertSame(17, $axis['H2HBeta']['franchise_id']);
+    }
+
+    public function testRetiredGmWhoseEraMatchesCurrentIdentityUsesTeamInfoColors(): void
+    {
+        $ti = $this->teamInfoRow(17);
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id'       => 17,
+            'season_year'        => 1896,
+            'season_ending_year' => 1897,
+            'team_city'          => $ti['team_city'],
+            'team_name'          => $ti['team_name'],
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id'        => 17,
+            'gm_display_name'     => 'H2HTheta',
+            'start_season_year'   => 1896,
+            'end_season_year'     => 1897,
+            'is_mid_season_start' => 0,
+            'is_mid_season_end'   => 0,
+        ]);
+
+        $axis = $this->axisByKey($this->repo->buildGmsMatrix('regular', 'all')['axis']);
+
+        self::assertArrayHasKey('H2HTheta', $axis);
+        self::assertSame($ti['color1'], $axis['H2HTheta']['color1']);
+        self::assertSame($ti['color2'], $axis['H2HTheta']['color2']);
+        self::assertSame('new17.png', $axis['H2HTheta']['logo']);
+        self::assertSame(0, $axis['H2HTheta']['link_franchise_id']);
+    }
+
+    public function testRetiredGmWhoseEraDiffersFromCurrentIdentityUsesEraBrandingColors(): void
+    {
+        $ti = $this->teamInfoRow(17);
+        self::assertNotSame(['San Antonio', 'Spurs'], [$ti['team_city'], $ti['team_name']]);
+
+        $axis = $this->axisByKey($this->repo->buildGmsMatrix('regular', 'all')['axis']);
+
+        self::assertArrayHasKey('H2HAlpha', $axis);
+        self::assertSame('C4CED4', $axis['H2HAlpha']['color1']);
+        self::assertSame('000000', $axis['H2HAlpha']['color2']);
+        self::assertNotSame($ti['color1'], $axis['H2HAlpha']['color1']);
+        self::assertSame('new17.png', $axis['H2HAlpha']['logo']);
+    }
+
+    public function testRetiredGmWithFranchiseSeasonButNoEraBrandingGetsEmptyColors(): void
+    {
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id'       => 22,
+            'season_year'        => 1898,
+            'season_ending_year' => 1899,
+            'team_city'          => 'Nowhere',
+            'team_name'          => 'Nobodies',
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id'        => 22,
+            'gm_display_name'     => 'H2HEta',
+            'start_season_year'   => 1898,
+            'end_season_year'     => 1899,
+            'is_mid_season_start' => 0,
+            'is_mid_season_end'   => 0,
+        ]);
+
+        $axis = $this->axisByKey($this->repo->buildGmsMatrix('regular', 'all')['axis']);
+
+        self::assertArrayHasKey('H2HEta', $axis);
+        self::assertSame('', $axis['H2HEta']['color1']);
+        self::assertSame('', $axis['H2HEta']['color2']);
+        self::assertSame('new22.png', $axis['H2HEta']['logo']);
+        self::assertSame(22, $axis['H2HEta']['franchise_id']);
+    }
+
+    public function testRetiredGmWithoutFranchiseSeasonRowGetsEmptyColorsAndDefaultLogo(): void
+    {
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id'        => 3,
+            'gm_display_name'     => 'H2HZeta',
+            'start_season_year'   => 1894,
+            'end_season_year'     => 1895,
+            'is_mid_season_start' => 0,
+            'is_mid_season_end'   => 0,
+        ]);
+
+        $axis = $this->axisByKey($this->repo->buildGmsMatrix('regular', 'all')['axis']);
+
+        self::assertArrayHasKey('H2HZeta', $axis);
+        self::assertSame('', $axis['H2HZeta']['color1']);
+        self::assertSame('', $axis['H2HZeta']['color2']);
+        self::assertSame('new3.png', $axis['H2HZeta']['logo']);
+        self::assertSame(3, $axis['H2HZeta']['franchise_id']);
+        self::assertSame(0, $axis['H2HZeta']['link_franchise_id']);
+    }
+
+    public function testCustomLogoResolverIsCalledOnlyForRetiredGmsWithFranchiseSeasonRow(): void
+    {
+        /** @var list<array{int, string}> $calls */
+        $calls = [];
+        $resolver = static function (int $id, string $name) use (&$calls): string {
+            $calls[] = [$id, $name];
+            return "custom-{$id}-{$name}.svg";
+        };
+
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id'       => 22,
+            'season_year'        => 1898,
+            'season_ending_year' => 1899,
+            'team_city'          => 'Nowhere',
+            'team_name'          => 'Nobodies',
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id'        => 22,
+            'gm_display_name'     => 'H2HEta',
+            'start_season_year'   => 1898,
+            'end_season_year'     => 1899,
+            'is_mid_season_start' => 0,
+            'is_mid_season_end'   => 0,
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id'        => 3,
+            'gm_display_name'     => 'H2HZeta',
+            'start_season_year'   => 1894,
+            'end_season_year'     => 1895,
+            'is_mid_season_start' => 0,
+            'is_mid_season_end'   => 0,
+        ]);
+
+        $repo = new HeadToHeadRecordsRepository($this->db, 1901, $resolver);
+        $axis = $this->axisByKey($repo->buildGmsMatrix('regular', 'all')['axis']);
+
+        self::assertSame('custom-17-Spurs.svg', $axis['H2HAlpha']['logo']);
+        self::assertSame('custom-22-Nobodies.svg', $axis['H2HEta']['logo']);
+        self::assertSame('new3.png', $axis['H2HZeta']['logo']);
+        self::assertSame('new17.png', $axis['H2HBeta']['logo']);
+        self::assertSame('new22.png', $axis['H2HGamma']['logo']);
+        self::assertSame([[17,'Spurs'],[22,'Nobodies']], $calls);
+    }
+
+    public function testCurrentScopeDerivesGmAxisFromRecordsOnly(): void
+    {
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id'        => 3,
+            'gm_display_name'     => 'H2HZeta',
+            'start_season_year'   => 1894,
+            'end_season_year'     => 1895,
+            'is_mid_season_start' => 0,
+            'is_mid_season_end'   => 0,
+        ]);
+
+        $payload = $this->repo->buildGmsMatrix('regular', 'current');
+
+        self::assertSame(['H2HAlpha','H2HGamma'], array_column($payload['axis'], 'key'));
+    }
+
+    public function testCurrentScopeWithNoCurrentSeasonGamesReturnsEmptyAxis(): void
+    {
+        $repo = new HeadToHeadRecordsRepository($this->db, 8888);
+
+        $payload = $repo->buildGmsMatrix('regular', 'current');
+
+        self::assertSame([], $payload['records']);
+        self::assertSame([], $payload['axis']);
+    }
+
+    public function testBestTenurePrefersCurrentThenLatestEndThenLowestId(): void
+    {
+        $tenures = [
+            ['H2HIota', 1, 1890, 1891],
+            ['H2HIota', 2, 1892, 1893],
+            ['H2HKappa', 1, 1892, 1893],
+            ['H2HKappa', 2, 1894, null],
+            ['H2HLambda', 2, 1888, 1889],
+            ['H2HLambda', 1, 1888, 1889],
+        ];
+        foreach ($tenures as [$gm, $fid, $start, $end]) {
+            $row = [
+                'franchise_id'        => $fid,
+                'gm_display_name'     => $gm,
+                'start_season_year'   => $start,
+                'is_mid_season_start' => 0,
+                'is_mid_season_end'   => 0,
+            ];
+            if ($end !== null) {
+                $row['end_season_year'] = $end;
+            }
+            $this->insertRow('ibl_gm_tenures', $row);
+        }
+
+        $axis = $this->axisByKey($this->repo->buildGmsMatrix('regular', 'all')['axis']);
+
+        self::assertSame(2, $axis['H2HIota']['franchise_id']);
+        self::assertSame(2, $axis['H2HKappa']['franchise_id']);
+        self::assertSame(2, $axis['H2HKappa']['link_franchise_id']);
+        self::assertSame(2, $axis['H2HLambda']['franchise_id']);
+    }
+
+    // -------------------------------------------------------------------------
     // Teams dimension
     // -------------------------------------------------------------------------
 
@@ -564,5 +777,40 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         return (int)($row['cnt'] ?? 0);
+    }
+
+    /**
+     * @param list<AxisEntry> $axis
+     * @return array<string, AxisEntry>
+     */
+    private function axisByKey(array $axis): array
+    {
+        $byKey = [];
+        foreach ($axis as $entry) {
+            $byKey[$entry['key']] = $entry;
+        }
+        return $byKey;
+    }
+
+    /** @return array{team_city: string, team_name: string, color1: string, color2: string} */
+    private function teamInfoRow(int $teamid): array
+    {
+        $stmt = $this->db->prepare('SELECT team_city, team_name, color1, color2 FROM ibl_team_info WHERE teamid = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $teamid);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        self::assertIsArray($row);
+        self::assertIsString($row['team_city'] ?? null, 'ibl_team_info.team_city must be a string');
+        self::assertIsString($row['team_name'] ?? null, 'ibl_team_info.team_name must be a string');
+        self::assertIsString($row['color1'] ?? null, 'ibl_team_info.color1 must be a string');
+        self::assertIsString($row['color2'] ?? null, 'ibl_team_info.color2 must be a string');
+        return [
+            'team_city' => $row['team_city'],
+            'team_name' => $row['team_name'],
+            'color1'    => $row['color1'],
+            'color2'    => $row['color2'],
+        ];
     }
 }

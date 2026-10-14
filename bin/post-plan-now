@@ -53,6 +53,9 @@
 # Exit 8: declined because the last run for this slug held on the same structural
 # reasons, the repeat DM was already sent, and plan+diff+harness are unchanged
 # (harness/holdrepeat.py). Nothing was fired. --force overrides.
+# Exit 8 also covers an active held-unfixable marker (harness/heldmarker.py): an earlier
+# in-run decline wrote it, and the hold and the plan file's mtime are both unchanged.
+# Nothing was fired. Edit the plan or delete the marker to clear; --force bypasses.
 #
 # --pr <n> drives the worktree that has PR <n>'s head branch checked out, instead
 # of the current branch. When no worktree has that branch, --pr creates one via
@@ -69,20 +72,26 @@
 # should_fallback <rc> — decide whether to escalate to the /post-plan skill session after the
 # compiled harness exits with <rc>. Returns 0 (DO fall back) for a generic harness failure;
 # returns 1 (do NOT fall back) for success (0) and the fail-closed sentinel (3) emitted by
-# runner.py exit_code_for(). Two kinds reach exit 3: (1) a rebase conflict the auto-resolver
-# declined or could not certify (unresolvable conflict class, per-file round cap, or failed
-# TREE-EQUIVALENT proof; see ibl5/docs/decisions/0134-harness-conflict-autoresolve.md), and
-# (2) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget). Both
-# are deterministic walls a skill re-run cannot climb, so the fallback is suppressed entirely.
+# runner.py exit_code_for(). Exit 3 means the error kind is in runner.py _FAIL_CLOSED_KINDS,
+# among them: (1) a rebase conflict the auto-resolver declined or could not certify
+# (unresolvable conflict class, per-file round cap, or failed TREE-EQUIVALENT proof; see
+# ibl5/docs/decisions/0134-harness-conflict-autoresolve.md); (2) a local pre-commit/pre-push
+# gate denial (missing ADR, stale doc, rules byte budget); (3) a Claude usage limit; and
+# (4) an expired Claude CLI login (llm-auth-expired), which the skill session would reuse.
+# Each is a deterministic wall a skill re-run cannot climb, so the fallback is suppressed entirely.
 # 7 is this launcher's own main-checkout refusal (the is_in_worktree block further down):
 # nothing ran, and the fix is to cd into the right worktree. The harness never emits 7
 # (runner.py exit_code_for returns only 0, 1 or 3). Listing 7 keeps one no-fallback
 # vocabulary, so a skill re-run can never be spent against the main checkout.
 # This function is embedded verbatim into the launchd plist below via `declare -f`, so the
 # tested logic here is exactly what runs there.
-should_fallback() { case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }
+# $2 = 1 in --rebase-only mode: the skill has no rebase-only path and would run the
+# full review on a PR only a human can clear, so a rebase-only failure never falls back.
+should_fallback() { [ "${2:-0}" = 1 ] && return 1; case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }
+# rebase_only_harness_arg <0|1>: the harness flag for --rebase-only, or nothing.
+rebase_only_harness_arg() { [ "${1:-0}" = 1 ] && printf ' --rebase-only'; return 0; }
 
-# blocked_ship_block <run-dir> <slug> <root> <log> — the plain-language message for an
+# blocked_ship_block <run-dir> <slug> <root> <log> <main-root> — the plain-language message for an
 # exit-3 stop. The harness writes <run-dir>/blocked-ship.txt (runner.py write_blocked_ship);
 # print it as is. `-s` treats an empty file (a failed write) like a missing one and prints
 # a generic block of the same shape instead. The file is emitted with cat, never eval'd,
@@ -100,8 +109,9 @@ blocked_ship_block() {
     printf 'Fix:\n  1. cd %s\n' "$3"
     printf '  2. Read the log named on the Log line below and fix what it reports\n'
     printf '  3. bin/post-plan-now\n\n'
-    printf 'Or open Claude in that folder and ask it to fix the ship block.\n'
     printf 'Log: %s\n' "$4"
+    printf 'Or paste this to have Claude fix it:\n'
+    printf '%s/bin/postplan-fix %s\n' "$5" "$2"
 }
 
 # shq <string> — single-quote <string> for the FAR side of the launchd boundary.
@@ -144,7 +154,7 @@ postplan_failure_body() {   # <rc> <label> <started>
     if [ "$rc" != stale ]; then
         case "$rc" in
             75) printf 'Paused for usage limit; auto-resumes after reset.\n' ;;
-            3) printf 'The harness hit a fail-closed wall and deliberately did not fall back. Cause: %s\n' "${HARNESS_RESULT:-a rebase conflict, or a local pre-commit/pre-push gate denial; the RESULT line in the log names which}" ;;
+            3) printf 'The harness hit a fail-closed wall and deliberately did not fall back. Cause: %s\n' "${HARNESS_RESULT:-a rebase conflict, a local pre-commit/pre-push gate denial, a Claude usage limit, or an expired Claude login; the RESULT line in the log names which}" ;;
             *) printf 'The run ended abnormally — check the log under `/tmp/post-plan-now-*.log`.\n' ;;
         esac
     fi
@@ -296,6 +306,22 @@ postplan_holdrepeat_decline() {
     return 0
 }
 
+# Held-unfixable marker decline (harness/heldmarker.py). Returns 0 = DECLINE (prints
+# the reason), 1 = proceed. Fails open: a missing harness, python error, or any exit
+# other than 10 proceeds. --force (FORCE=1) and --state-changed (STATE_CHANGED=1)
+# both proceed, exactly like postplan_holdrepeat_decline.
+postplan_heldmarker_decline() {
+    local harness="$1" slug="$2" plan="$3" out rc
+    [ "${FORCE:-0}" -eq 0 ] || return 1
+    [ "${STATE_CHANGED:-0}" -eq 0 ] || return 1
+    out=$(PYTHONPATH="$harness" python3 -m harness.heldmarker check \
+            --state-dir "${HOLDREPEAT_STATE_DIR:-$harness/out/state}" \
+            --slug "$slug" --plan "$plan" 2>/dev/null) && rc=0 || rc=$?
+    [ "$rc" -eq 10 ] || return 1
+    printf '%s\n' "$out"
+    return 0
+}
+
 # Sourced-guard: the unit test does `source bin/post-plan-now` to load should_fallback, then this
 # returns before the body executes. Must sit before `set -euo pipefail` (sourcing must not alter
 # the caller's shell options).
@@ -305,7 +331,7 @@ set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
-Usage: bin/post-plan-now [--auto] [--force] [--allow-test-only] [--state-changed] [--foreground] [--plan <path>] [--pr <n>]
+Usage: bin/post-plan-now [--auto] [--force] [--allow-test-only] [--state-changed] [--rebase-only] [--foreground] [--plan <path>] [--pr <n>]
 
 Fire a detached post-plan run on the current worktree's branch. Run from
 anywhere inside the target worktree.
@@ -323,6 +349,10 @@ Options:
                    keeps the in-flight and production-file guards. Passed by
                    bin/pr-cycle for DIRTY or red-check rescues through
                    bin/post-plan-fleet. Bare flag only.
+  --rebase-only    Pass --rebase-only to the harness: when the last hold was only
+                   human conditions (3, 7, 8), merge origin/master, push, and stop
+                   before review. Implies --state-changed. Passed by bin/pr-cycle
+                   through bin/post-plan-fleet. Bare flag only.
   --foreground     Run the engine in this shell instead of detaching via launchd.
   --plan <path>    Override the plan file path (default: resolved from branch slug).
   --pr <n>         Drive the worktree holding PR <n>'s head branch; creates the
@@ -338,6 +368,7 @@ AUTO=0
 FORCE=0
 ALLOW_TEST_ONLY=0
 STATE_CHANGED=0
+REBASE_ONLY=0
 PLAN_OVERRIDE=""
 FOREGROUND=0
 PR_NUM=""
@@ -369,6 +400,7 @@ while [ $# -gt 0 ]; do
         --force)  FORCE=1 ; shift ;;
         --allow-test-only) ALLOW_TEST_ONLY=1 ; shift ;;
         --state-changed) STATE_CHANGED=1 ; shift ;;
+        --rebase-only) REBASE_ONLY=1 ; STATE_CHANGED=1 ; shift ;;
         --foreground) FOREGROUND=1 ; shift ;;
         --plan)   [ $# -ge 2 ] || { echo "post-plan-now: --plan requires a path argument" >&2; exit 1; }
                   PLAN_OVERRIDE="$2" ; shift 2 ;;
@@ -376,7 +408,7 @@ while [ $# -gt 0 ]; do
         --pr)     [ $# -ge 2 ] || { echo "post-plan-now: --pr requires a PR number argument" >&2; exit 1; }
                   PR_NUM="$2" ; shift 2 ;;
         --pr=*)   PR_NUM="${1#--pr=}" ; shift ;;
-        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --force, --allow-test-only, --state-changed, --foreground, --plan <path>, --pr <n>)" >&2
+        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --force, --allow-test-only, --state-changed, --rebase-only, --foreground, --plan <path>, --pr <n>)" >&2
                   exit 1 ;;
     esac
 done
@@ -607,6 +639,15 @@ if postplan_holdrepeat_decline \
        "since; no tokens spent, no PR change. Override: bin/post-plan-now --force"
   exit 8
 fi
+# Exit 8 (marker): declined, held-unfixable marker active: same hold, plan unchanged (heldmarker.py).
+if postplan_heldmarker_decline \
+     "${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}" \
+     "$SLUG" "${PLAN_OVERRIDE:-}"; then
+  echo "RESULT: post-plan DECLINED — held-unfixable marker active (same hold, plan unchanged);" \
+       "no tokens spent, no PR change. Clear: edit the plan or delete the marker." \
+       "Override: bin/post-plan-now --force"
+  exit 8
+fi
 
 [ -f "$PLAN_FILE" ] \
     || echo "post-plan-now: warn — no plan at $PLAN_FILE; the harness will try a slug-drift match (<prefix>-$SLUG.md) and otherwise run plan-blind. Pass --plan <abs-path> to name one explicitly." >&2
@@ -733,20 +774,22 @@ fi
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ] && [ "${RESUME_STARTED:-0}" != 1 ]; then
     FALLBACK_FN="$(declare -f should_fallback blocked_ship_block); "
     PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
+    REBASE_ONLY_ARG="$(rebase_only_harness_arg "$REBASE_ONLY")"
     HARNESS_RUN_DIR="$HARNESS/out/live-$SAFE_SLUG-$TS"
-    HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_FORCE_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}; rc=\$?; "
+    HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_FORCE_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG}; rc=\$?; "
     # Foreground has no plist, so nothing points stdout at $LOG. Without the tee, $LOG
     # never exists: the RESULT capture below comes back empty and the Log line in the
     # rc=3 message points at a missing file. Foreground only:
     # under launchd, stdout already IS $LOG, and a tee there would write every line twice.
     [ "$FOREGROUND" -eq 1 ] \
-        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_FORCE_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG} 2>&1 | tee -a \"$LOG\"; rc=\${PIPESTATUS[0]}; "
-    GATE_OPEN="if [ \"\${_sigterm_received:-0}\" -eq 0 ] && should_fallback \"\$rc\" && ! usage_postrun_pause post-plan-now $(shq "$SESSION_ID") $(shq "$ROOT/bin/post-plan-now") \"\$rc\" $(shq "$LOG"); then "
+        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_FORCE_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG} 2>&1 | tee -a \"$LOG\"; rc=\${PIPESTATUS[0]}; "
+    GATE_OPEN="if [ \"\${_sigterm_received:-0}\" -eq 0 ] && should_fallback \"\$rc\" $REBASE_ONLY && ! usage_postrun_pause post-plan-now $(shq "$SESSION_ID") $(shq "$ROOT/bin/post-plan-now") \"\$rc\" $(shq "$LOG"); then "
     # The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
     # so $LOG holds its final RESULT: line. The capture now feeds only
     # postplan_failure_body; the exit-3 message comes from blocked_ship_block.
     POST_HARNESS_SEG="HARNESS_RESULT=\$(grep -m1 '^RESULT:' \"$LOG\" 2>/dev/null || true); HARNESS_RESULT=\${HARNESS_RESULT:0:1200}; "
-    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"\$(blocked_ship_block \"$HARNESS_RUN_DIR\" \"$SLUG\" \"$ROOT\" \"$LOG\")\"; printf '%s\n' '=== post-plan blocked ship ===' \"\$msg\" '=== end blocked ship ==='; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi"
+    FIX_ROOT="$(resolve_canonical_root "$ROOT")"
+    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"\$(blocked_ship_block \"$HARNESS_RUN_DIR\" \"$SLUG\" \"$ROOT\" \"$LOG\" \"$FIX_ROOT\")\"; printf '%s\n' '=== post-plan blocked ship ===' \"\$msg\" '=== end blocked ship ==='; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi"
     ENGINE="compiled post-plan harness (fails CLOSED on a rebase conflict or a local gate denial; falls back to the skill on other failures)"
 fi
 

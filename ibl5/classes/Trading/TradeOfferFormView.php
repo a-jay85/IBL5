@@ -24,9 +24,9 @@ class TradeOfferFormView
     {
         /** @var array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<TradingDraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<TradingDraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string, result?: string, error?: string} $pageData */
 
-        $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
+        $userTeam = $pageData['userTeam'];
         $userTeamId = $pageData['userTeamId'];
-        $partnerTeam = HtmlSanitizer::safeHtmlOutput($pageData['partnerTeam']);
+        $partnerTeam = $pageData['partnerTeam'];
         $partnerTeamId = $pageData['partnerTeamId'];
         $seasonEndingYear = $pageData['seasonEndingYear'];
         $seasonPhase = $pageData['seasonPhase'];
@@ -46,121 +46,39 @@ class TradeOfferFormView
 
         // Build player + pick rows for both teams, tracking the form field counter
         $k = 0;
-        $userPlayerRows = $this->buildPlayerRows($pageData['userPlayers'], $pageData['seasonPhase'], $k, $checkedItems);
-        $k = $userPlayerRows['nextK'];
-        $userPickRows = $this->buildPickRows($pageData['userPicks'], $k, $checkedItems);
-        $k = $userPickRows['nextK'];
-
-        $switchCounter = $k;
-
-        $partnerPlayerRows = $this->buildPlayerRows($pageData['partnerPlayers'], $pageData['seasonPhase'], $k, $checkedItems);
-        $k = $partnerPlayerRows['nextK'];
-        $partnerPickRows = $this->buildPickRows($pageData['partnerPicks'], $k, $checkedItems);
-        $k = $partnerPickRows['nextK'];
-        $k--;
 
         ob_start();
         echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, \Trading\TradeAlertMap::MAP, $pageData['error'] ?? null);
         ?>
 <form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
     <?= \Security\CsrfGuard::generateToken('trade_offer') ?>
-    <input type="hidden" name="offeringTeam" value="<?= HtmlSanitizer::trusted($userTeam) ?>">
+    <input type="hidden" name="offeringTeam" value="<?= HtmlSanitizer::safeHtmlOutput($userTeam) ?>">
     <div class="trading-layout">
         <h1 class="ibl-title">Trading</h1>
         <div class="team-cards-row">
             <div class="trading-layout__card">
                 <details class="trading-roster-details" open>
-                    <summary class="trading-roster-details__summary" style="<?= TableStyles::inlineTeamVars($userColor1, $userColor2) ?>">
-                        <img src="images/logo/<?= HtmlSanitizer::e($userTeamId) ?>.jpg" alt="<?= HtmlSanitizer::trusted($userTeam) ?>" class="trading-roster-details__logo">
-                        <span class="trading-roster-details__chevron"></span>
-                    </summary>
-                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($userColor1, $userColor1) ?>">
-                        <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
-                        <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
-                        <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
-                    </div>
-                    <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
-                        <table class="ibl-data-table trading-roster team-table" data-team-id="<?= HtmlSanitizer::e($userTeamId) ?>" style="<?= TableStyles::inlineTeamVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
-                            <colgroup>
-                                <col class="trading-col--checkbox">
-                                <col>
-                                <col class="trading-col--stat">
-                                <col class="trading-col--stat">
-                            </colgroup>
-                            <tbody>
-                                <?= HtmlSanitizer::trusted($userPlayerRows['html']) ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="trading-roster-details__panel" data-panel-id="picks">
-                        <table class="ibl-data-table trading-roster" data-no-responsive>
-                            <colgroup>
-                                <col class="trading-col--checkbox">
-                                <col>
-                            </colgroup>
-                            <tbody>
-                                <?= HtmlSanitizer::trusted($userPickRows['html']) ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="trading-roster-details__panel" data-panel-id="cash">
-                        <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="user">
-                            <tbody>
-<?= HtmlSanitizer::trusted($this->renderCashRows('userSendsCash', $cashStartYear, $cashEndYear, $seasonEndingYear, $pageData['userTeam'], $previousFormData['userSendsCash'] ?? [])) ?>
-                            </tbody>
-                        </table>
-                    </div>
+<?= HtmlSanitizer::trusted($this->renderCardHeader($userTeamId, $userTeam, $userColor1, $userColor2)) ?>
+<?= HtmlSanitizer::trusted($this->renderPlayersPanel($pageData['userPlayers'], $userTeamId, $pageData['userTeamColor1'], $pageData['userTeamColor2'], $seasonPhase, $k, $checkedItems)) ?>
+<?= HtmlSanitizer::trusted($this->renderPicksPanel($pageData['userPicks'], $k, $checkedItems)) ?>
+<?= HtmlSanitizer::trusted($this->renderCashPanel('user', 'userSendsCash', $cashStartYear, $cashEndYear, $seasonEndingYear, $pageData['userTeam'], $previousFormData['userSendsCash'] ?? [])) ?>
                 </details>
             </div>
             <div class="trading-layout__card">
+<?php $switchCounter = $k; ?>
                 <input type="hidden" name="switchCounter" value="<?= HtmlSanitizer::e($switchCounter) ?>">
-                <input type="hidden" name="listeningTeam" value="<?= HtmlSanitizer::trusted($partnerTeam) ?>">
+                <input type="hidden" name="listeningTeam" value="<?= HtmlSanitizer::safeHtmlOutput($partnerTeam) ?>">
                 <details class="trading-roster-details" open>
-                    <summary class="trading-roster-details__summary" style="<?= TableStyles::inlineTeamVars($partnerColor1, $partnerColor2) ?>">
-                        <img src="images/logo/<?= HtmlSanitizer::e($partnerTeamId) ?>.jpg" alt="<?= HtmlSanitizer::trusted($partnerTeam) ?>" class="trading-roster-details__logo">
-                        <span class="trading-roster-details__chevron"></span>
-                    </summary>
-                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($partnerColor1, $partnerColor1) ?>">
-                        <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
-                        <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
-                        <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
-                    </div>
-                    <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
-                        <table class="ibl-data-table trading-roster team-table" data-team-id="<?= HtmlSanitizer::e($partnerTeamId) ?>" style="<?= TableStyles::inlineTeamVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
-                            <colgroup>
-                                <col class="trading-col--checkbox">
-                                <col>
-                                <col class="trading-col--stat">
-                                <col class="trading-col--stat">
-                            </colgroup>
-                            <tbody>
-                                <?= HtmlSanitizer::trusted($partnerPlayerRows['html']) ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="trading-roster-details__panel" data-panel-id="picks">
-                        <table class="ibl-data-table trading-roster" data-no-responsive>
-                            <colgroup>
-                                <col class="trading-col--checkbox">
-                                <col>
-                            </colgroup>
-                            <tbody>
-                                <?= HtmlSanitizer::trusted($partnerPickRows['html']) ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="trading-roster-details__panel" data-panel-id="cash">
-                        <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="partner">
-                            <tbody>
-<?= HtmlSanitizer::trusted($this->renderCashRows('partnerSendsCash', $cashStartYear, $cashEndYear, $seasonEndingYear, $pageData['partnerTeam'], $previousFormData['partnerSendsCash'] ?? [])) ?>
-                            </tbody>
-                        </table>
-                    </div>
+<?= HtmlSanitizer::trusted($this->renderCardHeader($partnerTeamId, $partnerTeam, $partnerColor1, $partnerColor2)) ?>
+<?= HtmlSanitizer::trusted($this->renderPlayersPanel($pageData['partnerPlayers'], $partnerTeamId, $pageData['partnerTeamColor1'], $pageData['partnerTeamColor2'], $seasonPhase, $k, $checkedItems)) ?>
+<?= HtmlSanitizer::trusted($this->renderPicksPanel($pageData['partnerPicks'], $k, $checkedItems)) ?>
+<?= HtmlSanitizer::trusted($this->renderCashPanel('partner', 'partnerSendsCash', $cashStartYear, $cashEndYear, $seasonEndingYear, $pageData['partnerTeam'], $previousFormData['partnerSendsCash'] ?? [])) ?>
                 </details>
             </div>
         </div>
 <?= HtmlSanitizer::trusted($this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1)) ?>
         <div class="trading-layout__submit">
+<?php $k--; ?>
             <input type="hidden" name="fieldsCounter" value="<?= HtmlSanitizer::e($k) ?>">
             <button type="submit" class="ibl-btn ibl-btn--primary" id="trade-submit-btn" disabled>Make Trade Offer</button>
         </div>
@@ -195,17 +113,122 @@ $tradeConfig = [
     }
 
     /**
+     * Render one team card's header: the logo summary and the panel tabs.
+     * Both colors are already sanitized by the caller.
+     */
+    private function renderCardHeader(int $teamId, string $teamName, string $color1, string $color2): string
+    {
+        ob_start();
+        ?>
+                    <summary class="trading-roster-details__summary" style="<?= TableStyles::inlineTeamVars($color1, $color2) ?>">
+                        <img src="images/logo/<?= HtmlSanitizer::e($teamId) ?>.jpg" alt="<?= HtmlSanitizer::safeHtmlOutput($teamName) ?>" class="trading-roster-details__logo">
+                        <span class="trading-roster-details__chevron"></span>
+                    </summary>
+                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($color1, $color1) ?>">
+                        <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
+                        <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
+                        <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
+                    </div>
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render one team's players panel (the "Players" tab body).
+     * Colors are the raw team colors, as the table style has always received them.
+     *
+     * @param list<TradingPlayerRow> $players
+     * @param int $k Form field counter, advanced in place by buildPlayerRows
+     * @param array<string, true> $checkedItems
+     */
+    private function renderPlayersPanel(array $players, int $teamId, string $rawColor1, string $rawColor2, string $seasonPhase, int &$k, array $checkedItems): string
+    {
+        ob_start();
+        ?>
+                    <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
+                        <table class="ibl-data-table trading-roster team-table" data-team-id="<?= HtmlSanitizer::e($teamId) ?>" style="<?= TableStyles::inlineTeamVars($rawColor1, $rawColor2) ?>">
+                            <colgroup>
+                                <col class="trading-col--checkbox">
+                                <col>
+                                <col class="trading-col--stat">
+                                <col class="trading-col--stat">
+                            </colgroup>
+                            <tbody>
+                                <?= HtmlSanitizer::trusted($this->buildPlayerRows($players, $seasonPhase, $k, $checkedItems)) ?>
+                            </tbody>
+                        </table>
+                    </div>
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render one team's draft-picks panel (the "Picks" tab body).
+     *
+     * @param list<TradingDraftPickRow> $picks
+     * @param int $k Form field counter, advanced in place by buildPickRows
+     * @param array<string, true> $checkedItems
+     */
+    private function renderPicksPanel(array $picks, int &$k, array $checkedItems): string
+    {
+        ob_start();
+        ?>
+                    <div class="trading-roster-details__panel" data-panel-id="picks">
+                        <table class="ibl-data-table trading-roster" data-no-responsive>
+                            <colgroup>
+                                <col class="trading-col--checkbox">
+                                <col>
+                            </colgroup>
+                            <tbody>
+                                <?= HtmlSanitizer::trusted($this->buildPickRows($picks, $k, $checkedItems)) ?>
+                            </tbody>
+                        </table>
+                    </div>
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render one team's cash panel (the "Cash" tab body).
+     *
+     * @param array<int, int> $previousCash
+     */
+    private function renderCashPanel(string $side, string $prefix, int $cashStartYear, int $cashEndYear, int $seasonEndingYear, string $teamName, array $previousCash): string
+    {
+        ob_start();
+        ?>
+                    <div class="trading-roster-details__panel" data-panel-id="cash">
+                        <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="<?= HtmlSanitizer::e($side) ?>">
+                            <tbody>
+<?= HtmlSanitizer::trusted($this->renderCashRows($prefix, $cashStartYear, $cashEndYear, $seasonEndingYear, $teamName, $previousCash)) ?>
+                            </tbody>
+                        </table>
+                    </div>
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Build the player-name link with its thumbnail
+     */
+    private function renderPlayerCellLink(int $pid, string $rawName): string
+    {
+        $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $rawName);
+
+        return '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . HtmlSanitizer::e($pid) . '">'
+            . $resolved['thumbnail'] . HtmlSanitizer::e((string) $resolved['name']) . '</a>';
+    }
+
+    /**
      * Build HTML rows for players in the trade form
      *
      * @param list<TradingPlayerRow> $players Player rows from repository
      * @param string $seasonPhase Current season phase
-     * @param int $startK Starting form field counter
+     * @param int $k Form field counter, advanced in place by one per row
      * @param array<string, true> $checkedItems Previously checked items keyed by "type:id"
-     * @return array{html: string, nextK: int}
      */
-    private function buildPlayerRows(array $players, string $seasonPhase, int $startK, array $checkedItems = []): array
+    private function buildPlayerRows(array $players, string $seasonPhase, int &$k, array $checkedItems = []): string
     {
-        $k = $startK;
         $isOffseason = ($seasonPhase === 'Playoffs' || $seasonPhase === 'Draft' || $seasonPhase === 'Free Agency');
 
         ob_start();
@@ -213,11 +236,6 @@ $tradeConfig = [
             $pid = $row['pid'];
             $ordinal = $row['ordinal'] ?? 0;
             $contractYear = $row['cy'] ?? 0;
-            $playerPosition = HtmlSanitizer::safeHtmlOutput($row['pos']);
-            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $row['name']);
-            $playerName = HtmlSanitizer::safeHtmlOutput((string) $resolved['name']);
-            /** @var string $thumbnail */
-            $thumbnail = $resolved['thumbnail'];
 
             if ($isOffseason) {
                 $contractYear++;
@@ -247,8 +265,8 @@ $tradeConfig = [
         <input type="hidden" name="check<?= HtmlSanitizer::e($k) ?>">
     </td>
 <?php endif; ?>
-    <td class="ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= HtmlSanitizer::e($pid) ?>"><?= HtmlSanitizer::trusted($thumbnail) ?><?= HtmlSanitizer::trusted($playerName) ?></a></td>
-    <td><?= HtmlSanitizer::trusted($playerPosition) ?></td>
+    <td class="ibl-player-cell"><?= HtmlSanitizer::trusted($this->renderPlayerCellLink((int) $pid, $row['name'])) ?></td>
+    <td><?= HtmlSanitizer::safeHtmlOutput($row['pos']) ?></td>
     <td><?= HtmlSanitizer::e($contractAmount) ?></td>
 </tr>
             <?php
@@ -256,26 +274,23 @@ $tradeConfig = [
         }
         $html = (string) ob_get_clean();
 
-        return ['html' => $html, 'nextK' => $k];
+        return $html;
     }
 
     /**
      * Build HTML rows for draft picks in the trade form
      *
      * @param list<TradingDraftPickRow> $picks Draft pick rows from repository
-     * @param int $startK Starting form field counter
+     * @param int $k Form field counter, advanced in place by one per row
      * @param array<string, true> $checkedItems Previously checked items keyed by "type:id"
-     * @return array{html: string, nextK: int}
      */
-    private function buildPickRows(array $picks, int $startK, array $checkedItems = []): array
+    private function buildPickRows(array $picks, int &$k, array $checkedItems = []): string
     {
-        $k = $startK;
 
         ob_start();
         foreach ($picks as $row) {
             $pickId = $row['pickid'];
             $pickYear = $row['year'];
-            $pickTeam = HtmlSanitizer::safeHtmlOutput($row['teampick']);
             $pickTeamId = $row['teampick_id'];
             $pickRound = $row['round'];
             $pickNotes = $row['notes'];
@@ -288,13 +303,12 @@ $tradeConfig = [
         <input type="checkbox" name="check<?= HtmlSanitizer::e($k) ?>"<?= $wasPickChecked ? ' checked' : '' ?>>
     </td>
     <td class="ibl-player-cell">
-        <img src="images/logo/<?= HtmlSanitizer::trusted($pickTeam) ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+        <img src="images/logo/<?= HtmlSanitizer::safeHtmlOutput($row['teampick']) ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
         <div>
-            <?= HtmlSanitizer::e($pickYear) ?> R<?= HtmlSanitizer::e($pickRound) ?> <a href="./modules.php?name=Team&amp;op=team&amp;teamid=<?= HtmlSanitizer::e($pickTeamId) ?>" class="trading-roster__pick-link"><?= HtmlSanitizer::trusted($pickTeam) ?></a>
+            <?= HtmlSanitizer::e($pickYear) ?> R<?= HtmlSanitizer::e($pickRound) ?> <a href="./modules.php?name=Team&amp;op=team&amp;teamid=<?= HtmlSanitizer::e($pickTeamId) ?>" class="trading-roster__pick-link"><?= HtmlSanitizer::safeHtmlOutput($row['teampick']) ?></a>
 <?php if ($pickNotes !== null && $pickNotes !== ''):
-    $pickNotesEscaped = HtmlSanitizer::safeHtmlOutput($pickNotes);
 ?>
-            <div class="draft-picks-list__notes"><?= HtmlSanitizer::trusted($pickNotesEscaped) ?></div>
+            <div class="draft-picks-list__notes"><?= HtmlSanitizer::safeHtmlOutput($pickNotes) ?></div>
 <?php endif; ?>
         </div>
     </td>
@@ -304,7 +318,7 @@ $tradeConfig = [
         }
         $html = (string) ob_get_clean();
 
-        return ['html' => $html, 'nextK' => $k];
+        return $html;
     }
 
     /**
@@ -318,9 +332,9 @@ $tradeConfig = [
         ?>
 <div id="trade-roster-preview" class="trade-roster-preview" style="--preview-user-color: #<?= HtmlSanitizer::e($safeUserColor) ?>; --preview-partner-color: #<?= HtmlSanitizer::e($safePartnerColor) ?>;" hidden>
     <div class="trade-roster-preview__header">
-        <img src="images/logo/new<?= HtmlSanitizer::e($userTeamId) ?>.png" alt="<?= HtmlSanitizer::trusted($userTeam) ?>" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="<?= HtmlSanitizer::e($userTeamId) ?>">
+        <img src="images/logo/new<?= HtmlSanitizer::e($userTeamId) ?>.png" alt="<?= HtmlSanitizer::safeHtmlOutput($userTeam) ?>" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="<?= HtmlSanitizer::e($userTeamId) ?>">
         <div class="trade-roster-preview__title">Roster Preview</div>
-        <img src="images/logo/new<?= HtmlSanitizer::e($partnerTeamId) ?>.png" alt="<?= HtmlSanitizer::trusted($partnerTeam) ?>" class="trade-roster-preview__logo" data-team-id="<?= HtmlSanitizer::e($partnerTeamId) ?>">
+        <img src="images/logo/new<?= HtmlSanitizer::e($partnerTeamId) ?>.png" alt="<?= HtmlSanitizer::safeHtmlOutput($partnerTeam) ?>" class="trade-roster-preview__logo" data-team-id="<?= HtmlSanitizer::e($partnerTeamId) ?>">
     </div>
     <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($safeUserColor, $safeUserColor) ?>">
         <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
@@ -349,13 +363,12 @@ $tradeConfig = [
         ob_start();
         for ($i = $startYear; $i <= $endYear; $i++):
             $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i);
-            $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
             $prevCash = $previousCash[$i] ?? 0;
             ?>
                 <tr>
                     <td>
-                        <input type="number" name="<?= HtmlSanitizer::safeHtmlOutput($prefix) ?><?= HtmlSanitizer::e($i) ?>" value="<?= HtmlSanitizer::e($prevCash) ?>" min="0" max="2000" aria-label="<?= HtmlSanitizer::safeHtmlOutput($teamName) ?> cash for <?= HtmlSanitizer::trusted($yearLabelEscaped) ?>">
-                        for <?= HtmlSanitizer::trusted($yearLabelEscaped) ?>
+                        <input type="number" name="<?= HtmlSanitizer::safeHtmlOutput($prefix) ?><?= HtmlSanitizer::e($i) ?>" value="<?= HtmlSanitizer::e($prevCash) ?>" min="0" max="2000" aria-label="<?= HtmlSanitizer::safeHtmlOutput($teamName) ?> cash for <?= HtmlSanitizer::safeHtmlOutput($yearLabel) ?>">
+                        for <?= HtmlSanitizer::safeHtmlOutput($yearLabel) ?>
                     </td>
                 </tr>
         <?php endfor;

@@ -107,7 +107,53 @@ class ExtensionViewTest extends TestCase
         self::assertStringNotContainsString('ibl-alert', $teamView->render($this->createPageData(null, $msg)));
     }
 
-    public function testExtensionViewIsStateFreeAndEscapesAllDynamicOutput(): void
+    #[DataProvider('markupPayloadProvider')]
+    public function testMsgIsHtmlEscapedForEveryResult(string $result, string $prefix, string $suffix): void
+    {
+        $payload = '<script>alert(1)</script> & <b>';
+        $escaped = '&lt;script&gt;alert(1)&lt;/script&gt; &amp; &lt;b&gt;';
+
+        $output = $this->view->renderResultBanner($result, $payload);
+
+        self::assertSame($prefix . $escaped . $suffix, $output);
+        self::assertStringNotContainsString('<script>', $output);
+    }
+
+    /**
+     * @return array<string, array{string, string, string}>
+     */
+    public static function markupPayloadProvider(): array
+    {
+        return [
+            'error' => ['extension_error', '<div class="ibl-alert ibl-alert--error">', self::ERROR_SUFFIX . '</div>'],
+            'accepted' => ['extension_accepted', '<div class="ibl-alert ibl-alert--success"><strong>Player response:</strong> ', self::ACCEPTED_NOTE . '</div>'],
+            'rejected' => ['extension_rejected', '<div class="ibl-alert ibl-alert--info"><strong>Player response:</strong> ', self::REJECTED_NOTE . '</div>'],
+        ];
+    }
+
+    public function testOutputIgnoresRequestAndSessionState(): void
+    {
+        $saved = [$_GET, $_POST, $_REQUEST, $_SESSION ?? null];
+        $_GET = $_POST = $_REQUEST = ['msg' => 'POISON', 'result' => 'extension_accepted'];
+        $_SESSION = ['msg' => 'POISON', 'loggedInTeamID' => 99];
+
+        try {
+            self::assertSame(
+                '<div class="ibl-alert ibl-alert--info"><strong>Player response:</strong> Not enough.' . self::REJECTED_NOTE . '</div>',
+                $this->view->renderResultBanner('extension_rejected', 'Not enough.')
+            );
+            self::assertSame('', $this->view->renderResultBanner(null, null));
+        } finally {
+            [$_GET, $_POST, $_REQUEST] = $saved;
+            if ($saved[3] === null) {
+                unset($_SESSION);
+            } else {
+                $_SESSION = $saved[3];
+            }
+        }
+    }
+
+    public function testExtensionViewHoldsNoStateAndExposesOnlyRenderResultBanner(): void
     {
         $rc = new \ReflectionClass(ExtensionView::class);
 
@@ -122,20 +168,6 @@ class ExtensionViewTest extends TestCase
             )
         ));
         self::assertSame(['renderResultBanner'], $publicMethods);
-
-        $src = file_get_contents((string) $rc->getFileName());
-        self::assertIsString($src);
-
-        foreach (['mysqli', '$_SESSION', '$_GET', '$_POST', '$_REQUEST', '$loggedInTeamID', 'ob_start', 'new '] as $token) {
-            self::assertFalse(str_contains($src, $token), "ExtensionView must not contain `$token`");
-        }
-
-        $body = (string) preg_replace('/^.*function renderResultBanner\(.*$/m', '', $src);
-        $msgRefs = preg_match_all('/\$msg\b/', $body);
-        $escapedRefs = preg_match_all('/HtmlSanitizer::e\(\$msg/', $body);
-
-        self::assertGreaterThanOrEqual(1, $msgRefs);
-        self::assertSame($msgRefs, $escapedRefs, 'every $msg reference must sit inside HtmlSanitizer::e(');
     }
 
     /**

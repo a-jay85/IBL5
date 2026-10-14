@@ -58,7 +58,7 @@ def _fixture(**over):
         "pr_meta": {
             "number": 9999,
             "title": "fix: synthetic",
-            "body": "## Manual Testing\n\nNo manual testing needed\n",
+            "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
             "headRefOid": "deadbeef",
         },
         "labels": [],

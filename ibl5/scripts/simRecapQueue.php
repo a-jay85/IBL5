@@ -90,35 +90,6 @@ function collectRecentThemes(\SimRecap\SimSummaryRepository $repo): array
     return $themes;
 }
 
-/**
- * Team name → Discord snowflake, as STRINGS. Teams with no id are omitted
- * entirely so the prompt's plain-team-name fallback fires on a missing key
- * and no "<@null>" can ever be built.
- *
- * The snowflake is emitted as a JSON string, never a bare JSON number: a bare
- * number round-trips only under jq >= 1.7 with no arithmetic, and corrupts under
- * jq <= 1.6 (IEEE-754) or any other consumer. The (string) cast removes every
- * such case at once — and is a string cast, not an integer cast, so it leaves
- * the single pinned numeric conversion on --sim untouched.
- *
- * @return array<string, string>
- */
-function buildMentionMap(\mysqli $db): array
-{
-    $teams = new \Repositories\TeamIdentityRepository($db);
-    $map = [];
-    foreach ($teams->getAllRealTeams() as $team) {
-        $name = $team['team_name'];
-        $id = $teams->getTeamDiscordID($name);
-        if ($id === null) {
-            continue;
-        }
-        $map[$name] = (string) $id;
-    }
-
-    return $map;
-}
-
 // ── Argv parse — positional verb, then flags (mirrors bug-pipeline/transition.php).
 //    Runs entirely before any repository is constructed.
 $verb = null;
@@ -204,7 +175,8 @@ switch ($verb) {
         break;
 
     case 'mention-map':
-        $out = ['ok' => true, 'cmd' => 'mention-map', 'teams' => buildMentionMap($db)];
+        $mentionMap = new \SimRecap\MentionMapBuilder(new \Repositories\TeamIdentityRepository($db));
+        $out = ['ok' => true, 'cmd' => 'mention-map', 'teams' => $mentionMap->build()];
         break;
 
     default:

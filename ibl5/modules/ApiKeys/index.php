@@ -12,11 +12,14 @@ declare(strict_types=1);
  * @see ApiKeys\ApiKeysView For HTML rendering
  */
 
-if (stripos($_SERVER['PHP_SELF'], 'modules.php') === false) {
+$phpSelf = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelf) ? $phpSelf : '', 'modules.php') === false) {
     die("You can't access this file directly...");
 }
 
 global $mysqli_db, $user, $authService;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 
 $httpRequest = \Http\HttpRequest::fromGlobals();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : 'main';

@@ -83,6 +83,7 @@ final class RecordAnnouncementRepository extends \Database\BaseMysqliRepository
 
         /** @var list<array{game_date: string}> $rows */
         $rows = $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (SELECT DISTINCT game_date makes game_date unique, so the order is total)
             "SELECT DISTINCT game_date FROM `ibl_box_scores` WHERE game_date > ? AND game_date <= ? ORDER BY game_date ASC",
             'ss',
             $floor,

@@ -24,6 +24,11 @@ Usage: bin/check-pr-checks-green --repo=<owner/repo> --sha=<40-hex> [options]
   --wait                   Poll until settled or deadline. Without it: one shot.
   --interval-seconds=<n>   Poll interval (default 60).
   --timeout-seconds=<n>    Deadline for --wait (default 2400). Hitting it FAILS.
+  --base-ref=<branch>      PR base branch. Not master/develop -> FAIL at once
+                           (exit 1) with a stacked-base message, before any API call.
+                           Omitted: no base check (today's behavior).
+  --startup-grace-seconds=<n>  Sleep before the first poll (default 0). Skipped on
+                           a stacked-base FAIL; not counted against the deadline.
   --help, -h
 
 Every value flag takes the --key=value form; the space form is an unknown flag.
@@ -46,7 +51,8 @@ Environment:
                    Unset or empty means no self-exclusion.
 
 Exit codes: 0 = every non-ignored check settled in {success, skipped, neutral};
-            1 = a check failed, a check is still pending (one-shot), or the deadline
+            1 = a check failed, the base is stacked (--base-ref), a check is still
+                pending (one-shot), or the deadline
                 hit with checks still pending (fail-closed);
             2 = usage error, unparseable API response.
 EOF
@@ -60,6 +66,14 @@ ANCHOR=""
 WAIT=0
 INTERVAL=60
 TIMEOUT=2400
+BASE_REF=""
+BASE_REF_SET=0
+GRACE=0
+# Bases whose PRs run the full CI suite. Mirrors `branches: [ master, develop ]`
+# in .github/workflows/tests.yml and .github/workflows/pr-meta-checks.yml. A PR on
+# any other base never receives the Tests and Analysis / E2E Tests / Meta checks
+# anchors, so waiting for them only burns the deadline.
+MASTER_LIKE_BASES="master develop"
 
 for arg in "$@"; do
     case "$arg" in
@@ -72,6 +86,8 @@ for arg in "$@"; do
         --wait)               WAIT=1 ;;
         --interval-seconds=*) INTERVAL="${arg#--interval-seconds=}" ;;
         --timeout-seconds=*)  TIMEOUT="${arg#--timeout-seconds=}" ;;
+        --base-ref=*)         BASE_REF="${arg#--base-ref=}"; BASE_REF_SET=1 ;;
+        --startup-grace-seconds=*) GRACE="${arg#--startup-grace-seconds=}" ;;
         --*)
             echo "unknown flag: $arg" >&2
             usage >&2
@@ -96,6 +112,29 @@ fi
 if ! [[ "$INTERVAL" =~ ^[0-9]+$ ]] || ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]]; then
     echo "invalid --interval-seconds/--timeout-seconds: must be non-negative integers" >&2
     exit 2
+fi
+if ! [[ "$GRACE" =~ ^[0-9]+$ ]]; then
+    echo "invalid --startup-grace-seconds: must be a non-negative integer" >&2
+    exit 2
+fi
+if [ "$BASE_REF_SET" -eq 1 ]; then
+    if ! [[ "$BASE_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$BASE_REF" == -* ]] \
+            || [[ "$BASE_REF" == *..* ]]; then
+        echo "invalid --base-ref: '$BASE_REF' (want a branch name)" >&2
+        exit 2
+    fi
+    case " $MASTER_LIKE_BASES " in
+        *" $BASE_REF "*) ;;
+        *)
+            {
+                echo "FAIL: stacked on $BASE_REF: this PR's base is '$BASE_REF', not master."
+                echo "Full CI (Tests and Analysis, E2E Tests, Meta checks) runs only on PRs based on master, so those anchors never report here."
+                echo "After the parent PR merges and GitHub retargets this PR to master, push (merge or rebase onto origin/master) so CI starts."
+                echo "A 'gh run rerun' does not help: it replays the old event, which still carries base '$BASE_REF'."
+            } >&2
+            exit 1
+            ;;
+    esac
 fi
 
 # Sourced only after --help and flag validation, so --help works with no jq on PATH.
@@ -145,6 +184,13 @@ poll_once() {
     LINE="PASS: $total check-run(s) settled green on $SHA (anchors settled: ${ANCHOR_LIST:-<none>}) (ignored: ${IGNORED_LIST:-<none>})"
 }
 
+# Startup grace: give sibling workflows time to register their check-runs before
+# the first poll. Slept after the base check, so a stacked PR fails in seconds,
+# and before START, so the grace never eats into --timeout-seconds (the workflow
+# used to sleep outside the script, and the deadline is unchanged from then).
+if [ "$GRACE" -gt 0 ]; then
+    sleep "$GRACE"
+fi
 API_ERRORS=0
 START=$SECONDS
 while :; do

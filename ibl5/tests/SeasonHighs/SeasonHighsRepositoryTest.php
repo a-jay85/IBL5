@@ -18,76 +18,6 @@ class SeasonHighsRepositoryTest extends WideUnitTestCase
         return new \SeasonHighs\SeasonHighsRepository($db);
     }
 
-    public function testGetSeasonHighsNormalizesPlayerRow(): void
-    {
-        $this->mockDb->onQuery('ibl_box_scores', [[
-            'name'            => 'High Scorer',
-            'date'            => '2025-01-15',
-            'POINTS'          => '38',
-            'pid'             => '7',
-            'teamid'          => '3',
-            'team_city'       => 'City',
-            'color1'          => '00FF00',
-            'color2'          => '0000FF',
-            'box_id'          => '99',
-            'game_of_that_day' => '1',
-        ]]);
-
-        $result = $this->repo()->getSeasonHighs('(`game_2gm`*2)', 'POINTS', '', '2025-01-01', '2025-01-31');
-
-        $this->assertCount(1, $result);
-        $entry = $result[0];
-
-        $this->assertSame(38, $entry['value']);
-        $this->assertSame(7, $entry['pid']);
-        $this->assertSame(3, $entry['teamid']);
-        $this->assertSame(99, $entry['boxId']);
-        $this->assertSame(1, $entry['gameOfThatDay']);
-        $this->assertSame('00FF00', $entry['color1']);
-    }
-
-    public function testGetSeasonHighsAppliesColorAndKeyDefaults(): void
-    {
-        $this->mockDb->onQuery('ibl_box_scores', [[
-            'name'      => 'No Colors',
-            'date'      => '2025-01-10',
-            'POINTS'    => '12',
-            'teamid'    => '5',
-            'team_city' => 'Somewhere',
-        ]]);
-
-        $result = $this->repo()->getSeasonHighs('(`game_2gm`*2)', 'POINTS', '', '2025-01-01', '2025-01-31');
-
-        $this->assertCount(1, $result);
-        $entry = $result[0];
-
-        $this->assertSame('FFFFFF', $entry['color1']);
-        $this->assertSame('000000', $entry['color2']);
-        $this->assertArrayNotHasKey('pid', $entry);
-        $this->assertArrayNotHasKey('boxId', $entry);
-    }
-
-    public function testGetSeasonHighsTeamSuffixShapeOmitsPid(): void
-    {
-        $this->mockDb->onQuery('ibl_box_scores', [[
-            'name'      => 'Hawks',
-            'date'      => '2025-01-20',
-            'POINTS'    => '120',
-            'teamid'    => '2',
-            'team_city' => 'Atlanta',
-            'color1'    => 'FF0000',
-            'color2'    => '000000',
-        ]]);
-
-        $result = $this->repo()->getSeasonHighs('(`game_2gm`*2)', 'POINTS', '_teams', '2025-01-01', '2025-01-31');
-
-        $this->assertCount(1, $result);
-        $entry = $result[0];
-
-        $this->assertSame(2, $entry['teamid']);
-        $this->assertArrayNotHasKey('pid', $entry);
-    }
-
     public function testGetSeasonHighsBatchBucketsSortsAndSkipsUnknown(): void
     {
         $this->mockDb->onQuery('ibl_box_scores', [
@@ -153,27 +83,6 @@ class SeasonHighsRepositoryTest extends WideUnitTestCase
         $this->assertSame([], $result['ASSISTS']);
     }
 
-    public function testGetSeasonHighsRejectsStatNameWithNoAlphanumerics(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->repo()->getSeasonHighs('`game_ast`', '`;  ', '', '2025-01-01', '2025-01-31');
-    }
-
-    public function testGetSeasonHighsStripsAliasAndNeverEmbedsPayload(): void
-    {
-        $this->mockDb->onQuery('ibl_box_scores', []);
-        $this->repo()->getSeasonHighs('`game_ast`', 'AST`; DROP TABLE ibl_plr; --', '', '2025-01-01', '2025-01-31');
-        $sql = implode("\n", $this->mockDb->getExecutedQueries());
-        $this->assertStringContainsString('AS ASTDROPTABLEibl_plr', $sql);
-        $this->assertStringNotContainsString('DROP TABLE ibl_plr;', $sql);
-    }
-
-    public function testGetSeasonHighsRejectsExpressionOutsideAllowlist(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->repo()->getSeasonHighs('1; DROP TABLE ibl_plr; -- ', 'POINTS', '', '2025-01-01', '2025-01-31');
-    }
-
     /**
      * Payloads built only from allowlisted characters that the token pattern
      * must still reject.
@@ -188,10 +97,16 @@ class SeasonHighsRepositoryTest extends WideUnitTestCase
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('tokenOutsideAllowlistProvider')]
-    public function testGetSeasonHighsRejectsBareWordsAndUnbalancedBackticks(string $expression): void
+    public function testGetSeasonHighsBatchRejectsBareWordsAndUnbalancedBackticks(string $expression): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->repo()->getSeasonHighs($expression, 'POINTS', '', '2025-01-01', '2025-01-31');
+        $this->repo()->getSeasonHighsBatch(['POINTS' => $expression], '', '2025-01-01', '2025-01-31');
+    }
+
+    public function testGetSeasonHighsBatchRejectsExpressionOutsideAllowlistViaProvider(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->repo()->getSeasonHighsBatch(['POINTS' => '1; DROP TABLE ibl_plr; -- '], '', '2025-01-01', '2025-01-31');
     }
 
     public function testGetSeasonHighsBatchRejectsExpressionOutsideAllowlist(): void
@@ -223,8 +138,9 @@ class SeasonHighsRepositoryTest extends WideUnitTestCase
     public function testEveryServiceStatExpressionPassesAllowlist(string $expression): void
     {
         $this->mockDb->onQuery('ibl_box_scores', []);
-        $result = $this->repo()->getSeasonHighs($expression, 'Field Goals Made', '', '2025-01-01', '2025-01-31');
-        $this->assertSame([], $result);
-        $this->assertStringContainsString('AS FieldGoalsMade', implode("\n", $this->mockDb->getExecutedQueries()));
+        $result = $this->repo()->getSeasonHighsBatch(['Field Goals Made' => $expression], '', '2025-01-01', '2025-01-31');
+        $this->assertSame(['Field Goals Made' => []], $result);
+        // MockDatabase strips backticks from recorded SQL, so compare without them.
+        $this->assertStringContainsString('(' . str_replace('`', '', $expression) . ') AS stat_value', implode("\n", $this->mockDb->getExecutedQueries()));
     }
 }

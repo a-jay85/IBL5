@@ -221,6 +221,19 @@
 #                              after implementation.
 #                              A mention inside a backtick code span, or inside a
 #                              fenced fixture block, is not a marker and is skipped.
+#   RO (run-only) marker     — a `(run-only)` matrix marker (any PHPUnit / API-test /
+#                              E2E / Visual-regression row) sits directly after the
+#                              row's planned test token, names a path that exists on
+#                              the base branch, is not also marked (no-change), and
+#                              is not a must-appear ## Critical Files entry. The
+#                              post-plan harness honors it nowhere else, and a
+#                              misplaced one is a silent no-op that holds arming
+#                              condition (3) after implementation. Warns (never
+#                              fails) when a phase line pairs the token with an
+#                              edit verb, and when an unmarked test row names a
+#                              path that exists on the base branch but no phase
+#                              line or Critical Files entry cites. No resolvable
+#                              base ref fails OPEN for the existence checks only.
 #   ND **No diff:** marker   — a `**No diff:** <reason>` phase marker sits inside a
 #                              `## Phase N:` / `## Step N:` body with a reason of 15+
 #                              characters. The post-plan harness honors it nowhere
@@ -1279,6 +1292,109 @@ while IFS= read -r row; do
 done < "$GATEP_MATRIX"
 
 # ---------------------------------------------------------------------------
+# Gate RO: the `(run-only)` matrix marker (tools/postplan-harness/harness/planfile.py
+# parse_run_only_test_paths + conformance.check). It exempts the row's token from the
+# Phase 5.0 `MISSING:` item, so this gate makes sure the marker can only sit on a row
+# that RUNS an existing test. Checks, in order:
+#   1. the row has a whole-cell planning type (PHPUnit / API-test / E2E /
+#      Visual-regression) — a CLI row plans nothing and the marker is a no-op there;
+#   2. the marker is directly after a backticked token, and that token is the row's
+#      planned test token (first backticked test|spec token), so the harness and the
+#      author agree on which path is exempted;
+#   3. the same row does not also carry a bare `(no-change)` — one marker per token;
+#   4. the token exists on the base branch (git cat-file -e <ref>:<path>; dirs pass);
+#   5. the token is not a MUST_APPEAR ## Critical Files entry (that entry says the
+#      diff must touch it; the marker says it will not).
+# Warnings (never violations), because plan prose cannot prove an edit either way:
+#   6. a `## Phase N` / `## Step N` body line cites the token in backticks together
+#      with an edit verb;
+#   7. an UNMARKED planning row names a path that exists on the base branch, and no
+#      phase/step body line or Critical Files entry cites it — the author may have
+#      meant (run-only), or may have forgotten to name the edit in a phase.
+# Reference tree: CHECK_PLAN_MASTER_REF when set (test seam), else the first of
+# origin/master, master, HEAD that resolves (same chain as gate A). No resolvable
+# ref fails OPEN for checks 4 and 7 only; checks 1-3 and 5 still run.
+# ---------------------------------------------------------------------------
+_ro_ref=""
+if [ -n "${CHECK_PLAN_MASTER_REF:-}" ]; then
+    _ro_cands="$CHECK_PLAN_MASTER_REF"
+else
+    _ro_cands="origin/master master HEAD"
+fi
+for _ro_c in $_ro_cands; do
+    if git -C "$REPO_ROOT" rev-parse --verify -q "${_ro_c}^{commit}" >/dev/null 2>&1; then
+        _ro_ref="$_ro_c"
+        break
+    fi
+done
+_ro_on_base() {  # $1 = repo-relative path (file or directory)
+    [ -n "$_ro_ref" ] || return 0   # fail open: nothing to compare against
+    git -C "$REPO_ROOT" cat-file -e "${_ro_ref}:${1%/}" 2>/dev/null
+}
+_ro_must_appear="$(cf_parse_section "$PLAN_FILE" | sed -n 's/^MUST_APPEAR://p')"
+# Phase/step body lines (fence-stripped) for checks 6 and 7.
+_ro_phase_lines="$(awk '
+    /^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]/ { inp = 1; next }
+    /^##[[:space:]]/ { inp = 0 }
+    inp { print }
+' "$GATEP_BODY")"
+_ro_cf_lines="$(cf_section_named "$PLAN_FILE" "Critical Files")"
+_ro_edit_verbs='(edit|extend|modify|modif|update|rewrite|change|append|insert|replace|add|create|write|delete|remove|rename)'
+while IFS= read -r row; do
+    [ -n "$row" ] || continue
+    bare=$(sed 's/`[^`]*`//g' <<< "$row")
+    has_ro=0; grep -qiF '(run-only)' <<< "$bare" && has_ro=1
+    has_nc=0; grep -qiF '(no-change)' <<< "$bare" && has_nc=1
+    # Whole-cell planning type, same awk as gate X but for all four labels.
+    if ! awk -F'|' '
+        { for (i = 1; i <= NF; i++) { c = tolower($i); gsub(/^[[:space:]*`_]+|[[:space:]*`_]+$/, "", c)
+          if (c ~ /^(phpunit|api.?test|e2e|visual-?regression)([[:space:]]*\(|[[:space:]]*[+\/,&]|-analogue|[[:space:]]+db-integration|$)/) found = 1 } }
+        END { exit found ? 0 : 1 }' <<< "$row"; then
+        if [ "$has_ro" -eq 1 ]; then
+            viol "[RO] (run-only) marker on a row with no PHPUnit / API-test / E2E / Visual-regression type cell — the harness plans no test from this row, so the marker is a no-op; drop it: ${row}"
+        fi
+        continue
+    fi
+    planned=$(grep -oE '`[^`]*(test|spec|Test)[^`]*`' <<< "$row" | head -1 | tr -d '`')
+    [ -n "$planned" ] || continue
+    if [ "$has_ro" -eq 1 ]; then
+        if ! grep -qiE '`[[:space:]]*\(run-only\)' <<< "$row"; then
+            viol "[RO] (run-only) marker is not directly after the row's backticked test token — the harness honors only the shape \`path\` (run-only): ${row}"
+            continue
+        fi
+        marked=$(sed -nE 's/.*`([^`]+)`[[:space:]]*\([Rr][Uu][Nn]-[Oo][Nn][Ll][Yy]\).*/\1/p' <<< "$row")
+        if [ "$marked" != "$planned" ]; then
+            viol "[RO] (run-only) follows \`${marked}\` but the row's planned test token is \`${planned}\` — the harness exempts only the first test|spec token; move the marker: ${row}"
+            continue
+        fi
+        if [ "$has_nc" -eq 1 ]; then
+            viol "[RO] row carries both (run-only) and (no-change) — one marker per token; keep (no-change) for an untouched Visual-regression baseline, (run-only) for a test that is run but not written: ${row}"
+            continue
+        fi
+        if ! _ro_on_base "$planned"; then
+            viol "[RO] (run-only) path \`${planned}\` does not exist on ${_ro_ref} — a run-only row can only run a test that already exists; write the test (drop the marker) or fix the path: ${row}"
+            continue
+        fi
+        if grep -qxF -- "$planned" <<< "$_ro_must_appear"; then
+            viol "[RO] (run-only) path \`${planned}\` is a must-appear ## Critical Files entry — the entry says the diff must touch it, the marker says it will not; mark the entry (reference) or drop (run-only): ${row}"
+            continue
+        fi
+        if grep -iE "\`${planned}\`" <<< "$_ro_phase_lines" | grep -qiE "\\b${_ro_edit_verbs}" ; then
+            warn "[RO] warning: (run-only) path \`${planned}\` appears on a phase line with an edit verb — if that phase edits the file, drop (run-only); if it only runs it, reword the line"
+        fi
+        continue
+    fi
+    # Unmarked planning row (check 7): existing-on-base path that nothing else cites.
+    [ "$has_nc" -eq 1 ] && continue
+    [ -n "$_ro_ref" ] || continue
+    _ro_on_base "$planned" || continue
+    if ! grep -qF -- "\`${planned}\`" <<< "$_ro_phase_lines" \
+       && ! grep -qF -- "\`${planned}\`" <<< "$_ro_cf_lines"; then
+        warn "[RO] warning: unmarked test row names \`${planned}\`, which exists on ${_ro_ref}, and no phase line or Critical Files entry cites it — Phase 5.0 will emit MISSING unless the diff touches it; add (run-only) if the plan only runs it, or cite the edit in a phase"
+    fi
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
 # Gate Y: the `(one-time-check: <reason>)` matrix tag. bin/lib/plan-matrix-assertions
 # skips a tagged row instead of reporting UNREALISED-ASSERTION, and ignores the tag
 # fail-closed when it is malformed, so a bad tag silently re-arms the gate the author
@@ -1318,28 +1434,93 @@ fi
 
 # ---------------------------------------------------------------------------
 # Gate Z: an untagged CLI-executable row whose command runs only outside the repo
-# (~/, $HOME, /tmp) or against a post-PR CI run (gh run|pr|api). The diff cannot carry
-# such a row's tokens, so bin/lib/plan-matrix-assertions reports UNREALISED-ASSERTION
-# at Step 6.7 and the implementation never hands off. The (one-time-check: ...) tag is
-# the release; make the planner write it now. A row that also runs a repo path or a
-# repo-exercising command (composer, php, npx, docker, curl) is in-repo and exempt. Tag
-# shape, reason length, and type mismatches stay with gate Y above.
+# or against a post-PR CI run. Two arms, checked in order:
+#  (1) ~/, $HOME, /tmp, or gh run|pr|api. A row that also runs a repo path or a
+#      repo-exercising command (composer, php, npx, docker, curl) is exempt.
+#  (2) only when (1) did not match: a $VAR/, "$VAR/" or ${VAR}/ path whose VAR is
+#      not a repo-root name (_z_root). Exempt when the row also matches _z_in, or a
+#      variable is followed by a repo top dir ($T/bin/, the temp-copy mutation
+#      shape, _z_varin). Arm (1) never takes the _z_varin exemption.
+# The diff cannot carry such a row's tokens, so bin/lib/plan-matrix-assertions
+# reports UNREALISED-ASSERTION at Step 6.7 and the implementation never hands off.
+# The (one-time-check: ...) tag releases both arms. Tag shape, reason length, and
+# type mismatches stay with gate Y above.
 # ---------------------------------------------------------------------------
 _z_b='(^|[^A-Za-z0-9_./~-])'
 _z_out="${_z_b}(~/|\\\$HOME/|\\\$\\{HOME\\}|/tmp/|/private/tmp/)"
 _z_gh="${_z_b}gh[[:space:]]+(run|pr|api)([[:space:]]|\$)"
 _z_in="${_z_b}(bin|ibl5|tools|\\.claude|\\.github|vendor|e2e|tests)/|(^|/)IBL5(-worktrees)?/|${_z_b}(composer|php|npx|docker|curl)([[:space:]]|\$)"
+_z_var='\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/'
+_z_varin='\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/(bin|ibl5|tools|\.claude|\.github|vendor|e2e|tests)/'
+_z_root='^(ROOT|REPO|REPO_ROOT|WT|MAIN|PWD|SCRIPT_DIR|TOP|GITHUB_WORKSPACE)$'
 while IFS= read -r row; do
     matrix_split "$row" || continue
     [ "$MC_NUM" != "#" ] || continue
     [ "$MC_TYPE" = "CLI-executable" ] || continue
     _z_what="${MC_WHAT//$MSEN/|}"
     grep -qE '`[^`[:space:]]+`' <<< "$_z_what" || continue
-    grep -qE "$_z_out|$_z_gh" <<< "$MC_LOC" || continue
-    grep -qE "$_z_in" <<< "$MC_LOC" && continue
+    if grep -qE "$_z_out|$_z_gh" <<< "$MC_LOC"; then
+        grep -qE "$_z_in" <<< "$MC_LOC" && continue
+        grep -qE "$_y_shape" <<< "$_z_what" && continue
+        viol "[Z] row runs only outside the repo (~/, \$HOME, /tmp) or against a post-PR CI run (gh run|pr|api) and carries no one-time-check tag; the diff cannot carry its tokens and Step 6.7 stops on it. End the What-to-verify cell with '(one-time-check: <what was run and what it printed>)', or make the command also run a repo bin/ script or test: ${row}"
+        continue
+    fi
+    _z_v=""
+    while IFS= read -r _z_m; do
+        _z_n="${_z_m#\$}"; _z_n="${_z_n#\{}"; _z_n="${_z_n%/}"; _z_n="${_z_n%\}}"
+        grep -qE "$_z_root" <<< "$_z_n" && continue
+        _z_v="$_z_n"; break
+    done < <(grep -oE "$_z_var" <<< "$MC_LOC")
+    [ -n "$_z_v" ] || continue
+    grep -qE "$_z_in|$_z_varin" <<< "$MC_LOC" && continue
     grep -qE "$_y_shape" <<< "$_z_what" && continue
-    viol "[Z] row runs only outside the repo (~/, \$HOME, /tmp) or against a post-PR CI run (gh run|pr|api) and carries no one-time-check tag; the diff cannot carry its tokens and Step 6.7 stops on it. End the What-to-verify cell with '(one-time-check: <what was run and what it printed>)', or make the command also run a repo bin/ script or test: ${row}"
+    viol "[Z] row reaches files only through a shell variable that is not a repo-root name (ROOT, REPO, REPO_ROOT, WT, MAIN, PWD, SCRIPT_DIR, TOP, GITHUB_WORKSPACE) and carries no one-time-check tag; the diff cannot carry its tokens and Step 6.7 stops on it. End the What-to-verify cell with '(one-time-check: <what was run and what it printed>)', or make the command also run a repo bin/ script or test; offending variable \$${_z_v}: ${row}"
 done < "$MATRIX_FILE"
+
+# ---------------------------------------------------------------------------
+# Gate MT: a What-to-verify backtick token bin/lib/plan-matrix-assertions can never
+# realise, so Step 6.7 stops with UNREALISED-ASSERTION after implementation.
+#  (1) `<path>:NN` / `<path>:NN-NN`: arm 2c (_path_realised) needs a whole path or a
+#      /-aligned suffix, so the :LINE suffix makes the token unmatchable. Host:port
+#      tokens (`<name>.localhost:8080`, `iblhoops.net:443`) are exempt by extension.
+#  (2) a bare word equal to the stem of a tracked *-snapshots/*.png: it never enters
+#      arm 2c, and arm 3 saves it only when git grep finds it in tracked text, so it is
+#      rejected only when that grep finds nothing.
+# Rows come from $GATEP_MATRIX (fence-aware). A row ending in the one-time-check tag is
+# skipped, as the helper skips it. Text from the first `Mutation:` label on is ignored,
+# mirroring the helper's blanking (it under-rejects; accepted). A `name=value` token is
+# cut at `=`, as the helper cuts it. CHECK_PLAN_MT_GIT_ROOT is a test seam naming the
+# repo whose snapshots and tracked text rule (2) reads; unset or empty means $REPO_ROOT.
+# Outside a git repo the snapshot list is empty and rule (2) is skipped; rule (1) needs
+# no git and always runs.
+# ---------------------------------------------------------------------------
+_mt_root="${CHECK_PLAN_MT_GIT_ROOT:-$REPO_ROOT}"
+_mt_line_re='^[A-Za-z0-9_./-]+\.([A-Za-z][A-Za-z0-9]*):[0-9]+(-[0-9]+)?$'
+_mt_host_ext_re='^(localhost|local|test|com|net|org|io|dev)$'
+_mt_stem_re='^[A-Za-z0-9_-]+$'
+_mt_snaps=$(git -C "$_mt_root" ls-files 2>/dev/null | grep -E -- '-snapshots/.*\.png$' || true)
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    _mt_what="${MC_WHAT//$MSEN/|}"
+    grep -qE "$_y_shape" <<< "$_mt_what" && continue
+    _mt_what="${_mt_what%%Mutation:*}"
+    while IFS= read -r _mt_tok; do
+        _mt_tok="${_mt_tok#\`}"; _mt_tok="${_mt_tok%\`}"; _mt_tok="${_mt_tok%%=*}"
+        [ -n "$_mt_tok" ] || continue
+        if [[ "$_mt_tok" =~ $_mt_line_re ]]; then
+            [[ "${BASH_REMATCH[1]}" =~ $_mt_host_ext_re ]] && continue
+            viol "[MT] matrix token \`${_mt_tok}\` ends in a :LINE suffix; bin/lib/plan-matrix-assertions matches only a whole path or a /-aligned path suffix, so the row stays UNREALISED and Step 6.7 stops. Cite the bare path \`${_mt_tok%:*}\` and put the line number in prose outside backticks: ${row}"
+            continue
+        fi
+        [ -n "$_mt_snaps" ] || continue
+        [[ "$_mt_tok" =~ $_mt_stem_re ]] || continue
+        _mt_snap=$(grep -E -- "/${_mt_tok}\.png\$" <<< "$_mt_snaps" | head -n 1 || true)
+        [ -n "$_mt_snap" ] || continue
+        git -C "$_mt_root" grep -qF -e "$_mt_tok" -- ':(exclude)*.png' 2>/dev/null && continue
+        viol "[MT] matrix token \`${_mt_tok}\` is the stem of ${_mt_snap} and appears in no tracked text file, so bin/lib/plan-matrix-assertions can never realise it and Step 6.7 stops. Cite the snapshot path \`${_mt_snap}\` or the name of the test that writes it: ${row}"
+    done < <(grep -oE '`[^`[:space:]]+`' <<< "$_mt_what" || true)
+done < "$GATEP_MATRIX"
 
 # ---------------------------------------------------------------------------
 # Gate ND: a `**No diff:** <reason>` phase marker. The post-plan harness reads it only

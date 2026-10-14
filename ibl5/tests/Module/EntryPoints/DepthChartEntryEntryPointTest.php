@@ -13,7 +13,7 @@ use PHPUnit\Framework\Attributes\PreserveGlobalState;
  * static cache. Each test runs in a separate process.
  *
  * Skipped:
- * - op=submit (POST handler with redirect) — covered by E2E flows.
+ * - op=submit success path (POST + PRG redirect) — covered by E2E flows; the auth and team gates are pinned below.
  * - op=api with JSON body via php://input — runModule() doesn't support
  *   raw-body injection. GET-style api() is tested instead.
  */
@@ -79,5 +79,152 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
         ]);
 
         $this->assertNotSame('', $output);
+    }
+
+    /**
+     * Authenticate with a username (authenticateAs() leaves getUsername() null, which
+     * TeamIdentityRepository::getTeamnameFromUsername() maps to Free Agents).
+     */
+    private function authenticateWithUsername(string $username): void
+    {
+        $authStub = self::createStub(\Auth\Contracts\AuthServiceInterface::class);
+        $authStub->method('isAuthenticated')->willReturn(true);
+        $authStub->method('isAdmin')->willReturn(false);
+        $authStub->method('getUsername')->willReturn($username);
+        $authStub->method('getCookieArray')->willReturn([$username, $username, '']);
+        $GLOBALS['authService'] = $authStub;
+        $GLOBALS['user'] = base64_encode("{$username}:{$username}:");
+        $GLOBALS['cookie'] = [$username, $username, ''];
+    }
+
+    public function testDefaultOpUnauthenticatedRendersLoginBoxAndSkipsForm(): void
+    {
+        // loginbox() die()s for a still-unauthenticated session, which would kill the
+        // PHPUnit child. The stub answers false to is_user() and true to loginbox()'s
+        // own check, so loginbox() returns and main()'s early exit is observable.
+        $authStub = self::createStub(\Auth\Contracts\AuthServiceInterface::class);
+        $authStub->method('isAuthenticated')->willReturn(false, true);
+        $authStub->method('isAdmin')->willReturn(false);
+        $authStub->method('getCookieArray')->willReturn(null);
+        $authStub->method('getUsername')->willReturn(null);
+        $GLOBALS['authService'] = $authStub;
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('DepthChartEntry', ['op' => ''], [], [
+            'user' => '',
+        ]);
+
+        $this->assertSame('', $output);
+        $this->assertQueryNotExecuted('ibl_team_info');
+    }
+
+    public function testOpSubmitWithoutAuthRendersInlineErrorAndWritesNothing(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('DepthChartEntry', ['op' => 'submit'], ['Team_Name' => 'Boston'], [
+            'user' => '',
+        ]);
+
+        $this->assertStringContainsString('Invalid or expired form submission', $output);
+        $this->assertQueryNotExecuted('UPDATE');
+        $this->assertQueryNotExecuted('INSERT');
+        // The team lookup runs only past the auth gate: replacing !isUser() with false in
+        // submit() lets it through, so gm_username is the assertion that discriminates.
+        $this->assertQueryNotExecuted('gm_username');
+    }
+
+    public function testOpSubmitAuthenticatedWithoutTeamRendersInlineErrorAndWritesNothing(): void
+    {
+        $this->authenticateWithUsername('teamless');
+        // The helper pre-seeds $GLOBALS['cookie']; clear it so the assertion below proves
+        // submit() itself decoded the cookie.
+        unset($GLOBALS['cookie']);
+        $this->mockDb->onQuery('gm_username', []);
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('DepthChartEntry', ['op' => 'submit'], ['Team_Name' => 'Boston'], [
+            'user' => $GLOBALS['user'],
+        ]);
+
+        $this->assertStringContainsString('Invalid or expired form submission', $output);
+        $this->assertQueryNotExecuted('UPDATE');
+        $this->assertQueryNotExecuted('INSERT');
+        $this->assertQueryExecuted('gm_username');
+        // cookieDecode() must leave ['teamless','teamless',''] in $GLOBALS['cookie'].
+        $this->assertSame(['teamless', 'teamless', ''], $GLOBALS['cookie']);
+    }
+
+    public function testOpApiAuthenticatedWithoutTeamReturnsForbiddenJson(): void
+    {
+        $this->authenticateWithUsername('teamless');
+        unset($GLOBALS['cookie']);
+        $this->mockDb->onQuery('gm_username', []);
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('DepthChartEntry', ['op' => 'api', 'action' => 'list'], [], [
+            'user' => $GLOBALS['user'],
+        ]);
+
+        $decoded = json_decode($output, true);
+        $this->assertIsArray($decoded);
+        $this->assertSame('No team assigned', $decoded['error']);
+        $this->assertSame(['teamless', 'teamless', ''], $GLOBALS['cookie']);
+    }
+
+    public function testOpApiAuthenticatedFreeAgentsTeamReturnsForbiddenJson(): void
+    {
+        $this->authenticateWithUsername('fagm');
+        $this->mockDb->onQuery('gm_username', [['team_name' => 'Free Agents']]);
+        $this->mockDb->onQuery('WHERE team_name', [['teamid' => 0]]);
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('DepthChartEntry', ['op' => 'api', 'action' => 'list'], [], [
+            'user' => $GLOBALS['user'],
+        ]);
+
+        $decoded = json_decode($output, true);
+        $this->assertIsArray($decoded);
+        $this->assertSame('No team assigned', $decoded['error']);
+        $this->assertNoSavedDepthChartQuery();
+    }
+
+    public function testOpApiAuthenticatedUnresolvedTeamIdReturnsForbiddenJson(): void
+    {
+        $this->authenticateWithUsername('orphangm');
+        $this->mockDb->onQuery('gm_username', [['team_name' => 'Boston']]);
+        $this->mockDb->onQuery('WHERE team_name', []);
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('DepthChartEntry', ['op' => 'api', 'action' => 'list'], [], [
+            'user' => $GLOBALS['user'],
+        ]);
+
+        $decoded = json_decode($output, true);
+        $this->assertIsArray($decoded);
+        $this->assertSame('Team not found', $decoded['error']);
+        $this->assertNoSavedDepthChartQuery();
+    }
+
+    private function assertNoSavedDepthChartQuery(): void
+    {
+        $all = array_merge($this->mockDb->getPreparedQueries(), $this->mockDb->getExecutedQueries());
+        foreach ($all as $sql) {
+            $this->assertStringNotContainsString('ibl_saved_depth_charts', (string) $sql);
+        }
+    }
+
+    public function testOpApiWithoutAuthDoesNotDecodeCookie(): void
+    {
+        unset($GLOBALS['cookie']);
+
+        $output = $this->runModule('DepthChartEntry', ['op' => 'api'], [], [
+            'user' => '',
+        ]);
+
+        $decoded = json_decode($output, true);
+        $this->assertIsArray($decoded);
+        $this->assertSame('Unauthorized', $decoded['error']);
+        $this->assertArrayNotHasKey('cookie', $GLOBALS);
     }
 }

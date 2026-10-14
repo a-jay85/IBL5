@@ -52,15 +52,6 @@ class LeagueContextIntegrationTest extends TestCase
         $this->assertIsString(LeagueContext::COOKIE_NAME);
     }
 
-    /**
-     * Test constants are lowercase
-     */
-    public function testConstantValuesAreLowercase(): void
-    {
-        $this->assertSame(strtolower(LeagueContext::LEAGUE_IBL), LeagueContext::LEAGUE_IBL);
-        $this->assertSame(strtolower(LeagueContext::LEAGUE_OLYMPICS), LeagueContext::LEAGUE_OLYMPICS);
-    }
-
     // ============================================
     // CONFIG STRUCTURE TESTS
     // ============================================

@@ -22,13 +22,10 @@ class FranchiseRecordBookRepository extends \Database\BaseMysqliRepository imple
      * highest pid, used by COALESCE to backfill `pid` for records stored under the
      * cleaned name. Identical across all three record queries, so extracted here.
      */
-    private static function cleanNamePidSubquery(): string
-    {
-        return "LEFT JOIN (
+    private const CLEAN_NAME_PID_JOIN = "LEFT JOIN (
                SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
                FROM `ibl_plr` GROUP BY clean_name
              ) plr ON plr.clean_name = r.player_name";
-    }
 
     /**
      * @see FranchiseRecordBookRepositoryInterface::getTeamSingleSeasonRecords()
@@ -45,10 +42,10 @@ class FranchiseRecordBookRepository extends \Database\BaseMysqliRepository imple
                     r.stat_value, r.stat_raw,
                     r.team_of_record, r.season_year, r.career_total
              FROM `ibl_rcb_alltime_records` r
-             " . self::cleanNamePidSubquery() . "
+             " . self::CLEAN_NAME_PID_JOIN . "
              WHERE r.scope = 'team' AND r.teamid = ? AND r.record_type = 'single_season'
                AND r.ranking <= ?
-             ORDER BY r.stat_category, r.ranking",
+             ORDER BY r.stat_category, r.ranking, r.id ASC",
             'ii',
             $teamId,
             $limit
@@ -72,10 +69,10 @@ class FranchiseRecordBookRepository extends \Database\BaseMysqliRepository imple
                     r.stat_value, r.stat_raw,
                     r.team_of_record, r.season_year, r.career_total
              FROM `ibl_rcb_alltime_records` r
-             " . self::cleanNamePidSubquery() . "
+             " . self::CLEAN_NAME_PID_JOIN . "
              WHERE r.scope = 'league' AND r.record_type = 'career'
                AND r.ranking <= ?
-             ORDER BY r.stat_category, r.ranking",
+             ORDER BY r.stat_category, r.ranking, r.id ASC",
             'i',
             $limit
         );
@@ -98,10 +95,10 @@ class FranchiseRecordBookRepository extends \Database\BaseMysqliRepository imple
                     r.stat_value, r.stat_raw,
                     r.team_of_record, r.season_year, r.career_total
              FROM `ibl_rcb_alltime_records` r
-             " . self::cleanNamePidSubquery() . "
+             " . self::CLEAN_NAME_PID_JOIN . "
              WHERE r.scope = 'league' AND r.record_type = 'single_season'
                AND r.ranking <= ?
-             ORDER BY r.stat_category, r.ranking",
+             ORDER BY r.stat_category, r.ranking, r.id ASC",
             'i',
             $limit
         );

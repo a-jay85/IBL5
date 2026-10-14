@@ -50,6 +50,12 @@ _USAGE_LIMIT_RE = re.compile(
 # The CLI's reply when its OAuth login has lapsed. It is not malformed JSON, and a
 # re-ask cannot fix it, so the final llm-invalid-output detail names it plainly.
 _AUTH_FAILURE_RE = re.compile(r"Failed to authenticate|OAuth session expired", re.IGNORECASE)
+_AUTH_REPLY_MAX = 400   # same bound as the call_tooled usage-limit guard
+
+
+def _is_auth_failure(text: str) -> bool:
+    """An expired-login reply from the CLI: short, and naming the auth failure."""
+    return len(text.strip()) < _AUTH_REPLY_MAX and bool(_AUTH_FAILURE_RE.search(text))
 
 MODEL_MAP = {
     "haiku": "claude-haiku-5-5",
@@ -151,12 +157,15 @@ def _tooled_env(allowed_tools, denied_tools) -> dict:
 
 
 def _tooled_argv(model, *, agent, allowed_tools, denied_tools, add_dirs,
-                 append_system_prompt, setting_sources, max_turns) -> list[str]:
+                 append_system_prompt, setting_sources, max_turns,
+                 max_budget_usd: float | None = None) -> list[str]:
     """Pure argv builder so replay can record a live run's exact command line."""
     argv = ["claude", "-p", "--output-format", "json",
             "--max-turns", str(max_turns),
             "--permission-prompts", "none",
             "--setting-sources", setting_sources]
+    if max_budget_usd is not None:
+        argv += ["--max-budget-usd", f"{max_budget_usd:.2f}"]
     if agent:
         # no --model: the agent def's own `model:` pin wins, mirroring the skill's spawn
         argv += ["--agent", agent]
@@ -278,6 +287,7 @@ class ClaudeCli:
                     raise UsagePause(purpose)   # a sibling paused while this ran: discard
             except subprocess.TimeoutExpired:
                 last_err = f"call exceeded {DEFAULT_TIMEOUT}s wall clock"
+                auth_reply = ""
                 rec.retries = attempt
                 continue
             try:
@@ -291,8 +301,7 @@ class ClaudeCli:
                     self._usage_limit_pause(purpose)
                     raise HarnessError("llm-usage-limit",
                                        f"{purpose}: {raw[:200].strip()}")
-                if _AUTH_FAILURE_RE.search(raw):
-                    auth_reply = raw[:200].strip()
+                auth_reply = raw[:200].strip() if _is_auth_failure(raw) else ""
                 last_err = f"CLI non-JSON output (rc={proc.returncode}): {proc.stdout[:200]} {proc.stderr[:200]}"
                 rec.retries = attempt
                 continue
@@ -326,8 +335,7 @@ class ClaudeCli:
                     self._usage_limit_pause(purpose)
                     raise HarnessError("llm-usage-limit",
                                        f"{purpose}: {result_text[:200].strip()}")
-                if _AUTH_FAILURE_RE.search(result_text):
-                    auth_reply = result_text[:200].strip()
+                auth_reply = result_text[:200].strip() if _is_auth_failure(result_text) else ""
                 last_err = str(e)
                 attempt_prompt = (prompt + "\n\nYour previous reply was not valid per the "
                                   f"required JSON schema ({e}). Reply with ONLY the JSON.")
@@ -335,7 +343,7 @@ class ClaudeCli:
         rec.retries = max_retries
         self.ledger.add(rec)
         if auth_reply:
-            raise HarnessError("llm-invalid-output", f"{purpose}: auth-expired: {auth_reply}")
+            raise HarnessError("llm-auth-expired", f"{purpose}: auth-expired: {auth_reply}")
         raise HarnessError("llm-invalid-output", f"{purpose}: {last_err}")
 
     def call_tooled(self, purpose: str, model: str, prompt: str, *, cwd: str,
@@ -345,7 +353,8 @@ class ClaudeCli:
                     setting_sources: str = "user,project",
                     timeout: int = TOOLED_TIMEOUT,
                     max_turns: int = TOOLED_MAX_TURNS,
-                    max_retries: int = 1) -> str:
+                    max_retries: int = 1,
+                    max_budget_usd: float | None = None) -> str:
         """Bounded, tool-enabled call. Returns the envelope's RAW `result` text.
 
         The verdict this exists to fetch is a prose document, so parsing belongs to the
@@ -363,11 +372,13 @@ class ClaudeCli:
         argv = _tooled_argv(model, agent=agent, allowed_tools=allowed_tools,
                             denied_tools=denied_tools, add_dirs=add_dirs,
                             append_system_prompt=append_system_prompt,
-                            setting_sources=setting_sources, max_turns=max_turns)
+                            setting_sources=setting_sources, max_turns=max_turns,
+                            max_budget_usd=max_budget_usd)
         rec = LlmCallRecord(purpose=purpose, model=MODEL_MAP[model])
         # A read-only call cannot edit the worktree, so its pause is never dirty.
         can_write = usage_pause.tools_can_write(allowed_tools, denied_tools)
         last_err = ""
+        auth_reply = ""
         for attempt in range(max_retries + 1):
             try:
                 self._gate_before_spawn(purpose, cwd)
@@ -384,6 +395,7 @@ class ClaudeCli:
                                      prespawn=pre, cwd=cwd)
             except subprocess.TimeoutExpired:
                 last_err = f"tooled call exceeded {timeout}s wall clock"
+                auth_reply = ""
                 rec.retries = attempt
                 continue
             try:
@@ -397,6 +409,7 @@ class ClaudeCli:
                     self._usage_limit_pause(purpose, cwd, pre=pre, can_write=can_write)
                     raise HarnessError("llm-usage-limit",
                                        f"{purpose}: {raw[:200].strip()}")
+                auth_reply = raw[:200].strip() if _is_auth_failure(raw) else ""
                 last_err = (f"CLI non-JSON output (rc={proc.returncode}): "
                             f"{proc.stdout[:200]} {proc.stderr[:200]}")
                 rec.retries = attempt
@@ -424,6 +437,10 @@ class ClaudeCli:
                 self._usage_limit_pause(purpose, cwd, pre=pre, can_write=can_write)
                 raise HarnessError("llm-usage-limit",
                                    f"{purpose}: {result_text[:200].strip()}")
+            if _is_auth_failure(result_text):
+                rec.ok = False
+                self.ledger.add(rec)
+                raise HarnessError("llm-auth-expired", f"{purpose}: auth-expired: {result_text[:200].strip()}")
             # Content failures are never re-asked: a reviewer that errored out mid-review
             # would only error again, and its partial text must not escape as a verdict.
             subtype = envelope.get("subtype")
@@ -449,6 +466,8 @@ class ClaudeCli:
         rec.ok = False
         rec.retries = max_retries
         self.ledger.add(rec)
+        if auth_reply:
+            raise HarnessError("llm-auth-expired", f"{purpose}: auth-expired: {auth_reply}")
         raise HarnessError("llm-tooled-cli", f"{purpose}: {last_err}")
 
 
@@ -506,13 +525,15 @@ class FixtureLlm:
                     setting_sources: str = "user,project",
                     timeout: int = TOOLED_TIMEOUT,
                     max_turns: int = TOOLED_MAX_TURNS,
-                    max_retries: int = 1) -> str:
+                    max_retries: int = 1,
+                    max_budget_usd: float | None = None) -> str:
         if not allowed_tools:
             raise HarnessError("llm-tooled-no-tools", purpose)
         self.tooled_argvs.append((purpose, _tooled_argv(
             model, agent=agent, allowed_tools=allowed_tools, denied_tools=denied_tools,
             add_dirs=add_dirs, append_system_prompt=append_system_prompt,
-            setting_sources=setting_sources, max_turns=max_turns)))
+            setting_sources=setting_sources, max_turns=max_turns,
+            max_budget_usd=max_budget_usd)))
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
         val = self.canned[purpose]

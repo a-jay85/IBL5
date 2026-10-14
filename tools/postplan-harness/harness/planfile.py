@@ -149,6 +149,7 @@ def _is_test_path(tok: str) -> bool:
 
 
 _NO_CHANGE_MARKER = r"\(no-change\)"
+_RUN_ONLY_MARKER = r"\(run-only\)"
 
 
 # A WHOLE cell that is a planning Test-type label. Measured on the 1144-file
@@ -230,6 +231,39 @@ def parse_no_change_test_paths(content: str) -> list[str]:
         if has_marker and _is_visual_regression_row(cells):
             if p not in marked:
                 marked.append(p)
+        else:
+            unmarked.add(p)
+    return [p for p in marked if p not in unmarked]
+
+
+def parse_run_only_test_paths(content: str) -> list[str]:
+    """Planned tokens whose EVERY unfenced planning row carries `(run-only)`
+    immediately after the token's closing backtick (any planning row type).
+
+    A `(run-only)` row plans to RUN an existing test file, never to write it, so
+    an absent diff entry is the pass condition. The marker exempts only the
+    `MISSING:` item for that token; MISSING-FILE and MISSING-METHOD are untouched.
+    A token also planned by any unmarked row is NOT returned: the unannotated row
+    wins. A Visual-regression row marked `(no-change)` on the same token is
+    neutral, so a token whose rows mix the two markers is still exempt. Fenced
+    rows are stripped (same _strip_fenced walk as parse_matrix).
+    """
+    marked: list[str] = []
+    unmarked: set[str] = set()
+    for line in _strip_fenced(content):
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        row = " | ".join(cells)
+        p = _planned_token(cells)
+        if p is None:
+            continue
+        tok = r"`" + re.escape(p) + r"`\s*"
+        if re.search(tok + _RUN_ONLY_MARKER, row, re.I):
+            if p not in marked:
+                marked.append(p)
+        elif re.search(tok + _NO_CHANGE_MARKER, row, re.I) and _is_visual_regression_row(cells):
+            continue  # neutral: the (no-change) parser owns this row
         else:
             unmarked.add(p)
     return [p for p in marked if p not in unmarked]
@@ -863,6 +897,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
         info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
         info.executable_row_count = count_executable_matrix_rows(content)
         info.no_change_test_paths = parse_no_change_test_paths(content)
+        info.run_only_test_paths = parse_run_only_test_paths(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
     info.backlog_issues = parse_backlog_issues(content)

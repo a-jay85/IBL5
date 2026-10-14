@@ -145,7 +145,7 @@ check_entry() {
   git cat-file -e "HEAD:$NEWP" 2>/dev/null || { lost "file missing at HEAD: $NEWP"; return 0; }
   [ "$BIN" -eq 0 ] || return 0
   git show "HEAD:$NEWP" > "$HF" 2>/dev/null || { lost "could not read HEAD:$NEWP"; return 0; }
-  # One exemption, one key: an added `last_verified: YYYY-MM-DD` line is not lost when
+  # First exemption, one key (the second is the baseline block below): an added `last_verified: YYYY-MM-DD` line is not lost when
   # HEAD's own frontmatter carries an equal or newer date (both sides bumped the doc and
   # the resolver kept the newer stamp). Only a file opening with `---` qualifies, only
   # the first `last_verified:` inside that frontmatter is read, and every other added

@@ -1,4 +1,5 @@
 -- Speed up vw_franchise_summary (FranchiseHistory page, about 1 s in prod).
+-- rollback-incompatible: production's FranchiseHistoryQueryEquivalenceTest seeds box scores without running RefreshTeamSeasonRecordsStep, so it reads 0 wins from this view; live data is filled by that same step, which pre-PR code already runs each sim
 --
 -- The wl arm used to re-aggregate every regular-season box score through the
 -- ibl_team_win_loss view (97 percent of the query cost). It now sums the

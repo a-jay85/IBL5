@@ -50,6 +50,7 @@ def sh(d, *args, check=True, env=None):
 
 
 def _commit(d, path, body, message):
+    (Path(d) / path).parent.mkdir(parents=True, exist_ok=True)
     (Path(d) / path).write_text(body)
     sh(d, "add", "-A")
     sh(d, "commit", "-q", "-m", message)
@@ -460,3 +461,94 @@ def test_adapted_added_line_is_reported_lost_today(repo, key):
     assert "LOST: f.txt: +run /tmp/new.log" in out
     assert "CHECKED: files=1 added=1 deleted=0" in out
     assert DIVERGED in out
+
+
+# --- phpstan-baseline.neon absent-path exemption (ADR-0174 addendum) ---
+
+BASELINE = "ibl5/phpstan-baseline.neon"
+
+
+def neon_block(msg, ident, count, path):
+    return [
+        "\t\t-",
+        f"\t\t\trawMessage: '{msg}'",
+        f"\t\t\tidentifier: {ident}",
+        f"\t\t\tcount: {count}",
+        f"\t\t\tpath: {path}",
+        "",
+    ]
+
+
+def neon(*blocks):
+    body = ["parameters:", "\tignoreErrors:"]
+    for b in blocks:
+        body.extend(b)
+    return "\n".join(body) + "\n"
+
+
+def _commit_rm(d, path, message):
+    os.remove(Path(d) / path)
+    sh(d, "add", "-A")
+    sh(d, "commit", "-q", "-m", message)
+
+
+X = neon_block("Call to foo() on dead module.", "foo.dead", 1, "modules/Foo/index.php")
+Y = neon_block("Call to bar() on live module.", "bar.live", 2, "modules/Bar/index.php")
+
+
+def baseline_case(repo, key, *, base, branch, head, baseline_path=BASELINE, rm=(), keep_root=()):
+    """Seed `base` blocks plus a source file per block path under ibl5/ on origin/master,
+    commit `branch` blocks (and delete each `rm` file) on feat, capture PRE, then stand in
+    for a rebase whose resolution kept `head` blocks. `keep_root` paths are seeded at the
+    repo root instead of under ibl5/ (the prefix fixture). Returns the script's stdout."""
+    seed_base(repo, baseline_path, neon(*base))
+    for b in base:
+        p = b[4].split("path: ", 1)[1]
+        target = p if p in keep_root else f"ibl5/{p}"
+        seed_base(repo, target, "<?php\n")
+    for f in rm:
+        _commit_rm(repo, f, f"rm {f}")
+    # Sentinel branch change: when the resolution restores master's copy of the baseline,
+    # the post diff would otherwise be empty and the script would stop for the wrong reason.
+    _commit(repo, "ibl5/branch-note.txt", "work\n", "branch work")
+    _commit(repo, baseline_path, neon(*branch), "trim baseline")
+    capture_pre(repo, key)
+    _commit(repo, baseline_path, neon(*head), "resolution kept master entries")
+    return run_lostwork(repo, key)[1]
+
+
+def test_baseline_block_with_absent_path_is_exempt(repo, key):
+    out = baseline_case(repo, key, base=[X, Y], branch=[Y], head=[X, Y], rm=["ibl5/modules/Foo/index.php"])
+    assert "LOST:" not in out and last_line(out) == "TREE-EQUIVALENT"
+
+
+def test_baseline_block_with_present_path_dropped_is_lost(repo, key):
+    out = baseline_case(repo, key, base=[X, Y], branch=[Y], head=[X, Y])
+    assert "LOST: ibl5/phpstan-baseline.neon: -\t\t\tpath: modules/Foo/index.php" in out
+    assert last_line(out) == DIVERGED
+
+
+def test_baseline_mixed_blocks_only_present_path_lost(repo, key):
+    out = baseline_case(repo, key, base=[X, Y], branch=[], head=[X, Y], rm=["ibl5/modules/Foo/index.php"])
+    assert "path: modules/Bar/index.php" in out and "path: modules/Foo/index.php" not in out
+    assert "bar.live" in out and "foo.dead" not in out
+    assert last_line(out) == DIVERGED
+
+
+def test_baseline_exemption_checks_ibl5_prefix(repo, key):
+    # Foo exists at HEAD:modules/Foo/index.php (repo root) and NOT at HEAD:ibl5/modules/Foo/index.php.
+    out = baseline_case(repo, key, base=[X, Y], branch=[Y], head=[X, Y], keep_root=["modules/Foo/index.php"])
+    assert "LOST:" not in out and last_line(out) == "TREE-EQUIVALENT"
+
+
+def test_baseline_shared_line_text_in_exempt_block_is_exempt(repo, key):
+    X2 = neon_block("Call to foo() on dead module.", "bar.live", 2, "modules/Foo/index.php")
+    out = baseline_case(repo, key, base=[X2, Y], branch=[Y], head=[X2, Y], rm=["ibl5/modules/Foo/index.php"])
+    assert "LOST:" not in out and last_line(out) == "TREE-EQUIVALENT"
+
+
+def test_non_baseline_neon_is_not_exempt(repo, key):
+    out = baseline_case(repo, key, base=[X, Y], branch=[Y], head=[X, Y],
+                        baseline_path="ibl5/phpstan-tests-baseline.neon", rm=["ibl5/modules/Foo/index.php"])
+    assert "LOST: ibl5/phpstan-tests-baseline.neon: -\t\t\tpath: modules/Foo/index.php" in out
+    assert last_line(out) == DIVERGED

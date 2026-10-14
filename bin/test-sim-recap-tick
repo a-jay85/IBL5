@@ -146,6 +146,10 @@ if [ "${STUB_SENTINEL:-0}" = 1 ]; then
     printf 'AGENT-STDOUT-SENTINEL\n'
     printf 'AGENT-STDERR-SENTINEL\n' >&2
 fi
+if [ -f "$STUB/agent-auth-fail" ]; then
+    printf 'Failed to authenticate. API Error: 401 OAuth access token is invalid.\n'
+    exit 0
+fi
 if [ -f "$STUB/agent-usage-limit" ]; then
     printf 'api error: 429 rate_limit_error\n'
     exit 0
@@ -245,7 +249,7 @@ EOF
 # Per-case reset: wipe logs and all per-case control sentinels.
 srt_reset() {
     rm -f "$STUB"/ssh.log "$STUB"/claude.log "$STUB"/claude.sentinel \
-          "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit \
+          "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit "$STUB"/agent-auth-fail \
           "$STUB"/store-fails "$STUB"/store-banner "$STUB"/resp.* "$STUB"/fail.* \
           "$STUB"/record-stdin "$STUB"/store.cmd "$STUB"/store.stdin \
           "$STUB"/curl.log "$STUB"/prompt.argv "$STUB"/claude.argv "$STUB"/tick.stdout "$STUB"/tick.stderr "$STUB"/launchctl.log "$STUB"/launchctl.sentinel \
@@ -409,6 +413,65 @@ touch "$STUB/agent-usage-limit"
 srt_run
 srt_log_has "$STUB" tick.out "usage limit" "usage_limit_parks_with_reason — logged"
 srt_log_has "$STUB" ssh.log  "park"        "usage_limit_parks_with_reason — park in ssh.log"
+srt_log_lacks "$STUB" tick.out "auth failed" "usage_limit_parks_with_reason — not mislabelled as auth failure"
+
+# ── auth_error_parks_with_own_reason ──────────────────────────────────────────
+# A rejected CLAUDE_CODE_OAUTH_TOKEN (401) must log its own line, never the
+# "usage limit" one, and still park.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-auth-fail"
+srt_run
+srt_log_has   "$STUB" tick.out "auth failed" "auth_error_parks_with_own_reason — logged as auth failed"
+srt_log_lacks "$STUB" tick.out "usage limit" "auth_error_parks_with_own_reason — not logged as usage limit"
+srt_log_has   "$STUB" ssh.log  "park"        "auth_error_parks_with_own_reason — park in ssh.log"
+srt_log_lacks "$STUB" ssh.log  "storeSimRecap" "auth_error_parks_with_own_reason — no store"
+
+# ── parked_sim_exit_code_by_host_mode ─────────────────────────────────────────
+# actions + a parking path (no payload, park outcome pending) -> exit 1 (red run).
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "parked_actions_pending — exit 1" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "exiting 1" "parked_actions_pending — logs exiting 1"
+srt_log_has "$STUB" ssh.log  "park"      "parked_actions_pending — park in ssh.log"
+
+# launchd (default) with the same parking path stays exit 0.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-fails"
+( unset SIM_RECAP_HOST_MODE; srt_run; echo "$SRT_RC" > "$STUB/hm.rc" )
+srt_expect_eq "parked_launchd_pending — exit 0" 0 "$(cat "$STUB/hm.rc")"
+srt_log_lacks "$STUB" tick.out "exiting 1" "parked_launchd_pending — no exiting 1 line"
+srt_log_has   "$STUB" ssh.log  "park"      "parked_launchd_pending — park in ssh.log"
+
+# actions + park outcome 'none' (lost claim) is not a failure -> exit 0.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+printf '{"ok":true,"cmd":"park","sim":42,"outcome":"none"}' > "$STUB/resp.park"
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "parked_actions_none — exit 0" 0 "$SRT_RC"
+srt_log_has   "$STUB" tick.out "lost the claim" "parked_actions_none — lost-claim log line"
+srt_log_lacks "$STUB" tick.out "exiting 1"      "parked_actions_none — no exiting 1 line"
+
+# actions + park outcome 'failed' (attempt ceiling) is a failure -> exit 1.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+printf '{"ok":true,"cmd":"park","sim":42,"outcome":"failed"}' > "$STUB/resp.park"
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "parked_actions_failed — exit 1" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "exiting 1" "parked_actions_failed — logs exiting 1"
+
+# actions + successful store -> exit 0, nothing parked.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "actions_store_success — exit 0" 0 "$SRT_RC"
+srt_log_has   "$STUB" ssh.log  "storeSimRecap" "actions_store_success — store called"
+srt_log_lacks "$STUB" tick.out "exiting 1"     "actions_store_success — no exiting 1 line"
 
 # ── tunnel_attached_before_agent ──────────────────────────────────────────────
 # The generation path must attach the SELECT-only MySQL forward to the existing

@@ -11,8 +11,10 @@ use Season\Season;
 /**
  * SplitStatsRepository - Queries per-game averages filtered by game context
  *
- * Reuses the same SQL aggregation pattern as PeriodAverages (SUM/COUNT grouped by player)
- * with additional WHERE clauses or JOINs based on the split type.
+ * getSplitStats() reuses the SUM/COUNT-grouped-by-player aggregation pattern with
+ * additional WHERE clauses or JOINs based on the split type. getPeriodStats() hosts the
+ * date-range query that BasketballStats\Tables\PeriodAverages renders; the two SELECTs
+ * differ (NULLIF guards, season_year/game_type filter) and are kept separate on purpose.
  *
  * @phpstan-import-type SplitStatsRow from Contracts\SplitStatsRepositoryInterface
  *

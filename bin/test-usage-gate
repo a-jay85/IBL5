@@ -2857,6 +2857,121 @@ test_episode_refused_dir_silent() {
     assert_no_file episode_refused:no-dir "$real"
 }
 
+DEC_OPEN_RE="${LOG_PFX}fail-open reason=stale-usage age=[0-9]+\$"
+PRE_OPEN_RE="${LOG_PFX}prestart-fail-open reason=stale-usage runner=post-plan-now\$"
+STALE_END_RE="${LOG_PFX}stale-usage episode end duration=[0-9]+\$"
+dec() { IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A; }
+pre() { in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"; }
+
+test_stale_episode_hundred_calls_one_open() {
+    decide_setup 99
+    local d="$IBL5_USAGE_GATE_STATE_DIR" i out rc bad=0
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    for i in $(seq 1 100); do
+        out=$(dec); rc=$?
+        if [ -n "$out" ] || [ "$rc" -ne 0 ]; then bad=$((bad + 1)); fi
+    done
+    assert_eq stale_hundred:bad-calls 0 "$bad"
+    assert_eq stale_hundred:open-once 1 "$(log_re_count "$DEC_OPEN_RE")"
+    assert_eq stale_hundred:no-close 0 "$(log_re_count "$STALE_END_RE")"
+    assert_file stale_hundred:state "$d/episode-stale-usage"
+    assert_no_file stale_hundred:no-marker "$d/markers/$SID_A.json"
+    seed_cache "$(date +%s)" "$(usage_json 10 0)"
+    out=$(dec)
+    assert_eq stale_hundred:fresh-out "" "$out"
+    assert_eq stale_hundred:close-once 1 "$(log_re_count "$STALE_END_RE")"
+    assert_no_file stale_hundred:state-gone "$d/episode-stale-usage"
+    dec >/dev/null
+    assert_eq stale_hundred:close-still-once 1 "$(log_re_count "$STALE_END_RE")"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    dec >/dev/null
+    assert_eq stale_hundred:rearm-open 2 "$(log_re_count "$DEC_OPEN_RE")"
+}
+
+test_stale_episode_closes_on_recent_stale_cache() {
+    decide_setup 99
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    dec >/dev/null
+    assert_eq stale_recent:open 1 "$(log_re_count "$DEC_OPEN_RE")"
+    seed_cache "$(( $(date +%s) - 298 ))" "$(usage_json 10 0)"
+    dec >/dev/null
+    assert_eq stale_recent:close 1 "$(log_re_count "$STALE_END_RE")"
+}
+
+test_stale_episode_over_300_stays_open() {
+    decide_setup 99
+    local out
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    dec >/dev/null
+    seed_cache "$(( $(date +%s) - 305 ))" "$(usage_json 99 0)"
+    out=$(dec)
+    assert_eq stale_over300:out "" "$out"
+    assert_eq stale_over300:no-close 0 "$(log_re_count "$STALE_END_RE")"
+    assert_eq stale_over300:open-still-once 1 "$(log_re_count "$DEC_OPEN_RE")"
+}
+
+test_stale_episode_shared_across_sites() {
+    decide_setup 99
+    local i rc
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    dec >/dev/null
+    assert_eq stale_shared:decide-open 1 "$(log_re_count "$DEC_OPEN_RE")"
+    for i in 1 2 3; do
+        pre; rc=$?
+        assert_eq "stale_shared:pre-rc.$i" 0 "$rc"
+    done
+    assert_eq stale_shared:no-prestart-open 0 "$(log_re_count "$PRE_OPEN_RE")"
+    seed_cache "$(date +%s)" "$(usage_json 10 0)"
+    pre; rc=$?
+    assert_eq stale_shared:fresh-rc 0 "$rc"
+    assert_eq stale_shared:close 1 "$(log_re_count "$STALE_END_RE")"
+}
+
+test_prestart_stale_episode_open_close() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    local i rc
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 95 12)"
+    for i in 1 2 3; do
+        pre; rc=$?
+        assert_eq "prestart_episode:rc.$i" 0 "$rc"
+    done
+    assert_eq prestart_episode:open-once 1 "$(log_re_count "$PRE_OPEN_RE")"
+    seed_cache "$(date +%s)" "$(usage_json 10 0)"
+    pre; rc=$?
+    assert_eq prestart_episode:fresh-rc 0 "$rc"
+    assert_eq prestart_episode:close 1 "$(log_re_count "$STALE_END_RE")"
+}
+
+test_stale_episode_blind_pass_keeps_open() {
+    decide_setup 99
+    local FUT
+    FUT=$(( $(date +%s) + 3600 ))
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    dec >/dev/null
+    assert_eq stale_blind:open 1 "$(log_re_count "$DEC_OPEN_RE")"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json_resets 95 0 "$FUT" "")"
+    dec >/dev/null
+    assert_eq stale_blind:no-close 0 "$(log_re_count "$STALE_END_RE")"
+    assert_file stale_blind:state-kept "$IBL5_USAGE_GATE_STATE_DIR/episode-stale-usage"
+    if [ "$(log_count blind-trust)" -ge 1 ]; then pass stale_blind:blind-ran; else fail stale_blind:blind-ran "no blind-trust line"; fi
+}
+
+test_prestart_blind_pass_keeps_open() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    local FUT
+    FUT=$(( $(date +%s) + 3600 ))
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 95 12)"
+    pre
+    assert_eq prestart_blind:open 1 "$(log_re_count "$PRE_OPEN_RE")"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json_resets 95 0 "$FUT" "")"
+    pre
+    assert_eq prestart_blind:no-close 0 "$(log_re_count "$STALE_END_RE")"
+    assert_file prestart_blind:state-kept "$IBL5_USAGE_GATE_STATE_DIR/episode-stale-usage"
+    if [ "$(log_count blind-trust)" -ge 1 ]; then pass prestart_blind:blind-ran; else fail prestart_blind:blind-ran "no blind-trust line"; fi
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

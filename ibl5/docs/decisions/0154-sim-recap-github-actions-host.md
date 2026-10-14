@@ -1,6 +1,6 @@
 ---
 description: Sim recaps run on a GitHub Actions runner, triggered by a repository_dispatch from prod with an hourly schedule as fallback, over a dedicated forced-command SSH key; the Mac poller stays as a backup.
-last_verified: 2026-10-06
+last_verified: 2026-10-14
 ---
 
 # ADR-0154: Run the sim-recap pipeline on GitHub Actions
@@ -67,3 +67,11 @@ The Decision section says `pull_request` runs stop at the secrets gate. When thi
 The step now carries `if: github.event_name != 'pull_request'` and the `EVENT` mapping is gone. A PR run skips the step, no secret is mapped, and every later step skips because `steps.secrets.outputs.configured` is empty. The run stays green. `bin/test-sim-recap-tick` asserts that every step mapping a secret is gated by that `if:` or by the `configured` output, and fails on a copy where the guard is deleted, points at another event, or a stray step maps a secret with no `if:`.
 
 This guard is defense in depth against a hasty edit. GitHub passes no secrets to fork PRs, and a same-repo author already has write access, so an Environment with deployment-branch rules remains the access boundary; that is a repository setting outside this ADR.
+
+## Addendum: poller no longer self-unloads (2026-10-14)
+
+Originally the launchd host booted itself out when claim-next reported recaps disabled and no pending sim. `SIM_RECAP_HOST_MODE=actions` made that a logged no-op. A human then had to run `bin/sim-recap-cron-setup --resume` when HEAT began.
+
+Now neither host boots out. A disabled tick logs the phase and exits cheap, with the same reclaim-stale and claim-next calls as an idle in-season tick. The first tick after the phase enables recaps claims and generates as usual, so the poller resumes by itself within about 5 minutes. The `SIM_RECAP_LAUNCHCTL_BIN` seam is gone. `--resume` remains for manually re-arming an unloaded job.
+
+The reason is that a booted-out job cannot see the phase change, and prod cannot reach the Mac to re-arm it.

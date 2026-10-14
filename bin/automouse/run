@@ -1818,7 +1818,14 @@ run_between_plans_canary() {
     git -C "$REPO" fetch origin master >> "$LOG" 2>&1 || true
     git -C "$REPO" merge --ff-only origin/master >> "$LOG" 2>&1 || true
 
-    ci_out=$("$REPO/bin/check-master-ci-green" 2>&1) || ci_rc=$?
+    # The two post-merge jobs (.github/workflows/pages-deploy.yml `deploy`,
+    # .github/workflows/promote-to-production.yml `Promote master to
+    # production`) are in flight on every just-merged master, so without this
+    # the verdict is "pending" at every plan boundary and master health goes
+    # unchecked. They are ignored ONLY while pending: a completed red run of
+    # either still lands in "checks failed:" below and parks. Exact names.
+    ci_out=$(IGNORE_PENDING_CHECKS="deploy,Promote master to production" \
+        "$REPO/bin/check-master-ci-green" 2>&1) || ci_rc=$?
     CANARY_DETAIL="$ci_out"
     printf '%s\n' "$ci_out" >> "$LOG"
 
@@ -1826,8 +1833,10 @@ run_between_plans_canary() {
     if [ "$ci_rc" -ne 0 ]; then
         # check-master-ci-green exits 1 for three conditions. Only "checks
         # failed:" is evidence master is poisoned; "checks still running" and
-        # "check-run(s) found" mean the verdict is not known yet, and parking
-        # on those would stall the queue every night a plan auto-merges.
+        # "check-run(s) found" mean the verdict is not known yet. With the two
+        # post-merge jobs ignored while pending, "still running" now names
+        # only a check this canary does NOT ignore (a PR-CI re-run, a new
+        # workflow), and proceeding on it keeps the queue moving.
         case "$ci_out" in
             *"checks failed:"*) return 1 ;;
             *) return 4 ;;

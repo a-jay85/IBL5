@@ -170,6 +170,32 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         ];
     }
 
+    #[DataProvider('languageClauseGuardProvider')]
+    public function testLanguageClauseGuardsCurrentLang(string $currentLang, string $expectedClause): void
+    {
+        $news = self::createMock(\Topics\News\Contracts\NewsServiceInterface::class);
+        $news->expects($this->once())->method('getHomePageStories')
+            ->with(self::identicalTo(10), self::identicalTo($expectedClause))->willReturn([]);
+        $controller = $this->buildController(
+            config: $this->config(multilingual: 1, currentLang: $currentLang),
+            news: $news,
+        );
+        $this->runMain($controller);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function languageClauseGuardProvider(): array
+    {
+        return [
+            'plain' => ['english', "AND (alanguage='english' OR alanguage='')"],
+            'empty' => ['', "AND (alanguage='' OR alanguage='')"],
+            'dash underscore' => ['pt-BR_1', "AND (alanguage='pt-BR_1' OR alanguage='')"],
+            'thirty chars' => [str_repeat('a', 30), "AND (alanguage='" . str_repeat('a', 30) . "' OR alanguage='')"],
+        ];
+    }
+
     public function testUserNewsEnabledUsesUserStoryNum(): void
     {
         $news = self::createMock(\Topics\News\Contracts\NewsServiceInterface::class);

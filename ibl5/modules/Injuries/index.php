@@ -31,6 +31,7 @@ $pagetitle = "- Injured Players";
 $teamid = is_numeric($_REQUEST['teamid'] ?? null) ? (int) $_REQUEST['teamid'] : 0;
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Initialize services
 $service = new InjuriesService($mysqli_db);

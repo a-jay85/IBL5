@@ -1,13 +1,13 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 86,
+        "argument.type": 62,
         "binaryOp.invalid": 6,
         "booleanNot.exprNotBoolean": 4,
         "cast.int": 5,
         "cast.useless": 1,
         "constant.notFound": 3,
         "empty.notAllowed": 5,
-        "encapsedStringPart.nonString": 5,
+        "encapsedStringPart.nonString": 4,
         "equal.notAllowed": 2,
         "function.alreadyNarrowedType": 2,
         "function.deprecated": 2,

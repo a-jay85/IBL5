@@ -83,7 +83,10 @@ final class PrTriageCliTest extends TestCase
         $this->recursiveRm($this->tmpDir);
     }
 
-    private const CLEARED = "## Manual Testing\nNo manual testing needed — all changes are covered by automated tests.";
+    // A two-way merge-danger line: without one, pr-triage holds the PR (fails closed).
+    private const DANGER_TWO_WAY = "**Merge danger:** Door: two-way · Blast radius: localized · Why: fixture change, a revert restores it";
+
+    private const CLEARED = "## Manual Testing\nNo manual testing needed — all changes are covered by automated tests.\n\n" . self::DANGER_TWO_WAY;
 
     /**
      * The comprehensive fixture exercising every bucket exactly once, at the
@@ -104,7 +107,7 @@ final class PrTriageCliTest extends TestCase
             $this->pr(7,    'fix: prose hold',     self::CLEARED . "\n\nNeeds a human reviewer first.", 'CLEAN', 'shaGREEN'),
             $this->pr(8,    'fix: has dep',        self::CLEARED . "\n\nDepends-on: #1100",     'CLEAN', 'shaGREEN'),
             $this->pr(9,    'feat: shiny',         self::CLEARED,                              'CLEAN', 'shaGREEN'),
-            $this->pr(10,   'fix: handmade',       "Just a body, no manual testing heading.",  'CLEAN', 'shaGREEN'),
+            $this->pr(10,   'fix: handmade',       "Just a body, no manual testing heading." . "\n\n" . self::DANGER_TWO_WAY,  'CLEAN', 'shaGREEN'),
             $this->pr(11,   'fix: clean armable',  self::CLEARED,                              'CLEAN', 'shaGREEN'),
             $this->pr(12,   'feat: approved',      self::CLEARED,                              'CLEAN', 'shaGREEN', [], [['name' => 'human-approved']]),
         ];
@@ -152,7 +155,7 @@ final class PrTriageCliTest extends TestCase
         // The advisor's core correction: a green, non-feat, no-hold PR with NO
         // Manual-Testing section must NOT auto-arm (it is UNCLEARED, not ARMABLE).
         $this->writePrs([
-            $this->pr(10, 'fix: handmade green', 'A body with no manual testing heading at all.', 'CLEAN', 'shaGREEN'),
+            $this->pr(10, 'fix: handmade green', 'A body with no manual testing heading at all.' . "\n\n" . self::DANGER_TWO_WAY, 'CLEAN', 'shaGREEN'),
         ]);
         $r = $this->runScript(['--arm']);
         self::assertSame(0, $r['exit'], $r['output']);

@@ -324,4 +324,23 @@ class FreeAgencyOfferViewTest extends TestCase
         $this->assertStringNotContainsString('value="Hostile "Team"', $html);
         $this->assertStringNotContainsString('&amp;quot;', $html);
     }
+
+    public function testNullPlayerIdRendersAsZeroInBothHiddenPlayerIdInputs(): void
+    {
+        $player = self::createStub(Player::class);
+        $player->method('getPosition')->willReturn('PG');
+        $player->method('getName')->willReturn('No Id');
+        $player->method('getPlayerID')->willReturn(null);
+        $player->method('getTeamName')->willReturn('TestTeam');
+        $player->method('getBirdYears')->willReturn(0);
+        $player->method('getYearsOfExperience')->willReturn(5);
+        $data = $this->baseData(hasExistingOffer: true);
+        $data['player'] = $player;
+        $view = new FreeAgencyOfferView(new FreeAgencyFormView('TestTeam', $player));
+
+        $html = $view->render($data);
+
+        $this->assertSame(16, substr_count($html, 'name="playerID" value="0"'), 'both POST forms and the quick-offer forms cast a null id to 0');
+        $this->assertStringNotContainsString('name="playerID" value=""', $html);
+    }
 }

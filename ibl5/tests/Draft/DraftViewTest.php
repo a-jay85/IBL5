@@ -122,4 +122,22 @@ class DraftViewTest extends TestCase
         $this->assertStringContainsString('name="_csrf_token"', $result);
     }
 
+    public function testRenderDraftInterfaceAcceptsNullPickState(): void
+    {
+        $players = [[
+            'id' => 1, 'name' => 'Rookie One', 'pos' => 'PG', 'age' => 20, 'team' => 'Nowhere',
+            'fga' => 1, 'fgp' => 1, 'fta' => 1, 'ftp' => 1, 'r_3ga' => 1, 'r_3gp' => 1,
+            'orb' => 1, 'drb' => 1, 'ast' => 1, 'stl' => 1, 'tvr' => 1, 'blk' => 1,
+            'oo' => 1, 'r_drive_off' => 1, 'po' => 1, 'r_trans_off' => 1, 'od' => 1,
+            'dd' => 1, 'pd' => 1, 'td' => 1, 'talent' => 1, 'skill' => 1, 'intangibles' => 1,
+            'ranking' => null, 'invite' => null, 'drafted' => 0, 'sta' => null,
+            'team_tid' => null, 'color1' => null, 'color2' => null,
+        ]];
+
+        $owned = $this->view->renderDraftInterface($players, 'TestTeam', 'TestTeam', 1, 1, 2025, 1);
+        $this->assertStringContainsString('Draft Player', $owned);
+
+        $noPick = $this->view->renderDraftInterface($players, 'TestTeam', null, null, null, 2025, 1);
+        $this->assertStringNotContainsString('Draft Player', $noPick);
+    }
 }

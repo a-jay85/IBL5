@@ -14,6 +14,9 @@ use Season\Season;
 
 /**
  * PeriodAverages - Displays period (simulation) averages statistics table
+ *
+ * @phpstan-import-type TeamOffenseStatsRow from \TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface
+ * @phpstan-import-type TeamDefenseStatsRow from \TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface
  */
 class PeriodAverages
 {
@@ -54,7 +57,7 @@ class PeriodAverages
         $splitStatsRepository = new SplitStatsRepository($db);
         $resultPlayerSimBoxScores = $splitStatsRepository->getPeriodStats($teamid, is_string($startDate) ? $startDate : null, is_string($endDate) ? $endDate : null, $pidFilter);
 
-        /** @var list<array{name: string, pos: string, pid: int, games: int, min: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tov: string, blk: string, pf: string, pts: string}> $playerRows */
+        /** @var list<array{name: string, pos: string, pid: int, games: int, min: string|null, fgm: string|null, fga: string|null, fgp: string, ftm: string|null, fta: string|null, ftp: string, tgm: string|null, tga: string|null, tgp: string, orb: string|null, reb: string|null, ast: string|null, stl: string|null, tov: string|null, blk: string|null, pf: string|null, pts: string|null}> $playerRows */
         $playerRows = [];
 
         foreach ($resultPlayerSimBoxScores as $dbRow) {
@@ -88,116 +91,123 @@ class PeriodAverages
         // "\n" restores the template line break: PHP swallows the newline right after the closing PHP tag.
         // @phpstan-ignore ibl.trustedVariable (openTag() escapes the aria-label and sanitizes the colors)
         echo HtmlSanitizer::trusted(TeamStatsTableContext::openTag($team)), "\n";
+        echo self::renderHeader();
         ?>
-    <thead>
-        <tr>
-            <th>Pos</th>
-            <th class="sticky-col">Player</th>
-            <th>g</th>
-            <th class="sep-r-team">min</th>
-            <th>fgm</th>
-            <th>fga</th>
-            <th>fgp</th>
-            <th>ftm</th>
-            <th>fta</th>
-            <th>ftp</th>
-            <th>3gm</th>
-            <th>3ga</th>
-            <th class="sep-r-team">3gp</th>
-            <th>orb</th>
-            <th>reb</th>
-            <th>ast</th>
-            <th>stl</th>
-            <th>to</th>
-            <th>blk</th>
-            <th>pf</th>
-            <th>pts</th>
-        </tr>
-    </thead>
     <tbody>
-<?php foreach ($playerRows as $row): ?>
-        <tr>
-            <td><?= HtmlSanitizer::e($row['pos']) ?></td>
-            <?= PlayerImageHelper::renderPlayerCell($row['pid'], $row['name'], $starterPids) ?>
-            <td><?= (int)$row['games'] ?></td>
-            <td class="sep-r-team"><?= $row['min'] ?></td>
-            <td><?= $row['fgm'] ?></td>
-            <td><?= $row['fga'] ?></td>
-            <td class="sep-r-weak"><?= $row['fgp'] ?></td>
-            <td><?= $row['ftm'] ?></td>
-            <td><?= $row['fta'] ?></td>
-            <td class="sep-r-weak"><?= $row['ftp'] ?></td>
-            <td><?= $row['tgm'] ?></td>
-            <td><?= $row['tga'] ?></td>
-            <td class="sep-r-team"><?= $row['tgp'] ?></td>
-            <td><?= $row['orb'] ?></td>
-            <td><?= $row['reb'] ?></td>
-            <td><?= $row['ast'] ?></td>
-            <td><?= $row['stl'] ?></td>
-            <td><?= $row['tov'] ?></td>
-            <td><?= $row['blk'] ?></td>
-            <td><?= $row['pf'] ?></td>
-            <td><?= $row['pts'] ?></td>
-        </tr>
-<?php endforeach; ?>
+<?php foreach ($playerRows as $row):
+    echo self::renderPlayerRow($row, $starterPids);
+endforeach; ?>
     </tbody>
     <tfoot>
 <?php if ($bothStats !== null):
-    $off = $bothStats['offense'];
-    $def = $bothStats['defense'];
-    $offGames = $off['games'];
-    $defGames = $def['games'];
-    $offPts = StatsFormatter::calculatePoints($off['fgm'], $off['ftm'], $off['tgm']);
-    $defPts = StatsFormatter::calculatePoints($def['fgm'], $def['ftm'], $def['tgm']);
-?>
-        <tr>
-            <td colspan="2"><?= HtmlSanitizer::e($team->name) ?> Offense</td>
-            <td><?= $offGames ?></td>
-            <td class="sep-r-team"></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['fgm'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['fga'], $offGames) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($off['fgm'], $off['fga']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['ftm'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['fta'], $offGames) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($off['ftm'], $off['fta']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['tgm'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['tga'], $offGames) ?></td>
-            <td class="sep-r-team"><?= StatsFormatter::formatPercentage($off['tgm'], $off['tga']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['orb'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['reb'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['ast'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['stl'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['tvr'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['blk'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($off['pf'], $offGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($offPts, $offGames) ?></td>
-        </tr>
-        <tr>
-            <td colspan="2"><?= HtmlSanitizer::e($team->name) ?> Defense</td>
-            <td><?= $defGames ?></td>
-            <td class="sep-r-team"></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['fgm'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['fga'], $defGames) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($def['fgm'], $def['fga']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['ftm'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['fta'], $defGames) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($def['ftm'], $def['fta']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['tgm'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['tga'], $defGames) ?></td>
-            <td class="sep-r-team"><?= StatsFormatter::formatPercentage($def['tgm'], $def['tga']) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['orb'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['reb'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['ast'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['stl'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['tvr'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['blk'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($def['pf'], $defGames) ?></td>
-            <td><?= StatsFormatter::formatPerGameAverage($defPts, $defGames) ?></td>
-        </tr>
-<?php endif; ?>
+    echo self::renderTeamFooterRow($team, 'Offense', $bothStats['offense']);
+    echo self::renderTeamFooterRow($team, 'Defense', $bothStats['defense']);
+endif; ?>
     </tfoot>
 </table>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * The `<thead>` block, byte-for-byte the former inline template.
+     */
+    private static function renderHeader(): string
+    {
+        return "    <thead>\n"
+            . "        <tr>\n"
+            . "            <th>Pos</th>\n"
+            . '            <th class="sticky-col">Player</th>' . "\n"
+            . "            <th>g</th>\n"
+            . '            <th class="sep-r-team">min</th>' . "\n"
+            . "            <th>fgm</th>\n"
+            . "            <th>fga</th>\n"
+            . "            <th>fgp</th>\n"
+            . "            <th>ftm</th>\n"
+            . "            <th>fta</th>\n"
+            . "            <th>ftp</th>\n"
+            . "            <th>3gm</th>\n"
+            . "            <th>3ga</th>\n"
+            . '            <th class="sep-r-team">3gp</th>' . "\n"
+            . "            <th>orb</th>\n"
+            . "            <th>reb</th>\n"
+            . "            <th>ast</th>\n"
+            . "            <th>stl</th>\n"
+            . "            <th>to</th>\n"
+            . "            <th>blk</th>\n"
+            . "            <th>pf</th>\n"
+            . "            <th>pts</th>\n"
+            . "        </tr>\n"
+            . "    </thead>\n";
+    }
+
+    /**
+     * One `<tbody>` row. The player cell is followed by the games cell on the same line with
+     * no line break between them: the former template's `?>` swallowed that newline.
+     *
+     * @param array{name: string, pos: string, pid: int, games: int, min: string|null, fgm: string|null, fga: string|null, fgp: string, ftm: string|null, fta: string|null, ftp: string, tgm: string|null, tga: string|null, tgp: string, orb: string|null, reb: string|null, ast: string|null, stl: string|null, tov: string|null, blk: string|null, pf: string|null, pts: string|null} $row
+     * @param list<int> $starterPids
+     */
+    private static function renderPlayerRow(array $row, array $starterPids): string
+    {
+        return "        <tr>\n"
+            . '            <td>' . HtmlSanitizer::e($row['pos']) . "</td>\n"
+            . '            ' . PlayerImageHelper::renderPlayerCell($row['pid'], $row['name'], $starterPids)
+            . '            <td>' . (int)$row['games'] . "</td>\n"
+            . '            <td class="sep-r-team">' . $row['min'] . "</td>\n"
+            . '            <td>' . $row['fgm'] . "</td>\n"
+            . '            <td>' . $row['fga'] . "</td>\n"
+            . '            <td class="sep-r-weak">' . $row['fgp'] . "</td>\n"
+            . '            <td>' . $row['ftm'] . "</td>\n"
+            . '            <td>' . $row['fta'] . "</td>\n"
+            . '            <td class="sep-r-weak">' . $row['ftp'] . "</td>\n"
+            . '            <td>' . $row['tgm'] . "</td>\n"
+            . '            <td>' . $row['tga'] . "</td>\n"
+            . '            <td class="sep-r-team">' . $row['tgp'] . "</td>\n"
+            . '            <td>' . $row['orb'] . "</td>\n"
+            . '            <td>' . $row['reb'] . "</td>\n"
+            . '            <td>' . $row['ast'] . "</td>\n"
+            . '            <td>' . $row['stl'] . "</td>\n"
+            . '            <td>' . $row['tov'] . "</td>\n"
+            . '            <td>' . $row['blk'] . "</td>\n"
+            . '            <td>' . $row['pf'] . "</td>\n"
+            . '            <td>' . $row['pts'] . "</td>\n"
+            . "        </tr>\n";
+    }
+
+    /**
+     * One `<tfoot>` row: the escaped team label, the raw games count, an empty minutes cell,
+     * then the per-game team stat cells.
+     *
+     * @param 'Offense'|'Defense' $label
+     * @param TeamOffenseStatsRow|TeamDefenseStatsRow $stats
+     */
+    private static function renderTeamFooterRow(Team $team, string $label, array $stats): string
+    {
+        $games = $stats['games'];
+        $pts = StatsFormatter::calculatePoints($stats['fgm'], $stats['ftm'], $stats['tgm']);
+
+        return "        <tr>\n"
+            . '            <td colspan="2">' . HtmlSanitizer::e($team->name) . ' ' . $label . "</td>\n"
+            . '            <td>' . $games . "</td>\n"
+            . '            <td class="sep-r-team"></td>' . "\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['fgm'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['fga'], $games) . "</td>\n"
+            . '            <td class="sep-r-weak">' . StatsFormatter::formatPercentage($stats['fgm'], $stats['fga']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['ftm'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['fta'], $games) . "</td>\n"
+            . '            <td class="sep-r-weak">' . StatsFormatter::formatPercentage($stats['ftm'], $stats['fta']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['tgm'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['tga'], $games) . "</td>\n"
+            . '            <td class="sep-r-team">' . StatsFormatter::formatPercentage($stats['tgm'], $stats['tga']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['orb'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['reb'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['ast'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['stl'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['tvr'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['blk'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($stats['pf'], $games) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatPerGameAverage($pts, $games) . "</td>\n"
+            . "        </tr>\n";
     }
 }

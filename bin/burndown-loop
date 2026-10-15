@@ -86,6 +86,11 @@ UNITS=0
 FAILS=0
 LAST_FAIL=""
 EMPTY_STREAK=0
+MAX_FAILS=3
+EMPTY_SLEEP_MIN=240
+SCOUT_COOLDOWN_MIN=240
+PR_CEILING=15
+UNBLOCK_COOLDOWN_MIN=120
 START_EPOCH=$(date +%s)
 
 # Re-exec hand-off (see bl_maybe_reexec). Read once, then unset, so batch children
@@ -156,6 +161,17 @@ bl_timeout_secs() {
     local m
     m=$(bl_posint_env IBL5_BURNDOWN_BATCH_TIMEOUT_MIN 90) || exit 2
     echo $((m * 60))
+}
+
+# bl_load_knobs: every positive-integer knob, read once. Unset and empty take the
+# default; anything else exits 2 naming the variable. Called by run and start.
+bl_load_knobs() {
+    MAX_FAILS=$(bl_posint_env IBL5_BURNDOWN_MAX_FAILS 3) || exit 2
+    EMPTY_SLEEP_MIN=$(bl_posint_env IBL5_BURNDOWN_EMPTY_SLEEP_MIN 240) || exit 2
+    SCOUT_COOLDOWN_MIN=$(bl_posint_env IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN 240) || exit 2
+    PR_CEILING=$(bl_posint_env IBL5_BURNDOWN_PR_CEILING 15) || exit 2
+    UNBLOCK_COOLDOWN_MIN=$(bl_posint_env IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN 120) || exit 2
+    bl_timeout_secs >/dev/null || exit 2
 }
 
 # ------------------------------------------------------------ lock
@@ -601,14 +617,14 @@ bl_cmd_run() {
         esac
     done
 
-    MAX_FAILS=$(bl_posint_env IBL5_BURNDOWN_MAX_FAILS 3)
-    EMPTY_SLEEP_MIN=$(bl_posint_env IBL5_BURNDOWN_EMPTY_SLEEP_MIN 240) || exit 2
+    bl_load_knobs
     max_fails="$MAX_FAILS"
     timeout_secs=$(bl_timeout_secs)
 
     if [ "$dry" -eq 1 ]; then
         decision=$(bl_decide)
         echo "burndown-loop: DRY RUN reserve=$(usage_pace_reserve) timeout=$timeout_secs max_fails=$max_fails dm=$DISCORD_DM decision=$decision"
+        echo "burndown-loop: DRY RUN knobs ceiling=$PR_CEILING scout_cooldown=${SCOUT_COOLDOWN_MIN}m unblock_cooldown=${UNBLOCK_COOLDOWN_MIN}m empty_sleep=${EMPTY_SLEEP_MIN}m"
         return 0
     fi
 
@@ -708,6 +724,7 @@ bl_cmd_start() {
             *) bl_unknown "$a" ;;
         esac
     done
+    bl_load_knobs
     pid=$(bl_lock_live_pid)
     if [ -n "$pid" ]; then
         echo "burndown-loop: already running (pid $pid); use: bin/burndown-loop stop" >&2

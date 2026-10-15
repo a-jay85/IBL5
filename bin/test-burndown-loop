@@ -284,6 +284,12 @@ test_env_knob_empty_default() {
     assert_eq knob_empty:rc 0 "$RC"
     assert_contains knob_empty:timeout "$OUT" "timeout=5400"
     assert_contains knob_empty:max_fails "$OUT" "max_fails=3"
+    IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN='' IBL5_BURNDOWN_PR_CEILING='' \
+        IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN='' run_loop run --dry-run
+    assert_eq knob_empty_new:rc 0 "$RC"
+    assert_contains knob_empty_new:ceiling "$OUT" "ceiling=15"
+    assert_contains knob_empty_new:scout "$OUT" "scout_cooldown=240m"
+    assert_contains knob_empty_new:unblock "$OUT" "unblock_cooldown=120m"
 }
 
 test_env_knob_invalid() {
@@ -297,6 +303,34 @@ test_env_knob_invalid() {
     IBL5_BURNDOWN_BATCH_TIMEOUT_MIN=-5 run_loop run --dry-run
     assert_eq knob_neg:rc 2 "$RC"
     assert_contains knob_neg:names-var "$OUT" "IBL5_BURNDOWN_BATCH_TIMEOUT_MIN"
+    IBL5_BURNDOWN_PR_CEILING=abc run_loop run --dry-run
+    assert_eq knob_ceiling_abc:rc 2 "$RC"
+    assert_contains knob_ceiling_abc:names-var "$OUT" "IBL5_BURNDOWN_PR_CEILING"
+    IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN=0 run_loop run --dry-run
+    assert_eq knob_scout_zero:rc 2 "$RC"
+    assert_contains knob_scout_zero:names-var "$OUT" "IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN"
+    IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN=-5 run_loop run --dry-run
+    assert_eq knob_unblock_neg:rc 2 "$RC"
+    assert_contains knob_unblock_neg:names-var "$OUT" "IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN"
+}
+
+test_env_knob_values_new() {
+    new_env
+    IBL5_BURNDOWN_PR_CEILING=7 IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN=30 run_loop run --dry-run
+    assert_eq knob_values:rc 0 "$RC"
+    assert_contains knob_values:ceiling "$OUT" "ceiling=7"
+    assert_contains knob_values:scout "$OUT" "scout_cooldown=30m"
+}
+
+test_start_rejects_invalid_knob() {
+    new_env
+    seed_usage 5 0 1
+    IBL5_BURNDOWN_PR_CEILING=abc run_loop start
+    assert_eq start_knob:rc 2 "$RC"
+    assert_contains start_knob:names-var "$OUT" "IBL5_BURNDOWN_PR_CEILING"
+    assert_no_file start_knob:no-runner "$STATE/runner.sh"
+    assert_no_file start_knob:no-plist "$LAUNCH_DIR/com.ibl5.burndown-loop.plist"
+    assert_no_file start_knob:no-launchctl "$T/launchctl.calls"
 }
 
 test_env_reserve_values() {

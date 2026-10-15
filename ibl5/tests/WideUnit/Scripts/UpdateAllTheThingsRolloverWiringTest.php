@@ -48,7 +48,7 @@ final class UpdateAllTheThingsRolloverWiringTest extends TestCase
 
     public function testScriptPassesBasePathAndFilePrefixToDetector(): void
     {
-        self::assertStringContainsString('$basePath = $_SERVER[\'DOCUMENT_ROOT\'] . \'/ibl5\';', $this->src);
+        self::assertStringContainsString('$basePath = $documentRoot . \'/ibl5\';', $this->src);
         self::assertStringContainsString('$backupLocator, $archiveExtractor, $basePath, $filePrefix,', $this->block);
     }
 

@@ -45,8 +45,6 @@ if ($localClassesDir !== false) {
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/db.php';
 
-/** @var \mysqli $mysqli_db */
-
 function fail(string $msg): never
 {
     fwrite(STDERR, "storeSimRecap: {$msg}\n");
@@ -55,7 +53,7 @@ function fail(string $msg): never
 
 // ── Argv parse ────────────────────────────────────────────────────────────────
 $raw = null;
-foreach (array_slice($argv, 1) as $arg) {
+foreach (array_slice($argv ?? [], 1) as $arg) {
     if (!is_string($arg)) {
         continue;
     }
@@ -88,6 +86,7 @@ try {
     fail('malformed payload: ' . $e->getMessage());
 }
 
+/** @var \mysqli $mysqli_db */
 $repo = new \SimRecap\SimSummaryRepository($mysqli_db);
 
 // ── Resolve each game's box_id from its natural key ───────────────────────────

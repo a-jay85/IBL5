@@ -1,7 +1,7 @@
 ---
 name: reset-ready
-description: "Refill the headless pipeline before a usage reset or when automouse runs dry: scout pipeline logs, open PRs, prod logs and code health in parallel, pick refactor-and-fix work, fire each pick through bin/plan-now, and confirm automouse, the burndown loop and the usage-gate coordinator will restart after each limit reset."
-last_verified: 2026-10-10
+description: "Refill the headless pipeline before a usage reset or when automouse runs dry: scout pipeline logs and stale docs, open PRs, prod logs, slow queries, Lighthouse a11y scores and code health (PHPStan baseline, mutation, orphan CSS) in parallel, prefer chore, fix, refactor, test and docs picks over feat, fire each pick through bin/plan-now, and confirm automouse, the burndown loop and the usage-gate coordinator will restart after each limit reset."
+last_verified: 2026-10-15
 ---
 
 # /reset-ready
@@ -29,6 +29,10 @@ request, run every step.
   code cleanup.
 - A SQL, auth or destructive-migration item may go in, but its prompt routes to
   `plan-architect-xhigh`.
+- Prefer work whose honest PR title type is `chore`, `fix`, `refactor`, `test` or
+  `docs`. A `feat:` PR waits for the user's sign-off, so it ships last. Classify the type
+  with the GM-notice test in `.claude/rules/auto-commit.md`.
+- Never relabel a feat as chore to dodge the hold. The type follows what the diff is.
 
 ## Step 1: Read live state
 
@@ -79,18 +83,32 @@ session pinned to a worktree blocks Bash calls that resolve to the main checkout
 not enter a worktree until the scouts finish. Each writes its report to
 `/tmp/reset-ready/<area>.md` at about 6 KB, dedupes against `context.md`, and ends with a
 "Not confirmed" list. Each candidate carries a title, evidence with paths and counts, the
-fix, a size (S, M or L), and whether it touches a security surface or weakens a gate.
+fix, a size (S, M or L), its honest PR title type (`feat`, `fix`, `refactor`, `test`,
+`chore` or `docs`), and whether it touches a security surface or weakens a gate.
 
 | Area | Sources |
 |------|---------|
-| `pipeline` | Automouse `reports/`, `skipped/` and `logs/`; `/tmp/plan-now-*.log` and `/tmp/post-plan-now-*.log` RESULT, BLOCKED and PAUSED lines; the usage-gate log. Cluster failure causes since the last round. |
+| `pipeline` | Automouse `reports/`, `skipped/` and `logs/`; `/tmp/plan-now-*.log` and `/tmp/post-plan-now-*.log` RESULT, BLOCKED and PAUSED lines; the usage-gate log. Cluster failure causes since the last round. Stale docs: run `gh issue list -R a-jay85/IBL5 --label stale-docs --state open --json number,title,createdAt` and read the newest `/tmp/docfix-run-*.log`. Report only an open stale-docs issue with no refresh PR in `context.md`, or a docfix run that skipped or failed. The nightly audit and `bin/docfix-run` fix date-stale docs. Never propose a `last_verified` bump on a doc no change touches. Cap: 1 pick. Dedupe: by issue number against `context.md`. |
 | `prs` | Open PRs: failing checks with the first real error from `gh run view --log-failed`, conflicts, stalled holds. Group shared failure causes. Run `bin/pr-cycle-tick --dry-run` first: it already rescues conflicting and red PRs every 30 minutes, so only the PRs it skips at its retry cap count as work. |
-| `prodlogs` | `ssh -o BatchMode=yes iblhoops.net`, read-only commands only. The Monolog app logs `~/public_html/ibl5/logs/ibl5-<date>.log` first, then the access logs for 5xx and repeated 404s. Map each group to a repo file and line. |
-| `codehealth` | `ibl5/phpstan-baseline.neon` hotspots by path, per-module test ratio, long methods with or without characterization tests, duplicate helpers, TODO and FIXME. Behavior-preserving work only. |
+| `prodlogs` | Start with `bin/log-fetch-prod --days 7` and work from its Severity, Channel and deduplicated WARNING+ sections. Then `ssh -o BatchMode=yes iblhoops.net`, read-only commands only, for the access logs: 5xx and repeated 404s. Add one line with the last smoke-prod result from `gh run list -R a-jay85/IBL5 --workflow smoke-prod.yml --limit 1 --json conclusion,createdAt`. Map each group to a repo file and line. Cap: 3 picks. Dedupe: by exception class or message against `context.md`. |
+| `perf` | The "Slow Queries" section (grouped by repository) of `bin/log-fetch-prod --days 7`. Rank repositories by hit count, then by max ms, and trace each to its query method and the page that calls it. Cite the query text and table for every fix. Cap: 2 picks. Dedupe: by repository or class name against `context.md` Recent plans, the open PR branch names, and local branches from `git branch --list`. Branch `franchise-five-season-window-slow` already covers the FranchiseHistoryRepository slow queries. |
+| `a11y` | The newest weekly Lighthouse issue: `gh issue list -R a-jay85/IBL5 --label lighthouse-audit --state all --limit 1 --json number,title`, then `gh issue view <number> -R a-jay85/IBL5`. Take the three lowest Accessibility scores under 1.00 and any Performance score under 0.80. Map each URL to its module with `bin/lighthouse-audit-urls --json`. Fixes stay on existing markup per the pick rules. Do not run Lighthouse locally. Cap: 2 picks. Dedupe: by module against `context.md` and by URL against the earlier reset-ready reports. |
+| `codehealth` | `ibl5/phpstan-baseline.neon` hotspots by path from `awk '/count:/{c=$2} /path:/{s[$2]+=c} END{for(p in s) print s[p], p}' ibl5/phpstan-baseline.neon`, skipping every path backlog#1463 already lists. Per-module test ratio, long methods with or without characterization tests, duplicate helpers, TODO and FIXME. Mutation: the newest scheduled run from `gh run list -R a-jay85/IBL5 --workflow mutation.yml --event schedule --limit 1 --json databaseId`, then `gh run download <id> -R a-jay85/IBL5 -n mutation-reports -D /tmp/reset-ready/mutation` and its `infection-summary.log`. Report it only when the Escaped, Timed Out or Not Covered count is above zero. Orphan CSS: `bin/check-orphan-css` without `--crawl`. Its output lists candidates only, so grep the PHP and JS for a composed prefix (such as `txn-badge--` or `year-cell`) before calling a class dead. Behavior-preserving work only. Cap: 3 picks, at most 1 from the baseline. Dedupe: by file path against `context.md` and backlog#1463. |
+
+The burndown loop owns the PHPStan baseline cleanup in backlog#1463, so `codehealth`
+never picks a baseline path that issue lists.
 
 Add a `frontend` scout (CSS dedupe, dead styles, a11y on existing markup, axe coverage)
-only when the earlier rounds left frontend candidates unplanned. Keep its prompt inside the
-pick rules above.
+only when the earlier rounds left frontend candidates unplanned. That includes `a11y` and
+orphan-CSS candidates the newest `~/claude-plans/_reports/*-reset-ready.md` skipped at a
+cap. Keep its prompt inside the pick rules above. Cap: 2 picks. Dedupe: by CSS file or
+module against `context.md`.
+
+These tools are not scout sources. `bin/events-review` spawns `claude -p`, DMs the owner
+and needs the prod credential. `bin/smoke-prod` hits prod, and its workflow result is
+already a `prodlogs` line. `bin/mutation-diff` is a per-PR tool that needs pcov and the
+main-stack database. `bin/lighthouse-audit-report` only formats a CI manifest. Never run
+Lighthouse or `bin/check-orphan-css --crawl` from a scout.
 
 While the scouts run, do Step 6. Do not poll them. Each one notifies when it finishes.
 
@@ -98,7 +116,9 @@ While the scouts run, do Step 6. Do not poll them. Each one notifies when it fin
 
 Read the reports. Drop candidates that break a pick rule, that a report marks as covered,
 or that the reports could not confirm. Merge candidates with one shared fix shape into one
-plan. Order the picks by throughput unlocked, then by GM-visible bug, then by code health.
+plan. Put every non-feat pick first, ordered by throughput unlocked, then by GM-visible
+bug, then by code health. Feat picks fill only the slots left after that, in the same
+order.
 
 ## Step 5: Write and fire the prompts
 

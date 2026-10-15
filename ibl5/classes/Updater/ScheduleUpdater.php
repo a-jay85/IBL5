@@ -524,12 +524,9 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
 
             $this->preloadTeamNameMap();
 
-            $games = $this->loadScheduledGames();
-
             $currentDateSlot = null;
             $slotDate = null;
-
-            foreach ($games as $game) {
+            foreach ($this->loadScheduledGames() as $game) {
                 // Resolve the date when we move to a new date slot
                 if ($game['date_slot'] !== $currentDateSlot) {
                     $currentDateSlot = $game['date_slot'];
@@ -542,7 +539,6 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
 
                 $log .= $this->insertScheduledGame($game, $slotDate['date']);
             }
-
             $log .= $this->insertPlayoffGamesFromScheduleHtm();
         });
 

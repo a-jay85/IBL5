@@ -84,7 +84,7 @@ Full tables live in `.claude/rules/contract-rules.md`. The rules:
 
 - Standings come from played games in `ibl_schedule`. Box scores do not feed standings.
 - Each conference sends 8 teams to the playoffs: the division winners plus the 6 best other teams.
-- Tiebreakers, in order: win percentage, head-to-head, division winner, division record, conference record, point differential, team name.
+- Tiebreakers, in order: win percentage, head-to-head, division winner, division record, conference record, point differential, lowest team ID.
 - The conference champion is the team that wins playoff round 3.
 
 ## Stats and data

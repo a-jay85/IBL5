@@ -7,6 +7,7 @@ namespace FreeAgency;
 use Database\BaseMysqliRepository;
 use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
+use Repositories\SalaryCapRepository;
 
 /**
  * FreeAgencyDemandRepository - Database operations for free agency demand calculations
@@ -28,13 +29,13 @@ class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAge
      * Constructor - inherits from BaseMysqliRepository
      *
      * @param \mysqli $db Active mysqli connection
-     * @param SalaryCapRepositoryInterface $salaryCapRepo Shared salary queries
+     * @param SalaryCapRepositoryInterface|null $salaryCapRepo Shared salary queries (defaults to SalaryCapRepository)
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(\mysqli $db, SalaryCapRepositoryInterface $salaryCapRepo)
+    public function __construct(\mysqli $db, ?SalaryCapRepositoryInterface $salaryCapRepo = null)
     {
         parent::__construct($db);
-        $this->salaryCapRepo = $salaryCapRepo;
+        $this->salaryCapRepo = $salaryCapRepo ?? new SalaryCapRepository($db);
     }
 
     /**

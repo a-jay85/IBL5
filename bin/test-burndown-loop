@@ -769,6 +769,64 @@ test_start_bootstraps() {
     assert_contains start:bootstrap "$(cat "$T/launchctl.calls" 2>/dev/null)" "bootstrap gui/"
 }
 
+test_runner_persists_set_knobs() {
+    new_env
+    seed_usage 5 0 1
+    IBL5_BURNDOWN_PR_CEILING=7 IBL5_BURNDOWN_RESERVE_PCT=20 run_loop start
+    assert_eq runner_knobs:rc 0 "$RC"
+    assert_contains runner_knobs:ceiling "$(cat "$STATE/runner.sh" 2>/dev/null)" "export IBL5_BURNDOWN_PR_CEILING=7"
+    assert_contains runner_knobs:reserve "$(cat "$STATE/runner.sh" 2>/dev/null)" "export IBL5_BURNDOWN_RESERVE_PCT=20"
+}
+
+test_runner_omits_internal_vars() {
+    new_env
+    seed_usage 5 0 1
+    # REEXEC_FUTURE is a name the loop never unsets at startup, so only the case filter drops it.
+    IBL5_BURNDOWN_REEXEC_FUTURE=1 IBL5_BURNDOWN_LOOP=1 IBL5_BURNDOWN_EMPTY_SENTINEL=/tmp/x \
+        IBL5_BURNDOWN_MAX_FAILS='' run_loop start
+    assert_eq runner_internal:rc 0 "$RC"
+    local body
+    body=$(cat "$STATE/runner.sh" 2>/dev/null)
+    assert_not_contains runner_internal:reexec "$body" "REEXEC_FUTURE"
+    assert_not_contains runner_internal:loop "$body" "IBL5_BURNDOWN_LOOP="
+    assert_not_contains runner_internal:sentinel "$body" "EMPTY_SENTINEL"
+    assert_not_contains runner_internal:empty-value "$body" "IBL5_BURNDOWN_MAX_FAILS"
+    assert_not_contains runner_internal:empty-quotes "$body" "=''"
+}
+
+test_runner_exports_under_empty_env() {
+    new_env
+    seed_usage 5 0 1
+    IBL5_BURNDOWN_DISCORD_DM="$T/a b'c/dm" run_loop start
+    assert_eq runner_roundtrip:rc 0 "$RC"
+    local got
+    got=$(env -i PATH=/usr/bin:/bin /bin/bash -c 'eval "$(grep "^export IBL5_BURNDOWN_" "$1")"; printf %s "$IBL5_BURNDOWN_DISCORD_DM"' _ "$STATE/runner.sh")
+    assert_eq runner_roundtrip:value "$T/a b'c/dm" "$got"
+}
+
+test_runner_resume_carries_env() {
+    new_env
+    seed_usage 5 0 1
+    IBL5_BURNDOWN_PR_CEILING=7 run_loop start
+    assert_eq runner_resume:start-rc 0 "$RC"
+    gate_do "usage_argv_save $SID_A start --no-dm"
+    marker_for "$SID_A" burndown-loop
+    run_loop --resume-paused "$SID_A"
+    assert_eq runner_resume:rc 0 "$RC"
+    assert_contains runner_resume:carried "$(cat "$STATE/runner.sh" 2>/dev/null)" "export IBL5_BURNDOWN_PR_CEILING=7"
+    assert_contains runner_resume:sid "$(cat "$STATE/runner.sh" 2>/dev/null)" "--loop-sid=$SID_A"
+}
+
+test_runner_fresh_start_drops_old_env() {
+    new_env
+    seed_usage 5 0 1
+    IBL5_BURNDOWN_PR_CEILING=7 run_loop start
+    assert_contains runner_fresh:first "$(cat "$STATE/runner.sh" 2>/dev/null)" "IBL5_BURNDOWN_PR_CEILING"
+    run_loop start
+    assert_eq runner_fresh:rc 0 "$RC"
+    assert_not_contains runner_fresh:dropped "$(cat "$STATE/runner.sh" 2>/dev/null)" "IBL5_BURNDOWN_PR_CEILING"
+}
+
 test_start_refuses_live_lock() {
     new_env
     seed_usage 5 0 1

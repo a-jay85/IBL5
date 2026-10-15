@@ -1305,15 +1305,24 @@ done < "$GATEP_MATRIX"
 #   4. the token exists on the base branch (git cat-file -e <ref>:<path>; dirs pass);
 #   5. the token is not a MUST_APPEAR ## Critical Files entry (that entry says the
 #      diff must touch it; the marker says it will not).
+# Violation from plan prose (check 7a):
+#   7a. an UNMARKED planning row names a path that exists on the base branch, and a
+#       fence-stripped body line that cites the path in backticks says the file is
+#       only run (unedited, never edited, run-only, passes unchanged, ...). The plan
+#       itself says the diff will not touch the file, so Phase 5.0 would emit MISSING
+#       and hold arming; the fix is the (run-only) marker. Vetoed (falls through to
+#       7b) when the path is a must-appear Critical Files entry, or when a phase/step
+#       or Critical Files line citing it keeps an edit verb once the run-only phrases
+#       are removed from that line.
 # Warnings (never violations), because plan prose cannot prove an edit either way:
 #   6. a `## Phase N` / `## Step N` body line cites the token in backticks together
 #      with an edit verb;
-#   7. an UNMARKED planning row names a path that exists on the base branch, and no
-#      phase/step body line or Critical Files entry cites it — the author may have
-#      meant (run-only), or may have forgotten to name the edit in a phase.
+#   7b. an UNMARKED planning row names a path that exists on the base branch, no
+#      phase/step body line or Critical Files entry cites it, and 7a did not fire —
+#      the author may have meant (run-only), or may have forgotten to name the edit.
 # Reference tree: CHECK_PLAN_MASTER_REF when set (test seam), else the first of
 # origin/master, master, HEAD that resolves (same chain as gate A). No resolvable
-# ref fails OPEN for checks 4 and 7 only; checks 1-3 and 5 still run.
+# ref fails OPEN for checks 4, 7a and 7b only; checks 1-3 and 5 still run.
 # ---------------------------------------------------------------------------
 _ro_ref=""
 if [ -n "${CHECK_PLAN_MASTER_REF:-}" ]; then
@@ -1340,6 +1349,29 @@ _ro_phase_lines="$(awk '
 ' "$GATEP_BODY")"
 _ro_cf_lines="$(cf_section_named "$PLAN_FILE" "Critical Files")"
 _ro_edit_verbs='(edit|extend|modify|modif|update|rewrite|change|append|insert|replace|add|create|write|delete|remove|rename)'
+# Check 7a phrase list, lowercase, matched against a lowercased line. A bare
+# `unchanged`, `no edit`, or `must stay green` is deliberately absent (too broad).
+_ro_runonly_re='unedited|un-edited|never (be )?(edited|modified|touched|changed)|not (be )?(edited|modified|touched)|run-only|(passes|pass|stays? green|stays? passing) (green )?(unchanged|unedited)|run,? (but )?(is )?not (edited|modified)'
+# 7a trigger: some fence-stripped body line cites `$1` (full path, in backticks)
+# and, with every code span removed, carries a run-only phrase.
+_ro_says_run_only() {
+    local cite
+    cite="$(grep -F -- "\`${1}\`" "$GATEP_BODY" || true)"
+    [ -n "$cite" ] || return 1
+    cite="$(sed 's/`[^`]*`//g' <<< "$cite" | tr '[:upper:]' '[:lower:]')"
+    grep -qE -- "$_ro_runonly_re" <<< "$cite"
+}
+# 7a veto: `$1` is must-appear, or a phase/step or Critical Files line citing it
+# still has an edit verb after the run-only phrases are cut from the line.
+_ro_edit_vetoed() {
+    grep -qxF -- "$1" <<< "$_ro_must_appear" && return 0
+    local lines
+    lines="$(printf '%s\n%s\n' "$_ro_phase_lines" "$_ro_cf_lines" \
+        | grep -F -- "\`${1}\`" || true)"
+    [ -n "$lines" ] || return 1
+    lines="$(tr '[:upper:]' '[:lower:]' <<< "$lines" | sed -E "s/${_ro_runonly_re}//g")"
+    grep -qE -- "\\b${_ro_edit_verbs}" <<< "$lines"
+}
 while IFS= read -r row; do
     [ -n "$row" ] || continue
     bare=$(sed 's/`[^`]*`//g' <<< "$row")
@@ -1384,10 +1416,16 @@ while IFS= read -r row; do
         fi
         continue
     fi
-    # Unmarked planning row (check 7): existing-on-base path that nothing else cites.
+    # Unmarked planning row (check 7): existing-on-base path.
     [ "$has_nc" -eq 1 ] && continue
     [ -n "$_ro_ref" ] || continue
     _ro_on_base "$planned" || continue
+    # 7a: plan prose says the file is only run, yet the row lacks the marker.
+    if _ro_says_run_only "$planned" && ! _ro_edit_vetoed "$planned"; then
+        viol "[RO] unmarked run-only row: \`${planned}\` exists on ${_ro_ref} and a plan line citing it says the file is only run, never edited, but the row has no marker; Phase 5.0 will emit MISSING for it and hold arming. Add (run-only) directly after the token: ${row}"
+        continue
+    fi
+    # 7b: existing-on-base path that nothing else cites.
     if ! grep -qF -- "\`${planned}\`" <<< "$_ro_phase_lines" \
        && ! grep -qF -- "\`${planned}\`" <<< "$_ro_cf_lines"; then
         warn "[RO] warning: unmarked test row names \`${planned}\`, which exists on ${_ro_ref}, and no phase line or Critical Files entry cites it — Phase 5.0 will emit MISSING unless the diff touches it; add (run-only) if the plan only runs it, or cite the edit in a phase"

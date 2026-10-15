@@ -287,6 +287,166 @@ def missing_parts(reason: str) -> frozenset[str]:
                      if p.startswith(_MISSING_PREFIXES))
 
 
+# Positive allowlist: the fail-closed `UNREALISED-ASSERTION: matrix-assertion check
+# unavailable (...)` item does not start with `row `, so it never becomes a repeatable part.
+UNREALISED_ROW_PREFIX = "UNREALISED-ASSERTION: row "
+
+
+def unrealised_parts(reason: str) -> frozenset[str]:
+    """Normalized `UNREALISED-ASSERTION: row ...` parts of a condition-3 reason."""
+    norm = normalize_reason(reason or "")
+    return frozenset(p for p in norm.split("; ")
+                     if p.startswith(UNREALISED_ROW_PREFIX))
+
+
+def hold_parts(reason: str) -> frozenset[str]:
+    """Every repeatable condition-3 part: MISSING items plus UNREALISED rows."""
+    return missing_parts(reason) | unrealised_parts(reason)
+
+
+def _condition3_reason(rec) -> str:
+    for entry in (rec or {}).get("structural") or []:
+        if isinstance(entry, list) and len(entry) == 3 and entry[0] == 3:
+            return entry[2] or ""
+    return ""
+
+
+def unrealised_only_parts(state_dir, slug) -> frozenset[str]:
+    """UNREALISED row parts of the last condition-3 hold, only when it has no MISSING item.
+
+    A mixed hold stays on the MISSING path and never reaches the UNREALISED path.
+    """
+    reason = _condition3_reason(load_record(state_dir, slug))
+    if missing_parts(reason):
+        return frozenset()
+    return unrealised_parts(reason)
+
+
+@dataclass(frozen=True)
+class UnrealisedEval:
+    items: tuple[str, ...]
+    tokens: frozenset[str]
+
+
+def evaluate_unrealised(plan_path, diff_body, root, *, script=None,
+                        timeout=60) -> UnrealisedEval | None:
+    """Run the matrix script and return its UNREALISED row items and missing tokens.
+
+    None (proceed) when the check cannot be trusted: no plan, an unrunnable script,
+    a fail-closed `unavailable` line, or rows with no tokens to guard master with.
+    """
+    if not plan_path:
+        return None
+    import tempfile
+
+    from harness import conformance
+    script = script or conformance._MATRIX_ASSERTIONS_SCRIPT
+    try:
+        with tempfile.TemporaryDirectory(prefix="early-unrealised-") as td:
+            diff_path = os.path.join(td, "diff.patch")
+            body_path = os.path.join(td, "pr-body.md")
+            with open(diff_path, "w") as fh:
+                fh.write(diff_body or "")
+            with open(body_path, "w") as fh:
+                fh.write("")
+            proc = subprocess.run(
+                conformance._matrix_assertion_argv(script, plan_path, diff_path, body_path),
+                capture_output=True, text=True, check=False, timeout=timeout,
+                env={**os.environ, "MATRIX_ASSERT_ROOT": root})
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode < 0 or proc.returncode >= 2:
+        return None
+    items = []
+    for ln in proc.stdout.splitlines():
+        ln = ln.strip()
+        if not ln.startswith("UNREALISED-ASSERTION:"):
+            continue
+        if not ln.startswith(UNREALISED_ROW_PREFIX):
+            return None
+        items.append(ln)
+    tokens: set[str] = set()
+    for ln in proc.stderr.splitlines():
+        ln = ln.lstrip()
+        if ln.startswith("missing:"):
+            tokens.update(ln[len("missing:"):].split())
+    if items and not tokens:
+        return None
+    return UnrealisedEval(tuple(items), frozenset(tokens))
+
+
+def _git_out(repo: str, *args: str):
+    """(returncode, stdout) of a git probe, or None on any OS/timeout error."""
+    try:
+        proc = subprocess.run(["git", "-C", repo, *args], capture_output=True,
+                              text=True, check=False, timeout=120)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.returncode, proc.stdout
+
+
+def tokens_on_ref(repo, ref, tokens) -> bool | None:
+    """True when any token appears in `ref`'s file paths or file contents.
+
+    None for no tokens, an unknown ref, or a git error. Substring matching
+    over-approximates the matrix script's arms, so an error only makes callers proceed.
+    """
+    if not tokens:
+        return None
+    ok = _git_out(repo, "rev-parse", "--verify", "-q", f"{ref}^{{commit}}")
+    if ok is None or ok[0] != 0:
+        return None
+    paths = _git_out(repo, "ls-tree", "-r", "--name-only", ref)
+    if paths is None or paths[0] != 0:
+        return None
+    if any(tok in path for tok in tokens for path in paths[1].splitlines()):
+        return True
+    args = ["grep", "-F", "-q"]
+    for tok in sorted(tokens):
+        args += ["-e", tok]
+    grep = _git_out(repo, *args, ref, "--")
+    if grep is None or grep[0] not in (0, 1):
+        return None
+    return grep[0] == 0
+
+
+def worktree_clean(worktree) -> bool | None:
+    out = _git_out(worktree, "status", "--porcelain", "--untracked-files=normal")
+    if out is None or out[0] != 0:
+        return None
+    return out[1].strip() == ""
+
+
+def head_sha(worktree) -> str:
+    out = _git_out(worktree, "rev-parse", "HEAD")
+    if out is None or out[0] != 0:
+        return ""
+    return out[1].strip()
+
+
+def early_unrealised_repeat(state_dir, slug, missing_items, *, plan_path, diff_body,
+                            worktree, master_ref="origin/master", script=None):
+    """Decide whether an UNREALISED-only hold repeats. Returns (reason, note, tokens).
+
+    `reason` is None to proceed. Every check fails open; MISSING-only records spawn nothing.
+    """
+    prior = unrealised_only_parts(state_dir, slug)
+    if not prior:
+        return None, "no unrealised hold", frozenset()
+    if missing_parts("; ".join(missing_items or [])):
+        return None, "missing items present", frozenset()
+    if worktree_clean(worktree) is not True:
+        return None, "worktree dirty or unreadable", frozenset()
+    ev = evaluate_unrealised(plan_path, diff_body, worktree, script=script)
+    if ev is None:
+        return None, "matrix check unavailable", frozenset()
+    if unrealised_parts("; ".join(ev.items)) != prior:
+        return None, "unrealised set changed", frozenset()
+    if tokens_on_ref(worktree, master_ref, ev.tokens) is not False:
+        return None, "master carries a missing token or check unavailable", frozenset()
+    return "; ".join(sorted(prior)), "repeat", ev.tokens
+
+
 def early_repeat_reason(state_dir, slug, items) -> str | None:
     """Return the repeated reason when `items` equal the stored condition-3 MISSING set.
 

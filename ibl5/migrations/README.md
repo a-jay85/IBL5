@@ -334,7 +334,7 @@ Implements the IBL5 Database Optimization Audit:
 
 **PHP Code Changes:**
 - `CommonMysqliRepository::getTeamTotalSalary()` → uses `vw_current_salary`
-- New methods: `getTeamNextYearSalary()`, `getPositionSalaryCommitmentNextYear()`, `getTeamCapSpaceNextSeason()`
+- New methods: `getTeamNextYearSalary()`, `getTeamCapSpaceNextSeason()`
 - `NegotiationRepository`: Salary methods use `vw_current_salary`, `getMarketMaximums()` cached in `cache` table
 - `FreeAgencyDemandRepository::getPositionSalaryCommitment()` → uses `vw_current_salary`
 - `RecordHoldersRepository`: Uses `vw_team_total_score`, removes CAST() workarounds

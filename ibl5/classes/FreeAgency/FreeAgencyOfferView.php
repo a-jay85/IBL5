@@ -41,32 +41,55 @@ class FreeAgencyOfferView
         $birdYears = $player->getTeamName() === $team->name ? ($player->getBirdYears() ?? 0) : 0;
         $raisePercentage = \League\ContractRules::getMaxRaisePercentage($birdYears);
 
-        // Generate a single CSRF token for all forms on this page.
-        // The negotiate page has 16+ forms (custom, delete, quick-offer buttons).
-        // CsrfGuard's MAX_TOKENS=10 would evict the custom form's token if each
-        // form generated its own. One shared token avoids this.
+        // One shared CSRF token for every form on this page (16+: custom, delete, quick-offer buttons).
+        // CsrfGuard's MAX_TOKENS=10 would evict the custom form's token if each form generated its own.
         $this->formView->setCsrfToken(\Security\CsrfGuard::generateRawToken('free_agency'));
 
         ob_start();
-
         echo '<h1 class="ibl-title">Free Agency</h1>';
+        $noRosterSpots = $capMetrics['rosterSpots'][0] < 1 && !$hasExistingOffer;
+        echo HtmlSanitizer::trusted($this->renderAlerts($error, $noRosterSpots));
+        if ($noRosterSpots) {
+            return (string) ob_get_clean();
+        }
+        echo HtmlSanitizer::trusted($this->renderPlayerInfoCard($player));
+        echo HtmlSanitizer::trusted($this->renderOfferFormCard($player, $team, $demands, $existingOffer, $raisePercentage));
+        echo HtmlSanitizer::trusted($this->renderPresetsCard($player, $team));
+        ?>
+<?= HtmlSanitizer::trusted($this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $birdYears)) ?>
 
-        // Error banner from PRG redirect
+<?php if ($hasExistingOffer): ?>
+<?= HtmlSanitizer::trusted($this->renderDeleteOfferSection($player, $team)) ?>
+<?php endif; ?>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Error banner (from the PRG redirect) and the no-roster-spots warning.
+     */
+    private function renderAlerts(?string $error, bool $noRosterSpots): string
+    {
+        ob_start();
         if ($error !== null) {
             ?>
 <div class="ibl-alert ibl-alert--error"><?= HtmlSanitizer::e($error) ?></div>
             <?php
         }
-
-        // No roster spots warning
-        if ($capMetrics['rosterSpots'][0] < 1 && !$hasExistingOffer) {
+        if ($noRosterSpots) {
             ?>
 <div class="ibl-alert ibl-alert--warning">Sorry, you have no roster spots remaining and cannot offer a contract to this player.</div>
             <?php
-            return (string) ob_get_clean();
         }
+        return (string) ob_get_clean();
+    }
 
-        // Card 1: Player Info
+    /**
+     * Card 1: player headshot and ratings.
+     */
+    private function renderPlayerInfoCard(Player $player): string
+    {
+        ob_start();
         ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
@@ -80,7 +103,20 @@ class FreeAgencyOfferView
     </div>
 </div>
 
-<?php // Card 2: Demands + Custom Offer Form ?>
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Card 2: player demands and the custom offer form.
+     *
+     * @param array<string, int> $demands
+     * @param array<string, int> $existingOffer
+     */
+    private function renderOfferFormCard(Player $player, Team $team, array $demands, array $existingOffer, float $raisePercentage): string
+    {
+        ob_start();
+        ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
         <h2 class="ibl-card__title">Contract Offer</h2>
@@ -111,7 +147,17 @@ class FreeAgencyOfferView
     </div>
 </div>
 
-<?php // Card 3: Quick Offer Presets ?>
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Card 3: quick offer preset buttons.
+     */
+    private function renderPresetsCard(Player $player, Team $team): string
+    {
+        ob_start();
+        ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
         <h2 class="ibl-card__title">Quick Offer Presets</h2>
@@ -121,11 +167,17 @@ class FreeAgencyOfferView
     </div>
 </div>
 
-<?php // Card 4: Notes & Reminders ?>
-<?= HtmlSanitizer::trusted($this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $birdYears)) ?>
+<?php
+        return (string) ob_get_clean();
+    }
 
-<?php // Delete Offer (conditional) ?>
-<?php if ($hasExistingOffer): ?>
+    /**
+     * Delete-offer form, shown only when the team already has an offer in.
+     */
+    private function renderDeleteOfferSection(Player $player, Team $team): string
+    {
+        ob_start();
+        ?>
 <div class="offer-delete-section">
     <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
         <?= HtmlSanitizer::trusted($this->formView->renderCsrfInput()) ?>
@@ -134,8 +186,7 @@ class FreeAgencyOfferView
         <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>
     </form>
 </div>
-<?php endif; ?>
-        <?php
+<?php
         return (string) ob_get_clean();
     }
 

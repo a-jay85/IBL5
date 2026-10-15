@@ -28,6 +28,7 @@ class ScheduleUpdaterTest extends TestCase
 
     protected function tearDown(): void
     {
+        unset($GLOBALS['authService']);
         foreach ($this->tempDirs as $dir) {
             if (is_dir($dir)) {
                 $this->removeDir($dir);
@@ -72,6 +73,7 @@ class ScheduleUpdaterTest extends TestCase
         $leagueContext = self::createStub(LeagueContext::class);
         $leagueContext->method('getCurrentLeague')->willReturn($olympics ? 'olympics' : 'IBL');
         $leagueContext->method('isOlympics')->willReturn($olympics);
+        $leagueContext->method('getFilePrefix')->willReturn($olympics ? 'Olympics' : 'IBL5');
         $leagueContext->method('getTableName')->willReturnCallback(
             static fn (string $table): string => $olympics
                 ? str_replace('ibl_', 'ibl_olympics_', $table)
@@ -229,6 +231,35 @@ class ScheduleUpdaterTest extends TestCase
         }
     }
 
+    private function showDebugOutputAsAdmin(): void
+    {
+        $authStub = self::createStub(\Auth\AuthService::class);
+        $authStub->method('isAdmin')->willReturn(true);
+        $GLOBALS['authService'] = $authStub;
+    }
+
+    /** @return list<string> */
+    private function scheduleInserts(): array
+    {
+        return array_values(array_filter(
+            $this->mockDb->getExecutedQueries(),
+            static fn (string $q): bool => str_starts_with($q, 'INSERT INTO ibl_schedule')
+                || str_starts_with($q, 'INSERT INTO ibl_olympics_schedule'),
+        ));
+    }
+
+    private function runUpdateCapturingOutput(TestableScheduleUpdater $updater): string
+    {
+        ob_start();
+        try {
+            $updater->update();
+        } finally {
+            $output = ob_get_clean();
+        }
+
+        return $output === false ? '' : $output;
+    }
+
     private function registerUnreadableWrapper(): string
     {
         stream_wrapper_register(UnreadableScheduleHtmStreamWrapper::SCHEME, UnreadableScheduleHtmStreamWrapper::class);
@@ -295,6 +326,285 @@ class ScheduleUpdaterTest extends TestCase
         $this->assertTrue($threw, 'update() must rethrow when an insert fails');
         $this->assertContains('ROLLBACK', $log, 'a failed run must roll back');
         $this->assertNotContains('COMMIT', $log, 'a failed run must not commit');
+    }
+
+    /** @return list<array{team_name: string, teamid: int}> */
+    private function defaultPinTeams(): array
+    {
+        return [
+            ['team_name' => 'Alpha', 'teamid' => 1],
+            ['team_name' => 'Beta', 'teamid' => 2],
+            ['team_name' => 'Gamma', 'teamid' => 3],
+            ['team_name' => 'Delta', 'teamid' => 4],
+        ];
+    }
+
+    public function testUpdateBindsPlayedRegularGameValuesInColumnOrder(): void
+    {
+        $updater = $this->createUpdaterForFullRun(
+            $this->defaultPinTeams(),
+            [['date_slot' => 5, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 100, 'home_score' => 95]],
+            'Regular Season',
+            $this->makeRootWithoutScheduleHtm('sch_update_pin_'),
+        );
+
+        $this->runUpdateCapturingOutput($updater);
+
+        $this->assertSame('iisiiiis', $this->mockDb->getLastBoundTypes());
+        $params = $this->mockDb->getLastBoundParams();
+        $this->assertCount(8, $params);
+        $this->assertSame([2025, 75, '2024-10-6', 1, 100, 2, 95], array_slice($params, 0, 7));
+        $this->assertIsString($params[7]);
+        $this->assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $params[7]);
+
+        $prepared = array_values(array_filter(
+            $this->mockDb->getPreparedQueries(),
+            static fn (string $q): bool => str_contains($q, 'INSERT INTO `ibl_schedule`'),
+        ));
+        $this->assertCount(1, $prepared);
+        $this->assertStringContainsString('VALUES (?, ?, ?, ?, ?, ?, ?, ?)', $prepared[0]);
+        $this->assertStringNotContainsString('2024-10-6', $prepared[0]);
+    }
+
+    public function testUpdateBindsUnplayedRegularGameWithUnplayedBoxIdAndZeroScores(): void
+    {
+        $updater = $this->createUpdaterForFullRun(
+            $this->defaultPinTeams(),
+            [['date_slot' => 5, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 0, 'home_score' => 0]],
+            'Regular Season',
+            $this->makeRootWithoutScheduleHtm('sch_update_pin_'),
+        );
+
+        $this->runUpdateCapturingOutput($updater);
+
+        // 100000 fits ibl_schedule.box_id int(11) (ibl5/docs/schema/current-schema.sql)
+        $this->assertSame(
+            [2025, 100000, '2024-10-6', 1, 0, 2, 0],
+            array_slice($this->mockDb->getLastBoundParams(), 0, 7),
+        );
+    }
+
+    public function testHeatPhaseKeepsOctoberAndNovemberGamesAndDropsDecember(): void
+    {
+        $updater = $this->createUpdaterForFullRun(
+            $this->defaultPinTeams(),
+            [
+                ['date_slot' => 5, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 0, 'home_score' => 0],
+                ['date_slot' => 70, 'game_index' => 0, 'visitor' => 3, 'home' => 4, 'visitor_score' => 0, 'home_score' => 0],
+                ['date_slot' => 40, 'game_index' => 0, 'visitor' => 2, 'home' => 3, 'visitor_score' => 0, 'home_score' => 0],
+            ],
+            'HEAT',
+            $this->makeRootWithoutScheduleHtm('sch_update_pin_'),
+        );
+
+        $this->runUpdateCapturingOutput($updater);
+
+        $inserts = $this->scheduleInserts();
+        $joined = implode("\n", $inserts);
+        $this->assertCount(2, $inserts);
+        $this->assertStringContainsString("'2024-10-6'", $joined);
+        $this->assertStringContainsString("'2024-10-10'", $joined);
+        $this->assertStringNotContainsString("'2024-12-9'", $joined);
+    }
+
+    public function testPreseasonPhaseKeepsOctoberThroughDecemberAndDropsJanuary(): void
+    {
+        $updater = $this->createUpdaterForFullRun(
+            $this->defaultPinTeams(),
+            [
+                ['date_slot' => 5, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 0, 'home_score' => 0],
+                ['date_slot' => 103, 'game_index' => 0, 'visitor' => 3, 'home' => 4, 'visitor_score' => 0, 'home_score' => 0],
+                ['date_slot' => 40, 'game_index' => 0, 'visitor' => 2, 'home' => 3, 'visitor_score' => 0, 'home_score' => 0],
+                ['date_slot' => 70, 'game_index' => 0, 'visitor' => 1, 'home' => 4, 'visitor_score' => 0, 'home_score' => 0],
+            ],
+            'Preseason',
+            $this->makeRootWithoutScheduleHtm('sch_update_pin_'),
+        );
+
+        $this->runUpdateCapturingOutput($updater);
+
+        $inserts = $this->scheduleInserts();
+        $joined = implode("\n", $inserts);
+        $this->assertCount(3, $inserts);
+        $this->assertStringContainsString("'2024-10-6'", $joined);
+        $this->assertStringContainsString("'2024-9-10'", $joined);
+        $this->assertStringContainsString("'2024-10-9'", $joined);
+        $this->assertStringNotContainsString("'2025-1-11'", $joined);
+    }
+
+    public function testOlympicsUpdateSkipsGamesInvolvingFillerTeams(): void
+    {
+        $this->mockDb->setMockData([
+            ['team_name' => 'Eagles', 'teamid' => 1, 'is_real_team' => 1],
+            ['team_name' => 'Maple', 'teamid' => 2, 'is_real_team' => 1],
+            ['team_name' => 'Filler29', 'teamid' => 29, 'is_real_team' => 0],
+        ]);
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
+        $resolver->method('getContents')->willReturn($this->buildSchBytes([
+            ['date_slot' => 5, 'game_index' => 0, 'visitor' => 29, 'home' => 1, 'visitor_score' => 0, 'home_score' => 0],
+            ['date_slot' => 5, 'game_index' => 1, 'visitor' => 1, 'home' => 2, 'visitor_score' => 0, 'home_score' => 0],
+            ['date_slot' => 6, 'game_index' => 0, 'visitor' => 2, 'home' => 29, 'visitor_score' => 0, 'home_score' => 0],
+        ]));
+        $updater = $this->createUpdater(
+            phase: 'Regular Season',
+            olympics: true,
+            sourceResolver: $resolver,
+            basePath: $this->makeRootWithoutScheduleHtm('sch_update_pin_'),
+        );
+
+        $this->runUpdateCapturingOutput($updater);
+
+        $this->assertCount(1, $this->scheduleInserts());
+        $params = $this->mockDb->getLastBoundParams();
+        $this->assertSame(1, $params[3]);
+        $this->assertSame(2, $params[5]);
+    }
+
+    public function testGamesInOneDateSlotShareTheDateAndANewSlotRecomputesIt(): void
+    {
+        $updater = $this->createUpdaterForFullRun(
+            $this->defaultPinTeams(),
+            [
+                ['date_slot' => 10, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 0, 'home_score' => 0],
+                ['date_slot' => 10, 'game_index' => 1, 'visitor' => 3, 'home' => 4, 'visitor_score' => 0, 'home_score' => 0],
+                ['date_slot' => 11, 'game_index' => 0, 'visitor' => 1, 'home' => 3, 'visitor_score' => 0, 'home_score' => 0],
+            ],
+            'Regular Season',
+            $this->makeRootWithoutScheduleHtm('sch_update_pin_'),
+        );
+
+        $this->runUpdateCapturingOutput($updater);
+
+        $inserts = $this->scheduleInserts();
+        $joined = implode("\n", $inserts);
+        $this->assertCount(3, $inserts);
+        $this->assertSame(2, substr_count($joined, "'2024-10-11'"));
+        $this->assertSame(1, substr_count($joined, "'2024-10-12'"));
+    }
+
+    public function testInsertFailureEchoesEscapedNamesLogsErrorAndRethrowsCode1002(): void
+    {
+        $this->mockDb->setMockData([
+            ['team_name' => 'Alpha <b>', 'teamid' => 1],
+            ['team_name' => 'Beta & Co', 'teamid' => 2],
+        ]);
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
+        $resolver->method('getContents')->willReturn($this->buildSchBytes([
+            ['date_slot' => 5, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 100, 'home_score' => 95],
+        ]));
+        $prefix = 'Failed to insert schedule data for game between Alpha <b> and Beta & Co: ';
+        $loggedError = null;
+        $logger = self::createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('error')
+            ->with(
+                'ScheduleUpdater database insert error',
+                self::callback(static function (array $context) use (&$loggedError, $prefix): bool {
+                    $error = $context['error'] ?? null;
+                    if (!is_string($error)) {
+                        return false;
+                    }
+                    $loggedError = $error;
+
+                    return str_starts_with($error, $prefix) && strlen($error) > strlen($prefix);
+                }),
+            );
+        $updater = $this->createUpdater(
+            sourceResolver: $resolver,
+            basePath: $this->makeRootWithoutScheduleHtm('sch_update_pin_'),
+            logger: $logger,
+        );
+        $this->mockDb->failOnNthInsert(1);
+
+        $caught = null;
+        ob_start();
+        try {
+            $updater->update();
+        } catch (\RuntimeException $e) {
+            $caught = $e;
+        } finally {
+            $captured = ob_get_clean();
+        }
+        $output = $captured === false ? '' : $captured;
+
+        $this->assertNotNull($caught, 'update() must rethrow when an insert fails');
+        $this->assertSame(1002, $caught->getCode());
+        $this->assertSame($loggedError, $caught->getMessage());
+        $this->assertStringContainsString(
+            '<strong class="ibl-form-error">Script Error: Failed to insert schedule data for game between Alpha &lt;b&gt; and Beta &amp; Co.</strong>',
+            $output,
+        );
+        $this->assertContains('ROLLBACK', $this->mockDb->getOperationLog());
+    }
+
+    public function testUpdateThrowsWhenResolverHasNoScheduleFile(): void
+    {
+        $this->mockDb->setMockData($this->defaultPinTeams());
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
+        $resolver->method('getContents')->willReturn(null);
+        $updater = $this->createUpdater(
+            sourceResolver: $resolver,
+            basePath: $this->makeRootWithoutScheduleHtm('sch_update_pin_'),
+        );
+
+        $caught = null;
+        ob_start();
+        try {
+            $updater->update();
+        } catch (\RuntimeException $e) {
+            $caught = $e;
+        } finally {
+            ob_end_clean();
+        }
+
+        $this->assertNotNull($caught, 'update() must throw when the resolver has no schedule file');
+        $this->assertSame('Schedule file not found via resolver', $caught->getMessage());
+        $this->assertContains('ROLLBACK', $this->mockDb->getOperationLog());
+        $this->assertSame([], $this->scheduleInserts());
+    }
+
+    public function testUpdateReadsSchFileFromBasePathWhenNoResolverIsInjected(): void
+    {
+        $this->mockDb->setMockData([
+            ['team_name' => 'Eagles', 'teamid' => 1, 'is_real_team' => 1],
+            ['team_name' => 'Maple', 'teamid' => 2, 'is_real_team' => 1],
+        ]);
+        $root = $this->makeRootWithoutScheduleHtm('sch_file_pin_');
+        file_put_contents($root . '/Olympics.sch', $this->buildSchBytes([
+            ['date_slot' => 5, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 90, 'home_score' => 80],
+        ]));
+        // Olympics on purpose: with the IBL5 prefix a swapped ternary would read the same file.
+        $updater = $this->createUpdater(phase: 'Regular Season', olympics: true, basePath: $root);
+
+        $this->runUpdateCapturingOutput($updater);
+
+        $this->assertCount(1, $this->scheduleInserts());
+        $this->assertSame([1, 90, 2, 80], array_slice($this->mockDb->getLastBoundParams(), 3, 4));
+    }
+
+    public function testUpdateDebugLogListsDeleteThenEachInsertedGame(): void
+    {
+        $this->showDebugOutputAsAdmin();
+        $updater = $this->createUpdaterForFullRun(
+            $this->defaultPinTeams(),
+            [
+                ['date_slot' => 5, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 0, 'home_score' => 0],
+                ['date_slot' => 5, 'game_index' => 1, 'visitor' => 2, 'home' => 1, 'visitor_score' => 0, 'home_score' => 0],
+            ],
+            'Regular Season',
+            $this->makeRootWithoutScheduleHtm('sch_update_pin_'),
+        );
+
+        $output = $this->runUpdateCapturingOutput($updater);
+
+        $deletePos = strpos($output, 'DELETE FROM `ibl_schedule`&lt;p&gt;');
+        $firstPos = strpos($output, 'Inserted game: Alpha @ Beta on 2024-10-6<br>');
+        $secondPos = strpos($output, 'Inserted game: Beta @ Alpha on 2024-10-6<br>');
+        $this->assertNotFalse($deletePos);
+        $this->assertNotFalse($firstPos);
+        $this->assertNotFalse($secondPos);
+        $this->assertLessThan($firstPos, $deletePos);
+        $this->assertLessThan($secondPos, $firstPos);
     }
 
     public function testExtractDateReturnsNullForEmptyString(): void

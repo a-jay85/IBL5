@@ -353,6 +353,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                               diff_body=diff, worktree=worktree):
             return _finish(res, out_dir)
 
+        phase2_merge_danger = None   # MergeDanger this run's Phase 2 injected; None on the clean-tree rerun
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
         summary, stripped = strip_manual_testing_section(copy["summary_md"])
         if stripped:
@@ -387,6 +388,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         if _inject_merge_danger(copy, worktree, diff, log):
             body_check_degraded = True
+        phase2_merge_danger = _phase2_merge_danger_of(copy["summary_md"])
         log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
@@ -718,6 +720,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                    fixture=fixture, log=log)
         _arm_body = gh.pr_body() or body
+        if live and pr:
+            _arm_body = _retry_merge_danger(gh, pr, _arm_body, phase2_merge_danger, worktree,
+                                            git.diff_vs_base(), log, res)
         inputs = ArmInputs(
             pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
@@ -2207,6 +2212,41 @@ def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list
     for f in findings:
         log(f"phase2 body-check finding: {f}")
     return findings
+
+
+def _phase2_merge_danger_of(summary_md: str):
+    """The MergeDanger line Phase 2 injected into `summary_md`, or None when there is none
+    (clean-tree rerun: empty summary) or the line is malformed (a real condition (18)
+    verdict, never refilled)."""
+    try:
+        return merge_danger.parse_merge_danger(summary_md) if summary_md else None
+    except merge_danger.MalformedMergeDanger:
+        return None
+
+
+def _retry_merge_danger(gh, pr, body: str, phase2_md, worktree, diff_body: str, log, res) -> str:
+    """Phase 6.5: one bounded refill of the Merge danger line this run's Phase 2 wrote.
+
+    Retries only when Phase 2 computed a line this run (phase2_md) and the live body
+    classifies MISSING. ONE-WAY, MALFORMED and UNREADABLE are real verdicts and are never
+    touched; a run whose Phase 2 wrote nothing (clean-tree rerun) never refills. The line
+    re-applied is phase2_md itself, then the raise-only later-phase floor, so the Door can
+    only go up. Returns the body condition (18) should classify. Fail closed: any error
+    leaves the body as is, and the retry is still recorded so the hold says so."""
+    if phase2_md is None or merge_danger.classify_body(body) != "MISSING":
+        return body
+    res.retries["merge-danger"] = 1
+    try:
+        refilled = merge_danger.inject_merge_danger(body, phase2_md)
+        refilled = _merge_danger_body(refilled, worktree, diff_body, log, "phase6.5")
+        gh.pr_edit_body(pr, refilled)
+        fresh = gh.pr_body_fresh() or ""   # what GitHub holds now, never our own last write
+        log("phase6.5: merge-danger line missing from the live body; re-applied the Phase 2 "
+            f"line once -> state={merge_danger.classify_body(fresh)}")
+        return fresh
+    except (HarnessError, OSError, subprocess.SubprocessError, ValueError) as exc:
+        log(f"phase6.5: merge-danger refill failed ({exc}); condition (18) holds")
+        return body
 
 
 def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str) -> str:

@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-10-14
+last_verified: 2026-10-15
 ---
 
 # IBL5 Operations Runbook
@@ -440,9 +440,9 @@ All config files are `.gitignore`d — never commit them. See the `.example` tem
 
 ---
 
-## 8. Sim Recap (GitHub Actions primary, Mac poller backup)
+## 8. Sim Recap (GitHub Actions primary, Mac poller second host)
 
-Recaps run on a GitHub Actions runner from `.github/workflows/sim-recap.yml`. Prod posts a `repository_dispatch` when the updater queues a sim. An hourly schedule covers a lost dispatch. The Mac poller below stays installed as a backup. Both hosts can run at once because the queue claim is an atomic conditional UPDATE. The design is in ADR-0154.
+Recaps run on a GitHub Actions runner from `.github/workflows/sim-recap.yml`. Prod posts a `repository_dispatch` when the updater queues a sim. A schedule every 10 minutes covers a lost dispatch and picks up rows whose wait has ended. The Mac poller below is the second host. Both hosts can run at once because the queue claim is an atomic conditional UPDATE scoped by host. The design is in ADR-0154 and ADR-0196.
 
 With no secrets set, the workflow skips every real step and ends green. Merging it before the setup below is safe.
 
@@ -464,13 +464,13 @@ Copy `ibl5/config/github-dispatch.config.example.php` to `ibl5/config/github-dis
 
 ### Manual rerun
 
-Run `gh workflow run sim-recap.yml` for a claim-next drain. Add `-f sim=<N>` to claim a specific sim; only do this after re-queuing it on prod, because the tick exits 1 and turns the job red when that sim is not pending. Watch it with `gh run watch`. The job log stays quiet on purpose, because the repo is public. Read the outcome in the recap viewer or the ops alert thread. A red run means the sim parked. It retries with backoff on a later tick, so check `find --sim=N` on prod. An `auth failed` line in the log means the `CLAUDE_CODE_OAUTH_TOKEN` secret is invalid or expired. Replace it with a fresh token from `claude setup-token`.
+Run `gh workflow run sim-recap.yml` for a claim-next drain. Add `-f sim=<N>` to claim a specific sim; only do this after re-queuing it on prod, because the tick exits 1 and turns the job red when that sim is not pending. Watch it with `gh run watch`. The job log stays quiet on purpose, because the repo is public. Read the outcome in the recap viewer or #admin-chat. Prod posts one line there per state change: retrying, waiting for the usage reset, handed to the other host, unavailable, posted, or recovered. A park that retries, waits, or hands off keeps the run green, and a later tick or the other host picks it up. A red run means the sim is terminal (`failed`) and needs a human. The #admin-chat line names the fix. An `auth failed` line in the log means the `CLAUDE_CODE_OAUTH_TOKEN` secret is invalid or expired. Replace it with a fresh token from `claude setup-token`. ADR-0196 has the full routing table.
 
-### Uninstalling the Mac poller later
+### The Mac poller is the second host
 
-Once a few sims have recapped from Actions, remove the Mac backup with `bin/sim-recap-cron-setup --uninstall-schedule`. Until then, an outage can send one onset ping and one recovery ping from each host. The `com.ibl5.sim-recap-poll` entry is already gone from `bin/lib/launchd-expected-jobs.sh`, so `bin/launchd-health-check` no longer expects the job.
+The Mac poller runs as an active second host (ADR-0196). It claims rows handed to the Mac, and it backs up an unrouted row after 45 minutes without GitHub progress. `bin/lib/launchd-expected-jobs.sh` lists `com.ibl5.sim-recap-poll`, so `bin/launchd-health-check` flags the job when it is missing. Keep it installed.
 
-### Mac poller (backup)
+### Mac poller (second host)
 
 The sim recap poller is a macOS LaunchAgent (`com.ibl5.sim-recap-poll`, label managed by `bin/sim-recap-cron-setup`) that fires `bin/sim-recap-tick` every 300 s.
 

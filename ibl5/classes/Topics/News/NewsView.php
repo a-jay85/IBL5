@@ -26,7 +26,6 @@ class NewsView implements NewsViewInterface
                 $vm['hometext'],
                 $vm['notes'],
                 $vm['morelink'],
-                $vm['topicname'],
                 $vm['topicimage'],
                 $vm['topictext'],
             );
@@ -47,7 +46,6 @@ class NewsView implements NewsViewInterface
             $vm['title'],
             $vm['bodytext'],
             $vm['topic'],
-            $vm['topicname'],
             $vm['topicimage'],
             $vm['topictext'],
         );

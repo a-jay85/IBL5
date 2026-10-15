@@ -30,7 +30,8 @@ $updateMode = false;
 $syncMode = false;
 $flagBase = null;
 /** @var list<string> $argv */
-foreach (array_slice($argv, 1) as $arg) {
+$cliArgs = array_slice($argv, 1);
+foreach ($cliArgs as $arg) {
     if ($arg === '--update') {
         $updateMode = true;
     } elseif ($arg === '--sync') {

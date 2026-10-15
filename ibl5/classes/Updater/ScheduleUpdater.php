@@ -389,6 +389,124 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
         return $log;
     }
 
+    /**
+     * Read the regular-season schedule from the injected resolver or, without one,
+     * from <basePath>/<filePrefix>.sch.
+     *
+     * @return list<array{date_slot: int, game_index: int, visitor: int, home: int, visitor_score: int, home_score: int, played: bool}>
+     */
+    private function loadScheduledGames(): array
+    {
+        if ($this->sourceResolver !== null) {
+            $schData = $this->sourceResolver->getContents('sch');
+            if ($schData === null) {
+                throw new \RuntimeException('Schedule file not found via resolver');
+            }
+            return SchFileParser::parse($schData);
+        }
+
+        $ibl5Root = $this->basePath;
+        $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
+        $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
+        return SchFileParser::parseFile($schFilePath);
+    }
+
+    /**
+     * Calendar date for a .sch date slot, phase-adjusted by extractDate().
+     * Null when the slot does not map to a calendar day.
+     *
+     * @return array{date: string, year: int, month: int, day: int}|null
+     */
+    private function resolveSlotDate(int $dateSlot): ?array
+    {
+        $monthDay = SchFileParser::dateSlotToMonthDay($dateSlot);
+        if ($monthDay === null) {
+            return null;
+        }
+
+        return $this->extractDate($this->buildDateString($monthDay['month'], $monthDay['day']));
+    }
+
+    /**
+     * True when a parsed .sch game must not be inserted: phase filters
+     * (HEAT keeps only its month, Preseason keeps Preseason and HEAT months)
+     * and the Olympics filler-team rule.
+     *
+     * @param array{date_slot: int, game_index: int, visitor: int, home: int, visitor_score: int, home_score: int, played: bool} $game
+     */
+    private function shouldSkipScheduledGame(array $game, int $month): bool
+    {
+        // HEAT phase: only include games from the HEAT month
+        if ($this->season->phase === "HEAT" && $month !== Season::IBL_HEAT_MONTH) {
+            return true;
+        }
+
+        // Preseason filtering
+        if ($this->season->phase === "Preseason"
+            && $month !== Season::IBL_PRESEASON_MONTH && $month !== Season::IBL_HEAT_MONTH) {
+            return true;
+        }
+
+        // Olympics: skip games where either team is a filler (not a real team)
+        return !$this->isRealTeamGame($game['visitor'], $game['home']);
+    }
+
+    /**
+     * Inserts one regular-season .sch game and returns its debug-log line.
+     *
+     * @param array{date_slot: int, game_index: int, visitor: int, home: int, visitor_score: int, home_score: int, played: bool} $game
+     * @throws \RuntimeException code 1002 when the insert fails
+     */
+    private function insertScheduledGame(array $game, string $date): string
+    {
+        // Compute BoxID: real for played games, placeholder for unplayed
+        if ($game['played']) {
+            $boxID = SchFileParser::computeBoxId($game['date_slot'], $game['game_index']);
+        } else {
+            $boxID = self::UNPLAYED_BOX_ID;
+        }
+
+        $visitor_teamid = $game['visitor'];
+        $home_teamid = $game['home'];
+        $vScore = $game['visitor_score'];
+        $hScore = $game['home_score'];
+
+        $uuid = UuidGenerator::generateUuid();
+
+        $visitorName = $this->getTeamNameById($visitor_teamid);
+        $homeName = $this->getTeamNameById($home_teamid);
+
+        try {
+            $this->execute(
+                "INSERT INTO `ibl_schedule` (
+                    season_year,
+                    box_id,
+                    game_date,
+                    visitor_teamid,
+                    visitor_score,
+                    home_teamid,
+                    home_score,
+                    uuid
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "iisiiiis",
+                $this->season->endingYear,
+                $boxID,
+                $date,
+                $visitor_teamid,
+                $vScore,
+                $home_teamid,
+                $hScore,
+                $uuid
+            );
+            return "Inserted game: {$visitorName} @ {$homeName} on {$date}<br>";
+        } catch (\Exception $e) {
+            $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
+            $this->channelLogger->error('ScheduleUpdater database insert error', ['error' => $errorMessage]);
+            echo '<strong class="ibl-form-error">Script Error: Failed to insert schedule data for game between ' . HtmlSanitizer::e($visitorName) . ' and ' . HtmlSanitizer::e($homeName) . '.</strong>';
+            throw new \RuntimeException($errorMessage, 1002);
+        }
+    }
+
     public function update(): void {
         echo "Updating the `ibl_schedule` database table...<p>";
 
@@ -406,108 +524,23 @@ class ScheduleUpdater extends \Database\BaseMysqliRepository {
 
             $this->preloadTeamNameMap();
 
-            if ($this->sourceResolver !== null) {
-                $schData = $this->sourceResolver->getContents('sch');
-                if ($schData === null) {
-                    throw new \RuntimeException('Schedule file not found via resolver');
-                }
-                $games = SchFileParser::parse($schData);
-            } else {
-                $ibl5Root = $this->basePath;
-                $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
-                $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
-                $games = SchFileParser::parseFile($schFilePath);
-            }
+            $games = $this->loadScheduledGames();
 
-            $currentDateSlot = -1;
-            $date = null;
-            $year = null;
-            /** @var int|null $month */
-            $month = null;
+            $currentDateSlot = null;
+            $slotDate = null;
 
             foreach ($games as $game) {
-                // Compute date when we move to a new date slot
+                // Resolve the date when we move to a new date slot
                 if ($game['date_slot'] !== $currentDateSlot) {
                     $currentDateSlot = $game['date_slot'];
-                    $monthDay = SchFileParser::dateSlotToMonthDay($game['date_slot']);
-
-                    if ($monthDay !== null) {
-                        $dateString = $this->buildDateString($monthDay['month'], $monthDay['day']);
-                        $fullDate = $this->extractDate($dateString);
-                        $date = $fullDate['date'] ?? null;
-                        $year = $fullDate['year'] ?? null;
-                        $month = $fullDate['month'] ?? null;
-                    } else {
-                        $date = null;
-                        $year = null;
-                        $month = null;
-                    }
+                    $slotDate = $this->resolveSlotDate($game['date_slot']);
                 }
 
-                if ($date === null || $year === null) {
+                if ($slotDate === null || $this->shouldSkipScheduledGame($game, $slotDate['month'])) {
                     continue;
                 }
 
-                // HEAT phase: only include games from the HEAT month
-                if ($this->season->phase === "HEAT" && $month !== Season::IBL_HEAT_MONTH) {
-                    continue;
-                }
-                if ($this->season->phase === "Preseason" && $month !== null
-                    && $month !== Season::IBL_PRESEASON_MONTH && $month !== Season::IBL_HEAT_MONTH) {
-                    continue;
-                }
-
-                // Compute BoxID: real for played games, placeholder for unplayed
-                if ($game['played']) {
-                    $boxID = SchFileParser::computeBoxId($game['date_slot'], $game['game_index']);
-                } else {
-                    $boxID = self::UNPLAYED_BOX_ID;
-                }
-
-                $visitor_teamid = $game['visitor'];
-                $home_teamid = $game['home'];
-
-                if (!$this->isRealTeamGame($visitor_teamid, $home_teamid)) {
-                    continue;
-                }
-
-                $vScore = $game['visitor_score'];
-                $hScore = $game['home_score'];
-
-                $uuid = UuidGenerator::generateUuid();
-
-                $visitorName = $this->getTeamNameById($visitor_teamid);
-                $homeName = $this->getTeamNameById($home_teamid);
-
-                try {
-                    $this->execute(
-                        "INSERT INTO `ibl_schedule` (
-                            season_year,
-                            box_id,
-                            game_date,
-                            visitor_teamid,
-                            visitor_score,
-                            home_teamid,
-                            home_score,
-                            uuid
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        "iisiiiis",
-                        $this->season->endingYear,
-                        $boxID,
-                        $date,
-                        $visitor_teamid,
-                        $vScore,
-                        $home_teamid,
-                        $hScore,
-                        $uuid
-                    );
-                    $log .= "Inserted game: {$visitorName} @ {$homeName} on {$date}<br>";
-                } catch (\Exception $e) {
-                    $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
-                    $this->channelLogger->error('ScheduleUpdater database insert error', ['error' => $errorMessage]);
-                    echo '<strong class="ibl-form-error">Script Error: Failed to insert schedule data for game between ' . HtmlSanitizer::e($visitorName) . ' and ' . HtmlSanitizer::e($homeName) . '.</strong>';
-                    throw new \RuntimeException($errorMessage, 1002);
-                }
+                $log .= $this->insertScheduledGame($game, $slotDate['date']);
             }
 
             $log .= $this->insertPlayoffGamesFromScheduleHtm();

@@ -138,6 +138,7 @@ class PlanInfo:
     found: bool = False
     path: str = ""
     auto_merge_false: bool = False       # line-1 frontmatter `auto_merge: false`
+    auto_merge_value: Optional[str] = None  # raw line-1 `auto_merge:` value; None = absent
     has_matrix: bool = False
     has_security: bool = False
     has_reuse: bool = False

@@ -201,6 +201,8 @@ class ArmInputs:
     gate_backtest_status: str = "NOT-APPLICABLE"      # gate replay verdict; "HELD"/"UNKNOWN"/other blocks
     gate_backtest_reason: str = ""                    # verdict reason, surfaced in the hold line
     merge_danger_state: str = "MISSING"   # harness/merge_danger.classify_body(pr_body); only "TWO-WAY" arms (fail-closed default)
+    plan_auto_merge_value: Optional[str] = None   # raw line-1 `auto_merge:` value; None = absent
+    branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -327,8 +329,30 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
             unmerged.append(f"#{n}({state})")
     cs.append(ConditionResult(6, "depends-on-merge-order", bool(unmerged), ", ".join(unmerged)))
 
-    cs.append(ConditionResult(7, "plan-auto-merge-hold", inp.plan_auto_merge_false,
-                              "plan declares auto_merge: false" if inp.plan_auto_merge_false else ""))
+    # Condition (7), plan-time hold, four-way on the raw frontmatter value:
+    #   absent / "true"     -> no hold
+    #   "false"             -> hold (unchanged meaning; the bool stays authoritative
+    #                          so callers that only set it keep their meaning)
+    #   DOCS_REFRESH_TOKEN  -> hold iff any docs-refresh clause fails on the REALIZED PR
+    #   anything else       -> hold (unknown value, fail-closed; it armed silently before)
+    val = inp.plan_auto_merge_value
+    if inp.plan_auto_merge_false or val == "false":
+        c7_blocked, c7_reason = True, "plan declares auto_merge: false"
+    elif val is None or val == "true":
+        c7_blocked, c7_reason = False, ""
+    elif val == DOCS_REFRESH_TOKEN:
+        sel7, src7 = select_fidelity_verdict(inp.fidelity_verdict, inp.fidelity_verdict_2,
+                                             inp.fidelity_tree_2, inp.current_tree)
+        holds7 = docs_refresh_holds(inp.branch, inp.classification.files,
+                                    inp.merge_danger_state, sel7)
+        c7_blocked = bool(holds7)
+        c7_reason = (f"auto_merge: {DOCS_REFRESH_TOKEN} failed: " + ", ".join(holds7)
+                     + f" (verdict source: {src7})") if holds7 else ""
+    else:
+        c7_blocked = True
+        c7_reason = (f"unknown auto_merge value {val!r}; only true, false or "
+                     f"{DOCS_REFRESH_TOKEN} are recognized")
+    cs.append(ConditionResult(7, "plan-auto-merge-hold", c7_blocked, c7_reason))
 
     f_hold = feat_hold(inp.pr_title, inp.pr_labels)
     cs.append(ConditionResult(8, "feat-commit-type-floor", f_hold,

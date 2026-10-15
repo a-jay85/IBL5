@@ -14,7 +14,11 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.armable import docs_refresh_holds, docs_refresh_path_ok
+from harness.armable import (ArmInputs, DOCS_REFRESH_TOKEN, docs_refresh_holds,
+                             docs_refresh_path_ok, evaluate)
+from harness.planfile import frontmatter_auto_merge_false, frontmatter_auto_merge_value
+from harness.state import Classification
+from tests.test_armable import BODY_CLEARED
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PR_ARMABLE = REPO_ROOT / "bin" / "lib" / "pr-armable.sh"
@@ -153,3 +157,133 @@ def test_docs_refresh_shell_parity(name, head, files, md, verdict, expected):
     shell = _shell(head, files, md, verdict)
     assert shell == expected
     assert shell == docs_refresh_holds(head, files, md, verdict)
+
+
+# --- Condition (7) through evaluate() ---------------------------------------------------
+
+def _inputs(**overrides):
+    """Fully-arming baseline (conditions 1-18 pass), copied from tests/test_armable.py."""
+    base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
+                classification=Classification(), findings=[], unresolved_conformance=[],
+                phase5_status="pass", plan_auto_merge_false=False, headless=True,
+                dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
+                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY")
+    base.update(overrides)
+    return ArmInputs(**base)
+
+
+def _qualifying(**overrides):
+    """Token plus a PR that satisfies every docs-refresh clause."""
+    kw = dict(plan_auto_merge_value=DOCS_REFRESH_TOKEN, branch=REFRESH_BRANCH,
+              classification=Classification(files=list(QUALIFYING_FILES)),
+              merge_danger_state="TWO-WAY", fidelity_verdict="READY")
+    kw.update(overrides)
+    return _inputs(**kw)
+
+
+def _cond7(decision):
+    (c,) = [c for c in decision.conditions if c.name == "plan-auto-merge-hold"]
+    return c
+
+
+def test_frontmatter_auto_merge_value_absent_false_true_token():
+    assert frontmatter_auto_merge_value("# no frontmatter\n") is None
+    assert frontmatter_auto_merge_value("") is None
+    assert frontmatter_auto_merge_value("---\ntitle: x\n---\nbody\n") is None
+    assert frontmatter_auto_merge_value("---\nauto_merge: false\n---\n") == "false"
+    assert frontmatter_auto_merge_value("---\nauto_merge: true\n---\n") == "true"
+    assert frontmatter_auto_merge_value(
+        f"---\nauto_merge: {DOCS_REFRESH_TOKEN}\n---\n") == "docs-only-ready"
+    assert frontmatter_auto_merge_value("---\nauto_merge:   docs-only-ready  \n---\n") \
+        == "docs-only-ready"
+    # never lowercased: `False` is an unknown value
+    assert frontmatter_auto_merge_value("---\nauto_merge: False\n---\n") == "False"
+    # a body line after the closing fence cannot self-select
+    assert frontmatter_auto_merge_value("---\ntitle: x\n---\nauto_merge: false\n") is None
+    assert frontmatter_auto_merge_value("# h\n---\nauto_merge: false\n---\n") is None
+    assert frontmatter_auto_merge_false("---\nauto_merge: false\n---\n") is True
+    assert frontmatter_auto_merge_false("---\nauto_merge: true\n---\n") is False
+    assert frontmatter_auto_merge_false("---\nauto_merge: False\n---\n") is False
+    assert frontmatter_auto_merge_false("---\nauto_merge: docs-only-ready\n---\n") is False
+    assert frontmatter_auto_merge_false("no frontmatter") is False
+
+
+@pytest.mark.parametrize("value", [None, "true"])
+def test_cond7_value_absent_or_true_no_hold(value):
+    d = evaluate(_inputs(plan_auto_merge_value=value, plan_auto_merge_false=False))
+    c = _cond7(d)
+    assert not c.blocked
+    assert c.reason == ""
+
+
+def test_cond7_false_holds_regardless_of_diff():
+    d = evaluate(_qualifying(plan_auto_merge_value="false"))
+    c = _cond7(d)
+    assert c.blocked
+    assert c.reason == "plan declares auto_merge: false"
+    assert not d.armed
+
+
+def test_cond7_bool_only_false_holds():
+    d = evaluate(_inputs(plan_auto_merge_false=True, plan_auto_merge_value=None))
+    c = _cond7(d)
+    assert c.blocked
+    assert c.reason == "plan declares auto_merge: false"
+
+
+@pytest.mark.parametrize("value", ["False", "yes", "docs-only", "docs-only-ready-later"])
+def test_cond7_unknown_value_holds(value):
+    d = evaluate(_qualifying(plan_auto_merge_value=value))
+    c = _cond7(d)
+    assert c.blocked
+    assert c.reason.startswith("unknown auto_merge value")
+    assert not d.armed
+
+
+def test_cond7_token_qualifying_does_not_hold():
+    d = evaluate(_qualifying())
+    c = _cond7(d)
+    assert not c.blocked
+    assert c.reason == ""
+    assert d.armed
+
+
+@pytest.mark.parametrize("overrides,expected", [
+    pytest.param(dict(branch="feature-x"), "docs-refresh:branch:feature-x", id="branch"),
+    pytest.param(dict(branch=""), "docs-refresh:branch:<empty>", id="branch-empty"),
+    pytest.param(dict(classification=Classification(
+        files=["ibl5/docs/a.md", ".claude/rules/x.md"])),
+        "docs-refresh:paths:.claude/rules/x.md", id="paths-bad"),
+    pytest.param(dict(classification=Classification(files=[])),
+                 "docs-refresh:paths:empty", id="paths-empty"),
+    pytest.param(dict(merge_danger_state="ONE-WAY"),
+                 "docs-refresh:merge-danger:ONE-WAY", id="merge-danger-one-way"),
+    pytest.param(dict(merge_danger_state="MISSING"),
+                 "docs-refresh:merge-danger:MISSING", id="merge-danger-missing"),
+    pytest.param(dict(fidelity_verdict="READY WITH NOTES"),
+                 "docs-refresh:verdict:READY WITH NOTES", id="verdict-notes"),
+    pytest.param(dict(fidelity_verdict=None), "docs-refresh:verdict:<none>",
+                 id="verdict-none"),
+])
+def test_cond7_token_each_failed_clause_names_it(overrides, expected):
+    c = _cond7(evaluate(_qualifying(**overrides)))
+    assert c.blocked
+    assert expected in c.reason
+    assert c.reason.startswith(f"auto_merge: {DOCS_REFRESH_TOKEN} failed: ")
+
+
+def test_cond7_token_uses_tree_gated_verdict_2():
+    gated = dict(fidelity_verdict="READY WITH NOTES", fidelity_verdict_2="READY",
+                 fidelity_tree_2="t1")
+    ok = _cond7(evaluate(_qualifying(current_tree="t1", **gated)))
+    assert not ok.blocked
+    stale = _cond7(evaluate(_qualifying(current_tree="t2", **gated)))
+    assert stale.blocked
+    assert "READY WITH NOTES" in stale.reason
+    assert "verdict source: verdict-1" in stale.reason
+
+
+def test_cond7_token_never_releases_other_conditions():
+    d = evaluate(_qualifying(pr_title="feat: x"))
+    assert not _cond7(d).blocked
+    assert not d.armed

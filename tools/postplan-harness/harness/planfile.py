@@ -306,13 +306,18 @@ def parse_matrix(
     planned: list[str] = []
     manual: list[manual_rows.ManualRow] = []
     post_merge: list[manual_rows.ManualRow] = []
+    in_matrix = False  # inside a `What to verify` table, as bin/check-plan's GATEP_MATRIX
     for line in _strip_fenced(content):
         if not line.strip().startswith("|"):
+            in_matrix = False
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if any(_norm_cell(c).lower() == "what to verify" for c in cells):
+            in_matrix = True
         row = " | ".join(cells)
         if re.search(r"truly.?manual", row, re.I):
-            mrow = manual_rows.row_from_cells(cells, len(manual) + len(post_merge) + 1)
+            mrow = manual_rows.row_from_cells(
+                cells, len(manual) + len(post_merge) + 1, in_matrix=in_matrix)
             (post_merge if mrow.post_merge_reason else manual).append(mrow)
         p = _planned_token(cells)
         if p is not None and p not in planned:

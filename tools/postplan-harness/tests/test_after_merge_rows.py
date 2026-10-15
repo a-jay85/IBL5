@@ -95,3 +95,24 @@ def test_normalize_after_merge_without_tagged_rows_prints_nothing(tmp_path, caps
 def test_normalize_unknown_flag_exits_2(tmp_path, capsys):
     assert main(["--bogus", _plan(tmp_path, HDR + PLAIN)]) == 2
     assert "unknown flag" in capsys.readouterr().err
+
+
+def test_what_cell_post_merge_text_stays_manual():
+    row = (
+        "| 5 | confirm post-merge: the importer reads the file"
+        " | Truly-manual | post-impl | n/a |\n"
+    )
+    _, manual, post_merge = parse_matrix(HDR + row)
+    assert [r.number for r in manual] == ["5"]
+    assert post_merge == []
+
+
+def test_post_merge_row_outside_what_to_verify_table_stays_manual():
+    other = (
+        "\n## Notes\n\n| # | Item | Type | Timing | Where |\n|---|---|---|---|---|\n"
+        "| 5 | operator checks the nightly job | Truly-manual | post-impl"
+        " | post-merge: launchd scheduling on the live host only fires after deploy |\n"
+    )
+    _, manual, post_merge = parse_matrix(HDR + PLAIN + other)
+    assert sorted(r.number for r in manual) == ["29", "5"]
+    assert post_merge == []

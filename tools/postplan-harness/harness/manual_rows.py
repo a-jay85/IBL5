@@ -33,7 +33,12 @@ class ManualRow:
     post_merge_reason: str = ""
 
 
-def row_from_cells(cells: list[str], ordinal: int) -> ManualRow:
+LOC_CELL_INDEX = 4  # `| # | What | Type | Timing | Location |`, as bin/check-plan's MC_LOC
+
+
+def row_from_cells(cells: list[str], ordinal: int, in_matrix: bool = True) -> ManualRow:
+    """`post-merge:` is read from the location cell of a What-to-verify row only,
+    the one cell bin/check-plan gate [PM] validates."""
     raw = " | ".join(cells)
     number = cells[0] if cells and NUM_RE.match(cells[0].strip()) else str(ordinal)
     kept = [
@@ -45,9 +50,10 @@ def row_from_cells(cells: list[str], ordinal: int) -> ManualRow:
         )
     ]
     text = " — ".join(kept) if kept else raw
-    reason = next(
-        (m.group("reason").strip() for c in cells[1:] if (m := POST_MERGE_RE.search(c))), ""
-    )
+    reason = ""
+    if in_matrix and len(cells) > LOC_CELL_INDEX:
+        m = POST_MERGE_RE.search(cells[LOC_CELL_INDEX])
+        reason = m.group("reason").strip() if m else ""
     return ManualRow(number=number, text=text, raw=raw, post_merge_reason=reason)
 
 

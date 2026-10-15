@@ -88,6 +88,36 @@ class PlayerTradingCardFrontViewTest extends TestCase
     }
 
     /**
+     * Build a Player stub that configures only the CardBaseStyles::preparePlayerData()
+     * getters. Every rating, pill, and contract getter is left unconfigured, so the
+     * view sees null-or-zero for each.
+     *
+     * @return Player&\PHPUnit\Framework\MockObject\Stub
+     */
+    private function makePlayerWithNullRatings(): Player
+    {
+        /** @var Player&\PHPUnit\Framework\MockObject\Stub $player */
+        $player = self::createStub(Player::class);
+
+        $player->method('getTeamid')->willReturn(7);
+        $player->method('getName')->willReturn('Test Player');
+        $player->method('getNickname')->willReturn(null);
+        $player->method('getPosition')->willReturn('SF');
+        $player->method('getTeamName')->willReturn('Portland');
+        $player->method('getAge')->willReturn(28);
+        $player->method('getHeightFeet')->willReturn(6);
+        $player->method('getHeightInches')->willReturn(7);
+        $player->method('getWeightPounds')->willReturn(220);
+        $player->method('getCollegeName')->willReturn('Duke');
+        $player->method('getDraftYear')->willReturn(2019);
+        $player->method('getDraftRound')->willReturn(1);
+        $player->method('getDraftPickNumber')->willReturn(14);
+        $player->method('getDraftTeamOriginalName')->willReturn('Chicago');
+
+        return $player;
+    }
+
+    /**
      * getStyles() is deprecated and always returns ''; it is not under test here.
      * These two tests exercise render() boundaries instead to maintain 4-test coverage.
      */
@@ -129,5 +159,61 @@ class PlayerTradingCardFrontViewTest extends TestCase
         $result = PlayerTradingCardFrontView::render($player, 42, 'Y1/$5M', null);
 
         $this->assertSnapshotMatches($result, 'PlayerTradingCardFrontView.html');
+    }
+
+    public function testRenderEscapesHostileContractDisplay(): void
+    {
+        $result = PlayerTradingCardFrontView::render($this->makePlayer(), 42, '<script>alert(1)</script>"\'&', null);
+
+        $this->assertStringNotContainsString('<script>', $result);
+        $this->assertStringContainsString(
+            '<span class="contract-amount">&lt;script&gt;alert(1)&lt;/script&gt;&quot;&apos;&amp;</span>',
+            $result,
+        );
+    }
+
+    public function testRenderNullRatingsRenderAsZero(): void
+    {
+        $result = PlayerTradingCardFrontView::render($this->makePlayerWithNullRatings(), 42, 'Y1/$5M', null);
+
+        $this->assertSame(21, substr_count($result, '<div class="rating-value">0</div>'));
+        $this->assertSame(10, substr_count($result, '<span class="pill-value">0</span>'));
+        $this->assertStringContainsString('<span class="contract-value">0:0</span>', $result);
+    }
+
+    public function testRenderPillLabelLineKeepsTrailingSpace(): void
+    {
+        $result = PlayerTradingCardFrontView::render($this->makePlayer(), 42, 'Y1/$5M', null);
+
+        // The trailing space after </span> lives inside the renderPill heredoc.
+        $this->assertSame(10, preg_match_all('#<span class="pill-label">[A-Z]+</span> \n#', $result));
+    }
+
+    public function testViewHoldsNoStateAndRenderersTakeOnlyPlayerAndScalars(): void
+    {
+        $ref = new \ReflectionClass(PlayerTradingCardFrontView::class);
+
+        $this->assertSame([], $ref->getProperties());
+        $this->assertNull($ref->getConstructor());
+
+        $publicNames = [];
+        foreach ($ref->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            $publicNames[] = $method->getName();
+        }
+        sort($publicNames);
+        $this->assertSame(['getStyles', 'render'], $publicNames);
+
+        foreach ($ref->getMethods() as $method) {
+            $this->assertTrue($method->isStatic(), $method->getName());
+            foreach ($method->getParameters() as $param) {
+                $type = $param->getType();
+                $this->assertInstanceOf(\ReflectionNamedType::class, $type);
+                $this->assertContains(
+                    $type->getName(),
+                    ['Player\Player', 'int', 'string', 'bool', 'array'],
+                    $method->getName() . '::' . $param->getName(),
+                );
+            }
+        }
     }
 }

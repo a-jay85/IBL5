@@ -364,7 +364,7 @@ def _generate_cmd(tmp_path, extra_env=None, args=()):
 def test_generated_cmd_has_no_rc4_arm(tmp_path):
     cmd = _generate_cmd(tmp_path)
     assert '[ "$rc" = 4 ]' not in cmd, "rc=4 arm must be gone after the full-port"
-    assert cmd.index('should_fallback "$rc" && ! usage_postrun_pause') < cmd.index('elif [ "$rc" = 3 ]; then')
+    assert cmd.index('should_fallback "$rc" 0 && ! usage_postrun_pause') < cmd.index('elif [ "$rc" = 3 ]; then')
 
 def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     cmd = _generate_cmd(tmp_path)
@@ -493,7 +493,7 @@ def test_generated_cmd_captures_the_harness_result_line(tmp_path):
     assert "HARNESS_RESULT=$(grep -m1 '^RESULT:'" in cmd
     assert "HARNESS_RESULT=${HARNESS_RESULT:0:1200}" in cmd
     assert (cmd.index("rc=$?; ") < cmd.index("HARNESS_RESULT=$(grep")
-            < cmd.index('should_fallback "$rc" && ! usage_postrun_pause'))
+            < cmd.index('should_fallback "$rc" 0 && ! usage_postrun_pause'))
 
 
 def test_skill_only_cmd_has_no_harness_result_capture(tmp_path):
@@ -677,7 +677,7 @@ def test_prompt_assignment_count_is_still_two():
 
 def test_should_fallback_body_unchanged():
     src = open(PPN).read()
-    assert 'should_fallback() { case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }' in src
+    assert 'should_fallback() { [ "${2:-0}" = 1 ] && return 1; case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }' in src
     assert _fb(4) == "0"     # 4 escalates to the full skill like any other non-0/3 code
     assert _fb(6) == "0"     # neighbours of 7 still escalate: the arm is exact, not a range
     assert _fb(8) == "0"
@@ -1681,7 +1681,7 @@ def test_generated_cmd_guards_gate_open_with_sigterm_flag(tmp_path):
     """
     cmd = _generate_cmd(tmp_path)
     # The guard appears before should_fallback in the gate expression
-    gate_pos = cmd.index('should_fallback "$rc" && ! usage_postrun_pause')
+    gate_pos = cmd.index('should_fallback "$rc" 0 && ! usage_postrun_pause')
     sigterm_guard = '_sigterm_received'
     assert sigterm_guard in cmd[:gate_pos], (
         "GATE_OPEN must check _sigterm_received BEFORE calling should_fallback"

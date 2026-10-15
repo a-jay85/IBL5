@@ -327,6 +327,27 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T10b: real LEJ_EXPECTED_JOBS expects com.ibl5.sim-recap-poll (standard).
+#       Absent from `launchctl list` → FAIL: missing; present → no FAIL names it.
+# ---------------------------------------------------------------------------
+healthy_fixture T10b-absent
+grep -v 'com.ibl5.sim-recap-poll' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
+run_checker
+if [ "$RC" -ne 0 ] && grep -q 'FAIL: missing:com.ibl5.sim-recap-poll' <<< "$OUT"; then
+    ok T10b-absent
+else
+    fail T10b-absent "rc=$RC out=$(printf '%s' "$OUT")"
+fi
+healthy_fixture T10b-present
+run_checker
+if [ "$RC" -eq 0 ] && ! grep -q 'sim-recap-poll' <<< "$(grep '^FAIL: ' <<< "$OUT")"; then
+    ok T10b-present
+else
+    fail T10b-present "rc=$RC out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
 # T11: stale plan-now plist, label absent from list → INFO stale-oneshot, exit 0
 # ---------------------------------------------------------------------------
 healthy_fixture T11

@@ -24,6 +24,8 @@ use SeasonArchive\SeasonArchiveService;
 use SeasonArchive\SeasonDetailView;
 
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext|null $leagueContext */
 
 PageLayout\PageLayout::header();
 

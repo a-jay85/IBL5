@@ -6,7 +6,10 @@ namespace Tests\FreeAgency;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use FreeAgency\FreeAgencyDemandRepository;
+use FreeAgency\FreeAgencyMarketDemandCalculator;
 use FreeAgency\FreeAgencyProcessor;
+use Repositories\SalaryCapRepository;
 use FreeAgency\Contracts\FreeAgencyCapCalculatorFactoryInterface;
 use FreeAgency\Contracts\FreeAgencyCapCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyEntityLoaderInterface;
@@ -126,6 +129,13 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         $this->injectGlobalMockDb();
+    }
+
+    private function realCalculator(): FreeAgencyMarketDemandCalculator
+    {
+        return new FreeAgencyMarketDemandCalculator(
+            new FreeAgencyDemandRepository($this->mockDb, new SalaryCapRepository($this->mockDb))
+        );
     }
 
     protected function tearDown(): void
@@ -382,7 +392,7 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class), $this->realCalculator());
         $result = $processor->deleteOffers('Test Team', 1);
 
         $this->assertIsArray($result);
@@ -393,7 +403,7 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class), $this->realCalculator());
         $processor->deleteOffers('Test Team', 1);
 
         $queries = $this->mockDb->getExecutedQueries();
@@ -526,6 +536,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             self::createStub(TeamIdentityRepositoryInterface::class),
+            $this->realCalculator(),
             repository: $capturingRepo,
             entityLoader: $loaderStub,
             capCalculatorFactory: $factoryStub,
@@ -549,6 +560,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             self::createStub(TeamIdentityRepositoryInterface::class),
+            $this->realCalculator(),
             repository: $capturingRepo,
         );
 
@@ -604,6 +616,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             self::createStub(TeamIdentityRepositoryInterface::class),
+            $this->realCalculator(),
             repository: new CapturingRepository(),
             entityLoader: $loaderStub,
             capCalculatorFactory: $factoryStub,
@@ -671,6 +684,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             $commonRepo,
+            $this->realCalculator(),
             repository: $repoMock,
         );
 

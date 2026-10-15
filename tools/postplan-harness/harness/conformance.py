@@ -37,6 +37,13 @@ _ADR_RENUMBER = re.compile(r"^ibl5/docs/decisions/\d{4}-(?P<suffix>.+)$")
 # are all deliberately NOT accepted, and the changed-file side stays `_ADR_RENUMBER`
 # (`\d{4}`) so a committed placeholder file never satisfies a numbered token.
 _ADR_TOKEN = re.compile(r"^ibl5/docs/decisions/(?:\d{4}|NNNN)-(?P<suffix>.+)$")
+# Phase-omission only (never _resolve): a plan phase that CREATES a migration or ADR writes
+# the contract placeholder (`NNN_`/`NNNN-`), so the deliverable token can never equal the
+# numbered file in the diff. These match the token side; the changed-file side reuses
+# _MIGRATION_RENUMBER (`\d+_`) and _ADR_RENUMBER (exactly `\d{4}-`). Same literal-N rule as
+# _ADR_TOKEN: `nnn`, `N{5}` and any other directory get no tolerance.
+_MIGRATION_PLACEHOLDER_TOKEN = re.compile(r"^ibl5/migrations/N{3,4}_(?P<suffix>.+)$")
+_ADR_PLACEHOLDER_TOKEN = re.compile(r"^ibl5/docs/decisions/NNNN-(?P<suffix>.+)$")
 
 
 def _contract_items(plan: PlanInfo, changed_files: list[str],
@@ -193,6 +200,29 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
     return _renumbered_migration(tok, changed_files) or _renumbered_adr(tok, changed_files)
 
 
+def _placeholder_deliverable(evidence: list[str],
+                             changed_files: list[str]) -> tuple[str, str] | None:
+    """(token, changed file) for the first contract placeholder in `evidence` that a changed
+    file realises: same directory, any number, byte-identical suffix. None when no
+    placeholder is cited or none is realised. Two or more numbered hits still count as
+    realised (the diff touched the deliverable; same precision-over-recall stance as
+    _touched) and the lexically first is reported."""
+    for tok in evidence:
+        m = _MIGRATION_PLACEHOLDER_TOKEN.match(tok)
+        file_re = _MIGRATION_RENUMBER
+        if not m:
+            m = _ADR_PLACEHOLDER_TOKEN.match(tok)
+            file_re = _ADR_RENUMBER
+        if not m:
+            continue
+        suffix = m.group("suffix")
+        hits = sorted(f for f in changed_files
+                      if (r := file_re.match(f)) and r.group("suffix") == suffix)
+        if hits:
+            return tok, hits[0]
+    return None
+
+
 def _touched(tok: str, changed_files: list[str]) -> bool:
     """True when ANY changed path matches `tok` exactly, by path suffix, or by basename.
 
@@ -307,8 +337,13 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
     nothing. Hold-only: the items flow into arming condition (3) via check();
     fidelity.build_work_list excludes them from the fixer loop.
 
+    A phase citing a contract placeholder (`ibl5/migrations/NNN_<slug>.sql`,
+    `ibl5/docs/decisions/NNNN-<slug>.md`) is cleared when a changed file in that directory
+    carries the same suffix under any number (`_placeholder_deliverable`).
+
     `notes` is an out-param like `resolutions` on `check`. Each exemption appends one
-    `NO-DIFF-PHASE:` / `UNCHECKABLE-PHASE:` / `NON-REPO-CITATION:` line, and a rejected marker appends
+    `NO-DIFF-PHASE:` / `UNCHECKABLE-PHASE:` / `NON-REPO-CITATION:` / `PLACEHOLDER-MATCHED-PHASE:`
+    line, and a rejected marker appends
     `NO-DIFF-IGNORED:`. Notes are never returned as items, so they never hold a PR.
     """
     if not plan.found or not plan.phases:
@@ -326,6 +361,11 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
                          f"(exempt: {ph.no_diff_reason[:80]})")
             continue
         if not ph.evidence_paths:
+            continue
+        hit = _placeholder_deliverable(ph.evidence_paths, changed_files)
+        if hit:
+            _note(notes, f"PLACEHOLDER-MATCHED-PHASE: {ph.number} — {ph.heading[:80]} "
+                         f"(placeholder {hit[0]} shipped as {hit[1]})")
             continue
         tracked = tracked_files if tracked_files is not None else _tracked_files()
         dropped: list[str] = []

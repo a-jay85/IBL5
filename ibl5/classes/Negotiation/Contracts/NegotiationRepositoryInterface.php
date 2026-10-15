@@ -25,10 +25,10 @@ interface NegotiationRepositoryInterface
      * 
      * @param string $teamName Team name
      * @param string $position Player position
-     * @param string $excludePlayerName Player name to exclude from calculation
+     * @param int $excludePlayerID Player ID (ibl_plr.pid) to exclude from calculation
      * @return int Total salary committed to the position
      */
-    public function getPositionSalaryCommitment(string $teamName, string $position, string $excludePlayerName): int;
+    public function getPositionSalaryCommitment(string $teamName, string $position, int $excludePlayerID): int;
 
     /**
      * Calculate available cap space for next season

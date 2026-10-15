@@ -8,6 +8,7 @@ if (!defined('MODULE_FILE')) {
 }
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Keep serving op=api HTMX fast path — a redirect here would swap a full page layout
 // into the HTMX target. Route directly to the handler before the redirect.

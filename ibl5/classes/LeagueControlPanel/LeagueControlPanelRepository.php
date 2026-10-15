@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LeagueControlPanel;
 
+use JsbParser\Repositories\AwaRepository;
 use League\League;
 use League\LeagueContext;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
@@ -15,11 +16,16 @@ use Trading\BuyoutLedgerRepository;
 class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implements LeagueControlPanelRepositoryInterface
 {
     private string $league;
+    private AwaRepository $awaRepository;
 
-    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
-    {
+    public function __construct(
+        \mysqli $db,
+        ?LeagueContext $leagueContext = null,
+        ?AwaRepository $awaRepository = null
+    ) {
         parent::__construct($db, $leagueContext);
         $this->league = $leagueContext !== null ? $leagueContext->getCurrentLeague() : LeagueContext::LEAGUE_IBL;
+        $this->awaRepository = $awaRepository ?? new AwaRepository($db, $leagueContext);
     }
 
     /**
@@ -302,15 +308,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
      */
     public function upsertAward(int $year, string $award, string $name): int
     {
-        return $this->execute(
-            "INSERT INTO `ibl_awards` (year, award, name)
-            VALUES (?, ?, ?)
-            ON DUPLICATE KEY UPDATE name = VALUES(name)",
-            'iss',
-            $year,
-            $award,
-            $name
-        );
+        return $this->awaRepository->upsertAward($year, $award, $name);
     }
 
     /**

@@ -215,7 +215,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         worktree: str | None = None, headless: bool = True,
         plans_dir: str | None = None, live: bool = False,
         explicit_path: str | None = None,
-        probe=None, state_dir: str | None = None) -> RunResult:
+        probe=None, state_dir: str | None = None, rebase_only: bool = False) -> RunResult:
     os.makedirs(out_dir, exist_ok=True)
     run_started = time.time()
     ledger = llm.ledger
@@ -342,7 +342,15 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                         f"{', '.join(conflict_files)}; resolver would refuse: {refusal}")
                 log("phase2: LLM resolver active -- probe is advisory, falling through to rebase_onto()")
 
-        if _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log):
+        if rebase_only:
+            ok, why, ro_pr, ro_hold = _rebase_only_gate(
+                git, gh, slug, worktree, out_dir, live, state_dir, mode, log)
+            if ok:
+                return _rebase_only(res, git, ro_pr, ro_hold, worktree, diff, log, out_dir,
+                                    slug=slug, live=live, state_dir=state_dir, plan=plan)
+
+        if _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log,
+                              diff_body=diff, worktree=worktree):
             return _finish(res, out_dir)
 
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
@@ -388,65 +396,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             llm=llm, res=res)
         rebase_line = f"REBASE=not run ({mode} mode)"
         if live:
-            pre_rebase = git.head()
-            conflict_resolved = None
-            try:
-                git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
-                # A plain merge the resolver settled can also carry accepted adapted lines.
-                plain_resolution = getattr(git, "last_conflict_resolution", None)
-                for line in audit_lines_for_adaptations(
-                        getattr(plain_resolution, "adapted_lines", ())):
-                    log(f"phase2: {line}")
-                res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
-            except HarnessError as e:
-                res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
-                if e.kind != "rebase-conflict":
-                    raise
-                # DETECTION-TIME flag: recorded before the resolution attempt begins, so a
-                # run that dies mid-resolution still leaves evidence that this run touched a
-                # conflict. Arming the flag only on success would invert the fail-closed
-                # property -- the same reason the skill sets it in its Phase 2 detection arm
-                # and merely confirms it in step 7.
-                log(f"phase2: CONFLICT_FLAG=set (rebase conflict detected on {git.branch()}) "
-                    "-- attempting stacked --onto auto-resolution")
-                plain_conflicted = getattr(git, "last_conflict_files", ())
-                log(f"phase2: conflicted paths (plain rebase) = {', '.join(plain_conflicted) or '-'}")
-                conflict_resolved = git.autoresolve_stacked_rebase()
-                if not conflict_resolved.resolved:
-                    log(f"phase2: conflict auto-resolution declined -- {conflict_resolved.reason}")
-                    onto_conflicted = getattr(git, "last_conflict_files", ())
-                    log(f"phase2: conflicted paths (--onto) = {', '.join(onto_conflicted) or '-'}")
-                    block_cause = _classify_rebase_block(
-                        git, pre_rebase, plain_conflicted, onto_conflicted,
-                        conflict_resolved.reason)
-                    log(f"phase2: rebase block {block_cause}")
-                    err = HarnessError(
-                        "rebase-conflict",
-                        f"{e.detail} | auto-resolve declined: {conflict_resolved.reason}",
-                    )
-                    err.block_cause = block_cause
-                    raise err from e
-                log("phase2: conflict auto-resolved via --onto "
-                    f"{conflict_resolved.base_sha[:8]}; TREE-EQUIVALENT proved; "
-                    f"manifest={conflict_resolved.manifest_path} "
-                    f"notes={conflict_resolved.notes_path} "
-                    f"POST_RESOLUTION_SHA={conflict_resolved.post_resolution_sha}")
-                for line in audit_lines_for_adaptations(
-                        getattr(conflict_resolved, "adapted_lines", ())):
-                    log(f"phase2: {line}")
-                if conflict_resolved.collapse_warn:
-                    log(f"phase2: {conflict_resolved.collapse_warn}")
-            sha = git.head()
-            if conflict_resolved is not None:
-                auto_files = (f"; auto-resolved conflict in {', '.join(conflict_resolved.resolved_files)}"
-                              if conflict_resolved.resolved_files else "")
-                rebase_line = ("REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; "
-                               f"manifest={conflict_resolved.manifest_path}{auto_files}")
-            else:
-                log("phase2: merged origin/master")
-                # the skill's two success spellings, verbatim
-                rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
-                               if sha == pre_rebase else "REBASE=merged origin/master")
+            sha, rebase_line = _phase2_rebase(git, res, log)
         res.meta_checks_ok = run_meta_checks_local(
             git, worktree or "", "origin/master", log, live=live,
             failures_out=res.meta_check_failures, llm=llm)
@@ -986,10 +936,17 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         except HarnessError as e:
             retro = {"save": False, "error": e.kind}
             log(f"phase9: retrospective unavailable ({e.kind}) — terminal unchanged")
+        except usage_pause.UsagePause:
+            # The PR is already shipped and arming has run; the retrospective is
+            # record-only bookkeeping. A usage pause here skips it and keeps the real
+            # terminal instead of reporting FAILED/usage-pause (ADR-0143 addendum).
+            retro = {"save": False, "skipped": "usage-pause"}
+            log(f"phase9: retrospective skipped (usage-pause) — terminal "
+                f"{res.terminal.value} unchanged")
         res.retrospective = retro
         if retro.get("save"):
             log(f"phase9: memory-save intent recorded: {retro.get('name')}")
-        elif not retro.get("error"):
+        elif not retro.get("error") and not retro.get("skipped"):
             log("phase9: no durable lesson — nothing saved")
 
         # ---- Phase 10: preview environment ------------------------------
@@ -1566,6 +1523,34 @@ def _phase7_rewatch(gh, log, res, worktree, pr, sha, out_dir, run_started):
     return outcome, sha
 
 
+def _meta_check_skip(gh, pr, res, names, out_dir) -> list[str]:
+    """Phase-2 check names that explain a Meta-checks-only red, or [] to run ci-fix
+    as today. Every fetch or read failure fails open to []."""
+    if not cifix.meta_only(names):
+        return []
+    recorded = [f.get("name") for f in (res.meta_check_failures or [])]
+    if not recorded:
+        return []
+    skip_dir = os.path.join(out_dir, "ci-fix-meta-skip")
+    dest = os.path.join(skip_dir, "Meta-checks.log")
+    try:
+        ref = cifix.failed_job_refs(gh.pr_checks_json(pr),
+                                    [cifix.META_CHECK_NAME]).get(cifix.META_CHECK_NAME)
+        if not ref:
+            return []
+        os.makedirs(skip_dir, exist_ok=True)
+        try:
+            os.unlink(dest)  # never judge a stale log from an earlier iteration
+        except FileNotFoundError:
+            pass
+        gh.run_log_failed(ref[0], ref[1], dest)
+        with open(dest, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except (HarnessError, OSError, subprocess.SubprocessError):
+        return []
+    return cifix.attribute_meta_failure(text, recorded)
+
+
 def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                  mode, fixture, run_started):
     """Phase 7 CI fix loop — attempts to fix red CI with Opus.
@@ -1618,6 +1603,28 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
         if kind == "green":
             log("phase7 ci-fix: only human-signoff failed - treating CI as green")
             return sha, ciwatch.CiOutcome(0, [], outcome.evidence + " (human-signoff dropped)")
+
+        # Meta-checks skip: phase 2 already recorded this failure locally and ci-fix
+        # cannot edit gate-owned files, so spend no LLM attempt and no rerun probe.
+        # Fails open on any doubt. `outcome` is returned unchanged, so CI stays red
+        # and no arming path can fire on it.
+        if kind == "actionable":
+            skipped = _meta_check_skip(gh, pr, res, names, out_dir)
+            if skipped:
+                trail.append(cifix.meta_skip_note(skipped))
+                log(f"phase7 ci-fix: skipped - {cifix.META_CHECK_NAME} red on "
+                    f"{', '.join(skipped)} (phase 2 recorded it locally); "
+                    f"{attempt} LLM attempt(s) spent")
+                try:
+                    gh.post_review_summary(
+                        pr, cifix.SURVIVOR_TITLE,
+                        cifix.survivor_comment(
+                            names, trail, probed,
+                            refused=[(a, r, cifix_ship.quote_proposal(t, _redact))
+                                     for a, r, t in refused]))
+                except (HarnessError, OSError, subprocess.SubprocessError):
+                    log("phase7 ci-fix: survivor comment not posted")
+                return sha, outcome
 
         # Probe branch: fires on rollup-only or no-change
         if kind == "rollup-only" or last == "no-change":
@@ -3145,7 +3152,8 @@ def exit_code_for(res: RunResult) -> int:
         skill re-run uses the same login. All five are deterministic walls the ~1M-token skill
         re-run cannot climb.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
-    0 = shipped (armed or held), nothing to ship, degraded, or hold-repeat declined.
+    0 = shipped (armed or held), nothing to ship, degraded, hold-repeat declined,
+        or rebased-held (rebase-only mode pushed or found nothing to push).
     There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm.
     usage-pause maps to 75; main() downgrades it to 3 when the marker is gone."""
     if res.terminal == TerminalState.FAILED and res.error_kind == "usage-pause":
@@ -3431,8 +3439,146 @@ def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> 
         pass
 
 
-def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log) -> bool:
-    """Decline before any LLM call when condition 3's MISSING set repeats the prior hold.
+def _phase2_rebase(git, res, log) -> tuple[str, str]:
+    """Phase 2 merge of origin/master, shared by the full path and rebase-only mode.
+
+    Runs the LLM conflict resolver, the conflict ladder and the TREE-EQUIVALENT
+    lost-work proof inside `rebase_onto` / `autoresolve_stacked_rebase`. Returns
+    `(head sha, REBASE= line)`; an unresolved conflict or failed proof raises.
+    """
+    pre_rebase = git.head()
+    conflict_resolved = None
+    try:
+        git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
+        # A plain merge the resolver settled can also carry accepted adapted lines.
+        plain_resolution = getattr(git, "last_conflict_resolution", None)
+        for line in audit_lines_for_adaptations(
+                getattr(plain_resolution, "adapted_lines", ())):
+            log(f"phase2: {line}")
+        res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
+    except HarnessError as e:
+        res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
+        if e.kind != "rebase-conflict":
+            raise
+        # DETECTION-TIME flag: recorded before the resolution attempt begins, so a
+        # run that dies mid-resolution still leaves evidence that this run touched a
+        # conflict. Arming the flag only on success would invert the fail-closed
+        # property -- the same reason the skill sets it in its Phase 2 detection arm
+        # and merely confirms it in step 7.
+        log(f"phase2: CONFLICT_FLAG=set (rebase conflict detected on {git.branch()}) "
+            "-- attempting stacked --onto auto-resolution")
+        plain_conflicted = getattr(git, "last_conflict_files", ())
+        log(f"phase2: conflicted paths (plain rebase) = {', '.join(plain_conflicted) or '-'}")
+        conflict_resolved = git.autoresolve_stacked_rebase()
+        if not conflict_resolved.resolved:
+            log(f"phase2: conflict auto-resolution declined -- {conflict_resolved.reason}")
+            onto_conflicted = getattr(git, "last_conflict_files", ())
+            log(f"phase2: conflicted paths (--onto) = {', '.join(onto_conflicted) or '-'}")
+            block_cause = _classify_rebase_block(
+                git, pre_rebase, plain_conflicted, onto_conflicted,
+                conflict_resolved.reason)
+            log(f"phase2: rebase block {block_cause}")
+            err = HarnessError(
+                "rebase-conflict",
+                f"{e.detail} | auto-resolve declined: {conflict_resolved.reason}",
+            )
+            err.block_cause = block_cause
+            raise err from e
+        log("phase2: conflict auto-resolved via --onto "
+            f"{conflict_resolved.base_sha[:8]}; TREE-EQUIVALENT proved; "
+            f"manifest={conflict_resolved.manifest_path} "
+            f"notes={conflict_resolved.notes_path} "
+            f"POST_RESOLUTION_SHA={conflict_resolved.post_resolution_sha}")
+        for line in audit_lines_for_adaptations(
+                getattr(conflict_resolved, "adapted_lines", ())):
+            log(f"phase2: {line}")
+        if conflict_resolved.collapse_warn:
+            log(f"phase2: {conflict_resolved.collapse_warn}")
+    sha = git.head()
+    if conflict_resolved is not None:
+        auto_files = (f"; auto-resolved conflict in {', '.join(conflict_resolved.resolved_files)}"
+                      if conflict_resolved.resolved_files else "")
+        rebase_line = ("REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; "
+                       f"manifest={conflict_resolved.manifest_path}{auto_files}")
+    else:
+        log("phase2: merged origin/master")
+        # the skill's two success spellings, verbatim
+        rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
+                       if sha == pre_rebase else "REBASE=merged origin/master")
+    return sha, rebase_line
+
+
+def _rebase_only_gate(git, gh, slug, worktree, out_dir, live, state_dir, mode, log
+                      ) -> tuple[bool, str, int | None, str]:
+    """Decide whether rebase-only mode may skip review. Returns (ok, reason, pr, hold).
+
+    Fails toward the full path: any failed check or exception returns ok=False, so a
+    wrong selection costs one normal run and never skips a review the tree needs.
+    """
+    def _no(why):
+        log(f"phase2 rebase-only: ignored ({why}); running full path")
+        return False, why, None, ""
+    try:
+        if mode == "replay":
+            return _no("replay mode")
+        if not (live or state_dir is not None):
+            return _no("no state dir")
+        hr_dir = _state_dir(out_dir, live, state_dir)
+        if not holdrepeat.rebase_only_eligible(hr_dir, slug):
+            return _no("last hold is not a subset of {3,7,8}")
+        staged = subprocess.run(["git", "-C", worktree, "diff", "--cached", "--quiet"],
+                                capture_output=True, timeout=60)
+        if staged.returncode != 0:
+            return _no("uncommitted changes")
+        tracking = gitutil.tracking_sha(git.branch(), worktree)
+        if tracking and tracking != git.head():
+            return _no("local HEAD differs from its tracking ref")
+        pr = None
+        if live:
+            if not gh.pr_exists():
+                return _no("no open PR")
+            pr = gh.pr_number()
+        rec = holdrepeat.load_record(hr_dir, slug) or {}
+        hold = ",".join(str(n) for n in sorted({e[0] for e in rec.get("hold_set") or []}))
+        return True, "eligible", pr, hold
+    except Exception as e:  # noqa: BLE001 - fail toward the full path
+        return _no(f"gate error {e!r}")
+
+
+def _rebase_only(res, git, pr, hold, worktree, diff, log, out_dir, *, slug, live, state_dir, plan):
+    """Merge origin/master, push, and stop: no review, no sticky, never armed."""
+    pre_pid = fidelity.diff_patch_id(diff)
+    pre_head = git.head()
+    log(f"phase2 rebase-only: prior hold {{{hold}}} is human-only; merging origin/master, no review")
+    sha, rebase_line = _phase2_rebase(git, res, log)   # conflict resolver + LOST-hunk proof inside
+    post_pid = fidelity.diff_patch_id(git.diff_vs_base())
+    noop = sha == pre_head
+    pushed = False
+    if not noop:
+        pushed = bool(_push_with_lease_retry(git, log, "rebase-only", pr=pr, worktree=worktree))
+    refreshed = False
+    if (pushed or noop) and pre_pid and pre_pid == post_pid:
+        try:
+            fp = holdrepeat.fingerprint(getattr(plan, "path", "") or "", worktree)
+            refreshed = holdrepeat.refresh_fingerprint(
+                _state_dir(out_dir, live, state_dir), slug, fp,
+                datetime.datetime.now(datetime.timezone.utc).isoformat())
+        except Exception as e:  # noqa: BLE001 - a missed refresh only costs one full run
+            log(f"phase2 rebase-only: record refresh failed ({e!r}); next cycle runs full")
+    log(f"phase2 rebase-only: record_refreshed={refreshed}")
+    res.pr_number = pr
+    res.rebase_only = {"eligible": True, "hold": hold, "pre_patch_id": pre_pid,
+                       "post_patch_id": post_pid, "pushed": pushed, "noop": noop,
+                       "record_refreshed": refreshed, "rebase_line": rebase_line}
+    log(f"phase2 rebase-only: {rebase_line}; pushed={pushed} noop={noop} "
+        f"patch_id_unchanged={bool(pre_pid) and pre_pid == post_pid}")
+    res.terminal = TerminalState.REBASED_HELD
+    return _finish(res, out_dir)
+
+
+def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log, *,
+                       diff_body: str = "", worktree: str = "") -> bool:
+    """Decline before any LLM call when condition 3's MISSING set or an UNREALISED-ASSERTION-only set repeats the prior hold.
 
     True means `res` now carries the HOLD_REPEAT_DECLINED terminal and the caller
     returns. Fail-open: any exception, POSTPLAN_FORCE=1, no plan, or no matching
@@ -3447,27 +3593,49 @@ def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, lo
         hr_dir = _state_dir(out_dir, live, state_dir)
         items = conformance.early_missing_items(plan, conf_files)
         reason = holdrepeat.early_repeat_reason(hr_dir, slug, items)
+        kind = "MISSING"
+        head, tokens = "", frozenset()
         if reason is None:
-            log(f"phase2 early hold-repeat: proceed ({len(items)} MISSING item(s))")
-            return False
+            note = "no unrealised hold"
+            if worktree and holdrepeat.unrealised_only_parts(hr_dir, slug):
+                if not heldmarker._fetch_master(worktree):
+                    note = "fetch failed"
+                else:
+                    reason, note, tokens = holdrepeat.early_unrealised_repeat(
+                        hr_dir, slug, items, plan_path=plan.path,
+                        diff_body=diff_body, worktree=worktree)
+            if reason is None:
+                if note == "no unrealised hold":
+                    log(f"phase2 early hold-repeat: proceed ({len(items)} MISSING item(s))")
+                else:
+                    log(f"phase2 early hold-repeat: proceed ({len(items)} MISSING item(s); "
+                        f"unrealised: {note})")
+                return False
+            kind = "UNREALISED-ASSERTION"
+            head = holdrepeat.head_sha(worktree)
         rec = holdrepeat.load_record(hr_dir, slug) or {}
         key = rec.get("structural_key") or ""
         try:  # suppression is advisory: a marker failure must never undo the decline
             marker = heldmarker.write(
                 hr_dir, slug, plan_path=plan.path,
+                head_sha=head, missing_tokens=tokens,
                 now=datetime.datetime.now(datetime.timezone.utc).isoformat())
         except Exception:  # noqa: BLE001
             marker = None
         marker_path, marker_new = marker if marker else ("", False)
         dm_sent = False
         if key and (rec.get("dm_sent_key") != key or marker_new):
+            fix_line = ("Fix the missing files, or re-fire with:\n" if kind == "MISSING"
+                        else "Push a test that realises these matrix rows, or re-fire with:\n")
+            until = (" this slug until the plan file or this hold changes.\n" if kind == "MISSING"
+                     else " this slug until the plan file, the branch head or this hold changes.\n")
             msg = (f"post-plan declined before spending tokens: {slug}\n"
                    f"Same hold as last run: {reason}\n"
-                   "Fix the missing files, or re-fire with:\n"
+                   f"{fix_line}"
                    "  bin/post-plan-now --force")
             if marker_path:
                 msg += ("\nScheduled re-runs (bin/pr-cycle, bin/post-plan-fleet, automouse) now skip"
-                        " this slug until the plan file or this hold changes.\n"
+                        f"{until}"
                         f"Marker: {marker_path}\n"
                         "To clear it: edit the plan, or delete the marker file."
                         " bin/post-plan-now --force bypasses it for one run.")
@@ -3479,7 +3647,7 @@ def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, lo
                            "structural_key": key,
                            "repeat_count": rec.get("repeat_count") or 0,
                            "dm_sent": dm_sent, "marker": marker_path}
-        log(f"phase2 early hold-repeat: DECLINED, same MISSING set as last hold "
+        log(f"phase2 early hold-repeat: DECLINED, same {kind} set as last hold "
             f"({reason}) dm={'sent' if dm_sent else 'skipped'} "
             f"marker={'written' if marker_path else 'skipped'}")
         return True
@@ -3715,6 +3883,13 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         return ("RESULT: post-plan DECLINED — terminal=hold-repeat-declined; "
                 f"declined: same hold as last run ({reason}), no tokens spent. "
                 "Fix the missing files or re-run bin/post-plan-now --force.")
+    if res.terminal == TerminalState.REBASED_HELD:
+        ro = res.rebase_only or {}
+        what = ("already up to date with master, nothing pushed"
+                if ro.get("noop") else "merged origin/master and pushed")
+        return (f"RESULT: post-plan REBASED — terminal=rebased-held{pr}; "
+                f"{what}; held for a human (prior hold {_flat(ro.get('hold') or '') or 'unknown'}); "
+                "no review run, auto-merge not armed.")
 
     armed = "armed" if (res.arm and res.arm.armed) else "HELD (human merges)"
     tail = ""
@@ -3834,11 +4009,17 @@ def main() -> int:
                          "allowlisted gh mutations, watch CI")
     ap.add_argument("--plan", help="explicit plan file path (isolated only): overrides "
                                    "slug-derived variant selection")
+    ap.add_argument("--rebase-only", action="store_true",
+                    help="rebase-only mode (live only): when the last hold is a subset of "
+                         "{3,7,8}, merge origin/master, push, and stop before review; "
+                         "otherwise run normally")
     args = ap.parse_args()
     if args.live and args.mode != "isolated":
         ap.error("--live is only valid with --mode isolated")
     if args.plan and args.mode != "isolated":
         ap.error("--plan is only valid with --mode isolated")
+    if args.rebase_only and not args.live:
+        ap.error("--rebase-only is only valid with --live")
 
     fixture = None
     if args.mode == "replay":
@@ -3858,7 +4039,8 @@ def main() -> int:
         llm = ClaudeCli(ledger, out_dir=args.out)
 
     res = run(fixture, args.out, llm, mode=args.mode, worktree=args.worktree,
-              headless=not args.interactive, live=args.live, explicit_path=args.plan)
+              headless=not args.interactive, live=args.live, explicit_path=args.plan,
+              rebase_only=args.rebase_only)
     t = ledger.totals()
     rc = exit_code_for(res)
     rc = _settle_pause_marker(res, rc)

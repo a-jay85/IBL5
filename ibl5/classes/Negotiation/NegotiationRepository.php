@@ -58,22 +58,9 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
     /**
      * @see NegotiationRepositoryInterface::getPositionSalaryCommitment()
      */
-    public function getPositionSalaryCommitment(string $teamName, string $position, string $excludePlayerName): int
+    public function getPositionSalaryCommitment(string $teamName, string $position, int $excludePlayerID): int
     {
-        /** @var array{total_salary: int|null}|null $result */
-        $result = $this->fetchOne(
-            "SELECT SUM(next_year_salary) AS total_salary
-             FROM vw_current_salary
-             WHERE teamname = ?
-               AND pos = ?
-               AND name != ?",
-            "sss",
-            $teamName,
-            $position,
-            $excludePlayerName
-        );
-
-        return (int) ($result['total_salary'] ?? 0);
+        return $this->salaryCapRepo->getPositionSalaryCommitmentNextYear($teamName, $position, $excludePlayerID);
     }
 
     /**

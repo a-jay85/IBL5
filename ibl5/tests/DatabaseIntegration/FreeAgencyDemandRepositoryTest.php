@@ -7,6 +7,7 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 use FreeAgency\FreeAgencyDemandRepository;
+use Repositories\SalaryCapRepository;
 
 /**
  * Tests FreeAgencyDemandRepository against real MariaDB — team performance
@@ -20,7 +21,7 @@ class FreeAgencyDemandRepositoryTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repo = new FreeAgencyDemandRepository($this->db);
+        $this->repo = new FreeAgencyDemandRepository($this->db, new SalaryCapRepository($this->db));
     }
 
     // ── getTeamPerformance ──────────────────────────────────────

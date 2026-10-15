@@ -316,7 +316,9 @@ postplan_heldmarker_decline() {
     [ "${STATE_CHANGED:-0}" -eq 0 ] || return 1
     out=$(PYTHONPATH="$harness" python3 -m harness.heldmarker check \
             --state-dir "${HOLDREPEAT_STATE_DIR:-$harness/out/state}" \
-            --slug "$slug" --plan "$plan" 2>/dev/null) && rc=0 || rc=$?
+            --slug "$slug" --plan "$plan" \
+            --worktree "$(git rev-parse --show-toplevel 2>/dev/null)" \
+            2>/dev/null) && rc=0 || rc=$?
     [ "$rc" -eq 10 ] || return 1
     printf '%s\n' "$out"
     return 0

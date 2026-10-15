@@ -3294,6 +3294,38 @@ mk_lostwork_repo() {
     printf 'mine\n' >> "$d/f.txt"; git -C "$d" commit --quiet -am mine
     printf '%s' "$d"
 }
+# Baseline fixture for the second exemption (ADR-0174 addendum): X ignores a Foo path,
+# Y a Bar path. The branch trims X and (when $1 = 0) deletes Foo; the "resolution"
+# restores X, standing in for a rebase that dropped the branch's deletion.
+lw_neon_fixture() {
+    printf 'parameters:\n\tignoreErrors:\n'
+    local b; for b in "$@"; do
+        case "$b" in
+          X) printf '\t\t-\n\t\t\trawMessage: %s\n\t\t\tidentifier: foo.dead\n\t\t\tcount: 1\n\t\t\tpath: modules/Foo/index.php\n\n' "'Call to foo().'" ;;
+          Y) printf '\t\t-\n\t\t\trawMessage: %s\n\t\t\tidentifier: bar.live\n\t\t\tcount: 2\n\t\t\tpath: modules/Bar/index.php\n\n' "'Call to bar().'" ;;
+        esac
+    done
+}
+mk_lostwork_baseline_repo() {
+    local keep=$1 key=$2 d; d="$(mktemp -d "$BASE_TMP/lwb-XXXXXX")"
+    git -C "$d" init --quiet -b main
+    git -C "$d" config user.email 'postplan-test@example.invalid'
+    git -C "$d" config user.name  'postplan test'
+    mkdir -p "$d/ibl5/modules/Foo" "$d/ibl5/modules/Bar"
+    printf '<?php\n' > "$d/ibl5/modules/Foo/index.php"
+    printf '<?php\n' > "$d/ibl5/modules/Bar/index.php"
+    lw_neon_fixture X Y > "$d/ibl5/phpstan-baseline.neon"
+    git -C "$d" add -A; git -C "$d" commit --quiet -m base
+    git -C "$d" update-ref refs/remotes/origin/master "$(git -C "$d" rev-parse HEAD)"
+    [ "$keep" = 1 ] || git -C "$d" rm --quiet ibl5/modules/Foo/index.php
+    lw_neon_fixture Y > "$d/ibl5/phpstan-baseline.neon"
+    printf 'work\n' > "$d/branch-note.txt"
+    git -C "$d" add -A; git -C "$d" commit --quiet -m trim
+    git -C "$d" diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$key.patch"
+    lw_neon_fixture X Y > "$d/ibl5/phpstan-baseline.neon"
+    git -C "$d" commit --quiet -am 'resolution kept master entries'
+    printf '%s' "$d"
+}
 if [ ! -x "$LW" ]; then
     echo "FAIL: §5.9g — $LW missing or not executable"; FAILED=1
 else
@@ -3343,6 +3375,19 @@ else
           "/tmp/pr-ready-numstat-pre-$LWK2.txt" "/tmp/pr-ready-numstat-post-$LWK2.txt" \
           "/tmp/pr-ready-diff-pre-$LWK3.patch" "/tmp/pr-ready-diff-post-$LWK3.patch" \
           "/tmp/pr-ready-numstat-pre-$LWK3.txt" "/tmp/pr-ready-numstat-post-$LWK3.txt"
+
+    # §5.9g baseline exemption: a trimmed block whose path is gone at HEAD is not lost.
+    LWK4="lw-neon-dead-$$"; LWR4="$(mk_lostwork_baseline_repo 0 "$LWK4")"
+    LWO4="$(cd "$LWR4" && bash "$LW" "$LWK4" 2>&1 || true)"
+    have  "§5.9g: dead-path baseline block is exempt (TREE-EQUIVALENT)" "$LWO4" 'TREE-EQUIVALENT'
+    lacks "§5.9g: dead-path baseline block emits no LOST line"          "$LWO4" 'LOST:'
+    rm -f "/tmp/pr-ready-diff-pre-$LWK4.patch" "/tmp/pr-ready-diff-post-$LWK4.patch"
+    # §5.9g hard constraint: the same trimmed block with its path still at HEAD is lost.
+    LWK5="lw-neon-live-$$"; LWR5="$(mk_lostwork_baseline_repo 1 "$LWK5")"
+    LWO5="$(cd "$LWR5" && bash "$LW" "$LWK5" 2>&1 || true)"
+    have  "§5.9g: live-path baseline block is still LOST"  "$LWO5" "LOST: ibl5/phpstan-baseline.neon: -$(printf '\t\t\t')path: modules/Foo/index.php"
+    have  "§5.9g: live-path baseline block diverges"       "$LWO5" 'TREE DIVERGED — inspect before pushing'
+    rm -f "/tmp/pr-ready-diff-pre-$LWK5.patch" "/tmp/pr-ready-diff-post-$LWK5.patch"
 fi
 
 # §5.9h the BEHIND re-rebase loop. The loop body is orchestrator prose interleaved

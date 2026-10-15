@@ -1,6 +1,6 @@
 ---
 description: The post-plan lost-work proof reads the post-rebase tree per branch line instead of comparing numstat rows, so master edits to the same file no longer block; ambiguity still blocks.
-last_verified: 2026-10-06
+last_verified: 2026-10-14
 ---
 
 # ADR-0174: Lost-work proof compares branch changes against the post-rebase tree
@@ -71,6 +71,37 @@ The backtest supports the change. Two of the seven runs the numstat gate blocked
 - Whitespace-only or re-indented resolutions block, because matching is exact. That includes a line-ending change: a branch's LF line in a file master stores as CRLF reads as lost, as five player-module-renames-181-182 lines did.
 - An added line that already appears elsewhere in the file proves present even if the branch's own copy was dropped. The added-line check tests presence and does not count copies.
 - `git range-diff` and `patch-id` stay rejected for the reasons above.
+
+## Addendum — phpstan-baseline.neon absent-path exemption (2026-10-14) <!-- slop-ok -->
+
+The Decision above counts every deleted line of every file against the HEAD tree. From this
+date the proof carries a second named exemption, next to the `last_verified:` one, for a single
+file: `ibl5/phpstan-baseline.neon`.
+
+- **Rule.** A deleted line of that file is not reported `LOST:` when the 5-line ignore block it
+  belongs to names a `path:` that is absent from the HEAD tree, checked as
+  `git cat-file -e HEAD:ibl5/<path>` (baseline paths are relative to `ibl5/`). The ignore entry
+  has nothing left to ignore, so its disappearance is not lost work.
+- **Mechanism.** `lw_neon` in `lostwork.sh` parses both the HEAD copy and the `origin/master`
+  copy into blocks. Blocks whose path is absent are removed from both copies before the
+  per-line count runs, and each deleted line text is first charged against the removed blocks'
+  own lines (capped at the larger of the two copies' counts), so a `count: 1` shared between a
+  dead block and a live block is not read as a surviving copy of the live block's deletion.
+- **Bound.** A live block's `path:` line can never be charged to a dead block, because a dead
+  block's path is absent and a live block's path is present. A dropped deletion of a live block
+  therefore still reports at least its `path:` line. Added lines, every other file including
+  `ibl5/phpstan-tests-baseline.neon`, and a renamed baseline stay strict.
+- **Fail closed.** If either copy does not parse as `parameters:` / `ignoreErrors:` plus
+  well-formed blocks, the file is counted exactly as before this addendum. The parser is also
+  run against the real baseline in `tools/postplan-harness/tests/test_lostwork_change_level.py`
+  so a format change in PHPStan's output turns the exemption off loudly in CI instead of
+  silently.
+- **What this does not fix.** The run that prompted the change (live-records-hub, 2026-10-13)
+  is not released by this rule: its flagged paths still exist at HEAD. Its probable cause is a
+  different class, where master already removed entries the branch also removes and duplicated
+  line text makes the per-line count read `h >= m`. Fixing that needs per-block identity
+  counting; the block parser added here is its foundation. Until then that class still blocks,
+  which is the accepted fail-closed side.
 
 ## References
 

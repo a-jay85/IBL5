@@ -6,7 +6,10 @@ error_reporting(E_ALL);
 libxml_use_internal_errors(true);
 
 // Load mainfile first for authentication
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+$documentRoot = isset($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT'])
+    ? $_SERVER['DOCUMENT_ROOT']
+    : '';
+require $documentRoot . '/ibl5/mainfile.php';
 
 // SECURITY: Redirect logged-out users to login
 if (!function_exists('is_user') || !is_user($user ?? '')) {
@@ -79,8 +82,8 @@ if ($leagueContext !== null) {
 $view = new Updater\UpdaterView();
 
 $stylesheetPath = '/ibl5/themes/IBL/style/style.css';
-/** @var int|false $stylesheetMtime */
-$stylesheetMtime = filemtime($_SERVER['DOCUMENT_ROOT'] . $stylesheetPath);
+/** @var int<0, max>|false $stylesheetMtime */
+$stylesheetMtime = filemtime($documentRoot . $stylesheetPath);
 $cacheBuster = $stylesheetMtime !== false ? '?v=' . $stylesheetMtime : '';
 
 echo $view->renderPageOpen($stylesheetPath . $cacheBuster);
@@ -91,7 +94,7 @@ set_error_handler(function (int $errno, string $errstr, string $errfile, int $er
     $safeMessage = \Security\HtmlSanitizer::safeHtmlOutput(
         "[$errno] $errstr in $errfile on line $errline"
     );
-    echo $view->renderStepError('PHP Error', (string) $safeMessage);
+    echo $view->renderStepError('PHP Error', $safeMessage);
     flush();
     return false;
 });
@@ -104,13 +107,13 @@ set_exception_handler(function (\Throwable $exception) use ($view): void {
 
     echo $view->renderStepError(
         'Uncaught Exception',
-        (string) $safeMessage . ' in ' . (string) $safeFile . ' on line ' . $exception->getLine()
+        $safeMessage . ' in ' . $safeFile . ' on line ' . $exception->getLine()
     );
-    echo $view->renderLog('<pre>' . (string) $safeTrace . '</pre>');
+    echo $view->renderLog('<pre>' . $safeTrace . '</pre>');
     flush();
 });
 
-$basePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5';
+$basePath = $documentRoot . '/ibl5';
 
 try {
     // --- Initialization ---
@@ -328,7 +331,8 @@ try {
     // shadow only READS inputs and writes droppable diagnostic tables. IBL-only (the
     // engine bundle is IBL-scoped), so the gate stays !$isOlympics. Fire-and-forget:
     // the admin request returns immediately and the shadow process outlives it.
-    if (!$isOlympics && filter_var(getenv('ENGINE_SHADOW_ENABLED') ?: '', FILTER_VALIDATE_BOOLEAN)) {
+    $shadowFlag = getenv('ENGINE_SHADOW_ENABLED');
+    if (!$isOlympics && filter_var($shadowFlag === false ? '' : $shadowFlag, FILTER_VALIDATE_BOOLEAN)) {
         $shadowLauncher = new EngineShadow\ShadowProcessLauncher(
             $basePath . '/scripts/runEngineShadow.php',
             sys_get_temp_dir() . '/ibl5-engine-shadow.log',
@@ -340,8 +344,8 @@ try {
     $safeMessage = \Security\HtmlSanitizer::safeHtmlOutput($e->getMessage());
     $safeTrace = \Security\HtmlSanitizer::safeHtmlOutput($e->getTraceAsString());
 
-    echo $view->renderStepError('Exception', (string) $safeMessage);
-    echo $view->renderLog('<pre>' . (string) $safeTrace . '</pre>');
+    echo $view->renderStepError('Exception', $safeMessage);
+    echo $view->renderLog('<pre>' . $safeTrace . '</pre>');
     echo $view->renderSummary(0, 1);
     flush();
 }

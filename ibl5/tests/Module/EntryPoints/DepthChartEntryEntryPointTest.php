@@ -172,6 +172,48 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
         $this->assertSame(['teamless', 'teamless', ''], $GLOBALS['cookie']);
     }
 
+    public function testOpApiAuthenticatedFreeAgentsTeamReturnsForbiddenJson(): void
+    {
+        $this->authenticateWithUsername('fagm');
+        $this->mockDb->onQuery('gm_username', [['team_name' => 'Free Agents']]);
+        $this->mockDb->onQuery('WHERE team_name', [['teamid' => 0]]);
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('DepthChartEntry', ['op' => 'api', 'action' => 'list'], [], [
+            'user' => $GLOBALS['user'],
+        ]);
+
+        $decoded = json_decode($output, true);
+        $this->assertIsArray($decoded);
+        $this->assertSame('No team assigned', $decoded['error']);
+        $this->assertNoSavedDepthChartQuery();
+    }
+
+    public function testOpApiAuthenticatedUnresolvedTeamIdReturnsForbiddenJson(): void
+    {
+        $this->authenticateWithUsername('orphangm');
+        $this->mockDb->onQuery('gm_username', [['team_name' => 'Boston']]);
+        $this->mockDb->onQuery('WHERE team_name', []);
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('DepthChartEntry', ['op' => 'api', 'action' => 'list'], [], [
+            'user' => $GLOBALS['user'],
+        ]);
+
+        $decoded = json_decode($output, true);
+        $this->assertIsArray($decoded);
+        $this->assertSame('Team not found', $decoded['error']);
+        $this->assertNoSavedDepthChartQuery();
+    }
+
+    private function assertNoSavedDepthChartQuery(): void
+    {
+        $all = array_merge($this->mockDb->getPreparedQueries(), $this->mockDb->getExecutedQueries());
+        foreach ($all as $sql) {
+            $this->assertStringNotContainsString('ibl_saved_depth_charts', (string) $sql);
+        }
+    }
+
     public function testOpApiWithoutAuthDoesNotDecodeCookie(): void
     {
         unset($GLOBALS['cookie']);

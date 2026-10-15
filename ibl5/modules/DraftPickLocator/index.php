@@ -25,6 +25,7 @@ use DraftPickLocator\DraftPickLocatorView;
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 $season = new \Season\Season($mysqli_db);
 

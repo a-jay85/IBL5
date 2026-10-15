@@ -1,7 +1,7 @@
 ---
 description: Common repository helpers and gotchas for IBL5 PHP code.
 paths: "**/*.php"
-last_verified: 2026-08-21
+last_verified: 2026-10-15
 ---
 
 # Core Coding Reference

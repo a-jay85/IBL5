@@ -57,8 +57,6 @@ if ($localClassesDir !== false) {
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/db.php';
 
-/** @var \mysqli $mysqli_db */
-
 // ── Known missing snapshots (surveyed across backups/) ─────────────────────
 // Each entry: [season_dir, zip_basename]. The reconstructor auto-finds the
 // nearest prior .plr within the same season directory.
@@ -79,7 +77,7 @@ $snapshotRel = null;
 $all = false;
 $outDir = null;
 
-foreach ($argv as $arg) {
+foreach ($argv ?? [] as $arg) {
     if (str_starts_with($arg, '--base=')) {
         $basePath = substr($arg, strlen('--base='));
     } elseif (str_starts_with($arg, '--season-year=')) {
@@ -103,6 +101,7 @@ if (!is_dir($backupsDir)) {
     exit(2);
 }
 
+/** @var \mysqli $mysqli_db */
 $repository = new PlrParser\PlrBoxScoreRepository($mysqli_db);
 $inferrer = new PlrParser\PlrSimDateInferrer($repository);
 $service = new PlrParser\PlrReconstructionService($repository);
@@ -230,7 +229,7 @@ function runSnapshotMode(
 function deriveSeasonYearFromSeasonDir(string $seasonDir): ?int
 {
     // "88-89" → 1989, "06-07" → 2007, "99-00" → 2000
-    if (!preg_match('/^(\d{2})-(\d{2})$/', $seasonDir, $m)) {
+    if (preg_match('/^(\d{2})-(\d{2})$/', $seasonDir, $m) !== 1) {
         return null;
     }
     $end = (int) $m[2];

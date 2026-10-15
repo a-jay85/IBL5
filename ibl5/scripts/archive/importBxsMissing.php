@@ -29,6 +29,7 @@ if (PHP_SAPI !== 'cli') {
 require __DIR__ . '/../../mainfile.php';
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 $dryRun = in_array('--dry-run', $argv ?? [], true);
 
@@ -96,6 +97,7 @@ $scheduleOrder = [
 /**
  * Parse a .bxs game record header (95 bytes)
  *
+ * @param array<string, int> $teamNameToId
  * @return array{date: string, visName: string, homeName: string, visScore: int, homeScore: int, visId: int, homeId: int}|null
  */
 function parseBxsHeader(string $record, int $seasonEndingYear, array $teamNameToId): ?array

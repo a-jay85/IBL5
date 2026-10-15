@@ -78,15 +78,17 @@ class NegotiationRepositoryTest extends TestCase
     // GET POSITION SALARY COMMITMENT TESTS
     // ============================================
 
-    public function testGetPositionSalaryCommitmentReturnsZeroWhenNoPlayers(): void
+    public function testGetPositionSalaryCommitmentDelegatesToSalaryCapRepository(): void
     {
-        $repository = new NegotiationRepository($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
-        $this->mockDb->setMockData([]);
+        $salaryCap = self::createMock(SalaryCapRepositoryInterface::class);
+        $salaryCap->expects($this->once())
+            ->method('getPositionSalaryCommitmentNextYear')
+            ->with('Test Team', 'G', 200140001)
+            ->willReturn(4321);
 
-        $result = $repository->getPositionSalaryCommitment('Test Team', 'G', 'Excluded Player');
+        $repository = new NegotiationRepository($this->mockDb, $salaryCap);
 
-        $this->assertIsInt($result);
-        $this->assertSame(0, $result);
+        $this->assertSame(4321, $repository->getPositionSalaryCommitment('Test Team', 'G', 200140001));
     }
 
     // ============================================

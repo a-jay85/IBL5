@@ -167,12 +167,6 @@ parameters:
 			path: classes/Trading/TradingController.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class AwardHistory\AwardHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/AwardHistory/index.php
-
-		-
 			rawMessage: 'Parameter #1 $rawParams of method AwardHistory\AwardHistoryService::search() expects array<string, mixed>, array<mixed> given.'
 			identifier: argument.type
 			count: 1
@@ -209,12 +203,6 @@ parameters:
 			path: modules/ComparePlayers/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class ContractList\ContractListRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ContractList/index.php
-
-		-
 			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -231,78 +219,6 @@ parameters:
 			identifier: cast.int
 			count: 2
 			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DraftPickLocator\DraftPickLocatorRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftPickLocator/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftPickLocator/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FranchiseHistory\FranchiseHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FranchiseRecordBook\FranchiseRecordBookApiHandler constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseRecordBook/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FranchiseRecordBook\FranchiseRecordBookRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseRecordBook/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FreeAgencyPreview\FreeAgencyPreviewRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FreeAgencyPreview/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FreeAgencyPreview/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class GMContactList\GMContactListRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/GMContactList/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class GameBoxscore\GameBoxscoreRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/GameBoxscore/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class GameBoxscore\GameBoxscoreRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/GameBoxscore/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Injuries\InjuriesService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Injuries/index.php
 
 		-
 			rawMessage: Cannot cast mixed to int.
@@ -350,18 +266,6 @@ parameters:
 			path: modules/PlayerSearch/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class PlayerSearch\PlayerSearchRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerSearch/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Player\PlayerRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerSearch/index.php
-
-		-
 			rawMessage: 'Parameter #1 $rawParams of method PlayerSearch\PlayerSearchService::search() expects array<string, mixed>, array<mixed> given.'
 			identifier: argument.type
 			count: 1
@@ -380,38 +284,8 @@ parameters:
 			path: modules/Search/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Search\SearchRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Search/index.php
-
-		-
-			rawMessage: 'Parameter #2 $prefix of class Search\SearchRepository constructor expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Search/index.php
-
-		-
-			rawMessage: 'Part $module_name (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: modules/Search/index.php
-
-		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
-			count: 1
-			path: modules/SeasonArchive/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class SeasonArchive\SeasonArchiveRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonArchive/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class SeasonArchive\SeasonArchiveRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
 			count: 1
 			path: modules/SeasonArchive/index.php
 
@@ -500,18 +374,6 @@ parameters:
 			path: modules/SeasonLeaderboards/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class SeasonRosterChanges\SeasonRosterChangesRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonRosterChanges/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonRosterChanges/index.php
-
-		-
 			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'
 			identifier: booleanNot.exprNotBoolean
 			count: 1
@@ -528,18 +390,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/Team/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TeamOffDefStats/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class TeamOffDefStats\TeamOffDefStatsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TeamOffDefStats/index.php
 
 		-
 			rawMessage: 'Parameter #3 $searchFilters of method Topics\TopicsView::render() expects array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, articleComm: bool, preset?: string}, array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: array<int, string>, articleComm: bool, preset: ''''|''transactions''} given.'
@@ -566,124 +416,10 @@ parameters:
 			path: scripts/allStarRename.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Boxscore\AllStarTeamRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/allStarRename.php
-
-		-
 			rawMessage: Variable $admin might not be defined.
 			identifier: variable.undefined
 			count: 1
 			path: scripts/allStarRename.php
-
-		-
-			rawMessage: 'Function parseBxsHeader() has parameter $teamNameToId with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: scripts/archive/importBxsMissing.php
-
-		-
-			rawMessage: 'Function parseBxsHeader() should return array{date: string, visName: string, homeName: string, visScore: int, homeScore: int, visId: int, homeId: int}|null but returns array{date: non-falsy-string, visName: non-empty-string, homeName: non-empty-string, visScore: int, homeScore: int, visId: mixed, homeId: mixed}.'
-			identifier: return.type
-			count: 1
-			path: scripts/archive/importBxsMissing.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/archive/importBxsMissing.php
-
-		-
-			rawMessage: 'Loose comparison via "!=" between string and int is not allowed.'
-			identifier: notEqual.notAllowed
-			count: 1
-			path: scripts/archive/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/archive/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/archive/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/archive/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fread expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/archive/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fseek expects resource, resource|false given.'
-			identifier: argument.type
-			count: 2
-			path: scripts/archive/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $string of function substr expects string, string|false given.'
-			identifier: argument.type
-			count: 3
-			path: scripts/archive/plrScratchpad.php
-
-		-
-			rawMessage: 'addslashes() is banned. Use prepared statements for database escaping or json_encode()/htmlspecialchars() for output escaping.'
-			identifier: ibl.bannedAddslashes
-			count: 1
-			path: scripts/archive/plrScratchpad.php
-
-		-
-			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
-			identifier: ibl.unknownCliOption
-			count: 1
-			path: scripts/build-engine-bundle.php
-
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 3
-			path: scripts/bulkJsbImport.php
-
-		-
-			rawMessage: Variable $argc might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/generate_api_key.php
-
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/generate_api_key.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class JsbParser\JsbExportRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/jsbExport.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/jsbExport.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 2
-			path: scripts/jsbExport.php
 
 		-
 			rawMessage: 'Loose comparison via "!=" between int and int is not allowed.'
@@ -878,120 +614,6 @@ parameters:
 			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
 
 		-
-			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'
-			identifier: booleanNot.exprNotBoolean
-			count: 1
-			path: scripts/reconstructPlr.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class PlrParser\PlrBoxScoreRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/reconstructPlr.php
-
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/reconstructPlr.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/reconstructPlr.php
-
-		-
-			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
-			identifier: ibl.unknownCliOption
-			count: 1
-			path: scripts/runEngineShadow.php
-
-		-
-			rawMessage: PHPDoc tag @var above a function has no effect.
-			identifier: varTag.misplaced
-			count: 1
-			path: scripts/simRecapContext.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class SimRecap\SimRecapContextRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/simRecapContext.php
-
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/simRecapContext.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/simRecapContext.php
-
-		-
-			rawMessage: 'PHPDoc tag @var with type int is not subtype of native type int<1, max>|null.'
-			identifier: varTag.nativeType
-			count: 3
-			path: scripts/simRecapQueue.php
-
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/simRecapQueue.php
-
-		-
-			rawMessage: PHPDoc tag @var above a function has no effect.
-			identifier: varTag.misplaced
-			count: 1
-			path: scripts/storeSimRecap.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class SimRecap\SimSummaryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/storeSimRecap.php
-
-		-
-			rawMessage: Variable $argv might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/storeSimRecap.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 1
-			path: scripts/storeSimRecap.php
-
-		-
-			rawMessage: Binary operation "." between mixed and '/ibl5' results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: scripts/updateAllTheThings.php
-
-		-
-			rawMessage: Binary operation "." between mixed and '/ibl5/mainfile.php' results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: scripts/updateAllTheThings.php
-
-		-
-			rawMessage: Binary operation "." between mixed and '/ibl5/themes/IBL…' results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: scripts/updateAllTheThings.php
-
-		-
-			rawMessage: Casting to string something that's already string.
-			identifier: cast.useless
-			count: 6
-			path: scripts/updateAllTheThings.php
-
-		-
 			rawMessage: 'Direct is_admin() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
@@ -1007,18 +629,6 @@ parameters:
 			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
 			identifier: booleanNot.exprNotBoolean
 			count: 2
-			path: scripts/updateAllTheThings.php
-
-		-
-			rawMessage: 'PHPDoc tag @var with type int|false is not subtype of type int<0, max>|false.'
-			identifier: varTag.type
-			count: 1
-			path: scripts/updateAllTheThings.php
-
-		-
-			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
-			identifier: ternary.shortNotAllowed
-			count: 1
 			path: scripts/updateAllTheThings.php
 
 		-

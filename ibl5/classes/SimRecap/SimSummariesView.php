@@ -40,12 +40,38 @@ class SimSummariesView
 <div class="updater">
     <h1 class="updater__title">Sim Recaps</h1>
 
+<?php $this->renderErrorNotice($error, $requestedSim); ?>
+
+<?php $this->renderSimIndex($rows); ?>
+<?php if ($recap !== null): ?>
+<?php $this->renderRecapCard($recap, $gameRecaps, $orphanedGames); ?>
+<?php endif; ?>
+
+    <a href="/ibl5/index.php" class="updater__return underline">Return to IBL</a>
+</div>
+</body>
+</html>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    private function renderErrorNotice(?string $error, ?int $requestedSim): void
+    {
+        ?>
 <?php if ($error === 'malformed'): ?>
     <p class="ibl-card" id="recap-error">Invalid sim number.</p>
 <?php elseif ($error === 'notfound'): ?>
     <p class="ibl-card" id="recap-error">No recap stored for sim <?= HtmlSanitizer::e($requestedSim ?? '') ?>.</p>
 <?php endif; ?>
+<?php
+    }
 
+    /**
+     * @param list<array<string, mixed>> $rows
+     */
+    private function renderSimIndex(array $rows): void
+    {
+        ?>
     <table class="ibl-data-table">
         <thead>
             <tr>
@@ -77,26 +103,23 @@ class SimSummariesView
         </tbody>
     </table>
 
-<?php if ($recap !== null): ?>
+<?php
+    }
+
+    /**
+     * @param array<string, mixed>       $recap
+     * @param list<array<string, mixed>> $gameRecaps
+     * @param list<array<string, mixed>> $orphanedGames
+     */
+    private function renderRecapCard(array $recap, array $gameRecaps, array $orphanedGames): void
+    {
+        ?>
     <section class="ibl-card" id="recap-panel">
         <h2 class="ibl-title">Sim <?= HtmlSanitizer::e($recap['sim'] ?? '') ?></h2>
         <p>Status: <?= HtmlSanitizer::e($recap['status'] ?? '') ?> · Attempts: <?= HtmlSanitizer::e($recap['attempts'] ?? '') ?> · Generated: <?= HtmlSanitizer::e($recap['generated_at'] ?? '—') ?></p>
         <p id="recap-themes">Themes: <?= HtmlSanitizer::e($this->themeSummary($recap)) ?></p>
 <?php if ($orphanedGames !== []): ?>
-        <div id="recap-orphan-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
-            <p><strong>Warning:</strong> <?= HtmlSanitizer::e(count($orphanedGames)) ?> <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'game' : 'games') ?> in this sim recap could not be matched to a box score and <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'is' : 'are') ?> omitted from the postable document. Unresolvable keys:</p>
-            <ul>
-<?php foreach ($orphanedGames as $orphan): ?>
-<?php
-            $oDate = $orphan['game_date'] ?? null;
-            $oVid  = $orphan['visitor_teamid'] ?? null;
-            $oHid  = $orphan['home_teamid'] ?? null;
-            $oGotd = $orphan['game_of_that_day'] ?? null;
-?>
-            <li class="recap-orphan"><?= HtmlSanitizer::e(is_string($oDate) ? $oDate : '') ?> · team <?= HtmlSanitizer::e(is_scalar($oVid) ? (string) $oVid : '') ?> at team <?= HtmlSanitizer::e(is_scalar($oHid) ? (string) $oHid : '') ?> · game <?= HtmlSanitizer::e(is_scalar($oGotd) ? (string) $oGotd : '') ?> of that day</li>
-<?php endforeach; ?>
-            </ul>
-        </div>
+<?php $this->renderOrphanWarning($orphanedGames); ?>
 <?php endif; ?>
 <?php $body = $recap['recap_text'] ?? null; ?>
 <?php if (!is_string($body)): ?>
@@ -107,19 +130,7 @@ class SimSummariesView
         <p id="recap-intro" class="whitespace-pre-line"><?= HtmlSanitizer::e($intro) ?></p>
 <?php endif; ?>
 <?php if ($gameRecaps !== []): ?>
-        <ol id="recap-games">
-<?php foreach ($gameRecaps as $game): ?>
-<?php
-            $gDate = $game['game_date'] ?? null;
-            $gVid  = $game['visitor_teamid'] ?? null;
-            $gHid  = $game['home_teamid'] ?? null;
-?>
-            <li class="recap-game">
-                <span class="recap-game__meta"><?= HtmlSanitizer::e(is_string($gDate) ? $gDate : '') ?> · team <?= HtmlSanitizer::e(is_scalar($gVid) ? (string) $gVid : '') ?> at team <?= HtmlSanitizer::e(is_scalar($gHid) ? (string) $gHid : '') ?></span>
-                <p class="recap-game__text whitespace-pre-line"><?= HtmlSanitizer::e($game['recap_text'] ?? '') ?></p>
-            </li>
-<?php endforeach; ?>
-        </ol>
+<?php $this->renderGameRecaps($gameRecaps); ?>
 <?php endif; ?>
 <?php $outro = $recap['outro_text'] ?? null; ?>
 <?php if (is_string($outro) && $outro !== ''): ?>
@@ -151,14 +162,52 @@ class SimSummariesView
         </script>
 <?php endif; ?>
     </section>
-<?php endif; ?>
+<?php
+    }
 
-    <a href="/ibl5/index.php" class="updater__return underline">Return to IBL</a>
-</div>
-</body>
-</html>
-        <?php
-        return (string) ob_get_clean();
+    /**
+     * @param list<array<string, mixed>> $orphanedGames
+     */
+    private function renderOrphanWarning(array $orphanedGames): void
+    {
+        ?>
+        <div id="recap-orphan-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
+            <p><strong>Warning:</strong> <?= HtmlSanitizer::e(count($orphanedGames)) ?> <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'game' : 'games') ?> in this sim recap could not be matched to a box score and <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'is' : 'are') ?> omitted from the postable document. Unresolvable keys:</p>
+            <ul>
+<?php foreach ($orphanedGames as $orphan): ?>
+<?php
+            $oDate = $orphan['game_date'] ?? null;
+            $oVid  = $orphan['visitor_teamid'] ?? null;
+            $oHid  = $orphan['home_teamid'] ?? null;
+            $oGotd = $orphan['game_of_that_day'] ?? null;
+?>
+            <li class="recap-orphan"><?= HtmlSanitizer::e(is_string($oDate) ? $oDate : '') ?> · team <?= HtmlSanitizer::e(is_scalar($oVid) ? (string) $oVid : '') ?> at team <?= HtmlSanitizer::e(is_scalar($oHid) ? (string) $oHid : '') ?> · game <?= HtmlSanitizer::e(is_scalar($oGotd) ? (string) $oGotd : '') ?> of that day</li>
+<?php endforeach; ?>
+            </ul>
+        </div>
+<?php
+    }
+
+    /**
+     * @param list<array<string, mixed>> $gameRecaps
+     */
+    private function renderGameRecaps(array $gameRecaps): void
+    {
+        ?>
+        <ol id="recap-games">
+<?php foreach ($gameRecaps as $game): ?>
+<?php
+            $gDate = $game['game_date'] ?? null;
+            $gVid  = $game['visitor_teamid'] ?? null;
+            $gHid  = $game['home_teamid'] ?? null;
+?>
+            <li class="recap-game">
+                <span class="recap-game__meta"><?= HtmlSanitizer::e(is_string($gDate) ? $gDate : '') ?> · team <?= HtmlSanitizer::e(is_scalar($gVid) ? (string) $gVid : '') ?> at team <?= HtmlSanitizer::e(is_scalar($gHid) ? (string) $gHid : '') ?></span>
+                <p class="recap-game__text whitespace-pre-line"><?= HtmlSanitizer::e($game['recap_text'] ?? '') ?></p>
+            </li>
+<?php endforeach; ?>
+        </ol>
+<?php
     }
 
     private function renderHead(): string

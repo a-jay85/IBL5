@@ -15,6 +15,7 @@ if (!function_exists('is_admin') || !is_admin($admin)) {
 header('Content-Type: application/json');
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 $repository = new Boxscore\AllStarTeamRepository($mysqli_db);
 

@@ -25,6 +25,16 @@ if (PHP_SAPI !== 'cli') {
     exit(1);
 }
 
+// ── Unknown-option guard: every argument must be --<accepted>=<value> ─────────
+$acceptedOptions = ['year', 'start', 'end', 'game-type', 'seed', 'league-id'];
+foreach (array_slice($argv ?? [], 1) as $cliArg) {
+    if (preg_match('/^--([a-z-]+)=/', $cliArg, $m) !== 1 || !in_array($m[1], $acceptedOptions, true)) {
+        fwrite(STDERR, "build-engine-bundle: unknown or malformed argument '{$cliArg}'"
+            . ' (expected --<option>=<value>; accepted: ' . implode(', ', $acceptedOptions) . ")\n");
+        exit(1);
+    }
+}
+
 // ── Minimal bootstrap (mirrors scripts/bulkJsbImport.php) ─────────────────────
 $_SERVER['PHP_SELF'] = 'build-engine-bundle.php';
 $_SERVER['SERVER_NAME'] = 'localhost';
@@ -50,7 +60,7 @@ require_once __DIR__ . '/../db/db.php';
 /** @var \mysqli $mysqli_db */
 
 // ── Parse CLI options ─────────────────────────────────────────────────────────
-$opts = getopt('', ['year:', 'start::', 'end::', 'game-type::', 'seed::', 'league-id::']);
+$opts = getopt('', ['year:', 'start::', 'end::', 'game-type::', 'seed::', 'league-id::']); // @phpstan-ignore ibl.unknownCliOption
 
 $yearOpt = $opts['year'] ?? null;
 if (!is_string($yearOpt) || !ctype_digit($yearOpt)) {

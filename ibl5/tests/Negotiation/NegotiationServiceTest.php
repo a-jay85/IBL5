@@ -80,6 +80,27 @@ class NegotiationServiceTest extends TestCase
         $this->assertStringContainsString('card-flip-container', $result);
     }
 
+    public function testProcessNegotiationPassesPlayerIdToSalaryCommitment(): void
+    {
+        $mockSeason = self::createStub(\Season\Season::class);
+        $mockSeason->phase = 'Regular Season';
+        $mockSeason->endingYear = 2026;
+        $mockSeason->beginningYear = 2025;
+
+        $salaryCap = self::createMock(SalaryCapRepositoryInterface::class);
+        $salaryCap->expects($this->once())
+            ->method('getPositionSalaryCommitmentNextYear')
+            ->with(self::anything(), self::anything(), self::identicalTo(1))
+            ->willReturn(0);
+
+        $service = $this->buildService(season: $mockSeason, salaryCap: $salaryCap);
+
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+        $this->mockDb->onQuery('color1, color2 FROM ibl_team_info', [['color1' => 'D4AF37', 'color2' => '1e3a5f']]);
+
+        $service->processNegotiation(1, 'Test Team', 'prefix');
+    }
+
     // ============================================
     // INTERFACE COMPLIANCE TESTS
     // ============================================
@@ -88,9 +109,9 @@ class NegotiationServiceTest extends TestCase
     // HELPER METHODS
     // ============================================
 
-    private function buildService(?\Season\Season $season = null): NegotiationService
+    private function buildService(?\Season\Season $season = null, ?SalaryCapRepositoryInterface $salaryCap = null): NegotiationService
     {
-        $commonRepo = self::createStub(SalaryCapRepositoryInterface::class);
+        $commonRepo = $salaryCap ?? self::createStub(SalaryCapRepositoryInterface::class);
         return new NegotiationService(
             $this->mockDb,
             new NegotiationRepository($this->mockDb, $commonRepo),

@@ -490,6 +490,7 @@ class DepthChartControllerTest extends WideUnitTestCase
             ['renderTeamLogo', 'renderSavedDepthChartDropdown', 'renderHelpSection', 'renderLineupPreview', 'renderFormHeader', 'renderPlayerRow', 'renderPlayerRow', 'renderFormFooter', 'renderMobileView'],
             array_column($calls, 0)
         );
+        // renderFormHeader args: 'TestTeam', 1, ['PG','SG','SF','PF','C'] (JsbConstants::PLAYER_POSITIONS)
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
         self::assertSame([1], $calls[0][1]);
         self::assertSame(['TestTeam', 1, $positions], $calls[4][1]);

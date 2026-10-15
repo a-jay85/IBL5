@@ -319,7 +319,8 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
      * wins) plus a phantom repeat of the same (date, visitor, home) with ordinal 7 and swapped
      * scores. FIVE_SEASON_WINDOW_SQL collapses the pair to the lowest ordinal (visitor 0-1,
      * home 1-0). The refresh step groups on the 4-tuple including game_of_that_day, so it keeps
-     * both rows (visitor 1-1, home 1-1).
+     * both rows (visitor 1-1, home 1-1). RefreshTeamSeasonRecordsStep::execute() runs for real
+     * here, not a pasted copy of its SQL, so a change to the step is what turns this red.
      */
     public function testSeasonRecordsRefreshStillDoubleCountsPhantomOrdinal(): void
     {

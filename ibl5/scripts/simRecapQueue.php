@@ -5,9 +5,12 @@ declare(strict_types=1);
 /**
  * CLI-only queue driver for the sim-recap pipeline.
  *
- * Usage: php ibl5/scripts/simRecapQueue.php <verb> [--sim=N]
- *   Verbs: claim-next | claim --sim=N | reclaim-stale | park --sim=N
+ * Usage: php ibl5/scripts/simRecapQueue.php <verb> [--sim=N] [--host=H] [--cause=C] [--reset=EPOCH] [--event=done]
+ *   Verbs: claim-next --host=H | claim --sim=N --host=H | reclaim-stale
+ *          | park --sim=N --host=H --cause=C [--reset=EPOCH]
+ *          | notify --sim=N --host=H --event=done
  *          | find --sim=N | recent-themes | mention-map
+ *   H is mac|actions; C is flaky|usage_limit|auth|transport|prompt.
  *   One JSON object is emitted on stdout; bad argv writes
  *   "simRecapQueue: <message>" to stderr and exits 1 before any repo is built.
  *
@@ -90,16 +93,58 @@ function collectRecentThemes(\SimRecap\SimSummaryRepository $repo): array
     return $themes;
 }
 
+/**
+ * Post the #admin-chat line for a state change, at most once per sim and state.
+ *
+ * Returns 'unchanged' when the state is the same as last time or another host
+ * won the compare-and-set, the state name when posted, and 'failed' when the
+ * post threw (the state is reverted so a later change can post). A failed
+ * post never changes the exit code. Only the exception class is logged:
+ * the message can carry the webhook host.
+ */
+function postStatus(\SimRecap\SimSummaryRepository $repo, int $sim, string $host, ?string $prior, string $next): string
+{
+    if ($next === $prior) {
+        return 'unchanged';
+    }
+    if (!$repo->transitionNotifiedState($sim, $prior, $next)) {
+        return 'unchanged';
+    }
+    $row = $repo->find($sim) ?? [];
+    try {
+        \Discord\Discord::postToChannel('admin-chat', \SimRecap\AdminChatStatus::message($next, $sim, $row, $host));
+    } catch (\Throwable $e) {
+        $repo->revertNotifiedState($sim, $next, $prior);
+        fwrite(STDERR, 'simRecapQueue: admin-chat post failed (' . get_class($e) . ")\n");
+
+        return 'failed';
+    }
+
+    return $next;
+}
+
 // ── Argv parse — positional verb, then flags (mirrors bug-pipeline/transition.php).
 //    Runs entirely before any repository is constructed.
 $verb = null;
 $simRaw = null;
+$host = null;
+$cause = null;
+$resetRaw = null;
+$event = null;
 foreach (array_slice($argv, 1) as $arg) {
     if (!is_string($arg)) {
         continue;
     }
     if (str_starts_with($arg, '--sim=')) {
         $simRaw = substr($arg, 6);
+    } elseif (str_starts_with($arg, '--host=')) {
+        $host = substr($arg, 7);
+    } elseif (str_starts_with($arg, '--cause=')) {
+        $cause = substr($arg, 8);
+    } elseif (str_starts_with($arg, '--reset=')) {
+        $resetRaw = substr($arg, 8);
+    } elseif (str_starts_with($arg, '--event=')) {
+        $event = substr($arg, 8);
     } elseif ($verb === null && !str_starts_with($arg, '--')) {
         $verb = $arg;
     } else {
@@ -108,12 +153,12 @@ foreach (array_slice($argv, 1) as $arg) {
 }
 
 if ($verb === null) {
-    fail('a verb is required (claim-next|claim|reclaim-stale|park|find|recent-themes|mention-map)');
+    fail('a verb is required (claim-next|claim|reclaim-stale|park|notify|find|recent-themes|mention-map)');
 }
 
 // Verbs that require --sim; parse and validate it once, here.
 $sim = null;
-if (in_array($verb, ['claim', 'park', 'find'], true)) {
+if (in_array($verb, ['claim', 'park', 'notify', 'find'], true)) {
     if ($simRaw === null || !ctype_digit($simRaw)) {
         fail("--sim=N (positive integer) is required for verb {$verb}");
     }
@@ -121,6 +166,40 @@ if (in_array($verb, ['claim', 'park', 'find'], true)) {
     if ($sim < 1) {
         fail('--sim must be >= 1');
     }
+}
+
+// Host, cause, reset, and event are closed whitelists, checked before any repo exists.
+if (in_array($verb, ['claim-next', 'claim', 'park', 'notify'], true)) {
+    if ($host === null || !in_array($host, \SimRecap\ParkPolicy::HOSTS, true)) {
+        fail("--host=mac|actions is required for verb {$verb}");
+    }
+} elseif ($host !== null) {
+    fail("--host is not accepted for verb {$verb}");
+}
+if ($verb === 'park') {
+    if ($cause === null || !in_array($cause, \SimRecap\ParkPolicy::CAUSES, true)) {
+        fail('--cause=flaky|usage_limit|auth|transport|prompt is required for verb park');
+    }
+} elseif ($cause !== null) {
+    fail("--cause is not accepted for verb {$verb}");
+}
+$reset = null;
+if ($resetRaw !== null) {
+    if ($cause !== 'usage_limit') {
+        fail('--reset is accepted only with --cause=usage_limit');
+    }
+    $resetParsed = filter_var($resetRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if (!is_int($resetParsed)) {
+        fail('--reset must be a positive epoch');
+    }
+    $reset = $resetParsed;
+}
+if ($verb === 'notify') {
+    if ($event !== 'done') {
+        fail('--event=done is required for verb notify');
+    }
+} elseif ($event !== null) {
+    fail("--event is not accepted for verb {$verb}");
 }
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────
@@ -133,7 +212,8 @@ switch ($verb) {
         $out = [
             'ok' => true,
             'cmd' => 'claim-next',
-            'sim' => $repo->claimNextPending(),
+            /** @var string $host */
+            'sim' => $repo->claimNextPending($host),
             'phase' => $phase,
             'recaps_enabled' => \SimRecap\RecapPhasePolicy::isEnabled($phase),
         ];
@@ -141,7 +221,8 @@ switch ($verb) {
 
     case 'claim':
         /** @var int $sim */
-        $out = ['ok' => true, 'cmd' => 'claim', 'sim' => $sim, 'claimed' => $repo->claimPending($sim)];
+        /** @var string $host */
+        $out = ['ok' => true, 'cmd' => 'claim', 'sim' => $sim, 'claimed' => $repo->claimPending($sim, $host)];
         break;
 
     case 'reclaim-stale':
@@ -150,7 +231,35 @@ switch ($verb) {
 
     case 'park':
         /** @var int $sim */
-        $out = ['ok' => true, 'cmd' => 'park', 'sim' => $sim, 'outcome' => $repo->parkOrFail($sim)];
+        /** @var string $host */
+        /** @var string $cause */
+        $parked = $repo->parkByCause($sim, $host, $cause, $reset);
+        $notified = 'skipped';
+        if ($parked['outcome'] !== 'none') {
+            $nextState = \SimRecap\ParkPolicy::notifyStateFor($parked['outcome'], $parked['route'] ?? 'any', $parked['prior_notified']);
+            $notified = postStatus($repo, $sim, $host, $parked['prior_notified'], $nextState);
+        }
+        $out = [
+            'ok' => true,
+            'cmd' => 'park',
+            'sim' => $sim,
+            'outcome' => $parked['outcome'],
+            'route' => $parked['route'],
+            'blocked_until' => $parked['blocked_until'],
+            'notified' => $notified,
+        ];
+        break;
+
+    case 'notify':
+        /** @var int $sim */
+        /** @var string $host */
+        $row = $repo->find($sim);
+        $notified = 'skipped';
+        if ($row !== null && $row['status'] === 'done') {
+            $prior = $row['notified_state'];
+            $notified = postStatus($repo, $sim, $host, $prior, \SimRecap\ParkPolicy::notifyStateFor('done', $row['route'], $prior));
+        }
+        $out = ['ok' => true, 'cmd' => 'notify', 'sim' => $sim, 'notified' => $notified];
         break;
 
     case 'find':

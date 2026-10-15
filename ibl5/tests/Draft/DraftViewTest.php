@@ -290,6 +290,43 @@ class DraftViewTest extends TestCase
         $this->assertTrue($params[2]->allowsNull());
         $this->assertSame('string', (string) $method->getReturnType());
     }
+    public function testDraftViewHoldsNoStateOrCollaborators(): void
+    {
+        $class = new \ReflectionClass(DraftView::class);
+
+        $this->assertSame([], $class->getProperties(), 'DraftView must declare no properties (no DB handle, no session, no actor identity)');
+        $this->assertNull($class->getConstructor(), 'DraftView must have no constructor (no injected collaborators)');
+    }
+
+    public function testDraftViewPublicMethodsAllBelongToTheInterface(): void
+    {
+        $class = new \ReflectionClass(DraftView::class);
+        $interface = new \ReflectionClass(DraftViewInterface::class);
+
+        foreach ($class->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            $this->assertTrue(
+                $interface->hasMethod($method->getName()),
+                "Public method {$method->getName()} is not declared on DraftViewInterface; new helpers must be private"
+            );
+        }
+    }
+
+    public function testRenderPlayerRowAndStatColumnsArePrivate(): void
+    {
+        $method = new \ReflectionMethod(DraftView::class, 'renderPlayerRow');
+        $this->assertTrue($method->isPrivate());
+
+        $constant = new \ReflectionClassConstant(DraftView::class, 'STAT_COLUMNS');
+        $this->assertTrue($constant->isPrivate());
+
+        $columns = $constant->getValue();
+        $this->assertIsArray($columns);
+        $this->assertCount(24, $columns);
+        $this->assertSame($columns, array_values(array_unique($columns)), 'STAT_COLUMNS must have no duplicate keys');
+        $this->assertSame('age', $columns[0]);
+        $this->assertSame('intangibles', $columns[23]);
+    }
+
     // ============================================
     // GOLDEN HTML (captured from the pre-refactor renderer)
     // ============================================

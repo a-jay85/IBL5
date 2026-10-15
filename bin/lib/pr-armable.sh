@@ -13,10 +13,13 @@
 #   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json> [head_ref]
 #   (11) unresolved review thread  -> pr_unresolved_findings_hold <pr_number>
 #   (15) already-red CI checks     -> pr_red_check_hold <pr_number>
+#   (7, docs-only-ready) docs-refresh  -> pr_docs_refresh_hold <head_ref> <files_json> <md_state> <verdict>
 #        demoted to a warning when  -> pr_aggregator_required  (reads master protection)
 #
 # Conditions (2) review>=80, (3) MISSING-tests, (4) Phase-5 local verify, (7)
-# non-UI auto_merge:false, (9) realized-diff verdict are deliberately NOT here:
+# frontmatter read (the clause evaluation behind `auto_merge: docs-only-ready`
+# lives here as pr_docs_refresh_hold), (9) realized-diff verdict are
+# deliberately NOT here:
 # they are knowable only from a post-plan run's local state (/tmp, the local plan
 # file, the realized diff) and cannot be evaluated for an arbitrary PR. Callers
 # fail CLOSED on them — a PR is only ARMABLE with a POSITIVE clearance signal
@@ -204,6 +207,67 @@ pr_merge_danger_hold() {
     well=$(printf '%s\n' "$body" | grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external) · Why: .{20,}$' || true)
     [ -z "$well" ] && { echo "merge-danger:MALFORMED"; return 0; }
     case "$well" in *'Door: one-way'*) echo "merge-danger:ONE-WAY" ;; esac
+}
+
+# pr_docs_refresh_path_ok <repo-relative path>
+#   True (rc 0) when the path is a documentation file the stale-docs refresh
+#   pipeline may auto-merge: a `.md` file under ibl5/docs/, a class README at
+#   ibl5/classes/*/README.md, or the root README.md. Everything else (any
+#   .claude/ path, bin/, .github/, tests, code, config, a non-.md file under
+#   ibl5/docs/) is rc 1. Default-deny: a path has to match the allowlist to pass.
+#   Mirrors harness/armable.py docs_refresh_path_ok; the parity test pins both.
+pr_docs_refresh_path_ok() {
+    case "$1" in
+        *.md) ;;
+        *) return 1 ;;
+    esac
+    case "$1" in
+        ibl5/docs/*)              return 0 ;;
+        ibl5/classes/*/README.md) return 0 ;;
+        README.md)                return 0 ;;
+        *)                        return 1 ;;
+    esac
+}
+
+# pr_docs_refresh_hold <head_ref> <files_json> <merge_danger_state> <verdict_word>
+#   Phase 6.5 condition (7) when the plan's frontmatter reads
+#   `auto_merge: docs-only-ready`. Mirrors harness/armable.py docs_refresh_holds.
+#   Prints nothing when every clause passes. Otherwise prints one line per
+#   FAILED clause, in this fixed order (fail-closed; the caller holds on any line):
+#     docs-refresh:branch:<head_ref>       head ref lacks the docs-stale-refresh- prefix
+#     docs-refresh:paths:empty             the PR changed no files at all
+#     docs-refresh:paths:<path>            first changed path pr_docs_refresh_path_ok rejects
+#     docs-refresh:merge-danger:<STATE>    state is anything other than TWO-WAY
+#     docs-refresh:verdict:<word>          selected verdict is anything other than READY
+#   <files_json> is the `.files` array (same shape pr_golden_hold reads).
+#   <merge_danger_state> is TWO-WAY, or the suffix of pr_merge_danger_hold's
+#   output (ONE-WAY | MISSING | MALFORMED); an empty argument reads as MISSING.
+#   <verdict_word> is the SELECTED Phase 5.5 verdict (run-local state the caller
+#   supplies); READY WITH NOTES does not qualify, by decision. Empty reads as <none>.
+pr_docs_refresh_hold() {
+    local head_ref="$1" files_json="$2" md_state="$3" verdict="$4" paths p bad=""
+    case "$head_ref" in
+        docs-stale-refresh-*) ;;
+        *) echo "docs-refresh:branch:${head_ref:-<empty>}" ;;
+    esac
+    # `|| true`: jq exits non-zero on malformed JSON; an empty path list holds below.
+    paths=$(printf '%s' "$files_json" | jq -r '.[]?.path // empty' 2>/dev/null || true)
+    if [ -z "$paths" ]; then
+        echo "docs-refresh:paths:empty"
+    else
+        while IFS= read -r p; do
+            [ -z "$p" ] && continue
+            if ! pr_docs_refresh_path_ok "$p"; then bad="$p"; break; fi
+        done <<< "$paths"
+        [ -n "$bad" ] && echo "docs-refresh:paths:$bad"
+    fi
+    [ "$md_state" != "TWO-WAY" ] && echo "docs-refresh:merge-danger:${md_state:-MISSING}"
+    verdict=$(printf '%s' "$verdict" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+    [ "$verdict" != "READY" ] && echo "docs-refresh:verdict:${verdict:-<none>}"
+    # REQUIRED for the same reason pr_dep_holds documents: the `[ ... ] && echo`
+    # above is the last command, so a passing verdict leaves rc 1 and a
+    # `set -euo pipefail` caller would abort on the qualifying PR.
+    return 0
 }
 
 # pr_dep_holds <body>

@@ -10,6 +10,10 @@ use SimRecap\ParkPolicy;
 
 final class AdminChatStatusTest extends TestCase
 {
+    /**
+     * The waiting template fills {time} from blocked_until. Dropping {time}
+     * leaves only "the next reset" and fails here.
+     */
     public function testWaitingMessageNamesRetryTime(): void
     {
         $blocked = '2026-10-15 21:47:00';

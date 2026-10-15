@@ -217,6 +217,10 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         self::assertSame($reset + 120, $this->blockedEpoch(999001));
     }
 
+    /**
+     * A usage-limit wait refunds the claim (attempts-1, the LEAST term in
+     * parkByCause). Dropping the refund leaves attempts at 1 and fails here.
+     */
     public function testParkUsageLimitDoesNotCountAttempt(): void
     {
         $this->claimRow(999001, 'actions');

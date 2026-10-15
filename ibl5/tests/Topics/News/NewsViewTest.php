@@ -10,6 +10,9 @@ use Topics\News\NewsView;
 /**
  * The topic banner replaced the legacy OpenTable()/CloseTable() echo sites in NewsController.
  * The fixtures under fixtures/table-chrome/ hold the bytes those functions produced.
+ *
+ * @see NewsView::renderTopicBanner()
+ * @see NewsView::renderPageTitle()
  */
 final class NewsViewTest extends TestCase
 {

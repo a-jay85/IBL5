@@ -61,8 +61,13 @@ new_env() {
     export IBL5_BURNDOWN_BACKLOG="$STUB/backlog"
     mkdir -p "$HOME/claude-plans/_reports" "$IBL5_USAGE_GATE_STATE_DIR/markers" "$STUB"
     unset IBL5_BURNDOWN_RESERVE_PCT IBL5_BURNDOWN_MAX_FAILS IBL5_BURNDOWN_BATCH_TIMEOUT_MIN \
-        IBL5_BURNDOWN_EMPTY_SLEEP_MIN
+        IBL5_BURNDOWN_EMPTY_SLEEP_MIN IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN IBL5_BURNDOWN_PR_CEILING \
+        IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN
     STATE="$HOME/.claude/burndown-loop"
+    # Existing cases never exercise the scout: a fresh cooldown keeps the empty arm on
+    # its old 240m sleep. Scout cases rm this file first and drive the cooldown themselves.
+    mkdir -p "$STATE"
+    date +%s > "$STATE/scout.last"
     REPORTS="$HOME/claude-plans/_reports"
     LAUNCH_DIR="$HOME/Library/LaunchAgents"
     PATH="$STUB:$TMPROOT/bin:/usr/bin:/bin"
@@ -74,12 +79,29 @@ make_stubs() {
     printf '#!/bin/sh\nexit 1\n' > "$STUB/security"
     printf '#!/bin/sh\necho call >> "%s/curl.calls"\nexit 7\n' "$T" > "$STUB/curl"
     printf '#!/bin/sh\necho "$1" >> "%s/sleep.calls"\nif [ -f "%s/sleep.hook" ]; then sh "%s/sleep.hook"; rm -f "%s/sleep.hook"; fi\nexit 0\n' "$T" "$T" "$T" "$T" > "$STUB/sleep"
-    printf '#!/bin/sh\necho "$*" >> "%s/launchctl.calls"\nexit 0\n' "$T" > "$STUB/launchctl"
+    printf '#!/bin/sh\necho "$*" >> "%s/launchctl.calls"\n[ "$1" = list ] && [ -f "%s/launchctl.list" ] && cat "%s/launchctl.list"\nexit 0\n' "$T" "$T" "$T" > "$STUB/launchctl"
     # caffeinate -s <cmd...>: run the command directly so the exit status is the stub's own.
     printf '#!/bin/sh\nshift\nexec "$@"\n' > "$STUB/caffeinate"
     printf '#!/bin/sh\n{ cat; echo ---; } >> "%s/dm.calls"\n' "$T" > "$T/dm"
     # backlog stub: logs its args, prints held.txt when present, exits with backlog.rc (default 0).
     printf '#!/bin/sh\necho "$*" >> "%s/backlog.calls"\n[ -f "%s/held.txt" ] && cat "%s/held.txt"\nexit "$(cat "%s/backlog.rc" 2>/dev/null || echo 0)"\n' "$T" "$T" "$T" "$T" > "$STUB/backlog"
+    cat > "$STUB/gh" <<'GH_EOF'
+#!/bin/sh
+# gh stub: logs argv; `pr list` pops "<rc> <file>" from gh.queue, else prints [] rc 0.
+T="@T@"
+echo "$*" >> "$T/gh.calls"
+if [ "$1 $2" != "pr list" ]; then exit 0; fi
+q="$T/gh.queue"
+if [ -s "$q" ]; then
+    spec=$(head -n 1 "$q")
+    tail -n +2 "$q" > "$q.tmp"
+    mv "$q.tmp" "$q"
+    cat "${spec#* }"
+    exit "${spec%% *}"
+fi
+echo '[]'
+exit 0
+GH_EOF
     cat > "$STUB/claude" <<'CLAUDE_EOF'
 #!/usr/bin/env bash
 T="@T@"
@@ -134,6 +156,8 @@ exit 0
 CLAUDE_EOF
     sed -i.bak -e "s|@T@|$T|" -e "s|@REPO@|$REPO_ROOT|" "$STUB/claude"
     rm -f "$STUB/claude.bak"
+    sed -i.bak -e "s|@T@|$T|" "$STUB/gh"
+    rm -f "$STUB/gh.bak"
     chmod +x "$STUB"/*
     chmod +x "$T/dm"
 }
@@ -192,6 +216,21 @@ run_tree_loop() {  # <args...>: like run_loop, against the copied tree
 }
 
 queue() { printf '%s\n' "$@" > "$T/claude.queue"; }
+
+# gh_reply <rc> <json>: queue one `gh pr list` reply.
+gh_reply() {
+    local f
+    f=$(mktemp "$T/gh.reply.XXXXXX")
+    printf '%s\n' "$2" > "$f"
+    echo "$1 $f" >> "$T/gh.queue"
+}
+
+# prs_json <count>: <count> open, non-draft, mergeable, unarmed, green chore PRs.
+prs_json() {
+    jq -cn --argjson n "$1" '[range(1; $n + 1) | {number: ., title: "chore: pr \(.)",
+        isDraft: false, headRefName: "b\(.)", mergeable: "MERGEABLE",
+        autoMergeRequest: null, statusCheckRollup: []}]'
+}
 
 # run_loop <args...>: sets OUT (stdout+stderr) and RC.
 run_loop() {

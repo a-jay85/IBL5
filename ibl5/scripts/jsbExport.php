@@ -83,6 +83,7 @@ use JsbParser\JsbExportService;
 use PlrParser\PlrExportService;
 use Security\HtmlSanitizer;
 
+/** @var \mysqli $mysqli_db */
 $repository = new JsbExportRepository($mysqli_db);
 $service = new JsbExportService($repository);
 $plrExportService = new PlrExportService($repository);

@@ -37,6 +37,16 @@ if (PHP_SAPI !== 'cli') {
     exit(1);
 }
 
+// ── Unknown-option guard: every argument must be --<accepted>=<value> ─────────
+$acceptedOptions = ['year'];
+foreach (array_slice($argv ?? [], 1) as $cliArg) {
+    if (preg_match('/^--([a-z-]+)=/', $cliArg, $m) !== 1 || !in_array($m[1], $acceptedOptions, true)) {
+        fwrite(STDERR, "runEngineShadow: unknown or malformed argument '{$cliArg}'"
+            . ' (expected --<option>=<value>; accepted: ' . implode(', ', $acceptedOptions) . ")\n");
+        exit(1);
+    }
+}
+
 // ── Minimal bootstrap (mirrors scripts/build-engine-bundle.php) ───────────────
 $_SERVER['PHP_SELF'] = 'runEngineShadow.php';
 $_SERVER['SERVER_NAME'] = 'localhost';
@@ -71,7 +81,7 @@ if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
 
 // ── Resolve season year: --year override, else Season->endingYear (parity with
 // the removed inline EngineShadowStep). IBL-scoped (null LeagueContext). ───────
-$opts = getopt('', ['year::']);
+$opts = getopt('', ['year::']); // @phpstan-ignore ibl.unknownCliOption
 $yearOpt = $opts['year'] ?? null;
 $seasonYear = is_string($yearOpt) && ctype_digit($yearOpt)
     ? (int) $yearOpt

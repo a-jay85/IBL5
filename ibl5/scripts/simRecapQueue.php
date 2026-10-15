@@ -132,7 +132,7 @@ $host = null;
 $cause = null;
 $resetRaw = null;
 $event = null;
-foreach (array_slice($argv, 1) as $arg) {
+foreach (array_slice($argv ?? [], 1) as $arg) {
     if (!is_string($arg)) {
         continue;
     }
@@ -221,7 +221,9 @@ switch ($verb) {
         break;
 
     case 'claim':
-        /** @var int $sim */
+        if (!is_int($sim)) {
+            fail('sim number is required for this verb');
+        }
         /** @var string $host */
         $out = ['ok' => true, 'cmd' => 'claim', 'sim' => $sim, 'claimed' => $repo->claimPending($sim, $host)];
         break;
@@ -231,7 +233,9 @@ switch ($verb) {
         break;
 
     case 'park':
-        /** @var int $sim */
+        if (!is_int($sim)) {
+            fail('sim number is required for this verb');
+        }
         /** @var string $host */
         /** @var string $cause */
         $parked = $repo->parkByCause($sim, $host, $cause, $reset);
@@ -265,7 +269,9 @@ switch ($verb) {
         break;
 
     case 'find':
-        /** @var int $sim */
+        if (!is_int($sim)) {
+            fail('sim number is required for this verb');
+        }
         $row = $repo->find($sim);
         // Project the full envelope down to the six queue-state keys the tick
         // reads; the frozen find() returns recap_text (MEDIUMTEXT) and the

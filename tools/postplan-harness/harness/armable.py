@@ -25,6 +25,15 @@ from typing import Callable, Optional, Sequence
 
 from .state import ArmDecision, Classification, ConditionResult, Finding
 
+
+# Condition (7), conditional form. A plan whose line-1 frontmatter reads
+# `auto_merge: docs-only-ready` (seeded only by bin/docfix-run) arms when every
+# docs-refresh clause passes on the REALIZED PR. Shell twin: pr_docs_refresh_hold
+# in bin/lib/pr-armable.sh; tests/test_armable_docs_refresh.py pins parity.
+DOCS_REFRESH_TOKEN = "docs-only-ready"
+DOCS_REFRESH_BRANCH_PREFIX = "docs-stale-refresh-"
+_DOCS_REFRESH_CLASS_README = re.compile(r"ibl5/classes/.*/README\.md")
+
 # Required aggregator context (ADR-0149). bin/check-composite-contracts A2 pins this
 # literal to the workflow job name and to bin/lib/pr-armable.sh.
 AGGREGATOR_CONTEXT = "All checks green"
@@ -204,6 +213,45 @@ def select_fidelity_verdict(v1, v2, tree2, current_tree):
     if v2 and tree2 and tree2 == current_tree:
         return v2, "verdict-2"
     return v1, "verdict-1"
+
+
+def docs_refresh_path_ok(path: str) -> bool:
+    """Shell twin: pr_docs_refresh_path_ok. Default-deny docs allowlist.
+
+    `.md` under ibl5/docs/, a class README at ibl5/classes/*/README.md (the bash
+    `*` spans `/`, hence `.*` here), or the root README.md. Any .claude/ path,
+    bin/, .github/, tests, code, config, or non-.md file is rejected.
+    """
+    if not path.endswith(".md"):
+        return False
+    return (path.startswith("ibl5/docs/")
+            or _DOCS_REFRESH_CLASS_README.fullmatch(path) is not None
+            or path == "README.md")
+
+
+def docs_refresh_holds(head_ref: Optional[str], files: Sequence[str],
+                       merge_danger_state: Optional[str], verdict: Optional[str]) -> list[str]:
+    """Shell twin: pr_docs_refresh_hold. One `docs-refresh:<clause>` string per
+    FAILED clause, in the shell's fixed order; empty list = every clause passed.
+    """
+    holds: list[str] = []
+    ref = head_ref or ""
+    if not ref.startswith(DOCS_REFRESH_BRANCH_PREFIX):
+        holds.append(f"docs-refresh:branch:{ref or '<empty>'}")
+    paths = [p for p in files if p]
+    if not paths:
+        holds.append("docs-refresh:paths:empty")
+    else:
+        bad = next((p for p in paths if not docs_refresh_path_ok(p)), None)
+        if bad is not None:
+            holds.append(f"docs-refresh:paths:{bad}")
+    md = merge_danger_state or "MISSING"
+    if md != "TWO-WAY":
+        holds.append(f"docs-refresh:merge-danger:{md}")
+    word = (verdict or "").strip()
+    if word != "READY":
+        holds.append(f"docs-refresh:verdict:{word or '<none>'}")
+    return holds
 
 
 def conflict_flag_path(branch: str, tmp_dir: str = "/tmp") -> str:

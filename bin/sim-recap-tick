@@ -52,7 +52,8 @@ Key environment overrides (all have production defaults):
   SIM_RECAP_SSH_HOST     SSH host for queue access.
   SIM_RECAP_MODEL        Model to use for generation.
 
-Exit codes: 0 success, 1 tick failure, 2 unknown argument.
+Exit codes: 0 success, 1 tick failure, or a parked sim in actions mode,
+2 unknown argument.
 EOF
     exit 0
 fi
@@ -117,6 +118,10 @@ WORKDIR=""
 # Set by dry_run() before it fetches anything. Global rather than main()'s local
 # DRY_RUN because roster_health_transition() — five frames down — has to know.
 DRY_RUN_MODE=0
+
+# Set by park() when a sim parks as a failure (pending or failed, not a lost
+# claim). main() turns it into exit 1 in actions mode so the Actions run is red.
+TICK_PARKED=0
 cleanup_workdir() {
     [ -n "${SIM_RECAP_KEEP_WORKDIR:-}" ] && return 0
     [ -n "$WORKDIR" ] && rm -rf "$WORKDIR"
@@ -229,10 +234,18 @@ roster_health_transition() { # sim  ok|degraded
     return 0
 }
 
-# ── Usage/rate-limit detector (regex copied from bin/bug-pipeline-tick:76-79) ──
+# ── Usage/rate-limit detector (regex adapted from bin/bug-pipeline-tick:76-79) ──
+# 401/403 are NOT here: a rejected token is an auth error, not a quota error.
 claude_env_error() {
     printf '%s' "$1" | grep -qiE \
-        "hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error"
+        "hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(429|529)|overloaded_error|rate_limit_error"
+}
+
+# ── Auth-failure detector: a bad or expired CLAUDE_CODE_OAUTH_TOKEN ───────────
+# Real output: "Failed to authenticate. API Error: 401 OAuth access token is invalid."
+claude_auth_error() {
+    printf '%s' "$1" | grep -qiE \
+        "api error:[[:space:]]*(401|403)|failed to authenticate|oauth access token is invalid|invalid api key"
 }
 
 # ── One seam for every prod-side queue call ───────────────────────────────────
@@ -287,10 +300,10 @@ park() { # sim
     resp="$(q park --sim="$sim")"
     outcome="$(printf '%s' "$resp" | "$SIM_RECAP_JQ_BIN" -r '.outcome // empty' 2>/dev/null)"
     case "$outcome" in
-        pending) log "sim $sim: parked — re-queued with backoff; a later tick retries" ;;
-        failed)  log "sim $sim: parked FAILED — attempt ceiling reached; terminal" ;;
+        pending) TICK_PARKED=1; log "sim $sim: parked — re-queued with backoff; a later tick retries" ;;
+        failed)  TICK_PARKED=1; log "sim $sim: parked FAILED — attempt ceiling reached; terminal" ;;
         none)    log "sim $sim: park returned 'none' — lost the claim; another run owns it now, stopping" ;;
-        *)       log "sim $sim: park returned an unexpected outcome '$outcome'" ;;
+        *)       TICK_PARKED=1; log "sim $sim: park returned an unexpected outcome '$outcome'" ;;
     esac
     return 0
 }
@@ -400,6 +413,11 @@ generate() { # sim
 
     local agent_rc
     run_agent "$sim" "$prompt"; agent_rc=$?
+
+    if claude_auth_error "$(cat "$WORKDIR/agent.json" 2>/dev/null)"; then
+        log "sim $sim: agent auth failed (401/403) — CLAUDE_CODE_OAUTH_TOKEN is invalid or expired; parking"
+        park "$sim"; return 0
+    fi
 
     if claude_env_error "$(cat "$WORKDIR/agent.json" 2>/dev/null)"; then
         log "sim $sim: agent hit a usage limit — parking with a backoff"
@@ -640,6 +658,11 @@ main() {
 
     log "claimed sim $sim"
     generate "$sim"
+    if [ "$SIM_RECAP_HOST_MODE" = actions ] && [ "$TICK_PARKED" -eq 1 ]; then
+        log "sim $sim: parked — exiting 1 so the Actions run shows red (host mode: actions)"
+        return 1
+    fi
+    return 0
 }
 
 main "$@"

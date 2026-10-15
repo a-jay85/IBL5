@@ -75,3 +75,9 @@ Originally the launchd host booted itself out when claim-next reported recaps di
 Now neither host boots out. A disabled tick logs the phase and exits cheap, with the same reclaim-stale and claim-next calls as an idle in-season tick. The first tick after the phase enables recaps claims and generates as usual, so the poller resumes by itself within about 5 minutes. The `SIM_RECAP_LAUNCHCTL_BIN` seam is gone. `--resume` remains for manually re-arming an unloaded job.
 
 The reason is that a booted-out job cannot see the phase change, and prod cannot reach the Mac to re-arm it.
+
+## Addendum: Parked sims fail the job; auth errors logged separately (2026-10-14)
+
+The 2026-10-14 rehearsal found that a rejected `CLAUDE_CODE_OAUTH_TOKEN` parked the sim silently. The log said "agent hit a usage limit" and the job stayed green.
+
+Now an auth error (401 or 403) logs its own `agent auth failed` line. In actions mode, a sim that parks as `pending` or `failed` makes the tick exit 1, so the job turns red and GitHub emails. The launchd host is unchanged and still exits 0. A lost claim (park outcome `none`) is not a failure and stays green.

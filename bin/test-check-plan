@@ -3217,17 +3217,18 @@ assert_msg "gateMU-id-message-says-prose" 1 'Put the identifier in prose outside
 '
 # Two identifiers on one row: one violation per token. The exit code is 1 for any
 # violation, so count the [MU] lines instead.
+_mu_name='gateMU-two-ids-two-violations'
 _mu_body="$FM$YHDR"'
 | 1 | neither `return'"$MU_DOT"'type` nor `missingType'"$MU_DOT"'parameter` is reported | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
 '"$YROW"'
 '
-printf '%s\n' "$_mu_body" > "$TMP/gateMU-two-ids-two-violations.md"
-_mu_out="$("$GUARD" "$TMP/gateMU-two-ids-two-violations.md" 2>&1)"
+printf '%s\n' "$_mu_body" > "$TMP/$_mu_name.md"
+_mu_out="$("$GUARD" "$TMP/$_mu_name.md" 2>&1)"
 _mu_n="$(grep -c '^\[MU\] ' <<< "$_mu_out")"
 if [ "$_mu_n" = "2" ]; then
-    h_pass "gateMU-two-ids-two-violations (2 [MU] lines)"
+    h_pass "$_mu_name (2 [MU] lines)"
 else
-    h_fail "gateMU-two-ids-two-violations" "expected 2 [MU] lines, got $_mu_n"
+    h_fail "$_mu_name" "expected 2 [MU] lines, got $_mu_n"
 fi
 # An identifier whose every occurrence sits inside the Mutation clause (no closer, so
 # the clause runs to the cell end) is blanked by the helper: silent.

@@ -18,19 +18,12 @@ $textcolor2 = "#000000";
 function OpenTable(): void
 {
     global $bgcolor1, $bgcolor2;
+    /**
+     * @var string $bgcolor1
+     * @var string $bgcolor2
+     */
     echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\"><tr><td>\n";
     echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"$bgcolor1\"><tr><td>\n";
-}
-
-/**
- * @deprecated Use CSS classes directly: <div class="ibl-card">
- * Legacy PHP-Nuke centered table wrapper. Prefer modern CSS components.
- */
-function OpenTable2(): void
-{
-    global $bgcolor1, $bgcolor2;
-    echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\" align=\"center\"><tr><td>\n";
-    echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"$bgcolor1\"><tr><td>\n";
 }
 
 /**

@@ -37,13 +37,6 @@ if (!function_exists('OpenTable')) {
     }
 }
 
-if (!function_exists('OpenTable2')) {
-    function OpenTable2(): void
-    {
-        echo '<div class="stub-table">';
-    }
-}
-
 if (!function_exists('CloseTable')) {
     function CloseTable(): void
     {

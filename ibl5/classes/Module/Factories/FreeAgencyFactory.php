@@ -22,7 +22,7 @@ final class FreeAgencyFactory implements ModuleFactoryInterface
         $commonRepo = $this->services->teamIdentity();
 
         $repository = new \FreeAgency\FreeAgencyRepository($db);
-        $demandRepository = new \FreeAgency\FreeAgencyDemandRepository($db);
+        $demandRepository = new \FreeAgency\FreeAgencyDemandRepository($db, $this->services->salaryCap());
         $tableRenderer = new \FreeAgency\FreeAgencyTableRendererView($commonRepo);
         $service = new \FreeAgency\FreeAgencyService($repository, $demandRepository, $db, $commonRepo);
         $view = new \FreeAgency\FreeAgencyView(
@@ -31,7 +31,11 @@ final class FreeAgencyFactory implements ModuleFactoryInterface
             new \FreeAgency\FreeAgencyTeamFreeAgentsSectionView($tableRenderer),
             new \FreeAgency\FreeAgencyOtherFreeAgentsSectionView($tableRenderer)
         );
-        $processor = new \FreeAgency\FreeAgencyProcessor($db, $commonRepo);
+        $processor = new \FreeAgency\FreeAgencyProcessor(
+            $db,
+            $commonRepo,
+            new \FreeAgency\FreeAgencyMarketDemandCalculator($demandRepository)
+        );
 
         return new \FreeAgency\FreeAgencyController(
             $db,

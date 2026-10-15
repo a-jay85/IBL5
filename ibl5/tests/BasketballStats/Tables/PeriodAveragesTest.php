@@ -8,6 +8,7 @@ use BasketballStats\Tables\PeriodAverages;
 use Database\SqlPlaceholders;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Player\PlayerImageHelper;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
@@ -34,13 +35,13 @@ use Tests\WideUnit\Mocks\MockDatabase;
  */
 final class PeriodAveragesTest extends TestCase
 {
-    private function makeTeam(): \Team\Team
+    private function makeTeam(string $name = 'Test Team'): \Team\Team
     {
         $team = self::createStub(\Team\Team::class);
         $team->color1 = 'FF0000';
         $team->color2 = '0000FF';
         $team->teamid = 7;
-        $team->name = 'Test Team';
+        $team->name = $name;
 
         return $team;
     }
@@ -100,9 +101,10 @@ final class PeriodAveragesTest extends TestCase
     }
 
     /**
+     * @param array<string, string> $overrides
      * @return array<string, string>
      */
-    private function bothStatsRow(): array
+    private function bothStatsRow(array $overrides = []): array
     {
         $offense = [
             'teamID' => '7', 'name' => 'Test Team', 'games' => '10',
@@ -125,7 +127,7 @@ final class PeriodAveragesTest extends TestCase
             $row['tds_' . $key] = $value;
         }
 
-        return $row;
+        return array_merge($row, $overrides);
     }
 
     private function mainPreparedQuery(MockDatabase $db): string
@@ -148,6 +150,16 @@ final class PeriodAveragesTest extends TestCase
         $this->assertCount(1, $matches);
 
         return $matches[0];
+    }
+
+    private function footerRow(string $html, string $label): string
+    {
+        $start = strpos($html, '<td colspan="2">Test Team ' . $label . '</td>');
+        $this->assertIsInt($start, "footer row '$label' not rendered");
+        $end = strpos($html, '</tr>', $start);
+        $this->assertIsInt($end);
+
+        return substr($html, $start, $end - $start);
     }
 
     /**
@@ -363,5 +375,51 @@ final class PeriodAveragesTest extends TestCase
         $this->assertStringNotContainsString('<script>alert(1)', $html);
         $this->assertStringNotContainsString('<img src=x', $html);
         $this->assertStringContainsString('&lt;script&gt;', $html);
+    }
+
+    public function testHostileTeamNameIsEscapedInBothFooterLabels(): void
+    {
+        $db = $this->makeDb([], [$this->bothStatsRow()]);
+        $team = $this->makeTeam('Hostile <b>Team</b> & Co');
+
+        $html = PeriodAverages::render($db, $team, $this->makeSeason(), null, null, [], []);
+
+        $this->assertStringContainsString('<td colspan="2">Hostile &lt;b&gt;Team&lt;/b&gt; &amp; Co Offense</td>', $html);
+        $this->assertStringContainsString('<td colspan="2">Hostile &lt;b&gt;Team&lt;/b&gt; &amp; Co Defense</td>', $html);
+        $this->assertStringNotContainsString('<b>Team</b> Offense', $html);
+        $this->assertStringNotContainsString('<b>Team</b> Defense', $html);
+    }
+
+    public function testZeroGamesOffenseFooterRendersZeroAveragesBesideNormalDefense(): void
+    {
+        $db = $this->makeDb([], [$this->bothStatsRow([
+            'tos_games' => '0',
+            'tos_fga' => '0',
+            'tos_fta' => '0',
+            'tos_tga' => '0',
+        ])]);
+
+        $html = $this->renderWithDefaultRows($db, null, null);
+
+        $offense = $this->footerRow($html, 'Offense');
+        $this->assertStringStartsWith("<td colspan=\"2\">Test Team Offense</td>\n            <td>0</td>\n            <td class=\"sep-r-team\"></td>\n            <td>0.0</td>", $offense);
+        $this->assertSame(14, substr_count($offense, '<td>0.0</td>'));
+        $this->assertSame(3, substr_count($offense, '>0.000</td>'));
+        $this->assertStringNotContainsString('40.0', $offense);
+
+        $defense = $this->footerRow($html, 'Defense');
+        $this->assertStringStartsWith("<td colspan=\"2\">Test Team Defense</td>\n            <td>10</td>\n            <td class=\"sep-r-team\"></td>\n            <td>38.0</td>", $defense);
+    }
+
+    public function testNullPlayerNameRendersEmptyNameCellFollowedByGamesCell(): void
+    {
+        $db = $this->makeDb([$this->playerRow(105, 'ignored', 'SF', ['name' => null])], []);
+
+        $html = $this->renderWithDefaultRows($db, null, null);
+
+        $expectedCell = PlayerImageHelper::renderPlayerCell(105, '', []);
+        $this->assertStringContainsString("<td>SF</td>\n            " . $expectedCell . "            <td>12</td>", $html);
+        $this->assertStringNotContainsString('ignored', $html);
+        $this->assertStringNotContainsString('<td></td>', $html);
     }
 }

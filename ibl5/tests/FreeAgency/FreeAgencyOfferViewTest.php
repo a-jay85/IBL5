@@ -11,6 +11,11 @@ use Player\Player;
 use Team\Team;
 
 /**
+ * Refactors of the view also run a source census against master: the sorted
+ * multiset of `HtmlSanitizer::e(`, `(int) `, `name="teamname"`, `name="playerID"`,
+ * `name="offerType"`, `generateRawToken` and `renderCsrfInput()` occurrences must
+ * match, and the diff of the two listings must end in CENSUS-IDENTICAL.
+ *
  * @covers \FreeAgency\FreeAgencyOfferView
  * @phpstan-import-type NegotiationData from \FreeAgency\FreeAgencyOfferView
  */

@@ -422,4 +422,106 @@ final class PeriodAveragesTest extends TestCase
         $this->assertStringNotContainsString('ignored', $html);
         $this->assertStringNotContainsString('<td></td>', $html);
     }
+
+    public function testPeriodAveragesExposesOnlyRenderAsPublicMethod(): void
+    {
+        $class = new \ReflectionClass(PeriodAverages::class);
+
+        $publicNames = array_map(
+            static fn (\ReflectionMethod $m): string => $m->getName(),
+            $class->getMethods(\ReflectionMethod::IS_PUBLIC)
+        );
+        $this->assertSame(['render'], $publicNames);
+        $this->assertSame([], $class->getProperties());
+        $this->assertNull($class->getConstructor());
+
+        $render = $class->getMethod('render');
+        $this->assertTrue($render->isStatic());
+        $this->assertSame(
+            ['db', 'team', 'season', 'startDate', 'endDate', 'starterPids', 'pidFilter'],
+            array_map(static fn (\ReflectionParameter $p): string => $p->getName(), $render->getParameters())
+        );
+        $dbType = $render->getParameters()[0]->getType();
+        $this->assertInstanceOf(\ReflectionNamedType::class, $dbType);
+        $this->assertSame('mysqli', $dbType->getName());
+        $returnType = $render->getReturnType();
+        $this->assertInstanceOf(\ReflectionNamedType::class, $returnType);
+        $this->assertSame('string', $returnType->getName());
+    }
+
+    public function testRenderHelpersArePrivateStaticAndTakeNoDatabaseOrActorValue(): void
+    {
+        $class = new \ReflectionClass(PeriodAverages::class);
+        $helpers = array_values(array_filter(
+            $class->getMethods(),
+            static fn (\ReflectionMethod $m): bool => !$m->isPublic()
+        ));
+
+        $this->assertSame(
+            ['renderHeader', 'renderPlayerRow', 'renderTeamFooterRow'],
+            array_map(static fn (\ReflectionMethod $m): string => $m->getName(), $helpers)
+        );
+
+        foreach ($helpers as $helper) {
+            $this->assertTrue($helper->isPrivate(), $helper->getName());
+            $this->assertTrue($helper->isStatic(), $helper->getName());
+            $returnType = $helper->getReturnType();
+            $this->assertInstanceOf(\ReflectionNamedType::class, $returnType, $helper->getName());
+            $this->assertSame('string', $returnType->getName(), $helper->getName());
+        }
+
+        $this->assertSame([], self::helperParameterViolations($class));
+    }
+
+    /**
+     * @param \ReflectionClass<object> $class
+     * @return list<string> one entry per non-public method parameter typed outside the allowlist
+     */
+    private static function helperParameterViolations(\ReflectionClass $class): array
+    {
+        $violations = [];
+        foreach ($class->getMethods() as $method) {
+            if ($method->isPublic()) {
+                continue;
+            }
+            foreach ($method->getParameters() as $param) {
+                $type = $param->getType();
+                $name = $type instanceof \ReflectionNamedType ? $type->getName() : 'untyped';
+                if (!in_array($name, ['array', 'string', 'Team\Team'], true)) {
+                    $violations[] = $method->getName() . ' $' . $param->getName() . ': ' . $name;
+                }
+            }
+        }
+
+        return $violations;
+    }
+
+    public function testDischargeCheckFlagsDatabaseHandleAndIdentityParameters(): void
+    {
+        $mutant = new class {
+            private static ?\mysqli $db = null;
+
+            public function connect(\mysqli $db): void
+            {
+                self::$db = $db;
+            }
+
+            public function touch(): string
+            {
+                return self::$db === null ? '' : self::renderHeader(self::$db, 0);
+            }
+
+            private static function renderHeader(\mysqli $db, int $loggedInTeamID): string
+            {
+                return $db->host_info . $loggedInTeamID;
+            }
+        };
+        $class = new \ReflectionClass($mutant);
+
+        $this->assertSame(
+            ['renderHeader $db: mysqli', 'renderHeader $loggedInTeamID: int'],
+            self::helperParameterViolations($class)
+        );
+        $this->assertCount(1, $class->getProperties());
+    }
 }

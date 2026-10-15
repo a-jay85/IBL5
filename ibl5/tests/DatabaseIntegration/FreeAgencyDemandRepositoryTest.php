@@ -79,6 +79,19 @@ class FreeAgencyDemandRepositoryTest extends DatabaseTestCase
         self::assertGreaterThanOrEqual(2100, $result);
     }
 
+    public function testGetPositionSalaryCommitmentDelegatesToInjectedSalaryCapRepository(): void
+    {
+        $salaryCap = $this->createMock(\Repositories\Contracts\SalaryCapRepositoryInterface::class);
+        $salaryCap->expects($this->once())
+            ->method('getPositionSalaryCommitmentNextYear')
+            ->with('Metros', 'PG', 200070001)
+            ->willReturn(9876);
+
+        $repo = new FreeAgencyDemandRepository($this->db, $salaryCap);
+
+        self::assertSame(9876, $repo->getPositionSalaryCommitment('Metros', 'PG', 200070001));
+    }
+
     // ── getPlayerDemands ────────────────────────────────────────
 
     public function testGetPlayerDemandsReturnsDemandValues(): void

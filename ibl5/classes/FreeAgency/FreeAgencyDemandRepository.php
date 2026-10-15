@@ -6,6 +6,8 @@ namespace FreeAgency;
 
 use Database\BaseMysqliRepository;
 use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
+use Repositories\SalaryCapRepository;
 
 /**
  * FreeAgencyDemandRepository - Database operations for free agency demand calculations
@@ -21,15 +23,19 @@ use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
  */
 class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAgencyDemandRepositoryInterface
 {
+    private readonly SalaryCapRepositoryInterface $salaryCapRepo;
+
     /**
      * Constructor - inherits from BaseMysqliRepository
      *
      * @param \mysqli $db Active mysqli connection
+     * @param SalaryCapRepositoryInterface|null $salaryCapRepo Shared salary queries; defaults to a SalaryCapRepository on the same connection
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?SalaryCapRepositoryInterface $salaryCapRepo = null)
     {
         parent::__construct($db);
+        $this->salaryCapRepo = $salaryCapRepo ?? new SalaryCapRepository($db);
     }
 
     /**
@@ -67,20 +73,7 @@ class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAge
      */
     public function getPositionSalaryCommitment(string $teamName, string $position, int $excludePlayerID): int
     {
-        /** @var array{total_salary: int|null}|null $result */
-        $result = $this->fetchOne(
-            "SELECT SUM(next_year_salary) AS total_salary
-             FROM vw_current_salary
-             WHERE teamname = ?
-               AND pos = ?
-               AND pid != ?",
-            "ssi",
-            $teamName,
-            $position,
-            $excludePlayerID
-        );
-
-        return (int) ($result['total_salary'] ?? 0);
+        return $this->salaryCapRepo->getPositionSalaryCommitmentNextYear($teamName, $position, $excludePlayerID);
     }
 
     /**

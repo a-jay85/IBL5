@@ -71,6 +71,7 @@ BL_BACKOFF_PAD=5
 BL_BACKOFF_FLOOR=30
 BL_BACKOFF_CAP=300
 BL_FETCH_RETRY=120
+BL_PR_REPO="a-jay85/IBL5"
 BL_PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.bun/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 DISCORD_DM="${IBL5_BURNDOWN_DISCORD_DM:-$ROOT/bin/discord-dm}"
 BACKLOG_BIN="${IBL5_BURNDOWN_BACKLOG:-$ROOT/bin/backlog}"
@@ -86,6 +87,8 @@ UNITS=0
 FAILS=0
 LAST_FAIL=""
 EMPTY_STREAK=0
+GATE_STATE=open
+PR_JSON=""
 MAX_FAILS=3
 EMPTY_SLEEP_MIN=240
 SCOUT_COOLDOWN_MIN=240
@@ -113,6 +116,10 @@ unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BAT
     IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK
 
 BL_PROMPT='Invoke the /burndown skill now and run every step to completion. No human is present: never ask questions or wait for input. When the skill says to show or tell the user something, print it and continue. Make the safe choice and continue. If the first selection round in step 4 prints `LEDGER: none`, end your final message with this exact line on its own: BURNDOWN-LOOP: none-selected. If any bin/backlog command in the run exits 3 (fail-closed abort), stop the run and end your final message with this exact line on its own: BURNDOWN-LOOP: abort-exit-3'
+
+BL_UNBLOCK_MAX=5
+BL_UNBLOCK_DENY='Bash(gh pr merge:*),Bash(gh api:*),Bash(bin/post-plan-now:*),Bash(bin/post-plan-fleet:*),Bash(bin/pr-cycle:*),Bash(bin/pr-cycle-tick:*),Bash(bin/pr-triage:*),Bash(bin/postplan-fix:*)'
+BL_UNBLOCK_PROMPT='Unattended unblock pass for open pull requests in a-jay85/IBL5. No human is present: never ask questions or wait for input; make the safe choice and continue. Work only on these PRs (number:reason): @PRS@. For each one, read its head branch with `gh pr view <n> --json headRefName`, use its worktree from `git worktree list`, or create one with `bin/wt-new --existing <branch>`. reason=conflict: run `git fetch origin` and `git merge origin/master`, resolve every conflict keeping the intent of both sides, run the tests that cover the touched files, commit, and `git push` without force. reason=red: read the failures with `gh pr checks <n>` and `gh run view <run-id> --log-failed`, fix the cause, rerun the failing test locally, commit, and `git push` without force. Skip a PR whose fix needs a product or design decision. Hard rules: never enable auto-merge; never run `gh pr merge` or `gh api` in any form; never run bin/post-plan-now, bin/post-plan-fleet, bin/pr-cycle, bin/pr-cycle-tick, bin/pr-triage or bin/postplan-fix; never invoke the /post-plan or /ship skills; never mark a draft ready, close a PR, or push to master. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-UNBLOCK: pushed <n> (n = PRs you pushed a fix to), or BURNDOWN-UNBLOCK: none'
 
 bl_usage() {
     cat <<'USAGE_EOF'
@@ -400,6 +407,38 @@ bl_run_batch() {
     rm -f "$BL_EMPTY_SENTINEL"
 }
 
+# bl_run_session <kind> <model> <prompt> [claude args...]: one headless session in the
+# batch wrapper, minus the burndown opt-in (env -u keeps `post-plan-now --auto` inert).
+# Sets SESSION_RC and SESSION_LOG.
+bl_run_session() {
+    local kind="$1" model="$2" prompt="$3" ts timeout_secs caff=""
+    shift 3
+    ts=$(date -u +%Y%m%dT%H%M%SZ)
+    SESSION_LOG="$STATE/$kind-$ts.log"
+    timeout_secs=$(bl_timeout_secs)
+    if command -v caffeinate >/dev/null 2>&1; then caff="caffeinate -s"; fi
+    SESSION_RC=0
+    # shellcheck disable=SC2086
+    env -u IBL5_BURNDOWN_LOOP CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \
+        IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=burndown-loop \
+        IBL5_USAGE_GATE_MODEL="$model" \
+        IBL5_USAGE_GATE_RESUME_BIN="$ROOT/bin/burndown-loop" \
+        IBL5_USAGE_GATE_SESSION_ID="$LOOP_SID" \
+        perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$timeout_secs" \
+        $caff claude -p "$prompt" --dangerously-skip-permissions "$@" \
+        --model "$model" --effort high --name "burndown-$kind-$ts" \
+        >"$SESSION_LOG" 2>&1 || SESSION_RC=$?
+}
+
+# bl_session_marker <log> <prefix>: the last "<prefix>: ..." line, tolerating bold,
+# backtick and list decoration (.claude/rules/headless-marker-contract.md).
+bl_session_marker() {
+    local m
+    [ -r "$1" ] || { echo unconfirmed; return 0; }
+    m=$(sed -n "s/^[*\`> -]*\($2: [A-Za-z0-9 -]*\).*/\1/p" "$1" | tail -n 1)
+    echo "${m:-unconfirmed}"
+}
+
 # bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets BATCH_ITEMS to
 # this batch's item count, sets UNITS from each ledger's top-level units_used.
 # Never call it in $(...): the counters would update a subshell copy.
@@ -496,6 +535,142 @@ log: $LOOP_LOG"
             fi
             ;;
     esac
+}
+
+# ------------------------------------------------------------ open-PR ceiling
+
+# bl_cooldown_left <file> <minutes>: seconds left on a cooldown whose start epoch is
+# in <file>. Absent or garbled file: 0 (elapsed). A future epoch counts as just started.
+bl_cooldown_left() {
+    local last now span
+    span=$(( $2 * 60 ))
+    last=$(cat "$1" 2>/dev/null || true)
+    if ! bl_nonneg_int "$last"; then echo 0; return 0; fi
+    now=$(date +%s)
+    if [ "$last" -gt "$now" ]; then echo "$span"; return 0; fi
+    if [ $((now - last)) -ge "$span" ]; then echo 0; else echo $((span - (now - last))); fi
+}
+
+# bl_pr_snapshot: open PRs by the gh-authenticated owner (the account the loop runs
+# as) into PR_JSON. rc 1 when gh fails, rc 2 when the reply is not a JSON array.
+# Fail-closed probe (.claude/rules/shell-fail-open-probe.md): never `|| echo '[]'`.
+bl_pr_snapshot() {
+    local out
+    if ! out=$(gh pr list --repo "$BL_PR_REPO" --state open --author @me --limit 500 \
+        --json number,title,isDraft,headRefName,mergeable,autoMergeRequest,statusCheckRollup); then
+        return 1
+    fi
+    jq -e 'type == "array"' >/dev/null 2>&1 <<< "$out" || return 2
+    PR_JSON="$out"
+}
+
+# bl_unblock_candidates: reads PR_JSON and the loaded launchd labels, prints
+# N:conflict,M:red (at most BL_UNBLOCK_MAX), or nothing. Skips feat: titles, drafts,
+# armed PRs, mergeable=UNKNOWN, and PRs with a post-plan run or fleet rescue in flight.
+bl_unblock_candidates() {
+    local labels
+    labels=$(launchctl list 2>/dev/null | awk '{print $3}' || true)
+    jq -r --arg labels "$labels" --argjson max "$BL_UNBLOCK_MAX" '
+      ($labels | split("\n")) as $L
+      | [ .[]
+          | select((.title | test("^feat[(!:]")) | not)
+          | select(.isDraft | not)
+          | select(.autoMergeRequest == null)
+          | select(.mergeable != "UNKNOWN")
+          | .number as $n | .headRefName as $b
+          | select([$L[] | select(startswith("com.ibl5.postplan-now-" + $b + "-")
+                or . == ("com.ibl5.post-plan-fleet-" + ($n | tostring)))] | length == 0)
+          | (if .mergeable == "CONFLICTING" then "conflict"
+             elif ([.statusCheckRollup[]? | (.conclusion // .state // "")]
+                   | any(. == "FAILURE" or . == "ERROR" or . == "TIMED_OUT"
+                         or . == "CANCELLED" or . == "ACTION_REQUIRED" or . == "STARTUP_FAILURE"))
+             then "red" else empty end) as $why
+          | "\($n):\($why)" ]
+      | .[:$max] | join(",")' <<< "$PR_JSON"
+}
+
+# bl_work_gate: prints exactly one line and always returns 0 (it runs inside $(...)).
+#   batch open=N ceiling=C | unblock open=N ceiling=C prs=<list> | hold <reason> ...
+bl_work_gate() {
+    local n left cands src=0
+    bl_pr_snapshot || src=$?
+    if [ "$src" -ne 0 ]; then echo "hold pr-count-failed rc=$src"; return 0; fi
+    n=$(jq 'length' <<< "$PR_JSON")
+    if [ "$n" -lt "$PR_CEILING" ]; then echo "batch open=$n ceiling=$PR_CEILING"; return 0; fi
+    if [ -e "$STATE/unblock-disabled" ]; then
+        echo "hold unblock-disabled open=$n ceiling=$PR_CEILING"; return 0
+    fi
+    left=$(bl_cooldown_left "$STATE/unblock.last" "$UNBLOCK_COOLDOWN_MIN")
+    if [ "$left" -gt 0 ]; then
+        echo "hold unblock-cooldown open=$n ceiling=$PR_CEILING left=${left}s"; return 0
+    fi
+    cands=$(bl_unblock_candidates)
+    if [ -z "$cands" ]; then echo "hold ceiling-idle open=$n ceiling=$PR_CEILING"; return 0; fi
+    echo "unblock open=$n ceiling=$PR_CEILING prs=$cands"
+}
+
+# bl_gate_note <work-line>: runs in the main shell; DMs only when the state changes.
+bl_gate_note() {
+    local new
+    case "$1" in
+        batch*) new=open ;;
+        "hold pr-count-failed"*) new=blind ;;
+        *) new=ceiling ;;
+    esac
+    [ "$new" != "$GATE_STATE" ] || return 0
+    case "$new" in
+        ceiling) bl_dm "burndown-loop: open PRs at the ceiling; new batches and scouts paused
+$1
+log: $LOOP_LOG" ;;
+        blind) bl_dm "burndown-loop: open-PR count unavailable (gh failed); no new work until it recovers
+log: $LOOP_LOG" ;;
+        open) bl_dm "burndown-loop: open PRs below the ceiling again; batches resume
+$1" ;;
+    esac
+    GATE_STATE="$new"
+}
+
+# bl_unblock_arm_check <prs>: every PR handed to the session must still be open and
+# unarmed. A violation disarms it, writes the sticky unblock-disabled file and DMs.
+# An unverifiable check (gh failed) disables too: fail closed.
+bl_unblock_arm_check() {
+    local bad src=0 n
+    bl_pr_snapshot || src=$?
+    if [ "$src" -eq 0 ]; then
+        bad=$(jq -r --arg prs "$1" '($prs | split(",") | map(split(":")[0] | tonumber)) as $want
+            | (map(.number)) as $open
+            | [ $want[] as $w | select((($open | index($w)) == null)) | "\($w):gone" ]
+              + [ .[] | select(.autoMergeRequest != null) | .number as $n
+                  | select(any($want[]; . == $n)) | "\($n):armed" ]
+            | join(" ")' <<< "$PR_JSON") || bad="jq-failed"
+    else
+        bad="unverifiable:rc=$src"
+    fi
+    [ -n "$bad" ] || return 0
+    for n in $bad; do
+        case "$n" in *:armed) gh pr merge --disable-auto "${n%%:*}" --repo "$BL_PR_REPO" \
+            || bl_log "disarm failed pr=${n%%:*}" ;; esac
+    done
+    : > "$STATE/unblock-disabled"
+    bl_log "unblock ARM-CHECK violation=$bad; unblock disabled until $STATE/unblock-disabled is removed"
+    bl_dm "burndown-loop: unblock ARM-CHECK failed ($bad); armed PRs were disarmed; unblock disabled until $STATE/unblock-disabled is removed
+log: $LOOP_LOG"
+}
+
+bl_on_unblock() {
+    local prs="${1##* prs=}" marker
+    # Cooldown starts at launch, so a crash or timeout never retries at once.
+    date +%s > "$STATE/unblock.last"
+    bl_run_session unblock claude-sonnet-5-5 "${BL_UNBLOCK_PROMPT//@PRS@/$prs}" \
+        --disallowedTools "$BL_UNBLOCK_DENY"
+    bl_unblock_arm_check "$prs"
+    if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$SESSION_RC" "$SESSION_LOG"; then
+        bl_log "RESULT paused (usage gate); auto-resumes after reset."
+        bl_finish paused 75
+    fi
+    marker=$(bl_session_marker "$SESSION_LOG" BURNDOWN-UNBLOCK)
+    bl_log "unblock done prs=$prs rc=$SESSION_RC result=$marker log=$SESSION_LOG"
+    if [ "$ONCE" -eq 0 ]; then bl_sleep "$BL_SLEEP_CAP" unblock-recheck || bl_stopped; fi
 }
 
 # ------------------------------------------------------------ usage-gate pause
@@ -603,7 +778,7 @@ bl_maybe_reexec() {
 # ------------------------------------------------------------ run
 
 bl_cmd_run() {
-    local dry=0 a decision action rest secs reason max_fails timeout_secs
+    local dry=0 a decision action rest secs reason max_fails timeout_secs work
     for a in "$@"; do
         case "$a" in
             --once) ONCE=1 ;;
@@ -658,7 +833,19 @@ bl_cmd_run() {
                 bl_sleep "$secs" "$reason" || bl_stopped
                 ;;
             pause) bl_on_pause ;;
-            launch) bl_on_launch ;;
+            launch)
+                work=$(bl_work_gate)
+                bl_log "decision=$work"
+                bl_gate_note "$work"
+                case "${work%% *}" in
+                    batch) bl_on_launch ;;
+                    unblock) bl_on_unblock "$work" ;;
+                    *)
+                        rest="${work#hold }"
+                        bl_sleep "$BL_SLEEP_CAP" "${rest%% *}" || bl_stopped
+                        ;;
+                esac
+                ;;
         esac
         [ "$ONCE" -eq 0 ] || return 0
     done

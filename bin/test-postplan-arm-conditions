@@ -1299,7 +1299,7 @@ MXEOF
 MX_PY=$( cd "$REPO_ROOT/tools/postplan-harness" && python3 -c '
 import sys
 from harness.planfile import parse_matrix
-planned, manual = parse_matrix(open(sys.argv[1]).read())
+planned, manual, _ = parse_matrix(open(sys.argv[1]).read())
 print(",".join(planned) + "|" + str(len(manual)))
 ' "$MX_FIX" )
 if [ "$MX_PY" = "ibl5/tests/Unit/RealTest.php|0" ]; then

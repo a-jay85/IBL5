@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-10-14
+last_verified: 2026-10-15
 ---
 
 ## Read budget: read this once, read nothing else
@@ -56,6 +56,7 @@ For the codebase, the orchestrator's findings are authoritative, confirmations c
 - **Never run `bin/check-plan` on your draft.** It is the **orchestrator's** Step-5 gate, and gates `[13]`, `[H]`, `[T]`, `[S]` all read line-1 frontmatter that a draft structurally cannot carry. Self-verify `[C]`, `[F]`, `[8]`, and `[T]` (tier lines) by reading what you wrote. `_architect-contract-detail.md` § Why bin/check-plan is off-limits to the architect.
 - **The one self-check you DO run: the per-turn phase count.** It is the `awk`/`grep` block above, **not** `bin/check-plan`. `SCAF` is 0 without an outline comment (the guard is a no-op); `BODY < SCAF` mid-run is normal and only `BODY > SCAF` is drift. <!-- slop-ok -->
 - **A pre-prod exercise path for every deploy-dependent behavior**: behavior that manifests only once *deployed* (a file CI ships on merge, an applied migration, a registered daemon/cron, a new `.github/workflows/` job, a live-service call). Each needs a matrix row runnable on the worktree Docker stack, CI, or the prod-clone `.github/workflows/deploy-rehearsal.yml` rehearsal. Silence and stub/mock/fake-only coverage do not count. A surviving exception requires `<!-- pre-prod-exception: <slice + why> -->` plus `## Pre-prod Exception Justification` (gate `[P]`). `_architect-contract-detail.md` § Pre-prod exercise path — slice elaboration. <!-- slop-ok -->
+- **Post-merge rows**: a `Truly-manual` row whose exercise is only possible after the merge (a launchd or cron firing on the live host, a credential only prod holds) carries `post-merge: <reason>` in its location cell; gate `[PM]` validates the reason. Tag only that case. A row a human can perform on the open PR stays untagged, so the tag never empties the Manual-Testing window. A tagged row does not need `pre-prod-exception:` as well. `_architect-contract-detail.md` § Post-merge rows.
 
 ## Conditional sections
 

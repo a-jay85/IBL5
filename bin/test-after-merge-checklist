@@ -1,0 +1,338 @@
+#!/usr/bin/env bash
+# test-after-merge-checklist — contract harness for bin/after-merge-checklist.
+#
+# Usage: bin/test-after-merge-checklist
+#
+# No network and no real gh: a `gh` stub on PATH logs its argv to $SCRATCH/gh.log, answers
+# `pr view` by running the caller's --jq filter over $GH_VIEW_FIXTURE (so the marker lookup
+# in the script is what decides the count), and answers `pr comment` by copying the
+# --body-file to $SCRATCH/posted.md and exiting ${GH_STUB_FAIL:-0}.
+
+set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+H_FAIL_FD=2  # FAIL: lines stay on stderr, as in the sibling harnesses
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DRIVER="$SCRIPT_DIR/after-merge-checklist"
+[ -f "$DRIVER" ] || { echo "STOP: no driver at $DRIVER" >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "STOP: jq is required by the gh stub" >&2; exit 1; }
+
+h_tmp SCRATCH
+mkdir -p "$SCRATCH/bin"
+trap 'h_cleanup' EXIT
+
+# Same UTF-8 locale selection as the driver, so ${#v} counts characters here too.
+for _l in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+    case "$(locale -a 2>/dev/null || true)" in
+        *"$_l"*) export LC_ALL="$_l"; break ;;
+    esac
+done
+
+# A CI step's own GITHUB_OUTPUT must never receive this harness's status lines.
+unset GITHUB_OUTPUT
+
+cat > "$SCRATCH/bin/gh" <<STUB
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/gh.log"
+case "\$1 \$2" in
+    "pr view")
+        expr=""
+        while [ \$# -gt 0 ]; do
+            if [ "\$1" = "--jq" ]; then expr="\$2"; fi
+            shift
+        done
+        jq -r "\$expr" "\$GH_VIEW_FIXTURE" ;;
+    "pr comment")
+        while [ \$# -gt 0 ]; do
+            if [ "\$1" = "--body-file" ]; then cp "\$2" "$SCRATCH/posted.md"; fi
+            shift
+        done
+        exit "\${GH_STUB_FAIL:-0}" ;;
+esac
+exit 0
+STUB
+chmod +x "$SCRATCH/bin/gh"
+export PATH="$SCRATCH/bin:$PATH"
+export GH_STUB_FAIL=0
+export GH_VIEW_FIXTURE="$SCRATCH/view.json"
+
+CASE=""
+begin_case() { CASE="$1"; }
+ok()   { h_pass "$CASE"; }
+fail() { h_fail "[$CASE] $1"; }
+want() { case "$2" in *"$3"*) ok ;; *) fail "$1: expected to contain <<$3>>, got <<$2>>" ;; esac; }
+wantnot() { case "$2" in *"$3"*) fail "$1: expected NOT to contain <<$3>>" ;; *) ok ;; esac; }
+eq()   { [ "$2" = "$3" ] && ok || fail "$1: want <<$3>>, got <<$2>>"; }
+
+COMMENT="$SCRATCH/comment.md"
+DM="$SCRATCH/dm.txt"
+MARKER='<!-- after-merge-checklist -->'
+
+# reset — clean slate between cases: no outputs, empty gh.log, no PR comments on the stub.
+reset() {
+    rm -f "$COMMENT" "$DM" "$SCRATCH/posted.md" "$SCRATCH/gho"
+    : > "$SCRATCH/gh.log"
+    printf '{"comments":[]}\n' > "$GH_VIEW_FIXTURE"
+    GH_STUB_FAIL=0
+    unset GITHUB_OUTPUT
+}
+
+# run <body-file> [extra args...] -> OUT, ERR, RC
+run() {
+    local _body="$1"; shift
+    OUT="$(bash "$DRIVER" --pr-number 42 --pr-url 'https://github.com/o/r/pull/42' \
+            --title 'Add the thing' --pr-body-file "$_body" \
+            --comment-out "$COMMENT" --dm-out "$DM" "$@" 2>"$SCRATCH/err")"
+    RC=$?
+    ERR="$(cat "$SCRATCH/err")"
+}
+
+gh_count() { grep -c "^$1" "$SCRATCH/gh.log" || true; }
+exists()   { [ -e "$1" ] && echo yes || echo no; }
+
+TWO_ROWS="$SCRATCH/two-rows.md"
+cat > "$TWO_ROWS" <<'FIX'
+## Summary
+
+Something shipped.
+
+## After merge
+
+- **Row 3** — operator reads the nightly queue
+- [ ] **Row 7** — operator checks the Discord DM
+<!-- after-merge:end -->
+
+## Other
+FIX
+
+# The literal contract strings live in the script, not only in this harness.
+begin_case "script_carries_marker_and_line_filter"
+want "marker literal" "$(cat "$DRIVER")" '<!-- after-merge-checklist -->'
+want "row line filter literal" "$(cat "$DRIVER")" '^- (\[ \] )?\*\*Row'
+
+# ---------------------------------------------------------------------------
+begin_case "posts_once"
+reset
+run "$TWO_ROWS"
+eq "exit 0" "$RC" "0"
+eq "stdout status" "$OUT" "status=posted"
+eq "exactly one pr comment call" "$(gh_count 'pr comment')" "1"
+eq "pr comment targets the PR" "$(grep -c '^pr comment 42 --body-file' "$SCRATCH/gh.log" || true)" "1"
+eq "posted.md exists" "$(exists "$SCRATCH/posted.md")" "yes"
+want "posted body carries the marker" "$(cat "$SCRATCH/posted.md")" "$MARKER"
+eq "marker is the first line" "$(sed -n 1p "$SCRATCH/posted.md")" "$MARKER"
+eq "two checkbox rows" "$(grep -c -- '^- \[ \] \*\*Row' "$SCRATCH/posted.md" || true)" "2"
+want "row 3 text kept" "$(cat "$SCRATCH/posted.md")" "- [ ] **Row 3** — operator reads the nightly queue"
+want "row 7 not double-boxed" "$(cat "$SCRATCH/posted.md")" "- [ ] **Row 7** — operator checks the Discord DM"
+wantnot "no doubled checkbox" "$(cat "$SCRATCH/posted.md")" "[ ] [ ]"
+want "heading names the PR" "$(cat "$SCRATCH/posted.md")" "## After merge checklist for #42"
+want "footer" "$(cat "$SCRATCH/posted.md")" "Tick each box as you complete it."
+eq "DM file exists" "$(exists "$DM")" "yes"
+want "DM header" "$(cat "$DM")" "After merge: #42 Add the thing"
+want "DM url" "$(cat "$DM")" "https://github.com/o/r/pull/42"
+want "DM row bullet" "$(cat "$DM")" "• Row 3 — operator reads the nightly queue"
+wantnot "DM rows carry no bold markers" "$(cat "$DM")" "**"
+
+# ---------------------------------------------------------------------------
+begin_case "redelivered_event_is_noop"
+reset
+printf '{"comments":[{"body":"hello"},{"body":"%s\\n## After merge checklist for #42"}]}\n' "$MARKER" > "$GH_VIEW_FIXTURE"
+# A leftover DM from an earlier delivery must be removed so the notify step cannot resend it.
+printf 'stale\n' > "$DM"
+run "$TWO_ROWS"
+eq "exit 0" "$RC" "0"
+eq "stdout status" "$OUT" "status=skipped"
+eq "zero pr comment calls" "$(gh_count 'pr comment')" "0"
+eq "pr view was consulted" "$(gh_count 'pr view')" "1"
+eq "no DM file" "$(exists "$DM")" "no"
+
+# ---------------------------------------------------------------------------
+begin_case "absent_section_noop"
+reset
+printf '## Summary\n\nNothing deferred.\n\n## Manual Testing\n\nNo manual testing needed.\n' > "$SCRATCH/absent.md"
+run "$SCRATCH/absent.md"
+eq "exit 0" "$RC" "0"
+eq "stdout status" "$OUT" "status=absent"
+eq "no comment file" "$(exists "$COMMENT")" "no"
+eq "no DM file" "$(exists "$DM")" "no"
+eq "gh.log empty" "$(wc -c < "$SCRATCH/gh.log" | tr -d ' ')" "0"
+
+begin_case "empty_section_noop"
+reset
+printf '## After merge\n\n<!-- after-merge:end -->\n\n## Other\n' > "$SCRATCH/empty.md"
+run "$SCRATCH/empty.md"
+eq "exit 0" "$RC" "0"
+eq "stdout status" "$OUT" "status=absent"
+eq "no comment file" "$(exists "$COMMENT")" "no"
+eq "no DM file" "$(exists "$DM")" "no"
+eq "gh.log empty" "$(wc -c < "$SCRATCH/gh.log" | tr -d ' ')" "0"
+
+# ---------------------------------------------------------------------------
+begin_case "only_row_lines_forwarded"
+reset
+cat > "$SCRATCH/mixed.md" <<'FIX'
+## After merge
+
+- **Row 3** — keep this one
+- <img src="https://example.com/x.png"> not a row
+Free prose that is not a row.
+- plain bullet, not a row
+- [ ] **Row 4** — and this one
+### Sub heading inside the section
+## Nested
+
+- **Row 9** — after the next heading, not part of the section
+<!-- after-merge:end -->
+FIX
+run "$SCRATCH/mixed.md" --dry-run
+eq "exit 0" "$RC" "0"
+want "row 3 kept" "$(cat "$COMMENT")" "**Row 3** — keep this one"
+want "row 4 kept" "$(cat "$COMMENT")" "**Row 4** — and this one"
+wantnot "no img line" "$(cat "$COMMENT")" "<img"
+wantnot "no free prose" "$(cat "$COMMENT")" "Free prose"
+wantnot "no plain bullet" "$(cat "$COMMENT")" "plain bullet"
+wantnot "no nested heading" "$(cat "$COMMENT")" "Nested"
+wantnot "nothing past the next heading" "$(cat "$COMMENT")" "Row 9"
+wantnot "DM has no img line" "$(cat "$DM")" "<img"
+wantnot "DM nothing past the next heading" "$(cat "$DM")" "Row 9"
+
+begin_case "end_anchor_cuts_section"
+reset
+cat > "$SCRATCH/anchor.md" <<'FIX'
+## After merge
+
+- **Row 1** — before the anchor
+<!-- after-merge:end -->
+- **Row 2** — after the anchor
+FIX
+run "$SCRATCH/anchor.md" --dry-run
+want "row 1 kept" "$(cat "$COMMENT")" "**Row 1**"
+wantnot "row 2 cut" "$(cat "$COMMENT")" "Row 2"
+
+# ---------------------------------------------------------------------------
+begin_case "mentions_neutralized"
+reset
+cat > "$SCRATCH/mention.md" <<'FIX'
+## After merge
+
+- **Row 1** — ping @everyone and @a-jay85 about it
+<!-- after-merge:end -->
+FIX
+run "$SCRATCH/mention.md" --dry-run
+eq "exit 0" "$RC" "0"
+eq "no raw @everyone in either file" \
+    "$(( $(grep -c '@everyone' "$COMMENT" || true) + $(grep -c '@everyone' "$DM" || true) ))" "0"
+eq "everyone still rendered in both files" \
+    "$(( $(grep -c 'everyone' "$COMMENT" || true) + $(grep -c 'everyone' "$DM" || true) ))" "2"
+eq "no raw @a-jay85 in either file" \
+    "$(( $(grep -c '@a-jay85' "$COMMENT" || true) + $(grep -c '@a-jay85' "$DM" || true) ))" "0"
+eq "a-jay85 still rendered in both files" \
+    "$(( $(grep -c 'a-jay85' "$COMMENT" || true) + $(grep -c 'a-jay85' "$DM" || true) ))" "2"
+
+# ---------------------------------------------------------------------------
+begin_case "dm_capped"
+reset
+{
+    printf '## After merge\n\n'
+    _pad="$(printf 'x%.0s' $(seq 1 130))"
+    for _i in $(seq 1 40); do
+        printf -- '- **Row %s** — %s\n' "$_i" "$_pad"
+    done
+    printf '<!-- after-merge:end -->\n'
+} > "$SCRATCH/many.md"
+run "$SCRATCH/many.md" --dry-run
+eq "exit 0" "$RC" "0"
+_dm="$(cat "$DM")"
+eq "DM at most 1900 characters" "$([ "${#_dm}" -le 1900 ] && echo under || echo "over:${#_dm}")" "under"
+want "DM names the overflow" "$_dm" "more rows"
+want "DM overflow line shape" "$_dm" "in the PR comment)"
+eq "comment keeps every row" "$(grep -c -- '^- \[ \] \*\*Row' "$COMMENT" || true)" "40"
+wantnot "late rows are not in the DM" "$_dm" "Row 40 "
+
+begin_case "dm_row_cut_to_200"
+reset
+{
+    printf '## After merge\n\n'
+    printf -- '- **Row 1** — %s\n' "$(printf 'y%.0s' $(seq 1 400))"
+    printf '<!-- after-merge:end -->\n'
+} > "$SCRATCH/long.md"
+run "$SCRATCH/long.md" --dry-run
+_row="$(sed -n '3p' "$DM")"
+eq "DM row at most 200 characters" "$([ "${#_row}" -le 202 ] && echo under || echo "over:${#_row}")" "under"
+eq "comment row is not cut" "$(grep -c "$(printf 'y%.0s' $(seq 1 400))" "$COMMENT" || true)" "1"
+
+# ---------------------------------------------------------------------------
+begin_case "dry_run_calls_no_gh"
+reset
+run "$TWO_ROWS" --dry-run
+eq "exit 0" "$RC" "0"
+eq "stdout status" "$OUT" "status=dry-run"
+eq "gh.log empty" "$(wc -c < "$SCRATCH/gh.log" | tr -d ' ')" "0"
+eq "comment file written" "$(exists "$COMMENT")" "yes"
+eq "DM file written" "$(exists "$DM")" "yes"
+
+begin_case "empty_env_dry_run_ok"
+reset
+OUT="$(env -i PATH="$PATH" HOME="$SCRATCH" bash "$DRIVER" --pr-number 1 --pr-url u --title t \
+        --pr-body-file "$TWO_ROWS" --comment-out "$COMMENT" --dm-out "$DM" --dry-run 2>"$SCRATCH/err")"
+RC=$?
+eq "exit 0" "$RC" "0"
+eq "stdout status" "$OUT" "status=dry-run"
+eq "stderr clean" "$(cat "$SCRATCH/err")" ""
+
+# ---------------------------------------------------------------------------
+begin_case "unknown_flag_exits_2"
+reset
+run "$TWO_ROWS" --bogus
+eq "exit 2" "$RC" "2"
+want "stderr names the flag" "$ERR" "unknown argument: --bogus"
+eq "no gh call" "$(wc -c < "$SCRATCH/gh.log" | tr -d ' ')" "0"
+
+begin_case "missing_pr_number_exits_2"
+reset
+OUT="$(bash "$DRIVER" --pr-url u --title t --pr-body-file "$TWO_ROWS" \
+        --comment-out "$COMMENT" --dm-out "$DM" 2>"$SCRATCH/err")"
+RC=$?
+ERR="$(cat "$SCRATCH/err")"
+eq "exit 2" "$RC" "2"
+want "stderr names the required flags" "$ERR" "--pr-number"
+
+begin_case "unreadable_body_exits_2"
+reset
+run "$SCRATCH/does-not-exist.md"
+eq "exit 2" "$RC" "2"
+want "stderr says not readable" "$ERR" "not readable"
+
+begin_case "gh_comment_failure_exits_1"
+reset
+GH_STUB_FAIL=1
+run "$TWO_ROWS"
+eq "exit 1" "$RC" "1"
+wantnot "no posted status" "$OUT" "status=posted"
+want "stderr says the comment failed" "$ERR" "gh pr comment failed"
+GH_STUB_FAIL=0
+
+# ---------------------------------------------------------------------------
+begin_case "github_output_written"
+reset
+GITHUB_OUTPUT="$SCRATCH/gho"
+: > "$GITHUB_OUTPUT"
+export GITHUB_OUTPUT
+run "$TWO_ROWS"
+unset GITHUB_OUTPUT
+eq "exit 0" "$RC" "0"
+want "GITHUB_OUTPUT carries the status" "$(cat "$SCRATCH/gho")" "status=posted"
+eq "stdout status too" "$OUT" "status=posted"
+
+begin_case "github_output_empty_is_stdout_only"
+reset
+GITHUB_OUTPUT=""
+export GITHUB_OUTPUT
+run "$TWO_ROWS"
+unset GITHUB_OUTPUT
+eq "exit 0" "$RC" "0"
+eq "stdout status" "$OUT" "status=posted"
+eq "stderr clean" "$ERR" ""
+
+h_done

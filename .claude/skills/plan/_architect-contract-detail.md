@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-11
+last_verified: 2026-10-15
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -249,3 +249,12 @@ A phase that cites only non-repo tokens (`/proc/...`, `~/...`, `origin/master`, 
 ## Context bounds rationale
 
 A sectioned delivery keeps one context across all turns, so what you read on turn 1 is still in front of you on turn 9. Re-Reading the contract re-pays ~7K tokens for text the architect already holds. Opening a `*-detail.md` companion costs ~5K tokens and changes no decision made while writing a plan. Re-reading a `$DRAFT` that grows each turn costs quadratically across the delivery.
+
+## Post-merge rows
+
+`post-merge:` and `pre-prod-exception:` are not stacked on one row because they answer different questions. The pre-prod marker answers "where does the logic get exercised before merge". The post-merge tag answers "who confirms the deployed behavior afterwards". A tagged row already concedes the second, and gate 16 still demands a CLI row for the logic slice, so the pre-prod question is settled elsewhere in the matrix.
+
+Gate `[PM]` catches three abuse shapes:
+- **Wrong type.** The tag sits on a row that is not `Truly-manual`, such as a PHPUnit row marked `post-merge: runs after deploy`. Automated rows run in CI on the open PR, so the tag has no meaning there.
+- **Thin or off-vocabulary reason.** `post-merge: easier after it ships` is under the vocabulary bar. A valid reason names the dependency, for example `post-merge: launchd scheduling on the live host only fires after deploy`.
+- **Look-and-feel row.** A row asking a human to judge a new layout carries the tag to avoid holding the merge. That judgment can happen on the open PR, so the row stays in the Manual-Testing window.

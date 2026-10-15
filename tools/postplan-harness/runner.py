@@ -3456,6 +3456,9 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
                 getattr(plain_resolution, "adapted_lines", ())):
             log(f"phase2: {line}")
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
+        res.retries.update(getattr(git, "conflict_review_retries", {}) or {})
+        if res.retries.get("conflict-review"):
+            log("phase2: conflict-review re-asked once (first reply carried no verdict token)")
     except HarnessError as e:
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
         if e.kind != "rebase-conflict":

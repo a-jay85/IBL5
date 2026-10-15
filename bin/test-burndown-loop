@@ -1737,6 +1737,39 @@ test_scout_unconfirmed_marker() {
     assert_contains scout_marker:unconfirmed "$OUT" "scout done rc=0 result=unconfirmed"
 }
 
+test_dry_run_work_line() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    gh_reply 0 "$(prs_json 15)"
+    run_loop run --dry-run
+    assert_eq dry_work:rc 0 "$RC"
+    assert_contains dry_work:verdict "$OUT" "DRY RUN work=hold ceiling-idle open=15 ceiling=15"
+    assert_contains dry_work:scout "$OUT" "scout=ready"
+    assert_no_file dry_work:no-claude "$T/claude.calls"
+    assert_no_file dry_work:no-scout-last "$STATE/scout.last"
+    assert_no_file dry_work:no-unblock-last "$STATE/unblock.last"
+    assert_eq dry_work:one-pr-list 1 "$(grep -c '^pr list' "$T/gh.calls")"
+    assert_contains dry_work:defaults "$OUT" "DRY RUN knobs ceiling=15 scout_cooldown=240m unblock_cooldown=120m"
+}
+
+test_dry_run_gh_failure() {
+    new_env
+    seed_usage 5 0 1
+    gh_reply 1 ''
+    run_loop run --dry-run
+    assert_eq dry_gh_fail:rc 0 "$RC"
+    assert_contains dry_gh_fail:verdict "$OUT" "work=hold pr-count-failed rc=1"
+    assert_no_file dry_gh_fail:no-dm "$T/dm.calls"
+}
+
+test_dry_run_scout_cooldown() {
+    new_env
+    seed_usage 5 0 1
+    run_loop run --dry-run
+    assert_contains dry_scout_cd:cooldown "$OUT" "scout=cooldown left="
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

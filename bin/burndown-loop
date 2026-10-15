@@ -111,12 +111,16 @@ RX_FAILS="${IBL5_BURNDOWN_REEXEC_FAILS:-}"
 RX_START="${IBL5_BURNDOWN_REEXEC_START:-}"
 RX_LAST_FAIL="${IBL5_BURNDOWN_REEXEC_LAST_FAIL:-}"
 RX_EMPTY_STREAK="${IBL5_BURNDOWN_REEXEC_EMPTY_STREAK:-}"
+RX_GATE_STATE="${IBL5_BURNDOWN_REEXEC_GATE_STATE:-}"
 unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
     IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
-    IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK
+    IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK \
+    IBL5_BURNDOWN_REEXEC_GATE_STATE
 
 BL_PROMPT='Invoke the /burndown skill now and run every step to completion. No human is present: never ask questions or wait for input. When the skill says to show or tell the user something, print it and continue. Make the safe choice and continue. If the first selection round in step 4 prints `LEDGER: none`, end your final message with this exact line on its own: BURNDOWN-LOOP: none-selected. If any bin/backlog command in the run exits 3 (fail-closed abort), stop the run and end your final message with this exact line on its own: BURNDOWN-LOOP: abort-exit-3'
 
+BL_SCOUT_RECHECK=900
+BL_SCOUT_PROMPT='Invoke the /reset-ready skill now and run every step to completion. No human is present: never ask questions or wait for input; print what you would have told the user and continue. Step 1 has no usage hook line here and the caller already checked pace, so treat usage as allowing work. In Step 6, skip the burndown-loop stop/start bullet because the loop is your caller; keep the other bullets. Pick no new frontend features. Picks that touch SQL, auth or destructive changes keep the skill routing to plan-architect-xhigh. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-SCOUT: fired <n> (n = prompts handed to bin/plan-now), BURNDOWN-SCOUT: none, or BURNDOWN-SCOUT: aborted'
 BL_UNBLOCK_MAX=5
 BL_UNBLOCK_DENY='Bash(gh pr merge:*),Bash(gh api:*),Bash(bin/post-plan-now:*),Bash(bin/post-plan-fleet:*),Bash(bin/pr-cycle:*),Bash(bin/pr-cycle-tick:*),Bash(bin/pr-triage:*),Bash(bin/postplan-fix:*)'
 BL_UNBLOCK_PROMPT='Unattended unblock pass for open pull requests in a-jay85/IBL5. No human is present: never ask questions or wait for input; make the safe choice and continue. Work only on these PRs (number:reason): @PRS@. For each one, read its head branch with `gh pr view <n> --json headRefName`, use its worktree from `git worktree list`, or create one with `bin/wt-new --existing <branch>`. reason=conflict: run `git fetch origin` and `git merge origin/master`, resolve every conflict keeping the intent of both sides, run the tests that cover the touched files, commit, and `git push` without force. reason=red: read the failures with `gh pr checks <n>` and `gh run view <run-id> --log-failed`, fix the cause, rerun the failing test locally, commit, and `git push` without force. Skip a PR whose fix needs a product or design decision. Hard rules: never enable auto-merge; never run `gh pr merge` or `gh api` in any form; never run bin/post-plan-now, bin/post-plan-fleet, bin/pr-cycle, bin/pr-cycle-tick, bin/pr-triage or bin/postplan-fix; never invoke the /post-plan or /ship skills; never mark a draft ready, close a PR, or push to master. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-UNBLOCK: pushed <n> (n = PRs you pushed a fix to), or BURNDOWN-UNBLOCK: none'
@@ -472,7 +476,7 @@ bl_all_skipped() {
 }
 
 bl_on_launch() {
-    local class reason new units tail3
+    local class reason new units tail3 scout
     bl_run_batch
     if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$BATCH_RC" "$BLOG"; then
         bl_log "RESULT paused (usage gate); auto-resumes after reset."
@@ -511,7 +515,15 @@ batches=$BATCHES items=$ITEMS
 log: $LOOP_LOG"
             fi
             EMPTY_STREAK=$((EMPTY_STREAK + 1))
-            bl_sleep $((EMPTY_SLEEP_MIN * 60)) backlog-empty || bl_stopped
+            scout=$(bl_scout_gate)
+            bl_log "decision=$scout"
+            case "$scout" in
+                scout\ *)
+                    bl_run_scout
+                    bl_sleep "$BL_SCOUT_RECHECK" scout-recheck || bl_stopped
+                    ;;
+                *) bl_sleep $((EMPTY_SLEEP_MIN * 60)) backlog-empty || bl_stopped ;;
+            esac
             ;;
         abort)
             # An abort batch can still have written ledgers; count them before retrying.
@@ -673,6 +685,28 @@ bl_on_unblock() {
     if [ "$ONCE" -eq 0 ]; then bl_sleep "$BL_SLEEP_CAP" unblock-recheck || bl_stopped; fi
 }
 
+# bl_scout_gate: prints one line, scout <decision> or scout-skip <why>. The cooldown
+# is a file, so it survives re-exec and restart. The pace re-check runs here because
+# the batch that just ended may have spent the budget.
+bl_scout_gate() {
+    local left d
+    left=$(bl_cooldown_left "$STATE/scout.last" "$SCOUT_COOLDOWN_MIN")
+    if [ "$left" -gt 0 ]; then echo "scout-skip cooldown left=${left}s"; return 0; fi
+    d=$(bl_decide)
+    case "$d" in launch*) echo "scout $d" ;; *) echo "scout-skip pace $d" ;; esac
+}
+
+bl_run_scout() {
+    # Cooldown starts at launch, so a crash or timeout never retries at once.
+    date +%s > "$STATE/scout.last"
+    bl_run_session scout claude-opus-5-5 "$BL_SCOUT_PROMPT"
+    if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$SESSION_RC" "$SESSION_LOG"; then
+        bl_log "RESULT paused (usage gate); auto-resumes after reset."
+        bl_finish paused 75
+    fi
+    bl_log "scout done rc=$SESSION_RC result=$(bl_session_marker "$SESSION_LOG" BURNDOWN-SCOUT) log=$SESSION_LOG"
+}
+
 # ------------------------------------------------------------ usage-gate pause
 
 bl_on_pause() {
@@ -721,6 +755,7 @@ bl_reexec_apply() {
         if bl_nonneg_int "$RX_EMPTY_STREAK" && [ "$RX_EMPTY_STREAK" -gt 0 ]; then
             EMPTY_STREAK=1
         fi
+        case "$RX_GATE_STATE" in open|ceiling|blind) GATE_STATE="$RX_GATE_STATE" ;; esac
     else
         bl_log "re-exec state invalid; counters reset"
     fi
@@ -761,7 +796,7 @@ bl_maybe_reexec() {
         IBL5_BURNDOWN_REEXEC_BATCHES="$BATCHES" IBL5_BURNDOWN_REEXEC_ITEMS="$ITEMS" \
         IBL5_BURNDOWN_REEXEC_UNITS="$UNITS" IBL5_BURNDOWN_REEXEC_FAILS="$FAILS" \
         IBL5_BURNDOWN_REEXEC_START="$START_EPOCH" IBL5_BURNDOWN_REEXEC_LAST_FAIL="$LAST_FAIL" \
-        IBL5_BURNDOWN_REEXEC_EMPTY_STREAK="$EMPTY_STREAK"
+        IBL5_BURNDOWN_REEXEC_EMPTY_STREAK="$EMPTY_STREAK" IBL5_BURNDOWN_REEXEC_GATE_STATE="$GATE_STATE"
     set -- run "--loop-sid=$LOOP_SID"
     if [ "$NO_DM" -eq 1 ]; then set -- "$@" --no-dm; fi
     # execfail: a failed exec returns here instead of killing the loop.
@@ -770,7 +805,8 @@ bl_maybe_reexec() {
     shopt -u execfail
     unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
         IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
-        IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK
+        IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK \
+    IBL5_BURNDOWN_REEXEC_GATE_STATE
     bl_log "re-exec failed rc=$xrc; continuing on the old code"
     CODE_HASH="$now_hash"
 }

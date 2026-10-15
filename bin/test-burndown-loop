@@ -145,6 +145,16 @@ case "$act" in
         ;;
     exit3) echo "BURNDOWN-LOOP: abort-exit-3" ;;
     silent) ;;
+    scout-fired) echo "BURNDOWN-SCOUT: fired 2" ;;
+    scout-none) echo "BURNDOWN-SCOUT: none" ;;
+    none-wait)
+        sentinel
+        echo "BURNDOWN-LOOP: none-selected"
+        now=$(date +%s)
+        jq -cn --argjson t "$now" --argjson rs "$((now + 160 * 3600))" \
+            '{five_hour:{utilization:5},seven_day:{utilization:50,resets_at:($rs|todate)},fetched_at:$t}' \
+            > "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+        ;;
     unblock-none) echo "BURNDOWN-UNBLOCK: none" ;;
     unblock-bold) echo '**BURNDOWN-UNBLOCK: pushed 1**' ;;
     crash) exit 1 ;;
@@ -1280,6 +1290,62 @@ test_empty_streak_survives_reexec() {
     assert_no_file test_empty_streak_survives_reexec:blank-env-unset "$T/claude.reexec-env"
 }
 
+# ceiling_dms: how many "at the ceiling" DMs the run sent.
+ceiling_dms() {
+    if [ -f "$T/dm.calls" ]; then
+        grep -c 'open PRs at the ceiling' "$T/dm.calls" || true
+    else
+        echo 0
+    fi
+}
+
+test_gate_state_survives_reexec() {
+    # Carried: the held tick is already announced, so no ceiling DM.
+    new_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 15)"
+    : > "$STATE/unblock-disabled"
+    stop_on_sleep
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_GATE_STATE=ceiling' run
+    assert_eq gate_state:carried-dm 0 "$(ceiling_dms)"
+    assert_no_file gate_state:carried-env-unset "$T/claude.reexec-env"
+
+    # Absent: a hand-off from older code carries nothing, so the DM is sent.
+    new_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 15)"
+    : > "$STATE/unblock-disabled"
+    stop_on_sleep
+    reexec_handoff ':' run
+    assert_eq gate_state:absent-dm 1 "$(ceiling_dms)"
+
+    # Invalid: an unknown value keeps the default.
+    new_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 15)"
+    : > "$STATE/unblock-disabled"
+    stop_on_sleep
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_GATE_STATE=bogus' run
+    assert_eq gate_state:invalid-dm 1 "$(ceiling_dms)"
+
+    # Blind: a carried blind state suppresses the repeat gh-failure DM.
+    new_env
+    seed_usage 5 0 1
+    gh_reply 1 ''
+    stop_on_sleep
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_GATE_STATE=blind' run
+    assert_eq gate_state:blind-no-dm 0 "$(grep -c 'open-PR count unavailable' "$T/dm.calls" 2>/dev/null || true)"
+
+    # Unset hygiene: a batch child launched after the hand-off must not inherit the var.
+    new_env
+    seed_usage 5 0 1
+    queue none
+    stop_on_sleep
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_GATE_STATE=ceiling' run
+    assert_eq gate_state:batch-ran 1 "$(calls "$T/claude.calls")"
+    assert_no_file gate_state:batch-env-unset "$T/claude.reexec-env"
+}
+
 test_all_skipped_sleeps() {
     new_env
     seed_usage 5 0 1
@@ -1553,6 +1619,122 @@ test_unblock_usage_pause() {
     run_loop run
     assert_eq unblock_pause:rc 75 "$RC"
     assert_contains unblock_pause:log "$OUT" "RESULT paused"
+}
+
+# ---------------------------------------------------------------- gate state across a code re-exec
+
+test_gate_state_exported_on_reexec() {
+    new_env
+    seed_usage 5 0 1
+    make_tree
+    : > "$STATE/unblock-disabled"
+    gh_reply 0 "$(prs_json 15)"
+    gh_reply 0 "$(prs_json 15)"
+    tree_hook bin/lib/usage-fetch.sh '# changed'
+    run_tree_loop run
+    assert_eq gate_exported:rc 0 "$RC"
+    assert_contains gate_exported:resumed "$OUT" "re-exec resumed pid="
+    assert_eq gate_exported:one-dm 1 "$(ceiling_dms)"
+}
+
+test_unblock_cooldown_survives_reexec() {
+    new_env
+    seed_usage 5 0 1
+    make_tree
+    local fix
+    fix=$(ceiling_fix)
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    queue unblock-none
+    tree_hook bin/lib/usage-fetch.sh '# changed'
+    run_tree_loop run
+    assert_eq unblock_reexec:rc 0 "$RC"
+    assert_contains unblock_reexec:resumed "$OUT" "re-exec resumed pid="
+    assert_eq unblock_reexec:one-session 1 "$(grep -c -- '--name burndown-unblock-' "$T/claude.calls")"
+    assert_contains unblock_reexec:hold "$OUT" "decision=hold unblock-cooldown"
+}
+
+# ---------------------------------------------------------------- empty-backlog scout
+
+test_scout_fires_when_empty() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue none scout-fired
+    stop_on_sleep
+    IBL5_BURNDOWN_LOOP=1 run_loop run
+    local scout_call
+    scout_call=$(grep -- '--name burndown-scout-' "$T/claude.calls" 2>/dev/null)
+    assert_contains scout:decision "$OUT" "decision=scout launch"
+    assert_contains scout:model "$scout_call" "--model claude-opus-5-5"
+    assert_contains scout:optin-unset "$scout_call" "OPTIN=unset"
+    assert_contains scout:skill "$scout_call" "/reset-ready"
+    assert_file scout:cooldown-file "$STATE/scout.last"
+    assert_contains scout:result "$OUT" "result=BURNDOWN-SCOUT: fired 2"
+    assert_contains scout:recheck "$OUT" "sleep 900s reason=scout-recheck"
+}
+
+test_scout_cooldown_skips() {
+    new_env
+    seed_usage 5 0 1
+    queue none
+    stop_on_sleep
+    run_loop run
+    assert_contains scout_cd:decision "$OUT" "decision=scout-skip cooldown left="
+    assert_eq scout_cd:no-scout 0 "$(grep -c -- '--name burndown-scout-' "$T/claude.calls")"
+    assert_contains scout_cd:sleep "$OUT" "reason=backlog-empty"
+}
+
+test_scout_cooldown_knob() {
+    new_env
+    seed_usage 5 0 1
+    echo $(( $(date +%s) - 120 )) > "$STATE/scout.last"
+    queue none scout-none
+    stop_on_sleep
+    IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN=1 run_loop run
+    assert_contains scout_knob:fires "$OUT" "decision=scout launch"
+}
+
+test_scout_cooldown_driven() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue none scout-none none
+    run_loop run
+    assert_eq scout_driven:one-scout 1 "$(grep -c -- '--name burndown-scout-' "$T/claude.calls")"
+    assert_contains scout_driven:second-skip "$OUT" "decision=scout-skip cooldown left="
+}
+
+test_scout_pace_skips() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue none-wait
+    stop_on_sleep
+    run_loop run
+    assert_contains scout_pace:skip "$OUT" "scout-skip pace sleep 1800 pace"
+    assert_eq scout_pace:no-scout 0 "$(grep -c -- '--name burndown-scout-' "$T/claude.calls")"
+}
+
+test_scout_never_under_once() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue none
+    run_loop run --once
+    assert_eq scout_once:rc 0 "$RC"
+    assert_eq scout_once:no-scout 0 "$(grep -c -- '--name burndown-scout-' "$T/claude.calls")"
+}
+
+test_scout_unconfirmed_marker() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue none silent
+    stop_on_sleep
+    run_loop run
+    assert_contains scout_marker:unconfirmed "$OUT" "scout done rc=0 result=unconfirmed"
 }
 
 # ---------------------------------------------------------------- runner

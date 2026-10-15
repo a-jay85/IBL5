@@ -110,9 +110,10 @@ function postStatus(\SimRecap\SimSummaryRepository $repo, int $sim, string $host
     if (!$repo->transitionNotifiedState($sim, $prior, $next)) {
         return 'unchanged';
     }
-    $row = $repo->find($sim) ?? [];
+    $row = $repo->find($sim);
+    $context = ['last_cause' => $row['last_cause'] ?? null, 'blocked_until' => $row['blocked_until'] ?? null];
     try {
-        \Discord\Discord::postToChannel('admin-chat', \SimRecap\AdminChatStatus::message($next, $sim, $row, $host));
+        \Discord\Discord::postToChannel('admin-chat', \SimRecap\AdminChatStatus::message($next, $sim, $context, $host));
     } catch (\Throwable $e) {
         $repo->revertNotifiedState($sim, $next, $prior);
         fwrite(STDERR, 'simRecapQueue: admin-chat post failed (' . get_class($e) . ")\n");
@@ -209,10 +210,10 @@ $seasonQuery = new \Season\SeasonQueryRepository($db);
 switch ($verb) {
     case 'claim-next':
         $phase = $seasonQuery->getSeasonPhase();
+        /** @var string $host */
         $out = [
             'ok' => true,
             'cmd' => 'claim-next',
-            /** @var string $host */
             'sim' => $repo->claimNextPending($host),
             'phase' => $phase,
             'recaps_enabled' => \SimRecap\RecapPhasePolicy::isEnabled($phase),
@@ -251,8 +252,9 @@ switch ($verb) {
         break;
 
     case 'notify':
-        /** @var int $sim */
-        /** @var string $host */
+        if ($sim === null || $host === null) {
+            fail('--sim and --host are required for verb notify');
+        }
         $row = $repo->find($sim);
         $notified = 'skipped';
         if ($row !== null && $row['status'] === 'done') {

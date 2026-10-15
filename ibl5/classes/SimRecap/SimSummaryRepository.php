@@ -172,7 +172,7 @@ class SimSummaryRepository extends \Database\BaseMysqliRepository
             $sim,
             $host
         );
-        if ($row === null) {
+        if ($row === null || !is_numeric($row['created_epoch']) || !is_numeric($row['now_epoch'])) {
             return $none;
         }
 
@@ -183,8 +183,8 @@ class SimSummaryRepository extends \Database\BaseMysqliRepository
             'transport_failures' => is_int($row['transport_failures']) ? $row['transport_failures'] : 0,
             'usage_waits' => is_int($row['usage_waits']) ? $row['usage_waits'] : 0,
             'auth_failed_hosts' => is_string($row['auth_failed_hosts']) ? $row['auth_failed_hosts'] : '',
-            'created_epoch' => is_numeric($row['created_epoch']) ? (int) $row['created_epoch'] : 0,
-        ], $resetEpoch, is_numeric($row['now_epoch']) ? (int) $row['now_epoch'] : time());
+            'created_epoch' => (int) $row['created_epoch'],
+        ], $resetEpoch, (int) $row['now_epoch']);
 
         $status = $decision['outcome'] === 'failed' ? 'failed' : 'pending';
         $blockedEpoch = $decision['blockedUntilEpoch'] ?? 0;

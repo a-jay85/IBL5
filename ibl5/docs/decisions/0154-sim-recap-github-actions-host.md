@@ -80,10 +80,10 @@ The reason is that a booted-out job cannot see the phase change, and prod cannot
 
 The 2026-10-14 rehearsal found that a rejected `CLAUDE_CODE_OAUTH_TOKEN` parked the sim silently. The log said "agent hit a usage limit" and the job stayed green.
 
-Now an auth error (401 or 403) logs its own `agent auth failed` line. In actions mode, a sim that parks as `pending` or `failed` makes the tick exit 1, so the job turns red and GitHub emails. The launchd host is unchanged and still exits 0. A lost claim (park outcome `none`) is not a failure and stays green.
+Now an auth error (401 or 403) logs its own `agent auth failed` line. In actions mode, a sim that parks as `pending` or `failed`, or whose park returns an unexpected outcome, makes the tick exit 1, so the job turns red and GitHub emails. The launchd host is unchanged and still exits 0. A lost claim (park outcome `none`) is not a failure and stays green.
 
 ## Addendum: Cause-routed self-healing (2026-10-15)
 
 [ADR-0196](0196-sim-recap-self-healing-routing.md) adds cause routing to the queue. The cron now runs every 10 minutes instead of hourly. The Mac poller is an active second host again. It claims rows handed to it, and it backs up unrouted rows after 45 minutes. `bin/launchd-health-check` expects the job again.
 
-This partly supersedes the 2026-10-14 addendum. A park that hands off, retries, backs off, or waits for a usage reset keeps the run green. Only a terminal park (`failed`) turns the run red. The auth log line is unchanged. Each state change posts once to #admin-chat from prod.
+This partly supersedes the 2026-10-14 addendum. A park that hands off, retries, backs off, or waits for a usage reset keeps the run green. Only a terminal park (`failed`) or an unexpected park outcome turns the run red. The auth log line is unchanged. Each state change posts once to #admin-chat from prod.

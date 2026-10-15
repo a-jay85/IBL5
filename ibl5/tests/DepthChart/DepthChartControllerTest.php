@@ -130,6 +130,64 @@ class DepthChartControllerTest extends WideUnitTestCase
         ob_end_clean();
     }
 
+    /**
+     * Full-render wrapper for displayForm(): runs through PageLayout::footer().
+     * footer() ob_end_flush()es the sacrificial L1 buffer into L2, so L2 holds
+     * the whole page on return (same shape as TeamControllerTest::runDisplayTeamPage).
+     */
+    private function runDisplayFormToCompletion(DepthChartController $controller, string $username = 'testuser'): string
+    {
+        $baseLevel = ob_get_level();
+        ob_start(); // L2 outer capture
+        ob_start(); // L1 sacrificial, consumed by PageLayout::footer()
+        try {
+            $controller->displayForm($username);
+        } catch (\Throwable $e) {
+            while (ob_get_level() > $baseLevel) {
+                ob_end_clean();
+            }
+            throw $e;
+        }
+        $output = '';
+        while (ob_get_level() > $baseLevel) {
+            $output = (string) ob_get_clean() . $output;
+        }
+        return $output;
+    }
+
+    /**
+     * TeamTableService stub whose renderTableForDisplay() returns a marker
+     * instead of throwing, so displayForm() runs to the footer.
+     */
+    private function buildPassThroughTeamTableService(string $tableHtml = '<table id="ratings-marker"></table>'): TeamTableServiceInterface
+    {
+        $stub = self::createStub(TeamTableServiceInterface::class);
+        $stub->method('getRosterAndStarters')->willReturn(['roster' => [], 'starterPids' => []]);
+        $stub->method('buildDropdownGroups')->willReturn([]);
+        $stub->method('renderTableForDisplay')->willReturn($tableHtml);
+        return $stub;
+    }
+
+    /**
+     * Recording view mock: every render* call appends [method, args] to $calls.
+     * @param list<array{0: string, 1: list<mixed>}> $calls
+     */
+    private function buildRecordingView(array &$calls, int $playerRows): DepthChartViewInterface
+    {
+        $view = $this->createMock(DepthChartViewInterface::class);
+        foreach (['renderTeamLogo', 'renderSavedDepthChartDropdown', 'renderHelpSection', 'renderLineupPreview', 'renderFormHeader', 'renderFormFooter', 'renderMobileView'] as $method) {
+            $view->expects(self::once())->method($method)
+                ->willReturnCallback(function (mixed ...$args) use (&$calls, $method): void {
+                    $calls[] = [$method, array_values($args)];
+                });
+        }
+        $view->expects(self::exactly($playerRows))->method('renderPlayerRow')
+            ->willReturnCallback(function (mixed ...$args) use (&$calls): void {
+                $calls[] = ['renderPlayerRow', array_values($args)];
+            });
+        return $view;
+    }
+
     // ============================================
     // MULTIPLE INSTANCES TEST
     // ============================================
@@ -369,5 +427,209 @@ class DepthChartControllerTest extends WideUnitTestCase
         $this->assertIsArray($captured);
         self::assertSame('contracts', $captured[0]);
         self::assertNull($captured[6]);
+    }
+
+    // ============================================
+    // CHARACTERIZATION PINS — displayForm() full render
+    //
+    // Observation points: recorded view calls, captured echo output, and
+    // $_SESSION flash state. These run displayForm() through PageLayout::footer().
+    // ============================================
+
+    /**
+     * @return DepthChartRepositoryInterface
+     */
+    private function buildTwoPlayerRepository(): DepthChartRepositoryInterface
+    {
+        $repository = self::createStub(DepthChartRepositoryInterface::class);
+        $repository->method('getPlayersOnTeam')->willReturn([
+            ['pid' => 7, 'name' => 'Seven', 'dc_pg_depth' => 1],
+            ['pid' => 9, 'name' => 'Nine', 'dc_pg_depth' => 2],
+        ]);
+        return $repository;
+    }
+
+    public function testDisplayFormDefaultsToRatingsWhenDisplayParamAbsent(): void
+    {
+        /** @var list<mixed>|null $captured */
+        $captured = null;
+        $mockTeamTableService = $this->createMock(TeamTableServiceInterface::class);
+        $mockTeamTableService->method('getRosterAndStarters')->willReturn(['roster' => [], 'starterPids' => []]);
+        $mockTeamTableService->method('buildDropdownGroups')->willReturn([]);
+        $mockTeamTableService->expects($this->once())
+            ->method('renderTableForDisplay')
+            ->willReturnCallback(function (mixed ...$args) use (&$captured): never {
+                $captured = array_values($args);
+                throw new \RuntimeException('short-circuit');
+            });
+
+        try {
+            $this->runDisplayForm($this->buildDceController($mockTeamTableService, new HttpRequest()));
+        } catch (\RuntimeException $e) {
+            self::assertSame('short-circuit', $e->getMessage());
+        }
+
+        $this->assertIsArray($captured);
+        self::assertSame('ratings', $captured[0]);
+        self::assertNull($captured[6]);
+    }
+
+    public function testDisplayFormRendersViewCallsInFixedOrder(): void
+    {
+        $this->stubRepository = $this->buildTwoPlayerRepository();
+        $stubService = self::createStub(DepthChartServiceInterface::class);
+        $stubService->method('computeQualityScore')->willReturn(12.5);
+        $this->stubService = $stubService;
+        /** @var list<array{0: string, 1: list<mixed>}> $calls */
+        $calls = [];
+        $this->stubView = $this->buildRecordingView($calls, 2);
+
+        $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
+
+        self::assertSame(
+            ['renderTeamLogo', 'renderSavedDepthChartDropdown', 'renderHelpSection', 'renderLineupPreview', 'renderFormHeader', 'renderPlayerRow', 'renderPlayerRow', 'renderFormFooter', 'renderMobileView'],
+            array_column($calls, 0)
+        );
+        $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+        self::assertSame([1], $calls[0][1]);
+        self::assertSame(['TestTeam', 1, $positions], $calls[4][1]);
+        self::assertSame(1, $calls[5][1][1]);
+        self::assertSame(2, $calls[6][1][1]);
+        self::assertSame($positions, $calls[8][1][1]);
+    }
+
+    public function testDisplayFormMergesQualityScoreAndFlashOverrideIntoPlayerRows(): void
+    {
+        $_SESSION['_ibl_depth_chart_flash'] = ['errors_html' => '', 'post_data' => ['dc_pg_depth_7' => '3']];
+        $this->stubRepository = $this->buildTwoPlayerRepository();
+        $stubService = self::createStub(DepthChartServiceInterface::class);
+        $stubService->method('computeQualityScore')->willReturn(12.5);
+        $stubService->method('buildFormOverride')->willReturn([
+            7 => ['dc_pg_depth' => 3, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0, 'dc_can_play_in_game' => 1, 'dc_minutes' => 30],
+        ]);
+        $this->stubService = $stubService;
+        /** @var list<array{0: string, 1: list<mixed>}> $calls */
+        $calls = [];
+        $this->stubView = $this->buildRecordingView($calls, 2);
+
+        $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
+
+        $expectedRows = [
+            ['pid' => 7, 'name' => 'Seven', 'dc_pg_depth' => 3, 'quality_score' => 12.5, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0, 'dc_can_play_in_game' => 1, 'dc_minutes' => 30],
+            ['pid' => 9, 'name' => 'Nine', 'dc_pg_depth' => 2, 'quality_score' => 12.5],
+        ];
+        self::assertSame($expectedRows[0], $calls[5][1][0]);
+        self::assertSame($expectedRows[1], $calls[6][1][0]);
+        self::assertSame($expectedRows, $calls[8][1][0]);
+    }
+
+    public function testDisplayFormConsumesFailureFlashAndRendersErrorAlert(): void
+    {
+        $_SESSION['_ibl_depth_chart_flash'] = ['errors_html' => '<ul><li>Bad lineup</li></ul>', 'post_data' => []];
+        $stubService = self::createStub(DepthChartServiceInterface::class);
+        $stubService->method('buildFormOverride')->willReturn([]);
+        $this->stubService = $stubService;
+
+        $output = $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
+
+        $alert = '<div class="ibl-alert ibl-alert--error"><ul><li>Bad lineup</li></ul></div>';
+        $title = '<h1 class="ibl-title">Depth Chart Entry</h1>';
+        self::assertStringContainsString($alert, $output);
+        self::assertStringContainsString($title, $output);
+        self::assertGreaterThan((int) strpos($output, $title), (int) strpos($output, $alert));
+        self::assertFalse(isset($_SESSION['_ibl_depth_chart_flash']));
+    }
+
+    public function testDisplayFormOmitsErrorAlertAndOverrideWithoutFlash(): void
+    {
+        unset($_SESSION['_ibl_depth_chart_flash']);
+        $this->stubRepository = $this->buildTwoPlayerRepository();
+        $mockService = $this->createMock(DepthChartServiceInterface::class);
+        $mockService->expects(self::never())->method('buildFormOverride');
+        $mockService->method('computeQualityScore')->willReturn(12.5);
+        $this->stubService = $mockService;
+        /** @var list<array{0: string, 1: list<mixed>}> $calls */
+        $calls = [];
+        $this->stubView = $this->buildRecordingView($calls, 2);
+
+        $output = $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
+
+        self::assertStringNotContainsString('ibl-alert--error', $output);
+        self::assertSame(['pid' => 7, 'name' => 'Seven', 'dc_pg_depth' => 1, 'quality_score' => 12.5], $calls[5][1][0]);
+    }
+
+    public function testDisplayFormLeavesNonArrayFlashUntouched(): void
+    {
+        $_SESSION['_ibl_depth_chart_flash'] = 'not-an-array';
+
+        $output = $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
+
+        self::assertStringNotContainsString('ibl-alert--error', $output);
+        self::assertSame('not-an-array', $_SESSION['_ibl_depth_chart_flash']);
+    }
+
+    public function testDisplayFormSkipsMalformedFlashFieldsButStillConsumesFlash(): void
+    {
+        $_SESSION['_ibl_depth_chart_flash'] = ['errors_html' => 42, 'post_data' => 'x'];
+        $mockService = $this->createMock(DepthChartServiceInterface::class);
+        $mockService->expects(self::never())->method('buildFormOverride');
+        $this->stubService = $mockService;
+
+        $output = $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
+
+        self::assertStringNotContainsString('ibl-alert--error', $output);
+        self::assertFalse(isset($_SESSION['_ibl_depth_chart_flash']));
+    }
+
+    public function testDisplayFormEmitsJsConfigAndScriptTagsAfterRatingsTable(): void
+    {
+        $this->stubRepository = $this->buildTwoPlayerRepository();
+        $stubService = self::createStub(DepthChartServiceInterface::class);
+        $stubService->method('computeQualityScore')->willReturn(12.5);
+        $this->stubService = $stubService;
+
+        $output = $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
+
+        $open = '<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Player ratings">';
+        // TableViewDropdown::wrap() injects a caption inside the table, so match the opening tag only.
+        $marker = '<table id="ratings-marker">';
+        $openPos = strpos($output, $open);
+        self::assertNotFalse($openPos);
+        $markerPos = strpos($output, $marker, $openPos);
+        self::assertNotFalse($markerPos);
+        $closePos = strpos($output, '</div></div>', $markerPos);
+        self::assertNotFalse($closePos);
+
+        $config = '<script>window.IBL_DEPTH_CHART_CONFIG = {"teamId":1,"apiBaseUrl":"modules.php?name=DepthChartEntry&op=api","currentRosterPids":[7,9]};</script>';
+        $configPos = strpos($output, $config, $closePos);
+        self::assertNotFalse($configPos);
+
+        $previous = $configPos;
+        foreach (['depth-chart-changes.js', 'depth-chart-lineup-preview.js', 'saved-depth-charts.js', 'depth-chart-mobile.js', 'contract-hint.js'] as $script) {
+            $pos = strpos($output, '<script src="jslib/' . $script . '"></script>', $previous);
+            self::assertNotFalse($pos, $script);
+            $previous = $pos;
+        }
+
+        $nextSimPos = strpos($output, '<h2 class="ibl-title">Next Sim</h2>', $previous);
+        self::assertNotFalse($nextSimPos);
+        self::assertStringContainsString('No games projected next sim!', $output);
+    }
+
+    public function testDisplayFormPublicSurfaceIsUnchanged(): void
+    {
+        $class = new \ReflectionClass(DepthChartController::class);
+        $public = array_map(
+            static fn (\ReflectionMethod $m): string => $m->getName(),
+            $class->getMethods(\ReflectionMethod::IS_PUBLIC)
+        );
+        sort($public);
+        self::assertSame(['__construct', 'displayForm', 'getTableOutput', 'handleSubmit'], $public);
+
+        foreach ($class->getMethods() as $method) {
+            if (!$method->isPublic()) {
+                self::assertTrue($method->isPrivate(), $method->getName());
+            }
+        }
     }
 }

@@ -349,7 +349,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 return _rebase_only(res, git, ro_pr, ro_hold, worktree, diff, log, out_dir,
                                     slug=slug, live=live, state_dir=state_dir, plan=plan)
 
-        if _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log):
+        if _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log,
+                              diff_body=diff, worktree=worktree):
             return _finish(res, out_dir)
 
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
@@ -3575,8 +3576,9 @@ def _rebase_only(res, git, pr, hold, worktree, diff, log, out_dir, *, slug, live
     return _finish(res, out_dir)
 
 
-def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log) -> bool:
-    """Decline before any LLM call when condition 3's MISSING set repeats the prior hold.
+def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log, *,
+                       diff_body: str = "", worktree: str = "") -> bool:
+    """Decline before any LLM call when condition 3's MISSING set or an UNREALISED-ASSERTION-only set repeats the prior hold.
 
     True means `res` now carries the HOLD_REPEAT_DECLINED terminal and the caller
     returns. Fail-open: any exception, POSTPLAN_FORCE=1, no plan, or no matching
@@ -3591,27 +3593,49 @@ def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, lo
         hr_dir = _state_dir(out_dir, live, state_dir)
         items = conformance.early_missing_items(plan, conf_files)
         reason = holdrepeat.early_repeat_reason(hr_dir, slug, items)
+        kind = "MISSING"
+        head, tokens = "", frozenset()
         if reason is None:
-            log(f"phase2 early hold-repeat: proceed ({len(items)} MISSING item(s))")
-            return False
+            note = "no unrealised hold"
+            if worktree and holdrepeat.unrealised_only_parts(hr_dir, slug):
+                if not heldmarker._fetch_master(worktree):
+                    note = "fetch failed"
+                else:
+                    reason, note, tokens = holdrepeat.early_unrealised_repeat(
+                        hr_dir, slug, items, plan_path=plan.path,
+                        diff_body=diff_body, worktree=worktree)
+            if reason is None:
+                if note == "no unrealised hold":
+                    log(f"phase2 early hold-repeat: proceed ({len(items)} MISSING item(s))")
+                else:
+                    log(f"phase2 early hold-repeat: proceed ({len(items)} MISSING item(s); "
+                        f"unrealised: {note})")
+                return False
+            kind = "UNREALISED-ASSERTION"
+            head = holdrepeat.head_sha(worktree)
         rec = holdrepeat.load_record(hr_dir, slug) or {}
         key = rec.get("structural_key") or ""
         try:  # suppression is advisory: a marker failure must never undo the decline
             marker = heldmarker.write(
                 hr_dir, slug, plan_path=plan.path,
+                head_sha=head, missing_tokens=tokens,
                 now=datetime.datetime.now(datetime.timezone.utc).isoformat())
         except Exception:  # noqa: BLE001
             marker = None
         marker_path, marker_new = marker if marker else ("", False)
         dm_sent = False
         if key and (rec.get("dm_sent_key") != key or marker_new):
+            fix_line = ("Fix the missing files, or re-fire with:\n" if kind == "MISSING"
+                        else "Push a test that realises these matrix rows, or re-fire with:\n")
+            until = (" this slug until the plan file or this hold changes.\n" if kind == "MISSING"
+                     else " this slug until the plan file, the branch head or this hold changes.\n")
             msg = (f"post-plan declined before spending tokens: {slug}\n"
                    f"Same hold as last run: {reason}\n"
-                   "Fix the missing files, or re-fire with:\n"
+                   f"{fix_line}"
                    "  bin/post-plan-now --force")
             if marker_path:
                 msg += ("\nScheduled re-runs (bin/pr-cycle, bin/post-plan-fleet, automouse) now skip"
-                        " this slug until the plan file or this hold changes.\n"
+                        f"{until}"
                         f"Marker: {marker_path}\n"
                         "To clear it: edit the plan, or delete the marker file."
                         " bin/post-plan-now --force bypasses it for one run.")
@@ -3623,7 +3647,7 @@ def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, lo
                            "structural_key": key,
                            "repeat_count": rec.get("repeat_count") or 0,
                            "dm_sent": dm_sent, "marker": marker_path}
-        log(f"phase2 early hold-repeat: DECLINED, same MISSING set as last hold "
+        log(f"phase2 early hold-repeat: DECLINED, same {kind} set as last hold "
             f"({reason}) dm={'sent' if dm_sent else 'skipped'} "
             f"marker={'written' if marker_path else 'skipped'}")
         return True

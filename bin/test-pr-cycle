@@ -2631,6 +2631,32 @@ PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker --max-read
 grep -qF '#101 — held-unfixable marker active' <<< "$OUT" || fail "marker M-H: 101 skip line missing"
 grep -qF '#102 — over --max-ready cap' <<< "$OUT" && fail "marker M-H: 102 was capped out"
 hm_cleanup
+# M-I: an UNREALISED-ASSERTION marker written at another head never suppresses the PR, and an
+# empty headRefOid means the head is unknown, so the PR fires too.
+HM_UNREALISED="UNREALISED-ASSERTION: row V2 -- tests/test_x.py::test_y"
+for _hm_oid in bbbb2222 ""; do
+    reset_state
+    printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+    triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+    install_harness_result 101 first-slug hold-repeat-declined "3" CLEAN
+    mkdir -p "$HMPLANS" "$HMSTATE"
+    echo "# plan first-slug" > "$HMPLANS/first-slug.md"
+    hm_observe first-slug "$HM_UNREALISED"
+    env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$HMSTATE" first-slug "$HMPLANS/first-slug.md" <<'PY'
+import sys
+from harness import heldmarker
+sd, slug, plan = sys.argv[1:4]
+assert heldmarker.write(sd, slug, plan_path=plan, now="t0", head_sha="aaaa1111",
+                        missing_tokens=["test_y"]) is not None, "marker seed refused"
+PY
+    jq --arg oid "$_hm_oid" '.[0].headRefOid = $oid' "$SCRATCH/armed-state.json" \
+        > "$SCRATCH/armed-state.tmp" && mv "$SCRATCH/armed-state.tmp" "$SCRATCH/armed-state.json"
+    PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
+    hm_fires "M-I headRefOid='$_hm_oid'"
+    grep -qF 'held-unfixable marker active' <<< "$OUT" && fail "marker M-I: skip line printed for headRefOid='$_hm_oid'"
+    hm_cleanup
+done
+echo "PASS: heldmarker unrealised head mismatch proceeds"
 end_case "case held-unfixable marker pre-fire skip"
 
 # ==========================================================================================

@@ -384,6 +384,10 @@ class ScheduleUpdaterTest extends TestCase
         );
     }
 
+    /**
+     * Kills the Infection mutants NotIdentical (IBL_HEAT_MONTH), TrueValue (skip return) and Continue_ (the dropped
+     * December slot precedes a kept one, so a break loses the later insert).
+     */
     public function testHeatPhaseKeepsOctoberAndNovemberGamesAndDropsDecember(): void
     {
         $updater = $this->createUpdaterForFullRun(
@@ -407,6 +411,10 @@ class ScheduleUpdaterTest extends TestCase
         $this->assertStringNotContainsString("'2024-12-9'", $joined);
     }
 
+    /**
+     * Kills the Infection mutant LogicalOr (swapped for the month-clause conjunction), and removal of either month
+     * clause: January would be inserted or September dropped.
+     */
     public function testPreseasonPhaseKeepsOctoberThroughDecemberAndDropsJanuary(): void
     {
         $updater = $this->createUpdaterForFullRun(
@@ -432,6 +440,10 @@ class ScheduleUpdaterTest extends TestCase
         $this->assertStringNotContainsString("'2025-1-11'", $joined);
     }
 
+    /**
+     * Kills the Infection mutant LogicalAnd (swapped for the combined skip guard's disjunction) and the LogicalNot
+     * removal on the real-team check.
+     */
     public function testOlympicsUpdateSkipsGamesInvolvingFillerTeams(): void
     {
         $this->mockDb->setMockData([

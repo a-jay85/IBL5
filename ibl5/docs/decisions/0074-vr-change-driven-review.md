@@ -1,6 +1,6 @@
 ---
 description: The visual-review gallery is built from rows whose PR render differs from master's committed baseline (read via git show <base.sha>:<snapshot>), not from Playwright cells that failed pixel comparison; this makes the gallery immune to a baseline regen into the PR branch and lets it publish on pass OR fail.
-last_verified: 2026-08-30
+last_verified: 2026-10-13
 ---
 
 # ADR-0074: Change-driven visual-review gallery (render-diff, not comparison-failure)
@@ -149,3 +149,7 @@ cell selection.
 - `ibl5/tests/e2e/smoke/visual-regression.spec.ts` — writes `.a.png` + reload `.b.png` to `vr-actuals`.
 - `ibl5/docs/decisions/0073-vr-infra-vs-pixel-failure-labeling.md` — the infra/flake labeling this reuses.
 - `ibl5/docs/decisions/0069-vr-comment-new-vs-changed.md` — the NEW-vs-CHANGED split, now in the gallery builder.
+
+## Addendum: pixelmatch 8 threshold (2026-10-13)
+
+pixelmatch 8 replaced the YIQ colour metric with OKLab HyAB distance. Playwright's `toHaveScreenshot` still uses its own bundled YIQ pixelmatch, so the gate's per-pixel threshold stays 0.2. The gallery's `GATE_PIXEL_THRESHOLD` in `ibl5/tests/e2e/vr-gallery.ts` moved from 0.2 to 0.22, which is the OKLab value that keeps the same #2599 pairs on the same side of the cutoff. The settle check in `ibl5/tests/e2e/smoke/visual-regression.spec.ts` moved from 0.2 to 0.22 to match.

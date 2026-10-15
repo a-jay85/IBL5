@@ -798,8 +798,9 @@ class LeagueControlPanelProcessorTest extends TestCase
 
         $this->assertIsString($notice);
         $this->assertStringContainsString('Regular Season', $notice);
-        $this->assertStringContainsString('sim-recap-cron-setup --resume', $notice);
-        $this->assertStringContainsString('com.ibl5.sim-recap-poll', $notice);
+        $this->assertStringContainsString('sim recaps are enabled', $notice);
+        $this->assertStringContainsString('no action needed', $notice);
+        $this->assertStringNotContainsString('sim-recap-cron-setup', $notice);
     }
 
     private function createProcessorWithStub(): LeagueControlPanelProcessor

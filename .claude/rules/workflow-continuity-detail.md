@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-12
+last_verified: 2026-10-14
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -75,12 +75,25 @@ It prints `RESULT: post-plan DECLINED` with this phrase:
 `declined: same hold as last run (<reason>), no tokens spent`.
 It DMs once per recorded hold. A strict subset (some files added) or a new
 missing item runs normally, and so do holds on conditions (7), (8) and (13).
+A hold whose condition (3) items are only `UNREALISED-ASSERTION: row` rows gets the same
+early decline. The harness re-runs `bin/lib/plan-matrix-assertions` on the pre-merge diff and
+declines only when the row set equals the recorded one, the worktree is clean, a fresh fetch
+of `origin/master` succeeds, and no missing token from the script's stderr appears in
+`origin/master`. Any of those failing means the run proceeds, because a pushed test, an
+uncommitted edit or a master merge can realise a row. A hold that mixes MISSING items with
+UNREALISED rows keeps the MISSING rule above.
 `bin/post-plan-now --force` passes `POSTPLAN_FORCE=1` to the harness and skips this check
 too; every other launch passes `POSTPLAN_FORCE=0`.
 The in-run decline also writes a held-unfixable marker through `harness/heldmarker.py`:
 `tools/postplan-harness/out/state/<slug>.held-unfixable.json` in the main checkout, which
-`.gitignore` already covers. It stores a hash of condition (3)'s missing set and the plan
-file's mtime. While both still match the live hold record, `bin/post-plan-now` exits **8**
+`.gitignore` already covers. It stores a hash of condition (3)'s MISSING items and
+UNREALISED-ASSERTION rows plus the plan file's mtime. For a hold with UNREALISED-ASSERTION
+rows it also stores the branch head SHA and the rows' missing tokens. That marker stays
+active only while the head SHA matches, the worktree (when checked from one) is clean, and a
+fresh `origin/master` carries none of the tokens. `bin/post-plan-now` reads the head from the
+worktree and `bin/pr-cycle` reads it from `headRefOid`. An unknown head means proceed.
+Markers written before schema version 2 read as inactive. While the hash and mtime still
+match the live hold record, `bin/post-plan-now` exits **8**
 before launching anything, and `bin/pr-cycle` Stage 1 skips the PR so its `--max-ready`
 slot goes to the next one. The decline DM names the marker. Editing the plan makes it
 stale, and so does a later run that arms or holds on a different reason. To clear it by

@@ -768,19 +768,23 @@ _stage1_state_change() {
 
 # _heldmarker_would_suppress N — exit 0 only when `harness.heldmarker check` returns 10 for
 # PR N's head branch: an earlier in-run decline wrote a held-unfixable marker, and neither the
-# hold nor the plan file's mtime changed since. Every other path returns 1, so the skip fails
-# open. Needs no worktree: the marker is keyed by slug and the plan resolves via locate_plan.
+# hold, the plan file's mtime, nor (for an UNREALISED-ASSERTION hold) the PR head SHA changed
+# since. Every other path returns 1, so the skip fails open. Needs no worktree: the marker is
+# keyed by slug and the plan resolves via locate_plan.
 _heldmarker_would_suppress() {
-    local _hm_n="$1" _hm_ref _hm_h="$PR_CYCLE_HOLDREPEAT_HARNESS" _hm_rc
+    local _hm_n="$1" _hm_ref _hm_h="$PR_CYCLE_HOLDREPEAT_HARNESS" _hm_rc _hm_sha
     _ensure_armed_state
     [ -f "$RUNDIR/armed-state.json" ] || return 1
     _hm_ref="$(jq -r --argjson n "$_hm_n" '.[] | select(.number == $n) | .headRefName // ""' \
         "$RUNDIR/armed-state.json" 2>/dev/null || true)"
     [ -n "$_hm_ref" ] || return 1
+    _hm_sha="$(jq -r --argjson n "$_hm_n" '.[] | select(.number == $n) | .headRefOid // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
     [ -d "$_hm_h/harness" ] || return 1
     set +e
     PYTHONPATH="$_hm_h" python3 -m harness.heldmarker check \
         --state-dir "$PR_CYCLE_HOLDREPEAT_STATE_DIR" --slug "$_hm_ref" \
+        --head-sha "$_hm_sha" --repo "$_hm_h" \
         > /dev/null 2> "$RUNDIR/heldmarker-$_hm_n.err"
     _hm_rc=$?
     set -e

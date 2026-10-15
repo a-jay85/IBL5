@@ -23,6 +23,7 @@ use CapSpace\CapSpaceService;
 use CapSpace\CapSpaceView;
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 $season = new \Season\Season($mysqli_db);
 

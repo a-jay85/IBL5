@@ -6,7 +6,10 @@ namespace Tests\WideUnit\FreeAgency;
 
 use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
+use FreeAgency\FreeAgencyDemandRepository;
+use FreeAgency\FreeAgencyMarketDemandCalculator;
 use FreeAgency\FreeAgencyProcessor;
+use Repositories\SalaryCapRepository;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
@@ -32,7 +35,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $this->processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class), $this->realCalculator());
 
         // Prevent Discord notifications during tests
         $_SERVER['SERVER_NAME'] = 'localhost';
@@ -47,6 +50,13 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         // rather than on the raw bind placeholders.
         $this->mockDb->onQuery('FROM ibl_fa_offers[\s\S]*?MLE = 1', []);
         $this->mockDb->onQuery('FROM ibl_fa_offers[\s\S]*?LLE = 1', []);
+    }
+
+    private function realCalculator(): FreeAgencyMarketDemandCalculator
+    {
+        return new FreeAgencyMarketDemandCalculator(
+            new FreeAgencyDemandRepository($this->mockDb, new SalaryCapRepository($this->mockDb))
+        );
     }
 
     protected function tearDown(): void

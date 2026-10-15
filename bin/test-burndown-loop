@@ -1513,6 +1513,8 @@ test_unblock_chosen_at_ceiling() {
     assert_not_contains unblock:no-merge "$(cat "$T/gh.calls" 2>/dev/null)" "pr merge"
 }
 
+# Mutation check: anchoring the marker sed at ^BURNDOWN (no decoration prefix) fails
+# the result assertion below.
 test_unblock_marker_decorated() {
     new_env
     seed_usage 5 0 1

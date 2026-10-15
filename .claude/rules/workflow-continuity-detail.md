@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-14
+last_verified: 2026-10-15
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -127,6 +127,7 @@ It does **not** hold post-plan for a "risky" plan. Post-plan **always** runs and
 the PR. Whether the PR then **auto-merges** is decided at `/post-plan` Phase 6.5, which
 honors a plan's `auto_merge: false` (see `/plan` Step 4) and otherwise leaves the PR open
 for a human to merge.
+A plan seeded by `bin/docfix-run` carries `auto_merge: docs-only-ready` instead; Phase 6.5 arms it only when the realized PR is a docs-only refresh with a two-way merge-danger line and a READY verdict, and holds it otherwise with the failed clause named.
 
 ## Ad-hoc branches
 

@@ -90,15 +90,25 @@ class NegotiationWideUnitTest extends WideUnitTestCase
     {
         // Arrange
         $this->setupSuccessfulNegotiationScenario();
+        $salaryCap = self::createMock(SalaryCapRepositoryInterface::class);
+        // Verify the position salary commitment lookup ran, keyed on the player's pid
+        $salaryCap->expects($this->once())
+            ->method('getPositionSalaryCommitmentNextYear')
+            ->with(self::anything(), self::anything(), self::identicalTo(1))
+            ->willReturn(0);
+        $service = new NegotiationService(
+            $this->mockDb,
+            new NegotiationRepository($this->mockDb, $salaryCap),
+            new NegotiationValidator($this->mockDb, $this->mockSeason),
+            new ExtensionContractDemandCalculator($this->mockDb, $salaryCap),
+            self::createStub(TeamIdentityRepositoryInterface::class),
+        );
 
         // Act
-        $result = $this->service->processNegotiation(1, 'Miami Cyclones', 'ibl5');
+        $result = $service->processNegotiation(1, 'Miami Cyclones', 'ibl5');
 
         // Assert - Should include cap space in form
         $this->assertStringContainsString('Test Player', $result);
-        
-        // Verify cap space query was executed (queries vw_current_salary view)
-        $this->assertQueryExecuted("vw_current_salary");
     }
 
     /**

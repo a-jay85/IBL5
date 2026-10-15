@@ -212,13 +212,8 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         $offenseStats->freeThrowsMade += $freeThrowsMade;
         if ($freeThrowsMade > 0) {
             $result->playByPlay .= $offenseName . ' makes ' . $freeThrowsMade . ' of 2 free throws.<br>';
-            if ($isPlayer1OnOffense) {
-                $result->player1Score += $freeThrowsMade;
-            } else {
-                $result->player2Score += $freeThrowsMade;
-            }
-            // Change possession after free throws
-            $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
+            // Possession changes after free throws
+            $this->awardPoints($result, $isPlayer1OnOffense, $freeThrowsMade);
         } else {
             $result->playByPlay .= $offenseName . ' misses both free throws.<br>';
             // Offensive player gets the ball back after missed free throws
@@ -279,12 +274,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         $offenseStats->threePointersAttempted++;
         $offenseStats->fieldGoalsMade++;
         $offenseStats->threePointersMade++;
-        if ($isPlayer1OnOffense) {
-            $result->player1Score += 3;
-        } else {
-            $result->player2Score += 3;
-        }
-        $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
+        $this->awardPoints($result, $isPlayer1OnOffense, 3);
         return false;
     }
 
@@ -320,12 +310,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
             . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
         $offenseStats->fieldGoalsAttempted++;
         $offenseStats->fieldGoalsMade++;
-        if ($isPlayer1OnOffense) {
-            $result->player1Score += 2;
-        } else {
-            $result->player2Score += 2;
-        }
-        $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
+        $this->awardPoints($result, $isPlayer1OnOffense, 2);
         return false;
     }
 
@@ -361,12 +346,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
             . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
         $offenseStats->fieldGoalsAttempted++;
         $offenseStats->fieldGoalsMade++;
-        if ($isPlayer1OnOffense) {
-            $result->player1Score += 2;
-        } else {
-            $result->player2Score += 2;
-        }
-        $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
+        $this->awardPoints($result, $isPlayer1OnOffense, 2);
         return false;
     }
 
@@ -402,13 +382,21 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
             . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
         $offenseStats->fieldGoalsAttempted++;
         $offenseStats->fieldGoalsMade++;
+        $this->awardPoints($result, $isPlayer1OnOffense, 2);
+        return false;
+    }
+
+    /**
+     * Credit points to the offensive player and hand possession to the defense.
+     */
+    private function awardPoints(OneOnOneGameResult $result, bool $isPlayer1OnOffense, int $points): void
+    {
         if ($isPlayer1OnOffense) {
-            $result->player1Score += 2;
+            $result->player1Score += $points;
         } else {
-            $result->player2Score += 2;
+            $result->player2Score += $points;
         }
         $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
-        return false;
     }
 
     /**

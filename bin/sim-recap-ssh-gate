@@ -52,17 +52,34 @@ args="${BASH_REMATCH[3]}"
 [ "$req_root" = "$ROOT" ] || deny "$cmd"
 
 sim_re='^--sim=[0-9]{1,9}$'
-verb_re='^(claim|park|find) (--sim=[0-9]{1,9})$'
+# Fixed-order, fully anchored forms. Variable parts are digit runs or closed
+# enum alternations; argv is rebuilt from the captures, never from $args.
+host_grp='(mac|actions)'
+cause_grp='(flaky|usage_limit|auth|transport|prompt)'
+claim_next_re="^claim-next --host=${host_grp}\$"
+claim_re="^claim --sim=([0-9]{1,9}) --host=${host_grp}\$"
+find_re='^find --sim=([0-9]{1,9})$'
+park_re="^park --sim=([0-9]{1,9}) --host=${host_grp} --cause=${cause_grp}( --reset=([0-9]{1,10}))?\$"
+notify_re="^notify --sim=([0-9]{1,9}) --host=${host_grp} --event=done\$"
 argv=()
 case "$script" in
     simRecapQueue)
-        case "$args" in
-            claim-next|reclaim-stale|recent-themes|mention-map) argv=("$args") ;;
-            *)
-                [[ $args =~ $verb_re ]] || deny "$cmd"
-                argv=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")
-                ;;
-        esac
+        if [[ $args =~ ^(reclaim-stale|recent-themes|mention-map)$ ]]; then
+            argv=("${BASH_REMATCH[1]}")
+        elif [[ $args =~ $claim_next_re ]]; then
+            argv=(claim-next "--host=${BASH_REMATCH[1]}")
+        elif [[ $args =~ $claim_re ]]; then
+            argv=(claim "--sim=${BASH_REMATCH[1]}" "--host=${BASH_REMATCH[2]}")
+        elif [[ $args =~ $find_re ]]; then
+            argv=(find "--sim=${BASH_REMATCH[1]}")
+        elif [[ $args =~ $park_re ]]; then
+            argv=(park "--sim=${BASH_REMATCH[1]}" "--host=${BASH_REMATCH[2]}" "--cause=${BASH_REMATCH[3]}")
+            [ -n "${BASH_REMATCH[5]}" ] && argv+=("--reset=${BASH_REMATCH[5]}")
+        elif [[ $args =~ $notify_re ]]; then
+            argv=(notify "--sim=${BASH_REMATCH[1]}" "--host=${BASH_REMATCH[2]}" --event=done)
+        else
+            deny "$cmd"
+        fi
         ;;
     simRecapContext|storeSimRecap)
         [[ $args =~ $sim_re ]] || deny "$cmd"

@@ -141,7 +141,7 @@ use FreeAgency\FreeAgencyDemandRepository;
 use FreeAgency\FreeAgencyDemandCalculator;
 
 // Create repository with database connection
-$repository = new FreeAgencyDemandRepository($db);
+$repository = new FreeAgencyDemandRepository($db, new SalaryCapRepository($db));
 
 // Inject repository into calculator
 $calculator = new FreeAgencyDemandCalculator($repository);
@@ -266,7 +266,7 @@ Update to:
 
 ```php
 // NEW - Repository pattern
-$repository = new FreeAgencyDemandRepository($db);
+$repository = new FreeAgencyDemandRepository($db, new SalaryCapRepository($db));
 $calculator = new FreeAgencyDemandCalculator($repository);
 ```
 

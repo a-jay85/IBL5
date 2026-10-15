@@ -65,6 +65,24 @@ class SalaryCapRepository extends \Database\BaseMysqliRepository implements Sala
         return (int) ($result['total_salary'] ?? 0);
     }
 
+    public function getPositionSalaryCommitmentNextYear(string $teamName, string $position, int $excludePlayerID): int
+    {
+        /** @var array{total_salary: int|null}|null $result */
+        $result = $this->fetchOne(
+            "SELECT SUM(next_year_salary) AS total_salary
+            FROM vw_current_salary
+            WHERE teamname = ?
+              AND pos = ?
+              AND pid != ?",
+            "ssi",
+            $teamName,
+            $position,
+            $excludePlayerID
+        );
+
+        return (int) ($result['total_salary'] ?? 0);
+    }
+
     /**
      * @return array{current: int, nextYear: int}
      */

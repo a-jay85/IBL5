@@ -6,8 +6,11 @@ namespace Tests\WideUnit\FreeAgency;
 
 use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
+use FreeAgency\FreeAgencyDemandRepository;
+use FreeAgency\FreeAgencyMarketDemandCalculator;
 use FreeAgency\FreeAgencyProcessor;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\SalaryCapRepository;
 
 /**
  * Integration tests for complete free agency offer workflows
@@ -32,7 +35,13 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $this->processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            new FreeAgencyMarketDemandCalculator(
+                new FreeAgencyDemandRepository($this->mockDb, new SalaryCapRepository($this->mockDb))
+            )
+        );
 
         // Prevent Discord notifications during tests
         $_SERVER['SERVER_NAME'] = 'localhost';

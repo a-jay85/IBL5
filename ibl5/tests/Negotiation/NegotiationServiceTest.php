@@ -90,7 +90,7 @@ class NegotiationServiceTest extends TestCase
         $salaryCap = self::createMock(SalaryCapRepositoryInterface::class);
         $salaryCap->expects($this->once())
             ->method('getPositionSalaryCommitmentNextYear')
-            ->with($this->anything(), $this->anything(), $this->identicalTo(1))
+            ->with(self::anything(), self::anything(), self::identicalTo(1))
             ->willReturn(0);
 
         $service = $this->buildService(season: $mockSeason, salaryCap: $salaryCap);

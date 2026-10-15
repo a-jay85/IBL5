@@ -382,7 +382,7 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class), new StubDemandCalculator());
         $result = $processor->deleteOffers('Test Team', 1);
 
         $this->assertIsArray($result);
@@ -393,7 +393,7 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class), new StubDemandCalculator());
         $processor->deleteOffers('Test Team', 1);
 
         $queries = $this->mockDb->getExecutedQueries();
@@ -526,6 +526,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             self::createStub(TeamIdentityRepositoryInterface::class),
+            calculator: new StubDemandCalculator(),
             repository: $capturingRepo,
             entityLoader: $loaderStub,
             capCalculatorFactory: $factoryStub,
@@ -549,6 +550,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             self::createStub(TeamIdentityRepositoryInterface::class),
+            calculator: new StubDemandCalculator(),
             repository: $capturingRepo,
         );
 
@@ -604,6 +606,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             self::createStub(TeamIdentityRepositoryInterface::class),
+            calculator: new StubDemandCalculator(),
             repository: new CapturingRepository(),
             entityLoader: $loaderStub,
             capCalculatorFactory: $factoryStub,
@@ -671,6 +674,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             $commonRepo,
+            calculator: new StubDemandCalculator(),
             repository: $repoMock,
         );
 
@@ -811,7 +815,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             $commonRepo,
-            self::createStub(FreeAgencyMarketDemandCalculatorInterface::class),
+            new StubDemandCalculator(),
             $repository,
             self::createStub(\Psr\Log\LoggerInterface::class),
             self::createStub(Season::class),

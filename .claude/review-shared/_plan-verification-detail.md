@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _plan-verification.md — why each forced trigger exists, the incidents behind them, the worked pre-prod exercise-path catalogue, and the non-compliant counter-examples. Read only when editing the verification rules; the plan-architect never reads it.
-last_verified: 2026-10-11
+last_verified: 2026-10-15
 ---
 
 # _plan-verification Detail
@@ -110,5 +110,5 @@ Harness rules (`parse_run_only_test_paths` in `tools/postplan-harness/harness/pl
 - Honored on any PHPUnit, API-test, E2E or Visual-regression row, and only when the file is tracked in the PR tree. A path that is new in this PR is never exempt; write the test.
 - Exempts only that row's `MISSING:` item. `MISSING-FILE:` (Critical Files) and `MISSING-METHOD:` (Required Test Methods) are unchanged. A `(run-only)` path listed bare in `## Critical Files` still needs `(reference)` there.
 - If another row plans the same token without a marker, the unmarked row wins. A Visual-regression row marked `(no-change)` on the same token is neutral, so a token whose rows carry one marker each is still exempt.
-- `bin/check-plan` gate `[RO]` fails the plan when the marker is not directly after the row's planned token, when the path is absent from the base branch, when the row also carries `(no-change)`, or when the same path is a must-appear Critical Files entry. It warns when a phase line pairs the path with an edit verb, and when an unmarked test row names a path that exists on master but no phase or Critical Files entry cites.
+- `bin/check-plan` gate `[RO]` fails the plan when the marker is not directly after the row's planned token, when the path is absent from the base branch, when the row also carries `(no-change)`, or when the same path is a must-appear Critical Files entry. It warns when a phase line pairs the path with an edit verb, and when an unmarked test row names a path that exists on master but no phase or Critical Files entry cites. An unmarked row also fails `[RO]` when a plan line that cites the full test path in backticks says the file is only run (phrases such as `unedited`, `never edited`, `run-only`, `passes unchanged`). Add `(run-only)` after the token, or name the edit in a phase if the file does change.
 - Fenced examples and a code-span `(run-only)` never count.

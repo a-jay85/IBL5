@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-11
+last_verified: 2026-10-15
 ---
 
 # Post-Plan Orchestrator
@@ -572,7 +572,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 4. Phase 5 did not deterministically fail — `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`.
 5. Golden-snapshot safety — a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (headless-only block).
 6. Merge-order — every PR named in a `Depends-on:` line is already `MERGED`.
-7. Plan-time hold — the plan's line-1 `auto_merge: false` frontmatter is absent.
+7. Plan-time hold. The plan's line-1 `auto_merge:` value is absent or `true`, or it is `docs-only-ready` and every docs-refresh clause passes on the realized PR (refresh branch, docs-only paths, two-way merge danger, verdict exactly `READY`); `false` holds as before and any other value holds as unknown. Detail: `_phase-6.5-arm-auto-merge.md`.
 8. Commit-type floor — the PR title is not a conventional-commit `feat:` (unless `human-approved`-labeled).
 9. PR-time safety verdict — the realized diff surfaces no reason to hold for a human.
 10. Pipeline-authored floor — the PR does NOT carry the `pipeline-authored` label AND the branch name does not match `^bug-[0-9]+(-|$)`. The branch-name axis is the label-timing guard: `reconcile_pr_open_rows()` in `bin/bug-pipeline-tick` applies the label on a later cron tick than `ship_via_cron()` which arms auto-merge, so at arming time the label may not yet exist. The digit anchor prevents catching human `bug-pipeline-*` branches.

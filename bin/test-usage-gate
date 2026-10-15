@@ -834,6 +834,18 @@ test_decide_blind_normal_allows() {
     assert_eq decide_blind_normal:no-blind-trust 0 "$(log_count blind-trust)"
 }
 
+test_decide_stale_repeat_same_decision() {
+    decide_setup 99
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    local i out rc
+    for i in 1 2 3; do
+        out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A); rc=$?
+        assert_eq "decide_stale_repeat:out.$i" "" "$out"
+        assert_eq "decide_stale_repeat:rc.$i" 0 "$rc"
+        assert_no_file "decide_stale_repeat:no-marker.$i" "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    done
+}
+
 test_decide_blind_drain_pauses() {
     local FUT out m
     FUT=$(( $(date +%s) + 3600 ))
@@ -1570,6 +1582,18 @@ test_prestart_blind_normal_allows() {
     assert_contains prestart_blind_normal:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "prestart-fail-open reason=stale-usage"
 }
 
+test_prestart_stale_repeat_same_decision() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 95 12)"
+    local i rc
+    for i in 1 2 3; do
+        in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"; rc=$?
+        assert_eq "prestart_stale_repeat:rc.$i" 0 "$rc"
+        assert_no_file "prestart_stale_repeat:no-marker.$i" "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    done
+}
+
 test_prestart_blind_drain_pauses() {
     local FUT rc m
     FUT=$(( $(date +%s) + 3600 ))
@@ -2213,6 +2237,70 @@ test_coord_switch_incident_resumes() {
     assert_contains switch_incident:log "$(fetch_log)" "switch-resume sid=$SID_A via=acct"
 }
 
+# stub_no_login: keychain item not found (security exit 44), so the login is gone.
+stub_no_login() {
+    make_stub_bin "$STUB" "" '{}'
+    printf '#!/bin/sh\nexit 44\n' > "$STUB/security"
+}
+
+# fetch_auth_dead: a missing login or a 401 marks the login dead; any other keychain
+# failure does not; a good fetch clears it.
+test_fetch_auth_dead_marks_and_clears() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    make_stub_bin "$STUB" "" "$BODY_B"
+    fetch_once 45 >/dev/null
+    assert_no_file auth_dead:unreadable-keychain-not-dead "$d/fetch-auth-dead"
+    make_stub_http "$STUB" tok 401 '{}'
+    fetch_once 45 >/dev/null
+    assert_eq auth_dead:401 http-401 "$(gate_run usage_auth_dead)"
+    stub_no_login
+    fetch_once 45 >/dev/null
+    assert_eq auth_dead:no-login no-token "$(gate_run usage_auth_dead)"
+    printf '%s no-token\n' "$(( $(date +%s) - 900 ))" > "$d/fetch-auth-dead"
+    gate_run usage_auth_dead >/dev/null
+    assert_eq auth_dead:expires 1 "$?"
+    make_stub_http "$STUB" tok 200 "$BODY_B"
+    fetch_once 45 >/dev/null
+    assert_no_file auth_dead:cleared "$d/fetch-auth-dead"
+}
+
+# 2026-10-11 incident: the switch was seen while the new login had no working token.
+# The switch resume waits for a good usage check, then the normal zone launches it.
+test_coord_switch_holds_while_auth_dead() {
+    local mode
+    for mode in no-token http-401; do
+        coord_setup 97
+        rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+        seed_home uuid-B
+        sw_marker "$SID_A" uuid-A
+        sw_signal 30 - 1 account
+        if [ "$mode" = no-token ]; then stub_no_login; else make_stub_http "$STUB" tok 401 '{}'; fi
+        assert_contains "switch_auth_dead:$mode:dry" "$(run_coord --dry-run --once 2>&1)" "ACTION hold $SID_A auth-$mode"
+        run_coord --once >/dev/null 2>&1
+        sleep 1
+        assert_no_file "switch_auth_dead:$mode:held" "$T/launched.$SID_A"
+        assert_contains "switch_auth_dead:$mode:log" "$(fetch_log)" "switch-resume-held sid=$SID_A reason=auth-$mode"
+        assert_contains "switch_auth_dead:$mode:dm" "$(cat "$T/dm.txt" 2>/dev/null)" "Run claude and sign in"
+        make_stub_http "$STUB" tok 200 "$BODY_A"
+        run_coord --once >/dev/null 2>&1
+        wait_file "$T/launched.$SID_A"; assert_eq "switch_auth_dead:$mode:resumed" 0 "$?"
+    done
+}
+
+# An unreadable keychain (locked, no UI access) says nothing about the login, so a
+# switch resume still fires.
+test_coord_switch_unreadable_keychain_resumes() {
+    coord_setup 97
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    sw_signal 30 - 1 account
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq switch_unreadable:launched 0 "$?"
+    assert_contains switch_unreadable:log "$(fetch_log)" "switch-resume sid=$SID_A via=acct"
+}
+
 test_coord_switch_resume_once() {
     sw_stale_setup
     seed_home uuid-B
@@ -2567,6 +2655,321 @@ test_prod_unset_dir_uses_default() {
     assert_eq prod_default:rc 0 "$rc"
     assert_eq prod_default:out "$(real_default_dir)" "$out"
     assert_file prod_default:markers "$(real_default_dir)/markers"
+}
+
+test_usage_log_line_shape() {
+    new_env
+    local rc
+    bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_log probe a b"; rc=$?
+    assert_eq usage_log_shape:rc 0 "$rc"
+    assert_eq usage_log_shape:line 1 "$(log_re_count "${LOG_PFX}probe a b\$")"
+}
+
+# seed_log <lines> <file>: <lines> well-formed 64-byte log lines (4096 lines = 262144 bytes).
+seed_log() {
+    awk -v n="$1" 'BEGIN { for (i = 1; i <= n; i++) printf "2026-01-01T00:00:00Z 1 seed-%06d-padding-padding-padding-padd\n", i }' > "$2"
+}
+SEED_RE='^2026-01-01T00:00:00Z 1 seed-[0-9]{6}-padding-padding-padding-padd$'
+ulog() { bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_log $*"; }
+
+test_usage_log_rotates_at_limit() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc
+    seed_log 4096 "$d/usage-gate.log"
+    assert_eq rotate_at_limit:seeded 262144 "$(wc -c < "$d/usage-gate.log" | tr -dc 0-9)"
+    ulog after-rotate; rc=$?
+    assert_eq rotate_at_limit:rc 0 "$rc"
+    assert_file rotate_at_limit:old "$d/usage-gate.log.1"
+    assert_eq rotate_at_limit:old-seeds 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    assert_eq rotate_at_limit:new-lines 1 "$(wc -l < "$d/usage-gate.log" | tr -d ' ')"
+    assert_eq rotate_at_limit:new-line 1 "$(log_re_count "${LOG_PFX}after-rotate\$")"
+    if [ "$(wc -c < "$d/usage-gate.log" | tr -dc 0-9)" -lt 1024 ]; then pass rotate_at_limit:new-small; else fail rotate_at_limit:new-small; fi
+}
+
+test_usage_log_below_limit_no_rotate() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc
+    seed_log 4095 "$d/usage-gate.log"
+    ulog below; rc=$?
+    assert_eq below_limit:rc 0 "$rc"
+    assert_no_file below_limit:no-old "$d/usage-gate.log.1"
+    assert_eq below_limit:lines 4096 "$(wc -l < "$d/usage-gate.log" | tr -d ' ')"
+}
+
+test_usage_log_second_rotation_replaces_old() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    printf 'OLD-GEN\n' > "$d/usage-gate.log.1"
+    seed_log 4096 "$d/usage-gate.log"
+    ulog gen2
+    assert_eq gen2:old-gone 0 "$(grep -c OLD-GEN "$d/usage-gate.log.1")"
+    assert_eq gen2:seeds 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    assert_eq gen2:two-files 2 "$(find "$d" -maxdepth 1 -name 'usage-gate.log*' | wc -l | tr -d ' ')"
+}
+
+test_usage_log_rotate_lock_respected() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc
+    mkdir "$d/usage-log-rotate.lock.d"
+    seed_log 4096 "$d/usage-gate.log"
+    ulog held; rc=$?
+    assert_eq lock_held:rc 0 "$rc"
+    assert_no_file lock_held:no-old "$d/usage-gate.log.1"
+    assert_eq lock_held:lines 4097 "$(wc -l < "$d/usage-gate.log" | tr -d ' ')"
+    assert_file lock_held:lock-kept "$d/usage-log-rotate.lock.d"
+}
+
+test_usage_log_rotate_stale_lock_reclaimed() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    mkdir "$d/usage-log-rotate.lock.d"
+    touch -t 202001010000 "$d/usage-log-rotate.lock.d"
+    seed_log 4096 "$d/usage-gate.log"
+    ulog reclaimed
+    assert_file lock_stale:old "$d/usage-gate.log.1"
+    assert_eq lock_stale:seeds 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    assert_eq lock_stale:new-lines 1 "$(wc -l < "$d/usage-gate.log" | tr -d ' ')"
+    assert_no_file lock_stale:lock-gone "$d/usage-log-rotate.lock.d"
+}
+
+test_usage_log_rotate_recheck_under_lock() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    printf 'OLD-GEN\n' > "$d/usage-gate.log.1"
+    printf 'small\n' > "$d/usage-gate.log"
+    bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; _usage_log_rotate_locked '$d'"
+    assert_eq recheck:old OLD-GEN "$(cat "$d/usage-gate.log.1")"
+    assert_eq recheck:log small "$(cat "$d/usage-gate.log")"
+}
+
+test_usage_log_refused_dir_silent() {
+    new_env
+    seed_home ""
+    local real rc
+    real=$(real_default_dir)
+    IBL5_USAGE_GATE_TEST_MODE=1 bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; unset IBL5_USAGE_GATE_STATE_DIR; usage_log probe" 2>"$T/err"; rc=$?
+    assert_eq refused_silent:rc 0 "$rc"
+    assert_no_file refused_silent:no-dir "$real"
+    assert_no_file refused_silent:no-lock /dev/null/usage-gate-refused
+    assert_eq refused_silent:stderr-once 1 "$(grep -c 'usage-gate\.log' "$T/err")"
+}
+
+test_usage_log_concurrent_writers() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" w pids=""
+    seed_log 4096 "$d/usage-gate.log"
+    for w in 1 2 3 4 5 6 7 8; do
+        bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; for i in \$(seq 1 100); do usage_log writer-$w-\$i; done" &
+        pids="$pids $!"
+    done
+    for p in $pids; do wait "$p"; done
+    cat "$d/usage-gate.log" "$d/usage-gate.log.1" > "$T/all"
+    assert_eq concurrent:writer-lines 800 "$(grep -cE "${LOG_PFX}writer-[0-9]+-[0-9]+\$" "$T/all")"
+    assert_eq concurrent:no-malformed 0 "$(grep -cvE "(${LOG_PFX}writer-[0-9]+-[0-9]+\$)|(${SEED_RE#^})" "$T/all")"
+    assert_eq concurrent:no-dupes 0 "$(sort "$T/all" | uniq -d | wc -l | tr -d ' ')"
+    assert_eq concurrent:seeds-in-old 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    assert_eq concurrent:no-seeds-in-new 0 "$(grep -cE "$SEED_RE" "$d/usage-gate.log")"
+}
+
+ep() { bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; $*"; }
+
+# hold_fetch_lock: a fresh fetch.lock.d (as test_fetch_fresh_lock_respected seeds it).
+hold_fetch_lock() {
+    mkdir "$IBL5_USAGE_GATE_STATE_DIR/fetch.lock.d"
+    printf '%s\n' "$(date +%s) 999999" > "$IBL5_USAGE_GATE_STATE_DIR/fetch.lock.d/at"
+}
+
+test_inflight_episode_once() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" i out rc
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    hold_fetch_lock
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    for i in 1 2 3; do
+        out=$(fetch_once 45); rc=$?
+        assert_eq "inflight_episode:rc.$i" 2 "$rc"
+        assert_eq "inflight_episode:stale.$i" 41.0 "$(util_of "$out")"
+    done
+    assert_eq inflight_episode:open-once 1 "$(log_re_count "${LOG_PFX}fetch-skip reason=in-flight\$")"
+    assert_file inflight_episode:state "$d/episode-fetch-inflight"
+    rm -rf "$d/fetch.lock.d"
+    out=$(fetch_once 45); rc=$?
+    assert_eq inflight_episode:rc-fresh 0 "$rc"
+    assert_eq inflight_episode:fresh 77.0 "$(util_of "$out")"
+    assert_eq inflight_episode:close-once 1 "$(log_re_count "${LOG_PFX}in-flight episode end duration=[0-9]+\$")"
+    assert_no_file inflight_episode:state-gone "$d/episode-fetch-inflight"
+    hold_fetch_lock
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    fetch_once 45 >/dev/null
+    assert_eq inflight_episode:rearm-open 2 "$(log_re_count "${LOG_PFX}fetch-skip reason=in-flight\$")"
+    assert_eq inflight_episode:rearm-close 1 "$(log_re_count "${LOG_PFX}in-flight episode end duration=[0-9]+\$")"
+}
+
+test_inflight_episode_concurrent_open() {
+    new_env
+    local i
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    hold_fetch_lock
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    fetch_parallel 6 45
+    for i in 1 2 3 4 5 6; do
+        assert_eq "inflight_concurrent:rc.$i" 2 "$(cat "$T/rc.$i")"
+    done
+    assert_eq inflight_concurrent:open-once 1 "$(log_re_count "${LOG_PFX}fetch-skip reason=in-flight\$")"
+    assert_eq inflight_concurrent:no-curl 0 "$(curl_calls "$STUB")"
+}
+
+test_episode_end_concurrent_once() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" i pids="" p
+    ep usage_episode_start probe probe-open
+    for i in 1 2 3 4 5 6; do
+        ep 'usage_episode_end probe "probe episode end"' &
+        pids="$pids $!"
+    done
+    for p in $pids; do wait "$p"; done
+    assert_eq episode_end_concurrent:close-once 1 "$(log_re_count "${LOG_PFX}probe episode end duration=[0-9]+\$")"
+    assert_eq episode_end_concurrent:no-leftovers 0 "$(find "$d" -maxdepth 1 -name 'episode-probe*' | wc -l | tr -d ' ')"
+}
+
+test_episode_end_without_open_silent() {
+    new_env
+    local rc
+    ep 'usage_episode_end probe "probe episode end"'; rc=$?
+    assert_eq episode_end_none:rc 0 "$rc"
+    assert_eq episode_end_none:silent 0 "$(log_re_count 'probe episode end')"
+}
+
+test_episode_end_empty_stamp() {
+    new_env
+    : > "$IBL5_USAGE_GATE_STATE_DIR/episode-probe"
+    ep 'usage_episode_end probe "probe episode end"'
+    assert_eq episode_end_empty:duration-zero 1 "$(log_re_count "${LOG_PFX}probe episode end duration=0\$")"
+}
+
+test_episode_refused_dir_silent() {
+    new_env
+    seed_home ""
+    local real out
+    real=$(real_default_dir)
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; unset IBL5_USAGE_GATE_STATE_DIR; usage_episode_start probe probe-open; echo \"s=\$?\"; usage_episode_end probe 'probe episode end'; echo \"e=\$?\"" 2>/dev/null)
+    assert_eq episode_refused:rcs "s=0 e=0" "$(printf '%s' "$out" | tr '\n' ' ' | sed 's/ $//')"
+    assert_no_file episode_refused:no-dir "$real"
+}
+
+DEC_OPEN_RE="${LOG_PFX}fail-open reason=stale-usage age=[0-9]+\$"
+PRE_OPEN_RE="${LOG_PFX}prestart-fail-open reason=stale-usage runner=post-plan-now\$"
+STALE_END_RE="${LOG_PFX}stale-usage episode end duration=[0-9]+\$"
+dec() { IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A; }
+pre() { in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"; }
+
+test_stale_episode_hundred_calls_one_open() {
+    decide_setup 99
+    local d="$IBL5_USAGE_GATE_STATE_DIR" i out rc bad=0
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    for i in $(seq 1 100); do
+        out=$(dec); rc=$?
+        if [ -n "$out" ] || [ "$rc" -ne 0 ]; then bad=$((bad + 1)); fi
+    done
+    assert_eq stale_hundred:bad-calls 0 "$bad"
+    assert_eq stale_hundred:open-once 1 "$(log_re_count "$DEC_OPEN_RE")"
+    assert_eq stale_hundred:no-close 0 "$(log_re_count "$STALE_END_RE")"
+    assert_file stale_hundred:state "$d/episode-stale-usage"
+    assert_no_file stale_hundred:no-marker "$d/markers/$SID_A.json"
+    seed_cache "$(date +%s)" "$(usage_json 10 0)"
+    out=$(dec)
+    assert_eq stale_hundred:fresh-out "" "$out"
+    assert_eq stale_hundred:close-once 1 "$(log_re_count "$STALE_END_RE")"
+    assert_no_file stale_hundred:state-gone "$d/episode-stale-usage"
+    dec >/dev/null
+    assert_eq stale_hundred:close-still-once 1 "$(log_re_count "$STALE_END_RE")"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    dec >/dev/null
+    assert_eq stale_hundred:rearm-open 2 "$(log_re_count "$DEC_OPEN_RE")"
+}
+
+test_stale_episode_closes_on_recent_stale_cache() {
+    decide_setup 99
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    dec >/dev/null
+    assert_eq stale_recent:open 1 "$(log_re_count "$DEC_OPEN_RE")"
+    seed_cache "$(( $(date +%s) - 298 ))" "$(usage_json 10 0)"
+    dec >/dev/null
+    assert_eq stale_recent:close 1 "$(log_re_count "$STALE_END_RE")"
+}
+
+test_stale_episode_over_300_stays_open() {
+    decide_setup 99
+    local out
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    dec >/dev/null
+    seed_cache "$(( $(date +%s) - 305 ))" "$(usage_json 99 0)"
+    out=$(dec)
+    assert_eq stale_over300:out "" "$out"
+    assert_eq stale_over300:no-close 0 "$(log_re_count "$STALE_END_RE")"
+    assert_eq stale_over300:open-still-once 1 "$(log_re_count "$DEC_OPEN_RE")"
+}
+
+test_stale_episode_shared_across_sites() {
+    decide_setup 99
+    local i rc
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    dec >/dev/null
+    assert_eq stale_shared:decide-open 1 "$(log_re_count "$DEC_OPEN_RE")"
+    for i in 1 2 3; do
+        pre; rc=$?
+        assert_eq "stale_shared:pre-rc.$i" 0 "$rc"
+    done
+    assert_eq stale_shared:no-prestart-open 0 "$(log_re_count "$PRE_OPEN_RE")"
+    seed_cache "$(date +%s)" "$(usage_json 10 0)"
+    pre; rc=$?
+    assert_eq stale_shared:fresh-rc 0 "$rc"
+    assert_eq stale_shared:close 1 "$(log_re_count "$STALE_END_RE")"
+}
+
+test_prestart_stale_episode_open_close() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    local i rc
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 95 12)"
+    for i in 1 2 3; do
+        pre; rc=$?
+        assert_eq "prestart_episode:rc.$i" 0 "$rc"
+    done
+    assert_eq prestart_episode:open-once 1 "$(log_re_count "$PRE_OPEN_RE")"
+    seed_cache "$(date +%s)" "$(usage_json 10 0)"
+    pre; rc=$?
+    assert_eq prestart_episode:fresh-rc 0 "$rc"
+    assert_eq prestart_episode:close 1 "$(log_re_count "$STALE_END_RE")"
+}
+
+test_stale_episode_blind_pass_keeps_open() {
+    decide_setup 99
+    local FUT
+    FUT=$(( $(date +%s) + 3600 ))
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    dec >/dev/null
+    assert_eq stale_blind:open 1 "$(log_re_count "$DEC_OPEN_RE")"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json_resets 95 0 "$FUT" "")"
+    dec >/dev/null
+    assert_eq stale_blind:no-close 0 "$(log_re_count "$STALE_END_RE")"
+    assert_file stale_blind:state-kept "$IBL5_USAGE_GATE_STATE_DIR/episode-stale-usage"
+    if [ "$(log_count blind-trust)" -ge 1 ]; then pass stale_blind:blind-ran; else fail stale_blind:blind-ran "no blind-trust line"; fi
+}
+
+test_prestart_blind_pass_keeps_open() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    local FUT
+    FUT=$(( $(date +%s) + 3600 ))
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 95 12)"
+    pre
+    assert_eq prestart_blind:open 1 "$(log_re_count "$PRE_OPEN_RE")"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json_resets 95 0 "$FUT" "")"
+    pre
+    assert_eq prestart_blind:no-close 0 "$(log_re_count "$STALE_END_RE")"
+    assert_file prestart_blind:state-kept "$IBL5_USAGE_GATE_STATE_DIR/episode-stale-usage"
+    if [ "$(log_count blind-trust)" -ge 1 ]; then pass prestart_blind:blind-ran; else fail prestart_blind:blind-ran "no blind-trust line"; fi
 }
 
 # ---------------------------------------------------------------- runner

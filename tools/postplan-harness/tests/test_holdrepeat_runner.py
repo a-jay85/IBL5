@@ -44,7 +44,7 @@ def _fixture(plan=HOLD_7_PLAN, **over):
         "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
         "pr_number": 4242,
         "pr_meta": {"number": 4242, "title": "fix: synthetic",
-                    "body": "## Manual Testing\n\nNo manual testing needed\n",
+                    "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
                     "headRefOid": "deadbeef"},
         "labels": [],
         "final_state": "OPEN",

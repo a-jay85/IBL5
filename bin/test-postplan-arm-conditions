@@ -514,6 +514,7 @@ B7="$(extract_block '# condition (7)')"
 B13="$(extract_block '# condition (13)')"
 B15="$(extract_block '# condition (15)')"
 B17="$(extract_block '# condition (17)')"
+B18="$(extract_block '# condition (18)')"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 S1X="$(extract_block '# phase 6 step 1 extract' "$P25_SKILL")"
@@ -598,6 +599,7 @@ else
 fi
 assert_self_contained '# condition (15)' "condition (15)"
 assert_self_contained '# condition (17)' "condition (17)"
+assert_self_contained '# condition (18)' "condition (18)"
 assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
 assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"
 
@@ -1524,6 +1526,57 @@ else
         echo "FAIL: (17) unreadable body should say 'cannot read the PR body', got: '$out'"
         FAILED=1
     fi
+fi
+
+# condition (18) — merge danger door. The block reads the PR body's Merge danger line
+# through pr_merge_danger_hold; only one well-formed two-way line passes.
+# run_cond18 <body|__fail__> — scratch repo with the real predicate library symlinked.
+MD_TWO='**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff'
+MD_ONE='**Merge danger:** Door: one-way · Blast radius: site-wide · Why: mechanical: arming-path:bin/lib/pr-armable.sh'
+run_cond18() {
+    local c18="$BASE_TMP/c18"
+    rm -rf "$c18"
+    mkdir -p "$c18/bin/lib"
+    git -C "$c18" init -q
+    ln -s "$REPO_ROOT/bin/lib/pr-armable.sh" "$c18/bin/lib/pr-armable.sh"
+    local fail=""
+    if [ "$1" = "__fail__" ]; then
+        fail=1
+        printf '{"number":2100,"body":""}' > "$BASE_TMP/fixture.json"
+    else
+        jq -n --arg b "$1" '{number: 2100, body: $b}' > "$BASE_TMP/fixture.json"
+    fi
+    ( cd "$c18" && PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        GH_PR_FAIL="$fail" bash -c "$B18" 2>&1 )
+}
+expect_c18_text() { # label out needle
+    if [[ "$2" == *"$3"* ]]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 should say '$3', got: '$2'"
+        FAILED=1
+    fi
+}
+
+if [ -z "$B18" ]; then
+    echo "FAIL: no block matching '# condition (18)' in $SKILL — marker drifted"
+    FAILED=1
+else
+    expect_block "(18) two-way line -> NONE" NONE "$(run_cond18 "## Summary"$'\n'"$MD_TWO")"
+    out="$(run_cond18 "## Summary"$'\n'"$MD_ONE")"
+    expect_block "(18) one-way line -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) one-way names the door" "$out" "Door is one-way"
+    out="$(run_cond18 "## Summary"$'\n'"no field here")"
+    expect_block "(18) no line -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) missing line names the field" "$out" "no **Merge danger:** line"
+    out="$(run_cond18 "$MD_TWO"$'\n'"$MD_TWO")"
+    expect_block "(18) two lines -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) two lines read as malformed" "$out" "malformed (MALFORMED)"
+    out="$(run_cond18 '**Merge danger:** Door: maybe · Blast radius: module · Why: twenty characters at least')"
+    expect_block "(18) bad door value -> BLOCK" BLOCK "$out"
+    out="$(run_cond18 __fail__)"
+    expect_block "(18) unreadable PR body -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) unreadable body is fail-closed" "$out" "fail-closed"
 fi
 
 # --- Phase 5.0d autonomy contract: run_p50d helper + D1..D6 cases ---------
@@ -3241,6 +3294,38 @@ mk_lostwork_repo() {
     printf 'mine\n' >> "$d/f.txt"; git -C "$d" commit --quiet -am mine
     printf '%s' "$d"
 }
+# Baseline fixture for the second exemption (ADR-0174 addendum): X ignores a Foo path,
+# Y a Bar path. The branch trims X and (when $1 = 0) deletes Foo; the "resolution"
+# restores X, standing in for a rebase that dropped the branch's deletion.
+lw_neon_fixture() {
+    printf 'parameters:\n\tignoreErrors:\n'
+    local b; for b in "$@"; do
+        case "$b" in
+          X) printf '\t\t-\n\t\t\trawMessage: %s\n\t\t\tidentifier: foo.dead\n\t\t\tcount: 1\n\t\t\tpath: modules/Foo/index.php\n\n' "'Call to foo().'" ;;
+          Y) printf '\t\t-\n\t\t\trawMessage: %s\n\t\t\tidentifier: bar.live\n\t\t\tcount: 2\n\t\t\tpath: modules/Bar/index.php\n\n' "'Call to bar().'" ;;
+        esac
+    done
+}
+mk_lostwork_baseline_repo() {
+    local keep=$1 key=$2 d; d="$(mktemp -d "$BASE_TMP/lwb-XXXXXX")"
+    git -C "$d" init --quiet -b main
+    git -C "$d" config user.email 'postplan-test@example.invalid'
+    git -C "$d" config user.name  'postplan test'
+    mkdir -p "$d/ibl5/modules/Foo" "$d/ibl5/modules/Bar"
+    printf '<?php\n' > "$d/ibl5/modules/Foo/index.php"
+    printf '<?php\n' > "$d/ibl5/modules/Bar/index.php"
+    lw_neon_fixture X Y > "$d/ibl5/phpstan-baseline.neon"
+    git -C "$d" add -A; git -C "$d" commit --quiet -m base
+    git -C "$d" update-ref refs/remotes/origin/master "$(git -C "$d" rev-parse HEAD)"
+    [ "$keep" = 1 ] || git -C "$d" rm --quiet ibl5/modules/Foo/index.php
+    lw_neon_fixture Y > "$d/ibl5/phpstan-baseline.neon"
+    printf 'work\n' > "$d/branch-note.txt"
+    git -C "$d" add -A; git -C "$d" commit --quiet -m trim
+    git -C "$d" diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$key.patch"
+    lw_neon_fixture X Y > "$d/ibl5/phpstan-baseline.neon"
+    git -C "$d" commit --quiet -am 'resolution kept master entries'
+    printf '%s' "$d"
+}
 if [ ! -x "$LW" ]; then
     echo "FAIL: §5.9g — $LW missing or not executable"; FAILED=1
 else
@@ -3290,6 +3375,19 @@ else
           "/tmp/pr-ready-numstat-pre-$LWK2.txt" "/tmp/pr-ready-numstat-post-$LWK2.txt" \
           "/tmp/pr-ready-diff-pre-$LWK3.patch" "/tmp/pr-ready-diff-post-$LWK3.patch" \
           "/tmp/pr-ready-numstat-pre-$LWK3.txt" "/tmp/pr-ready-numstat-post-$LWK3.txt"
+
+    # §5.9g baseline exemption: a trimmed block whose path is gone at HEAD is not lost.
+    LWK4="lw-neon-dead-$$"; LWR4="$(mk_lostwork_baseline_repo 0 "$LWK4")"
+    LWO4="$(cd "$LWR4" && bash "$LW" "$LWK4" 2>&1 || true)"
+    have  "§5.9g: dead-path baseline block is exempt (TREE-EQUIVALENT)" "$LWO4" 'TREE-EQUIVALENT'
+    lacks "§5.9g: dead-path baseline block emits no LOST line"          "$LWO4" 'LOST:'
+    rm -f "/tmp/pr-ready-diff-pre-$LWK4.patch" "/tmp/pr-ready-diff-post-$LWK4.patch"
+    # §5.9g hard constraint: the same trimmed block with its path still at HEAD is lost.
+    LWK5="lw-neon-live-$$"; LWR5="$(mk_lostwork_baseline_repo 1 "$LWK5")"
+    LWO5="$(cd "$LWR5" && bash "$LW" "$LWK5" 2>&1 || true)"
+    have  "§5.9g: live-path baseline block is still LOST"  "$LWO5" "LOST: ibl5/phpstan-baseline.neon: -$(printf '\t\t\t')path: modules/Foo/index.php"
+    have  "§5.9g: live-path baseline block diverges"       "$LWO5" 'TREE DIVERGED — inspect before pushing'
+    rm -f "/tmp/pr-ready-diff-pre-$LWK5.patch" "/tmp/pr-ready-diff-post-$LWK5.patch"
 fi
 
 # §5.9h the BEHIND re-rebase loop. The loop body is orchestrator prose interleaved
@@ -3346,7 +3444,7 @@ done
 # §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
 # catches: a block can be perfect while the surrounding prose still claims twelve
 # conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
-have "§5.9k: SKILL.md counts fifteen conditions"         "$P25_TXT" '**All fifteen conditions**'
+have "§5.9k: SKILL.md counts eighteen conditions"        "$P25_TXT" '**All eighteen conditions**'
 have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
 have "§5.9k: the shared-predicate list carries (15)"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)/(15)'
 
@@ -3379,7 +3477,7 @@ else
     lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
 fi
 # §5.9l: the Phase 6.5 reference doc carries the (14) and (15) entries that
-# SKILL.md's "All fifteen conditions" count promises, as prose pointing at its block.
+# SKILL.md's "All eighteen conditions" count promises, as prose pointing at its block.
 ARM_TXT="$(cat "$SKILL")"
 have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
 have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'

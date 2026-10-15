@@ -12,6 +12,12 @@ SIGNOFF_CHECKS = frozenset({"human-signoff"})
 # Jobs whose only failure mode is "an upstream job failed" (tests.yml `gate`:
 # if: always(), needs: [...], exit 1 on any upstream failure). Never a fix target.
 ROLLUP_CHECKS = frozenset({"Tests and Analysis"})
+# Phase 7 Meta-checks skip (see _ci_fix_loop). "All checks green" is the aggregate
+# job in .github/workflows/all-checks-green.yml; it is non-actionable for this
+# predicate only. ROLLUP_CHECKS and triage() keep their meaning for every caller.
+META_CHECK_NAME = "Meta checks"
+META_SKIP_AGGREGATES = frozenset({"All checks green"})
+_STEP_BIN = re.compile(r"\bbin/([A-Za-z0-9_-]+)")
 CI_FIX_ALLOWED_TOOLS = REMEDIATION_ALLOWED_TOOLS
 # Ci-fix only: the harness judges and applies a proposed PR body. Phase 5.5's fixer
 # shares REMEDIATION_DENIED_TOOLS and still needs raw `gh pr edit`.
@@ -71,6 +77,62 @@ def failed_job_refs(checks: list[dict], names: list[str]) -> dict[str, tuple[str
         if m:
             result[name] = (m.group(1), m.group(2))
     return result
+
+
+def meta_only(names: list[str]) -> bool:
+    """True when the only actionable red, ignoring META_SKIP_AGGREGATES, is Meta checks.
+    `names` is the actionable list from triage(), so human-signoff and the
+    Tests and Analysis rollup are already gone."""
+    rest = [n for n in names if n not in META_SKIP_AGGREGATES]
+    return rest == [META_CHECK_NAME]
+
+
+def meta_log_steps(log_text: str) -> list[str]:
+    """Failed step names from a `gh run view --log-failed` body for the Meta checks
+    job, in first-seen order. Lines without the `<job>\\t<step>\\t` prefix are ignored,
+    so an "is still in progress" body yields []."""
+    steps: list[str] = []
+    for line in (log_text or "").splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) < 3 or parts[0] != META_CHECK_NAME:
+            continue
+        step = parts[1].strip()
+        if step and step not in steps:
+            steps.append(step)
+    return steps
+
+
+def attribute_meta_failure(log_text: str, recorded: list[str]) -> list[str]:
+    """Phase-2 check names that account for EVERY failed Meta checks step, or [].
+
+    A step is accounted for when it runs `bin/<X>` and a recorded name N equals X or
+    starts with `X-` (phase 2's `check-prose-since` matches CI's `bin/check-prose`).
+    Returns [] (fail open, ci-fix runs) when the log has no parseable step, when any
+    step matches no recorded name, or when `recorded` holds only "unknown"."""
+    names = [n for n in (recorded or []) if n and n != "unknown"]
+    steps = meta_log_steps(log_text)
+    if not names or not steps:
+        return []
+    matched: list[str] = []
+    for step in steps:
+        bins = _STEP_BIN.findall(step)
+        hits = [n for n in names
+                if any(n == b or n.startswith(b + "-") for b in bins)]
+        if not hits:
+            return []
+        for n in hits:
+            if n not in matched:
+                matched.append(n)
+    return matched
+
+
+def meta_skip_note(checks: list[str]) -> str:
+    """Survivor-comment and log reason for a skipped ci-fix. Names every check."""
+    joined = ", ".join(checks)
+    return (f"ci-fix skipped: {META_CHECK_NAME} failed on {joined}, which phase 2 "
+            f"already reported locally (META-CHECKS FAILED). ci-fix cannot edit "
+            f"gate-owned files and the phase 2 fix pass did not clear it, so no "
+            f"LLM attempt was spent")
 
 
 def ci_fix_prompt(pr_number, attempt: int, names: list[str], log_paths: dict[str, str],

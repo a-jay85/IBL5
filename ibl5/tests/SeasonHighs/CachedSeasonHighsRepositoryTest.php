@@ -157,16 +157,14 @@ final class CachedSeasonHighsRepositoryTest extends TestCase
         $this->assertSame(1, $this->cache->setCount);
     }
 
-    public function testPassThroughMethodsDelegateUncached(): void
+    public function testRcbPassThroughDelegatesUncached(): void
     {
         $inner = $this->createMock(SeasonHighsRepositoryInterface::class);
-        $inner->expects($this->exactly(2))->method('getSeasonHighs')->willReturn([]);
         $inner->expects($this->exactly(2))->method('getRcbSeasonHighs')->willReturn([]);
 
         $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
 
         for ($i = 0; $i < 2; $i++) {
-            $this->assertSame([], $repository->getSeasonHighs('1', 'Points', '', '2026-01-01', '2026-06-30'));
             $this->assertSame([], $repository->getRcbSeasonHighs(2026, 'home'));
         }
 

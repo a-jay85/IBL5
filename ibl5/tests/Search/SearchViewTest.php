@@ -569,4 +569,70 @@ EMPTY_GOLDEN;
         /** @var array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: string, min: int, offset: int, topicText: string, topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, results: list<mixed>|null, hasMore: bool, articleComm: bool, error: string} */
         return array_merge($defaults, $overrides);
     }
+
+    public function testResultItemsRenderBodyAsHtmlWithEscapedModifier(): void
+    {
+        $html = $this->view->render(self::createPageData([
+            'type' => 'users',
+            'query' => 'x',
+            'results' => [['userId' => 2, 'username' => 'bob', 'name' => 'Bob']],
+        ]));
+
+        $this->assertStringContainsString('<div class="search-result search-result--compact" style="--anim-delay: 0ms">', $html);
+        // Body is emitted as HTML (tags intact), not double-escaped.
+        $this->assertStringContainsString('<div class="search-result__header"><span class="search-result__title">bob</span>', $html);
+        $this->assertStringNotContainsString('&lt;div class="search-result__header"', $html);
+    }
+
+    public function testResultItemModifierIsEscapedWhileBodyIsPassedThroughAsHtml(): void
+    {
+        $method = new \ReflectionMethod(SearchView::class, 'renderResultList');
+
+        $hostileModifier = ' x"><script>alert(1)</script>';
+        $trustedBody = '<span class="search-result__title">ok</span>';
+        $html = $method->invoke($this->view, [$trustedBody], $hostileModifier);
+        self::assertIsString($html);
+
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringContainsString('&lt;script&gt;', $html);
+        $this->assertStringNotContainsString('x"><', $html);
+        // Body is already-escaped HTML supplied by the caller and must not be re-escaped.
+        $this->assertStringContainsString('>' . $trustedBody . '</div>', $html);
+        $this->assertStringNotContainsString('&lt;span class="search-result__title"', $html);
+    }
+
+    public function testResultItemAnimDelayStepsBy40msAndCapsAt400ms(): void
+    {
+        $results = [];
+        for ($i = 0; $i < 13; $i++) {
+            $results[] = ['userId' => $i + 1, 'username' => 'user' . $i, 'name' => 'Name ' . $i];
+        }
+
+        $html = $this->view->render(self::createPageData([
+            'type' => 'users',
+            'query' => 'x',
+            'results' => $results,
+        ]));
+
+        $this->assertStringContainsString('--anim-delay: 0ms"', $html);
+        $this->assertStringContainsString('--anim-delay: 360ms"', $html);
+        $this->assertStringContainsString('--anim-delay: 400ms"', $html);
+        $this->assertStringNotContainsString('--anim-delay: 440ms"', $html);
+        $this->assertStringNotContainsString('--anim-delay: 480ms"', $html);
+        // Indexes 10, 11 and 12 all cap at 400ms.
+        $this->assertSame(3, substr_count($html, '--anim-delay: 400ms"'));
+    }
+
+    public function testLocalTimeKeepsTimeElementInStoryAndCommentResults(): void
+    {
+        $html = $this->view->render(self::createPageData([
+            'query' => 'x',
+            'results' => [
+                ['sid' => 1, 'aid' => 'admin', 'informant' => '', 'title' => 'T', 'time' => 1700000000, 'comments' => 0, 'topicId' => 0, 'topicText' => ''],
+            ],
+        ]));
+
+        $this->assertStringContainsString('<time datetime="2023-11-14T22:13:20+00:00" class="local-time">', $html);
+        $this->assertStringNotContainsString('&lt;time', $html);
+    }
 }

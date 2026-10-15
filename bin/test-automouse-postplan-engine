@@ -383,6 +383,7 @@ rc3_sandbox() {
     ATTEMPT_FILE="$QUEUE_DIR/$PLAN_NAME.attempts"; echo 2 > "$ATTEMPT_FILE"
     FAILURE_FILE="$QUEUE_DIR/$PLAN_NAME.failure"
     CAP_REFUND_FILE="$QUEUE_DIR/$PLAN_NAME.cap-refunds"; echo 1 > "$CAP_REFUND_FILE"
+    PLAN_DEFECT_FILE="$QUEUE_DIR/$PLAN_NAME.plan-defect"
     MIN_VIABLE_SECS=60; STALL_KILL_SECS=1800
     printf '{"worktree": "%s"}\n' "$SB/worktree" > "$HANDOFF_FILE"
     STUB_RECORD="$SB/stub-record"; : > "$STUB_RECORD"

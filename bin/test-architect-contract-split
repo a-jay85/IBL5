@@ -15,9 +15,10 @@
 #   3. Orphans    : every Why: _…-detail.md § <heading> pointer in rules resolves
 #   4. Size caps  : _architect-contract.md ≤ 29696 B, _plan-verification.md ≤ 21504 B
 #   5. Read budget: every plan-architect def carries the no-re-read bounds (check_read_budget)
-#   6. Added rules: every post-split bold lead-in in ADDED_RULES is resident in the contract (check_added_rules)
 #                   (only enforced when the detail file exists — skipped on the un-split tree)
-#   7. Mutation rule: the whole-matrix mutation bullet, its detail pointer, the detail heading and the SKILL.md gate-9 pointer all stay resident (check_mutation_rule)
+#   6. Mutation rule: full-matrix mutation-rule text stays in the contract and SKILL.md gate 9
+#   7. Added rules: every post-split bold lead-in in ADDED_RULES is resident in the contract (check_added_rules)
+#   8. Mutation pointers: the whole-matrix mutation bullet, its detail pointer, the detail heading and the SKILL.md gate-9 pointer all stay resident (check_mutation_pointers)
 #
 # Run: bin/test-architect-contract-split              (exit 0 = pass, 1 = rule missing)
 #      bin/test-architect-contract-split --self-test  (also proves checker catches a deletion)
@@ -25,9 +26,11 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-FAILED=0
 
 usage() {
   printf 'usage: %s [--self-test | --help]\n' "$(basename "$0")"
@@ -69,8 +72,7 @@ validate_allowlists() {
     token="${entry%%	*}"
     reason="${entry#*	}"
     if [[ "${#reason}" -lt 15 ]]; then
-      printf 'FAIL: EXPECTED_ABSENT entry has reason shorter than 15 chars: "%s"\n' "$token"
-      FAILED=1
+      h_fail "$(printf 'EXPECTED_ABSENT entry has reason shorter than 15 chars: "%s"' "$token")"
     fi
   done
   for entry in "${EXPECTED_MOVED[@]+"${EXPECTED_MOVED[@]}"}"; do
@@ -79,12 +81,10 @@ validate_allowlists() {
     local detail_file="${rest%%	*}"
     reason="${rest#*	}"
     if [[ "${#reason}" -lt 15 ]]; then
-      printf 'FAIL: EXPECTED_MOVED entry has reason shorter than 15 chars: "%s"\n' "$token"
-      FAILED=1
+      h_fail "$(printf 'EXPECTED_MOVED entry has reason shorter than 15 chars: "%s"' "$token")"
     fi
     if [[ ! -f "$detail_file" ]]; then
-      printf 'FAIL: EXPECTED_MOVED references non-existent detail file: %s (token: "%s")\n' "$detail_file" "$token"
-      FAILED=1
+      h_fail "$(printf 'EXPECTED_MOVED references non-existent detail file: %s (token: "%s")' "$detail_file" "$token")"
     fi
   done
 }
@@ -178,8 +178,7 @@ assert_canonical_gate_tokens() {
   # [D] was removed prior to this PR; [M][V] live in _plan-verification.md, not here.
   for tok in '[C]' '[F]' '[H]' '[P]' '[S]' '[T]' '[8]' '[13]'; do
     if ! grep -qF -- "$tok" <<< "$gate_tokens"; then
-      printf 'FAIL: gate class missing canonical token %s\n' "$tok"
-      FAILED=1
+      h_fail "$(printf 'gate class missing canonical token %s' "$tok")"
     fi
   done
 }
@@ -187,9 +186,8 @@ assert_canonical_gate_tokens() {
 assert_phase_drift_present() {
   local baseline="$1"
   if ! grep -qF 'PHASE_DRIFT:' "$baseline"; then
-    printf 'FAIL: PHASE_DRIFT: literal not found in %s — fenced extractor may be blind\n' \
-      "$(basename "$baseline")"
-    FAILED=1
+    h_fail "$(printf 'PHASE_DRIFT: literal not found in %s — fenced extractor may be blind' \
+      "$(basename "$baseline")")"
   fi
 }
 
@@ -200,18 +198,15 @@ check_token_noloss_residency() {
   moved_to="$(expected_moved_detail "$token" 2>/dev/null || true)"
   if [[ -n "$moved_to" ]]; then
     if ! grep -qF -- "$token" "$moved_to" 2>/dev/null; then
-      printf 'FAIL [%s no-loss]: token absent from EXPECTED_MOVED detail file %s: "%s"\n' \
-        "$class" "$moved_to" "$token"
-      FAILED=1
+      h_fail "$(printf '[%s no-loss]: token absent from EXPECTED_MOVED detail file %s: "%s"' \
+        "$class" "$moved_to" "$token")"
     fi
   else
     if ! grep -qF -- "$token" <<< "$combined_content"; then
-      printf 'FAIL [%s no-loss]: token missing from rules+detail: "%s"\n' "$class" "$token"
-      FAILED=1
+      h_fail "$(printf '[%s no-loss]: token missing from rules+detail: "%s"' "$class" "$token")"
     fi
     if ! grep -qF -- "$token" <<< "$rules_content"; then
-      printf 'FAIL [%s residency]: token not in rules file: "%s"\n' "$class" "$token"
-      FAILED=1
+      h_fail "$(printf '[%s residency]: token not in rules file: "%s"' "$class" "$token")"
     fi
   fi
 }
@@ -226,18 +221,15 @@ check_fenced_noloss_residency() {
     local moved_fenced
     moved_fenced="$(extract_fenced "$moved_to" 2>/dev/null || true)"
     if ! grep -qF -- "$fhash" <<< "$moved_fenced"; then
-      printf 'FAIL [fenced no-loss]: block absent from EXPECTED_MOVED detail file %s: "%s"\n' \
-        "$moved_to" "$fline"
-      FAILED=1
+      h_fail "$(printf '[fenced no-loss]: block absent from EXPECTED_MOVED detail file %s: "%s"' \
+        "$moved_to" "$fline")"
     fi
   else
     if ! grep -qF -- "$fhash" <<< "$combined_fenced"; then
-      printf 'FAIL [fenced no-loss]: fenced block missing from rules+detail: "%s"\n' "$fline"
-      FAILED=1
+      h_fail "$(printf '[fenced no-loss]: fenced block missing from rules+detail: "%s"' "$fline")"
     fi
     if ! grep -qF -- "$fhash" <<< "$rules_fenced"; then
-      printf 'FAIL [fenced residency]: fenced block not in rules file: "%s"\n' "$fline"
-      FAILED=1
+      h_fail "$(printf '[fenced residency]: fenced block not in rules file: "%s"' "$fline")"
     fi
   fi
 }
@@ -266,10 +258,10 @@ check_pair() {
   printf 'classes: bold=%d gate=%d fenced=%d heading=%d   (file: %s)\n' \
     "$cnt_bold" "$cnt_gate" "$cnt_fenced" "$cnt_headings" "$(basename "$baseline")"
 
-  [[ "$cnt_bold" -gt 0 ]]     || { printf 'FAIL: bold lead-in extractor returned 0 tokens\n'; FAILED=1; }
-  [[ "$cnt_gate" -gt 0 ]]     || { printf 'FAIL: gate token extractor returned 0 tokens\n'; FAILED=1; }
-  [[ "$cnt_fenced" -gt 0 ]]   || { printf 'FAIL: fenced block extractor returned 0 tokens\n'; FAILED=1; }
-  [[ "$cnt_headings" -gt 0 ]] || { printf 'FAIL: heading extractor returned 0 tokens\n'; FAILED=1; }
+  [[ "$cnt_bold" -gt 0 ]]     || h_fail 'bold lead-in extractor returned 0 tokens'
+  [[ "$cnt_gate" -gt 0 ]]     || h_fail 'gate token extractor returned 0 tokens'
+  [[ "$cnt_fenced" -gt 0 ]]   || h_fail 'fenced block extractor returned 0 tokens'
+  [[ "$cnt_headings" -gt 0 ]] || h_fail 'heading extractor returned 0 tokens'
 
   # Canonical gate token and PHASE_DRIFT checks apply to contract pair only
   if [[ "$check_phase_drift" == "true" ]]; then
@@ -326,14 +318,12 @@ check_pair() {
     moved_to="$(expected_moved_detail "$token" 2>/dev/null || true)"
     if [[ -n "$moved_to" ]]; then
       if ! grep -qF -- "$token" "$moved_to" 2>/dev/null; then
-        printf 'FAIL [heading no-loss]: heading absent from EXPECTED_MOVED detail file %s: "%s"\n' \
-          "$moved_to" "$token"
-        FAILED=1
+        h_fail "$(printf '[heading no-loss]: heading absent from EXPECTED_MOVED detail file %s: "%s"' \
+          "$moved_to" "$token")"
       fi
     else
       if ! grep -qF -- "$token" <<< "$combined_content"; then
-        printf 'FAIL [heading no-loss]: heading missing from rules+detail: "%s"\n' "$token"
-        FAILED=1
+        h_fail "$(printf '[heading no-loss]: heading missing from rules+detail: "%s"' "$token")"
       fi
     fi
   done <<< "$headings"
@@ -354,9 +344,8 @@ check_pair() {
 
     heading_esc=$(printf '%s' "$heading" | sed 's/[][\\^$.|?*+(){}]/\\&/g')
     if ! grep -qE "^#{2,3}[[:space:]]+${heading_esc}" "$detail_path" 2>/dev/null; then
-      printf 'FAIL [orphan pointer]: rules file pointer to missing heading "%s" in %s\n' \
-        "$heading" "$detail_ref"
-      FAILED=1
+      h_fail "$(printf '[orphan pointer]: rules file pointer to missing heading "%s" in %s' \
+        "$heading" "$detail_ref")"
     fi
   done < <(grep -oE '_(architect-contract|plan-verification)-detail\.md § [^.,;)]+' "$rules" 2>/dev/null || true)
 
@@ -365,8 +354,7 @@ check_pair() {
     local actual_size
     actual_size="$(wc -c < "$rules" | tr -d '[:space:]')"
     if [[ "$actual_size" -gt "$size_cap" ]]; then
-      printf 'FAIL [size cap]: %s is %d bytes (cap: %d)\n' "$(basename "$rules")" "$actual_size" "$size_cap"
-      FAILED=1
+      h_fail "$(printf '[size cap]: %s is %d bytes (cap: %d)' "$(basename "$rules")" "$actual_size" "$size_cap")"
     else
       printf 'size: %d bytes (cap %d) — OK\n' "$actual_size" "$size_cap"
     fi
@@ -375,10 +363,10 @@ check_pair() {
 
 # ── Self-test mode ────────────────────────────────────────────────────────────
 run_selftest() {
-  local tmpdir
+  local tmpdir st_mark st_f0 st_n
   tmpdir="$(mktemp -d)"
   # shellcheck disable=SC2064
-  trap "rm -rf '$tmpdir'" EXIT
+  trap "rm -rf '$tmpdir'; h_cleanup" EXIT
 
   local rules_src="$REPO_ROOT/.claude/skills/plan/_architect-contract.md"
   local mutated="$tmpdir/_architect-contract.md"
@@ -392,9 +380,8 @@ run_selftest() {
     exit 1
   fi
 
-  # Run check_pair against mutated file; expect FAILED > 0
-  local old_failed=$FAILED
-  FAILED=0
+  # Run check_pair against mutated file; expect at least one counted failure
+  h_mark st_mark; st_f0=$H_FAIL
   check_pair \
     "$REPO_ROOT/bin/fixtures/architect-contract-presplit.md" \
     "$mutated" \
@@ -403,72 +390,102 @@ run_selftest() {
     28672 \
     true
 
-  if [[ "$FAILED" -gt 0 ]]; then
-    printf 'PASS: self-test correctly detected dropped rule (%d failure(s))\n' "$FAILED"
-    FAILED=$old_failed
+  st_n=$((H_FAIL - st_f0)); h_rewind "$st_mark"
+  if [[ "$st_n" -gt 0 ]]; then
+    h_pass "$(printf 'self-test correctly detected dropped rule (%d failure(s))' "$st_n")"
   else
-    printf 'FAIL: self-test did not detect dropped rule — checker is vacuous\n'
-    FAILED=$((old_failed + 1))
+    h_fail 'self-test did not detect dropped rule — checker is vacuous'
   fi
 
-  # Mutation 2: drop the first ADDED_RULES bullet; check_added_rules must fail.
+  # Mutation 2: strip one mid-line bold span from the contract copy.
+  local mut_contract="$tmpdir/mut-contract.md"
+  sed 's/\*\*The mutation must hit executed code:\*\*//' "$rules_src" > "$mut_contract"
+  if grep -qF '**The mutation must hit executed code:**' "$mut_contract"; then
+    printf 'FAIL: self-test mutation 2 did not remove the target span\n' >&2
+    exit 1
+  fi
+  h_mark st_mark; st_f0=$H_FAIL
+  check_mutation_rule "$mut_contract" "$REPO_ROOT/.claude/skills/plan/SKILL.md"
+  st_n=$((H_FAIL - st_f0)); h_rewind "$st_mark"
+  if [[ "$st_n" -gt 0 ]]; then
+    h_pass 'detected dropped contract mutation-rule text'
+  else
+    h_fail 'mutation-rule check missed a dropped contract span — vacuous'
+  fi
+
+  # Mutation 3: strip the gate-9 sentence from a SKILL.md copy.
+  local mut_skill="$tmpdir/mut-SKILL.md"
+  sed 's/each claim in a row names its own catching mutation//' \
+    "$REPO_ROOT/.claude/skills/plan/SKILL.md" > "$mut_skill"
+  if grep -qF 'each claim in a row names its own catching mutation' "$mut_skill"; then
+    printf 'FAIL: self-test mutation 3 did not remove the target sentence\n' >&2
+    exit 1
+  fi
+  h_mark st_mark; st_f0=$H_FAIL
+  check_mutation_rule "$rules_src" "$mut_skill"
+  st_n=$((H_FAIL - st_f0)); h_rewind "$st_mark"
+  if [[ "$st_n" -gt 0 ]]; then
+    h_pass 'detected dropped SKILL.md gate-9 sentence'
+  else
+    h_fail 'mutation-rule check missed a dropped gate-9 sentence — vacuous'
+  fi
+
+  # Mutation 4: drop the first ADDED_RULES bullet; check_added_rules must fail.
   local added_mut="$tmpdir/_architect-contract-added.md"
   local first_token="${ADDED_RULES[0]%%$'\t'*}"
   grep -vF -- "$first_token" "$rules_src" > "$added_mut"
   if grep -qF -- "$first_token" "$added_mut"; then
-    printf 'FAIL: self-test mutation 2 did not remove the added-rule bullet\n' >&2
+    printf 'FAIL: self-test mutation 4 did not remove the added-rule bullet\n' >&2
     exit 1
   fi
-  old_failed=$FAILED
-  FAILED=0
+  h_mark st_mark; st_f0=$H_FAIL
   check_added_rules "$added_mut"
-  if [[ "$FAILED" -gt 0 ]]; then
-    printf 'PASS: self-test detected dropped added rule (%d failure(s))\n' "$FAILED"
-    FAILED=$old_failed
+  st_n=$((H_FAIL - st_f0)); h_rewind "$st_mark"
+  if [[ "$st_n" -gt 0 ]]; then
+    h_pass "$(printf 'self-test detected dropped added rule (%d failure(s))' "$st_n")"
   else
-    printf 'FAIL: check_added_rules did not detect dropped bullet — checker is vacuous\n'
-    FAILED=$((old_failed + 1))
+    h_fail 'check_added_rules did not detect dropped bullet — checker is vacuous'
   fi
 
-  # Mutations 3-6: check_mutation_rule must fail when any one of its four anchors is removed.
+  # Mutations 5-8: check_mutation_pointers must fail when any one of its four anchors is removed.
   local detail_src="$REPO_ROOT/.claude/skills/plan/_architect-contract-detail.md"
   local skill_src="$REPO_ROOT/.claude/skills/plan/SKILL.md"
 
-  # Mutation 3 (A): delete the contract line carrying the bold lead-in.
+  # Mutation 5 (A): delete the contract line carrying the bold lead-in.
   local mut_a="$tmpdir/contract-no-lead.md"
   grep -vF -- "$MUTATION_LEAD" "$rules_src" > "$mut_a"
   if grep -qF -- "$MUTATION_LEAD" "$mut_a"; then
-    printf 'FAIL: self-test mutation 3 did not remove the mutation bullet\n' >&2
+    printf 'FAIL: self-test mutation 5 did not remove the mutation bullet\n' >&2
     exit 1
   fi
-  expect_mutation_rule_fails "deleted mutation bullet" "$mut_a" "$detail_src" "$skill_src"
+  expect_mutation_pointers_fails "deleted mutation bullet" "$mut_a" "$detail_src" "$skill_src"
 
-  # Mutation 4 (B): strip only the pointer text; the lead-in must survive so the pointer probe is what fails.
+  # Mutation 6 (B): strip only the pointer text; the lead-in must survive so the pointer probe is what fails.
   local mut_b="$tmpdir/contract-no-pointer.md"
   sed 's/Mutation-statement counter-examples//' "$rules_src" > "$mut_b"
   if grep -qF -- "$MUTATION_POINTER" "$mut_b" || ! grep -qF -- "$MUTATION_LEAD" "$mut_b"; then
-    printf 'FAIL: self-test mutation 4 did not isolate the pointer text\n' >&2
+    printf 'FAIL: self-test mutation 6 did not isolate the pointer text\n' >&2
     exit 1
   fi
-  expect_mutation_rule_fails "stripped contract pointer" "$mut_b" "$detail_src" "$skill_src"
+  expect_mutation_pointers_fails "stripped contract pointer" "$mut_b" "$detail_src" "$skill_src"
 
-  # Mutation 5 (C): delete the heading line from a detail copy.
+  # Mutation 7 (C): delete the heading line from a detail copy.
   local mut_c="$tmpdir/detail-no-heading.md"
   grep -vF -- "$MUTATION_HEADING" "$detail_src" > "$mut_c"
   if grep -qF -- "$MUTATION_HEADING" "$mut_c"; then
-    printf 'FAIL: self-test mutation 5 did not remove the detail heading\n' >&2
+    printf 'FAIL: self-test mutation 7 did not remove the detail heading\n' >&2
     exit 1
   fi
-  expect_mutation_rule_fails "deleted detail heading" "$rules_src" "$mut_c" "$skill_src"
+  expect_mutation_pointers_fails "deleted detail heading" "$rules_src" "$mut_c" "$skill_src"
 
-  # Mutation 6 (D): strip the gate-9 pointer sentence from a SKILL.md copy.
+  # Mutation 8 (D): strip the gate-9 pointer sentence from a SKILL.md copy.
   local mut_d="$tmpdir/skill-no-pointer.md"
   sed 's/ Every behavioral row also names the production-code mutation.*$//' "$skill_src" > "$mut_d"
   if grep -qF 'Mutation-statement counter-examples' "$mut_d"; then
-    printf 'FAIL: self-test mutation 6 did not remove the gate-9 sentence\n' >&2
+    printf 'FAIL: self-test mutation 8 did not remove the gate-9 sentence\n' >&2
     exit 1
   fi
-  expect_mutation_rule_fails "stripped gate-9 pointer" "$rules_src" "$detail_src" "$mut_d"
+  expect_mutation_pointers_fails "stripped gate-9 pointer" "$rules_src" "$detail_src" "$mut_d"
 }
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -502,14 +519,12 @@ check_read_budget() {
   for def in "${defs[@]}"; do
     path="$REPO_ROOT/.claude/agents/$def.md"
     if [[ ! -f "$path" ]]; then
-      printf 'FAIL [read budget]: missing agent def %s\n' "$path"
-      FAILED=$((FAILED + 1)); continue
+      h_fail "$(printf '[read budget]: missing agent def %s' "$path")"; continue
     fi
     missing=0
     for probe in "${probes[@]}"; do
       if ! grep -qF -- "$probe" "$path"; then
-        printf 'FAIL [read budget]: %s.md is missing bound: %s\n' "$def" "$probe"
-        FAILED=$((FAILED + 1)); missing=1
+        h_fail "$(printf '[read budget]: %s.md is missing bound: %s' "$def" "$probe")"; missing=1
       fi
     done
     [[ "$missing" -eq 0 ]] && printf '%s.md: all %d bounds present\n' "$def" "${#probes[@]}"
@@ -521,19 +536,17 @@ check_read_budget() {
     path="$REPO_ROOT/.claude/agents/$def.md"
     [[ -f "$path" ]] || continue
     if grep -qE 'Read [^.]*_(architect-contract|plan-verification)-detail\.md' "$path"; then
-      printf 'FAIL [read budget]: %s.md instructs a Read of a *-detail.md companion\n' "$def"
-      FAILED=$((FAILED + 1))
+      h_fail "$(printf '[read budget]: %s.md instructs a Read of a *-detail.md companion' "$def")"
     fi
   done
 
   # SKILL.md Step 3 must hand the architect the once-only instruction.
   if ! grep -qF 'exactly once, as its first action' "$REPO_ROOT/.claude/skills/plan/SKILL.md"; then
-    printf 'FAIL [read budget]: SKILL.md Step 3 no longer says the contract is Read exactly once\n'
-    FAILED=$((FAILED + 1))
+    h_fail '[read budget]: SKILL.md Step 3 no longer says the contract is Read exactly once'
   fi
 }
 
-# -- Assertion 6: post-split rules stay resident -----------------------------
+# -- Assertion 7: post-split rules stay resident -----------------------------
 check_added_rules() {
   local rules_file="$1" entry token reason
   printf '\n=== added rules ===\n'
@@ -541,66 +554,84 @@ check_added_rules() {
     token="${entry%%$'\t'*}"
     reason="${entry#*$'\t'}"
     if [[ "${#reason}" -lt 15 || "$reason" == "$entry" ]]; then
-      printf 'FAIL [added rules]: entry for %s lacks a reason of at least 15 chars\n' "$token"
-      FAILED=$((FAILED + 1))
+      h_fail "$(printf '[added rules]: entry for %s lacks a reason of at least 15 chars' "$token")"
       continue
     fi
     if ! grep -qF -- "$token" "$rules_file"; then
-      printf 'FAIL [added rules]: %s missing from %s\n' "$token" "$(basename "$rules_file")"
-      FAILED=$((FAILED + 1))
+      h_fail "$(printf '[added rules]: %s missing from %s' "$token" "$(basename "$rules_file")")"
     fi
   done
 }
 
-# -- Assertion 7: the whole-matrix mutation rule stays resident ---------------
+# -- Assertion 6: full-matrix mutation rule stays resident (backlog#922) ------
+# The three bold spans are mid-line, so extract_bold (bullet-start, fixture-based)
+# never sees them. Probe the live text directly.
+check_mutation_rule() {
+  local contract="$1" skill="$2" probe
+  printf '\n=== mutation rule ===\n'
+  local -a contract_probes=(
+    '**One mutation per claim:**'
+    '**The mutation must hit executed code:**'
+    '**Negative check**'
+    'pre-seeds the production logic'
+  )
+  for probe in "${contract_probes[@]}"; do
+    if ! grep -qF -- "$probe" "$contract"; then
+      h_fail "$(printf '[mutation rule]: %s is missing: %s' "$(basename "$contract")" "$probe")"
+    fi
+  done
+  probe='each claim in a row names its own catching mutation'
+  if ! grep -qF -- "$probe" "$skill"; then
+    h_fail "$(printf '[mutation rule]: SKILL.md Step 4 gate 9 is missing: %s' "$probe")"
+  fi
+}
+
+# -- Assertion 8: the whole-matrix mutation pointers stay resident ------------
 # The bullet and its pointer live in _architect-contract.md (29645 of 29696 B), the counter-example
 # section lives in _architect-contract-detail.md, and SKILL.md gate 9 points at both. Losing
 # any one leaves the mutation rule unreachable from the place a plan author reads.
 MUTATION_LEAD='**The mutation statement extends to the whole matrix, not just the negative-path rows above:**'
 MUTATION_POINTER='`_architect-contract-detail.md` § Mutation-statement counter-examples'
 MUTATION_HEADING='### Mutation-statement counter-examples'
-MUTATION_SKILL_RE='^9\. \*\*Negative-path coverage\*\*.*Mutation-statement counter-examples'
+MUTATION_SKILL_ITEM='^9\. \*\*Negative-path coverage\*\*'
+MUTATION_SKILL_POINTER='Mutation-statement counter-examples'
 
-check_mutation_rule() {
-  local contract="$1" detail="$2" skill="$3" f before
-  printf '\n=== mutation rule ===\n'
+check_mutation_pointers() {
+  local contract="$1" detail="$2" skill="$3" f before gate9
+  printf '\n=== mutation pointers ===\n'
   for f in "$contract" "$detail" "$skill"; do
     if [[ ! -f "$f" ]]; then
-      printf 'FAIL [mutation rule]: missing file %s\n' "$f"
-      FAILED=$((FAILED + 1)); return 0
+      h_fail "$(printf '[mutation pointers]: missing file %s' "$f")"; return 0
     fi
   done
-  before=$FAILED
+  before=$H_FAIL
   if ! grep -qF -- "$MUTATION_LEAD" "$contract"; then
-    printf 'FAIL [mutation rule]: %s lost the bullet lead-in: %s\n' "$(basename "$contract")" "$MUTATION_LEAD"
-    FAILED=$((FAILED + 1))
+    h_fail "$(printf '[mutation pointers]: %s lost the bullet lead-in: %s' "$(basename "$contract")" "$MUTATION_LEAD")"
   fi
   if ! grep -qF -- "$MUTATION_POINTER" "$contract"; then
-    printf 'FAIL [mutation rule]: %s lost the pointer: %s\n' "$(basename "$contract")" "$MUTATION_POINTER"
-    FAILED=$((FAILED + 1))
+    h_fail "$(printf '[mutation pointers]: %s lost the pointer: %s' "$(basename "$contract")" "$MUTATION_POINTER")"
   fi
   if ! grep -qF -- "$MUTATION_HEADING" "$detail"; then
-    printf 'FAIL [mutation rule]: %s lost the heading: %s\n' "$(basename "$detail")" "$MUTATION_HEADING"
-    FAILED=$((FAILED + 1))
+    h_fail "$(printf '[mutation pointers]: %s lost the heading: %s' "$(basename "$detail")" "$MUTATION_HEADING")"
   fi
-  if ! grep -qE -- "$MUTATION_SKILL_RE" "$skill"; then
-    printf 'FAIL [mutation rule]: %s gate 9 lost the mutation-rule pointer\n' "$(basename "$skill")"
-    FAILED=$((FAILED + 1))
+  # Gate 9 spans its numbered line and any continuation lines up to item 10.
+  gate9="$(ITEM="$MUTATION_SKILL_ITEM" awk '$0 ~ ENVIRON["ITEM"] {f=1; print; next} f && /^[0-9]+\. / {f=0} f' "$skill")"
+  if ! grep -qF -- "$MUTATION_SKILL_POINTER" <<< "$gate9"; then
+    h_fail "$(printf '[mutation pointers]: %s gate 9 lost the mutation-rule pointer' "$(basename "$skill")")"
   fi
-  [[ "$FAILED" -eq "$before" ]] && printf 'mutation rule: all 4 probes present\n'
+  [[ "$H_FAIL" -eq "$before" ]] && printf 'mutation pointers: all probes present\n'
 }
 
-# Runs check_mutation_rule on (contract, detail, skill) and expects it to fail.
-expect_mutation_rule_fails() {
-  local label="$1" old_failed=$FAILED
-  FAILED=0
-  check_mutation_rule "$2" "$3" "$4"
-  if [[ "$FAILED" -gt 0 ]]; then
-    printf 'PASS: self-test detected %s (%d failure(s))\n' "$label" "$FAILED"
-    FAILED=$old_failed
+# Runs check_mutation_pointers on (contract, detail, skill) and expects it to fail.
+expect_mutation_pointers_fails() {
+  local label="$1" st_mark st_f0 st_n
+  h_mark st_mark; st_f0=$H_FAIL
+  check_mutation_pointers "$2" "$3" "$4"
+  st_n=$((H_FAIL - st_f0)); h_rewind "$st_mark"
+  if [[ "$st_n" -gt 0 ]]; then
+    h_pass "$(printf 'self-test detected %s (%d failure(s))' "$label" "$st_n")"
   else
-    printf 'FAIL: check_mutation_rule did not detect %s — checker is vacuous\n' "$label"
-    FAILED=$((old_failed + 1))
+    h_fail "$(printf 'check_mutation_pointers did not detect %s — checker is vacuous' "$label")"
   fi
 }
 
@@ -617,7 +648,8 @@ else
 
   check_read_budget
   check_added_rules "$CONTRACT_RULES"
-  check_mutation_rule "$CONTRACT_RULES" "$CONTRACT_DETAIL" "$REPO_ROOT/.claude/skills/plan/SKILL.md"
+  check_mutation_rule "$CONTRACT_RULES" "$REPO_ROOT/.claude/skills/plan/SKILL.md"
+  check_mutation_pointers "$CONTRACT_RULES" "$CONTRACT_DETAIL" "$REPO_ROOT/.claude/skills/plan/SKILL.md"
 
   # Cap is 21504 (21 KB), not the plan's 19456 (19 KB). The plan's movable-rationale
   # inventory was right: "## Required format" measures 11197 B in
@@ -636,12 +668,9 @@ else
     "plan-verification" \
     21504 \
     false
+
+  # The checkers above pass silently; h_done needs one counted assertion.
+  [[ "$H_FAIL" -eq 0 ]] && h_pass 'all architect-contract-split checks passed'
 fi
 
-if [[ "$FAILED" -ne 0 ]]; then
-  printf '\n%d assertion(s) failed\n' "$FAILED"
-  exit 1
-fi
-
-printf '\nAll assertions passed\n'
-exit 0
+h_done

@@ -1,6 +1,6 @@
 ---
-description: PHPStan/Infection tooling — always use composer scripts; baseline management; infection exclude staleness; constant() false positives.
-last_verified: 2026-09-29
+description: PHPStan/Infection tooling — always use composer scripts; baseline management; infection exclude staleness; local Infection via bin/mutation-diff; constant() false positives.
+last_verified: 2026-10-14
 paths:
   - "**/*.php"
   - "ibl5/composer.json"
@@ -46,3 +46,7 @@ When a new PHPUnit test is added for a class excluded from `ibl5/infection.json5
 ERROR: 1 stale exclude(s) in infection.json5 now has a test
 ```
 This also fails `Tests and Analysis` and `Infection PHP (per-PR diff)`. **Fix:** remove the exclude line from `ibl5/infection.json5`. Any plan adding a new test for a View class must grep `ibl5/infection.json5` for the class name before committing.
+
+## Running Infection locally
+
+Run `bin/mutation-diff <base-ref>` from the worktree root. The base defaults to `origin/master`. It runs on the host, resets `ibl5_test` on the main-stack DB through `bin/db-test-up --no-run`, writes coverage, then runs Infection with the flags `.github/workflows/mutation-pr.yml` uses. A raw `vendor/bin/infection --git-diff-*` call skips the coverage run and fails with "Project tests must be in a passing state". Exit 3 names the missing prerequisite (pcov, the `ibl5-mariadb` container, or `bin/db-test-up`). Exit 4 means another run holds the lock.

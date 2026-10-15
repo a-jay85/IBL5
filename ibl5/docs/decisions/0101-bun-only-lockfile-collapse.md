@@ -1,6 +1,6 @@
 ---
 description: Collapse ibl5 to a single bun.lock; replace npm audit gate with bun audit + weekly tracking issue
-last_verified: 2026-08-13
+last_verified: 2026-10-12
 ---
 
 # ADR-0101: Bun-only lockfile for ibl5

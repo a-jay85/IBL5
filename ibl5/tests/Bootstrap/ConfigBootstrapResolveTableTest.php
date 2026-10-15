@@ -13,8 +13,8 @@ use PHPUnit\Framework\TestCase;
  *
  * loadNukeConfig() builds `SELECT * FROM \`<prefix>_config\`` from the
  * operator-controlled `$GLOBALS['prefix']`. The table name is a SQL identifier
- * (never a bound value), so resolveConfigTable() validates it against a
- * conservative identifier pattern and falls back to the default `nuke_config`
+ * (never a bound value), so resolveConfigTable() looks it up in a
+ * closed map and falls back to the default `nuke_config`
  * for any non-conforming value — an injection-style prefix can never reach the
  * query text.
  */
@@ -23,8 +23,13 @@ final class ConfigBootstrapResolveTableTest extends TestCase
     public function testValidPrefixResolvesToPrefixedTable(): void
     {
         self::assertSame('nuke_config', ConfigBootstrap::resolveConfigTable('nuke'));
-        self::assertSame('iblhoops_config', ConfigBootstrap::resolveConfigTable('iblhoops'));
-        self::assertSame('my_app_config', ConfigBootstrap::resolveConfigTable('my_app'));
+    }
+
+    public function testWellFormedUnknownPrefixFallsBackToNukeConfig(): void
+    {
+        self::assertSame('nuke_config', ConfigBootstrap::resolveConfigTable('custom'));
+        self::assertSame('nuke_config', ConfigBootstrap::resolveConfigTable('iblhoops'));
+        self::assertSame('nuke_config', ConfigBootstrap::resolveConfigTable('my_app'));
     }
 
     /**

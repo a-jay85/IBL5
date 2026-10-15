@@ -118,7 +118,7 @@ def test_auth_expired_reply_relabels_detail(tmp_path, monkeypatch):
     cli = _cli(tmp_path, monkeypatch, [AUTH, AUTH], seen)
     with pytest.raises(HarnessError) as ei:
         cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
-    assert ei.value.kind == "llm-invalid-output"
+    assert ei.value.kind == "llm-auth-expired"
     assert ei.value.detail.startswith("safety-verdict: auth-expired: Failed to authenticate")
     assert "no parseable JSON" not in ei.value.detail
     assert len(seen) == 2
@@ -130,7 +130,7 @@ def test_auth_text_in_non_json_stdout_relabels(tmp_path, monkeypatch):
     monkeypatch.setattr("harness.adapters.llm._run_reaped", _raw_stdout([AUTH, AUTH], seen))
     with pytest.raises(HarnessError) as ei:
         cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
-    assert ei.value.kind == "llm-invalid-output"
+    assert ei.value.kind == "llm-auth-expired"
     assert ei.value.detail.startswith("safety-verdict: auth-expired: Failed to authenticate")
     assert "CLI non-JSON output" not in ei.value.detail
     assert len(seen) == 2
@@ -142,6 +142,43 @@ def test_auth_expired_then_valid_returns_data(tmp_path, monkeypatch):
     data = cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
     assert data == {"holds": []}
     assert len(seen) == 2
+
+
+def test_auth_then_non_auth_failure_is_invalid_output(tmp_path, monkeypatch):
+    seen = []
+    cli = _cli(tmp_path, monkeypatch, [AUTH, "I think it is fine."], seen)
+    with pytest.raises(HarnessError) as ei:
+        cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
+    assert ei.value.kind == "llm-invalid-output"
+    assert "auth-expired" not in ei.value.detail   # the last attempt decides the label
+    assert len(seen) == 2
+
+
+def test_auth_then_non_auth_failure_label(tmp_path, monkeypatch):
+    seen = []
+    cli = _cli(tmp_path, monkeypatch, [AUTH, "I think it is fine."], seen)
+    with pytest.raises(HarnessError) as ei:
+        cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
+    assert "Failed to authenticate" not in ei.value.detail   # attempt 1's auth text is dropped
+
+
+def test_non_auth_then_auth_failure_is_auth_expired(tmp_path, monkeypatch):
+    seen = []
+    cli = _cli(tmp_path, monkeypatch, ["I think it is fine.", AUTH], seen)
+    with pytest.raises(HarnessError) as ei:
+        cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
+    assert ei.value.kind == "llm-auth-expired"
+    assert len(seen) == 2
+
+
+def test_long_reply_quoting_auth_stays_invalid_output(tmp_path, monkeypatch):
+    seen = []
+    long_reply = "x" * 500 + AUTH
+    cli = _cli(tmp_path, monkeypatch, [long_reply, long_reply], seen)
+    with pytest.raises(HarnessError) as ei:
+        cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
+    assert ei.value.kind == "llm-invalid-output"
+    assert "auth-expired" not in ei.value.detail
 
 
 def test_auth_reply_does_not_trigger_usage_pause(tmp_path, monkeypatch):
@@ -156,9 +193,14 @@ def test_auth_reply_does_not_trigger_usage_pause(tmp_path, monkeypatch):
     monkeypatch.setattr(ClaudeCli, "_usage_limit_pause", _raise_paused)
     with pytest.raises(HarnessError) as ei:
         cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
-    assert ei.value.kind == "llm-invalid-output"
+    assert ei.value.kind == "llm-auth-expired"
 
 
 def test_invalid_output_kind_stays_out_of_fail_closed_kinds():
     import runner
     assert "llm-invalid-output" not in runner._FAIL_CLOSED_KINDS
+
+
+def test_auth_expired_kind_is_fail_closed():
+    import runner
+    assert "llm-auth-expired" in runner._FAIL_CLOSED_KINDS

@@ -46,16 +46,17 @@ function CloseTable(): void
 function themeheader(): void
 {
     global $user, $bgcolor1, $leagueContext, $mysqli_db, $authService;
+    $nukeCompat = new \Utilities\NukeCompat();
 
     $db = $mysqli_db instanceof \mysqli ? $mysqli_db : null;
 
-    $isLoggedIn = (bool) is_user($user);
+    $isLoggedIn = $nukeCompat->isUser($user);
     $username = null;
     $teamId = null;
     $teamsData = null;
 
     if ($isLoggedIn) {
-        cookiedecode($user);
+        $nukeCompat->cookieDecode($user);
         if (!$authService instanceof \Auth\Contracts\AuthServiceInterface) {
             throw new \LogicException('themeheader() requires $authService for a logged-in user');
         }
@@ -123,7 +124,7 @@ function themeheader(): void
         requestUri: $requestUri,
         isDraftOrderFinalized: $isDraftOrderFinalized,
         isDebugAdmin: $debugSession->isDebugAdmin(),
-        isAdmin: is_admin() === 1,
+        isAdmin: $nukeCompat->isAdmin(),
         debugViewAllExtensions: $debugSession->isViewAllExtensionsEnabled(),
     );
 

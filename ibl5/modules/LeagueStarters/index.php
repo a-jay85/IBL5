@@ -21,6 +21,8 @@ use LeagueStarters\LeagueStartersService;
 use LeagueStarters\LeagueStartersView;
 
 global $mysqli_db, $authService;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 
 // Route HTMX API requests (no PageLayout, returns HTML fragment only)
 $op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';

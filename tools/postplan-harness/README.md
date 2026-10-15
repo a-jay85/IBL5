@@ -35,6 +35,17 @@ Every retained call: single turn, no tools, byte-capped input packet, JSON
 output validated by `harness/schemas.py`, one bounded retry, usage recorded.
 Invalid output is a typed failure — never silently accepted.
 
+Two arming inputs get one stage-level retry when they miss. A real verdict is never retried. The read-only
+`conflict-review` call is asked again once when its reply carries no verdict token or the
+call failed for a non-terminal reason (a usage limit or expired login is never re-asked); a
+second miss writes `CONFLICT-REVIEW=ABSENT` and condition (14) holds with `after 1 retry`.
+Phase 6.5 re-applies this run's Phase 2 `**Merge danger:**` line once when the live body has
+lost it; a clean-tree rerun wrote no line and never refills, and `ONE-WAY` or `MALFORMED` is a
+verdict, so condition (18) holds with `state=MISSING after 1 retry` only after a refill that did
+not land. `result.json` carries `retries` (`{"conflict-review": 1, "merge-danger": 1}` at most)
+only when a retry ran. No per-run call cap exists to raise: the budget grows by at most one
+`conflict-review` call per run.
+
 ## Layout
 
 ```

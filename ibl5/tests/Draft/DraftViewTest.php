@@ -185,6 +185,7 @@ class DraftViewTest extends TestCase
 
     public function testRenderPlayerTableNonOwnerUndraftedRowHasNoRadio(): void
     {
+        // Viewing team and pick owner differ ('Boston','Chicago'): no radio, empty sticky-col cell.
         $html = $this->view->renderPlayerTable([$this->makePlayer(['drafted' => 0])], 'Boston', 'Chicago');
 
         $this->assertSame($this->expectedNonOwner(), $html);

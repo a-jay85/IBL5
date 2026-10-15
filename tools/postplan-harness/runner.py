@@ -748,6 +748,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             gate_backtest_status=_gb.status,
             gate_backtest_reason=_gb.reason,
             merge_danger_state=merge_danger.classify_body(_arm_body),
+            retried_stages=sorted(res.retries),
         )
         if not live and (fixture or {}).get("current_tree"):
             # replay-only seam, the checks_outcome pattern: live mode never reads it

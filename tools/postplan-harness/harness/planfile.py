@@ -501,6 +501,14 @@ _PHASE_HEADING_RE = re.compile(r"^##\s+(?:Phase|Step)\s*(\d+)(?!\.\d)\b\s*[:.\-â
 # All-S tier marker = bookkeeping-only phase (close a backlog issue, bump a doc date).
 _BOOKKEEPING_MARKER_RE = re.compile(r"\[phases:\s*S(\s*/\s*S)*\s*\]")
 _EXAMPLE_SUFFIX_RE = re.compile(r"^\s*\(example\)")
+# The two placeholder shapes the architect contract mandates for a not-yet-numbered
+# file (`.claude/skills/plan/_architect-contract.md` "Number placeholders"). They carry
+# ` (example)` for the staleness guard, yet they ARE the phase's deliverable, so they
+# alone survive the (example) skip below. Token side is the exact uppercase literal
+# (`NNN`/`NNNN` for a migration, `NNNN` for an ADR); `nnn`, `N{5}` and any other
+# directory are not placeholders and stay skipped like every other (example) token.
+_PLACEHOLDER_TOKEN_RE = re.compile(
+    r"^(?:ibl5/migrations/N{3,4}_[^/\s]+\.sql|ibl5/docs/decisions/NNNN-[^/\s]+\.md)$")
 _LINE_SUFFIX_RE = re.compile(r"(?::|#)L?\d+(?:-L?\d+)?$")
 NO_DIFF_MIN_REASON = 15
 _NO_DIFF_MARKER_RE = re.compile(r"^\s*(?:[-*]\s+)?\*\*No diff:\*\*[ \t]*(.*?)\s*$")
@@ -510,15 +518,18 @@ def _phase_evidence_paths(body: str) -> list[str]:
     """Backticked tokens in a phase body that look like repo paths, deduped, first-seen order.
 
     A token followed by ` (example)` is an intentionally-absent path (staleness-guard idiom)
-    and is skipped. A `path::test_fn` pytest node id contributes its file part only. A
-    trailing line suffix (`:120`, `:438-457`, `#L12-L20`) is stripped so the token matches
-    the changed file. Glob tokens are skipped because _resolve cannot match them.
+    and is skipped, except a contract number placeholder (`_PLACEHOLDER_TOKEN_RE`), which
+    names the phase's deliverable and is kept. A `path::test_fn` pytest node id contributes
+    its file part only. A trailing line suffix (`:120`, `:438-457`, `#L12-L20`) is stripped
+    so the token matches the changed file. Glob tokens are skipped because _resolve cannot
+    match them.
     """
     out: list[str] = []
     for m in re.finditer(r"`([^`\n]+)`", body):
-        if _EXAMPLE_SUFFIX_RE.match(body[m.end():m.end() + 12]):
-            continue
         tok = m.group(1).split("::", 1)[0].strip()
+        if (_EXAMPLE_SUFFIX_RE.match(body[m.end():m.end() + 12])
+                and not _PLACEHOLDER_TOKEN_RE.match(tok)):
+            continue
         tok = _LINE_SUFFIX_RE.sub("", tok)
         if not _is_test_path(tok) or re.search(r"[*?\[\]]", tok):
             continue

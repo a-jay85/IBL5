@@ -46,8 +46,10 @@ class NegotiationRepositoryTest extends DatabaseTestCase
         self::assertSame(41, $perf['contract_avg_l']);
     }
 
-    public function testGetPositionSalaryCommitmentReturnsInt(): void
+    public function testGetPositionSalaryCommitmentReturnsExactSumExcludingPid(): void
     {
+        $baseline = $this->repo->getPositionSalaryCommitment('Metros', 'PG', 999999999);
+
         // Insert two test players at the same position on the same team
         $this->insertTestPlayer(200040001, 'NEG SalaryPG1', [
             'teamid' => 1,
@@ -67,9 +69,9 @@ class NegotiationRepositoryTest extends DatabaseTestCase
         ]);
 
         // Exclude NEG SalaryPG1 — should only include NEG SalaryPG2's next year salary
-        $commitment = $this->repo->getPositionSalaryCommitment('Metros', 'PG', 'NEG SalaryPG1');
+        $commitment = $this->repo->getPositionSalaryCommitment('Metros', 'PG', 200040001);
 
-        self::assertIsInt($commitment);
+        self::assertSame($baseline + 2100, $commitment);
     }
 
     public function testGetTeamCapSpaceNextSeasonReturnsInt(): void
@@ -100,7 +102,7 @@ class NegotiationRepositoryTest extends DatabaseTestCase
 
     public function testGetPositionSalaryCommitmentReturnsZeroForUnknownTeam(): void
     {
-        $result = $this->repo->getPositionSalaryCommitment('ZZ_NoTeam_B9', 'PG', 'SomePlayer');
+        $result = $this->repo->getPositionSalaryCommitment('ZZ_NoTeam_B9', 'PG', 200040001);
 
         self::assertSame(0, $result);
     }

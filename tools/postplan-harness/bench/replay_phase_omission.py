@@ -162,6 +162,7 @@ def compare(before: dict, after: dict) -> dict:
     class2: list[str] = []
     class3: list[str] = []
     class4: list[str] = []
+    class5: list[str] = []
     regressions: list[str] = []
     appeared: list[str] = []
     before_counts: Counter = Counter()
@@ -186,6 +187,8 @@ def compare(before: dict, after: dict) -> dict:
             class3.append(it)
         elif any(n.startswith(f"NON-REPO-CITATION: {num} ") for n in notes):
             class4.append(it)
+        elif any(n.startswith(f"PLACEHOLDER-MATCHED-PHASE: {num} ") for n in notes):
+            class5.append(it)
         else:
             regressions.append(it)
     for (name, num), it in sorted(after_held.items()):
@@ -200,6 +203,7 @@ def compare(before: dict, after: dict) -> dict:
            for it, n in before_counts.most_common(10)]
     audit_mismatch = sum(1 for r in before["runs"].values() if not r["audit_match"])
     return {"class1": class1, "class2": class2, "class3": class3, "class4": class4,
+            "class5": class5,
             "regressions": regressions, "appeared": appeared,
             "method_cleared": [f"{n}: {it}" for n, it in sorted(method_before - method_after)],
             "method_appeared": [f"{n}: {it}" for n, it in sorted(method_after - method_before)],
@@ -219,7 +223,9 @@ def render(res: dict) -> str:
            f"class-2 no-diff: {len(res['class2'])}",
            f"class-3 heading-named: {len(res['class3'])}",
            f"class-4 non-repo-citation: {len(res['class4'])}",
-           f"REGRESSION: {len(res['regressions'])}"]
+           f"class-5 placeholder-matched: {len(res['class5'])}"]
+    out.extend(f"  {it}" for it in res["class5"])
+    out.append(f"REGRESSION: {len(res['regressions'])}")
     out.extend(f"  {it}" for it in res["regressions"])
     out.append(f"appeared: {len(res['appeared'])}")
     out.extend(f"  {it}" for it in res["appeared"])

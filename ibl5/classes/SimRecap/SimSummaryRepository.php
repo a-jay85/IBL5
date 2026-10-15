@@ -39,32 +39,56 @@ class SimSummaryRepository extends \Database\BaseMysqliRepository
     }
 
     /**
+     * Host-scoped eligibility for claim-next. Picked by `match` on a host that
+     * ParkPolicy::assertHost() already validated; no input is ever concatenated.
+     * Actions takes a Mac-routed row back after 15 minutes; the Mac backs up a
+     * normal pending row after 45 minutes (GitHub outage or skipped run).
+     */
+    private const ELIGIBLE_FOR_ACTIONS = "(`route` IN ('any','actions')"
+        . " OR (`route` = 'mac' AND COALESCE(`routed_at`, `created_at`) <= NOW() - INTERVAL 15 MINUTE))";
+
+    private const ELIGIBLE_FOR_MAC = "(`route` = 'mac'"
+        . " OR (`route` IN ('any','actions') AND COALESCE(`routed_at`, `created_at`) <= NOW() - INTERVAL 45 MINUTE))";
+
+    /**
      * Atomic single-flight claim: the WHERE sim=? AND status='pending' guard
      * ensures only one caller proceeds. Returns true on success, false on lost race.
+     * Ignores route on purpose: `claim --sim=N` is the human override path.
      */
-    public function claimPending(int $sim): bool
+    public function claimPending(int $sim, string $host): bool
     {
+        ParkPolicy::assertHost($host);
+
         return $this->execute(
             "UPDATE `ibl_sim_summaries`
-             SET `status` = 'generating', `claimed_at` = NOW(),
+             SET `status` = 'generating', `claimed_at` = NOW(), `claimed_by` = ?,
                  `attempts` = `attempts` + 1, `blocked_until` = NULL
              WHERE `sim` = ? AND `status` = 'pending'",
-            'i',
+            'si',
+            $host,
             $sim
         ) === 1;
     }
 
     /**
-     * Select the oldest eligible pending sim and claim it.
-     * The SELECT is only a hint; the UPDATE is the authority (lost race → null).
+     * Select the oldest pending sim this host may claim, and claim it.
+     * The SELECT is only a hint; the UPDATE re-asserts every predicate and is
+     * the authority (lost race → null).
      */
-    public function claimNextPending(): ?int
+    public function claimNextPending(string $host): ?int
     {
+        ParkPolicy::assertHost($host);
+        $eligible = match ($host) {
+            'actions' => self::ELIGIBLE_FOR_ACTIONS,
+            default => self::ELIGIBLE_FOR_MAC,
+        };
+
         $row = $this->fetchOne(
-            "SELECT `sim` FROM `ibl_sim_summaries`
-             WHERE `status` = 'pending'
-               AND (`blocked_until` IS NULL OR `blocked_until` <= NOW())
-             ORDER BY `sim` ASC LIMIT 1"
+            "SELECT `sim` FROM `ibl_sim_summaries`"
+            . " WHERE `status` = 'pending'"
+            . " AND (`blocked_until` IS NULL OR `blocked_until` <= NOW())"
+            . " AND " . $eligible
+            . " ORDER BY `sim` ASC LIMIT 1"
         );
         if ($row === null) {
             return null;
@@ -72,10 +96,19 @@ class SimSummaryRepository extends \Database\BaseMysqliRepository
         /** @var int $sim */
         $sim = $row['sim'];
 
-        if (!$this->claimPending($sim)) {
-            return null;
-        }
-        return $sim;
+        $claimed = $this->execute(
+            "UPDATE `ibl_sim_summaries`"
+            . " SET `status` = 'generating', `claimed_at` = NOW(), `claimed_by` = ?,"
+            . " `attempts` = `attempts` + 1, `blocked_until` = NULL"
+            . " WHERE `sim` = ? AND `status` = 'pending'"
+            . " AND (`blocked_until` IS NULL OR `blocked_until` <= NOW())"
+            . " AND " . $eligible,
+            'si',
+            $host,
+            $sim
+        ) === 1;
+
+        return $claimed ? $sim : null;
     }
 
     /**
@@ -113,43 +146,136 @@ class SimSummaryRepository extends \Database\BaseMysqliRepository
     }
 
     /**
-     * Park or fail a claimed row after a generation attempt.
+     * Park a claimed row after a failed generation, routed by cause.
      *
-     * If attempts >= $maxAttempts → mark failed, return 'failed'.
-     * Otherwise → park as pending with backoff, return 'pending'.
-     * If the row is not in generating state → return 'none' (lost claim).
+     * Reads the row, asks ParkPolicy::decide() for the route, and writes the
+     * answer in ONE UPDATE guarded by status='generating' AND claimed_by=?.
+     * Zero affected rows (another host holds the claim, or the row moved on)
+     * returns outcome 'none', the lost-claim signal. `routed_at` records when
+     * the row becomes claimable: blocked_until when set, else now.
      *
-     * The ceiling is checked first so an at-ceiling row can never be parked
-     * for another retry.
+     * @return array{outcome: string, route: ?string, blocked_until: ?string, prior_notified: ?string}
      */
-    public function parkOrFail(int $sim, int $maxAttempts = 2, int $backoffMinutes = 30): string
+    public function parkByCause(int $sim, string $host, string $cause, ?int $resetEpoch): array
     {
-        $failed = $this->execute(
-            "UPDATE `ibl_sim_summaries`
-             SET `status` = 'failed', `claimed_at` = NULL
-             WHERE `sim` = ? AND `status` = 'generating' AND `attempts` >= ?",
-            'ii',
+        ParkPolicy::assertHost($host);
+        ParkPolicy::assertCause($cause);
+        $none = ['outcome' => 'none', 'route' => null, 'blocked_until' => null, 'prior_notified' => null];
+
+        $row = $this->fetchOne(
+            "SELECT `route`, `attempts`, `flaky_failures`, `transport_failures`, `usage_waits`,
+                    `auth_failed_hosts`, `notified_state`,
+                    UNIX_TIMESTAMP(`created_at`) AS `created_epoch`, UNIX_TIMESTAMP(NOW()) AS `now_epoch`
+             FROM `ibl_sim_summaries`
+             WHERE `sim` = ? AND `status` = 'generating' AND `claimed_by` = ?",
+            'is',
             $sim,
-            $maxAttempts
+            $host
         );
-        if ($failed === 1) {
-            return 'failed';
+        if ($row === null || !is_numeric($row['created_epoch']) || !is_numeric($row['now_epoch'])) {
+            return $none;
         }
 
-        $parked = $this->execute(
+        $decision = ParkPolicy::decide($cause, $host, [
+            'route' => is_string($row['route']) ? $row['route'] : 'any',
+            'attempts' => is_int($row['attempts']) ? $row['attempts'] : 0,
+            'flaky_failures' => is_int($row['flaky_failures']) ? $row['flaky_failures'] : 0,
+            'transport_failures' => is_int($row['transport_failures']) ? $row['transport_failures'] : 0,
+            'usage_waits' => is_int($row['usage_waits']) ? $row['usage_waits'] : 0,
+            'auth_failed_hosts' => is_string($row['auth_failed_hosts']) ? $row['auth_failed_hosts'] : '',
+            'created_epoch' => (int) $row['created_epoch'],
+        ], $resetEpoch, (int) $row['now_epoch']);
+
+        $status = $decision['outcome'] === 'failed' ? 'failed' : 'pending';
+        $blockedEpoch = $decision['blockedUntilEpoch'] ?? 0;
+        $counters = $decision['counters'];
+
+        $updated = $this->execute(
             "UPDATE `ibl_sim_summaries`
-             SET `status` = 'pending', `claimed_at` = NULL,
-                 `blocked_until` = NOW() + INTERVAL ? MINUTE
-             WHERE `sim` = ? AND `status` = 'generating'",
-            'ii',
-            $backoffMinutes,
-            $sim
+             SET `status` = ?, `claimed_at` = NULL, `route` = ?, `last_cause` = ?,
+                 `flaky_failures` = ?, `transport_failures` = ?, `usage_waits` = ?,
+                 `auth_failed_hosts` = ?,
+                 `attempts` = `attempts` - LEAST(`attempts`, ?),
+                 `blocked_until` = IF(? > 0, FROM_UNIXTIME(?), NULL),
+                 `routed_at` = IF(? > 0, FROM_UNIXTIME(?), NOW())
+             WHERE `sim` = ? AND `status` = 'generating' AND `claimed_by` = ?",
+            'sssiiisiiiiiis',
+            $status,
+            $decision['route'],
+            $cause,
+            $counters['flaky_failures'],
+            $counters['transport_failures'],
+            $counters['usage_waits'],
+            $counters['auth_failed_hosts'],
+            $counters['attempts_refund'],
+            $blockedEpoch,
+            $blockedEpoch,
+            $blockedEpoch,
+            $blockedEpoch,
+            $sim,
+            $host
         );
-        if ($parked === 1) {
-            return 'pending';
+        if ($updated !== 1) {
+            return $none;
         }
 
-        return 'none';
+        $after = $this->find($sim);
+
+        return [
+            'outcome' => $decision['outcome'],
+            'route' => $decision['route'],
+            'blocked_until' => $after['blocked_until'] ?? null,
+            'prior_notified' => is_string($row['notified_state']) ? $row['notified_state'] : null,
+        ];
+    }
+
+    /**
+     * Compare-and-set the #admin-chat state for a sim. Returns true only for
+     * the caller that moved it from $prior to $next — the exactly-once
+     * primitive across both hosts.
+     */
+    public function transitionNotifiedState(int $sim, ?string $prior, string $next): bool
+    {
+        ParkPolicy::assertNotifyState($next);
+        if ($prior === null) {
+            return $this->execute(
+                "UPDATE `ibl_sim_summaries` SET `notified_state` = ?
+                 WHERE `sim` = ? AND `notified_state` IS NULL",
+                'si',
+                $next,
+                $sim
+            ) === 1;
+        }
+        ParkPolicy::assertNotifyState($prior);
+
+        return $this->execute(
+            "UPDATE `ibl_sim_summaries` SET `notified_state` = ?
+             WHERE `sim` = ? AND `notified_state` <=> ?",
+            'sis',
+            $next,
+            $sim,
+            $prior
+        ) === 1;
+    }
+
+    /**
+     * Undo transitionNotifiedState() after the post itself failed, so the next
+     * state change (or the same one on another host) can post again.
+     */
+    public function revertNotifiedState(int $sim, string $current, ?string $prior): bool
+    {
+        ParkPolicy::assertNotifyState($current);
+        if ($prior === null) {
+            return $this->execute(
+                "UPDATE `ibl_sim_summaries` SET `notified_state` = NULL
+                 WHERE `sim` = ? AND `notified_state` <=> ?",
+                'is',
+                $sim,
+                $current
+            ) === 1;
+        }
+
+        return $this->transitionNotifiedState($sim, $current, $prior);
     }
 
     /**
@@ -302,14 +428,16 @@ class SimSummaryRepository extends \Database\BaseMysqliRepository
     /**
      * Read back a sim summary row, or null if absent.
      *
-     * @return array{sim: int, status: string, recap_text: ?string, intro_text: ?string, outro_text: ?string, themes_used: ?string, attempts: int, claimed_at: ?string, blocked_until: ?string, generated_at: ?string}|null
+     * @return array{sim: int, status: string, recap_text: ?string, intro_text: ?string, outro_text: ?string, themes_used: ?string, attempts: int, claimed_at: ?string, blocked_until: ?string, generated_at: ?string, route: string, routed_at: ?string, claimed_by: ?string, last_cause: ?string, flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, notified_state: ?string}|null
      */
     public function find(int $sim): ?array
     {
-        /** @var array{sim: int, status: string, recap_text: ?string, intro_text: ?string, outro_text: ?string, themes_used: ?string, attempts: int, claimed_at: ?string, blocked_until: ?string, generated_at: ?string}|null */
+        /** @var array{sim: int, status: string, recap_text: ?string, intro_text: ?string, outro_text: ?string, themes_used: ?string, attempts: int, claimed_at: ?string, blocked_until: ?string, generated_at: ?string, route: string, routed_at: ?string, claimed_by: ?string, last_cause: ?string, flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, notified_state: ?string}|null */
         return $this->fetchOne(
             "SELECT `sim`, `status`, `recap_text`, `intro_text`, `outro_text`, `themes_used`,
-                    `attempts`, `claimed_at`, `blocked_until`, `generated_at`
+                    `attempts`, `claimed_at`, `blocked_until`, `generated_at`,
+                    `route`, `routed_at`, `claimed_by`, `last_cause`, `flaky_failures`,
+                    `transport_failures`, `usage_waits`, `auth_failed_hosts`, `notified_state`
              FROM `ibl_sim_summaries`
              WHERE `sim` = ?",
             'i',

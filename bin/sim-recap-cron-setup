@@ -85,6 +85,7 @@ PLIST
 		     EnvironmentVariables, so a literal $HOME would bake in a dead path. -->
 PLIST
   lsched_key_string PATH "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin" 2
+  lsched_key_string SIM_RECAP_HOST_MODE launchd 2
   lsched_key_string SIM_RECAP_SSH_HOST "${SIM_RECAP_SSH_HOST:-}" 2
   lsched_key_string SIM_RECAP_REMOTE_ROOT "${SIM_RECAP_REMOTE_ROOT:-}" 2
   lsched_key_string SIM_RECAP_DB_USER "${SIM_RECAP_DB_USER:-}" 2

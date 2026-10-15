@@ -57,7 +57,7 @@ echo '<h1 class="ibl-title">Player Search</h1>';
 echo $view->renderSearchForm($searchResult['params']);
 
 // Render results if form was submitted
-if (!empty($_POST)) {
+if ($_POST !== []) {
     echo $view->renderTableHeader();
     
     if ($searchResult['count'] > 0) {

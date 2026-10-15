@@ -42,10 +42,12 @@ switch ($pa) {
     case "negotiate":
         $actionController = new PlayerActionController($mysqli_db, $commonRepository, $salaryCapRepo);
         $username = $authService->getUsername() ?? '';
+        $serverName = $_SERVER['SERVER_NAME'] ?? null;
+        $debugCookie = $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null;
         $debugSession = new \Debug\DebugSession(
             $username,
-            $_SERVER['SERVER_NAME'] ?? null,
-            $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null,
+            is_string($serverName) ? $serverName : null,
+            is_string($debugCookie) ? $debugCookie : null,
         );
         PageLayout\PageLayout::header();
         echo $actionController->renderNegotiation(

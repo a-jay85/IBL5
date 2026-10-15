@@ -70,7 +70,7 @@ function oneonone(): void
         // New game mode - check if we have valid player selections
         $errors = $service->validatePlayerSelection($player1, $player2);
         
-        if (!empty($errors)) {
+        if ($errors !== []) {
             echo $view->renderErrors($errors);
         } elseif ($player1 !== null && $player2 !== null) {
             if (!\Security\CsrfGuard::validateSubmittedToken('one_on_one')) {

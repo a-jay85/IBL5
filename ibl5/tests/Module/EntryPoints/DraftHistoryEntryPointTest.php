@@ -137,4 +137,15 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('TrailingJunkTeam', $output);
         $this->assertQueryExecuted("draftedby = 'TrailingJunkTeam'");
     }
+
+    public function testArrayTeamIdRendersYearIndex(): void
+    {
+        // teamid[]=5 is an array, not a numeric string, so it falls back to 0 and the year index renders.
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('DraftHistory', ['teamid' => ['5']]);
+
+        $this->assertNotSame('', $output);
+        $this->assertQueryExecuted('draftyear');
+        $this->assertQueryNotExecuted("draftedby = '");
+    }
 }

@@ -18,6 +18,9 @@ global $leagueContext;
 
 $pagetitle = "Season Stats";
 
+global $mysqli_db;
+/** @var \mysqli $mysqli_db */
+
 // Initialize classes
 $dbCache = new \Cache\DatabaseCache($mysqli_db);
 $innerRepository = new SeasonLeaderboardsRepository($mysqli_db, $leagueContext);

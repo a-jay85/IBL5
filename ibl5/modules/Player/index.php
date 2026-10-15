@@ -17,7 +17,8 @@ $nukeCompat = new \Utilities\NukeCompat();
 $commonRepository = new TeamIdentityRepository($mysqli_db);
 $salaryCapRepo = new SalaryCapRepository($mysqli_db);
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 

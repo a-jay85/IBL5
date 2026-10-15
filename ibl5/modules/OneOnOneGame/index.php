@@ -44,10 +44,10 @@ function oneonone(): void
     $ownerplaying = $authService->getUsername() ?? '';
 
     // Get form inputs
-    $player1 = isset($_POST['pid1']) ? (int) $_POST['pid1'] : null;
-    $player2 = isset($_POST['pid2']) ? (int) $_POST['pid2'] : null;
-    $gameid = isset($_POST['gameid']) ? (int) $_POST['gameid'] : null;
-    $gameidGet = isset($_GET['gameid']) ? (int) $_GET['gameid'] : null;
+    $player1 = is_string($_POST['pid1'] ?? null) ? (int) $_POST['pid1'] : null;
+    $player2 = is_string($_POST['pid2'] ?? null) ? (int) $_POST['pid2'] : null;
+    $gameid = is_string($_POST['gameid'] ?? null) ? (int) $_POST['gameid'] : null;
+    $gameidGet = is_string($_GET['gameid'] ?? null) ? (int) $_GET['gameid'] : null;
 
     // Initialize services
     $repository = new OneOnOneGameRepository($mysqli_db);

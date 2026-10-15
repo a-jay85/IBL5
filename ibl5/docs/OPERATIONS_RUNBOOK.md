@@ -464,7 +464,7 @@ Copy `ibl5/config/github-dispatch.config.example.php` to `ibl5/config/github-dis
 
 ### Manual rerun
 
-Run `gh workflow run sim-recap.yml` for a claim-next drain. Add `-f sim=<N>` to claim a specific sim; only do this after re-queuing it on prod, because the tick exits 1 and turns the job red when that sim is not pending. Watch it with `gh run watch`. The job log stays quiet on purpose, because the repo is public. Read the outcome in the recap viewer or the ops alert thread. A red run means the sim parked. It retries with backoff on a later tick, so check `find --sim=N` on prod. An `auth failed` line in the log means the `CLAUDE_CODE_OAUTH_TOKEN` secret is invalid or expired. Replace it with a fresh token from `claude setup-token`.
+Run `gh workflow run sim-recap.yml` for a claim-next drain. Add `-f sim=<N>` to claim a specific sim; only do this after re-queuing it on prod, because the tick exits 1 and turns the job red when that sim is not pending. Watch it with `gh run watch`. The job log stays quiet on purpose, because the repo is public. Read the outcome in the recap viewer or the ops alert thread. A red run means the sim parked. A pending park is re-queued with backoff and a later tick retries it, so check `find --sim=N` on prod. A `parked FAILED` log line means the attempt ceiling was reached. No retry is coming, and the sim needs a manual re-queue. An `auth failed` line in the log means the `CLAUDE_CODE_OAUTH_TOKEN` secret is invalid or expired. Replace it with a fresh token from `claude setup-token`.
 
 ### Uninstalling the Mac poller later
 

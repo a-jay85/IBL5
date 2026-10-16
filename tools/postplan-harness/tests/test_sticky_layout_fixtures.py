@@ -60,3 +60,27 @@ def test_layout_fixtures_hold_no_local_paths(name):
         text = fh.read()
     for needle in ("/tmp", "/var/folders", "/Users/"):
         assert needle not in text, f"{name} holds a local path: {needle}"
+
+
+REPO_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+
+
+def _read_repo(*parts: str) -> str:
+    with open(os.path.join(REPO_ROOT, *parts)) as fh:
+        return fh.read()
+
+
+def test_skill_writers_match_harness_layout():
+    skill = _read_repo(".claude", "skills", "post-plan", "_phase-5.5-fidelity.md")
+    rwn = fidelity.terminal_line("NOT READY", "", "<sha>", "READY WITH NOTES", "<tree>", 1)
+    assert f"| `{rwn}` |" in skill
+    assert "re-review returned `READY` or `READY WITH NOTES`" not in skill
+
+    pr_ready = _read_repo(".claude", "review-shared", "_phase7-verdict.md")
+    for needle in ("### Fixed in this PR", "### Still open (non-blocking)", "**Code review:**"):
+        assert needle in pr_ready
+
+    review = _read_repo(".claude", "review-shared", "_plan-fidelity-review.md")
+    assert "Phase 4B did not run in this run" in review
+    for word in ("NONE", "STALE", "CURRENT", "UNKNOWN"):
+        assert f"REVIEW-COVERAGE: {word}" in review

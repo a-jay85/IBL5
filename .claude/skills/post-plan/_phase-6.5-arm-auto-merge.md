@@ -355,3 +355,22 @@ else
   esac
 fi
 ```
+
+**(19) exec-mutations.** Phase 5.0's executable-mutation step writes one `EXEC-MUTATION:` line per held result to the bridge file `/tmp/post-plan-exec-mutations-$PPID`. Any line holds. A missing done-marker also holds, because then the step did not run. The block also upserts the `<!-- exec-mutations:begin -->` PR-body block with the same markers the harness writes, so either path replaces the other's block. Each line is prefixed `> ` so plan text cannot forge a heading. It only adds a hold and never clears another condition.
+
+```bash
+# condition (19): block unless every executable mutation tripped and the tree verified clean
+XMF="/tmp/post-plan-exec-mutations-$PPID"
+if [ ! -e "/tmp/post-plan-exec-mutations-done-$PPID" ]; then
+  echo "BLOCKED: exec-mutations: the executable-mutation step did not run"
+elif [ -s "$XMF" ]; then
+  echo "BLOCKED: exec-mutations: $(head -c 300 "$XMF" | tr '\n' ';')"
+fi
+if [ -s "$XMF" ] && XM_BODY=$(gh pr view --json body --jq '.body' 2>/dev/null); then
+  XM_BLOCK=$(printf '<!-- exec-mutations:begin -->\n### Executable mutations\n\n'
+             sed 's/^/> /' "$XMF"
+             printf '<!-- exec-mutations:end -->')
+  XM_BODY=$(printf '%s\n' "$XM_BODY" | sed '/<!-- exec-mutations:begin -->/,/<!-- exec-mutations:end -->/d')
+  printf '%s\n\n%s\n' "$XM_BODY" "$XM_BLOCK" | gh pr edit --body-file - >/dev/null
+fi
+```

@@ -18,6 +18,10 @@ use Updater\Steps\RefreshTeamSeasonRecordsStep;
  *
  * Never run DDL or ANALYZE TABLE in this class: both commit implicitly in MariaDB and
  * would leak the seed out of the rolled-back transaction into ibl5_test.
+ *
+ * One exception, declared last on purpose: testSeasonRecordsRefreshStillDoubleCountsPhantomOrdinal
+ * runs RefreshTeamSeasonRecordsStep, whose begin_transaction() commits the outer transaction.
+ * That test deletes its own seed rows and re-runs the step in a finally block so nothing leaks.
  */
 #[Group('database')]
 class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
@@ -64,6 +68,19 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
     private const FROZEN_HEAT_TOTALS_SQL = "SELECT currentname, SUM(wins) AS total_wins, SUM(losses) AS total_losses
             FROM `ibl_heat_win_loss`
             GROUP BY currentname";
+
+    /*
+     * The table-reading five-season window the caller asked for. Reference only: the plan
+     * records why it cannot replace FIVE_SEASON_WINDOW_SQL yet. Groups on the live
+     * ibl_team_info.team_name, as the CTE does, so a rename inside the window stays one row.
+     */
+    private const TABLE_WINDOW_SQL = "SELECT ti.team_name AS currentname,
+                    CAST(SUM(r.wins) AS UNSIGNED) AS five_season_wins,
+                    CAST(SUM(r.losses) AS UNSIGNED) AS five_season_losses
+             FROM `ibl_team_season_records` r
+             JOIN `ibl_team_info` ti ON ti.teamid = r.team_id
+             WHERE r.game_type = 1 AND r.`year` BETWEEN ? AND ?
+             GROUP BY ti.team_name";
 
     /**
      * Frozen from migration 174 section C (the wl arm before the franchise-summary-reads-season-records migration).
@@ -291,6 +308,97 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
         $year = self::SEED_CURRENT_ENDING_YEAR;
         $frozenExplain = $this->runFrozen('EXPLAIN ' . self::FROZEN_WINDOW_SQL, 'ii', $year - 4, $year);
         self::assertSame([], self::dateFilteredBoxScoreRows($frozenExplain), 'the pre-fix window plan already pushes a game_date range, so this check proves nothing');
+    }
+
+    /**
+     * Tripwire for the dedupe gap recorded in ~/claude-plans/franchise-five-season-window-slow.md.
+     * When RefreshTeamSeasonRecordsStep adopts the canonical MIN(game_of_that_day) dedupe this
+     * test fails; delete it and unblock the table-reading rewrite.
+     *
+     * Same seed as testDuplicateGameOfThatDayReplayCountedOnce: one real game (ordinal 3, home
+     * wins) plus a phantom repeat of the same (date, visitor, home) with ordinal 7 and swapped
+     * scores. FIVE_SEASON_WINDOW_SQL collapses the pair to the lowest ordinal (visitor 0-1,
+     * home 1-0). The refresh step groups on the 4-tuple including game_of_that_day, so it keeps
+     * both rows (visitor 1-1, home 1-1). RefreshTeamSeasonRecordsStep::execute() runs for real
+     * here, not a pasted copy of its SQL, so a change to the step is what turns this red.
+     */
+    public function testSeasonRecordsRefreshStillDoubleCountsPhantomOrdinal(): void
+    {
+        [$t1, $t2, $name1, $name2] = $this->firstTwoTeams();
+
+        $seededIds = [
+            $this->insertTeamBoxscoreRow('2013-11-05', 'Visitor', 3, $t1, $t2),
+            $this->insertTeamBoxscoreRow('2013-11-05', 'Home', 3, $t1, $t2),
+        ];
+        foreach (['Visitor', 'Home'] as $label) {
+            $seededIds[] = $this->insertRow('ibl_box_scores_teams', [
+                'game_date' => '2013-11-05',
+                'name' => $label,
+                'game_of_that_day' => 7,
+                'visitor_teamid' => $t1,
+                'home_teamid' => $t2,
+                'visitor_q1_points' => 28,
+                'visitor_q2_points' => 24,
+                'visitor_q3_points' => 22,
+                'visitor_q4_points' => 30,
+                'visitor_ot_points' => 0,
+                'home_q1_points' => 20,
+                'home_q2_points' => 22,
+                'home_q3_points' => 18,
+                'home_q4_points' => 25,
+                'home_ot_points' => 0,
+                'game_2gm' => 30,
+                'game_ftm' => 15,
+                'game_3gm' => 8,
+                'game_orb' => 10,
+                'game_drb' => 30,
+            ]);
+        }
+
+        $step = new RefreshTeamSeasonRecordsStep($this->db);
+
+        try {
+            $result = $step->execute();
+            self::assertTrue($result->success, 'refresh step must succeed: ' . $result->detail);
+
+            $fromCte = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
+            $fromTable = $this->indexBy($this->runFrozen(self::TABLE_WINDOW_SQL, 'ii', 2010, 2014), 'currentname');
+
+            foreach ([$name1, $name2] as $name) {
+                self::assertArrayHasKey($name, $fromCte);
+                self::assertArrayHasKey($name, $fromTable);
+            }
+
+            // CTE side: the canonical game only.
+            self::assertSame(0, (int) $fromCte[$name1]['five_season_wins']);
+            self::assertSame(1, (int) $fromCte[$name1]['five_season_losses']);
+            self::assertSame(1, (int) $fromCte[$name2]['five_season_wins']);
+            self::assertSame(0, (int) $fromCte[$name2]['five_season_losses']);
+
+            // Table side: the phantom with the higher ordinal is counted as a second game.
+            self::assertSame(1, (int) $fromTable[$name1]['five_season_wins'], 'step stopped double-counting: delete this test');
+            self::assertSame(1, (int) $fromTable[$name1]['five_season_losses']);
+            self::assertSame(1, (int) $fromTable[$name2]['five_season_wins']);
+            self::assertSame(1, (int) $fromTable[$name2]['five_season_losses'], 'step stopped double-counting: delete this test');
+
+            foreach ([$name1, $name2] as $name) {
+                self::assertNotSame(
+                    [(int) $fromCte[$name]['five_season_wins'], (int) $fromCte[$name]['five_season_losses']],
+                    [(int) $fromTable[$name]['five_season_wins'], (int) $fromTable[$name]['five_season_losses']],
+                    'table and CTE agree for ' . $name . ': the dedupe gap closed, delete this test'
+                );
+            }
+        } finally {
+            // The step committed the outer transaction, so undo the seed by hand and rebuild.
+            $stmt = $this->db->prepare('DELETE FROM `ibl_box_scores_teams` WHERE id = ?');
+            self::assertNotFalse($stmt, 'prepare failed: ' . $this->db->error);
+            foreach ($seededIds as $id) {
+                $stmt->bind_param('i', $id);
+                $stmt->execute();
+            }
+            $stmt->close();
+            $step->execute();
+        }
     }
 
     /**

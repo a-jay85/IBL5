@@ -1042,6 +1042,13 @@ _MERGE_DIGEST_HEADING_RE = re.compile(r"^#{1,6}[ \t]+Merge digest")
 _REVIEWED_TREE_TAIL_RE = re.compile(r"[ \t]*REVIEWED_TREE=[0-9a-f]{40}[ \t]*$")
 
 
+def _escape_quoted(line: str) -> str:
+    """One quoted line made safe for the sticky: no second marker, no second digest heading."""
+    if _MERGE_DIGEST_HEADING_RE.match(line):
+        line = "\\" + line
+    return line.replace(STICKY_MARKER, "<!-- pr-ready-verdict (quoted) -->")
+
+
 def findings_excerpt(path: str, verdict_present: bool) -> str:
     """The reviewer's findings, quoted safely into the sticky comment.
 
@@ -1069,9 +1076,7 @@ def findings_excerpt(path: str, verdict_present: bool) -> str:
             break
         if line.startswith("REVIEWED_TREE="):
             continue
-        if _MERGE_DIGEST_HEADING_RE.match(line):
-            line = "\\" + line
-        out.append(line.replace(STICKY_MARKER, "<!-- pr-ready-verdict (quoted) -->"))
+        out.append(_escape_quoted(line))
     text = "\n".join(out).strip("\n")
     if len(text) > EXCERPT_LIMIT:
         text = text[:EXCERPT_LIMIT] + "… (truncated)"
@@ -1330,6 +1335,112 @@ def digest_rows_for_display(digest: list, fid: dict) -> list:
     return rows
 
 
+_TERMINAL_WORD_RE = re.compile(r"^(NOT READY|READY WITH NOTES|READY)\b")
+# Same literal as runner.BODY_ONLY_SHA; the core module must not import the runner.
+_BODY_ONLY_SHA = "body-only"
+
+
+def _terminal_verdict_word(terminal: str) -> str | None:
+    """The leading verdict word of the terminal line, the one machine-read verdict."""
+    m = _TERMINAL_WORD_RE.match(terminal or "")
+    return m.group(1) if m else None
+
+
+def _code_review_comment(c: dict) -> str:
+    text = (f"a /code-review comment was posted at {c.get('created_at')} "
+            f"([comment](<{c.get('url')}>))")
+    summary = _escape_quoted(" ".join((c.get("summary") or "").split())).rstrip(".")
+    return f"{text}: {summary}" if summary else text
+
+
+def _code_review_line(cr: dict | None) -> str | None:
+    """What code review this PR shows, from in-process Phase 4B state and the comments scan.
+
+    None when the run recorded neither source (early-exit and replay dicts).
+    """
+    if cr is None:
+        return None
+    ran = bool(cr.get("phase4b_ran"))
+    seen = cr.get("seen")
+    comment = seen.get("comment") if isinstance(seen, dict) else None
+    if ran and comment:
+        return ("**Code review:** Phase 4B ran in this run, and "
+                f"{_code_review_comment(comment)}.")
+    if ran:
+        return "**Code review:** Phase 4B ran in this run."
+    if comment:
+        return (f"**Code review:** {_code_review_comment(comment)}. "
+                "Phase 4B did not run in this run.")
+    if isinstance(seen, dict):
+        return ("**Code review:** none ran. Phase 4B did not run, and the PR had no "
+                "/code-review comment when this run read its comments.")
+    return ("**Code review:** Phase 4B did not run. This run did not read the PR's "
+            "comments, so it cannot say whether a /code-review ran.")
+
+
+def _fixed_citation(sha: str | None, round_no: int) -> str:
+    if sha == _BODY_ONLY_SHA:
+        return f"fixed in the PR body, round {round_no}"
+    return f"fixed in {(sha or '')[:12]}" if sha else "fixed"
+
+
+def _status_sections(fid: dict, final_word: str | None) -> list[str]:
+    """Fixed and Still-open sections from the per-review items, or [] without them.
+
+    Fixed lists each blocking item a later round cleared, citing that round's commit. It
+    renders only when the final verdict passes: a hold that has not cleared has nothing
+    proven fixed. Still open lists what the final review left, with each note's backlog
+    link when `filed_notes` records one.
+    """
+    items = fid.get("review_items") or []
+    if not items or final_word not in ("READY", "READY WITH NOTES", "NOT READY"):
+        return []
+    passing = final_word != "NOT READY"
+    # The last review that produced a verdict: an indeterminate final re-review has no items.
+    final = next((r for r in reversed(items) if r.get("verdict")), items[-1])
+    out: list[str] = []
+
+    fixed: list[str] = []
+    if passing and len(items) > 1:
+        seen_titles: set = set()
+        for k in range(len(items) - 1):
+            for title in items[k].get("blocking") or []:
+                if title in seen_titles:
+                    continue
+                seen_titles.add(title)
+                cite = _fixed_citation(items[k + 1].get("remediation_sha"), k + 1)
+                fixed.append(f"- [x] {linkify_refs(title)} ({cite})")
+    if fixed:
+        out.extend(["### Fixed in this PR", *fixed, ""])
+
+    notes = final.get("notes") or []
+    filed = fid.get("filed_notes") or []
+    if not passing:
+        open_lines = [f"- [ ] {linkify_refs(t)}" for t in final.get("blocking") or []]
+        open_lines += [f"- [ ] {linkify_refs(t)} (not filed)" for t in notes]
+        heading = "### Still open (blocking)"
+    else:
+        open_lines = []
+        for rec in filed:
+            state = rec.get("state")
+            if state == "filed" and rec.get("issue") is not None:
+                where = _backlog_link(f"backlog#{rec['issue']}", rec["issue"])
+            elif state == "already tracked":
+                where = "already tracked in the backlog"
+            else:
+                where = "not filed"
+            open_lines.append(f"- [ ] {linkify_refs(rec.get('title') or '')} ({where})")
+        if filed and len(notes) > len(filed):
+            open_lines.append(f"- {len(notes) - len(filed)} more notes were not filed; "
+                              "the reviewer verdict below lists them.")
+        if not filed:
+            open_lines += [f"- [ ] {linkify_refs(t)} (not filed)" for t in notes]
+        heading = "### Still open (non-blocking)"
+    if open_lines:
+        out.extend([heading, *open_lines, ""])
+    return out
+
+
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
                    digest: list, excerpt: str, terminal: str, *,
                    diff_id: str = "", plan_hash: str = "",
@@ -1357,6 +1468,10 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
         verdict_word = rounds[findings_round - 1].get("verdict") or "missing"
     else:
         verdict_word = fid.get("verdict_1") or "missing"
+    # The terminal line is the one machine-read verdict; the banner copies its word so the
+    # two can never disagree. The round lookup above stays as the fallback for a terminal
+    # line that does not open with a verdict word.
+    verdict_word = _terminal_verdict_word(terminal) or verdict_word
 
     armed = decision is not None and getattr(decision, "armed", False)
     banner = f"**{verdict_word}**"
@@ -1384,12 +1499,20 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
         out.append("")
 
     visible, coverage = _shape_excerpt(excerpt)
-    if visible:
+    cr_line = _code_review_line(fid.get("code_review"))
+    if cr_line:
+        out.extend([cr_line, ""])
+    sections = _status_sections(fid, verdict_word)
+    out.extend(sections)
+    if visible and sections:
+        out.extend(["<details><summary>Reviewer verdict</summary>", "", visible, "",
+                    "</details>"])
+    elif visible:
         out.append(visible)
     elif not excerpt:
         out.append(f"(no verdict file: {fid.get('error_kind')})")
     nums = fid.get("backlog_issue_numbers") or []
-    if nums:
+    if nums and not fid.get("filed_notes"):
         out.append("**Backlog issues filed:** " + ", ".join(
             _backlog_link(f"a-jay85/IBL5-backlog#{n}", n) for n in nums))
 
@@ -1435,6 +1558,12 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
             f"{i + 1}. {(r.get('remediation_sha') or '')[:12]} "
             f"→ {r.get('verdict') or 'INDETERMINATE'}"
             for i, r in enumerate(rounds)))
+    review_items = fid.get("review_items") or []
+    if len(review_items) > 1:
+        for k, item in enumerate(review_items):
+            out.append(f"**Review {k + 1}:** {item.get('verdict') or 'INDETERMINATE'}, "
+                       f"{len(item.get('blocking') or [])} blocking, "
+                       f"{len(item.get('notes') or [])} notes")
     out.extend(["", "</details>"])
 
     out.append("")

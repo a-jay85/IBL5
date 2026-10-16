@@ -36,6 +36,11 @@ name: Merge digest notify
 # branch can predate this workflow entirely and so may not carry bin/digest-dm-build at
 # all, which would red the run at the builder step. The default branch always carries the
 # deployed parser, which is also the one reason (2) above asks for.
+#
+# The `after-merge-checklist` job reuses the digest job's deployment note: a `pull_request`
+# workflow runs on its own PR's `closed` event, so the PR that adds that job is the first
+# live exercise of it. The first checklist comment on that PR, or its absence, is the
+# verification step.
 
 on:
   pull_request:
@@ -124,4 +129,55 @@ jobs:
           ping: 'true'
           # A silently-dropped merge notification is indistinguishable from "nothing merged",
           # which is the exact failure the ledger had. Fail the run instead.
+          fail-on-delivery: 'true'
+
+  # The PR body is attacker-influenced text (anyone may open a PR). Every event value
+  # travels as an `env:` variable and the body travels as a file; nothing from the event is
+  # ever spliced into a `run:` body.
+  after-merge-checklist:
+    # Same merged + same-repo guard as the digest job (fork PRs get no secrets).
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write   # gh pr comment; the ONLY write scope in this workflow
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The DEFAULT branch, for the same reasons as the digest job: the deployed
+          # bin/after-merge-checklist must run, not the copy inside the PR being announced.
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Post after-merge checklist comment
+        id: checklist
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Pass a path, never the text (shell injection).
+          gh pr view "$PR_NUMBER" --json body --jq '.body // ""' > "$RUNNER_TEMP/pr-body.md"
+
+          bash bin/after-merge-checklist \
+            --pr-number "$PR_NUMBER" \
+            --title "$PR_TITLE" \
+            --pr-url "$PR_URL" \
+            --pr-body-file "$RUNNER_TEMP/pr-body.md" \
+            --comment-out "$RUNNER_TEMP/after-merge-comment.md" \
+            --dm-out "$RUNNER_TEMP/discord-msg.txt"
+
+      - name: Send Discord message
+        if: steps.checklist.outputs.status == 'posted'
+        uses: ./.github/actions/notify-discord
+        with:
+          message-file: ${{ runner.temp }}/discord-msg.txt
+          webhook-url: ${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}
+          ping: 'false'   # the digest job already pinged for this merge
           fail-on-delivery: 'true'

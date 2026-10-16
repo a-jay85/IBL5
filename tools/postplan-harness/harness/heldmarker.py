@@ -8,6 +8,9 @@ The marker is advisory and fails open. It is active only while the live hold rec
 still carries the same structural key and condition-3 MISSING set, and the plan resolves
 to the same path with the same mtime. Anything unsure means "proceed": a bug here costs
 one launch at most and can never suppress a run whose hold or plan changed.
+A marker whose hold carries `UNREALISED-ASSERTION: row` parts is also keyed on the branch
+head SHA and on origin/master not carrying any of the row's missing tokens. An unavailable
+head SHA, a dirty worktree or a failed fetch means proceed.
 
 This module only reads and writes files under `state_dir`. It never touches a PR, a
 label, a matrix row or an arming condition.
@@ -18,12 +21,13 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 import sys
 
 from harness import holdrepeat
 from harness.statefile import safe_slug
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SUPPRESS_EXIT = 10
 
 
@@ -34,8 +38,12 @@ def marker_path(state_dir: str, slug: str) -> str:
 def _condition3_parts(rec) -> frozenset:
     for entry in (rec or {}).get("structural") or []:
         if isinstance(entry, list) and len(entry) == 3 and entry[0] == 3:
-            return holdrepeat.missing_parts(entry[2] or "")
+            return holdrepeat.hold_parts(entry[2] or "")
     return frozenset()
+
+
+def _marker_unrealised(marker) -> bool:
+    return bool(holdrepeat.unrealised_parts(marker.get("reason") or ""))
 
 
 def record_hold(rec) -> tuple[str, str]:
@@ -64,12 +72,26 @@ def _read_marker(state_dir, slug):
     return doc
 
 
-def write(state_dir, slug, *, plan_path: str, now: str):
+def _fetch_master(repo: str) -> bool:
+    try:
+        proc = subprocess.run(["git", "-C", repo, "fetch", "--quiet", "origin", "master"],
+                              capture_output=True, check=False, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
+
+
+def write(state_dir, slug, *, plan_path: str, now: str, head_sha: str = "",
+          missing_tokens=()):
     """Write the marker. Returns (path, is_new), or None when refused or failed."""
     try:
         rec = holdrepeat.load_record(state_dir, slug)
         key, digest = record_hold(rec)
         if rec is None or not key or not digest or not plan_path:
+            return None
+        parts = _condition3_parts(rec)
+        if holdrepeat.unrealised_parts("; ".join(parts)) and (
+                not head_sha or not missing_tokens):
             return None
         mtime_ns = os.stat(plan_path).st_mtime_ns
         real_plan = os.path.realpath(plan_path)
@@ -78,9 +100,11 @@ def write(state_dir, slug, *, plan_path: str, now: str):
             "slug": slug,
             "structural_key": key,
             "hold_hash": digest,
-            "reason": "; ".join(sorted(_condition3_parts(rec))),
+            "reason": "; ".join(sorted(parts)),
             "plan_path": real_plan,
             "plan_mtime_ns": mtime_ns,
+            "head_sha": head_sha,
+            "missing_tokens": sorted(set(missing_tokens)),
             "written_at": now,
         }
         prior = _read_marker(state_dir, slug)
@@ -107,7 +131,8 @@ def write(state_dir, slug, *, plan_path: str, now: str):
         return None
 
 
-def active(state_dir, slug, plan_path: str) -> tuple[bool, str]:
+def active(state_dir, slug, plan_path: str, *, head_sha: str = "", repo: str = "",
+           worktree: str = "", fetch: bool = False) -> tuple[bool, str]:
     """Read-only. True only when the marker still describes the live hold and plan."""
     try:
         marker = _read_marker(state_dir, slug)
@@ -123,6 +148,24 @@ def active(state_dir, slug, plan_path: str) -> tuple[bool, str]:
             return False, ""
         if os.stat(plan_path).st_mtime_ns != marker.get("plan_mtime_ns"):
             return False, ""
+        if _marker_unrealised(marker):
+            if not head_sha and worktree:
+                head_sha = holdrepeat.head_sha(worktree)
+            if not head_sha or head_sha != marker.get("head_sha"):
+                return False, ""
+            if worktree and holdrepeat.worktree_clean(worktree) is not True:
+                return False, ""
+            repo = repo or worktree
+            if not repo:
+                return False, ""
+            if fetch and not _fetch_master(repo):
+                return False, ""
+            if holdrepeat.tokens_on_ref(
+                    repo, "origin/master", marker.get("missing_tokens") or []) is not False:
+                return False, ""
+            reason = (f"held-unfixable: same hold ({marker.get('reason')}), plan and head "
+                      f"{head_sha[:12]} unchanged; marker {marker_path(state_dir, slug)}")
+            return True, reason
         reason = (f"held-unfixable: same hold ({marker.get('reason')}), plan unchanged; "
                   f"marker {marker_path(state_dir, slug)}")
         return True, reason
@@ -144,6 +187,9 @@ def _build_parser() -> argparse.ArgumentParser:
     chk.add_argument("--state-dir", required=True)
     chk.add_argument("--slug", required=True)
     chk.add_argument("--plan", default="")  # explicit override path only; "" = resolve via locate_plan
+    chk.add_argument("--head-sha", default="")
+    chk.add_argument("--worktree", default="")
+    chk.add_argument("--repo", default="")
     return ap
 
 
@@ -153,7 +199,9 @@ def main(argv=None) -> int:
         from harness.planfile import locate_plan
         plan = locate_plan(args.slug, explicit_path=args.plan or None)
         plan_path = plan.path if plan.found else ""
-        is_active, reason = active(args.state_dir, args.slug, plan_path)
+        is_active, reason = active(args.state_dir, args.slug, plan_path,
+                                   head_sha=args.head_sha, repo=args.repo or os.getcwd(),
+                                   worktree=args.worktree, fetch=True)
     except Exception as e:  # noqa: BLE001 - fail open by design
         print(f"heldmarker: check failed ({e}); proceeding", file=sys.stderr)
         return 0

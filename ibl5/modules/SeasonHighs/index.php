@@ -33,8 +33,9 @@ global $mysqli_db, $leagueContext;
 $season = new \Season\Season($mysqli_db, $leagueContext);
 
 // Determine season phase (from request or current phase)
-$seasonPhase = isset($_GET['seasonPhase']) && !empty($_GET['seasonPhase'])
-    ? $_GET['seasonPhase']
+$seasonPhaseParam = $_GET['seasonPhase'] ?? null;
+$seasonPhase = is_string($seasonPhaseParam) && $seasonPhaseParam !== '' && $seasonPhaseParam !== '0'
+    ? $seasonPhaseParam
     : $season->phase;
 
 $pagetitle = "- $seasonPhase Stat Leaders";

@@ -114,9 +114,12 @@ pr_json() {
           headRefOid: $sha, headRefName: ("fixture-" + ($num|tostring))}'
 }
 
-BODY_CLEAR="$(printf '## Summary\nx\n\n## Manual Testing\nNo manual testing needed (covered by automated tests).')"
+DANGER_TWO_WAY='**Merge danger:** Door: two-way · Blast radius: localized · Why: fixture change, a revert restores it'
+DANGER_ONE_WAY='**Merge danger:** Door: one-way · Blast radius: site-wide · Why: fixture prunes data a revert cannot restore'
+MT_CLEAR=$'## Manual Testing\nNo manual testing needed (covered by automated tests).'
+BODY_CLEAR="$(printf '## Summary\nx\n\n%s\n\n%s' "$MT_CLEAR" "$DANGER_TWO_WAY")"
 BODY_HELD="$(printf '## Summary\nx\n\n## Manual Testing\n- [ ] click the button')"
-BODY_UNCLEARED="$(printf '## Summary\nx')"
+BODY_UNCLEARED="$(printf '## Summary\nx\n\n%s' "$DANGER_TWO_WAY")"
 
 # run_triage <fixdir> [--arm]  — sets OUT (merged stdout+stderr) and ST (exit status)
 run_triage() {
@@ -237,6 +240,35 @@ assert_match  "C10 bucket=UNCLEARED"      "^UNCLEARED$"       "$(row_bucket "$OU
 assert_absent "C10 no pr merge"           "pr merge"          "$(cat "$FIX/calls.log" 2>/dev/null)"
 assert_status "C10 exit 0"                0                   "$ST"
 
+# --- C10b: cleared + green but merge danger ONE-WAY is HELD, never armed (condition 18) ---
+FIX="$(mktemp -d -p "$TMP")"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 41).json"
+pr_json 41 BEHIND "$(printf '## Summary\nx\n\n%s\n\n%s' "$MT_CLEAR" "$DANGER_ONE_WAY")" | jq -s . > "$FIX/prs.json"
+run_triage "$FIX" --arm
+assert_match  "C10b bucket=HELD"              "^HELD$"               "$(row_bucket "$OUT" 41)"
+assert_match  "C10b HOLDS names one-way"      "merge-danger:ONE-WAY" "$OUT"
+assert_absent "C10b no pr merge"              "pr merge"             "$(cat "$FIX/calls.log" 2>/dev/null)"
+assert_status "C10b exit 0"                   0                      "$ST"
+
+# --- C10c: cleared + green but no merge-danger line is HELD (condition 18 fails closed) ---
+FIX="$(mktemp -d -p "$TMP")"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 42).json"
+pr_json 42 BLOCKED "$(printf '## Summary\nx\n\n%s' "$MT_CLEAR")" | jq -s . > "$FIX/prs.json"
+run_triage "$FIX" --arm
+assert_match  "C10c bucket=HELD"              "^HELD$"               "$(row_bucket "$OUT" 42)"
+assert_match  "C10c HOLDS names missing"      "merge-danger:MISSING" "$OUT"
+assert_absent "C10c no pr merge"              "pr merge"             "$(cat "$FIX/calls.log" 2>/dev/null)"
+
+# --- C10d: cleared + green but gate backtest HELD is HELD (condition 17) ---
+FIX="$(mktemp -d -p "$TMP")"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 43).json"
+BT_HELD="$(printf '%s\n\n<!-- gate-backtest:begin -->\n<!-- gate-backtest-state: HELD -->\n<!-- gate-backtest:end -->' "$BODY_CLEAR")"
+pr_json 43 BLOCKED "$BT_HELD" | jq -s . > "$FIX/prs.json"
+run_triage "$FIX" --arm
+assert_match  "C10d bucket=HELD"              "^HELD$"               "$(row_bucket "$OUT" 43)"
+assert_match  "C10d HOLDS names backtest"     "gate-backtest:HELD"   "$OUT"
+assert_absent "C10d no pr merge"              "pr merge"             "$(cat "$FIX/calls.log" 2>/dev/null)"
+
 # --- C11: BEHIND, merge-line pass fails: merge logged, pass logged, exit 1 ---
 FIX="$(mktemp -d -p "$TMP")"
 echo 1 > "$FIX/merge-line-rc"
@@ -350,6 +382,23 @@ assert_match  "H6 recorded (8)"                      '^\(8\) feat — awaiting h
 assert_absent "H6 stops at block end (trailing)"     'trailing'                                         "$OUT"
 OUT="$(hp_sticky_reasons "${H_STICKY/Auto-merge held:/**Auto-merge held:**}")"
 assert_match  "H6 bold header accepted"              '^\(7\) '                                          "$OUT"
+
+# pr3267 dual-layout: the old (v1) and new (v2) sticky layouts yield the same hold reasons,
+# and a Still-open bullet in the v2 layout is never read as a hold.
+PR3267_DIR="$SCRIPT_DIR/fixtures/review-shared"
+PR3267_V1="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v1.json")"
+PR3267_V2="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v2.json")"
+PR3267_WANT='(3) plan-matrix — MISSING: tests/example'
+OUT="$(hp_sticky_reasons "$PR3267_V1")"
+assert_status "pr3267-v1-hold-reasons"               0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
+OUT="$(hp_sticky_reasons "$PR3267_V2")"
+assert_status "pr3267-v2-hold-reasons"               0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
+PR3267_OPEN=$'### Still open (non-blocking)\n'
+PR3267_OPEN_NEW="${PR3267_OPEN}- (9) fake — x"$'\n'
+PR3267_V2_OPEN="${PR3267_V2/"$PR3267_OPEN"/$PR3267_OPEN_NEW}"
+assert_status "pr3267-v2-open-item-inserted"         0 "$([ "$PR3267_V2_OPEN" != "$PR3267_V2" ] && echo 0 || echo 1)"
+OUT="$(hp_sticky_reasons "$PR3267_V2_OPEN")"
+assert_status "pr3267-v2-open-item-not-a-hold"       0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
 
 OUT="$(hp_sticky_reasons "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Auto-merge held:' '- no arming decision recorded')")"
 assert_status "H7 no-decision bullet -> no reason"   0 "${#OUT}"

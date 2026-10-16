@@ -1279,6 +1279,30 @@ _st44="$(derive_status "$_DM_LOG")"
     || fail "dm-does-not-pollute-status: derive_status='$_st44', want 'READY' — notify() modified the log"
 end_case dm-does-not-pollute-status
 
+# --- fleet-pr3267-v2-terminal -------------------------------------------------------------
+# derive_status reads the post-plan-now LOG, never the sticky comment, so the new sticky
+# layout cannot change it. This twin pins that: the v1 terminal line and the v2 terminal
+# line (both `READY ... (re-review) ...` forms from the pr3267 fixtures) leave a log
+# classified the same way. The v1 value is captured from the v1 log, then pinned for v2.
+begin_case
+_fx_dir="$SCRIPT_DIR/fixtures/review-shared"
+_term_of() {  # $1 = fixture file; prints the terminal line (the line above the marker)
+    jq -r '.comments[-1].body' "$1" | awk '{ if ($0=="<!-- pr-ready-verdict -->") {print prev; exit} prev=$0 }'
+}
+_t_v1="$(_term_of "$_fx_dir/post-plan-sticky-pr3267-v1.json")"
+_t_v2="$(_term_of "$_fx_dir/post-plan-sticky-pr3267-v2.json")"
+[[ "$_t_v1" == "READY (re-review) — "* ]] || fail "fleet-pr3267-v2-terminal: v1 terminal line not as expected: $_t_v1"
+[[ "$_t_v2" == "READY WITH NOTES (re-review) — "* ]] || fail "fleet-pr3267-v2-terminal: v2 terminal line not as expected: $_t_v2"
+_log_v1="$SCRATCH/pr3267-v1.log"; _log_v2="$SCRATCH/pr3267-v2.log"
+printf 'PUSHED PR #7 abc123 (moved: yes, push rc: 0)\n%s\n' "$_t_v1" > "$_log_v1"
+printf 'PUSHED PR #7 abc123 (moved: yes, push rc: 0)\n%s\n' "$_t_v2" > "$_log_v2"
+_st_v1="$(derive_status "$_log_v1")"
+_st_v2="$(derive_status "$_log_v2")"
+[[ "$_st_v1" == "READY" ]] || fail "fleet-pr3267-v2-terminal: v1 log derive_status='$_st_v1', want 'READY'"
+[[ "$_st_v2" == "$_st_v1" ]] \
+    || fail "fleet-pr3267-v2-terminal: v2 log derive_status='$_st_v2', differs from v1 '$_st_v1'"
+end_case fleet-pr3267-v2-terminal
+
 # --- case 46: dm-unknown-flag-rejected ----------------------------------------------------
 begin_case
 check_reject 'unknown flag' --no-dms

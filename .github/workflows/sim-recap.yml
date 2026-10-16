@@ -3,7 +3,7 @@ on:
   repository_dispatch:
     types: [sim-recap]
   schedule:
-    - cron: '23 * * * *'        # hourly fallback; an empty tick spawns zero claude
+    - cron: '3,13,23,33,43,53 * * * *'   # future-time trigger; an idle run exits at the empty-tick cost guard
   workflow_dispatch:
     inputs:
       sim: { description: 'Claim this sim (digits) instead of claim-next', required: false, default: '' }
@@ -11,6 +11,7 @@ on:
     paths: ['.github/workflows/sim-recap.yml']   # checkout and parse only; Check secrets is skipped
 permissions:
   contents: read
+  actions: write               # lets the re-dispatch step start workflow_dispatch
 concurrency:
   group: sim-recap
   cancel-in-progress: false
@@ -38,6 +39,11 @@ jobs:
              || [ -z "$T1" ] || [ -z "$T2" ] || [ -z "$T3" ] || [ -z "$T4" ] \
              || [ -z "$T5" ] || [ -z "$T6" ] || [ -z "$T7" ] || [ -z "$T8" ] || [ -z "$T9" ]; then
             echo "secrets not configured, skipping"
+            missing=""
+            for pair in CLAUDE_CODE_OAUTH_TOKEN:T1 SIM_RECAP_SSH_KEY:T2 SIM_RECAP_REMOTE_ROOT:T3 SIM_RECAP_DB_USER:T4 SIM_RECAP_DB_NAME:T5 SIM_RECAP_DB_PASSWORD:T6 HOST:T7 PORT:T8 USERNAME:T9; do
+              [ -n "${!pair#*:}" ] || missing="${missing:+$missing, }${pair%%:*}"
+            done
+            echo "::warning title=sim-recap::secrets missing: ${missing}; GitHub cannot run recaps. The Mac backup claims pending sims after 45 minutes."
             echo "configured=false" >> "$GITHUB_OUTPUT"
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
@@ -62,6 +68,7 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with: { path: '${{ runner.temp }}/sim-recap-state', key: 'sim-recap-ops-alert-${{ github.run_id }}', restore-keys: 'sim-recap-ops-alert-' }
       - name: Run tick
+        id: tick
         if: steps.secrets.outputs.configured == 'true'
         timeout-minutes: 35
         env:
@@ -88,6 +95,11 @@ jobs:
           fi
           # shellcheck disable=SC2086  # sim_arg is empty or one validated --sim=digits word
           bin/sim-recap-tick $sim_arg >/dev/null
+      - name: Re-dispatch for an immediate retry
+        if: ${{ !cancelled() && steps.secrets.outputs.configured == 'true' && steps.tick.outputs.redispatch == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run sim-recap.yml --repo "$GITHUB_REPOSITORY" --ref "${{ github.event.repository.default_branch }}"
       - name: Close ssh master
         if: always() && steps.secrets.outputs.configured == 'true'
         run: ssh -O exit ibl-prod 2>/dev/null || true

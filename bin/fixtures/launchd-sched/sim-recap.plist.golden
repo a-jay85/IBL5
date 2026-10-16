@@ -25,6 +25,8 @@
 		     EnvironmentVariables, so a literal @HOME@ would bake in a dead path. -->
 		<key>PATH</key>
 		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
+		<key>SIM_RECAP_HOST_MODE</key>
+		<string>launchd</string>
 		<key>SIM_RECAP_SSH_HOST</key>
 		<string>golden-host</string>
 		<key>SIM_RECAP_REMOTE_ROOT</key>

@@ -17,5 +17,7 @@ final class NewsPageConfig
         public readonly string $siteName,
         public readonly int $multilingual,
         public readonly string $currentLang,
+        public readonly string $tableBgcolor1 = '#EEEEEE',
+        public readonly string $tableBgcolor2 = '#CCCCCC',
     ) {}
 }

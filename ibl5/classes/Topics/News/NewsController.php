@@ -45,6 +45,7 @@ class NewsController implements NewsControllerInterface
         private readonly \LastSimRecap\Contracts\LastSimRecapViewInterface $lastSimRecapView,
         private readonly \Topics\News\Contracts\NewsServiceInterface $newsService,
         private readonly \Topics\News\Contracts\NewsViewInterface $newsView,
+        private readonly \Api\Contracts\HtmlResponderInterface $htmlResponder = new \Api\Response\HtmlResponder(),
     ) {}
 
     public function main(mixed $new_topic): void
@@ -72,22 +73,18 @@ class NewsController implements NewsControllerInterface
 
         if ($new_topic !== 0) {
             $topicText = $newsService->getTopicText($new_topic);
-            OpenTable();
-            if ($topicText === null) {
-                echo "<center><font class=\"title\">$sitename</font><br><br>" . _NOINFO4TOPIC . "<br><br>[ <a href=\"modules.php?name=News\">" . _GOTONEWSINDEX . "</a> | <a href=\"modules.php?name=Topics\">" . _SELECTNEWTOPIC . "</a> ]</center>";
-            } else {
-                $topic_title = \Security\HtmlSanitizer::safeHtmlOutput($topicText);
+            $safeTopicTitle = null;
+            if ($topicText !== null) {
+                $safeTopicTitle = \Security\HtmlSanitizer::safeHtmlOutput($topicText);
                 $newsService->bumpAllTopics();
-                echo "<center><font class=\"title\">$sitename: $topic_title</font><br><br>"
-                    . "<form action=\"modules.php?name=Search\" method=\"post\">"
-                    . "<input type=\"hidden\" name=\"topic\" value=\"$new_topic\">"
-                    . "" . _SEARCHONTOPIC . ": <input type=\"name\" name=\"query\" size=\"30\">&nbsp;&nbsp;"
-                    . "<input type=\"submit\" value=\"" . _SEARCH . "\">"
-                    . "</form>"
-                    . "[ <a href=\"index.php\">" . _GOTOHOME . "</a> | <a href=\"modules.php?name=Topics\">" . _SELECTNEWTOPIC . "</a> ]</center>";
             }
-            CloseTable();
-            echo "<br>";
+            $this->htmlResponder->html($this->newsView->renderTopicBanner(
+                $sitename,
+                $safeTopicTitle,
+                $new_topic,
+                $this->config->tableBgcolor1,
+                $this->config->tableBgcolor2,
+            ));
         }
 
         $stories = $this->queryStories($new_topic, $storynum);
@@ -99,11 +96,7 @@ class NewsController implements NewsControllerInterface
     {
         \PageLayout\PageLayout::header();
 
-        if (defined('HOME_FILE')) {
-            echo '<h1 class="ibl-title">IBL: Internet Basketball League</h1>';
-        } else {
-            echo '<h1 class="ibl-title">News</h1>';
-        }
+        $this->htmlResponder->html($this->newsView->renderPageTitle(defined('HOME_FILE')));
     }
 
     /**
@@ -121,7 +114,7 @@ class NewsController implements NewsControllerInterface
                     $recapService = $this->lastSimRecapService;
                     $slate = $recapService->buildSlateForTeam($tid);
                     if ($slate !== null) {
-                        echo $this->lastSimRecapView->render($slate);
+                        $this->htmlResponder->html($this->lastSimRecapView->render($slate));
                     }
                 }
             }

@@ -79,6 +79,10 @@
   --color-txn-release-fg: #00838f;
 
   /* Neutrals (promoted so utilities + tokens share source) */
+  /* League brand primaries. Mirrored by League\LeagueContext::IBL_PRIMARY_COLOR
+     and ::OLYMPICS_PRIMARY_COLOR; LeagueContextTest fails on drift. */
+  --color-ibl-primary: #1a365d;
+  --color-olympics-primary: #c53030;
   --color-gray-50:  #f9fafb;
   --color-gray-100: #f3f4f6;
   --color-gray-200: #e5e7eb;

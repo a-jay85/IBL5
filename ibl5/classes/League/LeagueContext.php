@@ -14,6 +14,13 @@ class LeagueContext
 {
     const LEAGUE_IBL = 'ibl';
     const LEAGUE_OLYMPICS = 'olympics';
+
+    /** Mirrors --color-ibl-primary in ibl5/design/input.css (@theme). */
+    public const IBL_PRIMARY_COLOR = '#1a365d';
+
+    /** Mirrors --color-olympics-primary in ibl5/design/input.css (@theme). */
+    public const OLYMPICS_PRIMARY_COLOR = '#c53030';
+
     const COOKIE_NAME = 'ibl_league';
 
     /**
@@ -205,21 +212,21 @@ class LeagueContext
             self::LEAGUE_IBL => [
                 'title' => 'Internet Basketball League',
                 'short_name' => 'IBL',
-                'primary_color' => '#1a365d',
+                'primary_color' => self::IBL_PRIMARY_COLOR,
                 'logo_path' => 'images/ibl/logo.png',
                 'images_path' => 'images/'
             ],
             self::LEAGUE_OLYMPICS => [
                 'title' => 'IBL Olympics',
                 'short_name' => 'Olympics',
-                'primary_color' => '#c53030',
+                'primary_color' => self::OLYMPICS_PRIMARY_COLOR,
                 'logo_path' => 'images/olympics/logo.png',
                 'images_path' => 'images/olympics/'
             ],
             default => [
                 'title' => 'Internet Basketball League',
                 'short_name' => 'IBL',
-                'primary_color' => '#1a365d',
+                'primary_color' => self::IBL_PRIMARY_COLOR,
                 'logo_path' => 'images/ibl/logo.png',
                 'images_path' => 'images/'
             ]

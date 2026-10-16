@@ -296,6 +296,46 @@ class LeagueContextTest extends TestCase
         $this->assertSame('IBL', $config['short_name']);
     }
 
+    /**
+     * The IBL primary constant must equal the single --color-ibl-primary @theme token
+     */
+    public function testIblPrimaryColorMatchesDesignToken(): void
+    {
+        $css = file_get_contents(dirname(__DIR__, 2) . '/design/input.css');
+        $this->assertIsString($css);
+
+        $count = preg_match_all('/--color-ibl-primary:\s*(#[0-9a-fA-F]{6})\s*;/', $css, $m);
+
+        $this->assertSame(1, $count);
+        $this->assertSame(strtolower(LeagueContext::IBL_PRIMARY_COLOR), strtolower($m[1][0]));
+    }
+
+    /**
+     * The Olympics primary constant must equal the single --color-olympics-primary @theme token
+     */
+    public function testOlympicsPrimaryColorMatchesDesignToken(): void
+    {
+        $css = file_get_contents(dirname(__DIR__, 2) . '/design/input.css');
+        $this->assertIsString($css);
+
+        $count = preg_match_all('/--color-olympics-primary:\s*(#[0-9a-fA-F]{6})\s*;/', $css, $m);
+
+        $this->assertSame(1, $count);
+        $this->assertSame(strtolower(LeagueContext::OLYMPICS_PRIMARY_COLOR), strtolower($m[1][0]));
+    }
+
+    /**
+     * Test getConfig reads primary colors from the token-pinned constants
+     */
+    public function testGetConfigPrimaryColorsUseTokenConstants(): void
+    {
+        $_SESSION['current_league'] = 'ibl';
+        $this->assertSame(LeagueContext::IBL_PRIMARY_COLOR, $this->leagueContext->getConfig()['primary_color']);
+
+        $_SESSION['current_league'] = 'olympics';
+        $this->assertSame(LeagueContext::OLYMPICS_PRIMARY_COLOR, $this->leagueContext->getConfig()['primary_color']);
+    }
+
     // ---- isOlympics() tests ----
 
     public function testIsOlympicsReturnsFalseForIblContext(): void

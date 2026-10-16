@@ -932,7 +932,10 @@ _VERDICT_WORDS = ("READY WITH NOTES", "NOT READY", "READY")
     ("NOT READY", "NOT READY"),
 ])
 def test_sticky_banner_verdict_matches_terminal_verdict(tmp_path, v1, v2):
-    """Catches a banner and a terminal line that compute the verdict separately."""
+    """Catches a banner and a terminal line that compute the verdict separately.
+
+    Mutation check: appending out.append("READY") after the banner fails every case.
+    """
     body = sticky_shapes.render_sticky(sticky_shapes.pr3267_inputs(tmp_path, v1, v2))
     lines = body.splitlines()
     assert lines[-1] == fidelity.STICKY_MARKER

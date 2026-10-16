@@ -425,7 +425,10 @@ def test_phase4b_ran_false_when_phase4b_code_ran_absent(tmp_path, git_shim, monk
 # --- per-note filing record ---------------------------------------------------
 
 def test_file_note_issues_records_filed_duplicate_and_failed():
-    """The per-note record lists filed, already tracked and not filed, in note order."""
+    """The per-note record lists filed, already tracked and not filed, in note order.
+
+    The call is file_note_issues(filed=<list>) and the return value stays the issue numbers.
+    """
 
     class _Gh:
         def __init__(self):

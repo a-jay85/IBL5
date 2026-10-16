@@ -428,6 +428,7 @@ def test_scored_findings_reach_work_list_via_before_remediation(tmp_path, git_sh
 # --- per-review items survive the round loop -----------------------------------
 
 def test_review_items_keeps_verdict_one_after_rounds_advance(tmp_path, git_shim):
+    """review_items[0] keeps verdict 1's BLOCKING title after verdict_path advances."""
     llm = _ScriptedLlm(UsageLedger(), {
         "plan-fidelity-review": [
             "6d checks\n\n## FINDINGS\n\n- [BLOCKING] Banner disagrees\n"

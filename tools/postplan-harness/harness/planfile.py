@@ -279,8 +279,13 @@ def parse_run_only_test_paths(content: str) -> list[str]:
     return [p for p in marked if p not in unmarked]
 
 
-def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
-    """Returns (planned_test_paths, truly_manual_rows) from the Verification Matrix.
+def parse_matrix(
+    content: str,
+) -> tuple[list[str], list[manual_rows.ManualRow], list[manual_rows.ManualRow]]:
+    """Returns (planned_test_paths, truly_manual_rows, post_merge_rows) from the matrix.
+
+    A Truly-manual row whose cells carry `post-merge: <reason>` goes to
+    post_merge_rows instead of truly_manual_rows (bin/check-plan gate [PM]).
 
     Planned tests: rows whose Test type is PHPUnit / API-test / E2E / Visual-regression;
     path taken from the row's backticked file token.
@@ -310,17 +315,24 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
     """
     planned: list[str] = []
     manual: list[manual_rows.ManualRow] = []
+    post_merge: list[manual_rows.ManualRow] = []
+    in_matrix = False  # inside a `What to verify` table, as bin/check-plan's GATEP_MATRIX
     for line in _strip_fenced(content):
         if not line.strip().startswith("|"):
+            in_matrix = False
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if any(_norm_cell(c).lower() == "what to verify" for c in cells):
+            in_matrix = True
         row = " | ".join(cells)
         if re.search(r"truly.?manual", row, re.I):
-            manual.append(manual_rows.row_from_cells(cells, len(manual) + 1))
+            mrow = manual_rows.row_from_cells(
+                cells, len(manual) + len(post_merge) + 1, in_matrix=in_matrix)
+            (post_merge if mrow.post_merge_reason else manual).append(mrow)
         p = _planned_token(cells)
         if p is not None and p not in planned:
             planned.append(p)
-    return planned, manual
+    return planned, manual, post_merge
 
 
 _EXECUTABLE_TYPE = re.compile(
@@ -916,7 +928,9 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     info.has_security = any(_SECURITY_H.match(l) for l in content.splitlines())
     info.has_reuse = bool(_REUSE.search(content))
     if info.has_matrix:
-        info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
+        (
+            info.planned_test_paths, info.truly_manual_rows, info.post_merge_rows,
+        ) = parse_matrix(content)
         info.executable_row_count = count_executable_matrix_rows(content)
         info.no_change_test_paths = parse_no_change_test_paths(content)
         info.run_only_test_paths = parse_run_only_test_paths(content)

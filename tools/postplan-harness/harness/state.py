@@ -150,6 +150,8 @@ class PlanInfo:
     backlog_issues: list[tuple] = field(default_factory=list)  # (kind, number); kind in {"closes", "refs"}
     deferral_hits: list[tuple] = field(default_factory=list)  # (text, line_no, key) from ## Out of Scope; see outofscope.py
     truly_manual_rows: list[ManualRow] = field(default_factory=list)
+    # Truly-manual rows tagged post-merge:; rendered under ## After merge, never under ## Manual Testing
+    post_merge_rows: list[ManualRow] = field(default_factory=list)
     # Verification Matrix rows whose Test type is PHPUnit / API-test / E2E /
     # Visual-regression / CLI-executable (planfile.count_executable_matrix_rows).
     # None = not parsed: plan-blind run, no matrix, or a PlanInfo(...) literal in a test.

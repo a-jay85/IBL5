@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-11
+last_verified: 2026-10-15
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -193,6 +193,8 @@ A discharge never replaces a defense — the **Security** bullet (SQL prepared s
 
 ## Delegation packets — delegation economics
 
+The `Assertions:` field carries every property the phase's Verification Matrix rows assert. A sub-agent sees only the packet, so a property that stays in the matrix and never reaches the packet is a property the sub-agent will not ship. A source grep for the property name is green from birth and stays green through the exact regression it pins (the mutation statement in `_architect-contract.md`), so it never counts as running the test.
+
 For a phase that is **genuinely verbose or parallelizable**, delegate the **whole phase loop including its own verify/regen/fixup** — the sub-agent's tool output then accumulates in *its* context and returns as one summary, keeping the orchestrator's per-turn context flat. The win is **context localization** (the orchestrator stops re-reading a growing transcript every turn) — not a flat cost-percentage. Reserve packets for phases whose moved work clearly exceeds a sub-agent's fixed startup (~15K tokens); a packet for one tiny edit costs more than it saves, so keep small phases inline.
 
 This does **not** regress the ~15K economics: tiny sub-tier phases still stay inline because a sub-agent's fixed startup exceeds the work a one/two-edit phase moves. The rule changes only that such a phase is now *labeled* `(inline — …)` instead of left bare — zero new delegation is forced, only an explicit decision. The force applies solely to below-run-model phases whose moved work *already* clears ~15K, which the doctrine *already* says should be packets; the rule makes that latent "should" mechanically enforced.
@@ -249,3 +251,14 @@ A phase that cites only non-repo tokens (`/proc/...`, `~/...`, `origin/master`, 
 ## Context bounds rationale
 
 A sectioned delivery keeps one context across all turns, so what you read on turn 1 is still in front of you on turn 9. Re-Reading the contract re-pays ~7K tokens for text the architect already holds. Opening a `*-detail.md` companion costs ~5K tokens and changes no decision made while writing a plan. Re-reading a `$DRAFT` that grows each turn costs quadratically across the delivery.
+
+## Post-merge rows
+
+Tag only a row that cannot run before the merge. A row a human can perform on the open PR stays untagged, so the tag never empties the Manual-Testing window. A tagged row does not need `pre-prod-exception:` as well.
+
+`post-merge:` and `pre-prod-exception:` are not stacked on one row because they answer different questions. The pre-prod marker answers "where does the logic get exercised before merge". The post-merge tag answers "who confirms the deployed behavior afterwards". A tagged row already concedes the second, and gate 16 still demands a CLI row for the logic slice, so the pre-prod question is settled elsewhere in the matrix.
+
+Gate `[PM]` catches three abuse shapes:
+- **Wrong type.** The tag sits on a row that is not `Truly-manual`, such as a PHPUnit row marked `post-merge: runs after deploy`. Automated rows run in CI on the open PR, so the tag has no meaning there.
+- **Thin or off-vocabulary reason.** `post-merge: easier after it ships` is under the vocabulary bar. A valid reason names the dependency, for example `post-merge: launchd scheduling on the live host only fires after deploy`.
+- **Look-and-feel row.** A row asking a human to judge a new layout carries the tag to avoid holding the merge. That judgment can happen on the open PR, so the row stays in the Manual-Testing window.

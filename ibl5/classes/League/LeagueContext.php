@@ -178,6 +178,8 @@ class LeagueContext
                 'Voting',
                 'VotingResults',
                 'CapSpace',
+                'ContractList',
+                'Contracts',
                 'FranchiseHistory',
                 'AwardHistory',
                 'FranchiseRecordBook',

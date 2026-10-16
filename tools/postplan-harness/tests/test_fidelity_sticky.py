@@ -934,3 +934,41 @@ def test_sticky_banner_verdict_matches_terminal_verdict(tmp_path, v1, v2):
     stated = [ln for ln in above_rule
               if ln.replace("*", "").strip().startswith(_VERDICT_WORDS)]
     assert len(stated) == 1
+
+
+# --- terminal line wording and the re-review carry-forward guard --------------
+
+OLD_REMEDIATED = ("READY (re-review) \u2014 findings remediated in 009d537a1b2c and "
+                  "re-reviewed clean on tree tree2aaaa")
+NEW_REMEDIATED_NOTES = ("READY WITH NOTES (re-review) \u2014 findings remediated in abc; "
+                        "the re-review on tree t left non-blocking notes open")
+
+
+def test_terminal_line_reader_outcomes_characterized():
+    """The old remediated footer is never carried forward. Green before and after."""
+    body = _details_shaped_body(OLD_REMEDIATED)
+    assert fidelity._sticky_prior_verdict(body) is None
+
+
+def test_terminal_line_splits_the_remediated_passing_rows():
+    assert fidelity.terminal_line("NOT READY", None, "abc1234", "READY", TREE, 1) == (
+        f"READY (re-review) \u2014 findings remediated in abc1234 and re-reviewed clean on "
+        f"tree {TREE}")
+    assert fidelity.terminal_line(
+        "NOT READY", None, "abc1234", "READY WITH NOTES", TREE, 1) == (
+        f"READY WITH NOTES (re-review) \u2014 findings remediated in abc1234; the "
+        f"re-review on tree {TREE} left non-blocking notes open")
+
+
+def test_sticky_prior_verdict_rejects_re_review_notes_footer():
+    assert fidelity._sticky_prior_verdict(
+        _details_shaped_body(NEW_REMEDIATED_NOTES)) is None
+
+
+def test_sticky_prior_verdict_bare_notes_still_carries():
+    legacy = ("READY WITH NOTES \u2014 notes left for the merging reviewer; the compiled "
+              "harness remediates only NOT READY")
+    assert fidelity._sticky_prior_verdict(
+        _details_shaped_body("READY WITH NOTES")) == "READY WITH NOTES"
+    assert fidelity._sticky_prior_verdict(
+        _details_shaped_body(legacy)) == "READY WITH NOTES"

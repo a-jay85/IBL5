@@ -1026,6 +1026,7 @@ EXCERPT_LIMIT = 30000
 # a patch-id is 40 hex like a tree sha, so parsing **Reviewed tree:** for it would
 # cross-match. Separate from REVIEWED_TREE_RE, which parses the verdict FILE's bare
 # `REVIEWED_TREE=<sha>` line and is unchanged by this PR.
+_RE_REVIEW_TERMINAL_RE = re.compile(r"^(?:NOT READY|READY WITH NOTES|READY) \(re-review\)")
 STICKY_REVIEWED_DIFF_RE = re.compile(r"^\*\*Reviewed diff:\*\* ([0-9a-f]{40})$", re.M)
 STICKY_PLAN_HASH_RE = re.compile(r"^\*\*Plan hash:\*\* ([0-9a-f]{64})$", re.M)
 STICKY_REUSED_FROM_RE = re.compile(r"^\*\*Reused from:\*\* (\S+) \(([a-z-]+(?:, [a-z-]+)*)\)$", re.M)
@@ -1107,9 +1108,12 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
                 "remediate and re-run /post-plan")
     if v2 is None:
         return "NOT READY — re-review produced no verdict; re-run /post-plan"
-    if v2 in ("READY", "READY WITH NOTES"):
+    if v2 == "READY":
         return (f"READY (re-review) — findings remediated in {remediation_sha} and "
                 f"re-reviewed clean on tree {tree_2 or 'unrecorded'}")
+    if v2 == "READY WITH NOTES":
+        return (f"READY WITH NOTES (re-review) — findings remediated in {remediation_sha}; "
+                f"the re-review on tree {tree_2 or 'unrecorded'} left non-blocking notes open")
     if rounds_completed > 1:
         return (f"NOT READY (re-review) — {rounds_completed} remediation rounds ran and "
                 "the re-review's blocking findings remain; remediate and re-run /post-plan")
@@ -1126,11 +1130,13 @@ def _sticky_prior_verdict(sticky_body: str) -> str | None:
     carry-forward from one of them. Order matters too: the longest alternative is
     checked first, the same property VERDICT_RE encodes.
 
-    A remediated run is deliberately excluded. terminal_line emits "READY (re-review) —
-    ..." when a remediation round produced the passing verdict, and that verdict belongs
-    to the **Re-reviewed tree:** line, not to **Reviewed tree:**. Carrying it forward
-    against **Reviewed tree:** would compare the wrong pair, so it falls through to None
-    and the full review runs.
+    A remediated run is deliberately excluded by an explicit guard keyed on
+    " (re-review)". terminal_line emits "READY (re-review) — ..." or "READY WITH NOTES
+    (re-review) — ..." when a remediation round produced the passing verdict, and that
+    verdict belongs to the **Re-reviewed tree:** line, not to **Reviewed tree:**.
+    Carrying it forward against **Reviewed tree:** would compare the wrong pair, so it
+    returns None and the full review runs. The guard runs first because the READY WITH
+    NOTES prefix test below would otherwise accept the second wording.
     """
     if not sticky_body or STICKY_MARKER not in sticky_body:
         return None
@@ -1139,6 +1145,12 @@ def _sticky_prior_verdict(sticky_body: str) -> str | None:
     if not lines:
         return None
     last = lines[-1]
+    # A remediated verdict never carries forward, whatever its leading word. It belongs to
+    # **Re-reviewed tree:**, and carrying it against **Reviewed tree:** compares the wrong
+    # pair. This guard must run before the READY WITH NOTES prefix test below, which would
+    # otherwise accept "READY WITH NOTES (re-review) — ...".
+    if _RE_REVIEW_TERMINAL_RE.match(last):
+        return None
     if last == "READY":
         return "READY"
     if last.startswith("READY WITH NOTES"):

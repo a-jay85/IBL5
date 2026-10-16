@@ -34,6 +34,7 @@ import shlex
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -68,6 +69,7 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
+from harness.mutations import MutationReport, run_executable_mutations
 from harness import merge_danger
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
@@ -211,6 +213,33 @@ def _record_failure_context(res: RunResult, e: HarnessError) -> None:
     res.error_cmd = _redact(e.cmd) or None
     res.error_output_tail = _redact(e.output) or None
 
+
+
+def _exec_mutations_step(plan, worktree, live, log) -> MutationReport | None:
+    """Executable mutation claims (ADR-0199), run after verify and before arming.
+
+    Returns None when the step did not run (replay, no plan, no worktree), which
+    condition (19) holds on. A crash never aborts the run: it becomes a holding
+    report with tree_suspect=True, because the journal may hold an unreverted edit.
+    """
+    if not (live and plan is not None and getattr(plan, "found", False)
+            and getattr(plan, "path", None) and worktree and os.path.isdir(worktree)):
+        log("exec-mutations: skipped (not a live run with a plan and worktree)")
+        return None
+    try:
+        report = run_executable_mutations(Path(plan.path), Path(worktree))
+    except Exception as e:  # noqa: BLE001 - the step must hold, never fail the run
+        report = MutationReport(ran=False, results=(),
+                                holding=(f"executor-crashed: {e}",), tree_suspect=True)
+    for r in report.results:
+        log(f"exec-mutations: {r.kind} row {r.row} — {r.detail}")
+    for h in report.holding:
+        log(f"exec-mutations HOLD: {h}")
+    if report.tree_suspect:
+        log("exec-mutations: tree suspect — journal may hold an unreverted edit")
+    if not report.results and not report.holding:
+        log("exec-mutations: no executable mutations in plan")
+    return report
 
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         worktree: str | None = None, headless: bool = True,
@@ -723,6 +752,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
         _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                    fixture=fixture, log=log)
+        mutation_report = _exec_mutations_step(plan, worktree, live, log)
         _arm_body = gh.pr_body() or body
         inputs = ArmInputs(
             pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),

@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import Optional
 
 from .. import netretry
-from ..state import SUBPROCESS_TIMEOUT, HarnessError
+from ..mutations import JOURNAL_DIRNAME
+from ..state import MUTATION_JOURNAL_PENDING, SUBPROCESS_TIMEOUT, HarnessError
 from ..conflict import classify, parse_unmerged
 from .llm import run_bounded
 
@@ -267,9 +268,23 @@ class LiveGit:
     def is_dirty(self) -> bool:
         return bool(self._run("status", "--porcelain").strip())
 
+    def _journal_pending(self) -> bool:
+        """True when bin/lib/plan-exec-mutations left an unreverted edit (ADR-0199)."""
+        git_dir = Path(self._run("rev-parse", "--git-dir").strip())
+        if not git_dir.is_absolute():
+            git_dir = Path(self.worktree) / git_dir
+        return any((git_dir / JOURNAL_DIRNAME).glob("*.meta"))
+
+    def _refuse_if_journal_pending(self) -> None:
+        if self._journal_pending():
+            raise HarnessError(MUTATION_JOURNAL_PENDING,
+                               "exec-mutation journal pending — tree may be mutated; "
+                               "refusing to stage/commit")
+
     def stage_all(self) -> None:
         """post-plan-now fires on a DIRTY worktree by design — stage everything
         so untracked files land in the shippable diff before classification."""
+        self._refuse_if_journal_pending()
         self._run("add", "-A")
 
     def _merge_base(self, base: str) -> str:
@@ -357,6 +372,7 @@ class LiveGit:
         return [f for f in out.splitlines() if f]
 
     def commit_all(self, message: str) -> str:
+        self._refuse_if_journal_pending()
         self._run("add", "-A")
         if not self._run("diff", "--cached", "--name-only").strip():
             return ""

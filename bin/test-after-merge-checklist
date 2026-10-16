@@ -335,4 +335,25 @@ eq "exit 0" "$RC" "0"
 eq "stdout status" "$OUT" "status=posted"
 eq "stderr clean" "$ERR" ""
 
+# ---------------------------------------------------------------------------
+# The workflow job must run the DEFAULT-branch copy of bin/after-merge-checklist,
+# never the copy inside the PR being announced. bin/check-workflow-checkout does
+# not read `ref:`, so this case is the gate for that checkout line.
+begin_case "workflow_checks_out_default_branch"
+WF_NOTIFY="$SCRIPT_DIR/../.github/workflows/merge-digest-notify.yml"
+JOB="$(awk '
+  /^  after-merge-checklist:/ { injob=1; print; next }
+  injob && /^  [A-Za-z0-9_-]+:[[:space:]]*(#.*)?$/ { injob=0 }
+  injob && /^[^[:space:]#]/ { injob=0 }
+  injob { print }
+' "$WF_NOTIFY")"
+[ -n "$JOB" ] && ok || fail "after-merge-checklist job not found in $WF_NOTIFY"
+REFS="$(grep -E '^[[:space:]]*ref:' <<< "$JOB")"
+eq "exactly one checkout ref" "$(grep -c . <<< "$REFS")" "1"
+want "ref is the default branch" "$REFS" 'ref: ${{ github.event.repository.default_branch }}'
+case "$REFS" in
+  *pull_request.head*) fail "checkout ref names the PR head: $REFS" ;;
+  *) ok ;;
+esac
+
 h_done

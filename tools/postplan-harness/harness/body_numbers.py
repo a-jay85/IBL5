@@ -103,6 +103,17 @@ def _protected_spans(body: str) -> list[tuple[int, int]]:
             section_end = len(body)
         spans.append((section_start, section_end))
 
+    # 3. ## After merge section (runner-owned)
+    am_match = re.search(r"^## After merge[ \t]*$", body, re.MULTILINE)
+    if am_match:
+        end_marker = body.find("<!-- after-merge:end -->", am_match.end())
+        if end_marker != -1:
+            am_end = end_marker + len("<!-- after-merge:end -->")
+        else:
+            next_heading = re.search(r"^## ", body[am_match.end():], re.MULTILINE)
+            am_end = am_match.end() + next_heading.start() if next_heading else len(body)
+        spans.append((am_match.start(), am_end))
+
     return spans
 
 

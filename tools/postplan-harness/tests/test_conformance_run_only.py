@@ -30,7 +30,7 @@ PHP_ROW = f"| 2 | cap math | PHPUnit | post-impl | `{PHP_PATH}` |\n"
 
 def _plan(body: str) -> PlanInfo:
     """Build a PlanInfo the way locate_plan does, from matrix text alone."""
-    planned, manual = parse_matrix(body)
+    planned, manual, _ = parse_matrix(body)
     return PlanInfo(found=True, has_matrix=True, planned_test_paths=planned,
                     truly_manual_rows=manual,
                     no_change_test_paths=parse_no_change_test_paths(body),

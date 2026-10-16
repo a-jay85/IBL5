@@ -3878,6 +3878,68 @@ assert_viol "q_malformed_vr_cell_fails" 1 "[Q]" "$FM_OPUS"'
 | 1 | does the roster grid layout still look right | Truly-manual | post-impl | `vr: label=roster-grid; role=owner; url=modules.php?name=Roster` |
 '
 
+# Gate [PM]: a `post-merge:` location marker sits only on a Truly-manual row
+# with an intrinsic post-merge reason and a non-visual What cell.
+# (a) Valid tagged row -> clean.
+assert_viol "pm_tagged_with_reason_passes" 0 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+'
+
+# (b) Bare marker with no reason -> [PM] fires.
+assert_viol "pm_tagged_without_reason_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: |
+'
+
+# (c) Reason under 15 characters -> [PM] fires.
+assert_viol "pm_short_reason_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: launchd only |
+'
+
+# (d) Convenience reason with no intrinsic slice -> [PM] fires.
+assert_viol "pm_reason_without_intrinsic_vocab_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: easier to review after it has shipped |
+'
+
+# (e) Marker on a CLI-executable row -> [PM] fires.
+assert_viol "pm_on_cli_executable_row_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | CLI-executable | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+'
+
+# (f) Look-and-feel What cell -> [PM] fires.
+assert_viol "pm_on_lookandfeel_row_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the new dashboard layout look right | Truly-manual | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+'
+
+# (g) A bad row inside a fenced example never fires (fence-aware matrix).
+assert_viol "pm_marker_inside_fence_ignored" 0 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+
+```markdown
+| 2 | the operator reads the first nightly queue listing the morning after | CLI-executable | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+```
+'
+
+# (h) Additivity pin: an untagged Truly-manual row is untouched by [PM].
+assert_viol "pm_untagged_truly_manual_untouched" 0 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the exported CSV opens in Excel without a repair prompt | Truly-manual | post-impl | n/a |
+'
+
 # Gate [K]: autonomy-contract frontmatter validation.
 # [K] fires when stop_condition:/evidence: frontmatter fields are present but
 # malformed or unpaired. [K] must NOT fire when both fields are absent.

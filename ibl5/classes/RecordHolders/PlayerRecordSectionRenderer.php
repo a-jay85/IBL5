@@ -237,7 +237,7 @@ final class PlayerRecordSectionRenderer
         $output .= '</tr>';
 
         $output .= '</tbody></table>';
-        $output .= '<p><a href="modules.php?name=RecordHolders&amp;op=allstar">See all All-Star appearances</a></p>';
+        $output .= '<p><a href="modules.php?name=AllStarAppearances">See all All-Star appearances</a></p>';
         $output .= '</div>';
 
         return $output;

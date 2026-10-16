@@ -15,10 +15,7 @@ class ModuleRedirectTest extends TestCase
     {
         $this->assertSame('modules.php?name=ApiKeys', ModuleRedirect::targetFor('PlayerExportGuide'));
         $this->assertSame('modules.php?name=Voting', ModuleRedirect::targetFor('VotingResults'));
-        $this->assertSame(
-            'modules.php?name=RecordHolders&op=allstar',
-            ModuleRedirect::targetFor('AllStarAppearances')
-        );
+        $this->assertNull(ModuleRedirect::targetFor('AllStarAppearances'));
     }
 
     public function testTargetForReturnsNullForUnknownModule(): void

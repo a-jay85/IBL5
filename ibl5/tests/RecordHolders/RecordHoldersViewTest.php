@@ -612,7 +612,7 @@ final class RecordHoldersViewTest extends TestCase
 
         $html = $this->view->render($records);
 
-        $link = 'modules.php?name=RecordHolders&amp;op=allstar';
+        $link = 'modules.php?name=AllStarAppearances';
         $this->assertStringContainsString($link, $html);
         $this->assertSame(1, substr_count($html, $link));
 

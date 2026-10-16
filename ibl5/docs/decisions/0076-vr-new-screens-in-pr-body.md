@@ -1,6 +1,6 @@
 ---
 description: Brand-new VR views (gallery.newCells) are published inline at the top of the PR body — not only inside the sticky visual-review comment — via a marker-delimited, offset-0, idempotent managed block spliced in with `gh pr edit --body-file`, after a bounded readiness poll against the first new-screen image URL.
-last_verified: 2026-09-01
+last_verified: 2026-10-07
 ---
 
 # ADR-0076: Publish first-render screenshots of new VR views in the PR body
@@ -108,3 +108,7 @@ decision-trigger for those files; no `no-adr` bypass is needed.
 - `.github/workflows/e2e-tests.yml` — "Copy new-screen renders into gallery deploy tree" and
   "Splice new-screen images into PR body" steps.
 - `ibl5/docs/decisions/0074-vr-change-driven-review.md` — source of `gallery.json`'s `newCells`.
+
+## Addendum (2026-10-07): PR-keyed storage
+
+New-screen images now resolve under `pr/<N>/visual-review/new-screens/` (ADR-0179). The URLs carry no cache-bust, so a camo-cached image can lag one push behind. The offset-0 block placement is unchanged.

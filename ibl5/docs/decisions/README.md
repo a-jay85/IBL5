@@ -73,6 +73,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0196](0196-sim-recap-self-healing-routing.md) | Self-healing sim-recap routing across GitHub Actions and the Mac | Accepted | The prod queue routes each failed recap by cause (`ParkPolicy`, `SimSummaryRepository::parkByCause`): retry, wait for the usage reset, hand to the other host, back off, or stop; claims are host-scoped in SQL; prod posts one #admin-chat line per state change. |
 | [0198](0198-post-merge-manual-rows-after-merge-section.md) | Post-merge manual rows move to an After merge section | Accepted | A Truly-manual row tagged `post-merge: <reason>` (gate `[PM]`) renders under `## After merge`, outside the Phase 6.5 condition (1) window; `bin/after-merge-checklist` posts it as a checklist comment on merge. |
 | [0194](0194-engine-freeze-gates.md) | Freeze engine/ and gate new decompile tokens | Accepted | `bin/check-engine-freeze` runs in the required meta-checks job on every PR; it fails additions to `engine/` and any added line carrying a decompile token; the cutover PR retires it. |
+| [0179](0179-vr-pr-keyed-screens.md) | PR-keyed visual-review storage and phone-readable manual-row screens | Accepted | Galleries and manual-row screens live at gh-pages pr/<N>/, overwritten each push and removed on close. Manual rows render at phone and desktop width, before and after, in a PR-body block. |
 
 ## When an ADR is Required
 

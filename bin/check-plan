@@ -254,6 +254,11 @@
 #                              baseline dir only on a screenshot diff, so an
 #                              unmarked entry holds post-plan forever
 #                              (backlog#1277). Fenced examples never count.
+#   XM Executable mutations  — bin/lib/plan-exec-mutations parse must pass; a
+#                              check: override obeys gate V (gatev_nonrunnable);
+#                              with `## Executable Mutations` present, every
+#                              post-impl CLI row needs a block or a
+#                              (mutation-prose: <reason ≥15>) tag (ADR-0199).
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -426,6 +431,49 @@ _LOOKFEEL_LEX='(look|feel|visual|appearance|layout|spacing|alignment|legible|rea
 
 mtrim() { _s="${1#"${1%%[![:space:]]*}"}"; printf '%s' "${_s%"${_s##*[![:space:]]}"}"; }
 
+# gatev_nonrunnable <cell> — gate V's predicate chain. Prints why the cell is
+# not ONE runnable shell command, or nothing when it is. Shared by gate V and
+# gate [XM]'s check: override so both obey the same rules.
+gatev_nonrunnable() {
+    local MC_LOC="$1" _bad _probe _stripped _bt_ct
+    _bad=""
+    # A `...` between two ref-ish tokens is a git range (origin/master...HEAD),
+    # not an elision — mask ranges before testing. Corpus-verified: without this
+    # mask, 2 of 79 flagged cells were valid `git diff origin/master...HEAD`.
+    # A trailing `path/...` is a Go package wildcard (`go build ./...`), also not
+    # an elision — mask it too. The `(^|space)…/\.\.\.` anchor keys on a `/`
+    # immediately before `...`, so it clears `./...` and `dir/...` but leaves a
+    # genuine path elision (`~/.claude/plans/...`, leading `.../ibl5`) flagged.
+    # Corpus-verified: 16 bare `go build/test/vet ./...` cells were false-flagged.
+    _probe=$(printf '%s' "$MC_LOC" \
+        | sed -E 's#[A-Za-z0-9_/@^~.-]+\.\.\.[A-Za-z0-9_/@^~-]+#RANGE#g' \
+        | sed -E 's#(^|[[:space:]])[A-Za-z0-9_./@-]*/\.\.\.#\1WILD#g')
+    # Phase 5.0 strips ONE leading and ONE trailing backtick before `bash -c`.
+    # Mirror that strip, count what is left: an odd count means a stray
+    # backtick survives into the command (`cmd` trailing prose → cmd` trailing
+    # prose → bash exits 2 "unexpected EOF") and Phase 5.0 reports a false MISSING.
+    _stripped=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
+    _bt_ct=$(printf '%s' "$_stripped" | tr -cd '`' | wc -c | tr -d ' ')
+    if printf '%s' "$MC_LOC" | grep -qiE '^(phase|step|row)[[:space:]]+[0-9]'; then
+        _bad="a phase/step pointer, not a command"
+    elif printf '%s' "$_probe" | grep -q '…' || printf '%s' "$_probe" | grep -qF '...'; then
+        _bad="an elided command (ellipsis)"
+    elif printf '%s' "$MC_LOC" | grep -qE '<[A-Za-z_][A-Za-z0-9_./-]*>'; then
+        _bad="an unbound <placeholder> — bind it with \$(…) or a \$VAR that has a stated default"
+    elif printf '%s' "$MC_LOC" | grep -qE '^(ibl5|tests|engine|\.claude|\.github)/[^ ]+$'; then
+        _bad="a bare file path with no command verb (reclassify the row, or run it)"
+    elif printf '%s' "$MC_LOC" | grep -qiE '^(SELECT|INSERT|UPDATE|DELETE|ALTER|CREATE[[:space:]]+TABLE|DROP)[[:space:]]'; then
+        _bad="bare SQL — wrap it in bin/db-query"
+    elif printf '%s' "$MC_LOC" | grep -qiE '^(same[[:space:]]|re-run)'; then
+        _bad="prose referring to another row, not a command"
+    elif printf '%s' "$MC_LOC" | grep -qE '(^|[[:space:]])/path/to[/[:space:]]'; then
+        _bad="a /path/to placeholder — bind the real path with \$(git rev-parse --show-toplevel) or a \$VAR that has a stated default"
+    elif [ "$(( _bt_ct % 2 ))" -ne 0 ]; then
+        _bad="unbalanced backtick after Phase 5.0 strip — prose after the closing backtick causes bash -c to exit 2 (unexpected EOF); move description outside the backticks or into a shell comment inside them: \`cmd # description\`"
+    fi
+    printf '%s' "$_bad"
+}
+
 # matrix_split <row> — sets MC_NUM / MC_TYPE / MC_TIME / MC_LOC (trimmed, any
 # surrounding backticks stripped, pipes restored) and MC_PIPES (count of
 # STRUCTURAL pipes, i.e. after escaped pipes are hidden). Returns 1 for a
@@ -561,41 +609,7 @@ while IFS= read -r row; do
     # Gate V: a CLI-executable row's location cell must be ONE runnable command.
     # Fires only on CLI-executable rows, so a plan with none passes silently.
     if printf '%s' "$low" | grep -qE 'cli[- ]executable' && matrix_split "$row"; then
-        _bad=""
-        # A `...` between two ref-ish tokens is a git range (origin/master...HEAD),
-        # not an elision — mask ranges before testing. Corpus-verified: without this
-        # mask, 2 of 79 flagged cells were valid `git diff origin/master...HEAD`.
-        # A trailing `path/...` is a Go package wildcard (`go build ./...`), also not
-        # an elision — mask it too. The `(^|space)…/\.\.\.` anchor keys on a `/`
-        # immediately before `...`, so it clears `./...` and `dir/...` but leaves a
-        # genuine path elision (`~/.claude/plans/...`, leading `.../ibl5`) flagged.
-        # Corpus-verified: 16 bare `go build/test/vet ./...` cells were false-flagged.
-        _probe=$(printf '%s' "$MC_LOC" \
-            | sed -E 's#[A-Za-z0-9_/@^~.-]+\.\.\.[A-Za-z0-9_/@^~-]+#RANGE#g' \
-            | sed -E 's#(^|[[:space:]])[A-Za-z0-9_./@-]*/\.\.\.#\1WILD#g')
-        # Phase 5.0 strips ONE leading and ONE trailing backtick before `bash -c`.
-        # Mirror that strip, count what is left: an odd count means a stray
-        # backtick survives into the command (`cmd` trailing prose → cmd` trailing
-        # prose → bash exits 2 "unexpected EOF") and Phase 5.0 reports a false MISSING.
-        _stripped=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
-        _bt_ct=$(printf '%s' "$_stripped" | tr -cd '`' | wc -c | tr -d ' ')
-        if printf '%s' "$MC_LOC" | grep -qiE '^(phase|step|row)[[:space:]]+[0-9]'; then
-            _bad="a phase/step pointer, not a command"
-        elif printf '%s' "$_probe" | grep -q '…' || printf '%s' "$_probe" | grep -qF '...'; then
-            _bad="an elided command (ellipsis)"
-        elif printf '%s' "$MC_LOC" | grep -qE '<[A-Za-z_][A-Za-z0-9_./-]*>'; then
-            _bad="an unbound <placeholder> — bind it with \$(…) or a \$VAR that has a stated default"
-        elif printf '%s' "$MC_LOC" | grep -qE '^(ibl5|tests|engine|\.claude|\.github)/[^ ]+$'; then
-            _bad="a bare file path with no command verb (reclassify the row, or run it)"
-        elif printf '%s' "$MC_LOC" | grep -qiE '^(SELECT|INSERT|UPDATE|DELETE|ALTER|CREATE[[:space:]]+TABLE|DROP)[[:space:]]'; then
-            _bad="bare SQL — wrap it in bin/db-query"
-        elif printf '%s' "$MC_LOC" | grep -qiE '^(same[[:space:]]|re-run)'; then
-            _bad="prose referring to another row, not a command"
-        elif printf '%s' "$MC_LOC" | grep -qE '(^|[[:space:]])/path/to[/[:space:]]'; then
-            _bad="a /path/to placeholder — bind the real path with \$(git rev-parse --show-toplevel) or a \$VAR that has a stated default"
-        elif [ "$(( _bt_ct % 2 ))" -ne 0 ]; then
-            _bad="unbalanced backtick after Phase 5.0 strip — prose after the closing backtick causes bash -c to exit 2 (unexpected EOF); move description outside the backticks or into a shell comment inside them: \`cmd # description\`"
-        fi
+        _bad=$(gatev_nonrunnable "$MC_LOC")
         if [ -n "$_bad" ]; then
             viol "[V] CLI-executable row (row ${MC_NUM:-?}) has a non-runnable location cell: \"${MC_LOC}\" — ${_bad}. It must be a single shell command. Not accepted: 'Phase N' pointers, '...' ellipsis, '<placeholder>' tokens, bare file paths, bare SQL. Valid examples: bin/check-docs / grep -c 'FunctionName' ibl5/classes/Foo.php / python3 -c \"import sys; sys.exit(0)\""
         elif [ "$MHDR_PIPES" -gt 0 ] && [ "$MC_PIPES" -gt "$MHDR_PIPES" ]; then
@@ -874,6 +888,62 @@ GATEK_RC=$?
 if [ "$GATEK_RC" -eq 1 ]; then
     viol "[K] ${GATEK_MSG}"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate XM: executable mutation claims (ADR-0199).
+# ---------------------------------------------------------------------------
+# Delegates the grammar to bin/lib/plan-exec-mutations, which the /post-plan
+# Phase 5.0 executor and the harness also call (gate-K idiom: rc 1 is the one
+# violation line, rc 2 is a usage error and is ignored). A check: override is
+# held to gate V's predicates. Coverage runs only when the plan carries the
+# `## Executable Mutations` heading outside fences: that is the mechanical
+# "authored after this shipped" test, so every legacy plan is silent.
+XM_ROOT=$(git -C "$(dirname "$PLAN_FILE")" rev-parse --show-toplevel 2>/dev/null \
+    || git rev-parse --show-toplevel 2>/dev/null || pwd)
+XM_REC="$(mktemp)"
+"$SCRIPT_DIR/lib/plan-exec-mutations" parse --root "$XM_ROOT" "$PLAN_FILE" > "$XM_REC"
+XM_RC=$?
+if [ "$XM_RC" -eq 1 ]; then
+    viol "[XM] $(head -1 "$XM_REC")"
+elif [ "$XM_RC" -eq 0 ]; then
+    XM_ROWS=" "
+    while IFS= read -r -d '' _xm_row && IFS= read -r -d '' _xm_file \
+        && IFS= read -r -d '' _xm_check && IFS= read -r -d '' _xm_match \
+        && IFS= read -r _xm_replace; do
+        XM_ROWS="${XM_ROWS}${_xm_row} "
+        _xm_cell=""
+        while IFS= read -r row; do
+            matrix_split "$row" || continue
+            if [ "$MC_NUM" = "$_xm_row" ]; then
+                _xm_cell=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
+                break
+            fi
+        done < "$MATRIX_FILE"
+        if [ "$_xm_check" != "$_xm_cell" ]; then
+            _bad=$(gatev_nonrunnable "$_xm_check")
+            [ -z "$_bad" ] || viol "[XM] row ${_xm_row}: check override is not runnable — ${_bad}"
+        fi
+    done < "$XM_REC"
+    if grep -qE '^## Executable Mutations[[:space:]]*$' "$GATEP_BODY"; then
+        while IFS= read -r row; do
+            matrix_split "$row" || continue
+            [ "$MC_NUM" != "#" ] || continue
+            printf '%s' "$MC_TYPE" | grep -qiE 'cli[- ]executable' || continue
+            case "$(printf '%s' "$MC_TIME" | tr '[:upper:]' '[:lower:]')" in post-impl*) : ;; *) continue ;; esac
+            case "$MC_WHAT" in *'(one-time-check:'*) continue ;; esac
+            case "$XM_ROWS" in *" $MC_NUM "*) continue ;; esac
+            if grep -qF '(mutation-prose:' <<< "$MC_WHAT"; then
+                _xm_reason=$(sed -E 's/.*\(mutation-prose:[[:space:]]*([^()]*)\).*/\1/' <<< "$MC_WHAT")
+                if [ "${#_xm_reason}" -lt 15 ]; then
+                    viol "[XM] row ${MC_NUM}: mutation-prose reason too short (need 15 or more characters): ${row}"
+                fi
+                continue
+            fi
+            viol "[XM] row ${MC_NUM} is a post-impl CLI-executable row in an opted-in plan but carries neither a mutation block nor (mutation-prose: <reason ≥15 chars>)"
+        done < "$MATRIX_FILE"
+    fi
+fi
+rm -f "$XM_REC"
 
 # ---------------------------------------------------------------------------
 # Gate B: Security-Surface Discharge completeness (Step 4 gate 14b release condition).

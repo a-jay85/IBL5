@@ -10,8 +10,13 @@
 //
 // Additive modes (see ADR-0076):
 //   --copy-new-screens=DEST   copy each newCells render into DEST, then exit.
-//   --update-pr-body=N        splice a new-screens image section into PR #N's
-//                             body (offset 0, marker-delimited), then exit.
+//   --update-pr-body=N        splice the managed block (changed spots, new
+//                             screens, kept agent shots) into PR #N's body
+//                             (offset 0, marker-delimited), then exit.
+//   --crop-changed=DEST       crop each changed cell's before/after pair into
+//                             per-spot PNGs plus DEST/spots.json, then exit.
+//   --publish-agent-shots=N   push hand-made before/after shots to gh-pages and
+//                             upsert them into PR #N's body, then exit.
 //
 // Additive modes (see ADR-0126 — truly-manual visual rows):
 //   --manual-rows-from-pr=N   read PR #N's body, parse the `vr:` cells out of
@@ -23,24 +28,47 @@
 // Usage:
 //   bin/vr-review-comment --gallery=ibl5/vr-gallery.json --coverage=coverage.json \
 //     --pages-url=https://a-jay85.github.io/IBL5/<sha>/visual-review/ --out=vr-review-comment.md
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  copyFileSync,
+  mkdtempSync,
+  statSync,
+} from 'fs';
+import { tmpdir } from 'os';
 import { execFileSync } from 'child_process';
-import { resolve, dirname } from 'path';
+import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ibl5Dir = resolve(__dir, '..', 'ibl5');
 
 const { buildComment } = await import(resolve(ibl5Dir, 'tests/e2e/vr-review-comment.ts'));
-const { buildCopyPlan, buildNewScreensSection, newScreenUrl, normalizeBody, spliceBody } =
-  await import(resolve(ibl5Dir, 'tests/e2e/vr-pr-body.ts'));
+const {
+  buildCopyPlan,
+  newScreenUrl,
+  normalizeBody,
+  spliceBody,
+  buildPrBodyBlock,
+  extractAgentShots,
+  sanitizeLabel,
+  agentShotUrl,
+  buildAgentShotEntry,
+  upsertAgentShots,
+} = await import(resolve(ibl5Dir, 'tests/e2e/vr-pr-body.ts'));
+const { cropPair } = await import(resolve(ibl5Dir, 'tests/e2e/vr-crop-png.ts'));
+const { regionLabel } = await import(resolve(ibl5Dir, 'tests/e2e/vr-crop.ts'));
 const { parseManualBullets, buildManualSection, manualShotUrl } =
   await import(resolve(ibl5Dir, 'tests/e2e/vr-manual-rows.ts'));
 
 const USAGE =
   'Usage: bin/vr-review-comment --gallery=PATH --coverage=PATH --pages-url=URL [--out=PATH]\n' +
   '   or: bin/vr-review-comment --gallery=PATH --copy-new-screens=DEST [--renders-dir=SRC]\n' +
-  '   or: bin/vr-review-comment --gallery=PATH --pages-url=URL --update-pr-body=N [--dry-run] [--body-file-in=PATH]\n' +
+  '   or: bin/vr-review-comment --gallery=PATH --gallery-dir=DIR --crop-changed=DEST\n' +
+  '   or: bin/vr-review-comment --gallery=PATH --pages-url=URL --update-pr-body=N [--spots=PATH] [--head-sha=SHA] [--run-time=ISO] [--dry-run] [--body-file-in=PATH]\n' +
+  '   or: bin/vr-review-comment --publish-agent-shots=N --agent-shots=PATH [--sha=SHA] [--dry-run] [--body-file-in=PATH]\n' +
   '   or: bin/vr-review-comment --manual-rows-from-pr=N [--out-json=PATH] [--body-file-in=PATH]\n' +
   '   or: bin/vr-review-comment --manual-gallery=PATH --pages-url=URL [--out=PATH]';
 
@@ -56,6 +84,14 @@ let bodyFileIn: string | null = null;
 let manualRowsFromPr: string | null = null;
 let outJson = 'ibl5/vr-manual-rows.json';
 let manualGallery: string | null = null;
+let cropDest: string | null = null;
+let galleryDir: string | null = null;
+let spotsPath: string | null = null;
+let headSha = '';
+let runTimeArg: string | null = null;
+let publishAgentShots: string | null = null;
+let agentShotsPath: string | null = null;
+let shotSha: string | null = null;
 
 for (const arg of process.argv.slice(2)) {
   if (arg.startsWith('--gallery=')) galleryPath = arg.slice('--gallery='.length);
@@ -63,6 +99,15 @@ for (const arg of process.argv.slice(2)) {
   else if (arg.startsWith('--pages-url=')) pagesUrl = arg.slice('--pages-url='.length);
   else if (arg.startsWith('--out=')) outPath = arg.slice('--out='.length);
   else if (arg.startsWith('--copy-new-screens=')) copyDest = arg.slice('--copy-new-screens='.length);
+  else if (arg.startsWith('--crop-changed=')) cropDest = arg.slice('--crop-changed='.length);
+  else if (arg.startsWith('--gallery-dir=')) galleryDir = arg.slice('--gallery-dir='.length);
+  else if (arg.startsWith('--spots=')) spotsPath = arg.slice('--spots='.length);
+  else if (arg.startsWith('--head-sha=')) headSha = arg.slice('--head-sha='.length);
+  else if (arg.startsWith('--run-time=')) runTimeArg = arg.slice('--run-time='.length);
+  else if (arg.startsWith('--publish-agent-shots='))
+    publishAgentShots = arg.slice('--publish-agent-shots='.length);
+  else if (arg.startsWith('--agent-shots=')) agentShotsPath = arg.slice('--agent-shots='.length);
+  else if (arg.startsWith('--sha=')) shotSha = arg.slice('--sha='.length);
   else if (arg.startsWith('--renders-dir=')) rendersDir = arg.slice('--renders-dir='.length);
   else if (arg.startsWith('--update-pr-body=')) updatePr = arg.slice('--update-pr-body='.length);
   else if (arg === '--dry-run') dryRun = true;
@@ -102,6 +147,136 @@ if (manualRowsFromPr !== null) {
   process.exit(0);
 }
 
+// Agent-shot publish mode — push hand-made before/after shots into the PR head's
+// per-SHA gh-pages tree, then upsert them into PR #N's body. Every check runs
+// before any clone or push, and the body is edited only after a push lands, so
+// it never links to images that were never published. Needs no gallery.
+if (publishAgentShots !== null) {
+  const fail = (msg: string): never => {
+    process.stderr.write(`vr-review-comment: ${msg}\n`);
+    process.exit(2);
+  };
+  const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const MAX_SHOT_BYTES = 5 * 1024 * 1024;
+  const checkPng = (path: unknown): string => {
+    if (typeof path !== 'string' || path === '' || !existsSync(path)) {
+      return fail(`agent-shot file not found: ${String(path)}`);
+    }
+    const st = statSync(path);
+    if (!st.isFile() || st.size > MAX_SHOT_BYTES) fail(`agent-shot file must be a file of at most 5 MB: ${path}`);
+    if (!readFileSync(path).subarray(0, 8).equals(PNG_MAGIC)) fail(`agent-shot file is not a PNG: ${path}`);
+    return path;
+  };
+
+  if (!/^[1-9][0-9]*$/.test(publishAgentShots)) fail('--publish-agent-shots needs a PR number');
+  if (agentShotsPath === null) fail('--agent-shots is required with --publish-agent-shots');
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(readFileSync(agentShotsPath as string, 'utf-8'));
+  } catch {
+    fail(`cannot read --agent-shots JSON: ${agentShotsPath}`);
+  }
+  if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 20) {
+    fail('--agent-shots must hold 1 to 20 entries');
+  }
+  const seen = new Set<string>();
+  const shots = (parsed as { label?: unknown; before?: unknown; after?: unknown }[]).map((e) => {
+    const label = typeof e?.label === 'string' ? sanitizeLabel(e.label) : null;
+    if (label === null) return fail('invalid agent-shot label');
+    if (seen.has(label)) fail(`duplicate agent-shot label: ${label}`);
+    seen.add(label);
+    return {
+      label: label as string,
+      before: e.before === undefined || e.before === null ? null : checkPng(e.before),
+      after: checkPng(e.after),
+    };
+  });
+  const sha = (
+    shotSha ??
+    execFileSync('gh', ['pr', 'view', publishAgentShots, '--json', 'headRefOid', '-q', '.headRefOid'], {
+      encoding: 'utf-8',
+    })
+  ).trim();
+  if (!/^[0-9a-f]{40}$/.test(sha)) fail(`--sha must be a full 40-char lowercase hex sha (got "${sha}")`);
+
+  // Filenames come only from sanitized labels, so every write stays in shotDir.
+  const shotDir = `${sha}/visual-review/agent-shots`;
+  const files = shots.flatMap((s) => [
+    ...(s.before !== null ? [{ src: s.before, dest: `${shotDir}/${s.label}.before.png` }] : []),
+    { src: s.after, dest: `${shotDir}/${s.label}.after.png` },
+  ]);
+  const entries = shots.map((s) => ({ label: s.label, entry: buildAgentShotEntry(sha, s.label, s.before !== null) }));
+
+  if (dryRun) {
+    for (const f of files) process.stdout.write(`${f.dest}\n`);
+    const cur = bodyFileIn !== null && existsSync(bodyFileIn) ? readFileSync(bodyFileIn, 'utf-8') : '';
+    process.stdout.write(upsertAgentShots(normalizeBody(cur), entries) + '\n');
+    process.exit(0);
+  }
+
+  const work = mkdtempSync(join(tmpdir(), 'vr-agent-shots-'));
+  const repo = join(work, 'gh-pages');
+  const git = (args: string[]) => execFileSync('git', args, { stdio: 'inherit' });
+  const origin = execFileSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf-8' }).trim();
+  git(['clone', '--depth', '1', '--branch', 'gh-pages', '--single-branch', origin, repo]);
+  mkdirSync(join(repo, shotDir), { recursive: true });
+  for (const f of files) copyFileSync(f.src, join(repo, f.dest));
+  git(['-C', repo, 'add', '--', shotDir]);
+  let staged = true;
+  try {
+    execFileSync('git', ['-C', repo, 'diff', '--cached', '--quiet']);
+    staged = false; // exit 0: the same bytes are already on gh-pages
+  } catch {
+    // exit 1: there is something to commit
+  }
+  if (staged) {
+    git(['-C', repo, 'commit', '-m', `agent-shots: ${sha.slice(0, 12)} (${shots.length} shot(s))`]);
+    // Same contention loop as the vr-pages-cleanup job: every open PR's VR job
+    // pushes to gh-pages, so rebase onto the ref that beat us and try again.
+    let pushed = false;
+    for (let attempt = 1; attempt <= 3 && !pushed; attempt++) {
+      try {
+        git(['-C', repo, 'push', 'origin', 'HEAD:gh-pages']);
+        pushed = true;
+      } catch {
+        process.stderr.write(`vr-review-comment: gh-pages push attempt ${attempt} failed\n`);
+        if (attempt < 3) {
+          try {
+            git(['-C', repo, 'pull', '--rebase', 'origin', 'gh-pages']);
+          } catch {
+            // the next push attempt reports the failure
+          }
+        }
+      }
+    }
+    if (!pushed) {
+      process.stderr.write('vr-review-comment: gh-pages push failed 3 times; PR body left unchanged\n');
+      process.exit(1);
+    }
+  } else {
+    process.stdout.write('vr-review-comment: shots already on gh-pages; skipping the push\n');
+  }
+
+  // A push is invisible until Pages re-serves the tree.
+  try {
+    execFileSync('gh', ['workflow', 'run', 'pages-deploy.yml'], { stdio: 'inherit' });
+  } catch {
+    process.stderr.write('vr-review-comment: pages-deploy dispatch failed; shots go live on the next deploy\n');
+  }
+  const live = await waitForFirstScreen(agentShotUrl(sha, shots[0].label, 'after'));
+  if (!live) process.stderr.write('vr-review-comment: agent-shot URL not live yet; editing anyway\n');
+  const raw = execFileSync('gh', ['pr', 'view', publishAgentShots, '--json', 'body', '-q', '.body'], {
+    encoding: 'utf-8',
+  });
+  const next = upsertAgentShots(normalizeBody(raw), entries);
+  // The body file lives in the temp dir; the repo root does not ignore it.
+  const bodyFile = join(work, 'body.md');
+  writeFileSync(bodyFile, next + '\n');
+  execFileSync('gh', ['pr', 'edit', publishAgentShots, '--body-file', bodyFile], { stdio: 'inherit' });
+  process.stdout.write(`vr-review-comment: published ${shots.length} agent shot(s) to PR #${publishAgentShots}\n`);
+  process.exit(0);
+}
+
 // Change-driven gallery JSON — cells are PRE-CLASSIFIED by bin/vr-build-gallery
 // (changed/new vs master's committed baseline; flake = self-disagreeing render).
 // Absent/garbled ⇒ no diff/infra cells (the uncovered/global sections still
@@ -130,6 +305,54 @@ if (copyDest !== null) {
     else process.stderr.write(`vr-review-comment: missing render ${src}\n`); // defensive skip
   }
   process.stdout.write(`vr-review-comment: copied ${plan.length} new-screen render(s)\n`);
+  process.exit(0);
+}
+
+// Crop mode — cut each changed cell's before/after pair down to its changed
+// spots, write <title>.<i>.before/after.png plus spots.json into DEST, then exit.
+// DEST is the deploy tree's changed/ dir. One bad cell is logged and skipped;
+// spots.json is always written, so the splice step reads [] when nothing changed.
+if (cropDest !== null) {
+  if (galleryDir === null) {
+    process.stderr.write(`--gallery-dir is required with --crop-changed\n${USAGE}\n`);
+    process.exit(2);
+  }
+  mkdirSync(cropDest, { recursive: true });
+  const spots: Record<string, unknown>[] = [];
+  const cells = gallery.changedCells ?? [];
+  for (const cell of cells) {
+    const beforePath = join(galleryDir, `${cell.title}.before.png`);
+    const afterPath = join(galleryDir, `${cell.title}.after.png`);
+    if (!existsSync(beforePath) || !existsSync(afterPath)) {
+      process.stderr.write(`vr-review-comment: missing before/after pair for ${cell.title}\n`);
+      continue;
+    }
+    try {
+      const { plan, imageHeight, pairs } = cropPair(readFileSync(beforePath), readFileSync(afterPath));
+      const cellSpots = pairs.map((pair: { rect: unknown; before: Buffer; after: Buffer }, k: number) => {
+        const i = k + 1;
+        writeFileSync(join(cropDest, `${cell.title}.${i}.before.png`), pair.before);
+        writeFileSync(join(cropDest, `${cell.title}.${i}.after.png`), pair.after);
+        return {
+          module: cell.module,
+          viewport: cell.viewport,
+          title: cell.title,
+          index: i,
+          count: pairs.length,
+          kind: plan.kind === 'spots' ? 'spot' : 'uncropped',
+          ...(plan.kind === 'uncropped' ? { reason: plan.reason } : {}),
+          region: pair.rect === null ? '' : regionLabel(pair.rect, imageHeight),
+          beforeFile: `changed/${cell.title}.${i}.before.png`,
+          afterFile: `changed/${cell.title}.${i}.after.png`,
+        };
+      });
+      spots.push(...cellSpots);
+    } catch (err) {
+      process.stderr.write(`vr-review-comment: crop failed for ${cell.title}: ${String(err)}\n`);
+    }
+  }
+  writeFileSync(join(cropDest, 'spots.json'), JSON.stringify(spots, null, 2) + '\n');
+  process.stdout.write(`vr-review-comment: cropped ${spots.length} spot(s) from ${cells.length} changed cell(s)\n`);
   process.exit(0);
 }
 
@@ -182,22 +405,60 @@ if (manualGallery !== null) {
   process.exit(0);
 }
 
-// Update-body mode — splice the new-screens section into the PR body, then exit.
+// Update-body mode — rebuild the managed block (changed spots, new screens, and
+// any agent shots already in the body) and splice it into the PR body, then exit.
 if (updatePr !== null) {
-  const section = buildNewScreensSection(rawNewCells, pagesUrl);
+  let runTime = new Date();
+  if (runTimeArg !== null) {
+    if (Number.isNaN(Date.parse(runTimeArg))) {
+      process.stderr.write(`invalid --run-time: ${runTimeArg}\n${USAGE}\n`);
+      process.exit(2);
+    }
+    runTime = new Date(runTimeArg);
+  }
+  const raw = dryRun
+    ? bodyFileIn !== null && existsSync(bodyFileIn)
+      ? readFileSync(bodyFileIn, 'utf-8')
+      : ''
+    : execFileSync('gh', ['pr', 'view', updatePr, '--json', 'body', '-q', '.body'], { encoding: 'utf-8' });
+  const cur = normalizeBody(raw);
+  let spots: { beforeFile: string }[] = [];
+  if (spotsPath !== null && existsSync(spotsPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(spotsPath, 'utf-8'));
+      if (Array.isArray(parsed)) spots = parsed;
+    } catch {
+      // unreadable spots.json -> no changed section, never a crash in CI
+    }
+  }
+  const section = buildPrBodyBlock({
+    newCells: rawNewCells,
+    spots,
+    pagesUrl,
+    headSha,
+    runTime,
+    agentShots: extractAgentShots(cur),
+  });
+  const next = spliceBody(cur, section);
   if (dryRun) {
-    const cur = bodyFileIn !== null && existsSync(bodyFileIn) ? readFileSync(bodyFileIn, 'utf-8') : '';
-    process.stdout.write(spliceBody(normalizeBody(cur), section));
+    process.stdout.write(next + '\n');
     process.exit(0);
   }
-  if (rawNewCells.length > 0) {
-    const ok = await waitForFirstScreen(newScreenUrl(pagesUrl, rawNewCells[0].title));
-    if (!ok) process.stderr.write('vr-review-comment: new-screen URL not live; editing anyway\n');
+  const base = pagesUrl.endsWith('/') ? pagesUrl : pagesUrl + '/';
+  const firstUrl =
+    rawNewCells.length > 0
+      ? newScreenUrl(pagesUrl, rawNewCells[0].title)
+      : spots.length > 0
+        ? base + spots[0].beforeFile.split('/').map(encodeURIComponent).join('/')
+        : null;
+  if (firstUrl !== null) {
+    const ok = await waitForFirstScreen(firstUrl);
+    if (!ok) process.stderr.write('vr-review-comment: screen URL not live; editing anyway\n');
   }
-  const raw = execFileSync('gh', ['pr', 'view', updatePr, '--json', 'body', '-q', '.body'], {
-    encoding: 'utf-8',
-  });
-  const next = spliceBody(normalizeBody(raw), section);
+  if (next === cur) {
+    process.stdout.write('vr-review-comment: PR body already current; no edit\n');
+    process.exit(0);
+  }
   const tmp = resolve(process.cwd(), 'vr-pr-body.tmp.md');
   writeFileSync(tmp, next + '\n');
   execFileSync('gh', ['pr', 'edit', updatePr, '--body-file', tmp], { stdio: 'inherit' });

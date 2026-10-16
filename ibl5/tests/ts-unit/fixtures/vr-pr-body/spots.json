@@ -1,0 +1,36 @@
+[
+  {
+    "module": "standings",
+    "viewport": "desktop",
+    "title": "standings",
+    "index": 1,
+    "count": 2,
+    "kind": "spot",
+    "region": "top, y 0-120 px",
+    "beforeFile": "changed/standings.1.before.png",
+    "afterFile": "changed/standings.1.after.png"
+  },
+  {
+    "module": "standings",
+    "viewport": "desktop",
+    "title": "standings",
+    "index": 2,
+    "count": 2,
+    "kind": "spot",
+    "region": "bottom, y 900-1000 px",
+    "beforeFile": "changed/standings.2.before.png",
+    "afterFile": "changed/standings.2.after.png"
+  },
+  {
+    "module": "standings",
+    "viewport": "mobile",
+    "title": "standings-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "uncropped",
+    "reason": "dimensions-changed",
+    "region": "",
+    "beforeFile": "changed/standings-mobile.1.before.png",
+    "afterFile": "changed/standings-mobile.1.after.png"
+  }
+]

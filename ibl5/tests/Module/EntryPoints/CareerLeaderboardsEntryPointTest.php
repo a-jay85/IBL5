@@ -63,4 +63,30 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotSame('', $output);
         $this->assertStringContainsString('Career Leaderboards', $output);
     }
+
+    public function testEmptySubmittedSkipsLeaderboardQuery(): void
+    {
+        $this->runModule('CareerLeaderboards', [], [
+            'submitted' => '',
+            'boards_type' => 'Regular Season Totals',
+            'sort_cat' => 'Points',
+            'active' => '0',
+            'display' => '50',
+        ], $this->dbGlobals());
+
+        $this->assertQueryNotExecuted('ibl_hist');
+    }
+
+    public function testZeroStringSubmittedRunsLeaderboardQuery(): void
+    {
+        $this->runModule('CareerLeaderboards', [], [
+            'submitted' => '0',
+            'boards_type' => 'Regular Season Totals',
+            'sort_cat' => 'Points',
+            'active' => '0',
+            'display' => '50',
+        ], $this->dbGlobals());
+
+        $this->assertQueryExecuted('ibl_hist');
+    }
 }

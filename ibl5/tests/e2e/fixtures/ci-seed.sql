@@ -1600,6 +1600,16 @@ ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
   home_q1_points=VALUES(home_q1_points), home_q2_points=VALUES(home_q2_points),
   home_q3_points=VALUES(home_q3_points), home_q4_points=VALUES(home_q4_points);
 
+-- Regular-season rows materialized from the box scores above by RefreshTeamSeasonRecordsStep. vw_franchise_summary reads them. Regenerate with the refresher SQL whenever the box-score rows above change.
+INSERT INTO ibl_team_season_records (team_id, year, game_type, currentname, namethatyear, wins, losses) VALUES
+  (1, 2026, 1, 'Metros', 'Metros', 3, 1),
+  (2, 2026, 1, 'Stars', 'Stars', 1, 2),
+  (3, 2026, 1, 'Cougars', 'Cougars', 0, 1),
+  (5, 2026, 1, 'Minutemen', 'Minutemen', 1, 0),
+  (12, 2026, 1, 'Royals', 'Royals', 0, 1),
+  (50, 2026, 1, 'All-Star Away', 'All-Star Away', 1, 0),
+  (51, 2026, 1, 'All-Star Home', 'All-Star Home', 0, 1);
+
 -- ============================================================
 -- Power rankings (covers SOS tier dots, SOS summary)
 -- ============================================================

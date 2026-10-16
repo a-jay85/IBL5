@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _plan-verification.md — why each forced trigger exists, the incidents behind them, the worked pre-prod exercise-path catalogue, and the non-compliant counter-examples. Read only when editing the verification rules; the plan-architect never reads it.
-last_verified: 2026-10-11
+last_verified: 2026-10-15
 ---
 
 # _plan-verification Detail
@@ -31,6 +31,8 @@ Each row in the `## Forced integration-verification trigger` table was added fro
 An assertion grounded in an imagined value is how PR #887 shipped: it expected a display-cap count (~500, full-league) while the CI seed has only ~24 career rows, so the test was deterministically red the moment it ran. Grounding on the CI seed or a live DOM curl prevents that class.
 
 ### Why the test-type boundaries fall where they do
+
+Post-plan Phase 6 is a safety net for a missed row and does not replace plan-time classification. If nothing in UI/UX changed, visual regression covers it, so the row is never truly-manual.
 
 A truly-manual row must be performable on the *open PR*, before it merges (orthogonal to the Timing column — pre-/post-impl is when a test is *written*, not when it can be *performed*). The test is *"can a reviewer render this row's judgment now, against the worktree/local stack?"* — never "does a command exit 0."
 
@@ -110,5 +112,19 @@ Harness rules (`parse_run_only_test_paths` in `tools/postplan-harness/harness/pl
 - Honored on any PHPUnit, API-test, E2E or Visual-regression row, and only when the file is tracked in the PR tree. A path that is new in this PR is never exempt; write the test.
 - Exempts only that row's `MISSING:` item. `MISSING-FILE:` (Critical Files) and `MISSING-METHOD:` (Required Test Methods) are unchanged. A `(run-only)` path listed bare in `## Critical Files` still needs `(reference)` there.
 - If another row plans the same token without a marker, the unmarked row wins. A Visual-regression row marked `(no-change)` on the same token is neutral, so a token whose rows carry one marker each is still exempt.
-- `bin/check-plan` gate `[RO]` fails the plan when the marker is not directly after the row's planned token, when the path is absent from the base branch, when the row also carries `(no-change)`, or when the same path is a must-appear Critical Files entry. It warns when a phase line pairs the path with an edit verb, and when an unmarked test row names a path that exists on master but no phase or Critical Files entry cites.
+- `bin/check-plan` gate `[RO]` fails the plan when the marker is not directly after the row's planned token, when the path is absent from the base branch, when the row also carries `(no-change)`, or when the same path is a must-appear Critical Files entry. It warns when a phase line pairs the path with an edit verb, and when an unmarked test row names a path that exists on master but no phase or Critical Files entry cites. An unmarked row also fails `[RO]` when a plan line that cites the full test path in backticks says the file is only run (phrases such as `unedited`, `never edited`, `run-only`, `passes unchanged`). Add `(run-only)` after the token, or name the edit in a phase if the file does change.
 - Fenced examples and a code-span `(run-only)` never count.
+
+### Post-merge rows
+
+A row that is physically impossible before the merge used to have two outcomes. Dropping it lost the check. Keeping it held every PR with a nightly or launchd dependency on a human who could not act yet.
+
+The marker `post-merge: <reason>` lives in the Test-file/location cell. That mirrors `no-vr:` and `pre-prod-exception:`, and it leaves the What cell a plain sentence that reads well in the checklist comment.
+
+The row stays `Truly-manual`. Gate 13 and `bin/lib/plan-model-consistency` keep forcing `impl_model: opus` because a human still performs it, and `/plan` gate 14(a) still sets `auto_merge: false`.
+
+The tag bypasses condition (1) of Phase 6.5, so gate `[PM]` checks the reason for gate-16 vocabulary (scheduling, reachability, credential, live host). A reviewer can falsify a named dependency. A vague reason such as "easier after it ships" gives them nothing to check.
+
+`bin/check-plan` gate `[PM]` rejects three shapes: a tag on a non-`Truly-manual` row, a reason under 15 characters or without that vocabulary, and a tag on a look-and-feel row. Look-and-feel rows stay in the open-PR window.
+
+Delivery: post-plan writes tagged rows under `## After merge` in the PR body, outside the `## Manual Testing` window, so they do not hold the merge. The post-merge workflow posts a PR comment and one Discord message. The comment carries the `- [ ]` boxes. The `## After merge` copy in the PR body uses plain bullets, so no scanner ever counts them as open manual-test items. ADR-0198 records the decision.

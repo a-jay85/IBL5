@@ -26,8 +26,9 @@ $factory = \Module\ModuleServices::current()->factory(\Module\Factories\SeasonHi
 $season = $factory->season();
 
 // Determine season phase (from request or current phase)
-$seasonPhase = isset($_GET['seasonPhase']) && !empty($_GET['seasonPhase'])
-    ? $_GET['seasonPhase']
+$seasonPhaseParam = $_GET['seasonPhase'] ?? null;
+$seasonPhase = is_string($seasonPhaseParam) && $seasonPhaseParam !== '' && $seasonPhaseParam !== '0'
+    ? $seasonPhaseParam
     : $season->phase;
 
 $pagetitle = "- $seasonPhase Stat Leaders";

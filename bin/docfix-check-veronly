@@ -28,7 +28,7 @@ fi
 # Decides whether the worktree's realized diff is verification-only — every
 # change is a lone last_verified: date bump, strictly advancing, exactly one
 # plus/minus pair per file.  If so, arms the seeded plan file atomically:
-#   (a) flips auto_merge: false → true (frontmatter only)
+#   (a) flips auto_merge: false or docs-only-ready → true (frontmatter only)
 #   (b) deletes the ## Automouse Hold Justification section (to EOF or next ##)
 #
 # Steering markdown (.claude/**/*.md, CLAUDE.md, AGENTS.md) is held to a stricter tier: see check_steering_date_only.
@@ -387,10 +387,10 @@ awk '
     # Close frontmatter
     infm && /^---[[:space:]]*$/ { infm=0; fm_closed=1; print; next }
 
-    # Inside frontmatter: flip auto_merge: false → true.
+    # Inside frontmatter: flip auto_merge: false or docs-only-ready → true.
     # auto_merge: true already present → no match → printed as-is (idempotent).
     infm {
-        if (/^auto_merge:[[:space:]]*false[[:space:]]*$/) {
+        if (/^auto_merge:[[:space:]]*(false|docs-only-ready)[[:space:]]*$/) {
             print "auto_merge: true"
         } else {
             print
@@ -404,7 +404,7 @@ awk '
     fm_closed {
         if (/^## Automouse Hold Justification/) { in_hold=1; next }
         if (in_hold && /^## /) { in_hold=0 }
-        if (!in_hold) { gsub(/ Held for human merge\./, ""); print }
+        if (!in_hold) { gsub(/ ?Held for human merge( unless Phase 6\.5 finds it docs-only, two-way and READY)?\./, ""); print }
         next
     }
 

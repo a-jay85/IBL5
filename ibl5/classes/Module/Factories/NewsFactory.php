@@ -30,6 +30,8 @@ final class NewsFactory implements ModuleFactoryInterface
         string $siteName,
         int $multilingual,
         string $currentLang,
+        string $tableBgcolor1 = '#EEEEEE',
+        string $tableBgcolor2 = '#CCCCCC',
     ): \Topics\News\NewsController {
         $db = $this->services->db();
 
@@ -41,6 +43,8 @@ final class NewsFactory implements ModuleFactoryInterface
                 siteName: $siteName,
                 multilingual: $multilingual,
                 currentLang: $currentLang,
+                tableBgcolor1: $tableBgcolor1,
+                tableBgcolor2: $tableBgcolor2,
             ),
             $this->services->auth(),
             $this->services->teamIdentity(),

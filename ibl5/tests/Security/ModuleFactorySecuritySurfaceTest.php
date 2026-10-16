@@ -197,6 +197,7 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
             '/defined\([\'"]MODULE_FILE[\'"]\)/',
             '/stripos\(\$_SERVER\[\'PHP_SELF\'\], [\'"]modules\.php[\'"]\)/',
             '/stripos\(is_string\(\$phpSelf\) \? \$phpSelf : [\'"]{2}, [\'"]modules\.php[\'"]\)/',
+            '/stripos\(is_string\(\$phpSelfGuard\) \? \$phpSelfGuard : [\'"]{2}, [\'"]modules\.php[\'"]\)/',
             '/preg_match\(\'\/modules\\\\\.php\/i\'/',
         ] as $pattern) {
             if (preg_match($pattern, $code, $match, PREG_OFFSET_CAPTURE) === 1) {

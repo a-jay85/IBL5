@@ -37,7 +37,11 @@ $service = $factory->service();
 $view = $factory->view();
 
 // Get and validate search parameters from POST
-$searchResult = $service->search($_POST);
+$postData = [];
+foreach ($_POST as $key => $value) {
+    $postData[(string) $key] = $value;
+}
+$searchResult = $service->search($postData);
 
 // Render page
 PageLayout\PageLayout::header();
@@ -48,7 +52,7 @@ echo '<h1 class="ibl-title">Player Search</h1>';
 echo $view->renderSearchForm($searchResult['params']);
 
 // Render results if form was submitted
-if (!empty($_POST)) {
+if ($_POST !== []) {
     echo $view->renderTableHeader();
     
     if ($searchResult['count'] > 0) {

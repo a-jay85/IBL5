@@ -18,14 +18,14 @@ $view = $factory->view();
 
 // Get filter parameters from POST
 $filters = [
-    'year' => $_POST['year'] ?? '',
-    'team' => (int)($_POST['team'] ?? 0),
-    'sortby' => $_POST['sortby'] ?? 'PPG',
-    'limit' => $_POST['limit'] ?? ''
+    'year' => is_string($_POST['year'] ?? null) ? $_POST['year'] : '',
+    'team' => is_string($_POST['team'] ?? null) ? (int) $_POST['team'] : 0,
+    'sortby' => is_string($_POST['sortby'] ?? null) ? $_POST['sortby'] : 'PPG',
+    'limit' => is_string($_POST['limit'] ?? null) ? $_POST['limit'] : '',
 ];
 
 // Determine limit: use POST value if provided, otherwise default to 50 on first load
-$isFirstLoad = empty($_POST);
+$isFirstLoad = $_POST === [];
 $limit = 0;
 if ($isFirstLoad) {
     $limit = 50; // Default limit on first load

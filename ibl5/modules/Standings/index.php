@@ -12,7 +12,8 @@ declare(strict_types=1);
  * @see \Standings\StandingsView For HTML rendering
  */
 
-if (!preg_match('/modules\.php/i', $_SERVER['PHP_SELF'])) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (preg_match('/modules\.php/i', is_string($phpSelfGuard) ? $phpSelfGuard : '') !== 1) {
     die("You can't access this file directly...");
 }
 

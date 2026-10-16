@@ -26,7 +26,7 @@ $service = $factory->service();
 $indexView = $factory->indexView();
 $detailView = $factory->detailView();
 
-$year = isset($_GET['year']) ? (int) $_GET['year'] : 0;
+$year = is_string($_GET['year'] ?? null) ? (int) $_GET['year'] : 0;
 
 if ($year > 0) {
     $seasonData = $service->getSeasonDetail($year);

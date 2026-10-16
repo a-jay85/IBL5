@@ -35,7 +35,7 @@ $repository = $factory->repository();
 $view = $factory->view();
 
 // Check for team ID parameter
-$teamid = isset($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
+$teamid = is_string($_GET['teamid'] ?? null) ? (int) $_GET['teamid'] : 0;
 
 $isValidTeam = false;
 if ($teamid > 0) {
@@ -52,7 +52,7 @@ if ($isValidTeam) {
     $endYear = $repository->getLastDraftYear();
 
     // Get selected year from request, default to most recent draft
-    $year = isset($_REQUEST['year']) ? (int) $_REQUEST['year'] : $endYear;
+    $year = is_string($_REQUEST['year'] ?? null) ? (int) $_REQUEST['year'] : $endYear;
     $pagetitle = "- $year Draft";
 }
 

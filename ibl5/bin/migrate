@@ -30,6 +30,7 @@ $runner = new \Migration\MigrationRunner(
 );
 
 // --status flag: list pending migrations and exit
+/** @var list<string> $argv */
 if (in_array('--status', $argv, true)) {
     $pending = $runner->getPending();
 

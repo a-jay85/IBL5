@@ -25,7 +25,11 @@ $service = $factory->service();
 $view = $factory->view($service);
 
 // Get and validate search parameters from POST
-$searchResult = $service->search($_POST);
+$postData = [];
+foreach ($_POST as $key => $value) {
+    $postData[(string) $key] = $value;
+}
+$searchResult = $service->search($postData);
 
 // Render page
 PageLayout\PageLayout::header();

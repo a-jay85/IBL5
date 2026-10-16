@@ -37,7 +37,8 @@ if ($op === 'save_order') {
         return;
     }
 
-    $input = json_decode(file_get_contents('php://input'), true);
+    $rawBody = file_get_contents('php://input');
+    $input = is_string($rawBody) ? json_decode($rawBody, true) : null;
     if (!is_array($input) || !isset($input['order']) || !is_array($input['order'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid request body']);

@@ -5,7 +5,8 @@ declare(strict_types=1);
 global $authService, $prefix, $user;
 /** @var \Auth\AuthService $authService */
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 

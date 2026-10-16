@@ -18,12 +18,12 @@ $view = $factory->view();
 
 // Get filter parameters from POST
 $filters = [
-    'boards_type' => $_POST['boards_type'] ?? '',
-    'sort_cat' => $_POST['sort_cat'] ?? '',
-    'active' => $_POST['active'] ?? '0',
-    'display' => $_POST['display'] ?? '',
-    'submitted' => $_POST['submitted'] ?? null
+    'boards_type' => is_string($_POST['boards_type'] ?? null) ? $_POST['boards_type'] : '',
+    'sort_cat' => is_string($_POST['sort_cat'] ?? null) ? $_POST['sort_cat'] : '',
+    'active' => is_string($_POST['active'] ?? null) ? $_POST['active'] : '0',
+    'display' => is_string($_POST['display'] ?? null) ? $_POST['display'] : '',
 ];
+$submitted = is_string($_POST['submitted'] ?? null) ? $_POST['submitted'] : null;
 
 // Render page
 PageLayout\PageLayout::header();
@@ -34,14 +34,14 @@ echo '<h1 class="ibl-title">Career Leaderboards</h1>';
 echo $view->renderFilterForm($filters);
 
 // Run query if form has been submitted
-if ($filters['submitted'] != null) {
+if ($submitted !== null && $submitted !== '') {
     // Map display name to table key
     $boardTypes = $service->getBoardTypes();
-    $tableKey = array_search($filters['boards_type'], $boardTypes);
+    $tableKey = array_search($filters['boards_type'], $boardTypes, true);
     
     // Map display name to sort column
     $sortCategories = $service->getSortCategories();
-    $sortColumn = array_search($filters['sort_cat'], $sortCategories);
+    $sortColumn = array_search($filters['sort_cat'], $sortCategories, true);
     
     if ($tableKey !== false && $sortColumn !== false) {
         // Get table type (totals or averages)

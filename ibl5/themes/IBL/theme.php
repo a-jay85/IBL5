@@ -1,6 +1,6 @@
 <?php
 
-if ($_SERVER['SERVER_NAME'] != "localhost") {
+if ($_SERVER['SERVER_NAME'] !== "localhost") {
     $bgcolor1 = "#EEEEEE";
 } else {
     $bgcolor1 = "#BBBBBB";
@@ -18,19 +18,12 @@ $textcolor2 = "#000000";
 function OpenTable(): void
 {
     global $bgcolor1, $bgcolor2;
+    /**
+     * @var string $bgcolor1
+     * @var string $bgcolor2
+     */
     echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\"><tr><td>\n";
     echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"$bgcolor1\"><tr><td>\n";
-}
-
-/**
- * @deprecated Use CSS classes directly: <div class="ibl-card">
- * Legacy PHP-Nuke centered table wrapper. Prefer modern CSS components.
- */
-function OpenTable2(): void
-{
-    global $bgcolor1, $bgcolor2;
-    echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\" align=\"center\"><tr><td>\n";
-    echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"$bgcolor1\"><tr><td>\n";
 }
 
 /**
@@ -46,6 +39,7 @@ function CloseTable(): void
 function themeheader(): void
 {
     global $user, $bgcolor1, $leagueContext, $mysqli_db, $authService;
+    /** @var string $bgcolor1 */
     $nukeCompat = new \Utilities\NukeCompat();
 
     $db = $mysqli_db instanceof \mysqli ? $mysqli_db : null;
@@ -131,7 +125,7 @@ function themeheader(): void
     $navView = new \Navigation\NavigationView($navConfig);
     echo $navView->render();
 
-    echo "<body bgcolor=\"$bgcolor1\" style=\"--page-bg: $bgcolor1;\"" . ($teamId ? " data-user-team-id=\"$teamId\"" : '') . ">";
+    echo "<body bgcolor=\"$bgcolor1\" style=\"--page-bg: $bgcolor1;\"" . ($teamId !== null && $teamId !== 0 ? " data-user-team-id=\"$teamId\"" : '') . ">";
     echo "<div class=\"site-content\" id=\"site-content\" role=\"main\" hx-boost=\"true\" hx-target=\"#site-content\" hx-swap=\"innerHTML show:window:top\" hx-indicator=\"#site-content\">\n";
 }
 
@@ -142,9 +136,10 @@ function themefooter(): void
     PageLayout\PageLayout::renderPageGenerationTime();
 }
 
-function themeindex(string $aid, string $informant, int|string $time, string $title, int $counter, int $topic, ?string $thetext, string $notes, string $morelink, string $topicname, string $topicimage, string $topictext): void
+function themeindex(string $aid, string $informant, int|string $time, string $title, int $counter, int $topic, ?string $thetext, string $notes, string $morelink, string $topicimage, string $topictext): void
 {
     global $tipath;
+    /** @var string $tipath */
     $ThemeSel = 'IBL';
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
         $t_image = "themes/$ThemeSel/images/topics/$topicimage";
@@ -172,7 +167,7 @@ function themeindex(string $aid, string $informant, int|string $time, string $ti
     $topicLinkLabel = $safeTopictext !== '' ? $safeTopictext : 'View topic';
 
     $topicIconHtml = '';
-    if (!empty($t_image) && file_exists($t_image)) {
+    if ($t_image !== '' && $t_image !== '0' && file_exists($t_image)) {
         $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . $topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Security\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
     }
 
@@ -200,13 +195,13 @@ function themeindex(string $aid, string $informant, int|string $time, string $ti
 
     echo $thetext;
 
-    if (!empty($notes)) {
+    if ($notes !== '' && $notes !== '0') {
         echo '<div class="news-article__note">
             <strong>' . _NOTE . ':</strong> <em>' . $notes . '</em>
         </div>';
     }
 
-    if ("$aid" != "$informant" && !empty($informant)) {
+    if ($aid !== $informant && $informant !== '' && $informant !== '0') {
         echo '<p class="news-article__attribution">
             ' . _WRITES . ': ' . \Security\HtmlSanitizer::safeHtmlOutput($informant) . '
         </p>';
@@ -223,9 +218,13 @@ function themeindex(string $aid, string $informant, int|string $time, string $ti
     </article>';
 }
 
-function themearticle(string $aid, string $informant, int|string $datetime, string $title, ?string $thetext, int $topic, string $topicname, string $topicimage, string $topictext): void
+function themearticle(string $aid, string $informant, int|string $datetime, string $title, ?string $thetext, int $topic, string $topicimage, string $topictext): void
 {
     global $tipath, $anonymous;
+    /**
+     * @var string $tipath
+     * @var string $anonymous
+     */
     $ThemeSel = 'IBL';
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
         $t_image = "themes/$ThemeSel/images/topics/$topicimage";
@@ -244,8 +243,8 @@ function themearticle(string $aid, string $informant, int|string $datetime, stri
 
     // Determine contributor info
     $contributorHtml = '';
-    if ("$aid" != "$informant") {
-        if (!empty($informant)) {
+    if ($aid !== $informant) {
+        if ($informant !== '' && $informant !== '0') {
             $safeInformant = \Security\HtmlSanitizer::safeHtmlOutput($informant);
             $contributorHtml = '<span class="news-article__meta-item">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -259,7 +258,7 @@ function themearticle(string $aid, string $informant, int|string $datetime, stri
     $topicLinkLabel = $safeTopictext !== '' ? $safeTopictext : 'View topic';
 
     $topicIconHtml = '';
-    if (!empty($t_image) && file_exists($t_image)) {
+    if ($t_image !== '' && $t_image !== '0' && file_exists($t_image)) {
         $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . $topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Security\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
     }
 

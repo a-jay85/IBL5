@@ -23,7 +23,7 @@ if (!defined('INDEX_FILE')) {
 }
 $module_name = basename(dirname(__FILE__));
 
-global $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang;
+global $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang, $bgcolor1, $bgcolor2;
 $factory = \Module\ModuleServices::current()->factory(\Module\Factories\NewsFactory::class);
 $controller = $factory->controller(
     storyHome: is_numeric($storyhome) ? (int) $storyhome : 0,
@@ -32,6 +32,8 @@ $controller = $factory->controller(
     siteName: is_string($sitename) ? $sitename : '',
     multilingual: is_numeric($multilingual) ? (int) $multilingual : 0,
     currentLang: is_string($currentlang) ? $currentlang : '',
+    tableBgcolor1: is_string($bgcolor1) ? $bgcolor1 : '#EEEEEE',
+    tableBgcolor2: is_string($bgcolor2) ? $bgcolor2 : '#CCCCCC',
 );
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().

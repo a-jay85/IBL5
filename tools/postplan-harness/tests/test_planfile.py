@@ -54,7 +54,7 @@ def test_frontmatter_gate():
 
 
 def test_matrix_and_critical_files():
-    planned, manual = parse_matrix(PLAN)
+    planned, manual, _ = parse_matrix(PLAN)
     assert planned == ["ibl5/tests/Unit/EventLoggerTest.php", "ibl5/tests/e2e/admin/events.spec.ts"]
     assert len(manual) == 1 and "eyeball" in manual[0].raw
     cf = parse_critical_files(PLAN)
@@ -77,7 +77,7 @@ def test_matrix_rejects_package_name_and_url_phantoms():
         "| 13 | **NEG** `original_url` `https://evil.test/x` rejected | PHPUnit | post-impl "
         "| `ibl5/tests/BugPipeline/AttachmentInputValidatorTest.php` — NEW |\n"
     )
-    planned, _ = parse_matrix(content)
+    planned, _, _ = parse_matrix(content)
     assert planned == []
 
 
@@ -100,7 +100,7 @@ def test_matrix_ignores_fenced_rows():
 | looks right | Truly-manual | eyeball it |
 ````
 """
-    planned, manual = parse_matrix(fenced)
+    planned, manual, _ = parse_matrix(fenced)
     # identical to the unfenced plan: the appendix contributes nothing
     assert planned == parse_matrix(PLAN)[0]
     assert len(manual) == len(parse_matrix(PLAN)[1])
@@ -236,7 +236,7 @@ echo hi
 |---|---|---|
 | real | PHPUnit | `ibl5/tests/Unit/RealTest.php` |
 """
-    planned, _ = parse_matrix(nested)
+    planned, _, _ = parse_matrix(nested)
     assert planned == ["ibl5/tests/Unit/RealTest.php"]
 
 
@@ -1247,7 +1247,7 @@ def _plan_with_phpunit(test_expr: str) -> str:
 ])
 def test_shell_token_rejected(token, reason):
     """Each shell-shaped token yields planned == [] (Phase 5 D5 guard)."""
-    planned, _ = parse_matrix(_plan_with_phpunit(token))
+    planned, _, _ = parse_matrix(_plan_with_phpunit(token))
     assert planned == [], f"Expected empty planned for {reason!r}: got {planned!r}"
 
 
@@ -1260,7 +1260,7 @@ def test_real_path_lands_in_planned():
         "| spec runs | E2E | `ibl5/tests/e2e/admin/events.spec.ts` |\n"
         "| unit runs | PHPUnit | `tools/postplan-harness/tests/test_planfile.py` |\n"
     )
-    planned, _ = parse_matrix(plan)
+    planned, _, _ = parse_matrix(plan)
     assert "ibl5/tests/e2e/admin/events.spec.ts" in planned
     assert "tools/postplan-harness/tests/test_planfile.py" in planned
 

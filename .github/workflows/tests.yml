@@ -950,6 +950,7 @@ jobs:
             bin/test-pr-cycle \
             bin/test-pr-cycle-tick \
             bin/test-digest-dm-build \
+            bin/test-after-merge-checklist \
             bin/test-pr-review-now \
             bin/test-launchd-job \
             bin/test-launchd-sched \

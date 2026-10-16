@@ -1,13 +1,13 @@
 ---
 description: Per-condition run-and-report blocks for Phase 6.5 auto-merge arming.
-last_verified: 2026-10-11
+last_verified: 2026-10-15
 ---
 
 # Phase 6.5 — Arm Auto-Merge (post-plan reference)
 
 Purpose: the per-condition run-and-report blocks for Phase 6.5 arming.
 
-**Condition (1) — Manual-Testing clearance (mechanized via the shared predicate).** Previously a prose gate ("PR says No manual testing needed") the orchestrator eyeballed — itself a judgment-error surface. Now deterministic: `pr_manual_testing_clearance` returns `CLEARED` (the `No manual testing needed` sentinel is present — the positive signal Phase 6 writes after resolving every manual-testing item), `HELD` (real manual rows remain), or `UNKNOWN` (no `## Manual Testing` section at all). **Fail-closed: arm only on `CLEARED`.** Phase 6 always writes the section, so a post-plan PR is `CLEARED` or `HELD`, never `UNKNOWN` on this path — the armed set is unchanged; the stricter `UNKNOWN→block` only matters to `bin/pr-triage`'s cross-PR sweep of hand-made PRs:
+Condition (1), Manual-Testing clearance, is mechanized via the shared predicate. It was a prose gate ("PR says No manual testing needed") that the orchestrator eyeballed, which made it a judgment-error surface. It is now deterministic: `pr_manual_testing_clearance` returns `CLEARED` (the `No manual testing needed` sentinel is present, the positive signal Phase 6 writes after resolving every manual-testing item), `HELD` (real manual rows remain), or `UNKNOWN` (no `## Manual Testing` section at all). Plan rows tagged `post-merge:` are rendered under a separate `## After merge` heading, which ends the scan window, so they never reach this predicate; the predicate itself is unchanged. **Fail-closed: arm only on `CLEARED`.** Phase 6 always writes the section, so a post-plan PR is `CLEARED` or `HELD`, never `UNKNOWN` on this path, so the armed set is unchanged; the stricter `UNKNOWN→block` only matters to `bin/pr-triage`'s cross-PR sweep of hand-made PRs:
 
 ```bash
 # condition (1): block unless the Manual-Testing section is the positive sentinel.

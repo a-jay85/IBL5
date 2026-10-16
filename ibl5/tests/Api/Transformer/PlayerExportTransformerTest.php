@@ -161,7 +161,7 @@ class PlayerExportTransformerTest extends TestCase
     public function testTransformExcludesUuidsAndTimestamps(): void
     {
         $row = $this->makePlayerRow();
-        $result = $this->transformer->transform($row);
+        $this->transformer->transform($row);
         $headers = $this->transformer->getHeaders();
 
         $this->assertNotContains('player_uuid', $headers);

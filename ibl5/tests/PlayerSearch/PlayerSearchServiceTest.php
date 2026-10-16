@@ -45,7 +45,7 @@ final class PlayerSearchServiceTest extends TestCase
     {
         $result = $this->service->search([]);
 
-        $this->assertEmpty($result['players']);
+        $this->assertSame([], $result['players']);
         $this->assertSame(0, $result['count']);
         $this->assertArrayHasKey('params', $result);
     }

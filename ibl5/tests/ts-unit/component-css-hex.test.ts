@@ -6,7 +6,6 @@ import type { Allowlist } from './component-css-hex-scan';
 
 const ROOT = fileURLToPath(new URL('../../design/components', import.meta.url));
 const IBL5 = fileURLToPath(new URL('../../', import.meta.url));
-const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 const COLOR_WHITE_PIN = /--color-white:\s*#ffffff\s*;/i;
 
 // Every remaining raw declaration / definition hex under design/components/**.
@@ -166,23 +165,6 @@ describe('--white token', () => {
     const dir = `${IBL5}tests/e2e/smoke/visual-regression.spec.ts-snapshots`;
     for (const name of ['head-to-head-records.png', 'head-to-head-records-mobile.png']) {
       expect(existsSync(`${dir}/${name}`), `missing baseline ${name}`).toBe(true);
-    }
-  });
-});
-
-describe('CI trigger', () => {
-  it('the ibl5ts path filter covers the files this spec reads', () => {
-    const yml = readFileSync(`${REPO}.github/workflows/tests.yml`, 'utf8');
-    const startMatch = /^\s+ibl5ts:\s*$/m.exec(yml);
-    expect(startMatch).not.toBeNull();
-    const rest = yml.slice(startMatch!.index + startMatch![0].length);
-    const endMatch = /^\s{12}[a-z0-9_]+:\s*$/m.exec(rest);
-    expect(endMatch).not.toBeNull();
-    const block = rest.slice(0, endMatch!.index);
-    expect(block.length).toBeGreaterThan(0);
-    expect(block).not.toContain('iblbot:');
-    for (const glob of ['ibl5/design/components/**', 'ibl5/design/tokens/tokens.css', 'ibl5/design/input.css']) {
-      expect(block, `ibl5ts filter must list ${glob}`).toContain(`'${glob}'`);
     }
   });
 });

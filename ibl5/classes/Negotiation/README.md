@@ -1,6 +1,6 @@
 ---
 description: Contract negotiation demand calculation, eligibility validation, and offer rendering — refactored from a 382-line procedural function.
-last_verified: 2026-10-06
+last_verified: 2026-10-12
 ---
 
 # Contract Negotiation Refactoring - Summary
@@ -42,6 +42,7 @@ $service = new NegotiationService(
     new NegotiationRepository($this->mysqliDb, $this->salaryCapRepo),
     new NegotiationValidator($this->mysqliDb),
     new ExtensionContractDemandCalculator($this->mysqliDb, $this->salaryCapRepo),
+    $teamIdentityRepo,
 );
 
 return $service->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
@@ -273,7 +274,7 @@ $validator = new NegotiationValidator($db);
 $result = $validator->validateNegotiationEligibility($player, $userTeam);
 
 // Render view independently
-$html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxSalary);
+$html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, $capSpace, $maxSalary);
 ```
 
 ### As a User:
@@ -325,7 +326,7 @@ $result = $validator->validateNegotiationEligibility($player, 'Seattle Supersoni
 $this->assertTrue($result['valid']);
 
 // Test view rendering
-$html = NegotiationOfferView::renderNegotiationForm($player, $demands, 1000, 1063);
+$html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, 1000, 1063);
 $this->assertStringContainsString('form', $html);
 ```
 
@@ -336,6 +337,7 @@ $processor = new NegotiationService(
     $mockRepository,
     $mockValidator,
     $mockDemandCalculator,
+    $teamIdentityRepo,
 );
 $output = $processor->processNegotiation(123, 'Seattle Supersonics', 'nuke');
 $this->assertStringContainsString('Contract Demands', $output);

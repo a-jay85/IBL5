@@ -77,6 +77,13 @@ def _normalized_head(item):
     return re.sub(r"^\s*(?:[-*]|\d+[.)])\s+", "", item).replace("**", "").lstrip()
 
 
+def _has_marker(path):
+    """Marked verdicts fold nested lines (#1335); test_verdict_blocking_marker_corpus owns them."""
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
+    return "[BLOCKING]" in text or "[NOTE]" in text
+
+
 def test_verdict_findings_corpus_invariants():
     before = after = verdicts = heading = legacy = 0
     not_subset, went_zero, kept_disposition, legacy_changed = [], [], [], []
@@ -90,7 +97,7 @@ def test_verdict_findings_corpus_invariants():
         legacy += not h
         verdicts += 1
         name = os.path.basename(os.path.dirname(p)) + "/" + os.path.basename(p)
-        if not set(new) <= set(old):
+        if not _has_marker(p) and not set(new) <= set(old):
             not_subset.append(name)
         if len(old) >= 1 and len(new) == 0:
             went_zero.append(name)

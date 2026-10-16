@@ -10,6 +10,22 @@ declare(strict_types=1);
 
 const STALENESS_DAYS = 60;
 
+// Doc trees frozen in place: bin/check-engine-freeze rejects any PR that edits
+// them, so a stale or dead-glob finding there cannot be fixed. --staleness-report
+// omits them so the nightly audit and bin/docfix-run never target a frozen file.
+// The engine cutover PR deletes this constant and the helper with engine/.
+const FROZEN_DOC_PREFIXES = ['engine/'];
+
+function isFrozenDocPath(string $rel): bool
+{
+    foreach (FROZEN_DOC_PREFIXES as $prefix) {
+        if (str_starts_with($rel, $prefix)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 const IN_SCOPE_GLOBS = [
     'CLAUDE.md',
     'README.md',
@@ -152,6 +168,14 @@ Options:
                      changed file is also run through the full-scan checks
                      (future-date, staleness, dead-ref). Pure base-vs-head
                      value comparison — never date-equality-to-today.
+  --exclude-from=<file>
+                     Requires --since=<ref>. Drops every path listed in
+                     <file> (one repo-relative path per line, as git diff
+                     --name-only prints it; blank lines ignored) from the
+                     changed set, so it gets neither the bump nor the
+                     staleness check. Equals form only; an unreadable <file>
+                     exits 2. bin/pre-commit-hook passes the paths a merge
+                     commit stages byte-identical to origin/master.
   --no-staleness     Full-scan only: suppress the 60-day staleness rule while
                      still failing on frontmatter, future-date, dead-ref, and
                      ADR-transition issues. Used by the PR/push gate so an
@@ -938,7 +962,40 @@ function changedDocPaths(string $base, string $escapedRoot, string $escapedBase)
         }
     }
 
+    // --exclude-from: drop the listed paths after the union and before any check.
+    $excluded = excludedDocPaths();
+    $union = array_filter($union, static fn (string $rel): bool => !isset($excluded[$rel]));
+
     return array_values(array_unique($union));
+}
+
+/**
+ * Paths named by --exclude-from (--since mode only), as a set. Set once from main;
+ * changedDocPaths() drops them, so an excluded doc gets neither the bump check nor
+ * the staleness check.
+ *
+ * @param array<string, true>|null $set
+ * @return array<string, true>
+ */
+function excludedDocPaths(?array $set = null): array
+{
+    static $excluded = [];
+    if ($set !== null) {
+        $excluded = $set;
+    }
+    return $excluded;
+}
+
+/**
+ * True when $rel differs between HEAD and the working tree (staged or unstaged).
+ * CI checks out a clean tree, so this is always false there.
+ */
+function hasUncommittedChange(string $escapedRoot, string $rel): bool
+{
+    $out = [];
+    $code = 0;
+    exec(sprintf('git -C %s diff --quiet HEAD -- %s 2>/dev/null', $escapedRoot, escapeshellarg($rel)), $out, $code);
+    return $code === 1;
 }
 
 /**
@@ -1011,10 +1068,13 @@ function iterChangedDocs(string $base, string $repoRoot): array
 
         $headLv = $headFm['last_verified'] ?? null;
         $baseLv = $baseFm['last_verified'] ?? null;
-        $editDate = editCommitDate($repoRoot, $base, $rel);
-        // Fall back to the author machine's local today when editDate is null
+        // An uncommitted edit (staged or unstaged) will be committed today, so its
+        // edit date is local today — never the branch's last commit touching the
+        // doc, which let a pre-commit run pass an unbumped edit CI then failed
+        // (PR #2405). Otherwise fall back to local today when editDate is null
         // (first commit on branch — base..HEAD empty). localToday(), not PHP's
         // UTC default: see localToday().
+        $editDate = hasUncommittedChange($escapedRoot, $rel) ? null : editCommitDate($repoRoot, $base, $rel);
         $effectiveEditDate = $editDate ?? localToday();
         $verifiedAtEdit = $headLv !== null && $headLv >= $effectiveEditDate;
 
@@ -1930,7 +1990,7 @@ function checkSkillDraftPlaceholder(string $repoRoot): array
 
 // --- main ---
 
-$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false];
+$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false, 'exclude_from' => null];
 foreach (array_slice($argv, 1) as $arg) {
     if (str_starts_with($arg, '--since=')) {
         $opts['since'] = substr($arg, strlen('--since='));
@@ -1939,6 +1999,10 @@ foreach (array_slice($argv, 1) as $arg) {
             fwrite(STDERR, usage());
             exit(2);
         }
+        continue;
+    }
+    if (str_starts_with($arg, '--exclude-from=')) {
+        $opts['exclude_from'] = substr($arg, strlen('--exclude-from='));
         continue;
     }
     switch ($arg) {
@@ -1981,6 +2045,30 @@ foreach (array_slice($argv, 1) as $arg) {
     }
 }
 
+if ($opts['exclude_from'] !== null) {
+    // The full scan has no changed set to filter, so the flag is meaningless there.
+    if ($opts['since'] === null) {
+        fwrite(STDERR, "check-docs: --exclude-from requires --since=<ref>\n");
+        exit(2);
+    }
+    $excludeFrom = $opts['exclude_from'];
+    $excludeLines = ($excludeFrom !== '' && !is_dir($excludeFrom) && is_readable($excludeFrom))
+        ? @file($excludeFrom, FILE_IGNORE_NEW_LINES)
+        : false;
+    if ($excludeLines === false) {
+        fwrite(STDERR, "check-docs: cannot read --exclude-from file: {$excludeFrom}\n");
+        exit(2);
+    }
+    $excludeSet = [];
+    foreach ($excludeLines as $line) {
+        $line = trim($line);
+        if ($line !== '') {
+            $excludeSet[$line] = true;
+        }
+    }
+    excludedDocPaths($excludeSet);
+}
+
 $root = repoRoot();
 // Freshness — staleness age and the future-date check — is decided on the UTC
 // calendar day, pinned explicitly so the verdict does not follow the ambient
@@ -2008,7 +2096,10 @@ if ($opts['staleness_report']) {
         static fn (array $e): array => $e + ['reason' => 'stale'],
         stalenessReport($root, $today)
     );
-    $report = array_merge($stale, deadGlobReport($root));
+    $report = array_values(array_filter(
+        array_merge($stale, deadGlobReport($root)),
+        static fn (array $e): bool => !isFrozenDocPath((string) $e['path'])
+    ));
     echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";
     exit(0);
 }

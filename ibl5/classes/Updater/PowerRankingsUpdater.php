@@ -105,7 +105,7 @@ class PowerRankingsUpdater extends \Database\BaseMysqliRepository {
             FROM `ibl_schedule`
             WHERE visitor_score > 0 AND home_score > 0
             AND game_date BETWEEN ? AND ?
-            ORDER BY game_date ASC",
+            ORDER BY game_date ASC, id ASC",
             "ss",
             $startDate,
             $endDate
@@ -128,7 +128,7 @@ class PowerRankingsUpdater extends \Database\BaseMysqliRepository {
             FROM `ibl_schedule`
             WHERE visitor_score = 0 AND home_score = 0
             AND game_date BETWEEN ? AND ?
-            ORDER BY game_date ASC",
+            ORDER BY game_date ASC, id ASC",
             "ss",
             $startDate,
             $endDate

@@ -13,6 +13,10 @@
 # Tombstone reaping is separate and runs BEFORE that marker gate: a skipped/
 # entry whose plan file left PLANS_DIR is dead regardless of why it was skipped,
 # so it is deleted, not recovered. Reaping never requeues anything.
+#
+# Also reaps heartbeat-watcher subshells orphaned by a killed bin/automouse/run
+# (PPID 1, argv bin/automouse/run, direct `sleep 60` child, no live heartbeat
+# file names it).
 
 set -u
 
@@ -22,6 +26,9 @@ Usage: bin/automouse/self-heal [--dry-run]
 
 Requeue automouse plans that were skipped by the staleness gate and now pass it.
 Also reaps orphan skipped-dir entries whose plan file has left ~/claude-plans/.
+Also reaps heartbeat-watcher subshells orphaned by a killed bin/automouse/run
+(PPID 1, argv bin/automouse/run, direct `sleep 60` child, no live heartbeat file
+names it).
 
 Options:
   --dry-run   Preview healed / still-stale / reaped counts without making changes.
@@ -40,6 +47,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 : "${PLANS_DIR:=$HOME/claude-plans}"
 : "${STALENESS_GUARD:=$SCRIPT_DIR/../check-plan-staleness}"
+# Orphan-watcher sweep knobs. Tests point both at temp-dir fixtures so no test
+# run ever scans or signals a real automouse process.
+ORPHAN_ARGV_RE_DEFAULT='^[^ ]*bash [^ ]*bin/automouse/run( |$)'
+: "${AUTOMOUSE_ORPHAN_ARGV_RE:=$ORPHAN_ARGV_RE_DEFAULT}"
+: "${AUTOMOUSE_ORPHAN_PPID:=1}"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/../lib/plan-depends-on"
 
@@ -58,6 +70,8 @@ trap 'rm -f "$healed_names_file"' EXIT
 holds_cleared=0
 holds_waiting=0
 holds_reaped=0
+orphans_reaped=0
+orphans_spared=0
 
 # Clear dependency holds written by bin/automouse/run's depends_on: gate.
 # Runs BEFORE the skipped/-empty guard below, because skipped/ is usually empty
@@ -107,7 +121,67 @@ scan_depends_holds() {
     echo "self-heal: $holds_cleared hold(s) cleared, $holds_waiting still held, $holds_reaped orphan sidecar(s) reaped."
 }
 
+# Reap heartbeat-watcher subshells orphaned by a SIGKILLed bin/automouse/run
+# (cleanup_watcher never ran). A candidate must match EVERY clause below; any
+# doubt spares it, because killing a live run is worse than leaking a watcher.
+sweep_orphan_watchers() {
+    local me snap pid ppid pgid uid args kid kpid kppid kargs hb n spare now_ppid now_args
+    case "$AUTOMOUSE_ORPHAN_PPID" in ''|*[!0-9]*)
+        echo "[orphan-sweep-warn] AUTOMOUSE_ORPHAN_PPID='$AUTOMOUSE_ORPHAN_PPID' is not a pid; sweep disabled"
+        return 0 ;;
+    esac
+    me="$(id -u)"
+    snap="$(ps -A -ww -o pid= -o ppid= -o pgid= -o uid= -o args= 2>/dev/null)" \
+        || { echo "[orphan-sweep-warn] ps failed; sweep skipped"; return 0; }
+    while read -r pid ppid pgid uid args; do
+        [ "$uid" = "$me" ] || continue
+        [ "$ppid" = "$AUTOMOUSE_ORPHAN_PPID" ] || continue
+        [[ "$args" =~ $AUTOMOUSE_ORPHAN_ARGV_RE ]] || continue
+        { [ "$pid" != "$$" ] && [ "$pid" != "$PPID" ]; } || continue
+        # Only a watcher tick runs `sleep 60` as a direct child of the run script.
+        kid=""
+        while read -r kpid kppid _ _ kargs; do
+            if [ "$kppid" = "$pid" ] && [ "$kargs" = "sleep 60" ]; then kid=$kpid; break; fi
+        done <<< "$snap"
+        if [ -z "$kid" ]; then orphans_spared=$((orphans_spared + 1)); continue; fi
+        # A live run's heartbeat file (.heartbeat-<run pid>-<label>) naming this
+        # candidate's pid or pgid spares it.
+        spare=0
+        for hb in "$NIGHTLY_DIR"/.heartbeat-*; do
+            [ -e "$hb" ] || continue
+            n="${hb##*/.heartbeat-}"; n="${n%%-*}"
+            case "$n" in ''|*[!0-9]*) continue ;; esac
+            if { [ "$n" = "$pid" ] || [ "$n" = "$pgid" ]; } && kill -0 "$n" 2>/dev/null; then
+                spare=1; break
+            fi
+        done
+        if [ "$spare" -eq 1 ]; then
+            echo "[orphan-sweep] spared pid $pid: live heartbeat file names it"
+            orphans_spared=$((orphans_spared + 1)); continue
+        fi
+        if [ "$DRY_RUN" -eq 1 ]; then
+            echo "would reap orphan watcher: pid $pid (pgid $pgid)"
+            orphans_reaped=$((orphans_reaped + 1)); continue
+        fi
+        # Re-read right before signalling; any drift spares the candidate.
+        read -r now_ppid now_args < <(ps -ww -o ppid= -o args= -p "$pid" 2>/dev/null)
+        if [ "${now_ppid:-}" != "$ppid" ] || [ "${now_args:-}" != "$args" ]; then
+            echo "[orphan-sweep] spared pid $pid: changed since snapshot"
+            orphans_spared=$((orphans_spared + 1)); continue
+        fi
+        read -r kppid kargs < <(ps -ww -o ppid= -o args= -p "$kid" 2>/dev/null)
+        if [ "${kppid:-}" = "$pid" ] && [ "${kargs:-}" = "sleep 60" ]; then
+            kill -TERM "$kid" 2>/dev/null || true
+        fi
+        kill -TERM "$pid" 2>/dev/null || true
+        echo "[orphan-sweep] reaped orphan watcher pid $pid (pgid $pgid): $args"
+        orphans_reaped=$((orphans_reaped + 1))
+    done <<< "$snap"
+    echo "self-heal: $orphans_reaped orphan watcher(s) reaped, $orphans_spared spared."
+}
+
 scan_depends_holds
+sweep_orphan_watchers
 
 if ! ls "$SKIPPED_DIR"/*.md >/dev/null 2>&1; then
     echo "self-heal: skipped/ is empty — nothing else to recover."

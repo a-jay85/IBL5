@@ -30,12 +30,13 @@
 #
 # Run: bin/test-sigpipe-grep-q-guard   (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-FAILED=0
 
-pass() { echo "ok: $1"; }
-fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 # Both static cases below strip comments first: the fixes themselves carry
 # explanatory comments that quote the broken `| grep -qF` form, so a naive grep
@@ -113,9 +114,4 @@ else
          "use [ \"\$(... | grep -c ...)\" -gt 0 ] or capture the output into a variable"
 fi
 
-if [ "$FAILED" -eq 0 ]; then
-    echo "all cases passed"
-else
-    echo "one or more cases FAILED"
-fi
-exit "$FAILED"
+h_done

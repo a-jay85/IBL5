@@ -84,7 +84,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             'set_waivers_to_free_agents' => $this->setWaiversToFreeAgents(),
             'set_fa_factors_pfw' => $this->setFaFactorsPfw($postData),
             'update_tradition' => $this->updateTradition(),
-            'generate_awards' => $this->generateAwards($postData),
+            'generate_awards' => $this->generateAwards(),
             'set_finals_mvp' => $this->setFinalsMvp($postData),
             default => ['success' => false, 'message' => 'Unknown action: ' . $action],
         };
@@ -322,10 +322,9 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     }
 
     /**
-     * @param array<string, mixed> $postData
      * @return array{success: bool, message: string}
      */
-    private function generateAwards(array $postData): array
+    private function generateAwards(): array
     {
         $currentPhase = $this->repository->getSetting('Current Season Phase') ?? '';
 
@@ -390,6 +389,8 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     /**
      * Returns a Discord notice to post to #admin-chat when the season phase is
      * changed to one that enables sim recaps, or null for phases that disable them.
+     * The poller never unloads itself, so the notice is informational: it resumes
+     * on its own on the first tick after the phase change.
      *
      * When the approver Discord ID is empty (unconfigured), the ping prefix is
      * omitted and the message is sent without a mention.
@@ -403,9 +404,8 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         $approverId = Discord::getBugPipelineApproverDiscordId();
         $ping = $approverId !== '' ? "<@{$approverId}> " : '';
 
-        return "{$ping}Season phase is now **{$phase}** — sim recap poller is enabled. "
-            . 'Run `bin/sim-recap-cron-setup --resume` to restart the LaunchAgent '
-            . '(label: `com.ibl5.sim-recap-poll`).';
+        return "{$ping}Season phase is now **{$phase}** — sim recaps are enabled. "
+            . 'The poller picks this up on its own within about 5 minutes; no action needed.';
     }
 
     /**

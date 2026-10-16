@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+from typing import Optional
 
 from . import manual_rows
 from .classify import BACKLOG_REPO
@@ -48,18 +49,27 @@ _LEGAL_STOP_CONDITIONS = ("tests-green", "evidence-present")
 _EVIDENCE_TOKEN = re.compile(r"^[A-Za-z0-9._/-]+$")
 
 
-def frontmatter_auto_merge_false(content: str) -> bool:
-    """Line-1 YAML frontmatter only (a body documenting the syntax can't self-select)."""
+def frontmatter_auto_merge_value(content: str) -> Optional[str]:
+    """Raw `auto_merge:` value from the line-1 YAML frontmatter; None when the
+    file has no frontmatter or the key is absent. Line-1 frontmatter only (a body
+    documenting the syntax can't self-select). Whitespace-stripped, never lowercased:
+    `False` is an unknown value and condition (7) holds on it.
+    """
     lines = content.splitlines()
     if not lines or not re.match(r"^---\s*$", lines[0]):
-        return False
+        return None
     for line in lines[1:]:
         if re.match(r"^---\s*$", line):
-            return False
+            return None
         m = re.match(r"^auto_merge:\s*(.+?)\s*$", line)
         if m:
-            return m.group(1).strip() == "false"
-    return False
+            return m.group(1).strip()
+    return None
+
+
+def frontmatter_auto_merge_false(content: str) -> bool:
+    """Kept for existing callers and tests: True only for the exact value `false`."""
+    return frontmatter_auto_merge_value(content) == "false"
 
 
 def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
@@ -149,6 +159,7 @@ def _is_test_path(tok: str) -> bool:
 
 
 _NO_CHANGE_MARKER = r"\(no-change\)"
+_RUN_ONLY_MARKER = r"\(run-only\)"
 
 
 # A WHOLE cell that is a planning Test-type label. Measured on the 1144-file
@@ -235,8 +246,46 @@ def parse_no_change_test_paths(content: str) -> list[str]:
     return [p for p in marked if p not in unmarked]
 
 
-def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
-    """Returns (planned_test_paths, truly_manual_rows) from the Verification Matrix.
+def parse_run_only_test_paths(content: str) -> list[str]:
+    """Planned tokens whose EVERY unfenced planning row carries `(run-only)`
+    immediately after the token's closing backtick (any planning row type).
+
+    A `(run-only)` row plans to RUN an existing test file, never to write it, so
+    an absent diff entry is the pass condition. The marker exempts only the
+    `MISSING:` item for that token; MISSING-FILE and MISSING-METHOD are untouched.
+    A token also planned by any unmarked row is NOT returned: the unannotated row
+    wins. A Visual-regression row marked `(no-change)` on the same token is
+    neutral, so a token whose rows mix the two markers is still exempt. Fenced
+    rows are stripped (same _strip_fenced walk as parse_matrix).
+    """
+    marked: list[str] = []
+    unmarked: set[str] = set()
+    for line in _strip_fenced(content):
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        row = " | ".join(cells)
+        p = _planned_token(cells)
+        if p is None:
+            continue
+        tok = r"`" + re.escape(p) + r"`\s*"
+        if re.search(tok + _RUN_ONLY_MARKER, row, re.I):
+            if p not in marked:
+                marked.append(p)
+        elif re.search(tok + _NO_CHANGE_MARKER, row, re.I) and _is_visual_regression_row(cells):
+            continue  # neutral: the (no-change) parser owns this row
+        else:
+            unmarked.add(p)
+    return [p for p in marked if p not in unmarked]
+
+
+def parse_matrix(
+    content: str,
+) -> tuple[list[str], list[manual_rows.ManualRow], list[manual_rows.ManualRow]]:
+    """Returns (planned_test_paths, truly_manual_rows, post_merge_rows) from the matrix.
+
+    A Truly-manual row whose cells carry `post-merge: <reason>` goes to
+    post_merge_rows instead of truly_manual_rows (bin/check-plan gate [PM]).
 
     Planned tests: rows whose Test type is PHPUnit / API-test / E2E / Visual-regression;
     path taken from the row's backticked file token.
@@ -266,17 +315,24 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
     """
     planned: list[str] = []
     manual: list[manual_rows.ManualRow] = []
+    post_merge: list[manual_rows.ManualRow] = []
+    in_matrix = False  # inside a `What to verify` table, as bin/check-plan's GATEP_MATRIX
     for line in _strip_fenced(content):
         if not line.strip().startswith("|"):
+            in_matrix = False
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if any(_norm_cell(c).lower() == "what to verify" for c in cells):
+            in_matrix = True
         row = " | ".join(cells)
         if re.search(r"truly.?manual", row, re.I):
-            manual.append(manual_rows.row_from_cells(cells, len(manual) + 1))
+            mrow = manual_rows.row_from_cells(
+                cells, len(manual) + len(post_merge) + 1, in_matrix=in_matrix)
+            (post_merge if mrow.post_merge_reason else manual).append(mrow)
         p = _planned_token(cells)
         if p is not None and p not in planned:
             planned.append(p)
-    return planned, manual
+    return planned, manual, post_merge
 
 
 _EXECUTABLE_TYPE = re.compile(
@@ -467,6 +523,14 @@ _PHASE_HEADING_RE = re.compile(r"^##\s+(?:Phase|Step)\s*(\d+)(?!\.\d)\b\s*[:.\-â
 # All-S tier marker = bookkeeping-only phase (close a backlog issue, bump a doc date).
 _BOOKKEEPING_MARKER_RE = re.compile(r"\[phases:\s*S(\s*/\s*S)*\s*\]")
 _EXAMPLE_SUFFIX_RE = re.compile(r"^\s*\(example\)")
+# The two placeholder shapes the architect contract mandates for a not-yet-numbered
+# file (`.claude/skills/plan/_architect-contract.md` "Number placeholders"). They carry
+# ` (example)` for the staleness guard, yet they ARE the phase's deliverable, so they
+# alone survive the (example) skip below. Token side is the exact uppercase literal
+# (`NNN`/`NNNN` for a migration, `NNNN` for an ADR); `nnn`, `N{5}` and any other
+# directory are not placeholders and stay skipped like every other (example) token.
+_PLACEHOLDER_TOKEN_RE = re.compile(
+    r"^(?:ibl5/migrations/N{3,4}_[^/\s]+\.sql|ibl5/docs/decisions/NNNN-[^/\s]+\.md)$")
 _LINE_SUFFIX_RE = re.compile(r"(?::|#)L?\d+(?:-L?\d+)?$")
 NO_DIFF_MIN_REASON = 15
 _NO_DIFF_MARKER_RE = re.compile(r"^\s*(?:[-*]\s+)?\*\*No diff:\*\*[ \t]*(.*?)\s*$")
@@ -476,15 +540,18 @@ def _phase_evidence_paths(body: str) -> list[str]:
     """Backticked tokens in a phase body that look like repo paths, deduped, first-seen order.
 
     A token followed by ` (example)` is an intentionally-absent path (staleness-guard idiom)
-    and is skipped. A `path::test_fn` pytest node id contributes its file part only. A
-    trailing line suffix (`:120`, `:438-457`, `#L12-L20`) is stripped so the token matches
-    the changed file. Glob tokens are skipped because _resolve cannot match them.
+    and is skipped, except a contract number placeholder (`_PLACEHOLDER_TOKEN_RE`), which
+    names the phase's deliverable and is kept. A `path::test_fn` pytest node id contributes
+    its file part only. A trailing line suffix (`:120`, `:438-457`, `#L12-L20`) is stripped
+    so the token matches the changed file. Glob tokens are skipped because _resolve cannot
+    match them.
     """
     out: list[str] = []
     for m in re.finditer(r"`([^`\n]+)`", body):
-        if _EXAMPLE_SUFFIX_RE.match(body[m.end():m.end() + 12]):
-            continue
         tok = m.group(1).split("::", 1)[0].strip()
+        if (_EXAMPLE_SUFFIX_RE.match(body[m.end():m.end() + 12])
+                and not _PLACEHOLDER_TOKEN_RE.match(tok)):
+            continue
         tok = _LINE_SUFFIX_RE.sub("", tok)
         if not _is_test_path(tok) or re.search(r"[*?\[\]]", tok):
             continue
@@ -855,14 +922,18 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
             content = fh.read()
     info.found = True
     info.auto_merge_false = frontmatter_auto_merge_false(content)
+    info.auto_merge_value = frontmatter_auto_merge_value(content)
     info.stop_condition, info.evidence, info.contract_error = frontmatter_autonomy_contract(content)
     info.has_matrix = any(_MATRIX_HEADER.match(l) for l in content.splitlines())
     info.has_security = any(_SECURITY_H.match(l) for l in content.splitlines())
     info.has_reuse = bool(_REUSE.search(content))
     if info.has_matrix:
-        info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
+        (
+            info.planned_test_paths, info.truly_manual_rows, info.post_merge_rows,
+        ) = parse_matrix(content)
         info.executable_row_count = count_executable_matrix_rows(content)
         info.no_change_test_paths = parse_no_change_test_paths(content)
+        info.run_only_test_paths = parse_run_only_test_paths(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
     info.backlog_issues = parse_backlog_issues(content)

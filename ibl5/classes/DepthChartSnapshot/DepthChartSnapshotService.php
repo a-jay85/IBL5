@@ -6,8 +6,10 @@ namespace DepthChartSnapshot;
 
 use DepthChartSnapshot\Contracts\DepthChartSnapshotServiceInterface;
 use DepthChartSnapshot\Contracts\DepthChartSnapshotRepositoryInterface;
+use DepthChartSnapshot\Contracts\DepthChartLabelBuilderInterface;
 use DepthChartSnapshot\Contracts\SlotAssignmentResolverInterface;
 use Season\Season;
+use BasketballStats\StatsSanitizer;
 
 /**
  * @phpstan-import-type SavedDepthChartRow from Contracts\DepthChartSnapshotRepositoryInterface
@@ -21,6 +23,7 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
     private DepthChartSnapshotRepositoryInterface $repository;
     private \mysqli $db;
     private SlotAssignmentResolverInterface $slotResolver;
+    private DepthChartLabelBuilderInterface $labelBuilder;
 
     /**
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
@@ -40,12 +43,14 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
         \mysqli $db,
         ?DepthChartSnapshotRepositoryInterface $repo = null,
         ?\Psr\Log\LoggerInterface $logger = null,
-        ?SlotAssignmentResolverInterface $slotResolver = null
+        ?SlotAssignmentResolverInterface $slotResolver = null,
+        ?DepthChartLabelBuilderInterface $labelBuilder = null
     ) {
         $this->db = $db;
         $this->repository = $repo ?? new DepthChartSnapshotRepository($db);
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->slotResolver = $slotResolver ?? new SlotAssignmentResolver();
+        $this->labelBuilder = $labelBuilder ?? new DepthChartLabelBuilder();
     }
 
     /**
@@ -191,57 +196,16 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
     /**
      * Build label for the "Current (Live)" dropdown entry
      *
-     * Shows phase, phase-specific sim range, date range, and win-loss record.
+     * Delegates string assembly to DepthChartLabelBuilderInterface::buildLiveLabel().
      */
     public function buildCurrentLiveLabel(int $teamid, Season $season): string
     {
-        $currentPhaseSim = $season->getPhaseSpecificSimNumber();
-
-        $parts = [];
-
-        // Find active DC (most recently updated) for sim range, date range, and win-loss record
         $activeDc = $this->getActiveDc($teamid);
+        $record = $activeDc !== null
+            ? $this->getWinLossRecord($teamid, $activeDc['sim_start_date'], $season->lastSimEndDate)
+            : null;
 
-        // Use the active DC's name if it has one, otherwise default label
-        if ($activeDc !== null && $activeDc['name'] !== null && $activeDc['name'] !== '') {
-            $parts[] = $activeDc['name'] . ' (Live)';
-        } else {
-            $parts[] = 'Current (Live)';
-        }
-
-        // Sim range: active DC's start through current sim
-        if ($activeDc !== null) {
-            $phaseSimStart = $season->calculatePhaseSimNumber(
-                $activeDc['sim_number_start'],
-                $activeDc['phase'],
-                $activeDc['season_year']
-            );
-            $parts[] = $this->formatSimRange($season->phase, $phaseSimStart, $currentPhaseSim);
-
-            // Date range: active DC start through current sim end (or projected if no sim has consumed this DC yet)
-            $rawStartDate = $activeDc['sim_start_date'];
-            $rawEndDate = $season->lastSimEndDate;
-            if ($rawStartDate > $rawEndDate) {
-                $rawEndDate = $season->projectedNextSimEndDate->format('Y-m-d');
-            }
-
-            $startDate = (new \DateTime($rawStartDate))->format('M j');
-            $endDate = (new \DateTime($rawEndDate))->format('M j');
-        } else {
-            $parts[] = 'Sim ' . $currentPhaseSim;
-            $startDate = (new \DateTime($season->lastSimStartDate))->format('M j');
-            $endDate = (new \DateTime($season->lastSimEndDate))->format('M j');
-        }
-
-        $parts[] = $startDate . ' - ' . $endDate;
-
-        // Win-loss record for the active DC's span
-        if ($activeDc !== null) {
-            $record = $this->getWinLossRecord($teamid, $activeDc['sim_start_date'], $season->lastSimEndDate);
-            $parts[] = '(' . $record['wins'] . '-' . $record['losses'] . ')';
-        }
-
-        return implode(' ∙ ', $parts);
+        return $this->labelBuilder->buildLiveLabel($activeDc, $season, $record);
     }
 
     /**
@@ -270,7 +234,10 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
                 continue;
             }
 
-            $label = $this->buildDropdownLabel($dc, $season, $teamid);
+            // Ended DCs count through their own end date; the open DC counts through the last sim
+            $recordEndDate = $dc['sim_end_date'] ?? $season->lastSimEndDate;
+            $record = $this->getWinLossRecord($teamid, $dc['sim_start_date'], $recordEndDate);
+            $label = $this->labelBuilder->buildDropdownLabel($dc, $season, $record);
             $options[] = [
                 'id' => $dc['id'],
                 'label' => $label,
@@ -290,8 +257,8 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
     public function buildPlayerSnapshot(array $rosterPlayer, array $dcSettings, int $ordinal): array
     {
         return [
-            'pid' => $this->toInt($rosterPlayer['pid'] ?? 0),
-            'player_name' => $this->toString($rosterPlayer['name'] ?? ''),
+            'pid' => StatsSanitizer::toInt($rosterPlayer['pid'] ?? 0),
+            'player_name' => StatsSanitizer::scalarToString($rosterPlayer['name'] ?? ''),
             'ordinal' => $ordinal,
             'dc_pg_depth' => $dcSettings['pg'] ?? 0,
             'dc_sg_depth' => $dcSettings['sg'] ?? 0,
@@ -306,37 +273,6 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
             'dc_di' => $dcSettings['di'] ?? 0,
             'dc_bh' => $dcSettings['bh'] ?? 0,
         ];
-    }
-
-    /**
-     * Safely convert mixed value to int
-     */
-    private function toInt(mixed $value): int
-    {
-        if (is_int($value)) {
-            return $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-        if (is_float($value)) {
-            return (int) $value;
-        }
-        return 0;
-    }
-
-    /**
-     * Safely convert mixed value to string
-     */
-    private function toString(mixed $value): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-        return '';
     }
 
     /**
@@ -384,66 +320,6 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
         }
 
         return $this->activeDcCache[$teamid];
-    }
-
-    /**
-     * Build a human-readable dropdown label for a saved depth chart
-     *
-     * @param SavedDepthChartRow $dc
-     */
-    private function buildDropdownLabel(array $dc, Season $season, int $teamid): string
-    {
-        $parts = [];
-
-        if ($dc['name'] !== null && $dc['name'] !== '') {
-            $parts[] = $dc['name'];
-        }
-
-        // Phase-specific sim number range
-        $phaseSimStart = $season->calculatePhaseSimNumber(
-            $dc['sim_number_start'],
-            $dc['phase'],
-            $dc['season_year']
-        );
-
-        if ($dc['sim_number_end'] !== null) {
-            $phaseSimEnd = $season->calculatePhaseSimNumber(
-                $dc['sim_number_end'],
-                $dc['phase'],
-                $dc['season_year']
-            );
-            $parts[] = $this->formatSimRange($dc['phase'], $phaseSimStart, $phaseSimEnd);
-        } else {
-            $parts[] = 'Sim ' . $phaseSimStart;
-        }
-
-        // Date range
-        $startDate = (new \DateTime($dc['sim_start_date']))->format('M j');
-        $endDateStr = $dc['sim_end_date'] !== null
-            ? (new \DateTime($dc['sim_end_date']))->format('M j')
-            : '?';
-        $parts[] = $startDate . ' - ' . $endDateStr;
-
-        // Win-loss record using sim_end_date or lastSimEndDate for active DCs
-        $recordEndDate = $dc['sim_end_date'] ?? $season->lastSimEndDate;
-        $record = $this->getWinLossRecord($teamid, $dc['sim_start_date'], $recordEndDate);
-        $parts[] = '(' . $record['wins'] . '-' . $record['losses'] . ')';
-
-        return implode(' | ', $parts);
-    }
-
-    /**
-     * Format a sim number range with proper pluralization
-     *
-     * Returns "{phase} Sim {n}" for single sim, "{phase} Sims {start}-{end}" for range.
-     */
-    private function formatSimRange(string $phase, int $start, int $end): string
-    {
-        if ($start === $end) {
-            return 'Sim ' . $start;
-        }
-
-        return 'Sims ' . $start . '-' . $end;
     }
 
     /**

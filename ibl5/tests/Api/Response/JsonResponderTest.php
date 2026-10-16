@@ -6,6 +6,7 @@ namespace Tests\Api\Response;
 
 use Api\Response\JsonResponder;
 use PHPUnit\Framework\TestCase;
+use Tests\Clock\FixedClock;
 
 class JsonResponderTest extends TestCase
 {
@@ -80,6 +81,38 @@ class JsonResponderTest extends TestCase
         self::assertSame('v1', $decoded['meta']['version']);
     }
 
+    public function testSuccessTimestampIsIso8601UtcWithinCallWindow(): void
+    {
+        $before = time();
+        ob_start();
+        $this->responder->success([]);
+        $output = (string) ob_get_clean();
+        $after = time();
+
+        $decoded = json_decode($output, true);
+        self::assertIsArray($decoded);
+        self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $decoded['meta']['timestamp']);
+        $ts = strtotime($decoded['meta']['timestamp']);
+        self::assertGreaterThanOrEqual($before, $ts);
+        self::assertLessThanOrEqual($after, $ts);
+    }
+
+    public function testErrorTimestampIsIso8601UtcWithinCallWindow(): void
+    {
+        $before = time();
+        ob_start();
+        $this->responder->error(400, 'bad_request', 'Invalid parameter');
+        $output = (string) ob_get_clean();
+        $after = time();
+
+        $decoded = json_decode($output, true);
+        self::assertIsArray($decoded);
+        self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $decoded['meta']['timestamp']);
+        $ts = strtotime($decoded['meta']['timestamp']);
+        self::assertGreaterThanOrEqual($before, $ts);
+        self::assertLessThanOrEqual($after, $ts);
+    }
+
     public function testRawOutputsFlatBodyWithoutEnvelope(): void
     {
         ob_start();
@@ -100,5 +133,64 @@ class JsonResponderTest extends TestCase
         $output = (string) ob_get_clean();
 
         self::assertSame('', $output);
+    }
+
+    public function testSuccessTimestampComesFromInjectedClock(): void
+    {
+        $responder = new JsonResponder(new FixedClock(1791549296));
+
+        ob_start();
+        $responder->success(['x' => 1]);
+        $output = (string) ob_get_clean();
+
+        $decoded = json_decode($output, true);
+        self::assertIsArray($decoded);
+        self::assertSame('2026-10-09T12:34:56Z', $decoded['meta']['timestamp']);
+    }
+
+    public function testErrorTimestampComesFromInjectedClock(): void
+    {
+        $responder = new JsonResponder(new FixedClock(1791549296));
+
+        ob_start();
+        $responder->error(404, 'not_found', 'Nope');
+        $output = (string) ob_get_clean();
+
+        $decoded = json_decode($output, true);
+        self::assertIsArray($decoded);
+        self::assertSame('2026-10-09T12:34:56Z', $decoded['meta']['timestamp']);
+    }
+
+    public function testTimestampRollsOverAtUtcMidnight(): void
+    {
+        $clock = new FixedClock(1791763199);
+        $responder = new JsonResponder($clock);
+
+        ob_start();
+        $responder->success(['x' => 1]);
+        $first = json_decode((string) ob_get_clean(), true);
+        self::assertIsArray($first);
+        self::assertSame('2026-10-11T23:59:59Z', $first['meta']['timestamp']);
+
+        $clock->advance(1);
+
+        ob_start();
+        $responder->success(['x' => 1]);
+        $second = json_decode((string) ob_get_clean(), true);
+        self::assertIsArray($second);
+        self::assertSame('2026-10-12T00:00:00Z', $second['meta']['timestamp']);
+    }
+
+    public function testCallerSuppliedMetaTimestampOverridesClock(): void
+    {
+        $responder = new JsonResponder(new FixedClock(1791549296));
+
+        ob_start();
+        $responder->success(['x' => 1], ['timestamp' => 'caller-value']);
+        $output = (string) ob_get_clean();
+
+        $decoded = json_decode($output, true);
+        self::assertIsArray($decoded);
+        self::assertSame('caller-value', $decoded['meta']['timestamp']);
     }
 }

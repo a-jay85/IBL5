@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Pinned Opus 5.5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5-5
-last_verified: 2026-10-06
+last_verified: 2026-10-07
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -161,7 +161,7 @@ in this review.
      a factual digest; blockers belong in the 6d findings, and `**Watch:**` may point at them
      but must not restate the verdict.
    - **Name the exact subject, and keep its qualifier in the first sentence.** `bin/digest-dm-build`
-     truncates `**Watch:**` at 700 characters for the Discord DM (appending `…`), so a subject or
+     truncates `**Watch:**` at 650 characters for the Discord DM (appending `…`), so a subject or
      a bounding qualifier parked in a trailing clause can vanish from the only copy the user
      reads. Write "`engine.yml` is not a required-status check", never the unbounded "this repo
      has no required-status checks" — dropping the subject inverts the claim's scope. When the
@@ -186,7 +186,7 @@ in this review.
      rule it named, then continue. Do not loop a second time, do not abort, do not mention the
      linter in the digest. `bin/check-digest-prose` always exits 0 and never blocks output — <!-- slop-ok -->
      ship whatever the single rewrite produces. Rewriting must not change the label, split the
-     line in two, or push the line past `bin/digest-dm-build`'s `WATCH_MAX=700` /
+     line in two, or push the line past `bin/digest-dm-build`'s `WATCH_MAX=650` /
      `WHAT_MAX=1000` caps.
 4. **Return** a thin pointer only — the verdict word and the file path, e.g.
    `NOT READY /tmp/pr-ready-phase6-verdict-1901.md`. Never paste the diff, file bodies, or

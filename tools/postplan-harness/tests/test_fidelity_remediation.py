@@ -712,7 +712,11 @@ def test_notes_end_to_end(tmp_path, git_shim):
                 res.fidelity.get("rounds_completed", 0),
             ),
         )
-        assert "**Backlog issues filed:** [a-jay85/IBL5-backlog#" in sticky
+        # filed_notes is recorded, so the links sit in Still open and the old line is gone.
+        assert "### Still open (non-blocking)" in sticky
+        assert "**Backlog issues filed:**" not in sticky
+        for n in nums:
+            assert fidelity._backlog_link(f"backlog#{n}", n) in sticky
     finally:
         _cleanup(995)
 

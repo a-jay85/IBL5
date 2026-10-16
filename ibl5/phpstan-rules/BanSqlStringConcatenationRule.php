@@ -32,7 +32,7 @@ use PHPStan\Type\Type;
  * operand is visited exactly once — no `getAttribute('parent')` and no duplicate
  * errors.
  *
- * The `classes/` path guard prevents the rule from analyzing itself or test
+ * The `classes/` and `blocks/` path guard prevents the rule from analyzing itself or test
  * fixtures, avoiding a bootstrap/self-gating hazard.
  *
  * Unsound residual NOT covered by this rule (human-at-merge remains the control):
@@ -68,7 +68,10 @@ final class BanSqlStringConcatenationRule implements Rule
     {
         $file = $scope->getFile();
 
-        if (!str_contains($file, DIRECTORY_SEPARATOR . 'classes' . DIRECTORY_SEPARATOR)) {
+        if (
+            !str_contains($file, DIRECTORY_SEPARATOR . 'classes' . DIRECTORY_SEPARATOR)
+            && !str_contains($file, DIRECTORY_SEPARATOR . 'blocks' . DIRECTORY_SEPARATOR)
+        ) {
             return [];
         }
 

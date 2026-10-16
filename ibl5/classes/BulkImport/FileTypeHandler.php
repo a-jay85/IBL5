@@ -41,7 +41,7 @@ final class FileTypeHandler
             JsbFileType::Car => $this->jsbService->processCarFile($filePath, null),
             JsbFileType::His => $this->jsbService->processHisFile($filePath, $entry->sourceLabel),
             JsbFileType::Asw => $this->jsbService->processAswFile($filePath, $entry->year),
-            JsbFileType::Awa => $this->processAwa($filePath, $entry),
+            JsbFileType::Awa => $this->processAwa($filePath),
             // Historical .rcb files are stale snapshots of the cumulative alltime ledger; only their per-season records are valuable.
             JsbFileType::Rcb => $this->jsbService->processRcbFile($filePath, $entry->year, $entry->sourceLabel, includeAlltime: false),
             JsbFileType::Sco => $this->processSco($filePath, $entry),
@@ -58,7 +58,7 @@ final class FileTypeHandler
      * .awa requires a companion .car file in the same directory for PID resolution.
      * The Runner extracts both files to the same temp dir.
      */
-    private function processAwa(string $awaPath, ImportEntry $entry): JsbImportResult
+    private function processAwa(string $awaPath): JsbImportResult
     {
         $carPath = dirname($awaPath) . '/IBL5.car';
 

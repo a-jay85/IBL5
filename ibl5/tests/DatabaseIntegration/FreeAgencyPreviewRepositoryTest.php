@@ -31,7 +31,7 @@ class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getActivePlayers();
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
     }
 
     public function testGetActivePlayersIncludesRatingsAndPreferences(): void
@@ -40,7 +40,7 @@ class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getActivePlayers();
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         $first = $players[0];
 
         // Rating fields
@@ -68,5 +68,17 @@ class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
         // Team info from JOIN
         self::assertArrayHasKey('team_city', $first);
         self::assertArrayHasKey('color1', $first);
+    }
+
+    public function testGetActivePlayersBreaksOrdinalTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200139132, 'Tie 1391 B', ['ordinal' => 777, 'teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200139131, 'Tie 1391 A', ['ordinal' => 777, 'teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200139133, 'Tie 1391 C', ['ordinal' => 776, 'teamid' => 1, 'retired' => 0]);
+
+        $rows = $this->repo->getActivePlayers();
+
+        $ordered = array_values(array_filter(array_column($rows, 'pid'), static fn ($p): bool => in_array($p, [200139131, 200139132, 200139133], true)));
+        self::assertSame([200139133, 200139131, 200139132], $ordered);
     }
 }

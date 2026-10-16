@@ -19,24 +19,21 @@
 # Run: bin/test-refactor-flag  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REFACTOR_FLAG="$SCRIPT_DIR/refactor-flag"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+h_tmp TMP
 
-FAILED=0
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$1"; }
 
 # mk_repo — fresh repo with a committed classes file + matching test file.
 mk_repo() {
     local d
     d="$(mktemp -d "$TMP/repo.XXXXXX")"
-    git init -q "$d" >/dev/null 2>&1
-    git -C "$d" config user.email t@example.com >/dev/null 2>&1
-    git -C "$d" config user.name tester >/dev/null 2>&1
-    git -C "$d" config commit.gpgsign false >/dev/null 2>&1
+    h_git_repo "$d" --no-commit >/dev/null
     # Adverse config: rename detection OFF. The fix must still credit a renamed
     # test, because checkTestCoverage uses diffRenames() which forces `-M`. With the
     # old diffNames(_,'R') approach this would regress to exit 1 under this config.
@@ -98,9 +95,89 @@ printf '<?php\nclass BrandNewTest\n{\n    public function testNew(): void {}\n}\
 git -C "$d" add ibl5/tests/Foo/BrandNewTest.php >/dev/null 2>&1
 assert_rc "trigger-with-added-test-passes" 0 "$d"
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
+# ---------------------------------------------------------------------------
+# extractBypassReason characterization (pins the shared gate-common.php core).
+# Trigger = classes rename with no test change; body piped via --bypass-from-stdin.
+# ---------------------------------------------------------------------------
+# bypass_row <name> <want-exit> <body> [<extra-flag>]
+bypass_row() {
+    local name="$1" want="$2" body="$3" extra="${4---bypass-from-stdin}" d out rc
+    d="$(mk_repo)"
+    git -C "$d" mv ibl5/classes/Foo/FooService.php \
+        ibl5/classes/Foo/FooServiceRenamed.php >/dev/null 2>&1
+    out="$(printf '%s' "$body" | ( cd "$d" && "$REFACTOR_FLAG" --staged $extra 2>&1 ))"
+    rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected exit $want, got $rc"; echo "$out" | sed 's/^/    | /'
+    else
+        pass "$name (exit $rc)"
+    fi
+    BYPASS_OUT="$out"
+}
+bypass_row "refactor-bypass-exact-min-length" 0 '<!-- no-refactor-tests: abcdefghijklmnopqrst -->'
+case "$BYPASS_OUT" in
+    *"PASS (bypass): abcdefghijklmnopqrst"*) pass "refactor-bypass-exact-min-length-reason-trimmed" ;;
+    *) failcase "refactor-bypass-exact-min-length-reason-trimmed — no trimmed PASS (bypass) line" ;;
+esac
+bypass_row "refactor-bypass-one-under-min"       1 '<!-- no-refactor-tests: abcdefghijklmnopqrs -->'
+bypass_row "refactor-bypass-trim-before-length"  1 '<!--   no-refactor-tests:     abcdefghijklmnopqrs     -->'
+bypass_row "refactor-bypass-multiline"           0 $'<!-- no-refactor-tests:\n  reason line one long\n  line two -->'
+bypass_row "refactor-bypass-first-match-only"    1 $'<!-- no-refactor-tests: short -->\n<!-- no-refactor-tests: second marker reason long enough -->'
+bypass_row "refactor-bypass-literal-null-body"   1 'null'
+bypass_row "refactor-bypass-empty-body"          1 ''
+bypass_row "refactor-bypass-adr-marker-rejected" 1 '<!-- no-adr: a reason that is long enough to pass -->'
+# --staged WITHOUT --bypass-from-stdin: fetchPrBody returns null outside --pr.
+bypass_row "refactor-bypass-staged-ignores-stdin" 1 '<!-- no-refactor-tests: a reason that is long enough -->' ""
+
+# ---------------------------------------------------------------------------
+# fetchPrBody characterization (--pr mode, gh shim recording argv).
+# ---------------------------------------------------------------------------
+# pr_repo — mk_repo + origin/master at baseline + committed classes rename.
+pr_repo() {
+    local d
+    d="$(mk_repo)"
+    git -C "$d" update-ref refs/remotes/origin/master "$(git -C "$d" rev-parse HEAD)"
+    git -C "$d" mv ibl5/classes/Foo/FooService.php \
+        ibl5/classes/Foo/FooServiceRenamed.php >/dev/null 2>&1
+    git -C "$d" commit -qm rename >/dev/null 2>&1
+    echo "$d"
+}
+# recording_gh <exit-code> <body> — echoes the shim dir; logs argv to <dir>/argv.
+recording_gh() {
+    local g
+    g="$(mktemp -d "$TMP/rgh.XXXXXX")"
+    printf '%s\n' "$2" > "$g/body"
+    { echo '#!/bin/sh'
+      echo 'd="$(dirname "$0")"'
+      echo 'printf "%s\n" "$@" >> "$d/argv"'
+      echo 'cat "$d/body"'
+      echo "exit $1"; } > "$g/gh"
+    chmod +x "$g/gh"
+    echo "$g"
+}
+REF_STUB_BODY='<!-- no-refactor-tests: stub body reason that is long enough -->'
+
+d="$(pr_repo)"; g="$(recording_gh 0 "$REF_STUB_BODY")"
+( cd "$d" && env PATH="$g:$PATH" PR_NUMBER=4242 "$REFACTOR_FLAG" --pr </dev/null >/dev/null 2>&1 )
+rc=$?; [ "$rc" -eq 0 ] && pass "refactor-fetch-pr-number-set-bypasses (exit 0)" \
+    || failcase "refactor-fetch-pr-number-set-bypasses — expected exit 0, got $rc"
+if printf '%s\n' pr view 4242 --json body --jq .body | cmp -s - "$g/argv"; then
+    pass "refactor-fetch-pr-number-set-argv"
+else
+    failcase "refactor-fetch-pr-number-set-argv — gh argv differs"
 fi
-echo "RESULT: all passed"
-exit 0
+
+d="$(pr_repo)"; g="$(recording_gh 0 "$REF_STUB_BODY")"
+( cd "$d" && env -u PR_NUMBER PATH="$g:$PATH" "$REFACTOR_FLAG" --pr </dev/null >/dev/null 2>&1 )
+if printf '%s\n' pr view --json body --jq .body | cmp -s - "$g/argv"; then
+    pass "refactor-fetch-pr-number-unset-argv"
+else
+    failcase "refactor-fetch-pr-number-unset-argv — gh argv differs"
+fi
+
+d="$(pr_repo)"; g="$(recording_gh 1 "$REF_STUB_BODY")"
+( cd "$d" && env PATH="$g:$PATH" PR_NUMBER=4242 "$REFACTOR_FLAG" --pr </dev/null >/dev/null 2>&1 )
+rc=$?; [ "$rc" -eq 1 ] && pass "refactor-fetch-gh-failure-null-body-rejects (exit 1)" \
+    || failcase "refactor-fetch-gh-failure-null-body-rejects — expected exit 1, got $rc"
+
+h_done

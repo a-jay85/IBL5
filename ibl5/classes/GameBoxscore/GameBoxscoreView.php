@@ -79,6 +79,7 @@ class GameBoxscoreView implements GameBoxscoreViewInterface
         }
 
         $output = '<section class="game-boxscore">';
+        $output .= '<h1 class="sr-only">Game Boxscore</h1>';
         $output .= $this->renderScoreHeader($viewModel);
         $output .= $this->renderTeamSelector();
         $output .= $this->renderTeamPanel(

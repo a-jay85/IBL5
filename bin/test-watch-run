@@ -10,14 +10,14 @@
 # Run: bin/test-watch-run  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-FAILED=0
+h_tmp TMP
 
-pass() { echo "ok: $*"; }
-fail() { echo "FAIL: $*"; FAILED=1; }
+pass() { h_pass "$*"; }
+fail() { h_fail "$*"; }
 
 setup() {                       # setup <response tokens…>
     rm -rf "$TMP/stub" "$TMP/state"
@@ -119,4 +119,4 @@ echo "$OUT" | grep -q "Exit 4" \
     && pass "D: output contains 'Exit 4'" \
     || fail "D: output missing 'Exit 4'"
 
-exit "$FAILED"
+h_done

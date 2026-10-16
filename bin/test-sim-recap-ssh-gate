@@ -9,24 +9,21 @@
 # Run: bin/test-sim-recap-ssh-gate  (exit 0 = all pass, 1 = failures)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GATE="$SCRIPT_DIR/sim-recap-ssh-gate"
 
-FAILED=0
 GATE_RC=0
 
-srt_ok()   { echo "ok: $1"; }
-srt_fail() { echo "FAIL: $1"; FAILED=1; }
+srt_ok()   { h_pass "$1"; }
+srt_fail() { h_fail "$1"; }
 
 # srt_expect_eq <name> <want> <got>
-srt_expect_eq() {
-    if [ "$2" = "$3" ]; then srt_ok "$1"
-    else srt_fail "$1 — want [$2] got [$3]"; fi
-}
+srt_expect_eq() { h_eq "$1" "$2" "$3"; }
 
-STUB="$(mktemp -d)"
-trap 'rm -rf "$STUB"' EXIT
+h_tmp STUB
 
 cat > "$STUB/php" <<'SH'
 #!/usr/bin/env bash
@@ -62,9 +59,9 @@ gate_denied_report() {
 }
 
 # ── 1. admits claim-next ──────────────────────────────────────────────────────
-gate_run "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next"
+gate_run "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next --host=actions"
 srt_expect_eq "admits claim-next" \
-    "0|/srv/ibl/ibl5/scripts/simRecapQueue.php claim-next" \
+    "0|/srv/ibl/ibl5/scripts/simRecapQueue.php claim-next --host=actions" \
     "$GATE_RC|$(cat "$STUB/php.argv" 2>/dev/null)"
 
 # ── 2. admits every tick verb ─────────────────────────────────────────────────
@@ -80,8 +77,16 @@ done <<'VERBS'
 simRecapQueue|reclaim-stale
 simRecapQueue|recent-themes
 simRecapQueue|mention-map
-simRecapQueue|claim --sim=12
-simRecapQueue|park --sim=12
+simRecapQueue|claim-next --host=mac
+simRecapQueue|claim --sim=12 --host=mac
+simRecapQueue|claim --sim=12 --host=actions
+simRecapQueue|park --sim=12 --host=actions --cause=flaky
+simRecapQueue|park --sim=12 --host=mac --cause=auth
+simRecapQueue|park --sim=12 --host=actions --cause=transport
+simRecapQueue|park --sim=12 --host=actions --cause=prompt
+simRecapQueue|park --sim=12 --host=mac --cause=usage_limit
+simRecapQueue|park --sim=12 --host=actions --cause=usage_limit --reset=1760000000
+simRecapQueue|notify --sim=12 --host=mac --event=done
 simRecapQueue|find --sim=12
 simRecapContext|--sim=12
 storeSimRecap|--sim=12
@@ -96,16 +101,16 @@ printf '{"x":1}' | SSH_ORIGINAL_COMMAND="php /srv/ibl/ibl5/scripts/storeSimRecap
 srt_expect_eq "store passes stdin through" '{"x":1}' "$(cat "$STUB/php.stdin" 2>/dev/null)"
 
 # ── 4. denies wrong root ──────────────────────────────────────────────────────
-gate_expect_denied "php /tmp/evil/ibl5/scripts/simRecapQueue.php claim-next"
-gate_expect_denied "php /srv/ibl/../evil/ibl5/scripts/simRecapQueue.php claim-next"
+gate_expect_denied "php /tmp/evil/ibl5/scripts/simRecapQueue.php claim-next --host=mac"
+gate_expect_denied "php /srv/ibl/../evil/ibl5/scripts/simRecapQueue.php claim-next --host=mac"
 gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php x /srv/ibl/ibl5/scripts/storeSimRecap.php claim-next"
 gate_denied_report "denies wrong root"
 
 # ── 5. denies shell metacharacters ────────────────────────────────────────────
-gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next; id"
-gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next && cat /etc/passwd"
-gate_expect_denied 'php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next `id`'
-gate_expect_denied 'php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next $(id)'
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next --host=mac; id"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next --host=mac && cat /etc/passwd"
+gate_expect_denied 'php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next --host=mac `id`'
+gate_expect_denied 'php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next --host=mac $(id)'
 gate_denied_report "denies shell metacharacters"
 
 # ── 6. denies unknown verb and non-numeric sim ────────────────────────────────
@@ -113,6 +118,15 @@ gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php drop-all"
 gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim --sim=1e3"
 gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php park --sim="
 gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim --sim=1 --sim=2"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next --host=linux"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php park --sim=12 --host=mac --cause=bogus"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php park --sim=12 --cause=flaky --host=mac"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php park --sim=12 --host=mac --cause=usage_limit --reset=abc"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php park --sim=12 --host=mac --cause=flaky; id"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php notify --sim=12 --host=mac --event=posted"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php park --sim=12"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim --sim=12"
 gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapContext.php --sim=1234567890"
 gate_denied_report "denies unknown verb and non-numeric sim"
 
@@ -157,4 +171,4 @@ printf 'PAYLOAD-SENTINEL' | SSH_ORIGINAL_COMMAND="php /srv/ibl/ibl5/scripts/upda
 if grep -qF PAYLOAD-SENTINEL "$STUB/err"; then srt_fail "denial never echoes stdin — sentinel leaked"
 else srt_ok "denial never echoes stdin"; fi
 
-exit "$FAILED"
+h_done

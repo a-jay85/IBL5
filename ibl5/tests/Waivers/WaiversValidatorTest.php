@@ -26,7 +26,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     public function testValidateDropFailsWithFullRosterOverCap(): void
@@ -51,7 +51,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     public function testValidateAddFailsWithNullPlayerID(): void
@@ -125,7 +125,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     public function testValidateAddFailsOverCapWithNonVetMin(): void
@@ -154,7 +154,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     public function testValidateAddSucceedsWithNormalConditions(): void
@@ -167,18 +167,18 @@ class WaiversValidatorTest extends TestCase
         );
 
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     public function testResultsAreIndependentAcrossCalls(): void
     {
         $errorResult = $this->validator->validateAdd(null, 5, 6000, 100);
         $this->assertFalse($errorResult->isValid());
-        $this->assertNotEmpty($errorResult->getErrors());
+        $this->assertNotSame([], $errorResult->getErrors());
 
         $successResult = $this->validator->validateAdd(123, 5, 6000, 100);
         $this->assertTrue($successResult->isValid());
-        $this->assertEmpty($successResult->getErrors());
+        $this->assertSame([], $successResult->getErrors());
     }
 
     public function testValidateAddEdgeCaseAtExactCap(): void
@@ -191,7 +191,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     // --- Merged from WaiversValidatorEdgeCaseTest ---
@@ -527,11 +527,11 @@ class WaiversValidatorTest extends TestCase
     {
         // First validation fails
         $failedResult = $this->validator->validateAdd(null, 5, 6000, 100);
-        $this->assertNotEmpty($failedResult->getErrors());
+        $this->assertNotSame([], $failedResult->getErrors());
 
         // Second validation succeeds — completely independent result
         $successResult = $this->validator->validateAdd(123, 5, 6000, 100);
-        $this->assertEmpty($successResult->getErrors());
+        $this->assertSame([], $successResult->getErrors());
     }
 
     /**
@@ -541,11 +541,11 @@ class WaiversValidatorTest extends TestCase
     {
         // Add validation fails
         $addResult = $this->validator->validateAdd(null, 5, 6000, 100);
-        $this->assertNotEmpty($addResult->getErrors());
+        $this->assertNotSame([], $addResult->getErrors());
 
         // Drop validation succeeds — independent result, no cross-contamination
         $dropResult = $this->validator->validateDrop(2, 6000);
-        $this->assertEmpty($dropResult->getErrors());
+        $this->assertSame([], $dropResult->getErrors());
     }
 
     /**
@@ -553,7 +553,7 @@ class WaiversValidatorTest extends TestCase
      */
     public function testMultipleValidationsOnlyCaptureLatestErrors(): void
     {
-        $result1 = $this->validator->validateAdd(null, 5, 6000, 100);
+        $this->validator->validateAdd(null, 5, 6000, 100);
         $result2 = $this->validator->validateAdd(123, 0, 6000, 100);
 
         // Each result is independent — only the second failure's error

@@ -89,6 +89,7 @@ class NegotiationServiceIntegrationTest extends DatabaseTestCase
             new NegotiationRepository($this->db, new SalaryCapRepository($this->db)),
             new NegotiationValidator($this->db, $season),
             new ExtensionContractDemandCalculator($this->db, new SalaryCapRepository($this->db)),
+            new \Repositories\TeamIdentityRepository($this->db),
         );
     }
 

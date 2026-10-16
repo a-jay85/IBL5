@@ -103,6 +103,36 @@ class TeamIdentityRepository extends \Database\BaseMysqliRepository implements T
         return $result !== null ? $result['team_name'] : null;
     }
 
+    /**
+     * @see TeamIdentityRepositoryInterface::getTeamColorRow()
+     */
+    public function getTeamColorRow(int $teamid): ?array
+    {
+        /** @var array{color1: string, color2: string}|null $result */
+        $result = $this->fetchOne(
+            "SELECT color1, color2 FROM `ibl_team_info` WHERE teamid = ? LIMIT 1",
+            "i",
+            $teamid
+        );
+
+        return $result;
+    }
+
+    /**
+     * @see TeamIdentityRepositoryInterface::getOwnerName()
+     */
+    public function getOwnerName(int $teamid): ?string
+    {
+        /** @var array{owner_name: string}|null $result */
+        $result = $this->fetchOne(
+            "SELECT owner_name FROM `ibl_team_info` WHERE teamid = ? LIMIT 1",
+            "i",
+            $teamid
+        );
+
+        return $result !== null ? $result['owner_name'] : null;
+    }
+
     public function getTeamDiscordID(string $teamName): ?int
     {
         /** @var array{discord_id: int|string|null}|null $result */

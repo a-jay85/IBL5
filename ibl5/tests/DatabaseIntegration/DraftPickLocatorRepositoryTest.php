@@ -46,7 +46,7 @@ class DraftPickLocatorRepositoryTest extends DatabaseTestCase
 
         $picks = $this->repo->getDraftPicksForTeam(1);
 
-        self::assertNotEmpty($picks);
+        self::assertNotSame([], $picks);
 
         $found = false;
         foreach ($picks as $pick) {

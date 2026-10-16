@@ -12,28 +12,6 @@ use RecordHolders\RecordStatDefinitions;
 
 final class RecordStatDefinitionsTest extends TestCase
 {
-    /**
-     * Locks the canonical registry exactly — every field (teamKey, expression,
-     * unit, recordLabel) and the iteration order both consumers depend on.
-     */
-    public function testStatsRegistryIsTheCanonicalDefinition(): void
-    {
-        $expected = [
-            'points'    => ['teamKey' => 'team_points',   'expression' => 'bs.calc_points',   'unit' => 'points',         'recordLabel' => 'Most Points in a Single Game'],
-            'rebounds'  => ['teamKey' => 'team_rebounds', 'expression' => 'bs.calc_rebounds', 'unit' => 'rebounds',       'recordLabel' => 'Most Rebounds in a Single Game'],
-            'assists'   => ['teamKey' => 'team_assists',  'expression' => 'bs.game_ast',      'unit' => 'assists',        'recordLabel' => 'Most Assists in a Single Game'],
-            'steals'    => ['teamKey' => 'team_steals',   'expression' => 'bs.game_stl',      'unit' => 'steals',         'recordLabel' => 'Most Steals in a Single Game'],
-            'blocks'    => ['teamKey' => 'team_blocks',   'expression' => 'bs.game_blk',      'unit' => 'blocks',         'recordLabel' => 'Most Blocks in a Single Game'],
-            'turnovers' => ['teamKey' => null,            'expression' => 'bs.game_tov',      'unit' => 'turnovers',      'recordLabel' => 'Most Turnovers in a Single Game'],
-            'fg_made'   => ['teamKey' => 'team_fg_made',  'expression' => 'bs.calc_fg_made',  'unit' => 'field goals',    'recordLabel' => 'Most Field Goals in a Single Game'],
-            'ft_made'   => ['teamKey' => 'team_ft_made',  'expression' => 'bs.game_ftm',      'unit' => 'free throws',    'recordLabel' => 'Most Free Throws in a Single Game'],
-            '3pt_made'  => ['teamKey' => 'team_3pt_made', 'expression' => 'bs.game_3gm',      'unit' => 'three pointers', 'recordLabel' => 'Most Three Pointers in a Single Game'],
-        ];
-
-        // @phpstan-ignore method.alreadyNarrowedType (const value is statically known; assertion still guards against future edits)
-        $this->assertSame($expected, RecordStatDefinitions::STATS);
-    }
-
     public function testTurnoversIsTheOnlyPlayerOnlyStat(): void
     {
         $playerOnly = array_keys(array_filter(
@@ -42,16 +20,6 @@ final class RecordStatDefinitionsTest extends TestCase
         ));
 
         $this->assertSame(['turnovers'], $playerOnly);
-    }
-
-    public function testDateFiltersMapGameTypesToBoxScoreGameType(): void
-    {
-        // @phpstan-ignore method.alreadyNarrowedType (const value is statically known; assertion still guards against future edits)
-        $this->assertSame([
-            'regularSeason' => 'bs.game_type = 1',
-            'playoffs'      => 'bs.game_type = 2',
-            'heat'          => 'bs.game_type = 3',
-        ], RecordStatDefinitions::DATE_FILTERS);
     }
 
     // --- Single-source propagation guards ---

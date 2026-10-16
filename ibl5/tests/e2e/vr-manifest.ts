@@ -224,6 +224,10 @@ export const VR_MANIFEST: VrRow[] = [
   { name: 'training-camp-ratings-diff', auth: 'auth', url: 'modules.php?name=TrainingCampRatingsDiff',
     anchor: '.ratings-diff-page', viewports: ['desktop', 'mobile'],
     notes: 'Admin-only; renders the diff table against the CI seed 2025 finals snapshot.' },
+  { name: 'league-control-panel', auth: 'auth', url: 'modules.php?name=LeagueControlPanel',
+    anchor: '.updater-section__label', viewports: ['desktop', 'mobile'],
+    sourceGlobs: ['ibl5/modules/LeagueControlPanel/**', 'ibl5/classes/LeagueControlPanel/**'],
+    notes: 'Admin-only standalone page (own <head>, no theme wrapper). Reads phase settings from the DB, not appState, so no states; the VR job DB is freshly seeded (Free Agency, Trivia Off). Anchor is the recolored section label. Requires update-baselines on first run.' },
   { name: 'voting', auth: 'auth', url: 'modules.php?name=Voting',
     anchor: '.voting-form-container', viewports: ['desktop', 'mobile'],
     states: [

@@ -196,14 +196,12 @@ class TeamPageDataPreparer
         foreach ($playoffResults as $playoff) {
             $round = $playoff['round'];
             $winner = $playoff['winner'];
-            $loser = $playoff['loser'];
 
             if (!isset($roundsMap[$round])) {
                 continue;
             }
 
             $isWin = ($winner === $teamName);
-            $isLoss = ($loser === $teamName);
 
             $year = \Security\HtmlSanitizer::safeHtmlOutput((string) $playoff['year']);
             $winnerSafe = \Security\HtmlSanitizer::safeHtmlOutput($playoff['winner_name_that_year']);
@@ -366,9 +364,11 @@ class TeamPageDataPreparer
         foreach ($resultPicks as $draftPickRow) {
             $draftPick = new \Draft\DraftPick($draftPickRow);
 
+            $originalTeam = $teamsArray[$draftPick->originalTeam] ?? null;
+
             $draftPicks[] = [
-                'originalTeamID' => $teamsArray[$draftPick->originalTeam]->teamid,
-                'originalTeamCity' => $teamsArray[$draftPick->originalTeam]->city,
+                'originalTeamID' => $originalTeam !== null ? $originalTeam->teamid : 0,
+                'originalTeamCity' => $originalTeam !== null ? $originalTeam->city : '',
                 'originalTeamName' => $draftPick->originalTeam,
                 'year' => (string) $draftPick->year,
                 'round' => $draftPick->round,

@@ -210,7 +210,7 @@ class StandingsUpdaterTest extends TestCase
             $this->assertStringNotContainsString('TRUNCATE', $query);
         }
         $upserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'ON DUPLICATE KEY UPDATE'));
-        $this->assertNotEmpty($upserts);
+        $this->assertNotSame([], $upserts);
     }
 
     public function testGameResultsProduceCorrectTotalWinLoss(): void
@@ -457,7 +457,7 @@ class StandingsUpdaterTest extends TestCase
             return stripos($q, 'SELECT') === 0 && stripos($q, 'ibl_standings') !== false;
         });
 
-        $this->assertNotEmpty($selectQueries);
+        $this->assertNotSame([], $selectQueries);
     }
 
     public function testExtractWinsFromRecord(): void
@@ -589,7 +589,7 @@ class StandingsUpdaterTest extends TestCase
             return stripos($q, 'ibl_team_awards') !== false;
         });
 
-        $this->assertNotEmpty($awardQueries, 'Expected at least one ibl_team_awards upsert query');
+        $this->assertNotSame([], $awardQueries, 'Expected at least one ibl_team_awards upsert query');
     }
 
     public function testClinchConferenceDoesNotUpsertTeamAward(): void
@@ -671,7 +671,7 @@ class StandingsUpdaterTest extends TestCase
             return stripos($q, 'ibl_team_awards') !== false;
         });
 
-        $this->assertEmpty($awardQueries, 'Olympics context should not upsert team awards');
+        $this->assertSame([], $awardQueries, 'Olympics context should not upsert team awards');
     }
 
     public function testRegionAwardMapCoversOnlyDivisionRegions(): void
@@ -730,7 +730,7 @@ class StandingsUpdaterTest extends TestCase
         }
         $upserts = array_filter($queries, static fn (string $q): bool =>
             str_contains($q, 'INSERT INTO ibl_olympics_standings') && str_contains($q, 'ON DUPLICATE KEY UPDATE'));
-        $this->assertNotEmpty($upserts);
+        $this->assertNotSame([], $upserts);
     }
 
     public function testOlympicsContextFetchTeamMapQueriesOlympicsLeagueConfig(): void
@@ -750,7 +750,7 @@ class StandingsUpdaterTest extends TestCase
         $leagueConfigQueries = array_filter($queries, static function (string $q): bool {
             return stripos($q, 'league_config') !== false;
         });
-        $this->assertNotEmpty($leagueConfigQueries);
+        $this->assertNotSame([], $leagueConfigQueries);
 
         foreach ($leagueConfigQueries as $q) {
             $this->assertStringContainsString('ibl_olympics_league_config', $q);

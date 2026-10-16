@@ -16,7 +16,8 @@ declare(strict_types=1);
  * @see Voting\VotingSubmissionView For submission result rendering
  */
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -38,6 +39,8 @@ use Voting\VotingSubmissionService;
 use Voting\VotingSubmissionView;
 
 global $mysqli_db, $user, $authService;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 
 $repository        = new VotingRepository($mysqli_db);
 $ballotService     = new VotingBallotService($mysqli_db);

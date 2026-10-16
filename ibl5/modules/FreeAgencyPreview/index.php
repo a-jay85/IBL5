@@ -26,6 +26,7 @@ use FreeAgencyPreview\FreeAgencyPreviewView;
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Get current season info
 $season = new \Season\Season($mysqli_db);

@@ -283,6 +283,43 @@ class SlotAssignmentResolverTest extends TestCase
         $this->assertSame(0, $result['bh']);
     }
 
+    public function testBoolAndArrayPostValuesCoerceToZero(): void
+    {
+        $post = [
+            'pid2' => 500,
+            'pg2' => true,
+            'sg2' => ['3'],
+            'sf2' => '4',
+        ];
+
+        $result = $this->resolver->resolveSlotSettings(
+            ['pid' => 500, 'name' => 'Alice'],
+            $post,
+            1
+        );
+
+        $this->assertNotNull($result);
+        $this->assertSame(0, $result['pg']);
+        $this->assertSame(0, $result['sg']);
+        $this->assertSame(4, $result['sf']);
+    }
+
+    public function testNameFallbackCoercesScalarPostNamesViaToString(): void
+    {
+        $player = ['pid' => 999, 'name' => '23'];
+
+        $intName = $this->resolver->resolveSlotSettings($player, ['Name1' => 23, 'pg1' => '4'], 5);
+        $this->assertNotNull($intName);
+        $this->assertSame(4, $intName['pg']);
+
+        $floatName = $this->resolver->resolveSlotSettings($player, ['Name1' => 23.0, 'pg1' => '4'], 5);
+        $this->assertNotNull($floatName);
+        $this->assertSame(4, $floatName['pg']);
+
+        $this->assertNull($this->resolver->resolveSlotSettings($player, ['Name1' => true, 'pg1' => '4'], 5));
+        $this->assertNull($this->resolver->resolveSlotSettings($player, ['Name1' => ['23'], 'pg1' => '4'], 5));
+    }
+
     // ── Case 13: pid comparison is int-normalized on both sides ─────────────
 
     public function testNumericStringPidInPostStillMatchesAnIntegerPlayerPid(): void
@@ -297,6 +334,26 @@ class SlotAssignmentResolverTest extends TestCase
             ['pid' => 500, 'name' => 'Alice'],
             $post,
             1
+        );
+
+        $this->assertNotNull($result);
+        $this->assertSame(301, $result['pg']);
+    }
+
+    public function testPartiallyNumericPidFieldDoesNotMatchPlayer(): void
+    {
+        // A pid{N} field of "12abc" for a player whose pid is 12.
+        // SlotAssignmentResolver::findPidIndex coerces it with toInt('12abc') = 0, so the
+        // pid match fails and the resolver falls back to the name on slot 3.
+        // Mutant using sanitizeInt() → '12abc' becomes 12 → slot 1 by pid → 101.
+        $post = ['pid1' => '12abc', 'Name3' => 'Alice']
+            + $this->slotFields(1, 100)
+            + $this->slotFields(3, 300);
+
+        $result = $this->resolver->resolveSlotSettings(
+            ['pid' => 12, 'name' => 'Alice'],
+            $post,
+            5
         );
 
         $this->assertNotNull($result);

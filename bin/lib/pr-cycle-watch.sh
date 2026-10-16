@@ -15,6 +15,12 @@ source "$_PCW_LIB/ci-checks-green.sh"
 PCW_GRACE_MIN=30       # skip a PR whose last post-plan run finished this recently
 # shellcheck disable=SC2034  # read by bin/pr-cycle-tick
 PCW_MAX_PER_TICK=3     # PRs handed to one pr-cycle run (also its --max-ready)
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+PCW_STRIKE_CAP=2       # no-op rescues per (PR, head SHA) before the tick stops relaunching
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+# A launched worker's result file is overdue after 180 min: post-plan-fleet --wait tops out
+# at 7200 s and each session at timeout 5400, plus Stage 2 and launchd start-up margin.
+PCW_PENDING_MAX_AGE_S=10800
 
 # State dir: PR_CYCLE_WATCH_STATE_DIR when non-empty, else $HOME/.ibl5-pr-cycle-watch.
 # Unset and empty both mean "use the default". rc 1 when neither it nor HOME is set.
@@ -97,12 +103,99 @@ pcw_last_block() {
     printf '%s\t%s\n' "$newest" "$why"
 }
 
-# Retry cap, keyed by (PR, head SHA). attempts/<pr> holds the head SHA of the last
-# rescue the tick launched; dm-sent/<pr> holds the head SHA it last DM'd about.
-pcw_attempted_head() { [[ -f "$1/attempts/$2" && "$(cat "$1/attempts/$2")" == "$3" ]]; }
+# Retry cap, keyed by (PR, retry key). The key is the PR's patch-id (pcw_patch_id), which a
+# clean rebase keeps. When the patch-id cannot be computed the tick uses the head SHA.
+# attempts/<pr> holds the key of the last rescue the tick launched; dm-sent/<pr> holds the
+# key it last DM'd about. Each reader takes an optional head SHA as a second match: files
+# written before patch-id keying hold a bare head SHA and keep matching that head.
+_pcw_holds() {   # <file> <key> [<sha>]: 0 when the file's value equals the key or the sha
+    local v
+    [[ -f "$1" ]] || return 1
+    v="$(cat "$1")"
+    [[ "$v" == "$2" || ( -n "${3:-}" && "$v" == "${3:-}" ) ]]
+}
+pcw_attempted_head() { _pcw_holds "$1/attempts/$2" "$3" "${4:-}"; }
 pcw_record_attempt() { _pcw_write "$1/attempts/$2" "$3"; }
-pcw_dm_due()         { ! [[ -f "$1/dm-sent/$2" && "$(cat "$1/dm-sent/$2")" == "$3" ]]; }
+pcw_dm_due()         { ! _pcw_holds "$1/dm-sent/$2" "$3" "${4:-}"; }
 pcw_mark_dm()        { _pcw_write "$1/dm-sent/$2" "$3"; }
+# declined/<pr> holds the key post-plan holdrepeat declined. A declined key is not an
+# attempt: nothing ran, and a push that changes the PR's diff clears it by changing the key.
+pcw_declined_head()  { _pcw_holds "$1/declined/$2" "$3" "${4:-}"; }
+pcw_record_declined() { _pcw_write "$1/declined/$2" "$3"; }
+# strikes/<pr> holds "<key> <n>": rescues that never reached post-plan for that key.
+pcw_strike_count() {   # <dir> <pr> <key> [<sha>]: prints n when strikes/<pr> holds the key or sha, else 0
+    local f="$1/strikes/$2" s="" n=""
+    if [[ -f "$f" ]]; then read -r s n < "$f" || true; fi
+    if [[ -n "$s" && ( "$s" == "$3" || "$s" == "${4:-}" ) && "$n" =~ ^[0-9]+$ ]]; then
+        printf '%s\n' "$n"
+    else
+        printf '0\n'
+    fi
+}
+pcw_add_strike() {     # <dir> <pr> <key> [<sha>]: writes "<key> <count+1>" and prints the new count
+    local n
+    n=$(( $(pcw_strike_count "$1" "$2" "$3" "${4:-}") + 1 ))
+    _pcw_write "$1/strikes/$2" "$3 $n" && printf '%s\n' "$n"
+}
+# Per-kind DM ledger, same shape as dm-sent/: dm-<kind>/<pr> holds the key last DM'd about.
+# Kinds: declined, strikes, patchid. The patchid ledger stores the head SHA, because it
+# fires exactly when there is no patch-id.
+pcw_kind_dm_due()    { ! _pcw_holds "$1/dm-$2/$3" "$4" "${5:-}"; }
+pcw_kind_mark_dm()   { _pcw_write "$1/dm-$2/$3" "$4"; }
+# pcw_pending_has <state-dir> <pr>: 0 when a launched, not yet settled rescue lists the PR.
+# pending/<id> is "# result=<path> started=<epoch>" then one "<pr><TAB><sha><TAB><key>" line per PR
+# (files from the pre-key tick have no key column; reconcile reads it as key = sha).
+pcw_pending_has() {
+    local f
+    for f in "$1"/pending/*; do
+        [[ -f "$f" ]] || continue
+        awk -F'\t' -v p="$2" 'NR > 1 && $1 == p { found = 1 } END { exit !found }' "$f" && return 0
+    done
+    return 1
+}
+# pcw_stacked_on <baseRefName> <open-heads-tsv>: the TSV is "<headRefName>\t<number>"
+# lines for every open PR in the list (drafts included). Prints the parent PR number and
+# returns 0 when <baseRefName> is another open PR's head branch, else returns 1. The base
+# "master" and an empty base are never stacked. Pure: the caller fetches, this decides.
+pcw_stacked_on() {
+    local base="$1" heads="$2"
+    [[ -n "$base" && "$base" != "master" ]] || return 1
+    awk -F'\t' -v b="$base" '$1 == b { print $2; f = 1; exit } END { exit !f }' <<< "$heads"
+}
+# pcw_patch_id <root> <pr>: print the PR's patch-id (40 lowercase hex), or nothing on any
+# failure. Always returns 0. A non-empty PR_CYCLE_PATCH_ID_CMD replaces the git default
+# (`<cmd> <pr>` prints the id). The default fetches the PR head into refs/pr-cycle/<pr> and
+# hashes `git diff <merge-base with origin/master> <head>` with git patch-id --verbatim.
+# The caller removes the ref: bin/pr-cycle via _cleanup_fetch_refs, the tick via
+# pcw_drop_pr_ref. The diff keeps git's default 3 context lines. bin/pr-cycle's sticky
+# verdicts store ids made this way, so a different diff mode would invalidate them. A
+# rebase that changes lines next to the PR's hunks therefore changes the id.
+pcw_patch_id() {
+    local root="$1" pr="$2" pid="" base=""
+    [[ "$pr" =~ ^[0-9]+$ ]] || return 0
+    if [[ -n "${PR_CYCLE_PATCH_ID_CMD:-}" ]]; then
+        pid="$("$PR_CYCLE_PATCH_ID_CMD" "$pr" 2>/dev/null)" || true
+    else
+        git -C "$root" fetch --quiet origin master \
+            "+refs/pull/$pr/head:refs/pr-cycle/$pr" 2>/dev/null || true
+        base="$(git -C "$root" merge-base origin/master "refs/pr-cycle/$pr" 2>/dev/null)" || true
+        if [[ -n "$base" ]]; then
+            pid="$(git -C "$root" diff "$base" "refs/pr-cycle/$pr" 2>/dev/null \
+                | git -C "$root" patch-id --verbatim 2>/dev/null \
+                | awk '{print $1; exit}')" || true
+        fi
+    fi
+    [[ "$pid" =~ ^[0-9a-f]{40}$ ]] && printf '%s\n' "$pid"
+    return 0
+}
+# pcw_drop_pr_ref <root> <pr>: delete refs/pr-cycle/<pr> and nothing else, so a concurrent
+# bin/pr-cycle run keeps the refs it fetched. Always returns 0.
+pcw_drop_pr_ref() {
+    [[ "$2" =~ ^[0-9]+$ ]] || return 0
+    git -C "$1" update-ref -d "refs/pr-cycle/$2" 2>/dev/null || true
+    return 0
+}
+
 _pcw_write() {   # atomic: temp file then rename, so a killed tick never leaves half a SHA
     mkdir -p "$(dirname "$1")" && printf '%s\n' "$2" > "$1.tmp.$$" && mv -f "$1.tmp.$$" "$1"
 }
@@ -110,8 +203,13 @@ _pcw_write() {   # atomic: temp file then rename, so a killed tick never leaves 
 # pcw_prune <state-dir> <newline-separated open PR numbers>: drop state for closed PRs.
 pcw_prune() {
     local dir="$1" open="$2" f
-    for f in "$dir"/attempts/* "$dir"/dm-sent/*; do
+    for f in "$dir"/attempts/* "$dir"/dm-sent/* "$dir"/declined/* "$dir"/strikes/* \
+             "$dir"/dm-declined/* "$dir"/dm-strikes/* "$dir"/dm-patchid/*; do
         [[ -f "$f" ]] || continue
         grep -qxF "$(basename "$f")" <<< "$open" || rm -f "$f"
     done
+    # Result files of a settled entry are removed by reconcile. Sweep strays a day old; pending
+    # entries are never pruned here, only settled by reconcile.
+    [[ -d "$dir/results" ]] && find "$dir/results" -type f -mmin +1440 -delete 2>/dev/null
+    return 0
 }

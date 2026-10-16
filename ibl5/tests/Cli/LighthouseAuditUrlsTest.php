@@ -89,7 +89,7 @@ final class LighthouseAuditUrlsTest extends TestCase
 
         $decoded = json_decode($output, true);
         self::assertIsArray($decoded);
-        self::assertNotEmpty($decoded);
+        self::assertNotSame([], $decoded);
         self::assertStringContainsString('/ibl5/index.php', $decoded[0]);
     }
 

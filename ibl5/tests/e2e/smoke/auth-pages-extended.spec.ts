@@ -42,17 +42,13 @@ test.describe('Extended authenticated page smoke tests', () => {
     await page.goto('modules.php?name=NextSim');
     await assertNoPhpErrors(page, 'on modules.php?name=NextSim');
     await expect(page.getByText('Sign In')).not.toBeVisible();
-    await expect(
-      page.locator('.ibl-title, .ibl-data-table, table, h2, h3').first(),
-    ).toBeVisible();
+    await expect(page.locator('.next-sim-container h1.ibl-title')).toBeVisible();
   });
 
   test('gm contact list loads', async ({ page }) => {
     await page.goto('modules.php?name=GMContactList');
     await assertNoPhpErrors(page, 'on modules.php?name=GMContactList');
-    await expect(
-      page.locator('.ibl-data-table, table').first(),
-    ).toBeVisible();
+    await expect(page.locator('table.contact-table').first()).toBeVisible();
   });
 
   // Folded in from the deleted auth-pages.spec.ts — the only assertion there not

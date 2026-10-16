@@ -24,6 +24,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/launchd-sched.sh
+. "$REPO_ROOT/bin/lib/launchd-sched.sh"
 ACTION=""
 
 while [ $# -gt 0 ]; do
@@ -45,8 +47,7 @@ fi
 # ProgramArguments[0]/WorkingDirectory MUST point at the main checkout, never this
 # worktree (a worktree gets torn down — the LaunchAgent would then point at a dead path).
 # The first `git worktree list` entry is the main working tree.
-MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
-[ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"   # fallback: not in a git tree
+MAIN_WT="$(lsched_main_wt "$REPO_ROOT")"
 
 PLIST_LABEL="com.ibl5.db-sync-nightly"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
@@ -58,32 +59,17 @@ PROGRAM="$MAIN_WT/ibl5/bin/db-sync-now"
 # Variables expand at generation time (unquoted heredoc): HOME and MAIN_WT
 # are baked in so launchd, which does NOT expand env vars in EnvironmentVariables,
 # gets the real paths.
-build_plist() {
+plist_body() {
+  lsched_key_string Label "$PLIST_LABEL"
   cat <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>${PLIST_LABEL}</string>
 	<!-- do NOT 'fix' this to StartInterval — StartCalendarInterval fires once at 03:20,
 	     not every N seconds; StartInterval would run this every N seconds continuously. -->
-	<key>StartCalendarInterval</key>
-	<dict>
-		<key>Hour</key>
-		<integer>3</integer>
-		<key>Minute</key>
-		<integer>20</integer>
-	</dict>
-	<key>ProgramArguments</key>
-	<array>
-		<string>${PROGRAM}</string>
-		<string>--from-backup</string>
-	</array>
-	<key>WorkingDirectory</key>
-	<string>${MAIN_WT}</string>
-	<key>EnvironmentVariables</key>
-	<dict>
+PLIST
+  lsched_calendar Hour=3 Minute=20
+  lsched_program_arguments "$PROGRAM" --from-backup
+  lsched_key_string WorkingDirectory "$MAIN_WT"
+  lsched_env_open
+  cat <<PLIST
 		<!-- launchd agents start with a minimal PATH that omits Homebrew; ssh, gzip,
 		     mariadb-client must resolve. ~/.local/bin is where the Claude Code native
 		     installer puts the claude binary (not needed here, but kept for parity with
@@ -91,21 +77,16 @@ build_plist() {
 		     HOME is expanded HERE at generation time (the path is baked in), because launchd
 		     does NOT expand shell variables in EnvironmentVariables; an unexpanded reference
 		     would be a dead path. -->
-		<key>PATH</key>
-		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin</string>
-	</dict>
-	<key>StandardOutPath</key>
-	<string>${LOG_DIR}/db-sync-nightly.out.log</string>
-	<key>StandardErrorPath</key>
-	<string>${LOG_DIR}/db-sync-nightly.err.log</string>
-</dict>
-</plist>
 PLIST
+  lsched_key_string PATH "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin" 2
+  lsched_env_close
+  lsched_key_string StandardOutPath "${LOG_DIR}/db-sync-nightly.out.log"
+  lsched_key_string StandardErrorPath "${LOG_DIR}/db-sync-nightly.err.log"
 }
 
 case "$ACTION" in
   print)
-    build_plist
+    lsched_plist plist_body
     ;;
   install)
     # Validate PROD_SSH_HOST is set in .env — db-sync-now --from-backup needs
@@ -124,15 +105,11 @@ case "$ACTION" in
       echo "       Add PROD_SSH_HOST=<host> and re-run --install-schedule." >&2
       exit 1
     fi
-    mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
-    build_plist > "$PLIST_PATH"
-    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent: ignore "not loaded"
-    launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+    lsched_install "$PLIST_LABEL" "$PLIST_PATH" plist_body "$LOG_DIR"
     echo "Installed ${PLIST_LABEL} (03:20 nightly). Program: $PROGRAM --from-backup"
     ;;
   uninstall)
-    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
-    rm -f "$PLIST_PATH"                                                    # idempotent: no error if absent
+    lsched_uninstall "$PLIST_LABEL" "$PLIST_PATH"
     echo "Uninstalled ${PLIST_LABEL}."
     ;;
 esac

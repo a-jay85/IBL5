@@ -76,7 +76,7 @@ class CleanupPreseasonDataStepTest extends TestCase
         $this->assertStringContainsString('box scores', $result->detail);
 
         $log = $mockDb->getOperationLog();
-        $this->assertNotEmpty(array_filter($log, fn($entry) => str_contains((string) $entry, 'ibl_sim_dates')));
-        $this->assertNotEmpty(array_filter($log, fn($entry) => str_contains((string) $entry, 'ibl_team_awards')));
+        $this->assertNotSame([], array_filter($log, fn($entry) => str_contains((string) $entry, 'ibl_sim_dates')));
+        $this->assertNotSame([], array_filter($log, fn($entry) => str_contains((string) $entry, 'ibl_team_awards')));
     }
 }

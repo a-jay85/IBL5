@@ -33,7 +33,7 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
      */
     public function getQuadrupleDoubles(): array
     {
-        $query = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . ",
+        $query = "WITH _game_of_day AS " . self::GAME_OF_THAT_DAY_SUBQUERY . ",
             _qd_candidates AS (
                 -- Provably-complete candidate prune: every quad-double has >= 2 of
                 -- {ast,stl,blk} >= 10, so this UNION is a superset of qualifying rows.
@@ -82,7 +82,7 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
             ) >= 4
                 AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            ORDER BY bs.game_date ASC";
+            ORDER BY bs.game_date ASC, bs.id ASC";
 
         $rows = $this->fetchAll($query);
 
@@ -181,7 +181,7 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
                     WHERE " . $dateFilter . "
                         AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                         AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    ORDER BY " . $expression . " DESC
+                    ORDER BY " . $expression . " DESC, bs.game_date ASC, bs.id ASC
                     LIMIT 500
                 ) cand
                 JOIN `ibl_plr` p ON p.pid = cand.pid
@@ -193,12 +193,12 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
                 LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
                     WHEN h.teamid = cand.visitor_teamid THEN cand.home_teamid
                     ELSE cand.visitor_teamid END
-                ORDER BY cand.value DESC, cand.game_date ASC
+                ORDER BY cand.value DESC, cand.game_date ASC, cand.pid ASC
                 LIMIT 5)";
         }
 
         // CTE materializes game_of_that_day lookup once instead of per UNION ALL branch
-        $cte = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . "\n";
+        $cte = "WITH _game_of_day AS " . self::GAME_OF_THAT_DAY_SUBQUERY . "\n";
         $query = $cte . implode("\nUNION ALL\n", $unions);
         $rows = $this->fetchAll($query);
 
@@ -263,7 +263,7 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
                 FROM `ibl_hist` h
                 WHERE h." . $safeGames . " >= " . $minGames . "
                     AND h.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                ORDER BY value DESC
+                ORDER BY value DESC, h.year ASC, h.pid ASC
                 LIMIT 5)";
         }
 

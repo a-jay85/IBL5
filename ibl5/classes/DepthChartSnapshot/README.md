@@ -1,6 +1,6 @@
 ---
 description: Persists and retrieves GM-saved depth chart configurations via a JSON API.
-last_verified: 2026-10-03
+last_verified: 2026-10-07
 ---
 
 # DepthChartSnapshot
@@ -11,4 +11,5 @@ Provides a JSON API (no page view) for saving and loading GM-defined depth chart
 |---|---|
 | `DepthChartSnapshotApiHandler` | Handles API requests; routes to service |
 | `DepthChartSnapshotService` | Orchestrates save/retrieve logic |
+| `DepthChartLabelBuilder` | Builds dropdown and "Current (Live)" label strings from pre-fetched rows and records |
 | `DepthChartSnapshotRepository` | Database persistence for depth chart configs |

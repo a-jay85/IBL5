@@ -129,7 +129,7 @@ test.describe('ProjectedDraftOrder index: admin controls hidden for non-admin', 
     expect(response?.status()).toBe(200);
 
     const table = page
-      .locator('.projected-draft-order-table, .ibl-data-table')
+      .locator('.projected-draft-order-table')
       .first();
     await expect(table).toBeVisible();
 

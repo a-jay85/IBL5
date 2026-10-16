@@ -353,7 +353,7 @@ class StandingsUpdater {
 
     private function updateMagicNumbers(string $region): void {
         $this->appendOutput("<p>Updating the magic numbers for the {$region}...<br>");
-        list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
+        list($grouping, , $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
         $teams = $this->repository->fetchTeamsByRegion($grouping, $region);
 

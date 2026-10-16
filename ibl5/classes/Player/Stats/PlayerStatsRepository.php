@@ -46,7 +46,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var list<StatsRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_hist` WHERE pid = ? ORDER BY year ASC",
+            "SELECT * FROM `ibl_hist` WHERE pid = ? ORDER BY year ASC, pid ASC",
             "i",
             $playerID
         );
@@ -64,7 +64,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
              FROM `ibl_box_scores` bs
              LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
              WHERE bs.pid = ? AND bs.game_date BETWEEN ? AND ?
-             ORDER BY bs.game_date ASC",
+             ORDER BY bs.game_date ASC, bs.id ASC",
             "iss",
             $playerID,
             $startDate,
@@ -78,6 +78,8 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     public function getSimDates(int $limit = 20): array
     {
         return $this->fetchAll(
+            // ORDER BY is total: sim is the ibl_sim_dates primary key; sim is not on the rule allowlist.
+            // @phpstan-ignore ibl.orderByMissingTiebreaker
             "SELECT sim, start_date, end_date FROM `ibl_sim_dates` ORDER BY sim DESC LIMIT ?",
             "i",
             $limit
@@ -176,7 +178,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_olympics_stats` WHERE pid = ? ORDER BY year ASC",
+            "SELECT * FROM `ibl_olympics_stats` WHERE pid = ? ORDER BY year ASC, id ASC",
             "i",
             $playerID
         );
@@ -242,6 +244,8 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
      * Primary source for regular-season career averages. ibl_hist is refreshed every
      * sim from `ibl_plr_snapshots` and contains per-season aggregates (~12K rows) — much
      * faster than aggregating 589K+ ibl_box_scores rows.
+     *
+     * @param 'p.name = ?'|'h.pid = ?' $filterClause
      */
     private static function buildHistCareerAveragesQuery(string $filterClause): string
     {
@@ -282,6 +286,8 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
      * Build career averages from `ibl_box_scores` for playoff/HEAT game types
      * (game_type 2 and 3). Regular-season averages (game_type=1) use
      * buildHistCareerAveragesQuery() to avoid scanning 489K+ box-score rows.
+     *
+     * @param 'p.name = ?' $filterClause
      */
     private function buildCareerAveragesQuery(int $gameType, string $filterClause): string
     {

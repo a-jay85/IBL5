@@ -79,7 +79,7 @@ class Season
      *
      * @param \mysqli $db Active mysqli connection
      */
-    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null, ?\Clock\ClockInterface $clock = null)
     {
         $this->db = $db;
         $this->queryRepo = new SeasonQueryRepository($db, $leagueContext);
@@ -104,7 +104,7 @@ class Season
 
         $this->endingYear = (int)($settings['Current Season Ending Year'] ?? '0');
         if ($this->endingYear <= 0) {
-            $this->endingYear = (int)date('Y') + 1;
+            $this->endingYear = (int)date('Y', ($clock ?? new \Clock\SystemClock())->now()) + 1;
         }
         $this->beginningYear = $this->endingYear - 1;
 
@@ -189,7 +189,7 @@ class Season
      *
      * During Playoffs, Draft, and Free Agency the contract years have
      * effectively rolled over, so trade-related calculations (roster counting,
-     * queueing, cash considerations, cash-record sums) shift to the next
+     * cash considerations, cash-record sums) shift to the next
      * season's contracts.
      *
      * NOTE: This is a wider set than {@see isOffseasonPhase()} — it INCLUDES

@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-06
+last_verified: 2026-10-11
 ---
 
 # /burndown
@@ -48,6 +48,12 @@ bin/backlog burndown-sweep > "$W/sweep.txt"
 Exit 0 and exit 1 both continue, and `$W/sweep.txt` goes into the step 6 report. Exit 1
 means at least one item's live state was unknown; the sweep closed nothing for that item.
 Exit 3 stops the run with stderr shown to the user.
+A `HELD #N <path> (...)` line names a skipped ad-hoc item whose worktree still has unshipped
+work (dirty or ahead of origin/master, no PR, ledger older than 24h). `HELD-UNKNOWN` means
+the probe failed. The sweep never changes either; ship the worktree or remove it.
+A `STALE-PLAN` line names a queued item that has a plan file but no queue entry and no PR.
+When the issue is already closed, the sweep retires the row to skipped and prints `RETIRED`
+in place of `STALE-PLAN`. A failed issue lookup keeps the `STALE-PLAN` line.
 
 ```bash
 bin/backlog burndown-delta > "$W/delta.json"
@@ -98,7 +104,9 @@ sentinel (the path in `IBL5_BURNDOWN_EMPTY_SENTINEL`). The loop calls a batch em
 when that file exists. A live-unknown round (exit 1) writes no sentinel. Run step 4
 exactly as written; the sentinel needs no action from the skill.
 
-A `SKIP ... skip-label: <label>` row is a tagged item. It consumes no unit. A
+A `SKIP ... skip-label: <label>` row is a tagged item. It consumes no unit. The skip
+labels are `blocked`, `out-of-repo`, and `deferred`. A human adds `deferred` to an issue
+that needs its own design pass before any run should pick it. A
 `cleared blocked on #N` line on stderr means the blocking PR closed and the item is
 eligible again.
 
@@ -116,14 +124,25 @@ bin/backlog burndown-record <ledger> <n> status=closed-fixed
 ```
 
 **Route.** Apply `.claude/rules/work-triage.md` (cite it; do not restate its bar). An
-item you cannot do gets one of three skip forms, then report why:
+item you cannot do gets one of four skip forms, then report why:
 
+- Already tracked by a different issue `<m>`: close this one with a comment that points
+  at the other issue, then record the skip. Write `<m>` as `#<m>` when it is in the
+  backlog repo, or as `a-jay85/IBL5#<m>` when it is an IBL5 issue or PR.
+
+  ```bash
+  bin/backlog close <n> "Closing as a duplicate. Already tracked by <m>."
+  bin/backlog burndown-record <ledger> <n> status=skipped why="tracked by <m>"
+  ```
+
+  The closed issue frees its unit, so backfill picks a replacement.
 - Blocked on an open IBL5 PR: `bin/backlog burndown-record <ledger> <n> status=skipped reason=blocked blocked_by=<PR>`.
   This adds the `blocked` label and posts one comment with the PR number. The label
   clears itself on a later run once that PR merges or closes.
 - The target files live outside the repo: `bin/backlog burndown-record <ledger> <n> status=skipped reason=out-of-repo`.
   The `out-of-repo` label stays until a human removes it.
-- Any other reason you cannot classify: plain `status=skipped`.
+- Any other reason: `bin/backlog burndown-record <ledger> <n> status=skipped why=<one line, at most 200 chars>`.
+  A skip with no `why=` (and no `reason=`) exits 2 and writes nothing. The text lands in the item's `reason` field.
 
 A `reason=` record that exits 3 means the ledger kept the skip but the tag failed.
 Check `gh auth status`, then rerun `bin/backlog burndown-tag <n> reason=...`.
@@ -145,7 +164,7 @@ numbers at implement time, base on master, do not touch the paths of every other
 item across the given ledgers, emit `## Backlog issues` with
 `closes a-jay85/IBL5-backlog#<n>` plus each `also_closes`, and carry a corpus diff for a
 parser or gate change. Do not read `.claude/skills/plan-prompt/SKILL.md`. Exit 2 or 3
-from `burndown-prompt` stops this item: record `status=skipped` and report the stderr.
+from `burndown-prompt` stops this item: record `status=skipped why=burndown-prompt exit <code>` and report the stderr.
 
 An item with empty `.paths` claims no files and shares the batch like any other item.
 Its `Do not touch` list carries the paths of every other live item. No other item's
@@ -181,11 +200,11 @@ The record omits `pr_url=` because the PR may not exist yet, and the next sweep 
 A failed item:
 
 ```bash
-bin/backlog burndown-record <ledger> <n> route=ad-hoc slug=<slug> status=skipped
+bin/backlog burndown-record <ledger> <n> route=ad-hoc slug=<slug> status=skipped why=<what failed>
 ```
 
 Its worktree stays dirty and keeps the issue in flight through the Phase 3c worktree check.
-A failed ad-hoc item keeps its unit.
+A failed ad-hoc item keeps its unit and its cost. Any other skip records cost 0, so the ledger's units_used counts only live units.
 
 **Backfill.** Once every item in the current ledger has a settled status (closed-fixed,
 skipped, queued, or shipped), check for freed units. If any item closed-fixed, or was

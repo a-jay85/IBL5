@@ -1,0 +1,113 @@
+#!/bin/bash
+# <!-- no-adr: additive lint gate that pins model ids to one list; no new architectural boundary or constraint beyond the existing tiering rules -->
+# bin/check-model-pins — CI gate: every Claude model id in a tracked file must be
+# listed in bin/lib/current-models, unless the file is allowlisted as a
+# historical record in bin/lib/model-pins-allowlist.
+#
+# Why: model pins drift when a new generation ships. A hardcoded id that is
+# no longer current keeps working until the provider retires it, then fails
+# at runtime. This gate fails the PR that leaves a non-current id behind.
+#
+# Usage: bin/check-model-pins   (scans the repo root, from anywhere)
+#
+# Fail closed: a missing data file, an empty list, or a git error exits 2,
+# never 0.
+PATH="/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin${PATH:+:$PATH}"; export PATH
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-model-pins
+
+CI gate: scans tracked files for Claude model ids (for example claude-opus-5-5)
+and exits 1 if any id is not listed in bin/lib/current-models. Paths listed in
+bin/lib/model-pins-allowlist are skipped.
+
+Exit codes:
+  0  Every model id in the tree is current (or its file is allowlisted)
+  1  One or more stale model ids found
+  2  Usage error, missing data file, empty list, or git failure
+EOF
+}
+
+set -eu
+
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+    "") ;;
+    *)
+        echo "check-model-pins: unknown argument: $1" >&2
+        usage >&2
+        exit 2
+        ;;
+esac
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+LIST="bin/lib/current-models"
+ALLOW="bin/lib/model-pins-allowlist"
+for f in "$LIST" "$ALLOW"; do
+    if [ ! -f "$f" ]; then
+        echo "check-model-pins: missing $f" >&2
+        exit 2
+    fi
+done
+
+CURRENT="$(sed -e 's/#.*//' -e 's/[[:space:]]//g' "$LIST" | sed -e '/^$/d')"
+if [ -z "$CURRENT" ]; then
+    echo "check-model-pins: bin/lib/current-models lists no ids" >&2
+    exit 2
+fi
+
+EXCLUDES=()
+ALLOW_N=0
+ENTRIES="$(sed -e 's/#.*//' -e 's/[[:space:]]//g' "$ALLOW" | sed -e '/^$/d')"
+while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    ALLOW_N=$((ALLOW_N + 1))
+    if [ ! -e "${entry%/}" ]; then
+        echo "check-model-pins: WARN allowlist entry no longer exists: $entry" >&2
+        continue
+    fi
+    case "$entry" in
+        */) ;;
+        *)
+            if [ -d "$entry" ]; then
+                echo "check-model-pins: allowlist entry $entry is a directory; list files or end it with /" >&2
+                exit 2
+            fi
+            ;;
+    esac
+    EXCLUDES+=(":(exclude,literal)${entry%/}")
+done <<< "$ENTRIES"
+
+REGEX='claude-(opus|sonnet|haiku|fable)-[0-9]+(-[0-9]+)*'
+set +e
+HITS="$(git grep -nIoE -e "$REGEX" -- . ${EXCLUDES[@]+"${EXCLUDES[@]}"})"
+rc=$?
+set -e
+if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+    echo "check-model-pins: git grep failed (exit $rc)" >&2
+    exit 2
+fi
+
+OFFENDERS=""
+N=0
+while IFS=: read -r f n id; do
+    [ -n "$f" ] || continue
+    case $'\n'"$CURRENT"$'\n' in
+        *$'\n'"$id"$'\n'*) continue ;;
+    esac
+    OFFENDERS="${OFFENDERS}${f}:${n}: stale model id ${id} (not in bin/lib/current-models)"$'\n'
+    N=$((N + 1))
+done <<< "$HITS"
+
+if [ "$N" -gt 0 ]; then
+    printf '%s' "$OFFENDERS" >&2
+    echo "check-model-pins: $N stale model id(s). Repin to an id in bin/lib/current-models, or add the path with a # reason to bin/lib/model-pins-allowlist if it is a historical record." >&2
+    exit 1
+fi
+
+K="$(printf '%s\n' "$CURRENT" | wc -l | tr -d ' ')"
+echo "check-model-pins: OK ($K current ids, $ALLOW_N allowlist entries)"
+exit 0

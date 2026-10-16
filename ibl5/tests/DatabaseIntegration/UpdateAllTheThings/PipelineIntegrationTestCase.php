@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration\UpdateAllTheThings;
 
+use Boxscore\AllStarTeamRepository;
 use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreRepository;
 use Boxscore\BoxscoreView;
@@ -289,6 +290,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
 
         $boxscoreProcessor = new BoxscoreProcessor($this->db, null, $season);
         $boxscoreRepo = new BoxscoreRepository($this->db);
+        $allStarTeamRepo = new AllStarTeamRepository($this->db);
         $boxscoreView = new BoxscoreView();
 
         $savedDcRepo = new DepthChartSnapshotRepository($this->db);
@@ -351,7 +353,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         ));
 
         $service->addStep(new Steps\ProcessAllStarGamesStep(
-            $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $jsbFileResolver,
+            $boxscoreProcessor, $allStarTeamRepo, $boxscoreView, $jsbFileResolver,
         ));
 
         $service->addStep(new Steps\ParseJsbFilesStep($jsbService, $jsbFileResolver, $season->endingYear));
@@ -389,7 +391,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
 
         $standingsResult = $this->findResultByLabel($results, 'Standings updated');
         if ($standingsResult !== null) {
-            self::assertNotEmpty($standingsResult->capturedLog, 'Standings capturedLog empty — UpdateStandingsStep::takeOutputBuffer() wiring broken.');
+            self::assertNotSame('', $standingsResult->capturedLog, 'Standings capturedLog empty — UpdateStandingsStep::takeOutputBuffer() wiring broken.');
             self::assertStringContainsString('The standings table has been updated', $standingsResult->capturedLog, 'Standings capturedLog missing expected closing message.');
         }
 

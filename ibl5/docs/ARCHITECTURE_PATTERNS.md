@@ -1,6 +1,6 @@
 ---
 description: Canonical interface-driven Repository/Service/View patterns for new modules.
-last_verified: 2026-10-03
+last_verified: 2026-10-07
 ---
 
 # IBL5 Architecture Patterns
@@ -265,11 +265,11 @@ and is never registered in `Api/Router.php`.
 
 Current `*ApiHandler` inventory (module-local HTMX):
 `DepthChart\DepthChartApiHandler`,
+`DepthChartSnapshot\DepthChartSnapshotApiHandler`,
 `DraftHistory\DraftHistoryApiHandler`,
 `FranchiseRecordBook\FranchiseRecordBookApiHandler`,
 `LeagueStarters\LeagueStartersApiHandler`,
 `NextSim\NextSimTabApiHandler`,
-`DepthChartSnapshot\DepthChartSnapshotApiHandler`,
 `Team\TeamApiHandler`,
 `Trading\TradeRosterPreviewApiHandler`.
 

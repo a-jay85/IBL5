@@ -15,6 +15,8 @@
 # No set -e. bash 3.2 safe. Cleanup via trap EXIT.
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="${1:-$SCRIPT_DIR/bug-pipeline-test-env}"
@@ -24,16 +26,9 @@ if [ ! -f "$TARGET" ]; then
 fi
 TARGET="$(cd "$(dirname "$TARGET")" && pwd)/$(basename "$TARGET")"
 
-PASSED=0
-FAILED=0
-
-bpt_ok()   { echo "ok: $1";  PASSED=$(( PASSED + 1 )); }
-bpt_fail() { echo "FAIL: $1"; FAILED=$(( FAILED + 1 )); }
-bpt_expect_eq() {
-    if [ "$2" = "$3" ]; then bpt_ok "$1"
-    else bpt_fail "$1 — want [$2] got [$3]"
-    fi
-}
+bpt_ok()   { h_pass "$1"; }
+bpt_fail() { h_fail "$@"; }
+bpt_expect_eq() { h_eq "$1" "$2" "$3"; }
 bpt_expect_contains() {
     case "$3" in
         *"$2"*) bpt_ok "$1" ;;
@@ -49,10 +44,8 @@ bpt_expect_absent() {
 
 # Canonicalize: macOS records the physical /private/var/... in a worktree's
 # .git file, so a logical /var/... root would never compare equal.
-ROOT_RAW="$(mktemp -d)" || { echo "mktemp failed" >&2; exit 1; }
+h_tmp ROOT_RAW
 ROOT="$(cd "$ROOT_RAW" && pwd -P)"
-_cleanup() { rm -rf "$ROOT_RAW"; }
-trap '_cleanup' EXIT
 export HOME="$ROOT/home"; mkdir -p "$HOME"
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 MAIN="$ROOT/main"; WT="$ROOT/wt"; STUBS="$ROOT/stubs"; CALLS="$ROOT/stub-calls.log"
@@ -125,5 +118,4 @@ bpt_expect_eq "5b: single IBLBOT assignment" 1 "$(grep -cE '^[[:space:]]*IBLBOT=
 # ── Case 6: no side effects ───────────────────────────────────────────────────
 bpt_expect_eq "6: no docker/pm2/mariadb call" "" "$(cat "$CALLS" 2>/dev/null)"
 
-echo "passed=$PASSED failed=$FAILED"
-[ "$FAILED" -eq 0 ]
+h_done

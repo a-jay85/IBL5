@@ -17,6 +17,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
+from harness import cifix, merge_danger
 from harness.ciwatch import CiOutcome
 from harness.state import HarnessError, RunResult, TerminalState
 
@@ -78,7 +79,16 @@ class CiFixGh:
         self.body_edits: list[tuple] = []
         self.disarmed: list = []
         self.checks: list[dict] = []
+        # Baseline-guard reads: a probe that reaches the guard sees no label and no e2e run.
+        self.fresh_labels: list[str] = []
+        self.e2e_runs: list[dict] = []
+        self.label_calls: list[tuple] = []
 
+    def pr_has_label_fresh(self, pr, label): return label in self.fresh_labels
+    def e2e_runs_for_sha(self, sha): return list(self.e2e_runs)
+    def pr_comments_text(self, pr): return ""
+    def pr_label_remove(self, pr, label): self.label_calls.append(("remove", label)); return True
+    def pr_label_add_checked(self, pr, label): self.label_calls.append(("add", label)); return True
     def post_review_summary(self, pr, title, body): self.comments.append((pr, title, body))
     def pr_edit_body(self, pr, body): self.body_edits.append((pr, body))
     def pr_checks_json(self, pr):
@@ -104,6 +114,38 @@ class ScriptedLlm:
         if idx < len(self.side_effects) and self.side_effects[idx]:
             self.side_effects[idx](kw)
         return ""
+
+
+class MetaLogGh(CiFixGh):
+    """CiFixGh whose run_log_failed writes a scripted `gh run view --log-failed` body.
+    `logs` maps job_id -> text; a job_id absent from `logs` writes nothing."""
+
+    def __init__(self, logs=None, body=""):
+        super().__init__(body=body)
+        self.logs = dict(logs or {})
+        self.log_calls: list[tuple] = []
+        self.reruns: list = []
+
+    def run_rerun_failed(self, run_id):
+        self.reruns.append(run_id)
+
+    def run_log_failed(self, run_id, job_id, dest):
+        self.log_calls.append((run_id, job_id))
+        if job_id in self.logs:
+            with open(dest, "w") as fh:
+                fh.write(self.logs[job_id])
+        return job_id in self.logs
+
+
+# `gh run view --log-failed` prefixes each line with "<job>\t<step>\t" (live adapter:
+# harness/adapters/ghad.py run_log_failed). Step names come from
+# .github/workflows/pr-meta-checks.yml.
+META_PROSE_LOG = ("Meta checks\tRun bin/check-prose (self-test + added lines)\t"
+                  "2026-10-11T09:30:00.0000000Z .claude/rules/x.md:12 em-dash\n")
+META_BODY_LOG = ("Meta checks\tRun bin/check-pr-manual-testing\t"
+                 "2026-10-11T09:30:00.0000000Z missing Manual Testing section\n")
+META_CHECKS_ROW = {"name": "Meta checks", "state": "FAILURE",
+                   "link": "https://github.com/a/b/actions/runs/900/job/9001"}
 
 
 def _run(monkeypatch, tmp_path, git, gh, llm, *, failed, commit=("b" * 40,),
@@ -195,6 +237,130 @@ def test_char_successful_push_sets_ci_head_and_rewatches_new_sha(monkeypatch, tm
     assert r.res.ci_head == "b" * 40
     assert r.watched == ["b" * 40]
     assert _has(r.lines, "outcome=fixed")
+
+
+class RerunGh(CiFixGh):
+    """CiFixGh that records which failed runs the rerun probe re-ran."""
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.reruns: list = []
+
+    def run_rerun_failed(self, run_id): self.reruns.append(run_id)
+
+
+def test_char_probe_reruns_failed_run_on_no_change(monkeypatch, tmp_path):
+    """Characterization: a no-change attempt reruns the failed run, then logs the probe
+    outcome. Catches deleting the `gh.run_rerun_failed(run_id)` call."""
+    gh = RerunGh()
+    gh.checks = [{"name": "PHPUnit", "state": "FAILURE",
+                  "link": "https://github.com/a/b/actions/runs/777/job/7779"}]
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, ScriptedLlm(), failed=["PHPUnit"],
+             commit=("",))
+    assert gh.reruns == ["777"]
+    assert _has(r.lines, "phase7 ci-fix rerun probe: outcome=")
+
+
+_PROSE_RECORDED = [{"name": "check-prose-since", "output": "x"}]
+
+
+def _meta_run(monkeypatch, tmp_path, gh, *, failed, recorded):
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.meta_check_failures = list(recorded)
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, llm, failed=failed,
+             commit=("b" * 40,), res=res)
+    return r, llm
+
+
+def test_char_meta_body_check_failure_still_runs_cifix(monkeypatch, tmp_path):
+    """Body checks skip in phase 2, so nothing is recorded; ci-fix owns the proposal flow."""
+    gh = MetaLogGh(logs={"9001": META_BODY_LOG})
+    gh.checks = [META_CHECKS_ROW]
+    _r, llm = _meta_run(monkeypatch, tmp_path, gh,
+                        failed=["All checks green", "Meta checks"], recorded=[])
+    assert len(llm.calls) == 1
+    assert llm.calls[0][0] == "ci-fix"
+
+
+def test_char_meta_unattributed_log_still_runs_cifix(monkeypatch, tmp_path):
+    gh = MetaLogGh(logs={"9001": META_BODY_LOG})
+    gh.checks = [META_CHECKS_ROW]
+    _r, llm = _meta_run(monkeypatch, tmp_path, gh,
+                        failed=["All checks green", "Meta checks"],
+                        recorded=_PROSE_RECORDED)
+    assert len(llm.calls) == 1
+    assert llm.calls[0][0] == "ci-fix"
+
+
+def test_char_meta_missing_log_still_runs_cifix(monkeypatch, tmp_path):
+    gh = MetaLogGh(logs={})
+    gh.checks = [META_CHECKS_ROW]
+    _r, llm = _meta_run(monkeypatch, tmp_path, gh,
+                        failed=["All checks green", "Meta checks"],
+                        recorded=_PROSE_RECORDED)
+    assert len(llm.calls) == 1
+    assert llm.calls[0][0] == "ci-fix"
+
+
+def test_char_meta_with_other_actionable_red_still_runs_cifix(monkeypatch, tmp_path):
+    gh = MetaLogGh(logs={"9001": META_PROSE_LOG})
+    gh.checks = [META_CHECKS_ROW,
+                 {"name": "PHPUnit", "state": "FAILURE",
+                  "link": "https://github.com/a/b/actions/runs/901/job/9011"}]
+    _r, llm = _meta_run(monkeypatch, tmp_path, gh,
+                        failed=["Meta checks", "PHPUnit"], recorded=_PROSE_RECORDED)
+    assert len(llm.calls) == 1
+    assert llm.calls[0][0] == "ci-fix"
+
+
+def test_meta_prose_failure_recorded_skips_cifix_and_names_check(monkeypatch, tmp_path):
+    """PR #3022: a recorded check-prose-since failure spends no ci-fix attempt, no probe."""
+    gh = MetaLogGh(logs={"9001": META_PROSE_LOG})
+    gh.checks = [META_CHECKS_ROW]
+    r, llm = _meta_run(monkeypatch, tmp_path, gh,
+                       failed=["All checks green", "Meta checks"],
+                       recorded=_PROSE_RECORDED)
+    assert len(llm.calls) == 0
+    assert gh.reruns == []
+    assert r.watched == []
+    assert r.out[1].exit_code == 8
+    assert r.out[1].failed == ["All checks green", "Meta checks"]
+    assert _has(r.lines, "phase7 ci-fix: skipped - Meta checks red on check-prose-since")
+    assert gh.comments[0][1] == cifix.SURVIVOR_TITLE
+    assert "check-prose-since" in _trail_text(gh)
+    assert "Meta checks" in _trail_text(gh)
+
+
+# The probe-guard tests below run with the rest of tools/postplan-harness/tests/test_cifix_ship.py
+# and tests/test_cifix.py: pytest -q tests/test_cifix_ship.py tests/test_cifix.py
+def test_cifix_probe_skipped_with_update_baselines_label(monkeypatch, tmp_path):
+    """The label still on the PR with no e2e run means no regen reached its removal step.
+    Rerunning the failed jobs would fight the label, so the probe stands down."""
+    gh = RerunGh()
+    gh.fresh_labels = ["update-baselines"]
+    gh.checks = [{"name": "PHPUnit", "state": "FAILURE",
+                  "link": "https://github.com/a/b/actions/runs/777/job/7779"}]
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, llm, failed=["PHPUnit"], commit=("",))
+    assert gh.reruns == []
+    assert _has(r.lines, "rerun probe skipped: reason=update-baselines-label")
+    assert not _has(r.lines, "phase7 ci-fix rerun probe: outcome=")
+    assert len(llm.calls) == 1, "the skip must not fall through to another fix attempt"
+    assert gh.label_calls == [], "no regen run exists, so the guard must not touch the label"
+
+
+def test_cifix_probe_skipped_when_e2e_run_active(monkeypatch, tmp_path):
+    gh = RerunGh()
+    gh.e2e_runs = [{"databaseId": 5, "status": "in_progress", "conclusion": None,
+                    "event": "pull_request", "createdAt": "2026-10-08T00:00:00Z"}]
+    gh.checks = [{"name": "PHPUnit", "state": "FAILURE",
+                  "link": "https://github.com/a/b/actions/runs/777/job/7779"}]
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, llm, failed=["PHPUnit"], commit=("",))
+    assert gh.reruns == []
+    assert _has(r.lines, "rerun probe skipped: reason=e2e-run-active")
+    assert len(llm.calls) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -548,8 +714,11 @@ def test_ci_fix_denied_tools_add_gh_pr_edit_only_for_cifix(monkeypatch, tmp_path
 
 
 def test_benign_body_proposal_applied_once_and_waits_fresh_meta_run(monkeypatch, tmp_path):
-    proposed = _BODY.replace("Old summary paragraph.", "New, clearer summary paragraph.")
-    gh = CiFixGh(body=_BODY)
+    md_line = ("**Merge danger:** Door: two-way · Blast radius: localized · "
+               "Why: mechanical: no one-way trigger in the realized diff")
+    body = _BODY + "\n" + md_line + "\n"
+    proposed = body.replace("Old summary paragraph.", "New, clearer summary paragraph.")
+    gh = CiFixGh(body=body)
     gh.checks = [[_meta(100, "FAILURE")],    # failed-job log refs
                  [_meta(100, "FAILURE")],    # baseline before the edit
                  [_meta(100, "FAILURE")],    # poll 1: only the pre-edit run
@@ -559,7 +728,10 @@ def test_benign_body_proposal_applied_once_and_waits_fresh_meta_run(monkeypatch,
              failed=[_META], commit=("",))
     sha, outcome = r.out
     assert len(gh.body_edits) == 1
-    assert gh.body_edits[0][1] == proposed
+    # the applied body is the proposal with the Merge danger floor re-applied to its line
+    applied = gh.body_edits[0][1]
+    assert applied.startswith(proposed.rstrip("\n"))
+    assert merge_danger.classify_body(applied) == "TWO-WAY"
     assert outcome.exit_code == 0
     assert sha != runner.BODY_ONLY_SHA
     assert r.res.ci_head != runner.BODY_ONLY_SHA

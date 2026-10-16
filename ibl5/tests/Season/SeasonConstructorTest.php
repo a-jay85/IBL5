@@ -51,7 +51,7 @@ class SeasonConstructorTest extends TestCase
             $mockDb->getExecutedQueries(),
             static fn (string $q): bool => stripos($q, 'schedule') !== false,
         );
-        $this->assertNotEmpty($scheduleQueries);
+        $this->assertNotSame([], $scheduleQueries);
         foreach ($scheduleQueries as $q) {
             $this->assertStringContainsString('ibl_olympics_schedule', $q);
             $this->assertStringNotContainsString('FROM `ibl_schedule`', $q);

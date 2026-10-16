@@ -4,19 +4,59 @@ declare(strict_types=1);
 
 namespace Tests\DepthChart;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use DepthChart\DepthChartView;
+use Player\PlayerImageHelper;
 
 /**
  * Tests for DepthChartView
  */
 class DepthChartViewTest extends TestCase
 {
+    private const PHOTO_URL_SHAPE = '/\A(?:\.\/images\/player\/[1-9][0-9]*\.jpg|data:image\/png;base64,[A-Za-z0-9+\/]+={0,2})\z/';
+
     private DepthChartView $view;
+
+    private ?string $photoDir = null;
 
     protected function setUp(): void
     {
         $this->view = new DepthChartView(self::createStub(\League\LeagueContext::class), new \DepthChart\DepthChartService());
+    }
+
+    protected function tearDown(): void
+    {
+        PlayerImageHelper::usePhotoDirectory(null);
+
+        if ($this->photoDir !== null) {
+            $entries = scandir($this->photoDir);
+            if ($entries !== false) {
+                foreach ($entries as $name) {
+                    if ($name !== '.' && $name !== '..') {
+                        unlink($this->photoDir . $name);
+                    }
+                }
+            }
+            rmdir($this->photoDir);
+            $this->photoDir = null;
+        }
+
+        parent::tearDown();
+    }
+
+    /**
+     * Point PlayerImageHelper at a fresh temp directory, optionally holding
+     * a photo file for the given pid. tearDown() removes the directory.
+     */
+    private function usePhotoDirectoryWith(int $pid, bool $photoFileExists): void
+    {
+        $this->photoDir = sys_get_temp_dir() . '/ibl-photo-dc-' . bin2hex(random_bytes(4)) . '/';
+        mkdir($this->photoDir);
+        if ($photoFileExists) {
+            touch($this->photoDir . $pid . '.jpg');
+        }
+        PlayerImageHelper::usePhotoDirectory($this->photoDir);
     }
 
     /**
@@ -110,6 +150,94 @@ class DepthChartViewTest extends TestCase
         $this->assertStringContainsString('name="Injury1"', $output);
         $this->assertStringContainsString('name="Name1"', $output);
         $this->assertStringContainsString('data-pid="12345"', $output);
+    }
+
+    public function testRenderPlayerRowEmitsPhotoUrlWhenPhotoFileExists(): void
+    {
+        $this->usePhotoDirectoryWith(12345, true);
+
+        ob_start();
+        $this->view->renderPlayerRow($this->buildTestPlayer(12345), 1);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('data-photo-url="./images/player/12345.jpg"', $output);
+    }
+
+    public function testRenderPlayerRowEmitsPlaceholderPhotoUrlWithoutPhotoFile(): void
+    {
+        $this->usePhotoDirectoryWith(12345, false);
+
+        ob_start();
+        $this->view->renderPlayerRow($this->buildTestPlayer(12345), 1);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('data-photo-url="' . PlayerImageHelper::getImageUrl(0) . '"', $output);
+        $this->assertStringNotContainsString('images/player/12345.jpg', $output);
+    }
+
+    #[DataProvider('photoFilePresenceProvider')]
+    public function testRenderPlayerRowPhotoUrlMatchesThumbnailSrc(bool $photoFileExists): void
+    {
+        $this->usePhotoDirectoryWith(12345, $photoFileExists);
+
+        ob_start();
+        $this->view->renderPlayerRow($this->buildTestPlayer(12345), 1);
+        $output = (string) ob_get_clean();
+
+        $this->assertSame(1, preg_match('/data-photo-url="([^"]*)"/', $output, $attribute));
+        $this->assertSame(1, preg_match('/<img src="([^"]*)" alt="" class="ibl-player-photo"/', $output, $thumbnail));
+        $this->assertSame($thumbnail[1], $attribute[1]);
+    }
+
+    /**
+     * @return array<string, array{bool}>
+     */
+    public static function photoFilePresenceProvider(): array
+    {
+        return [
+            'photo file present' => [true],
+            'photo file missing' => [false],
+        ];
+    }
+
+    #[DataProvider('photoUrlShapeProvider')]
+    public function testRenderPlayerRowPhotoUrlAttributeHasSafeShape(int $pid, bool $photoFileExists): void
+    {
+        $this->usePhotoDirectoryWith($pid, $photoFileExists);
+
+        ob_start();
+        $this->view->renderPlayerRow($this->buildTestPlayer($pid), 1);
+        $output = (string) ob_get_clean();
+
+        $this->assertSame(1, preg_match_all('/data-photo-url="([^"]*)"/', $output, $matches));
+        $this->assertMatchesRegularExpression(self::PHOTO_URL_SHAPE, $matches[1][0]);
+
+        if (!$photoFileExists) {
+            $this->assertTrue(PlayerImageHelper::isPlaceholderUrl($matches[1][0]));
+        }
+    }
+
+    /**
+     * @return array<string, array{int, bool}>
+     */
+    public static function photoUrlShapeProvider(): array
+    {
+        return [
+            'photo file present' => [12345, true],
+            'photo file missing' => [12345, false],
+            'zero pid' => [0, false],
+            'negative pid' => [-7, false],
+        ];
+    }
+
+    public function testPlaceholderDataUriContainsOnlyBase64Characters(): void
+    {
+        $constant = new \ReflectionClassConstant(PlayerImageHelper::class, 'PLACEHOLDER_DATA_URI');
+        $value = $constant->getValue();
+
+        $this->assertIsString($value);
+        $this->assertMatchesRegularExpression('/\Adata:image\/png;base64,[A-Za-z0-9+\/]+={0,2}\z/', $value);
+        $this->assertSame($value, PlayerImageHelper::getImageUrl(0));
     }
 
     public function testRenderPlayerRowEscapesPlayerName(): void
@@ -346,6 +474,11 @@ class DepthChartViewTest extends TestCase
 
     public function testRenderMobileViewCardHasPhoto(): void
     {
+        $this->photoDir = sys_get_temp_dir() . '/ibl-photo-dc-' . bin2hex(random_bytes(4)) . '/';
+        mkdir($this->photoDir);
+        touch($this->photoDir . '12345.jpg');
+        PlayerImageHelper::usePhotoDirectory($this->photoDir);
+
         $players = [$this->buildTestPlayer(12345)];
 
         ob_start();
@@ -558,7 +691,7 @@ class DepthChartViewTest extends TestCase
 
         foreach (['pg', 'sg', 'sf', 'pf', 'c'] as $field) {
             preg_match('/<select name="' . $field . '1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-            $this->assertNotEmpty($matches, "Position depth select for {$field} not found");
+            $this->assertNotSame([], $matches, "Position depth select for {$field} not found");
             $selectHtml = $matches[1];
 
             foreach ($expectedLabels as $i => $label) {
@@ -580,7 +713,7 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $optionCount = substr_count($matches[1], '<option');
         $this->assertSame(6, $optionCount, 'Position depth should have exactly 6 options (No/1st/2nd/3rd/4th/ok)');
     }
@@ -596,11 +729,11 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         preg_match('/<select name="sf1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="1" SELECTED[^>]*>1st<\/option>/', $matches[1]);
 
         preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="0" SELECTED[^>]*>No<\/option>/', $matches[1]);
     }
 
@@ -618,7 +751,7 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="0" SELECTED[^>]*>No<\/option>/', $matches[1]);
     }
 
@@ -632,7 +765,7 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         preg_match('/<select name="sg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
     }
 
@@ -647,11 +780,11 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         preg_match('/<select name="sf1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="3" SELECTED[^>]*>3rd<\/option>/', $matches[1]);
 
         preg_match('/<select name="c1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
     }
 
@@ -667,7 +800,22 @@ class DepthChartViewTest extends TestCase
         // Mobile card uses the same clamp before indexing the depth label and
         // rendering the (disabled) select.
         preg_match('/<select name="sg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
+    }
+
+    public function testHostilePlayerNameEscapedExactlyOnceNextToThumbnail(): void
+    {
+        $player = $this->buildTestPlayer(77, 'O\'Neal <xss>&"q"');
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        $this->assertMatchesRegularExpression(
+            '#<a href="\./modules\.php\?name=Player&amp;pa=showpage&amp;pid=77"><img src="[^"]*" alt="" class="ibl-player-photo"[^>]*>O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;</a>#',
+            $output
+        );
+        $this->assertStringNotContainsString('&amp;lt;', $output);
     }
 }

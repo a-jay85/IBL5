@@ -387,18 +387,19 @@ class ExtensionContractDemandCalculatorTest extends TestCase
     /**
      * Helper to setup market maximums in mock database
      */
-    private function setupMarketMaximums(int $maxValue): void
+    /** @param array<string, int> $overrides keyed by the SQL alias (fga, fgp, ..., r_tvr, r_drive_off, r_trans_off) */
+    private function setupMarketMaximums(int $maxValue, array $overrides = []): void
     {
         // Return all MAX column aliases used by the single bulk query in getMarketMaximums()
         $this->mockDb->setMockData([
-            [
+            array_merge([
                 'fga' => $maxValue, 'fgp' => $maxValue, 'fta' => $maxValue, 'ftp' => $maxValue,
                 'tga' => $maxValue, 'tgp' => $maxValue, 'orb' => $maxValue, 'drb' => $maxValue,
                 'ast' => $maxValue, 'stl' => $maxValue, 'r_tvr' => $maxValue, 'blk' => $maxValue,
                 'foul' => $maxValue, 'oo' => $maxValue, 'od' => $maxValue, 'r_drive_off' => $maxValue,
                 'dd' => $maxValue, 'po' => $maxValue, 'pd' => $maxValue, 'r_trans_off' => $maxValue,
                 'td' => $maxValue,
-            ]
+            ], $overrides)
         ]);
     }
 
@@ -999,5 +1000,698 @@ class ExtensionContractDemandCalculatorTest extends TestCase
         $this->assertSame(8, $breakdown['faPreferences']['tradition']);
         $this->assertSame(3, $breakdown['faPreferences']['loyalty']);
         $this->assertSame(5, $breakdown['faPreferences']['playingTime']);
+    }
+
+    public function testBreakdownCharacterizationIntegralBaseDemandsDefaultFactors(): void
+    {
+        $player = $this->createPlayerWithRatings(50);
+        $this->setupMarketMaximums(100);
+
+        $actual = $this->calculator->calculateDemandsWithBreakdown($player, $this->getDefaultTeamFactors());
+
+        self::assertIsInt($actual['baseDemands']);
+        $expected = array (
+          'ratings' => 
+          array (
+            0 => 
+            array (
+              'name' => '2G Attempts',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            1 => 
+            array (
+              'name' => '2G Percentage',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            2 => 
+            array (
+              'name' => 'FT Attempts',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            3 => 
+            array (
+              'name' => 'FT Percentage',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            4 => 
+            array (
+              'name' => '3G Attempts',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            5 => 
+            array (
+              'name' => '3G Percentage',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            6 => 
+            array (
+              'name' => 'Off Rebounds',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            7 => 
+            array (
+              'name' => 'Def Rebounds',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            8 => 
+            array (
+              'name' => 'Assists',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            9 => 
+            array (
+              'name' => 'Steals',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            10 => 
+            array (
+              'name' => 'Turnovers',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            11 => 
+            array (
+              'name' => 'Blocks',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            12 => 
+            array (
+              'name' => 'Fouls',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            13 => 
+            array (
+              'name' => 'Outside Off',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            14 => 
+            array (
+              'name' => 'Outside Def',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            15 => 
+            array (
+              'name' => 'Drive Off',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            16 => 
+            array (
+              'name' => 'Drive Def',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            17 => 
+            array (
+              'name' => 'Post Off',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            18 => 
+            array (
+              'name' => 'Post Def',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            19 => 
+            array (
+              'name' => 'Transition Off',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            20 => 
+            array (
+              'name' => 'Transition Def',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+          ),
+          'totalRawScore' => 1050,
+          'baseline' => 700,
+          'adjustedScore' => 350,
+          'avgDemands' => 1050,
+          'totalDemands' => 5250,
+          'baseDemands' => 875,
+          'maxRaise' => 87.0,
+          'faPreferences' => 
+          array (
+            'playForWinner' => 3,
+            'tradition' => 3,
+            'loyalty' => 3,
+            'playingTime' => 3,
+          ),
+          'teamFactors' => 
+          array (
+            'wins' => 41,
+            'losses' => 41,
+            'tradition_wins' => 41,
+            'tradition_losses' => 41,
+            'money_committed_at_position' => 0,
+          ),
+          'modifiers' => 
+          array (
+            0 => 
+            array (
+              'name' => 'Play for Winner',
+              'formula' => 'PFW_FACTOR × (W - L) × (pref - 1)',
+              'inputs' => 'W=41, L=41, pref=3',
+              'result' => 0.0,
+            ),
+            1 => 
+            array (
+              'name' => 'Tradition',
+              'formula' => 'TRAD_FACTOR × (tradW - tradL) × (pref - 1)',
+              'inputs' => 'tradW=41, tradL=41, pref=3',
+              'result' => 0.0,
+            ),
+            2 => 
+            array (
+              'name' => 'Loyalty',
+              'formula' => 'sign × LOYALTY_PCT × (pref - 1)',
+              'inputs' => 'pref=3, isOwnTeam=true',
+              'result' => 0.05,
+            ),
+            3 => 
+            array (
+              'name' => 'Playing Time',
+              'formula' => '(BASE - MONEY_FACTOR × cap($) / DIV) × (pref - 1)',
+              'inputs' => '$=0, pref=3',
+              'result' => 0.05,
+            ),
+          ),
+          'totalModifier' => 1.1,
+          'demands' => 
+          array (
+            'year1' => 795.0,
+            'year2' => 875.0,
+            'year3' => 954.0,
+            'year4' => 1033.0,
+            'year5' => 1112.0,
+            'year6' => 0,
+            'years' => 5,
+            'total' => 4769.0,
+            'modifier' => 1.1,
+          ),
+        );
+        self::assertSame($expected, $actual);
+    }
+
+    public function testBreakdownCharacterizationFractionalBaseDemandsPartialTeamFactors(): void
+    {
+        $player = $this->createPlayerWithRatings(50, [
+            'winner' => 5, 'tradition' => 1, 'loyalty' => 4, 'playing_time' => 2,
+        ]);
+        $this->setupMarketMaximums(100, ['fgp' => 75, 'ftp' => 0, 'tgp' => 150, 'orb' => 80]);
+        $teamFactors = ['wins' => 60, 'tradition_losses' => 30, 'money_committed_at_position' => 1200];
+
+        $actual = $this->calculator->calculateDemandsWithBreakdown($player, $teamFactors);
+
+        self::assertIsFloat($actual['baseDemands']);
+        self::assertNotSame(floor($actual['baseDemands']), $actual['baseDemands']);
+        $expected = array (
+          'ratings' => 
+          array (
+            0 => 
+            array (
+              'name' => '2G Attempts',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            1 => 
+            array (
+              'name' => '2G Percentage',
+              'playerValue' => 50,
+              'marketMax' => 75,
+              'rawScore' => 67,
+            ),
+            2 => 
+            array (
+              'name' => 'FT Attempts',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            3 => 
+            array (
+              'name' => 'FT Percentage',
+              'playerValue' => 50,
+              'marketMax' => 1,
+              'rawScore' => 5000,
+            ),
+            4 => 
+            array (
+              'name' => '3G Attempts',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            5 => 
+            array (
+              'name' => '3G Percentage',
+              'playerValue' => 50,
+              'marketMax' => 150,
+              'rawScore' => 33,
+            ),
+            6 => 
+            array (
+              'name' => 'Off Rebounds',
+              'playerValue' => 50,
+              'marketMax' => 80,
+              'rawScore' => 63,
+            ),
+            7 => 
+            array (
+              'name' => 'Def Rebounds',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            8 => 
+            array (
+              'name' => 'Assists',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            9 => 
+            array (
+              'name' => 'Steals',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            10 => 
+            array (
+              'name' => 'Turnovers',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            11 => 
+            array (
+              'name' => 'Blocks',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            12 => 
+            array (
+              'name' => 'Fouls',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            13 => 
+            array (
+              'name' => 'Outside Off',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            14 => 
+            array (
+              'name' => 'Outside Def',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            15 => 
+            array (
+              'name' => 'Drive Off',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            16 => 
+            array (
+              'name' => 'Drive Def',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            17 => 
+            array (
+              'name' => 'Post Off',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            18 => 
+            array (
+              'name' => 'Post Def',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            19 => 
+            array (
+              'name' => 'Transition Off',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+            20 => 
+            array (
+              'name' => 'Transition Def',
+              'playerValue' => 50,
+              'marketMax' => 100,
+              'rawScore' => 50,
+            ),
+          ),
+          'totalRawScore' => 6013,
+          'baseline' => 700,
+          'adjustedScore' => 5313,
+          'avgDemands' => 15939,
+          'totalDemands' => 79695,
+          'baseDemands' => 13282.5,
+          'maxRaise' => 1328.0,
+          'faPreferences' => 
+          array (
+            'playForWinner' => 5,
+            'tradition' => 1,
+            'loyalty' => 4,
+            'playingTime' => 2,
+          ),
+          'teamFactors' => 
+          array (
+            'wins' => 60,
+            'losses' => 41,
+            'tradition_wins' => 41,
+            'tradition_losses' => 30,
+            'money_committed_at_position' => 1200,
+          ),
+          'modifiers' => 
+          array (
+            0 => 
+            array (
+              'name' => 'Play for Winner',
+              'formula' => 'PFW_FACTOR × (W - L) × (pref - 1)',
+              'inputs' => 'W=60, L=41, pref=5',
+              'result' => 0.011628000000000001,
+            ),
+            1 => 
+            array (
+              'name' => 'Tradition',
+              'formula' => 'TRAD_FACTOR × (tradW - tradL) × (pref - 1)',
+              'inputs' => 'tradW=41, tradL=30, pref=1',
+              'result' => 0.0,
+            ),
+            2 => 
+            array (
+              'name' => 'Loyalty',
+              'formula' => 'sign × LOYALTY_PCT × (pref - 1)',
+              'inputs' => 'pref=4, isOwnTeam=true',
+              'result' => 0.07500000000000001,
+            ),
+            3 => 
+            array (
+              'name' => 'Playing Time',
+              'formula' => '(BASE - MONEY_FACTOR × cap($) / DIV) × (pref - 1)',
+              'inputs' => '$=1200, pref=2',
+              'result' => -0.0049999999999999975,
+            ),
+          ),
+          'totalModifier' => 1.081628,
+          'demands' => 
+          array (
+            'year1' => 12280.0,
+            'year2' => 13508.0,
+            'year3' => 14736.0,
+            'year4' => 15963.0,
+            'year5' => 17191.0,
+            'year6' => 0,
+            'years' => 5,
+            'total' => 73678.0,
+            'modifier' => 1.081628,
+          ),
+        );
+        self::assertSame($expected, $actual);
+    }
+
+    public function testBreakdownCharacterizationNegativeScoreEmptyTeamFactorsNullPreferences(): void
+    {
+        $player = $this->createPlayerWithRatings(21, [
+            'winner' => null, 'tradition' => null, 'loyalty' => null, 'playing_time' => null,
+        ]);
+        $this->setupMarketMaximums(100);
+
+        $actual = $this->calculator->calculateDemandsWithBreakdown($player, []);
+
+        self::assertLessThan(0, $actual['adjustedScore']);
+        $expected = array (
+          'ratings' => 
+          array (
+            0 => 
+            array (
+              'name' => '2G Attempts',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            1 => 
+            array (
+              'name' => '2G Percentage',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            2 => 
+            array (
+              'name' => 'FT Attempts',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            3 => 
+            array (
+              'name' => 'FT Percentage',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            4 => 
+            array (
+              'name' => '3G Attempts',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            5 => 
+            array (
+              'name' => '3G Percentage',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            6 => 
+            array (
+              'name' => 'Off Rebounds',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            7 => 
+            array (
+              'name' => 'Def Rebounds',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            8 => 
+            array (
+              'name' => 'Assists',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            9 => 
+            array (
+              'name' => 'Steals',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            10 => 
+            array (
+              'name' => 'Turnovers',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            11 => 
+            array (
+              'name' => 'Blocks',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            12 => 
+            array (
+              'name' => 'Fouls',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            13 => 
+            array (
+              'name' => 'Outside Off',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            14 => 
+            array (
+              'name' => 'Outside Def',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            15 => 
+            array (
+              'name' => 'Drive Off',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            16 => 
+            array (
+              'name' => 'Drive Def',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            17 => 
+            array (
+              'name' => 'Post Off',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            18 => 
+            array (
+              'name' => 'Post Def',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            19 => 
+            array (
+              'name' => 'Transition Off',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+            20 => 
+            array (
+              'name' => 'Transition Def',
+              'playerValue' => 21,
+              'marketMax' => 100,
+              'rawScore' => 21,
+            ),
+          ),
+          'totalRawScore' => 441,
+          'baseline' => 700,
+          'adjustedScore' => -259,
+          'avgDemands' => -777,
+          'totalDemands' => -3885,
+          'baseDemands' => -647.5,
+          'maxRaise' => -65.0,
+          'faPreferences' => 
+          array (
+            'playForWinner' => 1,
+            'tradition' => 1,
+            'loyalty' => 1,
+            'playingTime' => 1,
+          ),
+          'teamFactors' => 
+          array (
+            'wins' => 41,
+            'losses' => 41,
+            'tradition_wins' => 41,
+            'tradition_losses' => 41,
+            'money_committed_at_position' => 0,
+          ),
+          'modifiers' => 
+          array (
+            0 => 
+            array (
+              'name' => 'Play for Winner',
+              'formula' => 'PFW_FACTOR × (W - L) × (pref - 1)',
+              'inputs' => 'W=41, L=41, pref=1',
+              'result' => 0.0,
+            ),
+            1 => 
+            array (
+              'name' => 'Tradition',
+              'formula' => 'TRAD_FACTOR × (tradW - tradL) × (pref - 1)',
+              'inputs' => 'tradW=41, tradL=41, pref=1',
+              'result' => 0.0,
+            ),
+            2 => 
+            array (
+              'name' => 'Loyalty',
+              'formula' => 'sign × LOYALTY_PCT × (pref - 1)',
+              'inputs' => 'pref=1, isOwnTeam=true',
+              'result' => 0.0,
+            ),
+            3 => 
+            array (
+              'name' => 'Playing Time',
+              'formula' => '(BASE - MONEY_FACTOR × cap($) / DIV) × (pref - 1)',
+              'inputs' => '$=0, pref=1',
+              'result' => 0.0,
+            ),
+          ),
+          'totalModifier' => 1.0,
+          'demands' => 
+          array (
+            'year1' => -648.0,
+            'year2' => -713.0,
+            'year3' => -778.0,
+            'year4' => -843.0,
+            'year5' => -908.0,
+            'year6' => 0,
+            'years' => 5,
+            'total' => -3890.0,
+            'modifier' => 1.0,
+          ),
+        );
+        self::assertSame($expected, $actual);
     }
 }

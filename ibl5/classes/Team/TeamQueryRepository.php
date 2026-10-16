@@ -28,12 +28,50 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
 {
     use PlayerTeamJoinQuery;
 
+    /** Last-sim starter column per JSB position (closed set; identifier literals only). */
+    private const LAST_SIM_DEPTH_COLUMNS = [
+        'PG' => 'pg_depth',
+        'SG' => 'sg_depth',
+        'SF' => 'sf_depth',
+        'PF' => 'pf_depth',
+        'C' => 'c_depth',
+    ];
+
+    /** Depth-chart starter column per JSB position (closed set; identifier literals only). */
+    private const DEPTH_CHART_DEPTH_COLUMNS = [
+        'PG' => 'dc_pg_depth',
+        'SG' => 'dc_sg_depth',
+        'SF' => 'dc_sf_depth',
+        'PF' => 'dc_pf_depth',
+        'C' => 'dc_c_depth',
+    ];
+
     private BuyoutLedgerRepositoryInterface $cashConsiderationRepo;
 
     public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null, ?BuyoutLedgerRepositoryInterface $cashConsiderationRepo = null)
     {
         parent::__construct($db, $leagueContext);
         $this->cashConsiderationRepo = $cashConsiderationRepo ?? new BuyoutLedgerRepository($db);
+    }
+
+    /**
+     * @return value-of<self::LAST_SIM_DEPTH_COLUMNS>
+     * @throws \InvalidArgumentException when $position is not a JSB position
+     */
+    private function lastSimDepthColumn(string $position): string
+    {
+        return self::LAST_SIM_DEPTH_COLUMNS[strtoupper($position)]
+            ?? throw new \InvalidArgumentException("Invalid position: {$position}");
+    }
+
+    /**
+     * @return value-of<self::DEPTH_CHART_DEPTH_COLUMNS>
+     * @throws \InvalidArgumentException when $position is not a JSB position
+     */
+    private function depthChartDepthColumn(string $position): string
+    {
+        return self::DEPTH_CHART_DEPTH_COLUMNS[strtoupper($position)]
+            ?? throw new \InvalidArgumentException("Invalid position: {$position}");
     }
 
     /**
@@ -59,7 +97,8 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             WHERE p.draftedby LIKE ?
             ORDER BY p.draftyear DESC,
                      p.draftround,
-                     p.draftpickno ASC",
+                     p.draftpickno ASC,
+                     p.pid ASC",
             "s",
             $teamName
         );
@@ -74,10 +113,11 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
     {
         /** @var list<DraftPickRow> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (pickid is the PK of ibl_draft_picks, inherently unique)
             "SELECT *
             FROM `ibl_draft_picks`
             WHERE owner_teamid = ?
-            ORDER BY year, round, teampick ASC",
+            ORDER BY year, round, teampick ASC, pickid ASC",
             "i",
             $teamId
         );
@@ -95,7 +135,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             "SELECT *
             FROM `ibl_fa_offers`
             WHERE teamid = ?
-            ORDER BY name ASC",
+            ORDER BY name ASC, pid ASC",
             "i",
             $teamId
         );
@@ -114,7 +154,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             WHERE p.teamid = ?
               AND p.retired = 0
               AND p.cyt != p.cy
-            ORDER BY p.name ASC",
+            ORDER BY p.name ASC, p.pid ASC",
             "i",
             $teamId
         );
@@ -147,7 +187,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             WHERE p.teamid = ?
               AND p.retired = 0
               AND p.ordinal <= '" . \League\JsbConstants::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
-            ORDER BY p.name ASC",
+            ORDER BY p.name ASC, p.pid ASC",
             "i",
             $teamId
         );
@@ -181,7 +221,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
               AND p.retired = 0
               AND p.ordinal <= '" . \League\JsbConstants::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
               AND p.injured = '0'
-            ORDER BY p.name ASC",
+            ORDER BY p.name ASC, p.pid ASC",
             "i",
             $teamId
         );
@@ -198,7 +238,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             FROM `ibl_plr`
             WHERE teamid = ?
               AND retired = 0
-              AND " . strtolower($position) . "_depth = 1",
+              AND " . $this->lastSimDepthColumn($position) . " = 1",
             "i",
             $teamId
         );
@@ -216,7 +256,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             FROM `ibl_plr`
             WHERE teamid = ?
               AND retired = 0
-              AND dc_" . strtolower($position) . "_depth = 1",
+              AND " . $this->depthChartDepthColumn($position) . " = 1",
             "i",
             $teamId
         );
@@ -273,7 +313,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             $this->playerWithTeamSelect() . "
             WHERE p.teamid = ?
               AND p.retired = 0
-            ORDER BY p.name ASC",
+            ORDER BY p.name ASC, p.pid ASC",
             "i",
             $teamId
         );
@@ -291,7 +331,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             $this->playerWithTeamSelect() . "
             WHERE p.teamid = ?
               AND p.retired = 0
-            ORDER BY p.ordinal ASC",
+            ORDER BY p.ordinal ASC, p.pid ASC",
             "i",
             $teamId
         );

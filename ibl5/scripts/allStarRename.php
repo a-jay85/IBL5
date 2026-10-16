@@ -15,8 +15,9 @@ if (!function_exists('is_admin') || !is_admin($admin)) {
 header('Content-Type: application/json');
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
-$repository = new Boxscore\BoxscoreRepository($mysqli_db);
+$repository = new Boxscore\AllStarTeamRepository($mysqli_db);
 
 $renameTeamId = isset($_POST['renameTeamId']) && is_string($_POST['renameTeamId'])
     ? (int) $_POST['renameTeamId']

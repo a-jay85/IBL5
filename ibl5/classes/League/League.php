@@ -27,6 +27,9 @@ class League extends BaseMysqliRepository
     const EASTERN_CONFERENCE_TEAMIDS = array(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 22, 25, 27);
     const WESTERN_CONFERENCE_TEAMIDS = array(6, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 26, 28);
 
+    /** One `?` per team id in a conference constant (14 each). */
+    private const CONFERENCE_TID_PLACEHOLDERS = '?,?,?,?,?,?,?,?,?,?,?,?,?,?';
+
     const ALL_STAR_BACKCOURT_POSITIONS = "'PG', 'SG'";
     const ALL_STAR_FRONTCOURT_POSITIONS = "'C', 'SF', 'PF'";
 
@@ -64,18 +67,6 @@ class League extends BaseMysqliRepository
     {
         parent::__construct($db, $leagueContext);
         $this->league = $leagueContext !== null ? $leagueContext->getCurrentLeague() : LeagueContext::LEAGUE_IBL;
-    }
-
-    /**
-     * Format team IDs for SQL IN clause
-     *
-     * @param array<int, int> $conferenceTids Array of team IDs
-     * @return string Formatted string for SQL IN clause
-     */
-    public function formatTidsForSqlQuery(array $conferenceTids): string
-    {
-        $tidsFormattedForQuery = join("','", $conferenceTids);
-        return $tidsFormattedForQuery;
     }
 
     /**
@@ -120,19 +111,23 @@ class League extends BaseMysqliRepository
             $positions = self::ALL_STAR_BACKCOURT_POSITIONS;
         }
 
-        // $positions (fixed position-list constant) and $conferenceTids (int team-id
-        // constants) are class constants, never user input — concatenate, not interpolate.
+        if (count($conferenceTids) !== 14) {
+            throw new \LogicException('Conference constant must hold 14 team ids');
+        }
+
+        // $positions (fixed position-list constant) is a class constant, never user input.
+        // The conference team ids are bound, one placeholder each.
         $query = "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
         FROM `ibl_plr` p
         " . $this->playerTeamInnerJoin() . "
         WHERE p.pos IN (" . $positions . ")
-          AND p.teamid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
+          AND p.teamid IN (" . self::CONFERENCE_TID_PLACEHOLDERS . ")
           AND p.retired = 0
           AND p.stats_gm > '14'
-        ORDER BY p.name";
+        ORDER BY p.name, p.pid ASC";
 
         /** @var list<PlayerRow> */
-        return $this->fetchAll($query);
+        return $this->fetchAll($query, str_repeat('i', 14), ...$conferenceTids);
     }
 
     /**
@@ -148,7 +143,7 @@ class League extends BaseMysqliRepository
             FROM `ibl_plr`
             WHERE injured > 0
               AND retired = 0
-            ORDER BY ordinal ASC"
+            ORDER BY ordinal ASC, pid ASC"
         );
     }
 
@@ -174,7 +169,7 @@ class League extends BaseMysqliRepository
                   WHEN 6 THEN salary_yr6
                   ELSE 0
               END = 0
-            ORDER BY name ASC"
+            ORDER BY name ASC, pid ASC"
         );
     }
 
@@ -192,7 +187,7 @@ class League extends BaseMysqliRepository
             WHERE ordinal > ?
               AND retired = 0
               AND name != '(no starter)'
-            ORDER BY name ASC",
+            ORDER BY name ASC, pid ASC",
             "i",
             JsbConstants::WAIVERS_ORDINAL
         );
@@ -213,7 +208,7 @@ class League extends BaseMysqliRepository
             WHERE p.retired = 0
               AND p.stats_gm >= '41'
               AND p.stats_min / p.stats_gm >= '30'
-            ORDER BY p.name"
+            ORDER BY p.name, p.pid ASC"
         );
     }
 
@@ -233,7 +228,7 @@ class League extends BaseMysqliRepository
               AND p.stats_min / p.stats_gm >= 15
               AND p.stats_gs / p.stats_gm <= '.5'
               AND p.stats_gm >= '41'
-            ORDER BY p.name"
+            ORDER BY p.name, p.pid ASC"
         );
     }
 
@@ -252,7 +247,7 @@ class League extends BaseMysqliRepository
             WHERE p.retired = 0
               AND p.exp = '1'
               AND p.stats_gm >= '41'
-            ORDER BY p.name"
+            ORDER BY p.name, p.pid ASC"
         );
     }
 
@@ -267,7 +262,7 @@ class League extends BaseMysqliRepository
             "SELECT owner_name, team_city, team_name
             FROM `ibl_team_info`
             WHERE teamid BETWEEN 1 AND ?
-            ORDER BY owner_name",
+            ORDER BY owner_name, teamid ASC",
             "i",
             self::MAX_REAL_TEAMID
         );

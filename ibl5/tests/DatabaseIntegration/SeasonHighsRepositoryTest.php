@@ -19,129 +19,6 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         $this->repo = new SeasonHighsRepository($this->db);
     }
 
-    public function testGetSeasonHighsPlayerReturnsRows(): void
-    {
-        $this->insertTestPlayer(200090301, 'SeasonHighs Test');
-
-        $this->insertPlayerBoxscoreRow(
-            '2098-01-15', 200090301, 'SeasonHighs Test', 'PG', 2, 1, 1,
-            minutes: 35, points2m: 10, points2a: 18, ftm: 6, fta: 7, points3m: 4, points3a: 8,
-        );
-
-        $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
-
-        $result = $this->repo->getSeasonHighs(
-            '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
-            'Points',
-            '',
-            '2098-01-01',
-            '2098-01-31',
-        );
-
-        self::assertNotEmpty($result);
-        $first = $result[0];
-        self::assertArrayHasKey('name', $first);
-        self::assertArrayHasKey('date', $first);
-        self::assertArrayHasKey('value', $first);
-        self::assertArrayHasKey('pid', $first);
-        self::assertArrayHasKey('gameOfThatDay', $first);
-        self::assertSame('SeasonHighs Test', $first['name']);
-        // points = 10*2 + 6 + 4*3 = 38
-        self::assertSame(38, $first['value']);
-        self::assertSame(1, $first['gameOfThatDay']);
-    }
-
-    public function testGetSeasonHighsTeamReturnsRows(): void
-    {
-        $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
-
-        $result = $this->repo->getSeasonHighs(
-            '`game_ast`',
-            'Assists',
-            '_teams',
-            '2098-01-01',
-            '2098-01-31',
-        );
-
-        self::assertNotEmpty($result);
-        $first = $result[0];
-        self::assertArrayHasKey('name', $first);
-        self::assertArrayHasKey('value', $first);
-        self::assertArrayHasKey('teamid', $first);
-    }
-
-    public function testGetSeasonHighsWithLocationFilterHome(): void
-    {
-        $this->insertTestPlayer(200090302, 'Home Filter Test', ['pos' => 'SG', 'ordinal' => 2]);
-
-        // Player at home: teamid=1 = home_teamid=1
-        $this->insertPlayerBoxscoreRow(
-            '2098-01-15', 200090302, 'Home Filter Test', 'SG', 2, 1, 1,
-            minutes: 30, points2m: 8, points2a: 15,
-        );
-
-        $result = $this->repo->getSeasonHighs(
-            '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
-            'Points',
-            '',
-            '2098-01-01',
-            '2098-01-31',
-            15,
-            'home',
-        );
-
-        $found = false;
-        foreach ($result as $row) {
-            if ($row['pid'] === 200090302) {
-                $found = true;
-                break;
-            }
-        }
-        self::assertTrue($found, 'Home player should appear in home filter');
-    }
-
-    public function testGetSeasonHighsWithLocationFilterAwayReturnsEmpty(): void
-    {
-        $this->insertTestPlayer(200090303, 'Away Filter Test', ['pos' => 'SF', 'ordinal' => 3]);
-
-        // Player at home (teamid=1 = home_teamid=1), so 'away' should exclude
-        $this->insertPlayerBoxscoreRow(
-            '2098-01-15', 200090303, 'Away Filter Test', 'SF', 2, 1, 1,
-        );
-
-        $result = $this->repo->getSeasonHighs(
-            '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
-            'Points',
-            '',
-            '2098-01-01',
-            '2098-01-31',
-            15,
-            'away',
-        );
-
-        $found = false;
-        foreach ($result as $row) {
-            if (isset($row['pid']) && $row['pid'] === 200090303) {
-                $found = true;
-                break;
-            }
-        }
-        self::assertFalse($found, 'Home player should NOT appear in away filter');
-    }
-
-    public function testGetSeasonHighsReturnsEmptyForNoData(): void
-    {
-        $result = $this->repo->getSeasonHighs(
-            '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
-            'Points',
-            '',
-            '2099-01-01',
-            '2099-01-31',
-        );
-
-        self::assertSame([], $result);
-    }
-
     public function testGetSeasonHighsBatchReturnsMultipleStats(): void
     {
         $this->insertTestPlayer(200090401, 'Batch Test One');
@@ -175,7 +52,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('ASSISTS', $result);
 
         // POINTS leader is player one (12*2 + 8 + 4*3 = 44)
-        self::assertNotEmpty($result['POINTS']);
+        self::assertNotSame([], $result['POINTS']);
         self::assertSame('Batch Test One', $result['POINTS'][0]['name']);
         self::assertSame(44, $result['POINTS'][0]['value']);
         self::assertArrayHasKey('pid', $result['POINTS'][0]);
@@ -183,7 +60,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('gameOfThatDay', $result['POINTS'][0]);
 
         // ASSISTS leader is player two
-        self::assertNotEmpty($result['ASSISTS']);
+        self::assertNotSame([], $result['ASSISTS']);
         self::assertSame('Batch Test Two', $result['ASSISTS'][0]['name']);
         self::assertSame(15, $result['ASSISTS'][0]['value']);
     }
@@ -278,7 +155,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getRcbSeasonHighs(2098, 'home');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertSame('pts', $first['stat_category']);
         self::assertSame(1, $first['ranking']);
@@ -291,5 +168,46 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getRcbSeasonHighs(9999, 'home');
 
         self::assertSame([], $result);
+    }
+
+    private function insertRcbSeasonTie(): void
+    {
+        $base = [
+            'season_year' => 2098,
+            'scope' => 'league',
+            'context' => 'home',
+            'stat_category' => 'pts',
+            'ranking' => 10,
+            'stat_value' => 50,
+            'record_season_year' => 2098,
+        ];
+        $idA = $this->insertRow('ibl_rcb_season_records', $base + ['teamid' => 27, 'player_name' => 'Rcb Tie A']);
+        $idB = $this->insertRow('ibl_rcb_season_records', $base + ['teamid' => 28, 'player_name' => 'Rcb Tie B']);
+        self::assertLessThan($idB, $idA, 'season record ids must be strictly ascending');
+    }
+
+    public function testGetRcbSeasonHighsBreaksCrossTeamRankingTieById(): void
+    {
+        $this->insertRcbSeasonTie();
+
+        $rows = array_values(array_filter(
+            $this->repo->getRcbSeasonHighs(2098, 'home'),
+            static fn (array $row): bool => $row['stat_category'] === 'pts' && $row['ranking'] === 10,
+        ));
+
+        // The return shape carries no id, so name order stands in for id order.
+        self::assertSame(
+            ['Rcb Tie A', 'Rcb Tie B'],
+            array_map(static fn (array $row): string => $row['player_name'], $rows),
+        );
+    }
+
+    public function testGetRcbSeasonHighsExcludesOtherContext(): void
+    {
+        $this->insertRcbSeasonTie();
+
+        foreach ($this->repo->getRcbSeasonHighs(2098, 'away') as $row) {
+            self::assertStringStartsNotWith('Rcb Tie', $row['player_name']);
+        }
     }
 }

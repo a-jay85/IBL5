@@ -34,3 +34,16 @@ ccg_failed() { jq -r '[.check_runs[] | select(.status == "completed" and ((.conc
 # ccg_skip_json <csv> — CSV of exact names -> JSON array, trimming spaces,
 #   dropping empties ("" -> []). Former SKIP_JSON derivation.
 ccg_skip_json() { printf '%s\n' "$1" | jq -R 'split(",") | map(sub("^ +";"") | sub(" +$";"")) | map(select(length > 0))'; }
+
+# ccg_drop_pending <ignore-json-array> — drop every run whose name is an EXACT
+#   match in $1 AND whose .status != "completed". A completed run of a listed
+#   name is kept whatever its conclusion, so a red (or cancelled) deploy still
+#   fails the verdict. Input/output: {check_runs:[...]} (total_count
+#   recomputed). Callers apply it BEFORE ccg_dedupe: dedupe keeps the newest run
+#   per name, and a pending re-run is newer than the completed-red run of the
+#   same name it would otherwise replace. Dropping the pending re-run first
+#   leaves the older red run in place, which is the fail-closed reading.
+#   An empty list is a no-op apart from total_count being recomputed.
+ccg_drop_pending() { jq --argjson ignore "$1" '
+  [ .check_runs[] | select(((.name | IN($ignore[])) and (.status != "completed")) | not) ]
+  | { total_count: length, check_runs: . }'; }

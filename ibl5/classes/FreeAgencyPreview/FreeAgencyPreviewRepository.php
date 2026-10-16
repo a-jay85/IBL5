@@ -39,7 +39,7 @@ class FreeAgencyPreviewRepository extends \Database\BaseMysqliRepository impleme
             FROM `ibl_plr` p
             " . $this->playerTeamLeftJoin() . "
             WHERE p.retired = 0
-            ORDER BY p.ordinal ASC";
+            ORDER BY p.ordinal ASC, p.pid ASC";
 
         /** @var list<ActivePlayerRow> */
         return $this->fetchAll($query);

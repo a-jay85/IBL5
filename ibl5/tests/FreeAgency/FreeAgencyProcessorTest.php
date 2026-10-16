@@ -6,7 +6,10 @@ namespace Tests\FreeAgency;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use FreeAgency\FreeAgencyDemandRepository;
+use FreeAgency\FreeAgencyMarketDemandCalculator;
 use FreeAgency\FreeAgencyProcessor;
+use Repositories\SalaryCapRepository;
 use FreeAgency\Contracts\FreeAgencyCapCalculatorFactoryInterface;
 use FreeAgency\Contracts\FreeAgencyCapCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyEntityLoaderInterface;
@@ -126,6 +129,13 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         $this->injectGlobalMockDb();
+    }
+
+    private function realCalculator(): FreeAgencyMarketDemandCalculator
+    {
+        return new FreeAgencyMarketDemandCalculator(
+            new FreeAgencyDemandRepository($this->mockDb, new SalaryCapRepository($this->mockDb))
+        );
     }
 
     protected function tearDown(): void
@@ -334,14 +344,14 @@ class FreeAgencyProcessorTest extends TestCase
             static fn (string $q): bool => stripos($q, 'ibl_team_info') !== false
                 && strpos($q, "'Test Team'") !== false
         );
-        $this->assertNotEmpty($verifiedLookup, 'Team lookup must use the verified session team name');
+        $this->assertNotSame([], $verifiedLookup, 'Team lookup must use the verified session team name');
 
         // The POST-supplied team name must never reach the database.
         $victimReferences = array_filter(
             $queries,
             static fn (string $q): bool => strpos($q, 'Victim Team') !== false
         );
-        $this->assertEmpty($victimReferences, 'POST-supplied team name must be discarded (IDOR D-07)');
+        $this->assertSame([], $victimReferences, 'POST-supplied team name must be discarded (IDOR D-07)');
 
         $this->assertNotNull($capturingRepo->lastSavedOffer, 'A valid offer should still be saved');
     }
@@ -370,7 +380,7 @@ class FreeAgencyProcessorTest extends TestCase
             static fn (string $q): bool => stripos($q, 'ibl_team_info') !== false
                 && strpos($q, "'Test Team'") !== false
         );
-        $this->assertNotEmpty($verifiedLookup, 'Verified team must be used even when POST team is absent');
+        $this->assertNotSame([], $verifiedLookup, 'Verified team must be used even when POST team is absent');
         $this->assertNotNull($capturingRepo->lastSavedOffer);
     }
 
@@ -382,7 +392,7 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class), $this->realCalculator());
         $result = $processor->deleteOffers('Test Team', 1);
 
         $this->assertIsArray($result);
@@ -393,12 +403,12 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class), $this->realCalculator());
         $processor->deleteOffers('Test Team', 1);
 
         $queries = $this->mockDb->getExecutedQueries();
         $deleteQueries = array_filter($queries, static fn (string $q): bool => stripos($q, 'DELETE') !== false);
-        $this->assertNotEmpty($deleteQueries);
+        $this->assertNotSame([], $deleteQueries);
     }
 
     // ================================================================
@@ -526,6 +536,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             self::createStub(TeamIdentityRepositoryInterface::class),
+            $this->realCalculator(),
             repository: $capturingRepo,
             entityLoader: $loaderStub,
             capCalculatorFactory: $factoryStub,
@@ -549,6 +560,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             self::createStub(TeamIdentityRepositoryInterface::class),
+            $this->realCalculator(),
             repository: $capturingRepo,
         );
 
@@ -604,6 +616,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             self::createStub(TeamIdentityRepositoryInterface::class),
+            $this->realCalculator(),
             repository: new CapturingRepository(),
             entityLoader: $loaderStub,
             capCalculatorFactory: $factoryStub,
@@ -671,6 +684,7 @@ class FreeAgencyProcessorTest extends TestCase
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
             $commonRepo,
+            $this->realCalculator(),
             repository: $repoMock,
         );
 

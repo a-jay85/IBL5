@@ -23,13 +23,11 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'draft pick locator',
     'franchise history',
     'franchise record book',
-    'free agency preview',
     'injuries',
     'one on one game',
     'player movement',
     'projected draft order',
     'record holders',
-    'schedule',
     // Search page with a transactions preset (modules.php?name=Search plus a preset).
     // Verified 2026-09-23: every failing node is pre-existing results markup
     // (.search-result__meta-item, .search-result__title, .search-pagination__link, <time>);
@@ -41,6 +39,9 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'team schedule',
     'topics',
     // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
+    // 2026-10-07 (IBL5-backlog#1270): 'free agency preview' and 'schedule' passed 10/10 and were removed (DELTA-OK).
+    // Re-checked 2026-10-07 (IBL5-backlog#1270): kept, together with 'season leaderboards' below.
+    // Their CI flake (commit 5cd079e6d) depends on ORDER BY ties, so local repeat runs cannot prove them clean.
     'league starters',
     // SeasonLeaderboards renders team-color cells via TeamCellHelper; which low-contrast team
     // surfaces in the top-N depends on ORDER BY tie ordering, so the violation appeared
@@ -66,6 +67,7 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     // Seeded empirically — see plan a11y-1-ratchet-best-practice
     // Auth pages
     'your account',
+    // The api keys and game boxscore pages left KNOWN_FAILING['page-has-heading-one'] once each rendered an h1.
   ]),
 
   // Heading-level skip (h4 after h2, no h3). See a-jay85/IBL5-backlog (label: a11y).
@@ -137,6 +139,9 @@ function getA11yOptions(
 
 // --- Public pages ---
 
+// Not listed on purpose: TransactionHistory and VotingResults are retired redirect
+// stubs. TransactionHistory lands on 'search transactions preset' below, and
+// VotingResults lands on Voting, covered by 'voting ASG ballot' / 'voting EOY ballot'.
 const publicPages: Array<{ name: string; url: string }> = [
   { name: 'homepage', url: 'index.php' },
   { name: 'standings', url: 'modules.php?name=Standings' },
@@ -173,6 +178,8 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'news categories', url: 'modules.php?name=News&file=categories&op=newindex&catid=15' },
   { name: 'news article', url: 'modules.php?name=News&file=article&sid=1' },
   { name: 'team schedule', url: 'modules.php?name=Schedule&teamid=1' },
+  // Seed rows for this game: ibl5/tests/e2e/fixtures/ci-seed.sql:124 and :814-823. An unknown pair 404s.
+  { name: 'game boxscore', url: 'modules.php?name=GameBoxscore&date=2026-02-20&game=1' },
 ];
 
 publicTest.describe('Public page accessibility', () => {
@@ -219,6 +226,7 @@ const authPages: Array<{
     state: { 'Current Season Phase': 'Free Agency', 'EOY Voting': 'Yes' },
   },
   { name: 'training camp ratings diff', url: 'modules.php?name=TrainingCampRatingsDiff' },
+  { name: 'api keys', url: 'modules.php?name=ApiKeys' },
   {
     name: 'league control panel',
     url: 'modules.php?name=LeagueControlPanel',

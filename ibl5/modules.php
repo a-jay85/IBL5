@@ -118,7 +118,7 @@ if (is_string($requestName) && $requestName !== '') {
                 $captureKey = $pageCacheKey;
                 $captureTtl = \Cache\PageCache::getTtl($name);
                 ob_start(static function (string $html) use ($captureKey, $captureTtl): string {
-                    \Cache\PageCache::set($captureKey, $html, $captureTtl);
+                    \Cache\PageCache::setIfOk($captureKey, $html, $captureTtl, http_response_code());
                     return $html;
                 });
             }

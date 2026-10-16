@@ -25,6 +25,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=bin/lib/tick-guards.sh disable=SC1091
+source "$SCRIPT_DIR/lib/tick-guards.sh"
 
 # launchd and `env -i` runs may lack HOME.
 if [ -z "${HOME:-}" ]; then HOME="$(cd ~ 2>/dev/null && pwd)"; export HOME; fi
@@ -82,8 +84,10 @@ case "$WT_GC_MIN_INTERVAL_SECS" in
 esac
 
 # ── Repo root ─────────────────────────────────────────────────────────────────
+# shellcheck source=bin/lib/git-helpers.sh disable=SC1091
+source "$SCRIPT_DIR/lib/git-helpers.sh"
 if [ -z "$WT_GC_REPO_ROOT" ]; then
-    WT_GC_REPO_ROOT="$(git -C "$SCRIPT_DIR/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')" || WT_GC_REPO_ROOT=""
+    WT_GC_REPO_ROOT="$(main_checkout_root "$SCRIPT_DIR/..")" || WT_GC_REPO_ROOT=""
 fi
 if [ -z "$WT_GC_REPO_ROOT" ]; then
     log "cannot resolve repo root — aborting"
@@ -93,21 +97,19 @@ fi
 # ── Presence gate (HID idle) ──────────────────────────────────────────────────
 # Fail-closed: missing reader, empty, or non-numeric idle means operator present.
 if [ "$FORCE" = 0 ]; then
-    if [ -z "$WT_GC_IOREG" ] || [ ! -x "$WT_GC_IOREG" ]; then
-        log "idle reader missing or not executable ('$WT_GC_IOREG') — treating as operator present (fail-closed)"
-        exit 0
-    fi
-    # Validate the raw ns field before any arithmetic. awk's coercion of a
-    # non-numeric field varies by implementation. On Linux CI it came out as 0,
-    # which read as "operator present" instead of fail-closed.
-    idle_ns="$("$WT_GC_IOREG" -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ && !f {print $NF; f=1}' 2>/dev/null)" || idle_ns=""
-    case "$idle_ns" in
-        ''|*[!0-9]*)
-            log "idle value unreadable ('${idle_ns:-<empty>}') — treating as operator present (fail-closed)"
+    idle_rc=0
+    idle="$(hid_idle_secs "$WT_GC_IOREG")" || idle_rc=$?
+    case "$idle_rc" in
+        0) ;;
+        1)
+            log "idle reader missing or not executable ('$WT_GC_IOREG') — treating as operator present (fail-closed)"
+            exit 0
+            ;;
+        *)
+            log "idle value unreadable ('${idle:-<empty>}') — treating as operator present (fail-closed)"
             exit 0
             ;;
     esac
-    idle=$(( idle_ns / 1000000000 ))
     if [ "$idle" -lt "$WT_GC_IDLE_SECS" ]; then
         log "operator present (idle ${idle}s < threshold ${WT_GC_IDLE_SECS}s) — exiting"
         exit 0
@@ -136,21 +138,20 @@ if [ "$FORCE" = 0 ] && [ "$DRY_RUN" = 0 ] && [ -f "$STAMP_FILE" ]; then
 fi
 
 # ── Single-flight lock ────────────────────────────────────────────────────────
-if [ -f "$LOCK_FILE" ]; then
-    existing_pid="$(cat "$LOCK_FILE" 2>/dev/null || true)"
-    if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
-        log "previous tick (pid $existing_pid) still running — exiting"
-        exit 0
-    fi
-    log "stale lock (pid ${existing_pid:-<unreadable>}) — reclaiming"
-fi
-if ! printf '%d\n' "$$" > "$LOCK_FILE" 2>/dev/null; then
-    log "could not write lock file $LOCK_FILE — aborting"
+# Event shim for tick_lock_acquire: keeps this tick's log wording.
+_gc_lock_event() {
+    case "$1" in
+        held)         log "previous tick (pid $2) still running — exiting" ;;
+        stale)        log "stale lock (pid ${2:-<unreadable>}) — reclaiming" ;;
+        write-failed) log "could not write lock file $2 — aborting" ;;
+    esac
+}
+if ! tick_lock_acquire "$LOCK_FILE" _gc_lock_event; then
     exit 0
 fi
 TMP_OUT="$(mktemp "${TMPDIR:-/tmp}/wt-gc-out.XXXXXX")"
 TMP_STATUS="$(mktemp "${TMPDIR:-/tmp}/wt-gc-status.XXXXXX")"
-trap 'rm -f "$LOCK_FILE" "$TMP_OUT" "$TMP_STATUS"' EXIT
+trap 'tick_lock_release "$LOCK_FILE"; rm -f "$TMP_OUT" "$TMP_STATUS"' EXIT
 
 EXIT_CODE=0
 

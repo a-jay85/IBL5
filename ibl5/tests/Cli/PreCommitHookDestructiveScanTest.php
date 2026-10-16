@@ -127,6 +127,91 @@ final class PreCommitHookDestructiveScanTest extends TestCase
         self::assertStringNotContainsString('destructive', $result['stdout']);
     }
 
+    public function testExcludeFromSkipsListedStagedMigration(): void
+    {
+        $this->stageFile('ibl5/migrations/201_x.sql', "DROP TABLE t;\n");
+        $excludeFile = $this->writeExcludeFile("ibl5/migrations/201_x.sql\n");
+
+        $result = $this->runScan(['--staged', '--exclude-from=' . $excludeFile]);
+
+        self::assertSame(0, $result['exit'], "stdout: {$result['stdout']}\nstderr: {$result['stderr']}");
+        self::assertStringNotContainsString('[drop-table]', $result['stdout']);
+    }
+
+    public function testExcludeFromStillScansUnlistedMigration(): void
+    {
+        $this->stageFile('ibl5/migrations/201_x.sql', "DROP TABLE t;\n");
+        $excludeFile = $this->writeExcludeFile("ibl5/migrations/202_other.sql\n\n");
+
+        $result = $this->runScan(['--staged', '--exclude-from=' . $excludeFile]);
+
+        self::assertSame(1, $result['exit'], "stdout: {$result['stdout']}\nstderr: {$result['stderr']}");
+        self::assertStringContainsString('ibl5/migrations/201_x.sql', $result['stdout']);
+        self::assertStringContainsString('[drop-table]', $result['stdout']);
+    }
+
+    public function testExcludeFromMissingFileExitsTwo(): void
+    {
+        $this->stageFile('ibl5/migrations/201_x.sql', "DROP TABLE t;\n");
+        $missing = $this->tmpDir . '/nonexistent-exclude-list';
+
+        $result = $this->runScan(['--staged', '--exclude-from=' . $missing]);
+
+        self::assertSame(2, $result['exit'], "stdout: {$result['stdout']}\nstderr: {$result['stderr']}");
+        self::assertStringContainsString('cannot read --exclude-from file', $result['stderr']);
+        self::assertStringContainsString($missing, $result['stderr']);
+    }
+
+    public function testExcludeFromSpaceFormIsRejected(): void
+    {
+        $this->stageFile('ibl5/migrations/201_x.sql', "DROP TABLE t;\n");
+        $excludeFile = $this->writeExcludeFile("ibl5/migrations/201_x.sql\n");
+
+        $result = $this->runScan(['--staged', '--exclude-from', $excludeFile]);
+
+        self::assertSame(2, $result['exit'], "stdout: {$result['stdout']}\nstderr: {$result['stderr']}");
+        self::assertStringContainsString('unknown flag: --exclude-from', $result['stderr']);
+    }
+
+    /**
+     * Write an --exclude-from list to an absolute path outside the scratch work tree.
+     */
+    private function writeExcludeFile(string $content): string
+    {
+        $path = $this->tmpDir . '/.git/test-exclude-list';
+        file_put_contents($path, $content);
+        return $path;
+    }
+
+    /**
+     * Run ./bin/check-destructive-migrations with $args from the scratch root.
+     *
+     * @param list<string> $args
+     * @return array{exit: int, stdout: string, stderr: string}
+     */
+    private function runScan(array $args): array
+    {
+        $proc = proc_open(
+            array_merge(['./bin/check-destructive-migrations'], $args),
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            $this->tmpDir
+        );
+        self::assertIsResource($proc);
+
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        return [
+            'exit' => $exit,
+            'stdout' => $stdout === false ? '' : $stdout,
+            'stderr' => $stderr === false ? '' : $stderr,
+        ];
+    }
+
     /**
      * Run ./bin/pre-commit-hook from the scratch root.
      *

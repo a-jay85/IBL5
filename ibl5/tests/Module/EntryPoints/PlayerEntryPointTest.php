@@ -22,7 +22,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Player');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('No player selected', $output);
     }
 
@@ -31,7 +31,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Player', ['pa' => 'bogus']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('No player selected', $output);
     }
 
@@ -70,7 +70,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
             ['pa' => 'showpage', 'pid' => '1'],
         );
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_plr');
     }
 
@@ -78,7 +78,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->seedShowpageMocks(['pid' => 0, 'name' => 'Unknown']);
 
-        $output = $this->runModule(
+        $this->runModule(
             'Player',
             ['pa' => 'showpage', 'pid' => 'garbage'],
         );
@@ -98,7 +98,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'negotiate', 'pid' => '1']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testNegotiateWithAuthRendersNegotiation(): void
@@ -112,7 +112,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'negotiate', 'pid' => '1']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     /**
@@ -151,6 +151,57 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->assertSame('', $output);
         $this->assertQueryNotExecuted('UPDATE');
         $this->assertQueryNotExecuted('ibl_team_info');
+    }
+
+    public function testProcessRookieOptionAuthenticatedDecodesCookieBeforeUsername(): void
+    {
+        $this->authenticateWithSentinel('testuser', true, 'getCookieArray');
+        $this->assertSentinelThrown('getCookieArray', function (): void {
+            $this->runModule(
+                'Player',
+                ['pa' => 'processrookieoption'],
+                [
+                    '_csrf_token' => \Security\CsrfGuard::generateRawToken('rookie_option'),
+                    'teamname' => 'Boston',
+                    'playerID' => '1',
+                ],
+                ['user' => $GLOBALS['user']],
+            );
+        });
+    }
+
+    public function testExtensionChecksUserAfterCsrf(): void
+    {
+        $this->skipWebBoot();
+        $this->authenticateWithSentinel('', false, 'isAuthenticated');
+        $this->mockDb->setMockData([]);
+
+        $this->assertSentinelThrown('isAuthenticated', function (): void {
+            $this->runModule(
+                'Player',
+                [],
+                ['_csrf_token' => \Security\CsrfGuard::generateRawToken('extension')],
+                array_merge($this->dbGlobals(), ['user' => $GLOBALS['user']]),
+                'extension.php',
+            );
+        });
+    }
+
+    public function testExtensionAuthenticatedDecodesCookieBeforeUsername(): void
+    {
+        $this->skipWebBoot();
+        $this->authenticateWithSentinel('testuser', true, 'getCookieArray');
+        $this->mockDb->setMockData([]);
+
+        $this->assertSentinelThrown('getCookieArray', function (): void {
+            $this->runModule(
+                'Player',
+                [],
+                ['_csrf_token' => \Security\CsrfGuard::generateRawToken('extension')],
+                array_merge($this->dbGlobals(), ['user' => $GLOBALS['user']]),
+                'extension.php',
+            );
+        });
     }
 
     private function seedTeamlessUser(): void
@@ -237,7 +288,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'showpage', 'pid' => $uuid]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted("uuid = '" . $uuid . "'");
         $this->assertQueryExecuted('p.pid = 42');
     }
@@ -250,7 +301,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'showpage', 'pid' => $uuid]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted("uuid = '" . $uuid . "'");
         $this->assertQueryExecuted('p.pid = 0');
     }

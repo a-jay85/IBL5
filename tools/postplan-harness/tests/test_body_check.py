@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
 from harness.adapters.llm import FixtureLlm, MODEL_MAP
-from harness.classify import FILES_CHANGED_BEGIN, name_status_text, numstat_text
+from harness.classify import FILES_CHANGED_BEGIN, TESTS_CHANGED_BEGIN, name_status_text, numstat_text
 from harness.state import HarnessError, TerminalState, UsageLedger
 
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
@@ -197,6 +197,17 @@ def test_body_check_degradation_joins_degraded_agents_and_holds_arming():
     assert res.terminal == TerminalState.DEGRADED
 
 
+def test_body_check_auth_expired_fails_closed():
+    """An expired login is not a degradable body-check failure: the run ends FAILED, exit 3."""
+    out = tempfile.mkdtemp()
+    llm = DegradingLlm(UsageLedger(), CANNED, {"body-check"}, kind="llm-auth-expired")
+    res = runner.run(_fixture(), out, llm, mode="replay")
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == "llm-auth-expired"
+    assert "body-check" not in res.degraded_agents
+    assert runner.exit_code_for(res) == 3
+
+
 def test_body_check_fixture_missing_degrades_instead_of_failing():
     """An uncanned body-check label degrades rather than raising."""
     out = tempfile.mkdtemp()
@@ -225,14 +236,13 @@ def test_corrected_body_reaches_pr_create():
     assert create_actions, "pr_create not found in recorded actions"
     body = create_actions[0].get("body", "")
     assert sentinel in body, f"sentinel not found in pr_create body: {body[:200]!r}"
-    assert FILES_CHANGED_BEGIN in body, (
-        f"files-changed block not regenerated in pr_create body: {body[:200]!r}"
-    )
+    for marker in (FILES_CHANGED_BEGIN, TESTS_CHANGED_BEGIN):
+        assert marker not in body, f"retired block written to pr_create body: {body[:200]!r}"
 
 
-def test_pr_copy_tier_is_sonnet_4_6():
-    """MODEL_MAP['sonnet'] resolves to claude-sonnet-4-6, and _pr_copy uses 'sonnet'."""
-    assert MODEL_MAP["sonnet"] == "claude-sonnet-4-6"
+def test_pr_copy_tier_is_sonnet_5_5():
+    """MODEL_MAP['sonnet'] resolves to claude-sonnet-5-5, and _pr_copy uses 'sonnet'."""
+    assert MODEL_MAP["sonnet"] == "claude-sonnet-5-5"
     src = inspect.getsource(runner._pr_copy)
     assert 'llm.call(schemas.PR_COPY_PURPOSE, "sonnet"' in src
     assert 'llm.call(schemas.PR_COPY_PURPOSE, "haiku"' not in src

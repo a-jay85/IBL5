@@ -22,7 +22,7 @@ import time
 
 from pathlib import Path
 
-from .. import followcap
+from .. import followcap, netretry
 from ..state import HarnessError
 
 # bin/lib/pr-sticky.sh in the harness's own checkout. Not under pr-ready/,
@@ -37,6 +37,33 @@ PRF_LIB = ARMABLE_LIB.parent / "post-review-findings.sh"
 # phase modules. tests/test_fidelity_carryforward.py asserts the two stay equal.
 PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
 
+# The heading `.claude/review-shared/scripts/4b-probe.sh` scans comments for. `\b` keeps
+# `## Code reviewer notes` from matching.
+CODE_REVIEW_RE = re.compile(r"(?m)^#{1,6} +Code review\b")
+
+
+def _last_code_review(data) -> dict:
+    """{"scanned": True, "comment": {created_at, url, summary} | None} from a comments fetch.
+
+    The last non-sticky comment whose body opens a `Code review` heading wins. Malformed
+    data scans as "found nothing".
+    """
+    found = None
+    try:
+        for c in (data.get("comments") or []):
+            body = c.get("body") or ""
+            if PR_STICKY_MARKER in body:
+                continue
+            m = CODE_REVIEW_RE.search(body)
+            if not m:
+                continue
+            rest = [ln.strip() for ln in body[m.end():].splitlines()[1:] if ln.strip()]
+            found = {"created_at": c.get("createdAt"), "url": c.get("url"),
+                     "summary": (rest[0] if rest else "")[:120]}
+    except (AttributeError, TypeError):
+        found = None
+    return {"scanned": True, "comment": found}
+
 
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
@@ -44,7 +71,7 @@ class RecordingGh:
                  "pr_sticky_verdict", "issue_create", "followup_create",
                  "pr_disable_auto_merge",
                  "pr_checks_json", "run_log_failed", "run_rerun_failed",
-                 "pr_resolve_thread")
+                 "pr_resolve_thread", "label_remove")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
@@ -210,6 +237,32 @@ class RecordingGh:
         self.record("run_rerun_failed", run_id=run_id)
         return True
 
+    # -- baseline guard (harness/baseline_guard.py): fresh reads, never the cached meta --
+    def pr_has_label_fresh(self, pr: int, label: str) -> bool:
+        if self.fixture.get("fresh_labels_error"):
+            raise HarnessError("gh", "replay: fresh label read failed")
+        return label in (self.fixture.get("fresh_labels") or [])
+
+    def e2e_runs_for_sha(self, sha: str) -> list[dict]:
+        if self.fixture.get("e2e_runs_error"):
+            raise HarnessError("gh", "replay: e2e run read failed")
+        return list(self.fixture.get("e2e_runs") or [])
+
+    def pr_comments_text(self, pr: int) -> str:
+        return "\n".join(self.fixture.get("pr_comments") or [])
+
+    def pr_label_remove(self, pr: int, label: str) -> bool:
+        self.record("label_remove", pr=pr, label=label)
+        return True
+
+    def pr_label_add_checked(self, pr: int, label: str) -> bool:
+        failures = int(self.fixture.get("label_add_failures") or 0)
+        if failures > 0:
+            self.fixture["label_add_failures"] = failures - 1
+            return False
+        self.record("label_add", pr=pr, label=label)
+        return True
+
     def pr_disable_auto_merge(self, pr: int) -> None:
         self.record("pr_disable_auto_merge", pr=pr)
 
@@ -240,8 +293,18 @@ class LiveGh(RecordingGh):
         self.branch = branch
         self.timeout = timeout
         self._meta: dict | None = None
+        self._code_review_seen: dict = {}
 
     def _gh(self, *args: str, input_text: str | None = None) -> str:
+        """Every gh call. Retries network-transient failures only for argv on
+        netretry's read-only/idempotent allowlist; everything else is one attempt.
+        Non-idempotent sites opt in through _gh_landed with a landed check."""
+        if not netretry.gh_retry_safe(args):
+            return self._gh_once(*args, input_text=input_text)
+        return netretry.call(lambda: self._gh_once(*args, input_text=input_text),
+                             label=f"gh {' '.join(args[:2])}")
+
+    def _gh_once(self, *args: str, input_text: str | None = None) -> str:
         try:
             proc = subprocess.run(["gh", *args], cwd=self.worktree, input=input_text,
                                   capture_output=True, text=True, timeout=self.timeout)
@@ -250,6 +313,36 @@ class LiveGh(RecordingGh):
         if proc.returncode != 0:
             raise HarnessError("gh", f"gh {' '.join(args[:3])}: {proc.stderr.strip()[:400]}")
         return proc.stdout
+
+    def _gh_landed(self, argv: tuple[str, ...], *, label: str,
+                   landed, input_text: str | None = None) -> str:
+        """A non-idempotent call. No landed check means one attempt (today)."""
+        if landed is None:
+            return self._gh(*argv, input_text=input_text)
+        return netretry.call(lambda: self._gh(*argv, input_text=input_text),
+                             label=label, landed=landed)
+
+    @staticmethod
+    def _count_increase_landed(count_fn):
+        """Snapshot count_fn() now. landed() is True once the count grows, so an
+        identical earlier comment or review never counts as the retried one.
+        A failed snapshot returns None: single attempt."""
+        try:
+            before = count_fn()
+        except Exception:
+            return None
+        return lambda: ((True, "") if count_fn() > before else (False, None))
+
+    def _open_prs_for_branch(self) -> list:
+        return json.loads(self._gh("pr", "list", "--head", self.branch, "--state",
+                                   "open", "--json", "number,url"))
+
+    def _matching_count(self, pr: int, field: str, body: str) -> int:
+        """Count comments (field="comments") or reviews (field="reviews") on the
+        PR whose body equals `body` after CRLF/whitespace normalisation."""
+        norm = lambda s: (s or "").replace("\r\n", "\n").strip()
+        data = json.loads(self._gh("pr", "view", str(pr), "--json", field))
+        return sum(1 for item in data.get(field, []) if norm(item.get("body")) == norm(body))
 
     def record(self, action: str, **payload) -> None:
         super().record(action, executed=True, **payload)
@@ -260,8 +353,18 @@ class LiveGh(RecordingGh):
 
     # -- mutations: executed, then recorded ------------------------------
     def pr_create(self, title: str, body: str, base: str) -> int:
-        out = self._gh("pr", "create", "--title", title, "--body", body,
-                       "--base", base, "--head", self.branch)
+        landed = None
+        try:
+            before = self._open_prs_for_branch()
+        except Exception:
+            before = None
+        if before == []:  # the runner calls pr_create only when no PR exists
+            def landed():
+                rows = self._open_prs_for_branch()
+                return (True, rows[0]["url"]) if rows else (False, None)
+        out = self._gh_landed(("pr", "create", "--title", title, "--body", body,
+                               "--base", base, "--head", self.branch),
+                              label="gh pr create", landed=landed)
         m = re.search(r"/pull/(\d+)", out)
         if not m:
             raise HarnessError("gh", f"pr create returned no PR URL: {out[:200]}")
@@ -408,13 +511,23 @@ class LiveGh(RecordingGh):
         try:
             data = json.loads(self._gh("pr", "view", str(pr), "--json", "comments"))
         except (HarnessError, ValueError, OSError):
+            self._code_review_seen[pr] = None
             return None
+        self._code_review_seen[pr] = _last_code_review(data)
         try:
             bodies = [c.get("body") or "" for c in (data.get("comments") or [])
                       if PR_STICKY_MARKER in (c.get("body") or "")]
         except (AttributeError, TypeError):
             return None
         return bodies[0] if len(bodies) == 1 else None
+
+    def code_review_seen(self, pr: int) -> dict | None:
+        """What the last `pr_sticky_body` fetch saw of a code-review comment.
+
+        Reads the cache that fetch filled and never calls `gh`. None means this run did
+        not read the comments (no fetch yet, or the fetch failed).
+        """
+        return self._code_review_seen.get(pr)
 
     def label_add(self, pr: int, label: str) -> None:
         self._gh("pr", "edit", str(pr), "--add-label", label)
@@ -456,20 +569,31 @@ class LiveGh(RecordingGh):
                    "comments": [{"path": f.path, "line": f.line, "side": "RIGHT",
                                  "body": f.body[:1000]} for f in findings]}
         try:
-            self._gh("api", f"repos/{self._repo()}/pulls/{pr}/reviews",
-                     "--method", "POST", "--input", "-",
-                     input_text=json.dumps(payload))
+            self._gh_landed(("api", f"repos/{self._repo()}/pulls/{pr}/reviews",
+                             "--method", "POST", "--input", "-"),
+                            label="gh api reviews POST",
+                            landed=self._count_increase_landed(
+                                lambda: self._matching_count(pr, "reviews", title)),
+                            input_text=json.dumps(payload))
         except HarnessError:
             # one out-of-diff line anchor 422s the whole review — degrade to a
             # summary comment; findings still hold arming from memory regardless
             body = "\n".join(f"- `{f.path}:{f.line}` — {f.body}" for f in findings)
-            self._gh("pr", "comment", str(pr), "--body", f"## {title}\n\n{body}")
+            comment = f"## {title}\n\n{body}"
+            self._gh_landed(("pr", "comment", str(pr), "--body", comment),
+                            label="gh pr comment",
+                            landed=self._count_increase_landed(
+                                lambda: self._matching_count(pr, "comments", comment)))
         self.record("pr_review_findings", pr=pr, head_sha=head_sha, title=title,
                     findings=[{"path": f.path, "line": f.line, "body": f.body[:1000],
                                "score": f.score} for f in findings])
 
     def post_review_summary(self, pr: int, title: str, body: str) -> None:
-        self._gh("pr", "comment", str(pr), "--body", f"## {title}\n\n{body}")
+        comment = f"## {title}\n\n{body}"
+        self._gh_landed(("pr", "comment", str(pr), "--body", comment),
+                        label="gh pr comment",
+                        landed=self._count_increase_landed(
+                            lambda: self._matching_count(pr, "comments", comment)))
         self.record("pr_comment", pr=pr, title=title, body=body[:4000])
 
     def pr_status_label(self, pr: int, label: str) -> None:
@@ -556,6 +680,41 @@ class LiveGh(RecordingGh):
             return True
         except (HarnessError, OSError, subprocess.SubprocessError):
             return False
+
+    # -- baseline guard (harness/baseline_guard.py) ------------------------
+    def pr_has_label_fresh(self, pr: int, label: str) -> bool:
+        """Live label read. Bypasses `_fetch_meta`: the label changes during the run."""
+        out = self._gh("api", f"repos/{{owner}}/{{repo}}/issues/{pr}/labels",
+                       "--jq", ".[].name")
+        return any(line.strip() == label for line in out.splitlines())
+
+    def e2e_runs_for_sha(self, sha: str) -> list[dict]:
+        return json.loads(self._gh(
+            "run", "list", "--workflow", "e2e-tests.yml", "--commit", sha,
+            "--json", "databaseId,status,conclusion,event,createdAt", "--limit", "20"))
+
+    def pr_comments_text(self, pr: int) -> str:
+        return self._gh("api", "--paginate", f"repos/{{owner}}/{{repo}}/issues/{pr}/comments",
+                        "--jq", ".[].body")
+
+    def pr_label_remove(self, pr: int, label: str) -> bool:
+        try:
+            self._gh("api", "--method", "DELETE",
+                     f"repos/{{owner}}/{{repo}}/issues/{pr}/labels/{label}")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return False
+        self.record("label_remove", pr=pr, label=label)
+        return True
+
+    def pr_label_add_checked(self, pr: int, label: str) -> bool:
+        try:
+            self._gh("api", "--method", "POST",
+                     f"repos/{{owner}}/{{repo}}/issues/{pr}/labels",
+                     "-f", f"labels[]={label}")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return False
+        self.record("label_add", pr=pr, label=label)
+        return True
 
     def pr_disable_auto_merge(self, pr: int) -> None:
         try:

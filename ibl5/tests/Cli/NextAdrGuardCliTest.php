@@ -18,11 +18,16 @@ final class NextAdrGuardCliTest extends TestCase
 
         $scriptSrc = (string) realpath(__DIR__ . '/../../../bin/next-adr');
         $libSrc    = (string) realpath(__DIR__ . '/../../../bin/lib/git-helpers.sh');
+        $nextNumberSrc = (string) realpath(__DIR__ . '/../../../bin/next-number');
+        $numberingSrc  = (string) realpath(__DIR__ . '/../../../bin/lib/numbering.sh');
         $tplSrc    = (string) realpath(__DIR__ . '/../../../ibl5/docs/decisions/0000-template.md');
 
         copy($scriptSrc, $t . '/bin/next-adr');
         chmod($t . '/bin/next-adr', 0755);
         copy($libSrc, $t . '/bin/lib/git-helpers.sh');
+        copy($nextNumberSrc, $t . '/bin/next-number');
+        chmod($t . '/bin/next-number', 0755);
+        copy($numberingSrc, $t . '/bin/lib/numbering.sh');
         copy($tplSrc, $t . '/ibl5/docs/decisions/0000-template.md');
 
         // .git as a DIRECTORY → main checkout layout
@@ -36,7 +41,7 @@ final class NextAdrGuardCliTest extends TestCase
 
         self::assertNotSame(0, $exit, 'guard must exit non-zero from main checkout');
         self::assertStringContainsString('bin/wt-new', $outputStr, 'error message must mention bin/wt-new');
-        self::assertEmpty(
+        self::assertSame([], 
             glob($t . '/ibl5/docs/decisions/[0-9][0-9][0-9][0-9]-guard-test.md'),
             'guard must not strand an ADR template file on the main checkout',
         );

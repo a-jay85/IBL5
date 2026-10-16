@@ -11,7 +11,7 @@ declare(strict_types=1);
  * ibl_playoff_series_results so the series result is correct.
  *
  * This file is a thin driver. All selection logic, every SQL statement, and the
- * embedded stat payload live in Boxscore\Season2008Finals4Restore, which is
+ * embedded stat payload live in Boxscore\Legacy\Season2008Finals4Restore, which is
  * what the DatabaseIntegration suite exercises; nothing is re-literalled here.
  *
  * Usage:
@@ -62,7 +62,7 @@ if ($envDryRun) {
 function countInsertedTeamRows(mysqli $db): int
 {
     $stmt = $db->prepare(
-        'SELECT COUNT(*) FROM `' . Boxscore\Season2008Finals4Restore::TEAM_TABLE . '`
+        'SELECT COUNT(*) FROM `' . Boxscore\Legacy\Season2008Finals4Restore::TEAM_TABLE . '`
          WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ?
            AND game_of_that_day = ?'
     );
@@ -70,10 +70,10 @@ function countInsertedTeamRows(mysqli $db): int
         throw new RuntimeException('Failed to prepare count query');
     }
 
-    $date    = Boxscore\Season2008Finals4Restore::GAME_DATE;
-    $visitor = Boxscore\Season2008Finals4Restore::VISITOR_TEAMID;
-    $home    = Boxscore\Season2008Finals4Restore::HOME_TEAMID;
-    $ordinal = Boxscore\Season2008Finals4Restore::GAME_OF_THAT_DAY;
+    $date    = Boxscore\Legacy\Season2008Finals4Restore::GAME_DATE;
+    $visitor = Boxscore\Legacy\Season2008Finals4Restore::VISITOR_TEAMID;
+    $home    = Boxscore\Legacy\Season2008Finals4Restore::HOME_TEAMID;
+    $ordinal = Boxscore\Legacy\Season2008Finals4Restore::GAME_OF_THAT_DAY;
     $stmt->bind_param('siii', $date, $visitor, $home, $ordinal);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -100,10 +100,10 @@ function countGameRows(mysqli $db, string $table): int
         throw new RuntimeException('Failed to prepare count query for ' . $table);
     }
 
-    $date    = Boxscore\Season2008Finals4Restore::GAME_DATE;
-    $visitor = Boxscore\Season2008Finals4Restore::VISITOR_TEAMID;
-    $home    = Boxscore\Season2008Finals4Restore::HOME_TEAMID;
-    $ordinal = Boxscore\Season2008Finals4Restore::GAME_OF_THAT_DAY;
+    $date    = Boxscore\Legacy\Season2008Finals4Restore::GAME_DATE;
+    $visitor = Boxscore\Legacy\Season2008Finals4Restore::VISITOR_TEAMID;
+    $home    = Boxscore\Legacy\Season2008Finals4Restore::HOME_TEAMID;
+    $ordinal = Boxscore\Legacy\Season2008Finals4Restore::GAME_OF_THAT_DAY;
     $stmt->bind_param('siii', $date, $visitor, $home, $ordinal);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -113,11 +113,11 @@ function countGameRows(mysqli $db, string $table): int
     return (int) ($row[0] ?? 0);
 }
 
-$restore = new Boxscore\Season2008Finals4Restore($mysqli_db);
+$restore = new Boxscore\Legacy\Season2008Finals4Restore($mysqli_db);
 
 $before = [
-    Boxscore\Season2008Finals4Restore::TEAM_TABLE   => countGameRows($mysqli_db, Boxscore\Season2008Finals4Restore::TEAM_TABLE),
-    Boxscore\Season2008Finals4Restore::PLAYER_TABLE => countGameRows($mysqli_db, Boxscore\Season2008Finals4Restore::PLAYER_TABLE),
+    Boxscore\Legacy\Season2008Finals4Restore::TEAM_TABLE   => countGameRows($mysqli_db, Boxscore\Legacy\Season2008Finals4Restore::TEAM_TABLE),
+    Boxscore\Legacy\Season2008Finals4Restore::PLAYER_TABLE => countGameRows($mysqli_db, Boxscore\Legacy\Season2008Finals4Restore::PLAYER_TABLE),
 ];
 
 try {

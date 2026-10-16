@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+# bin/test-mutation-diff — bin/mutation-diff control flow, with every tool stubbed.
+#
+# Each case builds a throwaway repo holding a copy of the real runner, stub
+# bin/db-test-up, stub phpunit and infection, and stub docker and php on PATH.
+# No DB, Docker, or PHP is needed, so it runs on the Linux CI runner.
+#
+# Run: bin/test-mutation-diff
+# Exit 0 when all cases pass, 1 on any failure.
+
+set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+    exit 0
+fi
+
+SRC_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+h_tmp TMP
+
+STUBS="$TMP/stubs"
+mkdir -p "$STUBS"
+cat >"$STUBS/docker" <<'EOF'
+#!/bin/sh
+echo "$*" >>"$LOG/docker.args"
+echo "${STUB_DOCKER_STATE:-true}"
+exit "${STUB_DOCKER_RC:-0}"
+EOF
+cat >"$STUBS/php" <<'EOF'
+#!/bin/sh
+if [ "$1" = "-m" ]; then
+    echo Core
+    echo mysqli
+    [ "${STUB_NO_PCOV:-0}" = 1 ] || echo pcov
+fi
+exit 0
+EOF
+chmod +x "$STUBS/docker" "$STUBS/php"
+
+CASE_N=0
+REPO=""
+LOG=""
+
+# Writes one tool stub that logs argv (one per line) and selected env.
+write_tool_stub() {
+    local path="$1" name="$2" rcvar="$3"
+    cat >"$path" <<EOF
+#!/bin/sh
+for a in "\$@"; do printf '%s\n' "\$a"; done >"\$LOG/$name.args"
+{
+    echo "DB_HOST=\${DB_HOST-}"
+    echo "DB_USER=\${DB_USER-}"
+    echo "DB_NAME=\${DB_NAME-}"
+    echo "GIT_CONFIG_KEY_0=\${GIT_CONFIG_KEY_0-}"
+    echo "GIT_CONFIG_VALUE_0=\${GIT_CONFIG_VALUE_0-}"
+} >"\$LOG/$name.env"
+if [ "$name" = phpunit ]; then
+    if [ -e "\${LOCK_UNDER_TEST:-}/pid" ]; then echo yes >"\$LOG/lock.seen"; else echo no >"\$LOG/lock.seen"; fi
+fi
+exit "\${$rcvar:-0}"
+EOF
+    chmod +x "$path"
+}
+
+# Fresh fake repo + log dir per case. Sets REPO, LOG, and exports LOG and the lock vars.
+make_repo() {
+    CASE_N=$((CASE_N + 1))
+    REPO="$TMP/case$CASE_N/repo"
+    LOG="$TMP/case$CASE_N/log"
+    mkdir -p "$LOG" "$REPO/bin/lib" "$REPO/ibl5/classes/Alpha" "$REPO/ibl5/vendor/bin"
+    h_git_repo "$REPO" --no-commit
+    printf '<?php\nclass Foo {}\n' >"$REPO/ibl5/classes/Alpha/Foo.php"
+    echo readme >"$REPO/README.md"
+    cp "$SRC_BIN/mutation-diff" "$REPO/bin/mutation-diff"
+    cp "$SRC_BIN/lib/db-helpers.sh" "$REPO/bin/lib/db-helpers.sh"
+    cat >"$REPO/bin/db-test-up" <<'EOF'
+#!/bin/sh
+echo "$*" >>"$LOG/dbtu.args"
+exit "${STUB_DBTU_RC:-0}"
+EOF
+    write_tool_stub "$REPO/ibl5/vendor/bin/phpunit" phpunit STUB_PHPUNIT_RC
+    write_tool_stub "$REPO/ibl5/vendor/bin/infection" infection STUB_INFECTION_RC
+    chmod +x "$REPO/bin/mutation-diff" "$REPO/bin/db-test-up"
+    git -C "$REPO" add -A
+    git -C "$REPO" commit -q -m base
+    git -C "$REPO" tag base
+    LOCK_DIR_UNDER_TEST="$TMP/case$CASE_N/lock"
+    export LOG
+    export MUTATION_DIFF_LOCK_DIR="$LOCK_DIR_UNDER_TEST"
+    export LOCK_UNDER_TEST="$LOCK_DIR_UNDER_TEST"
+}
+
+modify_class() {
+    printf '// changed\n' >>"$REPO/ibl5/classes/Alpha/Foo.php"
+}
+
+# run_md <args...>: runs the copied runner with stubs first on PATH.
+# Sets OUT, ERR, RC.
+run_md() {
+    local rc=0
+    OUT="$(cd "$REPO" && PATH="$STUBS:$PATH" bin/mutation-diff "$@" 2>"$TMP/stderr")" || rc=$?
+    ERR="$(cat "$TMP/stderr")"
+    RC=$rc
+}
+
+logline() {
+    if [ -f "$1" ]; then cat "$1"; else echo "<absent>"; fi
+}
+
+# 1
+make_repo
+run_md --help
+h_eq "help exits 0 with usage: exit" 0 "$RC"
+h_contains "help exits 0 with usage" "$OUT" "Usage: bin/mutation-diff"
+
+# 2
+make_repo
+run_md --bogus
+h_eq "unknown flag exits 2: exit" 2 "$RC"
+h_contains "unknown flag exits 2" "$ERR" "unknown option: --bogus"
+h_absent "unknown flag exits 2: docker not called" "$LOG/docker.args"
+
+# 3
+make_repo
+run_md base extra
+h_eq "two positionals exit 2: exit" 2 "$RC"
+h_contains "two positionals exit 2" "$ERR" "expected at most one"
+
+# 4
+make_repo
+run_md no-such-ref
+h_eq "unresolvable base exits 2: exit" 2 "$RC"
+h_contains "unresolvable base exits 2" "$ERR" "does not resolve to a commit"
+
+# 5
+make_repo
+echo more >>"$REPO/README.md"
+STUB_DOCKER_STATE=false STUB_NO_PCOV=1 run_md base
+h_eq "non-class diff skips before probes: exit" 0 "$RC"
+h_contains "non-class diff skips before probes" "$OUT" "SKIP: no added or modified classes/**/*.php"
+h_absent "non-class diff skips before probes: docker not called" "$LOG/docker.args"
+h_absent "non-class diff skips before probes: phpunit not called" "$LOG/phpunit.args"
+
+# 6
+make_repo
+git -C "$REPO" rm -q ibl5/classes/Alpha/Foo.php
+run_md base
+h_eq "deleted class only skips: exit" 0 "$RC"
+h_contains "deleted class only skips" "$OUT" "SKIP: no added or modified classes/**/*.php"
+
+# 7
+make_repo
+modify_class
+STUB_NO_PCOV=1 run_md base
+h_eq "missing pcov exits 3: exit" 3 "$RC"
+h_contains "missing pcov exits 3" "$ERR" "no pcov extension"
+h_absent "missing pcov exits 3: phpunit not called" "$LOG/phpunit.args"
+
+# 8
+make_repo
+modify_class
+STUB_DOCKER_STATE=false run_md base
+h_eq "stopped DB container exits 3: exit" 3 "$RC"
+h_contains "stopped DB container exits 3" "$ERR" "ibl5-mariadb is not running"
+h_contains "stopped DB container names the fix" "$ERR" "docker compose up -d"
+
+# 9
+make_repo
+modify_class
+STUB_DOCKER_RC=1 run_md base
+h_eq "failing docker inspect exits 3: exit" 3 "$RC"
+h_contains "failing docker inspect exits 3" "$ERR" "ibl5-mariadb is not running"
+h_contains "failing docker inspect names the fix" "$ERR" "docker compose up -d"
+
+# 10
+make_repo
+modify_class
+mkdir -p "$LOCK_DIR_UNDER_TEST"
+echo "$$" >"$LOCK_DIR_UNDER_TEST/pid"
+run_md base
+h_eq "live lock exits 4 and is kept: exit" 4 "$RC"
+h_contains "live lock exits 4 and is kept" "$ERR" "holds"
+h_contains "live lock names the holder pid" "$ERR" "pid $$"
+h_exists "live lock exits 4 and is kept: lock dir kept" "$LOCK_DIR_UNDER_TEST"
+h_absent "live lock exits 4 and is kept: db-test-up not called" "$LOG/dbtu.args"
+
+# 11
+make_repo
+modify_class
+sh -c 'exit 0' &
+DEAD_PID=$!
+wait "$DEAD_PID" 2>/dev/null || true
+mkdir -p "$LOCK_DIR_UNDER_TEST"
+echo "$DEAD_PID" >"$LOCK_DIR_UNDER_TEST/pid"
+run_md base
+h_eq "stale lock is reclaimed: exit" 0 "$RC"
+h_contains "stale lock is reclaimed" "$OUT$ERR" "reclaiming stale lock"
+h_absent "stale lock is reclaimed: lock dir gone" "$LOCK_DIR_UNDER_TEST"
+
+# 12
+make_repo
+modify_class
+mkdir -p "$LOCK_DIR_UNDER_TEST"
+run_md base
+h_eq "pidless lock exits 4: exit" 4 "$RC"
+h_contains "pidless lock exits 4" "$ERR" "no pid file"
+
+# 13
+make_repo
+modify_class
+STUB_DBTU_RC=1 run_md base
+h_eq "db-test-up failure exits 3: exit" 3 "$RC"
+h_contains "db-test-up failure exits 3" "$ERR" "db-test-up --no-run failed"
+h_absent "db-test-up failure exits 3: phpunit not called" "$LOG/phpunit.args"
+
+# 14
+make_repo
+modify_class
+run_md base
+h_eq "happy path mirrors CI flags: exit" 0 "$RC"
+h_eq "happy path: db-test-up gets --no-run" "--no-run" "$(logline "$LOG/dbtu.args")"
+h_eq "happy path: phpunit argv matches CI" \
+    "--configuration=phpunit-mutation.xml
+--coverage-clover
+coverage/clover.xml
+--coverage-xml
+coverage/coverage-xml
+--log-junit
+coverage/junit.xml
+--no-progress" "$(logline "$LOG/phpunit.args")"
+PENV="$(logline "$LOG/phpunit.env")"
+h_contains "happy path: DB_HOST" "$PENV" "DB_HOST=127.0.0.1"
+h_contains "happy path: DB_USER" "$PENV" "DB_USER=root"
+h_contains "happy path: DB_NAME is the sibling test DB" "$PENV" "DB_NAME=ibl5_test"
+h_eq "happy path: infection argv matches CI" \
+    "--configuration=infection.json5
+--coverage=coverage
+--git-diff-base=base
+--git-diff-lines
+--map-source-class-to-test
+--only-covering-test-cases
+--skip-initial-tests
+--show-mutations
+--no-progress
+--min-msi=100
+--ignore-msi-with-no-mutations" "$(logline "$LOG/infection.args")"
+IENV="$(logline "$LOG/infection.env")"
+h_contains "happy path: diff.relative key by env" "$IENV" "GIT_CONFIG_KEY_0=diff.relative"
+h_contains "happy path: diff.relative value by env" "$IENV" "GIT_CONFIG_VALUE_0=true"
+if git -C "$REPO" config --get diff.relative >/dev/null 2>&1; then
+    h_fail "happy path: shared git config untouched" "diff.relative was written to .git/config"
+else
+    h_pass "happy path: shared git config untouched"
+fi
+h_absent "happy path: lock dir gone afterward" "$LOCK_DIR_UNDER_TEST"
+h_eq "happy path: lock existed during phpunit" "yes" "$(logline "$LOG/lock.seen")"
+
+# 15
+make_repo
+modify_class
+STUB_PHPUNIT_RC=1 run_md base
+h_eq "phpunit failure stops before infection: exit" 1 "$RC"
+h_contains "phpunit failure stops before infection" "$ERR" "coverage run failed"
+h_absent "phpunit failure stops before infection: infection not called" "$LOG/infection.args"
+
+# 16
+make_repo
+modify_class
+STUB_INFECTION_RC=7 run_md base
+h_eq "infection exit code passes through" 7 "$RC"
+
+# 17
+DEFAULT_LOCK=/tmp/ibl5-mutation-diff.lock
+if [ -e "$DEFAULT_LOCK" ]; then
+    h_skip "empty lock var uses default path ($DEFAULT_LOCK exists; a real run may be active)"
+else
+    make_repo
+    modify_class
+    export MUTATION_DIFF_LOCK_DIR=
+    export LOCK_UNDER_TEST="$DEFAULT_LOCK"
+    run_md base
+    h_eq "empty lock var uses default path: exit" 0 "$RC"
+    h_eq "empty lock var uses default path" "yes" "$(logline "$LOG/lock.seen")"
+    h_absent "empty lock var uses default path: lock released" "$DEFAULT_LOCK"
+fi
+
+# 18
+make_repo
+mkdir -p "$REPO/ibl5/classes/Beta"
+printf '<?php\nclass Bar {}\n' >"$REPO/ibl5/classes/Beta/Bar.php"
+run_md base
+h_eq "untracked new class is marked intent-to-add: exit" 0 "$RC"
+h_contains "untracked new class is marked intent-to-add" "$OUT" "marked 1 untracked class file(s) intent-to-add"
+h_not_contains "untracked new class does not skip" "$OUT" "SKIP:"
+h_contains "untracked new class is visible to git diff" \
+    "$(git -C "$REPO" diff --name-only)" "ibl5/classes/Beta/Bar.php"
+
+h_done

@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Player;
+
+use Player\Views\TeamColorHelper;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * Pins the team-color fallback table: a full row returns its colors, while a
+ * missing row, empty columns and NULL columns fall back per column to
+ * D4AF37 / 1e3a5f. Provider rows must stay byte-identical across refactors.
+ */
+final class TeamColorFallbackCharacterizationTest extends TestCase
+{
+    /**
+     * @return array<string, array{0: list<array{color1: string|null, color2: string|null}>, 1: array{color1: string, color2: string}}>
+     */
+    public static function colorFallbackCases(): array
+    {
+        return [
+            'row with both colors' => [[['color1' => 'CE1141', 'color2' => '000000']], ['color1' => 'CE1141', 'color2' => '000000']],
+            'missing row' => [[], ['color1' => 'D4AF37', 'color2' => '1e3a5f']],
+            'empty color1 only' => [[['color1' => '', 'color2' => '000000']], ['color1' => 'D4AF37', 'color2' => '000000']],
+            'empty color2 only' => [[['color1' => 'CE1141', 'color2' => '']], ['color1' => 'CE1141', 'color2' => '1e3a5f']],
+            'null color1 and color2' => [[['color1' => null, 'color2' => null]], ['color1' => 'D4AF37', 'color2' => '1e3a5f']],
+        ];
+    }
+
+    /**
+     * @param list<array{color1: string|null, color2: string|null}> $mockRows
+     * @param array{color1: string, color2: string} $expected
+     */
+    #[DataProvider('colorFallbackCases')]
+    public function testColorFallbackMatchesCharacterizedTable(array $mockRows, array $expected): void
+    {
+        $row = $mockRows[0] ?? null;
+
+        self::assertSame($expected, TeamColorHelper::resolveTeamColors($row));
+    }
+}

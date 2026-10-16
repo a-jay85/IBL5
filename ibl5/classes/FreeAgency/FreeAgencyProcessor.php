@@ -34,7 +34,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     public function __construct(
         \mysqli $mysqli_db,
         TeamIdentityRepositoryInterface $commonRepo,
-        ?FreeAgencyMarketDemandCalculatorInterface $calculator = null,
+        FreeAgencyMarketDemandCalculatorInterface $calculator,
         ?FreeAgencyRepositoryInterface $repository = null,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?Season $season = null,
@@ -44,9 +44,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $this->season = $season ?? new Season($mysqli_db);
 
         $this->commonRepo = $commonRepo;
-        $this->calculator = $calculator ?? new FreeAgencyMarketDemandCalculator(
-            new FreeAgencyDemandRepository($mysqli_db)
-        );
+        $this->calculator = $calculator;
         $this->repository = $repository ?? new FreeAgencyRepository($mysqli_db);
         $this->entityLoader = $entityLoader ?? new FreeAgencyEntityLoader($mysqli_db);
         $this->capCalculatorFactory = $capCalculatorFactory ?? new FreeAgencyCapCalculatorFactory($mysqli_db);

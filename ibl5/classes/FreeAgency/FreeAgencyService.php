@@ -10,6 +10,7 @@ use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 use Player\Player;
 use Team\Team;
 use Team\Contracts\TeamQueryRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 
 /**
@@ -22,17 +23,20 @@ class FreeAgencyService implements FreeAgencyServiceInterface
     private FreeAgencyRepositoryInterface $repository;
     private FreeAgencyDemandRepositoryInterface $demandRepository;
     private \mysqli $mysqli_db;
+    private TeamIdentityRepositoryInterface $teamIdentityRepo;
     private TeamQueryRepositoryInterface $teamQueryRepo;
 
     public function __construct(
         FreeAgencyRepositoryInterface $repository,
         FreeAgencyDemandRepositoryInterface $demandRepository,
         \mysqli $mysqli_db,
+        TeamIdentityRepositoryInterface $teamIdentityRepo,
         ?TeamQueryRepositoryInterface $teamQueryRepo = null
     ) {
         $this->repository = $repository;
         $this->demandRepository = $demandRepository;
         $this->mysqli_db = $mysqli_db;
+        $this->teamIdentityRepo = $teamIdentityRepo;
         $this->teamQueryRepo = $teamQueryRepo ?? new \Team\TeamQueryRepository($mysqli_db);
     }
 
@@ -61,7 +65,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
 
         $teamColorsByTeamId = [];
         foreach (array_keys($teamIds) as $tid) {
-            $teamColorsByTeamId[$tid] = \Player\Views\TeamColorHelper::getTeamColors($this->mysqli_db, $tid);
+            $teamColorsByTeamId[$tid] = \Player\Views\TeamColorHelper::resolveTeamColors($this->teamIdentityRepo->getTeamColorRow($tid));
         }
 
         $rosterPartition = $this->buildRosterPartition($team->teamid, $season);

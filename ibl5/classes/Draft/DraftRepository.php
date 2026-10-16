@@ -187,7 +187,7 @@ class DraftRepository extends \Database\BaseMysqliRepository implements DraftRep
             "SELECT dc.*, t.teamid AS team_tid, t.color1, t.color2
             FROM `ibl_draft_class` dc
             LEFT JOIN `ibl_team_info` t ON dc.team = t.team_name
-            ORDER BY dc.drafted, dc.name"
+            ORDER BY dc.drafted, dc.name, dc.id ASC"
         );
     }
 

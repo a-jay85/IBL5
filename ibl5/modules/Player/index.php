@@ -10,13 +10,15 @@ use Repositories\TeamIdentityRepository;
 use Repositories\SalaryCapRepository;
 
 global $mysqli_db, $commonRepository, $salaryCapRepo, $httpRequest, $authService, $prefix, $user;
+$nukeCompat = new \Utilities\NukeCompat();
 /** @var \mysqli $mysqli_db */
 /** @var \Auth\AuthService $authService */
 
 $commonRepository = new TeamIdentityRepository($mysqli_db);
 $salaryCapRepo = new SalaryCapRepository($mysqli_db);
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -40,10 +42,12 @@ switch ($pa) {
     case "negotiate":
         $actionController = new PlayerActionController($mysqli_db, $commonRepository, $salaryCapRepo);
         $username = $authService->getUsername() ?? '';
+        $serverName = $_SERVER['SERVER_NAME'] ?? null;
+        $debugCookie = $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null;
         $debugSession = new \Debug\DebugSession(
             $username,
-            $_SERVER['SERVER_NAME'] ?? null,
-            $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null,
+            is_string($serverName) ? $serverName : null,
+            is_string($debugCookie) ? $debugCookie : null,
         );
         PageLayout\PageLayout::header();
         echo $actionController->renderNegotiation(
@@ -77,16 +81,16 @@ switch ($pa) {
             new \Topics\News\NewsRepository($mysqli_db),
         );
         $redirectUrl = $rookieController->handleSubmission(
-            static fn (): bool => is_user($user) === 1,
+            static fn (): bool => $nukeCompat->isUser($user),
             static fn (): bool => \Security\CsrfGuard::validateSubmittedToken('rookie_option'),
-            static function () use ($user, $authService): string {
-                cookiedecode($user);
+            static function () use ($user, $authService, $nukeCompat): string {
+                $nukeCompat->cookieDecode($user);
                 return $authService->getUsername() ?? '';
             },
             $_POST,
         );
         if ($redirectUrl === null) {
-            loginbox();
+            $nukeCompat->loginBox();
         } else {
             \Utilities\HtmxHelper::redirect($redirectUrl);
         }
@@ -100,8 +104,12 @@ switch ($pa) {
             $httpRequest,
         );
         $username = $authService->getUsername() ?? '';
+        $pageHtml = $pageController->showPage($pid, $pageView, $username);
+        if ($pageController->responseStatus() !== 200) {
+            http_response_code($pageController->responseStatus());
+        }
         PageLayout\PageLayout::header();
-        echo $pageController->showPage($pid, $pageView, $username);
+        echo $pageHtml;
         PageLayout\PageLayout::footer();
         break;
 

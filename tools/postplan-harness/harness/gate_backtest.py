@@ -87,18 +87,22 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-docs": _SINCE,
     "bin/check-prose": _SINCE,
     "bin/check-numbering": _SINCE,
+    "bin/check-engine-freeze": _SINCE,
     "bin/check-destructive-migrations": _BYPASS_SINCE,
     # Whole-tree scans with no required argument.
+    "bin/check-ci-image-registry": _TREE,
     "bin/check-claude-dir-placement": _TREE,
     "bin/check-composite-contracts": _TREE,
     "bin/check-digest-prose": _TREE,
     "bin/check-e2e-fa-offers-owner": _TREE,
     "bin/check-e2e-mutator-isolation": _TREE,
+    "bin/check-model-pins": _TREE,
     "bin/check-playwright-pinning": _TREE,
     "bin/check-registry-trigger-rows": _TREE,
     "bin/check-rules-byte-budget": _TREE,
     "bin/check-skill-arguments": _TREE,
     "bin/check-workflow-checkout": _TREE,
+    "bin/check-workflow-run-interpolation": _TREE,
     # Plan-file gates: the plan resolves from the historical PR's branch name.
     "bin/check-plan": _PLAN,
     "bin/check-plan-staleness": _PLAN,
@@ -544,9 +548,9 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
 
 
 def upsert_gate_backtest(body: str, block: str) -> str:
-    """Insert or replace the gate-backtest block in a PR body (same contract as
-    classify.upsert_tests_changed): both markers in order replace BEGIN..END inclusive,
-    otherwise append a fresh block and leave any orphan marker."""
+    """Insert or replace the gate-backtest block in a PR body. Both markers in
+    order replace BEGIN..END inclusive, otherwise append a fresh block and leave any
+    orphan marker."""
     body = body or ""
     if not body.strip():
         return block

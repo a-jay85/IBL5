@@ -18,8 +18,6 @@ use Standings\Contracts\StandingsRepositoryInterface;
  */
 class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
 {
-    private string $teamAwardsTable;
-
     /**
      * Closed allowlists for the column identifiers that callers may pass into the
      * setters/filters below. A column name is a SQL **identifier**, never a
@@ -50,7 +48,6 @@ class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->teamAwardsTable = 'ibl_team_awards';
     }
 
     /**
@@ -190,10 +187,8 @@ class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
      */
     public function upsertTeamAward(int $seasonYear, string $teamName, string $awardName): void
     {
-        // $teamAwardsTable is the fixed property 'ibl_team_awards' (constructor-set,
-        // never user input); concatenate it backticked instead of interpolating.
         $this->execute(
-            "INSERT INTO `" . $this->teamAwardsTable . "` (year, name, award)
+            "INSERT INTO `ibl_team_awards` (year, name, award)
              VALUES (?, ?, ?)
              ON DUPLICATE KEY UPDATE name = VALUES(name)",
             "iss",
@@ -216,7 +211,7 @@ class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
             "SELECT teamid, team_name, home_wins, home_losses, away_wins, away_losses
             FROM `ibl_standings`
             WHERE " . $groupingColumn . " = ?
-            ORDER BY pct DESC",
+            ORDER BY pct DESC, teamid ASC",
             "s",
             $region
         );
@@ -236,7 +231,7 @@ class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
                 "SELECT teamid, team_name, home_wins + away_wins AS wins
                 FROM `ibl_standings`
                 WHERE " . $groupingColumn . " = ?
-                ORDER BY wins DESC
+                ORDER BY wins DESC, teamid ASC
                 LIMIT 2",
                 "s",
                 $region
@@ -247,7 +242,7 @@ class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
         return $this->fetchAll(
             "SELECT teamid, team_name, home_wins + away_wins AS wins
             FROM `ibl_standings`
-            ORDER BY wins DESC
+            ORDER BY wins DESC, teamid ASC
             LIMIT 2",
             ""
         );
@@ -387,7 +382,7 @@ class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
             FROM `ibl_schedule`
             WHERE visitor_score > 0 AND home_score > 0
             AND game_date BETWEEN ? AND ?
-            ORDER BY game_date ASC",
+            ORDER BY game_date ASC, id ASC",
             "ss",
             $startDate,
             $endDate
@@ -406,7 +401,7 @@ class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
             "SELECT team_name, home_wins + away_wins AS wins
             FROM `ibl_standings`
             WHERE conference = ?
-            ORDER BY wins DESC
+            ORDER BY wins DESC, teamid ASC
             LIMIT 8",
             "s",
             $conference
@@ -425,7 +420,7 @@ class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
             "SELECT home_losses + away_losses AS losses
             FROM `ibl_standings`
             WHERE conference = ?
-            ORDER BY losses DESC
+            ORDER BY losses DESC, teamid ASC
             LIMIT 6",
             "s",
             $conference

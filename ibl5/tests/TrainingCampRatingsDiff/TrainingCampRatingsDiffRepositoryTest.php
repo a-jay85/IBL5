@@ -73,7 +73,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
         $repository->getDiffRows(2024, 'end-of-season');
 
         $queries = $this->mockDb->getExecutedQueries();
-        self::assertNotEmpty($queries);
+        self::assertNotSame([], $queries);
         $combined = implode("\n", $queries);
         self::assertStringContainsString('ibl_plr', $combined);
         self::assertStringContainsString('ibl_plr_snapshots', $combined);

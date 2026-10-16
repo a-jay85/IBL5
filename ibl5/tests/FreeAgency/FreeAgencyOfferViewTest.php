@@ -11,6 +11,11 @@ use Player\Player;
 use Team\Team;
 
 /**
+ * Refactors of the view also run a source census against master: the sorted
+ * multiset of `HtmlSanitizer::e(`, `(int) `, `name="teamname"`, `name="playerID"`,
+ * `name="offerType"`, `generateRawToken` and `renderCsrfInput()` occurrences must
+ * match, and the diff of the two listings must end in CENSUS-IDENTICAL.
+ *
  * @covers \FreeAgency\FreeAgencyOfferView
  * @phpstan-import-type NegotiationData from \FreeAgency\FreeAgencyOfferView
  */
@@ -24,34 +29,7 @@ class FreeAgencyOfferViewTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->player = self::createStub(Player::class);
-        $this->player->method('getPosition')->willReturn('PG');
-        $this->player->method('getName')->willReturn('Test Player');
-        $this->player->method('getPlayerID')->willReturn(42);
-        $this->player->method('getTeamName')->willReturn('TestTeam');
-        $this->player->method('getBirdYears')->willReturn(0);
-        $this->player->method('getYearsOfExperience')->willReturn(5);
-        $this->player->method('getRatingFieldGoalAttempts')->willReturn(1);
-        $this->player->method('getRatingFieldGoalPercentage')->willReturn(2);
-        $this->player->method('getRatingFreeThrowAttempts')->willReturn(3);
-        $this->player->method('getRatingFreeThrowPercentage')->willReturn(4);
-        $this->player->method('getRatingThreePointAttempts')->willReturn(5);
-        $this->player->method('getRatingThreePointPercentage')->willReturn(6);
-        $this->player->method('getRatingOffensiveRebounds')->willReturn(7);
-        $this->player->method('getRatingDefensiveRebounds')->willReturn(8);
-        $this->player->method('getRatingAssists')->willReturn(9);
-        $this->player->method('getRatingSteals')->willReturn(10);
-        $this->player->method('getRatingTurnovers')->willReturn(11);
-        $this->player->method('getRatingBlocks')->willReturn(12);
-        $this->player->method('getRatingFouls')->willReturn(13);
-        $this->player->method('getRatingOutsideOffense')->willReturn(14);
-        $this->player->method('getRatingDriveOffense')->willReturn(15);
-        $this->player->method('getRatingPostOffense')->willReturn(16);
-        $this->player->method('getRatingTransitionOffense')->willReturn(17);
-        $this->player->method('getRatingOutsideDefense')->willReturn(18);
-        $this->player->method('getRatingDriveDefense')->willReturn(19);
-        $this->player->method('getRatingPostDefense')->willReturn(20);
-        $this->player->method('getRatingTransitionDefense')->willReturn(21);
+        $this->player = $this->stubPlayer('Test Player', 42, 0);
 
         $this->team = self::createStub(Team::class);
         $this->team->name = 'TestTeam';
@@ -59,6 +37,40 @@ class FreeAgencyOfferViewTest extends TestCase
 
         $formView = new FreeAgencyFormView('TestTeam', $this->player);
         $this->view = new FreeAgencyOfferView($formView);
+    }
+
+    private function stubPlayer(string $name, int $playerId, int $birdYears): Player
+    {
+        $player = self::createStub(Player::class);
+        $player->method('getPosition')->willReturn('PG');
+        $player->method('getName')->willReturn($name);
+        $player->method('getPlayerID')->willReturn($playerId);
+        $player->method('getTeamName')->willReturn('TestTeam');
+        $player->method('getBirdYears')->willReturn($birdYears);
+        $player->method('getYearsOfExperience')->willReturn(5);
+        $player->method('getRatingFieldGoalAttempts')->willReturn(1);
+        $player->method('getRatingFieldGoalPercentage')->willReturn(2);
+        $player->method('getRatingFreeThrowAttempts')->willReturn(3);
+        $player->method('getRatingFreeThrowPercentage')->willReturn(4);
+        $player->method('getRatingThreePointAttempts')->willReturn(5);
+        $player->method('getRatingThreePointPercentage')->willReturn(6);
+        $player->method('getRatingOffensiveRebounds')->willReturn(7);
+        $player->method('getRatingDefensiveRebounds')->willReturn(8);
+        $player->method('getRatingAssists')->willReturn(9);
+        $player->method('getRatingSteals')->willReturn(10);
+        $player->method('getRatingTurnovers')->willReturn(11);
+        $player->method('getRatingBlocks')->willReturn(12);
+        $player->method('getRatingFouls')->willReturn(13);
+        $player->method('getRatingOutsideOffense')->willReturn(14);
+        $player->method('getRatingDriveOffense')->willReturn(15);
+        $player->method('getRatingPostOffense')->willReturn(16);
+        $player->method('getRatingTransitionOffense')->willReturn(17);
+        $player->method('getRatingOutsideDefense')->willReturn(18);
+        $player->method('getRatingDriveDefense')->willReturn(19);
+        $player->method('getRatingPostDefense')->willReturn(20);
+        $player->method('getRatingTransitionDefense')->willReturn(21);
+
+        return $player;
     }
 
     /**
@@ -145,6 +157,47 @@ class FreeAgencyOfferViewTest extends TestCase
         $this->assertStringContainsString('pa=deleteoffer', $html);
     }
 
+    public function testCsrfInputRenderedInBothForms(): void
+    {
+        $html = $this->view->render($this->baseData());
+
+        $total = substr_count($html, 'name="_csrf_token"');
+        $this->assertGreaterThanOrEqual(2, $total);
+        $this->assertSame($total, preg_match_all('/<input type="hidden" name="_csrf_token" value="[0-9a-f]{64}">/', $html));
+        $this->assertStringNotContainsString('&lt;input', $html);
+    }
+
+    public function testBirdRightsNoteRendersStrongTagForBothBranches(): void
+    {
+        $withoutBird = $this->view->render($this->baseData());
+        $this->assertStringContainsString('<li><strong>For Players who do not have Bird Rights with your team:</strong> You may add no more than ', $withoutBird);
+        $this->assertStringNotContainsString('Bird Rights Player on Your Team', $withoutBird);
+
+        $birdPlayer = self::createStub(Player::class);
+        $birdPlayer->method('getName')->willReturn('Bird Player');
+        $birdPlayer->method('getPlayerID')->willReturn(43);
+        $birdPlayer->method('getTeamName')->willReturn('TestTeam');
+        $birdPlayer->method('getBirdYears')->willReturn(3);
+        $birdPlayer->method('getYearsOfExperience')->willReturn(5);
+        $data = $this->baseData();
+        $data['player'] = $birdPlayer;
+        $withBird = (new FreeAgencyOfferView(new FreeAgencyFormView('TestTeam', $birdPlayer)))->render($data);
+        $this->assertStringContainsString('<li><strong>Bird Rights Player on Your Team:</strong> You may add no more than ', $withBird);
+        $this->assertStringNotContainsString('For Players who do not have Bird Rights', $withBird);
+
+        $this->assertStringNotContainsString('&lt;strong&gt;', $withoutBird);
+        $this->assertStringNotContainsString('&lt;strong&gt;', $withBird);
+    }
+
+    public function testPlayerRatingsRenderAsHtml(): void
+    {
+        $html = $this->view->render($this->baseData());
+
+        $this->assertStringContainsString('<table', $html);
+        $this->assertStringNotContainsString('&lt;table', $html);
+        $this->assertStringNotContainsString('&lt;td', $html);
+    }
+
     public function testSharedCsrfTokenReusedAcrossAllForms(): void
     {
         $html = $this->view->render($this->baseData());
@@ -152,7 +205,147 @@ class FreeAgencyOfferViewTest extends TestCase
         preg_match_all('/value="([0-9a-f]{64})"/', $html, $matches);
         $uniqueTokens = array_unique($matches[1]);
 
-        $this->assertNotEmpty($uniqueTokens, 'Expected at least one CSRF token in full render');
+        $this->assertNotSame([], $uniqueTokens, 'Expected at least one CSRF token in full render');
         $this->assertCount(1, $uniqueTokens, 'All forms must share exactly one CSRF token');
+    }
+
+    public function testFullRenderBirdRightsPlayerWithExistingOfferAndErrorBanner(): void
+    {
+        $birdPlayer = $this->stubPlayer('Bird Player', 43, 3);
+        $data = $this->baseData(hasExistingOffer: true);
+        $data['player'] = $birdPlayer;
+        $data['existingOffer'] = ['offer1' => 100, 'offer2' => 110, 'offer3' => 120, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0];
+        $view = new FreeAgencyOfferView(new FreeAgencyFormView('TestTeam', $birdPlayer));
+
+        $html = $view->render($data, 'Offer <rejected> & "quoted"');
+        $normalized = self::normalizeCsrf($html);
+
+        $this->assertStringContainsString('Offer &lt;rejected&gt; &amp; &quot;quoted&quot;', $normalized);
+        $this->assertStringContainsString('<strong>Bird Rights Player on Your Team:</strong>', $normalized);
+        $this->assertStringContainsString('no more than 12.5% of the amount', $normalized);
+        $this->assertStringContainsString('pa=deleteoffer', $normalized);
+        $this->assertStringEqualsFile(self::FIXTURES . '/fa-offer-full-render-bird-rights-error.golden.html', $normalized);
+    }
+
+    public function testFullRenderErrorBannerThenNoRosterSpotsEarlyReturn(): void
+    {
+        $html = $this->view->render($this->baseData(hasExistingOffer: false, rosterSpot0: 0), 'Offer <rejected> & "quoted"');
+
+        $this->assertStringContainsString('Offer &lt;rejected&gt; &amp; &quot;quoted&quot;', $html);
+        $this->assertStringContainsString('no roster spots remaining', $html);
+        $this->assertStringNotContainsString('Contract Negotiation', $html);
+        $this->assertStringEqualsFile(self::FIXTURES . '/fa-offer-error-no-roster-spots.golden.html', $html);
+    }
+
+    public function testCsrfInputDirectlyFollowsEveryFormOpenTag(): void
+    {
+        $html = $this->view->render($this->baseData(hasExistingOffer: true));
+
+        $formCount = preg_match_all('/<form\b[^>]*>/', $html);
+        $formsWithLeadingCsrf = preg_match_all(
+            '/<form\b[^>]*>\s*<input type="hidden" name="_csrf_token" value="[0-9a-f]{64}">/',
+            $html
+        );
+        $csrfInputs = substr_count($html, 'name="_csrf_token"');
+
+        $this->assertGreaterThanOrEqual(2, $formCount, 'custom offer form and delete form must both render');
+        $this->assertSame($formCount, $formsWithLeadingCsrf, 'every form opens with the CSRF input');
+        $this->assertSame($formCount, $csrfInputs, 'exactly one CSRF input per form');
+        $this->assertStringContainsString('<form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">', $html);
+        $this->assertStringContainsString('<form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">', $html);
+    }
+
+    public function testHiddenFieldSequenceInOfferAndDeleteForms(): void
+    {
+        $html = self::normalizeCsrf($this->view->render($this->baseData(hasExistingOffer: true)));
+
+        $this->assertSame(
+            [['_csrf_token', '__CSRF__'], ['teamname', 'TestTeam'], ['playerID', '42'], ['offerType', '0']],
+            self::hiddenFields($html, '/<form name="FAOffer".*?<\/form>/s')
+        );
+        $this->assertSame(
+            [['_csrf_token', '__CSRF__'], ['teamname', 'TestTeam'], ['playerID', '42']],
+            self::hiddenFields($html, '/<form method="post" action="modules\.php\?name=FreeAgency&pa=deleteoffer">.*?<\/form>/s')
+        );
+    }
+
+    /**
+     * @return list<array{string, string}>
+     */
+    private static function hiddenFields(string $html, string $formPattern): array
+    {
+        self::assertSame(1, preg_match($formPattern, $html, $form), 'form segment must match exactly once');
+        preg_match_all('/<input type="hidden" name="([A-Za-z_]+)" value="([^"]*)">/', $form[0], $m, PREG_SET_ORDER);
+        return array_map(static fn (array $match): array => [$match[1], $match[2]], $m);
+    }
+
+    public function testViewHoldsOnlyTheFormViewCollaborator(): void
+    {
+        $class = new \ReflectionClass(FreeAgencyOfferView::class);
+
+        $properties = $class->getProperties();
+        $this->assertCount(1, $properties, 'the view holds exactly one collaborator');
+        $this->assertSame('formView', $properties[0]->getName());
+        $propertyType = $properties[0]->getType();
+        $this->assertInstanceOf(\ReflectionNamedType::class, $propertyType);
+        $this->assertSame(FreeAgencyFormView::class, $propertyType->getName());
+
+        $constructor = $class->getConstructor();
+        $this->assertNotNull($constructor);
+        $this->assertCount(1, $constructor->getParameters());
+
+        $publicMethods = array_values(array_filter(
+            $class->getMethods(\ReflectionMethod::IS_PUBLIC),
+            static fn (\ReflectionMethod $m): bool => !$m->isConstructor()
+        ));
+        $this->assertCount(1, $publicMethods, 'render is the only public method');
+        $this->assertSame('render', $publicMethods[0]->getName());
+
+        foreach ($class->getMethods() as $method) {
+            foreach ($method->getParameters() as $parameter) {
+                $type = $parameter->getType();
+                if ($type instanceof \ReflectionNamedType) {
+                    $this->assertNotSame(\mysqli::class, $type->getName(), $method->getName() . ' must not take a DB handle');
+                }
+            }
+        }
+    }
+
+    public function testHostileTeamNameEscapedInEveryHiddenTeamnameInput(): void
+    {
+        $team = self::createStub(Team::class);
+        $team->name = 'Hostile "Team" <b>&';
+        $team->teamid = 1;
+        $data = $this->baseData(hasExistingOffer: true);
+        $data['team'] = $team;
+        $view = new FreeAgencyOfferView(new FreeAgencyFormView($team->name, $this->player));
+
+        $html = $view->render($data);
+
+        $teamnameInputs = substr_count($html, 'name="teamname"');
+        $escaped = substr_count($html, 'name="teamname" value="Hostile &quot;Team&quot; &lt;b&gt;&amp;"');
+        $this->assertGreaterThanOrEqual(2, $teamnameInputs, 'custom offer form and delete form both carry teamname');
+        $this->assertSame($teamnameInputs, $escaped, 'every hidden teamname value is escaped exactly once');
+        $this->assertStringNotContainsString('value="Hostile "Team"', $html);
+        $this->assertStringNotContainsString('&amp;quot;', $html);
+    }
+
+    public function testNullPlayerIdRendersAsZeroInBothHiddenPlayerIdInputs(): void
+    {
+        $player = self::createStub(Player::class);
+        $player->method('getPosition')->willReturn('PG');
+        $player->method('getName')->willReturn('No Id');
+        $player->method('getPlayerID')->willReturn(null);
+        $player->method('getTeamName')->willReturn('TestTeam');
+        $player->method('getBirdYears')->willReturn(0);
+        $player->method('getYearsOfExperience')->willReturn(5);
+        $data = $this->baseData(hasExistingOffer: true);
+        $data['player'] = $player;
+        $view = new FreeAgencyOfferView(new FreeAgencyFormView('TestTeam', $player));
+
+        $html = $view->render($data);
+
+        $this->assertSame(16, substr_count($html, 'name="playerID" value="0"'), 'both POST forms and the quick-offer forms cast a null id to 0');
+        $this->assertStringNotContainsString('name="playerID" value=""', $html);
     }
 }

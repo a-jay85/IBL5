@@ -41,7 +41,7 @@ class ApiGameRepositoryTest extends DatabaseTestCase
 
         $games = $this->repo->getGames($paginator);
 
-        self::assertNotEmpty($games);
+        self::assertNotSame([], $games);
     }
 
     public function testGetGamesRowHasExpectedStructure(): void
@@ -56,7 +56,7 @@ class ApiGameRepositoryTest extends DatabaseTestCase
 
         $games = $this->repo->getGames($paginator);
 
-        self::assertNotEmpty($games);
+        self::assertNotSame([], $games);
         $game = $games[0];
 
         self::assertArrayHasKey('game_uuid', $game);
@@ -128,6 +128,75 @@ class ApiGameRepositoryTest extends DatabaseTestCase
         }
     }
 
+    public function testGetGamesWithAllFiltersReturnsOnlyMatchingRows(): void
+    {
+        $teamUuid = $this->fetchScalarString('SELECT uuid AS v FROM `ibl_team_info` WHERE teamid = 5');
+
+        // Matches: team 5 visiting and team 5 hosting, completed, 2097-03-10.
+        $this->insertScheduleRow(2097, '2097-03-10', 5, 90, 6, 80, 0, ['uuid' => 'apigr-visit']);
+        $this->insertScheduleRow(2097, '2097-03-10', 10, 70, 5, 75, 0, ['uuid' => 'apigr-home']);
+        // Each of these misses exactly one filter.
+        $this->insertScheduleRow(2097, '2097-03-10', 7, 90, 8, 80, 0, ['uuid' => 'apigr-team']);
+        $this->insertScheduleRow(2097, '2097-03-10', 5, 0, 9, 0, 0, ['uuid' => 'apigr-status']);
+        $this->insertScheduleRow(2097, '2097-04-10', 6, 90, 5, 80, 0, ['uuid' => 'apigr-date']);
+        $this->insertScheduleRow(2096, '2096-03-10', 5, 90, 6, 80, 0, ['uuid' => 'apigr-season']);
+
+        $filters = [
+            'season' => '2097',
+            'status' => 'completed',
+            'team' => $teamUuid,
+            'date' => '2097-03-10',
+            'date_start' => '2097-03-01',
+            'date_end' => '2097-03-31',
+        ];
+        $paginator = new Paginator(['page' => '1', 'per_page' => '100'], 'game_date', ['game_date']);
+
+        $games = $this->repo->getGames($paginator, $filters);
+
+        $uuids = array_column($games, 'game_uuid');
+        sort($uuids);
+        self::assertSame(['apigr-home', 'apigr-visit'], $uuids);
+
+        // Independent count straight from the base table.
+        $expected = $this->fetchScalarString(
+            "SELECT COUNT(*) AS v FROM `ibl_schedule`
+             WHERE season_year = 2097 AND game_date = '2097-03-10'
+               AND (visitor_teamid = 5 OR home_teamid = 5)
+               AND NOT (visitor_score = 0 AND home_score = 0)
+               AND uuid LIKE 'apigr-%'"
+        );
+        self::assertSame(2, (int) $expected);
+        self::assertSame((int) $expected, $this->repo->countGames($filters));
+    }
+
+    public function testGetGamesWithNoFiltersMatchesCountGames(): void
+    {
+        $this->insertScheduleRow(2097, '2097-05-01', 1, 0, 2, 0, 0, ['uuid' => 'apigr-nf-a']);
+        $this->insertScheduleRow(2097, '2097-05-02', 3, 100, 4, 90, 0, ['uuid' => 'apigr-nf-b']);
+        $this->insertScheduleRow(2097, '2097-05-03', 5, 80, 6, 85, 0, ['uuid' => 'apigr-nf-c']);
+
+        $total = $this->repo->countGames();
+        $paginator = new Paginator(['page' => '1', 'per_page' => '100', 'order' => 'desc'], 'game_date', ['game_date']);
+
+        $games = $this->repo->getGames($paginator);
+
+        // Independent count straight from the view.
+        self::assertSame((int) $this->fetchScalarString('SELECT COUNT(*) AS v FROM `vw_schedule_upcoming`'), $total);
+        self::assertCount(min($total, 100), $games);
+        self::assertSame(['apigr-nf-c', 'apigr-nf-b', 'apigr-nf-a'], array_slice(array_column($games, 'game_uuid'), 0, 3));
+    }
+
+    private function fetchScalarString(string $sql): string
+    {
+        $result = $this->db->query($sql);
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertIsScalar($row['v']);
+
+        return (string) $row['v'];
+    }
+
     // ── countGames ──────────────────────────────────────────────
 
     public function testCountGamesReturnsPositiveCount(): void
@@ -191,7 +260,7 @@ class ApiGameRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBoxscoreTeams(1, 2, $date);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $row = $result[0];
 
         self::assertArrayHasKey('visitor_q1_points', $row);
@@ -217,7 +286,7 @@ class ApiGameRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBoxscorePlayers(1, 2, $date);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $row = $result[0];
 
         self::assertArrayHasKey('name', $row);

@@ -18,6 +18,8 @@ use Updater\StepResult;
  */
 final class RefreshIblHistStep implements PipelineStepInterface
 {
+    use MysqliExecTrait;
+
     public function __construct(
         private readonly \mysqli $db,
     ) {
@@ -42,23 +44,6 @@ final class RefreshIblHistStep implements PipelineStepInterface
         }
 
         return StepResult::success($this->getLabel(), $rowCount . ' rows');
-    }
-
-    /** Prepare and execute a zero-parameter DML statement; returns affected rows. */
-    private function dbExec(string $sql): int
-    {
-        $stmt = $this->db->prepare($sql);
-        if ($stmt === false) {
-            throw new \RuntimeException('Prepare failed: ' . $this->db->error);
-        }
-        if (!$stmt->execute()) {
-            $err = $stmt->error;
-            $stmt->close();
-            throw new \RuntimeException('Execute failed: ' . $err);
-        }
-        $affected = (int) $stmt->affected_rows;
-        $stmt->close();
-        return $affected;
     }
 
     /**

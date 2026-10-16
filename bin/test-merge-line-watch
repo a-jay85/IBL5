@@ -10,14 +10,15 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WATCH="$SCRIPT_DIR/merge-line-watch"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+h_tmp TMP
 
-FAILED=0
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 assert_match() {
     if grep -qE -- "$2" <<< "$3"; then pass "$1"; else
@@ -29,9 +30,7 @@ assert_absent() {
     else pass "$1"; fi
 }
 
-assert_eq() {
-    if [ "$2" = "$3" ]; then pass "$1"; else failcase "$1 — expected '$2', got '$3'"; fi
-}
+assert_eq() { h_eq "$1" "$2" "$3"; }
 
 GH_LOG="$TMP/gh.log"
 cat > "$TMP/gh" <<EOF
@@ -115,4 +114,4 @@ assert_eq "H: bad --interval exits 2" 2 "$RC"
 run "$WATCH" --bogus
 assert_eq "H: unknown flag exits 2" 2 "$RC"
 
-exit "$FAILED"
+h_done

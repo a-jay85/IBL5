@@ -1,7 +1,8 @@
 """Severity marker (`[BLOCKING]` / `[NOTE]`) on plan-fidelity verdict FINDINGS bullets.
 
-Characterization tests: the unchanged parser in `harness/fidelity.py` carries a marked
-bullet through whole, and an unmarked legacy bullet is still work (fail-closed).
+`harness/fidelity.py` `_verdict_findings` folds nested lines into their marked parent,
+drops `[NOTE]` groups from the hold-12 work list, keeps `[BLOCKING]` and unmarked
+bullets (fail-closed), and returns every group when a NOT READY verdict is all `[NOTE]`.
 """
 from __future__ import annotations
 
@@ -32,9 +33,8 @@ _MARKED_BODY = (
 )
 
 _MARKED_ITEMS = [
-    "- [BLOCKING] Phase 2 never edited `a.py`; restore the planned change.",
+    "- [BLOCKING] Phase 2 never edited `a.py`; restore the planned change.\n"
     "- nested detail line for the first finding",
-    "- [NOTE] The PR body says 3 files; the diff touches 4.",
     "- [BLOCKING] Check 5 row 4 names `test_x`, absent from the diff.",
 ]
 
@@ -52,14 +52,14 @@ def _verdict(word, body):
     )
 
 
-def test_marked_bullets_survive_verdict_findings_in_order(tmp_path):
-    """Catches a bullet regex or stripper that eats a leading `[...]` token."""
+def test_note_groups_dropped_and_nested_lines_fold_into_blocking_parent(tmp_path):
+    """Catches a [NOTE] group reaching the fixer, or a nested line split from its marked parent."""
     path = _write(tmp_path, _verdict("NOT READY", _MARKED_BODY))
     assert fidelity._verdict_findings(path) == _MARKED_ITEMS
 
 
-def test_marked_bullets_reach_build_work_list_as_hold_12(tmp_path):
-    """Catches build_work_list dropping or rewriting marked items."""
+def test_build_work_list_carries_only_blocking_groups_as_hold_12(tmp_path):
+    """Catches build_work_list re-adding [NOTE] text or splitting a group into two items."""
     path = _write(tmp_path, _verdict("NOT READY", _MARKED_BODY))
     assert fidelity.build_work_list(path, [], [], []) == [
         {"hold": "12", "text": item} for item in _MARKED_ITEMS
@@ -76,14 +76,13 @@ def test_unmarked_bullet_still_returned_fail_closed(tmp_path):
     ]
 
 
-def test_mixed_marked_and_unmarked_bullets_all_returned(tmp_path):
-    """Catches dropping unmarked bullets once any marked bullet exists."""
+def test_mixed_verdict_keeps_unmarked_and_drops_note(tmp_path):
+    """Catches dropping unmarked bullets once any marked bullet exists, or keeping [NOTE]."""
     body = "- [BLOCKING] one\n- unlabelled two\n- [NOTE] three\n"
     path = _write(tmp_path, _verdict("NOT READY", body))
     assert fidelity._verdict_findings(path) == [
         "- [BLOCKING] one",
         "- unlabelled two",
-        "- [NOTE] three",
     ]
 
 
@@ -93,6 +92,95 @@ def test_ready_with_notes_note_bullets_yield_no_work(tmp_path):
     path = _write(tmp_path, _verdict("READY WITH NOTES", body))
     assert fidelity._verdict_findings(path) == []
     assert fidelity.build_work_list(path, [], [], []) == []
+
+
+def test_unmarked_parent_keeps_nested_bullets_as_separate_items(tmp_path):
+    """Catches grouping nested lines under an UNMARKED parent (legacy output drift)."""
+    body = (
+        "- Phase 2 never edited a.py.\n"
+        "  - nested detail under an unmarked parent\n"
+        "- second unmarked finding\n"
+    )
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- Phase 2 never edited a.py.",
+        "- nested detail under an unmarked parent",
+        "- second unmarked finding",
+    ]
+
+
+def test_non_exact_marker_is_unmarked_and_kept(tmp_path):
+    """Catches a case-insensitive or bold-tolerant marker regex dropping a finding."""
+    body = (
+        "- [note] lower-case marker is not a marker\n"
+        "  - nested under the lower-case bullet\n"
+        "- **[NOTE]** bold-wrapped marker is not a marker\n"
+    )
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- [note] lower-case marker is not a marker",
+        "- nested under the lower-case bullet",
+        "- **[NOTE]** bold-wrapped marker is not a marker",
+    ]
+
+
+def test_all_note_not_ready_returns_every_group_fail_closed(tmp_path):
+    """Catches the filter returning [] for an all-[NOTE] NOT READY verdict."""
+    body = "- [NOTE] first\n  - detail one\n- [NOTE] second\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- [NOTE] first\n- detail one",
+        "- [NOTE] second",
+    ]
+    assert fidelity.build_work_list(path, [], [], []) != []
+
+
+def test_note_nested_under_unmarked_parent_is_kept(tmp_path):
+    """Catches a marker on a nested line being honored under an unmarked parent."""
+    body = "- unmarked parent\n  - [NOTE] nested note line\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- unmarked parent",
+        "- [NOTE] nested note line",
+    ]
+
+
+def test_note_group_closes_at_sibling_so_unmarked_sibling_kept(tmp_path):
+    """Catches a group that never closes and swallows the next top-level bullet."""
+    body = "- [NOTE] a note\n  - its detail\n- unmarked sibling after the note\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == ["- unmarked sibling after the note"]
+
+
+def test_deeper_nesting_all_attaches_to_marked_head(tmp_path):
+    """Catches attaching only one level of nesting, or comparing against the last line's indent."""
+    body = (
+        "- [BLOCKING] head\n"
+        "  - level one\n"
+        "    - level two\n"
+        "  - level one again\n"
+        "- [NOTE] dropped\n"
+    )
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- [BLOCKING] head\n- level one\n- level two\n- level one again",
+    ]
+
+
+def test_numbered_marked_bullet_groups_and_note_drops(tmp_path):
+    """Catches a marker regex that only accepts `-`/`*` bullet prefixes."""
+    body = "1. [BLOCKING] numbered head\n   - numbered detail\n2. [NOTE] numbered note\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "1. [BLOCKING] numbered head\n- numbered detail",
+    ]
+
+
+def test_marker_without_trailing_boundary_is_unmarked(tmp_path):
+    """Catches a marker regex missing its trailing whitespace-or-end lookahead."""
+    body = "- [NOTE]: glued colon is not a marker\n- [NOTE] real note\n"
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == ["- [NOTE]: glued colon is not a marker"]
 
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))

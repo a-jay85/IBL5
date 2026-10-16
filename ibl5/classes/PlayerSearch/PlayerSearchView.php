@@ -21,65 +21,90 @@ class PlayerSearchView implements PlayerSearchViewInterface
      */
     public function renderSearchForm(array $params): string
     {
-        $positions = \League\JsbConstants::PLAYER_POSITIONS;
-
-        /**
-         * Helper to extract a form field value as string for HTML display
-         *
-         * @param mixed $value
-         * @return string
-         */
-        $str = static function (mixed $value): string {
-            if ($value === null) {
-                return '';
-            }
-            if (is_int($value) || is_string($value)) {
-                return (string) $value;
-            }
-            return '';
-        };
-
-        // Extract form parameters with defaults
-        $pos = $str($params['pos'] ?? null);
-        $age = $str($params['age'] ?? null);
-        $talent = $str($params['talent'] ?? null);
-        $skill = $str($params['skill'] ?? null);
-        $intangibles = $str($params['intangibles'] ?? null);
-        $Clutch = $str($params['Clutch'] ?? null);
-        $Consistency = $str($params['Consistency'] ?? null);
-        $college = $str($params['college'] ?? null);
+        $fields = $this->extractSearchFormFields($params);
         $active = $params['active'] ?? null;
-        $exp = $str($params['exp'] ?? null);
-        $exp_max = $str($params['exp_max'] ?? null);
-        $bird = $str($params['bird'] ?? null);
-        $bird_max = $str($params['bird_max'] ?? null);
-        $search_name = $str($params['search_name'] ?? null);
 
-        // Rating values
-        $r_fga = $str($params['r_fga'] ?? null);
-        $r_fgp = $str($params['r_fgp'] ?? null);
-        $r_fta = $str($params['r_fta'] ?? null);
-        $r_ftp = $str($params['r_ftp'] ?? null);
-        $r_3ga = $str($params['r_3ga'] ?? null);
-        $r_3gp = $str($params['r_3gp'] ?? null);
-        $r_orb = $str($params['r_orb'] ?? null);
-        $r_drb = $str($params['r_drb'] ?? null);
-        $r_ast = $str($params['r_ast'] ?? null);
-        $r_stl = $str($params['r_stl'] ?? null);
-        $r_blk = $str($params['r_blk'] ?? null);
-        $r_to = $str($params['r_to'] ?? null);
-        $r_foul = $str($params['r_foul'] ?? null);
+        return $this->renderSearchFormIntro()
+            . $this->renderBasicsFieldset($fields, $active)
+            . $this->renderYearsFieldset($fields)
+            . $this->renderStatisticalRatingsFieldset($fields)
+            . $this->renderOffensiveDefensiveRatingsFieldset($fields)
+            . $this->renderMiscAttributesFieldset($fields)
+            . $this->renderSearchFormActions();
+    }
 
-        // Skill values
-        $oo = $str($params['oo'] ?? null);
-        $do = $str($params['do'] ?? null);
-        $po = $str($params['po'] ?? null);
-        $to = $str($params['to'] ?? null);
-        $od = $str($params['od'] ?? null);
-        $dd = $str($params['dd'] ?? null);
-        $pd = $str($params['pd'] ?? null);
-        $td = $str($params['td'] ?? null);
+    /**
+     * Helper to extract a form field value as string for HTML display
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private static function fieldToString(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        if (is_int($value) || is_string($value)) {
+            return (string) $value;
+        }
+        return '';
+    }
 
+    /**
+     * Extract form parameters as display strings, defaulting missing values to ''.
+     *
+     * `active` is excluded: the template compares it strictly against 1 and 0.
+     *
+     * @param array<string, mixed> $params
+     * @return array<string, string>
+     */
+    private function extractSearchFormFields(array $params): array
+    {
+        return [
+            // Extract form parameters with defaults
+            'pos' => self::fieldToString($params['pos'] ?? null),
+            'age' => self::fieldToString($params['age'] ?? null),
+            'talent' => self::fieldToString($params['talent'] ?? null),
+            'skill' => self::fieldToString($params['skill'] ?? null),
+            'intangibles' => self::fieldToString($params['intangibles'] ?? null),
+            'Clutch' => self::fieldToString($params['Clutch'] ?? null),
+            'Consistency' => self::fieldToString($params['Consistency'] ?? null),
+            'college' => self::fieldToString($params['college'] ?? null),
+            'exp' => self::fieldToString($params['exp'] ?? null),
+            'exp_max' => self::fieldToString($params['exp_max'] ?? null),
+            'bird' => self::fieldToString($params['bird'] ?? null),
+            'bird_max' => self::fieldToString($params['bird_max'] ?? null),
+            'search_name' => self::fieldToString($params['search_name'] ?? null),
+
+            // Rating values
+            'r_fga' => self::fieldToString($params['r_fga'] ?? null),
+            'r_fgp' => self::fieldToString($params['r_fgp'] ?? null),
+            'r_fta' => self::fieldToString($params['r_fta'] ?? null),
+            'r_ftp' => self::fieldToString($params['r_ftp'] ?? null),
+            'r_3ga' => self::fieldToString($params['r_3ga'] ?? null),
+            'r_3gp' => self::fieldToString($params['r_3gp'] ?? null),
+            'r_orb' => self::fieldToString($params['r_orb'] ?? null),
+            'r_drb' => self::fieldToString($params['r_drb'] ?? null),
+            'r_ast' => self::fieldToString($params['r_ast'] ?? null),
+            'r_stl' => self::fieldToString($params['r_stl'] ?? null),
+            'r_blk' => self::fieldToString($params['r_blk'] ?? null),
+            'r_to' => self::fieldToString($params['r_to'] ?? null),
+            'r_foul' => self::fieldToString($params['r_foul'] ?? null),
+
+            // Skill values
+            'oo' => self::fieldToString($params['oo'] ?? null),
+            'do' => self::fieldToString($params['do'] ?? null),
+            'po' => self::fieldToString($params['po'] ?? null),
+            'to' => self::fieldToString($params['to'] ?? null),
+            'od' => self::fieldToString($params['od'] ?? null),
+            'dd' => self::fieldToString($params['dd'] ?? null),
+            'pd' => self::fieldToString($params['pd'] ?? null),
+            'td' => self::fieldToString($params['td'] ?? null),
+        ];
+    }
+
+    private function renderSearchFormIntro(): string
+    {
         ob_start();
         ?>
 <p class="text-center">Age is less than or equal to the age entered. All other fields are greater than or equal to the amount entered.</p>
@@ -87,6 +112,20 @@ class PlayerSearchView implements PlayerSearchViewInterface
 (e.g., entering "Dard" will match with "Darden" and "Bedard").</p>
 
 <form name="Search" method="post" action="modules.php?name=PlayerSearch" class="ibl-filter-form max-w-3xl mx-auto">
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array<string, string> $fields
+     */
+    private function renderBasicsFieldset(array $fields, mixed $active): string
+    {
+        $positions = \League\JsbConstants::PLAYER_POSITIONS;
+        $pos = $fields['pos'];
+        $search_name = $fields['search_name'];
+        ob_start();
+        ?>
     <fieldset class="ibl-filter-fieldset">
         <legend>Basics</legend>
         <div class="ibl-filter-form__row">
@@ -113,6 +152,22 @@ class PlayerSearchView implements PlayerSearchViewInterface
         </div>
     </fieldset>
 
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array<string, string> $fields
+     */
+    private function renderYearsFieldset(array $fields): string
+    {
+        $age = $fields['age'];
+        $exp = $fields['exp'];
+        $exp_max = $fields['exp_max'];
+        $bird = $fields['bird'];
+        $bird_max = $fields['bird_max'];
+        ob_start();
+        ?>
     <fieldset class="ibl-filter-fieldset">
         <legend>Years</legend>
         <div class="ibl-filter-form__row">
@@ -139,6 +194,30 @@ class PlayerSearchView implements PlayerSearchViewInterface
         </div>
     </fieldset>
 
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array<string, string> $fields
+     */
+    private function renderStatisticalRatingsFieldset(array $fields): string
+    {
+        $r_fga = $fields['r_fga'];
+        $r_fgp = $fields['r_fgp'];
+        $r_fta = $fields['r_fta'];
+        $r_ftp = $fields['r_ftp'];
+        $r_3ga = $fields['r_3ga'];
+        $r_3gp = $fields['r_3gp'];
+        $r_orb = $fields['r_orb'];
+        $r_drb = $fields['r_drb'];
+        $r_ast = $fields['r_ast'];
+        $r_stl = $fields['r_stl'];
+        $r_blk = $fields['r_blk'];
+        $r_to = $fields['r_to'];
+        $r_foul = $fields['r_foul'];
+        ob_start();
+        ?>
     <fieldset class="ibl-filter-fieldset">
         <legend>Statistical Ratings</legend>
         <div class="ibl-filter-form__row mb-2">
@@ -199,6 +278,25 @@ class PlayerSearchView implements PlayerSearchViewInterface
         </div>
     </fieldset>
 
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array<string, string> $fields
+     */
+    private function renderOffensiveDefensiveRatingsFieldset(array $fields): string
+    {
+        $oo = $fields['oo'];
+        $do = $fields['do'];
+        $po = $fields['po'];
+        $to = $fields['to'];
+        $od = $fields['od'];
+        $dd = $fields['dd'];
+        $pd = $fields['pd'];
+        $td = $fields['td'];
+        ob_start();
+        ?>
     <fieldset class="ibl-filter-fieldset">
         <legend>Offensive/Defensive Ratings</legend>
         <div class="ibl-filter-form__row mb-2">
@@ -239,6 +337,23 @@ class PlayerSearchView implements PlayerSearchViewInterface
         </div>
     </fieldset>
 
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array<string, string> $fields
+     */
+    private function renderMiscAttributesFieldset(array $fields): string
+    {
+        $talent = $fields['talent'];
+        $skill = $fields['skill'];
+        $intangibles = $fields['intangibles'];
+        $Clutch = $fields['Clutch'];
+        $Consistency = $fields['Consistency'];
+        $college = $fields['college'];
+        ob_start();
+        ?>
     <fieldset class="ibl-filter-fieldset">
         <legend>Misc. Attributes</legend>
         <div class="ibl-filter-form__row mb-2">
@@ -271,6 +386,14 @@ class PlayerSearchView implements PlayerSearchViewInterface
         </div>
     </fieldset>
 
+<?php
+        return (string) ob_get_clean();
+    }
+
+    private function renderSearchFormActions(): string
+    {
+        ob_start();
+        ?>
     <div class="ibl-filter-form__row gap-3">
         <button type="button" class="ibl-btn ibl-btn--ghost" onclick="resetPlayerSearch();">Reset</button>
         <button type="submit" class="ibl-filter-form__submit">Search for Player</button>

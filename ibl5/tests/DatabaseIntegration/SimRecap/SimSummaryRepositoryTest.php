@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration\SimRecap;
 
 use PHPUnit\Framework\Attributes\Group;
+use SimRecap\ParkPolicy;
 use SimRecap\SimSummaryRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
@@ -37,7 +38,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         $this->repo->queuePendingIfAbsent(999002);
         $this->repo->queuePendingIfAbsent(999001);
 
-        $claimed = $this->repo->claimNextPending();
+        $claimed = $this->repo->claimNextPending('actions');
         self::assertSame(999001, $claimed);
 
         $row = $this->repo->find(999001);
@@ -50,7 +51,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
     public function testMarkDoneStoresTextAndThemes(): void
     {
         $this->repo->queuePendingIfAbsent(999001);
-        $this->repo->claimPending(999001);
+        $this->repo->claimPending(999001, 'actions');
 
         $gameRecap = $this->gameRecap(sortOrder: 0, gameOfThatDay: 1);
         $this->repo->markDone(999001, 'Intro.', 'Outro.', 'Recap prose.', [$gameRecap], '["comeback"]');
@@ -100,7 +101,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
     public function testQueuePendingIfAbsentIsIdempotent(): void
     {
         $this->repo->queuePendingIfAbsent(999001);
-        $this->repo->claimPending(999001);
+        $this->repo->claimPending(999001, 'actions');
 
         $created = $this->repo->queuePendingIfAbsent(999001);
         self::assertFalse($created);
@@ -114,16 +115,16 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
     {
         $this->repo->queuePendingIfAbsent(999001);
 
-        $first = $this->repo->claimPending(999001);
+        $first = $this->repo->claimPending(999001, 'actions');
         self::assertTrue($first);
 
-        $second = $this->repo->claimPending(999001);
+        $second = $this->repo->claimPending(999001, 'actions');
         self::assertFalse($second);
     }
 
     public function testClaimNextPendingReturnsNullWhenQueueIsEmpty(): void
     {
-        self::assertNull($this->repo->claimNextPending());
+        self::assertNull($this->repo->claimNextPending('actions'));
     }
 
     public function testClaimNextPendingSkipsABlockedRow(): void
@@ -135,7 +136,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         );
         $this->repo->queuePendingIfAbsent(999002);
 
-        $claimed = $this->repo->claimNextPending();
+        $claimed = $this->repo->claimNextPending('actions');
         self::assertSame(999002, $claimed);
 
         // Part 2 (boundary): blocked_until = NOW() should be eligible (<=)
@@ -145,64 +146,345 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
             "UPDATE `ibl_sim_summaries` SET `blocked_until` = NOW() WHERE `sim` = 999003"
         );
 
-        $boundary = $this->repo->claimNextPending();
+        $boundary = $this->repo->claimNextPending('actions');
         self::assertSame(999003, $boundary, 'blocked_until = NOW() must be eligible for claiming');
     }
 
-    public function testParkOrFailParksBelowTheCeiling(): void
+    // ── Cause-routed park ──────────────────────────────────────────────────────
+
+    public function testParkFlakyRetriesNowOnSameHost(): void
     {
-        $this->repo->queuePendingIfAbsent(999001);
-        $this->repo->claimPending(999001);
+        $this->claimRow(999001, 'actions');
+        $first = $this->repo->parkByCause(999001, 'actions', 'flaky', null);
+        self::assertSame('retry_now', $first['outcome']);
+        self::assertSame('actions', $first['route']);
 
-        $result = $this->repo->parkOrFail(999001);
-        self::assertSame('pending', $result);
+        $this->repo->claimPending(999001, 'actions');
+        $second = $this->repo->parkByCause(999001, 'actions', 'flaky', null);
+        self::assertSame('retry_now', $second['outcome'], 'n=2 still retries on the same host');
+        self::assertSame('actions', $second['route']);
 
-        $row = $this->repo->find(999001);
-        self::assertNotNull($row);
+        $row = $this->findRow(999001);
         self::assertSame('pending', $row['status']);
+        self::assertSame('actions', $row['route']);
+        self::assertNull($row['blocked_until']);
+        self::assertSame(2, $row['flaky_failures']);
+        self::assertSame('flaky', $row['last_cause']);
         self::assertNull($row['claimed_at']);
-        self::assertNotNull($row['blocked_until'], 'blocked_until must be set after parking');
     }
 
-    public function testParkOrFailFailsAtTheCeiling(): void
+    public function testParkFlakyThirdFailureHandsToOtherHost(): void
     {
-        // Queue and claim once (attempts=1)
-        $this->repo->queuePendingIfAbsent(999001);
-        $this->repo->claimPending(999001);
+        $this->claimRow(999001, 'actions');
+        $this->setColumns(999001, '`flaky_failures` = 2');
 
-        // Reset to pending manually so we can claim again
-        $this->db->query(
-            "UPDATE `ibl_sim_summaries` SET `status` = 'pending', `claimed_at` = NULL WHERE `sim` = 999001"
-        );
+        $result = $this->repo->parkByCause(999001, 'actions', 'flaky', null);
+        self::assertSame('handed', $result['outcome']);
+        self::assertSame('mac', $result['route']);
+        self::assertSame('mac', $this->findRow(999001)['route']);
+    }
 
-        // Claim again (attempts=2, at ceiling)
-        $this->repo->claimPending(999001);
+    public function testParkFlakyBackoffThenTerminalAtSix(): void
+    {
+        $this->claimRow(999001, 'mac');
+        $this->setColumns(999001, '`flaky_failures` = 4');
 
-        $result = $this->repo->parkOrFail(999001);
-        self::assertSame('failed', $result, 'At attempts >= 2 ceiling, parkOrFail must fail the row');
+        $fifth = $this->repo->parkByCause(999001, 'mac', 'flaky', null);
+        self::assertSame('backoff', $fifth['outcome']);
+        $row = $this->findRow(999001);
+        self::assertSame('pending', $row['status']);
+        self::assertSame('any', $row['route']);
+        self::assertNotNull($row['blocked_until']);
 
-        $row = $this->repo->find(999001);
-        self::assertNotNull($row);
-        self::assertSame('failed', $row['status']);
+        $this->setColumns(999001, '`blocked_until` = NULL');
+        self::assertTrue($this->repo->claimPending(999001, 'mac'));
+        $sixth = $this->repo->parkByCause(999001, 'mac', 'flaky', null);
+        self::assertSame('failed', $sixth['outcome']);
+        self::assertSame('failed', $this->findRow(999001)['status']);
+    }
+
+    public function testParkUsageLimitWaitsUntilResetWithoutHandOff(): void
+    {
+        $this->claimRow(999001, 'actions');
+        $reset = $this->dbNow() + 1800;
+
+        $result = $this->repo->parkByCause(999001, 'actions', 'usage_limit', $reset);
+        self::assertSame('waiting', $result['outcome']);
+        self::assertSame('any', $result['route'], 'A usage limit is never handed to the other host');
+        $row = $this->findRow(999001);
+        self::assertSame('any', $row['route']);
+        self::assertSame(1, $row['usage_waits']);
+        self::assertSame($reset + 120, $this->blockedEpoch(999001));
+    }
+
+    /**
+     * A usage-limit wait refunds the claim (attempts-1, the LEAST term in
+     * parkByCause). Dropping the refund leaves attempts at 1 and fails here.
+     */
+    public function testParkUsageLimitDoesNotCountAttempt(): void
+    {
+        $this->claimRow(999001, 'actions');
+        self::assertSame(1, $this->findRow(999001)['attempts']);
+
+        $this->repo->parkByCause(999001, 'actions', 'usage_limit', $this->dbNow() + 600);
+        self::assertSame(0, $this->findRow(999001)['attempts']);
+    }
+
+    public function testParkUsageLimitOutOfRangeResetUsesDefault(): void
+    {
+        $this->claimRow(999001, 'actions');
+        $now = $this->dbNow();
+        $this->repo->parkByCause(999001, 'actions', 'usage_limit', $now - 100);
+        self::assertEqualsWithDelta($now + 3600, $this->blockedEpoch(999001), 5, 'A reset in the past uses the 60-minute default');
+
+        $this->setColumns(999001, '`blocked_until` = NULL');
+        self::assertTrue($this->repo->claimPending(999001, 'actions'));
+        $now = $this->dbNow();
+        $this->repo->parkByCause(999001, 'actions', 'usage_limit', $now + 7 * 3600);
+        self::assertEqualsWithDelta($now + 3600, $this->blockedEpoch(999001), 5, 'A reset more than 6 h out uses the 60-minute default');
+    }
+
+    public function testParkUsageLimitPastWindowIsTerminal(): void
+    {
+        $this->claimRow(999001, 'actions');
+        $this->setColumns(999001, '`created_at` = NOW() - INTERVAL 1410 MINUTE');
+
+        $result = $this->repo->parkByCause(999001, 'actions', 'usage_limit', null);
+        self::assertSame('failed', $result['outcome'], 'A wait that ends past the 24 h window is terminal');
+        self::assertSame('failed', $this->findRow(999001)['status']);
+    }
+
+    public function testParkAuthHandsToOtherHost(): void
+    {
+        $this->claimRow(999001, 'actions');
+
+        $result = $this->repo->parkByCause(999001, 'actions', 'auth', null);
+        self::assertSame('handed', $result['outcome']);
+        self::assertSame('mac', $result['route']);
+        $row = $this->findRow(999001);
+        self::assertSame('mac', $row['route']);
+        self::assertSame('actions', $row['auth_failed_hosts']);
         self::assertNull($row['blocked_until']);
     }
 
-    public function testParkOrFailReturnsNoneWhenNotGenerating(): void
+    public function testParkAuthOnBothHostsIsTerminal(): void
+    {
+        $this->claimRow(999001, 'actions');
+        $this->repo->parkByCause(999001, 'actions', 'auth', null);
+
+        self::assertTrue($this->repo->claimPending(999001, 'mac'));
+        $result = $this->repo->parkByCause(999001, 'mac', 'auth', null);
+        self::assertSame('failed', $result['outcome']);
+        $row = $this->findRow(999001);
+        self::assertSame('failed', $row['status']);
+        self::assertSame('mac,actions', $row['auth_failed_hosts']);
+    }
+
+    public function testParkTransportHandsOffThenBacksOff(): void
+    {
+        $this->claimRow(999001, 'actions');
+        $this->setColumns(999001, '`transport_failures` = 2');
+        self::assertSame('handed', $this->repo->parkByCause(999001, 'actions', 'transport', null)['outcome'], 'n=3 hands off');
+
+        self::assertTrue($this->repo->claimPending(999001, 'mac'));
+        $fourth = $this->repo->parkByCause(999001, 'mac', 'transport', null);
+        self::assertSame('backoff', $fourth['outcome'], 'n=4 backs off');
+        self::assertSame('any', $fourth['route']);
+
+        $this->setColumns(999001, '`blocked_until` = NULL, `transport_failures` = 6');
+        self::assertTrue($this->repo->claimPending(999001, 'actions'));
+        self::assertSame('backoff', $this->repo->parkByCause(999001, 'actions', 'transport', null)['outcome'], 'n=7 backs off');
+
+        $this->setColumns(999001, '`blocked_until` = NULL');
+        self::assertTrue($this->repo->claimPending(999001, 'actions'));
+        self::assertSame('failed', $this->repo->parkByCause(999001, 'actions', 'transport', null)['outcome'], 'n=8 is terminal');
+    }
+
+    public function testParkPromptIsTerminal(): void
+    {
+        $this->claimRow(999001, 'actions');
+
+        self::assertSame('failed', $this->repo->parkByCause(999001, 'actions', 'prompt', null)['outcome']);
+        $row = $this->findRow(999001);
+        self::assertSame('failed', $row['status']);
+        self::assertSame('prompt', $row['last_cause']);
+    }
+
+    public function testParkPastWindowIsTerminal(): void
+    {
+        $this->claimRow(999001, 'actions');
+        $this->setColumns(999001, '`created_at` = NOW() - INTERVAL 25 HOUR');
+
+        self::assertSame('failed', $this->repo->parkByCause(999001, 'actions', 'flaky', null)['outcome']);
+    }
+
+    public function testParkAttemptBackstopIsTerminal(): void
+    {
+        $this->queueRow(999001);
+        $this->setColumns(999001, '`attempts` = 18');
+        self::assertTrue($this->repo->claimPending(999001, 'actions'));
+        self::assertSame('retry_now', $this->repo->parkByCause(999001, 'actions', 'flaky', null)['outcome'], 'attempts 19 is not terminal');
+
+        $this->setColumns(999001, '`flaky_failures` = 0');
+        self::assertTrue($this->repo->claimPending(999001, 'actions'));
+        self::assertSame('failed', $this->repo->parkByCause(999001, 'actions', 'flaky', null)['outcome'], 'attempts 20 is terminal');
+    }
+
+    public function testParkByOtherHostReturnsNone(): void
+    {
+        $this->claimRow(999001, 'actions');
+        $before = $this->findRow(999001);
+
+        $result = $this->repo->parkByCause(999001, 'mac', 'flaky', null);
+        self::assertSame('none', $result['outcome']);
+        self::assertSame($before, $this->findRow(999001));
+    }
+
+    public function testParkReturnsNoneWhenNotGenerating(): void
     {
         $this->repo->markDone(999001, 'i', 'o', 'text', [], null);
 
-        $result = $this->repo->parkOrFail(999001);
-        self::assertSame('none', $result);
+        self::assertSame('none', $this->repo->parkByCause(999001, 'actions', 'flaky', null)['outcome']);
+        self::assertSame('done', $this->findRow(999001)['status'], 'A lost claim must not touch a done row');
+    }
 
-        $row = $this->repo->find(999001);
-        self::assertNotNull($row);
-        self::assertSame('done', $row['status'], 'parkOrFail(none) must not touch a done row');
+    public function testParkRejectsUnknownCauseWithoutWrite(): void
+    {
+        $this->claimRow(999001, 'actions');
+        $before = $this->findRow(999001);
+
+        $threw = false;
+        try {
+            $this->repo->parkByCause(999001, 'actions', 'bogus', null);
+        } catch (\InvalidArgumentException) {
+            $threw = true;
+        }
+        self::assertTrue($threw, 'An unknown cause must throw');
+        self::assertSame($before, $this->findRow(999001));
+    }
+
+    public function testClaimRejectsUnknownHostWithoutWrite(): void
+    {
+        $this->queueRow(999001);
+        $before = $this->findRow(999001);
+
+        $threw = 0;
+        try {
+            $this->repo->claimPending(999001, 'linux');
+        } catch (\InvalidArgumentException) {
+            $threw++;
+        }
+        try {
+            $this->repo->claimNextPending('linux');
+        } catch (\InvalidArgumentException) {
+            $threw++;
+        }
+        self::assertSame(2, $threw, 'An unknown host must throw on claim and claim-next');
+        self::assertSame($before, $this->findRow(999001));
+    }
+
+    // ── Host-scoped claim ──────────────────────────────────────────────────────
+
+    public function testActionsClaimsAnyAndActionsRoutes(): void
+    {
+        $this->queueRow(999001);
+        $this->queueRow(999002);
+        $this->setColumns(999002, "`route` = 'actions', `routed_at` = NOW()");
+
+        self::assertSame(999001, $this->repo->claimNextPending('actions'));
+        self::assertSame(999002, $this->repo->claimNextPending('actions'));
+        self::assertSame('actions', $this->findRow(999002)['claimed_by']);
+    }
+
+    public function testActionsRefusesMacRouteBeforeFifteenMinutes(): void
+    {
+        $this->queueRow(999001);
+        $this->setColumns(999001, "`route` = 'mac', `routed_at` = NOW() - INTERVAL 14 MINUTE");
+
+        self::assertNull($this->repo->claimNextPending('actions'));
+    }
+
+    public function testActionsTakesBackMacRouteAfterFifteenMinutes(): void
+    {
+        $this->queueRow(999001);
+        $this->setColumns(999001, "`route` = 'mac', `routed_at` = NOW() - INTERVAL 16 MINUTE");
+
+        self::assertSame(999001, $this->repo->claimNextPending('actions'));
+    }
+
+    public function testMacRefusesPendingRowBeforeFortyFiveMinutes(): void
+    {
+        $this->queueRow(999001);
+        $this->setColumns(999001, '`created_at` = NOW() - INTERVAL 44 MINUTE');
+
+        self::assertNull($this->repo->claimNextPending('mac'));
+    }
+
+    public function testMacBackupClaimsPendingRowAfterFortyFiveMinutes(): void
+    {
+        $this->queueRow(999001);
+        $this->setColumns(999001, '`created_at` = NOW() - INTERVAL 46 MINUTE');
+
+        self::assertSame(999001, $this->repo->claimNextPending('mac'));
+        self::assertSame('mac', $this->findRow(999001)['claimed_by']);
+    }
+
+    public function testClaimRespectsBlockedUntilForBothHosts(): void
+    {
+        $this->queueRow(999001);
+        $this->setColumns(
+            999001,
+            "`route` = 'mac', `routed_at` = NOW() - INTERVAL 60 MINUTE, `blocked_until` = NOW() + INTERVAL 10 MINUTE"
+        );
+
+        self::assertNull($this->repo->claimNextPending('mac'));
+        self::assertNull($this->repo->claimNextPending('actions'));
+    }
+
+    // ── Notify compare-and-set ─────────────────────────────────────────────────
+
+    public function testNotifyTransitionIsCompareAndSet(): void
+    {
+        $this->queueRow(999001);
+
+        self::assertTrue($this->repo->transitionNotifiedState(999001, null, 'retrying'));
+        self::assertFalse($this->repo->transitionNotifiedState(999001, null, 'retrying'), 'A second host loses the CAS');
+        self::assertTrue($this->repo->transitionNotifiedState(999001, 'retrying', 'handed_mac'));
+        self::assertFalse($this->repo->transitionNotifiedState(999001, 'retrying', 'handed_mac'));
+        self::assertSame('handed_mac', $this->findRow(999001)['notified_state']);
+    }
+
+    public function testNotifyRevertRestoresPriorState(): void
+    {
+        $this->queueRow(999001);
+        $this->repo->transitionNotifiedState(999001, null, 'retrying');
+        $this->repo->transitionNotifiedState(999001, 'retrying', 'waiting');
+
+        self::assertTrue($this->repo->revertNotifiedState(999001, 'waiting', 'retrying'));
+        self::assertSame('retrying', $this->findRow(999001)['notified_state']);
+
+        self::assertTrue($this->repo->revertNotifiedState(999001, 'retrying', null));
+        self::assertNull($this->findRow(999001)['notified_state']);
+    }
+
+    public function testDoneMapsToRecoveredAfterFailureNotice(): void
+    {
+        $this->claimRow(999001, 'actions');
+        $park = $this->repo->parkByCause(999001, 'actions', 'auth', null);
+        $handed = ParkPolicy::notifyStateFor($park['outcome'], $park['route'], $park['prior_notified']);
+        self::assertSame('handed_mac', $handed);
+        self::assertTrue($this->repo->transitionNotifiedState(999001, null, $handed));
+        $this->repo->markDone(999001, 'i', 'o', 'text', [], null);
+
+        $row = $this->findRow(999001);
+        self::assertSame('recovered', ParkPolicy::notifyStateFor('done', $row['route'], $row['notified_state']));
+        self::assertSame('posted', ParkPolicy::notifyStateFor('done', 'any', null));
     }
 
     public function testReclaimStaleClaimIgnoresAFreshClaim(): void
     {
         $this->repo->queuePendingIfAbsent(999001);
-        $this->repo->claimPending(999001);
+        $this->repo->claimPending(999001, 'actions');
 
         $reclaimed = $this->repo->reclaimStaleClaim(45);
         self::assertNull($reclaimed, 'A freshly-claimed row must not be reclaimed');
@@ -211,7 +493,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
     public function testReclaimStaleClaimRecoversAnAbandonedRow(): void
     {
         $this->repo->queuePendingIfAbsent(999001);
-        $this->repo->claimPending(999001);
+        $this->repo->claimPending(999001, 'actions');
 
         // Back-date claimed_at to simulate abandonment
         $this->db->query(
@@ -237,7 +519,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
 
         $rows = $this->repo->recentThemes(5);
 
-        self::assertNotEmpty($rows, 'recentThemes must return rows even with malformed JSON');
+        self::assertNotSame([], $rows, 'recentThemes must return rows even with malformed JSON');
         $found = false;
         foreach ($rows as $row) {
             if ($row['themes_used'] === '"not-a-list"') {
@@ -829,5 +1111,54 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
             'sort_order'       => $sortOrder,
             'recap_text'       => "Recap for game {$gameOfThatDay}.",
         ];
+    }
+
+    private function queueRow(int $sim): void
+    {
+        $this->repo->queuePendingIfAbsent($sim);
+    }
+
+    private function claimRow(int $sim, string $host): void
+    {
+        $this->repo->queuePendingIfAbsent($sim);
+        self::assertTrue($this->repo->claimPending($sim, $host));
+    }
+
+    /** Test-only clock and counter setup; the call under test still runs the production SQL. */
+    private function setColumns(int $sim, string $assignments): void
+    {
+        $this->db->query("UPDATE `ibl_sim_summaries` SET {$assignments} WHERE `sim` = {$sim}");
+    }
+
+    /**
+     * @return array{sim: int, status: string, recap_text: ?string, intro_text: ?string, outro_text: ?string, themes_used: ?string, attempts: int, claimed_at: ?string, blocked_until: ?string, generated_at: ?string, route: string, routed_at: ?string, claimed_by: ?string, last_cause: ?string, flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, notified_state: ?string}
+     */
+    private function findRow(int $sim): array
+    {
+        $row = $this->repo->find($sim);
+        self::assertNotNull($row);
+
+        return $row;
+    }
+
+    private function dbNow(): int
+    {
+        return $this->scalarInt('SELECT UNIX_TIMESTAMP() AS `t`');
+    }
+
+    private function blockedEpoch(int $sim): int
+    {
+        return $this->scalarInt("SELECT UNIX_TIMESTAMP(`blocked_until`) AS `t` FROM `ibl_sim_summaries` WHERE `sim` = {$sim}");
+    }
+
+    private function scalarInt(string $sql): int
+    {
+        $result = $this->db->query($sql);
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertIsNumeric($row['t']);
+
+        return (int) $row['t'];
     }
 }

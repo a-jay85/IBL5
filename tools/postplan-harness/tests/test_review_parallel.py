@@ -164,6 +164,32 @@ def test_ledger_has_entry_for_every_agent():
         assert expected in purposes, f"{expected!r} missing from ledger — {purposes}"
 
 
+def test_security_audit_tier_is_sonnet_scoring_stays_haiku():
+    """security-audit runs on sonnet (Haiku price cliff); score-findings stays haiku."""
+
+    class _TierLlm(_SleepingLlm):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            self.models = {}
+
+        def call(self, purpose, model, prompt, validate, max_retries=1, normalizer=None):
+            self.models[purpose] = model
+            return super().call(purpose, model, prompt, validate,
+                                max_retries=max_retries, normalizer=normalizer)
+
+    canned = _make_canned({
+        "security": [{"path": "ibl5/s.php", "line": 3, "body": "security issue"}],
+    })
+    canned["score-findings"] = [{"n": 1, "score": 90}]
+    llm = _TierLlm(UsageLedger(), canned, sleep=0)
+
+    ReviewPhase(llm, _NullGh()).run({}, _php_cls(), PlanInfo())
+
+    assert llm.models["security-audit"] == "sonnet"
+    assert llm.models["score-findings"] == "haiku"
+    assert llm.models["review-agent-a"] == "sonnet"
+
+
 def test_findings_from_all_agents_are_returned():
     """Findings from each concurrent agent must appear in the result, in A→B→security order."""
     ledger = UsageLedger()

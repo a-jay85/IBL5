@@ -42,7 +42,10 @@ source "$(dirname "$0")/lib/wt-guards.sh"
 source "$(dirname "$0")/lib/git-helpers.sh"
 source "$(dirname "$0")/lib/branch-base.sh"
 
-REPO_ROOT="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+REPO_ROOT="$(main_checkout_root .)" || {
+    echo "ERROR: not inside a git repository" >&2
+    exit 1
+}
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 DRY_RUN=false
 

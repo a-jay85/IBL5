@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.wt-gc</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@MAIN_WT@/bin/wt-gc-tick</string>
+	</array>
+	<!-- Hourly poll; bin/wt-gc-tick's HID-idle gate (1800s) and 6h min-interval
+	     stamp decide whether a tick sweeps. Hourly fires survive sleep/wake
+	     better than a calendar slot, which would land on wake while the
+	     operator is present and fail the idle gate. -->
+	<key>StartInterval</key>
+	<integer>3600</integer>
+	<key>WorkingDirectory</key>
+	<string>@MAIN_WT@</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew and
+		     ~/.local/bin. Every binary the sweep shells out to must resolve
+		     here: git (/usr/bin), gh and docker (Homebrew or /usr/local/bin),
+		     lsof (/usr/sbin), and ioreg (/usr/sbin, though the tick calls it
+		     by absolute path). Add the dir, don't drop a tool.
+		     HOME interpolates HERE, at generation time — launchd does NOT expand
+		     variables in EnvironmentVariables, so a literal dollar-HOME would
+		     bake in a dead path. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:@HOME@/.local/bin</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc/launchd-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc/launchd-stderr.log</string>
+</dict>
+</plist>

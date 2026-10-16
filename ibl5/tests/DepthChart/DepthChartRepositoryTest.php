@@ -54,12 +54,11 @@ class DepthChartRepositoryTest extends TestCase
         $result = $this->repository->getPlayersOnTeam($teamid);
 
         $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     public function testUpdatePlayerDepthChartSuccessfullyUpdatesAllFields(): void
     {
-        $playerName = 'Test Player';
         $depthChartValues = [
             'pg' => 1,
             'sg' => 0,
@@ -84,7 +83,7 @@ class DepthChartRepositoryTest extends TestCase
 
         // Verify the query was executed
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
 
         // Verify the UPDATE statement contains all the expected fields
         $lastQuery = end($queries);
@@ -109,7 +108,6 @@ class DepthChartRepositoryTest extends TestCase
     {
         // This is the key test for the bug fix - when values don't change,
         // MySQL returns 0 affected rows, but this should still be considered success
-        $playerName = 'Test Player';
         $depthChartValues = [
             'pg' => 1,
             'sg' => 0,
@@ -137,7 +135,6 @@ class DepthChartRepositoryTest extends TestCase
 
     public function testUpdatePlayerDepthChartWithIntegerValues(): void
     {
-        $playerName = 'Test Player';
         $depthChartValues = [
             'pg' => 1,
             'sg' => 0,
@@ -163,7 +160,6 @@ class DepthChartRepositoryTest extends TestCase
     public function testUpdatePlayerDepthChartHardcodesRoleSlotsToZero(): void
     {
         // Role slots (of, df, oi, di, bh) are now hardcoded to 0 in SQL
-        $playerName = 'Test Player';
         $depthChartValues = [
             'pg' => 1,
             'sg' => 2,
@@ -223,7 +219,7 @@ class DepthChartRepositoryTest extends TestCase
         
         // Verify the query was executed
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
         
         // Verify the UPDATE statement contains both timestamp fields
         $lastQuery = end($queries);
@@ -370,15 +366,6 @@ class DepthChartRepositoryTest extends TestCase
     public function testCompleteDataFlowFromFormToDatabase(): void
     {
         // Step 1: User submits form with these POST values (all lowercase)
-        $postFieldNames = [
-            'pg1' => '1',
-            'sg1' => '2',
-            'sf1' => '0',
-            'pf1' => '0',
-            'c1' => '0',
-            'canPlayInGame1' => '1',
-            'min1' => '30',
-        ];
 
         // Step 2: Processor converts POST to processed array with lowercase keys
         // Role fields (of, df, oi, di, bh) are hardcoded to 0 by the processor

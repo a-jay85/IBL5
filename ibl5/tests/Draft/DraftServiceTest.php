@@ -122,7 +122,7 @@ class DraftServiceTest extends TestCase
                 break;
             }
         }
-        self::assertNotEmpty($pickQuery, 'getCurrentDraftPick query must be executed');
+        self::assertNotSame('', $pickQuery, 'getCurrentDraftPick query must be executed');
         self::assertStringContainsString('2025', $pickQuery, 'getCurrentDraftPick must use Season::endingYear (2025)');
     }
 }

@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -17,6 +18,9 @@ $teamid = is_numeric($_REQUEST['teamid'] ?? null) ? (int) $_REQUEST['teamid'] : 
 $pagetitle = "- Team Pages";
 
 global $mysqli_db, $authService, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
+/** @var \League\LeagueContext $leagueContext */
 
 $commonRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
 $teamRepository = new Team\TeamRepository($mysqli_db);

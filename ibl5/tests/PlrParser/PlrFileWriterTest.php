@@ -90,7 +90,7 @@ class PlrFileWriterTest extends TestCase
 
         $index = PlrFileWriter::indexPlayerRecords($lines);
 
-        $this->assertEmpty($index);
+        $this->assertSame([], $index);
     }
 
     public function testIndexPlayerRecordsSkipsHighOrdinals(): void
@@ -101,7 +101,7 @@ class PlrFileWriterTest extends TestCase
 
         $index = PlrFileWriter::indexPlayerRecords($lines);
 
-        $this->assertEmpty($index);
+        $this->assertSame([], $index);
     }
 
     public function testApplyChangesPreservesLength(): void

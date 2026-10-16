@@ -6,6 +6,7 @@ namespace Tests\Unit\PageLayout;
 
 use PageLayout\PageLayout;
 use PHPUnit\Framework\TestCase;
+use Tests\Clock\FixedClock;
 
 class PageLayoutTest extends TestCase
 {
@@ -50,6 +51,7 @@ class PageLayoutTest extends TestCase
     {
         $_SERVER = $this->savedServer;
         $_SESSION = $this->savedSession;
+        PageLayout::setTestClock(null);
 
         foreach ($this->savedGlobals as $key => $value) {
             if ($value === '__UNSET__') {
@@ -137,6 +139,149 @@ class PageLayoutTest extends TestCase
         self::assertStringNotContainsString('shortcut icon', $output);
     }
 
+    /**
+     * Everything PageLayout::header() emits before themeheader() runs, with cache-busters normalised.
+     * Slicing at the theme marker keeps the pin independent of ADMIN_PHASE_GATE_NOTICE, which another
+     * test in this class defines process-wide and which appends a div AFTER themeheader().
+     */
+    private function renderNormalisedHead(): string
+    {
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        $pos = strpos($output, '<!-- THEMEHEADER_CALLED -->');
+        self::assertNotFalse($pos, 'themeheader() marker missing; head slice would be unbounded');
+        $head = substr($output, 0, $pos);
+
+        $normalised = preg_replace('/\?v=\d*/', '?v=V', $head);
+        self::assertIsString($normalised);
+
+        return $normalised;
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function scriptPathProvider(): array
+    {
+        $root = \Bootstrap\AppPaths::root();
+
+        return [
+            'root index, no base tag' => [$root . '/index.php', ''],
+            'one level deep' => [$root . '/admin/index.php', "<base href=\"../\">\n"],
+            'two levels deep' => [$root . '/modules/Foo/index.php', "<base href=\"../../\">\n"],
+            'outside root, no base tag' => ['/tmp/not-ibl5/modules/Foo/index.php', ''],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('scriptPathProvider')]
+    public function testHeadOutputIsByteIdenticalToGolden(string $scriptFilename, string $baseLine): void
+    {
+        $GLOBALS['sitename'] = 'IBL"><script>alert(1)</script>';
+        $GLOBALS['pagetitle'] = 'Page & <b>Title</b>';
+        $GLOBALS['slogan'] = 'Slo"gan <i>&</i>';
+        unset($_SERVER['HTTP_HOST']);
+        $_SERVER['SCRIPT_FILENAME'] = $scriptFilename;
+
+        $golden = file_get_contents(__DIR__ . '/fixtures/head-golden.html');
+        self::assertIsString($golden);
+        self::assertSame(1, substr_count($golden, "<head>\n"), 'golden must hold exactly one <head> line to splice the base tag after');
+        $expected = str_replace("<head>\n", "<head>\n" . $baseLine, $golden);
+
+        self::assertSame($expected, $this->renderNormalisedHead());
+    }
+
+    public function testHeadEscapesHostileSiteGlobals(): void
+    {
+        $GLOBALS['sitename'] = 'IBL"><script>alert(1)</script>';
+        $GLOBALS['pagetitle'] = 'Page & <b>Title</b>';
+        $GLOBALS['slogan'] = 'Slo"gan <i>&</i>';
+        $_SERVER['SCRIPT_FILENAME'] = \Bootstrap\AppPaths::root() . '/index.php';
+
+        $head = $this->renderNormalisedHead();
+
+        self::assertStringNotContainsString('<script>alert(1)</script>', $head);
+        self::assertStringContainsString('<title>IBL&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt; Page &amp; &lt;b&gt;Title&lt;/b&gt;</title>', $head);
+        self::assertStringContainsString('<META NAME="AUTHOR" CONTENT="IBL&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;">', $head);
+        self::assertStringContainsString('<META NAME="COPYRIGHT" CONTENT="Copyright (c) by IBL&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;">', $head);
+        self::assertStringContainsString('<META NAME="DESCRIPTION" CONTENT="Slo&quot;gan &lt;i&gt;&amp;&lt;/i&gt;">', $head);
+    }
+
+    public function testHeadOpenGraphBlockForPreprodHostIsByteIdentical(): void
+    {
+        $_SERVER['HTTP_HOST'] = 'pre.iblhoops.net';
+        $_SERVER['SCRIPT_FILENAME'] = \Bootstrap\AppPaths::root() . '/index.php';
+
+        $head = $this->renderNormalisedHead();
+
+        $expectedOg = "<meta property=\"og:title\" content=\"IBL \xe2\x80\x94 Internet Basketball League\">\n"
+            . "<meta property=\"og:description\" content=\"The Internet Basketball League (IBL) is an online fantasy basketball league powered by the Jump Shot Basketball simulation engine.\">\n"
+            . "<meta property=\"og:type\" content=\"website\">\n"
+            . "<meta property=\"og:url\" content=\"https://pre.iblhoops.net/ibl5/index.php\">\n"
+            . "<meta property=\"og:image\" content=\"https://pre.iblhoops.net/ibl5/images/ibl/logocorner.jpg\">\n"
+            . "<meta property=\"og:image:width\" content=\"150\">\n"
+            . "<meta property=\"og:image:height\" content=\"150\">\n"
+            . "<meta property=\"og:site_name\" content=\"IBL \xe2\x80\x94 Internet Basketball League\">\n";
+        self::assertStringContainsString($expectedOg, $head);
+        self::assertStringNotContainsString('www.iblhoops.net', $head);
+    }
+
+    /** @return array<string, array{string, list<string>}> */
+    public static function headHelperProvider(): array
+    {
+        return [
+            'calculateRelativeBasePath' => ['calculateRelativeBasePath', ['currentFile', 'iblRoot']],
+            'renderScriptTags' => ['renderScriptTags', ['iblRootPath']],
+            'renderMetaTags' => ['renderMetaTags', ['sitename', 'slogan']],
+            'renderOpenGraphMetaTags' => ['renderOpenGraphMetaTags', ['requestHost']],
+            'renderStylesheetLink' => ['renderStylesheetLink', ['themeSel']],
+        ];
+    }
+
+    /**
+     * Security-surface discharge: each extracted head helper is a pure string builder.
+     * Structural invariant: private static, returns string, every parameter is a plain non-nullable
+     * string. A helper that grows a \mysqli, session, cookie, or actor-identity parameter, or that
+     * changes a parameter to mixed/array, fails here before any review reads the diff.
+     *
+     * @param list<string> $expectedParams
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('headHelperProvider')]
+    public function testExtractedHeadHelpersArePureStringBuilders(string $method, array $expectedParams): void
+    {
+        $reflection = new \ReflectionMethod(PageLayout::class, $method);
+
+        self::assertTrue($reflection->isPrivate(), "$method must stay private");
+        self::assertTrue($reflection->isStatic(), "$method must stay static");
+
+        $returnType = $reflection->getReturnType();
+        self::assertInstanceOf(\ReflectionNamedType::class, $returnType);
+        self::assertSame('string', $returnType->getName(), "$method must return string");
+
+        $actualParams = [];
+        foreach ($reflection->getParameters() as $parameter) {
+            $type = $parameter->getType();
+            self::assertInstanceOf(\ReflectionNamedType::class, $type, "$method parameter \${$parameter->getName()} must be typed");
+            self::assertSame('string', $type->getName(), "$method parameter \${$parameter->getName()} must be string");
+            self::assertFalse($type->allowsNull(), "$method parameter \${$parameter->getName()} must be non-nullable");
+            $actualParams[] = $parameter->getName();
+        }
+        self::assertSame($expectedParams, $actualParams, "$method parameter list drifted");
+    }
+
+    public function testRenderHeadSignatureIsUnchanged(): void
+    {
+        $reflection = new \ReflectionMethod(PageLayout::class, 'renderHead');
+
+        self::assertTrue($reflection->isPrivate());
+        self::assertTrue($reflection->isStatic());
+        self::assertSame(0, $reflection->getNumberOfParameters());
+
+        $returnType = $reflection->getReturnType();
+        self::assertInstanceOf(\ReflectionNamedType::class, $returnType);
+        self::assertSame('void', $returnType->getName());
+    }
+
     public function testHeaderNonBoostedSkipsRecordHitWhenNoDb(): void
     {
         unset($_SERVER['HTTP_HX_BOOSTED']);
@@ -199,6 +344,16 @@ class PageLayoutTest extends TestCase
         self::assertMatchesRegularExpression('/<!--.*Page Generation.*-->/', $output);
     }
 
+    public function testRenderPageGenerationTimeReportsElapsedSecondsSinceStartTime(): void
+    {
+        $GLOBALS['start_time'] = microtime(true) - 1.234;
+        ob_start();
+        PageLayout::renderPageGenerationTime();
+        $output = (string) ob_get_clean();
+
+        self::assertMatchesRegularExpression('/^<!-- .+ 1\.\d\d .+ -->\n$/', $output);
+    }
+
     public function testRenderPageGenerationTimeUsesDefinedLabels(): void
     {
         if (!defined('_PAGEGENERATION')) {
@@ -214,6 +369,47 @@ class PageLayoutTest extends TestCase
 
         self::assertStringContainsString(\_PAGEGENERATION, $output);
         self::assertStringContainsString(\_SECONDS, $output);
+    }
+
+    public function testRenderPageGenerationTimeUsesInjectedClock(): void
+    {
+        $label = defined('_PAGEGENERATION') ? \_PAGEGENERATION : 'Page Generation:';
+        $unit = defined('_SECONDS') ? \_SECONDS : 'seconds';
+        $GLOBALS['start_time'] = 1791549296.0;
+        PageLayout::setTestClock(new FixedClock(1791549296, 1791549296.25));
+
+        ob_start();
+        PageLayout::renderPageGenerationTime();
+        $output = (string) ob_get_clean();
+
+        self::assertSame("<!-- {$label} 0.25 {$unit} -->\n", $output);
+    }
+
+    public function testRenderPageGenerationTimeZeroElapsed(): void
+    {
+        $label = defined('_PAGEGENERATION') ? \_PAGEGENERATION : 'Page Generation:';
+        $unit = defined('_SECONDS') ? \_SECONDS : 'seconds';
+        $GLOBALS['start_time'] = 1791549296.0;
+        PageLayout::setTestClock(new FixedClock(1791549296));
+
+        ob_start();
+        PageLayout::renderPageGenerationTime();
+        $output = (string) ob_get_clean();
+
+        self::assertSame("<!-- {$label} 0 {$unit} -->\n", $output);
+    }
+
+    public function testSetTestClockNullRestoresSystemClock(): void
+    {
+        PageLayout::setTestClock(new FixedClock(1791549296, 1791549296.25));
+        PageLayout::setTestClock(null);
+        $GLOBALS['start_time'] = microtime(true) - 1.234;
+
+        ob_start();
+        PageLayout::renderPageGenerationTime();
+        $output = (string) ob_get_clean();
+
+        self::assertMatchesRegularExpression('/^<!-- .+ 1\.\d\d .+ -->\n$/', $output);
     }
 
     public function testHeaderBoostedShowsAdminPhaseGateNotice(): void

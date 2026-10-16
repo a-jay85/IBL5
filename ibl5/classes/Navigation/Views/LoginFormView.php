@@ -39,7 +39,6 @@ class LoginFormView implements LoginFormViewInterface
         $idPrefix = $isDesktop ? 'nav' : 'mobile-nav';
 
         $currentQuery = parse_url($requestUri ?? '', PHP_URL_QUERY);
-        $safeQuery = HtmlSanitizer::safeHtmlOutput(is_string($currentQuery) ? $currentQuery : '');
 
         ob_start();
         ?>
@@ -99,7 +98,7 @@ class LoginFormView implements LoginFormViewInterface
                 </label>
 
                 <input type="hidden" name="op" value="login">
-                <input type="hidden" name="redirect_query" value="<?= HtmlSanitizer::trusted($safeQuery) ?>">
+                <input type="hidden" name="redirect_query" value="<?= HtmlSanitizer::e(is_string($currentQuery) ? $currentQuery : '') ?>">
                 <?= \Security\CsrfGuard::generateToken('login') ?>
 
                 <button type="submit" class="<?= HtmlSanitizer::e($buttonClass) ?>">

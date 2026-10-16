@@ -4,6 +4,9 @@
 #
 # Reads two facts from the pr-ready sticky comment (<!-- pr-ready-verdict -->):
 #   line 1    **Reviewed tree:** <40-hex>              (the tree the fidelity reviewer judged)
+#             (line 1 ONLY, by design: this script fails toward firing; the post-plan
+#             audit-trail layout is deliberately NOT read here, so a post-plan sticky yields
+#             no-tree-line -> owed. skip-review.sh Step 8 is the only widened reader.)
 #   any line  REVIEW-COVERAGE: NONE|STALE|CURRENT|UNKNOWN
 # and compares the recorded tree to the current HEAD^{tree}. Coverage is current only when
 # the marker reads CURRENT AND the recorded tree equals the current tree. Every other state,

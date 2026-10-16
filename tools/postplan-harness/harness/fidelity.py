@@ -254,6 +254,47 @@ def _verdict_findings(verdict_path: str) -> list[str]:
     return [whole] if whole else []
 
 
+_ITEM_LEAD_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+(?:\[(?:BLOCKING|NOTE)\]\s*)?")
+
+
+def verdict_items(path: str) -> dict:
+    """{"verdict", "blocking": [title, ...], "notes": [title, ...]} for one verdict file.
+
+    Same parse as `_verdict_findings` (`_findings_section`, then `_group_findings`), but it
+    keeps NOTE items and does not gate on the verdict word. An unmarked item follows the
+    verdict: blocking under NOT READY, a note otherwise. A title is the item's first line
+    with the bullet and severity marker removed. A missing or unreadable file is empty.
+    """
+    empty = {"verdict": None, "blocking": [], "notes": []}
+    if not path:
+        return empty
+    try:
+        with open(path) as fh:
+            text = fh.read()
+    except OSError:
+        return empty
+    verdict = parse_verdict(path)
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == DIGEST_CUT:
+            lines = lines[:i]
+            break
+    body = [ln for ln in lines if not VERDICT_RE.match(ln)]
+    section = _findings_section(body)
+    scope = body if section is None else section
+    blocking: list[str] = []
+    notes: list[str] = []
+    for marker, item in _group_findings(scope):
+        title = _ITEM_LEAD_RE.sub("", item.splitlines()[0]).strip()
+        if not title:
+            continue
+        if marker == "BLOCKING" or (marker is None and verdict == "NOT READY"):
+            blocking.append(title)
+        else:
+            notes.append(title)
+    return {"verdict": verdict, "blocking": blocking, "notes": notes}
+
+
 def _render_finding(f: dict) -> str:
     """Hold (2) item text. review.py emits path/line/score/body_head; an unexpected
     shape is dumped rather than crashed on."""
@@ -896,7 +937,8 @@ def extract_notes(llm, verdict_path: str, log=None,
         return []
 
 
-def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[int]:
+def file_note_issues(gh, notes: list[dict], pr_number: int, log=None,
+                     filed: list | None = None) -> list[int]:
     """File deduped backlog issues for READY WITH NOTES notes.
 
     The body is the PR link plus the note's own detail. It carries no verdict excerpt:
@@ -906,8 +948,13 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
 
     Notes carry no severity, so they file in the order the reviewer listed them. Past the
     per-PR cap of 3 they fold into one roll-up issue (`harness/followcap.py`).
+
+    When `filed` is a list, one dict per note is appended in order: `{"title", "issue",
+    "state"}` with state `filed`, `already tracked` or `not filed`. The return value is
+    unchanged.
     """
     log = log or _noop_log
+    record = filed if filed is not None else []
     if not notes:
         return []
     try:
@@ -923,6 +970,7 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
         key = _norm_title(title)
         if key in seen:
             log(f"phase5.5 notes: skipping duplicate '{title[:50]}'")
+            record.append({"title": title, "issue": None, "state": "already tracked"})
             continue
         body = f"{pr_link}\n\n{detail}"
         try:
@@ -932,8 +980,12 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
                     nums.append(n)
                 seen.add(key)
                 log(f"phase5.5 notes: filed issue #{n} '{title[:50]}'")
+                record.append({"title": title, "issue": n, "state": "filed"})
+            else:
+                record.append({"title": title, "issue": None, "state": "not filed"})
         except (HarnessError, OSError) as exc:
             log(f"phase5.5 notes: followup_create failed ({exc})")
+            record.append({"title": title, "issue": None, "state": "not filed"})
     return nums
 
 

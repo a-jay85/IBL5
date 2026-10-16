@@ -139,6 +139,7 @@ def test_fidelity_dict_has_full_schema_after_loop(tmp_path, git_shim):
             "remediation_sha", "verdict_2", "reviewed_tree_2",
             "findings_round", "rounds", "rounds_completed",
             "backlog_issue_numbers", "diff_id", "plan_hash", "models",
+            "code_review", "review_items",
         }
         assert res.fidelity["models"] == ["sonnet", "opus", "opus"]
         assert set(res.fidelity["rounds"][0]) == {

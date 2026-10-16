@@ -420,3 +420,36 @@ def test_phase4b_ran_false_when_phase4b_code_ran_absent(tmp_path, git_shim, monk
     )
     assert captured.get("phase4b_ran") is False
     os.unlink(fidelity.verdict_path(99))
+
+
+# --- per-note filing record ---------------------------------------------------
+
+def test_file_note_issues_records_filed_duplicate_and_failed():
+    """The per-note record lists filed, already tracked and not filed, in note order."""
+
+    class _Gh:
+        def __init__(self):
+            self.created = 0
+
+        def issue_titles(self, label, **kw):
+            return ["Already tracked note"]
+
+        def followup_create(self, title, body, label):
+            self.created += 1
+            if self.created == 1:
+                return 1492
+            raise HarnessError("gh", "second failed")
+
+    notes = [
+        {"title": "Fresh note", "detail": "d1"},
+        {"title": "Already tracked note", "detail": "d2"},
+        {"title": "Doomed note", "detail": "d3"},
+    ]
+    filed: list = []
+    nums = fidelity.file_note_issues(_Gh(), notes, 99, filed=filed)
+    assert nums == [1492]
+    assert filed == [
+        {"title": "Fresh note", "issue": 1492, "state": "filed"},
+        {"title": "Already tracked note", "issue": None, "state": "already tracked"},
+        {"title": "Doomed note", "issue": None, "state": "not filed"},
+    ]

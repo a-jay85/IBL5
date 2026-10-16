@@ -423,3 +423,30 @@ def test_scored_findings_reach_work_list_via_before_remediation(tmp_path, git_sh
         assert res.fidelity["rounds"][0]["work_list_sizes"]["2"] == 1
     finally:
         _cleanup(9315, "9315-2")
+
+
+# --- per-review items survive the round loop -----------------------------------
+
+def test_review_items_keeps_verdict_one_after_rounds_advance(tmp_path, git_shim):
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [
+            "6d checks\n\n## FINDINGS\n\n- [BLOCKING] Banner disagrees\n"
+            "- [NOTE] Old note\n\nNOT READY\n"],
+        "fidelity-remediation": ["edited"],
+        "plan-fidelity-re-review-2": [
+            "## FINDINGS\n\n- [NOTE] Left over note\n\nREADY\n"],
+    })
+    try:
+        res = _drive(tmp_path, llm, _counting_git(), 9310)
+        fid = res.fidelity
+        assert fid["verdict_path"] == fidelity.verdict_path("9310-2")
+        first, second = fid["review_items"]
+        assert first["blocking"] == ["Banner disagrees"]
+        assert first["notes"] == ["Old note"]
+        assert first["remediation_sha"] is None
+        assert second["blocking"] == []
+        assert second["notes"] == ["Left over note"]
+        assert second["remediation_sha"] == fid["rounds"][0]["remediation_sha"]
+        assert fid["code_review"] == {"phase4b_ran": False, "seen": None}
+    finally:
+        _cleanup(9310, "9310-2")

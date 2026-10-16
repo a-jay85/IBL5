@@ -32,6 +32,8 @@ An assertion grounded in an imagined value is how PR #887 shipped: it expected a
 
 ### Why the test-type boundaries fall where they do
 
+Post-plan Phase 6 is a safety net for a missed row and does not replace plan-time classification. If nothing in UI/UX changed, visual regression covers it, so the row is never truly-manual.
+
 A truly-manual row must be performable on the *open PR*, before it merges (orthogonal to the Timing column — pre-/post-impl is when a test is *written*, not when it can be *performed*). The test is *"can a reviewer render this row's judgment now, against the worktree/local stack?"* — never "does a command exit 0."
 
 A UI/UX taste judgment **always** qualifies (bring the worktree up and look), so **never** cite "can't do it pre-merge" to drop a forced UI/UX row — that would defeat the § Forced manual-verification trigger + `/plan` Step 4 gate 14a.
@@ -123,4 +125,6 @@ The row stays `Truly-manual`. Gate 13 and `bin/lib/plan-model-consistency` keep 
 
 The tag bypasses condition (1) of Phase 6.5, so gate `[PM]` checks the reason for gate-16 vocabulary (scheduling, reachability, credential, live host). A reviewer can falsify a named dependency. A vague reason such as "easier after it ships" gives them nothing to check.
 
-Delivery: the post-merge workflow posts a PR comment that carries the `- [ ]` boxes. The `## After merge` copy in the PR body uses plain bullets, so no scanner ever counts them as open manual-test items. ADR-0198 records the decision.
+`bin/check-plan` gate `[PM]` rejects three shapes: a tag on a non-`Truly-manual` row, a reason under 15 characters or without that vocabulary, and a tag on a look-and-feel row. Look-and-feel rows stay in the open-PR window.
+
+Delivery: post-plan writes tagged rows under `## After merge` in the PR body, outside the `## Manual Testing` window, so they do not hold the merge. The post-merge workflow posts a PR comment and one Discord message. The comment carries the `- [ ]` boxes. The `## After merge` copy in the PR body uses plain bullets, so no scanner ever counts them as open manual-test items. ADR-0198 records the decision.

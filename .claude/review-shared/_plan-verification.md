@@ -43,13 +43,12 @@ Every row names its test type and its file or command; a bare "run X and check Y
 ### Classification rules
 
 - "Verify X returns Y", "check that Z happens", "confirm the redirect works" → automatable. Never classify as truly-manual.
-- Classify every row at plan-write time. Post-plan Phase 6 is a safety net for a missed row and does not replace plan-time classification.
+- Classify every row at plan-write time.
 - "Compare against production" / "does output still match iblhoops.net?" → **visual-regression** (screenshot diff), not truly-manual — unless UI/UX was intentionally redesigned.
-- If nothing in UI/UX changed, visual regression covers it. Do not classify as truly-manual.
 - The **only** truly-manual items are subjective judgment on **new or redesigned** UI/UX.
 - "I can't tell mechanically whether it works" is a **verification gap, not a truly-manual item** — build the self-asserting check (`/plan` autonomy lever 3 / Step 3 § Verification-gap mechanization).
 - **A truly-manual row must be performable on the *open PR*, before it merges.** Design an exercise path on one of the three pre-prod environments and keep the row. Only an *intrinsic* deploy-dependency that survives that challenge may use the `pre-prod-exception:` marker recorded by `bin/check-plan` gate `[P]`. Why: _plan-verification-detail.md § Why the test-type boundaries fall where they do
-- **Post-merge truly-manual rows**: a row that can only run after the merge carries a tag. Put `post-merge: <reason>` in its Test-file/location cell. The reason names the intrinsic post-merge dependency in gate-16 vocabulary (scheduling, reachability, credential, live host); "easier after it ships" does not qualify. `bin/check-plan` gate `[PM]` rejects a tag on a non-`Truly-manual` row, a reason under 15 characters or without that vocabulary, and a tag on a look-and-feel row (those stay in the open-PR window). Post-plan writes tagged rows under `## After merge` in the PR body, outside the `## Manual Testing` window, so they do not hold the merge; the merge workflow posts them back as a checklist comment plus one Discord message. The row still counts as `Truly-manual` for gate 13. Why: _plan-verification-detail.md § Post-merge rows
+- **Post-merge rows**: a truly-manual row that can run only after the merge puts `post-merge: <reason>` in its location cell. Gate `[PM]` checks the reason. Why: _plan-verification-detail.md § Post-merge rows
 - **Deploy-dependent behavior needs a row at all — an absent row is the violation.** Name which pre-prod environment exercises it — see § Pre-prod exercise paths.
 - If a plan has zero truly-manual items, state: `All verification is automated — no manual testing needed.`
 

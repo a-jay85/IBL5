@@ -54,6 +54,7 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               MERGE_DIGEST_BEGIN, MERGE_DIGEST_END, render_merge_digest,
                               upsert_merge_digest,
                               MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC,
+                              render_after_merge_block, upsert_after_merge,
                               backlog_closes_mismatch, classify, files_from_diff,
                               modified_files_from_diff,
                               name_status_text, normalize_backlog_closes, numstat_text,
@@ -281,6 +282,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     _active_audit = audit
     state = statefile.StateFile(os.path.join(_state_dir(out_dir, live, state_dir), statefile.safe_slug(slug) + ".json"), slug, git, out_dir, log)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
+        f"auto_merge_value={getattr(plan, 'auto_merge_value', None)!r} "
         f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)} "
         f"slug_drift={plan.slug_drift or '-'} plan_source={plan.plan_source or '-'}")
 
@@ -613,6 +615,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # that follows (strip_change_blocks, gate_backtest) and the
         # single pr_edit_body call are unchanged.
         body = upsert_hold_notice(body, plan.hold_justification)
+        # Every pass (idempotent), so a fixer rewrite or an older body is repaired;
+        # outside the clearance == "UNKNOWN" branch on purpose.
+        body = upsert_after_merge(
+            body, render_after_merge_block(plan.post_merge_rows) if plan.found else "")
         # Remove files-changed/tests-changed blocks left by older harness runs.
         body = strip_change_blocks(body)
         _gb = gate_backtest_result(worktree or ".", diff, pr=pr, live=live,
@@ -728,6 +734,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
+            plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
+            branch=git.branch(),
             dep_state_lookup=lambda n: gh.pr_state(n),
             # Phase 5.5 above produced these. None means INDETERMINATE (the reviewer
             # degraded or was not run), which holds condition (12) — it is never

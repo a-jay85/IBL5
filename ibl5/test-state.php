@@ -143,6 +143,7 @@ $knownActions = [
     'seed-reset-user',
     'set-award',
     'set-champion',
+    'set-draft-pick-notes',
     'set-eoy-votes',
     'set-leaders-htm',
     'set-player-name',
@@ -407,6 +408,43 @@ if ($method === 'DELETE' && $action === 'set-player-name') {
     $stmt->execute();
     $stmt->close();
     echo json_encode(['previous' => (string)$row['name'], 'applied' => $name]);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=set-draft-pick-notes&year=N&round=1|2&teampick=STR&notes=STR — set
+// the notes on one ibl_draft_picks row so E2E can drive the projected draft order
+// notes expander (flows/projected-draft-order.spec.ts). Empty notes stores NULL.
+// Returns the previous notes ('' for NULL) so the caller restores them in finally.
+if ($method === 'DELETE' && $action === 'set-draft-pick-notes') {
+    $year = (int)($_GET['year'] ?? 0);
+    $round = (int)($_GET['round'] ?? 0);
+    $teampick = (string)($_GET['teampick'] ?? '');
+    $notes = (string)($_GET['notes'] ?? '');
+    if ($year < 1900 || $year > 2200 || ($round !== 1 && $round !== 2)
+        || $teampick === '' || mb_strlen($teampick) > 32 || mb_strlen($notes) > 280) {
+        http_response_code(400);
+        echo json_encode(['error' => 'set-draft-pick-notes requires year, round=1|2, a 1..32 char teampick and notes of at most 280 chars']);
+        $db->close();
+        exit;
+    }
+    $stmt = $db->prepare('SELECT notes FROM ibl_draft_picks WHERE year = ? AND round = ? AND teampick = ? LIMIT 1');
+    $stmt->bind_param('iis', $year, $round, $teampick);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $row = $res instanceof mysqli_result ? $res->fetch_assoc() : null;
+    $stmt->close();
+    if (!is_array($row)) {
+        http_response_code(404);
+        echo json_encode(['error' => 'set-draft-pick-notes: no ibl_draft_picks row for ' . $year . ' round ' . $round . ' ' . $teampick]);
+        $db->close();
+        exit;
+    }
+    $stmt = $db->prepare("UPDATE ibl_draft_picks SET notes = NULLIF(?, '') WHERE year = ? AND round = ? AND teampick = ?");
+    $stmt->bind_param('siis', $notes, $year, $round, $teampick);
+    $stmt->execute();
+    $stmt->close();
+    echo json_encode(['previous' => (string)($row['notes'] ?? ''), 'applied' => $notes]);
     $db->close();
     exit;
 }

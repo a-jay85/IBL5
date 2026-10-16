@@ -77,6 +77,28 @@
     padding-bottom: 0;
 }
 
+/* Keyboard toggle inside the category h2 (VotingBallotView). It inherits every
+   text property from the h2 so the header renders exactly as before. Its click
+   bubbles to the .voting-category wrapper's onclick handler. */
+.voting-category-toggle {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    appearance: none;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    word-spacing: inherit;
+    text-indent: inherit;
+    text-shadow: inherit;
+    cursor: inherit;
+}
+
 .voting-category-instruction {
     margin: var(--space-1) 0 0 0;
     font-size: 1rem;

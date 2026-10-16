@@ -40,6 +40,35 @@
     text-overflow: clip;
 }
 
+/* Keyboard toggle inside a non-empty notes cell (ProjectedDraftOrderView).
+   A button is an atomic inline box, so the td's own ellipsis cannot truncate
+   text inside it. The truncation therefore lives on the button, and the td's
+   max-width still bounds it. */
+.projected-draft-order-notes__toggle {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    appearance: none;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: inherit;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.projected-draft-order-notes.is-expanded .projected-draft-order-notes__toggle {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
 /* On mobile, keep record text visible alongside logo (overrides global .ibl-team-cell__text hide) */
 @media (max-width: 768px) {
     .projected-draft-order-table td:nth-child(3) .ibl-team-cell__text {

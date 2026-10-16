@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-15
+last_verified: 2026-10-16
 ---
 
 # Post-Plan Orchestrator
@@ -356,6 +356,9 @@ Phase 5 consumes the Phase-3 flags `$HAS_PHP`, `$HAS_GO`, `$HAS_MATRIX`, `$PLAN_
 
 ```bash
 touch /tmp/post-plan-conformance-done-$PPID
+# Skip path: Phase 5.0 never ran the exec-mutation step. No plan means no mutations to hold on.
+: > /tmp/post-plan-exec-mutations-$PPID
+touch /tmp/post-plan-exec-mutations-done-$PPID
 ```
 
 ### Phase 5 END: emit `PHASE5_VERIFY_STATUS`
@@ -844,7 +847,7 @@ Kill known lingering patterns so their tool results deliver immediately (cache w
 pkill -f 'bin/e2e-wt' 2>/dev/null
 pkill -f 'bunx.*playwright' 2>/dev/null
 pkill -f 'gh pr checks.*--watch' 2>/dev/null
-rm -f /tmp/post-plan-spec-diff-$PPID /tmp/post-plan-spec-prod-diff-$PPID /tmp/post-plan-missing-tests-$PPID /tmp/post-plan-conformance-done-$PPID 2>/dev/null
+rm -f /tmp/post-plan-spec-diff-$PPID /tmp/post-plan-spec-prod-diff-$PPID /tmp/post-plan-missing-tests-$PPID /tmp/post-plan-conformance-done-$PPID /tmp/post-plan-exec-mutations-$PPID /tmp/post-plan-exec-mutations-done-$PPID 2>/dev/null
 echo "Background process cleanup complete"
 ```
 

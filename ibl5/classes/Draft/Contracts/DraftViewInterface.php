@@ -53,9 +53,9 @@ interface DraftViewInterface
      *
      * @param list<DraftClassPlayerRow> $players Array of player records from `ibl_draft_class`
      * @param string $teamLogo The current user's team name
-     * @param string $pickOwner The team that owns the current pick
-     * @param int $draftRound The current draft round
-     * @param int $draftPick The current draft pick number
+     * @param string|null $pickOwner The team that owns the current pick; null when no pick is pending
+     * @param int|null $draftRound The current draft round; null when no pick is pending
+     * @param int|null $draftPick The current draft pick number; null when no pick is pending
      * @param int $seasonYear The draft season year (for header display)
      * @param int $teamid The team ID (for logo image lookup)
      * @return string HTML formatted draft interface
@@ -91,7 +91,7 @@ interface DraftViewInterface
      *  // Includes all players from $players array
      *  // Shows submit button (user owns pick)
      */
-    public function renderDraftInterface(array $players, string $teamLogo, string $pickOwner, int $draftRound, int $draftPick, int $seasonYear, int $teamid): string;
+    public function renderDraftInterface(array $players, string $teamLogo, ?string $pickOwner, ?int $draftRound, ?int $draftPick, int $seasonYear, int $teamid): string;
 
     /**
      * Render the player table for draft selection

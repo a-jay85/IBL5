@@ -96,8 +96,46 @@ esac
 NFILES=0; NADD=0; NDEL=0; LOST=0
 HAVE=0; OLDP=""; NEWP=""; BIN=0
 lost() { echo "LOST: $*"; LOST=$((LOST + 1)); }
+# Parser for ibl5/phpstan-baseline.neon, the one file the second exemption reads.
+# `paths` prints each block's path; `split <file> <exempt-paths> <live-out> <dead-out>`
+# copies every block whose path is listed in <exempt-paths> to <dead-out> and every
+# other block to <live-out>. Grammar: `parameters:`, `\tignoreErrors:`, then 5-line
+# blocks (`\t\t-`, rawMessage, identifier, count, path) each followed by a blank line or
+# EOF. Anything else, or zero blocks, exits 1 and the caller keeps the file strict.
+lw_neon() {
+  local mode=$1 file=$2 exempt=${3:-/dev/null} live=${4:-/dev/null} dead=${5:-/dev/null}
+  LC_ALL=C awk -v mode="$mode" -v live="$live" -v dead="$dead" '
+    function bad() { rc = 1; exit 1 }
+    FILENAME == ARGV[1] && mode == "split" { ex[$0] = 1; next }
+    FNR == 1 { if ($0 != "parameters:") bad(); st = 1; next }
+    st == 1 { if ($0 != "\tignoreErrors:") bad(); st = 2; next }
+    st == 2 { if ($0 != "\t\t-") bad(); n = 1; blk[n] = $0; st = 3; next }
+    st == 3 {
+      if ($0 == "\t\t\trawMessage: '"'''"'") { blk[++n] = $0; st = 31; next }
+      if ($0 !~ /^\t\t\trawMessage: ./) bad()
+      blk[++n] = $0; st = 4; next }
+    st == 31 {
+      if ($0 == "\t\t\t'"'''"'") { blk[++n] = $0; st = 4; next }
+      if ($0 !~ /^\t\t\t\t/) bad()
+      blk[++n] = $0; next }
+    st == 4 { if ($0 !~ /^\t\t\tidentifier: ./) bad(); blk[++n] = $0; st = 5; next }
+    st == 5 { if ($0 !~ /^\t\t\tcount: [0-9]+$/) bad(); blk[++n] = $0; st = 6; next }
+    st == 6 {
+      if ($0 !~ /^\t\t\tpath: [A-Za-z0-9_][A-Za-z0-9_.\/-]*$/ || index($0, "..")) bad()
+      p = substr($0, 10); blk[++n] = $0; nb++
+      if (mode == "paths") pl[nb] = p
+      else { out = (p in ex) ? dead : live; for (i = 1; i <= n; i++) print blk[i] > out }
+      st = 7; next }
+    st == 7 { if ($0 != "") bad(); if (mode == "split") print "" > out; st = 2; next }
+    { bad() }
+    END {
+      if (rc) exit 1
+      if (nb == 0 || (st != 2 && st != 7)) exit 1
+      for (i = 1; i <= nb; i++) print pl[i] }
+  ' "$exempt" "$file"
+}
 check_entry() {
-  local rc L h m
+  local rc L h m p HC MC
   [ "$HAVE" -eq 1 ] || return 0
   NFILES=$((NFILES + 1))
   if [ "$NEWP" = /dev/null ]; then
@@ -107,7 +145,7 @@ check_entry() {
   git cat-file -e "HEAD:$NEWP" 2>/dev/null || { lost "file missing at HEAD: $NEWP"; return 0; }
   [ "$BIN" -eq 0 ] || return 0
   git show "HEAD:$NEWP" > "$HF" 2>/dev/null || { lost "could not read HEAD:$NEWP"; return 0; }
-  # One exemption, one key: an added `last_verified: YYYY-MM-DD` line is not lost when
+  # First exemption, one key (the second is the baseline block below): an added `last_verified: YYYY-MM-DD` line is not lost when
   # HEAD's own frontmatter carries an equal or newer date (both sides bumped the doc and
   # the resolver kept the newer stamp). Only a file opening with `---` qualifies, only
   # the first `last_verified:` inside that frontmatter is read, and every other added
@@ -148,9 +186,41 @@ check_entry() {
       cp "$DELS" "$KEEP" || rc=2
     fi
     [ "$rc" -le 1 ] || { lost "could not compare deleted lines of $OLDP"; return 0; }
+    # Second exemption, one key, one file: a deleted line of ibl5/phpstan-baseline.neon
+    # whose block names a `path:` absent from the HEAD tree (git cat-file -e
+    # HEAD:ibl5/<path>) is not lost; the ignore entry has nothing left to ignore. The
+    # `ibl5/` prefix is load-bearing: a bare `HEAD:$p` is always absent and would exempt
+    # every block. Both
+    # copies must parse (lw_neon) or the file stays fully strict. Blocks for absent paths
+    # are removed from both copies before counting, and each deleted line is charged to
+    # the dead blocks' own lines first, so a `count: 1` shared with a dead block is not
+    # read as a surviving copy of a live block's deletion. A live block's `path:` line is
+    # never chargeable (its path exists), so a dropped live deletion still reports it.
+    HC="$HF"; MC="$MF"
+    if [ "$NEWP" = ibl5/phpstan-baseline.neon ] && [ "$OLDP" = ibl5/phpstan-baseline.neon ] && [ -s "$MF" ]; then
+      if lw_neon paths "$HF" > "$TMPD/paths-h" && lw_neon paths "$MF" > "$TMPD/paths-m"; then
+        : > "$TMPD/dead-paths"
+        LC_ALL=C sort -u "$TMPD/paths-h" "$TMPD/paths-m" | while IFS= read -r p; do
+          git cat-file -e "HEAD:ibl5/$p" 2>/dev/null || printf '%s\n' "$p" >> "$TMPD/dead-paths"
+        done
+        : > "$TMPD/head-live"; : > "$TMPD/head-dead"; : > "$TMPD/master-live"; : > "$TMPD/master-dead"
+        if [ -s "$TMPD/dead-paths" ] \
+          && lw_neon split "$HF" "$TMPD/dead-paths" "$TMPD/head-live" "$TMPD/head-dead" \
+          && lw_neon split "$MF" "$TMPD/dead-paths" "$TMPD/master-live" "$TMPD/master-dead" \
+          && LC_ALL=C awk '
+               FILENAME == ARGV[1] { a[$0]++; next }
+               FILENAME == ARGV[2] { b[$0]++; next }
+               { bud = (a[$0] > b[$0]) ? a[$0] : b[$0]
+                 if (used[$0] < bud) { used[$0]++; next }
+                 print }' "$TMPD/master-dead" "$TMPD/head-dead" "$KEEP" > "$TMPD/dels-live"
+        then
+          mv "$TMPD/dels-live" "$KEEP"; HC="$TMPD/head-live"; MC="$TMPD/master-live"
+        fi
+      fi
+    fi
     while IFS= read -r L; do
-      h=$(LC_ALL=C grep -acxF -- "$L" "$HF" || :)
-      m=$(LC_ALL=C grep -acxF -- "$L" "$MF" || :)
+      h=$(LC_ALL=C grep -acxF -- "$L" "$HC" || :)
+      m=$(LC_ALL=C grep -acxF -- "$L" "$MC" || :)
       case "$h$m" in ''|*[!0-9]*) lost "could not count $OLDP: -$L"; continue ;; esac
       if [ "$h" -gt 0 ] && [ "$h" -ge "$m" ]; then lost "$NEWP: -$L"; fi
     done < "$KEEP"

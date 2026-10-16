@@ -28,6 +28,8 @@ $tab = $tabs->resolve($_GET['tab'] ?? null);
 $pagetitle = '- Leaderboards: ' . ($tab === 'career' ? 'Career' : 'Season');
 
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext $leagueContext */
 
 PageLayout\PageLayout::header();
 

@@ -150,3 +150,39 @@ def test_numbered_unmarked_nested_bullets_stay_separate(tmp_path):
         "- its detail",
         "2. second",
     ]
+
+
+# --- verdict_items ------------------------------------------------------------
+
+def test_verdict_items_splits_blocking_and_notes(tmp_path):
+    """Catches dropping NOTE items or sending them to the blocking list."""
+    path = _write(
+        tmp_path,
+        _DISPOSITIONS
+        + "\nNOT READY\n\n## FINDINGS\n\n- [BLOCKING] Banner disagrees\n"
+        "    - detail line\n- [NOTE] Note one\n- [NOTE] Note two\n"
+        "\n## DIGEST\nstuff\n",
+    )
+    assert fidelity.verdict_items(path) == {
+        "verdict": "NOT READY",
+        "blocking": ["Banner disagrees"],
+        "notes": ["Note one", "Note two"],
+    }
+
+
+def test_verdict_items_missing_file_is_empty(tmp_path):
+    """Boundary: a missing file or an empty path is an empty record, never a raise."""
+    empty = {"verdict": None, "blocking": [], "notes": []}
+    assert fidelity.verdict_items(str(tmp_path / "missing.md")) == empty
+    assert fidelity.verdict_items("") == empty
+
+
+def test_verdict_items_unmarked_follow_verdict(tmp_path):
+    """Catches routing unmarked items to one list whatever the verdict says."""
+    body = "\n{word}\n\n## FINDINGS\n\n- unmarked finding\n\n## DIGEST\nstuff\n"
+    not_ready = _write(tmp_path, body.format(word="NOT READY"))
+    assert fidelity.verdict_items(not_ready)["blocking"] == ["unmarked finding"]
+    assert fidelity.verdict_items(not_ready)["notes"] == []
+    ready = _write(tmp_path, body.format(word="READY WITH NOTES"))
+    assert fidelity.verdict_items(ready)["blocking"] == []
+    assert fidelity.verdict_items(ready)["notes"] == ["unmarked finding"]

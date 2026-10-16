@@ -11,6 +11,10 @@ use BasketballStats\Tables\SeasonTotals;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
+ * Goldens under fixtures/ were captured once from the unmodified class. Never
+ * regenerate them to make a failing test pass. The one-off capture method
+ * (testCaptureGoldensOnce) was deleted before the pin commit.
+ *
  * @covers \BasketballStats\Tables\SeasonTotals
  */
 #[AllowMockObjectsWithoutExpectations]
@@ -115,6 +119,84 @@ class SeasonTotalsTest extends TestCase
     }
 
     /**
+     * Every key PlayerStats::fill() reads from an ibl_plr row. Stat values are strings, as mysqli returns them; pid and retired are ints, as the repository row carries them.
+     *
+     * @param array<string, string|int> $overrides
+     * @return array<string, string|int>
+     */
+    private static function plrStatsRow(int $pid, array $overrides = []): array
+    {
+        $zeroKeys = [
+            'c_dd', 'c_td', 'car_3ga', 'car_3gm', 'car_ast', 'car_blk', 'car_drb', 'car_fga', 'car_fgm',
+            'car_fta', 'car_ftm', 'car_gm', 'car_min', 'car_orb', 'car_pf', 'car_reb', 'car_stl', 'car_tvr',
+            'ch_ast', 'ch_blk', 'ch_pts', 'ch_reb', 'ch_stl', 'cp_ast', 'cp_blk', 'cp_pts', 'cp_reb', 'cp_stl',
+            's_dd', 's_td', 'sh_ast', 'sh_blk', 'sh_pts', 'sh_reb', 'sh_stl', 'sp_ast', 'sp_blk', 'sp_pts',
+            'sp_reb', 'sp_stl',
+        ];
+        $row = array_fill_keys($zeroKeys, '0');
+        $row += [
+            'pid' => $pid, 'name' => 'Row ' . $pid, 'pos' => 'G', 'retired' => 0,
+            'stats_gm' => '20', 'stats_gs' => '15', 'stats_min' => '640',
+            'stats_fgm' => '140', 'stats_fga' => '300', 'stats_ftm' => '60', 'stats_fta' => '75',
+            'stats_3gm' => '30', 'stats_3ga' => '80', 'stats_orb' => '25', 'stats_drb' => '95',
+            'stats_ast' => '90', 'stats_stl' => '22', 'stats_tvr' => '40', 'stats_blk' => '12', 'stats_pf' => '48',
+        ];
+
+        return array_merge($row, $overrides);
+    }
+
+    private function makePlayer(
+        int $pid,
+        string $name,
+        string $pos,
+        int $teamid,
+        string $teamName,
+        ?string $color1,
+        ?string $color2,
+        string $statusClass = ''
+    ): \Player\Player {
+        $player = self::createStub(\Player\Player::class);
+        $player->method('getPlayerID')->willReturn($pid);
+        $player->method('getName')->willReturn($name);
+        $player->method('getDecoratedName')->willReturn($name);
+        $player->method('getNameStatusClass')->willReturn($statusClass);
+        $player->method('getPosition')->willReturn($pos);
+        $player->method('getTeamid')->willReturn($teamid);
+        $player->method('getTeamName')->willReturn($teamName);
+        $player->method('getTeamColor1')->willReturn($color1);
+        $player->method('getTeamColor2')->willReturn($color2);
+
+        return $player;
+    }
+
+    /** @return list<\Player\Player> */
+    private function playerPair(): array
+    {
+        return [
+            $this->makePlayer(11, 'Alpha Starter', 'PG', 7, 'Test Team', 'FF0000', '0000FF', 'is-injured'),
+            $this->makePlayer(12, 'Bravo Bench', 'C', 0, '', null, null),
+        ];
+    }
+
+    /** @return list<\Player\Player> */
+    private function hostilePlayers(): array
+    {
+        return [
+            $this->makePlayer(13, "O'Brien <script>alert(1)</script>", '<b>PG</b>', 7, '"><img src=x>', '"><img src=x>', '0000FF'),
+        ];
+    }
+
+    private function makePlayerDb(bool $withFooterStats = true): MockDatabase
+    {
+        $db = $this->makeDb($withFooterStats ? [self::bothStatsRow(10)] : null, $withFooterStats ? [self::bothStatsRow(11)] : null, 2024);
+        $db->onQuery('FROM ibl_plr WHERE pid = 11 LIMIT 1', [self::plrStatsRow(11)]);
+        $db->onQuery('FROM ibl_plr WHERE pid = 12 LIMIT 1', [self::plrStatsRow(12, ['stats_gm' => '3', 'stats_gs' => '0', 'stats_min' => '41'])]);
+        $db->onQuery('FROM ibl_plr WHERE pid = 13 LIMIT 1', [self::plrStatsRow(13)]);
+
+        return $db;
+    }
+
+    /**
      * @return array<string, array{
      *     0: string,
      *     1: string,
@@ -211,5 +293,66 @@ class SeasonTotalsTest extends TestCase
         $fallbackHtml = $this->renderGoldenCase($fallback[1], $fallback[2], $fallback[3], $fallback[4], $fallback[5], $fallback[6], $fallback[7]);
 
         $this->assertNotSame($regularHtml, $fallbackHtml);
+    }
+
+    public function testPlayerRowsMatchGolden(): void
+    {
+        $html = SeasonTotals::render($this->makePlayerDb(), $this->playerPair(), $this->makeTeam(), '', [11], '', 'Season table');
+        $this->assertStringEqualsFile(__DIR__ . '/fixtures/season-totals-player-rows.golden.html', $html);
+    }
+
+    public function testLeagueStartersMatchesGolden(): void
+    {
+        $html = SeasonTotals::render($this->makePlayerDb(), $this->playerPair(), $this->makeTeam(), '', [11], 'LeagueStarters', '');
+        $this->assertStringEqualsFile(__DIR__ . '/fixtures/season-totals-league-starters.golden.html', $html);
+    }
+
+    public function testHostilePlayerRowMatchesGolden(): void
+    {
+        $html = SeasonTotals::render($this->makePlayerDb(), $this->hostilePlayers(), $this->makeTeam("O'Brien <b>Hack</b>", '"><img src=x>'), '', [], 'LeagueStarters', '');
+        $this->assertStringEqualsFile(__DIR__ . '/fixtures/season-totals-hostile-players.golden.html', $html);
+    }
+
+    public function testHostilePlayerPositionIsEscaped(): void
+    {
+        $html = SeasonTotals::render($this->makePlayerDb(), $this->hostilePlayers(), $this->makeTeam(), '', [], 'LeagueStarters', '');
+        $this->assertStringContainsString('<td>&lt;b&gt;PG&lt;/b&gt;</td>', $html);
+        $this->assertStringNotContainsString('<td><b>PG</b></td>', $html);
+        $this->assertStringNotContainsString('<script>', $html);
+    }
+
+    public function testStarterPidMarksOnlyTheStarterCell(): void
+    {
+        $html = SeasonTotals::render($this->makePlayerDb(), $this->playerPair(), $this->makeTeam(), '', [11], '', '');
+        $this->assertSame(1, substr_count($html, ' is-starter'));
+        $noStarters = SeasonTotals::render($this->makePlayerDb(), $this->playerPair(), $this->makeTeam(), '', [], '', '');
+        $this->assertStringNotContainsString(' is-starter', $noStarters);
+    }
+
+    public function testLeagueStartersRendersTeamColumn(): void
+    {
+        $html = SeasonTotals::render($this->makePlayerDb(), $this->playerPair(), $this->makeTeam(), '', [], 'LeagueStarters', '');
+        $this->assertStringContainsString('<th>Team</th>', $html);
+        $this->assertStringContainsString('Free Agent', $html);
+        $teamModule = SeasonTotals::render($this->makePlayerDb(), $this->playerPair(), $this->makeTeam(), '', [], '', '');
+        $this->assertStringNotContainsString('<th>Team</th>', $teamModule);
+        $this->assertStringNotContainsString('Free Agent', $teamModule);
+    }
+
+    public function testLeagueStartersFooterLabelSpansThreeColumns(): void
+    {
+        $html = SeasonTotals::render($this->makePlayerDb(), $this->playerPair(), $this->makeTeam(), '', [], 'LeagueStarters', '');
+        $this->assertSame(2, substr_count($html, '<td colspan="3">'));
+        $this->assertStringNotContainsString('colspan="2"', $html);
+        $teamModule = SeasonTotals::render($this->makePlayerDb(), $this->playerPair(), $this->makeTeam(), '', [], '', '');
+        $this->assertSame(2, substr_count($teamModule, '<td colspan="2">'));
+    }
+
+    public function testHostileTeamNameIsEscapedInFooter(): void
+    {
+        $html = SeasonTotals::render($this->makePlayerDb(), $this->playerPair(), $this->makeTeam("O'Brien <b>Hack</b>"), '', [], '', '');
+        $this->assertStringContainsString("O&apos;Brien &lt;b&gt;Hack&lt;/b&gt; Offense", $html);
+        $this->assertStringContainsString("O&apos;Brien &lt;b&gt;Hack&lt;/b&gt; Defense", $html);
+        $this->assertStringNotContainsString('<b>Hack</b>', $html);
     }
 }

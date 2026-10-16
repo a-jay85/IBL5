@@ -18,6 +18,14 @@
 # night. Parking on pending would convert the loop's own success into a stall,
 # so those two return 4 (proceed with a warning) instead of 1 (park).
 #
+# Since the post-merge jobs `deploy` and `Promote master to production` are
+# pending at every boundary, the canary passes
+# IGNORE_PENDING_CHECKS="deploy,Promote master to production" to the script.
+# Those two names are dropped ONLY while status != completed; a completed red
+# run of either is still "checks failed:" and parks. Cases 12-15 pin the exact
+# list the canary passes and drive the real script through the extracted
+# function for green / red / non-listed-pending.
+#
 # Cases 8 and 9 run the REAL bin/check-master-ci-green against fixture JSON via
 # its documented GH_API_CMD stub, so the two stderr strings the proceed/park
 # split keys on are pinned to the shipped implementation rather than to a stub.
@@ -118,6 +126,7 @@ setup_case() {
     cat > "$REPO/bin/check-master-ci-green" <<STUBEOF
 #!/bin/sh
 touch "$CI_SENTINEL"
+printf '%s\n' "\${IGNORE_PENDING_CHECKS-<unset>}" > "$SANDBOX/ci-env"
 echo "$1" >&2
 exit $2
 STUBEOF
@@ -272,5 +281,52 @@ if bash -n "$RUNNER" 2>/dev/null; then
 else
     h_fail "runner-parses-after-edit" "bash -n failed"
 fi
+
+# --- Case 12: the canary passes the EXACT ignore list -----------------------
+# The stub records what it saw in IGNORE_PENDING_CHECKS. A missing prefix reads
+# "<unset>"; a reworded or reordered list fails the equality.
+
+setup_case "PASS: 3 check-run(s) all green" 0 0
+RC=0; run_between_plans_canary || RC=$?
+expect "ignore-list-stub-rc"         0 "$RC"
+same   "canary-passes-exact-ignore-list" "deploy,Promote master to production" "$(cat "$SANDBOX/ci-env")"
+
+# --- Cases 13-15: real script THROUGH the extracted canary function ----------
+# setup_case's stub is replaced by a wrapper that execs the real script against
+# a per-case fixture. IGNORE_PENDING_CHECKS reaches the real script only via
+# the canary's inline assignment, so these cases prove the whole path and that
+# the rc mapping needs no change: PASS -> 0, "checks failed:" -> 1, other
+# pending -> 4.
+
+real_canary_case() { # <fixture-json-line>
+    printf '%s\n' "$1" > "$TMP/canary-fixture.json"
+    cat > "$REPO/bin/check-master-ci-green" <<STUBEOF
+#!/bin/sh
+exec env MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/canary-fixture.json #" "$GREEN" "$DSHA"
+STUBEOF
+    chmod +x "$REPO/bin/check-master-ci-green"
+}
+
+# 13. others green + both post-merge jobs pending -> green (rc 0), smoke runs
+setup_case "unused" 0 0
+real_canary_case '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-09-06T10:00:00Z","started_at":"2026-09-06T09:00:00Z"},{"name":"deploy","status":"in_progress","conclusion":null,"completed_at":null,"started_at":"2026-09-06T10:01:00Z"},{"name":"Promote master to production","status":"in_progress","conclusion":null,"completed_at":null,"started_at":"2026-09-06T10:01:00Z"}]}'
+RC=0; run_between_plans_canary || RC=$?
+expect "real-ignored-pending-is-green"      0 "$RC"
+want   "real-ignored-pending-logs-pass"     "$(cat "$LOG")" "PASS: 1 check-run(s) all green"
+want   "real-ignored-pending-logs-ignore"   "$(cat "$LOG")" "IGNORE_PENDING_CHECKS active — ignoring while pending: Promote master to production, deploy"
+
+# 14. deploy completed failure -> "checks failed:" -> rc 1 (park)
+setup_case "unused" 0 0
+real_canary_case '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-09-06T10:00:00Z","started_at":"2026-09-06T09:00:00Z"},{"name":"deploy","status":"completed","conclusion":"failure","completed_at":"2026-09-06T10:05:00Z","started_at":"2026-09-06T10:01:00Z"}]}'
+RC=0; run_between_plans_canary || RC=$?
+expect "real-ignored-red-parks"             1 "$RC"
+want   "real-ignored-red-detail"            "$CANARY_DETAIL" "checks failed: deploy (failure)"
+
+# 15. a NON-listed check pending -> still "checks still running" -> rc 4 (proceed)
+setup_case "unused" 0 0
+real_canary_case '{"check_runs":[{"name":"e2e","status":"in_progress","conclusion":null,"completed_at":null,"started_at":"2026-09-06T10:01:00Z"},{"name":"deploy","status":"in_progress","conclusion":null,"completed_at":null,"started_at":"2026-09-06T10:01:00Z"}]}'
+RC=0; run_between_plans_canary || RC=$?
+expect "real-non-listed-pending-proceeds"   4 "$RC"
+want   "real-non-listed-pending-detail"     "$CANARY_DETAIL" "checks still running: e2e"
 
 h_done

@@ -29,7 +29,9 @@ $usage = "Usage: check-baseline-drift [--update|--sync] [--base=<ref>]\n";
 $updateMode = false;
 $syncMode = false;
 $flagBase = null;
-foreach (array_slice($argv, 1) as $arg) {
+/** @var list<string> $argv */
+$cliArgs = array_slice($argv, 1);
+foreach ($cliArgs as $arg) {
     if ($arg === '--update') {
         $updateMode = true;
     } elseif ($arg === '--sync') {
@@ -66,7 +68,7 @@ foreach ($baselineFiles as $key => $path) {
 }
 
 $enforceZeroFloorBeforeWrite = static function () use ($baselineFiles, $counter, $zeroFloorFiles): void {
-    $mainBaseline = $baselineFiles['phpstan-baseline.neon'] ?? '';
+    $mainBaseline = $baselineFiles['phpstan-baseline.neon'];
     if (file_exists($mainBaseline)) {
         $floorViolations = $counter->countByPathForIdentifier($mainBaseline, 'ibl.unescapedOutput');
         foreach ($zeroFloorFiles as $floorFile) {
@@ -215,12 +217,6 @@ if ($snapshotJson === false) {
 
 $snapshotCounts = $decodeSnapshot($snapshotJson);
 
-foreach ($currentCounts as $file => $counts) {
-    if (!is_array($counts)) {
-        unset($currentCounts[$file]);
-    }
-}
-
 $hasIncrease = false;
 $staleWarning = false;
 $exitCode = 0;
@@ -238,7 +234,7 @@ $hasIncrease = $result['increases'] !== [];
 $staleWarning = $result['warnings'] !== [];
 $exitCode = 0;
 
-$mainBaseline = $baselineFiles['phpstan-baseline.neon'] ?? '';
+$mainBaseline = $baselineFiles['phpstan-baseline.neon'];
 $floorFailed = false;
 if (file_exists($mainBaseline)) {
     $floorViolations = $counter->countByPathForIdentifier($mainBaseline, 'ibl.unescapedOutput');

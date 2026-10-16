@@ -7,6 +7,7 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 use FreeAgency\FreeAgencyDemandRepository;
+use Repositories\SalaryCapRepository;
 
 /**
  * Tests FreeAgencyDemandRepository against real MariaDB — team performance
@@ -20,7 +21,7 @@ class FreeAgencyDemandRepositoryTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repo = new FreeAgencyDemandRepository($this->db);
+        $this->repo = new FreeAgencyDemandRepository($this->db, new SalaryCapRepository($this->db));
     }
 
     // ── getTeamPerformance ──────────────────────────────────────
@@ -77,6 +78,19 @@ class FreeAgencyDemandRepositoryTest extends DatabaseTestCase
 
         // Result includes any pre-existing PG players on Metros + our test player 200070002
         self::assertGreaterThanOrEqual(2100, $result);
+    }
+
+    public function testGetPositionSalaryCommitmentDelegatesToInjectedSalaryCapRepository(): void
+    {
+        $salaryCap = self::createMock(\Repositories\Contracts\SalaryCapRepositoryInterface::class);
+        $salaryCap->expects($this->once())
+            ->method('getPositionSalaryCommitmentNextYear')
+            ->with('Metros', 'PG', 200070001)
+            ->willReturn(9876);
+
+        $repo = new FreeAgencyDemandRepository($this->db, $salaryCap);
+
+        self::assertSame(9876, $repo->getPositionSalaryCommitment('Metros', 'PG', 200070001));
     }
 
     // ── getPlayerDemands ────────────────────────────────────────

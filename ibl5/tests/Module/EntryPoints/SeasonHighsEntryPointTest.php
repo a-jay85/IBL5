@@ -38,4 +38,12 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotSame('', $output);
         $this->assertStringContainsString('Regular Season', $output);
     }
+
+    public function testZeroStringPhaseFallsBackToCurrent(): void
+    {
+        $output = $this->runModule('SeasonHighs', ['seasonPhase' => '0']);
+
+        $this->assertNotSame('', $output);
+        $this->assertStringContainsString('Regular Season', $output);
+    }
 }

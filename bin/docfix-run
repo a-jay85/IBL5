@@ -2,7 +2,7 @@
 #
 # bin/docfix-run <issue-num> <sig> — Mac-side headless doc remediation launcher.
 # Fired by bin/docfix-poll (launchd, daily) when the nightly audit has flagged
-# stale docs or dead `paths:` globs. Creates a worktree, seeds an auto_merge:false
+# stale docs or dead `paths:` globs. Creates a worktree, seeds an auto_merge:docs-only-ready
 # hold plan, and launches a detached headless Claude run that fixes the flagged docs
 # and opens a PR (held for human merge) that Closes the stale-docs issue.
 #
@@ -19,7 +19,7 @@ Usage: bin/docfix-run <issue-num> <sig>
 
 Mac-side headless doc remediation launcher. Fired by bin/docfix-poll
 (launchd, daily) when the nightly audit has flagged stale docs or dead
-paths: globs. Creates a worktree, seeds an auto_merge:false hold plan,
+paths: globs. Creates a worktree, seeds an auto_merge:docs-only-ready plan,
 and launches a detached headless Claude run that fixes flagged docs and
 opens a held PR that closes the stale-docs issue.
 
@@ -86,24 +86,29 @@ fi
 bin/wt-new "$SLUG"                                   # cwd is $MAIN (step 2)
 WT_ROOT="$(worktrees_parent_dir "$MAIN")/$SLUG"
 
-# --- 5. Seed the auto_merge:false hold plan (resolved by slug at post-plan) ----
+# --- 5. Seed the auto_merge:docs-only-ready plan (resolved by slug at post-plan) ----
 PLAN_FILE="$(plans_dir)/$SLUG.md"
 cat > "$PLAN_FILE" <<PLAN_EOF
 ---
-auto_merge: false
+auto_merge: docs-only-ready
 ---
 
 # Stale-docs auto-refresh ($SLUG)
 
-Runtime-seeded hold plan for the autonomous doc-fix run. Refreshes the docs the
-nightly Doc Freshness Audit flagged (issue #$ISSUE_NUM). Held for human merge.
+Runtime-seeded plan for the autonomous doc-fix run. Refreshes the docs the
+nightly Doc Freshness Audit flagged (issue #$ISSUE_NUM).
+Held for human merge unless Phase 6.5 finds it docs-only, two-way and READY.
 
 ## Automouse Hold Justification
 
-auto_merge: false — this PR is opened autonomously by a launchd-scheduled Claude
-run with no human in the loop, and it modifies documentation a human should read
-before it lands. /post-plan Phase 6.5 condition (7) reads this frontmatter and
-refuses to arm auto-merge, leaving the PR open for a human to merge.
+auto_merge: docs-only-ready. This PR is opened autonomously by a launchd-scheduled
+Claude run with no human in the loop. /post-plan Phase 6.5 condition (7) reads this
+value and arms auto-merge only when the realized PR passes every docs-refresh
+clause: the branch is a docs-stale-refresh-* branch, every changed path is a
+documentation file (ibl5/docs/**/*.md, ibl5/classes/*/README.md or README.md;
+any .claude/, bin/, workflow, test, code or config path holds), the body's merge
+danger line is two-way, and the Phase 5.5 verdict is exactly READY. A failed
+clause holds the PR for a human, with the clause named in the hold reason.
 PLAN_EOF
 
 # --- 6. Launch the detached headless doc-fix run ------------------------------

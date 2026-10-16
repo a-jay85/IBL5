@@ -2734,6 +2734,25 @@ mk_prior_body "READY (re-review) — findings remediated in abc1234 and re-revie
     "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
 cf_check cf-re-review-line "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-verdict-not-terminal"
 
+# pr3267 dual-layout: the full old (v1) and new (v2) sticky bodies, written over the
+# body mk_prior_body builds. mk_prior_body takes a terminal line, not a body, so it runs
+# first only to leave the digest and probe state in place. Both fixture terminal lines
+# are `READY (re-review) ...` forms, so neither carries. The fixture plan hash is the
+# 64 b's the cf cases already use.
+CF_FIXDIR="$REPO_ROOT/bin/fixtures/review-shared"
+CF_V1="$(jq -r '.comments[-1].body' "$CF_FIXDIR/post-plan-sticky-pr3267-v1.json")"
+CF_V2="$(jq -r '.comments[-1].body' "$CF_FIXDIR/post-plan-sticky-pr3267-v2.json")"
+mk_cf_digest 5; mk_cf_probe "SKIP-REVIEW $CF_T"
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+printf '%s\n' "$CF_V1" > "$CF_BODY"
+cf_check cf-pr3267-v1-re-review "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-verdict-not-terminal"
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+printf '%s\n' "$CF_V2" > "$CF_BODY"
+cf_check cf-pr3267-v2-re-review "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-verdict-not-terminal"
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+printf '%s\n' "$CF_V2" | sed 's/^READY WITH NOTES (re-review) — .*$/READY WITH NOTES/' > "$CF_BODY"
+cf_check cf-pr3267-v2-bare-notes-carries "$(cf_decide "$BCFD")" "FIDELITY_GATE=skip" "CARRY_WORD=READY WITH NOTES" "!FIDELITY_GATE_REASON=prior-verdict-not-terminal"
+
 mk_prior_body "READY" "**NOT READY** — 2026-10-01 00:00:00 UTC" "$CF_PLANLINE" "$CF_T"
 cf_check cf-banner-veto "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-banner-not-ready"
 

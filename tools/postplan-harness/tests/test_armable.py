@@ -154,7 +154,7 @@ def test_condition_set_is_skill_numbered():
     not run. (18) holds unless the body's Merge danger line is well-formed and two-way.
     (19) holds unless every executable mutation tripped and the tree verified clean."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == list(range(1, 20))
+    assert nums == list(range(1, 20))   # [1..19], one entry per SKILL condition
 
 
 def test_fidelity_is_additive_and_releases_nothing():

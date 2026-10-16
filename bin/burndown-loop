@@ -30,7 +30,7 @@
 # ---
 # Environment (unset and empty both take the default):
 #   IBL5_BURNDOWN_RESERVE_PCT         weekly percent kept free at reset (default 10)
-#   IBL5_BURNDOWN_PR_CEILING          open PRs by @me that pause new batches and scouts (15)
+#   IBL5_BURNDOWN_PR_CEILING          open PRs by @me that pause new batches and scouts (0 = no cap, default)
 #   IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN  minimum gap between empty-backlog /reset-ready scouts (240)
 #   IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN minimum gap between unblock sessions (120)
 #   IBL5_BURNDOWN_MAX_FAILS           consecutive failed or aborted batches before giving up (3)
@@ -39,7 +39,7 @@
 #   IBL5_BURNDOWN_BATCH_TIMEOUT_MIN   per-batch wall clock in minutes (90)
 #   IBL5_BURNDOWN_DISCORD_DM          finish-DM sender (default bin/discord-dm)
 #   `start` writes every non-empty IBL5_BURNDOWN_* into the generated runner, so the
-#   launchd job runs with the knobs it was started with. At the PR ceiling the loop
+#   launchd job runs with the knobs it was started with. With a ceiling set, at it the loop
 #   runs a no-arm unblock session on conflicting or red non-feat: PRs. A detected arm
 #   disarms the PR and writes $STATE/unblock-disabled; rm it to re-enable unblock. A
 #   failed gh count holds all new work (batches, scouts and unblock) until it recovers.
@@ -100,7 +100,7 @@ PR_JSON=""
 MAX_FAILS=3
 EMPTY_SLEEP_MIN=240
 SCOUT_COOLDOWN_MIN=240
-PR_CEILING=15
+PR_CEILING=0
 UNBLOCK_COOLDOWN_MIN=120
 START_EPOCH=$(date +%s)
 
@@ -182,13 +182,17 @@ bl_timeout_secs() {
     echo $((m * 60))
 }
 
-# bl_load_knobs: every positive-integer knob, read once. Unset and empty take the
-# default; anything else exits 2 naming the variable. Called by run and start.
+# bl_load_knobs: every integer knob, read once. Unset and empty take the default;
+# anything else exits 2 naming the variable. Called by run and start.
 bl_load_knobs() {
     MAX_FAILS=$(bl_posint_env IBL5_BURNDOWN_MAX_FAILS 3) || exit 2
     EMPTY_SLEEP_MIN=$(bl_posint_env IBL5_BURNDOWN_EMPTY_SLEEP_MIN 240) || exit 2
     SCOUT_COOLDOWN_MIN=$(bl_posint_env IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN 240) || exit 2
-    PR_CEILING=$(bl_posint_env IBL5_BURNDOWN_PR_CEILING 15) || exit 2
+    PR_CEILING="${IBL5_BURNDOWN_PR_CEILING:-0}"
+    bl_nonneg_int "$PR_CEILING" || {
+        echo "burndown-loop: IBL5_BURNDOWN_PR_CEILING must be 0 or a positive integer (got '$PR_CEILING')" >&2
+        exit 2
+    }
     UNBLOCK_COOLDOWN_MIN=$(bl_posint_env IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN 120) || exit 2
     bl_timeout_secs >/dev/null || exit 2
 }
@@ -610,9 +614,11 @@ bl_unblock_candidates() {
 }
 
 # bl_work_gate: prints exactly one line and always returns 0 (it runs inside $(...)).
-#   batch open=N ceiling=C | unblock open=N ceiling=C prs=<list> | hold <reason> ...
+#   batch ceiling=off | batch open=N ceiling=C | unblock open=N ceiling=C prs=<list> | hold <reason> ...
+# Ceiling 0 means no cap: batches run without the gh count.
 bl_work_gate() {
     local n left cands src=0
+    if [ "$PR_CEILING" -eq 0 ]; then echo "batch ceiling=off"; return 0; fi
     bl_pr_snapshot || src=$?
     if [ "$src" -ne 0 ]; then echo "hold pr-count-failed rc=$src"; return 0; fi
     n=$(jq 'length' <<< "$PR_JSON")

@@ -2846,8 +2846,19 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": [],
                     "diff_id": diff_id, "plan_hash": plan_hash}
+    # What code review the PR shows. `code_review_seen` reads the cache the one existing
+    # comments fetch filled, so this adds no network call. `res.fidelity` was replaced
+    # wholesale just above, so the key is set after it.
+    seen = getattr(gh, "code_review_seen", None)
+    res.fidelity["code_review"] = {
+        "phase4b_ran": bool(phase4b_ran),
+        "seen": (seen(pr) if (callable(seen) and live and pr) else None),
+    }
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
+    # Verdict 1's file: the round loop advances current_verdict_path, so this is the only
+    # handle on the first review's findings by compose time.
+    verdict_path_1 = current_verdict_path
     final_verdict, final_err = verdict, err
     for round_num in range(1, fidelity.MAX_FIDELITY_ROUNDS + 1):
         if final_verdict != "NOT READY":
@@ -3034,12 +3045,21 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # round already cleared, under a **Re-reviewed tree:** line that contradicts them.
         res.fidelity["verdict_path"] = path_n
         res.fidelity["findings_round"] = round_num
+    res.fidelity["review_items"] = [
+        {**fidelity.verdict_items(verdict_path_1), "remediation_sha": None}
+    ] + [
+        {**fidelity.verdict_items(r.get("verdict_path") or ""),
+         "remediation_sha": r.get("remediation_sha")}
+        for r in rounds
+    ]
     res.fidelity["models"] = [r["model"] for r in rounds]
     # Notes come from whichever review produced the final verdict: the initial one or
     # a re-review round. current_verdict_path tracks that review's verdict file.
     if final_verdict == "READY WITH NOTES":
         notes = fidelity.extract_notes(llm, current_verdict_path, log=log, pr_number=pr)
-        nums = fidelity.file_note_issues(gh, notes, pr, log=log)
+        filed_notes: list = []
+        nums = fidelity.file_note_issues(gh, notes, pr, log=log, filed=filed_notes)
+        res.fidelity["filed_notes"] = filed_notes
         res.fidelity["backlog_issue_numbers"] = nums
         log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
     return final_verdict, final_err

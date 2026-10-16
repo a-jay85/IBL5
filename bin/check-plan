@@ -1626,7 +1626,7 @@ done < "$MATRIX_FILE"
 # repo root or under ibl5/ (a `cd ibl5 && php bin/...` cell), or be named in
 # ## Critical Files (a script the plan creates). Gate G skips (one-shot) rows,
 # so without this a row can name a script that was never there: PR #3264's row 4
-# cited bin/check-bin-help. A path preceded by `/` (vendor/bin/phpunit) is not a
+# cited a check-bin-help script that never existed. A path preceded by `/` (vendor/bin/phpunit) is not a
 # repo bin/ path and is skipped. Measured on the 100 newest corpus plans: 0 hits.
 # ---------------------------------------------------------------------------
 _bx_tok_re='(^|[^A-Za-z0-9_./-])bin/[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*'

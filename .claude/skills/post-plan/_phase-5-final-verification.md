@@ -1,6 +1,6 @@
 ---
 description: Full Phase 5 how-to for plan-to-test, plan-to-file, diff-to-plan and plan-gap scope, and assertion-footprint conformance checks run during post-plan.
-last_verified: 2026-10-11
+last_verified: 2026-10-15
 ---
 
 # Phase 5 — Final Verification (post-plan reference)
@@ -62,6 +62,22 @@ done
 > A failing row follows the same **resolution** discipline as every other `MISSING:` item: resolved when the underlying defect is fixed and the command re-runs exit 0, or when the failure is environmental / the row was cut and a PR comment says so. Only items still **unresolved** at Phase 5.0 END reach `/tmp/post-plan-missing-tests-$PPID` via the existing append step. Writing to the bridge file *inline* here would be wrong — a row you then fix would still block auto-merge at Phase 6.5 condition (3).
 >
 > Scope: skill path only. As `:54` already states, `tools/postplan-harness` computes conformance in-process and never touches these `/tmp` files; do not port this executor to the harness.
+
+> **Run the executable mutations (last tree reader of Phase 5).** Runs AFTER every other Phase 5 / 5.0 consumer of the tree and BEFORE any stage or commit. The lib applies each `## Executable Mutations` entry, requires its check to exit non-zero, reverts, and verifies the tree byte-identical; a plan with no section is a silent no-op.
+
+```bash
+# Reuses $PLAN_FILE. Worktree root, same as the CLI-row block above.
+cd "$(git rev-parse --show-toplevel)"
+: > "/tmp/post-plan-exec-mutations-$PPID"
+XM_OUT=$(bin/lib/plan-exec-mutations run --root "$PWD" --timeout 30 "$PLAN_FILE"); XM_RC=$?
+printf '%s\n' "$XM_OUT" | grep -E '^(HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED|NO-TIMEOUT|PARSE-FAILED)' \
+  | sed 's/^/EXEC-MUTATION: /' >> "/tmp/post-plan-exec-mutations-$PPID"
+[ "$XM_RC" -eq 3 ] && echo "EXEC-MUTATION: tree not verified clean — run 'bin/lib/plan-exec-mutations recover' and inspect before any commit" >> "/tmp/post-plan-exec-mutations-$PPID"
+touch "/tmp/post-plan-exec-mutations-done-$PPID"
+bin/lib/plan-exec-mutations pending --root "$PWD" && echo "STOP: exec-mutation journal pending — do not stage or commit"
+```
+
+> Exit 0 means every entry printed `TRIPPED`. Exit 1 means at least one held result. Exit 3 means the revert was not verified. None of these fails the run. Phase 6.5 condition (19) reads the bridge file `/tmp/post-plan-exec-mutations-$PPID`. Unlike `MISSING:` items there is no resolution path. A `HELD` row means the plan's mutation claim was false, so the hold stands until a human reads the PR-body block. The `STOP` line is a hard precondition for every later `git add` or `git commit` in this skill. When `pending` exits 0, run `recover`, re-check, and never stage a tree while it still exits 0.
 
 **Shellcheck verify.** Runs when shell scripts changed (mirrors CI job flags exactly). Skip if `! $HAS_SHELL`:
 

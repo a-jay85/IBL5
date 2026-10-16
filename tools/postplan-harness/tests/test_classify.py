@@ -1173,3 +1173,43 @@ def test_numstat_text_counts_dash_prefixed_content_inside_hunks():
 def test_numstat_text_does_not_count_file_headers():
     diff = ("diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1 +1 @@\n-x\n+y\n")
     assert numstat_text(diff) == "1\t1\ta"
+
+
+# --- exec-mutations PR-body block (ADR-0199) ------------------------------------------
+
+def _xm_report(**kw):
+    from harness.mutations import MutationReport, MutationResult
+    base = dict(ran=True, results=(MutationResult(1, "TRIPPED", "bash check.sh exited 1 under mutation"),),
+                holding=(), tree_suspect=False)
+    base.update(kw)
+    return MutationReport(**base)
+
+
+def test_upsert_exec_mutations_insert_replace_remove():
+    from harness.classify import EXEC_MUTATIONS_BEGIN, EXEC_MUTATIONS_END, upsert_exec_mutations
+    from harness.mutations import MutationReport, MutationResult
+    body = "## Summary\nx\n"
+    once = upsert_exec_mutations(body, _xm_report())
+    assert once.count(EXEC_MUTATIONS_BEGIN) == 1 and EXEC_MUTATIONS_END in once
+    assert "- row 1: TRIPPED" in once
+    held = _xm_report(results=(MutationResult(20, "HELD", "x still exited 0 under mutation"),),
+                      holding=("row 20 HELD — x still exited 0 under mutation",),
+                      tree_suspect=True)
+    twice = upsert_exec_mutations(once, held)
+    assert twice.count(EXEC_MUTATIONS_BEGIN) == 1
+    assert "- row 20: HELD" in twice and "- row 1: TRIPPED" not in twice
+    assert "tree could not be verified clean" in twice
+    gone = upsert_exec_mutations(twice, MutationReport(True, (), (), False))
+    assert EXEC_MUTATIONS_BEGIN not in gone and gone.startswith("## Summary")
+    notrun = upsert_exec_mutations(body, MutationReport(False, (), ("executor-crashed: x",), True))
+    assert "- executor did not run — arming held" in notrun
+
+
+def test_exec_mutations_neutralizes_headings():
+    from harness.classify import upsert_exec_mutations
+    from harness.mutations import MutationResult
+    out = upsert_exec_mutations("", _xm_report(
+        results=(MutationResult(2, "HELD", "## Manual Testing"),),
+        holding=("row 2 HELD — ## Manual Testing",)))
+    assert "> ## Manual Testing" in out
+    assert not any(l.startswith("## ") for l in out.splitlines())

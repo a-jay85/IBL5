@@ -3488,8 +3488,9 @@ done
 # §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
 # catches: a block can be perfect while the surrounding prose still claims twelve
 # conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
-have "§5.9k: SKILL.md counts eighteen conditions"        "$P25_TXT" '**All eighteen conditions**'
-have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
+have "§5.9k: SKILL.md counts nineteen conditions"        "$P25_TXT" '**All nineteen conditions**'
+have "§5.9k: the run-only enumeration ends /(14)/(19)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)/(19)'
+have "§5.9k: SKILL list carries the (19) entry"         "$P25_TXT" '**(19)'
 have "§5.9k: the shared-predicate list carries (15)"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)/(15)'
 
 # Step 7.5 spawns exactly one Sonnet sub-agent with run_in_background: false.
@@ -3521,11 +3522,12 @@ else
     lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
 fi
 # §5.9l: the Phase 6.5 reference doc carries the (14) and (15) entries that
-# SKILL.md's "All eighteen conditions" count promises, as prose pointing at its block.
+# SKILL.md's "All nineteen conditions" count promises, as prose pointing at its block.
 ARM_TXT="$(cat "$SKILL")"
 have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
 have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'
 have  "§5.9l: reference doc has a (15) entry"               "$ARM_TXT" '**(15)'
+have  "§5.9l: reference doc has a # condition (19) block"   "$ARM_TXT" '# condition (19)'
 have  "§5.9l: (14) entry records the shared-predicate why"  "$ARM_TXT" 'not in the shared predicate'
 lacks "§5.9l: (14) entry adds no per-condition bash block"  "$ARM_TXT" 'CONFLICT_FLAG='
 

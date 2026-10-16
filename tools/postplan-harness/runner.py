@@ -65,7 +65,7 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               render_scope_notes,
                               restore_manual_testing_section, strip_change_blocks,
                               strip_manual_testing_section,
-                              upsert_gate_fix,
+                              upsert_exec_mutations, upsert_gate_fix,
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
@@ -215,16 +215,25 @@ def _record_failure_context(res: RunResult, e: HarnessError) -> None:
 
 
 
-def _exec_mutations_step(plan, worktree, live, log) -> MutationReport | None:
+def _exec_mutations_step(plan, worktree, live, log, fixture=None) -> MutationReport | None:
     """Executable mutation claims (ADR-0199), run after verify and before arming.
 
-    Returns None when the step did not run (replay, no plan, no worktree), which
-    condition (19) holds on. A crash never aborts the run: it becomes a holding
-    report with tree_suspect=True, because the journal may hold an unreverted edit.
+    Replay reads the report from the fixture (default: an empty, passing report). A run
+    with no plan has no `## Executable Mutations` section, so it gets the same empty
+    report. A live run with a plan but no worktree returns None, which condition (19)
+    holds on. A crash never aborts the run: it becomes a holding report with
+    tree_suspect=True, because the journal may hold an unreverted edit.
     """
-    if not (live and plan is not None and getattr(plan, "found", False)
-            and getattr(plan, "path", None) and worktree and os.path.isdir(worktree)):
-        log("exec-mutations: skipped (not a live run with a plan and worktree)")
+    if not live:
+        fx = fixture or {}
+        return MutationReport(ran=True, results=(),
+                              holding=tuple(fx.get("exec_mutations_holding") or ()),
+                              tree_suspect=bool(fx.get("exec_mutations_tree_suspect", False)))
+    if plan is None or not getattr(plan, "found", False) or not getattr(plan, "path", None):
+        log("exec-mutations: no plan — nothing to run")
+        return MutationReport(ran=True, results=(), holding=(), tree_suspect=False)
+    if not (worktree and os.path.isdir(worktree)):
+        log("exec-mutations: skipped (no worktree) — condition (19) holds")
         return None
     try:
         report = run_executable_mutations(Path(plan.path), Path(worktree))
@@ -240,6 +249,7 @@ def _exec_mutations_step(plan, worktree, live, log) -> MutationReport | None:
     if not report.results and not report.holding:
         log("exec-mutations: no executable mutations in plan")
     return report
+
 
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         worktree: str | None = None, headless: bool = True,
@@ -752,12 +762,19 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
         _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                    fixture=fixture, log=log)
-        mutation_report = _exec_mutations_step(plan, worktree, live, log)
+        mutation_report = _exec_mutations_step(plan, worktree, live, log, fixture)
+        if live and pr and mutation_report is not None:
+            # A second body edit: the Phase 6 body write above runs before this step.
+            gh.pr_edit_body(pr, upsert_exec_mutations(gh.pr_body_fresh() or "", mutation_report))
         _arm_body = gh.pr_body() or body
         inputs = ArmInputs(
             pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
+            exec_mutations_holding=(mutation_report.holding
+                                    if mutation_report is not None else None),
+            exec_mutations_tree_suspect=(mutation_report.tree_suspect
+                                         if mutation_report is not None else True),
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
             plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
             branch=git.branch(),

@@ -20,7 +20,7 @@ BODY_HELD = "## Summary\nx\n\n## Manual Testing\n\n- [ ] eyeball the layout\n"
 
 def inputs(**kw):
     base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
-                classification=Classification(), findings=[], unresolved_conformance=[],
+                classification=Classification(), findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False,
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
                 unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY")
@@ -146,14 +146,15 @@ def test_fidelity_default_is_fail_closed():
 
 
 def test_condition_set_is_skill_numbered():
-    """The set is {1..17} with no gaps. The numbers track the SKILL's condition numbers,
+    """The set is {1..19} with no gaps. The numbers track the SKILL's condition numbers,
     not this list's position: (11) shells out to bin/lib/pr-armable.sh for unresolved
     review-thread findings, (14) reads the conflict-resolved flag, (15) checks for
     already-red CI checks on the PR head at arm time, and (16) checks the pre-push
     local meta-check gate. (17) holds when the gate backtest flagged clean PRs or could
-    not run. (18) holds unless the body's Merge danger line is well-formed and two-way."""
+    not run. (18) holds unless the body's Merge danger line is well-formed and two-way.
+    (19) holds unless every executable mutation tripped and the tree verified clean."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    assert nums == list(range(1, 20))
 
 
 def test_fidelity_is_additive_and_releases_nothing():
@@ -588,3 +589,46 @@ def test_condition_3_blocks_on_missing_phase_item():
     result_clean = evaluate(clean_inputs)
     cond3_clean = next(c for c in result_clean.conditions if c.number == 3)
     assert cond3_clean.blocked is False
+
+
+# --- Condition (19): executable mutation claims (ADR-0199) ---------------------------
+
+def _c19(d):
+    return next(c for c in d.conditions if c.number == 19)
+
+
+def test_condition_19_passes_when_all_tripped():
+    assert _c19(evaluate(inputs(exec_mutations_holding=(),
+                                exec_mutations_tree_suspect=False))).blocked is False
+
+
+def test_condition_19_holds_on_held_row():
+    c = _c19(evaluate(inputs(
+        exec_mutations_holding=("row 20 HELD — x still exited 0 under mutation",))))
+    assert c.blocked is True
+    assert "row 20 HELD" in c.reason
+
+
+def test_condition_19_holds_when_step_did_not_run():
+    base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
+                classification=Classification(), findings=[], unresolved_conformance=[],
+                phase5_status="pass", plan_auto_merge_false=False, headless=True,
+                dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
+                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY")
+    d = evaluate(ArmInputs(**base))   # exec_mutations_* deliberately omitted
+    c = _c19(d)
+    assert c.blocked is True and "did not run" in c.reason
+    assert d.armed is False
+
+
+def test_condition_19_holds_on_tree_suspect():
+    c = _c19(evaluate(inputs(exec_mutations_holding=(), exec_mutations_tree_suspect=True)))
+    assert c.blocked is True
+    assert "tree not verified clean" in c.reason
+
+
+def test_condition_19_never_releases_other_holds():
+    d = evaluate(inputs(unresolved_conformance=["MISSING: x"],
+                        exec_mutations_holding=(), exec_mutations_tree_suspect=False))
+    assert d.armed is False
+    assert {c.number for c in d.holds} == {3}

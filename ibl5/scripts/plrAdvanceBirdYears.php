@@ -10,10 +10,27 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../db/db.php';
 
-$plrFile = fopen("IBL5.plr", "rb+");
+$rawArgv = $_SERVER['argv'] ?? [];
+$cliArgs = is_array($rawArgv) ? array_values(array_filter(array_slice($rawArgv, 1), 'is_string')) : [];
+
+try {
+    $session = \PlrParser\PlrBulkEditSession::fromCliArgs('advance-bird', $cliArgs);
+} catch (\InvalidArgumentException $e) {
+    fwrite(STDERR, $e->getMessage() . "\n");
+    exit(2);
+}
+
+try {
+    $plrFile = $session->open();
+} catch (\RuntimeException $e) {
+    fwrite(STDERR, 'Aborted before any write: ' . $e->getMessage() . "\n");
+    exit(1);
+}
+
+echo $session->isDryRun()
+    ? "DRY RUN: IBL5.plr opened read-only; no bytes will be written.\n"
+    : 'Backup written and verified: ' . $session->backupPath() . "\n";
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
 
@@ -36,7 +53,7 @@ while (!feof($plrFile)) {
         fseek($plrFile, -2, SEEK_CUR);
 
         $bird = sprintf("%2d", (int) $bird + 1);
-        fwrite($plrFile, $bird, 2);
+        $session->write($plrFile, substr($bird, 0, 2));
         echo "$name's new bird years = " . $bird . "<br>";
         echo "<br>";
         
@@ -46,4 +63,4 @@ while (!feof($plrFile)) {
 }
 fclose($plrFile);
 
-echo "done.";
+echo $session->isDryRun() ? "done (dry run: no bytes written)." : "done.";

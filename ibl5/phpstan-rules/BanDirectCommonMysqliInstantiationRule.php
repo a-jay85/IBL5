@@ -33,6 +33,8 @@ final class BanDirectCommonMysqliInstantiationRule implements Rule
         '/tests/',
         '/scripts/',
         '/Bootstrap/',
+        '/Module/ModuleServices.php',
+        '/Module/Factories/',
         'mainfile.php',
         'api.php',
     ];

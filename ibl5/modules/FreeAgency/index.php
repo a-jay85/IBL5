@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use FreeAgency\FreeAgencyController;
-
 /************************************************************************/
 /*                     IBL Free Agency Module                           */
 /*               (c) July 22, 2005 by Spencer Cooley                    */
@@ -18,9 +16,7 @@ $module_name = basename(dirname(__FILE__));
 
 $pagetitle = "- Free Agency System";
 
-global $mysqli_db, $authService, $user;
-/** @var \mysqli $mysqli_db */
-/** @var \Auth\Contracts\AuthServiceInterface $authService */
+global $user;
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
@@ -28,23 +24,5 @@ global $mysqli_db, $authService, $user;
 $pa  = is_string($_REQUEST['pa']  ?? null) ? $_REQUEST['pa']  : '';
 $pid = is_numeric($_REQUEST['pid'] ?? null) ? (int) $_REQUEST['pid'] : 0;
 
-$commonRepo = new Repositories\TeamIdentityRepository($mysqli_db);
-$repository = new FreeAgency\FreeAgencyRepository($mysqli_db);
-$salaryCapRepo = new Repositories\SalaryCapRepository($mysqli_db);
-$demandRepository = new FreeAgency\FreeAgencyDemandRepository($mysqli_db, $salaryCapRepo);
-$tableRenderer = new FreeAgency\FreeAgencyTableRendererView($commonRepo);
-$service = new FreeAgency\FreeAgencyService($repository, $demandRepository, $mysqli_db, $commonRepo);
-$view = new FreeAgency\FreeAgencyView(
-    new FreeAgency\FreeAgencyUnderContractSectionView($tableRenderer),
-    new FreeAgency\FreeAgencyContractOffersSectionView($tableRenderer),
-    new FreeAgency\FreeAgencyTeamFreeAgentsSectionView($tableRenderer),
-    new FreeAgency\FreeAgencyOtherFreeAgentsSectionView($tableRenderer)
-);
-$processor = new FreeAgency\FreeAgencyProcessor(
-    $mysqli_db,
-    $commonRepo,
-    new FreeAgency\FreeAgencyMarketDemandCalculator($demandRepository)
-);
-$request = \Http\HttpRequest::fromGlobals();
-$controller = new FreeAgencyController($mysqli_db, $commonRepo, $authService, $service, $view, $processor, $request);
-$controller->handleRequest($user, $pa, $pid);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\FreeAgencyFactory::class);
+$factory->controller()->handleRequest($user, $pa, $pid);

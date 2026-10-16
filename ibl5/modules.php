@@ -82,9 +82,12 @@ if (is_string($requestName) && $requestName !== '') {
         }
     }
 
-    // Phase-based access control
-    global $mysqli_db, $leagueContext;
-    $season = new \Season\Season($mysqli_db);
+    // Phase-based access control. Module services are published only after the
+    // page-cache HIT exit above, so a cache hit constructs nothing.
+    global $mysqli_db, $leagueContext, $bootApp;
+    $moduleServices = new \Module\ModuleServices($bootApp->getContainer());
+    \Module\ModuleServices::publish($moduleServices);
+    $season = $moduleServices->season();
     $accessControl = new Module\ModuleAccessControl($season, $leagueContext, $mysqli_db);
 
     $isModuleAccessible = $accessControl->isModuleAccessible($name);

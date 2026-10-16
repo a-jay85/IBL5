@@ -46,6 +46,13 @@ def pr3267_inputs(tmp_dir, v1="NOT READY", v2="READY WITH NOTES") -> dict:
         "rounds": [], "rounds_completed": 0, "findings_round": 0,
         "backlog_issue_numbers": [1492], "diff_id": "a" * 40, "plan_hash": "b" * 64,
         "verdict_path": path_1,
+        "review_items": [{**fidelity.verdict_items(path_1), "remediation_sha": None}],
+        "filed_notes": [{"title": "Note one", "issue": 1492, "state": "filed"},
+                        {"title": "Note two", "issue": None, "state": "not filed"}],
+        "code_review": {"phase4b_ran": False, "seen": {"scanned": True, "comment": {
+            "created_at": "2026-10-16T06:51:18Z",
+            "url": "https://github.com/a-jay85/IBL5/pull/3267#issuecomment-1",
+            "summary": "No issues found."}}},
     }
     if v2 is not None:
         path_2 = write_verdict_file(
@@ -55,6 +62,8 @@ def pr3267_inputs(tmp_dir, v1="NOT READY", v2="READY WITH NOTES") -> dict:
             "remediation_sha": REMEDIATION_SHA, "verdict_2": v2,
             "reviewed_tree_2": TREE_2, "rounds_completed": 1, "findings_round": 1,
             "verdict_path": path_2,
+            "review_items": fid["review_items"] + [
+                {**fidelity.verdict_items(path_2), "remediation_sha": REMEDIATION_SHA}],
             "rounds": [{"remediation_sha": REMEDIATION_SHA, "verdict": v2,
                         "reviewed_tree": "tree2aaaa", "verdict_path": path_2,
                         "model": "opus"}],

@@ -1095,7 +1095,7 @@ def test_sticky_layout_keeps_reader_anchors(tmp_path):
 
 
 def test_sticky_without_review_items_keeps_excerpt_visible(tmp_path):
-    body = _pr3267_body(tmp_path)
+    body = _pr3267_body(tmp_path, review_items=None, filed_notes=None, code_review=None)
     assert "### Fixed in this PR" not in body
     assert "### Still open" not in body
     assert "Reviewer verdict" not in body

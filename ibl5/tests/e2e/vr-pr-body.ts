@@ -54,17 +54,17 @@ export function formatStamp(headSha: string, runTime: Date): string {
   return `_VR screens for head \`${sha}\` at ${when} UTC._`;
 }
 
-// Returns the agent-shot sub-block (markers inclusive) from a body whose managed
-// block sits at offset 0; '' otherwise. Text outside the managed block is never read.
+// Returns the agent-shot sub-block (markers inclusive) from the first managed block, wherever it sits; '' otherwise. Text outside that block is never read.
 export function extractAgentShots(body: string): string {
-  if (!body.startsWith(PR_BODY_MARKER_BEGIN)) return '';
-  const blockEnd = body.indexOf(PR_BODY_MARKER_END);
-  if (blockEnd === -1) return '';
-  const begin = body.indexOf(AGENT_SHOTS_BEGIN);
+  const [b] = findManagedBlocks(body);
+  if (b === undefined) return '';
+  const block = body.slice(b.start, b.end);
+  const blockEnd = block.length;
+  const begin = block.indexOf(AGENT_SHOTS_BEGIN);
   if (begin === -1 || begin >= blockEnd) return '';
-  const end = body.indexOf(AGENT_SHOTS_END, begin + AGENT_SHOTS_BEGIN.length);
+  const end = block.indexOf(AGENT_SHOTS_END, begin + AGENT_SHOTS_BEGIN.length);
   if (end === -1 || end + AGENT_SHOTS_END.length > blockEnd) return '';
-  return body.slice(begin, end + AGENT_SHOTS_END.length);
+  return block.slice(begin, end + AGENT_SHOTS_END.length);
 }
 
 const AGENT_SHOT_ENTRY_END = '<!-- /vr-agent-shot -->';
@@ -109,15 +109,15 @@ export function upsertAgentShots(body: string, entries: { label: string; entry: 
   }
   const subBlock = [AGENT_SHOTS_BEGIN, ...merged.map((m) => m.entry), AGENT_SHOTS_END].join('\n');
 
-  const hasBlock = body.startsWith(PR_BODY_MARKER_BEGIN) && body.indexOf(PR_BODY_MARKER_END) !== -1;
-  if (!hasBlock) {
+  const [b] = findManagedBlocks(body);
+  if (b === undefined) {
     return spliceBody(body, [PR_BODY_MARKER_BEGIN, '', subBlock, PR_BODY_MARKER_END].join('\n'));
   }
   if (current !== '') {
-    const at = body.indexOf(current);
+    const at = body.indexOf(current, b.start);
     return body.slice(0, at) + subBlock + body.slice(at + current.length);
   }
-  const end = body.indexOf(PR_BODY_MARKER_END);
+  const end = b.end - PR_BODY_MARKER_END.length;
   return body.slice(0, end) + subBlock + '\n' + body.slice(end);
 }
 
@@ -280,14 +280,53 @@ export function normalizeBody(raw: string | null | undefined): string {
   return b.replace(/\n+$/, '');
 }
 
-// Offset-0-only, clobber-safe splice. currentBody must already be normalized.
-export function spliceBody(currentBody: string, section: string): string {
-  let human = currentBody;
-  if (currentBody.startsWith(PR_BODY_MARKER_BEGIN)) {
-    const end = currentBody.indexOf(PR_BODY_MARKER_END);
-    if (end !== -1) human = currentBody.slice(end + PR_BODY_MARKER_END.length).replace(/^\s+/, '');
-    // BEGIN-at-0 but no END => malformed (never written by us); leave human = currentBody.
+export interface ManagedBlock { start: number; end: number } // [start, end): BEGIN line start .. just past END marker text
+
+// Every managed vr-new-screens block in body order. A block starts at an own-line BEGIN
+// marker outside any fenced code block and ends at the next own-line END marker. Inline
+// mentions, fenced markers, an unterminated BEGIN and a stray END are human text.
+export function findManagedBlocks(body: string): ManagedBlock[] {
+  const blocks: ManagedBlock[] = [];
+  let open: number | null = null;
+  let fence: { ch: string; len: number } | null = null;
+  let offset = 0;
+  for (const line of body.split('\n')) {
+    const lineStart = offset;
+    offset += line.length + 1;
+    const f = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (f !== null) {
+      const run = f[1];
+      if (fence === null) fence = { ch: run[0], len: run.length };
+      else if (run[0] === fence.ch && run.length >= fence.len) fence = null;
+      continue;
+    }
+    if (fence !== null) continue;
+    const t = line.trim();
+    if (t === PR_BODY_MARKER_BEGIN) {
+      open = lineStart;
+    } else if (t === PR_BODY_MARKER_END && open !== null) {
+      blocks.push({ start: open, end: lineStart + line.indexOf(PR_BODY_MARKER_END) + PR_BODY_MARKER_END.length });
+      open = null;
+    }
   }
-  if (section === '') return human; // strip case
-  return human === '' ? section : `${section}\n\n${human}`;
+  return blocks;
+}
+
+// Replaces the first managed block in place, strips every later one, and prepends only when none exists. currentBody must already be normalized.
+export function spliceBody(currentBody: string, section: string): string {
+  const blocks = findManagedBlocks(currentBody);
+  if (blocks.length === 0) {
+    if (section === '') return currentBody;
+    return currentBody === '' ? section : `${section}\n\n${currentBody}`;
+  }
+  const before = currentBody.slice(0, blocks[0].start).replace(/\s+$/, '');
+  const after: string[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const from = blocks[i].end;
+    const to = i + 1 < blocks.length ? blocks[i + 1].start : currentBody.length;
+    const gap = currentBody.slice(from, to).replace(/^\s+/, '');
+    const piece = i + 1 < blocks.length ? gap.replace(/\s+$/, '') : gap;
+    if (piece !== '') after.push(piece);
+  }
+  return [before, section, after.join('\n\n')].filter((p) => p !== '').join('\n\n');
 }

@@ -416,12 +416,6 @@ if (updatePr !== null) {
     }
     runTime = new Date(runTimeArg);
   }
-  const raw = dryRun
-    ? bodyFileIn !== null && existsSync(bodyFileIn)
-      ? readFileSync(bodyFileIn, 'utf-8')
-      : ''
-    : execFileSync('gh', ['pr', 'view', updatePr, '--json', 'body', '-q', '.body'], { encoding: 'utf-8' });
-  const cur = normalizeBody(raw);
   let spots: { beforeFile: string }[] = [];
   if (spotsPath !== null && existsSync(spotsPath)) {
     try {
@@ -431,19 +425,23 @@ if (updatePr !== null) {
       // unreadable spots.json -> no changed section, never a crash in CI
     }
   }
-  const section = buildPrBodyBlock({
-    newCells: rawNewCells,
-    spots,
-    pagesUrl,
-    headSha,
-    runTime,
-    agentShots: extractAgentShots(cur),
-  });
-  const next = spliceBody(cur, section);
   if (dryRun) {
-    process.stdout.write(next + '\n');
+    const dryRaw = bodyFileIn !== null && existsSync(bodyFileIn) ? readFileSync(bodyFileIn, 'utf-8') : '';
+    const dryCur = normalizeBody(dryRaw);
+    const drySection = buildPrBodyBlock({
+      newCells: rawNewCells,
+      spots,
+      pagesUrl,
+      headSha,
+      runTime,
+      agentShots: extractAgentShots(dryCur),
+    });
+    process.stdout.write(spliceBody(dryCur, drySection) + '\n');
     process.exit(0);
   }
+  // Poll before reading the live body so the body snapshot is as fresh as
+  // possible — a concurrent edit that lands during the poll window would
+  // otherwise be overwritten with the stale version read before the wait.
   const base = pagesUrl.endsWith('/') ? pagesUrl : pagesUrl + '/';
   const firstUrl =
     rawNewCells.length > 0
@@ -455,6 +453,17 @@ if (updatePr !== null) {
     const ok = await waitForFirstScreen(firstUrl);
     if (!ok) process.stderr.write('vr-review-comment: screen URL not live; editing anyway\n');
   }
+  const raw = execFileSync('gh', ['pr', 'view', updatePr, '--json', 'body', '-q', '.body'], { encoding: 'utf-8' });
+  const cur = normalizeBody(raw);
+  const section = buildPrBodyBlock({
+    newCells: rawNewCells,
+    spots,
+    pagesUrl,
+    headSha,
+    runTime,
+    agentShots: extractAgentShots(cur),
+  });
+  const next = spliceBody(cur, section);
   if (next === cur) {
     process.stdout.write('vr-review-comment: PR body already current; no edit\n');
     process.exit(0);

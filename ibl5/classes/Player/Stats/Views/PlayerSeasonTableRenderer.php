@@ -29,9 +29,10 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
     {
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="sortable ibl-data-table player-view-table">
+<thead>
     <tr>
-        <td colspan=<?= $config->getColspan() ?> class="player-table-header"><?= HtmlSanitizer::e($config->title) ?></td>
+        <td colspan=<?= $config->getColspan() ?> class="player-view-table__title"><?= HtmlSanitizer::e($config->title) ?></td>
     </tr>
     <tr>
         <th>year</th>
@@ -50,6 +51,8 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
         <th>pf</th>
         <th>pts</th>
     </tr>
+</thead>
+<tbody>
         <?php
         foreach ($seasonRows as $row) {
             /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
@@ -74,12 +77,16 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
     </tr>
             <?php
         }
+        ?>
+</tbody>
+        <?php
 
         // Career averages row
         if ($careerAverages !== null) {
             /** @var array{pid: int, name: string, games: int, minutes: float, fgm: float, fga: float, fgpct: float, ftm: float, fta: float, ftpct: float, tgm: float, tga: float, tpct: float, orb: float, reb: float, ast: float, stl: float, tvr: float, blk: float, pf: float, pts: float, retired: int, ...<string, mixed>} $careerAverages */
             ?>
-    <tr class="player-table-row-bold">
+<tfoot>
+    <tr class="career-row">
         <td colspan=2><?= HtmlSanitizer::e($config->careerLabel) ?></td>
         <td><?= (int)$careerAverages['games'] ?></td>
         <td><?= StatsFormatter::formatWithDecimals($careerAverages['minutes'], 1) ?></td>
@@ -95,6 +102,7 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
         <td><?= StatsFormatter::formatWithDecimals($careerAverages['pf'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals($careerAverages['pts'], 1) ?></td>
     </tr>
+</tfoot>
             <?php
         }
         ?>
@@ -117,9 +125,10 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="sortable ibl-data-table player-view-table">
+<thead>
     <tr>
-        <td colspan=<?= $config->getColspan() ?> class="player-table-header"><?= HtmlSanitizer::e($config->title) ?></td>
+        <td colspan=<?= $config->getColspan() ?> class="player-view-table__title"><?= HtmlSanitizer::e($config->title) ?></td>
     </tr>
     <tr>
         <th>year</th>
@@ -138,6 +147,8 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
         <th>pf</th>
         <th>pts</th>
     </tr>
+</thead>
+<tbody>
         <?php
         foreach ($seasonRows as $row) {
             /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
@@ -196,7 +207,9 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
             <?php
         }
         ?>
-    <tr class="player-table-row-bold">
+</tbody>
+<tfoot>
+    <tr class="career-row">
         <td colspan=2><?= HtmlSanitizer::e($config->careerLabel) ?></td>
         <td><?= (int)$carTotals['gm'] ?></td>
         <td><?= (int)$carTotals['min'] ?></td>
@@ -212,6 +225,7 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
         <td><?= (int)$carTotals['pf'] ?></td>
         <td><?= (int)$carTotals['pts'] ?></td>
     </tr>
+</tfoot>
 </table>
         <?php
         return (string) ob_get_clean();

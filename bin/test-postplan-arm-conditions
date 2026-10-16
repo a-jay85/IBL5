@@ -1362,6 +1362,50 @@ printf '%s\n' '---' 'auto_merge: false' '---' '# drifted' > "$c7_dir/plan-myvar.
 expect_block "(7) drift-adopted plan declares auto_merge: false -> BLOCK" BLOCK \
     "$(run_cond7_slug "$B7" "myvar" "$c7_dir")"
 
+# condition (7), docs-only-ready — PR facts through the env seams (no gh shim).
+# run_cond7_token <block> <plan-value> <head-ref> <files-json> <body> <verdict-kind>
+# verdict-kind is a mk_verdict_fixture kind (ready, notes, absent).
+c7_two_way='**Merge danger:** Door: two-way · Blast radius: localized · Why: doc text only, no code path changes.'
+c7_one_way='**Merge danger:** Door: one-way · Blast radius: localized · Why: doc text only, no code path changes.'
+c7_docs_files='[{"path":"ibl5/docs/decisions/0086-x.md"},{"path":"ibl5/classes/Foo/README.md"}]'
+c7_have() { # name haystack needle (the shared have() is defined further down)
+    if grep -qF -- "$3" <<< "$2"; then echo "ok: $1"
+    else echo "FAIL: $1 — missing literal '$3' in: '$2'"; FAILED=1; fi
+}
+run_cond7_token() {
+    local plan_f="$BASE_TMP/c7-token-plan.md" vf="$BASE_TMP/c7-token-verdict.md"
+    printf '%s\n' '---' "auto_merge: $2" '---' '# Plan' > "$plan_f"
+    mk_verdict_fixture "$6" "$vf"
+    PLAN_DIR="$BASE_TMP/c7-empty-plans" PLAN_FILE="$plan_f" PR_NUM=0 PR_HEAD_REF="$3" \
+      PR_FILES_JSON="$4" PR_BODY="$5" FIDELITY_VERDICT_FILE="$vf" \
+      FIDELITY_VERDICT_FILE_2="$BASE_TMP/c7-no-verdict-2.md" bash -c "$1" 2>&1
+}
+expect_block "(7) docs-only-ready, qualifying PR -> NONE" NONE \
+    "$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" ready)"
+expect_block "(7) false with a qualifying PR -> BLOCK" BLOCK \
+    "$(run_cond7_token "$B7" false docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" ready)"
+c7_unknown="$(run_cond7_token "$B7" maybe docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" ready)"
+expect_block "(7) unknown value -> BLOCK" BLOCK "$c7_unknown"
+c7_have "(7) unknown value names it" "$c7_unknown" "unknown auto_merge value 'maybe'"
+c7_branch="$(run_cond7_token "$B7" docs-only-ready feature-x "$c7_docs_files" "$c7_two_way" ready)"
+expect_block "(7) token on a non-refresh branch -> BLOCK" BLOCK "$c7_branch"
+c7_have "(7) names the branch clause" "$c7_branch" 'docs-refresh:branch:feature-x'
+c7_paths="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 '[{"path":"ibl5/docs/a.md"},{"path":".claude/rules/x.md"}]' "$c7_two_way" ready)"
+expect_block "(7) token with a .claude/ path -> BLOCK" BLOCK "$c7_paths"
+c7_have "(7) names the paths clause" "$c7_paths" 'docs-refresh:paths:.claude/rules/x.md'
+c7_oneway="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_one_way" ready)"
+expect_block "(7) token with one-way door -> BLOCK" BLOCK "$c7_oneway"
+c7_have "(7) names the merge-danger clause" "$c7_oneway" 'docs-refresh:merge-danger:ONE-WAY'
+c7_nomd="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "body without the line" ready)"
+expect_block "(7) token with MISSING merge-danger line -> BLOCK" BLOCK "$c7_nomd"
+c7_have "(7) names MISSING" "$c7_nomd" 'docs-refresh:merge-danger:MISSING'
+c7_notes="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" notes)"
+expect_block "(7) token with READY WITH NOTES -> BLOCK" BLOCK "$c7_notes"
+c7_have "(7) names the verdict clause" "$c7_notes" 'docs-refresh:verdict:READY WITH NOTES'
+c7_noverdict="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" absent)"
+expect_block "(7) token with no verdict file -> BLOCK" BLOCK "$c7_noverdict"
+c7_have "(7) names <none>" "$c7_noverdict" 'docs-refresh:verdict:<none>'
+
 # condition (13) — slug-drift hold
 c13_dir="$BASE_TMP/c13-plans"
 mkdir -p "$c13_dir"

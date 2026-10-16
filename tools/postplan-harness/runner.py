@@ -282,6 +282,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     _active_audit = audit
     state = statefile.StateFile(os.path.join(_state_dir(out_dir, live, state_dir), statefile.safe_slug(slug) + ".json"), slug, git, out_dir, log)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
+        f"auto_merge_value={getattr(plan, 'auto_merge_value', None)!r} "
         f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)} "
         f"slug_drift={plan.slug_drift or '-'} plan_source={plan.plan_source or '-'}")
 
@@ -728,6 +729,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
+            plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
+            branch=git.branch(),
             dep_state_lookup=lambda n: gh.pr_state(n),
             # Phase 5.5 above produced these. None means INDETERMINATE (the reviewer
             # degraded or was not run), which holds condition (12) — it is never

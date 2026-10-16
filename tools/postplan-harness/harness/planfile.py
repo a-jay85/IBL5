@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+from typing import Optional
 
 from . import manual_rows
 from .classify import BACKLOG_REPO
@@ -48,18 +49,27 @@ _LEGAL_STOP_CONDITIONS = ("tests-green", "evidence-present")
 _EVIDENCE_TOKEN = re.compile(r"^[A-Za-z0-9._/-]+$")
 
 
-def frontmatter_auto_merge_false(content: str) -> bool:
-    """Line-1 YAML frontmatter only (a body documenting the syntax can't self-select)."""
+def frontmatter_auto_merge_value(content: str) -> Optional[str]:
+    """Raw `auto_merge:` value from the line-1 YAML frontmatter; None when the
+    file has no frontmatter or the key is absent. Line-1 frontmatter only (a body
+    documenting the syntax can't self-select). Whitespace-stripped, never lowercased:
+    `False` is an unknown value and condition (7) holds on it.
+    """
     lines = content.splitlines()
     if not lines or not re.match(r"^---\s*$", lines[0]):
-        return False
+        return None
     for line in lines[1:]:
         if re.match(r"^---\s*$", line):
-            return False
+            return None
         m = re.match(r"^auto_merge:\s*(.+?)\s*$", line)
         if m:
-            return m.group(1).strip() == "false"
-    return False
+            return m.group(1).strip()
+    return None
+
+
+def frontmatter_auto_merge_false(content: str) -> bool:
+    """Kept for existing callers and tests: True only for the exact value `false`."""
+    return frontmatter_auto_merge_value(content) == "false"
 
 
 def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
@@ -912,6 +922,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
             content = fh.read()
     info.found = True
     info.auto_merge_false = frontmatter_auto_merge_false(content)
+    info.auto_merge_value = frontmatter_auto_merge_value(content)
     info.stop_condition, info.evidence, info.contract_error = frontmatter_autonomy_contract(content)
     info.has_matrix = any(_MATRIX_HEADER.match(l) for l in content.splitlines())
     info.has_security = any(_SECURITY_H.match(l) for l in content.splitlines())

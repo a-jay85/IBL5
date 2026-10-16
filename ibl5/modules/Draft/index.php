@@ -7,7 +7,8 @@ declare(strict_types=1);
 /* 3/22/2005                                                            */
 /************************************************************************/
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -33,9 +34,14 @@ $controller = new \Draft\DraftController(
     null, null, $nukeCompat
 );
 
+$postData = [];
+foreach ($_POST as $key => $value) {
+    $postData[(string) $key] = $value;
+}
+
 switch ($op) {
     case 'select':
-        echo $controller->submitSelection($_POST, $user);
+        echo $controller->submitSelection($postData, $user);
         break;
     default:
         $controller->main($user);

@@ -353,12 +353,8 @@ class NewsControllerGoldenTest extends ModuleEntryPointTestCase
             'header' => $this->captureBuffered(static function (): void {
                 \PageLayout\PageLayout::header();
             }),
-            'open' => $this->captureBuffered(static function (): void {
-                OpenTable();
-            }),
-            'close' => $this->captureBuffered(static function (): void {
-                CloseTable();
-            }),
+            'open' => (string) file_get_contents(__DIR__ . '/fixtures/table-chrome/open-remote.html'),
+            'close' => (string) file_get_contents(__DIR__ . '/fixtures/table-chrome/close.html'),
             'footer' => $this->captureBuffered(static function (): void {
                 \PageLayout\PageLayout::footer();
             }),
@@ -415,8 +411,23 @@ class NewsControllerGoldenTest extends ModuleEntryPointTestCase
             $recapService ?? $this->recapServiceStub,
             $recapView ?? $this->recapViewStub,
             $news ?? self::createStub(\Topics\News\Contracts\NewsServiceInterface::class),
-            $view ?? self::createStub(\Topics\News\Contracts\NewsViewInterface::class),
+            $this->withRealChrome($view ?? self::createStub(\Topics\News\Contracts\NewsViewInterface::class)),
         );
+    }
+
+    /**
+     * Interface doubles return '' from the string-returning chrome methods; route them to the real NewsView
+     * so the page-level output stays comparable to the captured legacy bytes.
+     */
+    private function withRealChrome(\Topics\News\Contracts\NewsViewInterface $view): \Topics\News\Contracts\NewsViewInterface
+    {
+        if ($view instanceof \PHPUnit\Framework\MockObject\Stub) {
+            $real = new \Topics\News\NewsView();
+            $view->method('renderPageTitle')->willReturnCallback($real->renderPageTitle(...));
+            $view->method('renderTopicBanner')->willReturnCallback($real->renderTopicBanner(...));
+        }
+
+        return $view;
     }
 
     private function runMain(NewsController $controller, mixed $newTopic = 0): string

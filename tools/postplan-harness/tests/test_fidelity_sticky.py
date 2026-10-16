@@ -14,6 +14,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import sticky_shapes
 from harness import fidelity
 from harness.armable import ArmInputs, evaluate
 from harness.state import Classification
@@ -898,3 +899,38 @@ def test_remediation_denied_tools_contain_write_and_merge_verbs():
     assert "Bash(gh pr review:*)" in denied
     assert "Bash(gh api:*)" in denied
     assert "Agent" in denied
+
+
+# --- header word equals footer word ------------------------------------------
+
+
+def _verdict_word(line: str, cuts: tuple) -> str:
+    word = line.replace("*", "")
+    for cut in cuts:
+        word = word.split(cut)[0]
+    return word.strip()
+
+
+_VERDICT_WORDS = ("READY WITH NOTES", "NOT READY", "READY")
+
+
+@pytest.mark.parametrize("v1,v2", [
+    ("READY", None),
+    ("READY WITH NOTES", None),
+    ("NOT READY", "READY"),
+    ("NOT READY", "READY WITH NOTES"),
+    ("NOT READY", "NOT READY"),
+])
+def test_sticky_banner_verdict_matches_terminal_verdict(tmp_path, v1, v2):
+    """Catches a banner and a terminal line that compute the verdict separately."""
+    body = sticky_shapes.render_sticky(sticky_shapes.pr3267_inputs(tmp_path, v1, v2))
+    lines = body.splitlines()
+    assert lines[-1] == fidelity.STICKY_MARKER
+    banner = _verdict_word(lines[0], (" (", " \u2014", " \u00b7"))
+    footer = _verdict_word(
+        [ln for ln in lines[:-1] if ln.strip()][-1], (" (", " \u2014"))
+    assert banner == footer
+    above_rule = lines[:lines.index("---")]
+    stated = [ln for ln in above_rule
+              if ln.replace("*", "").strip().startswith(_VERDICT_WORDS)]
+    assert len(stated) == 1

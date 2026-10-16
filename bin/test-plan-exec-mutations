@@ -354,6 +354,42 @@ chk "NO-TIMEOUT reported" has "$OUT" "NO-TIMEOUT"
 chk "NO-TIMEOUT leaves target" eq "$(sha "$R/target.txt")" "$BEFORE"
 end_case
 
+# row20_e2e: the PR #3264 row 20 false claim, replayed on a detached worktree copy of
+# HEAD so no write touches this checkout. The mutation adds a second checkout `ref:`
+# naming the PR head to the after-merge-checklist job. bin/check-workflow-checkout
+# never reads `ref:` (HELD); bin/test-after-merge-checklist pins exactly one
+# default-branch ref (TRIPPED). Slow: one `git worktree add` plus two runs.
+start_case row20_e2e
+WT="$TMP/row20-wt"
+WF=".github/workflows/merge-digest-notify.yml"
+XM_MATCH='          # bin/after-merge-checklist must run, not the copy inside the PR being announced.'
+XM_REPLACE='          ref: ${{ github.event.pull_request.head.sha }}'
+if git -C "$REPO_ROOT" worktree add --detach "$WT" HEAD >/dev/null 2>&1; then
+    trap 'git -C "$REPO_ROOT" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMP"' EXIT
+    WF_BEFORE=$(sha "$WT/$WF")
+    for which in a b; do
+        if [ "$which" = a ]; then CHECK='bin/check-workflow-checkout'; else CHECK='bin/test-after-merge-checklist'; fi
+        P="$TMP/plan-$which.md"
+        printf '# Row 20 fixture\n\n## Verification Matrix\n\n| # | What to verify | Test type | Timing | Test file / location |\n|---|---------------|-----------|--------|---------------------|\n| 20 | checkout ref is the default branch | CLI-executable | post-impl | `%s` |\n\n## Executable Mutations\n\n%smutation\nrow: 20\nfile: %s\nmatch: %s\nreplace: %s\n%s\n' \
+            "$CHECK" "$F" "$WF" "$XM_MATCH" "$XM_REPLACE" "$F" > "$P"
+        OUT=$("$LIB" run --root "$WT" --timeout 60 "$P" 2>&1); RC=$?
+        if [ "$which" = a ]; then
+            chk "plan A exits 1" eq "$RC" 1
+            chk "plan A HELD" eval 'grep -qE "^HELD row 20 — bin/check-workflow-checkout still exited 0 under mutation" <<< "$OUT"'
+        else
+            chk "plan B exits 0" eq "$RC" 0
+            chk "plan B TRIPPED" eval 'grep -qE "^TRIPPED row 20 — bin/test-after-merge-checklist exited [1-9]" <<< "$OUT"'
+        fi
+        chk "plan $which porcelain empty" porcelain_clean "$WT"
+        chk "plan $which sha unchanged" eq "$(sha "$WT/$WF")" "$WF_BEFORE"
+        chk "plan $which .git is a worktree pointer" test -f "$WT/.git"
+        chk "plan $which journal empty" eval '[ -z "$(ls "$(git -C "$WT" rev-parse --absolute-git-dir)/exec-mutations/"*.meta 2>/dev/null)" ]'
+    done
+else
+    CASE_ERR="git worktree add failed"
+fi
+end_case
+
 if [ "$FAILS" -gt 0 ]; then
     echo "test-plan-exec-mutations: $FAILS case(s) failed"
     exit 1

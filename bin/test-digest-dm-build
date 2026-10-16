@@ -417,6 +417,37 @@ OUT="$(bash "$DRIVER" --pr-number 2200 --title "$(_rep T 80)" \
 want "prefix present" "$OUT" '!! ONE-WAY DOOR (blast radius: external)'
 eq "whole DM under the Discord cap" "$([ "${#OUT}" -lt 2000 ] && echo under || echo over)" "under"
 
+# ---------------------------------------------------------------------------
+# pr3267 dual-layout — the old (v1) and new (v2) sticky layouts fold to the same five
+# label/value pairs, and none of the v2-only sections leaks into a value. _digest_labels
+# is a function inside the driver (it has no flag of its own), so lift it by name.
+# ---------------------------------------------------------------------------
+eval "$(sed -n '/^_digest_labels() {/,/^}/p' "$DRIVER")"
+PR3267_DIR="$ROOT/bin/fixtures/review-shared"
+PR3267_V1="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v1.json")"
+PR3267_V2="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v2.json")"
+PR3267_WANT="$(printf '%s\t%s\n' \
+    'What changed' 'a thing' \
+    'Why' 'a reason' \
+    'Watch' 'a page' \
+    'Touches' 'a file' \
+    'Machine-authored fixes' 'none (post-plan remediation: 009d537a1b2c)')"
+
+begin_case "pr3267-v1-digest-labels"
+PR3267_L1="$(_digest_labels <<< "$PR3267_V1")"
+eq "five label/value pairs" "$PR3267_L1" "$PR3267_WANT"
+wantnot "no Still open" "$PR3267_L1" 'Still open'
+wantnot "no Fixed in this PR" "$PR3267_L1" 'Fixed in this PR'
+wantnot "no Code review" "$PR3267_L1" 'Code review'
+
+begin_case "pr3267-v2-digest-labels"
+PR3267_L2="$(_digest_labels <<< "$PR3267_V2")"
+eq "equal to the v1 pairs" "$PR3267_L2" "$PR3267_L1"
+eq "five label/value pairs" "$PR3267_L2" "$PR3267_WANT"
+wantnot "no Still open" "$PR3267_L2" 'Still open'
+wantnot "no Fixed in this PR" "$PR3267_L2" 'Fixed in this PR'
+wantnot "no Code review" "$PR3267_L2" 'Code review'
+
 begin_case "unknown-flag-exit-2"
 run "$SCRATCH/f1" --merge-danger x
 eq "unknown flag exits 2" "$RC" "2"

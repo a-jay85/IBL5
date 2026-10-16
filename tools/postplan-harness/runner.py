@@ -54,6 +54,7 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               MERGE_DIGEST_BEGIN, MERGE_DIGEST_END, render_merge_digest,
                               upsert_merge_digest,
                               MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC,
+                              render_after_merge_block, upsert_after_merge,
                               backlog_closes_mismatch, classify, files_from_diff,
                               modified_files_from_diff,
                               name_status_text, normalize_backlog_closes, numstat_text,
@@ -281,6 +282,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     _active_audit = audit
     state = statefile.StateFile(os.path.join(_state_dir(out_dir, live, state_dir), statefile.safe_slug(slug) + ".json"), slug, git, out_dir, log)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
+        f"auto_merge_value={getattr(plan, 'auto_merge_value', None)!r} "
         f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)} "
         f"slug_drift={plan.slug_drift or '-'} plan_source={plan.plan_source or '-'}")
 
@@ -611,6 +613,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # that follows (strip_change_blocks, gate_backtest) and the
         # single pr_edit_body call are unchanged.
         body = upsert_hold_notice(body, plan.hold_justification)
+        # Every pass (idempotent), so a fixer rewrite or an older body is repaired;
+        # outside the clearance == "UNKNOWN" branch on purpose.
+        body = upsert_after_merge(
+            body, render_after_merge_block(plan.post_merge_rows) if plan.found else "")
         # Remove files-changed/tests-changed blocks left by older harness runs.
         body = strip_change_blocks(body)
         _gb = gate_backtest_result(worktree or ".", diff, pr=pr, live=live,
@@ -723,6 +729,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
+            plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
+            branch=git.branch(),
             dep_state_lookup=lambda n: gh.pr_state(n),
             # Phase 5.5 above produced these. None means INDETERMINATE (the reviewer
             # degraded or was not run), which holds condition (12) — it is never
@@ -2838,8 +2846,19 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": [],
                     "diff_id": diff_id, "plan_hash": plan_hash}
+    # What code review the PR shows. `code_review_seen` reads the cache the one existing
+    # comments fetch filled, so this adds no network call. `res.fidelity` was replaced
+    # wholesale just above, so the key is set after it.
+    seen = getattr(gh, "code_review_seen", None)
+    res.fidelity["code_review"] = {
+        "phase4b_ran": bool(phase4b_ran),
+        "seen": (seen(pr) if (callable(seen) and live and pr) else None),
+    }
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
+    # Verdict 1's file: the round loop advances current_verdict_path, so this is the only
+    # handle on the first review's findings by compose time.
+    verdict_path_1 = current_verdict_path
     final_verdict, final_err = verdict, err
     for round_num in range(1, fidelity.MAX_FIDELITY_ROUNDS + 1):
         if final_verdict != "NOT READY":
@@ -3026,12 +3045,21 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # round already cleared, under a **Re-reviewed tree:** line that contradicts them.
         res.fidelity["verdict_path"] = path_n
         res.fidelity["findings_round"] = round_num
+    res.fidelity["review_items"] = [
+        {**fidelity.verdict_items(verdict_path_1), "remediation_sha": None}
+    ] + [
+        {**fidelity.verdict_items(r.get("verdict_path") or ""),
+         "remediation_sha": r.get("remediation_sha")}
+        for r in rounds
+    ]
     res.fidelity["models"] = [r["model"] for r in rounds]
     # Notes come from whichever review produced the final verdict: the initial one or
     # a re-review round. current_verdict_path tracks that review's verdict file.
     if final_verdict == "READY WITH NOTES":
         notes = fidelity.extract_notes(llm, current_verdict_path, log=log, pr_number=pr)
-        nums = fidelity.file_note_issues(gh, notes, pr, log=log)
+        filed_notes: list = []
+        nums = fidelity.file_note_issues(gh, notes, pr, log=log, filed=filed_notes)
+        res.fidelity["filed_notes"] = filed_notes
         res.fidelity["backlog_issue_numbers"] = nums
         log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
     return final_verdict, final_err

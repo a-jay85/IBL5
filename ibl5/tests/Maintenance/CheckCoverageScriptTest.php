@@ -135,4 +135,14 @@ final class CheckCoverageScriptTest extends TestCase
 
         self::assertSame(1, $result['code']);
     }
+
+    #[Test]
+    public function testTooFewArgumentsPrintsUsageAndExitsOne(): void
+    {
+        $result = $this->runScript([$this->createCloverXml(100, 85)]);
+
+        self::assertSame(1, $result['code']);
+        self::assertStringContainsString('Usage: php bin/check-coverage <clover-file> <threshold>', $result['stderr']);
+        self::assertSame('', $result['stdout']);
+    }
 }

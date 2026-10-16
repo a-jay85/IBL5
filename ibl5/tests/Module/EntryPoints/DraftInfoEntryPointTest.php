@@ -246,4 +246,26 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->assertTrue(ModuleRegistry::isValid('DraftInfo'));
     }
+
+    public function testTeamIdWithTrailingJunkParsesLeadingDigits(): void
+    {
+        // (int)'5abc' === 5, so the team branch renders for team 5.
+        $this->mockDb->setMockTeamData([self::fullTeamData(['teamid' => 5, 'team_name' => 'TrailingJunkTeam'])]);
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('DraftInfo', ['tab' => 'history', 'teamid' => '5abc']);
+
+        $this->assertStringContainsString('TrailingJunkTeam', $output);
+        $this->assertQueryExecuted("draftedby = 'TrailingJunkTeam'");
+    }
+
+    public function testArrayTeamIdRendersYearIndex(): void
+    {
+        // teamid[]=5 is an array, not a numeric string, so it falls back to 0 and the year index renders.
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('DraftInfo', ['tab' => 'history', 'teamid' => ['5']]);
+
+        $this->assertNotSame('', $output);
+        $this->assertQueryExecuted('draftyear');
+        $this->assertQueryNotExecuted("draftedby = '");
+    }
 }

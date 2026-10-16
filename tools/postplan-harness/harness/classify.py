@@ -621,6 +621,61 @@ def upsert_reviewer_verification(body: str, block: str) -> str:
     return body.rstrip() + "\n\n" + block + "\n"
 
 
+# ## After merge: Truly-manual rows tagged `post-merge:` (bin/check-plan gate [PM]).
+# The heading is the begin anchor, so it ends the Phase 6.5 condition (1) window
+# and upsert_reviewer_verification (insert before the next heading) lands above it.
+AFTER_MERGE_HEADING = "## After merge"
+AFTER_MERGE_END = "<!-- after-merge:end -->"
+_AFTER_MERGE_RE = re.compile(r"^## After merge[ \t]*$", re.M)
+
+
+def render_after_merge_block(rows: list) -> str:
+    """The `## After merge` block for post-merge rows, or "" when there are none."""
+    if not rows:
+        return ""
+    from .manual_rows import render_after_merge  # local import keeps module-level cycle-free
+    return (
+        f"{AFTER_MERGE_HEADING}\n\n"
+        "These rows run only after the PR merges. The merge workflow posts them as a "
+        "checklist comment on this PR and sends one Discord message.\n\n"
+        f"{render_after_merge(rows)}\n{AFTER_MERGE_END}"
+    )
+
+
+def upsert_after_merge(body: str, block: str) -> str:
+    """Idempotent upsert of the `## After merge` block, placed after the gate window.
+
+    Heading plus a following AFTER_MERGE_END: replace heading-line-start..END
+    inclusive (empty `block` removes the section and one surrounding blank line).
+    Otherwise a non-empty block goes at `_manual_testing_span(body)[1]`, or at
+    EOF when the body has no `## Manual Testing`. Empty body: return `block`.
+    """
+    body = body or ""
+    if not body.strip():
+        return block
+    m = _AFTER_MERGE_RE.search(body)
+    if m:
+        end_idx = body.find(AFTER_MERGE_END, m.end())
+        if end_idx != -1:
+            head = body[:m.start()]
+            tail = body[end_idx + len(AFTER_MERGE_END):]
+            if block:
+                return head + block + tail
+            if head.endswith("\n\n"):
+                head = head[:-1]
+            if tail.startswith("\n"):
+                tail = tail[1:]
+            return head + tail
+    if not block:
+        return body
+    span = _manual_testing_span(body)
+    if span is None:
+        return body.rstrip() + "\n\n" + block + "\n"
+    head = body[:span[1]].rstrip("\n") + "\n\n"
+    rest = body[span[1]:]
+    return head + block + ("\n\n" + rest if rest else "\n")
+
+
 def filter_diff(diff_text: str) -> str:
     """awk port: drop whole file-sections for migrations/lockfiles/snapshots."""
     out: list[str] = []

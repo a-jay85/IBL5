@@ -737,3 +737,28 @@ def test_version_hash_unchanged_when_master_sha_moves(monkeypatch):
     text[0] = "procedure bodY\n"
     c = runner._harness_version("/wt", "a" * 40, runner.HARNESS_ROOT)
     assert c and c != a
+
+
+# --- old and new remediated footers carry forward identically -----------------
+
+V1_FIXTURE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, os.pardir,
+    "bin", "fixtures", "review-shared", "post-plan-sticky-pr3267-v1.json")
+
+
+def test_carry_forward_equivalent_for_old_and_new_re_review_footer():
+    import json
+    import re
+    with open(V1_FIXTURE) as fh:
+        old = json.load(fh)["comments"][-1]["body"]
+    old_footer = [ln for ln in old.splitlines() if ln.startswith("READY (re-review)")][0]
+    new_footer = ("READY WITH NOTES (re-review) \u2014 findings remediated in 009d537a1b2c; "
+                  "the re-review on tree t left non-blocking notes open")
+    new = old.replace(old_footer, new_footer)
+    assert new != old
+    diff_id = re.search(r"^\*\*Reviewed diff:\*\* (\S+)$", old, re.M).group(1)
+    plan_hash = re.search(r"^\*\*Plan hash:\*\* (\S+)$", old, re.M).group(1)
+    got_old = fidelity.carry_forward_predicate(old, diff_id, plan_hash)
+    got_new = fidelity.carry_forward_predicate(new, diff_id, plan_hash)
+    assert got_old[0] is None
+    assert got_old == got_new

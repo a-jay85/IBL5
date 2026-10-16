@@ -35,7 +35,7 @@ final class ModuleRedirect
             return;
         }
 
-        header('Location: ' . $target, true, 302);
+        (new \Api\Response\RedirectResponder())->redirect($target);
     }
 
     /**
@@ -94,12 +94,13 @@ final class ModuleRedirect
         int $status = 302
     ): void {
         $url = self::passthroughUrl($target, $whitelist, $request, $validators);
+        $responder = new \Api\Response\RedirectResponder();
 
         if (HtmxHelper::isHtmxRequest()) {
-            header('HX-Redirect: ' . $url);
+            $responder->hxRedirect($url);
             return;
         }
 
-        header('Location: ' . $url, true, $status);
+        $responder->redirect($url, $status);
     }
 }

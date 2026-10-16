@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-10-14
+last_verified: 2026-10-15
 ---
 
 ## Read budget: read this once, read nothing else
@@ -56,6 +56,7 @@ For the codebase, the orchestrator's findings are authoritative, confirmations c
 - **Never run `bin/check-plan` on your draft.** It is the **orchestrator's** Step-5 gate, and gates `[13]`, `[H]`, `[T]`, `[S]` all read line-1 frontmatter that a draft structurally cannot carry. Self-verify `[C]`, `[F]`, `[8]`, and `[T]` (tier lines) by reading what you wrote. `_architect-contract-detail.md` § Why bin/check-plan is off-limits to the architect.
 - **The one self-check you DO run: the per-turn phase count.** It is the `awk`/`grep` block above, **not** `bin/check-plan`. `SCAF` is 0 without an outline comment (the guard is a no-op); `BODY < SCAF` mid-run is normal and only `BODY > SCAF` is drift. <!-- slop-ok -->
 - **A pre-prod exercise path for every deploy-dependent behavior**: behavior that manifests only once *deployed* (a file CI ships on merge, an applied migration, a registered daemon/cron, a new `.github/workflows/` job, a live-service call). Each needs a matrix row runnable on the worktree Docker stack, CI, or the prod-clone `.github/workflows/deploy-rehearsal.yml` rehearsal. Silence and stub/mock/fake-only coverage do not count. A surviving exception requires `<!-- pre-prod-exception: <slice + why> -->` plus `## Pre-prod Exception Justification` (gate `[P]`). `_architect-contract-detail.md` § Pre-prod exercise path — slice elaboration. <!-- slop-ok -->
+- **Post-merge rows**: a `Truly-manual` row runnable only after merge (live-host cron, prod-only credential) puts `post-merge: <reason>` in its location cell (gate `[PM]`). Rows runnable on the open PR stay untagged. `_architect-contract-detail.md` § Post-merge rows.
 
 ## Conditional sections
 
@@ -153,6 +154,6 @@ Format each packet as a fenced block within the plan:
 - **Report back:** a one-line summary only
 ````
 
-The `Assertions:` field is the packet's copy of the plan's assertion list. Paste every property the phase's Verification Matrix rows assert. A sub-agent sees only the packet, so a property that stays in the matrix and never reaches the packet is a property the sub-agent will not ship. `bin/check-plan` gate `[E]` requires the field, and requires every backticked token in it to appear literally in the packet's `**Self-verify:**`. Name the test methods and run them. A source grep for the property name is green from birth and stays green through the exact regression it pins (§ mutation statement above), so it does not count. A phase with no matrix rows of its own, such as a mechanical rename verified only by `composer run analyse`, carries a line opening with `no-assertions: <reason>` in the packet instead. Gate `[E]` ignores a mid-sentence mention or empty reason.
+The `Assertions:` field is the packet's copy of the plan's assertion list. `bin/check-plan` gate `[E]` requires the field, and requires every backticked token in it to appear literally in the packet's `**Self-verify:**`. Name the test methods and run them. A source grep for the property name does not count. A phase with no matrix rows of its own, such as a mechanical rename verified only by `composer run analyse`, carries a line opening with `no-assertions: <reason>` in the packet instead. Gate `[E]` ignores a mid-sentence mention or empty reason.
 
 **When to fill the `Rules:` field.** Never list an always-on rule (no `paths:` frontmatter key). Those load verbatim into every sub-agent. List a **path-scoped** rule only when the delegate's work depends on it and the packet's own file edits would not match its globs. Omit the field entirely otherwise. `_architect-contract-detail.md` § Rules field: worked examples.

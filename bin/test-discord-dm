@@ -752,6 +752,7 @@ flake-report.yml#1 webhook=dev ping=-
 log-review.yml#1 webhook=dev ping=-
 main.yml#1 webhook=dev ping=-
 merge-digest-notify.yml#1 webhook=merged ping='true'
+merge-digest-notify.yml#2 webhook=merged ping='false'   # the digest job already pinged for this merge
 mutation.yml#1 webhook=dev ping=-
 promote-to-production.yml#1 webhook=dev ping=${{ job.status == 'failure' }}
 promote-to-production.yml#2 webhook=dev ping=-
@@ -765,7 +766,7 @@ printf '\n-- notify-discord call sites --\n'
 # G1: the live workflows match the table.
 G1_GOT=$(notify_sites "$ROOT/.github/workflows")
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    ok "G1: 16 sites pass the expected webhook-url; ping only on the chosen sites"
+    ok "G1: 17 sites pass the expected webhook-url; ping only on the chosen sites"
 else
     fail "G1: call sites differ from the table"
     diff <(printf '%s\n' "$NOTIFY_SITES_WANT") <(printf '%s\n' "$G1_GOT") | sed 's/^/       /'

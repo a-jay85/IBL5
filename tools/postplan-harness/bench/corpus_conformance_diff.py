@@ -31,7 +31,7 @@ def main() -> int:
             content = fh.read()
         if not any(planfile._MATRIX_HEADER.match(ln) for ln in content.splitlines()):
             continue
-        planned, manual = planfile.parse_matrix(content)
+        planned, manual, _ = planfile.parse_matrix(content)
         info = PlanInfo(found=True, path=path, has_matrix=True,
                         planned_test_paths=planned, truly_manual_rows=manual)
         if no_change_parser is not None:

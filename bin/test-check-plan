@@ -2529,12 +2529,13 @@ XSECOND='
 assert_viol "gateX-second-token-marker-unchanged" 0 '[X]' "$FM$XSECOND"
 
 # ---------------------------------------------------------------------------
-# Gate [RO] fixtures (19 cases)
+# Gate [RO] fixtures (27 cases)
 # The (run-only) marker exempts a row's token from the harness MISSING item, so
 # the gate pins: whole-cell planning type, marker directly after the row's
 # planned token, one marker per token, token exists on the base ref, token is
-# not a must-appear Critical Files entry. Checks 6-7 are warnings (exit stays 0).
-# Cases 1-18 resolve existence against HEAD (the worktree's own tree) so a
+# not a must-appear Critical Files entry, and an unmarked row that plan prose
+# calls run-only gets the marker (check 7a). Checks 6 and 7b are warnings.
+# Cases 1-18 and 20-26 resolve existence against HEAD (the worktree's own tree) so a
 # default-depth CI checkout with no origin/master still works.
 # ---------------------------------------------------------------------------
 export CHECK_PLAN_MASTER_REF=HEAD
@@ -2676,6 +2677,78 @@ assert_viol "gateRO-no-change-row-untouched" 0 '[RO]' "$FM$RO18"
 # 19. no resolvable base ref fails OPEN for the existence checks.
 export CHECK_PLAN_MASTER_REF=refs/heads/gate-ro-no-such-ref-fixture
 assert_viol "gateRO-no-ref-fails-open" 0 '[RO]' "$FM$RO7"
+unset CHECK_PLAN_MASTER_REF
+# Check 7a: an unmarked row that plan prose calls run-only must carry (run-only).
+export CHECK_PLAN_MASTER_REF=HEAD
+# Phase heading kept in a variable so no plan or fixture line starts with a heading.
+ROPH="## Phase 1: Smoke"
+# 20. phrase in the row's own What cell (the period-averages shape) -> violation,
+# and the 7b warning is suppressed by the 7a continue.
+RO20="$ROHDR
+| 1 | nav smoke still passes unchanged | E2E | post-impl | \`$RONAV\` |
+"
+assert_msg "gateRO-unmarked-runonly-same-row-fires" 1 "[RO] unmarked run-only row: \`$RONAV\`" "[RO] warning: unmarked" "$FM$RO20"
+assert_msg "gateRO-unmarked-runonly-message-names-row" 1 "Add (run-only) directly after the token: | 1 | nav smoke still passes unchanged" "" "$FM$RO20"
+# 21. phrase on a Critical Files line that cites the full token (the sco and
+# lastsimrecap shape). (reference) keeps it out of must-appear.
+RO21="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+
+## Critical Files
+
+- \`$RONAV\` (reference) — run-only; must stay green unedited
+"
+assert_msg "gateRO-unmarked-runonly-critical-files-fires" 1 "[RO] unmarked run-only row: \`$RONAV\`" "" "$FM$RO21"
+# 22. the same prose with the marker present is the honored shape.
+RO22="$ROHDR
+| 1 | nav smoke still passes unchanged | E2E | post-impl | \`$RONAV\` (run-only) |
+"
+assert_viol "gateRO-marked-runonly-phrase-ok" 0 '[RO]' "$FM$RO22"
+# 23. veto (a): a phase line cites the token with an edit verb -> no violation;
+# 7b stays silent because a phase cites it.
+RO23="$ROHDR
+| 1 | nav smoke still passes unchanged | E2E | post-impl | \`$RONAV\` |
+
+$ROPH
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Extend \`$RONAV\` with a footer assertion.
+"
+assert_msg "gateRO-unmarked-runonly-phase-edit-vetoed" 0 "" "[RO] unmarked run-only row" "$FM$RO23"
+# 24. the veto strips run-only phrases first: "never edited" on a phase line is
+# the trigger, not an edit verb, so the violation still fires.
+RO24="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+
+$ROPH
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Run \`$RONAV\` before and after; it is never edited.
+"
+assert_msg "gateRO-unmarked-runonly-phase-phrase-fires" 1 "[RO] unmarked run-only row: \`$RONAV\`" "" "$FM$RO24"
+# 25. veto (b): a must-appear Critical Files entry (no exempt paren, no edit
+# verb) -> no violation.
+RO25="$ROHDR
+| 1 | nav smoke still passes unchanged | E2E | post-impl | \`$RONAV\` |
+
+## Critical Files
+
+- \`$RONAV\` — smoke spec
+"
+assert_msg "gateRO-unmarked-runonly-must-appear-vetoed" 0 "" "[RO] unmarked run-only row" "$FM$RO25"
+# 26. a bare basename mention is not a citation: no violation, and the plain
+# 7b warning still fires because nothing cites the full path.
+RO26="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+
+The navigation.spec.ts smoke spec is never edited.
+"
+assert_msg "gateRO-unmarked-basename-phrase-warns-only" 0 "[RO] warning: unmarked test row" "[RO] unmarked run-only row" "$FM$RO26"
+# 27. no resolvable base ref fails OPEN for 7a too.
+export CHECK_PLAN_MASTER_REF=refs/heads/gate-ro-no-such-ref-fixture
+assert_viol "gateRO-unmarked-runonly-no-ref-fails-open" 0 '[RO]' "$FM$RO20"
 unset CHECK_PLAN_MASTER_REF
 
 # ---------------------------------------------------------------------------
@@ -3764,6 +3837,68 @@ assert_viol "q_malformed_vr_cell_fails" 1 "[Q]" "$FM_OPUS"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | does the roster grid layout still look right | Truly-manual | post-impl | `vr: label=roster-grid; role=owner; url=modules.php?name=Roster` |
+'
+
+# Gate [PM]: a `post-merge:` location marker sits only on a Truly-manual row
+# with an intrinsic post-merge reason and a non-visual What cell.
+# (a) Valid tagged row -> clean.
+assert_viol "pm_tagged_with_reason_passes" 0 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+'
+
+# (b) Bare marker with no reason -> [PM] fires.
+assert_viol "pm_tagged_without_reason_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: |
+'
+
+# (c) Reason under 15 characters -> [PM] fires.
+assert_viol "pm_short_reason_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: launchd only |
+'
+
+# (d) Convenience reason with no intrinsic slice -> [PM] fires.
+assert_viol "pm_reason_without_intrinsic_vocab_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: easier to review after it has shipped |
+'
+
+# (e) Marker on a CLI-executable row -> [PM] fires.
+assert_viol "pm_on_cli_executable_row_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | CLI-executable | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+'
+
+# (f) Look-and-feel What cell -> [PM] fires.
+assert_viol "pm_on_lookandfeel_row_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the new dashboard layout look right | Truly-manual | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+'
+
+# (g) A bad row inside a fenced example never fires (fence-aware matrix).
+assert_viol "pm_marker_inside_fence_ignored" 0 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+
+```markdown
+| 2 | the operator reads the first nightly queue listing the morning after | CLI-executable | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+```
+'
+
+# (h) Additivity pin: an untagged Truly-manual row is untouched by [PM].
+assert_viol "pm_untagged_truly_manual_untouched" 0 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the exported CSV opens in Excel without a repair prompt | Truly-manual | post-impl | n/a |
 '
 
 # Gate [K]: autonomy-contract frontmatter validation.

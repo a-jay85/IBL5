@@ -47,7 +47,8 @@ if ($op === 'save_order') {
         return;
     }
 
-    $input = json_decode(file_get_contents('php://input'), true);
+    $rawBody = file_get_contents('php://input');
+    $input = is_string($rawBody) ? json_decode($rawBody, true) : null;
     if (!is_array($input) || !isset($input['order']) || !is_array($input['order'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid request body']);
@@ -128,7 +129,7 @@ if ($tab === DraftInfoView::TAB_PICKS) {
     $historyRepository = new DraftHistoryRepository($mysqli_db);
     $historyView = new DraftHistoryView();
 
-    $teamid = isset($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
+    $teamid = is_string($_GET['teamid'] ?? null) ? (int) $_GET['teamid'] : 0;
 
     $team = null;
     if ($teamid > 0) {
@@ -144,7 +145,7 @@ if ($tab === DraftInfoView::TAB_PICKS) {
     } else {
         $startYear = $historyRepository->getFirstDraftYear();
         $endYear = $historyRepository->getLastDraftYear();
-        $year = isset($_REQUEST['year']) ? (int) $_REQUEST['year'] : $endYear;
+        $year = is_string($_REQUEST['year'] ?? null) ? (int) $_REQUEST['year'] : $endYear;
         $tabBodyHtml = $historyView->render($year, $startYear, $endYear, $historyRepository->getDraftPicksByYear($year));
         $pagetitle = "- $year Draft";
     }

@@ -55,8 +55,10 @@ final class RefreshTeamSeasonRecordsStep implements PipelineStepInterface
     /**
      * Regular-season records (game_type=1).
      * Year boundary: MONTH(game_date) >= 10 ? YEAR+1 : YEAR.
+     *
+     * Public so DatabaseIntegration tests can refresh inside the per-test transaction; execute() would commit it.
      */
-    private const string INSERT_REGULAR_SEASON_SQL = <<<'SQL'
+    public const string INSERT_REGULAR_SEASON_SQL = <<<'SQL'
 INSERT INTO `ibl_team_season_records`
     (team_id, `year`, game_type, currentname, namethatyear, wins, losses)
 WITH unique_games AS (

@@ -28,7 +28,6 @@ final class PageCache
         'CareerLeaderboards'  => self::TTL_LONG,
         'RecordHolders'       => self::TTL_LONG,
         'SeasonLeaderboards'  => self::TTL_LONG,
-        'DraftHistory'        => self::TTL_LONG,
         'AwardHistory'        => self::TTL_LONG,
         'FranchiseHistory'    => self::TTL_LONG,
         'FranchiseRecordBook' => self::TTL_LONG,

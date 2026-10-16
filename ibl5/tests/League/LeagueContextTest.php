@@ -533,4 +533,13 @@ class LeagueContextTest extends TestCase
         $this->assertTrue($context->isModuleEnabled('Standings'));
         $this->assertTrue($context->isModuleEnabled('Team'));
     }
+
+    public function testDraftInfoDisabledForOlympics(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+        $this->assertFalse($this->leagueContext->isModuleEnabled('DraftInfo'));
+
+        $_SESSION['current_league'] = 'ibl';
+        $this->assertTrue($this->leagueContext->isModuleEnabled('DraftInfo'));
+    }
 }

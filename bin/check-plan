@@ -254,6 +254,10 @@
 #                              baseline dir only on a screenshot diff, so an
 #                              unmarked entry holds post-plan forever
 #                              (backlog#1277). Fenced examples never count.
+#   BX bin/ path exists      — every bin/<path> a matrix row's location cell
+#                              runs must exist at the repo root or under ibl5/,
+#                              or be named in ## Critical Files. Covers
+#                              (one-shot) rows, which gate G skips.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -1615,6 +1619,28 @@ while IFS= read -r row; do
         grep -rqF "$n" "$GH_WF" 2>/dev/null && continue
         viol "[G] matrix row names $n but no .github/workflows/*.yml runs it — wire it (and list that workflow in ## Critical Files), or annotate it as a shell comment inside the backticks: \`cmd # (one-shot)\` or \`cmd # (wired in this PR)\` (a note after the closing backtick fails gate [V])"
     done
+done < "$MATRIX_FILE"
+
+# ---------------------------------------------------------------------------
+# Gate BX: every bin/<path> a matrix row's location cell runs must exist, at the
+# repo root or under ibl5/ (a `cd ibl5 && php bin/...` cell), or be named in
+# ## Critical Files (a script the plan creates). Gate G skips (one-shot) rows,
+# so without this a row can name a script that was never there: PR #3264's row 4
+# cited a check-bin-help script that never existed. A path preceded by `/` (vendor/bin/phpunit) is not a
+# repo bin/ path and is skipped. Measured on the 100 newest corpus plans: 0 hits.
+# ---------------------------------------------------------------------------
+_bx_tok_re='(^|[^A-Za-z0-9_./-])bin/[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*'
+while IFS= read -r row; do
+    cell="$(printf '%s' "$row" | awk -F'|' '{print $(NF-1)}')"
+    while IFS= read -r _bx_tok; do
+        _bx_tok="bin/${_bx_tok#*bin/}"
+        _bx_tok="${_bx_tok%%[.,]}"
+        [ "$_bx_tok" != "bin/" ] || continue
+        [ -e "$REPO_ROOT/$_bx_tok" ] && continue
+        [ -e "$REPO_ROOT/ibl5/$_bx_tok" ] && continue
+        grep -qF -- "$_bx_tok" <<< "$CF_SECTION" && continue
+        viol "[BX] matrix row runs $_bx_tok, which does not exist at the repo root or under ibl5/ and is not named in ## Critical Files — fix the path, or list the script in ## Critical Files if this plan creates it: ${row}"
+    done < <(grep -oE "$_bx_tok_re" <<< "$cell" || true)
 done < "$MATRIX_FILE"
 
 # ---------------------------------------------------------------------------

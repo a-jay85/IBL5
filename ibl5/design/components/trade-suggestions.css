@@ -1,0 +1,124 @@
+@layer components {
+
+/* ============================================================
+   Trade Ideas panel (homepage, logged-in GM)
+   ============================================================ */
+
+.trade-suggestions {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    font-family: var(--font-sans);
+    max-width: 1400px;
+    margin-bottom: var(--space-4);
+    margin-inline: auto;
+    padding: var(--space-4);
+}
+
+.trade-suggestions__title {
+    margin: 0 0 var(--space-2);
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-bold);
+    font-size: 1.25rem;
+    color: var(--navy-900);
+}
+
+.trade-suggestions__mode {
+    margin: 0 0 var(--space-2);
+    color: var(--gray-800);
+}
+
+.trade-suggestions__mode-note {
+    color: var(--gray-500);
+}
+
+.trade-suggestions__mode-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+}
+
+.trade-suggestions__mode-label {
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-700);
+}
+
+.trade-suggestions__mode-save {
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--navy-700);
+    border-radius: var(--radius-md);
+    background: var(--navy-800);
+    color: var(--white);
+    cursor: pointer;
+}
+
+.trade-suggestions__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-3);
+}
+
+.trade-suggestions__item {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    background: var(--gray-50);
+}
+
+.trade-suggestions__partner {
+    margin: 0 0 var(--space-2);
+    font-size: 1rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--navy-900);
+}
+
+.trade-suggestions__sides {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.trade-suggestions__side-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    color: var(--gray-500);
+}
+
+.trade-suggestions__assets {
+    margin: 0;
+    padding-left: var(--space-4);
+}
+
+.trade-suggestions__reason {
+    margin: 0 0 var(--space-1);
+    font-size: 0.875rem;
+    color: var(--gray-700);
+}
+
+.trade-suggestions__open {
+    display: inline-block;
+    margin-top: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--accent-500);
+    color: var(--white);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: none;
+}
+
+.trade-suggestions__open:hover {
+    background: var(--accent-600);
+}
+
+.trade-suggestions__empty {
+    margin: 0;
+    color: var(--gray-600);
+}
+
+}

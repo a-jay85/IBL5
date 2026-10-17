@@ -606,4 +606,44 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
         $this->assertSame($level, ob_get_level());
         $this->assertStringContainsString('ibl_team_info', implode("\n", $this->mockDb->getExecutedQueries()));
     }
+
+    public function testExtractedRosterMethodsCarryNoActorIdentityOrRequestState(): void
+    {
+        $ref = new \ReflectionClass(TradeRosterPreviewApiHandler::class);
+
+        $properties = array_map(static fn (\ReflectionProperty $p): string => $p->getName(), $ref->getProperties());
+        sort($properties);
+        $this->assertSame(['cashRowBuilder', 'db', 'loggedInTeamID', 'paramValidator', 'season', 'tradeAssetRepository'], $properties);
+
+        $publicMethods = array_map(static fn (\ReflectionMethod $m): string => $m->getName(), $ref->getMethods(\ReflectionMethod::IS_PUBLIC));
+        sort($publicMethods);
+        $this->assertSame(['__construct', 'handle'], $publicMethods);
+
+        $privateMethods = array_map(static fn (\ReflectionMethod $m): string => $m->getName(), $ref->getMethods(\ReflectionMethod::IS_PRIVATE));
+        sort($privateMethods);
+        $this->assertSame(['buildPreviewRoster', 'collectRosterPids', 'renderTable', 'wrapWithDropdown'], $privateMethods);
+
+        foreach (['buildPreviewRoster', 'collectRosterPids', 'wrapWithDropdown'] as $name) {
+            foreach ($ref->getMethod($name)->getParameters() as $param) {
+                $label = $name . '::$' . $param->getName();
+                $this->assertNotContains($param->getName(), ['loggedInTeamID', 'showActionLinks', 'removePids'], $label);
+                $type = $param->getType();
+                $this->assertInstanceOf(\ReflectionNamedType::class, $type, $label);
+                $this->assertContains($type->getName(), ['Team\TeamTableService', 'Team\TeamRepository', 'Season\Season', 'int', 'string', 'array'], $label);
+            }
+        }
+
+        $this->assertSame('array', $this->returnTypeName($ref->getMethod('buildPreviewRoster')));
+        $this->assertSame('array', $this->returnTypeName($ref->getMethod('collectRosterPids')));
+        $this->assertSame('string', $this->returnTypeName($ref->getMethod('wrapWithDropdown')));
+        $this->assertSame(1, $ref->getMethod('collectRosterPids')->getNumberOfParameters());
+    }
+
+    private function returnTypeName(\ReflectionMethod $method): string
+    {
+        $type = $method->getReturnType();
+        $this->assertInstanceOf(\ReflectionNamedType::class, $type);
+
+        return $type->getName();
+    }
 }

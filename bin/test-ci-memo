@@ -55,7 +55,7 @@ vr_if_shape() {
 # A memo-only job may also need mirror-ready (ADR-0191) to pull GHCR mirror
 # images. mirror-ready reads no path-filter output, so it adds no filter skip.
 CHANGES_ALLOWLIST="audit-js,audit-php,iblbot"
-MEMO_ONLY_JOBS="test harness-tests db-integration phpstan shellcheck ibl5-ts-unit"
+MEMO_ONLY_JOBS="test harness-tests harness-tests-isolated db-integration phpstan shellcheck ibl5-ts-unit"
 UNCONDITIONAL_JOBS="phpunit-hygiene host-mariadb-guard automouse-impl-model-test actionlint"
 filter_free_topology() {
     local wf="$1" got bad=0 j

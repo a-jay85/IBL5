@@ -43,11 +43,14 @@ ROUTER="$SCRIPT_DIR/../lib/automouse-reorder-router.php"  # sibling router + pag
 command -v php >/dev/null 2>&1 || { echo "Error: php not found on PATH." >&2; exit 1; }
 [ -f "$ROUTER" ] || { echo "Error: router not found: $ROUTER" >&2; exit 1; }
 
-# Current run order (symlink lstat mtime, oldest-first = runs-first).
-# queue_entries_ordered from lib-queue-order returns full paths; basename each.
+# Current run order (lexical NNN- prefix order, runs-first). Cut a legacy
+# bare-named queue over first. queue_entries_ordered returns full paths;
+# entry_to_name strips the directory and the NNN- prefix, so the page and the
+# reorder engine both see bare <slug>.md names.
 # `|| true`: an empty queue prints nothing without error.
-order="$(queue_entries_ordered | while IFS= read -r f; do basename "$f"; done || true)"
-if [ -z "$order" ]; then
+normalize_queue "$QUEUE_DIR"
+queue_order="$(queue_entries_ordered | while IFS= read -r f; do entry_to_name "$f"; done || true)"
+if [ -z "$queue_order" ]; then
     echo "Queue empty, nothing to reorder."
     exit 0
 fi
@@ -75,7 +78,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # Launch — bind 127.0.0.1 ONLY (never 0.0.0.0 / never bare :PORT).
-AUTOMOUSE_QUEUE_ORDER="$order" \
+AUTOMOUSE_QUEUE_ORDER="$queue_order" \
 AUTOMOUSE_QUEUE_CMD="$QUEUE_CMD" \
 AUTOMOUSE_SENTINEL="$SENTINEL" \
 NIGHTLY_DIR="$NIGHTLY_DIR" PLANS_DIR="$PLANS_DIR" \
@@ -118,6 +121,6 @@ echo ""
 echo "New run order (next to run first):"
 i=1
 while IFS= read -r f; do
-    printf "  %2d. %s\n" "$i" "$(basename "$f")"
+    printf "  %2d. %s\n" "$i" "$(entry_to_name "$f")"
     i=$((i + 1))
 done < <(queue_entries_ordered)

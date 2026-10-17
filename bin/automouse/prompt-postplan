@@ -36,7 +36,7 @@ Verify the branch has commits ahead of master. If not, write an error report and
 
 ## Step 3: Run /post-plan
 
-The plan backing this branch is the symlink at `$NIGHTLY_DIR/queue/<PLAN_FILE>` (resolve it to its target under `~/claude-plans/`). This is the **authoritative** plan path for this run. When /post-plan Phase 1 locates the plan, set `PLAN_FILE` to this path directly — do NOT rely on its branch-slug derivation, because the branch slug (derived from the plan title) need not match the plan filename. The plan-conformance steps in Phases 4–6 depend on this path resolving correctly.
+The plan backing this branch is the queue symlink `$NIGHTLY_DIR/queue/NNN-<PLAN_FILE>`: the entry name carries a 3-digit run-order prefix, so locate it with `ls "$NIGHTLY_DIR"/queue/[0-9][0-9][0-9]-<PLAN_FILE>` (or `bin/automouse/queue`) and never assume it equals `<PLAN_FILE>`. Resolve it to its target under `~/claude-plans/`. This is the **authoritative** plan path for this run. When /post-plan Phase 1 locates the plan, set `PLAN_FILE` to this path directly — do NOT rely on its branch-slug derivation, because the branch slug (derived from the plan title) need not match the plan filename. The plan-conformance steps in Phases 4–6 depend on this path resolving correctly.
 
 Invoke /post-plan using the Skill tool and let it run to completion. Completion means Phase 11 (Background Process Cleanup) has executed — do not end your turn before that. Do NOT invoke /simplify, /commit, /code-review, or /security-audit separately — /post-plan orchestrates all of them.
 
@@ -58,9 +58,10 @@ Handling below, and only that outcome goes to skipped/.
 
 For either success outcome:
 
-1. Move the plan symlink from queue/ to done/:
+1. Dispose the plan to done/ (pass the bare plan filename; never `mv` the
+   NNN- queue entry yourself, since its prefix is run-order state):
    ```bash
-   mv "$NIGHTLY_DIR/queue/<plan-filename>" "$NIGHTLY_DIR/done/"
+   bin/automouse/queue dispose "<plan-filename>" done
    ```
    Do this even when auto-merge was held. Leaving the plan in queue/ does not
    "wait for the merge" — it makes the loop re-claim the plan and re-run post-plan
@@ -90,9 +91,9 @@ it is the second success outcome in Step 4.
 
 If ANY step fails:
 1. Write a detailed error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md
-2. Move the plan symlink to $NIGHTLY_DIR/skipped/ (not done/):
+2. Dispose the plan to $NIGHTLY_DIR/skipped/ (not done/; never a raw `mv`):
    ```bash
-   mv "$NIGHTLY_DIR/queue/<plan-filename>" "$NIGHTLY_DIR/skipped/"
+   bin/automouse/queue dispose "<plan-filename>" skipped
    ```
 3. Delete the handoff file (the branch has committed work for manual recovery):
    ```bash

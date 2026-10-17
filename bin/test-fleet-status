@@ -253,8 +253,8 @@ printf '1\n' > "$AM/.cmdpid-$DEAD_PID-postplan"
 # the primary lock-dir slug-resolution path works for all three live runners.
 # live-plan stays bare so its row shows bin/automouse/queue's defaults (opus,
 # true). idle-plan carries frontmatter so the parse itself is pinned.
-printf 'plan\n' > "$AM/queue/live-plan.md"
-cat > "$AM/queue/idle-plan.md" <<'PLAN'
+printf 'plan\n' > "$AM/queue/010-live-plan.md"
+cat > "$AM/queue/020-idle-plan.md" <<'PLAN'
 ---
 impl_model: sonnet
 auto_merge: false
@@ -263,7 +263,7 @@ auto_merge: false
 PLAN
 # No H1, so the title falls back to the quoted frontmatter `title:`. The
 # `# shellcheck` line sits inside a code fence, so it must not count as an H1.
-cat > "$AM/queue/fm-title-plan.md" <<'PLAN'
+cat > "$AM/queue/030-fm-title-plan.md" <<'PLAN'
 ---
 title: "Quoted fallback title"
 ---
@@ -272,15 +272,10 @@ body
 # shellcheck shell=bash
 ```
 PLAN
-touch -t 202601010003 "$AM/queue/fm-title-plan.md"
-# Stamp the mtimes apart, live-plan OLDER. render_queue orders by `ls -1tr`
-# (oldest first, same as claim_next_plan), so this puts live-plan at position 1 —
-# the REVERSE of alphabetical, which is the only way the order assertion below
-# can fail loudly if the glob ever comes back. Left to creation order the two
-# stamps land in the same second, and a sub-second tie falls back to name, which
-# BSD and GNU ls break in opposite directions.
-touch -t 202601010001 "$AM/queue/live-plan.md"
-touch -t 202601010002 "$AM/queue/idle-plan.md"
+# Queue entries carry NNN- prefixes and render in prefix order. live-plan gets
+# 010 so it sits at position 1, the REVERSE of alphabetical by slug, which is
+# the only way the order assertion below can fail loudly if a name sort ever
+# comes back. Locks and sidecars keep the bare <slug>.md name.
 mkdir -p "$AM/queue/live-plan.md.lock"
 printf '%s\n' "$LIVE_AUTOMOUSE_PID" > "$AM/queue/live-plan.md.lock/pid"
 printf '2\n' > "$AM/queue/live-plan.md.attempts"
@@ -290,7 +285,7 @@ printf '1\n' > "$AM/queue/nodotmd-plan.md.attempts"
 mkdir -p "$AM/queue/nightly-plan.md.lock"
 printf '%s\n' "$NIGHTLY_PID" > "$AM/queue/nightly-plan.md.lock/pid"
 printf '3\n' > "$AM/queue/nightly-plan.md.attempts"
-printf '# Post-plan phase plan\n' > "$AM/queue/pp-plan.md"
+printf '# Post-plan phase plan\n' > "$AM/queue/040-pp-plan.md"
 mkdir -p "$AM/queue/pp-plan.md.lock"
 printf '%s\n' "$PP_PID" > "$AM/queue/pp-plan.md.lock/pid"
 # Three locks whose runner is gone. A usage-gate pause keeps its lock on purpose
@@ -300,8 +295,10 @@ printf '%s\n' "$PP_PID" > "$AM/queue/pp-plan.md.lock/pid"
 USAGE_DIR="$TMP/usage-gate"; mkdir -p "$USAGE_DIR/markers"
 PAUSED_SID='aaaaaaaa-1111-2222-3333-444444444444'
 RESUMED_SID='bbbbbbbb-1111-2222-3333-444444444444'
+n=50
 for p in paused-plan resumed-plan resumed-gone-plan stale-lock-plan merged-plan; do
-    printf '# %s\n' "$p" > "$AM/queue/$p.md"
+    printf '# %s\n' "$p" > "$AM/queue/0$n-$p.md"
+    n=$((n + 10))
     mkdir -p "$AM/queue/$p.md.lock"
     printf '%s\n' "$DEAD_PID" > "$AM/queue/$p.md.lock/pid"
 done
@@ -937,7 +934,7 @@ IDLE_NEXT="$(grep -EA2 'idle-plan\.md +sonnet' <<< "$OUTPUT" | tail -n 2)"
 assert_lacks "queue: a queued plan has no details under it" \
     "$IDLE_NEXT" '●|pid |  log: |  audit: '
 
-# 7b — queue ORDER, not alphabetical. live-plan is stamped older, so it leads;
+# 7b — queue ORDER, not alphabetical. live-plan carries prefix 010, so it leads;
 # alphabetically idle-plan would. Collapsed to one line because assert_has runs
 # grep -E, which cannot see across lines.
 QUEUE_ORDER="$(grep -E '(live|idle)-plan\.md +[^ ]+ +[^ ]+ +(queued|in progress)' <<< "$OUTPUT" \
@@ -1065,9 +1062,9 @@ assert_lacks "links: no OSC 8 escapes in a non-tty capture" "$OUTPUT" '\]8;;'
 # vscode://file scheme so the click opens an editor. Patterns use `[^ ]*` to hop
 # the ESC bytes rather than embedding them, since no URI here contains a space.
 assert_has "links: queue row links to the plan file" \
-    "$OUTPUT_LINKS" '8;;vscode://file[^ ]*queue/live-plan\.md[^ ]*live-plan\.md[^ ]* +opus +true +in progress'
+    "$OUTPUT_LINKS" '8;;vscode://file[^ ]*queue/010-live-plan\.md[^ ]*live-plan\.md[^ ]* +opus +true +in progress'
 assert_has "links: queued (unlocked) row links too" \
-    "$OUTPUT_LINKS" '8;;vscode://file[^ ]*queue/idle-plan\.md[^ ]*idle-plan\.md[^ ]* +sonnet +false +queued'
+    "$OUTPUT_LINKS" '8;;vscode://file[^ ]*queue/020-idle-plan\.md[^ ]*idle-plan\.md[^ ]* +sonnet +false +queued'
 # The scheme swap itself. A file:// URI anywhere on the page means some call site
 # was missed, and the whole point is that a click never reaches the OS file-type
 # association. One assertion covers every link at once.

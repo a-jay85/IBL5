@@ -51,7 +51,12 @@ extract_fn() {
     ' "$RUNNER"
 }
 
-for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done claim_pr_terminal \
+# The queue-entry helpers (queue_entry_for_slug, entry_to_name) that dispose_entry and the
+# claim path call. The runner sources them via bin/automouse/lib-queue-order, a symlink to this file.
+# shellcheck source=lib/automouse-queue-order.sh
+. "$SCRIPT_DIR/lib/automouse-queue-order.sh"
+
+for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done dispose_entry claim_pr_terminal \
           postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold \
           postplan_newest_verdict postplan_no_worktree_dispose_if_merged claim_next_plan \
           dispose_resumed_postplan_lock; do
@@ -249,9 +254,10 @@ rm -f "$HANDOFF_DIR/p.md.json"
 make_fixture() {
     local base; base=$(mktemp -d)
     mkdir -p "$base/queue" "$base/done" "$base/reports" "$base/handoff"
-    # plan symlink pointing at a real temp file (matches -e semantics)
+    # plan symlink pointing at a real temp file (matches -e semantics); queue entries are
+    # NNN-<slug>.md while sidecars, handoff, and done/ keep the bare p.md name
     local target; target=$(mktemp)
-    ln -s "$target" "$base/queue/p.md"
+    ln -s "$target" "$base/queue/010-p.md"
     touch "$base/queue/p.md.attempts" "$base/queue/p.md.failure" "$base/queue/p.md.cap-refunds"
     printf '{"branch":"some-branch"}\n' > "$base/handoff/p.md.json"
     printf '' > "$base/run.log"
@@ -265,7 +271,8 @@ export NIGHTLY_DIR QUEUE_DIR HANDOFF_DIR LOG
 dispose_plan_done p.md p OPEN https://example.invalid/pr/1 claim-time
 today=$(date +%Y-%m-%d)
 if [ -e "$D/done/p.md" ] \
-   && [ ! -e "$D/queue/p.md" ] \
+   && [ ! -e "$D/queue/010-p.md" ] \
+   && [ ! -L "$D/queue/010-p.md" ] \
    && [ ! -f "$D/queue/p.md.attempts" ] \
    && [ ! -f "$D/queue/p.md.failure" ] \
    && [ ! -f "$D/queue/p.md.cap-refunds" ] \
@@ -294,9 +301,9 @@ else
 fi
 rm -rf "$D"
 
-# d3: queue/p.md already absent — rc 0, report still written, no abort under set -euo pipefail
+# d3: queue/010-p.md already absent — rc 0, report still written, no abort under set -euo pipefail
 D=$(make_fixture)
-rm -f "$D/queue/p.md"
+rm -f "$D/queue/010-p.md"
 NIGHTLY_DIR="$D"; QUEUE_DIR="$D/queue"; HANDOFF_DIR="$D/handoff"; LOG="$D/run.log"
 export NIGHTLY_DIR QUEUE_DIR HANDOFF_DIR LOG
 d3_rc=0
@@ -359,9 +366,9 @@ rm -rf "$D"
 # Asserted with the SAME predicate the digest uses (find -newermt, which lstat()s a symlink
 # because -L is absent) so the test cannot pass while the digest still misses the entry.
 D=$(make_fixture)
-touch -h -t 200001010000 "$D/queue/p.md"
+touch -h -t 200001010000 "$D/queue/010-p.md"
 # vacuity guard: prove the fixture really starts OUTSIDE the window, else the assert is empty
-if [ -n "$(find "$D/queue" -maxdepth 1 -name p.md -newermt '2020-01-01 00:00:00' 2>/dev/null)" ]; then
+if [ -n "$(find "$D/queue" -maxdepth 1 -name 010-p.md -newermt '2020-01-01 00:00:00' 2>/dev/null)" ]; then
     echo "FAIL: d7-vacuity — fixture symlink was not pinned to the past; d7 would prove nothing"
     FAILED=1
 fi
@@ -455,11 +462,13 @@ fi
 # Group e — post-postplan call site (Phase 5), static assertions over $RUNNER
 # ---------------------------------------------------------------------------
 
-# e1: ordering — write_env_stop_report … postplan < automouse_pr_state "$PP_BRANCH" < if [ ! -e "$NEXT_PLAN" ]
+# e1: ordering — write_env_stop_report … postplan < automouse_pr_state "$PP_BRANCH" < the loop-bottom
+# `if ! plan_still_queued` cleanup (was `if [ ! -e "$NEXT_PLAN" ]` before NNN- entries; the entry path
+# goes stale under a reorder rename, so queue membership is tested by slug)
 e1_result=$(awk '
     /write_env_stop_report "\$PLAN_NAME" postplan/ { b=NR }
     /automouse_pr_state "\$PP_BRANCH"/ { d=NR }
-    /if \[ ! -e "\$NEXT_PLAN" \]/ { c=NR }
+    /^[[:space:]]*if ! plan_still_queued; then/ { c=NR }
     END { if (b>0 && d>0 && c>0 && b<d && d<c) print "OK"; else print "ORDER-FAIL b="b" d="d" c="c }
 ' "$RUNNER")
 if [ "$e1_result" = "OK" ]; then
@@ -484,11 +493,11 @@ else
     echo "ok: e2-no-continue-break-in-postpostplan"
 fi
 
-# e3: disposition is guarded by [ -e "$NEXT_PLAN" ]
-if grep -qF '[ -e "$NEXT_PLAN" ]' "$RUNNER"; then
+# e3: disposition is guarded by plan_still_queued (was [ -e "$NEXT_PLAN" ])
+if grep -qE '^[[:space:]]*if plan_still_queued; then' "$RUNNER"; then
     echo "ok: e3-next-plan-guard"
 else
-    echo "FAIL: e3-next-plan-guard — missing [ -e \"$NEXT_PLAN\" ] gate"
+    echo "FAIL: e3-next-plan-guard — missing plan_still_queued gate"
     FAILED=1
 fi
 
@@ -948,7 +957,7 @@ fi
 #   H_CLEARED_AGE=<secs>  H_NO_CLEARED_DIR=1  H_HANDOFF_BRANCH=<b>  H_LOCK_BRANCH=<b>
 #   H_PR=open|merged|error  H_LAUNCHCTL=none|inflight|empty|fail|path-unset|path-empty
 #   H_CALL=claim|helper|helper-twice  H_GRACE=<secs> (set, even empty, exports
-#   RESUMED_POSTPLAN_GRACE_SECS)  H_SECOND=1 (adds an unlocked queue/q.md after p.md)
+#   RESUMED_POSTPLAN_GRACE_SECS)  H_SECOND=1 (adds an unlocked queue/020-q.md after p.md)
 H_SID_VAL="cccccccc-3333-4333-8333-cccccccccccc"
 
 run_h_case() {
@@ -959,8 +968,8 @@ run_h_case() {
         LOCK_TTL_SECS=10800; CAP_DEFERRED=" "
         export IBL5_USAGE_GATE_STATE_DIR="$D/gate"
         mkdir -p "$QUEUE_DIR" "$HANDOFF_DIR" "$D/plans" "$D/gate/markers" "$D/gate/cleared"; : > "$LOG"
-        : > "$D/plans/p.md"; ln -s "$D/plans/p.md" "$QUEUE_DIR/p.md"
-        touch -h -t 202001010000 "$QUEUE_DIR/p.md"   # old link mtime; proves dispose's touch -h
+        : > "$D/plans/p.md"; ln -s "$D/plans/p.md" "$QUEUE_DIR/010-p.md"
+        touch -h -t 202001010000 "$QUEUE_DIR/010-p.md"   # old link mtime; proves dispose's touch -h
         lock="$QUEUE_DIR/p.md.lock"
         mkdir "$lock"
         case "${H_OWNER:-dead}" in
@@ -1004,10 +1013,10 @@ run_h_case() {
         # shellcheck source=bin/lib/usage-gate.sh
         . "$SCRIPT_DIR/lib/usage-gate.sh"
         if [ "${H_SECOND:-0}" = 1 ]; then
-            : > "$D/plans/q.md"; ln -s "$D/plans/q.md" "$QUEUE_DIR/q.md"
-            queue_entries_ordered() { printf '%s\n' "$QUEUE_DIR/p.md" "$QUEUE_DIR/q.md"; }
+            : > "$D/plans/q.md"; ln -s "$D/plans/q.md" "$QUEUE_DIR/020-q.md"
+            queue_entries_ordered() { printf '%s\n' "$QUEUE_DIR/010-p.md" "$QUEUE_DIR/020-q.md"; }
         else
-            queue_entries_ordered() { printf '%s\n' "$QUEUE_DIR/p.md"; }
+            queue_entries_ordered() { printf '%s\n' "$QUEUE_DIR/010-p.md"; }
         fi
         stat() {
             if [ "${1:-}" = -f ] && [ "${2:-}" = %m ]; then
@@ -1036,7 +1045,7 @@ u_untouched() {  # $1 = case dir, $2 = "handoff" (default) | "nohandoff"
     local D="$1"
     [ "$(cat "$D/rc" 2>/dev/null)" = "1" ] \
         && [ -z "$(cat "$D/out" 2>/dev/null)" ] \
-        && [ -e "$D/queue/p.md" ] \
+        && [ -e "$D/queue/010-p.md" ] \
         && { [ "${2:-handoff}" = nohandoff ] || [ -e "$D/handoff/p.md.json" ]; } \
         && [ ! -e "$D/done/p.md" ] \
         && ! compgen -G "$D/reports/*-done-p.md" > /dev/null
@@ -1065,7 +1074,7 @@ h_state() {  # $1 = case dir; one-line dump for FAIL output
 # h1: dead owner, no paused-held → stolen
 D=$(H_OWNER=dead H_LOCK_AGE=60 H_PR=open H_LAUNCHCTL=none run_h_case)
 if [ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
-   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/p.md" ] \
+   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/010-p.md" ] \
    && [ "$(cat "$D/queue/p.md.lock/pid" 2>/dev/null)" != "$(cat "$D/deadpid" 2>/dev/null)" ] \
    && grep -q 'stole stale lock for p.md' "$D/run.log"; then
     echo "ok: h1-stale-dead-owner-no-hold-steals"
@@ -1079,7 +1088,7 @@ D=$(H_OWNER=dead H_LOCK_AGE=20000 H_SID="$H_SID_VAL" H_MARKER=1 H_HANDOFF_BRANCH
 if [ "$(cat "$D/rc" 2>/dev/null)" = "1" ] \
    && [ -z "$(cat "$D/out" 2>/dev/null)" ] \
    && [ "$(cat "$D/queue/p.md.lock/paused-held" 2>/dev/null)" = "$H_SID_VAL" ] \
-   && [ -e "$D/queue/p.md" ] && [ ! -e "$D/done/p.md" ]; then
+   && [ -e "$D/queue/010-p.md" ] && [ ! -e "$D/done/p.md" ]; then
     echo "ok: h2-paused-held-live-marker-skips"
 else
     echo "FAIL: h2-paused-held-live-marker-skips — $(h_state "$D")"
@@ -1089,7 +1098,7 @@ fi
 # h3: stale paused-held lock, PR lookup fails → plain steal, handoff kept
 D=$(H_OWNER=dead H_LOCK_AGE=20000 H_SID="$H_SID_VAL" H_MARKER=0 H_CLEARED_AGE=20000 H_HANDOFF_BRANCH=p H_LOCK_BRANCH=p H_PR=error H_LAUNCHCTL=none run_h_case)
 if [ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
-   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/p.md" ] \
+   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/010-p.md" ] \
    && [ -e "$D/handoff/p.md.json" ] && [ ! -e "$D/done/p.md" ]; then
     echo "ok: h3-stale-hold-pr-lookup-fails-steals"
 else
@@ -1101,7 +1110,7 @@ fi
 # cleared/ is removed so the grace check cannot fail on its own (see plan fixture notes).
 D=$(H_OWNER=dead H_LOCK_AGE=20000 H_HANDOFF_BRANCH=p H_PR=open H_LAUNCHCTL=none H_NO_CLEARED_DIR=1 run_h_case)
 if [ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
-   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/p.md" ] \
+   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/010-p.md" ] \
    && [ -e "$D/handoff/p.md.json" ] && [ ! -e "$D/done/p.md" ]; then
     echo "ok: h4-stale-no-hold-open-handoff-steals"
 else
@@ -1112,7 +1121,7 @@ fi
 # h5: live owner, lock age past TTL (stat stub), no paused-held → stolen on age alone
 D=$(H_OWNER=live H_LOCK_AGE=20000 H_PR=open H_LAUNCHCTL=none run_h_case)
 if [ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
-   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/p.md" ]; then
+   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/010-p.md" ]; then
     echo "ok: h5-stale-live-owner-ttl-steals"
 else
     echo "FAIL: h5-stale-live-owner-ttl-steals — $(h_state "$D")"
@@ -1150,7 +1159,7 @@ u_disposed() {
         && [ -z "$(cat "$D/out" 2>/dev/null)" ] \
         && [ -L "$D/done/p.md" ] \
         && [ -n "$(find "$D/done/p.md" -newer "$D/ref" 2>/dev/null)" ] \
-        && [ ! -L "$D/queue/p.md" ] && [ ! -e "$D/handoff/p.md.json" ] \
+        && [ ! -L "$D/queue/010-p.md" ] && [ ! -e "$D/handoff/p.md.json" ] \
         && [ -n "$r" ] && grep -q "branch PR is $state" "$r" \
         && [ -d "$D/queue/p.md.lock" ]
 }
@@ -1262,7 +1271,7 @@ D=$(w_base H_LOCK_AGE=60 H_CLEARED_AGE=600 H_PR=open H_LAUNCHCTL=inflight)
 w_ok=1
 if [ "$(cat "$D/rc" 2>/dev/null)" = "1" ] && [ -z "$(cat "$D/out" 2>/dev/null)" ] \
    && [ "$(cat "$D/queue/p.md.lock/paused-held" 2>/dev/null)" = "$H_SID_VAL" ] \
-   && [ -L "$D/queue/p.md" ] && [ ! -e "$D/done/p.md" ]; then w_ok=0; fi
+   && [ -L "$D/queue/010-p.md" ] && [ ! -e "$D/done/p.md" ]; then w_ok=0; fi
 u_report w2-claim-hold-inflight-skips "$D" "$w_ok"
 
 D=$(w_base H_LOCK_AGE=20000 H_CLEARED_AGE=20000 H_PR=merged)
@@ -1273,7 +1282,7 @@ u_report w3-claim-stale-hold-merged-disposes "$D" $?
 D=$(w_base H_LOCK_AGE=20000 H_CLEARED_AGE=20000 H_PR=open H_LAUNCHCTL=empty)
 w_ok=1
 if [ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
-   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/p.md" ] \
+   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/010-p.md" ] \
    && [ -e "$D/handoff/p.md.json" ] && [ ! -e "$D/done/p.md" ]; then w_ok=0; fi
 u_report w4-claim-stale-hold-launchctl-empty-steals "$D" "$w_ok"
 
@@ -1284,7 +1293,7 @@ u_report w5-claim-breadcrumb-no-handoff-disposes "$D" $?
 
 D=$(w_base H_SECOND=1 H_LOCK_AGE=60 H_CLEARED_AGE=600 H_PR=open)
 [ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
-    && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/q.md" ] \
+    && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/020-q.md" ] \
     && [ -L "$D/done/p.md" ] && [ -d "$D/queue/q.md.lock" ]
 u_report w6-claim-disposes-then-claims-next "$D" $?
 

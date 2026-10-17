@@ -1127,16 +1127,16 @@ render_queue() {
         section "AUTOMOUSE QUEUE$reorder"
     fi
 
-    # Rows are in QUEUE order, not alphabetical: oldest symlink lstat mtime first,
-    # matching claim_next_plan() in bin/automouse/run (both use queue_entries_ordered
-    # from lib-queue-order). Row 1 is the plan that runs next.
+    # Rows are in QUEUE order: the NNN- prefix order of the entry names, matching
+    # claim_next_plan() in bin/automouse/run (both use queue_entries_ordered from
+    # lib-queue-order). Row 1 is the plan that runs next.
     queue_list="$(queue_entries_ordered "$AUTOMOUSE_DIR/queue")"
 
     # Pass 1: which live runners already belong to a queued plan. Their details
     # print under that plan's row below, so the heartbeat sweep must skip them.
     while IFS= read -r f; do
         [ -n "$f" ] || continue
-        pid="$(queue_lock_runner "$(basename "$f")")" && claimed="$claimed$pid "
+        pid="$(queue_lock_runner "$(entry_to_name "$f")")" && claimed="$claimed$pid "
     done <<EOF_Q
 $queue_list
 EOF_Q
@@ -1191,7 +1191,7 @@ EOF_Q
     while IFS= read -r f; do
         [ -n "$f" ] || continue
         { [ -f "$f" ] || [ -L "$f" ]; } || continue
-        base="$(basename "$f")"
+        base="$(entry_to_name "$f")"   # NNN-<slug>.md entry -> <slug>.md, the lock and sidecar key
         count=$(( count + 1 ))
         meta="$(plan_meta "$f")"
         model="$(printf '%s' "$meta" | cut -f1)"

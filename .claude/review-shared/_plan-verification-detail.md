@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _plan-verification.md — why each forced trigger exists, the incidents behind them, the worked pre-prod exercise-path catalogue, and the non-compliant counter-examples. Read only when editing the verification rules; the plan-architect never reads it.
-last_verified: 2026-10-15
+last_verified: 2026-10-17
 ---
 
 # _plan-verification Detail
@@ -94,6 +94,10 @@ named only inside a fence therefore never counts as declared.
 
 A phase that ships no new test method needs no entry. One example is a phase that re-runs an
 existing suite as a characterization check.
+
+### Which backticked token a test row plans
+
+The row's token is the rightmost cell holding a valid backticked test path, so a seed or fixture path cited in the description cell (`ibl5/tests/e2e/fixtures/ci-seed.sql` as evidence) is never the planned test. A row whose first backticked test-ish token is a bare method name still plans nothing.
 
 ### One-time-check rows: tag rules
 

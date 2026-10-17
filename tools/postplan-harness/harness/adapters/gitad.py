@@ -146,6 +146,7 @@ class LiveGit:
         # the index. Reset at the start of each rebase method; read by runner.py for the
         # audit log so a fail-closed exit 3 names the files that conflicted.
         self.last_conflict_files: tuple[str, ...] = ()
+        self.conflict_review_retries: dict[str, int] = {}   # review_resolution retries_out; runner copies into RunResult.retries
         # Probe-only state (set by predict_rebase_conflict, read by resolver_refusal_reason).
         # Stage sets per conflicted path from the merge-tree probe, and whether the probe's
         # net merge is guaranteed to match the per-commit rebase (see predict_rebase_conflict).
@@ -770,6 +771,7 @@ class LiveGit:
                 worktree=self.worktree, key=key,
                 resolved_files=resolved_files, proof_out=proof_out,
                 adaptations=adapted_lines,
+                retries_out=self.conflict_review_retries,
             )
 
         return manifest_path, notes_path
@@ -799,6 +801,7 @@ class LiveGit:
         self.last_conflict_files = ()
         self.last_conflict_resolution = None
         self.last_conflict_rung = ""
+        self.conflict_review_retries = {}
         master_sha = self._run("rev-parse", base).strip()
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()

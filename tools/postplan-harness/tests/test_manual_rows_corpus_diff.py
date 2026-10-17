@@ -24,6 +24,7 @@ def _load():
 
 
 def test_unknown_flag_exits_2():
+    # Kills the mutant that swaps ap.parse_args(argv) for ap.parse_known_args(argv)[0].
     with pytest.raises(SystemExit) as exc:
         _load().main(["--harness-root", HARNESS_ROOT, "--bogus"])
     assert exc.value.code == 2

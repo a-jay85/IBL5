@@ -412,6 +412,26 @@ class PlrRatingsCongruenceCheckStepTest extends TestCase
         $this->assertSame('30 rating mismatch(es) across 30 player(s) [settled]', $result->detail);
     }
 
+    public function testTwoPointCheckNeverAddsThreePointTotalsToFieldGoals(): void
+    {
+        // FGM/FGA 500/1000, 3GM/3GA 100/300, 2GP rated 50 (expected 57). Adding threes instead of
+        // subtracting them would read 600/1300 and expect 46; the message must show 400/700 only.
+        $line = $this->buildPlrLine(1001, 'Player A', 500, 1000, 0, 0, 100, 300, 50, 0, 33);
+
+        /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
+        $stub = self::createStub(JsbSourceResolverInterface::class);
+        $stub->method('getContents')->willReturn($line);
+
+        $step = new PlrRatingsCongruenceCheckStep($stub, 'Regular Season');
+        $result = $step->execute();
+
+        $this->assertSame(1, $result->messageErrorCount);
+        $this->assertStringContainsString('real-life 400/700', $result->messages[0]);
+        $this->assertStringNotContainsString('real-life 600/700', $result->messages[0]);
+        $this->assertStringNotContainsString('real-life 400/1300', $result->messages[0]);
+        $this->assertStringNotContainsString('real-life 600/1300', $result->messages[0]);
+    }
+
     private function buildPlrLine(
         int $pid,
         string $name,

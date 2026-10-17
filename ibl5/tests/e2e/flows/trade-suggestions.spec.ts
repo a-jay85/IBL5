@@ -230,14 +230,17 @@ test.describe('Trade suggestions panel (GM)', () => {
     await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
 
     for (const pid of [USER_PID, PARTNER_PID]) {
-      const row = page
-        .locator('tr')
+      // Pick rows also carry index<k> (holding the pickid), so match type<k>=1 too.
+      const cell = page
+        .locator('td')
         .filter({
           has: page.locator(`input[type="hidden"][name^="index"][value="${pid}"]`),
         })
-        .first();
+        .filter({
+          has: page.locator('input[type="hidden"][name^="type"][value="1"]'),
+        });
       await expect(
-        row.locator('input[type="checkbox"][name^="check"]'),
+        cell.locator('input[type="checkbox"][name^="check"]'),
       ).toBeChecked();
     }
     await expect(

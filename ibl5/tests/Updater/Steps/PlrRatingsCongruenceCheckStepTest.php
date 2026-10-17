@@ -369,6 +369,24 @@ class PlrRatingsCongruenceCheckStepTest extends TestCase
         $this->assertStringContainsString('3 rating mismatch(es) across 1 player(s)', $result->detail);
     }
 
+    public function testPlayersFlaggedCountsOnlyPlayersWithMismatches(): void
+    {
+        // Player A: FT 80/100 = 80, rated 20, so one mismatch. Player B: all zeros, below MIN_ATTEMPTS, never flagged.
+        $flagged = $this->buildPlrLine(1001, 'Player A', 0, 0, 80, 100, 0, 0, 0, 20, 0);
+        $clean = $this->buildPlrLine(1002, 'Player B', 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        $data = implode("\r\n", [$flagged, $clean]);
+
+        /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
+        $stub = self::createStub(JsbSourceResolverInterface::class);
+        $stub->method('getContents')->willReturn($data);
+
+        $step = new PlrRatingsCongruenceCheckStep($stub, 'Regular Season');
+        $result = $step->execute();
+
+        $this->assertSame(1, $result->messageErrorCount);
+        $this->assertSame('1 rating mismatch(es) across 1 player(s) [settled]', $result->detail);
+    }
+
     private function buildPlrLine(
         int $pid,
         string $name,

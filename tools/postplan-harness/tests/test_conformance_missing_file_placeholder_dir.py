@@ -143,7 +143,10 @@ def test_top_level_dir_token_keeps_tier2_ambiguity():
 
 
 def test_prefix_collision_dir_token_stays_missing():
-    """Mutation caught: drop the `+ "/"` from `prefix`."""
+    """Mutation caught: drop the `+ "/"` from `prefix`.
+
+    `ibl5/classes/Trade` does not match `ibl5/classes/TradeSuggestions/…`.
+    """
     items = check(_plan_with_critical("ibl5/classes/Trade"),
                   ["ibl5/classes/TradeSuggestions/S.php"])
     assert _missing(items, "ibl5/classes/Trade")

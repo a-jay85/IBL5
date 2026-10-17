@@ -230,7 +230,7 @@ def _planned_token(cells: list[str]) -> str | None:
        token is a bare method name still plans nothing. Keeping this gate means the
        change moves tokens on 19 corpus rows and plans no new row (measured
        2026-10-17; a pure rightmost-cell rule would newly plan 1365 rows in 199
-       plans, a recall change filed as follow-up, see the PR body).
+       plans, a recall change filed as https://github.com/a-jay85/IBL5-backlog/issues/1501).
     2. Choice (new): the token comes from the RIGHTMOST cell holding a valid test
        path, so the location cell outranks a path cited in the description. Before
        this, record-holders-bullets-logo-abbr row 8 planned the seed file

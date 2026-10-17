@@ -8,11 +8,12 @@
    (e.g., bg-navy-800, text-accent-500, font-display). These values match what
    the CDN play script previously provided at runtime. */
 @theme {
-  /* Navy palette */
-  --color-navy-900: #0a0f1a;
-  --color-navy-800: #111827;
-  --color-navy-700: #1a2234;
-  --color-navy-600: #243044;
+  /* Navy palette: slate ramp (navy-800 = #1e293b). Light text on these
+     surfaces is pinned to WCAG AA by tests/ts-unit/navy-contrast.test.ts. */
+  --color-navy-900: #0f172a;
+  --color-navy-800: #1e293b;
+  --color-navy-700: #334155;
+  --color-navy-600: #475569;
 
   /* Accent palette (orange) */
   --color-accent-600: #ea580c;

@@ -1,4 +1,4 @@
-import { test as publicTest } from '../fixtures/public';
+import { test as publicTest, expect } from '../fixtures/public';
 import { test as authTest } from '../fixtures/auth';
 import { assertNoA11yViolations, type A11yOptions } from '../helpers/accessibility';
 import { gotoWithRetry } from '../helpers/navigation';
@@ -189,6 +189,74 @@ publicTest.describe('Public page accessibility', () => {
       await assertNoA11yViolations(page, `on ${url}`, getA11yOptions(name));
     });
   }
+});
+
+// --- Sign-in divider contrast ---
+// axe skips punctuation-only text, so the "|" in <span class="auth-links__divider">
+// (LoginView) is never contrast-checked by the 'sign in' row above. Compute the WCAG
+// ratio directly. The divider is display:none at narrow widths, so pin a desktop viewport.
+
+type Rgb = [number, number, number];
+
+function parseCssRgb(value: string): { rgb: Rgb; alpha: number } {
+  const match = value.match(/^rgba?\(\s*(\d+(?:\.\d+)?)[,\s]+(\d+(?:\.\d+)?)[,\s]+(\d+(?:\.\d+)?)(?:[,\s/]+(\d+(?:\.\d+)?%?))?\s*\)$/);
+  if (!match) {
+    throw new Error(`Unparseable CSS color: ${value}`);
+  }
+  const alphaRaw = match[4];
+  const alpha =
+    alphaRaw === undefined
+      ? 1
+      : alphaRaw.endsWith('%')
+        ? parseFloat(alphaRaw) / 100
+        : parseFloat(alphaRaw);
+  return { rgb: [Number(match[1]), Number(match[2]), Number(match[3])], alpha };
+}
+
+function relativeLuminance([r, g, b]: Rgb): number {
+  const [lr, lg, lb] = [r, g, b].map((channel) => {
+    const c = channel / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * lr! + 0.7152 * lg! + 0.0722 * lb!;
+}
+
+function contrastRatio(foreground: Rgb, background: Rgb): number {
+  const [lighter, darker] = [relativeLuminance(foreground), relativeLuminance(background)].sort(
+    (a, b) => b - a,
+  );
+  return (lighter! + 0.05) / (darker! + 0.05);
+}
+
+publicTest.describe('Sign-in divider contrast (WCAG 1.4.3)', () => {
+  publicTest.use({ viewport: { width: 1280, height: 720 } });
+
+  publicTest('.auth-links__divider meets 4.5:1 against its effective background', async ({
+    page,
+  }) => {
+    await gotoWithRetry(page, 'modules.php?name=YourAccount');
+
+    const divider = page.locator('.auth-links__divider').first();
+    await expect(divider).toBeVisible();
+
+    const { color, backgrounds } = await divider.evaluate((el) => {
+      const chain: string[] = [];
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        chain.push(getComputedStyle(node).backgroundColor);
+      }
+      return { color: getComputedStyle(el).color, backgrounds: chain };
+    });
+
+    // Effective background: first ancestor with a non-transparent fill; white if none.
+    const solid = backgrounds.map(parseCssRgb).find(({ alpha }) => alpha > 0);
+    const background: Rgb = solid?.rgb ?? [255, 255, 255];
+
+    const ratio = contrastRatio(parseCssRgb(color).rgb, background);
+    expect(
+      ratio,
+      `divider color ${color} on rgb(${background.join(', ')}) = ${ratio.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(4.5);
+  });
 });
 
 // --- Authenticated pages ---

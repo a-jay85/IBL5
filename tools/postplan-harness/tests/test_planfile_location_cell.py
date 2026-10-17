@@ -53,6 +53,7 @@ def _plan(body: str) -> PlanInfo:
 
 
 def test_seed_in_description_plans_only_the_location_token():
+    # Reverting _planned_token to the joined-row first match plans [SEED] here.
     body = HDR + VR_SEED_ROW
     assert parse_matrix(body)[0] == [SNAP]
     assert parse_no_change_test_paths(body) == [SNAP]

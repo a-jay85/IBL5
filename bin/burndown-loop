@@ -506,11 +506,20 @@ bl_on_launch() {
             bl_count_new
             bl_log "batch ran ledgers=$new items=$BATCH_ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
             # A batch that skipped every pick did no work. The next batch re-picks the
-            # same blocked items, so back off like an empty backlog.
+            # same blocked items, so treat it like an empty backlog: scout for new
+            # work when the gate allows, else back off.
             if bl_all_skipped; then
                 bl_log "every picked item skipped; re-check in ${EMPTY_SLEEP_MIN}m"
                 if [ "$ONCE" -eq 0 ]; then
-                    bl_sleep $((EMPTY_SLEEP_MIN * 60)) all-skipped || bl_stopped
+                    scout=$(bl_scout_gate)
+                    bl_log "decision=$scout"
+                    case "$scout" in
+                        scout\ *)
+                            bl_run_scout
+                            bl_sleep "$BL_SCOUT_RECHECK" scout-recheck || bl_stopped
+                            ;;
+                        *) bl_sleep $((EMPTY_SLEEP_MIN * 60)) all-skipped || bl_stopped ;;
+                    esac
                 fi
             fi
             ;;

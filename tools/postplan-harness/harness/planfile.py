@@ -185,6 +185,19 @@ def _has_planning_type_cell(cells: list[str]) -> bool:
     return any(_TEST_TYPE_LABEL.match(_norm_cell(c)) for c in cells)
 
 
+_TRULY_MANUAL_CELL = re.compile(r"truly.?manual", re.IGNORECASE)
+# Header cells that open a table whose rows may declare a Test type. "what to
+# verify" is the house matrix (bin/check-plan's GATEP_MATRIX); "test type" keeps
+# the legacy `| Behavior | Test type | Test |` matrices the harness still reads.
+_MANUAL_TABLE_HEADERS = frozenset({"what to verify", "test type"})
+
+
+def _has_truly_manual_cell(cells: list[str]) -> bool:
+    """True when some WHOLE cell is a Truly-manual label (bin/check-plan gate [Q]'s
+    MC_TYPE rule). A cell that merely mentions the words never counts."""
+    return any(_TRULY_MANUAL_CELL.fullmatch(_norm_cell(c)) for c in cells)
+
+
 def _planned_token(cells: list[str]) -> str | None:
     """The row's planned test token, or None when the row plans nothing.
 
@@ -312,20 +325,28 @@ def parse_matrix(
     and it already shipped. Making the harness report unbalanced-fence as
     INDETERMINATE rather than empty changes a Phase 5.0 contract, so it is filed as
     backlog, not fixed here.
+
+    A manual row needs a WHOLE Truly-manual cell inside a typed table (a
+    What-to-verify or `Test type` header), backlog#1490. The old whole-row
+    search read 28 of 128 corpus rows as manual: 17 sat in prose tables and
+    11 were CLI-executable matrix rows that only mentioned the words.
     """
     planned: list[str] = []
     manual: list[manual_rows.ManualRow] = []
     post_merge: list[manual_rows.ManualRow] = []
     in_matrix = False  # inside a `What to verify` table, as bin/check-plan's GATEP_MATRIX
+    in_typed_table = False  # What-to-verify OR a whole `Test type` header cell
     for line in _strip_fenced(content):
         if not line.strip().startswith("|"):
             in_matrix = False
+            in_typed_table = False
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if any(_norm_cell(c).lower() == "what to verify" for c in cells):
             in_matrix = True
-        row = " | ".join(cells)
-        if re.search(r"truly.?manual", row, re.I):
+        if any(_norm_cell(c).lower() in _MANUAL_TABLE_HEADERS for c in cells):
+            in_typed_table = True
+        if in_typed_table and _has_truly_manual_cell(cells):
             mrow = manual_rows.row_from_cells(
                 cells, len(manual) + len(post_merge) + 1, in_matrix=in_matrix)
             (post_merge if mrow.post_merge_reason else manual).append(mrow)

@@ -75,6 +75,7 @@ export default defineConfig({
         /projected-draft-order-submission\.spec\.ts$/,
         /google-sheet-card\.spec\.ts$/,
         /google-sheets-oauth\.spec\.ts$/,
+        /trade-suggestions\.spec\.ts$/,
       ],
     },
     {
@@ -155,6 +156,7 @@ export default defineConfig({
         /projected-draft-order-submission\.spec\.ts$/,
         /google-sheet-card\.spec\.ts$/,
         /google-sheets-oauth\.spec\.ts$/,
+        /trade-suggestions\.spec\.ts$/,
       ],
     },
   ],

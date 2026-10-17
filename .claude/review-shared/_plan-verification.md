@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time; no deferred manual items; E2E assertions must be seed- and DOM-grounded.
-last_verified: 2026-10-15
+last_verified: 2026-10-17
 ---
 
 # Plan Verification Matrix
@@ -65,6 +65,7 @@ Harness rules (`parse_no_change_test_paths` in `tools/postplan-harness/harness/p
 - Honored only on a row with a cell reading exactly `Visual-regression`. Elsewhere the marker is ignored. `bin/check-plan` gate `[X]` rejects it on other row types and anywhere but directly after the token.
 - Exempts only that row's token. If another row plans the same token unmarked, the unmarked row wins.
 - Fenced examples and a code-span `(no-change)` never count. Gate `[X]` skips both.
+- The row's token is the rightmost cell holding a valid backticked test path, so a seed or fixture path cited in the description cell (`ibl5/tests/e2e/fixtures/ci-seed.sql` as evidence) is never the planned test. A row whose first backticked test-ish token is a bare method name still plans nothing.
 
 A row that only runs an existing test takes `(run-only)` the same way: _plan-verification-detail.md § Test rows that run an existing test without changing it
 

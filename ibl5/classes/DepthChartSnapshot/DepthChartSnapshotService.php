@@ -143,15 +143,22 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
         }
     }
 
+    /**
+     * Runs after commit, so a logger failure must never reach saveOnSubmit's rollback catch.
+     */
     private function logSaved(int $dcId, int $teamid, ?string $name, Season $season): void
     {
-        $this->logger->info('depth_chart_saved', [
-            'action' => 'depth_chart_saved',
-            'dc_id' => $dcId,
-            'team_id' => $teamid,
-            'dc_name' => $name,
-            'phase' => $season->phase,
-        ]);
+        try {
+            $this->logger->info('depth_chart_saved', [
+                'action' => 'depth_chart_saved',
+                'dc_id' => $dcId,
+                'team_id' => $teamid,
+                'dc_name' => $name,
+                'phase' => $season->phase,
+            ]);
+        } catch (\Throwable) {
+            // Fire-and-forget: the save already committed; an audit-log failure must not surface as a save error.
+        }
     }
 
     /**

@@ -749,6 +749,31 @@ final class RecordBreakingDetectorTest extends TestCase
         $this->assertSame($result, $spy->captured);
     }
 
+    /**
+     * Characterization: a team stat that follows the player-only `turnovers`
+     * entry in the registry is still scanned and announced.
+     */
+    public function testTeamStatAfterTurnoversInRegistryIsAnnounced(): void
+    {
+        $teamBatch = $this->buildTeamBatchResult([]);
+        $teamBatch['team_3pt_made'] = [
+            $this->makeTeamRecord(['team_name' => 'Heat', 'date' => '2007-01-15', 'value' => 25]),
+            $this->makeTeamRecord(['team_name' => 'Bulls', 'date' => '2000-03-10', 'value' => 22]),
+        ];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($this->buildPlayerBatchResult([]));
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($teamBatch);
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+
+        $result = $this->detector->detectAndAnnounce(['2007-01-15']);
+
+        $this->assertSame([
+            "**NEW IBL TEAM RECORD!**\n"
+                . 'The Heat just recorded **25 most three pointers** in a regular season game, '
+                . "breaking the Bulls's all-time record of 22 most three pointers!",
+        ], $result);
+    }
+
     // --- Helper methods ---
 
     /**

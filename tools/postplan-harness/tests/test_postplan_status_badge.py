@@ -416,7 +416,8 @@ def test_generated_plist_wiring(tmp_path, _private_log_dir):
         "POSTPLAN_LOG_FILE must point into the per-test POSTPLAN_LOG_DIR "
         "(conftest.py _private_log_dir)"
     )
-    assert "POSTPLAN_LOG_FILE='/tmp/" not in cmd, "log escaped to /tmp"
+    # Linux pytest's basetemp is /tmp/pytest-of-<user>/, so match the default path itself.
+    assert "POSTPLAN_LOG_FILE='/tmp/post-plan-now-" not in cmd, "log escaped to /tmp"
     assert "POSTPLAN_STATUS_LABEL='post-plan-running'" in cmd
     assert "POSTPLAN_BADGE_BODY" not in cmd, "the sticky running body is gone"
 

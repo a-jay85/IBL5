@@ -422,4 +422,32 @@ final class ScheduleReconciliationAuditTest extends TestCase
         self::assertSame(AuditFinding::KIND_MISSING_BOXSCORE, $report->findings[1]->kind);
         self::assertSame(0, $report->scheduledGames);
     }
+
+    /** Two rows per kind: every row becomes a finding, kinds in order, repository row order within a kind. */
+    public function testEachDirectionEmitsOneFindingPerRepositoryRowInRowOrder(): void
+    {
+        $report = $this->makeAudit(
+            scheduleIndex: $this->oneGameSchedule(),
+            orphans: [$this->makeOrphanRow(date: '2008-02-05'), $this->makeOrphanRow(date: '2008-02-06')],
+            duplicates: [$this->makeDuplicateRow(date: '2008-04-15'), $this->makeDuplicateRow(date: '2008-04-16')],
+            missing: [$this->makeMissingRow(date: '2008-06-25'), $this->makeMissingRow(date: '2008-06-26')],
+        );
+
+        $mapped = array_map(
+            static fn (AuditFinding $f): string => $f->kind . '@' . $f->gameDate,
+            $report->findings,
+        );
+
+        self::assertSame(
+            [
+                AuditFinding::KIND_ORPHAN . '@2008-02-05',
+                AuditFinding::KIND_ORPHAN . '@2008-02-06',
+                AuditFinding::KIND_DUPLICATE_TRIPLE . '@2008-04-15',
+                AuditFinding::KIND_DUPLICATE_TRIPLE . '@2008-04-16',
+                AuditFinding::KIND_MISSING_BOXSCORE . '@2008-06-25',
+                AuditFinding::KIND_MISSING_BOXSCORE . '@2008-06-26',
+            ],
+            $mapped,
+        );
+    }
 }

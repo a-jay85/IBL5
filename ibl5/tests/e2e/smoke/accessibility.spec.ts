@@ -172,6 +172,8 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'team schedule', url: 'modules.php?name=Schedule&teamid=1' },
   // Seed rows for this game: ibl5/tests/e2e/fixtures/ci-seed.sql:124 and :814-823. An unknown pair 404s.
   { name: 'game boxscore', url: 'modules.php?name=GameBoxscore&date=2026-02-20&game=1' },
+  // Anonymous sign-in form. Gated modules (Voting, Trading, FreeAgency, ...) JS-redirect here via loginbox().
+  { name: 'sign in', url: 'modules.php?name=YourAccount' },
 ];
 
 publicTest.describe('Public page accessibility', () => {

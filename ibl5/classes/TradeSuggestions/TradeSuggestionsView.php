@@ -71,7 +71,7 @@ class TradeSuggestionsView implements TradeSuggestionsViewInterface
             TeamModeSetting::Rebuild->value => 'Rebuild',
         ];
 
-        $html = '<form class="trade-suggestions__mode-form" method="post" action="'
+        $html = '<form class="trade-suggestions__mode-form" method="post" hx-boost="false" action="'
             . HtmlSanitizer::e('modules.php?name=Trading&op=trade-mode') . '">';
         $html .= \Security\CsrfGuard::generateToken('trade_mode');
         $html .= '<label class="trade-suggestions__mode-label" for="trade-mode-select">Team mode</label>';

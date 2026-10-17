@@ -119,6 +119,7 @@ class TeamModeControllerTest extends TestCase
 
         $this->controller($repo, 'gm1', 'Team One', 1)->handleSetMode('POST', $post);
 
+        // A controller that read $post['teamid'] would record tid 2 here.
         self::assertSame([['tid' => 1, 'setting' => TeamModeSetting::Rebuild]], $repo->saves);
     }
 

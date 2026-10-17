@@ -953,6 +953,7 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
     }
 
     /**
+     * Pins deactivateForTeam(7,'2024-02-29',41).
      * Catches: lastSimNumber + 1 to + 0; unshifted lastSimEndDate as start date; teamid passed to saveDepthChartPlayers
      */
     public function testSaveOnSubmitCreateNewPassesSeasonDerivedArgs(): void
@@ -1001,6 +1002,7 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
     }
 
     /**
+     * Pins deactivateOthersForTeam(7,55,'2024-02-29',41) then reactivate(55,7).
      * Catches: deleting reactivate() on the loaded path; swapping teamid and dc id in deactivateOthersForTeam
      */
     public function testSaveOnSubmitLoadedDcDeactivatesOthersAndReactivatesWhenInactive(): void
@@ -1056,6 +1058,7 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
     }
 
     /**
+     * Pins reactivate(66,7) after deactivateOthersForTeam.
      * Catches: deleting reactivate() on the unused-most-recent path
      */
     public function testSaveOnSubmitUnusedMostRecentDeactivatesOthersAndReactivatesWhenInactive(): void
@@ -1224,7 +1227,7 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
             self::assertSame($boom, $caught);
         }
 
-        self::assertSame(['BEGIN', 'ROLLBACK'], $this->txnMarkers());
+        self::assertSame('BEGIN,ROLLBACK', implode(',', $this->txnMarkers()));
         self::assertSame([
             'getMostRecentDepthChart@BEGIN',
             'deactivateForTeam@BEGIN',
@@ -1286,7 +1289,7 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
             self::assertSame($boom, $caught);
         }
 
-        self::assertSame(['BEGIN', 'COMMIT', 'ROLLBACK'], $this->txnMarkers());
+        self::assertSame('BEGIN,COMMIT,ROLLBACK', implode(',', $this->txnMarkers()));
     }
 
 }

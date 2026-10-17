@@ -10,6 +10,7 @@ use Tests\WideUnit\WideUnitTestCase;
 use Season\Season;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
+use Psr\Log\LoggerInterface;
 
 /**
  * @covers \DepthChartSnapshot\DepthChartSnapshotService
@@ -827,6 +828,465 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
 
         $service->nameOrCreateActive(1, 'gm', 'New Name', $season);
         $service->buildCurrentLiveLabel(1, $season);
+    }
+
+    /** @return list<string> BEGIN/COMMIT/ROLLBACK entries of the op log, in order */
+    private function txnMarkers(): array
+    {
+        return array_values(array_filter(
+            $this->mockDb->getOperationLog(),
+            static fn (mixed $op): bool => in_array($op, ['BEGIN', 'COMMIT', 'ROLLBACK'], true)
+        ));
+    }
+
+    private function saveSeason(): Season
+    {
+        $season = new Season($this->mockDb);
+        $season->phase = 'Playoffs';
+        $season->endingYear = 2025;
+        $season->lastSimEndDate = '2024-02-29';
+        $season->lastSimNumber = 41;
+        return $season;
+    }
+
+    /** @return array<string, mixed> full SavedDepthChartRow shape, copied from captureSnapshots() */
+    private function saveDcRow(int $id, int $isActive, ?string $simEndDate): array
+    {
+        return [
+            'id' => $id, 'teamid' => 7, 'username' => 'gm7', 'name' => 'Old',
+            'phase' => 'Playoffs', 'season_year' => 2025,
+            'sim_start_date' => '2024-02-01', 'sim_end_date' => $simEndDate,
+            'sim_number_start' => 30, 'sim_number_end' => null,
+            'is_active' => $isActive, 'created_at' => '2024-02-01 00:00:00',
+            'updated_at' => '2024-02-01 00:00:00',
+        ];
+    }
+
+    /**
+     * Every saveOnSubmit-reachable repo method records "<method>@<txn markers at call time>"
+     * into $events and its argument list into $calls[<method>][], then returns its canned value
+     * or throws the Throwable mapped in $throwOn.
+     *
+     * @param list<string> $events
+     * @param array<string, list<list<mixed>>> $calls
+     * @param array<string, mixed>|null $loadedDc
+     * @param array<string, mixed>|null $mostRecent
+     * @param array<string, \Throwable> $throwOn
+     */
+    private function recordingRepo(
+        array &$events,
+        array &$calls,
+        ?array $loadedDc,
+        ?array $mostRecent,
+        array $throwOn = []
+    ): DepthChartSnapshotRepositoryInterface&Stub {
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
+        $canned = [
+            'getSavedDepthChartById' => $loadedDc,
+            'getMostRecentDepthChart' => $mostRecent,
+            'updateDepthChartPlayers' => null,
+            'deactivateOthersForTeam' => null,
+            'reactivate' => true,
+            'deactivateForTeam' => null,
+            'createSavedDepthChart' => 913,
+            'saveDepthChartPlayers' => null,
+        ];
+        foreach ($canned as $method => $result) {
+            $repo->method($method)->willReturnCallback(
+                function (mixed ...$args) use ($method, $result, $throwOn, &$events, &$calls): mixed {
+                    $events[] = $method . '@' . implode(',', $this->txnMarkers());
+                    $calls[$method][] = $args;
+                    if (isset($throwOn[$method])) {
+                        throw $throwOn[$method];
+                    }
+                    return $result;
+                }
+            );
+        }
+        return $repo;
+    }
+
+    /**
+     * @param list<string> $events
+     * @param list<array{0: mixed, 1: mixed}> $logged
+     */
+    private function recordingLogger(array &$events, array &$logged, ?\Throwable $throw = null): LoggerInterface&Stub
+    {
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            function (mixed $message, mixed $context = []) use ($throw, &$events, &$logged): void {
+                $events[] = 'info@' . implode(',', $this->txnMarkers());
+                $logged[] = [$message, $context];
+                if ($throw !== null) {
+                    throw $throw;
+                }
+            }
+        );
+        return $logger;
+    }
+
+    /**
+     * Catches: move commit() above saveDepthChartPlayers
+     */
+    public function testSaveOnSubmitCreateNewRunsRepoCallsInOrderInsideTransaction(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, null, null),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $result = $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
+
+        self::assertSame(913, $result);
+        self::assertSame([
+            'getMostRecentDepthChart@BEGIN',
+            'deactivateForTeam@BEGIN',
+            'createSavedDepthChart@BEGIN',
+            'saveDepthChartPlayers@BEGIN',
+            'info@BEGIN,COMMIT',
+        ], $events);
+        self::assertSame(['BEGIN', 'COMMIT'], $this->txnMarkers());
+    }
+
+    /**
+     * Catches: lastSimNumber + 1 to + 0; unshifted lastSimEndDate as start date; teamid passed to saveDepthChartPlayers
+     */
+    public function testSaveOnSubmitCreateNewPassesSeasonDerivedArgs(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, null, null),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
+
+        self::assertSame([[7, '2024-02-29', 41]], $calls['deactivateForTeam']);
+        self::assertSame([[7, 'gm7', 'Plan B', 'Playoffs', 2025, '2024-03-01', 42]], $calls['createSavedDepthChart']);
+        self::assertSame([[913, []]], $calls['saveDepthChartPlayers']);
+    }
+
+    /**
+     * Catches: dropping the sim_end_date === null check
+     */
+    public function testSaveOnSubmitCreatesNewWhenMostRecentDcAlreadyConsumed(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, null, $this->saveDcRow(66, 1, '2024-02-20')),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $result = $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
+
+        self::assertSame(913, $result);
+        self::assertSame([
+            'getMostRecentDepthChart@BEGIN',
+            'deactivateForTeam@BEGIN',
+            'createSavedDepthChart@BEGIN',
+            'saveDepthChartPlayers@BEGIN',
+            'info@BEGIN,COMMIT',
+        ], $events);
+        self::assertArrayNotHasKey('updateDepthChartPlayers', $calls);
+    }
+
+    /**
+     * Catches: deleting reactivate() on the loaded path; swapping teamid and dc id in deactivateOthersForTeam
+     */
+    public function testSaveOnSubmitLoadedDcDeactivatesOthersAndReactivatesWhenInactive(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, $this->saveDcRow(55, 0, null), null),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $result = $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 55, $this->saveSeason());
+
+        self::assertSame(55, $result);
+        self::assertSame([
+            'getSavedDepthChartById@BEGIN',
+            'updateDepthChartPlayers@BEGIN',
+            'deactivateOthersForTeam@BEGIN',
+            'reactivate@BEGIN',
+            'info@BEGIN,COMMIT',
+        ], $events);
+        self::assertSame([[55, 7]], $calls['getSavedDepthChartById']);
+        self::assertSame([[55, []]], $calls['updateDepthChartPlayers']);
+        self::assertSame([[7, 55, '2024-02-29', 41]], $calls['deactivateOthersForTeam']);
+        self::assertSame([[55, 7]], $calls['reactivate']);
+    }
+
+    /**
+     * Catches: removing the is_active === 0 guard on the loaded path
+     */
+    public function testSaveOnSubmitLoadedDcSkipsReactivateWhenActive(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, $this->saveDcRow(55, 1, null), null),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 55, $this->saveSeason());
+
+        self::assertSame([
+            'getSavedDepthChartById@BEGIN',
+            'updateDepthChartPlayers@BEGIN',
+            'deactivateOthersForTeam@BEGIN',
+            'info@BEGIN,COMMIT',
+        ], $events);
+        self::assertArrayNotHasKey('reactivate', $calls);
+    }
+
+    /**
+     * Catches: deleting reactivate() on the unused-most-recent path
+     */
+    public function testSaveOnSubmitUnusedMostRecentDeactivatesOthersAndReactivatesWhenInactive(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, null, $this->saveDcRow(66, 0, null)),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $result = $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
+
+        self::assertSame(66, $result);
+        self::assertSame([
+            'getMostRecentDepthChart@BEGIN',
+            'updateDepthChartPlayers@BEGIN',
+            'deactivateOthersForTeam@BEGIN',
+            'reactivate@BEGIN',
+            'info@BEGIN,COMMIT',
+        ], $events);
+        self::assertSame([[66, []]], $calls['updateDepthChartPlayers']);
+        self::assertSame([[7, 66, '2024-02-29', 41]], $calls['deactivateOthersForTeam']);
+        self::assertSame([[66, 7]], $calls['reactivate']);
+    }
+
+    /**
+     * Catches: removing the is_active === 0 guard on the unused-most-recent path
+     */
+    public function testSaveOnSubmitUnusedMostRecentSkipsReactivateWhenActive(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, null, $this->saveDcRow(66, 1, null)),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
+
+        self::assertSame([
+            'getMostRecentDepthChart@BEGIN',
+            'updateDepthChartPlayers@BEGIN',
+            'deactivateOthersForTeam@BEGIN',
+            'info@BEGIN,COMMIT',
+        ], $events);
+        self::assertArrayNotHasKey('reactivate', $calls);
+    }
+
+    /**
+     * Catches: replacing $existingDc !== null with true
+     */
+    public function testSaveOnSubmitFallsThroughToMostRecentWhenLoadedDcNotFound(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, null, $this->saveDcRow(66, 1, null)),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $result = $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 55, $this->saveSeason());
+
+        self::assertSame(66, $result);
+        self::assertSame([
+            'getSavedDepthChartById@BEGIN',
+            'getMostRecentDepthChart@BEGIN',
+            'updateDepthChartPlayers@BEGIN',
+            'deactivateOthersForTeam@BEGIN',
+            'info@BEGIN,COMMIT',
+        ], $events);
+        self::assertSame([[66, []]], $calls['updateDepthChartPlayers']);
+    }
+
+    /**
+     * Catches: dc_id => teamid in the loaded-path log; dropping the phase key
+     */
+    public function testSaveOnSubmitLogsSavedPayloadForLoadedDc(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, $this->saveDcRow(55, 1, null), null),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 55, $this->saveSeason());
+
+        self::assertSame([[
+            'depth_chart_saved',
+            ['action' => 'depth_chart_saved', 'dc_id' => 55, 'team_id' => 7, 'dc_name' => 'Plan B', 'phase' => 'Playoffs'],
+        ]], $logged);
+    }
+
+    /**
+     * Catches: dc_id => loadedDcId in the unused-most-recent log
+     */
+    public function testSaveOnSubmitLogsSavedPayloadForUnusedMostRecentDc(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, null, $this->saveDcRow(66, 1, null)),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
+
+        self::assertSame([[
+            'depth_chart_saved',
+            ['action' => 'depth_chart_saved', 'dc_id' => 66, 'team_id' => 7, 'dc_name' => 'Plan B', 'phase' => 'Playoffs'],
+        ]], $logged);
+    }
+
+    /**
+     * Catches: dc_id => teamid in the create-new log; dc_name => username
+     */
+    public function testSaveOnSubmitLogsSavedPayloadForNewDc(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, null, null),
+            $this->recordingLogger($events, $logged)
+        );
+
+        $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
+
+        self::assertSame([[
+            'depth_chart_saved',
+            ['action' => 'depth_chart_saved', 'dc_id' => 913, 'team_id' => 7, 'dc_name' => 'Plan B', 'phase' => 'Playoffs'],
+        ]], $logged);
+    }
+
+    /**
+     * Catches: deleting rollback(); replacing throw $e with return 0
+     */
+    public function testSaveOnSubmitRollsBackAndRethrowsWhenCreateThrows(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $boom = new \DomainException('insert failed');
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, null, null, ['createSavedDepthChart' => $boom]),
+            $this->recordingLogger($events, $logged)
+        );
+
+        try {
+            $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
+            self::fail('saveOnSubmit must rethrow the repository exception');
+        } catch (\DomainException $caught) {
+            self::assertSame($boom, $caught);
+        }
+
+        self::assertSame(['BEGIN', 'ROLLBACK'], $this->txnMarkers());
+        self::assertSame([
+            'getMostRecentDepthChart@BEGIN',
+            'deactivateForTeam@BEGIN',
+            'createSavedDepthChart@BEGIN',
+        ], $events);
+        self::assertSame([], $logged);
+    }
+
+    /**
+     * Catches: deleting rollback() on the loaded-path failure
+     */
+    public function testSaveOnSubmitRollsBackAndRethrowsWhenLoadedDcUpdateThrows(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $boom = new \DomainException('update failed');
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, $this->saveDcRow(55, 0, null), null, ['updateDepthChartPlayers' => $boom]),
+            $this->recordingLogger($events, $logged)
+        );
+
+        try {
+            $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 55, $this->saveSeason());
+            self::fail('saveOnSubmit must rethrow the repository exception');
+        } catch (\DomainException $caught) {
+            self::assertSame($boom, $caught);
+        }
+
+        self::assertSame(['BEGIN', 'ROLLBACK'], $this->txnMarkers());
+        self::assertSame([
+            'getSavedDepthChartById@BEGIN',
+            'updateDepthChartPlayers@BEGIN',
+        ], $events);
+        self::assertSame([], $logged);
+    }
+
+    /**
+     * Pins current behavior: the log call sits inside the try, so a throwing logger rolls back after COMMIT.
+     * Catches: moving the create-new logger->info() outside the try
+     */
+    public function testSaveOnSubmitRollsBackAfterCommitWhenLoggerThrows(): void
+    {
+        $events = [];
+        $calls = [];
+        $logged = [];
+        $boom = new \DomainException('log failed');
+        $service = new DepthChartSnapshotService(
+            $this->mockDb,
+            $this->recordingRepo($events, $calls, null, null),
+            $this->recordingLogger($events, $logged, $boom)
+        );
+
+        try {
+            $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
+            self::fail('saveOnSubmit must rethrow the logger exception');
+        } catch (\DomainException $caught) {
+            self::assertSame($boom, $caught);
+        }
+
+        self::assertSame(['BEGIN', 'COMMIT', 'ROLLBACK'], $this->txnMarkers());
     }
 
 }

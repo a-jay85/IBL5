@@ -73,14 +73,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   // Heading-level skip (h4 after h2, no h3). See a-jay85/IBL5-backlog (label: a11y).
   // Burn-down: a11y-2-heading-one-single-title (record holders view, same render pass).
   'heading-order': new Set([
-    // Pre-existing SearchView::renderResults() markup: the page emits <h1 class="ibl-title">
-    // then <h3 class="search-results__heading">, skipping h2. Identical on the plain
-    // modules.php?name=Search&query=waive results page on master — this is simply the first
-    // search-RESULTS page brought under axe (the 'search' row renders the bare
-    // form, which has no results heading). Loosens enforcement on no previously-checked page.
-    // Follow-up: promote .search-results__heading to <h2> and refresh the SearchView golden
-    // masters, then delete this entry.
-    'search transactions preset',
   ]),
 
   // Links with no discernible text. Remaining entry is the homepage last-sim-recap

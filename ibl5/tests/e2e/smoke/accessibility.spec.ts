@@ -173,6 +173,8 @@ const publicPages: Array<{ name: string; url: string }> = [
   // Seed rows for this game: ibl5/tests/e2e/fixtures/ci-seed.sql:124 and :814-823. An unknown pair 404s.
   { name: 'game boxscore', url: 'modules.php?name=GameBoxscore&date=2026-02-20&game=1' },
   // Anonymous sign-in form. Gated modules (Voting, Trading, FreeAgency, ...) JS-redirect here via loginbox().
+  // Deliberately absent from KNOWN_FAILING['color-contrast'] (the .auth-links colors are fixed in auth.css)
+  // and from MOBILE_KNOWN_FAILING['target-size'] (the 375px loop passes without an allowlist entry).
   { name: 'sign in', url: 'modules.php?name=YourAccount' },
 ];
 

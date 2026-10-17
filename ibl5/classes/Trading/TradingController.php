@@ -405,7 +405,8 @@ class TradingController implements TradingControllerInterface
         $pageData = $this->service->getTradeOfferPageData($username, $partner ?? '');
         $pageData['result'] = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
         $pageData['error'] = isset($_GET['error']) && is_string($_GET['error']) ? $_GET['error'] : null;
-        $pageData['previousFormData'] = $_SESSION['tradeFormData'] ?? null;
+        $pageData['previousFormData'] = $_SESSION['tradeFormData']
+            ?? TradePrefillParser::parse($_GET['prefill'] ?? null, $pageData);
         unset($_SESSION['tradeFormData']);
         \PageLayout\PageLayout::header();
         $responder = new \Api\Response\HtmlResponder();

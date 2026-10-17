@@ -133,7 +133,7 @@ class TradeSuggestionsViewTest extends TestCase
         $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), []));
 
         self::assertMatchesRegularExpression(
-            '/<form class="trade-suggestions__mode-form" method="post" action="[^"]*op=trade-mode">\s*'
+            '/<form class="trade-suggestions__mode-form" method="post" hx-boost="false" action="[^"]*op=trade-mode">\s*'
             . '<input type="hidden" name="_csrf_token" value="[0-9a-f]{64}">/',
             $html,
         );

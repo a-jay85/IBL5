@@ -1267,10 +1267,10 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
     }
 
     /**
-     * Pins current behavior: the log call sits inside the try, so a throwing logger rolls back after COMMIT.
-     * Catches: moving the create-new logger->info() outside the try
+     * A throwing logger must not turn a committed save into an error or trigger a rollback after COMMIT.
+     * Catches: moving logger->info() back outside logSaved()'s try/catch
      */
-    public function testSaveOnSubmitRollsBackAfterCommitWhenLoggerThrows(): void
+    public function testSaveOnSubmitSwallowsLoggerFailureAfterCommit(): void
     {
         $events = [];
         $calls = [];
@@ -1282,14 +1282,10 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
             $this->recordingLogger($events, $logged, $boom)
         );
 
-        try {
-            $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
-            self::fail('saveOnSubmit must rethrow the logger exception');
-        } catch (\DomainException $caught) {
-            self::assertSame($boom, $caught);
-        }
+        $dcId = $service->saveOnSubmit(7, 'gm7', 'Plan B', [], [], 0, $this->saveSeason());
 
-        self::assertSame('BEGIN,COMMIT,ROLLBACK', implode(',', $this->txnMarkers()));
+        self::assertSame(913, $dcId);
+        self::assertSame('BEGIN,COMMIT', implode(',', $this->txnMarkers()));
     }
 
 }

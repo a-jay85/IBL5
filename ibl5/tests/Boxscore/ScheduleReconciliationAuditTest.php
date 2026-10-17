@@ -405,6 +405,7 @@ final class ScheduleReconciliationAuditTest extends TestCase
         self::assertSame(3, $finding->visitorTeamId);
         self::assertSame(19, $finding->homeTeamId);
         self::assertSame('scheduled and played (134-147) but no boxscore rows found', $finding->detail);
+        self::assertStringNotContainsString('(147-134)', $finding->detail);
     }
 
     /** Empty schedule suppresses orphans only; duplicate then missing still emit in order. */

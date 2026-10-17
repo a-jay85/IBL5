@@ -387,6 +387,31 @@ class PlrRatingsCongruenceCheckStepTest extends TestCase
         $this->assertSame('1 rating mismatch(es) across 1 player(s) [settled]', $result->detail);
     }
 
+    public function testCapKeepsTheFirstMismatchesInFileOrder(): void
+    {
+        // 30 players, each FT 80/100 rated 50. The listed slice must be players 1..MAX_LISTED in file order.
+        $max = PlrRatingsCongruenceCheckStep::MAX_LISTED;
+        $lines = [];
+        for ($i = 1; $i <= 30; $i++) {
+            $lines[] = $this->buildPlrLine($i, sprintf('Player %02d', $i), 0, 0, 80, 100, 0, 0, 0, 50, 0);
+        }
+        $data = implode("\r\n", $lines);
+
+        /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
+        $stub = self::createStub(JsbSourceResolverInterface::class);
+        $stub->method('getContents')->willReturn($data);
+
+        $step = new PlrRatingsCongruenceCheckStep($stub, 'Regular Season');
+        $result = $step->execute();
+
+        $this->assertStringStartsWith('ERROR: Player 01 (pid 1): FTP rating 50', $result->messages[0]);
+        $this->assertStringStartsWith(
+            sprintf('ERROR: Player %02d (pid %d): FTP rating 50', $max, $max),
+            $result->messages[$max - 1],
+        );
+        $this->assertSame('30 rating mismatch(es) across 30 player(s) [settled]', $result->detail);
+    }
+
     private function buildPlrLine(
         int $pid,
         string $name,

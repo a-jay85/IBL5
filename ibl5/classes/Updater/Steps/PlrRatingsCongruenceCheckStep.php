@@ -80,6 +80,14 @@ final class PlrRatingsCongruenceCheckStep implements PipelineStepInterface
             }
         }
 
+        return $this->buildResult($mode, $checked, $playersFlagged, $all);
+    }
+
+    /**
+     * @param list<string> $all
+     */
+    private function buildResult(string $mode, int $checked, int $playersFlagged, array $all): StepResult
+    {
         $total = count($all);
 
         if ($total === 0) {

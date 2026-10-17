@@ -3,7 +3,9 @@
 Covers the label/failure-comment functions in bin/post-plan-now, the harness adapter
 (ghad.py pr_status_label), runner.py _post_status_label, and the SKILL.md blocks.
 """
+import glob
 import os
+import pathlib
 import re
 import shutil
 import stat
@@ -120,8 +122,22 @@ def _generate_cmd(tmp_path, extra_env=None):
     env.pop("POST_PLAN_SKILL", None)
     env.update(extra_env or {})
     repo = _fixture_repo(tmp_path)
+    log_dir = env.get("POSTPLAN_LOG_DIR")
+    tmp_glob = "/tmp/post-plan-now-wt-feature-*"
+    before = set(glob.glob(tmp_glob))
     r = subprocess.run(["bash", PPN], cwd=repo, env=env, capture_output=True, text=True)
+    leaked = set(glob.glob(tmp_glob)) - before
+    assert not leaked, (
+        f"bin/post-plan-now wrote to /tmp instead of POSTPLAN_LOG_DIR: {sorted(leaked)}. "
+        "Check that conftest.py _private_log_dir still sets POSTPLAN_LOG_DIR. Rare false "
+        "positive: a concurrent pytest run in another checkout without this fixture can "
+        "add a name during this window; rerun once to tell the two apart."
+    )
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert log_dir, "POSTPLAN_LOG_DIR unset: conftest.py _private_log_dir did not run"
+    logs = list(pathlib.Path(log_dir).glob("post-plan-now-wt-feature-*.log"))
+    assert len(logs) == 1, f"expected one log in {log_dir}, got {logs}"
+    assert "post-plan-now: started " in logs[0].read_text(), logs[0].read_text()
 
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
     assert len(plists) == 1, f"expected one generated plist, got {plists}"
@@ -348,11 +364,35 @@ def test_shq_round_trip_for_new_embeds():
         assert r.stdout == s, f"{s!r}: round-tripped to {r.stdout!r}"
 
 
+_LOG_LINE_RE = re.compile(
+    r'^LOG="\$\{POSTPLAN_LOG_DIR[^}]*\}/post-plan-now-\$SAFE_SLUG-\$TS\.log"$', re.M
+)
+
+
+@pytest.mark.parametrize("log_dir", [None, ""], ids=["unset", "empty"])
+def test_log_dir_default_expands_to_tmp(log_dir):
+    """Unset and empty POSTPLAN_LOG_DIR both fall back to /tmp (bin/fleet-status and
+    watch-run read logs there). Evaluates only the LOG= line, so no script runs and
+    no file is written."""
+    src = open(PPN, encoding="utf-8").read()
+    lines = _LOG_LINE_RE.findall(src)
+    assert len(lines) == 1, f"expected one LOG= line in {PPN}, got {lines!r}"
+    env = {k: v for k, v in os.environ.items() if k != "POSTPLAN_LOG_DIR"}
+    if log_dir is not None:
+        env["POSTPLAN_LOG_DIR"] = log_dir
+    r = subprocess.run(
+        ["bash", "-c", f'SAFE_SLUG=wt-feature; TS=20260101-000000-1; {lines[0]}; printf %s "$LOG"'],
+        env=env, capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr
+    assert r.stdout == "/tmp/post-plan-now-wt-feature-20260101-000000-1.log"
+
+
 # ---------------------------------------------------------------------------
 # Test 8: generated_plist_wiring
 # ---------------------------------------------------------------------------
 
-def test_generated_plist_wiring(tmp_path):
+def test_generated_plist_wiring(tmp_path, _private_log_dir):
     """The generated plist CMD carries all required badge env vars and control flow."""
     cmd = _generate_cmd(tmp_path)
 
@@ -362,7 +402,11 @@ def test_generated_plist_wiring(tmp_path):
     assert "POSTPLAN_BADGE_MARKER='" in cmd, "POSTPLAN_BADGE_MARKER not single-quoted"
     assert "POSTPLAN_RUNNING_LABEL='post-plan-running'" in cmd
     assert "POSTPLAN_FAILURE_MARKER='<!-- postplan-failure -->'" in cmd
-    assert "POSTPLAN_LOG_FILE='/tmp/post-plan-now-" in cmd
+    assert f"POSTPLAN_LOG_FILE='{_private_log_dir}/post-plan-now-wt-feature-" in cmd, (
+        "POSTPLAN_LOG_FILE must point into the per-test POSTPLAN_LOG_DIR "
+        "(conftest.py _private_log_dir)"
+    )
+    assert "POSTPLAN_LOG_FILE='/tmp/" not in cmd, "log escaped to /tmp"
     assert "POSTPLAN_STATUS_LABEL='post-plan-running'" in cmd
     assert "POSTPLAN_BADGE_BODY" not in cmd, "the sticky running body is gone"
 

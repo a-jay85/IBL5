@@ -364,6 +364,11 @@ def test_shq_round_trip_for_new_embeds():
         assert r.stdout == s, f"{s!r}: round-tripped to {r.stdout!r}"
 
 
+# Counterfactual production edits that turn test_log_dir_default_expands_to_tmp red
+# (apply to the working tree, run the test, revert):
+#   bin/post-plan-now:662  ${POSTPLAN_LOG_DIR:-/tmp} -> ${POSTPLAN_LOG_DIR:-/var/tmp}  (unset and empty fail)
+#   bin/post-plan-now:662  ${POSTPLAN_LOG_DIR:-/tmp} -> ${POSTPLAN_LOG_DIR-/tmp}  (empty fails, unset stays green)
+#   bin/post-plan-now:662  tail -$TS.log -> -$TS.txt  (both fail on "expected one LOG= line")
 _LOG_LINE_RE = re.compile(
     r'^LOG="\$\{POSTPLAN_LOG_DIR[^}]*\}/post-plan-now-\$SAFE_SLUG-\$TS\.log"$', re.M
 )
@@ -393,7 +398,12 @@ def test_log_dir_default_expands_to_tmp(log_dir):
 # ---------------------------------------------------------------------------
 
 def test_generated_plist_wiring(tmp_path, _private_log_dir):
-    """The generated plist CMD carries all required badge env vars and control flow."""
+    """The generated plist CMD carries all required badge env vars and control flow.
+
+    Counterfactual production edits that turn this test red (apply, run, revert):
+      bin/post-plan-now:878  POSTPLAN_LOG_FILE=$(shq "$LOG") -> $(shq "/tmp/x.log")  (private-dir assertion)
+      bin/post-plan-now:685  delete the "post-plan-now: started" printf  (positive log assertion in _generate_cmd)
+    """
     cmd = _generate_cmd(tmp_path)
 
     # Every exported value is single-quoted

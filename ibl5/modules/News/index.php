@@ -38,10 +38,41 @@ $newsPageConfig = new \Topics\News\NewsPageConfig(
     tableBgcolor2: is_string($bgcolor2) ? $bgcolor2 : '#CCCCCC',
 );
 
+$newsSeason = new \Season\Season($mysqli_db);
+$newsTeamIdentityRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
+$tradeFormRepo = new \Trading\TradeFormRepository($mysqli_db);
+$tradeValidator = new \Trading\TradeValidator($mysqli_db, $newsSeason);
+$teamModeRepo = new \TradeSuggestions\TeamModeRepository($mysqli_db);
+
+$tradeSuggestionsService = new \TradeSuggestions\TradeSuggestionsService(
+    new \TradeSuggestions\TeamModeService($teamModeRepo, new \TradeSuggestions\TeamModeGuesser()),
+    $teamModeRepo,
+    new \TradeSuggestions\SuggestionAssetRepository($mysqli_db),
+    new \ProjectedDraftOrder\ProjectedDraftOrderService(new \ProjectedDraftOrder\ProjectedDraftOrderRepository($mysqli_db)),
+    $tradeFormRepo,
+    new \Settings\SettingsService($newsSeason),
+    $newsSeason,
+    new \TradeSuggestions\PickValuer(),
+    new \TradeSuggestions\CandidateGenerator(),
+    new \TradeSuggestions\TradeImpactEvaluator(),
+    new \TradeSuggestions\SuggestionValidationFilter(
+        $tradeValidator,
+        new \Trading\TradeCapCalculator(
+            $newsTeamIdentityRepo,
+            new \Trading\BuyoutLedgerRepository($mysqli_db),
+            $newsSeason,
+            $tradeValidator,
+        ),
+        $tradeFormRepo,
+        $newsSeason,
+    ),
+    new \TradeSuggestions\SuggestionRanker(),
+);
+
 $controller = new \Topics\News\NewsController(
     $newsPageConfig,
     $authService,
-    new \Repositories\TeamIdentityRepository($mysqli_db),
+    $newsTeamIdentityRepo,
     new \LastSimRecap\LastSimRecapService(
         new \LastSimRecap\LastSimRecapRepository($mysqli_db),
         new \Repositories\PlayerLookupRepository($mysqli_db),
@@ -49,6 +80,8 @@ $controller = new \Topics\News\NewsController(
     new \LastSimRecap\LastSimRecapView(),
     new \Topics\News\NewsService($mysqli_db),
     new \Topics\News\NewsView(),
+    tradeSuggestionsService: $tradeSuggestionsService,
+    tradeSuggestionsView: new \TradeSuggestions\TradeSuggestionsView(),
 );
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().

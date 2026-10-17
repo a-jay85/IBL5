@@ -710,6 +710,8 @@ final class RecordBreakingDetectorTest extends TestCase
     /**
      * Characterization: full announcement order across player, team, fewest-points
      * and quadruple-double groups, over two game types. Green on master before the split.
+     * Also kills Infection's ArrayOneItem mutant on the per-game-type detection return,
+     * since five regular-season announcements would collapse to one.
      *
      * @param list<string> $gameDates
      * @param list<string> $expectedKeys

@@ -112,7 +112,7 @@ final class PowerRankingsUpdaterTest extends DatabaseTestCase
 
     public function testCalculateAndStoreSosOutputTextIsUnchanged(): void
     {
-        $authStub = $this->createStub(\Auth\AuthService::class);
+        $authStub = self::createStub(\Auth\AuthService::class);
         $authStub->method('isAdmin')->willReturn(true);
         $GLOBALS['authService'] = $authStub;
 

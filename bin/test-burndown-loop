@@ -1372,7 +1372,8 @@ test_all_skipped_scouts() {
     queue ledger-skipped scout-fired
     stop_on_sleep
     run_loop run
-    assert_contains all_skipped_scout:line "$OUT" "every picked item skipped"
+    assert_contains all_skipped_scout:line "$OUT" "every picked item skipped; scouting, then re-check in 15m"
+    assert_not_contains all_skipped_scout:no-240m "$OUT" "re-check in 240m"
     assert_contains all_skipped_scout:decision "$OUT" "decision=scout launch"
     assert_contains all_skipped_scout:result "$OUT" "result=BURNDOWN-SCOUT: fired 2"
     assert_contains all_skipped_scout:recheck "$OUT" "sleep 900s reason=scout-recheck"

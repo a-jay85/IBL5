@@ -90,6 +90,21 @@ test.describe('Engine shadow: out-of-band spawn on admin update', () => {
     ).toBe('failed');
   });
 
+  test('shadow-log serialises the spawn gate and rejects a bad offset', async ({ request }) => {
+    const resp = await request.get('test-state.php?action=shadow-log&offset=0');
+    expect(resp.status()).toBe(200);
+    const raw = await resp.text();
+    const log = JSON.parse(raw) as ShadowLog;
+    expect(typeof log.enabled).toBe('boolean');
+    expect(typeof log.size).toBe('number');
+    expect(log.tail.length).toBeLessThanOrEqual(8192);
+    // The gate must reach the wire as a JSON boolean: an unset or empty flag is "enabled":false.
+    expect(raw).toContain(log.enabled ? '"enabled":true' : '"enabled":false');
+
+    const bad = await request.get('test-state.php?action=shadow-log&offset=abc');
+    expect(bad.status()).toBe(400);
+  });
+
   test('hitting updateAllTheThings spawns the detached run and it reaches a terminal outcome', async ({
     request,
   }) => {

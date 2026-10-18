@@ -83,8 +83,9 @@ pcw_recent_finish() {
     return 1
 }
 
-# Stale post-plan-running label predicates. Every one is text-in / rc-out: the tick does
-# the strict fetches (gh, launchctl, ps, lsof) and passes the text here.
+# Stale post-plan-running label predicates. Five of the six are text-in / rc-out;
+# pcw_live_out_dir_fresh reads the out dirs with find. The tick does the strict fetches
+# (gh, launchctl, ps, lsof) and passes the text here.
 # Return codes: 0 = the condition that KEEPS the label is true (a run is live, the label
 # is too young, the out dir is fresh); 1 = evaluated and false; 2 = unevaluable (empty
 # or malformed input). The tick treats 0 and 2 alike (keep) and removes the label only

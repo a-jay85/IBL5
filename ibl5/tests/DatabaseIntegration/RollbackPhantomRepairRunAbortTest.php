@@ -33,7 +33,13 @@ final class RollbackPhantomRepairRunAbortTest extends TestCase
         'ibl_sim_game_recaps',
     ];
 
+    private const PROBE_ATTEMPTS = 3;
+
+    private const PROBE_RETRY_SLEEP_MICROS = 200_000;
+
     private string $ibl5Dir;
+
+    private string $lastProbeDiagnostic = '';
 
     protected function setUp(): void
     {
@@ -74,13 +80,77 @@ final class RollbackPhantomRepairRunAbortTest extends TestCase
         }
     }
 
+    public function testProbeRetryReturnsCountsAfterTransientFailure(): void
+    {
+        $allZero = array_fill_keys([...self::BACKUP_TABLES, ...self::LIVE_TABLES], 0);
+        $queue = [
+            ['exit' => 1, 'stdout' => '', 'stderr' => 'mysqli_sql_exception: Connection refused'],
+            self::okRun($allZero),
+        ];
+        $calls = 0;
+        $run = static function () use (&$queue, &$calls): array {
+            $calls++;
+
+            return array_shift($queue);
+        };
+
+        $result = self::probeWithRetry($run, 0);
+
+        self::assertSame($allZero, $result['counts']);
+        self::assertSame(2, $result['attempts']);
+        self::assertSame(2, $calls);
+    }
+
+    public function testProbeRetryGivesUpWithLastAttemptExitAndStderr(): void
+    {
+        $queue = [
+            ['exit' => 0, 'stdout' => '[]', 'stderr' => 'err-1'],
+            ['exit' => 0, 'stdout' => '{"ibl_box_scores":"x"}', 'stderr' => 'err-2'],
+            ['exit' => 13, 'stdout' => '', 'stderr' => 'err-3'],
+        ];
+        $calls = 0;
+        $run = static function () use (&$queue, &$calls): array {
+            $calls++;
+
+            return array_shift($queue);
+        };
+
+        $result = self::probeWithRetry($run, 0);
+
+        self::assertNull($result['counts']);
+        self::assertSame(13, $result['exit']);
+        self::assertSame('err-3', $result['stderr']);
+        self::assertSame(3, $result['attempts']);
+        self::assertSame(3, $calls);
+    }
+
+    public function testProbeRetryReturnsFirstSuccessWithoutRetrying(): void
+    {
+        $allZero = array_fill_keys([...self::BACKUP_TABLES, ...self::LIVE_TABLES], 0);
+        $changed = $allZero;
+        $changed['ibl_box_scores_phantom_backup'] = 5;
+        $queue = [self::okRun($changed), self::okRun($allZero)];
+        $calls = 0;
+        $run = static function () use (&$queue, &$calls): array {
+            $calls++;
+
+            return array_shift($queue);
+        };
+
+        $result = self::probeWithRetry($run, 0);
+
+        self::assertSame($changed, $result['counts']);
+        self::assertSame(1, $result['attempts']);
+        self::assertSame(1, $calls);
+    }
+
     public function testEmptyBackupsAbortWithExitOneAndWriteNothing(): void
     {
         $before = $this->probe();
         if (!self::backupsProvablyEmpty($before)) {
             $detail = $before === null ? 'probe failed' : json_encode($before);
             if (getenv('CI') === 'true') {
-                self::fail('Backup tables must exist and be empty on the CI database, got: ' . $detail);
+                self::fail('Backup tables must exist and be empty on the CI database, got: ' . $detail . $this->lastProbeDiagnostic);
             }
             // phpunit-hygiene-allow: refuses to run the destructive rollback against a DB holding backup rows
             self::markTestSkipped('backup tables not provably empty on this DB; refusing to run the rollback');
@@ -92,7 +162,11 @@ final class RollbackPhantomRepairRunAbortTest extends TestCase
         self::assertStringContainsString('no backup rows - nothing to roll back', $run['stderr']);
         self::assertStringContainsString('backup team rows     0', $run['stdout']);
 
-        self::assertSame($before, $this->probe(), 'The aborted run must not change any live or backup table count');
+        self::assertSame(
+            $before,
+            $this->probe(),
+            'The aborted run must not change any live or backup table count' . $this->lastProbeDiagnostic
+        );
     }
 
     /**
@@ -149,15 +223,60 @@ PHP;
         $file = sys_get_temp_dir() . '/rollback-probe-' . bin2hex(random_bytes(8)) . '.php';
         file_put_contents($file, $code);
         try {
-            $run = $this->runCommand([PHP_BINARY, $file]);
+            $result = self::probeWithRetry(
+                fn (): array => $this->runCommand([PHP_BINARY, $file]),
+                self::PROBE_RETRY_SLEEP_MICROS
+            );
         } finally {
             unlink($file);
         }
 
-        if ($run['exit'] !== 0) {
-            return null;
+        $stderr = trim($result['stderr']);
+        $this->lastProbeDiagnostic = sprintf(
+            ' [probe attempts: %d, last exit: %d, last stderr: %s]',
+            $result['attempts'],
+            $result['exit'],
+            $stderr === '' ? '(empty)' : $stderr
+        );
+
+        return $result['counts'];
+    }
+
+    /**
+     * Retries only a failed or malformed probe. A probe that exits 0 with six
+     * well-formed counts is returned on the spot, so a real row change is never
+     * retried away.
+     *
+     * @param callable(): array{exit: int, stdout: string, stderr: string} $run
+     * @return array{counts: array<string, int>|null, attempts: int, exit: int, stderr: string}
+     */
+    private static function probeWithRetry(callable $run, int $sleepMicros): array
+    {
+        $attempt = 0;
+        while (true) {
+            $attempt++;
+            $last = $run();
+            $counts = $last['exit'] === 0 ? self::decodeCounts($last['stdout']) : null;
+            if ($counts !== null || $attempt >= self::PROBE_ATTEMPTS) {
+                return [
+                    'counts' => $counts,
+                    'attempts' => $attempt,
+                    'exit' => $last['exit'],
+                    'stderr' => $last['stderr'],
+                ];
+            }
+            if ($sleepMicros > 0) {
+                usleep($sleepMicros);
+            }
         }
-        $decoded = json_decode(trim($run['stdout']), true);
+    }
+
+    /**
+     * @return array<string, int>|null
+     */
+    private static function decodeCounts(string $stdout): ?array
+    {
+        $decoded = json_decode(trim($stdout), true);
         if (!is_array($decoded) || count($decoded) !== 6) {
             return null;
         }
@@ -171,6 +290,15 @@ PHP;
         }
 
         return $counts;
+    }
+
+    /**
+     * @param array<string, int> $counts
+     * @return array{exit: int, stdout: string, stderr: string}
+     */
+    private static function okRun(array $counts): array
+    {
+        return ['exit' => 0, 'stdout' => json_encode($counts, JSON_THROW_ON_ERROR), 'stderr' => ''];
     }
 
     private function exportPath(string $relative): string

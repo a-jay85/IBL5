@@ -1,7 +1,7 @@
 """Matrix token choice: `_planned_token` prefers the rightmost valid cell.
 
 Each test is named for the mutation it kills. The planning gate (whole-cell Test type
-plus a valid first token in the joined row) is unchanged; only the token moves.
+plus a valid test path in any cell, backlog#1501) decides whether a row plans; this file pins which token it plans.
 """
 import os
 import sys

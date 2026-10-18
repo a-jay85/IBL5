@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Cli;
 
 use Cli\LighthouseAuditReportFormatter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Tests\Clock\FixedClock;
@@ -15,6 +16,41 @@ final class LighthouseAuditReportFormatterTest extends TestCase
     private LighthouseAuditReportFormatter $formatter;
     private string $fixtureDir;
     private string $savedTimezone;
+
+    private const CAVEATS_THROUGH_RULE = "## Caveats\n\n"
+        . "- Phase-gated modules (Draft, FreeAgency, Waivers) may render a \"not active\" gate page \u{2014} still audited for accessibility/best-practices.\n"
+        . "- All pages audited in anonymous context (no authenticated user).\n\n"
+        . "---\n\n";
+
+    private const TABLE_HEADER = "| URL | Performance | Accessibility | Best Practices | Composite |\n"
+        . "|-----|------------|---------------|----------------|----------|\n";
+
+    private const ALL_PASS_BODY = "## Summary\n\n"
+        . "- **URLs audited:** 2\n"
+        . "- \u{2705} **Pass:** 2\n"
+        . "- \u{1F7E1} **Warn:** 0\n"
+        . "- \u{1F534} **Error:** 0\n\n"
+        . "## Full Results\n\n"
+        . self::TABLE_HEADER
+        . "| `/modules.php?name=Standings` | 0.85 | 0.93 | 0.88 | 0.89 |\n"
+        . "| `/index.php` | 0.92 | 0.96 | 0.91 | 0.93 |\n\n"
+        . self::CAVEATS_THROUGH_RULE;
+
+    private const MIXED_BODY = "## Summary\n\n"
+        . "- **URLs audited:** 3\n"
+        . "- \u{2705} **Pass:** 1\n"
+        . "- \u{1F7E1} **Warn:** 1\n"
+        . "- \u{1F534} **Error:** 1\n\n"
+        . "## Flagged Pages\n\n"
+        . self::TABLE_HEADER
+        . "| `/modules.php?name=Player&pa=showpage&pid=1` | 0.70 | \u{1F534} 0.75 | 0.82 | 0.76 |\n"
+        . "| `/modules.php?name=Standings` | \u{1F7E1} 0.55 | 0.90 | 0.85 | 0.77 |\n\n"
+        . "## Full Results\n\n"
+        . self::TABLE_HEADER
+        . "| `/modules.php?name=Player&pa=showpage&pid=1` | 0.70 | \u{1F534} 0.75 | 0.82 | 0.76 |\n"
+        . "| `/modules.php?name=Standings` | \u{1F7E1} 0.55 | 0.90 | 0.85 | 0.77 |\n"
+        . "| `/index.php` | 0.92 | 0.96 | 0.91 | 0.93 |\n\n"
+        . self::CAVEATS_THROUGH_RULE;
 
     protected function setUp(): void
     {
@@ -134,6 +170,65 @@ final class LighthouseAuditReportFormatterTest extends TestCase
 
         self::assertStringContainsString('`abc1234`', $result['body']);
         self::assertStringContainsString('[Workflow run](https://github.com/run/1)', $result['body']);
+    }
+
+    public function testAllPassBodyMatchesExactly(): void
+    {
+        $formatter = new LighthouseAuditReportFormatter(new FixedClock(1791549296));
+
+        $result = $formatter->format($this->loadJson('audit-manifest-all-pass.json'));
+
+        self::assertSame("Lighthouse Audit \u{2014} Week of 2026-10-09", $result['title']);
+        self::assertSame(self::ALL_PASS_BODY, $result['body']);
+    }
+
+    public function testMixedBodyWithFlaggedSectionMatchesExactly(): void
+    {
+        $formatter = new LighthouseAuditReportFormatter(new FixedClock(1791549296));
+
+        $result = $formatter->format($this->loadJson('audit-manifest-mixed.json'));
+
+        self::assertSame(self::MIXED_BODY, $result['body']);
+    }
+
+    /**
+     * @return array<string, array{?string, ?string, ?float, string}>
+     */
+    public static function footerVariantProvider(): array
+    {
+        return [
+            'none' => [null, null, null, ''],
+            'sha only' => ['abc1234', null, null, "Commit: `abc1234`\n"],
+            'url only' => [null, 'https://github.com/run/1', null, "[Workflow run](https://github.com/run/1)\n"],
+            'duration only' => [null, null, 125.0, "Duration: 2m\n"],
+            'duration just under one minute' => [null, null, 59.9, "Duration: 0m\n"],
+            'duration exactly one minute' => [null, null, 60.0, "Duration: 1m\n"],
+            'all three' => [
+                'abc1234',
+                'https://github.com/run/1',
+                125.0,
+                "Commit: `abc1234` | [Workflow run](https://github.com/run/1) | Duration: 2m\n",
+            ],
+        ];
+    }
+
+    #[DataProvider('footerVariantProvider')]
+    public function testFooterVariantBodyMatchesExactly(
+        ?string $sha,
+        ?string $workflowUrl,
+        ?float $durationSeconds,
+        string $expectedTail,
+    ): void {
+        $formatter = new LighthouseAuditReportFormatter(new FixedClock(1791549296));
+
+        $result = $formatter->format(
+            $this->loadJson('audit-manifest-all-pass.json'),
+            $sha,
+            $workflowUrl,
+            $durationSeconds,
+        );
+
+        self::assertSame(self::ALL_PASS_BODY . $expectedTail, $result['body']);
     }
 
     public function testCliExitsTwoOnMissingManifest(): void

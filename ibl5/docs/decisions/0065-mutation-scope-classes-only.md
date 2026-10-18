@@ -23,7 +23,7 @@ Keep Infection's mutate-scope at `source.directories: ["classes"]`. Do not exten
 
 Therefore `classes/` is the correct, intentional mutate-scope. Within `classes/`, a small set of paths is further excluded (see `infection.json5` and `phpunit-mutation.xml`): low-level infra (`classes/Database`, `classes/JSB.php`), interface-only `Contracts`, the `OneOnOneGame` engine, and the Group-B View files that lack output-assertion tests. Those per-file exclusions are documented inline and enforced by `ibl5/bin/check-infection-excludes`.
 
-## Addendum — JSB.php exclusion path (2026-10-17)
+## Addendum: JSB.php exclusion path (2026-10-17)
 
 The Decision names `classes/JSB.php` as an excluded low-level infra file. That file no longer exists. The JSB engine-glue exclusion in `infection.json5` is now `League/JsbConstants.php`. The file was renamed and moved under `classes/League/`.
 

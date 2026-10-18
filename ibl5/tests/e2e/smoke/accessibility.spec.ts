@@ -27,7 +27,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'one on one game',
     'player movement',
     'projected draft order',
-    'record holders',
     // Search page with a transactions preset (modules.php?name=Search plus a preset).
     // Verified 2026-09-23: every failing node is pre-existing results markup
     // (.search-result__meta-item, .search-result__title, .search-pagination__link, <time>);

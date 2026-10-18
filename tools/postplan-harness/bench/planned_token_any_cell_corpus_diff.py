@@ -19,7 +19,6 @@ newly_planned is the expected result of the change and does not fail the run.
 Stdlib only.
 """
 import argparse
-import glob
 import os
 import re
 import subprocess
@@ -95,13 +94,16 @@ def _tracked_files(repo_root: str) -> set[str]:
 
 
 def _corpus_paths(plans_dir: str, report: str | None) -> list[str]:
+    # os.walk, not glob: glob never enters a dot-directory, which would leave the
+    # `.drafts` skip dead code.
     paths = []
-    for p in sorted(glob.glob(os.path.join(plans_dir, "**", "*.md"), recursive=True)):
-        parts = os.path.relpath(p, plans_dir).split(os.sep)
-        if os.path.abspath(p) == report or any(d in parts for d in _SKIP_DIRS):
-            continue
-        paths.append(p)
-    return paths
+    for root, dirs, files in os.walk(plans_dir):
+        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
+        for f in files:
+            p = os.path.join(root, f)
+            if f.endswith(".md") and os.path.abspath(p) != report:
+                paths.append(p)
+    return sorted(paths)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -15,7 +15,8 @@ skipped and new plans; LOST is a row old planned and new skips. Either one break
 structural invariant of the change.
 Files under a `_reports/` directory are skipped: they hold earlier runs of this tool,
 and re-reading them feeds their own rows back in.
-Exits 1 when lost>0 or newly_planned>0; REVIEW rows never fail the tool, the opt-in
+Exits 1 when lost>0. Newly planned rows are expected since the any-cell gate
+(backlog#1501) and do not fail the run. REVIEW rows never fail the tool, the opt-in
 pytest wrapper owns that allowlist.
 Stdlib only.
 """
@@ -134,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
         rows += [f"| {esc(r)} | {c} | `{esc(o)}` | `{esc(n)}` | {esc(e)} |" for r, c, o, n, e in changed]
         with open(args.report, "w", encoding="utf-8") as fh:
             fh.write("\n".join(out[-1:] + [""] + rows) + "\n")
-    return 1 if lost or newly else 0
+    return 1 if lost else 0
 
 
 if __name__ == "__main__":

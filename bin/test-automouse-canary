@@ -6,7 +6,8 @@
 # write_canary_park_report, and the loop-bottom dispatch block).
 #
 # The canary runs at a plan boundary, freshens the main checkout's master, and
-# checks two signals: bin/check-master-ci-green, then a 5s curl smoke against
+# checks two signals: bin/check-master-ci-green, then a curl smoke (15s per
+# try, up to 3 tries on curl exit 7 or 28) against
 # the main Docker stack. A genuinely red signal PARKS the queue — the loop
 # breaks, every remaining plan stays in queue/, and no attempt counter moves.
 #
@@ -80,20 +81,45 @@ expect() { # label want got
 want() { h_contains "$1" "$2" "$3"; }  # label haystack needle
 refuse() { h_not_contains "$1" "$2" "$3"; }  # label haystack needle (needle must be ABSENT)
 same() { h_eq "$1" "$2" "$3"; }  # label want got
+curl_calls() { cat "$TMP/curl-calls" 2>/dev/null || echo 0; }
+sleep_args() { cat "$TMP/sleep-args" 2>/dev/null || true; }
+retry_lines() { grep -c 'canary: smoke try ' "$LOG" || true; }
 
 # --- per-case sandbox ----------------------------------------------------
 
-# A PATH-prepended curl stub. Its exit code is read from $TMP/curl-rc at call
-# time, so a case can flip the smoke signal without rebuilding the sandbox.
+# A PATH-prepended curl stub. Every call bumps $TMP/curl-calls and appends its
+# argv to $TMP/curl-args. Exit code: line N of $TMP/curl-seq when that file
+# exists (the last line repeats past the end), else the single code in
+# $TMP/curl-rc. A case can flip the smoke signal without rebuilding the sandbox.
 STUBBIN="$TMP/stubbin"
 mkdir -p "$STUBBIN"
 cat > "$STUBBIN/curl" <<'STUBEOF'
 #!/bin/sh
-exit "$(cat "$CANARY_TEST_TMP/curl-rc" 2>/dev/null || echo 0)"
+d="$CANARY_TEST_TMP"
+n=$(( $(cat "$d/curl-calls" 2>/dev/null || echo 0) + 1 ))
+printf '%s\n' "$n" > "$d/curl-calls"
+printf '%s\n' "$*" >> "$d/curl-args"
+if [ -f "$d/curl-seq" ]; then
+    rc=$(sed -n "${n}p" "$d/curl-seq")
+    [ -n "$rc" ] || rc=$(tail -n 1 "$d/curl-seq")
+    exit "$rc"
+fi
+exit "$(cat "$d/curl-rc" 2>/dev/null || echo 0)"
 STUBEOF
 chmod +x "$STUBBIN/curl"
+
+# A PATH-prepended sleep stub: records its argument and returns at once, so the
+# retry back-off is assertable and costs no wall time. Nothing else this test
+# drives calls sleep (bin/check-master-ci-green has no sleep call).
+cat > "$STUBBIN/sleep" <<'STUBEOF'
+#!/bin/sh
+printf '%s\n' "$1" >> "$CANARY_TEST_TMP/sleep-args"
+exit 0
+STUBEOF
+chmod +x "$STUBBIN/sleep"
 export PATH="$STUBBIN:$PATH"
 export CANARY_TEST_TMP="$TMP"
+export AUTOMOUSE_CANARY_RETRY_SLEEP=0
 
 CASE_N=0
 
@@ -133,6 +159,7 @@ STUBEOF
     chmod +x "$REPO/bin/check-master-ci-green"
 
     printf '%s\n' "$3" > "$TMP/curl-rc"
+    rm -f "$TMP/curl-seq" "$TMP/curl-calls" "$TMP/curl-args" "$TMP/sleep-args"
 }
 
 # snapshot_queue — content-addressed snapshot of every file under QUEUE_DIR.
@@ -188,6 +215,79 @@ expect "smoke-red-returns-3" 3 "$RC"
 want "smoke-red-detail-names-curl-exit" "$CANARY_DETAIL" "curl exit 7"
 want "smoke-red-detail-names-ibl5-path" "$CANARY_DETAIL" "/ibl5/"
 same "smoke-red-queue-unchanged" "$BEFORE" "$(snapshot_queue)"
+
+SMOKE_URL="${AUTOMOUSE_CANARY_URL:-http://main.localhost/ibl5/}"
+
+# --- Case 4b: one timeout, then up -> retry recovers, no park -------------
+
+setup_case "PASS: 12 check-run(s) all green" 0 0
+printf '28\n0\n' > "$TMP/curl-seq"
+BEFORE="$(snapshot_queue)"
+RC=0; run_between_plans_canary || RC=$?
+expect "smoke-timeout-then-ok-returns-0"      0 "$RC"
+same   "smoke-timeout-then-ok-two-calls"      "2" "$(curl_calls)"
+same   "smoke-timeout-then-ok-one-retry-line" "1" "$(retry_lines)"
+want   "smoke-timeout-then-ok-retry-line-text" "$(cat "$LOG")" \
+       "canary: smoke try 1/3: curl exit 28 for $SMOKE_URL"
+refuse "smoke-timeout-then-ok-no-park-line"   "$(cat "$LOG")" "canary: smoke: curl exit"
+same   "smoke-retry-sleeps-env-value"         "0" "$(sleep_args)"
+want   "smoke-curl-max-time-15"               "$(cat "$TMP/curl-args")" "max-time 15"
+same   "smoke-timeout-then-ok-queue-unchanged" "$BEFORE" "$(snapshot_queue)"
+
+# --- Case 4c: three timeouts -> park with the byte-identical detail -------
+
+setup_case "PASS: 12 check-run(s) all green" 0 0
+printf '28\n28\n28\n' > "$TMP/curl-seq"
+BEFORE="$(snapshot_queue)"
+RC=0; run_between_plans_canary || RC=$?
+expect "smoke-timeout-x3-returns-3"        3 "$RC"
+same   "smoke-timeout-x3-detail-exact"     "smoke: curl exit 28 for $SMOKE_URL" "$CANARY_DETAIL"
+same   "smoke-timeout-x3-three-calls"      "3" "$(curl_calls)"
+same   "smoke-timeout-x3-two-retry-lines"  "2" "$(retry_lines)"
+same   "smoke-timeout-x3-queue-unchanged"  "$BEFORE" "$(snapshot_queue)"
+
+# --- Case 4d: connection refused x3 -> exit 7 is retried, then parks ------
+
+setup_case "PASS: 12 check-run(s) all green" 0 0
+printf '7\n7\n7\n' > "$TMP/curl-seq"
+RC=0; run_between_plans_canary || RC=$?
+expect "smoke-refused-x3-returns-3"        3 "$RC"
+want   "smoke-refused-x3-detail"           "$CANARY_DETAIL" "curl exit 7"
+same   "smoke-refused-x3-three-calls"      "3" "$(curl_calls)"
+
+# --- Case 4e: HTTP error (22) is not transient -> parks after ONE call ----
+# The seq's second entry is 0, so a retry on every non-zero exit would
+# recover to rc 0 with 2 calls and fail both assertions below.
+
+setup_case "PASS: 12 check-run(s) all green" 0 0
+printf '22\n0\n' > "$TMP/curl-seq"
+RC=0; run_between_plans_canary || RC=$?
+expect "smoke-http-error-returns-3"        3 "$RC"
+same   "smoke-http-error-one-call"         "1" "$(curl_calls)"
+same   "smoke-http-error-no-retry-line"    "0" "$(retry_lines)"
+want   "smoke-http-error-detail"           "$CANARY_DETAIL" "curl exit 22"
+
+# --- Cases 4f-4h: AUTOMOUSE_CANARY_RETRY_SLEEP falls back to 15 -----------
+# Unset, empty, and non-numeric all sleep the 15s default. The sleep stub
+# records the argument, so no wall time is spent.
+
+setup_case "PASS: 12 check-run(s) all green" 0 0
+printf '28\n0\n' > "$TMP/curl-seq"
+RC=0; ( unset AUTOMOUSE_CANARY_RETRY_SLEEP; run_between_plans_canary ) || RC=$?
+expect "retry-sleep-unset-returns-0"       0 "$RC"
+same   "retry-sleep-unset-defaults-15"     "15" "$(sleep_args)"
+
+setup_case "PASS: 12 check-run(s) all green" 0 0
+printf '28\n0\n' > "$TMP/curl-seq"
+RC=0; AUTOMOUSE_CANARY_RETRY_SLEEP='' run_between_plans_canary || RC=$?
+expect "retry-sleep-empty-returns-0"       0 "$RC"
+same   "retry-sleep-empty-defaults-15"     "15" "$(sleep_args)"
+
+setup_case "PASS: 12 check-run(s) all green" 0 0
+printf '28\n0\n' > "$TMP/curl-seq"
+RC=0; AUTOMOUSE_CANARY_RETRY_SLEEP=abc run_between_plans_canary || RC=$?
+expect "retry-sleep-non-numeric-returns-0" 0 "$RC"
+same   "retry-sleep-non-numeric-defaults-15" "15" "$(sleep_args)"
 
 # --- Case 5: AUTOMOUSE_SKIP_CANARY=1 bypasses everything ------------------
 

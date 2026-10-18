@@ -554,6 +554,56 @@ class TeamPageDataPreparerTest extends TestCase
         $this->assertSame('Nets &amp; Co', $result['rounds'][0]['results'][0]['loser']);
     }
 
+    public function testPreparePlayoffDataKeepsRoundTotalsIsolatedAcrossRounds(): void
+    {
+        // Two populated rounds, interleaved input order, asymmetric game counts.
+        // Every paired column differs, so a leak into a neighbouring round or a
+        // win/loss column swap in any one round fails this single assertSame.
+        $preparer = $this->buildPreparer($this->repoReturning('getPlayoffResults', [
+            self::playoffRow(2014, 3, 'Bulls', 'Spurs', 4, 1),
+            self::playoffRow(2012, 1, 'Celtics', 'Bulls', 4, 0),
+            self::playoffRow(2013, 3, 'Lakers', 'Bulls', 4, 3),
+            self::playoffRow(2011, 1, 'Bulls', 'Heat', 4, 2),
+            self::playoffRow(2010, 1, 'Bulls', 'Nets', 4, 1),
+        ]));
+
+        $result = $preparer->preparePlayoffData(self::bullsTeam());
+
+        $this->assertSame([
+            'rounds' => [
+                [
+                    'name' => 'First Round',
+                    'gameWins' => 8,
+                    'gameLosses' => 7,
+                    'seriesWins' => 2,
+                    'seriesLosses' => 1,
+                    'results' => [
+                        ['year' => '2012', 'winner' => 'Celtics', 'loser' => 'Bulls', 'winnerGames' => 4, 'loserGames' => 0, 'isWin' => false],
+                        ['year' => '2011', 'winner' => 'Bulls', 'loser' => 'Heat', 'winnerGames' => 4, 'loserGames' => 2, 'isWin' => true],
+                        ['year' => '2010', 'winner' => 'Bulls', 'loser' => 'Nets', 'winnerGames' => 4, 'loserGames' => 1, 'isWin' => true],
+                    ],
+                ],
+                ['name' => 'Conference Semis', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+                [
+                    'name' => 'Conference Finals',
+                    'gameWins' => 7,
+                    'gameLosses' => 5,
+                    'seriesWins' => 1,
+                    'seriesLosses' => 1,
+                    'results' => [
+                        ['year' => '2014', 'winner' => 'Bulls', 'loser' => 'Spurs', 'winnerGames' => 4, 'loserGames' => 1, 'isWin' => true],
+                        ['year' => '2013', 'winner' => 'Lakers', 'loser' => 'Bulls', 'winnerGames' => 4, 'loserGames' => 3, 'isWin' => false],
+                    ],
+                ],
+                ['name' => 'IBL Finals', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+            ],
+            'totalGameWins' => 15,
+            'totalGameLosses' => 12,
+            'totalSeriesWins' => 3,
+            'totalSeriesLosses' => 2,
+        ], $result);
+    }
+
     // -------------------------------------------------------------------------
     // prepareWinLossHistoryData
     // -------------------------------------------------------------------------

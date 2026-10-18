@@ -37,6 +37,16 @@ _ADR_RENUMBER = re.compile(r"^ibl5/docs/decisions/\d{4}-(?P<suffix>.+)$")
 # are all deliberately NOT accepted, and the changed-file side stays `_ADR_RENUMBER`
 # (`\d{4}`) so a committed placeholder file never satisfies a numbered token.
 _ADR_TOKEN = re.compile(r"^ibl5/docs/decisions/(?:\d{4}|NNNN)-(?P<suffix>.+)$")
+# Token side only, the migration sibling of _ADR_TOKEN. The contract writes
+# `ibl5/migrations/NNN_<slug>.sql` (exactly three N; the next number is 3 digits for the
+# foreseeable life of this repo), so a plan token may carry the literal `NNN` where the
+# changed file carries `\d+`. Exact uppercase literal: `nnn`, `NNNN`, `NNNNN` get no
+# tolerance here, and the changed-file side stays _MIGRATION_RENUMBER so a committed
+# placeholder file never satisfies a numbered token. Narrower than
+# _MIGRATION_PLACEHOLDER_TOKEN (`N{3,4}`, phase-omission side) on purpose: condition (3)
+# MISSING-FILE is the arming gate, phase omission is a note, and the gate takes the
+# literal the contract prescribes and nothing wider.
+_MIGRATION_TOKEN = re.compile(r"^ibl5/migrations/(?:\d+|NNN)_(?P<suffix>.+)$")
 # Phase-omission only (never _resolve): a plan phase that CREATES a migration or ADR writes
 # the contract placeholder (`NNN_`/`NNNN-`), so the deliverable token can never equal the
 # numbered file in the diff. These match the token side; the changed-file side reuses
@@ -79,12 +89,13 @@ def _contract_items(plan: PlanInfo, changed_files: list[str],
 def _renumbered_migration(tok: str, changed_files: list[str]) -> str | None:
     """The single changed migration sharing `tok`'s suffix under a different number.
 
-    None unless `tok` is `ibl5/migrations/NNN_<suffix>` AND exactly one changed path
+    None unless `tok` is `ibl5/migrations/NNN_<suffix>` (any number of digits, or the
+    literal placeholder `NNN`) AND exactly one changed path
     is `ibl5/migrations/MMM_<suffix>` with the identical suffix. Two such paths is
     ambiguous and returns None, so a MISSING-FILE still fires; the caller has already
     established that no exact, suffix, or basename match exists.
     """
-    m = _MIGRATION_RENUMBER.match(tok)
+    m = _MIGRATION_TOKEN.match(tok)
     if not m:
         return None
     suffix = m.group("suffix")
@@ -143,8 +154,12 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
     The union needs no token-shape test, because a file path and a directory path are
     never the same string, and any total of 2+ is ambiguous either way.
 
+    Between tiers 1 and 2, a token containing `/` that is a full repo-relative directory
+    path resolves to itself when any changed path starts with `<token>/`. Short and bare
+    directory tokens skip this rule and keep the tier-2 ambiguity semantics.
+
     Tier 3 runs only when Tiers 1 and 2 found nothing: a token of the form
-    `ibl5/migrations/NNN_<suffix>` resolves to the one changed path
+    `ibl5/migrations/NNN_<suffix>` (digits or the literal placeholder `NNN`) resolves to the one changed path
     `ibl5/migrations/MMM_<suffix>` with the identical suffix, and a token of the
     form `ibl5/docs/decisions/NNNN-<suffix>` resolves to the one changed path
     `ibl5/docs/decisions/MMMM-<suffix>` (the token's number may be four digits or
@@ -184,6 +199,18 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
         return hits[0]
     if hits:
         return None
+    if "/" in tok:
+        # A full repo-relative DIRECTORY token (`ibl5/classes/TradeSuggestions/`) is
+        # satisfied by any changed path beneath it. Root-anchored: `tok` was stripped of
+        # its slashes above, so `prefix` is `<tok>/` from the repo root and a short token
+        # (`classes/TradeSuggestions/`) or a top-level bare one (`bin/`) never matches here
+        # and keeps tier 2's ambiguity rule. The `/` suffix makes `ibl5/classes/Trade`
+        # miss `ibl5/classes/TradeSuggestions/x.php`. Reads changed_files only, never the
+        # disk, so a directory the branch deleted outright still resolves (PR #3281 held
+        # on two such tokens that tier 2 saw as a two-directory tie).
+        prefix = tok + "/"
+        if any(f.startswith(prefix) for f in changed_files):
+            return tok
     base = PurePosixPath(tok).name
     cands: set[str] = set()
     for f in changed_files:

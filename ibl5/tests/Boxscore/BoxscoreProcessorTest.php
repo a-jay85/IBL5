@@ -1381,6 +1381,10 @@ class BoxscoreProcessorTest extends TestCase
         self::assertSame(['recordRejectedGames'], $callLog->getArrayCopy());
     }
 
+    /**
+     * Key order is part of the contract. The public method keeps its name and array return too:
+     * both ProcessBoxscoresStepTest files rely on `createStub(BoxscoreProcessor::class)->method('processScoData')`.
+     */
     public function testProcessScoDataSuccessResultKeyOrder(): void
     {
         $mockDb = new MockDatabase();

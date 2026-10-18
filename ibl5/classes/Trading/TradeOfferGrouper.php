@@ -201,6 +201,8 @@ final class TradeOfferGrouper implements TradeOfferGrouperInterface
     /**
      * Build the header of a new offer group from its first involved row
      *
+     * The `@return` shape must keep `previewData`; dropping it makes PHPStan report `return.type`.
+     *
      * @param TradeInfoRow $row
      * @return array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>}}
      */

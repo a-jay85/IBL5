@@ -54,7 +54,7 @@ extract_fn() {
 for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done claim_pr_terminal \
           postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold \
           postplan_newest_verdict postplan_no_worktree_dispose_if_merged claim_next_plan \
-          dispose_resumed_postplan_lock; do
+          dispose_resumed_postplan_lock postplan_budget; do
     FN_SRC="$(extract_fn "$fn")"
     if [ -z "$FN_SRC" ]; then
         echo "FAIL: could not extract $fn from $RUNNER"
@@ -742,6 +742,42 @@ else echo "FAIL: k8-pr2239-remaining-secs-true"; FAILED=1; fi
 # k9: same run against MAX_PP_SECS — false (proves why REMAINING_SECS is required)
 if ! postplan_cap_timeout 137 3159 3600; then echo "ok: k9-pr2239-max-pp-secs-false"
 else echo "FAIL: k9-pr2239-max-pp-secs-false"; FAILED=1; fi
+
+# --- postplan_budget: spawn-or-defer decision for Phase 2 ------------------
+MIN_PP_SECS=$(awk -F'[= ]' '/^MIN_PP_SECS=/{print $2; exit}' "$RUNNER")
+MAX_PP_SECS=$(awk -F'[= ]' '/^MAX_PP_SECS=/{print $2; exit}' "$RUNNER")
+
+# pb0: the chosen minimum is 2400 and sits below the post-plan cap.
+if [ "$MIN_PP_SECS" = "2400" ] && [ "$MIN_PP_SECS" -lt "$MAX_PP_SECS" ]; then
+    echo "ok: pb0-min-pp-secs-2400-below-max"
+else
+    echo "FAIL: pb0-min-pp-secs-2400-below-max — MIN=$MIN_PP_SECS MAX=$MAX_PP_SECS"; FAILED=1
+fi
+
+# pb_defer <label> <remaining>: helper must return 1 and print the raw remaining.
+pb_defer() {
+    local out rc=0
+    out=$(postplan_budget "$2") || rc=$?
+    if [ "$rc" -eq 1 ] && [ "$out" = "$2" ]; then echo "ok: $1"
+    else echo "FAIL: $1 — rc=$rc out=$out"; FAILED=1; fi
+}
+# pb_spawn <label> <remaining> <expected-budget>: helper must return 0 and print the budget.
+pb_spawn() {
+    local out rc=0
+    out=$(postplan_budget "$2") || rc=$?
+    if [ "$rc" -eq 0 ] && [ "$out" = "$3" ]; then echo "ok: $1"
+    else echo "FAIL: $1 — rc=$rc out=$out want=$3"; FAILED=1; fi
+}
+
+pb_defer pb1-250-defers              250
+pb_defer pb2-900-defers              900
+pb_defer pb3-2000-defers             2000
+pb_defer pb4-2399-defers-boundary    2399
+pb_defer pb5-negative-defers         -120
+pb_spawn pb6-2400-spawns-boundary    2400 2400
+pb_spawn pb7-3000-spawns-uncapped    3000 3000
+pb_spawn pb8-5400-spawns-at-cap      5400 5400
+pb_spawn pb9-9000-spawns-capped      9000 5400
 
 # k10: hold direction — cap + OPEN + no verdict
 if should_hold_postplan_disposal 1 OPEN 0; then echo "ok: k10-hold-direction-true"

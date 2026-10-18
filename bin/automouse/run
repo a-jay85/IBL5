@@ -534,6 +534,11 @@ MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
 MAX_PP_SECS=5400     # per-phase cap: post-plan gets at most 1h30m. Post-plan is the
                      # phase that actually exhausts its wall: 2 of the 4 post-plan
                      # phases on 2026-09-16 were hard-killed at the cap (exit 137).
+MIN_PP_SECS=2400     # post-plan floor: Phase 2 starts post-plan only when at least
+                     # this much of MAX_ELAPSED remains, else it defers to the next
+                     # run with the handoff kept. Observed post-plan wall max was
+                     # 2040s (2026-10-17, 9 runs); a 300s floor got #3319 killed.
+                     # Must stay < MAX_PP_SECS.
 # Wall-clock cap-timeout classifier (see impl_cap_timeout below). The tolerance
 # absorbs process startup/teardown skew around `timeout`; it must stay SMALL —
 # a large value would forgive ordinary failures, which is exactly the
@@ -1651,6 +1656,25 @@ postplan_cap_timeout() {
     local status=$1 dur=$2 budget=$3
     [ "$status" -eq 143 ] || [ "$status" -eq 124 ] || [ "$status" -eq 137 ] || return 1
     [ "$dur" -ge $(( budget - CAP_TIMEOUT_TOLERANCE_SECS )) ]
+}
+
+# Phase-2 post-plan budget. Given the seconds left under MAX_ELAPSED, decide
+# whether post-plan may start now.
+#   return 0, print the timeout budget: remaining capped at MAX_PP_SECS
+#   return 1, print remaining unchanged: under MIN_PP_SECS (or negative), defer
+# Pure: reads only its argument and the two constants. Callers use it as
+# `if BUDGET=$(postplan_budget "$R"); then`, which is safe under set -e.
+postplan_budget() {
+    local remaining=$1
+    if [ "$remaining" -lt "$MIN_PP_SECS" ]; then
+        echo "$remaining"
+        return 1
+    fi
+    if [ "$remaining" -gt "$MAX_PP_SECS" ]; then
+        echo "$MAX_PP_SECS"
+    else
+        echo "$remaining"
+    fi
 }
 
 # Should the loop HOLD this plan in queue/ instead of disposing it to done/?

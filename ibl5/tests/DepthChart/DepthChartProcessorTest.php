@@ -908,4 +908,180 @@ class DepthChartProcessorTest extends TestCase
         $this->assertSame(42, $result['playerData'][4]['pid']);
         $this->assertSame(-3, $result['playerData'][5]['pid']);
     }
+
+    /**
+     * One POST row. $depths keys are pg|sg|sf|pf|c; unlisted positions post '0'.
+     * @param array<string, string> $depths
+     * @return array<string, string>
+     */
+    private function postRow(
+        int $i,
+        string $name,
+        array $depths = [],
+        string $injury = '0',
+        string $active = '1',
+        string $min = '20',
+    ): array {
+        $row = ['Name' . $i => $name];
+        foreach (['pg', 'sg', 'sf', 'pf', 'c'] as $slot) {
+            $row[$slot . $i] = $depths[$slot] ?? '0';
+        }
+        $row['canPlayInGame' . $i] = $active;
+        $row['min' . $i] = $min;
+        $row['Injury' . $i] = $injury;
+        return $row;
+    }
+
+    public function testPositionCountsAreWiredToDistinctOutputKeys(): void
+    {
+        $postData = array_merge(
+            $this->postRow(1, 'Row One', ['c' => '5']),
+            $this->postRow(2, 'Row Two', ['pf' => '5', 'c' => '5']),
+            $this->postRow(3, 'Row Three', ['sf' => '4', 'pf' => '4', 'c' => '4']),
+            $this->postRow(4, 'Row Four', ['sg' => '3', 'sf' => '3', 'pf' => '3', 'c' => '3']),
+            $this->postRow(5, 'Row Five', ['pg' => '2', 'sg' => '2', 'sf' => '2', 'pf' => '2', 'c' => '2']),
+        );
+
+        $result = $this->processor->processSubmission($postData, 15);
+
+        self::assertSame(1, $result['pos_1']);
+        self::assertSame(2, $result['pos_2']);
+        self::assertSame(3, $result['pos_3']);
+        self::assertSame(4, $result['pos_4']);
+        self::assertSame(5, $result['pos_5']);
+        self::assertFalse($result['hasStarterAtMultiplePositions']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('outOfRangeFieldProvider')]
+    public function testOutOfRangeValueIsClampedPerField(string $field, string $raw, int $expected): void
+    {
+        $postData = $this->postRow(1, 'Clamp Me');
+        $postData[$field . '1'] = $raw;
+
+        $result = $this->processor->processSubmission($postData, 15);
+
+        self::assertSame($expected, $result['playerData'][0][$field]);
+    }
+
+    /** @return array<string, array{string, string, int}> */
+    public static function outOfRangeFieldProvider(): array
+    {
+        return [
+            'pg above range' => ['pg', '9', 5],
+            'pg below range' => ['pg', '-3', 0],
+            'sg above range' => ['sg', '9', 5],
+            'sg below range' => ['sg', '-3', 0],
+            'sf above range' => ['sf', '9', 5],
+            'sf below range' => ['sf', '-3', 0],
+            'pf above range' => ['pf', '9', 5],
+            'pf below range' => ['pf', '-3', 0],
+            'c above range' => ['c', '9', 5],
+            'c below range' => ['c', '-3', 0],
+            'min above range' => ['min', '99', 40],
+            'min below range' => ['min', '-7', 0],
+        ];
+    }
+
+    public function testRowAtExactlyMaxPlayersIsIncluded(): void
+    {
+        $postData = array_merge(
+            $this->postRow(1, 'Row One'),
+            $this->postRow(2, 'Row Two'),
+            $this->postRow(3, 'Row Three'),
+        );
+
+        $result = $this->processor->processSubmission($postData, 2);
+
+        self::assertCount(2, $result['playerData']);
+        self::assertSame(['Row One', 'Row Two'], array_column($result['playerData'], 'name'));
+    }
+
+    public function testLastOfTwoMultiStartersWins(): void
+    {
+        $postData = array_merge(
+            $this->postRow(1, 'First Offender', ['pg' => '1', 'sg' => '1']),
+            $this->postRow(2, 'Second Offender', ['sf' => '1', 'pf' => '1']),
+        );
+
+        $result = $this->processor->processSubmission($postData, 15);
+
+        self::assertTrue($result['hasStarterAtMultiplePositions']);
+        self::assertSame('Second Offender', $result['nameOfProblemStarter']);
+    }
+
+    public function testDepthTwoThroughFiveNeverCountsAsStarter(): void
+    {
+        $postData = $this->postRow(1, 'Bench Guy', ['pg' => '2', 'sg' => '3', 'sf' => '4', 'pf' => '5', 'c' => '2']);
+
+        $result = $this->processor->processSubmission($postData, 15);
+
+        self::assertFalse($result['hasStarterAtMultiplePositions']);
+        self::assertSame('', $result['nameOfProblemStarter']);
+        self::assertSame(1, $result['pos_1']);
+        self::assertSame(1, $result['pos_2']);
+        self::assertSame(1, $result['pos_3']);
+        self::assertSame(1, $result['pos_4']);
+        self::assertSame(1, $result['pos_5']);
+    }
+
+    public function testSingleStarterDoesNotSetFlag(): void
+    {
+        $postData = $this->postRow(1, 'Lone Starter', ['pg' => '1', 'sg' => '2', 'sf' => '3']);
+
+        $result = $this->processor->processSubmission($postData, 15);
+
+        self::assertFalse($result['hasStarterAtMultiplePositions']);
+        self::assertSame('', $result['nameOfProblemStarter']);
+    }
+
+    public function testInjuredPlayerSkipsCountsButStillFlagsMultipleStarters(): void
+    {
+        $postData = $this->postRow(
+            1,
+            'Hurt Starter',
+            ['pg' => '1', 'sg' => '1', 'sf' => '2', 'pf' => '3', 'c' => '4'],
+            injury: '12',
+        );
+
+        $result = $this->processor->processSubmission($postData, 15);
+
+        self::assertSame(0, $result['pos_1']);
+        self::assertSame(0, $result['pos_2']);
+        self::assertSame(0, $result['pos_3']);
+        self::assertSame(0, $result['pos_4']);
+        self::assertSame(0, $result['pos_5']);
+        self::assertSame(12, $result['playerData'][0]['injury']);
+        self::assertTrue($result['hasStarterAtMultiplePositions']);
+        self::assertSame('Hurt Starter', $result['nameOfProblemStarter']);
+    }
+
+    public function testGapRowIsSkippedAndLaterRowStillRead(): void
+    {
+        $postData = array_merge(
+            $this->postRow(1, 'Row One', ['pg' => '1']),
+            $this->postRow(3, 'Row Three', ['sg' => '1']),
+        );
+        $postData['pg2'] = '1';
+        $postData['Injury2'] = '0';
+
+        $result = $this->processor->processSubmission($postData, 15);
+
+        self::assertSame(['Row One', 'Row Three'], array_column($result['playerData'], 'name'));
+        self::assertSame(1, $result['pos_1']);
+        self::assertSame(1, $result['pos_2']);
+    }
+
+    public function testOutputKeyOrderIsUnchanged(): void
+    {
+        $result = $this->processor->processSubmission($this->postRow(1, 'Key Order'), 15);
+
+        self::assertSame(
+            ['pid', 'name', 'pg', 'sg', 'sf', 'pf', 'c', 'canPlayInGame', 'min', 'of', 'df', 'oi', 'di', 'bh', 'injury'],
+            array_keys($result['playerData'][0]),
+        );
+        self::assertSame(
+            ['playerData', 'activePlayers', 'pos_1', 'pos_2', 'pos_3', 'pos_4', 'pos_5', 'hasStarterAtMultiplePositions', 'nameOfProblemStarter'],
+            array_keys($result),
+        );
+    }
 }

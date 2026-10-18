@@ -54,7 +54,7 @@ extract_fn() {
 for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done claim_pr_terminal \
           postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold \
           postplan_newest_verdict postplan_no_worktree_dispose_if_merged claim_next_plan \
-          dispose_resumed_postplan_lock postplan_budget; do
+          dispose_resumed_postplan_lock postplan_budget postplan_release_label_after_cap; do
     FN_SRC="$(extract_fn "$fn")"
     if [ -z "$FN_SRC" ]; then
         echo "FAIL: could not extract $fn from $RUNNER"
@@ -1405,6 +1405,47 @@ fi
 n=$(grep -cF 'REMAINING_SECS=300' "$RUNNER" || true)
 if [ "$n" = "1" ] && ! grep -qF 'REMAINING_SECS=300' <<<"$MB_SRC"; then echo "ok: mb5-no-300s-floor"
 else echo "FAIL: mb5-no-300s-floor — count=$n (want 1, impl phase only)"; FAILED=1; fi
+
+# --- postplan_release_label_after_cap: label cleanup after a cap-kill ------
+SELF_DIR="$(cd "$(dirname "$RUNNER")" && pwd)"
+RL_DIR=$(mktemp -d); RL_CALLS="$RL_DIR/calls"
+cat > "$RL_DIR/gh" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$RL_CALLS"
+[ "${RL_GH_FAIL:-0}" = 1 ] && exit 1
+exit 0
+STUB
+chmod +x "$RL_DIR/gh"
+export RL_CALLS
+rl_run() { : > "$RL_CALLS"; LOG="$RL_DIR/log"; GH_CMD="$RL_DIR/gh" postplan_release_label_after_cap "$@"; }
+
+# rl1: status 137 + numeric PR removes the label and posts the failure comment.
+rl_run 137 4242
+if grep -qF 'issues/4242/labels/post-plan-running' "$RL_CALLS" \
+   && grep -qF 'pr comment 4242' "$RL_CALLS"; then
+    echo "ok: rl1-cap-kill-removes-label-and-comments"
+else echo "FAIL: rl1-cap-kill-removes-label-and-comments — $(cat "$RL_CALLS")"; FAILED=1; fi
+
+# rl2: empty or non-numeric PR makes no gh call.
+for bad in '' 'abc' '12x'; do
+    rl_run 137 "$bad"
+    if [ ! -s "$RL_CALLS" ]; then echo "ok: rl2-non-numeric-pr-no-call ($bad)"
+    else echo "FAIL: rl2-non-numeric-pr-no-call ($bad)"; FAILED=1; fi
+done
+
+# rl3: a failing gh never fails the caller (best-effort under set -e).
+RL_GH_FAIL=1; export RL_GH_FAIL
+if rl_run 137 4242; then echo "ok: rl3-gh-failure-is-best-effort"
+else echo "FAIL: rl3-gh-failure-is-best-effort"; FAILED=1; fi
+unset RL_GH_FAIL
+
+# rl4: wiring. The call sits right after PP_CAP and is gated on PP_CAP -eq 1.
+RL_WIRE=$(grep -A3 -F 'postplan_cap_timeout "$PP_STATUS" "$PP_DUR" "$REMAINING_SECS" && PP_CAP=1' "$RUNNER")
+if grep -qF 'if [ "$PP_CAP" -eq 1 ]; then' <<<"$RL_WIRE" \
+   && grep -qF 'postplan_release_label_after_cap "$PP_STATUS" "$PP_PR_NUM"' <<<"$RL_WIRE"; then
+    echo "ok: rl4-wired-after-pp-cap"
+else echo "FAIL: rl4-wired-after-pp-cap"; FAILED=1; fi
+rm -rf "$RL_DIR"
 
 # ---------------------------------------------------------------------------
 # Tail

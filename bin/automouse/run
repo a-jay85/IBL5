@@ -1677,6 +1677,18 @@ postplan_budget() {
     fi
 }
 
+# Best-effort cleanup after a post-plan wall-kill. The shim SIGKILLs
+# bin/post-plan-now's bash before its TERM trap can call conclude_status_badge,
+# so the post-plan-running label would stay on the PR. Reuse post-plan-now's
+# own helper (defined above its sourced-guard) from a subshell; never fail.
+postplan_release_label_after_cap() {
+    local status=$1 pr=$2
+    case "$pr" in ''|*[!0-9]*) return 0 ;; esac
+    ( source "$SELF_DIR/../post-plan-now" && conclude_status_badge "$status" "$pr" ) \
+        >> "$LOG" 2>&1 || true
+    return 0
+}
+
 # Should the loop HOLD this plan in queue/ instead of disposing it to done/?
 #
 # Narrow by construction — ALL THREE must hold:
@@ -2950,6 +2962,9 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 # unreviewed. Filing it to done/ here is the silent-disposal defect.
                 PP_CAP=0
                 postplan_cap_timeout "$PP_STATUS" "$PP_DUR" "$REMAINING_SECS" && PP_CAP=1
+                if [ "$PP_CAP" -eq 1 ]; then
+                    postplan_release_label_after_cap "$PP_STATUS" "$PP_PR_NUM"
+                fi
                 PP_VERDICT_NEWEST=$(postplan_newest_verdict "$PP_PR_NUM")
                 # Fail-closed: 1 means "treat as reviewed", i.e. today's behaviour.
                 # It only drops to 0 when we hold a usable freshness reference AND

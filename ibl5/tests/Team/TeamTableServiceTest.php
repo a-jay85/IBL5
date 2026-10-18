@@ -835,6 +835,9 @@ HTML;
         return $rows;
     }
 
+    /**
+     * Outside the Regular Season the tab order is ratings,total_s,avg_s,per36mins,chunk,playoffs,contracts.
+     */
     #[DataProvider('tabPathOffseasonPhaseProvider')]
     public function testTabPathAddsPlayoffsTabBeforeContractsOutsideRegularSeason(string $phase, int $teamid, ?string $yr): void
     {
@@ -887,6 +890,9 @@ HTML;
         $this->assertSame(1, substr_count($caption, 'ibl-tab--active'));
     }
 
+    /**
+     * The tab path never loads the team list and reads getTeam(5) (or the pool/league id) once.
+     */
     #[DataProvider('tabPathSourceProvider')]
     public function testTabPathNeverCallsGetAllTeamsAndCallsGetTeamOnce(int $teamid, ?string $yr): void
     {
@@ -907,6 +913,9 @@ HTML;
         $this->assertStringContainsString('ibl-tabs', self::captionOf($html));
     }
 
+    /**
+     * The component escapes a hostile yr to &quot;&gt;&lt;script&gt;…, so the service need not.
+     */
     public function testHostileYrIsAttributeEscapedInTabCaption(): void
     {
         $yr = '2024"><script>alert(1)</script>';
@@ -946,6 +955,9 @@ HTML;
         return self::captionOf($service->getTableOutput(5, $yr, $display, $split));
     }
 
+    /**
+     * The noscript fallback link ends in …&amp;display=ratings.
+     */
     public function testDropdownCaptionForCurrentSeasonTeamIsByteIdentical(): void
     {
         $caption = $this->dropdownCaption('Regular Season', null, 'ratings');
@@ -990,6 +1002,9 @@ HTML;
         );
     }
 
+    /**
+     * An empty yr reads getRosterUnderContract(5) once and never the historical roster.
+     */
     public function testEmptyYrIsTreatedAsCurrentSeason(): void
     {
         $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);

@@ -101,10 +101,10 @@ def test_unmarked_row_sharing_the_token_still_wins():
     assert not any("ci-seed" in item for item in items)
 
 
-def test_bare_method_first_token_gate_is_unchanged():
+def test_bare_method_first_row_plans_location_path():
     cells = ["6", "`testFoo` keeps passing", "PHPUnit", "post-impl", f"`{PHP}`"]
-    assert _planned_token(cells) is None
-    assert parse_matrix(HDR + BARE_FIRST_ROW)[0] == []
+    assert _planned_token(cells) == PHP
+    assert parse_matrix(HDR + BARE_FIRST_ROW)[0] == [PHP]
 
 
 def test_marker_after_description_copy_of_the_same_token_still_exempts():

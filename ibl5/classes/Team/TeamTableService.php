@@ -64,8 +64,6 @@ class TeamTableService implements TeamTableServiceInterface
         // season (not a historical view), during Draft or Free Agency.
         $markExpiringRows = $isFreeAgency && $teamid > 0 && ($yr === null || $yr === '');
 
-        $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
-        $baseUrl = "modules.php?name=Team&op=team&teamid=$teamid" . $insertyear;
         $teamData = $this->repository->getTeam($teamid);
         $teamColor1 = is_string($teamData['color1'] ?? null) ? $teamData['color1'] : '000000';
         $teamColor2 = is_string($teamData['color2'] ?? null) ? $teamData['color2'] : 'FFFFFF';
@@ -96,19 +94,18 @@ class TeamTableService implements TeamTableServiceInterface
 
         $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $starterPids, $split, $markExpiringRows);
 
-        // HTMX API URL for tab/dropdown switching
-        $apiUrl = 'modules.php?name=Team&op=api&teamid=' . $teamid . $insertyear;
+        return $this->wrapWithViewControls($tableHtml, $teamid, $yr, $display, $split, $season, $teamColor1, $teamColor2);
+    }
 
-        // Use dropdown for actual teams in current season; tabs for everything else
-        $useDropdown = $teamid > 0 && ($yr === null || $yr === '');
-
-        if ($useDropdown) {
-            $dropdownGroups = $this->buildDropdownGroups($season);
-            $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
-            $dropdown = new TableViewDropdown($dropdownGroups, $activeValue, $baseUrl, $teamColor1, $teamColor2, $apiUrl);
-            return $dropdown->wrap($tableHtml);
-        }
-
+    /**
+     * Tab keys => labels for the tab-path wrapper. The playoffs tab appears
+     * (between chunk and contracts) only outside the Regular Season.
+     * buildDropdownGroups() keeps its own copy of this list on purpose.
+     *
+     * @return array<string, string>
+     */
+    private static function tabDefinitions(Season $season): array
+    {
         $tabDefinitions = [
             'ratings' => 'Ratings',
             'total_s' => 'Season Totals',
@@ -123,7 +120,42 @@ class TeamTableService implements TeamTableServiceInterface
 
         $tabDefinitions['contracts'] = 'Contracts';
 
-        $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2, $apiUrl);
+        return $tabDefinitions;
+    }
+
+    /**
+     * Wrap the rendered table in its view control: a dropdown for a real team
+     * in the current season, tabs for everything else. URLs are built with
+     * plain `&` and left unescaped here; TableViewSwitcher / TableViewDropdown
+     * escape them on output.
+     */
+    private function wrapWithViewControls(
+        string $tableHtml,
+        int $teamid,
+        ?string $yr,
+        string $display,
+        ?string $split,
+        Season $season,
+        string $teamColor1,
+        string $teamColor2
+    ): string {
+        $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
+        $baseUrl = "modules.php?name=Team&op=team&teamid=$teamid" . $insertyear;
+
+        // HTMX API URL for tab/dropdown switching
+        $apiUrl = 'modules.php?name=Team&op=api&teamid=' . $teamid . $insertyear;
+
+        // Use dropdown for actual teams in current season; tabs for everything else
+        $useDropdown = $teamid > 0 && ($yr === null || $yr === '');
+
+        if ($useDropdown) {
+            $dropdownGroups = $this->buildDropdownGroups($season);
+            $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
+            $dropdown = new TableViewDropdown($dropdownGroups, $activeValue, $baseUrl, $teamColor1, $teamColor2, $apiUrl);
+            return $dropdown->wrap($tableHtml);
+        }
+
+        $switcher = new TableViewSwitcher(self::tabDefinitions($season), $display, $baseUrl, $teamColor1, $teamColor2, $apiUrl);
         return $switcher->wrap($tableHtml);
     }
 

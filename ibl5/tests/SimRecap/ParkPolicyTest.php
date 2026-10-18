@@ -350,6 +350,7 @@ final class ParkPolicyTest extends TestCase
                 'auth', 'mac', self::row(route: 'any'), $windowEnd,
                 self::expected('failed', 'any', null, authFailedHosts: 'mac'),
             ],
+            // Append order would emit 'actions,mac'; the canonical HOSTS order is 'mac,actions'.
             'window end: auth re-emits prior and appended hosts in canonical order' => [
                 'auth', 'mac', self::row(route: 'any', authFailedHosts: 'actions'), $windowEnd,
                 self::expected('failed', 'any', null, authFailedHosts: 'mac,actions'),

@@ -56,11 +56,30 @@ cat > "$SHIMS/gh" <<GH_EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$SCRATCH/gh.log"
 if [[ "\${1:-}" == "pr" && "\${2:-}" == "list" ]]; then
-    cat "$SCRATCH/prs.json"
+    st=""; prev=""
+    for a in "\$@"; do [[ "\$prev" == "--state" ]] && st="\$a"; prev="\$a"; done
+    if [[ "\$st" == "open" ]]; then
+        cat "$SCRATCH/prs.json"
+    else
+        jq -s 'add' "$SCRATCH/prs.json" "$SCRATCH/prs-closed.json"
+    fi
     exit 0
 fi
 if [[ "\${1:-}" == "api" ]]; then
     case "\${2:-}" in
+        repos/*/issues/*/timeline*)
+            n="\${2#*/issues/}"; n="\${n%%/*}"
+            [[ ! -e "$SCRATCH/timeline-fail-\$n" ]] || exit 1
+            [[ -f "$SCRATCH/timeline-\$n.json" ]] || exit 1
+            expr=""; prev=""
+            for a in "\$@"; do [[ "\$prev" == "--jq" ]] && expr="\$a"; prev="\$a"; done
+            if [[ -n "\$expr" ]]; then jq -r "\$expr" "$SCRATCH/timeline-\$n.json"; else cat "$SCRATCH/timeline-\$n.json"; fi
+            exit 0 ;;
+        repos/*/issues/*/labels/*)
+            n="\${2#*/issues/}"; n="\${n%%/*}"; lbl="\${2##*/labels/}"
+            printf '%s %s %s\n' "\$(printf '%s ' "\$@" | grep -oE -- '--method [A-Z]+' | cut -d' ' -f2)" "\$n" "\$lbl" >> "$SCRATCH/gh-label.log"
+            [[ ! -e "$SCRATCH/delete-fail-\$n" ]] || exit 1
+            exit 0 ;;
         repos/*/commits/*/check-runs*)
             sha="\${2#*/commits/}"; sha="\${sha%%/*}"
             [[ -f "$SCRATCH/checks-\$sha.json" ]] || exit 1
@@ -78,6 +97,7 @@ GH_EOF
 cat > "$SHIMS/launchctl" <<LC_EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$SCRATCH/launchctl.log"
+[[ ! -e "$SCRATCH/launchctl-fail" ]] || exit 1
 if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
     cat "$SCRATCH/launchctl-list.txt"
     i=0
@@ -102,6 +122,22 @@ cat > "$SHIMS/claude" <<CL_EOF
 printf '%s\n' "\$*" >> "$SCRATCH/claude.log"
 exit 0
 CL_EOF
+
+cat > "$SHIMS/ps" <<PS_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/ps.log"
+[[ ! -e "$SCRATCH/ps-fail" ]] || exit 1
+cat "$SCRATCH/ps.txt"
+exit 0
+PS_EOF
+
+cat > "$SHIMS/lsof" <<LS_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/lsof.log"
+[[ ! -e "$SCRATCH/lsof-fail" ]] || exit 1
+cat "$SCRATCH/lsof.txt"
+exit 0
+LS_EOF
 
 cat > "$SCRATCH/pr-cycle-stub" <<PC_EOF
 #!/usr/bin/env bash
@@ -162,10 +198,16 @@ reset() {
     rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
     rm -f "$SCRATCH/pr-cycle-skip-notes-env" "$SCRATCH/pr-cycle-skip-notes-copy"
     rm -f "$SCRATCH"/key-*
+    rm -f "$SCRATCH/prs-closed.json" "$SCRATCH"/timeline-*.json "$SCRATCH"/timeline-fail-* \
+        "$SCRATCH"/delete-fail-* "$SCRATCH/ps-fail" "$SCRATCH/lsof-fail" \
+        "$SCRATCH/launchctl-fail" "$SCRATCH/lsof.txt"
     rm -rf "$HOME_DIR" "$REPO/tools" "$WT/tools" "$SCRATCH/usage-gate" "$SCRATCH/watch-state"
     mkdir -p "$HOME_DIR"
     : > "$SCRATCH/launchctl-list.txt"
     echo '[]' > "$SCRATCH/prs.json"
+    echo '[]' > "$SCRATCH/prs-closed.json"
+    printf '%s\n' '1 /sbin/launchd' '77 /usr/bin/login -fp t' > "$SCRATCH/ps.txt"
+    : > "$SCRATCH/lsof.txt"
     E_ZONE=normal; E_STOP="$UNSET"; E_STATE="$UNSET"
     E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
     E_HOME="set"; E_STUB_RC=0
@@ -204,6 +246,74 @@ set_jobs() {
         shift 2
     done
 }
+
+# set_labels <num> <label>...: sets .labels on the prs.json entry. PRs never given a call
+# carry no labels key, which the sweep must tolerate.
+set_labels() {
+    local n="$1" names
+    shift
+    names="$(printf '%s\n' "$@" | jq -R '{name: .}' | jq -sc '.')"
+    jq -c --argjson n "$n" --argjson l "$names" \
+        'map(if .number == $n then . + {labels: $l} else . end)' "$SCRATCH/prs.json" > "$SCRATCH/prs.json.tmp" \
+        && mv "$SCRATCH/prs.json.tmp" "$SCRATCH/prs.json"
+}
+
+# set_closed_prs "<num>|<branch>|<sha>|<state>|<isDraft>": the PRs a call without
+# `--state open` would also see.
+set_closed_prs() {
+    local e out="[]" n b s m d
+    for e in "$@"; do
+        IFS='|' read -r n b s m d <<< "$e"
+        out="$(jq -c --argjson n "$n" --arg b "$b" --arg s "$s" --arg m "$m" --argjson d "$d" \
+            '. + [{number:$n, headRefName:$b, headRefOid:$s, mergeStateStatus:$m, isDraft:$d, baseRefName:"master"}]' <<< "$out")"
+    done
+    printf '%s\n' "$out" > "$SCRATCH/prs-closed.json"
+}
+
+# set_label_age <num> <minutes-ago> [extra-older-minutes]: the timeline for PR <num>. With
+# the third argument an older labeled event, an unlabeled event and an unrelated labeled
+# event precede the last one, so "last labeled event for THIS label wins" is tested.
+set_label_age() {
+    local n="$1" m="$2" older="${3-}" now t ev
+    now="$(date +%s)"
+    t="$(jq -rn --argjson t $(( now - m * 60 )) '$t | todate')"
+    ev="[]"
+    if [[ -n "$older" ]]; then
+        local to
+        to="$(jq -rn --argjson t $(( now - older * 60 )) '$t | todate')"
+        ev="$(jq -nc --arg to "$to" '[
+            {event:"labeled", label:{name:"post-plan-running"}, created_at:$to},
+            {event:"unlabeled", label:{name:"post-plan-running"}, created_at:$to},
+            {event:"labeled", label:{name:"auto-mergeable"}, created_at:$to}]')"
+    fi
+    jq -c --arg t "$t" '. + [{event:"labeled", label:{name:"post-plan-running"}, created_at:$t}]' <<< "$ev" \
+        > "$SCRATCH/timeline-$n.json"
+}
+set_timeline_fail() { touch "$SCRATCH/timeline-fail-$1"; }
+set_delete_fail() { touch "$SCRATCH/delete-fail-$1"; }
+
+# set_ps <line>...: the `ps -axww -o pid=,command=` output the ps shim prints.
+set_ps() { printf '%s\n' "$@" > "$SCRATCH/ps.txt"; }
+set_ps_fail() { touch "$SCRATCH/ps-fail"; }
+set_lsof() { printf '%s\n' "$@" > "$SCRATCH/lsof.txt"; }
+set_lsof_fail() { touch "$SCRATCH/lsof-fail"; }
+set_launchctl_fail() { touch "$SCRATCH/launchctl-fail"; }
+
+# _stamp_at <epoch>: touch -t stamp. The one platform branch in this harness: BSD date -r
+# on macOS, GNU date -d @ on Linux CI.
+_stamp_at() { date -r "$1" +%Y%m%d%H%M.%S 2>/dev/null || date -d "@$1" +%Y%m%d%H%M.%S; }
+set_out_root() { mkdir -p "$REPO/tools/postplan-harness/out"; }
+# set_live_dir <branch> <minutes-ago> [wt]: a harness run dir with one file, both back-dated.
+set_live_dir() {
+    local branch="$1" m="$2" base="$REPO" run st
+    [[ -z "${3-}" ]] || base="$WT"
+    run="$base/tools/postplan-harness/out/live-$branch-20261018-000000"
+    mkdir -p "$run"
+    : > "$run/phase.log"
+    st="$(_stamp_at $(( $(date +%s) - m * 60 )))"
+    touch -t "$st" "$run/phase.log" "$run"
+}
+label_log() { cat "$SCRATCH/gh-label.log" 2>/dev/null || true; }
 
 _DROP=(); _SET=()
 _envv() { if [[ "$2" == "$UNSET" ]]; then _DROP+=(-u "$1"); else _SET+=("$1=$2"); fi; }

@@ -198,4 +198,154 @@ class StreakCalculatorTest extends TestCase
         $this->assertSame(2, $result[0]['losses']);
         $this->assertSame(0, $result[0]['wins']);
     }
+
+    // Pin: best-start tie returns both holders in accumulator insertion order (T7 before T4, not sorted)
+    public function testBestSeasonStartTieReturnsBothInInsertionOrder(): void
+    {
+        $games = [
+            $this->game('2024-01-01', 7, 5, 100, 90),
+            $this->game('2024-01-02', 4, 6, 100, 90),
+            $this->game('2024-01-03', 7, 5, 100, 90),
+            $this->game('2024-01-04', 4, 6, 100, 90),
+        ];
+
+        $result = StreakCalculator::bestWorstSeasonStart($games, 'best', $this->resolver);
+
+        $this->assertSame(['T7', 'T4'], array_column($result, 'team_name'));
+        $this->assertSame([
+            ['team_name' => 'T7', 'year' => 2024, 'wins' => 2, 'losses' => 0],
+            ['team_name' => 'T4', 'year' => 2024, 'wins' => 2, 'losses' => 0],
+        ], $result);
+    }
+
+    // Pin: worst-start tie returns both holders in insertion order (T8 before T3)
+    public function testWorstSeasonStartTieReturnsBothInInsertionOrder(): void
+    {
+        $games = [
+            $this->game('2024-01-01', 8, 2, 90, 100),
+            $this->game('2024-01-02', 3, 4, 90, 100),
+            $this->game('2024-01-03', 8, 2, 90, 100),
+            $this->game('2024-01-04', 3, 4, 90, 100),
+        ];
+
+        $result = StreakCalculator::bestWorstSeasonStart($games, 'worst', $this->resolver);
+
+        $this->assertSame(['T8', 'T3'], array_column($result, 'team_name'));
+        $this->assertSame([
+            ['team_name' => 'T8', 'year' => 2024, 'wins' => 0, 'losses' => 2],
+            ['team_name' => 'T3', 'year' => 2024, 'wins' => 0, 'losses' => 2],
+        ], $result);
+    }
+
+    // Pin: longest-streak tie returns both holders in first-appearance order (T7 before T4)
+    public function testLongestStreakTieReturnsBothInInsertionOrder(): void
+    {
+        $games = [
+            $this->game('2024-02-01', 7, 5, 100, 90),
+            $this->game('2024-02-02', 7, 5, 100, 90),
+            $this->game('2024-02-03', 4, 6, 100, 90),
+            $this->game('2024-02-04', 4, 6, 100, 90),
+        ];
+
+        $result = StreakCalculator::longestStreak($games, 'winning', $this->resolver);
+
+        $this->assertSame([
+            ['team_name' => 'T7', 'streak' => 2, 'start_date' => '2024-02-01', 'end_date' => '2024-02-02', 'start_year' => 2024, 'end_year' => 2024],
+            ['team_name' => 'T4', 'streak' => 2, 'start_date' => '2024-02-03', 'end_date' => '2024-02-04', 'start_year' => 2024, 'end_year' => 2024],
+        ], $result);
+    }
+
+    // Pin: a self-play row where the visitor loses leaves every start at 0, so the max > 0 gate returns []
+    public function testBestSeasonStartSelfPlayZeroMaxReturnsEmpty(): void
+    {
+        $games = [$this->game('2024-01-01', 9, 9, 90, 100)];
+
+        $result = StreakCalculator::bestWorstSeasonStart($games, 'best', $this->resolver);
+
+        $this->assertSame([], $result);
+    }
+
+    // Pin: same degenerate row for longestStreak; every best streak stays 0, so the gate returns []
+    public function testLongestStreakSelfPlayZeroMaxReturnsEmpty(): void
+    {
+        $games = [$this->game('2024-01-01', 9, 9, 90, 100)];
+
+        $result = StreakCalculator::longestStreak($games, 'winning', $this->resolver);
+
+        $this->assertSame([], $result);
+    }
+
+    // Pin: a team that never loses all season (streak never broken) is still a record holder
+    public function testBestSeasonStartTeamUnbeatenAllSeason(): void
+    {
+        $games = [
+            $this->game('2024-01-01', 1, 2, 100, 90),
+            $this->game('2024-01-02', 3, 1, 90, 100),
+            $this->game('2024-01-03', 1, 4, 100, 90),
+            $this->game('2024-01-04', 5, 1, 90, 100),
+        ];
+
+        $result = StreakCalculator::bestWorstSeasonStart($games, 'best', $this->resolver);
+
+        $this->assertSame([
+            ['team_name' => 'T1', 'year' => 2024, 'wins' => 4, 'losses' => 0],
+        ], $result);
+    }
+
+    // Pin: any $type other than 'best' takes the worst branch
+    public function testSeasonStartUnknownTypeFallsThroughToWorst(): void
+    {
+        $games = [
+            $this->game('2024-01-01', 1, 2, 90, 100),
+            $this->game('2024-01-02', 1, 2, 90, 100),
+            $this->game('2024-01-03', 1, 2, 100, 90),
+        ];
+
+        $result = StreakCalculator::bestWorstSeasonStart($games, 'nonsense', $this->resolver);
+
+        $this->assertSame([
+            ['team_name' => 'T1', 'year' => 2024, 'wins' => 0, 'losses' => 2],
+        ], $result);
+    }
+
+    // Pin: any $type other than 'winning' takes the losing branch
+    public function testLongestStreakUnknownTypeFallsThroughToLosing(): void
+    {
+        $games = [
+            $this->game('2024-01-01', 10, 12, 90, 100),
+            $this->game('2024-01-02', 10, 12, 90, 100),
+            $this->game('2024-01-03', 10, 12, 90, 100),
+            $this->game('2024-01-04', 10, 12, 100, 90),
+        ];
+
+        $result = StreakCalculator::longestStreak($games, 'nonsense', $this->resolver);
+
+        $this->assertSame([
+            ['team_name' => 'T10', 'streak' => 3, 'start_date' => '2024-01-01', 'end_date' => '2024-01-03', 'start_year' => 2024, 'end_year' => 2024],
+        ], $result);
+    }
+
+    // Pin: a 100-100 score counts as a HOME win (visitorWon uses strict >); also the only max-of-1 input
+    public function testLongestStreakScoreTieCountsAsHomeWin(): void
+    {
+        $games = [$this->game('2024-01-01', 1, 2, 100, 100)];
+
+        $result = StreakCalculator::longestStreak($games, 'winning', $this->resolver);
+
+        $this->assertSame([
+            ['team_name' => 'T2', 'streak' => 1, 'start_date' => '2024-01-01', 'end_date' => '2024-01-01', 'start_year' => 2024, 'end_year' => 2024],
+        ], $result);
+    }
+
+    // Pin: same score-tie rule through bestWorstSeasonStart (second copy of the teamWon expression today)
+    public function testBestSeasonStartScoreTieCountsAsHomeWin(): void
+    {
+        $games = [$this->game('2024-01-01', 1, 2, 100, 100)];
+
+        $result = StreakCalculator::bestWorstSeasonStart($games, 'best', $this->resolver);
+
+        $this->assertSame([
+            ['team_name' => 'T2', 'year' => 2024, 'wins' => 1, 'losses' => 0],
+        ], $result);
+    }
 }

@@ -1241,8 +1241,11 @@ fi
 # condition (3) and Phase 6 check 5 forever (a-jay85/IBL5-backlog#1277).
 # Two clears: `(conditional — only if VR baselines change)` makes the entry
 # EXEMPT in cf_parse_section_raw, so this loop never sees it; the whole-word
-# token `vr-baseline-change` on the entry line accepts a deliberate regen or
-# deletion while Phase 5.0 still requires the path in the diff. Additive only:
+# token `vr-baseline-change` on the entry line accepts a `git rm` of baselines
+# while Phase 5.0 still requires the path in the diff. A vr-baseline-change
+# line that names CI regeneration (update-baselines, CI + regen, CI ... label)
+# is rejected: the label commits PNGs after the PR exists, so the pre-push diff
+# never carries them (PRs 3301, 3311, 3329 held this way after PR 2645). Additive only:
 # the lib parser and Phase 5.0 are unchanged. Fence-stripped (cf_section and
 # cf_parse_section_raw both strip fences). Skipped on an unbalanced fence,
 # which gate [F] already rejects. Measured 2026-10-01 on the 1050-plan corpus:
@@ -1257,7 +1260,12 @@ if ! cf_fence_unbalanced "$PLAN_FILE"; then
         _vr_lines=$(grep -F -- "\`$_vr_path\`" <<<"$_vr_entry_lines" || true)
         if ! grep -iE '(^|[^[:alnum:]_-])vr-baseline-change([^[:alnum:]_-]|$)' \
             <<<"$_vr_lines" >/dev/null; then
-            viol "[VR] ## Critical Files entry \`$_vr_path\` is a Visual Regression baseline directory listed as must-appear. CI changes it only when a screenshot diff regenerates baselines, so post-plan hold (3) blocks forever on a green VR run. Mark it (conditional — only if VR baselines change), or (vr-baseline-change: <what changes>) when the plan deliberately regenerates or deletes baselines."
+            viol "[VR] ## Critical Files entry \`$_vr_path\` is a Visual Regression baseline directory listed as must-appear. CI changes it only when a screenshot diff regenerates baselines, so post-plan hold (3) blocks forever on a green VR run. Mark it (conditional — only if VR baselines change), CI update-baselines regen included, or (vr-baseline-change: <what>) only when the diff git rm's the baselines."
+        elif grep -qiF 'update-baselines' <<<"$_vr_lines" \
+            || { grep -qE '(^|[^[:alnum:]_])CI([^[:alnum:]_]|$)' <<<"$_vr_lines" \
+                 && grep -qiE '(^|[^[:alnum:]_-])regen' <<<"$_vr_lines"; } \
+            || grep -qE '(^|[^[:alnum:]_])CI([^[:alnum:]_]|$).*[Ll]abel' <<<"$_vr_lines"; then
+            viol "[VR] ## Critical Files entry \`$_vr_path\` carries vr-baseline-change but names CI regeneration (the update-baselines label). vr-baseline-change is must-appear, and CI commits regenerated PNGs only after the PR exists, so the pre-push diff can never carry them and post-plan hold (3) blocks forever. Mark it (conditional — only if VR baselines change); reserve (vr-baseline-change: <what>) for baselines the diff git rm's."
         fi
     done <<<"$_vr_paths"
 fi

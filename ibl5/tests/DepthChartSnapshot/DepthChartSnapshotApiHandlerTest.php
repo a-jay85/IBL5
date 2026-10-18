@@ -244,6 +244,7 @@ class DepthChartSnapshotApiHandlerTest extends WideUnitTestCase
 
     public function testHandleLoadReturns404ForAnotherTeamsSnapshot(): void
     {
+        // The request's params.teamid (2) must be ignored; only handle()'s teamid (1) scopes the lookup.
         $this->registerLoadFixture(7, 2, null);
 
         $data = $this->loadJson(1, ['id' => 7, 'teamid' => 2]);

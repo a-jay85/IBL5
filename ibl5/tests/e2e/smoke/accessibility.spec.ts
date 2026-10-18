@@ -26,11 +26,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'injuries',
     'player movement',
     'projected draft order',
-    // Search page with a transactions preset (modules.php?name=Search plus a preset).
-    // Verified 2026-09-23: every failing node is pre-existing results markup
-    // (.search-result__meta-item, .search-result__title, .search-pagination__link, <time>);
-    // none is the new preset select. .ibl-search__btn is fixed in design/components/forms.css.
-    'search transactions preset',
     'season archive',
     'season highs',
     'team off/def stats',
@@ -174,6 +169,11 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'sign in', url: 'modules.php?name=YourAccount' },
 ];
 
+// Pages whose entrance animation (.search-result searchResultIn) would be sampled mid-fade by
+// axe, which reads transient colours. These pages load under prefers-reduced-motion: reduce
+// (design/base.css zeroes animations) so axe sees the settled colours. Keyed on a publicPages name.
+const SETTLED_ANIMATION_PAGES = new Set(['search transactions preset']);
+
 publicTest.describe('Public page accessibility', () => {
   publicTest.beforeEach(async ({ appState }) => {
     await appState({ 'Trivia Mode': 'Off' });
@@ -181,6 +181,9 @@ publicTest.describe('Public page accessibility', () => {
 
   for (const { name, url } of publicPages) {
     publicTest(`${name} has no accessibility violations`, async ({ page }) => {
+      if (SETTLED_ANIMATION_PAGES.has(name)) {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+      }
       await page.goto(url);
       await assertNoA11yViolations(page, `on ${url}`, getA11yOptions(name));
     });

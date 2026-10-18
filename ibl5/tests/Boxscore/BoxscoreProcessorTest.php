@@ -1381,6 +1381,47 @@ class BoxscoreProcessorTest extends TestCase
         self::assertSame(['recordRejectedGames'], $callLog->getArrayCopy());
     }
 
+    public function testProcessScoDataSuccessResultKeyOrder(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFile([
+            $this->buildGameRecord($this->gameInfoLineForGame('2008-04-01', 1, 1, 2, 2008)),
+        ]);
+        $data = file_get_contents($scoFile);
+        self::assertNotFalse($data);
+
+        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub);
+        $processor->guardOverride = new ScheduleMembershipGuard(2008, ['2008-04-01' => [1 => [2 => true]]], []);
+
+        $result = $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: true);
+
+        self::assertSame(
+            [
+                'success',
+                'gamesInserted',
+                'gamesUpdated',
+                'gamesSkipped',
+                'linesProcessed',
+                'messages',
+                'gamesRejected',
+                'rejectedGames',
+                'operatingSeasonEndingYear',
+                'operatingSeasonPhase',
+                'outOfWindowGames',
+                'rejectsRecorded',
+                'scheduleGuardEnabled',
+                'sourceArchive',
+            ],
+            array_keys($result),
+        );
+    }
+
     public function testWindowTallyExcludesGamesOnWindowBoundaryDates(): void
     {
         $mockDb = new MockDatabase();

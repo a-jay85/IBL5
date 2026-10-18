@@ -60,72 +60,19 @@ class TradeRosterPreviewCashRowBuilder implements TradeRosterPreviewCashRowBuild
         $userTeam = \Security\HtmlSanitizer::safeHtmlOutput($userTeam);
         $partnerTeam = \Security\HtmlSanitizer::safeHtmlOutput($partnerTeam);
 
-        $partnerTeamId = 0;
-        if ($viewingTeamId !== $userTeamId) {
-            $partnerTeamId = $viewingTeamId;
-        }
-
         $cash = $this->collectCashByYear($cashStartYear, $cashEndYear);
-        $hasUserCash = $cash['user']['hasCash'];
-        $hasPartnerCash = $cash['partner']['hasCash'];
-        $userCash = $cash['user']['amounts'];
-        $partnerCash = $cash['partner']['amounts'];
 
-        if (!$hasUserCash && !$hasPartnerCash) {
+        if (!$cash['user']['hasCash'] && !$cash['partner']['hasCash']) {
             return [];
         }
 
-        $rows = [];
-        $isViewingUserTeam = ($viewingTeamId === $userTeamId);
-
-        if ($isViewingUserTeam) {
-            // Viewing user's team
-            if ($hasUserCash) {
-                $rows[] = $this->makeCashRow(
-                    '| Cash to ' . $partnerTeam,
-                    $viewingTeamId,
-                    $userCash,
-                    $cashStartYear,
-                    $cashEndYear,
-                    false
-                );
-            }
-            if ($hasPartnerCash) {
-                $rows[] = $this->makeCashRow(
-                    '| Cash from ' . $partnerTeam,
-                    $viewingTeamId,
-                    $partnerCash,
-                    $cashStartYear,
-                    $cashEndYear,
-                    true
-                );
-            }
-        } else {
-            // Viewing partner's team
-            if ($hasPartnerCash) {
-                $rows[] = $this->makeCashRow(
-                    '| Cash to ' . $userTeam,
-                    $partnerTeamId,
-                    $partnerCash,
-                    $cashStartYear,
-                    $cashEndYear,
-                    false
-                );
-            }
-            if ($hasUserCash) {
-                $rows[] = $this->makeCashRow(
-                    '| Cash from ' . $userTeam,
-                    $partnerTeamId,
-                    $userCash,
-                    $cashStartYear,
-                    $cashEndYear,
-                    true
-                );
-            }
+        // The viewed team's outgoing cash renders as "Cash to <counterparty>"
+        // (positive) and its incoming cash as "Cash from <counterparty>" (negated).
+        if ($viewingTeamId === $userTeamId) {
+            return $this->rowsForSide($partnerTeam, $viewingTeamId, $cash['user'], $cash['partner'], $cashStartYear, $cashEndYear);
         }
 
-        /** @var list<array<string, mixed>> $rows */
-        return $rows;
+        return $this->rowsForSide($userTeam, $viewingTeamId, $cash['partner'], $cash['user'], $cashStartYear, $cashEndYear);
     }
 
     /**
@@ -166,6 +113,31 @@ class TradeRosterPreviewCashRowBuilder implements TradeRosterPreviewCashRowBuild
             'user' => ['amounts' => $userCash, 'hasCash' => $hasUserCash],
             'partner' => ['amounts' => $partnerCash, 'hasCash' => $hasPartnerCash],
         ];
+    }
+
+    /**
+     * Build the cash rows for one viewed team, in display order.
+     *
+     * @param array{amounts: array<int, int>, hasCash: bool} $outgoing cash the viewed team sends ("Cash to", positive)
+     * @param array{amounts: array<int, int>, hasCash: bool} $incoming cash the viewed team receives ("Cash from", negated)
+     * @return list<array<string, mixed>>
+     */
+    private function rowsForSide(string $counterparty, int $teamId, array $outgoing, array $incoming, int $cashStartYear, int $cashEndYear): array
+    {
+        $rowSpecs = [
+            ['| Cash to ' . $counterparty, $outgoing, false],
+            ['| Cash from ' . $counterparty, $incoming, true],
+        ];
+
+        $rows = [];
+        foreach ($rowSpecs as [$label, $side, $negate]) {
+            if (!$side['hasCash']) {
+                continue;
+            }
+            $rows[] = $this->makeCashRow($label, $teamId, $side['amounts'], $cashStartYear, $cashEndYear, $negate);
+        }
+
+        return $rows;
     }
 
     /**

@@ -191,6 +191,10 @@ class StandingsUpdaterTest extends TestCase
         $this->assertSame(0.5, $this->captured[6]['confGb']);
     }
 
+    /**
+     * Guards the division grouping: feeding the conference grouping to the division
+     * leader lookup leaves $divLeaderGB['Atlantic'] undefined and fails this test.
+     */
     public function testDivisionGamesBehindMeasuredFromDivisionLeaderNotConferenceLeader(): void
     {
         $this->runCompute($this->buildPinFixture());

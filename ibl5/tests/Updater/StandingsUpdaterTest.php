@@ -154,8 +154,8 @@ class StandingsUpdaterTest extends TestCase
     }
 
     /**
-     * Six-team pin fixture. Conference leaders (team 3 East, team 5 West) sit last
-     * in their map order, so a missing or reversed sort changes the leader.
+     * Six-team pin fixture. Neither conference leader (team 3 East, team 5 West) sits first
+     * in map order, so a missing or reversed sort changes the leader.
      */
     private function buildPinFixture(): TestableStandingsUpdater
     {

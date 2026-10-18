@@ -58,8 +58,7 @@ final class TradeOfferGrouper implements TradeOfferGrouperInterface
             $itemId = $row['itemid'];
             $itemType = $row['itemtype'];
 
-            $isInvolved = ($from === $userTeam || $to === $userTeam);
-            if (!$isInvolved) {
+            if (!$this->isInvolved($row, $userTeam)) {
                 continue;
             }
 
@@ -166,6 +165,16 @@ final class TradeOfferGrouper implements TradeOfferGrouperInterface
     }
 
     /**
+     * Whether the user's team is the sending or receiving side of the row
+     *
+     * @param TradeInfoRow $row
+     */
+    private function isInvolved(array $row, string $userTeam): bool
+    {
+        return $row['trade_from'] === $userTeam || $row['trade_to'] === $userTeam;
+    }
+
+    /**
      * Collect de-duplicated batch-preload ids from rows that involve the user team
      *
      * @param list<TradeInfoRow> $rows
@@ -177,9 +186,7 @@ final class TradeOfferGrouper implements TradeOfferGrouperInterface
         $pickIds = [];
         $offerIds = [];
         foreach ($rows as $row) {
-            $from = $row['trade_from'];
-            $to = $row['trade_to'];
-            if ($from !== $userTeam && $to !== $userTeam) {
+            if (!$this->isInvolved($row, $userTeam)) {
                 continue;
             }
             if ($row['itemtype'] === TradeItemType::Player->value) {

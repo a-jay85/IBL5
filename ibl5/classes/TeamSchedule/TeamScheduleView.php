@@ -71,7 +71,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
             }
         }
 
-        $html = '<div class="schedule-container schedule-container--team" style="' . \UI\TableStyles::inlineTeamVars($color1, $color2) . '">';
+        $html = '<div class="schedule-container schedule-container--team" style="' . \UI\TableStyles::inlineTeamVars($color1, $color2, withOnPrimary: true) . '">';
         $html .= $this->renderTeamBanner($teamId, $teamName);
         $html .= $this->renderHeader($simLengthInDays, $firstUpcomingId);
         $html .= $this->renderMonthNav($gamesByMonth, $isPlayoffPhase, $playoffMonthKey);

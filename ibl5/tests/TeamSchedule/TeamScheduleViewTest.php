@@ -51,6 +51,7 @@ class TeamScheduleViewTest extends TestCase
         $this->assertStringNotContainsString('<style>', $result);
         $this->assertStringContainsString('--team-color-primary:', $result);
         $this->assertStringContainsString('--team-color-secondary:', $result);
+        $this->assertStringContainsString('--team-color-on-primary: #', $result);
     }
 
     public function testRenderContainsTeamLogo(): void

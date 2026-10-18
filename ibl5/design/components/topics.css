@@ -249,7 +249,7 @@
 
 /* Empty state within card */
 .topic-card__empty {
-    color: var(--gray-400);
+    color: var(--gray-600);
     font-style: italic;
     font-size: 1rem;
     margin: 0;

@@ -191,22 +191,21 @@ _TRULY_MANUAL_CELL = re.compile(r"truly.?manual", re.IGNORECASE)
 # the legacy `| Behavior | Test type | Test |` matrices the harness still reads.
 _MANUAL_TABLE_HEADERS = frozenset({"what to verify", "test type"})
 
-# A backticked span that names a test-ish token. Searched per cell (rightmost cell
-# first) and, as the planning gate, over the joined row.
+# A backticked token that names a test file or test method. Matched per CELL, so
+# a description cell's bare method name (`testFoo`) or command never hides the
+# location cell's path.
 _TEST_TOKEN_RE = re.compile(r"`([^`]*(?:test|spec|Test)[^`]*)`")
 
 
-def _first_test_path(text: str) -> str | None:
-    """The FIRST backticked test-ish token in `text` when it passes _is_test_path, else None.
+def _first_test_path(cell: str) -> str | None:
+    """The first backticked test-ish token in `cell` that passes `_is_test_path`.
 
-    First match only, no continue: a cell or row whose first such token is a bare
-    method name (`testFoo`) or a command yields None, exactly as before this
-    helper existed. Measured 2026-10-17: scanning every match instead of the first
-    changes zero of 2144 planning rows in the corpus, so the narrower rule is kept.
+    Every token in the cell is tried, so `testFoo` followed by
+    `tests/Foo/BarTest.php` in one cell yields the path.
     """
-    m = _TEST_TOKEN_RE.search(text)
-    if m and _is_test_path(m.group(1)):
-        return m.group(1)
+    for m in _TEST_TOKEN_RE.finditer(cell):
+        if _is_test_path(m.group(1)):
+            return m.group(1)
     return None
 
 
@@ -223,42 +222,27 @@ def _planned_token(cells: list[str]) -> str | None:
     parse_no_change_test_paths and parse_run_only_test_paths must agree on it, or
     a token could be exempted by one parser and planned by another.
 
-    Two steps, deliberately separate:
+    The Test type is read from a WHOLE cell (`_has_planning_type_cell`), never
+    from the joined row. The old whole-row `\\bE2E\\b` search planned
+    `/tmp/bug-pipeline-test-env.sh` from a CLI-executable row whose command ended
+    in `bin/test-bug-pipeline-e2e` (bug-pipeline-e2e-guard-tests row 10), and the
+    phantom path blocked arming via Phase 5.0 condition (3).
 
-    1. Gate (unchanged): the Test type is a WHOLE cell (`_has_planning_type_cell`)
-       AND the first test-ish token in the joined row is a path. A row whose first
-       token is a bare method name still plans nothing. Keeping this gate means the
-       change moves tokens on 19 corpus rows and plans no new row (measured
-       2026-10-17; a pure rightmost-cell rule would newly plan 1365 rows in 199
-       plans, a recall change filed as https://github.com/a-jay85/IBL5-backlog/issues/1501).
-    2. Choice (new): the token comes from the RIGHTMOST cell holding a valid test
-       path, so the location cell outranks a path cited in the description. Before
-       this, record-holders-bullets-logo-abbr row 8 planned the seed file
-       `ibl5/tests/e2e/fixtures/ci-seed.sql` named as evidence in its description,
-       and PR #3287 held at Phase 6.5 condition (3) with MISSING for a file no
-       diff would ever write. The whole-row first match is the fallback only when
-       no single cell holds a valid path; with the gate above it is unreachable in
-       practice (the gate's own token sits in some cell) and is kept as the safe
-       default.
-
-    Rightmost VALID cell, never "last non-empty cell": a trailing notes cell such
-    as `` `testMethod` `` would otherwise hide the location token. The two rules
-    agree on every corpus row that plans today; the rightmost rule also covers
-    4 trailing-cell rows the gate currently rejects, should the gate ever move.
-    A location cell that is a command (`cd ibl5 && composer test`) fails
-    _is_test_path and the walk continues leftward to the description cell. A
-    `path::method` token is returned whole; conformance strips the `::` suffix.
+    The path is read cell by cell, rightmost first, so the location cell wins
+    over a description cell. In each cell every backticked test-ish token is
+    tried. The row plans a test when ANY cell holds a token passing
+    `_is_test_path`. Gating on the joined row's FIRST token planned nothing for
+    a row whose description cited `testFoo` (no `/`) or a command ahead of the
+    location cell's `tests/Foo/BarTest.php`, so a test the diff never wrote
+    raised no MISSING (backlog#1501).
     """
     if not _has_planning_type_cell(cells):
         return None
-    gate = _first_test_path(" | ".join(cells))
-    if gate is None:
-        return None
     for cell in reversed(cells):
-        chosen = _first_test_path(cell)
-        if chosen is not None:
-            return chosen
-    return gate
+        tok = _first_test_path(cell)
+        if tok is not None:
+            return tok
+    return None
 
 
 def _is_visual_regression_row(cells: list[str]) -> bool:

@@ -1,7 +1,7 @@
 """Matrix token choice: `_planned_token` prefers the rightmost valid cell.
 
 Each test is named for the mutation it kills. The planning gate (whole-cell Test type
-plus a valid first token in the joined row) is unchanged; only the token moves.
+plus a valid test path in any cell, backlog#1501) decides whether a row plans; this file pins which token it plans.
 """
 import os
 import sys
@@ -101,10 +101,10 @@ def test_unmarked_row_sharing_the_token_still_wins():
     assert not any("ci-seed" in item for item in items)
 
 
-def test_bare_method_first_token_gate_is_unchanged():
+def test_bare_method_first_row_plans_location_path():
     cells = ["6", "`testFoo` keeps passing", "PHPUnit", "post-impl", f"`{PHP}`"]
-    assert _planned_token(cells) is None
-    assert parse_matrix(HDR + BARE_FIRST_ROW)[0] == []
+    assert _planned_token(cells) == PHP
+    assert parse_matrix(HDR + BARE_FIRST_ROW)[0] == [PHP]
 
 
 def test_marker_after_description_copy_of_the_same_token_still_exempts():

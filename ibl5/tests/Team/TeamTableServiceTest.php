@@ -701,4 +701,353 @@ class TeamTableServiceTest extends TestCase
         $this->assertNotFalse($posBeta, 'Beta Contracted must be in output');
         $this->assertLessThan($posBeta, $posAlpha, 'Alpha must appear before Beta (sort order preserved)');
     }
+
+    // ============================================
+    // getTableOutput() WRAPPER PINS (tab path)
+    // ============================================
+
+    /** The wrapper the view-control component injects: first <caption …> through its </caption>. */
+    private static function captionOf(string $html): string
+    {
+        $start = strpos($html, '<caption class="team-table-caption">');
+        self::assertNotFalse($start, 'wrapper caption missing');
+        $end = strpos($html, '</caption>', $start);
+        self::assertNotFalse($end, 'wrapper caption unterminated');
+        return substr($html, $start, $end + strlen('</caption>') - $start);
+    }
+
+    /**
+     * Ordered data-display keys of the tab anchors in a caption.
+     *
+     * @return list<string>
+     */
+    private static function displayKeysOf(string $caption): array
+    {
+        preg_match_all('/data-display="([^"]+)"/', $caption, $m);
+        return $m[1];
+    }
+
+    /**
+     * Ordered option values inside the named <optgroup>.
+     *
+     * @return list<string>
+     */
+    private static function optionValuesOf(string $caption, string $groupLabel): array
+    {
+        $open = '<optgroup label="' . $groupLabel . '">';
+        $start = strpos($caption, $open);
+        self::assertNotFalse($start, "optgroup $groupLabel missing");
+        $end = strpos($caption, '</optgroup>', $start);
+        self::assertNotFalse($end);
+        preg_match_all('/<option value="([^"]*)"/', substr($caption, $start, $end - $start), $m);
+        return $m[1];
+    }
+
+    /**
+     * Season stub whose isOffseasonPhase() matches production: Draft and Free Agency are offseason.
+     */
+    private function seasonStubForPhase(string $phase): Season
+    {
+        $season = self::createStub(Season::class);
+        $season->phase = $phase;
+        $season->method('isOffseasonPhase')->willReturn(in_array($phase, ['Draft', 'Free Agency'], true));
+        return $season;
+    }
+
+    /**
+     * Historical rows render through the snapshot mapper, which reads these extra columns.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildHistoricalRosterRow(): array
+    {
+        return $this->buildFullRosterRow([
+            'year' => 2024, 'team' => 'Test Team', 'r_2ga' => 8, 'r_2gp' => 50,
+            'r_oo' => 70, 'r_od' => 65, 'r_dd' => 62, 'r_po' => 55, 'r_pd' => 50,
+            'r_td' => 70, 'salary' => 1000000,
+        ]);
+    }
+
+    /**
+     * Render getTableOutput() down the tab path (teamid <= 0, or a historical yr).
+     * The roster source is wired by teamid and the free-agent argument is pinned to the phase.
+     */
+    private function tabPathHtml(string $phase, int $teamid, ?string $yr, string $display = 'ratings'): string
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow($teamid)]);
+        $rows = [$yr === null ? $this->buildFullRosterRow() : $this->buildHistoricalRosterRow()];
+
+        $isOffseason = in_array($phase, ['Draft', 'Free Agency'], true);
+        $repository = self::createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->method('getFreeAgents')->willReturnCallback(
+            static function (bool $isFreeAgency) use ($isOffseason, $rows): array {
+                self::assertSame($isOffseason, $isFreeAgency);
+                return $rows;
+            }
+        );
+        $repository->method('getEntireLeagueRoster')->willReturn($rows);
+        $repository->method('getHistoricalRoster')->willReturn($rows);
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+
+        $service = new TeamTableService($this->mockDb, $repository, $this->seasonStubForPhase($phase));
+        return $service->getTableOutput($teamid, $yr, $display);
+    }
+
+    public function testTabCaptionForHistoricalRosterIsByteIdentical(): void
+    {
+        $caption = self::captionOf($this->tabPathHtml('Regular Season', 5, '2024'));
+
+        $expected = <<<'HTML'
+<caption class="team-table-caption"><div class="ibl-tabs" style="--team-color-primary: #000000; --team-color-secondary: #FFFFFF;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=ratings" class="ibl-tab ibl-tab--active" data-display="ratings" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=ratings" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=ratings">Ratings</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=total_s" class="ibl-tab" data-display="total_s" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=total_s" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=total_s">Season Totals</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=avg_s" class="ibl-tab" data-display="avg_s" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=avg_s" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=avg_s">Season Averages</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=per36mins" class="ibl-tab" data-display="per36mins" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=per36mins" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=per36mins">Per 36 Minutes</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=chunk" class="ibl-tab" data-display="chunk" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=chunk" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=chunk">Sim Averages</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=contracts" class="ibl-tab" data-display="contracts" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=contracts" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=contracts">Contracts</a></div></caption>
+HTML;
+        $this->assertSame($expected, $caption);
+    }
+
+    public function testTabCaptionForFreeAgentPoolIsByteIdentical(): void
+    {
+        $caption = self::captionOf($this->tabPathHtml('Regular Season', 0, null));
+
+        $expected = <<<'HTML'
+<caption class="team-table-caption"><div class="ibl-tabs" style="--team-color-primary: #000000; --team-color-secondary: #FFFFFF;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=ratings" class="ibl-tab ibl-tab--active" data-display="ratings" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=0&amp;display=ratings" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=ratings">Ratings</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=total_s" class="ibl-tab" data-display="total_s" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=0&amp;display=total_s" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=total_s">Season Totals</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=avg_s" class="ibl-tab" data-display="avg_s" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=0&amp;display=avg_s" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=avg_s">Season Averages</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=per36mins" class="ibl-tab" data-display="per36mins" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=0&amp;display=per36mins" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=per36mins">Per 36 Minutes</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=chunk" class="ibl-tab" data-display="chunk" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=0&amp;display=chunk" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=chunk">Sim Averages</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=contracts" class="ibl-tab" data-display="contracts" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=0&amp;display=contracts" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=contracts">Contracts</a></div></caption>
+HTML;
+        $this->assertSame($expected, $caption);
+    }
+
+    public function testTabCaptionForEntireLeagueIsByteIdentical(): void
+    {
+        $caption = self::captionOf($this->tabPathHtml('Regular Season', -1, null));
+
+        $expected = <<<'HTML'
+<caption class="team-table-caption"><div class="ibl-tabs" style="--team-color-primary: #000000; --team-color-secondary: #FFFFFF;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=ratings" class="ibl-tab ibl-tab--active" data-display="ratings" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=-1&amp;display=ratings" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=ratings">Ratings</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=total_s" class="ibl-tab" data-display="total_s" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=-1&amp;display=total_s" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=total_s">Season Totals</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=avg_s" class="ibl-tab" data-display="avg_s" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=-1&amp;display=avg_s" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=avg_s">Season Averages</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=per36mins" class="ibl-tab" data-display="per36mins" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=-1&amp;display=per36mins" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=per36mins">Per 36 Minutes</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=chunk" class="ibl-tab" data-display="chunk" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=-1&amp;display=chunk" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=chunk">Sim Averages</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=contracts" class="ibl-tab" data-display="contracts" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=-1&amp;display=contracts" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=contracts">Contracts</a></div></caption>
+HTML;
+        $this->assertSame($expected, $caption);
+    }
+
+    /** @return array<string, array{string, int, ?string}> */
+    public static function tabPathOffseasonPhaseProvider(): array
+    {
+        $rows = [];
+        foreach (['Playoffs', 'Draft', 'Free Agency'] as $phase) {
+            $rows["$phase / historical 5"] = [$phase, 5, '2024'];
+            $rows["$phase / free agents"]  = [$phase, 0, null];
+            $rows["$phase / league"]       = [$phase, -1, null];
+        }
+        return $rows;
+    }
+
+    #[DataProvider('tabPathOffseasonPhaseProvider')]
+    public function testTabPathAddsPlayoffsTabBeforeContractsOutsideRegularSeason(string $phase, int $teamid, ?string $yr): void
+    {
+        $caption = self::captionOf($this->tabPathHtml($phase, $teamid, $yr));
+
+        $this->assertSame(
+            ['ratings', 'total_s', 'avg_s', 'per36mins', 'chunk', 'playoffs', 'contracts'],
+            self::displayKeysOf($caption)
+        );
+
+        $playoffsAnchor = match ($teamid) {
+            5 => '<a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=playoffs" class="ibl-tab" data-display="playoffs" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=playoffs" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=playoffs">Playoffs Averages</a>',
+            0 => '<a href="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=playoffs" class="ibl-tab" data-display="playoffs" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=0&amp;display=playoffs" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=0&amp;display=playoffs">Playoffs Averages</a>',
+            -1 => '<a href="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=playoffs" class="ibl-tab" data-display="playoffs" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=-1&amp;display=playoffs" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=-1&amp;display=playoffs">Playoffs Averages</a>',
+            default => self::fail("unexpected teamid $teamid"),
+        };
+        $this->assertStringContainsString($playoffsAnchor, $caption);
+    }
+
+    /** @return array<string, array{int, ?string}> */
+    public static function tabPathSourceProvider(): array
+    {
+        return [
+            'historical 5' => [5, '2024'],
+            'free agents'  => [0, null],
+            'league'       => [-1, null],
+        ];
+    }
+
+    #[DataProvider('tabPathSourceProvider')]
+    public function testTabPathOmitsPlayoffsTabDuringRegularSeason(int $teamid, ?string $yr): void
+    {
+        $caption = self::captionOf($this->tabPathHtml('Regular Season', $teamid, $yr));
+
+        $this->assertSame(
+            ['ratings', 'total_s', 'avg_s', 'per36mins', 'chunk', 'contracts'],
+            self::displayKeysOf($caption)
+        );
+        $this->assertStringNotContainsString('Playoffs Averages', $caption);
+    }
+
+    public function testTabPathMarksNonDefaultDisplayActive(): void
+    {
+        $caption = self::captionOf($this->tabPathHtml('Regular Season', 5, '2024', 'avg_s'));
+
+        $expected = <<<'HTML'
+<caption class="team-table-caption"><div class="ibl-tabs" style="--team-color-primary: #000000; --team-color-secondary: #FFFFFF;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=ratings" class="ibl-tab" data-display="ratings" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=ratings" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=ratings">Ratings</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=total_s" class="ibl-tab" data-display="total_s" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=total_s" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=total_s">Season Totals</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=avg_s" class="ibl-tab ibl-tab--active" data-display="avg_s" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=avg_s" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=avg_s">Season Averages</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=per36mins" class="ibl-tab" data-display="per36mins" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=per36mins" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=per36mins">Per 36 Minutes</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=chunk" class="ibl-tab" data-display="chunk" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=chunk" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=chunk">Sim Averages</a><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=contracts" class="ibl-tab" data-display="contracts" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5&amp;yr=2024&amp;display=contracts" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024&amp;display=contracts">Contracts</a></div></caption>
+HTML;
+        $this->assertSame($expected, $caption);
+        $this->assertSame(1, substr_count($caption, 'ibl-tab--active'));
+    }
+
+    public function testTabPathNeverCallsGetAllTeamsAndCallsGetTeamOnce(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);
+
+        $repository = $this->createMock(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->method('getHistoricalRoster')->willReturn([$this->buildHistoricalRosterRow()]);
+        $repository->expects($this->never())->method('getAllTeams');
+        $repository->expects($this->once())->method('getTeam')->with(5)
+            ->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+
+        $service = new TeamTableService($this->mockDb, $repository, $this->seasonStubForPhase('Regular Season'));
+        $html = $service->getTableOutput(5, '2024', 'ratings');
+
+        $this->assertStringContainsString('ibl-tabs', self::captionOf($html));
+    }
+
+    public function testHostileYrIsAttributeEscapedInTabCaption(): void
+    {
+        $yr = '2024"><script>alert(1)</script>';
+        $caption = self::captionOf($this->tabPathHtml('Regular Season', 5, $yr));
+
+        $this->assertStringNotContainsString('"><script>', $caption);
+        $this->assertStringContainsString(
+            '&amp;yr=2024&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;&amp;display=ratings',
+            $caption
+        );
+    }
+
+    // ============================================
+    // getTableOutput() WRAPPER PINS (dropdown path)
+    // ============================================
+
+    /**
+     * Repository stub wired for a current-season dropdown render.
+     */
+    private function dropdownRepository(): \Team\Contracts\TeamRepositoryInterface
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);
+
+        $repository = self::createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->method('getRosterUnderContract')->willReturn([$this->buildFullRosterRow()]);
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+        $repository->method('getAllTeams')->willReturn([
+            ['teamid' => 1, 'team_name' => 'Atlanta'],
+            ['teamid' => 2, 'team_name' => 'Boston'],
+        ]);
+        return $repository;
+    }
+
+    private function dropdownCaption(string $phase, ?string $yr, string $display, ?string $split = null): string
+    {
+        $service = new TeamTableService($this->mockDb, $this->dropdownRepository(), $this->seasonStubForPhase($phase));
+        return self::captionOf($service->getTableOutput(5, $yr, $display, $split));
+    }
+
+    public function testDropdownCaptionForCurrentSeasonTeamIsByteIdentical(): void
+    {
+        $caption = $this->dropdownCaption('Regular Season', null, 'ratings');
+
+        $expected = <<<'HTML'
+<caption class="team-table-caption"><div class="ibl-view-dropdown" style="--team-color-primary: #000000; --team-color-secondary: #FFFFFF;"><select class="ibl-view-select" aria-label="Stats display" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-trigger="change" onchange="if(window.htmx)return;var v=this.value,d=v,s='';if(v.indexOf('split:')===0){d='split';s='&amp;split='+encodeURIComponent(v.substring(6))}else{d=encodeURIComponent(d)}window.location.href='modules.php?name=Team&amp;op=team&amp;teamid=5&amp;display='+d+s"><optgroup label="Views"><option value="ratings" selected>Ratings</option><option value="total_s">Season Totals</option><option value="avg_s">Season Averages</option><option value="per36mins">Per 36 Minutes</option><option value="chunk">Sim Averages</option><option value="contracts">Contracts</option></optgroup><optgroup label="Location"><option value="split:home">Home</option><option value="split:road">Road</option></optgroup><optgroup label="Result"><option value="split:wins">Wins</option><option value="split:losses">Losses</option></optgroup><optgroup label="Season Half"><option value="split:pre_allstar">Pre All-Star</option><option value="split:post_allstar">Post All-Star</option></optgroup><optgroup label="By Month"><option value="split:month_11">November</option><option value="split:month_12">December</option><option value="split:month_1">January</option><option value="split:month_2">February</option><option value="split:month_3">March</option><option value="split:month_4">April</option><option value="split:month_5">May</option></optgroup><optgroup label="vs. Division"><option value="split:div_atlantic">vs. Atlantic</option><option value="split:div_central">vs. Central</option><option value="split:div_midwest">vs. Midwest</option><option value="split:div_pacific">vs. Pacific</option></optgroup><optgroup label="vs. Conference"><option value="split:conf_eastern">vs. Eastern</option><option value="split:conf_western">vs. Western</option></optgroup><optgroup label="vs. Team"><option value="split:vs_1">vs. Atlanta</option><option value="split:vs_2">vs. Boston</option></optgroup></select><noscript><a href="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;display=ratings">Back to Ratings</a></noscript></div></caption>
+HTML;
+        $this->assertSame($expected, $caption);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function offseasonPhaseProvider(): array
+    {
+        return [
+            'Playoffs'     => ['Playoffs'],
+            'Draft'        => ['Draft'],
+            'Free Agency'  => ['Free Agency'],
+        ];
+    }
+
+    #[DataProvider('offseasonPhaseProvider')]
+    public function testDropdownViewsGroupAddsPlayoffsOutsideRegularSeason(string $phase): void
+    {
+        $caption = $this->dropdownCaption($phase, null, 'ratings');
+
+        $this->assertSame(
+            ['ratings', 'total_s', 'avg_s', 'per36mins', 'chunk', 'playoffs', 'contracts'],
+            self::optionValuesOf($caption, 'Views')
+        );
+        $this->assertStringContainsString('<option value="playoffs">Playoffs Averages</option>', $caption);
+    }
+
+    public function testDropdownViewsGroupOmitsPlayoffsDuringRegularSeason(): void
+    {
+        $caption = $this->dropdownCaption('Regular Season', null, 'ratings');
+        $values = self::optionValuesOf($caption, 'Views');
+
+        $this->assertNotContains('playoffs', $values);
+        $this->assertSame(
+            ['ratings', 'total_s', 'avg_s', 'per36mins', 'chunk', 'contracts'],
+            $values
+        );
+    }
+
+    public function testEmptyYrIsTreatedAsCurrentSeason(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);
+
+        $repository = $this->createMock(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->expects($this->once())->method('getRosterUnderContract')->with(5)
+            ->willReturn([$this->buildFullRosterRow()]);
+        $repository->expects($this->never())->method('getHistoricalRoster');
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+        $repository->method('getAllTeams')->willReturn([
+            ['teamid' => 1, 'team_name' => 'Atlanta'],
+            ['teamid' => 2, 'team_name' => 'Boston'],
+        ]);
+
+        $service = new TeamTableService($this->mockDb, $repository, $this->seasonStubForPhase('Regular Season'));
+        $caption = self::captionOf($service->getTableOutput(5, '', 'ratings'));
+
+        $this->assertStringContainsString('<select class="ibl-view-select"', $caption);
+        $this->assertStringNotContainsString('ibl-tabs', $caption);
+        $this->assertStringContainsString('hx-get="modules.php?name=Team&amp;op=api&amp;teamid=5"', $caption);
+        $this->assertStringNotContainsString('yr=', $caption);
+    }
+
+    public function testDropdownMarksNonDefaultDisplaySelected(): void
+    {
+        $caption = $this->dropdownCaption('Regular Season', null, 'avg_s');
+
+        $this->assertStringContainsString('<option value="avg_s" selected>', $caption);
+        $this->assertSame(1, substr_count($caption, ' selected'));
+    }
+
+    public function testDropdownSelectsSplitOptionWhenSplitGiven(): void
+    {
+        $caption = $this->dropdownCaption('Regular Season', null, 'split', 'home');
+
+        $this->assertStringContainsString('<option value="split:home" selected>', $caption);
+        $this->assertSame(1, substr_count($caption, ' selected'));
+    }
+
+    public function testDropdownSelectsNothingWhenSplitMissing(): void
+    {
+        $caption = $this->dropdownCaption('Regular Season', null, 'split', null);
+
+        $this->assertSame(0, substr_count($caption, ' selected'));
+    }
+
+    public function testDropdownPathCallsGetAllTeamsOnceAndGetTeamOnce(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);
+
+        $repository = $this->createMock(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->method('getRosterUnderContract')->willReturn([$this->buildFullRosterRow()]);
+        $repository->expects($this->once())->method('getAllTeams')->willReturn([
+            ['teamid' => 1, 'team_name' => 'Atlanta'],
+            ['teamid' => 2, 'team_name' => 'Boston'],
+        ]);
+        $repository->expects($this->once())->method('getTeam')->with(5)
+            ->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+
+        $service = new TeamTableService($this->mockDb, $repository, $this->seasonStubForPhase('Regular Season'));
+        $caption = self::captionOf($service->getTableOutput(5, null, 'ratings'));
+
+        $this->assertStringContainsString('ibl-view-select', $caption);
+    }
 }

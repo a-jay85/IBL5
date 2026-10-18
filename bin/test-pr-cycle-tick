@@ -66,9 +66,12 @@ if [[ "\${1:-}" == "pr" && "\${2:-}" == "list" ]]; then
     exit 0
 fi
 if [[ "\${1:-}" == "api" ]]; then
-    case "\${2:-}" in
+    # The endpoint is the first repos/ argument: a DELETE puts --method before it.
+    ep=""
+    for a in "\$@"; do [[ -z "\$ep" && "\$a" == repos/* ]] && ep="\$a"; done
+    case "\$ep" in
         repos/*/issues/*/timeline*)
-            n="\${2#*/issues/}"; n="\${n%%/*}"
+            n="\${ep#*/issues/}"; n="\${n%%/*}"
             [[ ! -e "$SCRATCH/timeline-fail-\$n" ]] || exit 1
             [[ -f "$SCRATCH/timeline-\$n.json" ]] || exit 1
             expr=""; prev=""
@@ -76,12 +79,12 @@ if [[ "\${1:-}" == "api" ]]; then
             if [[ -n "\$expr" ]]; then jq -r "\$expr" "$SCRATCH/timeline-\$n.json"; else cat "$SCRATCH/timeline-\$n.json"; fi
             exit 0 ;;
         repos/*/issues/*/labels/*)
-            n="\${2#*/issues/}"; n="\${n%%/*}"; lbl="\${2##*/labels/}"
+            n="\${ep#*/issues/}"; n="\${n%%/*}"; lbl="\${ep##*/labels/}"
             printf '%s %s %s\n' "\$(printf '%s ' "\$@" | grep -oE -- '--method [A-Z]+' | cut -d' ' -f2)" "\$n" "\$lbl" >> "$SCRATCH/gh-label.log"
             [[ ! -e "$SCRATCH/delete-fail-\$n" ]] || exit 1
             exit 0 ;;
         repos/*/commits/*/check-runs*)
-            sha="\${2#*/commits/}"; sha="\${sha%%/*}"
+            sha="\${ep#*/commits/}"; sha="\${sha%%/*}"
             [[ -f "$SCRATCH/checks-\$sha.json" ]] || exit 1
             cat "$SCRATCH/checks-\$sha.json"
             exit 0 ;;
@@ -343,6 +346,13 @@ run_tick() {
 out_has() { grep -qF -- "$1" <<< "$OUT"; }
 err_has() { grep -qF -- "$1" "$ERR"; }
 no_file() { [[ ! -e "$1" ]]; }
+# True when gh was never called, or only for the stale-label sweep's one `pr list` read.
+# The sweep runs ahead of the usage gate and the worker guard, so those exits still make
+# that call; the rescue path's own reads (check-runs, the full PR list) stay forbidden.
+gh_sweep_only() {
+    [[ ! -e "$SCRATCH/gh.log" ]] && return 0
+    ! grep -vE '^pr list .*isDraft,labels$' "$SCRATCH/gh.log" | grep -q .
+}
 attempt() { cat "$STATE_DIR/attempts/$1" 2>/dev/null; }
 pending_count() { find "$STATE_DIR/pending" -type f 2>/dev/null | wc -l | tr -d ' '; }
 dm_count() { if [[ -f "$SCRATCH/dm.log" ]]; then wc -l < "$SCRATCH/dm.log" | tr -d ' '; else echo 0; fi; }
@@ -398,7 +408,7 @@ for z in drain stop; do
     run_tick
     [[ $RC -eq 0 ]] || fail "usage-pause($z): rc $RC, want 0"
     out_has 'usage zone' || fail "usage-pause($z): no 'usage zone' line: $OUT"
-    no_file "$SCRATCH/gh.log" || fail "usage-pause($z): gh was called"
+    gh_sweep_only || fail "usage-pause($z): gh was called beyond the stale-label read"
     no_file "$SCRATCH/pr-cycle.log" || fail "usage-pause($z): pr-cycle was launched"
 done
 end_case usage-pause
@@ -420,7 +430,7 @@ set_jobs 123 com.ibl5.pr-cycle-20261003-120000
 run_tick
 [[ $RC -eq 0 ]] || fail "live-worker: rc $RC, want 0"
 out_has 'worker running' || fail "live-worker: no 'worker running' line: $OUT"
-no_file "$SCRATCH/gh.log" || fail "live-worker: gh was called"
+gh_sweep_only || fail "live-worker: gh was called beyond the stale-label read"
 no_file "$SCRATCH/pr-cycle.log" || fail "live-worker: pr-cycle was launched"
 end_case live-worker
 

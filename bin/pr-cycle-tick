@@ -7,6 +7,8 @@
 #               command, write no state, send no DM, launch nothing.
 #   --help      Print this header comment.
 # ---
+# The tick also removes a post-plan-running label older than PCW_STALE_LABEL_MIN minutes
+# when no post-plan run is live; --dry-run prints the would-remove set and removes nothing.
 # Fired every 1800s by the LaunchAgent that bin/pr-cycle-tick-cron-setup installs.
 # Reads open PRs with gh, drops the ones that do not need a rescue, and passes the rest
 # to `bin/pr-cycle --go --only <csv> --max-ready <n>`. An idle tick exits before
@@ -86,6 +88,113 @@ cd "$ROOT" || { log "cannot cd to $ROOT"; exit 1; }
 if [[ -e "$STOP_FILE" ]]; then
     log "stop file present ($STOP_FILE)"; exit 0
 fi
+
+# ── (a2) Stale post-plan-running sweep ───────────────────────────────────────
+# A run that died leaves the label behind, and bin/merge-line-select skips any PR that
+# carries it. This removes the label only when nothing says a run is live. Every probe
+# is tri-state (see bin/lib/pr-cycle-watch.sh): 0 keeps, 2 (unevaluable) keeps, and only
+# an all-1 verdict removes. It spends no Claude, so it runs ahead of the usage gate. It
+# uses `return`, never `exit`: a sweep problem must not stop the rest of the tick.
+
+# Prints the worktree path holding branch $1. rc 0 found, 1 no worktree, 2 list failed.
+sweep_worktree_root() {
+    local list wt
+    list="$(git -C "$ROOT" worktree list --porcelain 2>/dev/null)" || return 2
+    wt="$(awk -v want="branch refs/heads/$1" '
+        /^worktree / { path = substr($0, 10) }
+        $0 == want && !f { print path; f=1 }' <<< "$list")"
+    [[ -n "$wt" ]] || return 1
+    printf '%s\n' "$wt"
+}
+
+stale_label_sweep() {
+    local sweep_json labelled snap ps_txt claude_pids crc lsof_txt="" lsof_ok=1
+    local pr branch draft labeled_at last age_min wt wrc rc dirs cwd_ev evidence
+    sweep_json="$(gh pr list --state open --author @me --limit 200 \
+        --json number,headRefName,isDraft,labels 2>/dev/null)" \
+        || { log "stale-label: gh pr list failed; sweep skipped"; return 0; }
+    labelled="$(jq -r '.[] | select(((.labels // []) | map(.name)) | index("post-plan-running"))
+        | [.number, .headRefName, (.isDraft | tostring)] | @tsv' <<< "$sweep_json" 2>/dev/null)" \
+        || { log "stale-label: unparseable pr list; sweep skipped"; return 0; }
+    [[ -n "$labelled" ]] || return 0
+
+    # Strict reads: ljob_snapshot swallows a launchctl failure and reads as "nothing live".
+    snap="$(launchctl list 2>/dev/null)" || snap=""
+    [[ -n "$snap" ]] || { log "stale-label: launchctl unreadable; sweep skipped"; return 0; }
+    ps_txt="$(ps -axww -o pid=,command= 2>/dev/null)" || ps_txt=""
+    [[ -n "$ps_txt" ]] || { log "stale-label: ps unreadable; sweep skipped"; return 0; }
+    claude_pids="$(pcw_claude_print_pids "$ps_txt")"; crc=$?
+    if [[ "$crc" -eq 0 ]]; then
+        lsof_txt="$(lsof -a -d cwd -p "$(paste -sd, - <<< "$claude_pids")" -Fn 2>/dev/null)" \
+            || lsof_txt=""
+        [[ -n "$lsof_txt" ]] || lsof_ok=0
+    fi
+
+    while IFS=$'\t' read -r pr branch draft; do
+        [[ -n "$pr" ]] || continue
+        age_min="?"
+        labeled_at="$(gh api "repos/{owner}/{repo}/issues/$pr/timeline" --paginate \
+            --jq '.[] | select(.event=="labeled" and .label.name=="post-plan-running") | .created_at' \
+            </dev/null 2>/dev/null)" || labeled_at=""
+        last="$(sed -n '$p' <<< "$labeled_at")"
+        if [[ -z "$last" ]]; then
+            log "stale-label: #$pr held (age ?m): label time unevaluable"; continue
+        fi
+        pcw_label_too_young "$last"; rc=$?
+        age_min="$(pcw_label_age_min "$last")" || age_min="?"
+        if [[ "$rc" -eq 0 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): too young"; continue
+        elif [[ "$rc" -ne 1 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): label time unparseable"; continue
+        fi
+        if pcw_inflight "$pr" "$branch" "$snap"; then
+            log "stale-label: #$pr held (age ${age_min}m): launchd job live"; continue
+        fi
+        wt="$(sweep_worktree_root "$branch")"; wrc=$?
+        if [[ "$wrc" -eq 2 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): git worktree list unevaluable"; continue
+        fi
+        # stale-label: argv probe
+        pcw_postplan_argv_live "$wt" "$(ljob_safe_slug "$branch")" "$ps_txt" "$$ $PPID"; rc=$?
+        if [[ "$rc" -eq 0 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): post-plan process live"; continue
+        elif [[ "$rc" -ne 1 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): ps unevaluable"; continue
+        fi
+        cwd_ev="n/a"
+        if [[ "$wrc" -eq 0 ]]; then
+            cwd_ev="none"
+            if [[ "$lsof_ok" -eq 0 ]]; then
+                log "stale-label: #$pr held (age ${age_min}m): lsof unevaluable"; continue
+            fi
+            if [[ "$crc" -eq 0 ]] && pcw_cwd_in_worktree "$wt" "$lsof_txt"; then
+                log "stale-label: #$pr held (age ${age_min}m): headless claude cwd in worktree"; continue
+            fi
+        fi
+        dirs=("$ROOT/tools/postplan-harness/out")
+        [[ "$wrc" -ne 0 ]] || dirs+=("$wt/tools/postplan-harness/out")
+        pcw_live_out_dir_fresh "$branch" "${dirs[@]}"; rc=$?
+        if [[ "$rc" -eq 0 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): out dir written <${PCW_STALE_LABEL_MIN}m ago"; continue
+        elif [[ "$rc" -ne 1 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): out dir root missing"; continue
+        fi
+        evidence="age=${age_min}m launchd=none argv=none claude-cwd=$cwd_ev out-dir=idle>=${PCW_STALE_LABEL_MIN}m draft=$draft"
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            log "dry-run: stale-label: would remove post-plan-running from #$pr ($evidence)"; continue
+        fi
+        # Own gh call, not postplan_label_remove: that helper ends in `|| true` and would
+        # hide the failure this log line has to report.
+        if gh api --method DELETE "repos/{owner}/{repo}/issues/$pr/labels/post-plan-running" \
+            </dev/null >/dev/null 2>&1; then
+            log "stale-label: removed post-plan-running from #$pr ($evidence)"
+        else
+            log "stale-label: DELETE failed for #$pr; label kept ($evidence)"
+        fi
+    done <<< "$labelled"
+    return 0
+}
+stale_label_sweep
 
 # ── (b) Usage gate ───────────────────────────────────────────────────────────
 # Read-only mirror of the first half of usage_prestart_gate. The gate itself writes a

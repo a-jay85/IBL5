@@ -27,7 +27,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'one on one game',
     'player movement',
     'projected draft order',
-    'record holders',
     // Search page with a transactions preset (modules.php?name=Search plus a preset).
     // Verified 2026-09-23: every failing node is pre-existing results markup
     // (.search-result__meta-item, .search-result__title, .search-pagination__link, <time>);
@@ -36,8 +35,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'season archive',
     'season highs',
     'team off/def stats',
-    'team schedule',
-    'topics',
     // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
     // 2026-10-07 (IBL5-backlog#1270): 'free agency preview' and 'schedule' passed 10/10 and were removed (DELTA-OK).
     // Re-checked 2026-10-07 (IBL5-backlog#1270): kept, together with 'season leaderboards' below.

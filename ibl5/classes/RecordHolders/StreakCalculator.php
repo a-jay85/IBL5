@@ -32,13 +32,9 @@ final class StreakCalculator
             $date = $row['game_date'];
             $visitorTid = $row['visitor_teamid'];
             $homeTid = $row['home_teamid'];
-            $visitorScore = $row['visitorScore'];
-            $homeScore = $row['homeScore'];
-
-            $visitorWon = $visitorScore > $homeScore;
 
             foreach ([$visitorTid, $homeTid] as $teamid) {
-                $teamWon = ($teamid === $visitorTid) ? $visitorWon : !$visitorWon;
+                $teamWon = self::teamResult($row, $teamid);
                 $isStreakType = ($type === 'winning') ? $teamWon : !$teamWon;
 
                 if (!isset($streaks[$teamid])) {
@@ -64,30 +60,18 @@ final class StreakCalculator
             }
         }
 
-        // Find the overall best
-        $maxStreak = 0;
-        foreach ($bestStreaks as $data) {
-            if ($data['streak'] > $maxStreak) {
-                $maxStreak = $data['streak'];
-            }
-        }
-
-        // Collect all teams matching the max streak
         /** @var list<StreakRecord> $records */
         $records = [];
-        foreach ($bestStreaks as $teamid => $data) {
-            if ($data['streak'] === $maxStreak && $maxStreak > 0) {
-                $startYear = IblSeasonDateHelper::dateToSeasonEndingYear($data['start']);
-                $endYear = IblSeasonDateHelper::dateToSeasonEndingYear($data['end']);
-                $records[] = [
-                    'team_name' => $resolveTeamName($teamid),
-                    'streak' => $data['streak'],
-                    'start_date' => $data['start'],
-                    'end_date' => $data['end'],
-                    'start_year' => $startYear,
-                    'end_year' => $endYear,
-                ];
-            }
+        $holders = self::collectMaxHolders($bestStreaks, static fn (array $data): int => $data['streak']);
+        foreach ($holders as $teamid => $data) {
+            $records[] = [
+                'team_name' => $resolveTeamName($teamid),
+                'streak' => $data['streak'],
+                'start_date' => $data['start'],
+                'end_date' => $data['end'],
+                'start_year' => IblSeasonDateHelper::dateToSeasonEndingYear($data['start']),
+                'end_year' => IblSeasonDateHelper::dateToSeasonEndingYear($data['end']),
+            ];
         }
 
         return $records;
@@ -100,8 +84,8 @@ final class StreakCalculator
      */
     public static function bestWorstSeasonStart(array $games, string $type, callable $resolveTeamName): array
     {
-        // Track season starts per team per season
-        /** @var array<string, array{wins: int, losses: int, streakBroken: bool}> $seasonStarts */
+        // Track season starts per team per season; 'count' is wins for 'best', losses otherwise
+        /** @var array<string, array{teamid: int, year: int, count: int, streakBroken: bool}> $seasonStarts */
         $seasonStarts = [];
 
         foreach ($games as $row) {
@@ -109,74 +93,90 @@ final class StreakCalculator
             $date = $row['game_date'];
             $visitorTid = $row['visitor_teamid'];
             $homeTid = $row['home_teamid'];
-            $visitorScore = $row['visitorScore'];
-            $homeScore = $row['homeScore'];
-            $visitorWon = $visitorScore > $homeScore;
             $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($date);
 
             foreach ([$visitorTid, $homeTid] as $teamid) {
                 $key = $teamid . '-' . $seasonYear;
                 if (!isset($seasonStarts[$key])) {
-                    $seasonStarts[$key] = ['wins' => 0, 'losses' => 0, 'streakBroken' => false];
+                    $seasonStarts[$key] = ['teamid' => $teamid, 'year' => $seasonYear, 'count' => 0, 'streakBroken' => false];
                 }
 
                 if ($seasonStarts[$key]['streakBroken']) {
                     continue;
                 }
 
-                $teamWon = ($teamid === $visitorTid) ? $visitorWon : !$visitorWon;
+                $teamWon = self::teamResult($row, $teamid);
+                $extendsStart = ($type === 'best') ? $teamWon : !$teamWon;
 
-                if ($type === 'best') {
-                    if ($teamWon) {
-                        $seasonStarts[$key]['wins']++;
-                    } else {
-                        $seasonStarts[$key]['streakBroken'] = true;
-                    }
+                if ($extendsStart) {
+                    $seasonStarts[$key]['count']++;
                 } else {
-                    if (!$teamWon) {
-                        $seasonStarts[$key]['losses']++;
-                    } else {
-                        $seasonStarts[$key]['streakBroken'] = true;
-                    }
+                    $seasonStarts[$key]['streakBroken'] = true;
                 }
-            }
-        }
-
-        // Find the record-holding start
-        $maxValue = 0;
-        foreach ($seasonStarts as $data) {
-            $value = $type === 'best' ? $data['wins'] : $data['losses'];
-            if ($value > $maxValue) {
-                $maxValue = $value;
             }
         }
 
         /** @var list<SeasonStartRecord> $records */
         $records = [];
-        foreach ($seasonStarts as $key => $data) {
-            $value = $type === 'best' ? $data['wins'] : $data['losses'];
-            if ($value === $maxValue && $maxValue > 0) {
-                [$tidStr, $yearStr] = explode('-', $key);
-                $teamid = (int) $tidStr;
-                $year = (int) $yearStr;
-                if ($type === 'best') {
-                    $records[] = [
-                        'team_name' => $resolveTeamName($teamid),
-                        'year' => $year,
-                        'wins' => $data['wins'],
-                        'losses' => 0,
-                    ];
-                } else {
-                    $records[] = [
-                        'team_name' => $resolveTeamName($teamid),
-                        'year' => $year,
-                        'wins' => 0,
-                        'losses' => $data['losses'],
-                    ];
-                }
-            }
+        $holders = self::collectMaxHolders($seasonStarts, static fn (array $start): int => $start['count']);
+        foreach ($holders as $start) {
+            $records[] = self::seasonStartRecord($type, $resolveTeamName($start['teamid']), $start['year'], $start['count']);
         }
 
         return $records;
+    }
+
+    /**
+     * Whether $teamid won this game. A tied score counts as a home win. When both
+     * team ids are equal (degenerate self-play row) the team takes the visitor's result.
+     *
+     * @param array{game_date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int} $row
+     */
+    private static function teamResult(array $row, int $teamid): bool
+    {
+        $visitorWon = $row['visitorScore'] > $row['homeScore'];
+
+        return ($teamid === $row['visitor_teamid']) ? $visitorWon : !$visitorWon;
+    }
+
+    /**
+     * Entries whose value equals the maximum, with keys and insertion order preserved.
+     * Returns [] when $byKey is empty or the maximum is not positive; the empty check
+     * keeps max([]) from throwing.
+     *
+     * @template K of array-key
+     * @template T
+     * @param array<K, T> $byKey
+     * @param callable(T): int $valueOf
+     * @return array<K, T>
+     */
+    private static function collectMaxHolders(array $byKey, callable $valueOf): array
+    {
+        if ($byKey === []) {
+            return [];
+        }
+
+        $values = array_map($valueOf, $byKey);
+        $max = max($values);
+        if ($max <= 0) {
+            return [];
+        }
+
+        return array_intersect_key($byKey, array_filter($values, static fn (int $value): bool => $value === $max));
+    }
+
+    /**
+     * @return SeasonStartRecord
+     */
+    private static function seasonStartRecord(string $type, string $teamName, int $year, int $count): array
+    {
+        $isBest = $type === 'best';
+
+        return [
+            'team_name' => $teamName,
+            'year' => $year,
+            'wins' => $isBest ? $count : 0,
+            'losses' => $isBest ? 0 : $count,
+        ];
     }
 }

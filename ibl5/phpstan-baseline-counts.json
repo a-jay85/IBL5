@@ -8,7 +8,6 @@
         "ibl.bannedNukeGlobal": 3,
         "ibl.directHeader": 1,
         "ibl.hardcodedEnvString": 8,
-        "new.deprecatedClass": 1,
         "notEqual.notAllowed": 4,
         "variable.undefined": 1
     },

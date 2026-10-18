@@ -1050,9 +1050,9 @@ rc_is "argv foo exact (no foo-bar)" 0 pcw_postplan_argv_live /wt/foo s "13 /bin/
 rc_is "argv /x/foo vs /x/foo-bar" 1 pcw_postplan_argv_live /x/foo s "13 /bin/bash -lc cd /x/foo-bar && x"
 rc_is "argv /x/foo exact" 0 pcw_postplan_argv_live /x/foo s "13 /bin/bash -lc cd /x/foo && x"
 rc_is "argv /x/foo child /x/foo/ibl5" 0 pcw_postplan_argv_live /x/foo s "13 /bin/bash -lc cd /x/foo/ibl5 && x"
-rc_is "argv log token" 0 pcw_postplan_argv_live "" foo "14 tail /tmp/post-plan-now-foo-20261018-004740-25853.log"
+rc_is "argv log token" 0 pcw_postplan_argv_live "" foo "14 tail /logs/post-plan-now-foo-20261018-004740-25853.log"
 rc_is "argv run-dir token" 0 pcw_postplan_argv_live "" foo "15 py tools/postplan-harness/out/live-foo-20261018-004740"
-rc_is "argv slug boundary" 1 pcw_postplan_argv_live "" foo "16 tail /tmp/post-plan-now-foo-bar-20261018-004740-25853.log"
+rc_is "argv slug boundary" 1 pcw_postplan_argv_live "" foo "16 tail /logs/post-plan-now-foo-bar-20261018-004740-25853.log"
 rc_is "argv empty text" 2 pcw_postplan_argv_live "" foo ""
 rc_is "argv excluded pid" 1 pcw_postplan_argv_live "" foo "77 py out/live-foo-20261018-004740" "77 5"
 rc_is "argv not-excluded pid" 0 pcw_postplan_argv_live "" foo "78 py out/live-foo-20261018-004740" "77 5"
@@ -1106,7 +1106,7 @@ end_case sweep-a-removed
 # (b) older than the threshold but a live post-plan process names the worktree or the slug.
 for ps_line in \
     "5555 /bin/bash -lc cd $WT && caffeinate -s tools/postplan-harness/run isolated $WT x --live" \
-    "5555 tail -f /tmp/post-plan-now-branch-one-20261018-004740-25853.log" \
+    "5555 tail -f /logs/post-plan-now-branch-one-20261018-004740-25853.log" \
     "5555 python3 runner.py tools/postplan-harness/out/live-branch-one-20261018-004740 --live"; do
     sweep_fixture; begin_case
     set_ps "$ps_line"

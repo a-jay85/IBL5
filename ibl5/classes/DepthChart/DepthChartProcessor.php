@@ -16,6 +16,13 @@ use DepthChart\Contracts\DepthChartProcessorInterface;
 class DepthChartProcessor implements DepthChartProcessorInterface
 {
     /**
+     * Depth-chart slots in output order: index N here is `pos_(N+1)` in ProcessedSubmission.
+     * Lowercase on purpose: these are the POST field prefixes and the ProcessedPlayerData keys.
+     * \League\JsbConstants::PLAYER_POSITIONS is the uppercase CSV header list and stays separate.
+     */
+    private const POSITIONS = ['pg', 'sg', 'sf', 'pf', 'c'];
+
+    /**
      * @see DepthChartProcessorInterface::processSubmission()
      * @param array<string, mixed> $postData
      * @return ProcessedSubmission
@@ -24,11 +31,7 @@ class DepthChartProcessor implements DepthChartProcessorInterface
     {
         $activePlayers = 0;
         $playerData = [];
-        $pos1 = 0;
-        $pos2 = 0;
-        $pos3 = 0;
-        $pos4 = 0;
-        $pos5 = 0;
+        $positionCounts = array_fill_keys(self::POSITIONS, 0);
         $hasStarterAtMultiplePositions = false;
         $nameOfProblemStarter = '';
 
@@ -37,67 +40,21 @@ class DepthChartProcessor implements DepthChartProcessorInterface
                 continue;
             }
 
-            $injury = StatsSanitizer::intFromArray($postData, 'Injury' . $i);
-
-            /** @var string $rawName */
-            $rawName = $postData['Name' . $i];
-            $player = [
-                'pid' => StatsSanitizer::intFromArray($postData, 'pid' . $i),
-                'name' => $this->sanitizePlayerName($rawName),
-                'pg' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'pg' . $i)),
-                'sg' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'sg' . $i)),
-                'sf' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'sf' . $i)),
-                'pf' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'pf' . $i)),
-                'c' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'c' . $i)),
-                'canPlayInGame' => $this->sanitizeActiveValue(StatsSanitizer::intFromArray($postData, 'canPlayInGame' . $i)),
-                'min' => $this->sanitizeMinutesValue(StatsSanitizer::intFromArray($postData, 'min' . $i)),
-                'of' => 0,
-                'df' => 0,
-                'oi' => 0,
-                'di' => 0,
-                'bh' => 0,
-                'injury' => $injury
-            ];
-
+            $player = $this->readPlayerRow($postData, $i);
             $playerData[] = $player;
 
             if ($player['canPlayInGame'] === 1) {
                 $activePlayers++;
             }
 
-            if ($injury === 0) {
-                if ($player['pg'] > 0) {
-                    $pos1++;
-                }
-                if ($player['sg'] > 0) {
-                    $pos2++;
-                }
-                if ($player['sf'] > 0) {
-                    $pos3++;
-                }
-                if ($player['pf'] > 0) {
-                    $pos4++;
-                }
-                if ($player['c'] > 0) {
-                    $pos5++;
-                }
-            }
-
             $startCount = 0;
-            if ($player['pg'] === 1) {
-                $startCount++;
-            }
-            if ($player['sg'] === 1) {
-                $startCount++;
-            }
-            if ($player['sf'] === 1) {
-                $startCount++;
-            }
-            if ($player['pf'] === 1) {
-                $startCount++;
-            }
-            if ($player['c'] === 1) {
-                $startCount++;
+            foreach (self::POSITIONS as $slot) {
+                if ($player['injury'] === 0 && $player[$slot] > 0) {
+                    $positionCounts[$slot]++;
+                }
+                if ($player[$slot] === 1) {
+                    $startCount++;
+                }
             }
             if ($startCount > 1) {
                 $hasStarterAtMultiplePositions = true;
@@ -108,16 +65,47 @@ class DepthChartProcessor implements DepthChartProcessorInterface
         return [
             'playerData' => $playerData,
             'activePlayers' => $activePlayers,
-            'pos_1' => $pos1,
-            'pos_2' => $pos2,
-            'pos_3' => $pos3,
-            'pos_4' => $pos4,
-            'pos_5' => $pos5,
+            'pos_1' => $positionCounts['pg'],
+            'pos_2' => $positionCounts['sg'],
+            'pos_3' => $positionCounts['sf'],
+            'pos_4' => $positionCounts['pf'],
+            'pos_5' => $positionCounts['c'],
             'hasStarterAtMultiplePositions' => $hasStarterAtMultiplePositions,
             'nameOfProblemStarter' => $nameOfProblemStarter
         ];
     }
-    
+
+    /**
+     * Reads and sanitises one submitted roster row. Keys stay literal and in
+     * ProcessedPlayerData order so PHPStan keeps the array shape.
+     *
+     * @param array<string, mixed> $postData
+     * @return ProcessedPlayerData
+     */
+    private function readPlayerRow(array $postData, int $i): array
+    {
+        /** @var string $rawName */
+        $rawName = $postData['Name' . $i];
+
+        return [
+            'pid' => StatsSanitizer::intFromArray($postData, 'pid' . $i),
+            'name' => $this->sanitizePlayerName($rawName),
+            'pg' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'pg' . $i)),
+            'sg' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'sg' . $i)),
+            'sf' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'sf' . $i)),
+            'pf' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'pf' . $i)),
+            'c' => $this->sanitizeDepthValue(StatsSanitizer::intFromArray($postData, 'c' . $i)),
+            'canPlayInGame' => $this->sanitizeActiveValue(StatsSanitizer::intFromArray($postData, 'canPlayInGame' . $i)),
+            'min' => $this->sanitizeMinutesValue(StatsSanitizer::intFromArray($postData, 'min' . $i)),
+            'of' => 0,
+            'df' => 0,
+            'oi' => 0,
+            'di' => 0,
+            'bh' => 0,
+            'injury' => StatsSanitizer::intFromArray($postData, 'Injury' . $i),
+        ];
+    }
+
     private function sanitizePlayerName(string $name): string
     {
         return trim(strip_tags($name));

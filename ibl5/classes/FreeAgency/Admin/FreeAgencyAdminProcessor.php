@@ -389,12 +389,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         string $newsBodyText
     ): array {
         if ($signings === []) {
-            return [
-                'success' => false,
-                'successCount' => 0,
-                'errorCount' => 0,
-                'message' => 'No operations were executed.',
-            ];
+            return self::result(false, 0, 0, 'No operations were executed.');
         }
 
         try {
@@ -412,12 +407,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                 'signings_submitted' => count($signings),
             ]);
 
-            return [
-                'success' => false,
-                'successCount' => 0,
-                'errorCount' => 0,
-                'message' => "Day {$day} has already been processed. Re-running it is blocked.",
-            ];
+            return self::result(false, 0, 0, "Day {$day} has already been processed. Re-running it is blocked.");
         }
 
         $successCount = $counts['successCount'];
@@ -435,48 +425,71 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             $message = "Successfully executed {$successCount} operations. Free agents have been assigned to teams.";
 
             if ($newsSid > 0) {
-                $chunks = $this->buildDiscordChunks($newsHomeText, $newsSid);
-                $totalChunks = count($chunks);
-                $deliveredChunks = 0;
-
-                try {
-                    foreach ($chunks as $chunk) {
-                        $this->discordDispatcher->dispatch($chunk);
-                        $deliveredChunks++;
-                    }
-                } catch (\Throwable $e) {
-                    $this->discordLogger->error('fa_signings_discord_post_failed', [
-                        'action' => 'fa_signings_discord_post_failed',
-                        'day' => $day,
-                        'news_sid' => $newsSid,
-                        'delivered_chunks' => $deliveredChunks,
-                        'total_chunks' => $totalChunks,
-                        'error' => $e->getMessage(),
-                    ]);
-                    // Parts already delivered are visible to the whole league, so the
-                    // operator must be told where to resume — reposting the whole story
-                    // would duplicate everything up to the failure point.
-                    $message .= $deliveredChunks === 0
-                        ? ' (Discord post to #free-agency failed — nothing was posted; post manually.)'
-                        : " (Discord post to #free-agency failed after {$deliveredChunks} of {$totalChunks}"
-                            . " parts — parts 1-{$deliveredChunks} are already in the channel; post manually"
-                            . ' from part ' . ($deliveredChunks + 1) . '.)';
-                }
+                $message .= $this->postSigningsToDiscord($day, $newsSid, $newsHomeText);
             }
 
-            return [
-                'success' => true,
-                'successCount' => $successCount,
-                'errorCount' => $errorCount,
-                'message' => $message,
-            ];
+            return self::result(true, $successCount, $errorCount, $message);
         }
 
+        return self::result(
+            false,
+            $successCount,
+            $errorCount,
+            "Completed with errors: {$successCount} operations succeeded, {$errorCount} operations failed."
+        );
+    }
+
+    /**
+     * Post the signings story to #free-agency, one chunk per Discord message.
+     *
+     * A delivery failure is logged to the discord channel and never propagates.
+     * An exception from buildDiscordChunks() is not caught and propagates as before.
+     *
+     * @return string Suffix for the operator message; '' when every chunk was delivered
+     */
+    private function postSigningsToDiscord(int $day, int $newsSid, string $newsHomeText): string
+    {
+        $chunks = $this->buildDiscordChunks($newsHomeText, $newsSid);
+        $totalChunks = count($chunks);
+        $deliveredChunks = 0;
+
+        try {
+            foreach ($chunks as $chunk) {
+                $this->discordDispatcher->dispatch($chunk);
+                $deliveredChunks++;
+            }
+        } catch (\Throwable $e) {
+            $this->discordLogger->error('fa_signings_discord_post_failed', [
+                'action' => 'fa_signings_discord_post_failed',
+                'day' => $day,
+                'news_sid' => $newsSid,
+                'delivered_chunks' => $deliveredChunks,
+                'total_chunks' => $totalChunks,
+                'error' => $e->getMessage(),
+            ]);
+            // Parts already delivered are visible to the whole league, so the
+            // operator must be told where to resume — reposting the whole story
+            // would duplicate everything up to the failure point.
+            return $deliveredChunks === 0
+                ? ' (Discord post to #free-agency failed — nothing was posted; post manually.)'
+                : " (Discord post to #free-agency failed after {$deliveredChunks} of {$totalChunks}"
+                    . " parts — parts 1-{$deliveredChunks} are already in the channel; post manually"
+                    . ' from part ' . ($deliveredChunks + 1) . '.)';
+        }
+
+        return '';
+    }
+
+    /**
+     * @return array{success: bool, successCount: int, errorCount: int, message: string}
+     */
+    private static function result(bool $success, int $successCount, int $errorCount, string $message): array
+    {
         return [
-            'success' => false,
+            'success' => $success,
             'successCount' => $successCount,
             'errorCount' => $errorCount,
-            'message' => "Completed with errors: {$successCount} operations succeeded, {$errorCount} operations failed.",
+            'message' => $message,
         ];
     }
 

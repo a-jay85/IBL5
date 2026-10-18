@@ -21,6 +21,11 @@ PCW_STRIKE_CAP=2       # no-op rescues per (PR, head SHA) before the tick stops 
 # A launched worker's result file is overdue after 180 min: post-plan-fleet --wait tops out
 # at 7200 s and each session at timeout 5400, plus Stage 2 and launchd start-up margin.
 PCW_PENDING_MAX_AGE_S=10800
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+# A post-plan-running label this old, with no live run anywhere, is stale and the tick
+# removes it. 2x the per-phase post-plan cap MAX_PP_SECS=5400 in bin/automouse/run (the
+# observed maximum wall time is about 34 min). bin/test-pr-cycle-tick pins the 2x ratio.
+PCW_STALE_LABEL_MIN=180
 
 # State dir: PR_CYCLE_WATCH_STATE_DIR when non-empty, else $HOME/.ibl5-pr-cycle-watch.
 # Unset and empty both mean "use the default". rc 1 when neither it nor HOME is set.
@@ -76,6 +81,112 @@ pcw_recent_finish() {
         [[ -n "$hit" ]] && return 0
     done
     return 1
+}
+
+# Stale post-plan-running label predicates. Every one is text-in / rc-out: the tick does
+# the strict fetches (gh, launchctl, ps, lsof) and passes the text here.
+# Return codes: 0 = the condition that KEEPS the label is true (a run is live, the label
+# is too young, the out dir is fresh); 1 = evaluated and false; 2 = unevaluable (empty
+# or malformed input). The tick treats 0 and 2 alike (keep) and removes the label only
+# when every predicate returned 1, so empty input fails closed without a fetch here.
+
+# pcw_label_age_min <labeled-at-iso8601>: prints the age in whole minutes of a GitHub
+# created_at value (2026-10-18T02:44:37Z) and returns 0. Returns 2 and prints nothing
+# when the argument is empty or does not parse. A negative age (clock skew) prints 0.
+pcw_label_age_min() {
+    local epoch age
+    [[ -n "${1-}" ]] || return 2
+    epoch="$(jq -rn --arg t "$1" '$t | fromdateiso8601' 2>/dev/null)" || return 2
+    [[ "$epoch" =~ ^[0-9]+$ ]] || return 2
+    age=$(( ( $(date +%s) - epoch ) / 60 ))
+    (( age < 0 )) && age=0
+    printf '%s\n' "$age"
+}
+
+# pcw_label_too_young <labeled-at-iso8601>: 0 when the label is younger than
+# PCW_STALE_LABEL_MIN, 1 when at or above it (exactly 180 is not too young), 2 when the
+# age is unevaluable.
+pcw_label_too_young() {
+    local age
+    age="$(pcw_label_age_min "${1-}")" || return 2
+    (( age < PCW_STALE_LABEL_MIN ))
+}
+
+# pcw_postplan_argv_live <worktree-root-or-empty> <safe-slug> <ps-text> [exclude-pids]:
+# ps-text is `ps -axww -o pid=,command=`. 0 when a non-excluded process argv names the
+# worktree root (boundary on both sides, so /x/foo never matches /x/foo-bar), the
+# post-plan-now-<slug>-<ts>- log/label token, or the live-<slug>-<date>- run-dir token.
+# bin/post-plan-now runs the harness and the skill fallback as children of one
+# `/bin/bash -lc "$CMD"` whose argv carries all three. 1 = no match, 2 = empty ps-text
+# or empty slug. exclude-pids is a space-separated pid list (the tick passes "$$ $PPID").
+pcw_postplan_argv_live() {
+    local root="${1-}" safe="${2-}" ps_txt="${3-}" exclude="${4-}"
+    local esc_root="" root_re="" slug_re pid cmd
+    [[ -n "$ps_txt" && -n "$safe" ]] || return 2
+    if [[ -n "$root" ]]; then
+        esc_root="$(sed 's/[][\.*^$+?(){}|]/\\&/g' <<< "$root")"
+        root_re="(^|[[:space:]\"'=:])${esc_root}(\$|[[:space:]/\"';&|)])"
+    fi
+    slug_re="post-plan-now-${safe}-[0-9]{8}-[0-9]{6}-|live-${safe}-[0-9]{8}-"
+    while read -r pid cmd; do
+        [[ -n "$pid" ]] || continue
+        [[ " $exclude " == *" $pid "* ]] && continue
+        if [[ -n "$root_re" ]] && grep -qE -- "$root_re" <<< "$cmd"; then return 0; fi
+        if grep -qE -- "$slug_re" <<< "$cmd"; then return 0; fi
+    done <<< "$ps_txt"
+    return 1
+}
+
+# pcw_claude_print_pids <ps-text>: prints, one per line, the pids of headless `claude`
+# processes (-p or --print as a separate word). 0 when it printed at least one, 1 when
+# none, 2 on empty text. Interactive claude sessions are excluded on purpose, so an idle
+# session sitting in a worktree cannot pin the label forever.
+pcw_claude_print_pids() {
+    local ps_txt="${1-}" pid cmd found=1
+    [[ -n "$ps_txt" ]] || return 2
+    while read -r pid cmd; do
+        [[ -n "$pid" ]] || continue
+        if grep -qE -- '(^|/)claude([[:space:]]|$)' <<< "$cmd" \
+            && grep -qE -- '(^|[[:space:]])(-p|--print)([[:space:]]|$)' <<< "$cmd"; then
+            printf '%s\n' "$pid"
+            found=0
+        fi
+    done <<< "$ps_txt"
+    return "$found"
+}
+
+# pcw_cwd_in_worktree <worktree-root> <lsof-Fn-text>: 0 when any n<path> line equals the
+# root or sits under <root>/, 1 otherwise, 2 when the root or the text is empty.
+pcw_cwd_in_worktree() {
+    local root="${1-}" txt="${2-}" line
+    [[ -n "$root" && -n "$txt" ]] || return 2
+    while IFS= read -r line; do
+        [[ "$line" == n* ]] || continue
+        line="${line#n}"
+        [[ "$line" == "$root" || "$line" == "$root"/* ]] && return 0
+    done <<< "$txt"
+    return 1
+}
+
+# pcw_live_out_dir_fresh <branch> <out-dir>...: 2 when none of the out dirs exists.
+# Otherwise picks the newest live-<safe>-<date>-* run dir by name across the existing
+# dirs and returns 0 when anything inside it (the dir included) was written within
+# PCW_STALE_LABEL_MIN minutes, 1 when not or when no run dir exists.
+pcw_live_out_dir_fresh() {
+    local safe d run newest="" any=0
+    safe="$(ljob_safe_slug "$1")"; shift
+    [[ -n "$safe" ]] || return 2
+    for d in "$@"; do
+        [[ -d "$d" ]] || continue
+        any=1
+        while IFS= read -r run; do
+            if [[ -z "$newest" || "${run##*/}" > "${newest##*/}" ]]; then newest="$run"; fi
+        done < <(find "$d" -mindepth 1 -maxdepth 1 -type d \
+            -name "live-$safe-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*" 2>/dev/null)
+    done
+    (( any )) || return 2
+    [[ -n "$newest" ]] || return 1
+    [[ -n "$(find "$newest" -mmin "-$PCW_STALE_LABEL_MIN" -print 2>/dev/null)" ]]
 }
 
 # pcw_last_block <branch> <out-dir>...: for the newest harness run dir for this branch

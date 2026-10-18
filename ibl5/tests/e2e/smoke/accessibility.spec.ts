@@ -36,7 +36,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'season archive',
     'season highs',
     'team off/def stats',
-    'topics',
     // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
     // 2026-10-07 (IBL5-backlog#1270): 'free agency preview' and 'schedule' passed 10/10 and were removed (DELTA-OK).
     // Re-checked 2026-10-07 (IBL5-backlog#1270): kept, together with 'season leaderboards' below.

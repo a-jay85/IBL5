@@ -204,6 +204,20 @@ class PageLayoutTest extends TestCase
         );
     }
 
+    public function testEveryHeadScriptTagIsDeferred(): void
+    {
+        $_SERVER['SCRIPT_FILENAME'] = \Bootstrap\AppPaths::root() . '/index.php';
+
+        $html = $this->renderNormalisedHead();
+
+        preg_match_all('#<script\b[^>]*\bsrc="jslib/[^"]*"[^>]*>#', $html, $m);
+        self::assertCount(8, $m[0], 'expected exactly eight jslib head scripts');
+        foreach ($m[0] as $tag) {
+            self::assertMatchesRegularExpression('#\sdefer[\s>]#', $tag, "head script not deferred: {$tag}");
+        }
+        self::assertStringNotContainsString(' async', $html, 'async would break document-order execution');
+    }
+
     public function testHeadEscapesHostileSiteGlobals(): void
     {
         $GLOBALS['sitename'] = 'IBL"><script>alert(1)</script>';

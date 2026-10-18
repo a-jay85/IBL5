@@ -128,6 +128,23 @@ class TeamColorHelper
     }
 
     /**
+     * Keep the preferred text color when it meets WCAG AA against the background,
+     * otherwise fall back to white or black via getTextColor().
+     *
+     * @param string $bgHex Background hex color
+     * @param string $preferredHex Preferred text hex color
+     * @return string $preferredHex unchanged, or 'ffffff' / '000000'
+     */
+    public static function getReadableTextColor(string $bgHex, string $preferredHex, float $minRatio = 4.5): string
+    {
+        if (self::getContrastRatio($bgHex, $preferredHex) >= $minRatio) {
+            return $preferredHex;
+        }
+
+        return self::getTextColor($bgHex);
+    }
+
+    /**
      * Lighten a color by a percentage
      * 
      * @param string $hex Hex color

@@ -315,4 +315,57 @@ class DepthChartSnapshotApiHandlerTest extends WideUnitTestCase
             'createdAt' => '2024-01-01 00:00:00',
         ], $data['depthCharts'][0]);
     }
+
+    public function testHandlerSourceNeverReadsTeamidFromRequestOrGlobals(): void
+    {
+        $file = (new \ReflectionClass(DepthChartSnapshotApiHandler::class))->getFileName();
+        $this->assertIsString($file);
+        $src = file_get_contents($file);
+        $this->assertIsString($src);
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/\$params\[\s*[\'"]teamid[\'"]\s*\]|\$_(SESSION|GET|POST|REQUEST|COOKIE)\b|getTidFromTeamname|getTeamnameFromUsername/',
+            $src
+        );
+    }
+
+    public function testPureHelpersAreStaticAndCarryNoDbOrTeamid(): void
+    {
+        $expectedParams = [
+            'parseId' => ['params'],
+            'buildPlayersPayload' => ['players', 'tradedPids'],
+            'buildNewPlayers' => ['rosterPlayers', 'newPlayerPids'],
+        ];
+
+        foreach ($expectedParams as $name => $paramNames) {
+            $method = new \ReflectionMethod(DepthChartSnapshotApiHandler::class, $name);
+            $this->assertTrue($method->isStatic(), $name . ' must be static');
+            $this->assertTrue($method->isPrivate(), $name . ' must be private');
+            $this->assertSame(
+                $paramNames,
+                array_map(static fn (\ReflectionParameter $p): string => $p->getName(), $method->getParameters()),
+                $name . ' parameter list changed'
+            );
+            foreach ($method->getParameters() as $param) {
+                $this->assertNotSame('teamid', $param->getName(), $name . ' must not take teamid');
+                $type = $param->getType();
+                if ($type instanceof \ReflectionNamedType) {
+                    $this->assertNotSame('mysqli', $type->getName(), $name . ' must not take a DB handle');
+                }
+            }
+        }
+    }
+
+    public function testRenderStatsHtmlTakesTeamidAsIntParameter(): void
+    {
+        $method = new \ReflectionMethod(DepthChartSnapshotApiHandler::class, 'renderStatsHtml');
+        $this->assertTrue($method->isPrivate());
+        $this->assertFalse($method->isStatic());
+
+        $first = $method->getParameters()[0];
+        $this->assertSame('teamid', $first->getName());
+        $type = $first->getType();
+        $this->assertInstanceOf(\ReflectionNamedType::class, $type);
+        $this->assertSame('int', $type->getName());
+    }
 }

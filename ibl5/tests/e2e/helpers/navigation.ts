@@ -12,12 +12,17 @@ export async function openMobileMenu(page: Page): Promise<Locator> {
 /**
  * Navigate and verify the page actually rendered content.
  * Under parallel load, PHP's built-in server can return blank HTML.
- * Retries up to 4 times with increasing back-off before failing.
+ * Retries up to 4 times with linear back-off (attempt * backoffMs) before failing.
+ * backoffMs defaults to 1000, so every existing caller keeps its 1+2+3+4 s schedule.
+ * Tests that drive the helper against a routed fixture pass a tiny value.
  */
-export async function gotoWithRetry(page: Page, url: string): Promise<void> {
+export async function gotoWithRetry(page: Page, url: string, backoffMs = 1000): Promise<void> {
+  if (!Number.isFinite(backoffMs) || backoffMs < 0) {
+    throw new RangeError(`gotoWithRetry: backoffMs must be a finite number >= 0, got ${backoffMs}`);
+  }
   for (let attempt = 0; attempt < 5; attempt++) {
     // eslint-disable-next-line playwright/no-wait-for-timeout -- deliberate retry back-off between gotoWithRetry attempts, not a page-state wait
-    if (attempt > 0) await page.waitForTimeout(attempt * 1000);
+    if (attempt > 0) await page.waitForTimeout(attempt * backoffMs);
     let response: Awaited<ReturnType<Page['goto']>>;
     try {
       response = await page.goto(url, { timeout: 15_000 });

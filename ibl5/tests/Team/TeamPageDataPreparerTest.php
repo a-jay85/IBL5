@@ -604,6 +604,37 @@ class TeamPageDataPreparerTest extends TestCase
         ], $result);
     }
 
+    public function testPlayoffHelpersAreStateFreePrivateStatics(): void
+    {
+        // Security-surface discharge for the escaping move in preparePlayoffData:
+        // buildResultItem owns the three HtmlSanitizer::safeHtmlOutput calls and
+        // must stay a pure function. Static rules out $this (so no repository or
+        // db handle); builtin-only parameters rule out an injected collaborator.
+        $helpers = ['emptyRoundsMap', 'buildResultItem', 'addSeriesToRound', 'summarizeRounds'];
+
+        foreach ($helpers as $name) {
+            $method = new \ReflectionMethod(\Team\TeamPageDataPreparer::class, $name);
+
+            $this->assertTrue($method->isPrivate(), "$name must be private");
+            $this->assertTrue($method->isStatic(), "$name must be static so it cannot touch \$this");
+
+            foreach ($method->getParameters() as $parameter) {
+                $type = $parameter->getType();
+                $this->assertInstanceOf(\ReflectionNamedType::class, $type, "$name(\${$parameter->getName()}) must declare a type");
+                $this->assertTrue(
+                    $type->isBuiltin(),
+                    "$name(\${$parameter->getName()}) must be a builtin type, found {$type->getName()}",
+                );
+            }
+        }
+
+        $buildResultItem = new \ReflectionMethod(\Team\TeamPageDataPreparer::class, 'buildResultItem');
+        $this->assertSame(
+            ['playoff', 'teamName'],
+            array_map(static fn (\ReflectionParameter $p): string => $p->getName(), $buildResultItem->getParameters()),
+        );
+    }
+
     // -------------------------------------------------------------------------
     // prepareWinLossHistoryData
     // -------------------------------------------------------------------------

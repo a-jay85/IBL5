@@ -932,6 +932,10 @@ class DepthChartProcessorTest extends TestCase
         return $row;
     }
 
+    /**
+     * Distinct counts per slot (1..5) so any swap of pos_1..pos_5 wiring shows up.
+     * Each pos_N count must match its own slot, not a neighbour's.
+     */
     public function testPositionCountsAreWiredToDistinctOutputKeys(): void
     {
         $postData = array_merge(

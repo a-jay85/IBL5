@@ -40,7 +40,7 @@ final class DepthChartProcessorStateFreeTest extends TestCase
         };
 
         self::assertSame(['db'], $this->declaredPropertyNames($fixture));
-        self::assertSame(['__construct::db', 'run::conn'], $this->mysqliTypedParameters($fixture));
+        self::assertSame(['__construct::db','run::conn'], $this->mysqliTypedParameters($fixture));
         self::assertNotNull((new \ReflectionClass($fixture))->getConstructor());
     }
 

@@ -1319,10 +1319,11 @@ w_lock_gone_disposed "$D" \
 u_report w5-claim-breadcrumb-no-handoff-disposes "$D" $?
 
 D=$(w_base H_SECOND=1 H_LOCK_AGE=60 H_CLEARED_AGE=600 H_PR=open)
-[ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
+w6_rc=0
+{ [ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
     && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/q.md" ] \
-    && [ -L "$D/done/p.md" ] && [ -d "$D/queue/q.md.lock" ]
-u_report w6-claim-disposes-then-claims-next "$D" $?
+    && [ -L "$D/done/p.md" ] && [ -d "$D/queue/q.md.lock" ]; } || w6_rc=1
+u_report w6-claim-disposes-then-claims-next "$D" "$w6_rc"
 
 # ---------------------------------------------------------------------------
 # Group g — CI wiring guard
@@ -1336,6 +1337,74 @@ else
     echo "FAIL: g1-wired-in-ci — test not found in $WORKFLOW"
     FAILED=1
 fi
+
+# --- postplan-min-budget branch: slice the Phase 2 head and run it ---------
+for a in '# postplan-min-budget: begin' '# postplan-min-budget: end'; do
+    n=$(grep -cF "$a" "$RUNNER" || true)
+    if [ "$n" = "1" ]; then echo "ok: mb0-anchor-unique ($a)"
+    else echo "FAIL: mb0-anchor-unique ($a) — count=$n"; FAILED=1; fi
+done
+MB_SRC=$(awk '/# postplan-min-budget: begin/,/# postplan-min-budget: end/' "$RUNNER")
+
+# mb_run <elapsed>: runs the slice inside a one-pass loop with stubs.
+# Sets MB_BROKE (1 = the slice hit break), MB_REFUNDS, MB_BUDGET, MB_LOG.
+mb_run() {
+    local mb_logf; mb_logf=$(mktemp)
+    MB_REFUNDS=0; MB_BROKE=1; FAIL_NOTES=""; REMAINING_SECS=""
+    refund_attempt() { MB_REFUNDS=$(( MB_REFUNDS + 1 )); }
+    note_failure() { FAIL_NOTES="${FAIL_NOTES}$1;"; }
+    LOG="$mb_logf"; PLAN_NAME="mb-plan.md"; MAX_ELAPSED=17100
+    START=$(( $(date +%s) - $1 ))
+    # shellcheck disable=SC2043 # one-pass loop: the sliced branch ends in `break`
+    for _mb in 1; do
+        eval "$MB_SRC"
+        MB_BROKE=0
+    done
+    MB_BUDGET="$REMAINING_SECS"; MB_LOG=$(cat "$mb_logf"); rm -f "$mb_logf"
+}
+LEGACY='Time guard between phases — will resume postplan next run.'
+
+# mb1: 2000s left defers, refunds once, logs the new line then the legacy line.
+mb_run 15100
+L1=$(sed -n 1p <<<"$MB_LOG"); L2=$(sed -n 2p <<<"$MB_LOG")
+if [ "$MB_BROKE" = 1 ] && [ "$MB_REFUNDS" = 1 ] \
+   && grep -Eq '^Post-plan deferred: (1999|2000)s left under MAX_ELAPSED, below MIN_PP_SECS=2400s\.$' <<<"$L1" \
+   && [ "$L2" = "$LEGACY" ] && [ -n "$FAIL_NOTES" ]; then
+    echo "ok: mb1-2000-left-defers-refunds-logs"
+else
+    echo "FAIL: mb1-2000-left-defers-refunds-logs — broke=$MB_BROKE refunds=$MB_REFUNDS L1=$L1 L2=$L2"; FAILED=1
+fi
+
+# mb2: past MAX_ELAPSED (negative remaining) takes the same branch and now refunds.
+mb_run 17200
+if [ "$MB_BROKE" = 1 ] && [ "$MB_REFUNDS" = 1 ] && [ "$(sed -n 2p <<<"$MB_LOG")" = "$LEGACY" ]; then
+    echo "ok: mb2-past-max-elapsed-defers-and-refunds"
+else
+    echo "FAIL: mb2-past-max-elapsed-defers-and-refunds — broke=$MB_BROKE refunds=$MB_REFUNDS"; FAILED=1
+fi
+
+# mb3: 3100s left spawns uncapped (budget within 2s of 3100), no log, no refund.
+mb_run 14000
+if [ "$MB_BROKE" = 0 ] && [ "$MB_REFUNDS" = 0 ] && [ -z "$MB_LOG" ] \
+   && [ "$MB_BUDGET" -ge 3098 ] && [ "$MB_BUDGET" -le 3100 ]; then
+    echo "ok: mb3-3100-left-spawns-uncapped"
+else
+    echo "FAIL: mb3-3100-left-spawns-uncapped — broke=$MB_BROKE budget=$MB_BUDGET"; FAILED=1
+fi
+
+# mb4: 16100s left spawns capped at MAX_PP_SECS.
+mb_run 1000
+if [ "$MB_BROKE" = 0 ] && [ "$MB_BUDGET" = "$MAX_PP_SECS" ]; then
+    echo "ok: mb4-16100-left-spawns-capped"
+else
+    echo "FAIL: mb4-16100-left-spawns-capped — broke=$MB_BROKE budget=$MB_BUDGET"; FAILED=1
+fi
+
+# mb5: the post-plan 300s floor is gone. The impl phase keeps its own floor, so
+# exactly one `REMAINING_SECS=300` (impl) must remain in the runner.
+n=$(grep -cF 'REMAINING_SECS=300' "$RUNNER" || true)
+if [ "$n" = "1" ] && ! grep -qF 'REMAINING_SECS=300' <<<"$MB_SRC"; then echo "ok: mb5-no-300s-floor"
+else echo "FAIL: mb5-no-300s-floor — count=$n (want 1, impl phase only)"; FAILED=1; fi
 
 # ---------------------------------------------------------------------------
 # Tail

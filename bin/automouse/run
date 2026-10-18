@@ -2759,21 +2759,22 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
 
     # --- Phase 2: Post-Plan (only if handoff file exists) ---
     if [ -f "$HANDOFF_FILE" ]; then
-        # Re-check time guard before starting post-plan
+        # postplan-min-budget: begin
+        # Re-check time guard before starting post-plan. postplan_budget defers
+        # when less than MIN_PP_SECS of MAX_ELAPSED is left (negative included),
+        # so post-plan never starts on a budget the timeout shim would kill.
+        # The handoff file is kept; the next run resumes as post-plan only.
         ELAPSED=$(( $(date +%s) - START ))
-        if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
+        REMAINING_RAW=$(( MAX_ELAPSED - ELAPSED ))
+        if ! REMAINING_SECS=$(postplan_budget "$REMAINING_RAW"); then
+            echo "Post-plan deferred: ${REMAINING_RAW}s left under MAX_ELAPSED, below MIN_PP_SECS=${MIN_PP_SECS}s." >> "$LOG"
             echo "Time guard between phases — will resume postplan next run." >> "$LOG"
             note_failure "The time limit was reached before shipping ${PLAN_NAME%.md}. Post-plan will run next time."
+            # A deferral is not a failure: give back the attempt this run spent.
+            refund_attempt
             break
         fi
-
-        REMAINING_SECS=$(( MAX_ELAPSED - $(( $(date +%s) - START )) ))
-        if [ "$REMAINING_SECS" -lt 300 ]; then
-            REMAINING_SECS=300
-        fi
-        if [ "$REMAINING_SECS" -gt "$MAX_PP_SECS" ]; then
-            REMAINING_SECS="$MAX_PP_SECS"
-        fi
+        # postplan-min-budget: end
         PP_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
         HEARTBEAT_FILE="$NIGHTLY_DIR/.heartbeat-$$-postplan"
         CMDPID_FILE="$NIGHTLY_DIR/.cmdpid-$$-postplan"

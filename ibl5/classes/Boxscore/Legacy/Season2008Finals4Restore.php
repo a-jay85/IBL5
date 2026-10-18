@@ -8,6 +8,7 @@ use Boxscore\Boxscore;
 use mysqli;
 use RuntimeException;
 use Updater\Steps\RefreshPlayoffSeriesResultsStep;
+use Utilities\UuidGenerator;
 
 /**
  * One-shot INSERT for the missing 2008 IBL Finals Game 4 boxscore.
@@ -411,7 +412,7 @@ final class Season2008Finals4Restore
             [, $pos, $name, $pid, $teamid, $min, $twoGm, $twoGa, $ftm, $fta,
                 $threeGm, $threeGa, $orb, $drb, $ast, $stl, $tov, $blk, $pf] = $player;
 
-            $uuid = $this->generateUuid4();
+            $uuid = UuidGenerator::generateUuid();
 
             $values = [
                 self::GAME_DATE, $uuid, $name, $pos, $pid,
@@ -478,18 +479,6 @@ final class Season2008Finals4Restore
     }
 
     // ------------------------------------------------------------- plumbing
-
-    private function generateUuid4(): string
-    {
-        return sprintf(
-            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0x0fff) | 0x4000,
-            mt_rand(0, 0x3fff) | 0x8000,
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-        );
-    }
 
     /**
      * bind_param() takes values by reference — a row from a class constant cannot

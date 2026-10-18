@@ -179,6 +179,7 @@ class LastSimRecapServiceTest extends TestCase
         self::assertSame(40, $slate->teamWins);
         self::assertSame(22, $slate->teamLosses);
         self::assertSame(['1|2030-03-31'], $log->getArrayCopy());
+        self::assertNotSame(['1|2030-03-01'], $log->getArrayCopy()); // window start date must not be used
     }
 
     public function testSlateHeaderFieldsComeFromWindowAndTeamInfo(): void

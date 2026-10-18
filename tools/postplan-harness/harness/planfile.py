@@ -191,6 +191,24 @@ _TRULY_MANUAL_CELL = re.compile(r"truly.?manual", re.IGNORECASE)
 # the legacy `| Behavior | Test type | Test |` matrices the harness still reads.
 _MANUAL_TABLE_HEADERS = frozenset({"what to verify", "test type"})
 
+# A backticked span that names a test-ish token. Searched per cell (rightmost cell
+# first) and, as the planning gate, over the joined row.
+_TEST_TOKEN_RE = re.compile(r"`([^`]*(?:test|spec|Test)[^`]*)`")
+
+
+def _first_test_path(text: str) -> str | None:
+    """The FIRST backticked test-ish token in `text` when it passes _is_test_path, else None.
+
+    First match only, no continue: a cell or row whose first such token is a bare
+    method name (`testFoo`) or a command yields None, exactly as before this
+    helper existed. Measured 2026-10-17: scanning every match instead of the first
+    changes zero of 2144 planning rows in the corpus, so the narrower rule is kept.
+    """
+    m = _TEST_TOKEN_RE.search(text)
+    if m and _is_test_path(m.group(1)):
+        return m.group(1)
+    return None
+
 
 def _has_truly_manual_cell(cells: list[str]) -> bool:
     """True when some WHOLE cell is a Truly-manual label (bin/check-plan gate [Q]'s
@@ -201,24 +219,46 @@ def _has_truly_manual_cell(cells: list[str]) -> bool:
 def _planned_token(cells: list[str]) -> str | None:
     """The row's planned test token, or None when the row plans nothing.
 
-    Single source of truth for "this matrix row plans a test": parse_matrix and
-    parse_no_change_test_paths must agree on it, or a token could be exempted by
-    one parser and planned by the other.
+    Single source of truth for "this matrix row plans a test": parse_matrix,
+    parse_no_change_test_paths and parse_run_only_test_paths must agree on it, or
+    a token could be exempted by one parser and planned by another.
 
-    The Test type is read from a WHOLE cell (`_has_planning_type_cell`), never
-    from the joined row. The old whole-row `\\bE2E\\b` search planned
-    `/tmp/bug-pipeline-test-env.sh` from a CLI-executable row whose command ended
-    in `bin/test-bug-pipeline-e2e` (bug-pipeline-e2e-guard-tests row 10), and the
-    phantom path blocked arming via Phase 5.0 condition (3). The path itself is
-    still the first backticked `test|spec` token in the joined row.
+    Two steps, deliberately separate:
+
+    1. Gate (unchanged): the Test type is a WHOLE cell (`_has_planning_type_cell`)
+       AND the first test-ish token in the joined row is a path. A row whose first
+       token is a bare method name still plans nothing. Keeping this gate means the
+       change moves tokens on 19 corpus rows and plans no new row (measured
+       2026-10-17; a pure rightmost-cell rule would newly plan 1365 rows in 199
+       plans, a recall change filed as https://github.com/a-jay85/IBL5-backlog/issues/1501).
+    2. Choice (new): the token comes from the RIGHTMOST cell holding a valid test
+       path, so the location cell outranks a path cited in the description. Before
+       this, record-holders-bullets-logo-abbr row 8 planned the seed file
+       `ibl5/tests/e2e/fixtures/ci-seed.sql` named as evidence in its description,
+       and PR #3287 held at Phase 6.5 condition (3) with MISSING for a file no
+       diff would ever write. The whole-row first match is the fallback only when
+       no single cell holds a valid path; with the gate above it is unreachable in
+       practice (the gate's own token sits in some cell) and is kept as the safe
+       default.
+
+    Rightmost VALID cell, never "last non-empty cell": a trailing notes cell such
+    as `` `testMethod` `` would otherwise hide the location token. The two rules
+    agree on every corpus row that plans today; the rightmost rule also covers
+    4 trailing-cell rows the gate currently rejects, should the gate ever move.
+    A location cell that is a command (`cd ibl5 && composer test`) fails
+    _is_test_path and the walk continues leftward to the description cell. A
+    `path::method` token is returned whole; conformance strips the `::` suffix.
     """
     if not _has_planning_type_cell(cells):
         return None
-    row = " | ".join(cells)
-    m = re.search(r"`([^`]*(?:test|spec|Test)[^`]*)`", row)
-    if m and _is_test_path(m.group(1)):
-        return m.group(1)
-    return None
+    gate = _first_test_path(" | ".join(cells))
+    if gate is None:
+        return None
+    for cell in reversed(cells):
+        chosen = _first_test_path(cell)
+        if chosen is not None:
+            return chosen
+    return gate
 
 
 def _is_visual_regression_row(cells: list[str]) -> bool:

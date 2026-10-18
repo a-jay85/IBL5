@@ -546,7 +546,7 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
         $seattleKey = '22|Seattle|Supersonics';
         $spursKey   = '17|San Antonio|Spurs';
 
-        self::assertArrayHasKey($seattleKey, $payload['records']);
+        self::assertArrayHasKey('22|Seattle|Supersonics', $payload['records']);
         self::assertArrayHasKey($spursKey, $payload['records'][$seattleKey]);
         self::assertSame(1, $payload['records'][$seattleKey][$spursKey]['wins']);
         self::assertSame(0, $payload['records'][$seattleKey][$spursKey]['losses']);

@@ -431,6 +431,7 @@ class BulkImportRunnerTest extends TestCase
         $output = ob_get_clean();
 
         self::assertIsString($output);
+        // sourceLabel strips only the last extension: PATHINFO_BASENAME would record '0607-sim03.zip'.
         self::assertSame(
             [[2007, 'Regular Season', '0607-sim03'], [2007, 'Playoffs', '0607-sim07.final'], [2009, 'HEAT', '0708-heat']],
             $plrCalls,

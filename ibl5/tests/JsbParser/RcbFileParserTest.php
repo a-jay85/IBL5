@@ -498,6 +498,70 @@ class RcbFileParserTest extends TestCase
         ], $alltime);
     }
 
+    public function testDecodeAlltimeEntryReturnsNullForEvenIndexAbsentFromSingleSeasonStats(): void
+    {
+        $line = $this->buildAlltimeLine([
+            ['group' => 1, 'entry' => 0, 'data' => $this->buildAlltimeSingleSeasonEntry()],
+        ]);
+
+        $this->assertNull(RcbFileParser::decodeAlltimeEntry($line, 0, 16, 0));
+        $this->assertNotNull(RcbFileParser::decodeAlltimeEntry($line, 1, 0, 0));
+    }
+
+    public function testDecodeAlltimeEntryReturnsNullForOddIndexAbsentFromCareerStats(): void
+    {
+        $line = $this->buildAlltimeLine([
+            ['group' => 1, 'entry' => 1, 'data' => $this->buildAlltimeCareerEntry()],
+        ]);
+
+        $this->assertNull(RcbFileParser::decodeAlltimeEntry($line, 0, 17, 0));
+        $this->assertNotNull(RcbFileParser::parseAlltimeCareerEntry(
+            substr($line, 17 * RcbFileParser::ALLTIME_ENTRY_SIZE, RcbFileParser::ALLTIME_ENTRY_SIZE)
+        ));
+    }
+
+    public function testDecodeAlltimeEntryReturnsNullForShortEntry(): void
+    {
+        $entry = $this->buildAlltimeSingleSeasonEntry();
+
+        $this->assertNull(RcbFileParser::decodeAlltimeEntry(substr($entry, 0, 50), 0, 0, 0));
+        $this->assertNotNull(RcbFileParser::decodeAlltimeEntry($entry, 0, 0, 0));
+    }
+
+    public function testDecodeAlltimeEntryReturnsNullForOddEntryInTeamGroups(): void
+    {
+        foreach ([1, 14, 28] as $group) {
+            $line = $this->buildAlltimeLine([
+                ['group' => $group, 'entry' => 3, 'data' => $this->buildAlltimeCareerEntry()],
+            ]);
+
+            $this->assertNull(RcbFileParser::decodeAlltimeEntry($line, $group, 3, 0), "group $group");
+        }
+
+        $controlLine = $this->buildAlltimeLine([
+            ['group' => 0, 'entry' => 3, 'data' => $this->buildAlltimeCareerEntry()],
+        ]);
+        $control = RcbFileParser::decodeAlltimeEntry($controlLine, 0, 3, 0);
+
+        $this->assertNotNull($control);
+        $this->assertSame('trb', $control['stat_category']);
+        $this->assertSame('career', $control['record_type']);
+    }
+
+    public function testDecodeAlltimeEntryBuildsTeamRecordWithOneBasedRanking(): void
+    {
+        $line = $this->buildAlltimeLine([
+            ['group' => 5, 'entry' => 2, 'data' => $this->buildAlltimeSingleSeasonEntry('Stephen Curry', 3851, 3611, 19, 2005)],
+        ]);
+
+        $this->assertSame([
+            'scope' => 'team', 'teamid' => 5, 'record_type' => 'single_season',
+            'stat_category' => 'rpg', 'ranking' => 5, 'player_name' => 'Stephen Curry',
+            'car_block_id' => 3851, 'stat_value' => 36.11, 'stat_raw' => 3611,
+            'team_of_record' => 19, 'season_year' => 2006, 'career_total' => null,
+        ], RcbFileParser::decodeAlltimeEntry($line, 5, 2, 4));
+    }
+
     public function testParseFileWithCurrentSeasonRecord(): void
     {
         // Build a season line with an entry at position 0 (away PTS rank #1)

@@ -41,22 +41,7 @@ class LastSimRecapService implements LastSimRecapServiceInterface
         $games = $this->repo->getGamesForTeamInWindow($tid, $window['startDate'], $window['endDate']);
 
         if ($games === []) {
-            return new RecapSlate(
-                teamTid: $tid,
-                teamCity: $teamInfo['city'],
-                teamName: $teamInfo['name'],
-                simNumber: $window['sim'],
-                startDate: $window['startDate'],
-                endDate: $window['endDate'],
-                wins: 0,
-                losses: 0,
-                netMargin: 0,
-                bestLabel: '',
-                worstLabel: '',
-                teamWins: 0,
-                teamLosses: 0,
-                games: [],
-            );
+            return $this->makeSlate($tid, $teamInfo, $window, 0, 0, 0, '', '', 0, 0, []);
         }
 
         $recapGames = [];
@@ -64,12 +49,47 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             $recapGames[] = $this->buildGame($tid, $g);
         }
 
+        $summary = $this->summarize($recapGames);
+
+        $bestLabel = $this->formatMarginLabel($recapGames[$summary['bestIdx']]);
+        $worstLabel = $this->formatMarginLabel($recapGames[$summary['worstIdx']]);
+
+        // End-of-window record reflects every game played up to the window's
+        // last date (inclusive). Slate header W/L counts only games in the
+        // window, but the badge under the team name shows season W-L.
+        $teamRecord = $this->repo->getTeamRecordAsOf($tid, $window['endDate']);
+
+        return $this->makeSlate(
+            $tid,
+            $teamInfo,
+            $window,
+            $summary['wins'],
+            $summary['losses'],
+            $summary['netMargin'],
+            $bestLabel,
+            $worstLabel,
+            $teamRecord['wins'],
+            $teamRecord['losses'],
+            $recapGames,
+        );
+    }
+
+    /**
+     * Fold the slate's games into W/L totals, net margin, and the indexes of
+     * the best and worst margins. Ties keep the first game in list order.
+     * Game 0 seeds both extremes, so the caller must pass a non-empty list.
+     *
+     * @param non-empty-list<RecapGame> $recapGames
+     * @return array{wins: int, losses: int, netMargin: int, bestIdx: int<0, max>, worstIdx: int<0, max>}
+     */
+    private function summarize(array $recapGames): array
+    {
         $wins = 0;
         $losses = 0;
         $netMargin = 0;
-        $bestMargin = null;
+        $bestMargin = $recapGames[0]->margin;
         $bestIdx = 0;
-        $worstMargin = null;
+        $worstMargin = $recapGames[0]->margin;
         $worstIdx = 0;
 
         foreach ($recapGames as $idx => $rg) {
@@ -80,24 +100,43 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             }
             $netMargin += $rg->margin;
 
-            if ($bestMargin === null || $rg->margin > $bestMargin) {
+            if ($rg->margin > $bestMargin) {
                 $bestMargin = $rg->margin;
                 $bestIdx = $idx;
             }
-            if ($worstMargin === null || $rg->margin < $worstMargin) {
+            if ($rg->margin < $worstMargin) {
                 $worstMargin = $rg->margin;
                 $worstIdx = $idx;
             }
         }
 
-        $bestLabel = $this->formatMarginLabel($recapGames[$bestIdx]);
-        $worstLabel = $this->formatMarginLabel($recapGames[$worstIdx]);
+        return [
+            'wins' => $wins,
+            'losses' => $losses,
+            'netMargin' => $netMargin,
+            'bestIdx' => $bestIdx,
+            'worstIdx' => $worstIdx,
+        ];
+    }
 
-        // End-of-window record reflects every game played up to the window's
-        // last date (inclusive). Slate header W/L counts only games in the
-        // window, but the badge under the team name shows season W-L.
-        $teamRecord = $this->repo->getTeamRecordAsOf($tid, $window['endDate']);
-
+    /**
+     * @param array{tid: int, city: string, name: string} $teamInfo
+     * @param array{sim: int, startDate: string, endDate: string} $window
+     * @param list<RecapGame> $games
+     */
+    private function makeSlate(
+        int $tid,
+        array $teamInfo,
+        array $window,
+        int $wins,
+        int $losses,
+        int $netMargin,
+        string $bestLabel,
+        string $worstLabel,
+        int $teamWins,
+        int $teamLosses,
+        array $games,
+    ): RecapSlate {
         return new RecapSlate(
             teamTid: $tid,
             teamCity: $teamInfo['city'],
@@ -110,9 +149,9 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             netMargin: $netMargin,
             bestLabel: $bestLabel,
             worstLabel: $worstLabel,
-            teamWins: $teamRecord['wins'],
-            teamLosses: $teamRecord['losses'],
-            games: $recapGames,
+            teamWins: $teamWins,
+            teamLosses: $teamLosses,
+            games: $games,
         );
     }
 

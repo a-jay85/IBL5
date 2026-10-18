@@ -65,26 +65,11 @@ class TradeRosterPreviewCashRowBuilder implements TradeRosterPreviewCashRowBuild
             $partnerTeamId = $viewingTeamId;
         }
 
-        // Collect cash amounts per year
-        /** @var array<int, int> $userCash */
-        $userCash = [];
-        /** @var array<int, int> $partnerCash */
-        $partnerCash = [];
-        $hasUserCash = false;
-        $hasPartnerCash = false;
-
-        for ($yr = $cashStartYear; $yr <= $cashEndYear; $yr++) {
-            $uAmount = $this->validator->validateCashAmount('userCash' . $yr);
-            $pAmount = $this->validator->validateCashAmount('partnerCash' . $yr);
-            $userCash[$yr] = $uAmount;
-            $partnerCash[$yr] = $pAmount;
-            if ($uAmount > 0) {
-                $hasUserCash = true;
-            }
-            if ($pAmount > 0) {
-                $hasPartnerCash = true;
-            }
-        }
+        $cash = $this->collectCashByYear($cashStartYear, $cashEndYear);
+        $hasUserCash = $cash['user']['hasCash'];
+        $hasPartnerCash = $cash['partner']['hasCash'];
+        $userCash = $cash['user']['amounts'];
+        $partnerCash = $cash['partner']['amounts'];
 
         if (!$hasUserCash && !$hasPartnerCash) {
             return [];
@@ -141,6 +126,46 @@ class TradeRosterPreviewCashRowBuilder implements TradeRosterPreviewCashRowBuild
 
         /** @var list<array<string, mixed>> $rows */
         return $rows;
+    }
+
+    /**
+     * Read the validated per-year cash amounts for both sides of the trade.
+     *
+     * Reads userCash{yr} and partnerCash{yr} from the validator for every year
+     * in [$cashStartYear, $cashEndYear]. A side "has cash" when any of its
+     * amounts is above zero; validateCashAmount() never returns a negative.
+     *
+     * @return array{
+     *     user: array{amounts: array<int, int>, hasCash: bool},
+     *     partner: array{amounts: array<int, int>, hasCash: bool}
+     * }
+     */
+    private function collectCashByYear(int $cashStartYear, int $cashEndYear): array
+    {
+        /** @var array<int, int> $userCash */
+        $userCash = [];
+        /** @var array<int, int> $partnerCash */
+        $partnerCash = [];
+        $hasUserCash = false;
+        $hasPartnerCash = false;
+
+        for ($yr = $cashStartYear; $yr <= $cashEndYear; $yr++) {
+            $uAmount = $this->validator->validateCashAmount('userCash' . $yr);
+            $pAmount = $this->validator->validateCashAmount('partnerCash' . $yr);
+            $userCash[$yr] = $uAmount;
+            $partnerCash[$yr] = $pAmount;
+            if ($uAmount > 0) {
+                $hasUserCash = true;
+            }
+            if ($pAmount > 0) {
+                $hasPartnerCash = true;
+            }
+        }
+
+        return [
+            'user' => ['amounts' => $userCash, 'hasCash' => $hasUserCash],
+            'partner' => ['amounts' => $partnerCash, 'hasCash' => $hasPartnerCash],
+        ];
     }
 
     /**

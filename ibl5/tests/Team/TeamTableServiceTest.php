@@ -1055,6 +1055,36 @@ HTML;
         $this->assertStringContainsString('ibl-view-select', $caption);
     }
 
+    /**
+     * Structural invariant behind the security-surface discharge: the service
+     * carries no actor identity, and the extracted wrapper helpers take only the
+     * request scalars, the Season and the two colours. A new session/user
+     * property or parameter fails this test.
+     */
+    public function testServiceHoldsNoActorIdentityAndHelpersTakeOnlyRequestScalars(): void
+    {
+        $class = new \ReflectionClass(TeamTableService::class);
+
+        $propertyNames = array_map(static fn (\ReflectionProperty $p): string => $p->getName(), $class->getProperties());
+        self::assertSame(['db', 'repository', 'season'], $propertyNames);
+
+        $tabs = $class->getMethod('tabDefinitions');
+        self::assertTrue($tabs->isPrivate());
+        self::assertTrue($tabs->isStatic());
+        self::assertSame(['season'], array_map(static fn (\ReflectionParameter $p): string => $p->getName(), $tabs->getParameters()));
+
+        $wrap = $class->getMethod('wrapWithViewControls');
+        self::assertTrue($wrap->isPrivate());
+        self::assertSame(
+            ['tableHtml', 'teamid', 'yr', 'display', 'split', 'season', 'teamColor1', 'teamColor2'],
+            array_map(static fn (\ReflectionParameter $p): string => $p->getName(), $wrap->getParameters())
+        );
+
+        foreach ([...$propertyNames, ...array_map(static fn (\ReflectionParameter $p): string => $p->getName(), $wrap->getParameters())] as $name) {
+            self::assertDoesNotMatchRegularExpression('/logged|user|session|actor|login/i', $name);
+        }
+    }
+
     // ============================================
     // getTableOutput() STARTER NARROWING (through the rendered output)
     // ============================================

@@ -1804,9 +1804,13 @@ EOF
 # Returns: 0 green | 1 CI red, park | 2 CI auth/usage error, env-stop
 #          3 smoke red, park | 4 CI verdict not yet known, proceed with warning
 # Sets CANARY_DETAIL to the text the park report should carry.
+# The smoke curl gets up to 3 tries of 15s each. Only curl exit 7 (connection
+# refused) and 28 (timeout) are retried, after AUTOMOUSE_CANARY_RETRY_SLEEP
+# seconds (unset, empty, or non-numeric falls back to 15). Worst case for a
+# persistent timeout: 3 x 15 + 2 x 15 = 75s.
 run_between_plans_canary() {
     local ci_out url
-    local ci_rc=0 smoke_rc=0
+    local ci_rc=0 smoke_rc=0 try=1 retry_sleep
     CANARY_DETAIL=""
 
     if [ -n "${AUTOMOUSE_SKIP_CANARY:-}" ]; then
@@ -1847,7 +1851,27 @@ run_between_plans_canary() {
     # Host(`main.localhost`) for it; the basename-derived hostname is the
     # WORKTREE rule and 404s here. Override with AUTOMOUSE_CANARY_URL.
     url="${AUTOMOUSE_CANARY_URL:-http://main.localhost/ibl5/}"
-    curl -sf --max-time 5 "$url" -o /dev/null || smoke_rc=$?
+    retry_sleep="${AUTOMOUSE_CANARY_RETRY_SLEEP-}"
+    case "$retry_sleep" in
+        ''|*[!0-9]*) retry_sleep=15 ;;
+    esac
+    # Exit 7 (refused) and 28 (timeout) are what a Traefik or php container
+    # restart looks like from here. Every other exit parks on the first try.
+    while :; do
+        smoke_rc=0
+        curl -sf --max-time 15 "$url" -o /dev/null || smoke_rc=$?
+        case "$smoke_rc" in
+            7|28) ;;
+            *) break ;;
+        esac
+        if [ "$try" -ge 3 ]; then
+            break
+        fi
+        printf '[%s] canary: smoke try %s/3: curl exit %s for %s; retrying in %ss\n' \
+            "$(date +%H:%M:%S)" "$try" "$smoke_rc" "$url" "$retry_sleep" >> "$LOG"
+        sleep "$retry_sleep"
+        try=$((try + 1))
+    done
     if [ "$smoke_rc" -ne 0 ]; then
         CANARY_DETAIL="smoke: curl exit $smoke_rc for $url"
         printf '[%s] canary: %s\n' "$(date +%H:%M:%S)" "$CANARY_DETAIL" >> "$LOG"

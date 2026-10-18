@@ -41,7 +41,7 @@ class TableStylesTest extends TestCase
 
     public function testInlineTeamVarsDefaultOmitsOnPrimaryVar(): void
     {
-        $vars = TableStyles::inlineTeamVars('003DA5', 'FF5733');
+        $vars = TableStyles::inlineTeamVars('003DA5','FF5733');
         self::assertSame('--team-color-primary: #003DA5; --team-color-secondary: #FF5733;', $vars);
     }
 

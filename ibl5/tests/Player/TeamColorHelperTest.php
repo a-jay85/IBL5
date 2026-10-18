@@ -184,12 +184,12 @@ final class TeamColorHelperTest extends TestCase
 
     public function testGetReadableTextColorKeepsPreferredWhenContrastPasses(): void
     {
-        $this->assertSame('ffffff', TeamColorHelper::getReadableTextColor('003DA5', 'ffffff'));
+        $this->assertSame('ffffff', TeamColorHelper::getReadableTextColor('003DA5','ffffff'));
     }
 
     public function testGetReadableTextColorFallsBackWhenContrastFails(): void
     {
-        $this->assertSame('000000', TeamColorHelper::getReadableTextColor('FF5733', '003DA5'));
+        $this->assertSame('000000', TeamColorHelper::getReadableTextColor('FF5733','003DA5'));
     }
 
     public function testGetReadableTextColorBoundaryAtMinRatio(): void

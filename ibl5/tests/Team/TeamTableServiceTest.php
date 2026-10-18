@@ -1054,4 +1054,56 @@ HTML;
 
         $this->assertStringContainsString('ibl-view-select', $caption);
     }
+
+    // ============================================
+    // getTableOutput() STARTER NARROWING (through the rendered output)
+    // ============================================
+
+    private static function starterCell(int $pid): string
+    {
+        return '<td class="sticky-col ibl-player-cell is-starter"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">';
+    }
+
+    /**
+     * Offseason roster widening must not surface an expiring player as a starter:
+     * the contracted depth-1 player is marked, the expiring depth-1 player is not.
+     */
+    public function testStartersForNarrowsExpiringRowsDuringOffseason(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);
+
+        $repository = self::createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->method('getRosterUnderContract')->willReturn([
+            $this->buildFullRosterRow(['pid' => 1, 'name' => 'Contracted Starter', 'cy' => 1, 'cyt' => 3, 'pg_depth' => 1]),
+            $this->buildFullRosterRow(['pid' => 2, 'name' => 'Expiring Starter', 'cy' => 3, 'cyt' => 3, 'sg_depth' => 1]),
+        ]);
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+        $repository->method('getAllTeams')->willReturn([]);
+
+        $service = new TeamTableService($this->mockDb, $repository, $this->seasonStubForPhase('Free Agency'));
+        $html = $service->getTableOutput(5, null, 'ratings');
+
+        $this->assertStringContainsString(self::starterCell(1), $html);
+        $this->assertStringNotContainsString(self::starterCell(2), $html);
+    }
+
+    /**
+     * The free-agent pool is not a team: depth columns on its rows never mark a starter.
+     */
+    public function testFreeAgentPoolRowsAreNeverMarkedStarter(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(0)]);
+
+        $repository = self::createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->method('getFreeAgents')->willReturn([
+            $this->buildFullRosterRow(['pid' => 1, 'name' => 'Pool Player', 'pg_depth' => 1]),
+        ]);
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+
+        $service = new TeamTableService($this->mockDb, $repository, $this->seasonStubForPhase('Regular Season'));
+        $html = $service->getTableOutput(0, null, 'ratings');
+
+        $this->assertStringContainsString('pid=1">', $html);
+        $this->assertStringNotContainsString('is-starter', $html);
+    }
 }

@@ -41,23 +41,7 @@ class TeamTableService implements TeamTableServiceInterface
         $season = $this->season ?? new Season($this->db);
 
         $isFreeAgency = $season->isOffseasonPhase();
-
-        if ($teamid === 0) {
-            $result = $this->repository->getFreeAgents($isFreeAgency);
-        } elseif ($teamid === -1) {
-            $result = $this->repository->getEntireLeagueRoster();
-        } else {
-            if ($yr !== null && $yr !== '') {
-                $result = $this->repository->getHistoricalRoster($teamid, $yr);
-            } else {
-                // During Draft / Free Agency the Team page deliberately keeps
-                // expiring-contract players in the roster so they can render
-                // faded (see $markExpiringRows below). getRosterUnderContract()
-                // is getFreeAgencyRoster() without the `cyt != cy` filter, so
-                // one source now serves both phases.
-                $result = $this->repository->getRosterUnderContract($teamid);
-            }
-        }
+        $result = $this->loadRoster($teamid, $yr, $isFreeAgency);
 
         // Fade expiring players only where the widening actually applies:
         // a real team (not the FA pool or the league roster) in the current
@@ -70,31 +54,77 @@ class TeamTableService implements TeamTableServiceInterface
 
         $team = Team::initialize($this->db, $teamid);
 
-        /** @var list<int> $starterPids */
-        $starterPids = [];
-        if ($teamid > 0 && ($yr === null || $yr === '')) {
-            // extractStartersData() derives starters from the *_depth columns on the
-            // roster rows themselves, not from a starters table. Widening the roster
-            // above would therefore let an expiring player surface as a starter during
-            // the offseason. Narrow the rows back to the pre-widening set (cy != cyt)
-            // exactly where the widening applied, so $starterPids stays byte-identical.
-            $starterSource = $markExpiringRows
-                ? array_values(array_filter(
-                    $result,
-                    static fn (array $row): bool => self::rowInt($row['cy'] ?? 0) !== self::rowInt($row['cyt'] ?? 0)
-                ))
-                : $result;
-            $starters = $this->extractStartersData($starterSource);
-            foreach ($starters as $data) {
-                if ($data['pid'] !== null) {
-                    $starterPids[] = $data['pid'];
-                }
-            }
-        }
+        $starterPids = $this->startersFor($result, $teamid, $yr, $markExpiringRows);
 
         $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $starterPids, $split, $markExpiringRows);
 
         return $this->wrapWithViewControls($tableHtml, $teamid, $yr, $display, $split, $season, $teamColor1, $teamColor2);
+    }
+
+    /**
+     * Roster source by team id: the FA pool (0), the whole league (-1), a
+     * historical season when $yr is set, otherwise the current roster.
+     *
+     * @return list<PlayerRow>|list<array<string, mixed>>
+     */
+    private function loadRoster(int $teamid, ?string $yr, bool $isFreeAgency): array
+    {
+        if ($teamid === 0) {
+            return $this->repository->getFreeAgents($isFreeAgency);
+        }
+
+        if ($teamid === -1) {
+            return $this->repository->getEntireLeagueRoster();
+        }
+
+        if ($yr !== null && $yr !== '') {
+            return $this->repository->getHistoricalRoster($teamid, $yr);
+        }
+
+        // During Draft / Free Agency the Team page deliberately keeps
+        // expiring-contract players in the roster so they can render
+        // faded (see $markExpiringRows in getTableOutput). getRosterUnderContract()
+        // is getFreeAgencyRoster() without the `cyt != cy` filter, so
+        // one source now serves both phases.
+        return $this->repository->getRosterUnderContract($teamid);
+    }
+
+    /**
+     * Starter pids for a real team in the current season; empty for the FA
+     * pool, the league roster and historical views.
+     *
+     * extractStartersData() derives starters from the *_depth columns on the
+     * roster rows themselves, not from a starters table. The roster widening in
+     * loadRoster() would therefore let an expiring player surface as a starter
+     * during the offseason. Narrow the rows back to the pre-widening set
+     * (cy != cyt) exactly where the widening applied, so the pids stay
+     * byte-identical.
+     *
+     * @param list<PlayerRow>|list<array<string, mixed>> $result
+     * @return list<int>
+     */
+    private function startersFor(array $result, int $teamid, ?string $yr, bool $markExpiringRows): array
+    {
+        if (!($teamid > 0 && ($yr === null || $yr === ''))) {
+            return [];
+        }
+
+        $starterSource = $markExpiringRows
+            ? array_values(array_filter(
+                $result,
+                static fn (array $row): bool => self::rowInt($row['cy'] ?? 0) !== self::rowInt($row['cyt'] ?? 0)
+            ))
+            : $result;
+
+        /** @var list<int> $starterPids */
+        $starterPids = [];
+        foreach ($this->extractStartersData($starterSource) as $data) {
+            if ($data['pid'] !== null) {
+                $starterPids[] = $data['pid'];
+            }
+        }
+
+        return $starterPids;
     }
 
     /**

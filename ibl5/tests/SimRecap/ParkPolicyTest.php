@@ -328,6 +328,56 @@ final class ParkPolicyTest extends TestCase
         ];
     }
 
+    /**
+     * @param Row $row
+     * @param Decision $expected
+     */
+    #[DataProvider('gatesKeepCauseCountersProvider')]
+    public function testDecideGatesKeepCauseCounters(string $cause, string $host, array $row, int $now, array $expected): void
+    {
+        self::assertSame($expected, ParkPolicy::decide($cause, $host, $row, null, $now));
+    }
+
+    /**
+     * @return array<string, array{string, string, Row, int, Decision}>
+     */
+    public static function gatesKeepCauseCountersProvider(): array
+    {
+        $windowEnd = self::CREATED + 24 * 3600;
+
+        return [
+            'window end: auth keeps the appended host' => [
+                'auth', 'mac', self::row(route: 'any'), $windowEnd,
+                self::expected('failed', 'any', null, authFailedHosts: 'mac'),
+            ],
+            // Append order would emit 'actions,mac'; the canonical HOSTS order is 'mac,actions'.
+            'window end: auth re-emits prior and appended hosts in canonical order' => [
+                'auth', 'mac', self::row(route: 'any', authFailedHosts: 'actions'), $windowEnd,
+                self::expected('failed', 'any', null, authFailedHosts: 'mac,actions'),
+            ],
+            'window end: transport keeps the incremented count' => [
+                'transport', 'mac', self::row(route: 'any', transport: 2), $windowEnd,
+                self::expected('failed', 'any', null, transport: 3),
+            ],
+            'window end: usage_limit keeps the wait and refund' => [
+                'usage_limit', 'mac', self::row(route: 'any'), $windowEnd,
+                self::expected('failed', 'any', null, usageWaits: 1, refund: 1),
+            ],
+            'window end: prompt passes counters through unchanged' => [
+                'prompt', 'mac', self::row(route: 'any', flaky: 2, transport: 1), $windowEnd,
+                self::expected('failed', 'any', null, flaky: 2, transport: 1),
+            ],
+            'attempt backstop: auth keeps the appended host' => [
+                'auth', 'mac', self::row(route: 'any', attempts: 20), self::NOW,
+                self::expected('failed', 'any', null, authFailedHosts: 'mac'),
+            ],
+            'attempt backstop: prompt passes counters through unchanged' => [
+                'prompt', 'mac', self::row(route: 'any', attempts: 20, flaky: 2), self::NOW,
+                self::expected('failed', 'any', null, flaky: 2),
+            ],
+        ];
+    }
+
     public function testDecidePromptAlwaysFails(): void
     {
         $row = self::row(route: 'any', flaky: 2, transport: 1, usageWaits: 1, authFailedHosts: 'actions');

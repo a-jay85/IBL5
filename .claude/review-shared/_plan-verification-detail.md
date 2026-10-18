@@ -97,7 +97,7 @@ existing suite as a characterization check.
 
 ### Which backticked token a test row plans
 
-The row's token is the rightmost cell holding a valid backticked test path, so a seed or fixture path cited in the description cell (`ibl5/tests/e2e/fixtures/ci-seed.sql` as evidence) is never the planned test. A row whose first backticked test-ish token is a bare method name still plans nothing.
+The row's token is the rightmost cell holding a valid backticked test path, so a seed or fixture path cited in the description cell (`ibl5/tests/e2e/fixtures/ci-seed.sql` as evidence) is never the planned test. The harness reads the row cell by cell, rightmost first, and plans the first backticked test-ish token in a cell that passes `_is_test_path` (`_planned_token` in `tools/postplan-harness/harness/planfile.py`). A bare method name or a command earlier in the row never hides the location cell's path. A row that names an existing test it only runs therefore carries `(run-only)` on that path, or Phase 5.0 reports `MISSING:` for it. A directory token is planned the same way, and `(run-only)` exempts it when the directory is tracked.
 
 ### One-time-check rows: tag rules
 

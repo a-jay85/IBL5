@@ -44,26 +44,10 @@ final class TradeOfferGrouper implements TradeOfferGrouperInterface
     public function groupOffers(array $allTradeRows, string $userTeam, int $seasonEndingYear): array
     {
         // Pre-load all players, picks, and cash in batch to avoid N+1 queries
-        $playerIds = [];
-        $pickIds = [];
-        $offerIds = [];
-        foreach ($allTradeRows as $row) {
-            $from = $row['trade_from'];
-            $to = $row['trade_to'];
-            if ($from !== $userTeam && $to !== $userTeam) {
-                continue;
-            }
-            if ($row['itemtype'] === TradeItemType::Player->value) {
-                $playerIds[] = $row['itemid'];
-            } elseif ($row['itemtype'] === TradeItemType::DraftPick->value) {
-                $pickIds[] = $row['itemid'];
-            } elseif ($row['itemtype'] === TradeItemType::Cash->value) {
-                $offerIds[] = $row['tradeofferid'];
-            }
-        }
-        $playersMap = $this->assetRepository->getPlayersByIds(array_values(array_unique($playerIds)));
-        $picksMap = $this->assetRepository->getDraftPicksByIds(array_values(array_unique($pickIds)));
-        $cashMap = $this->cashRepository->getCashTransactionsByOfferIds(array_values(array_unique($offerIds)));
+        $batchIds = $this->collectBatchIds($allTradeRows, $userTeam);
+        $playersMap = $this->assetRepository->getPlayersByIds($batchIds['players']);
+        $picksMap = $this->assetRepository->getDraftPicksByIds($batchIds['picks']);
+        $cashMap = $this->cashRepository->getCashTransactionsByOfferIds($batchIds['offers']);
 
         $tradeOffers = [];
 
@@ -71,7 +55,6 @@ final class TradeOfferGrouper implements TradeOfferGrouperInterface
             $offerId = $row['tradeofferid'];
             $from = $row['trade_from'];
             $to = $row['trade_to'];
-            $approval = $row['approval'];
             $itemId = $row['itemid'];
             $itemType = $row['itemtype'];
 
@@ -81,15 +64,7 @@ final class TradeOfferGrouper implements TradeOfferGrouperInterface
             }
 
             if (!isset($tradeOffers[$offerId])) {
-                $tradeOffers[$offerId] = [
-                    'from' => $from,
-                    'to' => $to,
-                    'approval' => $approval,
-                    'oppositeTeam' => ($from === $userTeam) ? $to : $from,
-                    'hasHammer' => ($approval === $userTeam || $approval === 'test'),
-                    'items' => [],
-                    'previewData' => ['fromPids' => [], 'toPids' => []],
-                ];
+                $tradeOffers[$offerId] = $this->openGroup($row, $userTeam);
             }
 
             if ($itemType === TradeItemType::Cash->value) {
@@ -188,6 +163,64 @@ final class TradeOfferGrouper implements TradeOfferGrouperInterface
         }
 
         return $enriched;
+    }
+
+    /**
+     * Collect de-duplicated batch-preload ids from rows that involve the user team
+     *
+     * @param list<TradeInfoRow> $rows
+     * @return array{players: list<int>, picks: list<int>, offers: list<int>}
+     */
+    private function collectBatchIds(array $rows, string $userTeam): array
+    {
+        $playerIds = [];
+        $pickIds = [];
+        $offerIds = [];
+        foreach ($rows as $row) {
+            $from = $row['trade_from'];
+            $to = $row['trade_to'];
+            if ($from !== $userTeam && $to !== $userTeam) {
+                continue;
+            }
+            if ($row['itemtype'] === TradeItemType::Player->value) {
+                $playerIds[] = $row['itemid'];
+            } elseif ($row['itemtype'] === TradeItemType::DraftPick->value) {
+                $pickIds[] = $row['itemid'];
+            } elseif ($row['itemtype'] === TradeItemType::Cash->value) {
+                $offerIds[] = $row['tradeofferid'];
+            }
+        }
+
+        return [
+            'players' => array_values(array_unique($playerIds)),
+            'picks' => array_values(array_unique($pickIds)),
+            'offers' => array_values(array_unique($offerIds)),
+        ];
+    }
+
+    /**
+     * Build the header of a new offer group from its first involved row
+     *
+     * The `@return` shape must keep `previewData`; dropping it makes PHPStan report `return.type`.
+     *
+     * @param TradeInfoRow $row
+     * @return array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>}}
+     */
+    private function openGroup(array $row, string $userTeam): array
+    {
+        $from = $row['trade_from'];
+        $to = $row['trade_to'];
+        $approval = $row['approval'];
+
+        return [
+            'from' => $from,
+            'to' => $to,
+            'approval' => $approval,
+            'oppositeTeam' => ($from === $userTeam) ? $to : $from,
+            'hasHammer' => ($approval === $userTeam || $approval === 'test'),
+            'items' => [],
+            'previewData' => ['fromPids' => [], 'toPids' => []],
+        ];
     }
 
     /**

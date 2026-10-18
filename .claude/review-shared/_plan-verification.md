@@ -66,8 +66,6 @@ Harness rules (`parse_no_change_test_paths` in `tools/postplan-harness/harness/p
 - Exempts only that row's token. If another row plans the same token unmarked, the unmarked row wins.
 - Fenced examples and a code-span `(no-change)` never count. Gate `[X]` skips both.
 
-The harness reads a test row cell by cell, rightmost first, and plans the first backticked test-ish token in a cell that passes `_is_test_path` (`_planned_token` in `tools/postplan-harness/harness/planfile.py`). A bare method name or a command earlier in the row never hides the location cell's path. A row that names an existing test it only runs therefore carries `(run-only)` on that path, or Phase 5.0 reports `MISSING:` for it. A directory token is planned the same way, and `(run-only)` exempts it when the directory is tracked.
-
 A row that only runs an existing test takes `(run-only)` the same way: _plan-verification-detail.md § Test rows that run an existing test without changing it
 
 ### Pre-prod exercise paths

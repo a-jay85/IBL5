@@ -119,6 +119,8 @@ Harness rules (`parse_run_only_test_paths` in `tools/postplan-harness/harness/pl
 - `bin/check-plan` gate `[RO]` fails the plan when the marker is not directly after the row's planned token, when the path is absent from the base branch, when the row also carries `(no-change)`, or when the same path is a must-appear Critical Files entry. It warns when a phase line pairs the path with an edit verb, and when an unmarked test row names a path that exists on master but no phase or Critical Files entry cites. An unmarked row also fails `[RO]` when a plan line that cites the full test path in backticks says the file is only run (phrases such as `unedited`, `never edited`, `run-only`, `passes unchanged`). Add `(run-only)` after the token, or name the edit in a phase if the file does change.
 - Fenced examples and a code-span `(run-only)` never count.
 
+The harness reads a test row cell by cell, rightmost first, and plans the first backticked test-ish token in a cell that passes `_is_test_path` (`_planned_token` in `tools/postplan-harness/harness/planfile.py`). A bare method name or a command earlier in the row never hides the location cell's path. A row that names an existing test it only runs therefore carries `(run-only)` on that path, or Phase 5.0 reports `MISSING:` for it. A directory token is planned the same way, and `(run-only)` exempts it when the directory is tracked.
+
 ### Post-merge rows
 
 A row that is physically impossible before the merge used to have two outcomes. Dropping it lost the check. Keeping it held every PR with a nightly or launchd dependency on a human who could not act yet.

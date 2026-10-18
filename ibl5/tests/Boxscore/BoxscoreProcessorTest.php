@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tests\Boxscore;
 
 use Boxscore\Boxscore;
+use Boxscore\BoxscoreAuditRepository;
 use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreRepository;
 use Boxscore\Contracts\ProgressReporterInterface;
+use Boxscore\RegularSeasonGameProcessor;
 use Boxscore\RejectedGame;
 use Boxscore\ScheduleMembershipGuard;
 use JsbParser\ScoFileParser;
@@ -1229,6 +1231,154 @@ class BoxscoreProcessorTest extends TestCase
         self::assertSame(2, $result['gamesRejected']);
         self::assertSame(1, $result['gamesInserted']);
         self::assertSame([1, 2, 3], $spy->counts);
+    }
+
+    public function testProgressReporterOmitsSkipRecordFromReportSequence(): void
+    {
+        $spy = new class implements ProgressReporterInterface {
+            /** @var list<int> */
+            public array $counts = [];
+            public function report(int $processedCount): void { $this->counts[] = $processedCount; }
+        };
+
+        $gameProcessor = self::createStub(RegularSeasonGameProcessor::class);
+        $gameProcessor->method('process')->willReturnOnConsecutiveCalls(
+            ['action' => 'skip', 'linesProcessed' => 0, 'messages' => []],
+            ['action' => 'insert', 'linesProcessed' => 30, 'messages' => []],
+        );
+
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFile([
+            $this->buildGameRecord($this->gameInfoLineForGame('2008-04-05', 1, 21, 17, 2008)), // rejected
+            $this->buildGameRecord($this->gameInfoLineForGame('2008-04-01', 1, 1, 2, 2008)),   // accepted, skipped
+            $this->buildGameRecord($this->gameInfoLineForGame('2008-04-02', 1, 1, 2, 2008)),   // accepted, inserted
+            $this->buildGameRecord($this->gameInfoLineForGame('2008-04-06', 1, 21, 17, 2008)), // rejected
+        ]);
+        $data = file_get_contents($scoFile);
+        self::assertNotFalse($data);
+
+        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub, null, $spy, $gameProcessor);
+        $processor->guardOverride = new ScheduleMembershipGuard(
+            2008,
+            ['2008-04-01' => [1 => [2 => true]], '2008-04-02' => [1 => [2 => true]]],
+            [],
+        );
+
+        $result = $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: true);
+
+        self::assertSame(2, $result['gamesRejected']);
+        self::assertSame(1, $result['gamesSkipped']);
+        self::assertSame(1, $result['gamesInserted']);
+        self::assertSame([1, 3, 4], $spy->counts);
+    }
+
+    public function testRecordRejectedGamesRunsAfterUpdateSimDates(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        /** @var \ArrayObject<int, string> $callLog */
+        $callLog = new \ArrayObject();
+
+        $auditRepo = new class ($mockDb, $callLog) extends BoxscoreAuditRepository {
+            /** @param \ArrayObject<int, string> $callLog */
+            public function __construct(\mysqli $db, private \ArrayObject $callLog)
+            {
+                parent::__construct($db);
+            }
+
+            public function recordRejectedGames(int $seasonYear, array $rejects, ?string $sourceArchive): int
+            {
+                $this->callLog->append('recordRejectedGames');
+                return count($rejects);
+            }
+        };
+
+        $processor = new class ($mockDb, $repository, $seasonStub, null, null, null, null, null, $auditRepo) extends TestableBoxscoreProcessor {
+            /** @var \ArrayObject<int, string>|null */
+            public ?\ArrayObject $callLog = null;
+
+            protected function updateSimDates(string $operatingSeasonPhase): array
+            {
+                $this->callLog?->append('updateSimDates');
+                return [];
+            }
+        };
+        $processor->callLog = $callLog;
+        $processor->guardOverride = new ScheduleMembershipGuard(2008, ['2008-04-01' => [1 => [2 => true]]], []);
+
+        $scoFile = $this->buildScoFile([
+            $this->buildGameRecord($this->gameInfoLineForGame('2008-04-05', 1, 21, 17, 2008)), // rejected
+            $this->buildGameRecord($this->gameInfoLineForGame('2008-04-01', 1, 1, 2, 2008)),   // accepted
+        ]);
+        $data = file_get_contents($scoFile);
+        self::assertNotFalse($data);
+
+        $result = $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: false);
+
+        self::assertSame(['updateSimDates', 'recordRejectedGames'], $callLog->getArrayCopy());
+        self::assertSame(1, $result['rejectsRecorded']);
+    }
+
+    public function testSkipSimDatesStillRecordsRejectedGamesWithoutUpdatingSimDates(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        /** @var \ArrayObject<int, string> $callLog */
+        $callLog = new \ArrayObject();
+
+        $auditRepo = new class ($mockDb, $callLog) extends BoxscoreAuditRepository {
+            /** @param \ArrayObject<int, string> $callLog */
+            public function __construct(\mysqli $db, private \ArrayObject $callLog)
+            {
+                parent::__construct($db);
+            }
+
+            public function recordRejectedGames(int $seasonYear, array $rejects, ?string $sourceArchive): int
+            {
+                $this->callLog->append('recordRejectedGames');
+                return count($rejects);
+            }
+        };
+
+        $processor = new class ($mockDb, $repository, $seasonStub, null, null, null, null, null, $auditRepo) extends TestableBoxscoreProcessor {
+            /** @var \ArrayObject<int, string>|null */
+            public ?\ArrayObject $callLog = null;
+
+            protected function updateSimDates(string $operatingSeasonPhase): array
+            {
+                $this->callLog?->append('updateSimDates');
+                return [];
+            }
+        };
+        $processor->callLog = $callLog;
+        $processor->guardOverride = new ScheduleMembershipGuard(2008, ['2008-04-01' => [1 => [2 => true]]], []);
+
+        $scoFile = $this->buildScoFile([
+            $this->buildGameRecord($this->gameInfoLineForGame('2008-04-05', 1, 21, 17, 2008)), // rejected
+            $this->buildGameRecord($this->gameInfoLineForGame('2008-04-01', 1, 1, 2, 2008)),   // accepted
+        ]);
+        $data = file_get_contents($scoFile);
+        self::assertNotFalse($data);
+
+        $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: true);
+
+        self::assertSame(['recordRejectedGames'], $callLog->getArrayCopy());
     }
 
     public function testWindowTallyExcludesGamesOnWindowBoundaryDates(): void

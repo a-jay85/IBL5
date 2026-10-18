@@ -887,18 +887,22 @@ HTML;
         $this->assertSame(1, substr_count($caption, 'ibl-tab--active'));
     }
 
-    public function testTabPathNeverCallsGetAllTeamsAndCallsGetTeamOnce(): void
+    #[DataProvider('tabPathSourceProvider')]
+    public function testTabPathNeverCallsGetAllTeamsAndCallsGetTeamOnce(int $teamid, ?string $yr): void
     {
-        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow($teamid)]);
+        $rows = [$yr === null ? $this->buildFullRosterRow() : $this->buildHistoricalRosterRow()];
 
         $repository = $this->createMock(\Team\Contracts\TeamRepositoryInterface::class);
-        $repository->method('getHistoricalRoster')->willReturn([$this->buildHistoricalRosterRow()]);
+        $repository->method('getFreeAgents')->willReturn($rows);
+        $repository->method('getEntireLeagueRoster')->willReturn($rows);
+        $repository->method('getHistoricalRoster')->willReturn($rows);
         $repository->expects($this->never())->method('getAllTeams');
-        $repository->expects($this->once())->method('getTeam')->with(5)
+        $repository->expects($this->once())->method('getTeam')->with($teamid)
             ->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
 
         $service = new TeamTableService($this->mockDb, $repository, $this->seasonStubForPhase('Regular Season'));
-        $html = $service->getTableOutput(5, '2024', 'ratings');
+        $html = $service->getTableOutput($teamid, $yr, 'ratings');
 
         $this->assertStringContainsString('ibl-tabs', self::captionOf($html));
     }

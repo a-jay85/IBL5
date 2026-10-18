@@ -915,6 +915,300 @@ class FreeAgencyAdminProcessorTest extends TestCase
     }
 
     // ============================================
+    // executeSignings() — characterization pins (exact results and log contexts)
+    // ============================================
+
+    public function testExecuteSigningsPinsEmptySigningsResult(): void
+    {
+        $processor = new FreeAgencyAdminProcessor(
+            $this->makeRepositoryReturningCounts(9, 9, 9),
+            $this->mockDb,
+            null,
+            $this->makeRecordingDispatcher()
+        );
+
+        $result = $processor->executeSignings(1, [], 'FA Day 1', '', '');
+
+        $this->assertSame(
+            ['success' => false, 'successCount' => 0, 'errorCount' => 0, 'message' => 'No operations were executed.'],
+            $result
+        );
+    }
+
+    public function testExecuteSigningsPinsDayAlreadyProcessedResultAndWarningContext(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willThrowException(new \FreeAgency\DayAlreadyProcessedException('Day already processed'));
+        $logger = $this->makeContextRecordingLogger();
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, $logger, $dispatcher);
+        $result = $processor->executeSignings(1, $signings, 'FA Day 1', '', '');
+
+        $this->assertSame(
+            [
+                'success' => false,
+                'successCount' => 0,
+                'errorCount' => 0,
+                'message' => 'Day 1 has already been processed. Re-running it is blocked.',
+            ],
+            $result
+        );
+        $this->assertSame(
+            [[
+                'level' => \Psr\Log\LogLevel::WARNING,
+                'message' => 'fa_signings_blocked_already_processed',
+                'context' => [
+                    'action' => 'fa_signings_blocked_already_processed',
+                    'day' => 1,
+                    'signings_submitted' => 1,
+                ],
+            ]],
+            $logger->records
+        );
+        $this->assertSame([], $dispatcher->messages);
+    }
+
+    public function testExecuteSigningsPinsSuccessResultWithoutNewsStory(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+        $discordLogger = $this->makeContextRecordingLogger();
+
+        $processor = new FreeAgencyAdminProcessor(
+            $this->makeRepositoryReturningCounts(3, 0, 0),
+            $this->mockDb,
+            null,
+            $dispatcher
+        );
+        $this->swapDiscordLogger($processor, $discordLogger);
+        $result = $processor->executeSignings(1, $signings, 'FA Day 1', '', '');
+
+        $this->assertSame(
+            [
+                'success' => true,
+                'successCount' => 3,
+                'errorCount' => 0,
+                'message' => 'Successfully executed 3 operations. Free agents have been assigned to teams.',
+            ],
+            $result
+        );
+        $this->assertSame([], $dispatcher->messages);
+        $this->assertSame([], $discordLogger->records);
+    }
+
+    public function testExecuteSigningsPinsSuccessResultWhenDiscordFullyDelivered(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+        $discordLogger = $this->makeContextRecordingLogger();
+
+        $processor = new FreeAgencyAdminProcessor(
+            $this->makeRepositoryReturningCounts(80, 0, self::DAY12_NEWS_SID),
+            $this->mockDb,
+            null,
+            $dispatcher
+        );
+        $this->swapDiscordLogger($processor, $discordLogger);
+        $result = $processor->executeSignings(12, $signings, 'FA Day 12', $this->loadDay12HomeText(), 'Body text');
+
+        $this->assertSame(
+            [
+                'success' => true,
+                'successCount' => 80,
+                'errorCount' => 0,
+                'message' => 'Successfully executed 80 operations. Free agents have been assigned to teams.',
+            ],
+            $result
+        );
+        $this->assertCount(4, $dispatcher->messages);
+        $this->assertSame([], $discordLogger->records);
+    }
+
+    public function testExecuteSigningsPinsPartialDiscordFailureResultAndDiscordLogContext(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeDispatcherFailingAfter(1);
+        $logger = $this->makeContextRecordingLogger();
+        $discordLogger = $this->makeContextRecordingLogger();
+
+        $processor = new FreeAgencyAdminProcessor(
+            $this->makeRepositoryReturningCounts(80, 0, self::DAY12_NEWS_SID),
+            $this->mockDb,
+            $logger,
+            $dispatcher
+        );
+        $this->swapDiscordLogger($processor, $discordLogger);
+        $result = $processor->executeSignings(12, $signings, 'FA Day 12', $this->loadDay12HomeText(), 'Body text');
+
+        $this->assertSame(
+            [
+                'success' => true,
+                'successCount' => 80,
+                'errorCount' => 0,
+                'message' => 'Successfully executed 80 operations. Free agents have been assigned to teams.'
+                    . ' (Discord post to #free-agency failed after 1 of 4 parts'
+                    . ' — parts 1-1 are already in the channel; post manually from part 2.)',
+            ],
+            $result
+        );
+        $this->assertSame(
+            [[
+                'level' => \Psr\Log\LogLevel::ERROR,
+                'message' => 'fa_signings_discord_post_failed',
+                'context' => [
+                    'action' => 'fa_signings_discord_post_failed',
+                    'day' => 12,
+                    'news_sid' => self::DAY12_NEWS_SID,
+                    'delivered_chunks' => 1,
+                    'total_chunks' => 4,
+                    'error' => 'Discord unavailable',
+                ],
+            ]],
+            $discordLogger->records
+        );
+        $this->assertSame(['fa_signings_executed'], array_column($logger->records, 'message'));
+    }
+
+    public function testExecuteSigningsPinsFirstChunkDiscordFailureResultAndDiscordLogContext(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeDispatcherFailingAfter(0);
+        $discordLogger = $this->makeContextRecordingLogger();
+
+        $processor = new FreeAgencyAdminProcessor(
+            $this->makeRepositoryReturningCounts(80, 0, self::DAY12_NEWS_SID),
+            $this->mockDb,
+            null,
+            $dispatcher
+        );
+        $this->swapDiscordLogger($processor, $discordLogger);
+        $result = $processor->executeSignings(12, $signings, 'FA Day 12', $this->loadDay12HomeText(), 'Body text');
+
+        $this->assertSame(
+            [
+                'success' => true,
+                'successCount' => 80,
+                'errorCount' => 0,
+                'message' => 'Successfully executed 80 operations. Free agents have been assigned to teams.'
+                    . ' (Discord post to #free-agency failed — nothing was posted; post manually.)',
+            ],
+            $result
+        );
+        $this->assertSame(
+            [[
+                'level' => \Psr\Log\LogLevel::ERROR,
+                'message' => 'fa_signings_discord_post_failed',
+                'context' => [
+                    'action' => 'fa_signings_discord_post_failed',
+                    'day' => 12,
+                    'news_sid' => self::DAY12_NEWS_SID,
+                    'delivered_chunks' => 0,
+                    'total_chunks' => 4,
+                    'error' => 'Discord unavailable',
+                ],
+            ]],
+            $discordLogger->records
+        );
+    }
+
+    public function testExecuteSigningsPinsCompletedWithErrorsResult(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $processor = new FreeAgencyAdminProcessor(
+            $this->makeRepositoryReturningCounts(2, 1, self::DAY12_NEWS_SID),
+            $this->mockDb,
+            null,
+            $dispatcher
+        );
+        $result = $processor->executeSignings(12, $signings, 'FA Day 12', $this->loadDay12HomeText(), 'Body text');
+
+        $this->assertSame(
+            [
+                'success' => false,
+                'successCount' => 2,
+                'errorCount' => 1,
+                'message' => 'Completed with errors: 2 operations succeeded, 1 operations failed.',
+            ],
+            $result
+        );
+        $this->assertSame([], $dispatcher->messages);
+    }
+
+    public function testExecuteSigningsPinsZeroSuccessZeroErrorAsCompletedWithErrors(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $processor = new FreeAgencyAdminProcessor(
+            $this->makeRepositoryReturningCounts(0, 0, self::DAY12_NEWS_SID),
+            $this->mockDb,
+            null,
+            $dispatcher
+        );
+        $result = $processor->executeSignings(12, $signings, 'FA Day 12', $this->loadDay12HomeText(), 'Body text');
+
+        $this->assertSame(
+            [
+                'success' => false,
+                'successCount' => 0,
+                'errorCount' => 0,
+                'message' => 'Completed with errors: 0 operations succeeded, 0 operations failed.',
+            ],
+            $result
+        );
+        $this->assertSame([], $dispatcher->messages);
+    }
+
+    public function testExecuteSigningsLogsExecutedContextBeforeFirstDiscordDispatch(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $logger = $this->makeContextRecordingLogger();
+        $dispatcher = new class ($logger) implements FreeAgencyDiscordDispatcherInterface {
+            /** @var list<int> */
+            public array $recordCountsAtDispatch = [];
+
+            public function __construct(private object $logger)
+            {
+            }
+
+            public function dispatch(string $message): void
+            {
+                $records = $this->logger->records ?? null;
+                assert(is_array($records));
+                $this->recordCountsAtDispatch[] = count($records);
+            }
+        };
+
+        $processor = new FreeAgencyAdminProcessor(
+            $this->makeRepositoryReturningCounts(80, 0, self::DAY12_NEWS_SID),
+            $this->mockDb,
+            $logger,
+            $dispatcher
+        );
+        $processor->executeSignings(12, $signings, 'FA Day 12', $this->loadDay12HomeText(), 'Body text');
+
+        $this->assertSame([1, 1, 1, 1], $dispatcher->recordCountsAtDispatch);
+        $this->assertSame(
+            [[
+                'level' => \Psr\Log\LogLevel::INFO,
+                'message' => 'fa_signings_executed',
+                'context' => [
+                    'action' => 'fa_signings_executed',
+                    'day' => 12,
+                    'success_count' => 80,
+                    'error_count' => 0,
+                ],
+            ]],
+            $logger->records
+        );
+    }
+
+    // ============================================
     // processDay() — processed_at field from repository
     // ============================================
 
@@ -1069,6 +1363,44 @@ class FreeAgencyAdminProcessorTest extends TestCase
                 $this->messages[] = $message;
             }
         };
+    }
+
+    /**
+     * PSR-3 logger that records level, message and context for exact-context pins.
+     *
+     * @return \Psr\Log\AbstractLogger&object{records: list<array{level: mixed, message: string, context: array<mixed>}>}
+     */
+    private function makeContextRecordingLogger(): object
+    {
+        return new class extends \Psr\Log\AbstractLogger {
+            /** @var list<array{level: mixed, message: string, context: array<mixed>}> */
+            public array $records = [];
+
+            public function log(mixed $level, string|\Stringable $message, array $context = []): void
+            {
+                $this->records[] = ['level' => $level, 'message' => (string) $message, 'context' => $context];
+            }
+        };
+    }
+
+    /**
+     * Test-only: replace the private, non-injectable discordLogger so its calls are observable.
+     * Production construction is unchanged; the constructor still always uses
+     * LoggerFactory::getChannel('discord').
+     */
+    private function swapDiscordLogger(FreeAgencyAdminProcessor $processor, \Psr\Log\LoggerInterface $logger): void
+    {
+        $property = new \ReflectionProperty(FreeAgencyAdminProcessor::class, 'discordLogger');
+        $property->setValue($processor, $logger);
+    }
+
+    private function makeRepositoryReturningCounts(int $successCount, int $errorCount, int $newsSid): FreeAgencyAdminRepositoryInterface
+    {
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => $successCount, 'errorCount' => $errorCount, 'newsSid' => $newsSid]);
+
+        return $stub;
     }
 
     private function makeThrowingDispatcher(): FreeAgencyDiscordDispatcherInterface

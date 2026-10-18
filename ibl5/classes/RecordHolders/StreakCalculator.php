@@ -141,7 +141,8 @@ final class StreakCalculator
 
     /**
      * Entries whose value equals the maximum, with keys and insertion order preserved.
-     * Returns [] when $byKey is empty or the maximum is not positive.
+     * Returns [] when $byKey is empty or the maximum is not positive; the empty check
+     * keeps max([]) from throwing.
      *
      * @template K of array-key
      * @template T

@@ -199,7 +199,8 @@ class StreakCalculatorTest extends TestCase
         $this->assertSame(0, $result[0]['wins']);
     }
 
-    // Pin: best-start tie returns both holders in accumulator insertion order (T7 before T4, not sorted)
+    // Pin: best-start tie returns both holders in accumulator insertion order (T7 before T4, not sorted).
+    // A ksort before collecting would yield ['T4','T7']; expected here is ['T7','T4'].
     public function testBestSeasonStartTieReturnsBothInInsertionOrder(): void
     {
         $games = [
@@ -218,7 +219,8 @@ class StreakCalculatorTest extends TestCase
         ], $result);
     }
 
-    // Pin: worst-start tie returns both holders in insertion order (T8 before T3)
+    // Pin: worst-start tie returns both holders in insertion order (T8 before T3).
+    // A ksort before collecting would yield ['T3','T8']; expected here is ['T8','T3'].
     public function testWorstSeasonStartTieReturnsBothInInsertionOrder(): void
     {
         $games = [
@@ -237,7 +239,8 @@ class StreakCalculatorTest extends TestCase
         ], $result);
     }
 
-    // Pin: longest-streak tie returns both holders in first-appearance order (T7 before T4)
+    // Pin: longest-streak tie returns both holders in first-appearance order (T7 before T4).
+    // Adding ksort($bestStreaks) before collecting would put T4 first.
     public function testLongestStreakTieReturnsBothInInsertionOrder(): void
     {
         $games = [

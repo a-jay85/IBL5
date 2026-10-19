@@ -585,3 +585,25 @@ def test_review_threads_all_uses_prf_review_threads(tmp_path, monkeypatch):
     assert gh.trusted_open_threads(PR) == [{"commentId": 1}]
     assert "prf_review_threads" in argvs[0] and "list_trusted_open_threads" not in argvs[0]
     assert "list_trusted_open_threads" in argvs[1] and "prf_review_threads" not in argvs[1]
+
+
+def test_run_thread_ingestion_enveloped_verdict_not_logged(tmp_path):
+    """A verdict wrapped in an envelope is not a verdict: skipped, nothing resolved, nothing logged."""
+    log_path = tmp_path / "o.jsonl"
+    result = _three_thread_run(tmp_path, [
+        '{"answer": {"verdict": "DECLINE", "reason": "x", "category": "wrong"}}',
+        '{"result": {"verdict": "FIX", "reason": "y"}}',
+        '{"verdict": ["DECLINE"], "reason": "z"}',
+    ], log_path)
+    assert result["skipped"] == 3
+    assert not log_path.exists()
+
+
+def test_run_thread_ingestion_per_thread_outcomes_are_known(tmp_path):
+    """Logging leaves the per-thread outcome strings at fixed|declined|skipped."""
+    result = _three_thread_run(tmp_path, [
+        '{"verdict":"FIX","reason":"a"}',
+        '{"verdict":"DECLINE","reason":"b","category":"wrong"}',
+        "not a verdict",
+    ], tmp_path / "o.jsonl")
+    assert [t["outcome"] for t in result["threads"]] == ["fixed", "declined", "skipped"]

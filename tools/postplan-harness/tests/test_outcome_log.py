@@ -71,6 +71,7 @@ def test_append_events_unwritable_path_never_raises(tmp_path):
     logs = []
     assert ol.append_events(str(blocker / "sub" / "log.jsonl"), [_ev()], logs.append) == 0
     assert len(logs) == 1 and logs[0].startswith("outcome-log: append failed")
+    assert "NotADirectoryError" in logs[0]
 
 
 def test_resolve_log_path_env_override_nonempty_wins(tmp_path):

@@ -88,3 +88,18 @@ def test_cli_log_env_override_empty_is_unset(tmp_path):
                             "state", ol.LOG_BASENAME)
     assert os.path.realpath(os.path.dirname(path)) == os.path.dirname(expected)
     assert os.path.basename(path) == ol.LOG_BASENAME
+
+
+def test_cli_record_unknown_comment_id_writes_nothing(tmp_path):
+    verdicts = tmp_path / "verdicts.jsonl"
+    threads = tmp_path / "threads.jsonl"
+    _write_jsonl(verdicts, [{"commentId": 99, "verdict": "FIX", "reason": "fabricated", "sha": "z"}])
+    _write_jsonl(threads, [{"commentId": 11, "score": 85, "agent": "B"}])
+    log = tmp_path / "o.jsonl"
+    seeded = json.dumps(ol.build_event(pr=12, finding_id=1, agent="A", score=80, outcome="fixed",
+                                       source="phase4.5", basis="fix-verdict", pipeline="skill")) + "\n"
+    log.write_text(seeded)
+    rc = ol.main(["record", "--pr=12", f"--verdicts={verdicts}", f"--threads={threads}",
+                  f"--log={log}"])
+    assert rc == 0
+    assert log.read_text() == seeded

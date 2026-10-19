@@ -116,7 +116,7 @@ final class RivalriesViewTest extends TestCase
 
         preg_match_all('/class="([^"]+)"/', $html, $matches);
         $tokens = array_unique(array_merge(...array_map(
-            static fn (string $c): array => preg_split('/\s+/', trim($c)) ?: [],
+            static fn (string $c): array => explode(' ', trim($c)),
             $matches[1],
         )));
         self::assertNotSame([], $tokens);

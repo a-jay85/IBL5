@@ -38,8 +38,8 @@ final class RivalriesRepository extends \Database\BaseMysqliRepository implement
      */
     public function getFranchisePairStats(int $recentFromSeasonYear): array
     {
-        $sql = $this->gamesCte() . '
-SELECT LEAST(visitor_teamid, home_teamid) AS a, GREATEST(visitor_teamid, home_teamid) AS b,
+        $sql = $this->gamesCte()
+            . ' SELECT LEAST(visitor_teamid, home_teamid) AS a, GREATEST(visitor_teamid, home_teamid) AS b,
        SUM(ABS(visitor_pts - home_pts) <= ?) AS close_games,
        SUM(season_year >= ?) AS recent_games,
        SUM(game_type = 2) AS playoff_games
@@ -67,8 +67,8 @@ ORDER BY a, b',
      */
     public function getGmPairStats(int $recentFromSeasonYear): array
     {
-        $sql = $this->gmCte() . '
-SELECT LEAST(v_gm, h_gm) AS a, GREATEST(v_gm, h_gm) AS b,
+        $sql = $this->gmCte()
+            . ' SELECT LEAST(v_gm, h_gm) AS a, GREATEST(v_gm, h_gm) AS b,
        SUM(ABS(visitor_pts - home_pts) <= ?) AS close_games,
        SUM(season_year >= ?) AS recent_games,
        SUM(game_type = 2) AS playoff_games
@@ -98,8 +98,9 @@ ORDER BY a, b',
      */
     public function getFranchisePairGames(int $a, int $b): array
     {
-        $sql = $this->gamesCte() . '
-SELECT ' . self::GAME_COLUMNS . ',
+        $sql = $this->gamesCte()
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (no doubleheaders: game_date + game_of_that_day + visitor_teamid is unique)
+            . ' SELECT ' . self::GAME_COLUMNS . ',
        CAST(visitor_teamid AS CHAR) AS visitor_side, CAST(home_teamid AS CHAR) AS home_side
 FROM games
 WHERE (visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?)
@@ -113,8 +114,9 @@ ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
      */
     public function getGmPairGames(string $a, string $b): array
     {
-        $sql = $this->gmCte() . '
-SELECT ' . self::GAME_COLUMNS . ', v_gm AS visitor_side, h_gm AS home_side
+        $sql = $this->gmCte()
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (no doubleheaders: game_date + game_of_that_day + visitor_teamid is unique)
+            . ' SELECT ' . self::GAME_COLUMNS . ', v_gm AS visitor_side, h_gm AS home_side
 FROM gm_games
 WHERE v_gm <> h_gm AND ((v_gm = ? AND h_gm = ?) OR (v_gm = ? AND h_gm = ?))
 ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
@@ -128,6 +130,7 @@ ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
     public function getFranchisePlayoffSeries(int $a, int $b): array
     {
         $rows = $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (year + round + both teams identify one series)
             'SELECT pr.year, pr.round, pr.winner_tid, pr.loser_tid, pr.winner_games, pr.loser_games,
        CAST(pr.winner_tid AS CHAR) AS winner_side
 FROM `ibl_playoff_series_results` pr
@@ -149,8 +152,9 @@ ORDER BY pr.year ASC, pr.round ASC, pr.winner_tid ASC, pr.loser_tid ASC',
     public function getGmPlayoffSeries(string $a, string $b): array
     {
         $rows = $this->fetchAll(
-            $this->gmSeriesCte() . '
-SELECT year, round, winner_tid, loser_tid, winner_games, loser_games, w_gm AS winner_side
+            $this->gmSeriesCte()
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (year + round + both teams identify one series)
+            . ' SELECT year, round, winner_tid, loser_tid, winner_games, loser_games, w_gm AS winner_side
 FROM gm_series
 WHERE w_gm <> l_gm AND ((w_gm = ? AND l_gm = ?) OR (w_gm = ? AND l_gm = ?))
 ORDER BY year ASC, round ASC, winner_tid ASC, loser_tid ASC',
@@ -337,8 +341,8 @@ LIMIT 3',
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
-     * @param list<array<string, mixed>> $seriesRows
+     * @param array<int, array<string, mixed>> $rows
+     * @param array<int, array<string, mixed>> $seriesRows
      * @return list<PairStat>
      */
     private function mergeStats(array $rows, array $seriesRows): array
@@ -366,7 +370,7 @@ LIMIT 3',
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
+     * @param array<int, array<string, mixed>> $rows
      * @return list<GameRow>
      */
     private function mapGames(array $rows): array
@@ -393,7 +397,7 @@ LIMIT 3',
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
+     * @param array<int, array<string, mixed>> $rows
      * @return list<SeriesRow>
      */
     private function mapSeries(array $rows): array

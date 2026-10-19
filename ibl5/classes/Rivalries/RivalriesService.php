@@ -312,8 +312,7 @@ final class RivalriesService implements RivalriesServiceInterface
             $my = abs($y['visitor_points'] - $y['home_points']);
             $byMargin = $ascending ? $mx <=> $my : $my <=> $mx;
 
-            return $byMargin
-                ?: [$y['game_date'], $y['game_of_that_day']] <=> [$x['game_date'], $x['game_of_that_day']];
+            return $byMargin !== 0 ? $byMargin : [$y['game_date'], $y['game_of_that_day']] <=> [$x['game_date'], $x['game_of_that_day']];
         });
 
         return array_slice($games, 0, self::PAIR_LIST_LIMIT);

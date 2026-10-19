@@ -37,15 +37,10 @@ final class RivalryScorerTest extends TestCase
 
         self::assertSame(27, $even);
         self::assertSame(7, $lopsided);
-        self::assertSame(20, $even - $lopsided);
     }
 
     public function testWeightsSumToOneHundred(): void
     {
-        $sum = RivalryScorer::WEIGHT_PLAYOFF + RivalryScorer::WEIGHT_VOLUME + RivalryScorer::WEIGHT_CLOSENESS
-            + RivalryScorer::WEIGHT_CLOSE_GAMES + RivalryScorer::WEIGHT_RECENCY;
-        self::assertSame(100, $sum);
-
         $max = $this->input([
             'games' => 100, 'a_wins' => 50, 'b_wins' => 50, 'playoff_series' => 5,
             'playoff_games' => 20, 'close_games' => 200, 'recent_games' => 30,

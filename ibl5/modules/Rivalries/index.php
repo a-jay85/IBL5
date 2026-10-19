@@ -47,9 +47,10 @@ if ($nukeCompat->isUser($user)) {
     }
 }
 
-$userTeamKey = isset($currentUser->teamid) ? (string) $currentUser->teamid : null;
-$owner  = isset($currentUser->teamid)
-    ? (new \Repositories\TeamIdentityRepository($mysqli_db))->getOwnerName($currentUser->teamid)
+$userTeamId  = isset($currentUser->teamid) && is_int($currentUser->teamid) ? $currentUser->teamid : null;
+$userTeamKey = $userTeamId !== null ? (string) $userTeamId : null;
+$owner  = $userTeamId !== null
+    ? (new \Repositories\TeamIdentityRepository($mysqli_db))->getOwnerName($userTeamId)
     : null;
 $userGm = is_string($owner) && $owner !== '' ? $owner : null;
 

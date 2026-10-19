@@ -59,7 +59,7 @@ class TeamView implements TeamViewInterface
             <?= HtmlSanitizer::trusted($this->renderRosterRegion($tableOutput)) ?>
         </div>
                 <?= HtmlSanitizer::trusted($this->renderCardsRow($isActualTeam, $team, $currentSeasonCard, $draftPicksTable, $awardsCard)) ?>
-        <?= HtmlSanitizer::trusted($this->renderFranchiseHistory($isActualTeam, $franchiseHistoryCard) . $rivalsCard) ?>
+        <?= HtmlSanitizer::trusted($this->renderFranchiseHistory($isActualTeam, $franchiseHistoryCard)) ?><?= HtmlSanitizer::trusted($this->renderRivalsCard($rivalsCard)) ?>
         <?= HtmlSanitizer::trusted($this->renderRafters($isActualTeam, $rafters)) ?>
     </div>
 </div>
@@ -141,6 +141,14 @@ class TeamView implements TeamViewInterface
     private function renderFranchiseHistory(bool $isActualTeam, string $franchiseHistoryCard): string
     {
         return $isActualTeam ? '<div class="franchise-history-wrapper">' . $franchiseHistoryCard . '</div>' : '';
+    }
+
+    /**
+     * @param string $rivalsCard Pre-built HTML from TeamService::getTeamPageData() (RivalsCardBuilder); '' when absent
+     */
+    private function renderRivalsCard(string $rivalsCard): string
+    {
+        return $rivalsCard;
     }
 
     /**

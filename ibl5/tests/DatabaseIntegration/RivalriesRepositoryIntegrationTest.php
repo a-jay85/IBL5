@@ -87,14 +87,14 @@ final class RivalriesRepositoryIntegrationTest extends DatabaseTestCase
         $franchiseGames = $this->repo->getFranchisePairGames(1, 3);
         $franchiseCell = $h2h->buildFranchisesMatrix('all', 'all')['records']['1']['3'];
         self::assertSame($franchiseCell['wins'], $this->winsFor('1', $franchiseGames));
-        self::assertSame($franchiseCell['wins'] + $franchiseCell['losses'], count($franchiseGames));
+        self::assertCount($franchiseCell['wins'] + $franchiseCell['losses'], $franchiseGames);
 
         $gmGames = $this->repo->getGmPairGames('Inv One', 'Inv Three');
         self::assertCount(5, $gmGames);
         $gmCell = $h2h->buildGmsMatrix('all', 'all')['records']['Inv One']['Inv Three'];
         self::assertSame($gmCell['wins'], $this->winsFor('Inv One', $gmGames));
         self::assertSame(4, $gmCell['wins']);
-        self::assertSame($gmCell['wins'] + $gmCell['losses'], count($gmGames));
+        self::assertCount($gmCell['wins'] + $gmCell['losses'], $gmGames);
     }
 
     public function testFranchisePairStatsCountsCloseRecentAndPlayoffGames(): void
@@ -147,7 +147,7 @@ final class RivalriesRepositoryIntegrationTest extends DatabaseTestCase
     }
 
     /**
-     * @param list<array{visitor_points: int, home_points: int, visitor_side: string, home_side: string}> $games
+     * @param list<array{visitor_points: int, home_points: int, visitor_side: string, home_side: string, ...}> $games
      */
     private function winsFor(string $side, array $games): int
     {
@@ -163,7 +163,7 @@ final class RivalriesRepositoryIntegrationTest extends DatabaseTestCase
     }
 
     /**
-     * @return array{close_games: int, recent_games: int, playoff_games: int, playoff_series: int}
+     * @return array{a: string, b: string, close_games: int, recent_games: int, playoff_games: int, playoff_series: int}
      */
     private function statFor(int $a, int $b): array
     {
@@ -173,6 +173,6 @@ final class RivalriesRepositoryIntegrationTest extends DatabaseTestCase
             }
         }
 
-        return ['close_games' => 0, 'recent_games' => 0, 'playoff_games' => 0, 'playoff_series' => 0];
+        return ['a' => (string) $a, 'b' => (string) $b, 'close_games' => 0, 'recent_games' => 0, 'playoff_games' => 0, 'playoff_series' => 0];
     }
 }

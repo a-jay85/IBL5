@@ -91,8 +91,9 @@ final class RivalryScorer implements RivalryScorerInterface
         }
 
         usort($scored, static function (array $x, array $y): int {
-            return [$y['score'], $y['games']] <=> [$x['score'], $x['games']]
-                ?: strcmp($x['a'] . "\0" . $x['b'], $y['a'] . "\0" . $y['b']);
+            $byScore = [$y['score'], $y['games']] <=> [$x['score'], $x['games']];
+
+            return $byScore !== 0 ? $byScore : strcmp($x['a'] . "\0" . $x['b'], $y['a'] . "\0" . $y['b']);
         });
 
         return $scored;

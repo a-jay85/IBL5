@@ -185,6 +185,7 @@ def run_sweep(threads, pr, path, log, *, pipeline) -> int:
 USAGE = (
     "usage: review-outcomes record --pr=N --verdicts=PATH --threads=PATH [--pipeline=skill|harness] [--log=PATH]\n"
     "       review-outcomes sweep --pr=N [--pipeline=skill|harness] [--log=PATH]  (thread JSONL on stdin)\n"
+    "       review-outcomes report [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--log=PATH] [--json]\n"
     "flags take the --flag=value form only"
 )
 _FLAGS = {
@@ -257,8 +258,99 @@ def _cli_sweep(flags, log) -> None:
     run_sweep(rows, pr, path, log, pipeline=flags.get("pipeline", "skill"))
 
 
+_REPORT_KEYS = ("total",) + OUTCOMES + ("wrong_or_didnt_matter_share",)
+_REPORT_HEADER = "agent  total  fixed  wrong  intentional  didnt-matter  wrong+dm%"
+
+
+def _parse_report_flags(args):
+    """``--flag=value`` plus a bare ``--json``. ``None`` on any usage error."""
+    flags = {"json": False}
+    for arg in args:
+        if arg == "--json":
+            flags["json"] = True
+            continue
+        if not arg.startswith("--") or "=" not in arg:
+            return None
+        name, _, value = arg[2:].partition("=")
+        if name not in ("since", "until", "log"):
+            return None
+        if name in ("since", "until"):
+            try:
+                datetime.date.fromisoformat(value)
+            except ValueError:
+                return None
+        flags[name] = value
+    return flags
+
+
+def _agent_row(counts) -> dict:
+    row = {"total": sum(counts.get(o, 0) for o in OUTCOMES)}
+    for o in OUTCOMES:
+        row[o] = counts.get(o, 0)
+    bad = row["declined-wrong"] + row["didnt-matter"]
+    row["wrong_or_didnt_matter_share"] = round(bad / row["total"], 3) if row["total"] else None
+    return row
+
+
+def build_report(events, since=None, until=None) -> dict:
+    """Last event wins per (pr, findingId); the date filter applies to the winning event."""
+    latest = {}
+    for e in events:
+        latest[(e.get("pr"), e.get("findingId"))] = e
+    per_agent = {}
+    total = {}
+    for e in latest.values():
+        day = str(e.get("ts", ""))[:10]
+        if (since and day < since) or (until and day > until):
+            continue
+        outcome = e.get("outcome")
+        if outcome not in OUTCOMES:
+            continue
+        agent = e.get("agent") or "unknown"
+        counts = per_agent.setdefault(agent, {})
+        counts[outcome] = counts.get(outcome, 0) + 1
+        total[outcome] = total.get(outcome, 0) + 1
+    return {"since": since, "until": until,
+            "agents": {a: _agent_row(c) for a, c in per_agent.items()},
+            "total": _agent_row(total)}
+
+
+def format_report(report) -> str:
+    def line(name, row):
+        share = row["wrong_or_didnt_matter_share"]
+        pct = "-" if share is None else f"{share * 100:.1f}"
+        return (f"{name:<7}{row['total']:>5}  {row['fixed']:>5}  {row['declined-wrong']:>5}  "
+                f"{row['intentional']:>12}  {row['didnt-matter']:>12}  {pct:>9}")
+
+    names = sorted(report["agents"], key=lambda a: (a == "unknown", a))
+    lines = [_REPORT_HEADER]
+    lines += [line(a, report["agents"][a]) for a in names]
+    lines.append(line("TOTAL", report["total"]))
+    return "\n".join(lines)
+
+
+def _cli_report(flags) -> int:
+    try:
+        path = flags.get("log") or resolve_log_path(os.getcwd())
+        report = build_report(read_events(path), flags.get("since"), flags.get("until"))
+    except Exception as e:  # noqa: BLE001 - report is a human command; say what broke
+        print(f"review-outcomes: report failed ({e!r})", file=sys.stderr)
+        return 1
+    if flags["json"]:
+        print(json.dumps(report, sort_keys=True))
+    else:
+        print(format_report(report))
+    return 0
+
+
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "report":
+        flags = _parse_report_flags(argv[1:])
+        if flags is None:
+            print(USAGE, file=sys.stderr)
+            return 2
+        return _cli_report(flags)
     handlers = {"record": _cli_record, "sweep": _cli_sweep}
     if not argv or argv[0] not in handlers:
         print(USAGE, file=sys.stderr)

@@ -32,7 +32,7 @@ from test_fidelity_carryforward import (CANNED_READY, VERSION, _drive_cf, _recor
                                         _sticky, git_shim)
 from test_runner_replay import CANNED
 
-pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show", "standard_review_depth")
 
 REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
                    "security-audit", "score-findings")

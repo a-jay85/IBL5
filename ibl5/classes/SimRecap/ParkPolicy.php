@@ -89,7 +89,35 @@ final class ParkPolicy
         self::assertCause($cause);
         self::assertHost($host);
         $other = self::otherHost($host);
+        $counters = self::countFailure($cause, $host, $row);
+        $windowEnd = $row['created_epoch'] + self::WINDOW_HOURS * 3600;
+        $route = $row['route'];
 
+        if ($nowEpoch >= $windowEnd) {
+            return self::outcome('failed', $route, null, $counters);
+        }
+        if ($cause !== 'usage_limit' && $row['attempts'] >= self::ATTEMPT_BACKSTOP) {
+            return self::outcome('failed', $route, null, $counters);
+        }
+
+        // assertCause() admits only the five CAUSES, so the default arm is usage_limit.
+        return match ($cause) {
+            'prompt' => self::decidePrompt($route, $counters),
+            'auth' => self::decideAuth($other, $row['auth_failed_hosts'], $route, $counters),
+            'transport' => self::decideTransport($other, $nowEpoch, $route, $counters),
+            'flaky' => self::decideFlaky($host, $other, $nowEpoch, $route, $counters),
+            default => self::decideUsageLimit($resetEpoch, $nowEpoch, $windowEnd, $route, $counters),
+        };
+    }
+
+    /**
+     * The row's counters after this failure. Increments happen once, here, before any gate.
+     *
+     * @param array{route: string, attempts: int, flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, created_epoch: int} $row
+     * @return array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int}
+     */
+    private static function countFailure(string $cause, string $host, array $row): array
+    {
         $counters = [
             'flaky_failures' => $row['flaky_failures'],
             'transport_failures' => $row['transport_failures'],
@@ -97,9 +125,6 @@ final class ParkPolicy
             'auth_failed_hosts' => $row['auth_failed_hosts'],
             'attempts_refund' => 0,
         ];
-        $windowEnd = $row['created_epoch'] + self::WINDOW_HOURS * 3600;
-        $route = $row['route'];
-        $priorAuthHosts = [];
 
         if ($cause === 'flaky') {
             $counters['flaky_failures']++;
@@ -109,73 +134,116 @@ final class ParkPolicy
             $counters['usage_waits']++;
             $counters['attempts_refund'] = 1;
         } elseif ($cause === 'auth') {
-            $hosts = $row['auth_failed_hosts'] === '' ? [] : explode(',', $row['auth_failed_hosts']);
-            $priorAuthHosts = $hosts;
+            $hosts = self::parseHosts($row['auth_failed_hosts']);
             $hosts[] = $host;
             $counters['auth_failed_hosts'] = implode(',', array_values(array_intersect(self::HOSTS, $hosts)));
         }
 
-        $failed = static fn (): array => [
-            'outcome' => 'failed',
+        return $counters;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function parseHosts(string $csv): array
+    {
+        return $csv === '' ? [] : explode(',', $csv);
+    }
+
+    /**
+     * @param 'retry_now'|'handed'|'backoff'|'waiting'|'failed' $outcome
+     * @param array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int} $counters
+     * @return array{outcome: 'retry_now'|'handed'|'backoff'|'waiting'|'failed', route: string, blockedUntilEpoch: ?int, counters: array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int}}
+     */
+    private static function outcome(string $outcome, string $route, ?int $blockedUntilEpoch, array $counters): array
+    {
+        return [
+            'outcome' => $outcome,
             'route' => $route,
-            'blockedUntilEpoch' => null,
+            'blockedUntilEpoch' => $blockedUntilEpoch,
             'counters' => $counters,
         ];
+    }
 
-        if ($nowEpoch >= $windowEnd) {
-            return $failed();
+    /**
+     * @param array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int} $counters
+     * @return array{outcome: 'retry_now'|'handed'|'backoff'|'waiting'|'failed', route: string, blockedUntilEpoch: ?int, counters: array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int}}
+     */
+    private static function decidePrompt(string $route, array $counters): array
+    {
+        return self::outcome('failed', $route, null, $counters);
+    }
+
+    /**
+     * Fail when the other host already failed auth for this row, else hand to it.
+     *
+     * @param array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int} $counters
+     * @return array{outcome: 'retry_now'|'handed'|'backoff'|'waiting'|'failed', route: string, blockedUntilEpoch: ?int, counters: array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int}}
+     */
+    private static function decideAuth(string $other, string $priorAuthFailedHosts, string $route, array $counters): array
+    {
+        if (in_array($other, self::parseHosts($priorAuthFailedHosts), true)) {
+            return self::outcome('failed', $route, null, $counters);
         }
-        if ($cause !== 'usage_limit' && $row['attempts'] >= self::ATTEMPT_BACKSTOP) {
-            return $failed();
+
+        return self::outcome('handed', $other, null, $counters);
+    }
+
+    /**
+     * @param array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int} $counters
+     * @return array{outcome: 'retry_now'|'handed'|'backoff'|'waiting'|'failed', route: string, blockedUntilEpoch: ?int, counters: array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int}}
+     */
+    private static function decideTransport(string $other, int $nowEpoch, string $route, array $counters): array
+    {
+        $n = $counters['transport_failures'];
+        if ($n <= 3) {
+            return self::outcome('handed', $other, null, $counters);
+        }
+        if ($n <= 7) {
+            return self::backoff($nowEpoch, $counters);
         }
 
-        switch ($cause) {
-            case 'prompt':
-                return $failed();
+        return self::outcome('failed', $route, null, $counters);
+    }
 
-            case 'auth':
-                if (in_array($other, $priorAuthHosts, true)) {
-                    return $failed();
-                }
-
-                return ['outcome' => 'handed', 'route' => $other, 'blockedUntilEpoch' => null, 'counters' => $counters];
-
-            case 'transport':
-                $n = $counters['transport_failures'];
-                if ($n <= 3) {
-                    return ['outcome' => 'handed', 'route' => $other, 'blockedUntilEpoch' => null, 'counters' => $counters];
-                }
-                if ($n <= 7) {
-                    return self::backoff($nowEpoch, $counters);
-                }
-
-                return $failed();
-
-            case 'flaky':
-                $n = $counters['flaky_failures'];
-                if ($n <= 2) {
-                    return ['outcome' => 'retry_now', 'route' => $host, 'blockedUntilEpoch' => null, 'counters' => $counters];
-                }
-                if ($n === 3) {
-                    return ['outcome' => 'handed', 'route' => $other, 'blockedUntilEpoch' => null, 'counters' => $counters];
-                }
-                if ($n <= 5) {
-                    return self::backoff($nowEpoch, $counters);
-                }
-
-                return $failed();
-
-            default: // usage_limit
-                $latestReset = $nowEpoch + self::USAGE_MAX_RESET_HOURS * 3600;
-                $blocked = ($resetEpoch !== null && $resetEpoch > $nowEpoch && $resetEpoch <= $latestReset)
-                    ? $resetEpoch + self::USAGE_RESET_SLACK_SECONDS
-                    : $nowEpoch + self::USAGE_DEFAULT_WAIT_MINUTES * 60;
-                if ($blocked > $windowEnd) {
-                    return $failed();
-                }
-
-                return ['outcome' => 'waiting', 'route' => $route, 'blockedUntilEpoch' => $blocked, 'counters' => $counters];
+    /**
+     * @param array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int} $counters
+     * @return array{outcome: 'retry_now'|'handed'|'backoff'|'waiting'|'failed', route: string, blockedUntilEpoch: ?int, counters: array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int}}
+     */
+    private static function decideFlaky(string $host, string $other, int $nowEpoch, string $route, array $counters): array
+    {
+        $n = $counters['flaky_failures'];
+        if ($n <= 2) {
+            return self::outcome('retry_now', $host, null, $counters);
         }
+        if ($n === 3) {
+            return self::outcome('handed', $other, null, $counters);
+        }
+        if ($n <= 5) {
+            return self::backoff($nowEpoch, $counters);
+        }
+
+        return self::outcome('failed', $route, null, $counters);
+    }
+
+    /**
+     * Wait for the reported reset when it is plausible, else the default wait; fail when that
+     * wait would end after the window.
+     *
+     * @param array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int} $counters
+     * @return array{outcome: 'retry_now'|'handed'|'backoff'|'waiting'|'failed', route: string, blockedUntilEpoch: ?int, counters: array{flaky_failures: int, transport_failures: int, usage_waits: int, auth_failed_hosts: string, attempts_refund: int}}
+     */
+    private static function decideUsageLimit(?int $resetEpoch, int $nowEpoch, int $windowEnd, string $route, array $counters): array
+    {
+        $latestReset = $nowEpoch + self::USAGE_MAX_RESET_HOURS * 3600;
+        $blocked = ($resetEpoch !== null && $resetEpoch > $nowEpoch && $resetEpoch <= $latestReset)
+            ? $resetEpoch + self::USAGE_RESET_SLACK_SECONDS
+            : $nowEpoch + self::USAGE_DEFAULT_WAIT_MINUTES * 60;
+        if ($blocked > $windowEnd) {
+            return self::outcome('failed', $route, null, $counters);
+        }
+
+        return self::outcome('waiting', $route, $blocked, $counters);
     }
 
     /**

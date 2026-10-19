@@ -1295,7 +1295,7 @@ def test_background_watch_is_reaped_on_harness_error(monkeypatch, tmp_path):
                         lambda bg, **k: reaped.append(bg))
 
     class _ExplodingReviewPhase:
-        def __init__(self, llm, gh):
+        def __init__(self, llm, gh, depth=None):
             pass
 
         def run(self, *a, **k):
@@ -2352,3 +2352,22 @@ def test_scope_check_timeout_fails_run_closed_with_named_step(tmp_path, monkeypa
     assert starts, "no phase2 step-start line was logged"
     assert starts[-1].endswith("phase2: starting scope check"), starts
     assert not any("phase2: starting commit" in ln for ln in starts), starts
+
+
+def test_replay_phase2_logs_how_to_revert_once(tmp_path):
+    """Phase 2 logs one `how-to-revert source=` line, between the merge danger line and the
+    commit ADR gate, and the advisory field never produces a body-check finding.
+
+    Mutation caught: delete the `_inject_how_to_revert(...)` call in runner.run.
+    """
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    lines = _audit(out).splitlines()
+    htr_idx = [i for i, ln in enumerate(lines) if "phase2: how-to-revert source=" in ln]
+    assert len(htr_idx) == 1, lines
+    md_idx = [i for i, ln in enumerate(lines) if "phase2: merge danger Door=" in ln]
+    adr_idx = [i for i, ln in enumerate(lines) if "phase2: starting commit ADR gate" in ln]
+    assert md_idx and adr_idx, lines
+    assert md_idx[0] < htr_idx[0] < adr_idx[0], (md_idx, htr_idx, adr_idx)
+    assert not any("body-check finding: how-to-revert" in ln for ln in lines), lines

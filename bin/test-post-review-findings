@@ -960,4 +960,44 @@ run_p45_remediate() { # snapshot-ids-newline-separated
 [ "$(run_p45_remediate '' | tail -1)" = "0" ] && ok "p45-filter: empty snapshot acts on nothing" \
     || fail "p45-filter: expected 0 work items for an empty snapshot"
 
+# ── agent marker: written at post time (inline comments only) and parsed back ─
+reset_outputs
+fa="$BASE_TMP/f-agent.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug A","score":85,"agent":"B"}]' > "$fa"
+post_review_findings 42 deadbeefcafe "Code review" "$fa"
+assert_jq "agent: marker follows the score marker" \
+    '.comments[0].body | endswith("<!-- score: 85 -->\n<!-- agent: B -->")' "$REVIEW_OUT"
+
+reset_outputs
+fh="$BASE_TMP/f-agent-hostile.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug H","score":85,"agent":"x --> <script>"}]' > "$fh"
+post_review_findings 42 deadbeefcafe "Code review" "$fh"
+assert_not_contains "agent: hostile value writes no marker" "$REVIEW_OUT" "<!-- agent:"
+
+reset_outputs
+fn="$BASE_TMP/f-agent-missing.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug N","score":85}]' > "$fn"
+post_review_findings 42 deadbeefcafe "Code review" "$fn"
+assert_not_contains "agent: missing key writes no marker" "$REVIEW_OUT" "<!-- agent:"
+
+fix_agent="$BASE_TMP/threads-agent.json"
+cat > "$fix_agent" <<'THREADS'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"id":"PRRT_a","isResolved":false,"isOutdated":false,"path":"a.php","line":3,
+   "comments":{"nodes":[{"databaseId":501,"body":"Bug\n\n<!-- score: 85 -->\n<!-- agent: B -->","author":null}]}},
+  {"id":"PRRT_b","isResolved":false,"isOutdated":false,"path":"a.php","line":4,
+   "comments":{"nodes":[{"databaseId":502,"body":"Old\n\n<!-- score: 80 -->","author":null}]}}
+]}}}}}
+THREADS
+GH_THREADS_FIXTURE="$fix_agent"
+AGENT_OUT="$BASE_TMP/agent.jsonl"
+prf_review_threads 42 > "$AGENT_OUT"
+if jq -s -e '.[0].agent == "B" and .[0].score == 85 and .[1].agent == null and .[1].score == 80' \
+      "$AGENT_OUT" >/dev/null 2>&1; then
+    ok "agent: marker parsed, null without a marker"
+else
+    fail "agent: parse wrong: $(jq -c '{agent,score}' "$AGENT_OUT" | tr '\n' ' ')"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
 h_done

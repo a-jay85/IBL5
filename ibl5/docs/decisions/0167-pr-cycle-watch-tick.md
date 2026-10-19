@@ -1,6 +1,6 @@
 ---
 description: Scheduled pr-cycle watcher tick, its retry and in-flight guards, and the post-plan race fix in both directions.
-last_verified: 2026-10-12
+last_verified: 2026-10-18
 ---
 
 # ADR-0167: Schedule bin/pr-cycle on a launchd tick
@@ -73,3 +73,15 @@ The tick now keys every ledger on the PR's patch-id: `attempts/`, `dm-sent/`, `d
 - **Old state.** Files written before this change hold a bare head SHA. Every reader also matches the current head SHA, so an old record keeps its cap until the next push. That push runs one more rescue, which records the patch-id. Pending files without a key column settle under their SHA.
 - **Known limit.** `git patch-id` hashes the changed lines and their 3 context lines. A rebase that changes a line next to one of the PR's hunks changes the patch-id and allows one more rescue. The diff keeps the default context because `bin/pr-cycle`'s sticky verdicts store patch-ids made that way.
 - **Dry run.** `--dry-run` still computes the patch-id, so its qualifying set matches a real tick. It writes no state, sends no DM, launches nothing, and deletes the `refs/pr-cycle/<pr>` ref it fetched.
+
+## Addendum 2026-10-18: stale post-plan-running labels are swept by the tick
+
+An armed, green, BEHIND PR stays out of the merge line while it carries `post-plan-running`, because `bin/merge-line-select` skips any PR with that label. A post-plan run that dies before its release step leaves the label behind. PR 3306 and PR 3319 were both stuck this way for hours after their runs had ended.
+
+`bin/pr-cycle-tick` now removes the label when every check evaluates false. The label is at least `PCW_STALE_LABEL_MIN` old (180 minutes, twice `MAX_PP_SECS`). No launchd post-plan job exists for the PR or branch. No process has an argv naming the worktree or the run's slug tokens. No headless `claude -p` has the worktree as its cwd. Nothing was written under the newest `live-<slug>-*` out dir within the same window. A check that cannot be evaluated keeps the label. The sweep runs before the usage gate because it spends no Claude.
+
+The sweep leaves `bin/merge-line-select` and its guard alone. It touches no other label and no merged or closed PR. It does nothing about why the run died.
+
+The original Alternatives entry still holds against a lock file. Launchd labels, the wrapper shell's argv and the harness out dir are records a run already leaves. A new lock file would not exist for the runs that are already stuck.
+
+Every removal logs the PR number, the label age and the evidence string. `bin/pr-cycle-tick --dry-run` prints the would-remove set and changes nothing.

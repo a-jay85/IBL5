@@ -3,7 +3,7 @@ description: Lighthouse CI runs after merge only (master-push baseline plus week
 paths:
   - ".github/workflows/lighthouse*"
   - "ibl5/.lighthouserc.json"
-last_verified: 2026-10-06
+last_verified: 2026-10-18
 ---
 
 # Lighthouse CI (post-merge)
@@ -13,7 +13,7 @@ last_verified: 2026-10-06
 Lighthouse runs after merge only. PRs get no Lighthouse check and no sticky comment.
 
 - `.github/workflows/lighthouse-baseline.yml` runs on master push. It collects the **full** site set with `lhci collect`, applies no assertions, and uploads the `lighthouse-baseline-manifest` artifact. An artifact-age gate skips the run when a fresh baseline already exists.
-- `.github/workflows/lighthouse-audit.yml` runs weekly (Sunday 03:00 UTC) and on `workflow_dispatch`. It audits the full set against `ibl5/.lighthouserc.json` and opens or closes the `lighthouse-audit` issue.
+- `.github/workflows/lighthouse-audit.yml` runs weekly (Sunday 03:00 UTC) and on `workflow_dispatch`. It audits the full set against `ibl5/.lighthouserc.json` and opens or closes the `lighthouse-audit` issue. When the newest baseline artifact is at most 7 days old, the audit reuses that manifest and skips its own collection. The issue footer's `Commit:` then names the commit the baseline run audited, which `bin/lighthouse-audit-report --baseline-artifacts` reads from the download action's artifact metadata. When the audit collects its own results, the footer names the audit run's commit.
 
 ## Why there is no PR run
 

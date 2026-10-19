@@ -23,6 +23,8 @@ namespace Player\Views;
  */
 class TeamColorHelper
 {
+    private const MIN_CONTRAST = 4.5; // WCAG AA standard for normal text
+
     /**
      * Apply the presentation fallback to a raw ibl_team_info color row.
      *
@@ -203,94 +205,86 @@ class TeamColorHelper
         // Ensure we have the darker color as the gradient base
         $primary = self::isDark($color1) ? $color1 : $color2;
         $secondary = self::isDark($color1) ? $color2 : $color1;
-        
-        // Generate gradient colors
-        $gradientStart = $secondary;
-        $gradientMid = self::darken($primary, 10);
-        $gradientEnd = $secondary;
-        
-        // Border and accent color selection with improved contrast logic
-        // Choose the color with better contrast against the primary background
-        $color1Contrast = self::getContrastRatio($color1, $primary);
-        $color2Contrast = self::getContrastRatio($color2, $primary);
-        
-        // Start with the color that has better contrast with primary
-        $border = ($color1Contrast > $color2Contrast) ? $color1 : $color2;
-        $originalBorder = $border; // Keep track of original for fallback
-        
-        // Minimum contrast for readability
-        $minContrast = 4.5; // WCAG AA standard for normal text
-        $borderContrast = self::getContrastRatio($border, $primary);
-        
-        // If the initial border doesn't meet standards, adjust it
-        if ($borderContrast < $minContrast) {
-            $borderLuminance = self::getLuminance(self::hexToRgb($border));
-            $primaryLuminance = self::getLuminance(self::hexToRgb($primary));
-            
-            // Determine if we should lighten or darken based on relative luminance
-            if ($borderLuminance > $primaryLuminance) {
-                // Border is lighter than primary - lighten it more
-                $lightenPercent = 20;
-                while ($lightenPercent <= 90 && $borderContrast < $minContrast) {
-                    $border = self::lighten($originalBorder, $lightenPercent);
-                    $borderContrast = self::getContrastRatio($border, $primary);
-                    $lightenPercent += 10;
-                }
-            } else {
-                // Border is darker than or similar to primary - lighten significantly
-                $lightenPercent = 80;
-                while ($lightenPercent <= 98 && $borderContrast < $minContrast) {
-                    $border = self::lighten($originalBorder, $lightenPercent);
-                    $borderContrast = self::getContrastRatio($border, $primary);
-                    $lightenPercent += 2;
-                }
-            }
-            
-            // Fallback: if still not enough contrast, use white or black
-            if ($borderContrast < $minContrast) {
-                $border = self::isDark($primary) ? 'f0f0f0' : '1a1a1a';
-            }
-        }
-        
+
+        $border = self::chooseBorder($color1, $color2, $primary);
+
         // Get RGB values for border (for rgba() usage)
         $borderRgb = self::hexToRgb($border);
         $borderRgbString = "{$borderRgb['r']}, {$borderRgb['g']}, {$borderRgb['b']}";
-        
-        // Accent color - ensure it also has good contrast
-        // Try lightening the border by 10%, but verify contrast
-        $accent = self::lighten($border, 10);
-        $accentContrast = self::getContrastRatio($accent, $primary);
-        
-        // If accent contrast is too low, use the same as border
-        if ($accentContrast < $minContrast) {
-            $accent = $border;
-        }
-        
-        // Text colors based on contrast
-        $textOnPrimary = self::getTextColor($primary);
-        $text = $textOnPrimary;
-        
-        // Muted text - ensure it still meets WCAG AA for large text (3:1)
-        $textMuted = self::isDark($primary) ? 'cccccc' : '333333';
-        $mutedContrast = self::getContrastRatio($textMuted, $primary);
-        
-        // If muted text doesn't meet 3:1 (large text minimum), adjust it
-        if ($mutedContrast < 3.0) {
-            $textMuted = self::isDark($primary) ? 'dddddd' : '222222';
-        }
-        
+
         return [
             'primary' => $primary,
             'secondary' => $secondary,
-            'gradient_start' => $gradientStart,
-            'gradient_mid' => $gradientMid,
-            'gradient_end' => $gradientEnd,
+            'gradient_start' => $secondary,
+            'gradient_mid' => self::darken($primary, 10),
+            'gradient_end' => $secondary,
             'border' => $border,
             'border_rgb' => $borderRgbString,
-            'accent' => $accent,
-            'text' => $text,
-            'text_muted' => $textMuted
+            'accent' => self::deriveAccent($border, $primary),
+            'text' => self::getTextColor($primary),
+            'text_muted' => self::deriveMutedText($primary),
         ];
+    }
+
+    /**
+     * Pick the team color with better contrast against the primary, lighten it until it
+     * meets MIN_CONTRAST, and fall back to near-white or near-black if it never does.
+     */
+    private static function chooseBorder(string $color1, string $color2, string $primary): string
+    {
+        $seed = (self::getContrastRatio($color1, $primary) > self::getContrastRatio($color2, $primary)) ? $color1 : $color2;
+
+        if (self::getContrastRatio($seed, $primary) >= self::MIN_CONTRAST) {
+            return $seed;
+        }
+
+        // Lighter than primary: lighten more. Darker or equal: lighten significantly.
+        $border = (self::getLuminance(self::hexToRgb($seed)) > self::getLuminance(self::hexToRgb($primary)))
+            ? self::lightenUntilContrast($seed, $primary, 20, 90, 10)
+            : self::lightenUntilContrast($seed, $primary, 80, 98, 2);
+
+        if (self::getContrastRatio($border, $primary) < self::MIN_CONTRAST) {
+            return self::isDark($primary) ? 'f0f0f0' : '1a1a1a';
+        }
+
+        return $border;
+    }
+
+    /**
+     * Lighten $color by $start, $start + $step, ... up to $max percent, stopping at the first
+     * result that meets MIN_CONTRAST against $background. Returns the last result tried.
+     */
+    private static function lightenUntilContrast(string $color, string $background, int $start, int $max, int $step): string
+    {
+        $result = $color;
+        for ($percent = $start; $percent <= $max; $percent += $step) {
+            $result = self::lighten($color, $percent);
+            if (self::getContrastRatio($result, $background) >= self::MIN_CONTRAST) {
+                break;
+            }
+        }
+
+        return $result;
+    }
+
+    private static function deriveAccent(string $border, string $primary): string
+    {
+        // Lighten the border by 10%; if contrast is too low, use the border itself
+        $accent = self::lighten($border, 10);
+
+        return self::getContrastRatio($accent, $primary) < self::MIN_CONTRAST ? $border : $accent;
+    }
+
+    private static function deriveMutedText(string $primary): string
+    {
+        // Muted text must meet WCAG AA for large text (3:1)
+        $textMuted = self::isDark($primary) ? 'cccccc' : '333333';
+        if (self::getContrastRatio($textMuted, $primary) < 3.0) {
+            // '222222' is unreachable today; kept verbatim
+            $textMuted = self::isDark($primary) ? 'dddddd' : '222222';
+        }
+
+        return $textMuted;
     }
 
     /**

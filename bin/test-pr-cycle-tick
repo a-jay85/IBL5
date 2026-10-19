@@ -50,19 +50,44 @@ git -C "$REPO" config user.name t
 git -C "$REPO" add -A >/dev/null 2>&1
 git -C "$REPO" commit -qm seed >/dev/null 2>&1
 git -C "$REPO" worktree add -q -b branch-one "$WT" >/dev/null 2>&1
+# git reports the physical path (macOS: /private/var/...), and the sweep cases name $WT in
+# fake ps and lsof rows that must match it. Resolve it once, here.
+WT="$(cd "$WT" && pwd -P)"
 
 # --- shims ---------------------------------------------------------------------------------
 cat > "$SHIMS/gh" <<GH_EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$SCRATCH/gh.log"
 if [[ "\${1:-}" == "pr" && "\${2:-}" == "list" ]]; then
-    cat "$SCRATCH/prs.json"
+    st=""; prev=""
+    for a in "\$@"; do [[ "\$prev" == "--state" ]] && st="\$a"; prev="\$a"; done
+    if [[ "\$st" == "open" ]]; then
+        cat "$SCRATCH/prs.json"
+    else
+        jq -s 'add' "$SCRATCH/prs.json" "$SCRATCH/prs-closed.json"
+    fi
     exit 0
 fi
 if [[ "\${1:-}" == "api" ]]; then
-    case "\${2:-}" in
+    # The endpoint is the first repos/ argument: a DELETE puts --method before it.
+    ep=""
+    for a in "\$@"; do [[ -z "\$ep" && "\$a" == repos/* ]] && ep="\$a"; done
+    case "\$ep" in
+        repos/*/issues/*/timeline*)
+            n="\${ep#*/issues/}"; n="\${n%%/*}"
+            [[ ! -e "$SCRATCH/timeline-fail-\$n" ]] || exit 1
+            [[ -f "$SCRATCH/timeline-\$n.json" ]] || exit 1
+            expr=""; prev=""
+            for a in "\$@"; do [[ "\$prev" == "--jq" ]] && expr="\$a"; prev="\$a"; done
+            if [[ -n "\$expr" ]]; then jq -r "\$expr" "$SCRATCH/timeline-\$n.json"; else cat "$SCRATCH/timeline-\$n.json"; fi
+            exit 0 ;;
+        repos/*/issues/*/labels/*)
+            n="\${ep#*/issues/}"; n="\${n%%/*}"; lbl="\${ep##*/labels/}"
+            printf '%s %s %s\n' "\$(printf '%s ' "\$@" | grep -oE -- '--method [A-Z]+' | cut -d' ' -f2)" "\$n" "\$lbl" >> "$SCRATCH/gh-label.log"
+            [[ ! -e "$SCRATCH/delete-fail-\$n" ]] || exit 1
+            exit 0 ;;
         repos/*/commits/*/check-runs*)
-            sha="\${2#*/commits/}"; sha="\${sha%%/*}"
+            sha="\${ep#*/commits/}"; sha="\${sha%%/*}"
             [[ -f "$SCRATCH/checks-\$sha.json" ]] || exit 1
             cat "$SCRATCH/checks-\$sha.json"
             exit 0 ;;
@@ -78,6 +103,7 @@ GH_EOF
 cat > "$SHIMS/launchctl" <<LC_EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$SCRATCH/launchctl.log"
+[[ ! -e "$SCRATCH/launchctl-fail" ]] || exit 1
 if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
     cat "$SCRATCH/launchctl-list.txt"
     i=0
@@ -102,6 +128,34 @@ cat > "$SHIMS/claude" <<CL_EOF
 printf '%s\n' "\$*" >> "$SCRATCH/claude.log"
 exit 0
 CL_EOF
+
+cat > "$SHIMS/ps" <<PS_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/ps.log"
+[[ ! -e "$SCRATCH/ps-fail" ]] || exit 1
+cat "$SCRATCH/ps.txt"
+exit 0
+PS_EOF
+
+cat > "$SHIMS/lsof" <<LS_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/lsof.log"
+[[ ! -e "$SCRATCH/lsof-fail" ]] || exit 1
+cat "$SCRATCH/lsof.txt"
+exit 0
+LS_EOF
+
+# git: passes through, except `git worktree list` fails while the flag file exists.
+REAL_GIT="$(command -v git)"
+cat > "$SHIMS/git" <<GIT_EOF
+#!/usr/bin/env bash
+if [[ -e "$SCRATCH/git-worktree-fail" && "\${1:-}" != "" ]]; then
+    for a in "\$@"; do
+        if [[ "\$a" == worktree ]]; then exit 128; fi
+    done
+fi
+exec "$REAL_GIT" "\$@"
+GIT_EOF
 
 cat > "$SCRATCH/pr-cycle-stub" <<PC_EOF
 #!/usr/bin/env bash
@@ -162,10 +216,18 @@ reset() {
     rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
     rm -f "$SCRATCH/pr-cycle-skip-notes-env" "$SCRATCH/pr-cycle-skip-notes-copy"
     rm -f "$SCRATCH"/key-*
+    rm -f "$SCRATCH/prs-closed.json" "$SCRATCH"/timeline-*.json "$SCRATCH"/timeline-fail-* \
+        "$SCRATCH"/delete-fail-* "$SCRATCH/ps-fail" "$SCRATCH/lsof-fail" \
+        "$SCRATCH/launchctl-fail" "$SCRATCH/lsof.txt"
     rm -rf "$HOME_DIR" "$REPO/tools" "$WT/tools" "$SCRATCH/usage-gate" "$SCRATCH/watch-state"
     mkdir -p "$HOME_DIR"
     : > "$SCRATCH/launchctl-list.txt"
     echo '[]' > "$SCRATCH/prs.json"
+    echo '[]' > "$SCRATCH/prs-closed.json"
+    printf '%s\n' '1 /sbin/launchd' '77 /usr/bin/login -fp t' > "$SCRATCH/ps.txt"
+    : > "$SCRATCH/lsof.txt"
+    rm -f "$SCRATCH/git-worktree-fail" "$REPO/bin/pr-cycle-tick-mut"
+    TICK_OVERRIDE=""
     E_ZONE=normal; E_STOP="$UNSET"; E_STATE="$UNSET"
     E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
     E_HOME="set"; E_STUB_RC=0
@@ -205,6 +267,83 @@ set_jobs() {
     done
 }
 
+# set_labels <num> <label>...: sets .labels on the prs.json entry. PRs never given a call
+# carry no labels key, which the sweep must tolerate.
+set_labels() {
+    local n="$1" names
+    shift
+    names="$(printf '%s\n' "$@" | jq -R '{name: .}' | jq -sc '.')"
+    jq -c --argjson n "$n" --argjson l "$names" \
+        'map(if .number == $n then . + {labels: $l} else . end)' "$SCRATCH/prs.json" > "$SCRATCH/prs.json.tmp" \
+        && mv "$SCRATCH/prs.json.tmp" "$SCRATCH/prs.json"
+}
+
+# set_closed_prs "<num>|<branch>|<sha>|<state>|<isDraft>": the PRs a call without
+# `--state open` would also see.
+set_closed_prs() {
+    local e out="[]" n b s m d
+    for e in "$@"; do
+        IFS='|' read -r n b s m d <<< "$e"
+        out="$(jq -c --argjson n "$n" --arg b "$b" --arg s "$s" --arg m "$m" --argjson d "$d" \
+            '. + [{number:$n, headRefName:$b, headRefOid:$s, mergeStateStatus:$m, isDraft:$d, baseRefName:"master"}]' <<< "$out")"
+    done
+    printf '%s\n' "$out" > "$SCRATCH/prs-closed.json"
+}
+
+# set_label_age <num> <minutes-ago> [extra-older-minutes]: the timeline for PR <num>. With
+# the third argument an older labeled event, an unlabeled event and an unrelated labeled
+# event precede the last one, so "last labeled event for THIS label wins" is tested.
+set_label_age() {
+    local n="$1" m="$2" older="${3-}" now t ev
+    now="$(date +%s)"
+    t="$(jq -rn --argjson t $(( now - m * 60 )) '$t | todate')"
+    ev="[]"
+    if [[ -n "$older" ]]; then
+        local to
+        to="$(jq -rn --argjson t $(( now - older * 60 )) '$t | todate')"
+        ev="$(jq -nc --arg to "$to" '[
+            {event:"labeled", label:{name:"post-plan-running"}, created_at:$to},
+            {event:"unlabeled", label:{name:"post-plan-running"}, created_at:$to},
+            {event:"labeled", label:{name:"auto-mergeable"}, created_at:$to}]')"
+    fi
+    jq -c --arg t "$t" '. + [{event:"labeled", label:{name:"post-plan-running"}, created_at:$t}]' <<< "$ev" \
+        > "$SCRATCH/timeline-$n.json"
+}
+set_closed_labels() {  # <num> <label>...: set_labels, pointed at prs-closed.json
+    local n="$1" names
+    shift
+    names="$(printf '%s\n' "$@" | jq -R '{name: .}' | jq -sc '.')"
+    jq -c --argjson n "$n" --argjson l "$names" \
+        'map(if .number == $n then . + {labels: $l} else . end)' "$SCRATCH/prs-closed.json" > "$SCRATCH/prs-closed.json.tmp" \
+        && mv "$SCRATCH/prs-closed.json.tmp" "$SCRATCH/prs-closed.json"
+}
+set_git_worktree_fail() { touch "$SCRATCH/git-worktree-fail"; }
+set_timeline_fail() { touch "$SCRATCH/timeline-fail-$1"; }
+set_delete_fail() { touch "$SCRATCH/delete-fail-$1"; }
+
+# set_ps <line>...: the `ps -axww -o pid=,command=` output the ps shim prints.
+set_ps() { printf '%s\n' "$@" > "$SCRATCH/ps.txt"; }
+set_ps_fail() { touch "$SCRATCH/ps-fail"; }
+set_lsof() { printf '%s\n' "$@" > "$SCRATCH/lsof.txt"; }
+set_lsof_fail() { touch "$SCRATCH/lsof-fail"; }
+set_launchctl_fail() { touch "$SCRATCH/launchctl-fail"; }
+
+# _stamp_at <epoch>: touch -t stamp. The one platform branch in this harness: BSD date -r
+# on macOS, GNU date -d @ on Linux CI.
+_stamp_at() { date -r "$1" +%Y%m%d%H%M.%S 2>/dev/null || date -d "@$1" +%Y%m%d%H%M.%S; }
+set_out_root() { mkdir -p "$REPO/tools/postplan-harness/out"; }
+# set_live_dir <branch> <minutes-ago> [wt]: a harness run dir with one file, both back-dated.
+set_live_dir() {
+    local branch="$1" m="$2" base="$REPO" run st
+    [[ -z "${3-}" ]] || base="$WT"
+    run="$base/tools/postplan-harness/out/live-$branch-20261018-000000"
+    mkdir -p "$run"
+    : > "$run/phase.log"
+    st="$(_stamp_at $(( $(date +%s) - m * 60 )))"
+    touch -t "$st" "$run/phase.log" "$run"
+}
+label_log() { cat "$SCRATCH/gh-label.log" 2>/dev/null || true; }
+
 _DROP=(); _SET=()
 _envv() { if [[ "$2" == "$UNSET" ]]; then _DROP+=(-u "$1"); else _SET+=("$1=$2"); fi; }
 
@@ -225,7 +364,7 @@ run_tick() {
         PATH="$SHIMS:$PATH" \
         IBL5_USAGE_GATE_STATE_DIR="$SCRATCH/usage-gate" \
         STUB_RC="$E_STUB_RC" \
-        "$TICK" "$@" 2>"$ERR")"
+        "${TICK_OVERRIDE:-$TICK}" "$@" 2>"$ERR")"
     RC=$?
     return 0
 }
@@ -233,6 +372,22 @@ run_tick() {
 out_has() { grep -qF -- "$1" <<< "$OUT"; }
 err_has() { grep -qF -- "$1" "$ERR"; }
 no_file() { [[ ! -e "$1" ]]; }
+# True when gh was never called, or only for reads the tick makes on the way to a launch: the
+# stale-label sweep's `pr list ... isDraft,labels`, the rescue path's `pr list ...
+# isDraft,baseRefName`, and its `api repos/.../commits/<sha>/check-runs?per_page=100`. Any
+# other call (a timeline read, a label DELETE) is not accepted.
+gh_sweep_only() {
+    [[ ! -e "$SCRATCH/gh.log" ]] && return 0
+    ! grep -vE '^(pr list .*isDraft,(labels|baseRefName)|api repos/[^ ]*/commits/[^ ]+/check-runs\?per_page=100)$' \
+        "$SCRATCH/gh.log" | grep -q .
+}
+# Stricter: gh was never called, or only for the stale-label sweep's `pr list ... isDraft,labels`.
+# For the early-exit cases (usage pause, live worker), which must stop before the rescue path's
+# `isDraft,baseRefName` list and `check-runs` read.
+gh_stale_label_only() {
+    [[ ! -e "$SCRATCH/gh.log" ]] && return 0
+    ! grep -vE '^pr list .*isDraft,labels$' "$SCRATCH/gh.log" | grep -q .
+}
 attempt() { cat "$STATE_DIR/attempts/$1" 2>/dev/null; }
 pending_count() { find "$STATE_DIR/pending" -type f 2>/dev/null | wc -l | tr -d ' '; }
 dm_count() { if [[ -f "$SCRATCH/dm.log" ]]; then wc -l < "$SCRATCH/dm.log" | tr -d ' '; else echo 0; fi; }
@@ -288,7 +443,7 @@ for z in drain stop; do
     run_tick
     [[ $RC -eq 0 ]] || fail "usage-pause($z): rc $RC, want 0"
     out_has 'usage zone' || fail "usage-pause($z): no 'usage zone' line: $OUT"
-    no_file "$SCRATCH/gh.log" || fail "usage-pause($z): gh was called"
+    gh_stale_label_only || fail "usage-pause($z): gh was called beyond the stale-label read"
     no_file "$SCRATCH/pr-cycle.log" || fail "usage-pause($z): pr-cycle was launched"
 done
 end_case usage-pause
@@ -310,7 +465,7 @@ set_jobs 123 com.ibl5.pr-cycle-20261003-120000
 run_tick
 [[ $RC -eq 0 ]] || fail "live-worker: rc $RC, want 0"
 out_has 'worker running' || fail "live-worker: no 'worker running' line: $OUT"
-no_file "$SCRATCH/gh.log" || fail "live-worker: gh was called"
+gh_stale_label_only || fail "live-worker: gh was called beyond the stale-label read"
 no_file "$SCRATCH/pr-cycle.log" || fail "live-worker: pr-cycle was launched"
 end_case live-worker
 
@@ -381,6 +536,34 @@ run_tick
 grep -qF "$(printf '101\taaa1111')" "$STATE_DIR"/pending/* 2>/dev/null \
     || fail "red-qualifies: pending entry lacks the 101/aaa1111 line"
 end_case red-qualifies
+
+# gh_sweep_only accepts the rescue path's own reads and still rejects any other gh call.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+grep -E -- '^pr list ' "$SCRATCH/gh.log" | grep -qE -- 'isDraft,baseRefName$' \
+    || fail "gh-sweep-widened: no baseRefName read in gh.log"
+grep -qE -- '^api repos/.*/commits/aaa1111/check-runs\?per_page=100$' "$SCRATCH/gh.log" \
+    || fail "gh-sweep-widened: no check-runs call in gh.log"
+gh_sweep_only || fail "gh-sweep-widened: helper rejected the sweep, baseRefName and check-runs calls"
+echo 'api --method DELETE repos/{owner}/{repo}/issues/41/labels/post-plan-running' >> "$SCRATCH/gh.log"
+gh_sweep_only && fail "gh-sweep-widened: helper accepted a DELETE call"
+sed -i.bak '$d' "$SCRATCH/gh.log"
+gh_sweep_only || fail "gh-sweep-widened: helper rejected the log after the DELETE line was removed"
+echo 'api repos/{owner}/{repo}/issues/41/timeline --paginate' >> "$SCRATCH/gh.log"
+gh_sweep_only && fail "gh-sweep-widened: helper accepted a timeline call"
+# gh_stale_label_only accepts the stale-label read alone and rejects the rescue path's reads.
+grep -E -- '^pr list ' "$SCRATCH/gh.log" | grep -E -- 'isDraft,labels$' > "$SCRATCH/gh.log.strict"
+[[ -s "$SCRATCH/gh.log.strict" ]] || fail "gh-sweep-widened: no stale-label read in gh.log"
+cp "$SCRATCH/gh.log" "$SCRATCH/gh.log.full"
+cp "$SCRATCH/gh.log.strict" "$SCRATCH/gh.log"
+gh_stale_label_only || fail "gh-sweep-widened: strict helper rejected the stale-label read"
+grep -E -- '^pr list ' "$SCRATCH/gh.log.full" | grep -E -- 'isDraft,baseRefName$' >> "$SCRATCH/gh.log"
+gh_stale_label_only && fail "gh-sweep-widened: strict helper accepted a baseRefName read"
+cp "$SCRATCH/gh.log.strict" "$SCRATCH/gh.log"
+grep -E -- '^api repos/.*/check-runs\?per_page=100$' "$SCRATCH/gh.log.full" >> "$SCRATCH/gh.log"
+gh_stale_label_only && fail "gh-sweep-widened: strict helper accepted a check-runs call"
+end_case gh-sweep-widened
 
 reset; begin_case
 set_prs '101|branch-one|aaa1111|DIRTY|false'
@@ -864,6 +1047,273 @@ if grep -qE '\$\{PR_CYCLE_[A-Z_]+-[^}]*\}' <<< "$stripped"; then
     fail "invariants: tick source uses a colon-less \${VAR-} default for a seam variable"
 fi
 end_case invariants
+
+# --- stale post-plan-running sweep ----------------------------------------------------------
+iso_ago() { jq -rn --argjson t $(( $(date +%s) - $1 * 60 )) '$t | todate'; }
+rc_is() {  # rc_is <label> <want-rc> <cmd>...
+    local label="$1" want="$2" got
+    shift 2
+    "$@" >/dev/null 2>&1; got=$?
+    [[ $got -eq $want ]] || fail "$label: rc $got, want $want"
+}
+# sweep_fixture: PR 41 (worktree $WT) carries the label, 240 min old; PR 42 has no worktree
+# and no label. Zone cooldown makes guard (b) exit right after the sweep, so every case also
+# pins placement: the block moved below guard (b) loses its output.
+sweep_fixture() {
+    reset; set_out_root; E_ZONE=cooldown
+    set_prs "41|branch-one|aaaaaaa|BEHIND|false" "42|branch-two|bbbbbbb|BEHIND|false"
+    set_labels 41 post-plan-running auto-mergeable
+    set_label_age 41 240
+}
+no_label_call() { [[ -z "$(label_log)" ]]; }
+one_delete_41() { [[ "$(label_log)" == "DELETE 41 post-plan-running" ]]; }
+
+reset; begin_case
+# shellcheck source=/dev/null
+. "$REPO/bin/lib/pr-cycle-watch.sh"
+rc_is "label-too-young 179" 0 pcw_label_too_young "$(iso_ago 179)"
+rc_is "label-too-young 180" 1 pcw_label_too_young "$(iso_ago 180)"
+rc_is "label-too-young 240" 1 pcw_label_too_young "$(iso_ago 240)"
+rc_is "label-too-young empty" 2 pcw_label_too_young ""
+rc_is "label-too-young garbage" 2 pcw_label_too_young garbage
+rc_is "label-age empty" 2 pcw_label_age_min ""
+rc_is "label-age garbage" 2 pcw_label_age_min garbage
+[[ "$(pcw_label_age_min "$(iso_ago 90)")" == "90" ]] || fail "label-age: 90 min old did not print 90"
+PS_LINES="$(printf '%s\n' "11 /bin/bash -lc cd /wt/foo-bar && x" "12 sleep 1")"
+rc_is "argv foo vs foo-bar" 1 pcw_postplan_argv_live /wt/foo s "$PS_LINES"
+rc_is "argv foo exact" 0 pcw_postplan_argv_live /wt/foo-bar s "$PS_LINES"
+rc_is "argv foo child path" 0 pcw_postplan_argv_live /wt/foo-bar s "13 /bin/bash -lc cd /wt/foo-bar/ibl5 && x"
+rc_is "argv foo exact (no foo-bar)" 0 pcw_postplan_argv_live /wt/foo s "13 /bin/bash -lc cd /wt/foo && x"
+rc_is "argv /x/foo vs /x/foo-bar" 1 pcw_postplan_argv_live /x/foo s "13 /bin/bash -lc cd /x/foo-bar && x"
+rc_is "argv /x/foo exact" 0 pcw_postplan_argv_live /x/foo s "13 /bin/bash -lc cd /x/foo && x"
+rc_is "argv /x/foo child /x/foo/ibl5" 0 pcw_postplan_argv_live /x/foo s "13 /bin/bash -lc cd /x/foo/ibl5 && x"
+rc_is "argv log token" 0 pcw_postplan_argv_live "" foo "14 tail /logs/post-plan-now-foo-20261018-004740-25853.log"
+rc_is "argv run-dir token" 0 pcw_postplan_argv_live "" foo "15 py tools/postplan-harness/out/live-foo-20261018-004740"
+rc_is "argv slug boundary" 1 pcw_postplan_argv_live "" foo "16 tail /logs/post-plan-now-foo-bar-20261018-004740-25853.log"
+rc_is "argv empty text" 2 pcw_postplan_argv_live "" foo ""
+rc_is "argv excluded pid" 1 pcw_postplan_argv_live "" foo "77 py out/live-foo-20261018-004740" "77 5"
+rc_is "argv not-excluded pid" 0 pcw_postplan_argv_live "" foo "78 py out/live-foo-20261018-004740" "77 5"
+CLP="$(pcw_claude_print_pids "$(printf '%s\n' "4242 /usr/local/bin/claude -p prompt --session-id x" "4243 claude" "4244 /opt/claude-launcher --print")")"
+[[ "$CLP" == "4242" ]] || fail "claude-print-pids: printed '$CLP', want 4242"
+rc_is "claude-print-pids interactive" 1 pcw_claude_print_pids "4243 claude"
+rc_is "claude-print-pids launcher" 1 pcw_claude_print_pids "4244 /opt/claude-launcher --print"
+rc_is "claude-print-pids --print" 0 pcw_claude_print_pids "4245 claude --print hi"
+rc_is "claude-print-pids empty" 2 pcw_claude_print_pids ""
+rc_is "cwd in worktree" 0 pcw_cwd_in_worktree /wt/foo "$(printf 'p4242\nfcwd\nn/wt/foo/ibl5')"
+rc_is "cwd in worktree root" 0 pcw_cwd_in_worktree /wt/foo "$(printf 'p4242\nfcwd\nn/wt/foo')"
+rc_is "cwd foo-bar" 1 pcw_cwd_in_worktree /wt/foo "$(printf 'p4242\nfcwd\nn/wt/foo-bar')"
+rc_is "cwd empty text" 2 pcw_cwd_in_worktree /wt/foo ""
+rc_is "cwd empty root" 2 pcw_cwd_in_worktree "" "$(printf 'n/wt/foo')"
+POUT="$SCRATCH/pout"
+rm -rf "$POUT"
+rc_is "out-dir root absent" 2 pcw_live_out_dir_fresh foo "$POUT"
+mkdir -p "$POUT/live-foo-20261018-000000"
+: > "$POUT/live-foo-20261018-000000/f"
+OLD_ST="$(_stamp_at $(( $(date +%s) - 240 * 60 )))"
+touch -t "$OLD_ST" "$POUT/live-foo-20261018-000000/f" "$POUT/live-foo-20261018-000000"
+rc_is "out-dir 4h old" 1 pcw_live_out_dir_fresh foo "$POUT"
+touch "$POUT/live-foo-20261018-000000/f"
+rc_is "out-dir touched" 0 pcw_live_out_dir_fresh foo "$POUT"
+rc_is "out-dir other branch" 1 pcw_live_out_dir_fresh baz "$POUT"
+rm -rf "$POUT"
+# gh shim self-tests: a later edit that breaks the shim must fail here, not in the tick.
+set_label_age 7 240 600
+SHIM_TL="$(env PATH="$SHIMS:$PATH" gh api repos/o/r/issues/7/timeline --paginate \
+    --jq '.[] | select(.event=="labeled" and .label.name=="post-plan-running") | .created_at')"
+[[ "$(wc -l <<< "$SHIM_TL" | tr -d ' ')" == "2" ]] || fail "gh-shim: --jq timeline printed '$SHIM_TL', want two dates"
+set_timeline_fail 7
+SHIM_OUT="$(env PATH="$SHIMS:$PATH" gh api repos/o/r/issues/7/timeline --paginate 2>/dev/null)"; SHIM_RC=$?
+[[ $SHIM_RC -eq 1 && -z "$SHIM_OUT" ]] || fail "gh-shim: timeline-fail gave rc $SHIM_RC out '$SHIM_OUT'"
+end_case sweep-predicates
+
+# (a) stale label, no live run: removed. Also the unlabeled PR is never touched (N-1).
+sweep_fixture; begin_case
+run_tick
+one_delete_41 || fail "S-a: label log is '$(label_log)', want one DELETE 41 post-plan-running"
+out_has "stale-label: removed post-plan-running from #41 (age=240m launchd=none argv=none claude-cwd=none out-dir=idle>=180m draft=false)" \
+    || fail "S-a: no removal line: $OUT"
+out_has "usage zone cooldown" || fail "S-a: guard (b) output missing after the sweep: $OUT"
+grep -E -- 'pr list' "$SCRATCH/gh.log" | grep -qF -- '--state open' || fail "S-a: sweep read was not --state open"
+grep -E -- 'pr list' "$SCRATCH/gh.log" | grep -qF -- 'labels' || fail "S-a: sweep read did not ask for labels"
+grep -qF 'issues/41/timeline' "$SCRATCH/gh.log" || fail "S-a: no timeline call for #41"
+grep -qF 'issues/42/timeline' "$SCRATCH/gh.log" && fail "S-a: timeline call for the unlabeled #42"
+grep -qF ' 42 ' "$SCRATCH/gh-label.log" 2>/dev/null && fail "S-a: DELETE issued for the unlabeled #42"
+end_case sweep-a-removed
+
+# (b) older than the threshold but a live post-plan process names the worktree or the slug.
+for ps_line in \
+    "5555 /bin/bash -lc cd $WT && caffeinate -s tools/postplan-harness/run isolated $WT x --live" \
+    "5555 tail -f /logs/post-plan-now-branch-one-20261018-004740-25853.log" \
+    "5555 python3 runner.py tools/postplan-harness/out/live-branch-one-20261018-004740 --live"; do
+    sweep_fixture; begin_case
+    set_ps "$ps_line"
+    run_tick
+    no_label_call || fail "S-b: label removed despite a live process ($ps_line)"
+    out_has "stale-label: #41 held (age 240m): post-plan process live" || fail "S-b: no held line ($ps_line): $OUT"
+    out_has "usage zone cooldown" || fail "S-b: guard (b) output missing: $OUT"
+    end_case sweep-b-live-process
+done
+
+# (c) live skill fallback: a wrapper argv, or an orphan headless claude whose cwd is the worktree.
+sweep_fixture; begin_case
+set_ps "5556 /bin/bash -lc cd $WT && x claude -p y --session-id 0f0f"
+run_tick
+no_label_call || fail "S-c wrapper: label removed"
+out_has "stale-label: #41 held (age 240m): post-plan process live" || fail "S-c wrapper: no held line: $OUT"
+end_case sweep-c-wrapper
+sweep_fixture; begin_case
+set_ps "4242 /usr/local/bin/claude -p prompt --session-id x"; set_lsof "p4242" "fcwd" "n$WT"
+run_tick
+no_label_call || fail "S-c orphan: label removed"
+out_has "stale-label: #41 held (age 240m): headless claude cwd in worktree" || fail "S-c orphan: no held line: $OUT"
+grep -qF -- '-p 4242' "$SCRATCH/lsof.log" 2>/dev/null || fail "S-c orphan: lsof was not asked about pid 4242"
+end_case sweep-c-orphan
+sweep_fixture; begin_case
+set_ps "4243 claude"; set_lsof "p4243" "fcwd" "n$WT"
+run_tick
+one_delete_41 || fail "S-c interactive: an idle interactive claude pinned the label: '$(label_log)'"
+no_file "$SCRATCH/lsof.log" || fail "S-c interactive: lsof was called with no headless claude"
+end_case sweep-c-interactive
+
+# (d) younger than the threshold stays; exactly the threshold goes.
+sweep_fixture; begin_case
+set_label_age 41 179
+run_tick
+no_label_call || fail "S-d: 179 min label removed"
+out_has "stale-label: #41 held (age 179m): too young" || fail "S-d: no too-young line: $OUT"
+set_label_age 41 180
+run_tick
+one_delete_41 || fail "S-d: 180 min label not removed: '$(label_log)'"
+end_case sweep-d-threshold
+
+# (e) every lookup failure keeps the label.
+sweep_fixture; begin_case
+set_launchctl_fail; run_tick
+no_label_call || fail "S-e launchctl: label removed"
+out_has "stale-label: launchctl unreadable; sweep skipped" || fail "S-e launchctl: no skip line: $OUT"
+end_case sweep-e-launchctl
+sweep_fixture; begin_case
+set_ps_fail; run_tick
+no_label_call || fail "S-e ps: label removed"
+out_has "stale-label: ps unreadable; sweep skipped" || fail "S-e ps: no skip line: $OUT"
+end_case sweep-e-ps
+sweep_fixture; begin_case
+set_ps "4242 claude -p x"; set_lsof_fail; run_tick
+no_label_call || fail "S-e lsof: label removed"
+out_has "stale-label: #41 held (age 240m): lsof unevaluable" || fail "S-e lsof: no held line: $OUT"
+end_case sweep-e-lsof
+sweep_fixture; begin_case
+set_timeline_fail 41; run_tick
+no_label_call || fail "S-e timeline: label removed"
+out_has "stale-label: #41 held (age ?m): label time unevaluable" || fail "S-e timeline: no held line: $OUT"
+end_case sweep-e-timeline
+sweep_fixture; begin_case
+set_git_worktree_fail; run_tick
+no_label_call || fail "S-e git: label removed"
+out_has "stale-label: #41 held (age 240m): git worktree list unevaluable" || fail "S-e git: no held line: $OUT"
+end_case sweep-e-git-worktree
+
+# (f) --dry-run names the PR and removes nothing.
+sweep_fixture; begin_case
+run_tick --dry-run
+out_has "dry-run: stale-label: would remove post-plan-running from #41" || fail "S-f: no would-remove line: $OUT"
+no_label_call || fail "S-f: dry-run issued a DELETE"
+grep -qF 'DELETE' "$SCRATCH/gh.log" && fail "S-f: gh.log holds a DELETE"
+out_has "usage zone cooldown" || fail "S-f: dry-run did not continue into guard (b): $OUT"
+end_case sweep-f-dry-run
+
+# N-2: only post-plan-running is ever deleted.
+sweep_fixture; begin_case
+set_labels 41 post-plan-running auto-mergeable human-signoff
+run_tick
+one_delete_41 || fail "N-2: label log is '$(label_log)'"
+[[ "$(grep -cE 'auto-mergeable|human-signoff' "$SCRATCH/gh-label.log")" == "0" ]] || fail "N-2: another label was deleted"
+end_case sweep-n2-only-this-label
+
+# N-3: a merged PR carrying an old label is never listed or deleted.
+sweep_fixture; begin_case
+set_closed_prs "43|branch-two|ccccccc|MERGED|false"; set_closed_labels 43 post-plan-running; set_label_age 43 600
+run_tick
+out_has "#43" && fail "N-3: the merged PR #43 was swept: $OUT"
+grep -qF ' 43 ' "$SCRATCH/gh-label.log" 2>/dev/null && fail "N-3: DELETE issued for the merged PR"
+end_case sweep-n3-merged-pr
+
+# N-4: a process in a sibling worktree whose name extends this one does not keep the label.
+sweep_fixture; begin_case
+set_ps "5557 /bin/bash -lc cd ${WT}-bar && caffeinate x"
+run_tick
+one_delete_41 || fail "N-4: wt-one-bar kept the wt-one PR: '$(label_log)'"
+set_ps "5557 /bin/bash -lc cd $WT/ibl5 && caffeinate x"
+rm -f "$SCRATCH/gh-label.log"
+run_tick
+no_label_call || fail "N-4: a process in wt-one/ibl5 did not keep the PR"
+end_case sweep-n4-slug-boundary
+
+# N-5: the LAST labeled event for this label wins.
+sweep_fixture; begin_case
+set_label_age 41 60 600
+run_tick
+no_label_call || fail "N-5: an older labeled event aged the label out"
+out_has "stale-label: #41 held (age 60m): too young" || fail "N-5: no too-young line: $OUT"
+end_case sweep-n5-last-label-event
+
+# N-6: a failed DELETE is reported, not swallowed.
+sweep_fixture; begin_case
+set_delete_fail 41
+run_tick
+out_has "stale-label: DELETE failed for #41; label kept" || fail "N-6: no failure line: $OUT"
+out_has "stale-label: removed" && fail "N-6: logged a removal that did not happen"
+end_case sweep-n6-delete-failure
+
+# N-7: the harness out dir is evidence.
+sweep_fixture; begin_case
+set_live_dir branch-one 30
+run_tick
+no_label_call || fail "N-7: a 30 min old run dir did not keep the label"
+out_has "stale-label: #41 held (age 240m): out dir written <180m ago" || fail "N-7: no fresh-out-dir line: $OUT"
+set_live_dir branch-one 300
+run_tick
+one_delete_41 || fail "N-7: a 300 min old run dir kept the label: '$(label_log)'"
+end_case sweep-n7-out-dir
+sweep_fixture; begin_case
+rm -rf "$REPO/tools"
+set_labels 41 auto-mergeable; set_labels 42 post-plan-running; set_label_age 42 240
+run_tick
+no_label_call || fail "N-7 root: label removed with no out dir root"
+out_has "stale-label: #42 held (age 240m): out dir root missing" || fail "N-7 root: no held line: $OUT"
+end_case sweep-n7-out-root-missing
+sweep_fixture; begin_case
+set_labels 41 auto-mergeable; set_labels 42 post-plan-running; set_label_age 42 240
+run_tick
+out_has "claude-cwd=n/a" || fail "no-worktree branch: evidence lacks claude-cwd=n/a: $OUT"
+grep -qxF 'DELETE 42 post-plan-running' <<< "$(label_log)" || fail "no-worktree branch: #42 not removed: '$(label_log)'"
+end_case sweep-no-worktree-branch
+
+# Threshold pin: the stale-label age stays at least twice the per-phase post-plan cap.
+reset; begin_case
+MAXPP="$(grep -oE '^MAX_PP_SECS=[0-9]+' "$SCRIPT_DIR/automouse/run" | cut -d= -f2)"
+[[ "$MAXPP" =~ ^[1-9][0-9]*$ ]] || fail "threshold-pin: MAX_PP_SECS not found in bin/automouse/run"
+STALE_MIN="$(. "$REPO/bin/lib/pr-cycle-watch.sh"; printf '%s' "$PCW_STALE_LABEL_MIN")"
+[[ "$STALE_MIN" =~ ^[1-9][0-9]*$ ]] || fail "threshold-pin: PCW_STALE_LABEL_MIN not found"
+if [[ "$MAXPP" =~ ^[1-9][0-9]*$ && "$STALE_MIN" =~ ^[1-9][0-9]*$ ]]; then
+    (( STALE_MIN * 60 >= 2 * MAXPP )) || fail "threshold-pin: PCW_STALE_LABEL_MIN=$STALE_MIN is under 2x MAX_PP_SECS=$MAXPP"
+fi
+end_case sweep-threshold-pin
+
+# Mutated copy: the always-dead override flips case (b), so (b) is driven by the real predicate.
+sweep_fixture; begin_case
+[[ "$(grep -c '# stale-label: argv probe' "$TICK")" == "1" ]] || fail "mutated-copy: argv-probe anchor is not unique"
+awk '{print} /# stale-label: argv probe/ {print "pcw_postplan_argv_live() { return 1; }"}' "$TICK" \
+    > "$REPO/bin/pr-cycle-tick-mut"
+chmod +x "$REPO/bin/pr-cycle-tick-mut"
+set_ps "5555 /bin/bash -lc cd $WT && caffeinate x"
+run_tick
+no_label_call || fail "mutated-copy: unmutated tick removed the label"
+TICK_OVERRIDE="$REPO/bin/pr-cycle-tick-mut"
+run_tick
+one_delete_41 || fail "mutated-copy: an always-dead probe did not flip (b) to removed: '$(label_log)'"
+TICK_OVERRIDE=""
+end_case sweep-mutated-copy
 
 reset; begin_case
 # Run from the linked worktree: Program must still name the MAIN checkout.

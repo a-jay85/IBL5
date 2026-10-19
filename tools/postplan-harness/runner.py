@@ -38,8 +38,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, llm_calls,
-                     manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
+                     manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
@@ -73,6 +73,7 @@ from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
 from harness.review import ReviewPhase
+from harness import review_depth
 from harness import baseline_guard
 from harness.state import (SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState,
                            UsageLedger)
@@ -389,6 +390,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         if _inject_merge_danger(copy, worktree, diff, log):
             body_check_degraded = True
+        _inject_how_to_revert(copy, diff, log)
         log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
@@ -461,7 +463,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         cache_key = None
         head_before_45 = git.head()
         res.thread_ingestion = _run_thread_ingestion_phase(
-            gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, res)
+            gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, res,
+            outcome_log_path=os.path.join(_state_dir(out_dir, live, state_dir), outcome_log.LOG_BASENAME))
         if git.head() != head_before_45:
             sha = git.head()
             files = git.changed_files()
@@ -484,7 +487,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if cache_rec is not None and not reviewcache.key_matches(cache_rec, cache_key):
             conflict_only = _conflict_only_proof(git, cache_rec, cache_key, cache_files, log)
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        review_phase = ReviewPhase(llm, gh)
+        review_phase = _review_phase_for(llm, gh, copy, meta, log)
         cur_gates = review_phase.gates(cls) if cache_rec is not None else None
         restored = None
         key_hit = cache_rec is not None and reviewcache.key_matches(cache_rec, cache_key)
@@ -1174,7 +1177,7 @@ def _reclaim_stale_lease(git, log, phase: str, snap, *, run_git=None) -> None:
 
 
 def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out_dir,
-                                log, res) -> dict:
+                                log, res, outcome_log_path=None) -> dict:
     """Phase 4.5 wrapper: same commit/push injection as the Phase 5.5 remediation.
     Swallows everything except gate-path-edit (a local commit touched a gate-owning
     path; shipping it later would bypass the gate) and push-failed (the tree and origin
@@ -1183,6 +1186,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
     try:
         out = run_thread_ingestion(
             gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
+            outcome_log_path=outcome_log_path,
             commit=lambda msg: _commit_with_gate_fix(
                 git, worktree, msg, log, phase="phase4.5", llm=llm, res=res),
             push=lambda: _push_with_gate_fix(git, log, "phase4.5", llm=llm,
@@ -1200,6 +1204,13 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
         log(f"phase4.5: thread ingestion failed ({e!r}); continuing")
         out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
                "error": _redact(repr(e))}
+    if outcome_log_path:
+        try:
+            rows = gh.review_threads_all(pr)
+            if rows is not None:
+                outcome_log.run_sweep(rows, pr, outcome_log_path, log, pipeline="harness")
+        except Exception as e:  # noqa: BLE001 - outcome logging never affects the run
+            log(f"outcome-log: sweep fetch failed ({e!r}); continuing")
     log(f"phase4.5: {out.get('found', 0)} trusted thread(s) found, {out.get('fixed', 0)} fixed, "
         f"{out.get('declined', 0)} declined, {out.get('skipped', 0)} skipped (error) "
         f"in {time.monotonic() - t0:.2f}s")
@@ -2216,6 +2227,19 @@ def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list
     return findings
 
 
+def _inject_how_to_revert(copy: dict, diff_body: str, log) -> None:
+    """Phase 2: advisory How to revert line, placed after Merge danger. Log-only: no finding,
+    no degraded body check. An empty summary_md is the clean-tree rerun and is left as is."""
+    if not copy["summary_md"]:
+        return
+    try:
+        copy["summary_md"], source = how_to_revert.apply_to_body(copy["summary_md"], diff_body)
+    except Exception as exc:  # advisory field: never fail Phase 2 over it
+        log(f"phase2: how-to-revert skipped ({exc})")
+        return
+    log(f"phase2: how-to-revert source={source}")
+
+
 def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str) -> str:
     """Return `body` carrying exactly one Merge danger line: the mechanical floor merged
     with any line already in the body, which may only raise Door / Blast radius.
@@ -2650,6 +2674,24 @@ def _interdiff_eligibility(cache_rec, cache_key, cache_files, gates, cls):
     if not reviewcache.subset_diff(cls.filtered_diff, delta):
         return None   # delta lives only in filtered-out files: never send agents an empty diff
     return delta, prior
+
+
+def _review_phase_for(llm, gh, copy: dict, meta: dict | None, log) -> ReviewPhase:
+    """Phase 4 review depth: the deeper of the Phase-2 body and the live PR body.
+
+    An empty copy["summary_md"] is the clean-tree rerun (Phase 2 wrote nothing), so only the
+    live body counts then. A live body that is absent or not a string reads as UNREADABLE,
+    which is deep. Deepen only: no source can lower the depth another source chose.
+    """
+    sources: list[tuple[str, str | None]] = []
+    if copy.get("summary_md"):
+        sources.append(("phase2", copy["summary_md"]))
+    live = (meta or {}).get("body")
+    sources.append(("live", live if isinstance(live, str) else None))
+    verdicts = [(name, *review_depth.classify_depth(body)) for name, body in sources]
+    depth = review_depth.max_depth(*(d for _, d, _ in verdicts))
+    log(f"review-depth: {depth} (" + ", ".join(f"{n}={r}" for n, _, r in verdicts) + ")")
+    return ReviewPhase(llm, gh, depth=depth)
 
 
 def _interdiff_review(review_phase, meta, cls, plan, delta, keep_findings, keep_scored, log):

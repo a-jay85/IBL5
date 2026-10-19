@@ -18,6 +18,7 @@ import re
 from .state import Classification, Finding, HarnessError, PlanInfo
 from . import schemas
 from .classify import slice_spec_diffs
+from .review_depth import DEEP, STANDARD, max_depth
 
 CODE_THRESHOLD = 80      # drop findings scored below (rubric Thresholds table)
 SEC_THRESHOLD = 75
@@ -91,10 +92,12 @@ def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
     )
 
 
-def agent_b_prompt(meta: dict, cls: Classification, run_history: bool, run_comments: bool) -> str:
+def agent_b_prompt(meta: dict, cls: Classification, run_history: bool, run_comments: bool,
+                   *, any_files: bool = False) -> str:
     parts = []
     if run_history:
-        parts.append("Look for regression risk: for the PHP files with the most "
+        parts.append("Look for regression risk: for the "
+                     + ("" if any_files else "PHP ") + "files with the most "
                      "changed lines, does the change risk re-introducing a bug the "
                      "file's structure suggests was fixed (guard clauses, boundary "
                      "checks, type casts being removed)?")
@@ -206,14 +209,17 @@ def _reused_note(reused: list[Finding]) -> str:
 
 
 class ReviewPhase:
-    def __init__(self, llm, gh):
+    def __init__(self, llm, gh, depth: str = STANDARD):
         self.llm = llm
         self.gh = gh
+        self.depth = max_depth(depth)      # anything but exactly "standard" is deep
 
     def gates(self, cls: Classification) -> dict:
         b_hist = cls.has_php and cls.lines_php_changed > 50
+        if self.depth == DEEP:
+            b_hist = not cls.non_code_only
         b_comm = (not cls.non_code_only) and cls.has_comments_in_diff
-        return {
+        g = {
             "A": not (cls.non_code_only or cls.engine_only),
             "B_history": b_hist, "B_comments": b_comm,
             "B": b_hist or b_comm,
@@ -221,6 +227,9 @@ class ReviewPhase:
             "D": cls.has_e2e_specs,
             "security": cls.has_php,
         }
+        if self.depth == DEEP:
+            g["depth"] = DEEP              # deep-only key: a standard<->deep switch misses the cache
+        return g
 
     def run(self, meta: dict, cls: Classification, plan: PlanInfo,
             reused: list[Finding] | None = None) -> tuple[list[Finding], dict, list[dict], list[str]]:
@@ -230,20 +239,22 @@ class ReviewPhase:
 
         # Build the list of independent agent tasks (preserved submission order so that
         # finding indices are deterministic for the scorer's n=1..N mapping).
+        deep_model = "opus" if self.depth == DEEP else "sonnet"
         tasks: list[tuple[str, str, str, str, str]] = []
         if gates["A"]:
-            tasks.append(("A", "code-review", "review-agent-a", "sonnet",
+            tasks.append(("A", "code-review", "review-agent-a", deep_model,
                           agent_a_prompt(meta, cls, plan)))
         if gates["B"]:
             tasks.append(("B", "code-review", "review-agent-b", "sonnet",
-                          agent_b_prompt(meta, cls, gates["B_history"], gates["B_comments"])))
+                          agent_b_prompt(meta, cls, gates["B_history"], gates["B_comments"],
+                                         any_files=(self.depth == DEEP))))
         # Agent C (previous-PR feedback) requires live gh search — replay serves
         # recorded "no prior feedback"; a live variant would add a gh-read adapter.
         if gates["D"]:
             tasks.append(("D", "code-review", "review-agent-d", "sonnet",
                           agent_d_prompt(meta, cls)))
         if gates["security"]:
-            tasks.append(("security", "security-audit", "security-audit", "sonnet",
+            tasks.append(("security", "security-audit", "security-audit", deep_model,
                           security_prompt(meta, cls, plan)))
 
         def _call_agent(task: tuple[str, str, str, str, str]):

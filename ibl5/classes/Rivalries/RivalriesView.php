@@ -37,12 +37,12 @@ final class RivalriesView implements RivalriesViewInterface
      */
     public function renderIndex(array $league, ?string $userTeamKey, ?string $userGm): string
     {
-        return '<h2 class="ibl-title">Rivalries</h2>'
+        return '<h1 class="ibl-title">Rivalries</h1>'
             . '<div class="ibl-grid">'
-            . '<section class="ibl-card"><h3>Top franchise rivalries</h3>'
+            . '<section class="ibl-card"><h2>Top franchise rivalries</h2>'
             . $this->renderRankTable($league['franchises'], 'teams', $userTeamKey, 'No pair has met 10 times yet.')
             . '</section>'
-            . '<section class="ibl-card"><h3>Top GM rivalries</h3>'
+            . '<section class="ibl-card"><h2>Top GM rivalries</h2>'
             . $this->renderRankTable($league['gms'], 'gms', $userGm, 'No pair has met 10 times yet.')
             . '</section>'
             . '</div>';
@@ -53,7 +53,7 @@ final class RivalriesView implements RivalriesViewInterface
      */
     public function renderGm(string $gmName, array $rivals, bool $known, ?string $userGm): string
     {
-        return '<h2 class="ibl-title">' . HtmlSanitizer::e($gmName) . "'s rivals</h2>"
+        return '<h1 class="ibl-title">' . HtmlSanitizer::e($gmName) . "'s rivals</h1>"
             . $this->renderRankTable($rivals, 'gms', $userGm, 'This general manager has no rival with 10 or more games yet.');
     }
 
@@ -69,7 +69,7 @@ final class RivalriesView implements RivalriesViewInterface
         $labels = [$page['a'] => $page['a_label'], $page['b'] => $page['b_label']];
         $sideLabel = static fn (string $side): string => $labels[$side] ?? $side;
 
-        $html = '<h2 class="ibl-title">' . HtmlSanitizer::e($page['a_label']) . ' vs ' . HtmlSanitizer::e($page['b_label']) . '</h2>';
+        $html = '<h1 class="ibl-title">' . HtmlSanitizer::e($page['a_label']) . ' vs ' . HtmlSanitizer::e($page['b_label']) . '</h1>';
 
         $html .= '<section class="ibl-card">';
         if ($page['kind'] === 'gms') {
@@ -86,7 +86,7 @@ final class RivalriesView implements RivalriesViewInterface
         }
         $html .= '</section>';
 
-        $html .= '<section class="ibl-card"><h3>Playoff series</h3>';
+        $html .= '<section class="ibl-card"><h2>Playoff series</h2>';
         if ($page['series'] === []) {
             $html .= $this->renderEmpty('No playoff series between them.');
         } else {
@@ -101,8 +101,8 @@ final class RivalriesView implements RivalriesViewInterface
         $html .= '</section>';
 
         $html .= '<div class="ibl-grid">'
-            . '<section class="ibl-card"><h3>Closest games</h3>' . $this->gamesTable($page['closest']) . '</section>'
-            . '<section class="ibl-card"><h3>Biggest blowouts</h3>' . $this->gamesTable($page['blowouts']) . '</section>'
+            . '<section class="ibl-card"><h2>Closest games</h2>' . $this->gamesTable($page['closest']) . '</section>'
+            . '<section class="ibl-card"><h2>Biggest blowouts</h2>' . $this->gamesTable($page['blowouts']) . '</section>'
             . '</div>';
 
         $totals = '';
@@ -117,8 +117,8 @@ final class RivalriesView implements RivalriesViewInterface
                 . HtmlSanitizer::e($h['game_date']) . '</td></tr>';
         }
         $html .= '<div class="ibl-grid">'
-            . '<section class="ibl-card"><h3>Top scorers in the matchup</h3>' . $this->table(['Player', 'Side', 'Games', 'Points'], $totals) . '</section>'
-            . '<section class="ibl-card"><h3>Best single games</h3>' . $this->table(['Player', 'Side', 'Points', 'Date'], $highs) . '</section>'
+            . '<section class="ibl-card"><h2>Top scorers in the matchup</h2>' . $this->table(['Player', 'Side', 'Games', 'Points'], $totals) . '</section>'
+            . '<section class="ibl-card"><h2>Best single games</h2>' . $this->table(['Player', 'Side', 'Points', 'Date'], $highs) . '</section>'
             . '</div>';
 
         return $html;

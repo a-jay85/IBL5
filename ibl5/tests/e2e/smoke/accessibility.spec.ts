@@ -158,6 +158,8 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'season archive', url: 'modules.php?name=SeasonArchive' },
   { name: 'season highs', url: 'modules.php?name=SeasonHighs' },
   { name: 'head-to-head records', url: 'modules.php?name=HeadToHeadRecords' },
+  { name: 'rivalries', url: 'modules.php?name=Rivalries' },
+  { name: 'rivalries pair', url: 'modules.php?name=Rivalries&op=teams&a=1&b=2' },
   { name: 'team off/def stats', url: 'modules.php?name=TeamOffDefStats' },
   { name: 'search transactions preset', url: 'modules.php?name=Search&preset=transactions' },
   { name: 'search', url: 'modules.php?name=Search' },

@@ -35,7 +35,9 @@ final class RollbackPhantomRepairRunAbortTest extends TestCase
 
     private const PROBE_ATTEMPTS = 3;
 
-    private const PROBE_RETRY_SLEEP_MICROS = 200_000;
+    private const PROBE_RETRY_SLEEP_MICROS = 1_000_000;
+
+    private const PROBE_STDOUT_SNIPPET_CHARS = 200;
 
     private string $ibl5Dir;
 
@@ -120,6 +122,7 @@ final class RollbackPhantomRepairRunAbortTest extends TestCase
         self::assertNull($result['counts']);
         self::assertSame(13, $result['exit']);
         self::assertSame('err-3', $result['stderr']);
+        self::assertSame('', $result['stdout']);
         self::assertSame(3, $result['attempts']);
         self::assertSame(3, $calls);
     }
@@ -232,11 +235,13 @@ PHP;
         }
 
         $stderr = trim($result['stderr']);
+        $stdout = mb_substr(trim($result['stdout']), 0, self::PROBE_STDOUT_SNIPPET_CHARS);
         $this->lastProbeDiagnostic = sprintf(
-            ' [probe attempts: %d, last exit: %d, last stderr: %s]',
+            ' [probe attempts: %d, last exit: %d, last stderr: %s, last stdout: %s]',
             $result['attempts'],
             $result['exit'],
-            $stderr === '' ? '(empty)' : $stderr
+            $stderr === '' ? '(empty)' : $stderr,
+            $stdout === '' ? '(empty)' : $stdout
         );
 
         return $result['counts'];
@@ -245,10 +250,10 @@ PHP;
     /**
      * Retries only a failed or malformed probe. A probe that exits 0 with six
      * well-formed counts is returned on the spot, so a real row change is never
-     * retried away.
+     * retried away. The pause doubles after each failed attempt.
      *
      * @param callable(): array{exit: int, stdout: string, stderr: string} $run
-     * @return array{counts: array<string, int>|null, attempts: int, exit: int, stderr: string}
+     * @return array{counts: array<string, int>|null, attempts: int, exit: int, stdout: string, stderr: string}
      */
     private static function probeWithRetry(callable $run, int $sleepMicros): array
     {
@@ -262,11 +267,12 @@ PHP;
                     'counts' => $counts,
                     'attempts' => $attempt,
                     'exit' => $last['exit'],
+                    'stdout' => $last['stdout'],
                     'stderr' => $last['stderr'],
                 ];
             }
             if ($sleepMicros > 0) {
-                usleep($sleepMicros);
+                usleep($sleepMicros * (2 ** ($attempt - 1)));
             }
         }
     }

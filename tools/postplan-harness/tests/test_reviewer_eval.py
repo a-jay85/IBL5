@@ -227,3 +227,166 @@ def test_corpus_digest_scope():
     c = _corpus()
     c["clean"][0]["commit"] = "d" * 40
     assert re_.corpus_digest(c) != base
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: corpus validate
+# ---------------------------------------------------------------------------
+
+import json  # noqa: E402
+
+NOW = 1_790_000_000
+DAY = 86400
+
+
+def _commit(repo, msg, ts, files):
+    for name, text in files.items():
+        p = repo / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+    env = {**os.environ, "GIT_COMMITTER_DATE": f"{ts} +0000", "GIT_AUTHOR_DATE": f"{ts} +0000"}
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, env=env)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t",
+                    "-c", "commit.gpgsign=false", "commit", "-q", "--no-verify", "-m", msg],
+                   check=True, env=env)
+    return subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def _mk_repo(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    path = "ibl5/classes/Foo.php"
+    lines = [f"line{n:02d}" for n in range(1, 31)]
+    text = lambda ls: "\n".join(ls) + "\n"  # noqa: E731
+    base = _commit(repo, "chore: base (#1)", NOW - 100 * DAY, {path: text(lines)})
+    for n in range(10, 15):
+        lines[n - 1] = f"intro{n}"
+    intro = _commit(repo, "feat: add rule (#10)", NOW - 60 * DAY, {path: text(lines)})
+    lines = [f"pad{n}" for n in range(1, 6)] + lines   # shifts I's lines down by 5
+    shift = _commit(repo, "chore: shift (#12)", NOW - 55 * DAY, {path: text(lines)})
+    lines[lines.index("intro12")] = "fixed12"
+    fix = _commit(repo, "fix: off by one (#11)", NOW - 50 * DAY, {path: text(lines)})
+    lines[lines.index("line25")] = "tweak25"
+    fix2 = _commit(repo, "fix: unrelated tweak (#13)", NOW - 45 * DAY, {path: text(lines)})
+    return {"root": repo, "base": base, "intro": intro, "shift": shift, "fix": fix, "fix2": fix2}
+
+
+def _bug(r, **kw):
+    c = {"id": "b1", "kind": "bug", "status": "confirmed", "pr": 10, "commit": r["intro"],
+         "fix_pr": 11, "fix_commit": r["fix"],
+         "expected": [{"path": "ibl5/classes/Foo.php", "start": 10, "end": 14}],
+         "description": "off by one"}
+    c.update(kw)
+    return c
+
+
+def _vcorpus(cases, clean=()):
+    return {"schema_version": 1, "window_days": 30, "cases": list(cases), "clean": list(clean)}
+
+
+def _clean(cid, pr, commit):
+    return {"id": cid, "pr": pr, "commit": commit, "checked_through": "2026-09-01"}
+
+
+def _vg(r, corpus):
+    return re_.validate_git(r["root"], corpus, now=NOW)
+
+
+def test_validate_schema_rejects_bad_fields(tmp_path):
+    r = {"intro": "a" * 40, "fix": "b" * 40}
+    assert re_.validate_schema(_vcorpus([_bug(r)])) == []
+    variants = [
+        _bug(r, commit="a" * 39),
+        _bug(r, expected=[{"path": "x.php", "start": 5, "end": 4}]),
+        _bug(r, extra="x"),
+        _bug(r, description="mail me@example.com"),
+        _bug(r, pr=True),
+    ]
+    for v in variants:
+        errs = re_.validate_schema(_vcorpus([v]))
+        assert len(errs) == 1, (v, errs)
+    errs = re_.validate_schema(_vcorpus([_bug(r), _bug(r)]))
+    assert len(errs) == 1 and "duplicate" in errs[0]
+
+
+def test_validate_git_confirmed_case_passes(tmp_path):
+    r = _mk_repo(tmp_path)
+    assert _vg(r, _vcorpus([_bug(r)])) == []
+
+
+def test_validate_range_outside_added_lines(tmp_path):
+    r = _mk_repo(tmp_path)
+    c = _bug(r, expected=[{"path": "ibl5/classes/Foo.php", "start": 20, "end": 22}])
+    errs = _vg(r, _vcorpus([c]))
+    assert any("b1" in e and "outside the lines added" in e for e in errs), errs
+
+
+def test_validate_fix_not_touching_range(tmp_path):
+    r = _mk_repo(tmp_path)
+    c = _bug(r, fix_commit=r["fix2"], fix_pr=13)
+    errs = _vg(r, _vcorpus([c]))
+    assert any("b1" in e and "does not corroborate" in e for e in errs), errs
+    assert len(errs) == 1
+
+
+def test_validate_fix_must_be_later(tmp_path):
+    r = _mk_repo(tmp_path)
+    c = _bug(r, commit=r["fix"], pr=11, fix_commit=r["intro"], fix_pr=10)
+    errs = _vg(r, _vcorpus([c]))
+    assert any("b1" in e and "must be later" in e for e in errs), errs
+
+
+def test_validate_subject_pr_mismatch(tmp_path):
+    r = _mk_repo(tmp_path)
+    errs = _vg(r, _vcorpus([_bug(r, pr=99)]))
+    assert any("b1" in e and "subject" in e and "(#99)" in e for e in errs), errs
+
+
+def test_validate_unconfirmed_skips_git(tmp_path):
+    r = _mk_repo(tmp_path)
+    u = _bug(r, id="u1", status="unconfirmed", commit="f" * 40, fix_commit="e" * 40)
+    assert _vg(r, _vcorpus([_bug(r), u])) == []
+
+
+def test_validate_zero_confirmed_is_error(tmp_path):
+    r = _mk_repo(tmp_path)
+    u = _bug(r, id="u1", status="unconfirmed")
+    assert "no confirmed bug cases" in _vg(r, _vcorpus([u]))
+
+
+def test_validate_clean_blamed_by_fix_rejected(tmp_path):
+    r = _mk_repo(tmp_path)
+    errs = _vg(r, _vcorpus([_bug(r)], [_clean("c1", 10, r["intro"])]))
+    assert any("c1" in e and f"blamed by fix {r['fix'][:12]}" in e for e in errs), errs
+    assert _vg(r, _vcorpus([_bug(r)], [_clean("c2", 1, r["base"])])) == []
+
+
+def test_validate_clean_too_young(tmp_path):
+    r = _mk_repo(tmp_path)
+    young = _commit(r["root"], "chore: late (#14)", NOW - 5 * DAY, {"ibl5/classes/Bar.php": "x\n"})
+    errs = _vg(r, _vcorpus([_bug(r)], [_clean("c1", 14, young)]))
+    assert any("c1" in e and "too young" in e for e in errs), errs
+
+
+def test_validate_cli_exit_codes(tmp_path, capsys):
+    r = _mk_repo(tmp_path)
+
+    def write(name, corpus):
+        p = tmp_path / name
+        p.write_text(json.dumps(corpus))
+        return str(p)
+
+    good = write("good.json", _vcorpus([_bug(r)], [_clean("c1", 1, r["base"])]))
+    bad = write("bad.json", _vcorpus([_bug(r, pr=99)]))
+    repo = str(r["root"])
+    assert re_.main(["validate", "--corpus", good, "--repo", repo]) == 0
+    assert "validate ok: 1 confirmed, 0 unconfirmed, 1 clean" in capsys.readouterr().out
+    assert re_.main(["validate", "--corpus", bad, "--repo", repo]) == 1
+    assert "FAIL b1:" in capsys.readouterr().out
+    assert re_.main(["validate", "--corpus", str(tmp_path / "nope.json"), "--repo", repo]) == 2
+    assert "error:" in capsys.readouterr().err
+    with pytest.raises(SystemExit) as exc:
+        re_.main(["validate", "--bogus"])
+    assert exc.value.code == 2

@@ -151,3 +151,17 @@ def test_apply_to_body_uses_mechanical_on_migration_diff():
     assert source == "mechanical"
     assert htr.STEP_MIGRATION in (htr.parse_how_to_revert(out) or "")
     assert htr.count_field_lines(out) == 1
+
+
+def test_pr_body_claims_documents_how_to_revert_rule():
+    claims = (REPO_ROOT / ".claude/skills/post-plan/_pr-body-claims.md").read_text(encoding="utf-8")
+    lines = claims.splitlines()
+    assert "## How to revert rule" in lines
+    start = lines.index("## How to revert rule")
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    section = "\n".join(lines[start:end])
+    for needle in (htr.FIELD_PREFIX, f"shorter than {htr.MIN_TEXT} characters",
+                   "bin/db-sync-prod", "ibl5/.htaccess", "ibl5/composer.json"):
+        assert needle in section, needle
+    skill = (REPO_ROOT / ".claude/skills/post-plan/SKILL.md").read_text(encoding="utf-8")
+    assert "§ How to revert rule" in skill

@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-15
+last_verified: 2026-10-19
 ---
 
 # Post-Plan Orchestrator
@@ -198,7 +198,7 @@ fi
 ```
 
 3. push
-4. **If no PR exists for the current branch:** create one with `gh pr create`. Read `.claude/skills/post-plan/_pr-body-claims.md` and apply it before writing the body. The body carries exactly one `**Merge danger:**` line per `_pr-body-claims.md` § Merge danger rule; when any listed one-way trigger is in the diff the Door is `one-way`. Read `.claude/review-shared/_prose-voice-contract.md` before writing any PR-body prose — it carries the five written-voice rules and the two annotated failure samples, and it governs every prose surface this phase and Phase 6 compose. <!-- slop-ok -->
+4. **If no PR exists for the current branch:** create one with `gh pr create`. Read `.claude/skills/post-plan/_pr-body-claims.md` and apply it before writing the body. The body carries exactly one `**Merge danger:**` line per `_pr-body-claims.md` § Merge danger rule; when any listed one-way trigger is in the diff the Door is `one-way`. Directly after it goes one advisory `**How to revert:**` line per `_pr-body-claims.md` § How to revert rule. Read `.claude/review-shared/_prose-voice-contract.md` before writing any PR-body prose — it carries the five written-voice rules and the two annotated failure samples, and it governs every prose surface this phase and Phase 6 compose. <!-- slop-ok -->
 
    > **Voice check, once.** After writing the Scope why-paragraph, pipe it through `bin/check-digest-prose` (`printf '%s\n' "$SCOPE_PROSE" | bin/check-digest-prose`). If it reports a violation, rewrite that paragraph **once** to address the named rule, then continue. Do not loop twice and do not abort: `bin/check-digest-prose` always exits 0 and never blocks the PR — ship whatever the single rewrite produces. <!-- slop-ok -->
 

@@ -40,6 +40,8 @@ class LadderContext:
     pre_rebase_sha: str
     conflicted_files: tuple[str, ...]
     trail: tuple[str, ...] = ()
+    state_dir: str = ""                                         # cost-guard marker dir; "" = guard unavailable, rung skips
+    extend_pre_patch: Optional[Callable[[tuple[str, ...]], None]] = None  # gitad._rewrite_pre_patch_for_regen wrapper
 
 
 @dataclass(frozen=True)
@@ -489,4 +491,5 @@ def make_session_rung(branch: str) -> Rung:
 
 
 def default_rungs(branch: str) -> tuple[Rung, ...]:
-    return (make_regen_rung(), make_opus_rung(), make_session_rung(branch))
+    from .conflict_fix import make_fix_rung
+    return (make_regen_rung(), make_opus_rung(), make_session_rung(branch), make_fix_rung(branch))

@@ -262,7 +262,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         plan = locate_plan(slug, content_override=fixture.get("plan_content") or None)
     else:
         assert worktree
-        git = LiveGit(worktree, push_remote="origin" if live else None, llm=llm)
+        git = LiveGit(worktree, push_remote="origin" if live else None, llm=llm,
+                      state_dir=_state_dir(out_dir, live, state_dir))
         global _active_git
         _active_git = git
         slug = git.branch()
@@ -3479,6 +3480,10 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
         lines += [f"  {n + 1}. bin/post-plan-now", ""]
         if res.error_kind == "rebase-conflict" and res.block_cause:
             lines.append("Cause: " + " ".join(res.block_cause.split()))
+        if res.error_kind == "rebase-conflict" and res.conflict_fix_summary:
+            clean = "".join(ch for ch in " ".join(res.conflict_fix_summary.split()) if ch.isprintable())[:300]
+            lines.append("Headless Sonnet fix: tried once for this head and master tip; the lost-work proof still failed.")
+            lines.append("Session summary (untrusted model text): " + clean)
         lines.append(f"Log: {log}")
         if fix_arg:
             lines += ["Or paste this to have Claude fix it:",
@@ -3526,8 +3531,10 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
                 getattr(plain_resolution, "adapted_lines", ())):
             log(f"phase2: {line}")
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
+        res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
     except HarnessError as e:
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
+        res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
         if e.kind != "rebase-conflict":
             raise
         # DETECTION-TIME flag: recorded before the resolution attempt begins, so a

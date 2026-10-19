@@ -1701,10 +1701,10 @@ for l in conflict-hold retries; do
 done
 set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
 run_tick
-for l in conflict-hold retries; do
-    no_file "$STATE_DIR/$l/999" || fail "prune-conflict-ledgers: $l/999 survived"
-    [[ -f "$STATE_DIR/$l/101" ]] || fail "prune-conflict-ledgers: $l/101 was pruned"
-done
+no_file "$STATE_DIR/conflict-hold/999" || fail "prune-conflict-ledgers: conflict-hold/999 survived"
+no_file "$STATE_DIR/retries/999" || fail "prune-conflict-ledgers: retries/999 survived"
+[[ -f "$STATE_DIR/conflict-hold/101" ]] || fail "prune-conflict-ledgers: conflict-hold/101 was pruned"
+[[ -f "$STATE_DIR/retries/101" ]] || fail "prune-conflict-ledgers: retries/101 was pruned"
 end_case prune-conflict-ledgers
 
 # conflict-hold-launch-tip: the tip captured at launch rides the pending row and is what

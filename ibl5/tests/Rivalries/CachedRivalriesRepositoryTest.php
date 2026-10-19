@@ -71,7 +71,7 @@ final class CachedRivalriesRepositoryTest extends TestCase
     }
 }
 
-final class RivalriesSpyRepository implements RivalriesRepositoryInterface
+class RivalriesSpyRepository implements RivalriesRepositoryInterface
 {
     /** @var array<string, int> */
     public array $calls = [];

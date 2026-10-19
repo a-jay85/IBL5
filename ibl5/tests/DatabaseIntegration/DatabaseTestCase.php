@@ -139,6 +139,40 @@ abstract class DatabaseTestCase extends TestCase
     }
 
     /**
+     * Insert a team boxscore row whose final score is exactly $visitorPts to $homePts.
+     */
+    protected function insertScoredTeamBoxscoreRow(string $date, int $gameOfDay, int $visitorTid, int $homeTid, int $visitorPts, int $homePts): int
+    {
+        $id = $this->insertTeamBoxscoreRow($date, 'Test', $gameOfDay, $visitorTid, $homeTid);
+        $stmt = $this->db->prepare(
+            'UPDATE ibl_box_scores_teams SET visitor_q1_points = ?, visitor_q2_points = 0, visitor_q3_points = 0,
+                visitor_q4_points = 0, visitor_ot_points = 0, home_q1_points = ?, home_q2_points = 0,
+                home_q3_points = 0, home_q4_points = 0, home_ot_points = 0 WHERE id = ?'
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('iii', $visitorPts, $homePts, $id);
+        $stmt->execute();
+        $stmt->close();
+
+        return $id;
+    }
+
+    protected function insertGmTenureRow(int $franchiseId, string $gmName, int $startYear, ?int $endYear, int $isMidSeasonStart = 0): int
+    {
+        $data = [
+            'franchise_id' => $franchiseId,
+            'gm_display_name' => $gmName,
+            'start_season_year' => $startYear,
+            'is_mid_season_start' => $isMidSeasonStart,
+        ];
+        if ($endYear !== null) {
+            $data['end_season_year'] = $endYear;
+        }
+
+        return $this->insertRow('ibl_gm_tenures', $data);
+    }
+
+    /**
      * Insert a player boxscore row with reasonable defaults for the 29-column table.
      * Generated columns (game_type, season_year, calc_points, calc_rebounds, calc_fg_made)
      * are computed automatically by MariaDB.

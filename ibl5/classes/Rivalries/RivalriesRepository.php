@@ -1,0 +1,430 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Rivalries;
+
+use League\League;
+use Rivalries\Contracts\RivalriesRepositoryInterface;
+
+/**
+ * RivalriesRepository - Game-level reads for franchise and GM rivalries.
+ *
+ * W/L totals are never computed here; the service takes them from the H2H
+ * matrix. The `unique_games` dedupe and the GM tenure rule are copied verbatim
+ * from HeadToHeadRecordsRepository so the two pages always agree.
+ *
+ * @phpstan-import-type PairStat from RivalriesRepositoryInterface
+ * @phpstan-import-type GameRow from RivalriesRepositoryInterface
+ * @phpstan-import-type SeriesRow from RivalriesRepositoryInterface
+ * @phpstan-import-type PerformerTotal from RivalriesRepositoryInterface
+ * @phpstan-import-type PerformerHigh from RivalriesRepositoryInterface
+ *
+ * @see RivalriesRepositoryInterface
+ */
+final class RivalriesRepository extends \Database\BaseMysqliRepository implements RivalriesRepositoryInterface
+{
+    private const TENURE_SUBQUERY = '(SELECT t.gm_display_name FROM `ibl_gm_tenures` t
+          WHERE t.franchise_id = %s
+            AND %s BETWEEN (t.start_season_year + t.is_mid_season_start)
+                                  AND COALESCE(t.end_season_year, 9999)
+          ORDER BY t.start_season_year ASC, t.id ASC LIMIT 1)';
+
+    private const GAME_COLUMNS = 'game_date, game_of_that_day, season_year, game_type, visitor_teamid, home_teamid,
+    visitor_label, home_label, visitor_pts AS visitor_points, home_pts AS home_points';
+
+    /**
+     * @see RivalriesRepositoryInterface::getFranchisePairStats()
+     */
+    public function getFranchisePairStats(int $recentFromSeasonYear): array
+    {
+        $sql = $this->gamesCte() . '
+SELECT LEAST(visitor_teamid, home_teamid) AS a, GREATEST(visitor_teamid, home_teamid) AS b,
+       SUM(ABS(visitor_pts - home_pts) <= ?) AS close_games,
+       SUM(season_year >= ?) AS recent_games,
+       SUM(game_type = 2) AS playoff_games
+FROM games
+GROUP BY a, b
+ORDER BY a, b';
+        $rows = $this->fetchAll($sql, 'ii', RivalryScorer::CLOSE_GAME_MARGIN, $recentFromSeasonYear);
+
+        $seriesRows = $this->fetchAll(
+            'SELECT LEAST(winner_tid, loser_tid) AS a, GREATEST(winner_tid, loser_tid) AS b, COUNT(*) AS n
+FROM `ibl_playoff_series_results`
+WHERE winner_tid BETWEEN 1 AND ? AND loser_tid BETWEEN 1 AND ?
+GROUP BY a, b
+ORDER BY a, b',
+            'ii',
+            League::MAX_REAL_TEAMID,
+            League::MAX_REAL_TEAMID,
+        );
+
+        return $this->mergeStats($rows, $seriesRows);
+    }
+
+    /**
+     * @see RivalriesRepositoryInterface::getGmPairStats()
+     */
+    public function getGmPairStats(int $recentFromSeasonYear): array
+    {
+        $sql = $this->gmCte() . '
+SELECT LEAST(v_gm, h_gm) AS a, GREATEST(v_gm, h_gm) AS b,
+       SUM(ABS(visitor_pts - home_pts) <= ?) AS close_games,
+       SUM(season_year >= ?) AS recent_games,
+       SUM(game_type = 2) AS playoff_games
+FROM gm_games
+WHERE v_gm IS NOT NULL AND h_gm IS NOT NULL AND v_gm <> h_gm
+GROUP BY a, b
+ORDER BY a, b';
+        $rows = $this->fetchAll($sql, 'ii', RivalryScorer::CLOSE_GAME_MARGIN, $recentFromSeasonYear);
+
+        $seriesRows = $this->fetchAll(
+            $this->gmSeriesCte() . '
+SELECT LEAST(w_gm, l_gm) AS a, GREATEST(w_gm, l_gm) AS b, COUNT(*) AS n
+FROM gm_series
+WHERE w_gm IS NOT NULL AND l_gm IS NOT NULL AND w_gm <> l_gm
+GROUP BY a, b
+ORDER BY a, b',
+            'ii',
+            League::MAX_REAL_TEAMID,
+            League::MAX_REAL_TEAMID,
+        );
+
+        return $this->mergeStats($rows, $seriesRows);
+    }
+
+    /**
+     * @see RivalriesRepositoryInterface::getFranchisePairGames()
+     */
+    public function getFranchisePairGames(int $a, int $b): array
+    {
+        $sql = $this->gamesCte() . '
+SELECT ' . self::GAME_COLUMNS . ',
+       CAST(visitor_teamid AS CHAR) AS visitor_side, CAST(home_teamid AS CHAR) AS home_side
+FROM games
+WHERE (visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?)
+ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
+
+        return $this->mapGames($this->fetchAll($sql, 'iiii', $a, $b, $b, $a));
+    }
+
+    /**
+     * @see RivalriesRepositoryInterface::getGmPairGames()
+     */
+    public function getGmPairGames(string $a, string $b): array
+    {
+        $sql = $this->gmCte() . '
+SELECT ' . self::GAME_COLUMNS . ', v_gm AS visitor_side, h_gm AS home_side
+FROM gm_games
+WHERE v_gm <> h_gm AND ((v_gm = ? AND h_gm = ?) OR (v_gm = ? AND h_gm = ?))
+ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
+
+        return $this->mapGames($this->fetchAll($sql, 'ssss', $a, $b, $b, $a));
+    }
+
+    /**
+     * @see RivalriesRepositoryInterface::getFranchisePlayoffSeries()
+     */
+    public function getFranchisePlayoffSeries(int $a, int $b): array
+    {
+        $rows = $this->fetchAll(
+            'SELECT pr.year, pr.round, pr.winner_tid, pr.loser_tid, pr.winner_games, pr.loser_games,
+       CAST(pr.winner_tid AS CHAR) AS winner_side
+FROM `ibl_playoff_series_results` pr
+WHERE (pr.winner_tid = ? AND pr.loser_tid = ?) OR (pr.winner_tid = ? AND pr.loser_tid = ?)
+ORDER BY pr.year ASC, pr.round ASC, pr.winner_tid ASC, pr.loser_tid ASC',
+            'iiii',
+            $a,
+            $b,
+            $b,
+            $a,
+        );
+
+        return $this->mapSeries($rows);
+    }
+
+    /**
+     * @see RivalriesRepositoryInterface::getGmPlayoffSeries()
+     */
+    public function getGmPlayoffSeries(string $a, string $b): array
+    {
+        $rows = $this->fetchAll(
+            $this->gmSeriesCte() . '
+SELECT year, round, winner_tid, loser_tid, winner_games, loser_games, w_gm AS winner_side
+FROM gm_series
+WHERE w_gm <> l_gm AND ((w_gm = ? AND l_gm = ?) OR (w_gm = ? AND l_gm = ?))
+ORDER BY year ASC, round ASC, winner_tid ASC, loser_tid ASC',
+            'iissss',
+            League::MAX_REAL_TEAMID,
+            League::MAX_REAL_TEAMID,
+            $a,
+            $b,
+            $b,
+            $a,
+        );
+
+        return $this->mapSeries($rows);
+    }
+
+    /**
+     * @see RivalriesRepositoryInterface::getFranchiseTopPerformers()
+     */
+    public function getFranchiseTopPerformers(int $a, int $b): array
+    {
+        $pairCte = $this->gamesCte() . ',
+pair_games AS (
+    SELECT * FROM games
+    WHERE (visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?)
+)';
+
+        return $this->topPerformers($pairCte, 'CAST(bs.teamid AS CHAR)', 'iiii', [$a, $b, $b, $a]);
+    }
+
+    /**
+     * @see RivalriesRepositoryInterface::getGmTopPerformers()
+     */
+    public function getGmTopPerformers(string $a, string $b): array
+    {
+        $pairCte = $this->gmCte() . ',
+pair_games AS (
+    SELECT * FROM gm_games
+    WHERE v_gm <> h_gm AND ((v_gm = ? AND h_gm = ?) OR (v_gm = ? AND h_gm = ?))
+)';
+
+        return $this->topPerformers($pairCte, 'IF(bs.teamid = g.visitor_teamid, g.v_gm, g.h_gm)', 'ssss', [$a, $b, $b, $a]);
+    }
+
+    /**
+     * @see RivalriesRepositoryInterface::gmExists()
+     */
+    public function gmExists(string $gmName): bool
+    {
+        $row = $this->fetchOne(
+            'SELECT 1 AS hit FROM `ibl_gm_tenures` WHERE gm_display_name = ? LIMIT 1',
+            's',
+            $gmName,
+        );
+
+        return $row !== null;
+    }
+
+    /**
+     * H2H `unique_games` + `games` CTEs, phase `all` (HEAT counts), plus dates and era labels.
+     */
+    private function gamesCte(): string
+    {
+        $maxTid = League::MAX_REAL_TEAMID;
+
+        return sprintf(
+            'WITH unique_games AS (
+    SELECT MIN(id) AS id
+    FROM `ibl_box_scores_teams` b
+    WHERE b.game_type IN (1, 2, 3)
+      AND b.visitor_teamid BETWEEN 1 AND %d
+      AND b.home_teamid   BETWEEN 1 AND %d
+    GROUP BY b.game_date, b.visitor_teamid, b.home_teamid, b.game_of_that_day
+),
+games AS (
+    SELECT b.season_year, b.visitor_teamid, b.home_teamid, b.game_date, b.game_of_that_day, b.game_type,
+           (b.visitor_q1_points + b.visitor_q2_points + b.visitor_q3_points + b.visitor_q4_points
+            + COALESCE(b.visitor_ot_points, 0)) AS visitor_pts,
+           (b.home_q1_points + b.home_q2_points + b.home_q3_points + b.home_q4_points
+            + COALESCE(b.home_ot_points, 0)) AS home_pts,
+           COALESCE(CONCAT(vfs.team_city, \' \', vfs.team_name), CONCAT(vti.team_city, \' \', vti.team_name)) AS visitor_label,
+           COALESCE(CONCAT(hfs.team_city, \' \', hfs.team_name), CONCAT(hti.team_city, \' \', hti.team_name)) AS home_label
+    FROM `ibl_box_scores_teams` b
+    JOIN unique_games u ON u.id = b.id
+    LEFT JOIN `ibl_franchise_seasons` vfs ON vfs.franchise_id = b.visitor_teamid AND vfs.season_ending_year = b.season_year
+    LEFT JOIN `ibl_franchise_seasons` hfs ON hfs.franchise_id = b.home_teamid AND hfs.season_ending_year = b.season_year
+    LEFT JOIN `ibl_team_info` vti ON vti.teamid = b.visitor_teamid
+    LEFT JOIN `ibl_team_info` hti ON hti.teamid = b.home_teamid
+)',
+            $maxTid,
+            $maxTid,
+        );
+    }
+
+    /**
+     * Games CTE plus each side's GM resolved with the H2H tenure rule.
+     */
+    private function gmCte(): string
+    {
+        return $this->gamesCte() . ',
+gm_games AS (
+    SELECT g.*,
+        ' . sprintf(self::TENURE_SUBQUERY, 'g.visitor_teamid', 'g.season_year') . ' AS v_gm,
+        ' . sprintf(self::TENURE_SUBQUERY, 'g.home_teamid', 'g.season_year') . ' AS h_gm
+    FROM games g
+)';
+    }
+
+    /**
+     * Playoff series rows with each side's GM resolved by `pr.year`. Binds two `i` params.
+     */
+    private function gmSeriesCte(): string
+    {
+        return 'WITH gm_series AS (
+    SELECT pr.year, pr.round, pr.winner_tid, pr.loser_tid, pr.winner_games, pr.loser_games,
+        ' . sprintf(self::TENURE_SUBQUERY, 'pr.winner_tid', 'pr.year') . ' AS w_gm,
+        ' . sprintf(self::TENURE_SUBQUERY, 'pr.loser_tid', 'pr.year') . ' AS l_gm
+    FROM `ibl_playoff_series_results` pr
+    WHERE pr.winner_tid BETWEEN 1 AND ? AND pr.loser_tid BETWEEN 1 AND ?
+)';
+    }
+
+    /**
+     * @param list<int|string> $params
+     * @return array{totals: list<PerformerTotal>, highs: list<PerformerHigh>}
+     */
+    private function topPerformers(string $pairCte, string $sideExpr, string $types, array $params): array
+    {
+        $perGame = $pairCte . ',
+per_game AS (
+    SELECT bs.pid, bs.teamid, bs.game_date, bs.game_of_that_day, MAX(bs.calc_points) AS pts, ' . $sideExpr . ' AS side
+    FROM `ibl_box_scores` bs
+    JOIN pair_games g ON g.game_date = bs.game_date AND g.visitor_teamid = bs.visitor_teamid
+        AND g.home_teamid = bs.home_teamid AND g.game_of_that_day = bs.game_of_that_day
+    WHERE bs.pid > 0 AND bs.teamid IN (g.visitor_teamid, g.home_teamid)
+    GROUP BY bs.pid, bs.teamid, bs.game_date, bs.game_of_that_day, side
+)';
+
+        $totalRows = $this->fetchAll(
+            $perGame . '
+SELECT pg.pid, p.name, pg.side, COUNT(*) AS games, SUM(pg.pts) AS total_points
+FROM per_game pg
+JOIN `ibl_plr` p ON p.pid = pg.pid
+GROUP BY pg.pid, p.name, pg.side
+ORDER BY total_points DESC, pg.pid ASC
+LIMIT 5',
+            $types,
+            ...$params,
+        );
+
+        $highRows = $this->fetchAll(
+            $perGame . '
+SELECT pg.pid, p.name, pg.side, pg.pts AS points, pg.game_date
+FROM per_game pg
+JOIN `ibl_plr` p ON p.pid = pg.pid
+ORDER BY pg.pts DESC, pg.game_date ASC, pg.pid ASC
+LIMIT 3',
+            $types,
+            ...$params,
+        );
+
+        $totals = [];
+        foreach ($totalRows as $row) {
+            $totals[] = [
+                'pid' => self::int($row['pid'] ?? null),
+                'name' => self::str($row['name'] ?? null),
+                'side' => self::str($row['side'] ?? null),
+                'games' => self::int($row['games'] ?? null),
+                'total_points' => self::int($row['total_points'] ?? null),
+            ];
+        }
+
+        $highs = [];
+        foreach ($highRows as $row) {
+            $highs[] = [
+                'pid' => self::int($row['pid'] ?? null),
+                'name' => self::str($row['name'] ?? null),
+                'side' => self::str($row['side'] ?? null),
+                'points' => self::int($row['points'] ?? null),
+                'game_date' => self::str($row['game_date'] ?? null),
+            ];
+        }
+
+        return ['totals' => $totals, 'highs' => $highs];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param list<array<string, mixed>> $seriesRows
+     * @return list<PairStat>
+     */
+    private function mergeStats(array $rows, array $seriesRows): array
+    {
+        $series = [];
+        foreach ($seriesRows as $row) {
+            $series[self::str($row['a'] ?? null) . "\0" . self::str($row['b'] ?? null)] = self::int($row['n'] ?? null);
+        }
+
+        $stats = [];
+        foreach ($rows as $row) {
+            $a = self::str($row['a'] ?? null);
+            $b = self::str($row['b'] ?? null);
+            $stats[] = [
+                'a' => $a,
+                'b' => $b,
+                'close_games' => self::int($row['close_games'] ?? null),
+                'recent_games' => self::int($row['recent_games'] ?? null),
+                'playoff_games' => self::int($row['playoff_games'] ?? null),
+                'playoff_series' => $series[$a . "\0" . $b] ?? 0,
+            ];
+        }
+
+        return $stats;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<GameRow>
+     */
+    private function mapGames(array $rows): array
+    {
+        $games = [];
+        foreach ($rows as $row) {
+            $games[] = [
+                'game_date' => self::str($row['game_date'] ?? null),
+                'game_of_that_day' => self::int($row['game_of_that_day'] ?? null),
+                'season_year' => self::int($row['season_year'] ?? null),
+                'game_type' => self::int($row['game_type'] ?? null),
+                'visitor_teamid' => self::int($row['visitor_teamid'] ?? null),
+                'home_teamid' => self::int($row['home_teamid'] ?? null),
+                'visitor_label' => self::str($row['visitor_label'] ?? null),
+                'home_label' => self::str($row['home_label'] ?? null),
+                'visitor_points' => self::int($row['visitor_points'] ?? null),
+                'home_points' => self::int($row['home_points'] ?? null),
+                'visitor_side' => self::str($row['visitor_side'] ?? null),
+                'home_side' => self::str($row['home_side'] ?? null),
+            ];
+        }
+
+        return $games;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<SeriesRow>
+     */
+    private function mapSeries(array $rows): array
+    {
+        $series = [];
+        foreach ($rows as $row) {
+            $series[] = [
+                'year' => self::int($row['year'] ?? null),
+                'round' => self::int($row['round'] ?? null),
+                'winner_tid' => self::int($row['winner_tid'] ?? null),
+                'loser_tid' => self::int($row['loser_tid'] ?? null),
+                'winner_games' => self::int($row['winner_games'] ?? null),
+                'loser_games' => self::int($row['loser_games'] ?? null),
+                'winner_side' => self::str($row['winner_side'] ?? null),
+            ];
+        }
+
+        return $series;
+    }
+
+    private static function int(mixed $v): int
+    {
+        return is_numeric($v) ? (int) $v : 0;
+    }
+
+    private static function str(mixed $v): string
+    {
+        if (is_string($v)) {
+            return $v;
+        }
+
+        return is_int($v) ? (string) $v : '';
+    }
+}

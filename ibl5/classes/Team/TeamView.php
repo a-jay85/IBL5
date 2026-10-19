@@ -41,6 +41,7 @@ class TeamView implements TeamViewInterface
         $awardsCard = $pageData['awardsCard'];
         $franchiseHistoryCard = $pageData['franchiseHistoryCard'];
         $rafters = $pageData['rafters'];
+        $rivalsCard = $pageData['rivalsCard'] ?? '';
         $userTeamName = $pageData['userTeamName'];
         $isOwnTeam = $pageData['isOwnTeam'];
         $extensionResult = $pageData['extensionResult'];
@@ -58,7 +59,7 @@ class TeamView implements TeamViewInterface
             <?= HtmlSanitizer::trusted($this->renderRosterRegion($tableOutput)) ?>
         </div>
                 <?= HtmlSanitizer::trusted($this->renderCardsRow($isActualTeam, $team, $currentSeasonCard, $draftPicksTable, $awardsCard)) ?>
-        <?= HtmlSanitizer::trusted($this->renderFranchiseHistory($isActualTeam, $franchiseHistoryCard)) ?>
+        <?= HtmlSanitizer::trusted($this->renderFranchiseHistory($isActualTeam, $franchiseHistoryCard) . $rivalsCard) ?>
         <?= HtmlSanitizer::trusted($this->renderRafters($isActualTeam, $rafters)) ?>
     </div>
 </div>

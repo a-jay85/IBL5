@@ -21,22 +21,8 @@ global $mysqli_db, $user, $leagueContext;
 /** @var mixed $user */
 /** @var \League\LeagueContext|null $leagueContext */
 
-$season      = new \Season\Season($mysqli_db, $leagueContext);
-$logoResolver = new \HeadToHeadRecords\LogoResolver();
-/** @var string $docRoot */
-$docRoot   = $_SERVER['DOCUMENT_ROOT'];
-$imageRoot = $docRoot . '/ibl5/images/logo';
-
-$innerRepo = new \HeadToHeadRecords\HeadToHeadRecordsRepository(
-    $mysqli_db,
-    $season->endingYear,
-    fn (int $id, string $name): string => $logoResolver->resolve($id, $name, $imageRoot),
-);
-
-$repo = new \HeadToHeadRecords\CachedHeadToHeadRecordsRepository(
-    $innerRepo,
-    new \Cache\DatabaseCache($mysqli_db)
-);
+$season  = new \Season\Season($mysqli_db, $leagueContext);
+$docRoot = is_string($_SERVER['DOCUMENT_ROOT'] ?? null) ? $_SERVER['DOCUMENT_ROOT'] : '';
 
 // $user is the raw PHP-Nuke cookie string, not an object. Decode it to the
 // username, then resolve that GM's teamid so the tables can highlight their row.
@@ -67,14 +53,10 @@ $owner  = isset($currentUser->teamid)
     : null;
 $userGm = is_string($owner) && $owner !== '' ? $owner : null;
 
-$rivalriesRepo = new \Rivalries\CachedRivalriesRepository(
-    new \Rivalries\RivalriesRepository($mysqli_db),
-    new \Cache\DatabaseCache($mysqli_db),
-);
 $controller = new \Rivalries\RivalriesController(
-    new \Rivalries\RivalriesService($rivalriesRepo, $repo, new \Rivalries\RivalryScorer(), $season->endingYear),
+    \Rivalries\RivalriesServiceFactory::create($mysqli_db, $season, $docRoot . '/ibl5/images/logo'),
     new \Rivalries\RivalriesView(),
-    $rivalriesRepo,
+    \Rivalries\RivalriesServiceFactory::createRepository($mysqli_db),
 );
 
 \PageLayout\PageLayout::header();

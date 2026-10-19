@@ -200,6 +200,7 @@ class PlayerTradingCardFrontViewTest extends TestCase
             $publicNames[] = $method->getName();
         }
         sort($publicNames);
+        // PlayerStatsCardView::getStyles() is a separate view's stub and is not covered by this pin.
         $this->assertSame(['render'], $publicNames);
 
         foreach ($ref->getMethods() as $method) {

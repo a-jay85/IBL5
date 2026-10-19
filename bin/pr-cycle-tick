@@ -252,9 +252,20 @@ strike() {
     fi
 }
 
-# settle_row <pr> <sha> <key> <status> <outcome> <reason>: the outcome table, one PR.
+# settle_row <pr> <sha> <key> <status> <outcome> <reason> [<tip>]: the outcome table, one PR.
 settle_row() {
-    local pr="$1" sha="$2" key="$3" status="$4" outcome="$5" reason="$6" msg
+    local pr="$1" sha="$2" key="$3" status="$4" outcome="$5" reason="$6" tip="${7:-}" t7 msg
+    # conflict-hold/<pr>: only a settled rebase conflict may later re-try on a new master tip.
+    # A paused rescue never ran, so it keeps any hold. Every other fired or holdrepeat
+    # outcome is a determinate result and drops the hold back to the plain retry cap.
+    case "$status:$outcome" in
+        fired:conflict)
+            pcw_record_conflict_hold "$STATE" "$pr" "$tip"
+            t7="${tip:-unknown}"
+            log "PR $pr: conflict hold recorded (master ${t7:0:7})" ;;
+        fired:paused) ;;
+        fired:*|holdrepeat:*) pcw_clear_conflict_hold "$STATE" "$pr" ;;
+    esac
     case "$status:$outcome" in
         fired:shipped|fired:held|fired:conflict|fired:timed-out)
             pcw_record_attempt "$STATE" "$pr" "$key"
@@ -284,7 +295,7 @@ settle_row() {
 }
 
 reconcile_pending() {
-    local pf id rf started now hdr pr sha key row status outcome reason all_reason=""
+    local pf id rf started now hdr pr sha key tip row status outcome reason all_reason=""
     [[ -d "$STATE/pending" ]] || return 0
     if [[ "$DRY_RUN" -eq 1 ]]; then
         local n=0
@@ -314,7 +325,7 @@ reconcile_pending() {
             log "pending $id: no result yet"
             continue
         fi
-        while IFS=$'\t' read -r pr sha key; do
+        while IFS=$'\t' read -r pr sha key tip; do
             [[ -n "$pr" && -n "$sha" ]] || continue
             # The key was captured at launch; a pending file from the pre-key tick has none.
             [[ -n "$key" ]] || key="$sha"
@@ -326,7 +337,7 @@ reconcile_pending() {
                 strike "$pr" "$sha" "$key" no-row - -; continue
             fi
             IFS=$'\t' read -r _ status outcome reason <<< "$row"
-            settle_row "$pr" "$sha" "$key" "$status" "$outcome" "${reason:--}"
+            settle_row "$pr" "$sha" "$key" "$status" "$outcome" "${reason:--}" "$tip"
         done < <(tail -n +2 "$pf")
         rm -f "$pf" "$rf"
     done
@@ -418,6 +429,9 @@ while IFS=$'\t' read -r pr branch sha mstate base; do
             fi
         fi
     fi
+    # origin/master tip now. pcw_patch_id above already fetched origin master. Empty means
+    # unreadable, which never makes a conflict hold eligible.
+    tip="$(pcw_master_tip "$ROOT")"
     if pcw_attempted_head "$STATE" "$pr" "$key" "$sha"; then
         skip "$pr" "retry cap (head ${sha:0:7})"
         if pcw_dm_due "$STATE" "$pr" "$key" "$sha"; then
@@ -450,7 +464,7 @@ while IFS=$'\t' read -r pr branch sha mstate base; do
     if [[ "$(pcw_strike_count "$STATE" "$pr" "$key" "$sha")" -ge "$PCW_STRIKE_CAP" ]]; then
         skip "$pr" "no-op rescue cap (head ${sha:0:7})"; continue
     fi
-    QUALIFY+=("$pr|$sha|$key")
+    QUALIFY+=("$pr|$sha|$key|$tip")
 done < <(jq -r 'sort_by(.number) | .[] | select(.isDraft | not)
                 | [.number, .headRefName, .headRefOid, .mergeStateStatus, .baseRefName] | @tsv' <<< "$PRS_JSON")
 
@@ -477,8 +491,8 @@ log "launching: $PR_CYCLE_CMD --go --only $csv --max-ready $count"
 # entry is written first so a killed tick never loses the launch; a failed launch removes it.
 pending_body="# result=$STATE/results/$id.tsv started=$(date +%s)"
 for entry in "${LAUNCH[@]}"; do
-    IFS='|' read -r l_pr l_sha l_key <<< "$entry"
-    pending_body+=$'\n'"$l_pr"$'\t'"$l_sha"$'\t'"$l_key"
+    IFS='|' read -r l_pr l_sha l_key l_tip <<< "$entry"
+    pending_body+=$'\n'"$l_pr"$'\t'"$l_sha"$'\t'"$l_key"$'\t'"$l_tip"
 done
 _pcw_write "$STATE/pending/$id" "$pending_body"
 if PR_CYCLE_RESULT_FILE="$STATE/results/$id.tsv" PR_CYCLE_SKIP_NOTES="$SKIP_NOTES" "$PR_CYCLE_CMD" --go --only "$csv" --max-ready "$count"; then

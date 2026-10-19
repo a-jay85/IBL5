@@ -1417,8 +1417,8 @@ E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"; K2="$(key_of 2222222)
 set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
 set_result "101\tfired\tfailed\tkind=test"
 run_tick
-grep -qxF "$(printf '101\taaa1111\t%s' "$K1")" "$STATE_DIR"/pending/* \
-    || fail "settle-uses-launch-key: pending line is not <pr>TAB<sha>TAB<key>: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+grep -qxF "$(printf '101\taaa1111\t%s\t%s' "$K1" "$(key_of e0001)")" "$STATE_DIR"/pending/* \
+    || fail "settle-uses-launch-key: pending line is not <pr>TAB<sha>TAB<key>TAB<tip>:$(cat "$STATE_DIR"/pending/* 2>/dev/null)"
 set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red; set_key 101 "$K2"
 run_tick
 [[ "$(attempt 101)" == "$K1" ]] || fail "settle-uses-launch-key: attempts/101 is '$(attempt 101)', want the launch-time key $K1"
@@ -1465,8 +1465,8 @@ grep -qF 'could not compute its patch-id' "$SCRATCH/dm.log" || fail "patchid-fal
 out_has 'patch-id unavailable; retry key falls back to head aaa1111' || fail "patchid-fallback-dm: no fallback log line: $OUT"
 [[ "$(cat "$STATE_DIR/dm-patchid/101" 2>/dev/null)" == "aaa1111" ]] \
     || fail "patchid-fallback-dm: dm-patchid/101 is '$(cat "$STATE_DIR/dm-patchid/101" 2>/dev/null)'"
-grep -qxF "$(printf '101\taaa1111\taaa1111')" "$STATE_DIR"/pending/* \
-    || fail "patchid-fallback-dm: pending line key is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+grep -qxF "$(printf '101\taaa1111\taaa1111\t%s' "$(key_of e0001)")" "$STATE_DIR"/pending/* \
+    || fail "patchid-fallback-dm:pending line key is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
 run_tick
 [[ "$(dm_count)" == "1" ]] || fail "patchid-fallback-dm: fallback DM resent for the same head ($(dm_count))"
 set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red
@@ -1480,8 +1480,8 @@ set_prs "$RED101"; set_checks aaa1111 red
 run_tick
 out_has 'patch-id unavailable' || fail "patchid-nonhex-falls-back: non-hex output was accepted: $OUT"
 [[ "$(dm_count)" == "1" ]] || fail "patchid-nonhex-falls-back: want 1 fallback DM, got $(dm_count)"
-grep -qxF "$(printf '101\taaa1111\taaa1111')" "$STATE_DIR"/pending/* \
-    || fail "patchid-nonhex-falls-back: pending key column is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+grep -qxF "$(printf '101\taaa1111\taaa1111\t%s' "$(key_of e0001)")" "$STATE_DIR"/pending/* \
+    || fail "patchid-nonhex-falls-back:pending key column is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
 grep -qF 'not-a-patch-id' "$STATE_DIR"/pending/* && fail "patchid-nonhex-falls-back: junk reached the pending file"
 end_case patchid-nonhex-falls-back
 
@@ -1706,6 +1706,62 @@ for l in conflict-hold retries; do
     [[ -f "$STATE_DIR/$l/101" ]] || fail "prune-conflict-ledgers: $l/101 was pruned"
 done
 end_case prune-conflict-ledgers
+
+# conflict-hold-launch-tip: the tip captured at launch rides the pending row and is what
+# settle records, even though master moved before the rescue settled.
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_tip e0001
+set_result "101\tfired\tconflict\trebase-conflict"
+run_tick
+PF="$(find "$STATE_DIR/pending" -type f | head -n 1)"
+[[ "$(sed -n '2p' "$PF" | awk -F'\t' '{print NF}')" == "4" ]] \
+    || fail "conflict-hold-launch-tip: pending row is not 4 fields: $(sed -n '2p' "$PF")"
+[[ "$(sed -n '2p' "$PF" | cut -f4)" == "$(key_of e0001)" ]] \
+    || fail "conflict-hold-launch-tip: pending tip is '$(sed -n '2p' "$PF" | cut -f4)'"
+set_tip e0002
+run_tick
+[[ "$(conflict_hold 101)" == "$(key_of e0001)" ]] \
+    || fail "conflict-hold-launch-tip: held tip is '$(conflict_hold 101)', want the launch tip"
+out_has 'PR 101: conflict hold recorded (master e000100)' \
+    || fail "conflict-hold-launch-tip: no hold log line: $OUT"
+end_case conflict-hold-launch-tip
+
+# conflict-hold-cleared-by-later-settle: a determinate later outcome clears the hold, a
+# paused rescue (which never ran) keeps it. The seeded hold is the only hand-written state.
+reset; begin_case
+mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_result "101\tfired\theld\t-"
+run_tick
+run_tick
+[[ -z "$(conflict_hold 101)" ]] || fail "conflict-hold-cleared-by-later-settle: held settle kept the hold: '$(conflict_hold 101)'"
+end_case conflict-hold-cleared-by-later-settle
+
+reset; begin_case
+mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_result "101\tfired\tpaused\t-"
+run_tick
+run_tick
+[[ "$(conflict_hold 101)" == "$(key_of e0009)" ]] \
+    || fail "conflict-hold-kept-by-paused-settle: paused settle dropped the hold: '$(conflict_hold 101)'"
+end_case conflict-hold-kept-by-paused-settle
+
+# pending-legacy-3col (invocation-2-only: legacy files exist only on disk): a pending row
+# written before the master-tip column still settles, records the attempt, and records the
+# hold as unknown.
+reset; begin_case
+mkdir -p "$STATE_DIR/pending" "$STATE_DIR/results"
+printf '# result=%s started=%s\n101\taaa1111\t%s\n' \
+    "$STATE_DIR/results/legacy1.tsv" "$(date +%s)" "$(key_of aaa1111)" > "$STATE_DIR/pending/legacy1"
+printf '# pr-cycle-result v1\n101\tfired\tconflict\trebase-conflict\n' > "$STATE_DIR/results/legacy1.tsv"
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+run_tick
+[[ "$(attempt 101)" == "$(key_of aaa1111)" ]] || fail "pending-legacy-3col: attempt is '$(attempt 101)'"
+[[ "$(conflict_hold 101)" == "unknown" ]] || fail "pending-legacy-3col: hold is '$(conflict_hold 101)', want unknown"
+no_file "$STATE_DIR/pending/legacy1" || fail "pending-legacy-3col: legacy pending file survived"
+end_case pending-legacy-3col
 
 # --- summary -------------------------------------------------------------------------------
 h_done

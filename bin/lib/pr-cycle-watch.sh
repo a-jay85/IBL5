@@ -258,8 +258,9 @@ pcw_add_strike() {     # <dir> <pr> <key> [<sha>]: writes "<key> <count+1>" and 
 pcw_kind_dm_due()    { ! _pcw_holds "$1/dm-$2/$3" "$4" "${5:-}"; }
 pcw_kind_mark_dm()   { _pcw_write "$1/dm-$2/$3" "$4"; }
 # pcw_pending_has <state-dir> <pr>: 0 when a launched, not yet settled rescue lists the PR.
-# pending/<id> is "# result=<path> started=<epoch>" then one "<pr><TAB><sha><TAB><key>" line per PR
-# (files from the pre-key tick have no key column; reconcile reads it as key = sha).
+# pending/<id> is "# result=<path> started=<epoch>" then one "<pr><TAB><sha><TAB><key>[<TAB><master-tip>]" line per PR
+# (files from the pre-key tick have no key column; reconcile reads it as key = sha. Files from before the
+# master-tip column have no 4th column; settle records the conflict hold as unknown).
 pcw_pending_has() {
     local f
     for f in "$1"/pending/*; do

@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-10-18
+last_verified: 2026-10-19
 ---
 
 ## Read budget: read this once, read nothing else

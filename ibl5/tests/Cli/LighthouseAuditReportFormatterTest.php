@@ -250,6 +250,167 @@ final class LighthouseAuditReportFormatterTest extends TestCase
     }
 
     /**
+     * Catches: not assigning the resolver result to `$sha` (no Commit part),
+     * and calling the formatter with the raw newest element (the expired
+     * `ffffffff...` entry) instead of the resolver's pick.
+     */
+    public function testCliRendersAuditedCommitFromBaselineArtifacts(): void
+    {
+        $result = $this->runScript([
+            '--manifest=' . $this->fixtureDir . '/audit-manifest-all-pass.json',
+            '--baseline-artifacts=' . $this->fixtureDir . '/baseline-artifacts.json',
+        ]);
+
+        self::assertSame(0, $result['exit']);
+        self::assertStringContainsString(
+            'Commit: `39989da42eb8033c852937d16c6049b36007e167`',
+            $result['output'],
+        );
+        self::assertStringNotContainsString('ffffffff', $result['output']);
+    }
+
+    /**
+     * Catches: substituting any fallback value (for example the run sha) when
+     * the resolver returns null.
+     */
+    public function testCliOmitsCommitWhenBaselineArtifactsYieldNoSha(): void
+    {
+        $result = $this->runScriptWithArtifactsContent('[]');
+
+        self::assertSame(0, $result['exit']);
+        self::assertStringNotContainsString('Commit:', $result['output']);
+    }
+
+    /**
+     * Catches: deleting the warning `fwrite` when the resolver returns null.
+     */
+    public function testCliWarnsWhenBaselineArtifactsYieldNoSha(): void
+    {
+        $result = $this->runScriptWithArtifactsContent('[]');
+
+        self::assertSame(0, $result['exit']);
+        self::assertStringContainsString('Warning: no audited commit found', $result['output']);
+    }
+
+    /**
+     * Catches: a resolver or script change that lets `JsonException` escape
+     * (exit 255).
+     */
+    public function testCliOmitsCommitForMalformedBaselineArtifacts(): void
+    {
+        $result = $this->runScriptWithArtifactsContent('{not json');
+
+        self::assertSame(0, $result['exit']);
+        self::assertStringNotContainsString('Commit:', $result['output']);
+    }
+
+    /**
+     * Catches: deleting the exclusivity check (exit 0 with one flag silently
+     * winning).
+     */
+    public function testCliRejectsShaWithBaselineArtifacts(): void
+    {
+        $result = $this->runScript([
+            '--manifest=' . $this->fixtureDir . '/audit-manifest-all-pass.json',
+            '--sha=' . str_repeat('a', 40),
+            '--baseline-artifacts=' . $this->fixtureDir . '/baseline-artifacts.json',
+        ]);
+
+        self::assertSame(2, $result['exit']);
+        self::assertStringContainsString('mutually exclusive', $result['output']);
+    }
+
+    /**
+     * Catches: deleting the `is_file` check (the read-failure branch prints a
+     * different message).
+     */
+    public function testCliRejectsMissingBaselineArtifactsFile(): void
+    {
+        $result = $this->runScript([
+            '--manifest=' . $this->fixtureDir . '/audit-manifest-all-pass.json',
+            '--baseline-artifacts=/nonexistent/lh-artifacts.json',
+        ]);
+
+        self::assertSame(2, $result['exit']);
+        self::assertStringContainsString('Baseline artifacts file not found', $result['output']);
+    }
+
+    /**
+     * Catches: removing the `=== ''` arm together with `is_file`.
+     */
+    public function testCliRejectsEmptyBaselineArtifactsPath(): void
+    {
+        $result = $this->runScript([
+            '--manifest=' . $this->fixtureDir . '/audit-manifest-all-pass.json',
+            '--baseline-artifacts=',
+        ]);
+
+        self::assertSame(2, $result['exit']);
+        self::assertStringContainsString('Baseline artifacts file not found', $result['output']);
+    }
+
+    /**
+     * Catches: loosening the parse to `str_starts_with($arg, '--baseline-artifacts')`.
+     */
+    public function testCliRejectsSpaceSeparatedBaselineArtifactsFlag(): void
+    {
+        $result = $this->runScript([
+            '--manifest=' . $this->fixtureDir . '/audit-manifest-all-pass.json',
+            '--baseline-artifacts',
+            $this->fixtureDir . '/baseline-artifacts.json',
+        ]);
+
+        self::assertSame(2, $result['exit']);
+        self::assertStringContainsString('Unknown argument: --baseline-artifacts', $result['output']);
+    }
+
+    /**
+     * Catches: breaking the `--sha=` parse branch while inserting the new one.
+     */
+    public function testCliStillRendersShaFlag(): void
+    {
+        $sha = str_repeat('c', 40);
+        $result = $this->runScript([
+            '--manifest=' . $this->fixtureDir . '/audit-manifest-all-pass.json',
+            '--sha=' . $sha,
+        ]);
+
+        self::assertSame(0, $result['exit']);
+        self::assertStringContainsString('Commit: `' . $sha . '`', $result['output']);
+    }
+
+    /**
+     * Catches: skipping the usage-text update.
+     */
+    public function testCliHelpListsBaselineArtifactsFlag(): void
+    {
+        $result = $this->runScript(['--help']);
+
+        self::assertSame(0, $result['exit']);
+        self::assertStringContainsString('--baseline-artifacts=PATH', $result['output']);
+    }
+
+    /**
+     * @return array{output: string, exit: int}
+     */
+    private function runScriptWithArtifactsContent(string $content): array
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'lh');
+        self::assertNotFalse($tmp);
+
+        try {
+            file_put_contents($tmp, $content);
+
+            return $this->runScript([
+                '--manifest=' . $this->fixtureDir . '/audit-manifest-all-pass.json',
+                '--baseline-artifacts=' . $tmp,
+            ]);
+        } finally {
+            unlink($tmp);
+        }
+    }
+
+    /**
      * @param list<string> $args
      * @return array{output: string, exit: int}
      */

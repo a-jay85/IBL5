@@ -339,6 +339,7 @@ def test_validate_fix_must_be_later(tmp_path):
 
 
 def test_validate_subject_pr_mismatch(tmp_path):
+    # The introducing commit's subject must end (#pr) for the case's own pr number.
     r = _mk_repo(tmp_path)
     errs = _vg(r, _vcorpus([_bug(r, pr=99)]))
     assert any("b1" in e and "subject" in e and "(#99)" in e for e in errs), errs
@@ -850,6 +851,7 @@ def test_check_claim_unchanged_skips_body_loader(tmp_path):
 
 
 def test_check_claim_regex_never_evals_body(tmp_path, monkeypatch):
+    # The body is matched by regex only; passing it through str.format would expand {0}.
     root, base = _claim_repo(tmp_path)
     (root / re_.REVIEW_SURFACE_PATHS[3]).write_text("two\n")
     _commit_all(root, "change rubric")

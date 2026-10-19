@@ -73,6 +73,7 @@ from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
 from harness.review import ReviewPhase
+from harness import review_depth
 from harness import baseline_guard
 from harness.state import (SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState,
                            UsageLedger)
@@ -486,7 +487,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if cache_rec is not None and not reviewcache.key_matches(cache_rec, cache_key):
             conflict_only = _conflict_only_proof(git, cache_rec, cache_key, cache_files, log)
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        review_phase = ReviewPhase(llm, gh)
+        review_phase = _review_phase_for(llm, gh, copy, meta, log)
         cur_gates = review_phase.gates(cls) if cache_rec is not None else None
         restored = None
         key_hit = cache_rec is not None and reviewcache.key_matches(cache_rec, cache_key)
@@ -2673,6 +2674,24 @@ def _interdiff_eligibility(cache_rec, cache_key, cache_files, gates, cls):
     if not reviewcache.subset_diff(cls.filtered_diff, delta):
         return None   # delta lives only in filtered-out files: never send agents an empty diff
     return delta, prior
+
+
+def _review_phase_for(llm, gh, copy: dict, meta: dict | None, log) -> ReviewPhase:
+    """Phase 4 review depth: the deeper of the Phase-2 body and the live PR body.
+
+    An empty copy["summary_md"] is the clean-tree rerun (Phase 2 wrote nothing), so only the
+    live body counts then. A live body that is absent or not a string reads as UNREADABLE,
+    which is deep. Deepen only: no source can lower the depth another source chose.
+    """
+    sources: list[tuple[str, str | None]] = []
+    if copy.get("summary_md"):
+        sources.append(("phase2", copy["summary_md"]))
+    live = (meta or {}).get("body")
+    sources.append(("live", live if isinstance(live, str) else None))
+    verdicts = [(name, *review_depth.classify_depth(body)) for name, body in sources]
+    depth = review_depth.max_depth(*(d for _, d, _ in verdicts))
+    log(f"review-depth: {depth} (" + ", ".join(f"{n}={r}" for n, _, r in verdicts) + ")")
+    return ReviewPhase(llm, gh, depth=depth)
 
 
 def _interdiff_review(review_phase, meta, cls, plan, delta, keep_findings, keep_scored, log):

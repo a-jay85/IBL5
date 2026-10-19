@@ -23,7 +23,7 @@ from test_review_cache_hit import (ALPHA, BETA, CANNED_FINDINGS, DIFF, FILES, KE
 from test_runner_replay import _actions
 
 # Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
-pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show", "standard_review_depth")
 
 NEW_DIFF_ID = "e" * 40
 

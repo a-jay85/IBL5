@@ -111,6 +111,9 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-post-merge-recipe": ReplaySpec(
         argv=("--body-file", "{body_file}", "--repo-slug", "a-jay85/IBL5"),
     ),
+    "bin/check-reviewer-eval": ReplaySpec(
+        argv=("--body-file", "{body_file}", "--base", "{base}"),
+    ),
     # Diff-scoped hygiene: --pr diffs against the env base, set to the PR's own base.
     "bin/check-e2e-hygiene": ReplaySpec(
         argv=("--pr",), env=(("E2E_HYGIENE_BASE_REF", "{base}"),),

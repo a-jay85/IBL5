@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/check-reviewer-eval — Blocking gate: a PR that edits the post-plan review surface must carry a before/after score.
+#
+# The review surface is the prompt files, the rubric, review.py and the MODEL_MAP block
+# (see ibl5/docs/reviewer-eval.md). When its hash differs between base and head, the PR body
+# needs exactly one `Reviewer eval before:` and one `Reviewer eval after:` line, as printed
+# by `bin/reviewer-eval compare`. This gate binds those lines to the surface hash at base and
+# head, to the corpus digest at head, and to degraded=0. A worse score needs a waiver.
+# When the surface hash is unchanged the gate passes without reading the PR body.
+# Honest limit: it cannot prove the run happened. It proves the claim names the right
+# surface and corpus, and that the numbers are consistent.
+# The body is data only: it is matched with regexes, never eval'd, sourced, or used as a format string.
+#
+# Modes:
+#   --pr <n>          Fetch the body via gh and check it (live gate use).
+#   --body-file <p>   Read the body from a file path (pre-push and test seam).
+#
+# Flags:
+#   --base <ref>      Required. The ref the PR targets (a SHA works).
+#   --head <ref>      Default HEAD.
+#   --repo <dir>      Repo to read refs from. Default: this checkout.
+#
+# Waivers (in the PR body, reason of 15+ characters):
+#   <!-- reviewer-eval-skip: <reason> -->            skip the gate for this PR
+#   <!-- reviewer-eval-regression-ok: <reason> -->   accept a worse score
+#
+# Exit codes:
+#   0  ok, surface unchanged, or valid waiver.
+#   1  finding or malformed waiver.
+#   2  usage, gh failure, bad ref, unreadable surface or corpus.
+
+set -euo pipefail
+
+GH_CMD="${GH_CMD:-gh}"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-reviewer-eval (--pr <n> | --body-file <path>) --base <ref> [--head <ref>] [--repo <dir>] [--help|-h]
+
+Checks that a PR which edits the post-plan review surface carries a valid
+before/after score claim. Passes at once when the surface hash is unchanged.
+
+Options:
+  --pr <n>          PR number; the body is fetched via gh.
+  --body-file <p>   Read the body from a file (mutually exclusive with --pr).
+  --base <ref>      Required. The ref the PR targets.
+  --head <ref>      Default HEAD.
+  --repo <dir>      Repo to read refs from. Default: this checkout.
+  --help, -h        Show this message.
+
+Environment (test seams):
+  GH_CMD            Override the gh command. Unset and empty both fall back to "gh".
+
+Waivers:
+  <!-- reviewer-eval-skip: <reason, 15+ chars> -->
+  <!-- reviewer-eval-regression-ok: <reason, 15+ chars> -->
+
+Exit codes:
+  0  ok, surface unchanged, or valid waiver.
+  1  finding or malformed waiver.
+  2  usage, gh failure, bad ref, unreadable surface or corpus.
+EOF
+}
+
+PR_NUM=""
+BODY_FILE=""
+BASE_REF=""
+HEAD_REF="HEAD"
+REPO_DIR=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --pr)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --pr requires a PR number" >&2
+                usage >&2
+                exit 2
+            fi
+            PR_NUM="$2"
+            shift 2
+            ;;
+        --body-file)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --body-file requires a path" >&2
+                usage >&2
+                exit 2
+            fi
+            BODY_FILE="$2"
+            shift 2
+            ;;
+        --base)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --base requires a ref" >&2
+                usage >&2
+                exit 2
+            fi
+            BASE_REF="$2"
+            shift 2
+            ;;
+        --head)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --head requires a ref" >&2
+                usage >&2
+                exit 2
+            fi
+            HEAD_REF="$2"
+            shift 2
+            ;;
+        --repo)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --repo requires a directory" >&2
+                usage >&2
+                exit 2
+            fi
+            REPO_DIR="$2"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [[ -z "$BASE_REF" ]]; then
+    echo "Error: --base is required" >&2
+    usage >&2
+    exit 2
+fi
+if [[ -z "$PR_NUM" && -z "$BODY_FILE" ]]; then
+    echo "Error: exactly one of --pr or --body-file is required" >&2
+    usage >&2
+    exit 2
+fi
+if [[ -n "$PR_NUM" && -n "$BODY_FILE" ]]; then
+    echo "Error: --pr and --body-file are mutually exclusive" >&2
+    usage >&2
+    exit 2
+fi
+if [[ -n "$PR_NUM" && ! "$PR_NUM" =~ ^[0-9]+$ ]]; then
+    echo "Error: --pr must be a number, got: $PR_NUM" >&2
+    exit 2
+fi
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+SRC=(--pr "$PR_NUM")
+if [[ -n "$BODY_FILE" ]]; then
+    SRC=(--body-file "$BODY_FILE")
+fi
+
+export PYTHONPATH="$ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m harness.reviewer_eval check-claim \
+    --repo "${REPO_DIR:-${REPO:-$ROOT}}" \
+    --gh "$GH_CMD" \
+    --base "$BASE_REF" \
+    --head "$HEAD_REF" \
+    "${SRC[@]}"

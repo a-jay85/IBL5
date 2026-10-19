@@ -51,6 +51,7 @@ harness/
   scope_conformance.py    shells out to bin/lib/plan-scope-conformance; renders advisory scope notes as a PR-body `## Unplanned changes` block and holds on none
   armable.py              twelve ported arming conditions (numbered 1–12, no gap; the skill's condition (11), unresolved review-thread findings, stays skill-only)
   review.py               Phase 4 launch gates + bounded review/security/scoring calls
+  reviewer_eval.py        reviewer eval: corpus validate, run, score line, surface hash, mine, compare, check-claim
   ciwatch.py              Phase 7 outcome interpretation
   llm_calls.py            prompt builders for the non-review retained calls
   schemas.py              typed validation for every LLM output
@@ -62,6 +63,7 @@ harness/
     verify.py             LiveVerify (phpunit/phpstan/go) / ReplayVerify (recorded outputs)
 tests/                    27 tests (pure logic + live-git tempdir + full replay runs)
 fixtures/scenarios/<slug>/fixture.json   point-in-time inputs from 8 historical runs
+fixtures/reviewer-eval/corpus.json       confirmed bug cases + clean cases scored by bin/reviewer-eval
 bench/benchmark.py        Method-A replay benchmark + parity gates
 report/report.html        self-contained benchmark report
 out/                      per-run result.json, audit.log, actions.jsonl

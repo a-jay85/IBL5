@@ -7,6 +7,7 @@ See ibl5/docs/reviewer-eval.md.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime
 import hashlib
 import json
@@ -377,7 +378,7 @@ _FIX_SUBJECT_RE = re.compile(r"^(fix|revert|Revert)")
 
 def _gitt(root: Path, *argv: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", "-C", str(root), *argv],
-                          capture_output=True, text=True, check=False)
+                          capture_output=True, text=True, errors="replace", check=False)
 
 
 def diff_line_sets(root: Path, commit: str, path: str) -> tuple[set[int], set[int]]:
@@ -419,6 +420,36 @@ def blame_origins(root: Path, rev: str, path: str,
             m = _BLAME_HDR_RE.match(line)
             if m:
                 out.append((m.group(1), int(m.group(2))))
+    return out
+
+
+def blame_records(root: Path, rev: str, path: str,
+                  lines: Iterable[int]) -> list[tuple[str, int, str]]:
+    """(origin sha, line number in the origin commit, path in the origin commit).
+
+    Same porcelain parse as `blame_origins`; the `filename` line maps a renamed
+    file to its path in the introducing commit.
+    """
+    out: list[tuple[str, int, str]] = []
+    runs: list[tuple[int, int]] = []
+    for n in sorted(set(lines)):
+        if runs and n == runs[-1][1] + 1:
+            runs[-1] = (runs[-1][0], n)
+        else:
+            runs.append((n, n))
+    for a, b in runs:
+        r = _gitt(root, "blame", "--porcelain", "-L", f"{a},{b}", rev, "--", path)
+        if r.returncode != 0:
+            continue
+        names: dict[str, str] = {}
+        pending: list[tuple[str, int]] = []
+        for line in r.stdout.splitlines():
+            m = _BLAME_HDR_RE.match(line)
+            if m:
+                pending.append((m.group(1), int(m.group(2))))
+            elif line.startswith("filename ") and pending:
+                names[pending[-1][0]] = line[len("filename "):]
+        out.extend((sha, orig, names.get(sha, path)) for sha, orig in pending)
     return out
 
 
@@ -523,12 +554,8 @@ def validate_git(root: Path, corpus: dict, *, ref: str = "HEAD", now: float) -> 
 # --- CLI -------------------------------------------------------------------
 
 def _repo_root(arg: Optional[str]) -> Path:
-    if arg:
-        return Path(arg)
-    r = _gitt(Path.cwd(), "rev-parse", "--show-toplevel")
-    if r.returncode != 0:
-        raise EvalUsageError("not inside a git repository (pass --repo)")
-    return Path(r.stdout.strip())
+    # Module-relative, so a base tree's own copy of this module resolves to that tree.
+    return Path(arg) if arg else Path(__file__).resolve().parents[3]
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
@@ -744,7 +771,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
         raise EvalUsageError("; ".join(errors))
     case_ids = {s for s in args.cases.split(",") if s} if args.cases else None
     ledger = UsageLedger()
-    cache_dir: Optional[Path] = None if args.no_cache else root / DEFAULT_CACHE_REL
+    cache_dir: Optional[Path] = None
+    if not args.no_cache:
+        cache_dir = Path(args.cache_dir) if args.cache_dir else root / DEFAULT_CACHE_REL
     if args.canned:
         canned = load_corpus(Path(args.canned))
         cache_dir = None
@@ -769,8 +798,238 @@ def _cmd_run(args: argparse.Namespace) -> int:
             out_fh.close()
 
 
+# ---------------------------------------------------------------------------
+# Phase 5: compare (the miner lives in reviewer_eval_mine.py)
+# ---------------------------------------------------------------------------
+
+Runner = Callable[[Path, list], "tuple[int, str]"]
+
+
+def _default_runner(path: Path, args: list) -> tuple[int, str]:
+    r = subprocess.run([str(path), *args], capture_output=True, text=True, check=False)
+    return r.returncode, r.stdout
+
+
+@contextlib.contextmanager
+def _default_make_tree(root: Path, sha: str):
+    from .gate_backtest_replay import ScratchTree
+    with ScratchTree(str(root), sha) as scratch:
+        yield Path(scratch.dir)
+
+
+def _last_line(text: str) -> str:
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    return lines[-1].strip() if lines else ""
+
+
+def compare(root: Path, base: str, corpus_path: Path, *, runner: Runner,
+            make_tree: Callable, out: TextIO, cache_dir: Optional[Path] = None,
+            err: Optional[TextIO] = None) -> int:
+    err = err if err is not None else sys.stderr
+    rv = _gitt(root, "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}")
+    if rv.returncode != 0 or not rv.stdout.strip():
+        print(f"error: cannot resolve base ref {base}", file=err)
+        return 2
+    base_sha = rv.stdout.strip()
+    if _gitt(root, "cat-file", "-e", f"{base_sha}:bin/reviewer-eval").returncode != 0:
+        print(f"error: base {base} predates bin/reviewer-eval; "
+              "record the before score from a checkout that has it", file=err)
+        return 2
+    cache = cache_dir if cache_dir is not None else root / DEFAULT_CACHE_REL
+    args = ["run", "--corpus", str(corpus_path.resolve()), "--cache-dir", str(Path(cache).resolve())]
+    with make_tree(root, base_sha) as tree:
+        base_rc, base_out = runner(Path(tree) / "bin/reviewer-eval", args)
+    head_rc, head_out = runner(root / "bin/reviewer-eval", args)
+    if 2 in (base_rc, head_rc):
+        print("error: reviewer eval run failed with a usage error", file=err)
+        return 2
+    for rc in (base_rc, head_rc):
+        if rc not in (0, 3):
+            print(f"error: reviewer eval run exited {rc}", file=err)
+            return 1
+    before_line, after_line = _last_line(base_out), _last_line(head_out)
+    try:
+        before, after = parse_score_line(before_line), parse_score_line(after_line)
+    except EvalUsageError as e:
+        print(f"error: {e}", file=err)
+        return 2
+    print(f"Reviewer eval before: {before_line}", file=out)
+    print(f"Reviewer eval after: {after_line}", file=out)
+    try:
+        worse = is_worse(before, after)
+    except EvalUsageError as e:
+        print(f"error: {e}", file=err)
+        return 2
+    if worse:
+        print("note: after is worse than before; the PR body needs "
+              "<!-- reviewer-eval-regression-ok: <reason> -->", file=err)
+    return 3 if 3 in (base_rc, head_rc) else 0
+
+
+def _cmd_compare(args: argparse.Namespace) -> int:
+    root = _repo_root(args.repo)
+    corpus_path = Path(args.corpus) if args.corpus else root / DEFAULT_CORPUS
+    cache_dir = Path(args.cache_dir) if args.cache_dir else None
+    return compare(root, args.base, corpus_path, runner=_default_runner,
+                   make_tree=_default_make_tree, out=sys.stdout, cache_dir=cache_dir)
+
+
+def _cmd_mine(args: argparse.Namespace) -> int:
+    from . import reviewer_eval_mine as mine
+    root = _repo_root(args.repo)
+    now = time.time()
+    if args.mine_cmd == "bugs":
+        since = args.since or datetime.datetime.fromtimestamp(
+            now - 180 * 86400, datetime.timezone.utc).date().isoformat()
+        return mine.mine_bugs(root, ref=args.ref, since=since, limit=args.limit,
+                              out=sys.stdout)
+    return mine.mine_clean(root, ref=args.ref, window_days=args.window_days,
+                           limit=args.limit, now=now, out=sys.stdout)
+
+
 def _cmd_smoke(args: argparse.Namespace) -> int:
     return smoke(ClaudeCli(UsageLedger()))
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: hash and check-claim (the CI binding of a PR-body score to the surface)
+# ---------------------------------------------------------------------------
+
+SKIP_RE = re.compile(r"<!--\s*reviewer-eval-skip:\s*(.*?)\s*-->")
+REGRESSION_RE = re.compile(r"<!--\s*reviewer-eval-regression-ok:\s*(.*?)\s*-->")
+_BEFORE_RE = re.compile(r"^Reviewer eval before:[ \t]*(.+)$", re.M)
+_AFTER_RE = re.compile(r"^Reviewer eval after:[ \t]*(.+)$", re.M)
+MIN_WAIVER_REASON = 15
+
+
+def _corpus_at_ref(root: Path, ref: str) -> dict:
+    raw = read_git_ref(root, ref, DEFAULT_CORPUS)
+    if raw is None:
+        raise EvalUsageError(f"corpus absent at {ref}: {DEFAULT_CORPUS}")
+    try:
+        corpus = json.loads(raw.decode("utf-8"))
+        corpus_digest(corpus)
+    except (ValueError, KeyError, TypeError) as e:
+        raise EvalUsageError(f"corpus at {ref} is not a valid corpus: {e}") from e
+    return corpus
+
+
+def _cmd_hash(args: argparse.Namespace) -> int:
+    root = _repo_root(args.repo)
+    if args.ref:
+        v = surface_hash_ref(root, args.ref)
+        c = corpus_digest(_corpus_at_ref(root, args.ref))
+    else:
+        v = surface_hash_worktree(root)
+        c = corpus_digest(load_corpus(root / DEFAULT_CORPUS))
+    print(f"v={v} c={c}")
+    return 0
+
+
+def check_claim(root: Path, base: str, head: str, body_loader: Callable[[], str], *,
+                out: Optional[TextIO] = None, err: Optional[TextIO] = None) -> int:
+    """Bind a PR body's before/after score lines to the surface at base/head and the corpus at head."""
+    out = out if out is not None else sys.stdout
+    err = err if err is not None else sys.stderr
+    try:
+        v_base = surface_hash_ref(root, base)
+        v_head = surface_hash_ref(root, head)
+    except SurfaceError as e:
+        print(f"check-reviewer-eval: {e}", file=err)
+        return 2
+    if v_base == v_head:
+        print(f"reviewer-eval: review surface unchanged (v={v_base})", file=out)
+        return 0
+    try:
+        c_head = corpus_digest(_corpus_at_ref(root, head))
+        body = body_loader()
+    except (EvalUsageError, SurfaceError) as e:
+        print(f"check-reviewer-eval: {e}", file=err)
+        return 2
+    body = body.replace("\r\n", "\n")
+
+    skip = SKIP_RE.search(body)
+    if skip:
+        reason = skip.group(1)
+        if len(reason) >= MIN_WAIVER_REASON:
+            print(f"reviewer-eval-skip: {reason}", file=out)
+            return 0
+        print("check-reviewer-eval: malformed reviewer-eval-skip waiver (reason < 15 chars)",
+              file=err)
+        return 1
+
+    hint = "produce both lines with `bin/reviewer-eval compare` and paste them into the PR body"
+    befores, afters = _BEFORE_RE.findall(body), _AFTER_RE.findall(body)
+    if len(befores) != 1 or len(afters) != 1:
+        print(f"check-reviewer-eval: review surface changed (v {v_base} -> {v_head}); the PR body "
+              f"needs exactly one 'Reviewer eval before:' and one 'Reviewer eval after:' line "
+              f"(found {len(befores)} and {len(afters)}); {hint}", file=err)
+        return 1
+    try:
+        before, after = parse_score_line(befores[0]), parse_score_line(afters[0])
+    except EvalUsageError as e:
+        print(f"check-reviewer-eval: {e}; {hint}", file=err)
+        return 1
+
+    bad = False
+    for label, claimed, expected in (("before.v", before.v, v_base), ("after.v", after.v, v_head),
+                                     ("before.c", before.c, c_head), ("after.c", after.c, c_head)):
+        if claimed != expected:
+            print(f"check-reviewer-eval: {label} mismatch: expected {expected}, claimed {claimed}",
+                  file=err)
+            bad = True
+    for label, sc in (("before", before), ("after", after)):
+        if sc.degraded != 0:
+            print(f"check-reviewer-eval: {label} score is degraded (degraded={sc.degraded}); "
+                  f"rerun until degraded=0", file=err)
+            bad = True
+    if bad:
+        return 1
+
+    try:
+        worse = is_worse(before, after)
+    except EvalUsageError as e:
+        print(f"check-reviewer-eval: {e}", file=err)
+        return 1
+    if worse:
+        reg = REGRESSION_RE.search(body)
+        if reg and len(reg.group(1)) >= MIN_WAIVER_REASON:
+            print(f"reviewer-eval-regression-ok: {reg.group(1)}", file=out)
+            return 0
+        print("check-reviewer-eval: the review got worse (fewer hits or more false alarms) and "
+              "the PR body has no valid '<!-- reviewer-eval-regression-ok: <reason, 15+ chars> -->'",
+              file=err)
+        return 1
+    print("reviewer-eval: before/after claim matches base and head", file=out)
+    return 0
+
+
+def _gh_body_loader(gh: str, pr: str) -> Callable[[], str]:
+    def load() -> str:
+        try:
+            r = subprocess.run([gh, "pr", "view", pr, "--json", "body", "-q", ".body"],
+                               capture_output=True, text=True, check=False)
+        except OSError as e:
+            raise EvalUsageError(f"gh failed for PR {pr}: {e}") from e
+        if r.returncode != 0:
+            raise EvalUsageError(f"gh pr view failed for PR {pr}")
+        return r.stdout
+    return load
+
+
+def _file_body_loader(path: str) -> Callable[[], str]:
+    def load() -> str:
+        try:
+            return Path(path).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            raise EvalUsageError(f"cannot read body file {path}: {e}") from e
+    return load
+
+
+def _cmd_check_claim(args: argparse.Namespace) -> int:
+    root = _repo_root(args.repo)
+    loader = _gh_body_loader(args.gh, args.pr) if args.pr else _file_body_loader(args.body_file)
+    return check_claim(root, args.base, args.head, loader)
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -787,12 +1046,46 @@ def main(argv: Optional[list[str]] = None) -> int:
     r.add_argument("--kinds", choices=("bug", "clean", "all"), default="all")
     r.add_argument("--cases", metavar="ID,ID", default=None)
     r.add_argument("--no-cache", action="store_true")
+    r.add_argument("--cache-dir", metavar="DIR", default=None)
     r.add_argument("--canned", metavar="FILE", default=None)
     r.add_argument("--dry-run", action="store_true")
     r.add_argument("--out", metavar="FILE", default=None)
     r.set_defaults(func=_cmd_run)
     sm = sub.add_parser("smoke", help="one live scorer call proving the claude -p boundary")
     sm.set_defaults(func=_cmd_smoke)
+    c = sub.add_parser("compare", help="score the base tree and this tree on one corpus and cache")
+    c.add_argument("--base", metavar="REF", default="origin/master")
+    c.add_argument("--corpus", metavar="PATH", default=None)
+    c.add_argument("--repo", metavar="DIR", default=None)
+    c.add_argument("--cache-dir", metavar="DIR", default=None)
+    c.set_defaults(func=_cmd_compare)
+    mn = sub.add_parser("mine", help="print corpus candidates from history (writes nothing)")
+    msub = mn.add_subparsers(dest="mine_cmd", required=True)
+    mb = msub.add_parser("bugs", help="fixes that blame back to an introducing PR")
+    mb.add_argument("--since", metavar="YYYY-MM-DD", default=None)
+    mb.add_argument("--ref", metavar="REF", default="HEAD")
+    mb.add_argument("--limit", type=int, default=40)
+    mb.add_argument("--repo", metavar="DIR", default=None)
+    mb.set_defaults(func=_cmd_mine)
+    mc = msub.add_parser("clean", help="settled PRs no later fix blamed")
+    mc.add_argument("--window-days", type=int, default=30)
+    mc.add_argument("--ref", metavar="REF", default="HEAD")
+    mc.add_argument("--limit", type=int, default=20)
+    mc.add_argument("--repo", metavar="DIR", default=None)
+    mc.set_defaults(func=_cmd_mine)
+    h = sub.add_parser("hash", help="print v=<surface hash> c=<corpus digest> for the tree or a ref")
+    h.add_argument("--ref", metavar="REF", default=None)
+    h.add_argument("--repo", metavar="DIR", default=None)
+    h.set_defaults(func=_cmd_hash)
+    cc = sub.add_parser("check-claim", help="check a PR body's before/after claim (CI gate)")
+    cc.add_argument("--repo", metavar="DIR", default=None)
+    cc.add_argument("--base", metavar="REF", required=True)
+    cc.add_argument("--head", metavar="REF", default="HEAD")
+    grp = cc.add_mutually_exclusive_group(required=True)
+    grp.add_argument("--pr", metavar="N", default=None)
+    grp.add_argument("--body-file", metavar="PATH", default=None)
+    cc.add_argument("--gh", metavar="CMD", default="gh")
+    cc.set_defaults(func=_cmd_check_claim)
     args = parser.parse_args(argv)
     try:
         return args.func(args)

@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/reviewer-eval — score the post-plan PR reviewer against a corpus of known bugs.
+#
+# Usage: bin/reviewer-eval <run|validate|smoke|compare|mine> [flags]
+#   run       review each corpus case offline and print the one-line score
+#   validate  check the corpus schema and its history claims offline
+#   smoke     one live scorer call proving the claude -p boundary
+#   compare   score the base tree and this tree on one corpus and print a before/after block
+#   mine      print bug or clean corpus candidates from history (writes no file)
+#   exit 0 ok, 1 finding or failure, 2 usage, 3 incomplete (a degraded review agent)
+#
+# The logic lives in tools/postplan-harness/harness/reviewer_eval.py. This wrapper resolves
+# the compare base and puts the harness on PYTHONPATH.
+# Never reads a bare $HOME, so it runs under `env -i`.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ "$#" -eq 0 ]; then
+    awk 'NR==1||/shellcheck/{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0" >&2
+    exit 2
+fi
+
+case "$1" in
+    -h|--help)
+        awk 'NR==1||/shellcheck/{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+        exit 0
+        ;;
+esac
+
+EXTRA=()
+if [ "$1" = "compare" ]; then
+    HAVE_BASE=0
+    for arg in "$@"; do
+        case "$arg" in
+            --base|--base=*) HAVE_BASE=1 ;;
+        esac
+    done
+    if [ "$HAVE_BASE" = 0 ]; then
+        # shellcheck source=lib/branch-base.sh
+        . "$ROOT/bin/lib/branch-base.sh"
+        BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+        BASE=""
+        if [ -n "$BRANCH" ] && [ "$BRANCH" != "HEAD" ]; then
+            BASE="$(branch_base_resolve "$ROOT" "$BRANCH" 2>/dev/null || true)"
+        fi
+        case "$BASE" in
+            "") BASE="origin/master" ;;
+            origin/*) ;;
+            *) BASE="origin/$BASE" ;;
+        esac
+        EXTRA=("--base" "$BASE")
+    fi
+fi
+
+export PYTHONPATH="$ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m harness.reviewer_eval "$@" ${EXTRA[@]+"${EXTRA[@]}"}

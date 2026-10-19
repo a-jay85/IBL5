@@ -582,3 +582,279 @@ def test_null_gh_rejects_unknown_call():
     assert gh.post_review_summary(1, "t", "b") is None
     with pytest.raises(AttributeError):
         gh.get_pr
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: miner, compare
+# ---------------------------------------------------------------------------
+
+import contextlib  # noqa: E402
+
+from harness import reviewer_eval_mine as mine_  # noqa: E402
+
+
+def _status(root):
+    return subprocess.run(["git", "-C", str(root), "status", "--porcelain"], check=True,
+                          capture_output=True, text=True).stdout
+
+
+def _mine_bugs_out(root, capsys, *extra):
+    rc = re_.main(["mine", "bugs", "--repo", str(root), "--since", "2000-01-01", *extra])
+    assert rc == 0
+    return [json.loads(ln) for ln in capsys.readouterr().out.splitlines() if ln.strip()]
+
+
+def _simple_repo(tmp_path, *, path=FOO, intro_subject="feat: add rule (#10)", fixed=1, total=100):
+    """base -> introducer rewrites every line -> fix rewrites the first `fixed` lines."""
+    repo = tmp_path / "simple"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    text = lambda ls: "\n".join(ls) + "\n"  # noqa: E731
+    lines = [f"line{n:03d}" for n in range(1, total + 1)]
+    _commit(repo, "chore: base (#1)", NOW - 100 * DAY, {path: text(lines)})
+    lines = [f"intro{n:03d}" for n in range(1, total + 1)]
+    intro = _commit(repo, intro_subject, NOW - 60 * DAY, {path: text(lines)})
+    lines = [f"fixed{n:03d}" if n <= fixed else ln for n, ln in enumerate(lines, 1)]
+    fix = _commit(repo, "fix: patch (#11)", NOW - 50 * DAY, {path: text(lines)})
+    return {"root": repo, "intro": intro, "fix": fix}
+
+
+def test_mine_bugs_blame_mapping(tmp_path, capsys):
+    r = _mk_repo(tmp_path)
+    cands = _mine_bugs_out(r["root"], capsys)
+    assert len(cands) == 1
+    c = cands[0]
+    assert c["commit"] == r["intro"] and c["fix_commit"] == r["fix"]
+    assert c["expected"] == [{"path": "ibl5/classes/Foo.php", "start": 12, "end": 12}]
+    assert c["status"] == "unconfirmed" and c["pr"] == 10 and c["fix_pr"] == 11
+    assert c["id"] == "bug-pr10-foo"
+    curated = {k: v for k, v in c.items() if not k.startswith("_")}
+    curated.update(status="confirmed", description="off by one")
+    assert re_.validate_schema(_vcorpus([curated])) == []
+    assert re_.validate_git(r["root"], _vcorpus([curated]), now=NOW) == []
+    # the underscore hints fail the schema on purpose until a curator strips them
+    assert re_.validate_schema(_vcorpus([c])) != []
+
+
+def test_mine_bugs_skips_chore_introducer(tmp_path, capsys):
+    ok = _simple_repo(tmp_path, intro_subject="feat: add rule (#10)")
+    assert len(_mine_bugs_out(ok["root"], capsys)) == 1
+    assert "chore" in mine_.SKIP_TYPES
+    sub = tmp_path / "chore"
+    sub.mkdir()
+    r = _simple_repo(sub, intro_subject="chore: move (#12)")
+    assert _mine_bugs_out(r["root"], capsys) == []
+
+
+def test_mine_bugs_skips_large_fix(tmp_path, capsys):
+    small = _simple_repo(tmp_path, fixed=5)
+    assert len(_mine_bugs_out(small["root"], capsys)) == 1
+    sub = tmp_path / "big"
+    sub.mkdir()
+    big = _simple_repo(sub, fixed=81)
+    assert mine_.MAX_FIX_LINES == 80
+    assert _mine_bugs_out(big["root"], capsys) == []
+
+
+@pytest.mark.parametrize("path", ["ibl5/classes/FooTest.php", "ibl5/modules/Bar/tests/Helper.php"])
+def test_mine_bugs_skips_test_paths(tmp_path, capsys, path):
+    ok = _simple_repo(tmp_path)
+    assert len(_mine_bugs_out(ok["root"], capsys)) == 1
+    sub = tmp_path / "t"
+    sub.mkdir()
+    r = _simple_repo(sub, path=path)
+    assert _mine_bugs_out(r["root"], capsys) == []
+
+
+def test_mine_clean_excludes_blamed_and_young(tmp_path):
+    r = _mk_repo(tmp_path)
+    bar = _commit(r["root"], "feat: add bar (#20)", NOW - 40 * DAY, {"ibl5/classes/Bar.php": "x\n"})
+    young = _commit(r["root"], "feat: young (#21)", NOW - 5 * DAY, {"ibl5/classes/Baz.php": "x\n"})
+    buf = io.StringIO()
+    assert mine_.mine_clean(r["root"], ref="HEAD", window_days=30, limit=20, now=NOW, out=buf) == 0
+    rows = [json.loads(ln) for ln in buf.getvalue().splitlines()]
+    commits = {row["commit"] for row in rows}
+    assert bar in commits
+    assert r["intro"] not in commits      # blamed by the fix
+    assert young not in commits           # inside the window
+    assert r["shift"] not in commits      # chore
+    row = next(x for x in rows if x["commit"] == bar)
+    assert row["id"] == "clean-pr20" and row["pr"] == 20
+    assert re_.validate_schema(_vcorpus([_bug(r)], [row])) == []
+
+
+def test_mine_never_writes_files(tmp_path, capsys):
+    r = _mk_repo(tmp_path)
+    before = _status(r["root"])
+    assert re_.main(["mine", "bugs", "--repo", str(r["root"]), "--since", "2000-01-01"]) == 0
+    assert capsys.readouterr().out.strip()
+    assert re_.main(["mine", "clean", "--repo", str(r["root"]), "--window-days", "1"]) == 0
+    assert capsys.readouterr().out.strip()
+    assert _status(r["root"]) == before
+
+
+class _Runner:
+    def __init__(self, results):
+        self.results = results
+        self.calls = []
+
+    def __call__(self, path, args):
+        self.calls.append((path, list(args)))
+        return self.results[len(self.calls) - 1]
+
+
+class _Trees:
+    def __init__(self, tree):
+        self.tree = tree
+        self.entered = []
+
+    @contextlib.contextmanager
+    def __call__(self, root, sha):
+        self.entered.append(sha)
+        yield self.tree
+
+
+def _compare_repo(tmp_path):
+    r = _mk_repo(tmp_path)
+    r["tool"] = _commit(r["root"], "chore: add tool (#30)", NOW - DAY,
+                        {"bin/reviewer-eval": "#!/bin/sh\n"})
+    r["tree"] = tmp_path / "tree"
+    r["tree"].mkdir()
+    return r
+
+
+def _compare(r, runner, corpus=None, **kw):
+    out, err = io.StringIO(), io.StringIO()
+    trees = _Trees(r["tree"])
+    rc = re_.compare(r["root"], r["tool"], corpus or (r["root"] / "corpus.json"),
+                     runner=runner, make_tree=trees, out=out, err=err, **kw)
+    return rc, out.getvalue(), err.getvalue(), trees
+
+
+def test_compare_prints_block(tmp_path):
+    r = _compare_repo(tmp_path)
+    a, b = re_.format_score_line(_s(5, 1)), re_.format_score_line(_s(6, 1))
+    runner = _Runner([(0, f"noise\n{a}\n"), (0, f"noise\n{b}\n")])
+    rc, out, _err, trees = _compare(r, runner)
+    assert rc == 0
+    assert out == f"Reviewer eval before: {a}\nReviewer eval after: {b}\n"
+    assert runner.calls[0][0] == r["tree"] / "bin/reviewer-eval"
+    assert runner.calls[1][0] == r["root"] / "bin/reviewer-eval"
+    assert trees.entered == [r["tool"]]
+
+
+def test_compare_worse_notes_stderr_and_exits_0(tmp_path):
+    r = _compare_repo(tmp_path)
+    a, b = re_.format_score_line(_s(6, 1)), re_.format_score_line(_s(5, 1))
+    rc, out, err, _t = _compare(r, _Runner([(0, a), (0, b)]))
+    assert rc == 0
+    assert "reviewer-eval-regression-ok" in err
+    assert "reviewer-eval-regression-ok" not in out
+
+
+def test_compare_shared_corpus_and_cache(tmp_path):
+    r = _compare_repo(tmp_path)
+    line = re_.format_score_line(_s(5, 1))
+    runner = _Runner([(0, line), (0, line)])
+    corpus = tmp_path / "shared" / "corpus.json"
+    cache = tmp_path / "shared" / "cache"
+    rc, _out, _err, _t = _compare(r, runner, corpus, cache_dir=cache)
+    assert rc == 0
+    (_, base_args), (_, head_args) = runner.calls
+    assert base_args == head_args
+    assert base_args == ["run", "--corpus", str(corpus.resolve()),
+                         "--cache-dir", str(cache.resolve())]
+    assert os.path.isabs(base_args[2]) and os.path.isabs(base_args[4])
+
+
+def test_compare_base_predates_tool(tmp_path):
+    r = _compare_repo(tmp_path)
+    runner = _Runner([])
+    out, err = io.StringIO(), io.StringIO()
+    trees = _Trees(r["tree"])
+    rc = re_.compare(r["root"], r["base"], r["root"] / "corpus.json",
+                     runner=runner, make_tree=trees, out=out, err=err)
+    assert rc == 2
+    assert "predates bin/reviewer-eval" in err.getvalue()
+    assert trees.entered == [] and runner.calls == []
+    rc = re_.compare(r["root"], "no-such-ref", r["root"] / "corpus.json",
+                     runner=runner, make_tree=trees, out=out, err=err)
+    assert rc == 2 and trees.entered == []
+
+
+def test_compare_propagates_degraded_and_usage(tmp_path):
+    r = _compare_repo(tmp_path)
+    line = re_.format_score_line(_s(5, 1))
+    rc, out, _err, _t = _compare(r, _Runner([(0, line), (3, line)]))
+    assert rc == 3
+    assert out.count("Reviewer eval ") == 2
+    rc, out, _err, _t = _compare(r, _Runner([(2, ""), (0, line)]))
+    assert rc == 2 and out == ""
+    rc, out, _err, _t = _compare(r, _Runner([(0, line), (2, "")]))
+    assert rc == 2 and out == ""
+    rc, out, _err, _t = _compare(r, _Runner([(0, "garbage"), (0, line)]))
+    assert rc == 2 and out == ""
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: check_claim
+# ---------------------------------------------------------------------------
+
+def _git_run(root, *argv):
+    subprocess.run(["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t", *argv],
+                   check=True, capture_output=True)
+
+
+def _claim_repo(tmp_path):
+    root = tmp_path / "claim"
+    root.mkdir()
+    _git_run(root, "init", "-q")
+    for rel in re_.REVIEW_SURFACE_PATHS:
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("one\n")
+    llm = root / re_.MODEL_MAP_SOURCE
+    llm.parent.mkdir(parents=True, exist_ok=True)
+    llm.write_text("MODEL_MAP = {\n    'a': 'b',\n}\n")
+    corpus = root / re_.DEFAULT_CORPUS
+    corpus.parent.mkdir(parents=True, exist_ok=True)
+    corpus.write_text(json.dumps({
+        "schema_version": 1, "window_days": 30,
+        "cases": [{"id": "bug-one", "commit": "a" * 40, "status": "confirmed",
+                   "expected": [{"path": "a.php", "start": 1, "end": 2}]}],
+        "clean": [{"id": "clean-one", "commit": "b" * 40}],
+    }))
+    _git_run(root, "add", "-A")
+    _git_run(root, "commit", "-q", "-m", "base")
+    base = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True,
+                          text=True, check=True).stdout.strip()
+    return root, base
+
+
+def _commit_all(root, msg):
+    _git_run(root, "add", "-A")
+    _git_run(root, "commit", "-q", "-m", msg)
+
+
+def test_check_claim_unchanged_skips_body_loader(tmp_path):
+    root, base = _claim_repo(tmp_path)
+    (root / "unrelated.txt").write_text("x\n")
+    _commit_all(root, "unrelated")
+
+    def boom():
+        raise AssertionError("body_loader must not run when the surface is unchanged")
+
+    out = io.StringIO()
+    rc = re_.check_claim(root, base, "HEAD", boom, out=out, err=io.StringIO())
+    assert rc == 0
+    assert "review surface unchanged" in out.getvalue()
+
+
+def test_check_claim_regex_never_evals_body(tmp_path, monkeypatch):
+    root, base = _claim_repo(tmp_path)
+    (root / re_.REVIEW_SURFACE_PATHS[3]).write_text("two\n")
+    _commit_all(root, "change rubric")
+    monkeypatch.chdir(tmp_path)
+    body = "$(touch PWNED) `touch PWNED` {0} {} %s {body.__class__}\n"
+    rc = re_.check_claim(root, base, "HEAD", lambda: body, out=io.StringIO(), err=io.StringIO())
+    assert rc == 1
+    assert not (tmp_path / "PWNED").exists()

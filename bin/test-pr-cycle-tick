@@ -203,7 +203,14 @@ cat "$SCRATCH/key-\$1" 2>/dev/null
 PF_EOF
 printf '#!/usr/bin/env bash\nexit 1\n' > "$SCRATCH/patchid-fail"
 printf '#!/usr/bin/env bash\necho not-a-patch-id\n' > "$SCRATCH/patchid-junk"
-chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub" "$SCRATCH/pad40" "$SCRATCH/patchid-identity" "$SCRATCH/patchid-file" "$SCRATCH/patchid-fail" "$SCRATCH/patchid-junk"
+# mastertip-file: controllable origin/master tip; prints $SCRATCH/master-tip, fails when absent.
+cat > "$SCRATCH/mastertip-file" <<MT_EOF
+#!/usr/bin/env bash
+cat "$SCRATCH/master-tip" 2>/dev/null
+MT_EOF
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/mastertip-empty"
+printf '#!/usr/bin/env bash\necho not-a-sha\n' > "$SCRATCH/mastertip-junk"
+chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub" "$SCRATCH/pad40" "$SCRATCH/patchid-identity" "$SCRATCH/patchid-file" "$SCRATCH/patchid-fail" "$SCRATCH/patchid-junk" "$SCRATCH/mastertip-file" "$SCRATCH/mastertip-empty" "$SCRATCH/mastertip-junk"
 
 # --- per-case state ------------------------------------------------------------------------
 UNSET="__UNSET__"
@@ -211,6 +218,7 @@ E_ZONE=normal; E_STOP="$UNSET"; E_STATE="$UNSET"
 E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
 E_HOME="set"; E_STUB_RC=0
 E_PATCHID="$SCRATCH/patchid-identity"
+E_MASTERTIP="$SCRATCH/mastertip-file"
 
 reset() {
     rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
@@ -232,6 +240,8 @@ reset() {
     E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
     E_HOME="set"; E_STUB_RC=0
     E_PATCHID="$SCRATCH/patchid-identity"
+    E_MASTERTIP="$SCRATCH/mastertip-file"
+    "$SCRATCH/pad40" e0001 > "$SCRATCH/master-tip"
 }
 
 # set_prs "<num>|<branch>|<sha>|<mergeStateStatus>|<isDraft>[|<baseRefName>]" ...
@@ -358,6 +368,7 @@ run_tick() {
     _envv PR_CYCLE_TICK_PR_CYCLE_CMD "$E_PRCMD"
     _envv PR_CYCLE_TICK_DM_CMD "$E_DMCMD"
     _envv PR_CYCLE_PATCH_ID_CMD "$E_PATCHID"
+    _envv PR_CYCLE_MASTER_TIP_CMD "$E_MASTERTIP"
     if [[ "$E_HOME" == "set" ]]; then _SET+=("HOME=$HOME_DIR"); else _DROP+=(-u HOME); fi
     ERR="$SCRATCH/last.err"
     OUT="$(cd "$SCRATCH" && env ${_DROP[@]+"${_DROP[@]}"} ${_SET[@]+"${_SET[@]}"} \
@@ -393,6 +404,9 @@ pending_count() { find "$STATE_DIR/pending" -type f 2>/dev/null | wc -l | tr -d 
 dm_count() { if [[ -f "$SCRATCH/dm.log" ]]; then wc -l < "$SCRATCH/dm.log" | tr -d ' '; else echo 0; fi; }
 launch_count() { if [[ -f "$SCRATCH/pr-cycle.log" ]]; then wc -l < "$SCRATCH/pr-cycle.log" | tr -d ' '; else echo 0; fi; }
 strikes() { cat "$STATE_DIR/strikes/$1" 2>/dev/null; }
+conflict_hold() { cat "$STATE_DIR/conflict-hold/$1" 2>/dev/null; }
+retries() { cat "$STATE_DIR/retries/$1" 2>/dev/null; }
+set_tip() { "$SCRATCH/pad40" "$1" > "$SCRATCH/master-tip"; }
 key_of() { "$SCRATCH/pad40" "$1"; }
 set_key() { printf '%s\n' "$2" > "$SCRATCH/key-$1"; }
 pr_refs() { git -C "$REPO" for-each-ref refs/pr-cycle; }

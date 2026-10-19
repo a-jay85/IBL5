@@ -1271,6 +1271,45 @@ if ! cf_fence_unbalanced "$PLAN_FILE"; then
 fi
 
 # ---------------------------------------------------------------------------
+# Gate [VR], matrix-row clause: a planned test token that is a VR baseline.
+# ---------------------------------------------------------------------------
+# Phase 5.0 reads each planning row's test token (harness planfile._planned_token:
+# whole PHPUnit / API-test / E2E / Visual-regression cell, first backticked
+# test|spec|Test span scanning cells from the right) and emits MISSING: when the
+# diff never touches it. A `-snapshots` path or PNG is written only by the CI
+# update-baselines label after the PR exists, so such a row holds arming
+# condition (3) forever even when Critical Files is already conditional (PR
+# 3289). Exempt: the token directly followed by (no-change) (gate [X] polices
+# the row type) or (run-only) (gate [RO] polices trackedness); both are harness
+# exemptions already. Mirrors the Python picker in bash; the type-cell regex is
+# copied from gate [RO]. Measured 2026-10-18 on 1109 plans: 16 tokens in 12
+# plans, all shipped or held.
+while IFS= read -r _vrm_row; do
+    _vrm_pick=$(awk -F'|' '
+        { for (i = 1; i <= NF; i++) { c = tolower($i); gsub(/^[[:space:]*`_]+|[[:space:]*`_]+$/, "", c)
+            if (c ~ /^(phpunit|api.?test|e2e|visual-?regression)([[:space:]]*\(|[[:space:]]*[+\/,&]|-analogue|[[:space:]]+db-integration|$)/) typed = 1 }
+          if (!typed) exit
+          for (i = NF; i >= 1; i--) {
+            s = $i
+            while (match(s, /`[^`]+`/)) {
+                t = substr(s, RSTART + 1, RLENGTH - 2); s = substr(s, RSTART + RLENGTH)
+                if (t ~ /(test|spec|Test)/ && t !~ /[[:space:]&;<>$\\]/) {
+                    if (tolower(s) ~ /^[[:space:]]*\((no-change|run-only)\)/) print "EXEMPT " t
+                    else print "PLANNED " t
+                    exit
+                } } } }' <<<"$_vrm_row")
+    case "$_vrm_pick" in
+        PLANNED\ *) _vrm_tok="${_vrm_pick#PLANNED }" ;;
+        *) continue ;;
+    esac
+    case "$_vrm_tok" in
+        *-snapshots*|*.png|*.PNG) ;;
+        *) continue ;;
+    esac
+    viol "[VR] Verification Matrix row plans \`$_vrm_tok\` as its test. A -snapshots path or PNG is written only by the CI update-baselines label after the PR exists, so post-plan Phase 5.0 reports MISSING: and hold (3) blocks forever. Replacement shapes: for a CI regen plan \`ibl5/tests/e2e/smoke/visual-regression.spec.ts\` (run-only) on the Visual-regression row; for an untouched baseline write \`<png>\` (no-change) directly after the token; for a git rm use a CLI-executable row, which plans no test. Row: ${_vrm_row}"
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
 # Gate M: a PHPUnit matrix row demands a ## Required Test Methods section.
 # ---------------------------------------------------------------------------
 # Phase 5.0 can only check the test FILE path, so a substituted, weaker test at

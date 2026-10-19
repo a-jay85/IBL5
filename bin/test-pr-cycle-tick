@@ -372,12 +372,14 @@ run_tick() {
 out_has() { grep -qF -- "$1" <<< "$OUT"; }
 err_has() { grep -qF -- "$1" "$ERR"; }
 no_file() { [[ ! -e "$1" ]]; }
-# True when gh was never called, or only for the stale-label sweep's one `pr list` read.
-# The sweep runs ahead of the usage gate and the worker guard, so those exits still make
-# that call; the rescue path's own reads (check-runs, the full PR list) stay forbidden.
+# True when gh was never called, or only for reads the tick makes on the way to a launch: the
+# stale-label sweep's `pr list ... isDraft,labels`, the rescue path's `pr list ...
+# isDraft,baseRefName`, and its `api repos/.../commits/<sha>/check-runs?per_page=100`. Any
+# other call (a timeline read, a label DELETE) is not accepted.
 gh_sweep_only() {
     [[ ! -e "$SCRATCH/gh.log" ]] && return 0
-    ! grep -vE '^pr list .*isDraft,labels$' "$SCRATCH/gh.log" | grep -q .
+    ! grep -vE '^(pr list .*isDraft,(labels|baseRefName)|api repos/[^ ]*/commits/[^ ]+/check-runs\?per_page=100)$' \
+        "$SCRATCH/gh.log" | grep -q .
 }
 attempt() { cat "$STATE_DIR/attempts/$1" 2>/dev/null; }
 pending_count() { find "$STATE_DIR/pending" -type f 2>/dev/null | wc -l | tr -d ' '; }
@@ -527,6 +529,23 @@ run_tick
 grep -qF "$(printf '101\taaa1111')" "$STATE_DIR"/pending/* 2>/dev/null \
     || fail "red-qualifies: pending entry lacks the 101/aaa1111 line"
 end_case red-qualifies
+
+# gh_sweep_only accepts the rescue path's own reads and still rejects any other gh call.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+grep -E -- '^pr list ' "$SCRATCH/gh.log" | grep -qE -- 'isDraft,baseRefName$' \
+    || fail "gh-sweep-widened: no baseRefName read in gh.log"
+grep -qE -- '^api repos/.*/commits/aaa1111/check-runs\?per_page=100$' "$SCRATCH/gh.log" \
+    || fail "gh-sweep-widened: no check-runs call in gh.log"
+gh_sweep_only || fail "gh-sweep-widened: helper rejected the sweep, baseRefName and check-runs calls"
+echo 'api --method DELETE repos/{owner}/{repo}/issues/41/labels/post-plan-running' >> "$SCRATCH/gh.log"
+gh_sweep_only && fail "gh-sweep-widened: helper accepted a DELETE call"
+sed -i.bak '$d' "$SCRATCH/gh.log"
+gh_sweep_only || fail "gh-sweep-widened: helper rejected the log after the DELETE line was removed"
+echo 'api repos/{owner}/{repo}/issues/41/timeline --paginate' >> "$SCRATCH/gh.log"
+gh_sweep_only && fail "gh-sweep-widened: helper accepted a timeline call"
+end_case gh-sweep-widened
 
 reset; begin_case
 set_prs '101|branch-one|aaa1111|DIRTY|false'

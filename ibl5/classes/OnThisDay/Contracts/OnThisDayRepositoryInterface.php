@@ -45,4 +45,9 @@ interface OnThisDayRepositoryInterface
      * @return list<Moment>
      */
     public function findTrades(array $monthDays, int $beforeSeasonYear): array;
+
+    /**
+     * End date (Y-m-d) of the given sim, or null when the sim has no row or no end date.
+     */
+    public function findSimEndDate(int $sim): ?string;
 }

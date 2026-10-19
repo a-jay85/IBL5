@@ -342,6 +342,21 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
     }
 
     /**
+     * @see OnThisDayRepositoryInterface::findSimEndDate()
+     */
+    public function findSimEndDate(int $sim): ?string
+    {
+        $row = $this->fetchOne('SELECT end_date FROM `ibl_sim_dates` WHERE sim = ?', 'i', $sim);
+        if ($row === null) {
+            return null;
+        }
+
+        $endDate = $row['end_date'] ?? null;
+
+        return is_string($endDate) && $endDate !== '' ? $endDate : null;
+    }
+
+    /**
      * Guarded player games inside the month/day window and before the season,
      * filtered by the kind's literal predicate on the guarded columns (alias `g`).
      *

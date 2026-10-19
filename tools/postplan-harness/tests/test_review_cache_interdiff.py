@@ -16,14 +16,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import review, reviewcache
 from harness.adapters.llm import FixtureLlm
+from harness.review import VERIFIER_PURPOSES
 from harness.state import Finding, HarnessError, TerminalState, UsageLedger
 from test_review_cache_hit import (ALPHA, BETA, CANNED_FINDINGS, DIFF, FILES, KEY,
                                    REVIEW_PURPOSES, TITLE, _arm, _drive, _finding_dict,
-                                   _purposes, _record)
+                                   _all_real, _pin_verifier_worktree, _purposes, _record)  # noqa: F401 (autouse fixture)
 from test_runner_replay import _actions
 
 # Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
-pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show", "standard_review_depth")
 
 NEW_DIFF_ID = "e" * 40
 
@@ -122,10 +123,12 @@ def _interdiff_drive(monkeypatch, tmp_path, *, name, canned, arm=None, record_ke
                   key=key, files=files, llm=llm)
 
 
-def _fresh_a_canned(findings, scores=None):
+def _fresh_a_canned(findings, verdicts=None):
+    """`verdicts` is the raw reply all three verifier seats return; default is all-real."""
     canned = dict(CANNED_FINDINGS)
     canned["review-agent-a"] = findings
-    canned["score-findings"] = scores if scores is not None else []
+    reply = verdicts if verdicts is not None else _all_real(len(findings))
+    canned.update({p: reply for p in VERIFIER_PURPOSES})
     return canned
 
 
@@ -148,7 +151,7 @@ def test_interdiff_merges_reused_findings_by_path(monkeypatch, tmp_path):
     arm = _arm(findings=[_finding_dict(ALPHA, 90, body="cached unchanged-file finding"),
                          _finding_dict(BETA, 85, body="stale delta-file finding")])
     canned = _fresh_a_canned([{"path": BETA, "line": 1, "body": "fresh delta-file finding"}],
-                             [{"n": 1, "score": 88}])
+                             _all_real(1))
     res, _ = _interdiff_drive(monkeypatch, tmp_path, name="merge", canned=canned, arm=arm)
     assert res.terminal != TerminalState.FAILED, res.error
     assert res.review_delta == [BETA]
@@ -156,12 +159,12 @@ def test_interdiff_merges_reused_findings_by_path(monkeypatch, tmp_path):
     by_body = {f.body: f for f in res.findings}
     reused = by_body["cached unchanged-file finding"]
     assert reused.path == ALPHA and reused.score == 90
-    assert by_body["fresh delta-file finding"].score == 88
+    assert by_body["fresh delta-file finding"].score == 100   # three real votes
     assert "stale delta-file finding" not in by_body
     assert [f.body for f in res.findings] == ["cached unchanged-file finding",
                                               "fresh delta-file finding"]
     # scored_findings follow the same merge: cached row for the unchanged file, no stale row.
-    assert [(s["path"], s["score"]) for s in res.scored_findings] == [(ALPHA, 90), (BETA, 88)]
+    assert [(s["path"], s["score"]) for s in res.scored_findings] == [(ALPHA, 90), (BETA, 100)]
 
 
 def test_interdiff_summary_names_reused_count_and_never_no_issues(monkeypatch, tmp_path):

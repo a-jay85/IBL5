@@ -75,8 +75,8 @@ final class RivalriesRepositoryIntegrationTest extends DatabaseTestCase
         $this->insertGmTenureRow(1, 'Inv One', 2002, 2002);
         $this->insertGmTenureRow(3, 'Inv Three', 2002, 2002);
         $this->insertScoredTeamBoxscoreRow('2001-11-05', 1, 1, 3, 90, 80);
-        // Duplicate row for the same game: the dedupe must count it once.
-        $this->insertScoredTeamBoxscoreRow('2001-11-05', 1, 1, 3, 90, 80);
+        // Second row for the same game (the other team's row): the dedupe must count it once.
+        $this->insertScoredTeamBoxscoreRow('2001-11-05', 1, 1, 3, 90, 80, 'Test Dup');
         $this->insertScoredTeamBoxscoreRow('2001-11-12', 1, 3, 1, 95, 80);
         $this->insertScoredTeamBoxscoreRow('2001-12-01', 1, 1, 3, 101, 99);
         $this->insertScoredTeamBoxscoreRow('2001-10-10', 1, 3, 1, 70, 75);

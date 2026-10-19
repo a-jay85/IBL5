@@ -42,10 +42,50 @@ STUBS="$T/stubs"
 mkdir -p "$STUBS"
 
 # ── Stubs ─────────────────────────────────────────────────────────────────────
+# claude: logs argv and stdin per call, answers from $STUB_DIR/{review,score}.out
+# and exits with $STUB_DIR/{review,score}.rc. The scorer is the call that asks
+# for the haiku model.
 cat > "$STUBS/claude" <<'SH'
 #!/usr/bin/env bash
 d="${STUB_DIR:?}"
+n=$(( $(cat "$d/claude.n" 2>/dev/null || echo 0) + 1 ))
+echo "$n" > "$d/claude.n"
 printf 'call\n' >> "$d/claude.calls"
+printf '%s\n' "$@" > "$d/claude.$n.args"
+cat > "$d/claude.$n.stdin"
+role=review
+for a in "$@"; do [ "$a" = haiku ] && role=score; done
+echo "$role" > "$d/claude.$n.role"
+[ -f "$d/$role.out" ] && cat "$d/$role.out"
+rc=0
+[ -f "$d/$role.rc" ] && rc="$(cat "$d/$role.rc")"
+exit "$rc"
+SH
+# gh: list answers from gh.{open,closed}.json (default []), create prints a URL
+# and saves the title, label and body file per call.
+cat > "$STUBS/gh" <<'SH'
+#!/usr/bin/env bash
+d="${STUB_DIR:?}"
+printf '%s\n' "$*" >> "$d/gh.log"
+case "$1 $2" in
+    "issue list")
+        st=open; prev=""
+        for a in "$@"; do [ "$prev" = --state ] && st="$a"; prev="$a"; done
+        [ -f "$d/gh.list.rc.$st" ] && exit "$(cat "$d/gh.list.rc.$st")"
+        if [ -f "$d/gh.$st.json" ]; then cat "$d/gh.$st.json"; else echo '[]'; fi ;;
+    "issue create")
+        n=$(( $(cat "$d/gh.create.n" 2>/dev/null || echo 0) + 1 ))
+        echo "$n" > "$d/gh.create.n"
+        prev=""
+        for a in "$@"; do
+            [ "$prev" = --body-file ] && cp "$a" "$d/gh.body.$n"
+            [ "$prev" = --title ] && printf '%s' "$a" > "$d/gh.title.$n"
+            [ "$prev" = --label ] && printf '%s' "$a" > "$d/gh.label.$n"
+            prev="$a"
+        done
+        [ -f "$d/gh.create.rc" ] && exit "$(cat "$d/gh.create.rc")"
+        echo "https://github.com/a-jay85/IBL5-backlog/issues/$((100 + n))" ;;
+esac
 SH
 cat > "$STUBS/launchctl" <<'SH'
 #!/usr/bin/env bash
@@ -61,6 +101,7 @@ new_fixture() {
     STATE="$FX/state"
     STUB_DIR="$FX/stubcalls"
     mkdir -p "$STUB_DIR" "$FX/home"
+    SHARED=""; MAXB=""
     local m
     for m in Alpha Beta Gamma; do
         mkdir -p "$CLASSES/$m"
@@ -76,7 +117,10 @@ csr() {
         CODE_SLICE_REVIEW_CLASSES_DIR="$CLASSES" \
         CODE_SLICE_REVIEW_STATE_DIR="$STATE" \
         CODE_SLICE_REVIEW_CLAUDE_BIN="$STUBS/claude" \
+        CODE_SLICE_REVIEW_GH_BIN="$STUBS/gh" \
         CODE_SLICE_REVIEW_LAUNCHCTL_BIN="$STUBS/launchctl" \
+        CODE_SLICE_REVIEW_SHARED_DIR="${SHARED:-}" \
+        CODE_SLICE_REVIEW_MAX_SLICE_BYTES="${MAXB:-}" \
         bash "$CSR" "$@" 2> "$errf")" || RC=$?
     ERR="$(cat "$errf")"
 }
@@ -155,6 +199,550 @@ case_seam_env_empty_uses_default() {
     expect_has "empty STATE_DIR resolves under HOME" "$plist" "$FX/home/.local/state/ibl5-code-slice-review/logs/run.log"
     plist="$(env -u CODE_SLICE_REVIEW_STATE_DIR HOME="$FX/home" bash "$CSR" --print-schedule)"
     expect_has "unset STATE_DIR resolves the same" "$plist" "$FX/home/.local/state/ibl5-code-slice-review/logs/run.log"
+}
+
+# ── Helpers for the pipeline cases ────────────────────────────────────────────
+# fnd <file> <line> <symbol> <category> <kind> <score> <title> [body] -> one finding.
+fnd() {
+    jq -nc --arg path "$1" --argjson line "$2" --arg symbol "$3" --arg category "$4" \
+        --arg kind "$5" --argjson score "$6" --arg title "$7" --arg body "${8:-Body text for $7.}" \
+        '{path:$path,line:$line,symbol:$symbol,category:$category,kind:$kind,score:$score,title:$title,body:$body}'
+}
+
+# set_review <findings...>: reviewer answers with these findings in a success envelope.
+set_review() {
+    local arr
+    arr="$(printf '%s\n' "$@" | jq -sc 'map(select(. != null))')"
+    [ "$#" -gt 0 ] || arr="[]"
+    jq -nc --argjson f "$arr" \
+        '{type:"result",subtype:"success",is_error:false,total_cost_usd:0.5,structured_output:{findings:$f}}' \
+        > "$STUB_DIR/review.out"
+}
+
+# set_scores <index:score ...>: scorer answers with these scores.
+set_scores() {
+    local pair arr="[]"
+    for pair in "$@"; do
+        arr="$(jq -c --argjson i "${pair%%:*}" --argjson s "${pair##*:}" '. + [{index:$i,score:$s}]' <<< "$arr")"
+    done
+    jq -nc --argjson s "$arr" \
+        '{type:"result",subtype:"success",is_error:false,total_cost_usd:0.01,structured_output:{scores:$s}}' \
+        > "$STUB_DIR/score.out"
+}
+
+# arg_after <call-number> <flag>: the argv line after FLAG in the stub's log.
+arg_after() {
+    awk -v f="$2" 'p {print; p=0} $0 == f {p=1}' "$STUB_DIR/claude.$1.args"
+}
+
+alpha_path() { printf '%s' "$CLASSES/Alpha/Alpha.php"; }
+
+# Copy of the shared docs the case can break. Sets SHARED.
+fake_shared() {
+    SHARED="$FX/shared"
+    cp -R "$REPO_ROOT/.claude/review-shared" "$SHARED"
+}
+
+calls() { # number of claude calls made so far
+    if [ -f "$STUB_DIR/claude.calls" ]; then wc -l < "$STUB_DIR/claude.calls" | tr -d ' '; else echo 0; fi
+}
+
+creates() {
+    if [ -f "$STUB_DIR/gh.create.n" ]; then cat "$STUB_DIR/gh.create.n"; else echo 0; fi
+}
+
+# ── Cases: env seams ──────────────────────────────────────────────────────────
+case_shared_dir_empty_uses_default() {
+    new_fixture
+    csr --print-prompt --slice=Alpha
+    expect_eq "empty SHARED_DIR runs" 0 "$RC"
+    expect_has "empty SHARED_DIR reads the repo docs" "$OUT" "Bug detection"
+    local out
+    out="$(env -u CODE_SLICE_REVIEW_SHARED_DIR HOME="$FX/home" CODE_SLICE_REVIEW_CLASSES_DIR="$CLASSES" \
+        CODE_SLICE_REVIEW_STATE_DIR="$STATE" bash "$CSR" --print-prompt --slice=Alpha)"
+    expect_has "unset SHARED_DIR gives the same" "$out" "Bug detection"
+}
+
+case_bin_seams_empty_use_path_default() {
+    new_fixture
+    set_review
+    local rc=0
+    env HOME="$FX/home" PATH="$STUBS:$PATH" STUB_DIR="$STUB_DIR" \
+        CODE_SLICE_REVIEW_CLASSES_DIR="$CLASSES" CODE_SLICE_REVIEW_STATE_DIR="$STATE" \
+        CODE_SLICE_REVIEW_CLAUDE_BIN= CODE_SLICE_REVIEW_GH_BIN= CODE_SLICE_REVIEW_LAUNCHCTL_BIN= \
+        bash "$CSR" --dry-run --slice=Alpha >/dev/null 2>&1 || rc=$?
+    expect_eq "empty bin seams run" 0 "$rc"
+    [ -f "$STUB_DIR/claude.calls" ] && ok "empty CLAUDE_BIN resolves to PATH claude" || fail "empty CLAUDE_BIN resolves to PATH claude"
+    [ -f "$STUB_DIR/gh.log" ] && ok "empty GH_BIN resolves to PATH gh" || fail "empty GH_BIN resolves to PATH gh"
+    env HOME="$FX/home" PATH="$STUBS:$PATH" STUB_DIR="$STUB_DIR" CODE_SLICE_REVIEW_STATE_DIR="$STATE" \
+        CODE_SLICE_REVIEW_LAUNCHCTL_BIN= bash "$CSR" --uninstall-schedule >/dev/null 2>&1 || true
+    [ -f "$STUB_DIR/launchctl.log" ] && ok "empty LAUNCHCTL_BIN resolves to PATH launchctl" || fail "empty LAUNCHCTL_BIN resolves to PATH launchctl"
+}
+
+# ── Cases: rotation ───────────────────────────────────────────────────────────
+slice_of() { grep -o 'slice=[A-Za-z]* cycle=[0-9-]*' <<< "$OUT" | head -n 1; }
+
+case_rotation_no_repeat_within_cycle() {
+    new_fixture
+    set_review
+    local seq="" i
+    for i in 1 2 3 4; do
+        csr
+        seq="$seq$(slice_of | sed 's/slice=//; s/ cycle=/@/') "
+    done
+    expect_eq "four runs rotate then wrap" "Alpha@1 Beta@1 Gamma@1 Alpha@2 " "$seq"
+}
+
+case_rotation_new_module_mid_cycle() {
+    new_fixture
+    set_review
+    csr
+    mkdir -p "$CLASSES/Aa"; printf '<?php\nclass Aa {}\n' > "$CLASSES/Aa/Aa.php"
+    csr
+    expect_has "new module picked at its sorted position" "$OUT" "slice=Aa cycle=1"
+    csr
+    expect_has "then the next old module" "$OUT" "slice=Beta cycle=1"
+}
+
+case_rotation_removed_module() {
+    new_fixture
+    set_review
+    csr; csr
+    rm -rf "$CLASSES/Gamma"
+    csr
+    expect_has "wraps to cycle 2 after a removal" "$OUT" "slice=Alpha cycle=2"
+}
+
+case_sort_is_c_locale() {
+    new_fixture
+    set_review
+    rm -rf "${CLASSES:?}"/*
+    local m out
+    for m in beta Zeta; do
+        mkdir -p "$CLASSES/$m"; printf '<?php\nclass X {}\n' > "$CLASSES/$m/X.php"
+    done
+    out="$(env HOME="$FX/home" PATH="$STUBS:$PATH" STUB_DIR="$STUB_DIR" LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
+        CODE_SLICE_REVIEW_CLASSES_DIR="$CLASSES" CODE_SLICE_REVIEW_STATE_DIR="$STATE" \
+        CODE_SLICE_REVIEW_CLAUDE_BIN="$STUBS/claude" CODE_SLICE_REVIEW_GH_BIN="$STUBS/gh" \
+        bash "$CSR" --dry-run 2>/dev/null)"
+    expect_has "uppercase sorts before lowercase" "$out" "slice=Zeta"
+}
+
+case_dry_run_writes_no_state() {
+    new_fixture
+    set_review
+    csr --dry-run
+    expect_eq "dry-run exits 0" 0 "$RC"
+    expect_absent "dry-run writes no rotation.state" "$STATE/rotation.state"
+    csr --dry-run
+    expect_has "dry-run does not advance" "$OUT" "slice=Alpha"
+}
+
+case_pinned_slice_writes_no_state() {
+    new_fixture
+    set_review
+    csr
+    cp "$STATE/rotation.state" "$FX/state.before"
+    csr --slice=Gamma
+    expect_eq "pinned run exits 0" 0 "$RC"
+    expect_has "pinned mode named" "$OUT" "mode=pinned"
+    if cmp -s "$STATE/rotation.state" "$FX/state.before"; then ok "pinned run leaves rotation.state identical"; else fail "pinned run changed rotation.state"; fi
+}
+
+case_failed_run_does_not_advance() {
+    new_fixture
+    set_review
+    echo 1 > "$STUB_DIR/review.rc"
+    csr
+    expect_eq "failed run exits 1" 1 "$RC"
+    expect_has "failed run names the failure" "$OUT" "review failed"
+    csr
+    expect_has "second run retries the same module" "$OUT" "slice=Alpha"
+    expect_has "second failure skips the module" "$OUT" "skipped Alpha after 2 failed runs"
+    rm -f "$STUB_DIR/review.rc"
+    csr
+    expect_has "third run moves on" "$OUT" "slice=Beta"
+}
+
+case_corrupt_state_exits_1() {
+    new_fixture
+    mkdir -p "$STATE"
+    printf 'bogus 1\n' > "$STATE/rotation.state"
+    cp "$STATE/rotation.state" "$FX/state.before"
+    csr
+    expect_eq "corrupt state exits 1" 1 "$RC"
+    expect_has "corrupt state named" "$ERR" "corrupt rotation.state"
+    cmp -s "$STATE/rotation.state" "$FX/state.before" && ok "corrupt file left alone" || fail "corrupt file changed"
+    expect_absent "no claude call" "$STUB_DIR/claude.calls"
+    printf 'cycle x\n' > "$STATE/rotation.state"
+    csr
+    expect_eq "non-integer cycle exits 1" 1 "$RC"
+}
+
+case_empty_slice_advances_without_claude() {
+    new_fixture
+    mkdir -p "$CLASSES/Aaa"
+    csr
+    expect_has "empty slice named" "$OUT" "empty slice"
+    expect_absent "no claude call" "$STUB_DIR/claude.calls"
+    grep -qx 'reviewed Aaa' "$STATE/rotation.state" && ok "empty module is marked reviewed" || fail "empty module is marked reviewed"
+}
+
+case_byte_budget_partial() {
+    new_fixture
+    local f
+    for f in B C; do
+        { printf '<?php\n'; head -c 120 /dev/zero | tr '\0' 'x'; } > "$CLASSES/Alpha/$f.php"
+    done
+    set_review
+    MAXB=250
+    csr --dry-run --slice=Alpha
+    expect_has "partial slice printed" "$OUT" "partial slice (2/3 files, byte budget 250)"
+    MAXB=""
+    csr --dry-run --slice=Alpha
+    expect_lacks "empty value means the default budget" "$OUT" "partial slice"
+    MAXB=abc
+    csr --dry-run --slice=Alpha
+    expect_eq "non-integer budget exits 2" 2 "$RC"
+}
+
+# ── Cases: prompt composition ─────────────────────────────────────────────────
+case_prompt_includes_anchored_sections() {
+    new_fixture
+    csr --print-prompt --slice=Alpha
+    local want
+    for want in "### Section 1: Architectural fitness" "### Section 2: Bug detection" \
+        "### Section 3: Database performance" "### Section 2: Code comments" \
+        "### Section 1: SQL Injection" "### Section 2: CSRF Protection" "### Section 3: Authentication" \
+        "## Thresholds" "## Scoring scale" "## Automatic Zero" "## IBL5-specific false positives"; do
+        expect_has "prompt has $want" "$OUT" "$want"
+    done
+    expect_absent "print-prompt makes no claude call" "$STUB_DIR/claude.calls"
+    expect_absent "print-prompt writes no state" "$STATE/rotation.state"
+}
+
+case_prompt_excludes_diff_sections() {
+    new_fixture
+    csr --print-prompt --slice=Alpha
+    expect_lacks "no common preamble" "$OUT" "## Common preamble"
+    expect_lacks "no git history section" "$OUT" "### Section 1: Git history"
+    expect_lacks "no previous PRs agent" "$OUT" "## Agent C"
+}
+
+case_missing_anchor_exits_1() {
+    new_fixture
+    fake_shared
+    grep -v '^### Section 2: Bug detection' "$SHARED/_review-agents.md" > "$SHARED/x" && mv "$SHARED/x" "$SHARED/_review-agents.md"
+    csr
+    expect_eq "missing anchor exits 1" 1 "$RC"
+    expect_has "missing anchor named" "$ERR" "anchor not found"
+    expect_absent "no claude call" "$STUB_DIR/claude.calls"
+    expect_absent "no state file" "$STATE/rotation.state"
+}
+
+case_ambiguous_anchor_exits_1() {
+    new_fixture
+    fake_shared
+    awk '{print} /^### Section 2: Bug detection/ {print "### Section 2: Bug detection (again)"}' \
+        "$SHARED/_review-agents.md" > "$SHARED/x" && mv "$SHARED/x" "$SHARED/_review-agents.md"
+    csr
+    expect_eq "ambiguous anchor exits 1" 1 "$RC"
+    expect_has "ambiguous anchor named" "$ERR" "anchor ambiguous"
+    expect_absent "no claude call" "$STUB_DIR/claude.calls"
+}
+
+case_fenced_hash_does_not_end_section() {
+    new_fixture
+    fake_shared
+    awk '{print} /^### Section 2: Bug detection/ {print "```"; print "# not a heading"; print "```"; print "FENCE-TAIL-MARK"}' \
+        "$SHARED/_review-agents.md" > "$SHARED/x" && mv "$SHARED/x" "$SHARED/_review-agents.md"
+    csr --print-prompt --slice=Alpha
+    expect_has "text after a fenced hash survives" "$OUT" "FENCE-TAIL-MARK"
+}
+
+case_nonce_framing() {
+    new_fixture
+    csr --print-prompt --slice=Alpha
+    local first="$OUT" n1 n2
+    csr --print-prompt --slice=Alpha
+    n1="$(grep -o '<slice id="[0-9a-f]\{16\}">' <<< "$first" | head -n 1 | sed 's/.*id="//; s/".*//')"
+    n2="$(grep -o '<slice id="[0-9a-f]\{16\}">' <<< "$OUT" | head -n 1 | sed 's/.*id="//; s/".*//')"
+    [ "${#n1}" -eq 16 ] && ok "nonce is 16 hex" || fail "nonce is 16 hex (got '$n1')"
+    expect_has "closing tag carries the same nonce" "$first" "</slice id=\"$n1\">"
+    [ -n "$n1" ] && [ "$n1" != "$n2" ] && ok "two runs use different nonces" || fail "two runs use different nonces"
+}
+
+case_thresholds_match_rubric() {
+    new_fixture
+    csr --print-prompt --slice=Alpha
+    expect_has "rubric table carries 80" "$OUT" "| Code review | **80** |"
+    expect_has "rubric table carries 75" "$OUT" "| Security audit | **75** |"
+    grep -qx 'CODE_FLOOR=80' "$CSR" && grep -qx 'SECURITY_FLOOR=75' "$CSR" \
+        && ok "script floors match the rubric" || fail "script floors drifted from the rubric"
+}
+
+# ── Cases: claude call outcomes ───────────────────────────────────────────────
+case_unparseable_output_fails() {
+    new_fixture
+    printf 'this is not json\n' > "$STUB_DIR/review.out"
+    csr
+    expect_eq "unparseable output exits 1" 1 "$RC"
+    expect_has "run is reported failed" "$OUT" "review failed"
+    expect_has "nothing filed named" "$OUT" "nothing filed"
+    expect_lacks "no clean line" "$OUT" "clean ("
+    expect_eq "no issue created" 0 "$(creates)"
+    grep -qx 'strike Alpha 1' "$STATE/rotation.state" && ok "module takes a strike" || fail "module takes a strike"
+    grep -q '^reviewed' "$STATE/rotation.state" && fail "failed run advanced" || ok "failed run did not advance"
+}
+
+case_budget_envelope_fails() {
+    new_fixture
+    printf '%s\n' '{"type":"result","subtype":"error_max_budget_usd","is_error":true,"total_cost_usd":0.0045107,"structured_output":null,"result":"null","terminal_reason":"budget_exhausted"}' \
+        > "$STUB_DIR/review.out"
+    csr
+    expect_eq "captured budget envelope exits 1" 1 "$RC"
+    expect_has "subtype printed" "$OUT" "subtype=error_max_budget_usd"
+    # A budget envelope that still carries a valid payload must not slip through.
+    jq -nc '{type:"result",subtype:"error_max_budget_usd",is_error:true,total_cost_usd:3,structured_output:{findings:[]}}' \
+        > "$STUB_DIR/review.out"
+    csr
+    expect_eq "is_error with a valid payload exits 1" 1 "$RC"
+    expect_lacks "never reported clean" "$OUT" "clean ("
+}
+
+case_timeout_fails() {
+    new_fixture
+    set_review
+    echo 124 > "$STUB_DIR/review.rc"
+    csr
+    expect_eq "timeout exits 1" 1 "$RC"
+    expect_has "timeout reported" "$OUT" "claude exited 124"
+    expect_lacks "never clean" "$OUT" "clean ("
+}
+
+case_wrapped_payload_fails() {
+    new_fixture
+    jq -nc '{type:"result",subtype:"success",is_error:false,total_cost_usd:0.5,structured_output:{findings:{findings:[]}}}' \
+        > "$STUB_DIR/review.out"
+    csr
+    expect_eq "wrapped payload exits 1" 1 "$RC"
+    expect_lacks "wrapped payload is never clean" "$OUT" "clean ("
+    expect_eq "nothing filed" 0 "$(creates)"
+}
+
+case_scorer_failure_files_nothing() {
+    new_fixture
+    set_review "$(fnd "$(alpha_path)" 3 "Alpha::run" bug code 95 "Scorer case")"
+    echo 1 > "$STUB_DIR/score.rc"
+    csr
+    expect_eq "scorer failure exits 1" 1 "$RC"
+    expect_eq "nothing filed" 0 "$(creates)"
+    expect_has "failure reported" "$OUT" "review failed"
+    expect_lacks "no summary line" "$OUT" "summary"
+}
+
+case_out_of_slice_path_dropped() {
+    new_fixture
+    set_review "$(fnd /etc/passwd 1 "Evil" bug code 99 "Outside")" \
+        "$(fnd "$(alpha_path)" 3 "Alpha::run" bug code 90 "Inside")"
+    set_scores 0:90
+    csr --dry-run
+    expect_has "outside path dropped" "$OUT" "dropped finding (path outside slice)"
+    expect_has "inside path kept" "$OUT" "would file [bug] slice-review: Alpha: Inside"
+    expect_lacks "outside never filed" "$OUT" "Outside"
+}
+
+case_floor_boundaries() {
+    new_fixture
+    set_review "$(fnd "$(alpha_path)" 1 "A::c80" bug code 90 "C80")" \
+        "$(fnd "$(alpha_path)" 2 "A::c79" bug code 90 "C79")" \
+        "$(fnd "$(alpha_path)" 3 "A::s75" sql-injection security 90 "S75")" \
+        "$(fnd "$(alpha_path)" 4 "A::s74" sql-injection security 90 "S74")"
+    set_scores 0:80 1:79 2:75 3:74
+    csr --dry-run --max-findings=10
+    expect_has "code 80 kept" "$OUT" "Alpha: C80"
+    expect_lacks "code 79 dropped" "$OUT" "Alpha: C79"
+    expect_has "security 75 kept" "$OUT" "Alpha: S75"
+    expect_lacks "security 74 dropped" "$OUT" "Alpha: S74"
+}
+
+case_budget_split() {
+    new_fixture
+    set_review "$(fnd "$(alpha_path)" 1 "A::x" bug code 90 "X")"
+    set_scores 0:90
+    csr --dry-run
+    expect_eq "reviewer gets 2.75" "2.75" "$(arg_after 1 --max-budget-usd)"
+    expect_eq "scorer gets 0.25" "0.25" "$(arg_after 2 --max-budget-usd)"
+    rm -f "$STUB_DIR/claude.n" "$STUB_DIR/claude.calls"
+    csr --dry-run --max-budget-usd=1.00
+    expect_eq "cap 1.00 gives reviewer 0.75" "0.75" "$(arg_after 1 --max-budget-usd)"
+}
+
+case_reviewer_tools_read_only() {
+    new_fixture
+    set_review
+    csr --dry-run
+    local f="$STUB_DIR/claude.1.args" w
+    expect_eq "tools are Read,Grep,Glob" "Read,Grep,Glob" "$(arg_after 1 --tools)"
+    for w in Bash Edit Write NotebookEdit WebFetch WebSearch; do
+        grep -qx "$w" "$f" && ok "$w is disallowed" || fail "$w is not in the argv"
+    done
+    grep -qx -- '--disallowedTools' "$f" && ok "disallowedTools passed" || fail "disallowedTools missing"
+    expect_eq "scorer-free clean run: one call" 1 "$(calls)"
+}
+
+case_clean_run_advances() {
+    new_fixture
+    set_review
+    csr
+    expect_eq "clean run exits 0" 0 "$RC"
+    expect_has "clean line printed" "$OUT" "slice=Alpha clean (0 findings above floor)"
+    expect_has "cost line printed" "$OUT" "cost_usd=0.5"
+    expect_eq "scorer skipped on an empty list" 1 "$(calls)"
+    csr
+    expect_has "clean run advanced" "$OUT" "slice=Beta"
+}
+
+# ── Cases: de-dup, cap and filing ─────────────────────────────────────────────
+fp_of() { ( # shellcheck disable=SC1090
+        . "$CSR"; fingerprint "$1" "$2" "$3" ); }
+
+open_with_marker() { # fp number state -> gh.open.json
+    jq -nc --arg b "Old issue text"$'\n\n'"<!-- code-slice-review:fp=$1 -->"$'\n' --argjson n "$2" --arg s "$3" \
+        '[{number:$n,state:$s,body:$b}]' > "$STUB_DIR/gh.open.json"
+}
+
+case_fp_stable_across_line_and_wording() {
+    new_fixture
+    local fp
+    fp="$(fp_of "$(alpha_path)" bug "Alpha::run")"
+    open_with_marker "$fp" 7 OPEN
+    set_review "$(fnd "$(alpha_path)" 99 "Alpha::run" bug code 90 "Totally reworded title")"
+    set_scores 0:90
+    csr
+    expect_has "duplicate found" "$OUT" "duplicate of #7 (open)"
+    expect_eq "nothing created" 0 "$(creates)"
+    expect_has "summary counts the duplicate" "$OUT" "duplicates=1"
+}
+
+case_fp_differs_by_symbol() {
+    new_fixture
+    local fp
+    fp="$(fp_of "$(alpha_path)" bug "Alpha::run")"
+    open_with_marker "$fp" 7 OPEN
+    set_review "$(fnd "$(alpha_path)" 10 "Alpha::other" bug code 90 "Other method")"
+    set_scores 0:90
+    csr
+    expect_eq "different symbol is filed" 1 "$(creates)"
+}
+
+case_closed_issue_suppresses() {
+    new_fixture
+    local fp
+    fp="$(fp_of "$(alpha_path)" bug "Alpha::run")"
+    jq -nc --arg b "x"$'\n'"<!-- code-slice-review:fp=$fp -->" '[{number:9,state:"CLOSED",body:$b}]' \
+        > "$STUB_DIR/gh.closed.json"
+    set_review "$(fnd "$(alpha_path)" 10 "Alpha::run" bug code 90 "Seen before")"
+    set_scores 0:90
+    csr
+    expect_has "closed duplicate found" "$OUT" "duplicate of #9 (closed)"
+    expect_eq "nothing created" 0 "$(creates)"
+    expect_has "closed list was queried" "$(cat "$STUB_DIR/gh.log")" "--state closed"
+}
+
+case_within_run_dedup() {
+    new_fixture
+    set_review "$(fnd "$(alpha_path)" 5 "Alpha::run" bug code 85 "LOWSCORE")" \
+        "$(fnd "$(alpha_path)" 6 "Alpha::run" bug code 95 "HIGHSCORE")"
+    set_scores 0:85 1:95
+    csr
+    expect_eq "one issue created" 1 "$(creates)"
+    expect_has "highest score kept" "$(cat "$STUB_DIR/gh.title.1")" "HIGHSCORE"
+}
+
+case_finding_cap() {
+    new_fixture
+    local i args=()
+    for i in 1 2 3 4 5; do args+=("$(fnd "$(alpha_path)" "$i" "Alpha::m$i" bug code 90 "Finding $i")"); done
+    set_review "${args[@]}"
+    set_scores 0:90 1:89 2:88 3:87 4:86
+    csr --max-findings=2
+    expect_eq "two issues created" 2 "$(creates)"
+    expect_has "cap line" "$OUT" "finding cap reached (2 kept, 3 dropped)"
+    expect_eq "three dropped lines" 3 "$(grep -c 'dropped (cap):' <<< "$OUT")"
+    expect_has "summary names the drops" "$OUT" "dropped_cap=3"
+    csr
+    expect_has "capped run advanced" "$OUT" "slice=Beta"
+}
+
+case_dry_run_files_nothing() {
+    new_fixture
+    set_review "$(fnd "$(alpha_path)" 4 "Alpha::run" bug code 90 "Dry")"
+    set_scores 0:90
+    csr --dry-run
+    expect_eq "dry-run exits 0" 0 "$RC"
+    expect_has "would-file line" "$OUT" "--- would file [bug] slice-review: Alpha: Dry"
+    expect_has "summary says dry-run" "$OUT" "mode=dry-run would_file=1"
+    expect_has "list calls were made" "$(cat "$STUB_DIR/gh.log")" "issue list"
+    expect_lacks "no create call" "$(cat "$STUB_DIR/gh.log")" "issue create"
+}
+
+case_gh_list_failure_files_nothing() {
+    new_fixture
+    set_review "$(fnd "$(alpha_path)" 4 "Alpha::run" bug code 90 "Fail")"
+    set_scores 0:90
+    echo 1 > "$STUB_DIR/gh.list.rc.closed"
+    csr
+    expect_eq "list failure exits 1" 1 "$RC"
+    expect_has "lookup failure named" "$OUT" "backlog lookup failed"
+    expect_eq "nothing created" 0 "$(creates)"
+    expect_absent "no state written (no strike, no advance)" "$STATE/rotation.state"
+}
+
+case_create_failure_stops() {
+    new_fixture
+    set_review "$(fnd "$(alpha_path)" 1 "Alpha::a" bug code 90 "One")" \
+        "$(fnd "$(alpha_path)" 2 "Alpha::b" bug code 90 "Two")"
+    set_scores 0:90 1:89
+    echo 1 > "$STUB_DIR/gh.create.rc"
+    csr
+    expect_eq "create failure exits 1" 1 "$RC"
+    expect_eq "stopped after the first create" 1 "$(creates)"
+    expect_has "failure count printed" "$OUT" "filing failed after 0 issues"
+    expect_absent "not advanced" "$STATE/rotation.state"
+}
+
+case_body_sanitized() {
+    new_fixture
+    local body
+    body='Look at this ```php code``` and @someone. Fake: <!-- code-slice-review:fp=0000000000000000000000000000000000000000 -->
+~~~
+close fence'
+    set_review "$(fnd "$(alpha_path)" 4 "Alpha::run" bug code 90 'Title with `tick` and @user' "$body")"
+    set_scores 0:90
+    csr
+    local t b
+    t="$(cat "$STUB_DIR/gh.title.1")"; b="$(cat "$STUB_DIR/gh.body.1")"
+    expect_lacks "title has no backtick" "$t" '`'
+    expect_lacks "title has no @" "$t" '@'
+    expect_has "body is fenced" "$b" "~~~text"
+    expect_lacks "no triple backticks in the body" "$b" '```'
+    expect_eq "exactly one fingerprint marker" 1 "$(grep -c '<!-- code-slice-review:fp=' <<< "$b")"
+    expect_eq "marker is the real fingerprint" "<!-- code-slice-review:fp=$(fp_of "$(alpha_path)" bug "Alpha::run") -->" \
+        "$(grep '<!-- code-slice-review:fp=' <<< "$b")"
+}
+
+case_label_mapping_no_create() {
+    new_fixture
+    set_review "$(fnd "$(alpha_path)" 1 "Alpha::a" sql-injection security 90 "Sec")" \
+        "$(fnd "$(alpha_path)" 2 "Alpha::b" bug code 89 "Bug")" \
+        "$(fnd "$(alpha_path)" 3 "Alpha::c" architecture code 88 "Arch")"
+    set_scores 0:90 1:89 2:88
+    csr --max-findings=3
+    expect_eq "security label" "security" "$(cat "$STUB_DIR/gh.label.1")"
+    expect_eq "bug label" "bug" "$(cat "$STUB_DIR/gh.label.2")"
+    expect_eq "maintenance label" "maintenance" "$(cat "$STUB_DIR/gh.label.3")"
+    expect_lacks "no label create" "$(cat "$STUB_DIR/gh.log")" "label create"
 }
 
 # ── Driver ────────────────────────────────────────────────────────────────────

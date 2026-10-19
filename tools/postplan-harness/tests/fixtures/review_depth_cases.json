@@ -1,0 +1,102 @@
+[
+  {
+    "id": "two-way-localized",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "standard"
+  },
+  {
+    "id": "two-way-module",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way · Blast radius: module · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "standard"
+  },
+  {
+    "id": "two-way-site-wide",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way · Blast radius: site-wide · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "two-way-external",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way · Blast radius: external · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "one-way-localized",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: one-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "one-way-module",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: one-way · Blast radius: module · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "one-way-site-wide",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: one-way · Blast radius: site-wide · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "one-way-external",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: one-way · Blast radius: external · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "missing-line",
+    "body": "## Summary\n\nSome text.",
+    "depth": "deep"
+  },
+  {
+    "id": "empty-body",
+    "body": "",
+    "depth": "deep"
+  },
+  {
+    "id": "unreadable",
+    "body": null,
+    "depth": "deep"
+  },
+  {
+    "id": "unknown-door",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: maybe · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "unknown-blast",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way · Blast radius: galaxy · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "short-why",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: too short\n",
+    "depth": "deep"
+  },
+  {
+    "id": "two-lines",
+    "body": "Intro.\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "fenced-plus-real",
+    "body": "Intro.\n\n```\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n```\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "trailing-space",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff   \n",
+    "depth": "standard"
+  },
+  {
+    "id": "crlf",
+    "body": "Intro paragraph.\r\n\r\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\r\n",
+    "depth": "standard"
+  },
+  {
+    "id": "indented",
+    "body": "Intro paragraph.\n\n  **Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  },
+  {
+    "id": "ascii-separator",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way - Blast radius: localized - Why: mechanical: no one-way trigger in the realized diff\n",
+    "depth": "deep"
+  }
+]

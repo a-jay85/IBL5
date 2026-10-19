@@ -381,6 +381,13 @@ gh_sweep_only() {
     ! grep -vE '^(pr list .*isDraft,(labels|baseRefName)|api repos/[^ ]*/commits/[^ ]+/check-runs\?per_page=100)$' \
         "$SCRATCH/gh.log" | grep -q .
 }
+# Stricter: gh was never called, or only for the stale-label sweep's `pr list ... isDraft,labels`.
+# For the early-exit cases (usage pause, live worker), which must stop before the rescue path's
+# `isDraft,baseRefName` list and `check-runs` read.
+gh_stale_label_only() {
+    [[ ! -e "$SCRATCH/gh.log" ]] && return 0
+    ! grep -vE '^pr list .*isDraft,labels$' "$SCRATCH/gh.log" | grep -q .
+}
 attempt() { cat "$STATE_DIR/attempts/$1" 2>/dev/null; }
 pending_count() { find "$STATE_DIR/pending" -type f 2>/dev/null | wc -l | tr -d ' '; }
 dm_count() { if [[ -f "$SCRATCH/dm.log" ]]; then wc -l < "$SCRATCH/dm.log" | tr -d ' '; else echo 0; fi; }
@@ -436,7 +443,7 @@ for z in drain stop; do
     run_tick
     [[ $RC -eq 0 ]] || fail "usage-pause($z): rc $RC, want 0"
     out_has 'usage zone' || fail "usage-pause($z): no 'usage zone' line: $OUT"
-    gh_sweep_only || fail "usage-pause($z): gh was called beyond the stale-label read"
+    gh_stale_label_only || fail "usage-pause($z): gh was called beyond the stale-label read"
     no_file "$SCRATCH/pr-cycle.log" || fail "usage-pause($z): pr-cycle was launched"
 done
 end_case usage-pause
@@ -458,7 +465,7 @@ set_jobs 123 com.ibl5.pr-cycle-20261003-120000
 run_tick
 [[ $RC -eq 0 ]] || fail "live-worker: rc $RC, want 0"
 out_has 'worker running' || fail "live-worker: no 'worker running' line: $OUT"
-gh_sweep_only || fail "live-worker: gh was called beyond the stale-label read"
+gh_stale_label_only || fail "live-worker: gh was called beyond the stale-label read"
 no_file "$SCRATCH/pr-cycle.log" || fail "live-worker: pr-cycle was launched"
 end_case live-worker
 
@@ -545,6 +552,17 @@ sed -i.bak '$d' "$SCRATCH/gh.log"
 gh_sweep_only || fail "gh-sweep-widened: helper rejected the log after the DELETE line was removed"
 echo 'api repos/{owner}/{repo}/issues/41/timeline --paginate' >> "$SCRATCH/gh.log"
 gh_sweep_only && fail "gh-sweep-widened: helper accepted a timeline call"
+# gh_stale_label_only accepts the stale-label read alone and rejects the rescue path's reads.
+grep -E -- '^pr list ' "$SCRATCH/gh.log" | grep -E -- 'isDraft,labels$' > "$SCRATCH/gh.log.strict"
+[[ -s "$SCRATCH/gh.log.strict" ]] || fail "gh-sweep-widened: no stale-label read in gh.log"
+cp "$SCRATCH/gh.log" "$SCRATCH/gh.log.full"
+cp "$SCRATCH/gh.log.strict" "$SCRATCH/gh.log"
+gh_stale_label_only || fail "gh-sweep-widened: strict helper rejected the stale-label read"
+grep -E -- '^pr list ' "$SCRATCH/gh.log.full" | grep -E -- 'isDraft,baseRefName$' >> "$SCRATCH/gh.log"
+gh_stale_label_only && fail "gh-sweep-widened: strict helper accepted a baseRefName read"
+cp "$SCRATCH/gh.log.strict" "$SCRATCH/gh.log"
+grep -E -- '^api repos/.*/check-runs\?per_page=100$' "$SCRATCH/gh.log.full" >> "$SCRATCH/gh.log"
+gh_stale_label_only && fail "gh-sweep-widened: strict helper accepted a check-runs call"
 end_case gh-sweep-widened
 
 reset; begin_case

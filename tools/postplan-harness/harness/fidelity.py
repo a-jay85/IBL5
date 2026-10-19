@@ -18,6 +18,7 @@ import time
 
 from .state import HarnessError
 from . import llm_calls
+from . import fidelity_filefix
 
 # Anchored and multiline: a verdict word must own its whole line. Longest alternative
 # first so "READY WITH NOTES" is never truncated to "READY".
@@ -293,6 +294,25 @@ def verdict_items(path: str) -> dict:
         else:
             notes.append(title)
     return {"verdict": verdict, "blocking": blocking, "notes": notes}
+
+
+def blocking_finding_texts(verdict_path: str) -> list[str]:
+    """Full text of each explicitly `[BLOCKING]`-marked bullet under `## FINDINGS`, bullet line first.
+
+    Only this heading feeds the file-fix carve-out: the pre-digest and whole-body fallbacks
+    `_verdict_findings` uses for the work list are too loose to widen a commit permission.
+    """
+    text = _read_or_marker(verdict_path, "")
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == DIGEST_CUT:
+            lines = lines[:i]
+            break
+    body = [ln for ln in lines if not VERDICT_RE.match(ln)]
+    section = _findings_section(body)
+    if section is None:
+        return []
+    return [item for marker, item in _group_findings(section) if marker == "BLOCKING"]
 
 
 def _render_finding(f: dict) -> str:
@@ -662,7 +682,14 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         _out("empty-work-list")
         return None
 
-    procedure = _find_procedure(worktree, master_sha, REMEDIATION_PATHS,
+    filefix = fidelity_filefix.snapshot(blocking_finding_texts(verdict1_path), gitad, worktree)
+    log("phase5.5: file-fix carve-out "
+        + (f"active for {', '.join(sorted(filefix.eligible))}" if filefix.active
+           else f"inactive ({filefix.reason})"))
+    filefix_note = (f"\n{fidelity_filefix.prompt_text(filefix.eligible)}\n"
+                    if filefix.active else "")
+
+    procedure =_find_procedure(worktree, master_sha, REMEDIATION_PATHS,
                                "remediation-procedure-missing")
     with open(os.path.join(packet_dir, "remediation.md"), "w") as fh:
         fh.write(procedure)
@@ -691,6 +718,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         f"{pr_note}\n"
         "No Agent tool: do not delegate.\n"
         f"{GATE_EDIT_DENY_TEXT}\n"
+        f"{filefix_note}"
         "When a file you must inspect is large, Read it with offset and limit rather\n"
         "than whole; a whole-file Read of a large file is denied in this session.\n\n"
         "=== REMEDIATION PROCEDURE (follow it exactly) ===\n"
@@ -724,6 +752,10 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
     # a reset. A denied commit stays local, which is the same state the other terminal
     # kinds already leave behind.
     hits = denied_gate_edits(gitad.changed_files(f"{sha}^"))
+    if hits and fidelity_filefix.permit(hits, filefix, worktree, sha, log):
+        log(f"phase5.5: remediation file-fix commit allowed ({', '.join(hits)})")
+        _out("filefix-committed")
+        hits = []
     if hits:
         log(f"phase5.5: remediation touched gate-owning paths ({', '.join(hits)}) "
             "- commit left local, remediation ends")

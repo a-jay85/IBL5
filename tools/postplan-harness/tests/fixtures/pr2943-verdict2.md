@@ -1,11 +1,11 @@
-**NOT READY** (re-review, round 1) — 2026-10-19 04:00:15 PDT · auto-merge held
+**NOT READY** (re-review, round 1) — 2026-10-19 04:00:15 PDT · auto-merge held <!-- slop-ok -->
 
 Auto-merge held:
-- (1) manual-testing-clearance — state=HELD
-- (7) plan-auto-merge-hold — plan declares auto_merge: false
-- (12) plan-fidelity-verdict — fidelity verdict='NOT READY' (source: verdict-2); need READY or READY WITH NOTES
-- (14) conflict-auto-resolved — this branch carries a /post-plan auto-resolved rebase conflict — conflict-review verdict=ABSENT; need CONFLICT-REVIEW=CLEAN
-- (18) merge-danger — state=MISSING
+- (1) manual-testing-clearance — state=HELD <!-- slop-ok -->
+- (7) plan-auto-merge-hold — plan declares auto_merge: false <!-- slop-ok -->
+- (12) plan-fidelity-verdict — fidelity verdict='NOT READY' (source: verdict-2); need READY or READY WITH NOTES <!-- slop-ok -->
+- (14) conflict-auto-resolved — this branch carries a /post-plan auto-resolved rebase conflict — conflict-review verdict=ABSENT; need CONFLICT-REVIEW=CLEAN <!-- slop-ok -->
+- (18) merge-danger — state=MISSING <!-- slop-ok -->
 
 **Code review:** Phase 4B ran in this run, and a /code-review comment was posted at 2026-10-15T18:35:22Z ([comment](<https://github.com/a-jay85/IBL5/pull/2943#issuecomment-6199477991>)): No issues found.
 

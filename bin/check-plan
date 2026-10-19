@@ -1293,7 +1293,8 @@ while IFS= read -r _vrm_row; do
             s = $i
             while (match(s, /`[^`]+`/)) {
                 t = substr(s, RSTART + 1, RLENGTH - 2); s = substr(s, RSTART + RLENGTH)
-                if (t ~ /(test|spec|Test)/ && t !~ /[[:space:]&;<>$\\]/) {
+                if (t ~ /(test|spec|Test)/ && t ~ /\// && t !~ /[[:space:]&|;<>$\\]/ && t !~ /:\/\// \
+                    && index("-\"$@\047", substr(t, 1, 1)) == 0) {
                     if (tolower(s) ~ /^[[:space:]]*\((no-change|run-only)\)/) print "EXEMPT " t
                     else print "PLANNED " t
                     exit

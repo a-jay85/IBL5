@@ -187,4 +187,31 @@ class TeamCellHelperTest extends TestCase
             $this->assertSame($expected, $m[1]);
         }
     }
+
+    /**
+     * Each failing pair the golden fixtures carried, with the readable color they now expect.
+     *
+     * @return array<string, array{string, string, string}>
+     */
+    public static function rewrittenFixturePairProvider(): array
+    {
+        return [
+            '008348/BB9753 (Draft view)' => ['008348', 'BB9753', 'ffffff'],
+            '0C2340/C8102E (SeasonArchive detail)' => ['0C2340', 'C8102E', 'ffffff'],
+            'CE1141/000000 (SeasonArchive, Trading sidebar)' => ['CE1141', '000000', 'ffffff'],
+            '007A33/BA9653 (Trading sidebar)' => ['007A33', 'BA9653', 'ffffff'],
+            'FF0000/0000FF (BasketballStats league starters)' => ['FF0000', '0000FF', '000000'],
+            '000000/0000FF (BasketballStats hostile players)' => ['000000', '0000FF', 'ffffff'],
+            '006BB6/ED174C (ci-seed Diesels)' => ['006BB6', 'ED174C', 'ffffff'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('rewrittenFixturePairProvider')]
+    public function testRewrittenFixturePairEmitsReadableColor(string $bg, string $oldFg, string $expected): void
+    {
+        $result = TeamCellHelper::renderTeamCell(1, 'X', $bg, $oldFg);
+
+        $this->assertStringContainsString('--team-cell-bg: #' . $bg . '; --team-cell-color: #' . $expected . ';', $result);
+        $this->assertStringNotContainsString('--team-cell-color: #' . $oldFg . ';', $result);
+    }
 }

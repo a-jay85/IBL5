@@ -317,3 +317,42 @@ def test_run_result_carries_thread_ingestion():
     assert "thread_ingestion" in parsed, (
         "thread_ingestion must appear in RunResult.to_json() output"
     )
+
+
+def test_thread_ingestion_phase_forwards_outcome_log_path(tmp_path, monkeypatch):
+    """Mutation caught: dropping the forward leaves the spy with None."""
+    seen: dict = {}
+
+    def _spy(*args, **kwargs):
+        seen["path"] = kwargs.get("outcome_log_path")
+        return {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None}
+
+    monkeypatch.setattr(runner, "run_thread_ingestion", _spy)
+    runner._run_thread_ingestion_phase(
+        _gh(tmp_path), None, _git(), str(tmp_path), None, {111}, str(tmp_path), _log(), _res(),
+        outcome_log_path="/x/o.jsonl")
+    assert seen["path"] == "/x/o.jsonl"
+
+
+def test_thread_ingestion_phase_unwritable_outcome_log_keeps_counts(tmp_path, monkeypatch):
+    """Mutation caught: an append_events that re-raises would reach the broad except
+    in the phase wrapper, which zeroes the counts and sets "error"."""
+    from harness.adapters.llm import FixtureLlm
+    from harness.thread_ingestion import PURPOSE
+
+    thread = {"commentId": 7, "path": "a.php", "line": 3, "body": "Bug", "score": 85,
+              "agent": "B", "authorLogin": "a-jay85", "authorType": "User",
+              "isResolved": False, "isOutdated": False}
+    gh = RecordingGh(str(tmp_path), {"trusted_threads": [thread], "pr_number": 1})
+    llm = FixtureLlm(_ledger(), {PURPOSE: '{"verdict":"FIX","reason":"done"}'})
+    monkeypatch.setattr(runner, "_commit_with_gate_fix", lambda *a, **k: "abc123")
+    monkeypatch.setattr(runner, "_push_with_gate_fix", lambda *a, **k: "def456")
+    blocker = tmp_path / "blocker"
+    blocker.write_text("x")
+
+    result = runner._run_thread_ingestion_phase(
+        gh, llm, _git(), str(tmp_path), 1, {7}, str(tmp_path), _log(), _res(),
+        outcome_log_path=str(blocker / "sub" / "o.jsonl"))
+
+    assert result["fixed"] == 1
+    assert "error" not in result

@@ -487,7 +487,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if cache_rec is not None and not reviewcache.key_matches(cache_rec, cache_key):
             conflict_only = _conflict_only_proof(git, cache_rec, cache_key, cache_files, log)
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        review_phase = _review_phase_for(llm, gh, copy, meta, log)
+        review_phase = _review_phase_for(llm, gh, copy, meta, log, worktree=worktree)
         cur_gates = review_phase.gates(cls) if cache_rec is not None else None
         restored = None
         key_hit = cache_rec is not None and reviewcache.key_matches(cache_rec, cache_key)
@@ -2676,7 +2676,7 @@ def _interdiff_eligibility(cache_rec, cache_key, cache_files, gates, cls):
     return delta, prior
 
 
-def _review_phase_for(llm, gh, copy: dict, meta: dict | None, log) -> ReviewPhase:
+def _review_phase_for(llm, gh, copy: dict, meta: dict | None, log, worktree: str | None = None) -> ReviewPhase:
     """Phase 4 review depth: the deeper of the Phase-2 body and the live PR body.
 
     An empty copy["summary_md"] is the clean-tree rerun (Phase 2 wrote nothing), so only the
@@ -2691,7 +2691,7 @@ def _review_phase_for(llm, gh, copy: dict, meta: dict | None, log) -> ReviewPhas
     verdicts = [(name, *review_depth.classify_depth(body)) for name, body in sources]
     depth = review_depth.max_depth(*(d for _, d, _ in verdicts))
     log(f"review-depth: {depth} (" + ", ".join(f"{n}={r}" for n, _, r in verdicts) + ")")
-    return ReviewPhase(llm, gh, depth=depth)
+    return ReviewPhase(llm, gh, depth=depth, log=log, worktree=worktree)
 
 
 def _interdiff_review(review_phase, meta, cls, plan, delta, keep_findings, keep_scored, log):

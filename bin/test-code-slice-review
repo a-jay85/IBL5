@@ -790,16 +790,14 @@ SH
     fnd_json="$(jq -nc '[{path:"ibl5/classes/Example/Example.php",line:12,symbol:"Example::run",category:"bug",kind:"code",score:90,title:"Unchecked array index",body:"run() reads $rows[0] without checking that $rows is non-empty."}]')"
     score="$(TMPDIR="$LT" bash -c '. "$1"; score_findings "$2" || { echo "scorer failed: $SCORE_FAIL_REASON" >&2; exit 1; }; jq -r ".[0].score" <<< "$SCORES_JSON"' _ "$CSR" "$fnd_json")" || score="error"
     if [[ "$score" =~ ^[0-9]+$ ]] && [ "$score" -le 100 ]; then ok "scorer returned integer score $score"; else fail "scorer returned [$score]"; fi
-    h_done
 }
 
 if [ "${1:-}" = "--live" ]; then
     live_main
-    exit $?
+else
+    for c in $(declare -F | awk '$3 ~ /^case_/ {print $3}'); do
+        "$c"
+    done
 fi
-
-for c in $(declare -F | awk '$3 ~ /^case_/ {print $3}'); do
-    "$c"
-done
 
 h_done

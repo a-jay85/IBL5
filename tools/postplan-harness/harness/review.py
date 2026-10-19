@@ -27,8 +27,10 @@ CODE_THRESHOLD = 80      # drop findings scored below (rubric Thresholds table)
 SEC_THRESHOLD = 75
 
 VERIFIER_COUNT = 3                     # odd, smallest N > 1 that makes "all reject" meaningful
-VERIFIER_PURPOSES = tuple(f"verify-findings-{i}" for i in range(1, VERIFIER_COUNT + 1))
-VERIFIER_MODEL = "sonnet"              # call_tooled allowlist is {"opus","sonnet"}; Haiku cannot read code here
+# The "verify-findings", "sonnet" literal pair is pinned by reviewcache.MODEL_PINS.
+# call_tooled's allowlist is {"opus","sonnet"}; Haiku cannot read code here.
+_VERIFIER_PURPOSE_STEM, VERIFIER_MODEL = "verify-findings", "sonnet"
+VERIFIER_PURPOSES = tuple(f"{_VERIFIER_PURPOSE_STEM}-{i}" for i in range(1, VERIFIER_COUNT + 1))
 VERIFIER_ALLOWED_TOOLS = ("Read", "Grep", "Glob")
 VERIFIER_DENIED_TOOLS = ("Bash", "Write", "Edit", "NotebookEdit", "Agent")
 VERIFIER_MAX_TURNS = 25

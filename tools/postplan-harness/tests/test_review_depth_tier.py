@@ -4,14 +4,16 @@
 so the standard tier is pinned to what shipped before the depth argument existed."""
 from __future__ import annotations
 
+import json
 import os
 import sys
+import tempfile
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.review import ReviewPhase, agent_b_prompt
+from harness.review import VERIFIER_PURPOSES, ReviewPhase, agent_b_prompt
 from harness.state import Classification, PlanInfo, UsageLedger
 
 from tests.test_review_parallel import _NullGh, _SleepingLlm, _make_canned, _php_cls
@@ -100,14 +102,20 @@ class _ModelLlm(_SleepingLlm):
         return super().call(purpose, model, prompt, validate,
                             max_retries=max_retries, normalizer=normalizer)
 
+    def call_tooled(self, purpose, model, prompt, **kw):
+        self.models[purpose] = model
+        return super().call_tooled(purpose, model, prompt, **kw)
+
 
 def _models_for(depth: str) -> dict[str, str]:
     finding = [{"path": "ibl5/a.php", "line": 1, "body": "an issue"}]
     canned = _make_canned({"A": finding, "B": finding, "D": finding, "security": finding})
-    canned["score-findings"] = [{"n": i, "score": 90} for i in range(1, 5)]
+    for purpose in VERIFIER_PURPOSES:
+        canned[purpose] = json.dumps([{"n": i, "verdict": "real", "reason": "verified"}
+                                      for i in range(1, 5)])
     llm = _ModelLlm(UsageLedger(), canned, sleep=0)
     cls = _php_cls(has_e2e_specs=True)
-    ReviewPhase(llm, _NullGh(), depth=depth).run({}, cls, PlanInfo())
+    ReviewPhase(llm, _NullGh(), depth=depth, worktree=tempfile.gettempdir()).run({}, cls, PlanInfo())
     return llm.models
 
 
@@ -117,7 +125,7 @@ def test_standard_models():
     assert models["review-agent-b"] == "sonnet"
     assert models["review-agent-d"] == "sonnet"
     assert models["security-audit"] == "sonnet"
-    assert models["score-findings"] == "haiku"
+    assert all(models[p] == "sonnet" for p in VERIFIER_PURPOSES)
 
 
 def test_deep_models():
@@ -126,7 +134,7 @@ def test_deep_models():
     assert models["security-audit"] == "opus"
     assert models["review-agent-b"] == "sonnet"
     assert models["review-agent-d"] == "sonnet"
-    assert models["score-findings"] == "haiku"
+    assert all(models[p] == "sonnet" for p in VERIFIER_PURPOSES)
 
 
 def test_b_prompt_wording_by_depth():

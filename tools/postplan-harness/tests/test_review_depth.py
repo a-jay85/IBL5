@@ -22,6 +22,7 @@ _MALFORMED_IDS = ("unknown-door", "unknown-blast", "short-why", "two-lines", "fe
 
 @pytest.mark.parametrize("row", CASES, ids=[r["id"] for r in CASES])
 def test_depth_case_table(row):
+    """Changing the MISSING verdict in classify_depth to standard turns [missing-line] red."""
     assert depth_for_body(row["body"]) == row["depth"]
 
 
@@ -45,6 +46,7 @@ def test_classify_depth_reasons():
 
 
 def test_max_depth():
+    """A max_depth that returns depths[0] fails the standard-then-deep case."""
     assert max_depth("standard", "standard") == "standard"
     assert max_depth("standard", "deep") == "deep"
     assert max_depth("deep", "standard") == "deep"

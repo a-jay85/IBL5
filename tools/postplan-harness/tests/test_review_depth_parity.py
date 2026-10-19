@@ -26,6 +26,8 @@ def _run(args: list[str], body: str, env: dict[str, str]) -> subprocess.Complete
 
 @pytest.mark.parametrize("row", CASES, ids=[r["id"] for r in CASES])
 def test_shell_matches_python(row):
+    """The shell prints exactly `<depth> <reason>` from classify_depth for every case row.
+    Changing the line-count test to `-ge 1` in review-depth.sh turns [two-lines] red."""
     depth, reason = classify_depth(row["body"])
     if row["body"] is None:
         proc = _run(["--unreadable"], "", {"PATH": "/usr/bin:/bin"})

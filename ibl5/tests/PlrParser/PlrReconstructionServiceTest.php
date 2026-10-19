@@ -588,6 +588,96 @@ class PlrReconstructionServiceTest extends TestCase
         $this->assertSame(0, (int) trim(substr($actual, 208, 4)), 'playoffSeasonGP zeroed');
     }
 
+    public function testReconstructLoadMessageReportsDistinctAggregateCounts(): void
+    {
+        $this->writeBaseFile($this->messageSequenceBaseRecords());
+
+        $repo = $this->stubRepo(
+            regular: [
+                self::LEBRON_PID => $this->nonzeroPlayerStats(),
+                self::MCGRADY_PID => $this->nonzeroPlayerStats(),
+                self::BENCHWARMER_PID => $this->nonzeroPlayerStats(),
+                4242 => $this->nonzeroPlayerStats(),
+            ],
+            playoffs: [self::LEBRON_PID => $this->nonzeroPlayerStats()],
+            regularHighs: [
+                self::LEBRON_PID => $this->highsRow(),
+                self::MCGRADY_PID => $this->highsRow(),
+                self::BENCHWARMER_PID => $this->highsRow(),
+            ],
+            playoffHighs: [
+                self::LEBRON_PID => $this->highsRow(),
+                self::MCGRADY_PID => $this->highsRow(),
+            ],
+        );
+
+        $result = (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $this->assertSame(
+            'Loaded box-score aggregates through 2007-05-01: 4 regular / 1 playoff players, 3 / 2 highs rows',
+            $result->messages[1],
+        );
+        $this->assertSame([], $result->errors);
+    }
+
+    public function testReconstructZeroedHighsPathZeroesPlayoffHighsAndPreservesCareerBests(): void
+    {
+        $record = $this->buildPlayerRecord(
+            ordinal: 1,
+            pid: self::LEBRON_PID,
+            name: 'LeBron James',
+            seasonStats: $this->zeroSeasonStats(),
+        );
+        $record = substr_replace($record, PlrFieldSerializer::formatInt(40, 2), 341, 2);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt(25, 2), 355, 2);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt(55, 6), 365, 6);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt(48, 6), 407, 6);
+        $this->writeBaseFile([$record]);
+
+        $repo = $this->stubRepo(regular: [self::LEBRON_PID => $this->nonzeroPlayerStats()]);
+
+        (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $actual = $this->readPlayerLine($this->outputFile, 0);
+        $this->assertSame(0, (int) trim(substr($actual, 341, 2)), 'seasonHighPTS zeroed');
+        $this->assertSame(0, (int) trim(substr($actual, 355, 2)), 'seasonPlayoffHighPTS zeroed');
+        $this->assertSame(55, (int) trim(substr($actual, 365, 6)), 'careerSeasonHighPTS preserved');
+        $this->assertSame(48, (int) trim(substr($actual, 407, 6)), 'careerPlayoffHighPTS preserved');
+    }
+
+    public function testReconstructQueriesPlayerAggregatesInFixedOrder(): void
+    {
+        $this->writeBaseFile($this->messageSequenceBaseRecords());
+
+        /** @var list<array{string, int, int, string}> $calls */
+        $calls = [];
+        $repo = self::createStub(PlrBoxScoreRepositoryInterface::class);
+        $repo->method('sumStatsByGameTypeThroughDate')->willReturnCallback(
+            static function (int $seasonYear, int $gameType, string $endDate) use (&$calls): array {
+                $calls[] = ['sum', $seasonYear, $gameType, $endDate];
+                return [];
+            },
+        );
+        $repo->method('getSingleGameMaximumsThroughDate')->willReturnCallback(
+            static function (int $seasonYear, int $gameType, string $endDate) use (&$calls): array {
+                $calls[] = ['max', $seasonYear, $gameType, $endDate];
+                return [];
+            },
+        );
+
+        (new PlrReconstructionService($repo))
+            ->reconstruct($this->baseFile, 2007, '2007-05-01', $this->outputFile);
+
+        $this->assertSame([
+            ['sum', 2007, PlrBoxScoreRepositoryInterface::GAME_TYPE_REGULAR_SEASON, '2007-05-01'],
+            ['sum', 2007, PlrBoxScoreRepositoryInterface::GAME_TYPE_PLAYOFFS, '2007-05-01'],
+            ['max', 2007, PlrBoxScoreRepositoryInterface::GAME_TYPE_REGULAR_SEASON, '2007-05-01'],
+            ['max', 2007, PlrBoxScoreRepositoryInterface::GAME_TYPE_PLAYOFFS, '2007-05-01'],
+        ], $calls);
+    }
+
     public function testReconstructSkipsPlayerLineWithZeroPid(): void
     {
         $ghost = $this->buildPlayerRecord(

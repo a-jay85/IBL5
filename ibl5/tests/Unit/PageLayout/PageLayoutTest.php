@@ -191,6 +191,33 @@ class PageLayoutTest extends TestCase
         self::assertSame($expected, $this->renderNormalisedHead());
     }
 
+    public function testHeadScriptTagsKeepLoadOrder(): void
+    {
+        $_SERVER['SCRIPT_FILENAME'] = \Bootstrap\AppPaths::root() . '/index.php';
+
+        $html = $this->renderNormalisedHead();
+
+        preg_match_all('#<script src="jslib/([a-z.-]+)\.js\?v=#', $html, $m);
+        self::assertSame(
+            ['htmx.min', 'sorttable', 'responsive-tables', 'name-abbreviation', 'user-team-highlighter', 'sticky-page-header', 'htmx-init', 'local-time'],
+            $m[1]
+        );
+    }
+
+    public function testEveryHeadScriptTagIsDeferred(): void
+    {
+        $_SERVER['SCRIPT_FILENAME'] = \Bootstrap\AppPaths::root() . '/index.php';
+
+        $html = $this->renderNormalisedHead();
+
+        preg_match_all('#<script\b[^>]*\bsrc="jslib/[^"]*"[^>]*>#', $html, $m);
+        self::assertCount(8, $m[0], 'expected exactly eight jslib head scripts');
+        foreach ($m[0] as $tag) {
+            self::assertMatchesRegularExpression('#\sdefer[\s>]#', $tag, "head script not deferred: {$tag}");
+        }
+        self::assertStringNotContainsString(' async', $html, 'async would break document-order execution');
+    }
+
     public function testHeadEscapesHostileSiteGlobals(): void
     {
         $GLOBALS['sitename'] = 'IBL"><script>alert(1)</script>';

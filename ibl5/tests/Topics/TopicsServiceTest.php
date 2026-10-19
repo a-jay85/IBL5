@@ -37,7 +37,7 @@ class TopicsServiceTest extends TestCase
         $searchRepo = self::createStub(SearchRepositoryInterface::class);
         $searchRepo->method('getTopics')->willReturn([$topicFilterRow]);
         $searchRepo->method('getCategories')->willReturn([$categoryRow]);
-        $searchRepo->method('getAuthors')->willReturn([1 => 'A. Reporter']);
+        $searchRepo->method('getAuthors')->willReturn(['A. Reporter']);
 
         $service = new TopicsService(
             self::createStub(\mysqli::class),
@@ -55,7 +55,7 @@ class TopicsServiceTest extends TestCase
         $this->assertTrue($result['searchFilters']['articleComm']);
         $this->assertSame([$topicFilterRow], $result['searchFilters']['topics']);
         $this->assertSame([$categoryRow], $result['searchFilters']['categories']);
-        $this->assertSame([1 => 'A. Reporter'], $result['searchFilters']['authors']);
+        $this->assertSame(['A. Reporter'], $result['searchFilters']['authors']);
     }
 
     // ============================================

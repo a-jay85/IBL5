@@ -409,8 +409,8 @@ health_report() {
           --jq '[.[] | select(.headRefName | startswith("docs-stale-refresh-"))] | .[0] // empty')" \
           || pr_json=""
         if [ -n "$pr_json" ]; then
-            # An open PR is the DESIGNED steady state (auto_merge:false — the user
-            # reviews it). Only a RED check is a failure; green/pending stay silent.
+            # An open PR is the DESIGNED steady state (the plan seeds
+            # auto_merge:docs-only-ready and Phase 6.5 decides on the realized PR). Only a RED check is a failure; green/pending stay silent.
             pr_num="$(jq -r .number <<<"$pr_json")"
             red="$(gh pr view "$pr_num" --json statusCheckRollup \
               --jq '[.statusCheckRollup[]? | select(.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"

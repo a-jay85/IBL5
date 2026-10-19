@@ -1,6 +1,6 @@
 ---
 description: Triage non-trivial work as ad-hoc vs /plan; ad-hoc bar, safety mirror, Sonnet execution routing, hook-enforced triggers.
-last_verified: 2026-10-07
+last_verified: 2026-10-16
 ---
 
 # Work Triage Rule
@@ -42,6 +42,8 @@ The plan-vs-ad-hoc verdict decides *whether to plan*, not *who executes the edit
 - **Machine-verifiable** — a test/linter/script exists (or ships with the chunk) that fails on a wrong edit.
 
 When both hold, **hand off by default — do not pause for permission**: state the routing call in one line ("execution is Sonnet-suitable — delegating"), then spawn **one** Sonnet sub-agent (format: `.claude/skills/plan/_architect-contract.md` § Delegation packets for verbose phases). Design, routing call, and final diff review stay on Opus — this routes *execution*, never understanding.
+
+One sub-agent is the floor. A single sweep stays with one agent, because its edits must agree with each other. When the work splits into chunks that do not depend on each other, spawn one agent per chunk, all in the same message, so they run at the same time. Detail: `work-triage-detail.md` § Inline vs. delegated.
 
 Stay inline (Opus edits directly) only when: the edits are genuinely **entangled** with the design, or the chunk is **trivial**. Criteria and spawn-cost rationale: `work-triage-detail.md` § Inline vs. delegated.
 

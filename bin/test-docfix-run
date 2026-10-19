@@ -246,9 +246,10 @@ PLIST_PY
   && ok "(1b) plist execs the runner: KeepAlive false, PATH set, no \$ or empty values, runner path clean" \
   || bad "(1b) plist shape: $PLIST_REPORT"
 { [ -n "$PLAN" ] && head -1 "$PLAN" | grep -q '^---$' \
-    && grep -q '^auto_merge: false$' "$PLAN" \
+    && grep -q '^auto_merge: docs-only-ready$' "$PLAN" \
+    && ! grep -q '^auto_merge: false$' "$PLAN" \
     && grep -q '## Automouse Hold Justification' "$PLAN"; } \
-  && ok "(2) held plan seeded with auto_merge:false + hold section" \
+  && ok "(2) plan seeded with auto_merge:docs-only-ready + hold section" \
   || bad "(2) hold plan seeding"
 
 SB="$(build_sandbox)"
@@ -308,10 +309,11 @@ H10_BAD="$(grep -vE '^[0-9]+: +[A-Z_]+: \$\{\{ *inputs\.[a-z_]+ *\}\}$' <<<"$H10
   && ok "(H10) docfix-health.yml: every inputs.* reference is an env: entry (no run: interpolation)" \
   || bad "(H10) docfix-health.yml: inputs interpolated outside env: [$H10_BAD]"
 
-# --- Case 8: carry-forward — bin/docfix-run still has auto_merge:false --------
-{ grep -q '^auto_merge: false$' "$REAL_DOCFIX" \
+# --- Case 8: carry-forward — bin/docfix-run seeds auto_merge:docs-only-ready --
+{ grep -q '^auto_merge: docs-only-ready$' "$REAL_DOCFIX" \
+    && ! grep -q '^auto_merge: false$' "$REAL_DOCFIX" \
     && grep -q '## Automouse Hold Justification' "$REAL_DOCFIX"; } \
-  && ok "(8) bin/docfix-run: auto_merge:false and hold section preserved" \
+  && ok "(8) bin/docfix-run: auto_merge:docs-only-ready and hold section preserved" \
   || bad "(8) carry-forward check"
 
 # --- Case 9: --print-schedule -------------------------------------------------
@@ -2062,5 +2064,57 @@ cp "$PLAN_V" "$SB2/after1.md"
     && cmp -s "$PLAN_V" "$SB2/after1.md"; } \
   && ok "(81) veronly: arming strips 'Held for human merge', second run is a no-op" \
   || bad "(81) veronly: stale 'Held for human merge' sentence"
+
+# docs-only-ready fixture: the plan shape bin/docfix-run now seeds.
+# Usage: veronly_seed_ready_plan "$PLAN_V"
+veronly_seed_ready_plan() {
+    printf '%s\n' '---' 'auto_merge: docs-only-ready' '---' '' '# Stale-docs auto-refresh' '' \
+        'Runtime-seeded plan for the autonomous doc-fix run. Refreshes the docs the' \
+        'nightly Doc Freshness Audit flagged (issue #965).' \
+        'Held for human merge unless Phase 6.5 finds it docs-only, two-way and READY.' \
+        '' '## Automouse Hold Justification' '' 'auto_merge: docs-only-ready. hold.' > "$1"
+}
+
+# Case 82: a verification-only diff on a docs-only-ready plan arms it to
+# unconditional auto_merge: true, drops the hold section and the seeded sentence
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_ready_plan "$PLAN_V"
+printf 'last_verified: 2026-08-13\n' > "$R/ibl5/docs/x.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 0 ] \
+    && grep -q '^auto_merge: true$' "$PLAN_V" \
+    && ! grep -q 'auto_merge: docs-only-ready' "$PLAN_V" \
+    && ! grep -q '## Automouse Hold Justification' "$PLAN_V" \
+    && ! grep -q 'Held for human merge' "$PLAN_V"; } \
+  && ok "(82) veronly: docs-only-ready plan armed to auto_merge:true on a date-only bump" \
+  || bad "(82) veronly: docs-only-ready plan not armed"
+
+# Case 83: a non-verification diff leaves a docs-only-ready plan untouched (rc 1)
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_ready_plan "$PLAN_V"
+printf 'last_verified: 2026-08-13\nextra prose\n' > "$R/ibl5/docs/x.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] \
+    && grep -q '^auto_merge: docs-only-ready$' "$PLAN_V" \
+    && grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
+  && ok "(83) veronly: prose change leaves the docs-only-ready plan held (rc 1)" \
+  || bad "(83) veronly: docs-only-ready plan hold"
+
+# Case 84: arming a docs-only-ready plan twice is idempotent (byte-identical)
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_ready_plan "$PLAN_V"
+printf 'last_verified: 2026-08-13\n' > "$R/ibl5/docs/x.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+cp "$PLAN_V" "$SB2/after1.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC2=0 || VRC2=$?
+{ [ "$VRC" -eq 0 ] && [ "$VRC2" -eq 0 ] \
+    && grep -q '^auto_merge: true$' "$PLAN_V" \
+    && cmp -s "$PLAN_V" "$SB2/after1.md"; } \
+  && ok "(84) veronly: second run on an armed docs-only-ready plan is a byte-identical no-op" \
+  || bad "(84) veronly: docs-only-ready idempotency"
 
 h_done

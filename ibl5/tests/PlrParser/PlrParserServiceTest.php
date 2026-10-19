@@ -345,6 +345,107 @@ class PlrParserServiceTest extends TestCase
         $this->assertSame(0, $derived['ratingFOUL']);
     }
 
+    public function testComputeDerivedFieldsFoulRatingWithZeroMinutesAndPositiveFouls(): void
+    {
+        $raw = $this->buildRawParsedData([
+            'realLifePF' => 100,
+            'realLifeMIN' => 0,
+        ]);
+
+        $derived = $this->service->computeDerivedFields($raw, 0.1);
+
+        $this->assertSame(100, $derived['ratingFOUL']);
+    }
+
+    public function testComputeDerivedFieldsFoulRatingWithZeroFoulsAndZeroMinutes(): void
+    {
+        $raw = $this->buildRawParsedData([
+            'realLifePF' => 0,
+            'realLifeMIN' => 0,
+        ]);
+
+        $derived = $this->service->computeDerivedFields($raw, 0.1);
+
+        $this->assertSame(100, $derived['ratingFOUL']);
+    }
+
+    public function testComputeDerivedFieldsAppendsDerivedKeysInFixedOrder(): void
+    {
+        $raw = $this->buildRawParsedData();
+        $derivedKeys = self::expectedDerivedKeyOrder();
+        // Precondition: the fixture carries none of the derived keys.
+        $this->assertSame([], array_values(array_intersect(array_keys($raw), $derivedKeys)));
+
+        $derived = $this->service->computeDerivedFields($raw, 0.1);
+
+        $this->assertSame(
+            array_merge(array_keys($raw), $derivedKeys),
+            array_keys($derived),
+        );
+    }
+
+    public function testComputeDerivedFieldsKeepsPreSeededDerivedKeyPositions(): void
+    {
+        $raw = $this->buildRawParsedData(['heightInches' => 79]);
+        $plain = $this->service->computeDerivedFields($raw, 0.1);
+        $seeded = ['seasonFGM' => -1, 'ratingFOUL' => -1] + $raw;
+
+        $derived = $this->service->computeDerivedFields($seeded, 0.1);
+
+        $remaining = array_values(array_diff(
+            self::expectedDerivedKeyOrder(),
+            ['seasonFGM', 'ratingFOUL'],
+        ));
+        $this->assertSame(
+            array_merge(['seasonFGM', 'ratingFOUL'], array_keys($raw), $remaining),
+            array_keys($derived),
+        );
+        $this->assertSame($plain['seasonFGM'], $derived['seasonFGM']);
+        $this->assertSame($plain['ratingFOUL'], $derived['ratingFOUL']);
+        $this->assertNotSame(-1, $derived['seasonFGM']);
+    }
+
+    public function testComputeDerivedFieldsSalaryIsZeroWhenContractYearKeyMissing(): void
+    {
+        $raw = $this->buildRawParsedData(['currentContractYear' => 8]);
+        // Precondition: the fixture has no contractYear8, so the `?? 0` branch runs.
+        $this->assertArrayNotHasKey('contractYear8', $raw);
+
+        $derived = $this->service->computeDerivedFields($raw, 0.1);
+
+        $this->assertSame(0, $derived['currentSeasonSalary']);
+    }
+
+    public function testComputeDerivedFieldsReturnsIntForEveryDerivedKey(): void
+    {
+        $raw = $this->buildRawParsedData([
+            'heightInches' => 79,
+            'realLifePF' => 100,
+            'realLifeMIN' => 2000,
+        ]);
+
+        $derived = $this->service->computeDerivedFields($raw, 0.1);
+
+        foreach (self::expectedDerivedKeyOrder() as $key) {
+            $this->assertIsInt($derived[$key], $key);
+        }
+    }
+
+    /**
+     * The 13 keys computeDerivedFields() appends, in array_merge order.
+     *
+     * @return list<string>
+     */
+    private static function expectedDerivedKeyOrder(): array
+    {
+        return [
+            'seasonFGM', 'seasonFGA', 'seasonREB', 'seasonPTS',
+            'careerFGM', 'careerFGA', 'careerREB', 'careerPTS',
+            'currentSeasonSalary', 'heightFT', 'heightIN',
+            'draftYear', 'ratingFOUL',
+        ];
+    }
+
     public function testParsePlrLineAcceptsOrdinalExactly1440(): void
     {
         $line = $this->buildPlrLine(['ordinal' => 1440, 'pid' => 12345]);

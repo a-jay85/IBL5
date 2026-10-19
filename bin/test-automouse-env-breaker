@@ -582,6 +582,52 @@ assert_present "P6: post-plan marker survives"           "$E2_GATE/markers/$E2_P
 assert_eq      "P6: lock branch breadcrumb names the handoff branch" \
                "$(cat "$E2_NDIR/queue/ppausey.md.lock/branch" 2>/dev/null)" "stub"
 
+echo ""
+echo "# L3: a post-plan wall-kill (cap) releases the post-plan-running label via the runner"
+# Runner copy: 3s post-plan cap, 1s minimum, 1s kill grace. The helper sources the
+# real bin/post-plan-now (so conclude_status_badge is the production one) while the
+# post-plan invocation itself runs a stub that sleeps past the cap. A gh stub answers
+# the branch PR lookup with an OPEN PR #4243 and records every other call.
+L3_STUB="$E2_ROOT/l3-stub"
+L3_CALLS="$E2_ROOT/l3-gh-calls"
+L3_RUNNER="$E2_ROOT/run-l3"
+L3_PP="$E2_ROOT/l3-post-plan-now"
+mkdir -p "$L3_STUB"
+printf '#!/bin/bash\nCALLS=%q\nHANDOFF=%q\n' "$L3_CALLS" "$E2_NDIR/handoff/l3cap.md.json" > "$L3_STUB/gh"
+cat >> "$L3_STUB/gh" <<'L3GH'
+printf '%s\n' "$*" >> "$CALLS"
+if [ "${1:-}" = "pr" ] && [ "${2:-}" = "list" ] && [ -f "$HANDOFF" ]; then
+    echo "OPEN https://github.com/a-jay85/IBL5/pull/4243"
+fi
+exit 0
+L3GH
+chmod +x "$L3_STUB/gh"
+printf '#!/bin/bash\nexec sleep 30\n' > "$L3_PP"
+chmod +x "$L3_PP"
+sed -e "s#source \"\$SELF_DIR/../post-plan-now\"#source \"$REPO_ROOT/bin/post-plan-now\"#" \
+    -e "s#\"\$SELF_DIR/../post-plan-now\"#\"$L3_PP\"#" \
+    -e 's#^MAX_PP_SECS=5400#MAX_PP_SECS=3#' \
+    -e 's#^MIN_PP_SECS=2400#MIN_PP_SECS=1#' \
+    -e 's#^MIN_VIABLE_SECS=[0-9]*#MIN_VIABLE_SECS=0#' \
+    -e "s#^export PATH=\"#export PATH=\"$L3_STUB:#" \
+    "$E2_RUNNER" > "$L3_RUNNER"
+chmod +x "$L3_RUNNER"
+if grep -q '^MAX_PP_SECS=3 ' "$L3_RUNNER" && grep -q '^MIN_PP_SECS=1 ' "$L3_RUNNER" \
+   && grep -qF "$REPO_ROOT/bin/post-plan-now" "$L3_RUNNER" && grep -qF "$L3_PP" "$L3_RUNNER"; then
+    ok "L3: runner copy carries the rewritten constants and paths"
+else
+    fail "L3: runner copy rewrite missed an anchor"
+fi
+reset_e2
+: > "$L3_CALLS"
+write_e2_plan "l3cap"
+STUB_MODE=ppause KILL_GRACE_SECS=1 NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 timeout 60 "$L3_RUNNER" > /dev/null 2>&1 || true
+L3_LOG="$(e2_logtxt)"
+want           "L3: post-plan was wall-killed"           "$L3_LOG" "post-plan-now exited code="
+want           "L3: gh removed the label from PR 4243"   "$(cat "$L3_CALLS")" "issues/4243/labels/post-plan-running"
+reset_e2   # L3's plan stays queued; later cases must start from an empty queue
+
 # ── Worktree-resume refusal cases (Claude Code resume safety check) ─────────
 # wtref_setup <plan>: pause <plan> mid-run (marker mode), give its session a
 # transcript so the resume uses --resume, and clear the launch and runner logs so

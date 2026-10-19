@@ -20,7 +20,7 @@ failcase() { h_fail "$1"; }
 
 # assert_match <name> <ERE> <output>
 assert_match() {
-    if printf '%s\n' "$3" | grep -qE "$2"; then
+    if grep -qE "$2" <<<"$3"; then
         pass "$1"
     else
         failcase "$1 - expected to match: $2"
@@ -30,7 +30,7 @@ assert_match() {
 
 # assert_absent <name> <ERE> <output>
 assert_absent() {
-    if printf '%s\n' "$3" | grep -qE "$2"; then
+    if grep -qE "$2" <<<"$3"; then
         failcase "$1 - expected NOT to match: $2"
         printf '%s\n' "$3" | sed 's/^/    /'
     else
@@ -382,6 +382,23 @@ assert_match  "H6 recorded (8)"                      '^\(8\) feat — awaiting h
 assert_absent "H6 stops at block end (trailing)"     'trailing'                                         "$OUT"
 OUT="$(hp_sticky_reasons "${H_STICKY/Auto-merge held:/**Auto-merge held:**}")"
 assert_match  "H6 bold header accepted"              '^\(7\) '                                          "$OUT"
+
+# pr3267 dual-layout: the old (v1) and new (v2) sticky layouts yield the same hold reasons,
+# and a Still-open bullet in the v2 layout is never read as a hold.
+PR3267_DIR="$SCRIPT_DIR/fixtures/review-shared"
+PR3267_V1="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v1.json")"
+PR3267_V2="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v2.json")"
+PR3267_WANT='(3) plan-matrix — MISSING: tests/example'
+OUT="$(hp_sticky_reasons "$PR3267_V1")"
+assert_status "pr3267-v1-hold-reasons"               0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
+OUT="$(hp_sticky_reasons "$PR3267_V2")"
+assert_status "pr3267-v2-hold-reasons"               0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
+PR3267_OPEN=$'### Still open (non-blocking)\n'
+PR3267_OPEN_NEW="${PR3267_OPEN}- (9) fake — x"$'\n'
+PR3267_V2_OPEN="${PR3267_V2/"$PR3267_OPEN"/$PR3267_OPEN_NEW}"
+assert_status "pr3267-v2-open-item-inserted"         0 "$([ "$PR3267_V2_OPEN" != "$PR3267_V2" ] && echo 0 || echo 1)"
+OUT="$(hp_sticky_reasons "$PR3267_V2_OPEN")"
+assert_status "pr3267-v2-open-item-not-a-hold"       0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
 
 OUT="$(hp_sticky_reasons "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Auto-merge held:' '- no arming decision recorded')")"
 assert_status "H7 no-decision bullet -> no reason"   0 "${#OUT}"

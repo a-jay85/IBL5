@@ -38,8 +38,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, llm_calls,
-                     manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
+                     manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
@@ -54,6 +54,7 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               MERGE_DIGEST_BEGIN, MERGE_DIGEST_END, render_merge_digest,
                               upsert_merge_digest,
                               MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC,
+                              render_after_merge_block, upsert_after_merge,
                               backlog_closes_mismatch, classify, files_from_diff,
                               modified_files_from_diff,
                               name_status_text, normalize_backlog_closes, numstat_text,
@@ -72,6 +73,7 @@ from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
 from harness.review import ReviewPhase
+from harness import review_depth
 from harness import baseline_guard
 from harness.state import (SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState,
                            UsageLedger)
@@ -281,6 +283,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     _active_audit = audit
     state = statefile.StateFile(os.path.join(_state_dir(out_dir, live, state_dir), statefile.safe_slug(slug) + ".json"), slug, git, out_dir, log)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
+        f"auto_merge_value={getattr(plan, 'auto_merge_value', None)!r} "
         f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)} "
         f"slug_drift={plan.slug_drift or '-'} plan_source={plan.plan_source or '-'}")
 
@@ -387,6 +390,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         if _inject_merge_danger(copy, worktree, diff, log):
             body_check_degraded = True
+        _inject_how_to_revert(copy, diff, log)
         log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
@@ -459,7 +463,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         cache_key = None
         head_before_45 = git.head()
         res.thread_ingestion = _run_thread_ingestion_phase(
-            gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, res)
+            gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, res,
+            outcome_log_path=os.path.join(_state_dir(out_dir, live, state_dir), outcome_log.LOG_BASENAME))
         if git.head() != head_before_45:
             sha = git.head()
             files = git.changed_files()
@@ -482,7 +487,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if cache_rec is not None and not reviewcache.key_matches(cache_rec, cache_key):
             conflict_only = _conflict_only_proof(git, cache_rec, cache_key, cache_files, log)
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        review_phase = ReviewPhase(llm, gh)
+        review_phase = _review_phase_for(llm, gh, copy, meta, log)
         cur_gates = review_phase.gates(cls) if cache_rec is not None else None
         restored = None
         key_hit = cache_rec is not None and reviewcache.key_matches(cache_rec, cache_key)
@@ -611,6 +616,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # that follows (strip_change_blocks, gate_backtest) and the
         # single pr_edit_body call are unchanged.
         body = upsert_hold_notice(body, plan.hold_justification)
+        # Every pass (idempotent), so a fixer rewrite or an older body is repaired;
+        # outside the clearance == "UNKNOWN" branch on purpose.
+        body = upsert_after_merge(
+            body, render_after_merge_block(plan.post_merge_rows) if plan.found else "")
         # Remove files-changed/tests-changed blocks left by older harness runs.
         body = strip_change_blocks(body)
         _gb = gate_backtest_result(worktree or ".", diff, pr=pr, live=live,
@@ -723,6 +732,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
+            plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
+            branch=git.branch(),
             dep_state_lookup=lambda n: gh.pr_state(n),
             # Phase 5.5 above produced these. None means INDETERMINATE (the reviewer
             # degraded or was not run), which holds condition (12) — it is never
@@ -1166,7 +1177,7 @@ def _reclaim_stale_lease(git, log, phase: str, snap, *, run_git=None) -> None:
 
 
 def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out_dir,
-                                log, res) -> dict:
+                                log, res, outcome_log_path=None) -> dict:
     """Phase 4.5 wrapper: same commit/push injection as the Phase 5.5 remediation.
     Swallows everything except gate-path-edit (a local commit touched a gate-owning
     path; shipping it later would bypass the gate) and push-failed (the tree and origin
@@ -1175,6 +1186,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
     try:
         out = run_thread_ingestion(
             gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
+            outcome_log_path=outcome_log_path,
             commit=lambda msg: _commit_with_gate_fix(
                 git, worktree, msg, log, phase="phase4.5", llm=llm, res=res),
             push=lambda: _push_with_gate_fix(git, log, "phase4.5", llm=llm,
@@ -1192,6 +1204,13 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
         log(f"phase4.5: thread ingestion failed ({e!r}); continuing")
         out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
                "error": _redact(repr(e))}
+    if outcome_log_path:
+        try:
+            rows = gh.review_threads_all(pr)
+            if rows is not None:
+                outcome_log.run_sweep(rows, pr, outcome_log_path, log, pipeline="harness")
+        except Exception as e:  # noqa: BLE001 - outcome logging never affects the run
+            log(f"outcome-log: sweep fetch failed ({e!r}); continuing")
     log(f"phase4.5: {out.get('found', 0)} trusted thread(s) found, {out.get('fixed', 0)} fixed, "
         f"{out.get('declined', 0)} declined, {out.get('skipped', 0)} skipped (error) "
         f"in {time.monotonic() - t0:.2f}s")
@@ -2208,6 +2227,19 @@ def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list
     return findings
 
 
+def _inject_how_to_revert(copy: dict, diff_body: str, log) -> None:
+    """Phase 2: advisory How to revert line, placed after Merge danger. Log-only: no finding,
+    no degraded body check. An empty summary_md is the clean-tree rerun and is left as is."""
+    if not copy["summary_md"]:
+        return
+    try:
+        copy["summary_md"], source = how_to_revert.apply_to_body(copy["summary_md"], diff_body)
+    except Exception as exc:  # advisory field: never fail Phase 2 over it
+        log(f"phase2: how-to-revert skipped ({exc})")
+        return
+    log(f"phase2: how-to-revert source={source}")
+
+
 def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str) -> str:
     """Return `body` carrying exactly one Merge danger line: the mechanical floor merged
     with any line already in the body, which may only raise Door / Blast radius.
@@ -2644,6 +2676,24 @@ def _interdiff_eligibility(cache_rec, cache_key, cache_files, gates, cls):
     return delta, prior
 
 
+def _review_phase_for(llm, gh, copy: dict, meta: dict | None, log) -> ReviewPhase:
+    """Phase 4 review depth: the deeper of the Phase-2 body and the live PR body.
+
+    An empty copy["summary_md"] is the clean-tree rerun (Phase 2 wrote nothing), so only the
+    live body counts then. A live body that is absent or not a string reads as UNREADABLE,
+    which is deep. Deepen only: no source can lower the depth another source chose.
+    """
+    sources: list[tuple[str, str | None]] = []
+    if copy.get("summary_md"):
+        sources.append(("phase2", copy["summary_md"]))
+    live = (meta or {}).get("body")
+    sources.append(("live", live if isinstance(live, str) else None))
+    verdicts = [(name, *review_depth.classify_depth(body)) for name, body in sources]
+    depth = review_depth.max_depth(*(d for _, d, _ in verdicts))
+    log(f"review-depth: {depth} (" + ", ".join(f"{n}={r}" for n, _, r in verdicts) + ")")
+    return ReviewPhase(llm, gh, depth=depth)
+
+
 def _interdiff_review(review_phase, meta, cls, plan, delta, keep_findings, keep_scored, log):
     sub = dataclasses.replace(cls, filtered_diff=reviewcache.subset_diff(cls.filtered_diff, delta))
     findings, gates, scored, degraded = review_phase.run(meta, sub, plan, reused=keep_findings)
@@ -2838,8 +2888,19 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": [],
                     "diff_id": diff_id, "plan_hash": plan_hash}
+    # What code review the PR shows. `code_review_seen` reads the cache the one existing
+    # comments fetch filled, so this adds no network call. `res.fidelity` was replaced
+    # wholesale just above, so the key is set after it.
+    seen = getattr(gh, "code_review_seen", None)
+    res.fidelity["code_review"] = {
+        "phase4b_ran": bool(phase4b_ran),
+        "seen": (seen(pr) if (callable(seen) and live and pr) else None),
+    }
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
+    # Verdict 1's file: the round loop advances current_verdict_path, so this is the only
+    # handle on the first review's findings by compose time.
+    verdict_path_1 = current_verdict_path
     final_verdict, final_err = verdict, err
     for round_num in range(1, fidelity.MAX_FIDELITY_ROUNDS + 1):
         if final_verdict != "NOT READY":
@@ -3026,12 +3087,21 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # round already cleared, under a **Re-reviewed tree:** line that contradicts them.
         res.fidelity["verdict_path"] = path_n
         res.fidelity["findings_round"] = round_num
+    res.fidelity["review_items"] = [
+        {**fidelity.verdict_items(verdict_path_1), "remediation_sha": None}
+    ] + [
+        {**fidelity.verdict_items(r.get("verdict_path") or ""),
+         "remediation_sha": r.get("remediation_sha")}
+        for r in rounds
+    ]
     res.fidelity["models"] = [r["model"] for r in rounds]
     # Notes come from whichever review produced the final verdict: the initial one or
     # a re-review round. current_verdict_path tracks that review's verdict file.
     if final_verdict == "READY WITH NOTES":
         notes = fidelity.extract_notes(llm, current_verdict_path, log=log, pr_number=pr)
-        nums = fidelity.file_note_issues(gh, notes, pr, log=log)
+        filed_notes: list = []
+        nums = fidelity.file_note_issues(gh, notes, pr, log=log, filed=filed_notes)
+        res.fidelity["filed_notes"] = filed_notes
         res.fidelity["backlog_issue_numbers"] = nums
         log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
     return final_verdict, final_err

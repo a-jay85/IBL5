@@ -87,6 +87,8 @@ class RcbImporter
     }
 
     /**
+     * Keep the list<...> tags: without them PHPStan raises missingType.iterableValue.
+     *
      * @param list<AlltimeEntry> $entries
      * @return list<AlltimeRow>
      */

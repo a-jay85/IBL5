@@ -246,6 +246,29 @@ final class RcbImporterTest extends TestCase
         $this->assertSame([], $result->messages);
     }
 
+    /**
+     * Pins that RcbImporter::importFile() feeds file contents through import() and forwards the alltime flag.
+     */
+    public function testImportFileForwardsFlagsThroughSplitHelpers(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'rcb');
+        self::assertIsString($path);
+        file_put_contents($path, $this->buildMinimalRcbData());
+
+        try {
+            $repo = self::createMock(JsbImportRepositoryInterface::class);
+            $repo->expects(self::never())->method('replaceRcbAlltimeRecords');
+            $repo->expects(self::once())->method('replaceRcbSeasonRecords')->willReturn(2);
+
+            $result = (new RcbImporter($repo))->importFile($path, 2006, 'rcb.rcb', false);
+        } finally {
+            unlink($path);
+        }
+
+        $this->assertSame(2, $result->inserted);
+        $this->assertSame(0, $result->errors);
+    }
+
     public function testImportFileReportsMissingFile(): void
     {
         $result = (new RcbImporter(self::createStub(JsbImportRepositoryInterface::class)))->importFile('/nonexistent/x.rcb', 2006);

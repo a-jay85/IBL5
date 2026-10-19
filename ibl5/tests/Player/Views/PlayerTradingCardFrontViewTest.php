@@ -118,8 +118,7 @@ class PlayerTradingCardFrontViewTest extends TestCase
     }
 
     /**
-     * getStyles() is deprecated and always returns ''; it is not under test here.
-     * These two tests exercise render() boundaries instead to maintain 4-test coverage.
+     * These two tests exercise render() boundaries to maintain 4-test coverage.
      */
     public function testRenderContainsContractDisplay(): void
     {
@@ -201,7 +200,7 @@ class PlayerTradingCardFrontViewTest extends TestCase
             $publicNames[] = $method->getName();
         }
         sort($publicNames);
-        $this->assertSame(['getStyles', 'render'], $publicNames);
+        $this->assertSame(['render'], $publicNames);
 
         foreach ($ref->getMethods() as $method) {
             $this->assertTrue($method->isStatic(), $method->getName());

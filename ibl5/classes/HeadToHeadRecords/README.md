@@ -1,6 +1,6 @@
 ---
 description: Head-to-head win/loss matrix across franchises, teams, and GMs for any game phase and scope.
-last_verified: 2026-09-21
+last_verified: 2026-10-19
 ---
 
 # HeadToHeadRecords Module
@@ -30,7 +30,7 @@ HeadToHeadRecords/
   in earlier drafts.
 - **Migration 182.** Migration 182 creates the `ibl_franchise_era_branding` table, which stores
   color and identity overrides for retired franchise eras. The module reads from the shared
-  DatabaseCache table, populated on first warm-up or when `RefreshHeadToHeadRecordsStep` runs.
+  DatabaseCache table, populated on first warm-up or when `RefreshHeadToHeadRecordsStep` runs. The same step also rebuilds the Rivalries cache (see ibl5/classes/Rivalries/README.md).
 - **CSS contract.** The view emits class names from `ibl5/design/components/head-to-head-records.css`
   and the site-wide shared patterns: `sticky-scroll-wrapper`, `h2h-matrix`, `h2h-row-label`,
   `h2h-winning`, `h2h-losing`, `h2h-tied`, `h2h-self`, `h2h-user-row`,

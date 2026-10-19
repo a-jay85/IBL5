@@ -15,6 +15,7 @@ import os
 
 from .fidelity import REMEDIATION_ALLOWED_TOOLS, REMEDIATION_DENIED_TOOLS, denied_gate_edits
 from .adapters.llm import extract_json
+from . import outcome_log
 from .state import HarnessError
 
 TRUSTED_LOGIN = "a-jay85"
@@ -45,7 +46,7 @@ def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int]) -> list[dict] | Non
             continue
         if not _is_trusted(t.get("authorLogin") or "", t.get("authorType") or ""):
             continue
-        keep.append({k: t.get(k) for k in ("commentId", "path", "line", "body", "score", "authorLogin")})
+        keep.append({k: t.get(k) for k in ("commentId", "path", "line", "body", "score", "authorLogin", "agent")})
     return keep
 
 
@@ -81,12 +82,14 @@ def thread_prompt(thread: dict, file_excerpt: str) -> str:
         ]
     lines += [
         "",
-        'Required final answer: one JSON object {"verdict": "FIX"|"DECLINE", "reason": "<one sentence>"} as the last line of your result.',
+        'Required final answer: one JSON object {"verdict": "FIX"|"DECLINE", "reason": "<one sentence>", "category": "wrong"|"intentional"|"already-fixed"|"not-worth-it"} as the last line of your result.',
+        'category is required for DECLINE and ignored for FIX: wrong = the finding is mistaken or not a defect; intentional = the flagged behavior is deliberate; already-fixed = the current tree already addresses it; not-worth-it = real but out of scope or not worth changing here.',
     ]
     return "\n".join(lines)
 
 
-def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push, model="sonnet") -> str:
+def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push, model="sonnet",
+                       info: dict | None = None) -> str:
     """Evaluate and action one review thread. Returns 'fixed', 'declined', or 'skipped'."""
     cid = thread.get("commentId")
     path = thread.get("path") or ""
@@ -139,6 +142,9 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
         log(f"thread {cid}: invalid verdict {verdict!r} or empty reason")
         return "skipped"
 
+    if info is not None:
+        info.update(verdict=verdict, reason=reason, category=verdict_obj.get("category"))
+
     # Step 3: DECLINE
     if verdict == "DECLINE":
         gh.resolve_review_thread(pr, cid, f"Declined: {reason}")
@@ -161,7 +167,8 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
     return "fixed"
 
 
-def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, *, commit, push, model="sonnet") -> dict:
+def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, *, commit, push, model="sonnet",
+                         outcome_log_path: str | None = None) -> dict:
     """Run the thread ingestion loop and write thread-ingestion.json to out_dir."""
     threads = fetch_trusted_threads(gh, pr, pre_posting_ids)
     if threads is None:
@@ -188,13 +195,16 @@ def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, l
     declined = 0
     skipped = 0
     per_thread: list[dict] = []
+    events: list[dict] = []
 
     for thread in threads:
         cid = thread.get("commentId")
         pre_sha = last_sha_box[0]
+        thread_info: dict = {}
         try:
             outcome = disposition_thread(thread, llm, git, worktree, pr, gh, log,
-                                         commit=_tracked_commit, push=_tracked_push, model=model)
+                                         commit=_tracked_commit, push=_tracked_push, model=model,
+                                         info=thread_info)
         except HarnessError as e:
             if e.kind != "thread-resolve-failed":
                 raise
@@ -208,11 +218,27 @@ def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, l
         else:
             skipped += 1
         per_thread.append({"commentId": cid, "outcome": outcome, "sha": post_sha})
+        if outcome_log_path and outcome in ("fixed", "declined") and thread_info.get("verdict"):
+            try:
+                event = outcome_log.event_from_verdict(
+                    pr=pr, thread=thread, verdict=thread_info["verdict"],
+                    category=thread_info.get("category"), reason=thread_info["reason"],
+                    sha=post_sha, pipeline="harness")
+                if event is not None:
+                    events.append(event)
+            except Exception as e:  # noqa: BLE001 - logging must never change the run result
+                log(f"outcome-log: phase4.5 logging failed ({e!r}); continuing")
 
     # After the loop, if dirty, log and count as skipped
     if git.is_dirty():
         log("thread ingestion left uncommitted edits; leaving open")
         skipped += 1
+
+    if outcome_log_path and events:
+        try:
+            outcome_log.append_events(outcome_log_path, events, log)
+        except Exception as e:  # noqa: BLE001 - append_events swallows; belt and braces
+            log(f"outcome-log: phase4.5 logging failed ({e!r}); continuing")
 
     result = {
         "found": len(threads),

@@ -38,8 +38,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, llm_calls,
-                     manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
+                     manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
@@ -389,6 +389,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         if _inject_merge_danger(copy, worktree, diff, log):
             body_check_degraded = True
+        _inject_how_to_revert(copy, diff, log)
         log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
@@ -461,7 +462,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         cache_key = None
         head_before_45 = git.head()
         res.thread_ingestion = _run_thread_ingestion_phase(
-            gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, res)
+            gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, res,
+            outcome_log_path=os.path.join(_state_dir(out_dir, live, state_dir), outcome_log.LOG_BASENAME))
         if git.head() != head_before_45:
             sha = git.head()
             files = git.changed_files()
@@ -1174,7 +1176,7 @@ def _reclaim_stale_lease(git, log, phase: str, snap, *, run_git=None) -> None:
 
 
 def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out_dir,
-                                log, res) -> dict:
+                                log, res, outcome_log_path=None) -> dict:
     """Phase 4.5 wrapper: same commit/push injection as the Phase 5.5 remediation.
     Swallows everything except gate-path-edit (a local commit touched a gate-owning
     path; shipping it later would bypass the gate) and push-failed (the tree and origin
@@ -1183,6 +1185,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
     try:
         out = run_thread_ingestion(
             gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
+            outcome_log_path=outcome_log_path,
             commit=lambda msg: _commit_with_gate_fix(
                 git, worktree, msg, log, phase="phase4.5", llm=llm, res=res),
             push=lambda: _push_with_gate_fix(git, log, "phase4.5", llm=llm,
@@ -1200,6 +1203,13 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
         log(f"phase4.5: thread ingestion failed ({e!r}); continuing")
         out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
                "error": _redact(repr(e))}
+    if outcome_log_path:
+        try:
+            rows = gh.review_threads_all(pr)
+            if rows is not None:
+                outcome_log.run_sweep(rows, pr, outcome_log_path, log, pipeline="harness")
+        except Exception as e:  # noqa: BLE001 - outcome logging never affects the run
+            log(f"outcome-log: sweep fetch failed ({e!r}); continuing")
     log(f"phase4.5: {out.get('found', 0)} trusted thread(s) found, {out.get('fixed', 0)} fixed, "
         f"{out.get('declined', 0)} declined, {out.get('skipped', 0)} skipped (error) "
         f"in {time.monotonic() - t0:.2f}s")
@@ -2214,6 +2224,19 @@ def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list
     for f in findings:
         log(f"phase2 body-check finding: {f}")
     return findings
+
+
+def _inject_how_to_revert(copy: dict, diff_body: str, log) -> None:
+    """Phase 2: advisory How to revert line, placed after Merge danger. Log-only: no finding,
+    no degraded body check. An empty summary_md is the clean-tree rerun and is left as is."""
+    if not copy["summary_md"]:
+        return
+    try:
+        copy["summary_md"], source = how_to_revert.apply_to_body(copy["summary_md"], diff_body)
+    except Exception as exc:  # advisory field: never fail Phase 2 over it
+        log(f"phase2: how-to-revert skipped ({exc})")
+        return
+    log(f"phase2: how-to-revert source={source}")
 
 
 def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str) -> str:

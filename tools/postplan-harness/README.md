@@ -193,3 +193,26 @@ landed anyway, it returns that result and makes no second call. A push counts as
 landed when the remote branch tip already equals HEAD. A failed snapshot or
 landed check means one attempt, and so does every other mutation. The
 `cannot lock ref` fetch retry (`FETCH_LOCK_RETRIES`) keeps its own budget.
+
+## Review outcome log
+
+Phase 4.5 and a deterministic sweep append what happened to each review finding. The log is `tools/postplan-harness/out/state/review-outcomes.jsonl` in the main checkout (gitignored). Set `IBL_REVIEW_OUTCOMES_LOG` to point somewhere else. Logging never changes a run's result, counts or exit code.
+
+One JSON object per line: `v, ts, pr, findingId, agent, score, outcome, source, basis, pipeline, reason, sha`. `source` is `phase4.5` or `sweep`. `pipeline` is `harness` or `skill`.
+
+| Outcome | Comes from |
+|---------|------------|
+| `fixed` | verdict FIX, DECLINE category `already-fixed`, or a sweep of an outdated thread |
+| `declined-wrong` | DECLINE category `wrong` |
+| `intentional` | DECLINE category `intentional` |
+| `didnt-matter` | DECLINE category `not-worth-it`, a missing or unknown category, or a sweep of a thread resolved without a reply |
+
+The sweep never reads who resolved a thread. A finding is logged once, and the first observation wins in the log. `report` keeps the last event per `(pr, findingId)`.
+
+```bash
+bin/review-outcomes record --pr=12 --verdicts=/tmp/done.jsonl --threads=/tmp/all.jsonl
+gh api graphql ... | bin/review-outcomes sweep --pr=12
+bin/review-outcomes report --since=2026-10-01 --json
+```
+
+`report` counts outcomes per review agent and prints the share that was wrong or didn't matter. It leaves out rounds-to-pass because no field records it today.

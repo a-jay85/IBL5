@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-15
+last_verified: 2026-10-19
 ---
 
 # Post-Plan Orchestrator
@@ -198,7 +198,7 @@ fi
 ```
 
 3. push
-4. **If no PR exists for the current branch:** create one with `gh pr create`. Read `.claude/skills/post-plan/_pr-body-claims.md` and apply it before writing the body. The body carries exactly one `**Merge danger:**` line per `_pr-body-claims.md` § Merge danger rule; when any listed one-way trigger is in the diff the Door is `one-way`. Read `.claude/review-shared/_prose-voice-contract.md` before writing any PR-body prose — it carries the five written-voice rules and the two annotated failure samples, and it governs every prose surface this phase and Phase 6 compose. <!-- slop-ok -->
+4. **If no PR exists for the current branch:** create one with `gh pr create`. Read `.claude/skills/post-plan/_pr-body-claims.md` and apply it before writing the body. The body carries exactly one `**Merge danger:**` line per `_pr-body-claims.md` § Merge danger rule; when any listed one-way trigger is in the diff the Door is `one-way`. Directly after it goes one advisory `**How to revert:**` line per `_pr-body-claims.md` § How to revert rule. Read `.claude/review-shared/_prose-voice-contract.md` before writing any PR-body prose — it carries the five written-voice rules and the two annotated failure samples, and it governs every prose surface this phase and Phase 6 compose. <!-- slop-ok -->
 
    > **Voice check, once.** After writing the Scope why-paragraph, pipe it through `bin/check-digest-prose` (`printf '%s\n' "$SCOPE_PROSE" | bin/check-digest-prose`). If it reports a violation, rewrite that paragraph **once** to address the named rule, then continue. Do not loop twice and do not abort: `bin/check-digest-prose` always exits 0 and never blocks the PR — ship whatever the single rewrite produces. <!-- slop-ok -->
 
@@ -336,7 +336,7 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 > Phase 4 runs code review (up to five sub-agents A–E) and a conditional security audit, then scores, filters, and posts findings to the PR. Every sub-agent launch is gated on the Phase 3 flags (`NON_CODE_ONLY`, `ENGINE_ONLY`, `HAS_PHP`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `HAS_E2E_SPECS`, `LINES_PHP_CHANGED`, `HAS_SHELL`, `HAS_WORKFLOW`, `HAS_SKILL_PROSE`) — a non-code diff skips the code agents cleanly. Phase 4 emits PR comments only; no Phase-4 output is a variable a later phase keys on.
 >
-> **Read `.claude/skills/post-plan/_phase-4-review-audit.md` now and follow 4A→4D, then 4.5, in order.** It holds the PR-data fetch (4A), the Agent A/B/C/D/E launch gates + model tiers + Agent-D and Agent-E diff pre-slices (4B), the security-audit agent (4C), and the score/filter/post procedure including the `bin/lib/post-review-findings.sh` sourcing (4D). Phase 4.5 fixes or declines pre-existing trusted review threads and may commit; Phase 5 then runs on the new head.
+> **Read `.claude/skills/post-plan/_phase-4-review-audit.md` now and follow 4A→4D, then 4.5, in order.** It holds the PR-data fetch (4A), the Agent A/B/C/D/E launch gates + model tiers + Agent-D and Agent-E diff pre-slices (4B), the security-audit agent (4C), and the score/filter/post procedure including the `bin/lib/post-review-findings.sh` sourcing (4D). Phase 4.5 fixes or declines pre-existing trusted review threads and may commit; Phase 5 then runs on the new head. Each resolved thread's outcome, plus a sweep of outdated or resolved-without-reply findings, is appended to `tools/postplan-harness/out/state/review-outcomes.jsonl` in the main checkout. Logging never fails or holds the run, and `bin/review-outcomes report` summarises it.
 
 ---
 

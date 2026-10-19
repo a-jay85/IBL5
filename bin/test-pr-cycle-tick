@@ -1623,5 +1623,89 @@ no_file "$STATE_DIR/pending" || fail "patch-id-real-git: dry-run wrote pending/"
 git -C "$REPO" remote remove origin
 end_case patch-id-real-git
 
+# master-tip-seam: unset and empty PR_CYCLE_MASTER_TIP_CMD both select the git default; a
+# junk, empty, or failing seam prints nothing and still returns 0.
+reset; begin_case
+MT="$SCRATCH/mt-repo"; MTB="$SCRATCH/mt-bare-repo"
+git init -q -b master "$MT"; git init -q -b master "$MTB"
+for r in "$MT" "$MTB"; do
+    git -C "$r" config user.email t@t.invalid; git -C "$r" config user.name t
+    git -C "$r" config commit.gpgsign false
+    git -C "$r" commit -q --allow-empty -m one
+done
+git -C "$MT" update-ref refs/remotes/origin/master HEAD
+MT_SHA="$(git -C "$MT" rev-parse HEAD)"
+set_tip e0002
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    unset PR_CYCLE_MASTER_TIP_CMD
+    pcw_master_tip "$MT" > "$SCRATCH/mt-unset"
+    pcw_master_tip "$MTB" > "$SCRATCH/mt-unset-bare"
+    PR_CYCLE_MASTER_TIP_CMD=""
+    pcw_master_tip "$MT" > "$SCRATCH/mt-empty"
+    pcw_master_tip "$MTB" > "$SCRATCH/mt-empty-bare"
+    PR_CYCLE_MASTER_TIP_CMD="$SCRATCH/mastertip-file"
+    pcw_master_tip "$MT" > "$SCRATCH/mt-file"
+    PR_CYCLE_MASTER_TIP_CMD="$SCRATCH/mastertip-empty"
+    pcw_master_tip "$MT" > "$SCRATCH/mt-seam-empty"; echo "$?" > "$SCRATCH/mt-seam-empty-rc"
+    PR_CYCLE_MASTER_TIP_CMD="$SCRATCH/mastertip-junk"
+    pcw_master_tip "$MT" > "$SCRATCH/mt-seam-junk"; echo "$?" > "$SCRATCH/mt-seam-junk-rc"
+    PR_CYCLE_MASTER_TIP_CMD=false
+    pcw_master_tip "$MT" > "$SCRATCH/mt-seam-false"; echo "$?" > "$SCRATCH/mt-seam-false-rc"
+)
+[[ "$(cat "$SCRATCH/mt-unset")" == "$MT_SHA" ]] || fail "master-tip-seam: unset did not select the git default"
+[[ "$(cat "$SCRATCH/mt-empty")" == "$MT_SHA" ]] || fail "master-tip-seam: empty did not select the git default"
+[[ "$(wc -c < "$SCRATCH/mt-unset-bare" | tr -d ' ')" == "0" ]] || fail "master-tip-seam: unset printed for a repo with no origin/master"
+[[ "$(wc -c < "$SCRATCH/mt-empty-bare" | tr -d ' ')" == "0" ]] || fail "master-tip-seam: empty printed for a repo with no origin/master"
+[[ "$(cat "$SCRATCH/mt-file")" == "$(key_of e0002)" ]] || fail "master-tip-seam: seam file tip not printed"
+for m in seam-empty seam-junk seam-false; do
+    [[ "$(wc -c < "$SCRATCH/mt-$m" | tr -d ' ')" == "0" ]] || fail "master-tip-seam: $m printed something"
+    [[ "$(cat "$SCRATCH/mt-$m-rc")" == "0" ]] || fail "master-tip-seam: $m returned non-zero"
+done
+end_case master-tip-seam
+
+# conflict-retry-due-codes: 1 no hold, 2 same or malformed tip, 0 new tip under the cap,
+# 3 at the cap, 0 again on a new day, `unknown` hold eligible, cleared hold back to 1.
+reset; begin_case
+CRD="$SCRATCH/crd"; rm -rf "$CRD"; mkdir -p "$CRD"
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    T1="$(key_of e0001)"; T2="$(key_of e0002)"
+    rc() { local r=0; "$@" || r=$?; printf '%s' "$r"; }
+    {
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+        pcw_record_conflict_hold "$CRD" 5 "$T1"
+        rc pcw_conflict_retry_due "$CRD" 5 "$T1" 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 not-a-sha 2026-10-19
+        pcw_bump_retry "$CRD" 5 2026-10-19; pcw_bump_retry "$CRD" 5 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-20
+        pcw_record_conflict_hold "$CRD" 6 ""
+        rc pcw_conflict_retry_due "$CRD" 6 "$T2" 2026-10-19
+        pcw_clear_conflict_hold "$CRD" 5
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+    } > "$SCRATCH/crd-codes"
+    cat "$CRD/conflict-hold/6" > "$SCRATCH/crd-hold6"
+)
+[[ "$(cat "$SCRATCH/crd-codes")" == "12023001" ]] || fail "conflict-retry-due-codes: want 1,2,0,2,3,0,0,1 got $(cat "$SCRATCH/crd-codes")"
+[[ "$(cat "$SCRATCH/crd-hold6")" == "unknown" ]] || fail "conflict-retry-due-codes: empty tip did not record unknown"
+end_case conflict-retry-due-codes
+
+# prune-conflict-ledgers: pcw_prune drops the new ledgers of a closed PR (999), keeps PR 101's.
+reset; begin_case
+for l in conflict-hold retries; do
+    mkdir -p "$STATE_DIR/$l"; echo x > "$STATE_DIR/$l/999"; echo x > "$STATE_DIR/$l/101"
+done
+set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
+run_tick
+for l in conflict-hold retries; do
+    no_file "$STATE_DIR/$l/999" || fail "prune-conflict-ledgers: $l/999 survived"
+    [[ -f "$STATE_DIR/$l/101" ]] || fail "prune-conflict-ledgers: $l/101 was pruned"
+done
+end_case prune-conflict-ledgers
+
 # --- summary -------------------------------------------------------------------------------
 h_done

@@ -26,6 +26,9 @@ PCW_PENDING_MAX_AGE_S=10800
 # removes it. 2x the per-phase post-plan cap MAX_PP_SECS=5400 in bin/automouse/run (the
 # observed maximum wall time is about 34 min). bin/test-pr-cycle-tick pins the 2x ratio.
 PCW_STALE_LABEL_MIN=180
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+# DIRTY rescue launches per PR per local calendar day. Bounds the conflict re-try spend.
+PCW_CONFLICT_RETRY_DAILY_CAP=2
 
 # State dir: PR_CYCLE_WATCH_STATE_DIR when non-empty, else $HOME/.ibl5-pr-cycle-watch.
 # Unset and empty both mean "use the default". rc 1 when neither it nor HOME is set.
@@ -307,6 +310,57 @@ pcw_drop_pr_ref() {
     git -C "$1" update-ref -d "refs/pr-cycle/$2" 2>/dev/null || true
     return 0
 }
+# pcw_master_tip <root>: print the origin/master tip (40 lowercase hex), or nothing on any
+# failure. Always returns 0. A non-empty PR_CYCLE_MASTER_TIP_CMD replaces the git default
+# (`<cmd>` takes no argument and prints the tip). Unset and empty both select the default,
+# which reads refs/remotes/origin/master without fetching: the tick calls pcw_patch_id
+# first, and its default fetches origin master. Callers treat no output as "never eligible".
+pcw_master_tip() {
+    local root="$1" tip=""
+    if [[ -n "${PR_CYCLE_MASTER_TIP_CMD:-}" ]]; then
+        tip="$("$PR_CYCLE_MASTER_TIP_CMD" 2>/dev/null)" || true
+    else
+        tip="$(git -C "$root" rev-parse --verify --quiet refs/remotes/origin/master 2>/dev/null)" || true
+    fi
+    [[ "$tip" =~ ^[0-9a-f]{40}$ ]] && printf '%s\n' "$tip"
+    return 0
+}
+# conflict-hold/<pr> holds the origin/master tip recorded at the launch of a rescue that
+# settled `conflict`, or `unknown` when that launch had no readable tip. settle writes it on
+# `conflict` and clears it on every other settled outcome.
+pcw_record_conflict_hold() { _pcw_write "$1/conflict-hold/$2" "${3:-unknown}"; }
+pcw_clear_conflict_hold()  { rm -f "$1/conflict-hold/$2"; }
+# retries/<pr> holds "<YYYY-MM-DD> <n>": DIRTY rescue launches for the PR on that local day.
+pcw_today() { date +%F; }
+pcw_retry_count() {   # <dir> <pr> <day>: prints n when retries/<pr> holds that day, else 0
+    local f="$1/retries/$2" d="" n=""
+    if [[ -f "$f" ]]; then read -r d n < "$f" || true; fi
+    if [[ -n "$d" && "$d" == "$3" && "$n" =~ ^[0-9]+$ ]]; then
+        printf '%s\n' "$n"
+    else
+        printf '0\n'
+    fi
+}
+pcw_bump_retry() {    # <dir> <pr> <day>: writes "<day> <count+1>"
+    local n
+    n=$(( $(pcw_retry_count "$1" "$2" "$3") + 1 ))
+    _pcw_write "$1/retries/$2" "$3 $n"
+}
+# pcw_conflict_retry_due <dir> <pr> <tip> <day>: may a retry-capped PR relaunch?
+#   0 = yes: a conflict hold exists, <tip> is 40 hex and differs from the held tip, and the
+#       day's launch count is below PCW_CONFLICT_RETRY_DAILY_CAP
+#   1 = no conflict hold (today's retry-cap rule applies unchanged)
+#   2 = conflict hold, but <tip> is unreadable or equals the held tip
+#   3 = conflict hold and a new tip, but the daily cap is spent
+pcw_conflict_retry_due() {
+    local f="$1/conflict-hold/$2" held=""
+    [[ -f "$f" ]] || return 1
+    [[ "$3" =~ ^[0-9a-f]{40}$ ]] || return 2
+    held="$(cat "$f")"
+    [[ "$held" != "$3" ]] || return 2
+    (( $(pcw_retry_count "$1" "$2" "$4") < PCW_CONFLICT_RETRY_DAILY_CAP )) || return 3
+    return 0
+}
 
 _pcw_write() {   # atomic: temp file then rename, so a killed tick never leaves half a SHA
     mkdir -p "$(dirname "$1")" && printf '%s\n' "$2" > "$1.tmp.$$" && mv -f "$1.tmp.$$" "$1"
@@ -316,7 +370,8 @@ _pcw_write() {   # atomic: temp file then rename, so a killed tick never leaves 
 pcw_prune() {
     local dir="$1" open="$2" f
     for f in "$dir"/attempts/* "$dir"/dm-sent/* "$dir"/declined/* "$dir"/strikes/* \
-             "$dir"/dm-declined/* "$dir"/dm-strikes/* "$dir"/dm-patchid/*; do
+             "$dir"/dm-declined/* "$dir"/dm-strikes/* "$dir"/dm-patchid/* \
+             "$dir"/conflict-hold/* "$dir"/retries/*; do
         [[ -f "$f" ]] || continue
         grep -qxF "$(basename "$f")" <<< "$open" || rm -f "$f"
     done

@@ -282,6 +282,70 @@ def test_type_change_file_to_symlink_against_own_head_is_equivalent(repo, key):
     assert last_line(out) == "TREE-EQUIVALENT"
 
 
+def test_type_change_symlink_to_file_against_own_head_is_equivalent(repo, key):
+    """The reverse pair: origin/master holds a symlink, the branch turns it into a file."""
+    sh(repo, "checkout", "-q", "master")
+    _commit_symlink(repo, "h.lnk", "f.txt", "seed a symlink on master")
+    sh(repo, "push", "-q", "origin", "master")
+    sh(repo, "checkout", "-q", "feat")
+    sh(repo, "fetch", "-q", "origin")
+    sh(repo, "reset", "-q", "--hard", "origin/master")
+    (Path(repo) / "h.lnk").unlink()  # write_text would follow the link into f.txt
+    _commit(repo, "h.lnk", text(["H1", "H2"]), "h.lnk becomes a regular file")
+    capture_pre(repo, key)
+    pre = Path(f"/tmp/pr-ready-diff-pre-{key}.patch").read_text()
+    assert "deleted file mode 120000" in pre and "new file mode 100644" in pre
+    rc, out = run_lostwork(repo, key)
+    assert rc == 0
+    assert "LOST:" not in out
+    assert "CHECKED: files=2 added=2 deleted=1" in out
+    assert last_line(out) == "TREE-EQUIVALENT"
+
+
+def test_type_change_resolved_to_old_regular_file_diverges(repo, key):
+    """Negative: the resolver kept the old regular file. HEAD mode 100644 differs from the
+    create header's 120000, so the delete half is a lost deletion and the create half's
+    added line is missing. Both LOST lines must print."""
+    _commit(repo, "f.txt", text(f_with(b=["B1"])), "unrelated edit keeps POST non-empty")
+    _commit_symlink(repo, "g.txt", "f.txt", "g.txt becomes a symlink")
+    capture_pre(repo, key)
+    (Path(repo) / "g.txt").unlink()
+    _commit(repo, "g.txt", text(BASE_G), "resolution kept the regular file")
+    rc, out = run_lostwork(repo, key)
+    assert rc == 0
+    assert "LOST: deletion lost, still at HEAD: g.txt" in out
+    assert "LOST: g.txt: +f.txt" in out
+    assert last_line(out) == DIVERGED
+
+
+def test_type_change_pair_with_retargeted_symlink_diverges(repo, key):
+    """Mode equality alone is not enough: HEAD is a symlink (delete half honoured) but it
+    points elsewhere, so the create half's content check still reports the lost line."""
+    _commit(repo, "f.txt", text(f_with(b=["B1"])), "unrelated edit keeps POST non-empty")
+    _commit_symlink(repo, "g.txt", "f.txt", "g.txt becomes a symlink")
+    capture_pre(repo, key)
+    _commit_symlink(repo, "g.txt", "elsewhere.txt", "resolution retargeted the link")
+    rc, out = run_lostwork(repo, key)
+    assert rc == 0
+    assert "deletion lost" not in out
+    assert "LOST: g.txt: +f.txt" in out
+    assert last_line(out) == DIVERGED
+
+
+def test_deleted_file_with_unrelated_new_file_diverges(repo, key):
+    """A real deletion next to an unrelated new file: the create lookup is keyed by path,
+    so n.txt's `M` record must not excuse g.txt's lost deletion."""
+    _commit(repo, "n.txt", text(["N1"]), "new file elsewhere")
+    sh(repo, "rm", "-q", "g.txt")
+    sh(repo, "commit", "-q", "-m", "delete g.txt")
+    capture_pre(repo, key)
+    _commit(repo, "g.txt", text(BASE_G), "resolution restored g.txt")
+    rc, out = run_lostwork(repo, key)
+    assert rc == 0
+    assert "LOST: deletion lost, still at HEAD: g.txt" in out
+    assert last_line(out) == DIVERGED
+
+
 def test_both_sides_edited_same_line_blocks(repo, key):
     # Fail-closed ambiguity (documented in the ADR): a conflict resolved to a third
     # value drops the branch's own line, and the proof cannot tell that from a loss.

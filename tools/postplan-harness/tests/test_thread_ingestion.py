@@ -569,3 +569,19 @@ def test_run_thread_ingestion_logging_fault_keeps_result(tmp_path, monkeypatch):
         assert result[key] == baseline[key]
     assert os.path.exists(os.path.join(str(tmp_path), "thread-ingestion.json"))
     assert any(line.startswith("outcome-log: phase4.5 logging failed") for line in lines)
+
+
+def test_review_threads_all_uses_prf_review_threads(tmp_path, monkeypatch):
+    """Mutation caught: swapping the function names in the two helper calls."""
+    argvs = []
+
+    def _spy(argv, *a, **k):
+        argvs.append(argv)
+        return subprocess.CompletedProcess(args=argv, returncode=0, stdout='{"commentId": 1}\n', stderr="")
+
+    monkeypatch.setattr("harness.adapters.llm._run_reaped", _spy)
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    assert gh.review_threads_all(PR) == [{"commentId": 1}]
+    assert gh.trusted_open_threads(PR) == [{"commentId": 1}]
+    assert "prf_review_threads" in argvs[0] and "list_trusted_open_threads" not in argvs[0]
+    assert "list_trusted_open_threads" in argvs[1] and "prf_review_threads" not in argvs[1]

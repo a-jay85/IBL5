@@ -356,3 +356,51 @@ def test_thread_ingestion_phase_unwritable_outcome_log_keeps_counts(tmp_path, mo
 
     assert result["fixed"] == 1
     assert "error" not in result
+
+
+def _sweep_gh(tmp_path, all_threads, trusted):
+    return RecordingGh(str(tmp_path), {"trusted_threads": trusted, "all_threads": all_threads,
+                                       "pr_number": 1})
+
+
+def _sweep_thread(cid, **kw):
+    base = {"commentId": cid, "path": "a.php", "line": 3, "body": "Bug", "score": 85,
+            "agent": "B", "authorLogin": "a-jay85", "authorType": "User",
+            "isResolved": False, "isOutdated": False}
+    base.update(kw)
+    return base
+
+
+def test_sweep_runs_after_ingestion_and_skips_just_declined(tmp_path, monkeypatch):
+    """Mutation caught: moving the sweep above run_thread_ingestion makes thread 7
+    log as resolved-no-reply from the sweep."""
+    import json
+
+    from harness.adapters.llm import FixtureLlm
+    from harness.thread_ingestion import PURPOSE
+
+    t7 = _sweep_thread(7)
+    gh = _sweep_gh(tmp_path, [_sweep_thread(7, isResolved=True),
+                              _sweep_thread(8, isOutdated=True)], [t7])
+    llm = FixtureLlm(_ledger(), {PURPOSE: '{"verdict":"DECLINE","reason":"ok","category":"wrong"}'})
+    log_path = tmp_path / "o.jsonl"
+
+    runner._run_thread_ingestion_phase(
+        gh, llm, _git(), str(tmp_path), 1, {7}, str(tmp_path), _log(), _res(),
+        outcome_log_path=str(log_path))
+
+    events = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert [(e["findingId"], e["source"]) for e in events] == [(7, "phase4.5"), (8, "sweep")]
+
+
+def test_sweep_adapter_failure_keeps_result(tmp_path, monkeypatch):
+    class _BoomGh(RecordingGh):
+        def review_threads_all(self, pr):
+            raise RuntimeError("graphql down")
+
+    gh = _BoomGh(str(tmp_path), {"trusted_threads": [], "pr_number": 1})
+    result = runner._run_thread_ingestion_phase(
+        gh, None, _git(), str(tmp_path), 1, set(), str(tmp_path), _log(), _res(),
+        outcome_log_path=str(tmp_path / "o.jsonl"))
+    assert result["found"] == 0
+    assert "error" not in result

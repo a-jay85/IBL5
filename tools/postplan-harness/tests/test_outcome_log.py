@@ -118,3 +118,55 @@ def test_read_events_skips_corrupt_and_foreign_version(tmp_path):
     good = _ev()
     path.write_text(json.dumps(good) + "\n" + '{"v": 1, "pr"' + "\n" + '{"v": 2}\n\n')
     assert ol.read_events(str(path)) == [good]
+
+
+# ---------------------------------------------------------------------------
+# Sweep (resolved / outdated findings that Phase 4.5 never answered)
+# ---------------------------------------------------------------------------
+
+def _th(cid, **kw):
+    base = {"commentId": cid, "score": 82, "agent": "B", "authorLogin": "a-jay85",
+            "authorType": "User", "isResolved": False, "isOutdated": False}
+    base.update(kw)
+    return base
+
+
+def test_sweep_outdated_is_fixed():
+    events = ol.sweep_events([_th(1, isOutdated=True, isResolved=True)], 9, set(), pipeline="harness")
+    assert [(e["outcome"], e["basis"], e["source"]) for e in events] == [("fixed", "outdated", "sweep")]
+    assert events[0]["score"] == 82 and events[0]["agent"] == "B"
+
+
+def test_sweep_resolved_not_outdated_is_didnt_matter():
+    events = ol.sweep_events([_th(1, isResolved=True)], 9, set(), pipeline="harness")
+    assert [(e["outcome"], e["basis"]) for e in events] == [("didnt-matter", "resolved-no-reply")]
+
+
+def test_sweep_open_thread_logs_nothing():
+    assert ol.sweep_events([_th(1)], 9, set(), pipeline="harness") == []
+
+
+def test_sweep_skips_unscored_and_untrusted():
+    threads = [_th(1, score=None, isOutdated=True),
+               _th(2, isOutdated=True, authorLogin="mallory", authorType="User")]
+    assert ol.sweep_events(threads, 9, set(), pipeline="harness") == []
+
+
+def test_sweep_skips_seen_ids():
+    threads = [_th(101, isOutdated=True), _th(102, isOutdated=True)]
+    events = ol.sweep_events(threads, 9, {101}, pipeline="harness")
+    assert [e["findingId"] for e in events] == [102]
+
+
+def test_run_sweep_twice_is_idempotent(tmp_path):
+    path = str(tmp_path / "o.jsonl")
+    rows = [_th(1, isOutdated=True), _th(2, isResolved=True), _th(3)]
+    assert ol.run_sweep(rows, 9, path, lambda m: None, pipeline="harness") == 2
+    assert ol.run_sweep(rows, 9, path, lambda m: None, pipeline="harness") == 0
+    assert sorted(e["findingId"] for e in ol.read_events(path)) == [1, 2]
+
+
+def test_run_sweep_unreadable_log_never_raises(tmp_path):
+    seen = []
+    assert ol.run_sweep([_th(1, isOutdated=True)], 9, str(tmp_path), seen.append, pipeline="harness") == 0
+    assert any("outcome-log: sweep failed" in m for m in seen)

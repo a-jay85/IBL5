@@ -1203,6 +1203,13 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
         log(f"phase4.5: thread ingestion failed ({e!r}); continuing")
         out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
                "error": _redact(repr(e))}
+    if outcome_log_path:
+        try:
+            rows = gh.review_threads_all(pr)
+            if rows is not None:
+                outcome_log.run_sweep(rows, pr, outcome_log_path, log, pipeline="harness")
+        except Exception as e:  # noqa: BLE001 - outcome logging never affects the run
+            log(f"outcome-log: sweep fetch failed ({e!r}); continuing")
     log(f"phase4.5: {out.get('found', 0)} trusted thread(s) found, {out.get('fixed', 0)} fixed, "
         f"{out.get('declined', 0)} declined, {out.get('skipped', 0)} skipped (error) "
         f"in {time.monotonic() - t0:.2f}s")

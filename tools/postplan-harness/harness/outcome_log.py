@@ -105,7 +105,7 @@ def append_events(path, events, log) -> int:
 
 def read_events(path) -> list:
     """Parse the log; skip blank, corrupt, or foreign-version lines."""
-    if not os.path.isfile(path):
+    if not os.path.exists(path):
         return []
     events = []
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -120,3 +120,42 @@ def read_events(path) -> list:
             if isinstance(obj, dict) and obj.get("v") == SCHEMA_VERSION:
                 events.append(obj)
     return events
+
+
+def seen_finding_ids(path, pr) -> set:
+    return {e["findingId"] for e in read_events(path) if e.get("pr") == int(pr)}
+
+
+def sweep_events(threads, pr, seen, *, pipeline, now=None) -> list:
+    """Outcomes for findings Phase 4.5 never answered, from GitHub thread facts only."""
+    from .thread_ingestion import _is_trusted  # function-local: thread_ingestion imports this module
+    out = []
+    for t in threads or []:
+        cid = t.get("commentId")
+        if cid is None or t.get("score") is None:
+            continue  # no <!-- score --> marker: not a posted finding
+        if not _is_trusted(t.get("authorLogin") or "", t.get("authorType") or ""):
+            continue  # forged marker from an untrusted commenter
+        if int(cid) in seen:
+            continue  # already logged by 4.5 or an earlier sweep
+        if t.get("isOutdated"):
+            outcome, basis = "fixed", "outdated"
+        elif t.get("isResolved"):
+            outcome, basis = "didnt-matter", "resolved-no-reply"
+        else:
+            continue  # still open: no outcome yet
+        out.append(build_event(pr=pr, finding_id=cid, agent=t.get("agent"), score=t.get("score"),
+                               outcome=outcome, source="sweep", basis=basis,
+                               pipeline=pipeline, now=now))
+        seen.add(int(cid))
+    return out
+
+
+def run_sweep(threads, pr, path, log, *, pipeline) -> int:
+    """Log sweep events for unanswered findings. Never raises; returns events written."""
+    try:
+        seen = seen_finding_ids(path, pr)
+        return append_events(path, sweep_events(threads, pr, seen, pipeline=pipeline), log)
+    except Exception as e:  # noqa: BLE001 - logging must never change a run
+        log(f"outcome-log: sweep failed ({e!r}); continuing")
+        return 0

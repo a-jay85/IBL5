@@ -220,19 +220,12 @@ def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, l
         per_thread.append({"commentId": cid, "outcome": outcome, "sha": post_sha})
         if outcome_log_path and outcome in ("fixed", "declined") and thread_info.get("verdict"):
             try:
-                mapped = outcome_log.map_outcome(thread_info["verdict"], thread_info.get("category"))
-                if mapped is not None:
-                    category = thread_info.get("category")
-                    if thread_info["verdict"] == "FIX":
-                        basis = "fix-verdict"
-                    elif isinstance(category, str) and category in outcome_log.DECLINE_CATEGORIES:
-                        basis = category
-                    else:
-                        basis = "category-missing"
-                    events.append(outcome_log.build_event(
-                        pr=pr, finding_id=cid, agent=thread.get("agent"), score=thread.get("score"),
-                        outcome=mapped, source="phase4.5", basis=basis, pipeline="harness",
-                        reason=thread_info["reason"], sha=post_sha))
+                event = outcome_log.event_from_verdict(
+                    pr=pr, thread=thread, verdict=thread_info["verdict"],
+                    category=thread_info.get("category"), reason=thread_info["reason"],
+                    sha=post_sha, pipeline="harness")
+                if event is not None:
+                    events.append(event)
             except Exception as e:  # noqa: BLE001 - logging must never change the run result
                 log(f"outcome-log: phase4.5 logging failed ({e!r}); continuing")
 

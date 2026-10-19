@@ -10,6 +10,7 @@ import datetime
 import json
 import os
 import subprocess
+import sys
 
 SCHEMA_VERSION = 1
 LOG_BASENAME = "review-outcomes.jsonl"
@@ -64,6 +65,22 @@ def build_event(*, pr, finding_id, agent, score, outcome, source, basis, pipelin
         "reason": _clean_reason(reason),
         "sha": sha,
     }
+
+
+def event_from_verdict(*, pr, thread, verdict, category, reason, sha, pipeline):
+    """One Phase 4.5 event from a verdict and its thread row, or ``None`` to log nothing."""
+    mapped = map_outcome(verdict, category)
+    if mapped is None:
+        return None
+    if verdict == "FIX":
+        basis = "fix-verdict"
+    elif isinstance(category, str) and category in DECLINE_CATEGORIES:
+        basis = category
+    else:
+        basis = "category-missing"
+    return build_event(pr=pr, finding_id=thread.get("commentId"), agent=thread.get("agent"),
+                       score=thread.get("score"), outcome=mapped, source="phase4.5",
+                       basis=basis, pipeline=pipeline, reason=reason, sha=sha)
 
 
 def resolve_log_path(repo_dir, env=None) -> str:
@@ -159,3 +176,108 @@ def run_sweep(threads, pr, path, log, *, pipeline) -> int:
     except Exception as e:  # noqa: BLE001 - logging must never change a run
         log(f"outcome-log: sweep failed ({e!r}); continuing")
         return 0
+
+
+# ---------------------------------------------------------------------------
+# CLI (bin/review-outcomes wraps `python3 -m harness.outcome_log`)
+# ---------------------------------------------------------------------------
+
+USAGE = (
+    "usage: review-outcomes record --pr=N --verdicts=PATH --threads=PATH [--pipeline=skill|harness] [--log=PATH]\n"
+    "       review-outcomes sweep --pr=N [--pipeline=skill|harness] [--log=PATH]  (thread JSONL on stdin)\n"
+    "flags take the --flag=value form only"
+)
+_FLAGS = {
+    "record": {"pr", "verdicts", "threads", "pipeline", "log"},
+    "sweep": {"pr", "pipeline", "log"},
+}
+
+
+def _parse_flags(subcommand, args):
+    """``--flag=value`` only. Returns a dict, or ``None`` on any usage error."""
+    allowed = _FLAGS[subcommand]
+    flags = {}
+    for arg in args:
+        if not arg.startswith("--") or "=" not in arg:
+            return None
+        name, _, value = arg[2:].partition("=")
+        if name not in allowed:
+            return None
+        flags[name] = value
+    if not flags.get("pr", "").isdigit():
+        return None
+    if flags.get("pipeline", "skill") not in ("skill", "harness"):
+        return None
+    if subcommand == "record" and not (flags.get("verdicts") and flags.get("threads")):
+        return None
+    return flags
+
+
+def _read_jsonl_text(text) -> list:
+    rows = []
+    for raw in text.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            obj = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(obj, dict):
+            rows.append(obj)
+    return rows
+
+
+def _cli_record(flags, log) -> None:
+    pr = int(flags["pr"])
+    pipeline = flags.get("pipeline", "skill")
+    path = flags.get("log") or resolve_log_path(os.getcwd())
+    with open(flags["verdicts"], encoding="utf-8", errors="replace") as fh:
+        verdicts = _read_jsonl_text(fh.read())
+    with open(flags["threads"], encoding="utf-8", errors="replace") as fh:
+        threads = {t.get("commentId"): t for t in _read_jsonl_text(fh.read())}
+    events = []
+    for v in verdicts:
+        thread = threads.get(v.get("commentId"))
+        if thread is None:
+            continue  # a verdict for an id the thread file never listed is not logged
+        event = event_from_verdict(pr=pr, thread=thread, verdict=v.get("verdict"),
+                                   category=v.get("category"), reason=v.get("reason"),
+                                   sha=v.get("sha"), pipeline=pipeline)
+        if event is not None:
+            events.append(event)
+    if events:
+        append_events(path, events, log)
+
+
+def _cli_sweep(flags, log) -> None:
+    pr = int(flags["pr"])
+    path = flags.get("log") or resolve_log_path(os.getcwd())
+    rows = _read_jsonl_text(sys.stdin.read())
+    run_sweep(rows, pr, path, log, pipeline=flags.get("pipeline", "skill"))
+
+
+def main(argv=None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    handlers = {"record": _cli_record, "sweep": _cli_sweep}
+    if not argv or argv[0] not in handlers:
+        print(USAGE, file=sys.stderr)
+        return 2
+    subcommand = argv[0]
+    flags = _parse_flags(subcommand, argv[1:])
+    if flags is None:
+        print(USAGE, file=sys.stderr)
+        return 2
+
+    def log(msg):
+        print(msg, file=sys.stderr)
+
+    try:
+        handlers[subcommand](flags, log)
+    except Exception as e:  # noqa: BLE001 - logging must never fail the caller
+        print(f"review-outcomes: {subcommand} failed ({e!r})", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

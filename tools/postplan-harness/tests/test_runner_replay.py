@@ -1295,7 +1295,7 @@ def test_background_watch_is_reaped_on_harness_error(monkeypatch, tmp_path):
                         lambda bg, **k: reaped.append(bg))
 
     class _ExplodingReviewPhase:
-        def __init__(self, llm, gh):
+        def __init__(self, llm, gh, depth=None):
             pass
 
         def run(self, *a, **k):

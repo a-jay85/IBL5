@@ -25,7 +25,7 @@ from test_review_cache_hit import (ALPHA, BETA, CANNED_FINDINGS, FILES, FIXTURE,
 from test_runner_replay import DegradingLlm, ScriptedToolLlm, _verdict_doc
 
 # Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
-pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show", "standard_review_depth")
 
 REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
                    "security-audit", "score-findings")

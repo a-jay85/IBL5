@@ -21,7 +21,7 @@ from harness.state import Finding, TerminalState, UsageLedger
 from test_runner_replay import CANNED, _actions
 
 # Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
-pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show", "standard_review_depth")
 
 REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
                    "security-audit", "score-findings")

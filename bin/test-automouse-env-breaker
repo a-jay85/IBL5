@@ -281,6 +281,9 @@ export IBL5_USAGE_CLAUDE_PROJECTS="$E2_PROJECTS"
 # (IBL5-backlog#1375). Exported once so run_e2 and the direct P4/P4b/P5
 # launches all inherit it. The W1 canary-skipped check fails if it is removed.
 export AUTOMOUSE_SKIP_CANARY=1
+# Skip the login preflight's real probe. Its Tier 3 haiku call is a `claude -p` the
+# stub would log as an impl launch, and in wtrefuse mode it would eat a refusal.
+export AUTOMOUSE_LOGIN_PROBE_CMD="echo ok"
 printf '#!/bin/sh\nexit 1\n' > "$E2_STUB/security"
 chmod +x "$E2_STUB/security"
 E2_ARGS="$E2_ROOT/stub-args"
@@ -337,7 +340,7 @@ case "\${STUB_MODE:-}" in
     wtrefuse)
         # -p calls 1..STUB_WTREF_REFUSALS print Claude Code's resume refusal and exit 1
         # fast; the next -p call writes a handoff for STUB_WTREF_PLAN and succeeds.
-        # Other calls (the login preflight's `auth status`) take the default path.
+        # Other calls take the default path.
         if [ "\${1:-}" = "-p" ]; then
             n=\$(( \$(cat "$E2_WTREF_COUNT" 2>/dev/null || echo 0) + 1 ))
             printf '%s\n' "\$n" > "$E2_WTREF_COUNT"
@@ -651,7 +654,7 @@ run_wtref() {
     timeout 60 "$E2_RUNNER" --resume-paused "$1" > /dev/null 2>&1 || true
     rm -f "$E2_PROJECTS/default/$1.jsonl"
 }
-launches()       { grep -c '^ARGS -p ' "$E2_ARGS" 2>/dev/null || true; }  # skips the login preflight's auth call
+launches()       { grep -c '^ARGS -p ' "$E2_ARGS" 2>/dev/null || true; }  # only -p calls count
 env_stop_count() { find "$E2_NDIR/reports" -name "*-env-stop-$1.md" 2>/dev/null | wc -l | tr -d ' '; }
 REPO_REAL="$(cd "$REPO_ROOT" && pwd -P)"
 

@@ -207,9 +207,14 @@ if [ "$HEADLESS" = 1 ]; then
     fi
     [ "$(git -C "$WT" rev-parse HEAD)" = "$HEAD0" ] || fix_abort "session moved HEAD"
     [ "$LAST" = "RESOLVED" ] || fix_abort "session ended ${LAST:-without verdict}"
-    if git -C "$WT" grep -qE '^(<<<<<<< |=======$|>>>>>>> )' -- .; then
-        fix_abort "conflict markers remain"
-    fi
+    # Only the paths that were conflicted: a stray `=======` line in an
+    # unrelated tracked file (setext heading, fixture) is not a leftover marker.
+    while IFS= read -r p; do
+        [ -n "$p" ] && [ -f "$WT/$p" ] || continue
+        if grep -qE '^(<<<<<<< |=======$|>>>>>>> )' "$WT/$p"; then
+            fix_abort "conflict markers remain"
+        fi
+    done <<< "$CONFLICTED0"
     if [ -n "$(git -C "$WT" diff --name-only --diff-filter=U)" ]; then
         fix_abort "unresolved paths remain"
     fi

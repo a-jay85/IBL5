@@ -32,6 +32,15 @@ final class RivalriesController
     /**
      * @param array<mixed> $get
      */
+    public function main(array $get, ?string $userTeamKey, ?string $userGm): void
+    {
+        // @phpstan-ignore ibl.echoInNonView
+        echo $this->handle($get, $userTeamKey, $userGm);
+    }
+
+    /**
+     * @param array<mixed> $get
+     */
     public function handle(array $get, ?string $userTeamKey, ?string $userGm): string
     {
         $op = is_string($get['op'] ?? null) && in_array($get['op'], self::OPS, true) ? $get['op'] : 'index';

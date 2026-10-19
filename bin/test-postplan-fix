@@ -19,6 +19,9 @@
 #  11. Run from a linked worktree: the main checkout's out dir is still searched.
 #  12. env -i probe: no HOME, no Homebrew, bash with pipefail; POSTPLAN_LOG_DIR forwarded.
 #  13. POSTPLAN_LOG_DIR unset or empty: the private log dir is not read.
+#  14-24. --headless [--dry-run]: flag rejection, dry run, main-checkout refusal, dirty
+#      tree, resolve-and-commit, FAILED verdict, leftover markers, moved ref, clean merge,
+#      missing harness, env -i. Each prints one "case ok headless-<name>" line.
 #
 # Run: bin/test-postplan-fix  (exit 0 = all pass, 1 = a case failed)
 
@@ -56,6 +59,34 @@ for B in "$B_BLOCK" "$B_JSON" "$B_NORUN" "$B_BIG"; do
     git -C "$MAIN" worktree add -q -b "$B" "$TMP/wt-$B"
 done
 
+# Headless fixture: MAIN is on master with an origin remote. B_CONFLICT changes a.txt to
+# "feature"; master commits a.txt as "master" and pushes, so merging origin/master conflicts.
+# The denied-tool import needs harness/ under MAIN: only that package is linked, because a
+# link to the whole tools/ dir would aim the OUT fixtures below at the real checkout.
+git -C "$MAIN" branch -M master
+# A user-level rerere would replay case 18's resolution into the later cases.
+git -C "$MAIN" config rerere.enabled false
+B_CONFLICT="pfx$$-conflict"; B_CLEAN="pfx$$-clean"
+GITC=(git -c user.name=t -c user.email=t@t)
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
+mkdir -p "$MAIN/tools/postplan-harness"
+ln -s "$ROOT/tools/postplan-harness/harness" "$MAIN/tools/postplan-harness/harness"
+git clone -q --bare "$MAIN" "$TMP/origin.git"
+git -C "$MAIN" remote add origin "$TMP/origin.git"
+git -C "$MAIN" fetch -q origin
+INIT_SHA=$(git -C "$MAIN" rev-parse master)
+git -C "$MAIN" worktree add -q -b "$B_CONFLICT" "$TMP/wt-$B_CONFLICT" "$INIT_SHA"
+printf 'feature\n' > "$TMP/wt-$B_CONFLICT/a.txt"
+git -C "$TMP/wt-$B_CONFLICT" add a.txt
+"${GITC[@]}" -C "$TMP/wt-$B_CONFLICT" commit -qm feature
+printf 'master\n' > "$MAIN/a.txt"
+git -C "$MAIN" add a.txt
+"${GITC[@]}" -C "$MAIN" commit -qm master-change
+git -C "$MAIN" push -q origin master
+git -C "$MAIN" worktree add -q -b "$B_CLEAN" "$TMP/wt-$B_CLEAN" master
+# A pre-existing remote-tracking ref for the moved-ref case to disturb.
+git -C "$MAIN" update-ref "refs/remotes/origin/$B_CONFLICT" "$INIT_SHA"
+
 OUT="$MAIN/tools/postplan-harness/out"
 JSON_OUT="$TMP/wt-$B_JSON/tools/postplan-harness/out"
 mkdir -p "$OUT/live-$B_BLOCK-20261007-090000-1" "$OUT/live-$B_BLOCK-20261008-120000-2" \
@@ -82,6 +113,10 @@ cat > "$STUB/claude" <<STUBEOF
 pwd -P > "$TMP/claude.cwd"
 echo "\$#" > "$TMP/claude.argc"
 printf '%s' "\$1" > "$TMP/claude.prompt"
+printf '%s\n' "\$@" >> "$TMP/claude.args"
+# CLAUDE_STUB_EFFECT / CLAUDE_STUB_REPLY are test-only: a script to run, a file to print.
+if [ -n "\${CLAUDE_STUB_EFFECT-}" ]; then bash "\$CLAUDE_STUB_EFFECT"; fi
+if [ -n "\${CLAUDE_STUB_REPLY-}" ]; then cat "\$CLAUDE_STUB_REPLY"; fi
 exit 0
 STUBEOF
 cat > "$STUB/gh" <<STUBEOF
@@ -95,7 +130,7 @@ chmod +x "$STUB/claude" "$STUB/gh"
 # run_fix <script> <args...>: sets RC, ERR, STDOUT, PROMPT; clears the stub's records first.
 run_fix() {
     local script="$1"; shift
-    rm -f "$TMP/claude.cwd" "$TMP/claude.argc" "$TMP/claude.prompt" "$TMP/gh.called"
+    rm -f "$TMP/claude.cwd" "$TMP/claude.argc" "$TMP/claude.prompt" "$TMP/gh.called" "$TMP/claude.args"
     STDOUT=$(PATH="$STUB:$PATH" bash "$script" "$@" 2>"$TMP/err"); RC=$?
     ERR=$(cat "$TMP/err")
     PROMPT=""; [ -f "$TMP/claude.prompt" ] && PROMPT=$(cat "$TMP/claude.prompt")
@@ -211,5 +246,166 @@ run_fix "$SUT" "$B_BLOCK"
 rc_is "13: empty POSTPLAN_LOG_DIR still exits 0" "$RC" 0
 hasnt "13: empty var does not read the private log dir" "$PROMPT" "$RUNLOG"
 export POSTPLAN_LOG_DIR="$SAVED_RUNLOG_DIR"
+
+# --- headless rescue mode (--headless [--dry-run]) ---
+# Each case collects its checks with need() and reports once through h_pass as
+# "case ok headless-<name>" (or one h_fail naming every failed check).
+# Cases 14-24 start from the same state: B_CONFLICT at its feature tip, clean tree, and
+# origin/<B_CONFLICT> at the fixture's init commit.
+WTC="$TMP/wt-$B_CONFLICT"
+TIP=$(git -C "$WTC" rev-parse HEAD)
+WTP=$(git -C "$MAIN" worktree list --porcelain | awk -v b="refs/heads/$B_CONFLICT" '
+    /^worktree / { p = substr($0, 10) }
+    /^branch /   { if (substr($0, 8) == b && !f) { print p; f=1 } }
+')
+mkdir -p "$TMP/effects"
+hl_bad=""
+need() { local d="$1"; shift; if ! "$@"; then hl_bad+="$d; "; fi; }
+case_end() {
+    if [ -z "$hl_bad" ]; then h_pass "case ok $1"; else h_fail "$1" "$hl_bad"; fi
+    hl_bad=""
+}
+has_s() { case "$1" in *"$2"*) return 0 ;; esac; return 1; }
+ends_s() { case "$1" in *"$2") return 0 ;; esac; return 1; }
+no_args() { [ ! -e "$TMP/claude.args" ]; }
+hl_reset() {
+    git -C "$WTC" merge --abort >/dev/null 2>&1 || true
+    git -C "$WTC" reset -q --hard "$TIP"
+    git -C "$WTC" clean -fdq
+    git -C "$MAIN" update-ref "refs/remotes/origin/$B_CONFLICT" "$INIT_SHA"
+    unset CLAUDE_STUB_REPLY CLAUDE_STUB_EFFECT
+}
+no_merge() { ! git -C "$WTC" rev-parse -q --verify MERGE_HEAD >/dev/null; }
+origin_branch() { git --git-dir="$TMP/origin.git" rev-parse "refs/heads/$B_CONFLICT" 2>/dev/null || echo none; }
+printf 'SUMMARY: kept both\nRESOLVED\n' > "$TMP/reply-resolved"
+printf 'SUMMARY: gave up\nFAILED\n' > "$TMP/reply-failed"
+printf 'printf "feature\\nmaster\\n" > a.txt\ngit add a.txt\n' > "$TMP/effects/resolve.sh"
+printf 'git update-ref "refs/remotes/origin/%s" HEAD\n' "$B_CONFLICT" > "$TMP/effects/moveref.sh"
+
+# 14
+hl_reset
+for args in "--headless=1 x" "--dry-run x" "--bogus"; do
+    # shellcheck disable=SC2086
+    run_fix "$SUT" $args
+    need "rc 2 for '$args'" test "$RC" = 2
+    if has_s "$ERR" "unknown flag" || has_s "$ERR" "needs --headless"; then :; else hl_bad+="message for '$args'; "; fi
+    need "no stub call for '$args'" no_args
+done
+case_end headless-reject-forms
+
+# 15
+hl_reset
+ORIGIN0=$(git --git-dir="$TMP/origin.git" rev-parse refs/heads/master)
+REMOTE0=$(git -C "$WTC" rev-parse refs/remotes/origin/master)
+run_fix "$SUT" --headless --dry-run "$B_CONFLICT"
+need "rc 0" test "$RC" = 0
+need "no stub call" no_args
+need "origin.git unchanged" test "$(git --git-dir="$TMP/origin.git" rev-parse refs/heads/master)" = "$ORIGIN0"
+need "origin/master unchanged" test "$(git -C "$WTC" rev-parse refs/remotes/origin/master)" = "$REMOTE0"
+need "no MERGE_HEAD" no_merge
+# shellcheck disable=SC2088  # the prompt holds a literal ~/claude-plans/
+for tok in "argv:" "--model" "claude-sonnet-5-5" "--disallowedTools" "Bash(git push:*)" "Bash(gh:*)" \
+    "Bash(git -C:*)" "--max-budget-usd" "SUMMARY:" "RESOLVED" "FAILED" "Do NOT commit" "~/claude-plans/"; do
+    need "stdout has '$tok'" has_s "$STDOUT" "$tok"
+done
+case_end headless-dry-run
+
+# 16
+hl_reset
+run_fix "$SUT" --headless master
+need "rc 2" test "$RC" = 2
+need "message" has_s "$ERR" "refuses the main checkout"
+need "no stub call" no_args
+need "origin/master unchanged (no fetch)" test "$(git -C "$WTC" rev-parse refs/remotes/origin/master)" = "$REMOTE0"
+case_end headless-refuses-main
+
+# 17
+hl_reset
+printf 'x\n' > "$WTC/untracked.txt"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "message" has_s "$ERR" "worktree is dirty"
+need "no MERGE_HEAD" no_merge
+need "no stub call" no_args
+case_end headless-dirty-tree
+
+# 18
+hl_reset
+ORIGIN_BR0=$(origin_branch)
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/resolve.sh"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "merge commit parents" test "$(git -C "$WTC" log -1 --format=%P)" = "$TIP $(git -C "$WTC" rev-parse refs/remotes/origin/master)"
+need "origin branch unchanged" test "$(origin_branch)" = "$ORIGIN_BR0"
+need "stub cwd is the worktree" test "$(cat "$TMP/claude.cwd" 2>/dev/null)" = "$(cd "$WTC" && pwd -P)"
+need "stdout says nothing pushed" has_s "$STDOUT" "nothing pushed"
+need "stdout ends with the ship line" ends_s "$STDOUT" "cd $WTP && bin/post-plan-now"
+need "a.txt resolved" test "$(cat "$WTC/a.txt")" = "$(printf 'feature\nmaster')"
+case_end headless-resolves-and-commits
+
+# 19
+hl_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-failed"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "no MERGE_HEAD" no_merge
+need "HEAD is the branch tip" test "$(git -C "$WTC" rev-parse HEAD)" = "$TIP"
+need "a.txt is feature" test "$(cat "$WTC/a.txt")" = "feature"
+need "stderr names the verdict" has_s "$ERR" "session ended FAILED"
+case_end headless-failed-verdict
+
+# 20
+hl_reset
+printf 'RESOLVED\n' > "$TMP/reply-bare-resolved"
+export CLAUDE_STUB_REPLY="$TMP/reply-bare-resolved"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "stderr names the markers (got: $ERR)" has_s "$ERR" "conflict markers remain"
+need "no MERGE_HEAD" no_merge
+need "HEAD is the branch tip" test "$(git -C "$WTC" rev-parse HEAD)" = "$TIP"
+case_end headless-markers-remain
+
+# 21
+hl_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/moveref.sh"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "stderr names moved refs" has_s "$ERR" "session moved refs"
+need "ref restored" test "$(git -C "$WTC" rev-parse "refs/remotes/origin/$B_CONFLICT")" = "$INIT_SHA"
+need "no MERGE_HEAD" no_merge
+case_end headless-moved-ref
+
+# 22
+hl_reset
+run_fix "$SUT" --headless "$B_CLEAN"
+need "rc 0" test "$RC" = 0
+need "stdout says merges cleanly" has_s "$STDOUT" "merges cleanly"
+need "no stub call" no_args
+case_end headless-clean-merge
+
+# 23
+hl_reset
+MAIN2="$TMP/main2"
+git init -q "$MAIN2"
+mkdir -p "$MAIN2/bin"
+cp "$ROOT/bin/postplan-fix" "$MAIN2/bin/postplan-fix"
+cp -R "$ROOT/bin/lib" "$MAIN2/bin/lib"
+git -C "$MAIN2" add -A
+git -C "$MAIN2" commit -qm init
+git -C "$MAIN2" worktree add -q -b "$B_CONFLICT" "$TMP/wt2-$B_CONFLICT"
+run_fix "$MAIN2/bin/postplan-fix" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "message" has_s "$ERR" "denied-tool list unavailable"
+need "no stub call" no_args
+case_end headless-no-harness
+
+# 24
+hl_reset
+mkdir -p "$TMP/home"
+env -i PATH=/usr/bin:/bin HOME="$TMP/home" POSTPLAN_LOG_DIR="$RUNLOG" \
+    bash -o pipefail "$SUT" --headless --dry-run "$B_CONFLICT" >/dev/null 2>"$TMP/err"; RC=$?
+ERR=$(cat "$TMP/err")
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+case_end headless-env-i
 
 h_done

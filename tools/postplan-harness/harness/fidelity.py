@@ -689,8 +689,8 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
     filefix_note = (f"\n{fidelity_filefix.prompt_text(filefix.eligible)}\n"
                     if filefix.active else "")
 
-    procedure =_find_procedure(worktree, master_sha, REMEDIATION_PATHS,
-                               "remediation-procedure-missing")
+    procedure = _find_procedure(worktree, master_sha, REMEDIATION_PATHS,
+                                "remediation-procedure-missing")
     with open(os.path.join(packet_dir, "remediation.md"), "w") as fh:
         fh.write(procedure)
 

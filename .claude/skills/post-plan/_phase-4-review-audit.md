@@ -49,8 +49,8 @@ When the inputs do switch:
   Agent D and Agent E `awk` pre-slices below — becomes `$DELTA_FILE`. Both pre-slicers keep their
   existing `^diff --git` keys unchanged, because the delta artifact is emitted with
   `--unified=100000`, which preserves those headers.
-- Model tiers are untouched: Agents A/B/D stay `subagent_type: "sonnet-5-5"` with `model` omitted,
-  Agent C stays Haiku.
+- Delta mode does not change model tiers. They come from the review depth below: the standard
+  tier keeps Agents A/B/D on `subagent_type: "sonnet-5-5"` with `model` omitted and Agent C on Haiku.
 
 **Flag resolution for the launch gates.** The launch gates below name `$DELTA_*` flags. In delta
 mode, read each one literally from the command's stdout. **In full mode — the default — read each
@@ -95,12 +95,42 @@ Both counts and both path lists are printed even when zero — a `0` is the info
 
 **Reuse conformance (Agent A only, when `PLAN_FOUND` and `$HAS_PLAN_REUSE`):** extract the plan's Reuse notes from `$PLAN_FILE` and append them to Agent A's prompt under a `PLANNED REUSE:` heading, instructing it to flag any step that hand-rolled logic the plan directed it to reuse (e.g. plan named `SalaryCapRepository::getTeamTotalSalary()`, impl wrote a raw query). This turns Section 1's open-ended architectural judgment into a concrete conformance check.
 
+**Review depth.** Resolve it before the model tiers and launch gates. The PR body's `**Merge danger:**`
+line picks the depth. Run yourself, with `<N>` and `<MASTER_SHA>` as in the delta block above:
+
+```bash
+# phase 4 review-depth
+if git show <MASTER_SHA>:bin/lib/review-depth.sh > /tmp/post-plan-depth-<N>.sh 2>/dev/null \
+   && test -s /tmp/post-plan-depth-<N>.sh; then
+  if body=$(gh pr view <N> --json body --jq '.body'); then
+    printf '%s\n' "$body" | bash /tmp/post-plan-depth-<N>.sh || echo "deep SCRIPT-FAILED"
+  else
+    bash /tmp/post-plan-depth-<N>.sh --unreadable
+  fi
+else
+  echo "deep PIN-UNAVAILABLE"
+fi
+```
+
+Print the line. `$REVIEW_DEPTH` is `standard` only when the first word is the literal `standard`.
+Any other output is `deep`: a `deep` line, an empty line, or a failed command. The script maps
+Door one-way, Blast radius site-wide or external, and a missing, malformed, or unreadable line
+to `deep`. Master's copy runs for the same reason as `skip-review.sh`: a PR cannot lower its own
+review depth. Deep only adds review. It never skips an agent the standard tier launches.
+
 **Model tiers:**
 
 - Agent A (Architecture + Bug detection + DB performance): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`)
 - Agent B (Git history + Code comments): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`)
 - Agent C (Previous PRs): **Haiku**
 - Agent D (E2E specs: POST-effect + assertion discrimination + coverage-branch): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`)
+- Deep tier (`$REVIEW_DEPTH` is `deep`): launch Agent A with `subagent_type: "sonnet-5-5"` and `model: "opus"`. An explicit `model` overrides the def's Sonnet pin, so Agent A runs on Opus. Agents B, C, D and E keep the tiers above.
+
+**Deep-tier gate overrides** (only when `$REVIEW_DEPTH` is `deep`; the standard tier reads every gate below as written):
+
+- Agent B: the history sub-gate passes whenever `! $DELTA_NON_CODE_ONLY`, ignoring `$DELTA_HAS_PHP` and the 50-line test. Tell the agent to cover the files with the most changed lines, of any language.
+- Agent C: drop the `$DELTA_LINES_PHP_CHANGED <= 50` clause. Still skip on `$DELTA_NON_CODE_ONLY` or `! $DELTA_HAS_MODIFIED`.
+- Agents A, D and E: gates unchanged.
 
 **Launch gates** (resolve each `$DELTA_*` name per the flag-resolution rule above — skip the launch entirely, don't let the agent exit early):
 
@@ -150,7 +180,7 @@ Read `.claude/review-shared/_shell-workflow-agent.md` for the canonical Agent E 
 
 **Read** `.claude/review-shared/_security-agents.md` — the canonical security agent definition and pattern-detection bash block.
 
-Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Sonnet 5.5 agent** (`subagent_type: "sonnet-5-5"`, omit `model`) with the categories line and the PHP-only subset of `$DIFF`. Do not forward CLAUDE.md content (auto-loaded).
+Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Sonnet 5.5 agent** (`subagent_type: "sonnet-5-5"`, omit `model`) with the categories line and the PHP-only subset of `$DIFF`. Do not forward CLAUDE.md content (auto-loaded). In the deep tier, launch it on Opus (`subagent_type: "sonnet-5-5"` with `model: "opus"`) in place of Sonnet 5.5. The `! $HAS_PHP` skip above is unchanged.
 
 **Plan-backed mode (when `PLAN_FOUND` and `$HAS_PLAN_SECURITY`):** the plan already declares each touched surface and its intended defense. Pass the plan's Security section to the agent as an `EXPECTED DEFENSES:` checklist and instruct it to (a) confirm each planned defense is present in the diff and (b) flag any state-changing surface the plan did *not* anticipate. You may build `CATEGORIES:` directly from the plan's declared surfaces instead of running the pattern-detection grep. This shifts the audit from discovery to verification — it catches "CSRF was planned but the impl omitted it" and cuts the false positives blind pattern-matching produces.
 

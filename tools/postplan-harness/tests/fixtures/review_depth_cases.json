@@ -98,5 +98,15 @@
     "id": "ascii-separator",
     "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way - Blast radius: localized - Why: mechanical: no one-way trigger in the realized diff\n",
     "depth": "deep"
+  },
+  {
+    "id": "short-why-multibyte",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: ééééééééééééééééééé\n",
+    "depth": "deep"
+  },
+  {
+    "id": "why-20-multibyte",
+    "body": "Intro paragraph.\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: éééééééééééééééééééé\n",
+    "depth": "standard"
   }
 ]

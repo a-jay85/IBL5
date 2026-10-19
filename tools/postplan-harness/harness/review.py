@@ -239,10 +239,11 @@ class ReviewPhase:
 
         # Build the list of independent agent tasks (preserved submission order so that
         # finding indices are deterministic for the scorer's n=1..N mapping).
-        deep_model = "opus" if self.depth == DEEP else "sonnet"
+        # The "purpose", "sonnet" literals below are pinned by reviewcache.MODEL_PINS (greped by
+        # test_model_pins_match_source), so the deep switch stays inline with them.
         tasks: list[tuple[str, str, str, str, str]] = []
         if gates["A"]:
-            tasks.append(("A", "code-review", "review-agent-a", deep_model,
+            tasks.append(("A", "code-review", "review-agent-a", "sonnet" if self.depth != DEEP else "opus",
                           agent_a_prompt(meta, cls, plan)))
         if gates["B"]:
             tasks.append(("B", "code-review", "review-agent-b", "sonnet",
@@ -254,7 +255,7 @@ class ReviewPhase:
             tasks.append(("D", "code-review", "review-agent-d", "sonnet",
                           agent_d_prompt(meta, cls)))
         if gates["security"]:
-            tasks.append(("security", "security-audit", "security-audit", deep_model,
+            tasks.append(("security", "security-audit", "security-audit", "sonnet" if self.depth != DEEP else "opus",
                           security_prompt(meta, cls, plan)))
 
         def _call_agent(task: tuple[str, str, str, str, str]):

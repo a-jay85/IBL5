@@ -147,7 +147,7 @@ def test_surface_hash_model_map_edit_changes(tmp_path):
     root = _surface_tree(tmp_path)
     before = re_.surface_hash_worktree(root)
     llm = root / re_.MODEL_MAP_SOURCE
-    llm.write_text(LLM_PY.replace('"claude-sonnet-5-5"', '"claude-sonnet-5-6"'))
+    llm.write_text(LLM_PY.replace('"claude-sonnet-5-5"', '"claude-opus-5-5"'))
     assert re_.surface_hash_worktree(root) != before
 
 

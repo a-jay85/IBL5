@@ -57,7 +57,7 @@ When the hash changed, run this from the worktree:
 bin/reviewer-eval compare
 ```
 
-It scores the base tree and the head tree with one shared cache and prints two lines. Paste both into the PR body. The check requires that the before line matches the base hash, the after line matches the head hash and the head corpus digest, and the after line shows `degraded=0`. It fails when the after score is worse than the before score.
+It scores the base tree and the head tree with one shared cache and prints two lines. Paste both into the PR body. The check requires that the before line matches the base hash, the after line matches the head hash, both lines match the head corpus digest, and both show `degraded=0`. It fails when the after score is worse than the before score.
 
 Two waivers go in the PR body as HTML comments. Each needs a reason of 15 or more characters.
 
@@ -74,7 +74,7 @@ One run is a sample. LLM output varies between runs. Rerun a borderline comparis
 
 Recorded 2026-10-19 on review surface `v=16345a91e105`. The dry run estimated 62 model calls, and the live run made 45.
 
-No finding survived the reviewer's threshold on any case. A spot check of `saved-dc-sum-is-int` shows agents A and B both naming the defect at line 312, and the scorer gave each finding 75. `CODE_THRESHOLD` in `tools/postplan-harness/harness/review.py` is 80, so both were dropped. The zero recall measures the scorer and the threshold together.
+No finding survived the reviewer's threshold on any case. An unrecorded spot check of `saved-dc-sum-is-int` suggested agents A and B named the defect at line 312 and the scorer rated each finding below `CODE_THRESHOLD` (80, in `tools/postplan-harness/harness/review.py`). No artifact keeps those pre-threshold scores, because the cache stores only surviving findings. Treat that as unverified. The zero recall may reflect the scorer and the threshold together.
 
 ```
 case depth-chart-log-after-commit bug MISS findings=0 file_only=0

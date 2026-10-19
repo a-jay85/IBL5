@@ -29,7 +29,9 @@ trap 'rm -rf "$TMPD"' EXIT
 REC="$TMPD/records"; HF="$TMPD/head"; HFP="$TMPD/head-patterns"; MF="$TMPD/master"
 ADDS="$TMPD/adds"; DELS="$TMPD/dels"; MISS="$TMPD/missing"; KEEP="$TMPD/dels-checked"
 # One pass over $PRE. Records: `F<old>\t<new>` opens an entry, `+<line>`/`-<line>` are its
-# significant changed lines, `B` marks it binary. Exit 3 = git-quoted path, 4 = an entry
+# significant changed lines, `B` marks it binary, `M<path>\t<mode>` carries the six-digit
+# mode of an entry with a `new file mode` header (used by the delete arm to recognise a
+# type-change pair). Exit 3 = git-quoted path, 4 = an entry
 # whose paths cannot be read. An entry with no ---/+++ lines (binary, empty new file,
 # mode-only, pure rename) takes its paths from the rename/copy headers or from a
 # `diff --git a/P b/P` line whose two halves match; anything else is unparseable.
@@ -57,12 +59,13 @@ function finish(   n, k) {
     }
     print "F" oldp "\t" newp
   }
+  if (isnew && newmode != "") print "M" newp "\t" newmode
   if (bin) print "B"
 }
 /^diff --git / {
   finish()
   inent = 1; emitted = 0; latch = 0; bin = 0; isnew = 0; isdel = 0; seenold = 0
-  oldp = ""; newp = ""; rfrom = ""; rto = ""
+  oldp = ""; newp = ""; rfrom = ""; rto = ""; newmode = ""
   dg = substr($0, 12)
   if (substr(dg, 1, 1) == "\"") fail(3)
   next
@@ -82,7 +85,11 @@ latch {
 }
 /^(rename|copy) from / { p = $0; sub(/^(rename|copy) from /, "", p); if (substr(p, 1, 1) == "\"") fail(3); rfrom = p; next }
 /^(rename|copy) to / { p = $0; sub(/^(rename|copy) to /, "", p); if (substr(p, 1, 1) == "\"") fail(3); rto = p; next }
-/^new file mode / { isnew = 1; next }
+/^new file mode / {
+  isnew = 1; newmode = substr($0, 15)
+  if (newmode !~ /^[0-7][0-7][0-7][0-7][0-7][0-7]$/) fail(4)
+  next
+}
 /^deleted file mode / { isdel = 1; next }
 /^Binary files / || /^GIT binary patch/ { bin = 1; next }
 END { if (dead) exit dead; finish() }
@@ -93,6 +100,10 @@ case "$AWKRC" in
   4) echo "TREE DIVERGED — unparseable entry in $PRE"; exit 1 ;;
   *) echo "TREE DIVERGED — could not parse $PRE"; exit 1 ;;
 esac
+# Pre-pass: paths this patch creates, with the mode the create header recorded. The delete
+# half of a type-change pair runs before its create half, so the lookup is built up front.
+CREATED="$TMPD/created"
+LC_ALL=C grep '^M' "$REC" | cut -c2- > "$CREATED" || :
 NFILES=0; NADD=0; NDEL=0; LOST=0
 HAVE=0; OLDP=""; NEWP=""; BIN=0
 lost() { echo "LOST: $*"; LOST=$((LOST + 1)); }
@@ -135,11 +146,22 @@ lw_neon() {
   ' "$exempt" "$file"
 }
 check_entry() {
-  local rc L h m p HC MC
+  local rc L h m p HC MC cm hm
   [ "$HAVE" -eq 1 ] || return 0
   NFILES=$((NFILES + 1))
   if [ "$NEWP" = /dev/null ]; then
-    if git cat-file -e "HEAD:$OLDP" 2>/dev/null; then lost "deletion lost, still at HEAD: $OLDP"; fi
+    if git cat-file -e "HEAD:$OLDP" 2>/dev/null; then
+      # Type-change pair: `git diff` writes a regular-file<->symlink change as a delete of
+      # the old path plus a create of the same path, so the delete half alone reads as a
+      # lost deletion. It is honoured only when this patch also creates the path and
+      # HEAD's mode equals the mode the create header recorded; the create entry's own
+      # content check still runs. Any other mode, or no create entry, is a lost deletion.
+      cm=$(LC_ALL=C awk -F'\t' -v p="$OLDP" '$1 == p { print $2; exit }' "$CREATED")
+      hm=$(git ls-tree HEAD -- "$OLDP" 2>/dev/null | cut -d' ' -f1)
+      if [ -z "$cm" ] || [ -z "$hm" ] || [ "$cm" != "$hm" ]; then
+        lost "deletion lost, still at HEAD: $OLDP"
+      fi
+    fi
     return 0
   fi
   git cat-file -e "HEAD:$NEWP" 2>/dev/null || { lost "file missing at HEAD: $NEWP"; return 0; }
@@ -234,6 +256,7 @@ while IFS= read -r rec; do
        OLDP=${body%%$'\t'*}; NEWP=${body#*$'\t'}; BIN=0; HAVE=1
        : > "$ADDS"; : > "$DELS" ;;
     B) BIN=1 ;;
+    M) ;;  # consumed by the pre-pass above
     +) printf '%s\n' "$body" >> "$ADDS"; NADD=$((NADD + 1)) ;;
     -) printf '%s\n' "$body" >> "$DELS"; NDEL=$((NDEL + 1)) ;;
     *) echo "TREE DIVERGED — unexpected record from the $PRE parser"; exit 1 ;;

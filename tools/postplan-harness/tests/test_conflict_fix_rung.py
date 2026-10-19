@@ -10,6 +10,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -110,6 +112,16 @@ def test_fix_rung_failed_verdict_resets_tree(tmp_path, key):
     out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
     assert out.rung == ""
     assert out.trail[0].startswith("sonnet-fix: session ended FAILED")
+    _assert_untouched(d, merge)
+
+
+@pytest.mark.parametrize("verdict", ["**RESOLVED**", "RESOLVED."])
+def test_fix_rung_decorated_verdict_is_not_resolved(tmp_path, key, verdict):
+    d, pre, master, merge, llm, ctx, _ = _fix_ladder(
+        tmp_path, key, f"SUMMARY: restored keep-me\n{verdict}", _edit_keepme)
+    out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
+    assert out.rung == ""
+    assert out.trail[0].startswith("sonnet-fix: session ended ")
     _assert_untouched(d, merge)
 
 
@@ -290,8 +302,6 @@ def test_fix_prompt_names_remit_and_tests(tmp_path, key):
 
 import ast  # noqa: E402
 
-import pytest  # noqa: E402
-
 import runner  # noqa: E402
 from harness.adapters.gitad import LiveGit, lostwork_pre_path  # noqa: E402
 from harness.conflict_ladder import LadderOutcome  # noqa: E402
@@ -312,6 +322,7 @@ _HARNESS_ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_livegit_state_dir_defaults_empty(tmp_path):
+    # LiveGit.state_dir stays "" unless the caller passes one; "" makes the rung skip.
     assert LiveGit(str(tmp_path)).state_dir == ""
     assert LiveGit(str(tmp_path), state_dir="/x").state_dir == "/x"
 

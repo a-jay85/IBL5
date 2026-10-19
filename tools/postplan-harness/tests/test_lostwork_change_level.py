@@ -56,6 +56,16 @@ def _commit(d, path, body, message):
     sh(d, "commit", "-q", "-m", message)
 
 
+def _commit_symlink(d, path, target, message):
+    """Replace `path` with a symlink to `target` (a regular-file -> symlink type change)."""
+    p = Path(d) / path
+    if p.is_symlink() or p.exists():
+        p.unlink()
+    os.symlink(target, p)
+    sh(d, "add", "-A")
+    sh(d, "commit", "-q", "-m", message)
+
+
 def text(lines):
     return "\n".join(lines) + "\n"
 
@@ -255,6 +265,21 @@ def test_deleted_file_still_present_diverges(repo, key):
     assert rc == 0
     assert "LOST: deletion lost, still at HEAD: g.txt" in out
     assert "TREE DIVERGED" in out
+
+
+def test_type_change_file_to_symlink_against_own_head_is_equivalent(repo, key):
+    """PR #3105: `git diff` emits a type change as a delete+create pair on one path.
+    The delete half must not read as a lost deletion when HEAD holds the new type."""
+    _commit_symlink(repo, "g.txt", "f.txt", "g.txt becomes a symlink")
+    capture_pre(repo, key)
+    pre = Path(f"/tmp/pr-ready-diff-pre-{key}.patch").read_text()
+    assert pre.count("diff --git a/g.txt b/g.txt") == 2  # delete half + create half
+    assert "deleted file mode 100644" in pre and "new file mode 120000" in pre
+    rc, out = run_lostwork(repo, key)
+    assert rc == 0
+    assert "LOST: deletion lost, still at HEAD: g.txt" not in out
+    assert "CHECKED: files=2 added=1 deleted=5" in out
+    assert last_line(out) == "TREE-EQUIVALENT"
 
 
 def test_both_sides_edited_same_line_blocks(repo, key):

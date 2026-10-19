@@ -10,15 +10,21 @@ import argparse
 import datetime
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Optional, Sequence
+from typing import Callable, Iterable, Optional, Sequence, TextIO
 
-from .state import Finding
+from . import schemas
+from .adapters.llm import ClaudeCli, FixtureLlm
+from .classify import classify, files_from_diff, modified_files_from_diff
+from .review import ReviewPhase, scoring_prompt
+from .state import Classification, Finding, HarnessError, PlanInfo, UsageLedger
 
 # ---------------------------------------------------------------------------
 # Phase 1: pure scoring core
@@ -548,6 +554,225 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# Phase 4: run and smoke
+# ---------------------------------------------------------------------------
+
+DEFAULT_CACHE_REL = "tools/postplan-harness/out/reviewer-eval/cache"
+_TRAILING_PR_RE = re.compile(r"\s*\(#(\d+)\)\s*$")
+_AGENT_GATES = ("A", "B", "D", "security")
+
+
+class NullGh:
+    """Swallows the two posting calls the reviewer makes; any other gh call raises."""
+
+    def post_review_findings(self, *a, **k):
+        return None
+
+    def post_review_summary(self, *a, **k):
+        return None
+
+
+def case_input(root: Path, commit: str) -> tuple[dict, Classification]:
+    r = _gitt(root, "diff", "--no-color", "--no-ext-diff", f"{commit}^", commit)
+    if r.returncode != 0:
+        raise EvalUsageError(f"git diff failed for {commit}: {r.stderr.strip()}")
+    diff = r.stdout
+    if not diff.strip():
+        raise EvalUsageError(f"empty diff for {commit}")
+    cls = classify(files_from_diff(diff), diff, modified_files_from_diff(diff))
+    subj = subject(root, commit)
+    m = _TRAILING_PR_RE.search(subj)
+    meta = {"number": int(m.group(1)) if m else 0,
+            "title": _TRAILING_PR_RE.sub("", subj),
+            "headRefOid": commit}
+    return meta, cls
+
+
+def case_digest(case: dict, kind: str) -> str:
+    blob = json.dumps({"kind": kind, "commit": case["commit"],
+                       "expected": case.get("expected", [])}, sort_keys=True)
+    return hashlib.sha256(blob.encode()).hexdigest()[:12]
+
+
+class _CountingLlm:
+    """Counts the calls a case actually makes through the wrapped llm."""
+
+    def __init__(self, inner: object):
+        self._inner = inner
+        self._lock = threading.Lock()
+        self.calls = 0
+
+    def call(self, *a, **k):
+        with self._lock:
+            self.calls += 1
+        return self._inner.call(*a, **k)  # type: ignore[attr-defined]
+
+
+def _load_cached(path: Path) -> Optional[tuple[list[Finding], list[str]]]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        findings = [Finding(source=f["source"], agent=f["agent"], path=f["path"],
+                            line=int(f["line"]), body="", score=f["score"])
+                    for f in data["findings"]]
+        degraded = [str(d) for d in data["degraded"]]
+        return findings, degraded
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def _write_cache(path: Path, findings: Sequence[Finding]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"findings": [{"source": f.source, "agent": f.agent, "path": f.path,
+                             "line": f.line, "score": f.score} for f in findings],
+               "degraded": []}
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
+             llm_factory: Callable[[str], object], cache_dir: Optional[Path],
+             dry_run: bool, out: TextIO) -> int:
+    known = {c["id"] for c in corpus["cases"]} | {c["id"] for c in corpus["clean"]}
+    if case_ids is not None:
+        unknown = sorted(case_ids - known)
+        if unknown:
+            raise EvalUsageError(f"unknown case id(s): {', '.join(unknown)}")
+
+    def wanted(c: dict) -> bool:
+        return case_ids is None or c["id"] in case_ids
+
+    bug_cases = ([c for c in corpus["cases"] if c["status"] == "confirmed" and wanted(c)]
+                 if kinds in ("bug", "all") else [])
+    clean_cases = ([c for c in corpus["clean"] if wanted(c)]
+                   if kinds in ("clean", "all") else [])
+    excluded = sum(1 for c in corpus["cases"] if c["status"] != "confirmed")
+    v = surface_hash_worktree(root)
+    c_digest = corpus_digest({"cases": bug_cases, "clean": clean_cases})
+
+    selected = [(c, "bug") for c in bug_cases] + [(c, "clean") for c in clean_cases]
+
+    if dry_run:
+        total = 0
+        for case, kind in selected:
+            _meta, cls = case_input(root, case["commit"])
+            gates = ReviewPhase(None, NullGh()).gates(cls)
+            on = [k for k in _AGENT_GATES if gates[k]]
+            est = len(on) + 1
+            total += est
+            print(f"case {case['id']} {kind} dry gates={','.join(on)} "
+                  f"diff_bytes={len(cls.filtered_diff.encode())} est_calls={est}", file=out)
+        print(f"excluded_unconfirmed={excluded}", file=out)
+        print(f"dry-run total est_calls={total}", file=out)
+        return 0
+
+    bug_out: list[CaseOutcome] = []
+    clean_out: list[CaseOutcome] = []
+    llm_calls = 0
+    for case, kind in selected:
+        cid = case["id"]
+        cache_path = (cache_dir / v / f"{cid}-{case_digest(case, kind)}.json"
+                      if cache_dir is not None else None)
+        cached = _load_cached(cache_path) if cache_path is not None else None
+        if cached is not None:
+            findings, degraded = cached
+        else:
+            meta, cls = case_input(root, case["commit"])
+            llm = _CountingLlm(llm_factory(cid))
+            surviving, _gates, _scored, degraded = ReviewPhase(llm, NullGh()).run(
+                meta, cls, PlanInfo())
+            llm_calls += llm.calls
+            findings = list(surviving)
+            if cache_path is not None and not degraded:
+                _write_cache(cache_path, findings)
+        suffix = f" DEGRADED={','.join(degraded)}" if degraded else ""
+        if kind == "bug":
+            expected = [ExpectedRange(e["path"], e["start"], e["end"]) for e in case["expected"]]
+            hit = case_hit(findings, expected)
+            bug_out.append(CaseOutcome(cid, "bug", tuple(findings), tuple(degraded), hit))
+            print(f"case {cid} bug {'HIT' if hit else 'MISS'} findings={len(findings)} "
+                  f"file_only={file_only_count(findings, expected)}{suffix}", file=out)
+        else:
+            clean_out.append(CaseOutcome(cid, "clean", tuple(findings), tuple(degraded), None))
+            print(f"case {cid} clean flagged={len(findings)}{suffix}", file=out)
+
+    score = compute_score(bug_out, clean_out, v=v, c=c_digest)
+    print(f"excluded_unconfirmed={excluded}", file=out)
+    print(f"llm_calls={llm_calls}", file=out)
+    print(format_score_line(score), file=out)
+    return 3 if score.degraded > 0 else 0
+
+
+def smoke(llm: object) -> int:
+    f = Finding(source="code-review", agent="A", path="ibl5/classes/Example.php", line=1,
+                body="Possible null dereference of $row before the isset check.")
+    try:
+        scores = llm.call("score-findings", "haiku", scoring_prompt([f]),  # type: ignore[attr-defined]
+                          schemas.validate_scores)
+    except HarnessError as e:
+        print(f"smoke failed: {e.kind}: {e.detail}", file=sys.stderr)
+        return 1
+    for s in scores:
+        if s.get("n") == 1:
+            print(f"smoke ok score={s['score']}")
+            return 0
+    print("smoke failed: bad-output: no entry with n == 1", file=sys.stderr)
+    return 1
+
+
+class _Tee:
+    def __init__(self, *streams: TextIO):
+        self._streams = streams
+
+    def write(self, text: str) -> int:
+        for s in self._streams:
+            s.write(text)
+        return len(text)
+
+    def flush(self) -> None:
+        for s in self._streams:
+            s.flush()
+
+
+def _cmd_run(args: argparse.Namespace) -> int:
+    root = _repo_root(args.repo)
+    corpus_path = Path(args.corpus) if args.corpus else root / DEFAULT_CORPUS
+    corpus = load_corpus(corpus_path)
+    errors = validate_schema(corpus)
+    if errors:
+        raise EvalUsageError("; ".join(errors))
+    case_ids = {s for s in args.cases.split(",") if s} if args.cases else None
+    ledger = UsageLedger()
+    cache_dir: Optional[Path] = None if args.no_cache else root / DEFAULT_CACHE_REL
+    if args.canned:
+        canned = load_corpus(Path(args.canned))
+        cache_dir = None
+
+        def factory(cid: str) -> object:
+            if cid not in canned:
+                raise EvalUsageError(f"case {cid} missing from canned file")
+            return FixtureLlm(ledger, canned[cid])
+    else:
+        shared = ClaudeCli(ledger)
+
+        def factory(cid: str) -> object:
+            return shared
+    out_fh = open(args.out, "w", encoding="utf-8") if args.out else None
+    try:
+        out: TextIO = _Tee(sys.stdout, out_fh) if out_fh else sys.stdout  # type: ignore[assignment]
+        return run_eval(root, corpus, kinds=args.kinds, case_ids=case_ids,
+                        llm_factory=factory, cache_dir=cache_dir,
+                        dry_run=args.dry_run, out=out)
+    finally:
+        if out_fh:
+            out_fh.close()
+
+
+def _cmd_smoke(args: argparse.Namespace) -> int:
+    return smoke(ClaudeCli(UsageLedger()))
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="reviewer_eval")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -556,6 +781,18 @@ def main(argv: Optional[list[str]] = None) -> int:
     v.add_argument("--repo", metavar="DIR", default=None)
     v.add_argument("--ref", metavar="REF", default="HEAD")
     v.set_defaults(func=_cmd_validate)
+    r = sub.add_parser("run", help="run the reviewer over the corpus and print the score line")
+    r.add_argument("--corpus", metavar="PATH", default=None)
+    r.add_argument("--repo", metavar="DIR", default=None)
+    r.add_argument("--kinds", choices=("bug", "clean", "all"), default="all")
+    r.add_argument("--cases", metavar="ID,ID", default=None)
+    r.add_argument("--no-cache", action="store_true")
+    r.add_argument("--canned", metavar="FILE", default=None)
+    r.add_argument("--dry-run", action="store_true")
+    r.add_argument("--out", metavar="FILE", default=None)
+    r.set_defaults(func=_cmd_run)
+    sm = sub.add_parser("smoke", help="one live scorer call proving the claude -p boundary")
+    sm.set_defaults(func=_cmd_smoke)
     args = parser.parse_args(argv)
     try:
         return args.func(args)

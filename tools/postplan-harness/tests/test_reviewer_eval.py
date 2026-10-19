@@ -390,3 +390,195 @@ def test_validate_cli_exit_codes(tmp_path, capsys):
     with pytest.raises(SystemExit) as exc:
         re_.main(["validate", "--bogus"])
     assert exc.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: run and smoke
+# ---------------------------------------------------------------------------
+
+import io  # noqa: E402
+
+from harness.state import HarnessError  # noqa: E402
+
+FOO = "ibl5/classes/Foo.php"
+
+
+def _canned(path, line, score):
+    return {"review-agent-a": [{"path": path, "line": line, "body": "b"}],
+            "review-agent-b": [], "review-agent-d": [], "security-audit": [],
+            "score-findings": [{"n": 1, "score": score}]}
+
+
+class _StubLlm:
+    def __init__(self, canned, raises=()):
+        self.canned = canned
+        self.raises = set(raises)
+        self.calls = []
+
+    def call(self, purpose, model, prompt, validate, max_retries=1, normalizer=None):
+        self.calls.append(purpose)
+        if purpose in self.raises:
+            raise HarnessError("llm-invalid-output", "x")
+        data = self.canned[purpose]
+        if normalizer is not None:
+            data = normalizer(data)
+        validate(data)
+        return data
+
+
+def _eval_repo(tmp_path):
+    r = _mk_repo(tmp_path)
+    _surface_tree(r["root"])
+    return r
+
+
+def _eval_corpus(r):
+    b2 = _bug(r, id="b2", commit=r["fix"], pr=11, fix_commit=r["fix2"], fix_pr=13)
+    u1 = _bug(r, id="u1", status="unconfirmed", commit="f" * 40, fix_commit="e" * 40)
+    return _vcorpus([_bug(r), b2, u1], [_clean("c1", 13, r["fix2"])])
+
+
+def _run(r, corpus, factory, **kw):
+    out = io.StringIO()
+    args = dict(kinds="all", case_ids=None, llm_factory=factory, cache_dir=None, dry_run=False)
+    args.update(kw)
+    rc = re_.run_eval(r["root"], corpus, out=out, **args)
+    return rc, out.getvalue()
+
+
+def _last(text):
+    return text.strip().splitlines()[-1]
+
+
+def _canned_by_case():
+    return {"b1": _canned(FOO, 12, 90), "b2": _canned(FOO, 50, 90), "c1": _canned(FOO, 3, 90)}
+
+
+def test_run_canned_hit_and_miss(tmp_path):
+    r = _eval_repo(tmp_path)
+    canned = _canned_by_case()
+    rc, text = _run(r, _eval_corpus(r), lambda cid: _StubLlm(canned[cid]))
+    assert rc == 0
+    assert _last(text).endswith("recall=1/2 false_alarms=1 clean_flagged=1/1 degraded=0")
+    assert "case b1 bug HIT" in text and "case b2 bug MISS" in text
+
+
+def test_run_below_threshold_not_counted(tmp_path):
+    r = _eval_repo(tmp_path)
+    corpus = _vcorpus([_bug(r)])
+    rc, text = _run(r, corpus, lambda cid: _StubLlm(_canned(FOO, 12, 79)))
+    assert rc == 0
+    assert "case b1 bug MISS findings=0" in text
+    assert "recall=0/1" in _last(text)
+
+
+def test_run_degraded_exit_3(tmp_path):
+    r = _eval_repo(tmp_path)
+    cache = tmp_path / "cache"
+    rc, text = _run(r, _vcorpus([_bug(r)]),
+                    lambda cid: _StubLlm(_canned(FOO, 12, 90), raises={"review-agent-a"}),
+                    cache_dir=cache)
+    assert rc == 3
+    assert _last(text).endswith("degraded=1")
+    assert "DEGRADED=review-agent-a" in text
+    assert not cache.exists()
+
+
+def test_run_cache_reuse(tmp_path):
+    r = _eval_repo(tmp_path)
+    corpus = _vcorpus([_bug(r)])
+    cache = tmp_path / "cache"
+    stub = _StubLlm(_canned(FOO, 12, 90))
+    rc, first = _run(r, corpus, lambda cid: stub, cache_dir=cache)
+    assert rc == 0 and stub.calls
+    stub.calls.clear()
+    rc, second = _run(r, corpus, lambda cid: stub, cache_dir=cache)
+    assert rc == 0 and stub.calls == []
+    assert _last(second).encode() == _last(first).encode()
+    _run(r, corpus, lambda cid: stub, cache_dir=None)
+    assert stub.calls
+    stub.calls.clear()
+    with open(r["root"] / ".claude/review-shared/_review-rubric.md", "ab") as fh:
+        fh.write(b"edit")
+    _run(r, corpus, lambda cid: stub, cache_dir=cache)
+    assert stub.calls
+
+
+def test_run_canned_never_writes_cache(tmp_path, capsys):
+    r = _eval_repo(tmp_path)
+    corpus = _eval_corpus(r)
+    cpath = tmp_path / "corpus.json"
+    cpath.write_text(json.dumps(corpus))
+    fpath = tmp_path / "canned.json"
+    fpath.write_text(json.dumps(_canned_by_case()))
+    repo = str(r["root"])
+    rc = re_.main(["run", "--canned", str(fpath), "--repo", repo, "--corpus", str(cpath)])
+    assert rc == 0
+    assert "recall=1/2" in capsys.readouterr().out
+    assert not (r["root"] / "tools/postplan-harness/out/reviewer-eval/cache").exists()
+
+
+def test_run_unconfirmed_excluded(tmp_path):
+    r = _eval_repo(tmp_path)
+    canned = _canned_by_case()
+    seen = []
+
+    def factory(cid):
+        seen.append(cid)
+        return _StubLlm(canned[cid])
+
+    rc, text = _run(r, _eval_corpus(r), factory)
+    assert rc == 0
+    assert "u1" not in seen and sorted(seen) == ["b1", "b2", "c1"]
+    assert "excluded_unconfirmed=1" in text
+
+
+def test_run_subset_changes_c(tmp_path):
+    r = _eval_repo(tmp_path)
+    canned = _canned_by_case()
+    corpus = _eval_corpus(r)
+    _, full = _run(r, corpus, lambda cid: _StubLlm(canned[cid]))
+    _, sub = _run(r, corpus, lambda cid: _StubLlm(canned[cid]), case_ids={"b1"})
+    assert re_.parse_score_line(_last(sub)).c != re_.parse_score_line(_last(full)).c
+
+
+def test_run_unknown_case_id_usage_error(tmp_path, capsys):
+    r = _eval_repo(tmp_path)
+    corpus = _eval_corpus(r)
+    cpath = tmp_path / "corpus.json"
+    cpath.write_text(json.dumps(corpus))
+    fpath = tmp_path / "canned.json"
+    fpath.write_text(json.dumps(_canned_by_case()))
+    rc = re_.main(["run", "--canned", str(fpath), "--repo", str(r["root"]),
+                   "--corpus", str(cpath), "--cases", "nope"])
+    assert rc == 2
+    assert "nope" in capsys.readouterr().err
+    with pytest.raises(re_.EvalUsageError):
+        _run(r, corpus, lambda cid: _StubLlm({}), case_ids={"nope"})
+
+
+def test_run_dry_run_no_llm(tmp_path):
+    r = _eval_repo(tmp_path)
+
+    def factory(cid):
+        raise AssertionError("llm_factory must not be called in dry-run")
+
+    rc, text = _run(r, _eval_corpus(r), factory, dry_run=True)
+    assert rc == 0
+    assert "dry-run total est_calls=" in text
+    assert "case b1 bug dry gates=A,security" in text
+
+
+def test_smoke_stub_ok_and_failure(capsys):
+    assert re_.smoke(_StubLlm({"score-findings": [{"n": 1, "score": 40}]})) == 0
+    assert "smoke ok" in capsys.readouterr().out
+    assert re_.smoke(_StubLlm({}, raises={"score-findings"})) == 1
+    assert "smoke failed: llm-invalid-output: x" in capsys.readouterr().err
+
+
+def test_null_gh_rejects_unknown_call():
+    gh = re_.NullGh()
+    assert gh.post_review_findings(1, "sha", "t", []) is None
+    assert gh.post_review_summary(1, "t", "b") is None
+    with pytest.raises(AttributeError):
+        gh.get_pr

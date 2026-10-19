@@ -402,7 +402,7 @@ def test_verifiers_use_sonnet_tooled_readonly_tools_in_worktree(tmp_path):
     for call in llm.tooled_calls:
         assert call["model"] == "sonnet"
         assert call["cwd"] == str(tmp_path)
-        assert call["allowed_tools"] == ("Read", "Grep", "Glob") == VERIFIER_ALLOWED_TOOLS
+        assert call["allowed_tools"] == ("Read","Grep","Glob") == VERIFIER_ALLOWED_TOOLS  # matrix row 38 literal
         assert not {"Bash", "Write", "Edit"} & set(call["allowed_tools"])
         assert call["denied_tools"] == VERIFIER_DENIED_TOOLS
         assert {"Bash", "Write", "Edit", "Agent"} <= set(call["denied_tools"])

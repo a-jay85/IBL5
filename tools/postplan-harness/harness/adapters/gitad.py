@@ -1076,14 +1076,25 @@ class LiveGit:
         if self.is_dirty():
             return StackedRebaseResult(False, "worktree dirty at resolution entry")
 
-        # Step 4: pre-side capture — must happen before touching history
-        pre_patch = self._run_bytes("diff", f"{ibl_base}...HEAD")
+        # Pin master_sha once, BEFORE the pre-side capture, so the proof's base and the
+        # rebase target come from the same fetch (a concurrent fetch cannot split them).
+        master_sha = self._run("rev-parse", "origin/master").strip()
+
+        # Step 4: pre-side capture — must happen before touching history.
+        # `bin/wt-new` records `iblBase=master` for every ordinary branch, and the local
+        # `master` ref can sit behind origin/master after a merge-pull. A stale base makes
+        # `{ibl_base}...HEAD` carry master's own commits, so a deletion master made and
+        # later reversed reads as a branch deletion the proof then reports as LOST. When
+        # ibl_base is an ancestor of the pinned master_sha, `{master_sha}...HEAD` starts at
+        # merge-base(master_sha, HEAD) and holds only the branch's net change (same range
+        # as the plain path in _rebase_onto). A stacked parent tip that is not an ancestor
+        # keeps the iblBase range so the parent's unmerged work is not charged to this branch.
+        anc_rc, _ = self._run_out("merge-base", "--is-ancestor", ibl_base, master_sha)
+        pre_base = master_sha if anc_rc == 0 else ibl_base
+        pre_patch = self._run_bytes("diff", f"{pre_base}...HEAD")
         if not pre_patch.strip():
             return StackedRebaseResult(False, "pre-rebase diff vs iblBase is empty")
         Path(lostwork_pre_path(key)).write_bytes(pre_patch)
-
-        # Pin master_sha once so a concurrent fetch cannot split the proof across two bases
-        master_sha = self._run("rev-parse", "origin/master").strip()
 
         # Step 5: extract proof and guard scripts by pinned git show
         lostwork_path = self._load_lostwork(master_sha, key)
@@ -1142,7 +1153,7 @@ class LiveGit:
         # pre-squash tip) and AFTER pre_rebase_sha is armed (restore point = pre-squash HEAD).
         self._squashed_from = pre_rebase_sha  # armed BEFORE the ref moves; restore is a no-op while HEAD == pre
         squashed_head, squash_note, squash_fatal = self._squash_merge_range_for_replay(
-            ibl_base, branch, pre_rebase_sha,
+            pre_base, branch, pre_rebase_sha,
         )
         self._last_squash_note = squash_note
         if not squashed_head:
@@ -1151,7 +1162,7 @@ class LiveGit:
             return StackedRebaseResult(False, squash_note)
 
         rebase_proc = subprocess.run(
-            ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--onto", master_sha, ibl_base, branch],
+            ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--onto", master_sha, pre_base, branch],
             capture_output=True, text=True, errors="replace",
         )
         auto_resolved_files: tuple = ()

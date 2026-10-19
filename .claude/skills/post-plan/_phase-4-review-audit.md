@@ -144,13 +144,13 @@ awk '
 
 Read `.claude/review-shared/_shell-workflow-agent.md` for the canonical Agent E definition and pass it the contents of `/tmp/post-plan-shell-diff-$PPID` plus the Phase 3 file list. If that file is empty (possible when the flags fire on a rename-only change), skip the spawn — do not send an agent an empty diff.
 
-### 4C: Security Audit — single conditional Haiku agent
+### 4C: Security Audit (single conditional Sonnet agent)
 
 **Skip entire 4C if** `! $HAS_PHP`. CSS, markdown, migrations, and lockfile bumps cannot introduce SQLi/CSRF/auth vulnerabilities.
 
 **Read** `.claude/review-shared/_security-agents.md` — the canonical security agent definition and pattern-detection bash block.
 
-Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Haiku agent** with the categories line and the PHP-only subset of `$DIFF`. Do not forward CLAUDE.md content (auto-loaded).
+Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Sonnet 5.5 agent** (`subagent_type: "sonnet-5-5"`, omit `model`) with the categories line and the PHP-only subset of `$DIFF`. Do not forward CLAUDE.md content (auto-loaded).
 
 **Plan-backed mode (when `PLAN_FOUND` and `$HAS_PLAN_SECURITY`):** the plan already declares each touched surface and its intended defense. Pass the plan's Security section to the agent as an `EXPECTED DEFENSES:` checklist and instruct it to (a) confirm each planned defense is present in the diff and (b) flag any state-changing surface the plan did *not* anticipate. You may build `CATEGORIES:` directly from the plan's declared surfaces instead of running the pattern-detection grep. This shifts the audit from discovery to verification — it catches "CSRF was planned but the impl omitted it" and cuts the false positives blind pattern-matching produces.
 

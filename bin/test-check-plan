@@ -2671,17 +2671,7 @@ XSECOND='
 |---|---------------|-----------|--------|---------------------|
 | 1 | baselines unchanged | Visual-regression | post-impl | `a.spec.ts-snapshots` and `b.spec.ts-snapshots` (no-change) |
 '
-# The [VR] matrix-row clause now rejects this shape (token 1 is the planned
-# token and carries no marker), so assert gate [X] silence on the output
-# instead of the overall exit.
-f="$TMP/gateX-second-token-marker-unchanged.md"
-printf '%s\n' "$FM$XSECOND" > "$f"
-out="$("$GUARD" "$f" 2>&1)" || true
-if grep -qF '[X]' <<<"$out"; then
-    h_fail "gateX-second-token-marker-unchanged" "gate [X] fired on the second-token marker shape"
-else
-    h_pass "gateX-second-token-marker-unchanged"
-fi
+assert_viol "gateX-second-token-marker-unchanged" 0 '[X]' "$FM$XSECOND"
 
 # ---------------------------------------------------------------------------
 # Gate [RO] fixtures (27 cases)

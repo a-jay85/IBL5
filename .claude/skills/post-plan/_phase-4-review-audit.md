@@ -204,9 +204,13 @@ Combine ALL issues from 4B and 4C into one numbered list.
 
 **Skip the scoring agent if the combined list is empty** — jump straight to the `post_review_summary` no-issues path below.
 
-Otherwise launch a **single Haiku agent**, pass it the issues list plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per that rubric. Parse the response and assign scores back to each issue.
+Otherwise launch **three verifier agents in one message** (`subagent_type: "sonnet-5-5"`, omit `model`; tools `Read`, `Grep`, `Glob` only; cwd = this worktree). Each gets the same packet: the numbered issue list; for every cited path the hunk from `git diff origin/master...HEAD -- <path>` (cap each hunk at 20 KB); and the **Automatic Zero** and **IBL5-specific false positives** sections of `_review-rubric.md` as rejection rules. Tell each agent to judge only the numbered issues, to open the cited file and line before voting, to never report a new issue, to vote `not-real` only when the code shows the claim is wrong or matches a rejection rule, and to vote `real` whenever it cannot open the file or cannot decide. Each returns `[{"n": 1, "verdict": "real", "reason": "..."}]` with `verdict` one of `real` / `not-real`.
 
-**Filter** per the thresholds in `_review-rubric.md`.
+**Aggregate per issue.** A seat whose reply is missing, unparseable, timed out, or omits the issue's `n` is an abstention. Drop an issue only when all three seats returned a valid `not-real`. Any other tally keeps it. Score a kept issue `base + round((100 - base) * real_votes / 3)`, where `base` is 80 for code review and 75 for security (100 / 93 / 87 / 80 for code, 100 / 92 / 83 / 75 for security); a dropped issue scores 0. Write the tallies to `/tmp/post-plan-verifier-votes-$PPID.json` and print one line per issue in the run output: `phase4d verifier: kept|DROPPED [source/agent] path:line score=N real=a not-real=b abstain=c`. A dropped **security** issue always prints `phase4d verifier: DROPPED security finding path:line` followed by every rejecting reason, so the run log keeps it even though it is never posted.
+
+This step only removes issues. It never adds one and never lifts a score above what the votes give. Phase 6.5 conditions (2) and (11) therefore see more held findings than before: the old text-only scorer dropped findings without reading code, and an issue now drops only when three code-reading verifiers all reject it. An issue any verifier kept holds arming exactly as it did.
+
+**Filter** per the thresholds in `_review-rubric.md`. A kept issue always clears its threshold; the filter stays so the Thresholds table remains the single statement of the posting rule.
 
 **Re-check PR state:** `gh pr view --json state --jq '.state'` — skip posting if not `OPEN`.
 

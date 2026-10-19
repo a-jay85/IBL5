@@ -187,7 +187,11 @@ if [ "$HEADLESS" = 1 ]; then
     SUMMARY="$(printf '%s\n' "$REPLY" | tr -cd '[:print:]\n' | sed '/^[[:space:]]*$/d' | tail -n 3 | tr '\n' ' ' | cut -c1-300)"
     fix_abort() {
         echo "postplan-fix: $1: $SUMMARY" >&2
-        git -C "$WT" merge --abort >/dev/null 2>&1 || true
+        # A session that ran `git commit` or `merge --continue` removed
+        # MERGE_HEAD, so --abort fails; the worktree was clean at HEAD0 on
+        # entry, so a hard reset restores it.
+        git -C "$WT" merge --abort >/dev/null 2>&1 \
+            || git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
         exit 1
     }
     REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/remotes)"

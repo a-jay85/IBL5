@@ -39,6 +39,7 @@ final class ModuleRegistry
         'PlayerSearch',
         'ProjectedDraftOrder',
         'RecordHolders',
+        'Rivalries',
         'Schedule',
         'Search',
         'SeasonArchive',

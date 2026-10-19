@@ -16,6 +16,7 @@ on:
       - 'bin/lib/current-models'
       - 'bin/check-*'
       - 'bin/gate-backtest'
+      - '.claude/review-shared/scripts/lostwork.sh'
   push:
     branches: [master]
     paths:
@@ -28,6 +29,7 @@ on:
       - 'bin/lib/current-models'
       - 'bin/check-*'
       - 'bin/gate-backtest'
+      - '.claude/review-shared/scripts/lostwork.sh'
 
 permissions:
   contents: read

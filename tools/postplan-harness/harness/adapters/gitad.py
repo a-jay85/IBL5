@@ -934,7 +934,9 @@ class LiveGit:
                     if not outcome.rung:
                         self.last_conflict_rung = "exhausted"
                         self.last_conflict_fix_summary = next(
-                            (t for t in outcome.trail if t.startswith("sonnet-fix: ")), "")
+                            (t for t in outcome.trail
+                             if t.startswith("sonnet-fix: ")
+                             and not t.startswith("sonnet-fix: skipped")), "")
                         abort_and_restore(self._run, worktree=self.worktree,
                                           pre_rebase_sha=pre_rebase_sha,
                                           reason=ladder_failure_reason(first_proof, adapt_trail + tuple(outcome.trail)))

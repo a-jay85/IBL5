@@ -36,14 +36,14 @@ set -euo pipefail
 #
 # Exit codes: 0 success (including a clean slice), 1 run failure, 2 usage.
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 
 # log: fatal and config problems, on stderr. say: run results, on stdout.
 log() { echo "code-slice-review: $*" >&2; }
 say() { echo "code-slice-review: $*"; }
 
-usage() { awk 'NR<=2{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; }
+usage() { awk 'NR<=2{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "${BASH_SOURCE[0]}"; }
 
 # ── Env seams (${VAR:-x}: unset and empty both mean the default) ──────────────
 # No HOME-derived default lives here; resolve_state_dir computes those, so

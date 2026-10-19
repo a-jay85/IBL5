@@ -746,9 +746,56 @@ case_label_mapping_no_create() {
 }
 
 # ── Driver ────────────────────────────────────────────────────────────────────
+# ── Live exercise (never run in CI) ───────────────────────────────────────────
+# Stub-free: real claude, real read-only gh. Reviews the smallest module with
+# --dry-run --slice=, then calls the scorer once on a made-up finding. The
+# model's answer varies by run, so every assertion holds for "clean" too.
+live_main() {
+    local classes="$REPO_ROOT/ibl5/classes" best="" best_size=0 d size f total
+    command -v claude >/dev/null 2>&1 || { echo "live: claude is not on PATH" >&2; exit 2; }
+    command -v gh >/dev/null 2>&1 || { echo "live: gh is not on PATH" >&2; exit 2; }
+    while IFS= read -r d; do
+        total=0
+        while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            size="$(wc -c < "$f" | tr -d ' ')"; total=$((total + size))
+        done < <(find "$classes/$d" -type f -name '*.php')
+        [ "$total" -gt 0 ] || continue
+        if [ -z "$best" ] || [ "$total" -lt "$best_size" ]; then best="$d"; best_size="$total"; fi
+    done < <(find "$classes" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | LC_ALL=C sort)
+    [ -n "$best" ] || { echo "live: no module with php files" >&2; exit 2; }
+    echo "live: reviewing $best ($best_size bytes)"
+
+    h_tmp LT
+    mkdir -p "$LT/bin" "$LT/state"
+    cat > "$LT/bin/gh" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$LT/gh.log"
+if [ "\$1 \$2" = "issue list" ]; then exec "$(command -v gh)" "\$@"; fi
+exit 1
+SH
+    chmod +x "$LT/bin/gh"
+    local out rc=0
+    out="$(CODE_SLICE_REVIEW_GH_BIN="$LT/bin/gh" CODE_SLICE_REVIEW_STATE_DIR="$LT/state" \
+        bash "$CSR" --dry-run --slice="$best" --max-budget-usd=1.00 --max-findings=3 2>&1)" || rc=$?
+    echo "$out"
+    expect_eq "live dry-run exits 0" 0 "$rc"
+    expect_has "live summary line" "$out" "summary slice=$best mode=dry-run"
+    if grep -qE 'cost_usd=[0-9]+(\.[0-9]+)?([eE]-?[0-9]+)?$' <<< "$out"; then ok "cost_usd is numeric"; else fail "cost_usd is not numeric"; fi
+    expect_eq "two issue list calls" 2 "$(grep -c '^issue list' "$LT/gh.log" || true)"
+    expect_lacks "no issue create" "$(cat "$LT/gh.log")" "issue create"
+    expect_absent "no rotation.state" "$LT/state/rotation.state"
+
+    local fnd_json score
+    fnd_json="$(jq -nc '[{path:"ibl5/classes/Example/Example.php",line:12,symbol:"Example::run",category:"bug",kind:"code",score:90,title:"Unchecked array index",body:"run() reads $rows[0] without checking that $rows is non-empty."}]')"
+    score="$(TMPDIR="$LT" bash -c '. "$1"; score_findings "$2" || { echo "scorer failed: $SCORE_FAIL_REASON" >&2; exit 1; }; jq -r ".[0].score" <<< "$SCORES_JSON"' _ "$CSR" "$fnd_json")" || score="error"
+    if [[ "$score" =~ ^[0-9]+$ ]] && [ "$score" -le 100 ]; then ok "scorer returned integer score $score"; else fail "scorer returned [$score]"; fi
+    h_done
+}
+
 if [ "${1:-}" = "--live" ]; then
-    echo "live exercise is added in Phase 6" >&2
-    exit 2
+    live_main
+    exit $?
 fi
 
 for c in $(declare -F | awk '$3 ~ /^case_/ {print $3}'); do

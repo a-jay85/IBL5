@@ -273,4 +273,24 @@ DROP_OUT=$(drop_body mismatch)
 same "body: drop starts with the revoked marker" "<!-- hs-approved-diff: revoked -->" "${DROP_OUT%%$'\n'*}"
 want "body: drop names the diff change" "$DROP_OUT" "the PR diff changed after the label was applied"
 
+# real captured gh api response (PR 3339 fixture)
+FIX="$REPO_ROOT/bin/fixtures/human-signoff/pr3339-comments.json"
+# recorded_of <comments_file> — real hs_recorded_fingerprint; rc is its rc.
+recorded_of() { LAST_OUT=$(bash -c "set -euo pipefail; source '$LIB'; hs_recorded_fingerprint \"\$1\"" _ "$1" 2>&1); }
+recorded_of "$FIX"; rc=$?
+expect "real comments: no marker -> rc 1" 1 "$rc"
+FIX_BOT="$T/fix-bot.json"
+jq --arg b "$(record_body "$A")" \
+    '. + [([.[] | select(.user.login == "github-actions[bot]")] | last | .body = $b | .created_at = "2026-10-19T05:00:00Z")]' \
+    "$FIX" > "$FIX_BOT"
+recorded_of "$FIX_BOT"; rc=$?
+expect "real comments: bot marker -> rc 0" 0 "$rc"
+same "real comments: bot marker -> prints A" "$A" "$LAST_OUT"
+FIX_USER="$T/fix-user.json"
+jq --arg b "$(record_body "$A")" \
+    '. + [([.[] | select(.user.login == "a-jay85")] | first | .body = $b | .created_at = "2026-10-19T05:00:00Z")]' \
+    "$FIX" > "$FIX_USER"
+recorded_of "$FIX_USER"; rc=$?
+expect "real comments: user-authored marker -> rc 1" 1 "$rc"
+
 h_done

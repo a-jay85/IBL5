@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-code-slice-review — harness for bin/code-slice-review.
+#
+# Usage: bin/test-code-slice-review [--live]
+#
+# Every external binary (claude, gh, launchctl) is replaced through the
+# script's env seams, and each case runs against a mktemp fixture for the
+# classes dir and the state dir. No network, no real Claude call. `--live` is
+# the one stub-free exercise (real claude, real read-only gh) the owner runs
+# once before arming the schedule.
+#
+# Exit 0 = all pass, 1 = failures.
+
+set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CSR="$SCRIPT_DIR/code-slice-review"
+
+ok()   { h_pass "$1"; }
+fail() { h_fail "$1"; }
+
+expect_eq() { # name want got
+    if [ "$2" = "$3" ]; then ok "$1"; else fail "$1 - want [$2] got [$3]"; fi
+}
+expect_has() { # name haystack needle
+    if grep -qF -- "$3" <<< "$2"; then ok "$1"; else fail "$1 - '$3' absent"; fi
+}
+expect_lacks() { # name haystack needle
+    if grep -qF -- "$3" <<< "$2"; then fail "$1 - '$3' unexpectedly present"; else ok "$1"; fi
+}
+expect_absent() { # name path
+    if [ -e "$2" ]; then fail "$1 - $2 exists"; else ok "$1"; fi
+}
+
+h_tmp T
+STUBS="$T/stubs"
+mkdir -p "$STUBS"
+
+# ── Stubs ─────────────────────────────────────────────────────────────────────
+cat > "$STUBS/claude" <<'SH'
+#!/usr/bin/env bash
+d="${STUB_DIR:?}"
+printf 'call\n' >> "$d/claude.calls"
+SH
+cat > "$STUBS/launchctl" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${STUB_DIR:?}/launchctl.log"
+SH
+chmod +x "$STUBS"/*
+
+# ── Fixture ───────────────────────────────────────────────────────────────────
+# Sets FX, CLASSES, STATE, STUB_DIR. Three modules: Alpha, Beta, Gamma.
+new_fixture() {
+    h_tmp FX
+    CLASSES="$FX/classes"
+    STATE="$FX/state"
+    STUB_DIR="$FX/stubcalls"
+    mkdir -p "$STUB_DIR" "$FX/home"
+    local m
+    for m in Alpha Beta Gamma; do
+        mkdir -p "$CLASSES/$m"
+        printf '<?php\nclass %s {}\n' "$m" > "$CLASSES/$m/$m.php"
+    done
+}
+
+# csr <args...> — run the script against the fixture, capture OUT/ERR/RC.
+csr() {
+    OUT=""; ERR=""; RC=0
+    local errf="$FX/err.txt"
+    OUT="$(env HOME="$FX/home" PATH="$STUBS:$PATH" STUB_DIR="$STUB_DIR" \
+        CODE_SLICE_REVIEW_CLASSES_DIR="$CLASSES" \
+        CODE_SLICE_REVIEW_STATE_DIR="$STATE" \
+        CODE_SLICE_REVIEW_CLAUDE_BIN="$STUBS/claude" \
+        CODE_SLICE_REVIEW_LAUNCHCTL_BIN="$STUBS/launchctl" \
+        bash "$CSR" "$@" 2> "$errf")" || RC=$?
+    ERR="$(cat "$errf")"
+}
+
+# ── Cases: flags, env and schedule ────────────────────────────────────────────
+case_unknown_flag_exits_2() {
+    new_fixture
+    csr --bogus
+    expect_eq "unknown flag exits 2" 2 "$RC"
+    expect_has "unknown flag is named" "$ERR" "--bogus"
+    bash -c "$CSR --bogus >/dev/null 2>&1; test \$? -eq 2" && ok "row 1: --bogus exits 2" || fail "row 1: --bogus exits 2"
+}
+
+case_space_form_exits_2() {
+    new_fixture
+    csr --slice Alpha
+    expect_eq "--slice Alpha exits 2" 2 "$RC"
+    csr --max-findings 3
+    expect_eq "--max-findings 3 exits 2" 2 "$RC"
+    bash -c "$CSR --slice Alpha >/dev/null 2>&1; test \$? -eq 2" && ok "row 2: space form exits 2" || fail "row 2: space form exits 2"
+}
+
+case_bad_cap_values_exit_2() {
+    new_fixture
+    local a
+    for a in --max-findings=0 --max-findings=11 --max-findings=x \
+        --max-budget-usd=0 --max-budget-usd=abc --max-budget-usd=0.40; do
+        csr "$a"
+        expect_eq "$a exits 2" 2 "$RC"
+    done
+}
+
+case_bad_slice_exits_2() {
+    new_fixture
+    local a
+    for a in --slice= --slice=../bin --slice=NoSuchModule; do
+        csr "$a"
+        expect_eq "$a exits 2" 2 "$RC"
+    done
+}
+
+case_plist_supervisor_env() {
+    new_fixture
+    local plist
+    plist="$(env HOME=/Users/fixture bash "$CSR" --print-schedule)"
+    expect_has "PATH covers homebrew" "$plist" "string>/opt/homebrew/bin:"
+    expect_has "HOME expanded" "$plist" "<string>/Users/fixture</string>"
+    expect_has "label present" "$plist" "com.ibl5.code-slice-review"
+    expect_lacks "no literal \$HOME" "$plist" '$HOME'
+    expect_lacks "no \${" "$plist" '${'
+    expect_lacks "no empty string" "$plist" "<string></string>"
+    env HOME=/Users/fixture bash "$CSR" --print-schedule | grep -qF 'string>/opt/homebrew/bin:' \
+        && ok "row 5: plist PATH" || fail "row 5: plist PATH"
+    env HOME=/Users/fixture bash "$CSR" --print-schedule | grep -cE '[$]HOME|[$][{]|string></string' | grep -qx 0 \
+        && ok "row 6: no unexpanded values" || fail "row 6: no unexpanded values"
+    env HOME=/Users/fixture bash "$CSR" --print-schedule | grep -qF 'string>/Users/fixture</string' \
+        && ok "row 7: HOME in env" || fail "row 7: HOME in env"
+}
+
+case_home_unset_refuses() {
+    new_fixture
+    local out rc=0
+    out="$(env -i /bin/bash "$CSR" 2>&1 >/dev/null)" || rc=$?
+    expect_eq "HOME unset exits 1" 1 "$rc"
+    expect_has "HOME unset message" "$out" "cannot resolve state dir"
+    env -i /bin/bash "$CSR" 2>&1 >/dev/null | grep -qF 'cannot resolve state dir' \
+        && ok "row 8: empty-env guard" || fail "row 8: empty-env guard"
+    env -i /bin/bash "$CSR" --help >/dev/null && ok "row 9: --help under empty env" || fail "row 9: --help under empty env"
+    expect_absent "no claude call" "$STUB_DIR/claude.calls"
+}
+
+case_seam_env_empty_uses_default() {
+    new_fixture
+    local plist
+    plist="$(env HOME="$FX/home" CODE_SLICE_REVIEW_STATE_DIR= bash "$CSR" --print-schedule)"
+    expect_has "empty STATE_DIR resolves under HOME" "$plist" "$FX/home/.local/state/ibl5-code-slice-review/logs/run.log"
+    plist="$(env -u CODE_SLICE_REVIEW_STATE_DIR HOME="$FX/home" bash "$CSR" --print-schedule)"
+    expect_has "unset STATE_DIR resolves the same" "$plist" "$FX/home/.local/state/ibl5-code-slice-review/logs/run.log"
+}
+
+# ── Driver ────────────────────────────────────────────────────────────────────
+if [ "${1:-}" = "--live" ]; then
+    echo "live exercise is added in Phase 6" >&2
+    exit 2
+fi
+
+for c in $(declare -F | awk '$3 ~ /^case_/ {print $3}'); do
+    "$c"
+done
+
+h_done

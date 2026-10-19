@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+set -euo pipefail
+#
+# bin/code-slice-review — weekly rotating review of EXISTING code.
+#
+# Picks the next unreviewed ibl5/classes/<Module> directory, runs a read-only
+# Sonnet reviewer over it with the PR-review agent prompts and rubric, scores
+# the findings with a Haiku call, de-dups them against the backlog and files at
+# most --max-findings issues in a-jay85/IBL5-backlog. Nothing is fixed
+# automatically. Decision record: ibl5/docs/decisions/*-weekly-code-slice-review.md.
+#
+# Usage: bin/code-slice-review [flags]
+#
+# Flags (= form only; "--slice Foo" is rejected):
+#   --help                  Print this help and exit 0.
+#   --dry-run               Run the whole pipeline, file nothing, write no
+#                           rotation state. Prints what it would file.
+#   --slice=<Module>        Review this one ibl5/classes/<Module> directory and
+#                           skip rotation. Never writes rotation state.
+#   --max-budget-usd=<n>    Whole-run cost cap, at least 0.50 (default 3.00).
+#                           0.25 of it is reserved for the Haiku scorer.
+#   --max-findings=<n>      Per-run filing cap, integer 1..10 (default 3).
+#   --print-schedule        Print the launchd plist and exit (no side effect).
+#   --install-schedule      Write the plist and bootstrap it (main checkout only).
+#   --uninstall-schedule    Boot the job out and remove the plist (idempotent).
+#
+# Environment (empty means default):
+#   CODE_SLICE_REVIEW_STATE_DIR=$HOME/.local/state/ibl5-code-slice-review
+#   CODE_SLICE_REVIEW_CLASSES_DIR=<repo>/ibl5/classes
+# Test seams: CODE_SLICE_REVIEW_CLAUDE_BIN, CODE_SLICE_REVIEW_GH_BIN,
+#   CODE_SLICE_REVIEW_LAUNCHCTL_BIN.
+#
+# Exit codes: 0 success (including a clean slice), 1 run failure, 2 usage.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+
+log() { echo "code-slice-review: $*" >&2; }
+
+usage() { awk 'NR<=2{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; }
+
+# ── Env seams (${VAR:-x}: unset and empty both mean the default) ──────────────
+# No HOME-derived default lives here; resolve_state_dir computes those, so
+# --help works under `env -i` and the empty-HOME guard fires under `set -u`.
+CODE_SLICE_REVIEW_CLAUDE_BIN="${CODE_SLICE_REVIEW_CLAUDE_BIN:-claude}"
+CODE_SLICE_REVIEW_GH_BIN="${CODE_SLICE_REVIEW_GH_BIN:-gh}"
+CODE_SLICE_REVIEW_LAUNCHCTL_BIN="${CODE_SLICE_REVIEW_LAUNCHCTL_BIN:-launchctl}"
+CODE_SLICE_REVIEW_CLASSES_DIR="${CODE_SLICE_REVIEW_CLASSES_DIR:-$REPO_ROOT/ibl5/classes}"
+
+PLIST_LABEL="com.ibl5.code-slice-review"
+STATE_DIR=""
+
+# A missing HOME stops the run: state under /tmp would vanish on reboot and the
+# rotation cycle would silently restart.
+resolve_state_dir() {
+    if [ -n "${CODE_SLICE_REVIEW_STATE_DIR:-}" ]; then
+        STATE_DIR="$CODE_SLICE_REVIEW_STATE_DIR"
+    elif [ -n "${HOME:-}" ]; then
+        STATE_DIR="$HOME/.local/state/ibl5-code-slice-review"
+    else
+        log "cannot resolve state dir (HOME unset)"
+        exit 1
+    fi
+}
+
+# ── launchd schedule (--print/--install/--uninstall-schedule) ─────────────────
+# Program and WorkingDirectory MUST point at the main checkout: a worktree is
+# torn down after its PR merges and the job would silently stop working. The
+# first `git worktree list` entry is the main working tree.
+main_wt() {
+    local wt
+    wt="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}' || true)"
+    [ -n "$wt" ] || wt="$REPO_ROOT"
+    printf '%s' "$wt"
+}
+
+xml_esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+
+# HOME is interpolated at generation time: launchd does not expand variables in
+# EnvironmentVariables, so a literal home-variable would bake in a dead path.
+build_plist() {
+    local home="$1" main_wt_dir path_val log_path
+    main_wt_dir="$(main_wt | xml_esc)"
+    path_val="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$(printf '%s' "$home" | xml_esc)/.local/bin"
+    log_path="$(printf '%s' "$STATE_DIR" | xml_esc)/logs/run.log"
+    home="$(printf '%s' "$home" | xml_esc)"
+    cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${PLIST_LABEL}</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/caffeinate</string>
+		<string>-s</string>
+		<string>/bin/bash</string>
+		<string>${main_wt_dir}/bin/code-slice-review</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>${main_wt_dir}</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Weekday</key>
+		<integer>6</integer>
+		<key>Hour</key>
+		<integer>5</integer>
+		<key>Minute</key>
+		<integer>20</integer>
+	</dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>${path_val}</string>
+		<key>HOME</key>
+		<string>${home}</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>${log_path}</string>
+	<key>StandardErrorPath</key>
+	<string>${log_path}</string>
+</dict>
+</plist>
+PLIST
+}
+
+schedule_main() {
+    local mode="$1" home="${HOME:-}" plist_path uid wt
+    if [ -z "$home" ]; then
+        log "HOME is required for the schedule flags (unset or empty)"
+        exit 2
+    fi
+    plist_path="$home/Library/LaunchAgents/${PLIST_LABEL}.plist"
+    wt="$(main_wt)"
+    case "$mode" in
+        print)
+            build_plist "$home"
+            ;;
+        install)
+            if [ "$REPO_ROOT" != "$wt" ]; then
+                log "--install-schedule must be run from the main checkout ($wt); current: $REPO_ROOT"
+                exit 2
+            fi
+            uid="$(id -u)"
+            mkdir -p "$STATE_DIR/logs" "$home/Library/LaunchAgents"
+            build_plist "$home" > "$plist_path"
+            "$CODE_SLICE_REVIEW_LAUNCHCTL_BIN" bootout "gui/$uid/$PLIST_LABEL" 2>/dev/null || true
+            "$CODE_SLICE_REVIEW_LAUNCHCTL_BIN" bootstrap "gui/$uid" "$plist_path"
+            echo "Installed $PLIST_LABEL (Saturdays 05:20). Program: $wt/bin/code-slice-review"
+            ;;
+        uninstall)
+            uid="$(id -u)"
+            "$CODE_SLICE_REVIEW_LAUNCHCTL_BIN" bootout "gui/$uid/$PLIST_LABEL" 2>/dev/null || true
+            rm -f "$plist_path"
+            echo "Uninstalled $PLIST_LABEL."
+            ;;
+    esac
+}
+
+# ── Flags ─────────────────────────────────────────────────────────────────────
+DRY_RUN=0
+SLICE=""
+MAX_BUDGET_USD="3.00"
+MAX_FINDINGS=3
+MODE="run"
+
+parse_flags() {
+    local v
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --help|-h) usage; exit 0 ;;
+            --dry-run) DRY_RUN=1; shift ;;
+            --slice=*)
+                v="${1#--slice=}"
+                if [ -z "$v" ] || [[ "$v" == */* ]] || [[ "$v" == *..* ]] \
+                    || [ ! -d "$CODE_SLICE_REVIEW_CLASSES_DIR/$v" ]; then
+                    log "--slice must name a directory under $CODE_SLICE_REVIEW_CLASSES_DIR (got '$v')"
+                    exit 2
+                fi
+                SLICE="$v"
+                shift ;;
+            --max-budget-usd=*)
+                v="${1#--max-budget-usd=}"
+                if ! [[ "$v" =~ ^[0-9]+(\.[0-9]{1,2})?$ ]] || ! [[ "$v" =~ [1-9] ]]; then
+                    log "--max-budget-usd must be a positive amount like 3.00 (got '$v')"
+                    exit 2
+                fi
+                MAX_BUDGET_USD="$v"
+                shift ;;
+            --max-findings=*)
+                v="${1#--max-findings=}"
+                if [ "${#v}" -gt 3 ] || ! [[ "$v" =~ ^[0-9]+$ ]] || [ "$((10#$v))" -lt 1 ] || [ "$((10#$v))" -gt 10 ]; then
+                    log "--max-findings must be an integer from 1 to 10 (got '$v')"
+                    exit 2
+                fi
+                MAX_FINDINGS="$((10#$v))"
+                shift ;;
+            --print-schedule)     MODE="print"; shift ;;
+            --install-schedule)   MODE="install"; shift ;;
+            --uninstall-schedule) MODE="uninstall"; shift ;;
+            *)
+                log "unknown argument: $1"
+                usage >&2
+                exit 2 ;;
+        esac
+    done
+    # 0.25 of the cap is reserved for the Haiku scorer, so a cap under 0.50
+    # would leave the reviewer too little to read a module.
+    if ! awk -v b="$MAX_BUDGET_USD" 'BEGIN { exit !(b + 0 >= 0.50) }'; then
+        log "--max-budget-usd must be >= 0.50 (0.25 is reserved for scoring)"
+        exit 2
+    fi
+}
+
+main() {
+    parse_flags "$@"
+    resolve_state_dir
+    case "$MODE" in
+        print|install|uninstall) schedule_main "$MODE"; exit 0 ;;
+    esac
+    # Phases 2-5 fill in the run pipeline here.
+    log "run pipeline not implemented yet"
+    exit 1
+}
+
+# Sourceable: a harness can `source` the script and call one function.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

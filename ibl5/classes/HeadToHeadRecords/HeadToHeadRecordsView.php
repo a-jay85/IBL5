@@ -285,8 +285,9 @@ final class HeadToHeadRecordsView
         if ($entry['color1'] !== '') {
             $c1        = TableStyles::sanitizeColor($entry['color1']);
             $c2        = TableStyles::sanitizeColor($entry['color2']);
+            $text      = \Player\Views\TeamColorHelper::getReadableTextColor($c1, $c2);
             $classes  .= ' ibl-team-cell--colored';
-            $styleAttr = ' style="--team-cell-bg: #' . $c1 . '; --team-cell-color: #' . $c2 . ';"';
+            $styleAttr = ' style="--team-cell-bg: #' . $c1 . '; --team-cell-color: #' . $text . ';"';
         }
 
         $inner = '<img src="' . $safeLogo . '" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';

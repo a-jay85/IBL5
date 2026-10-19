@@ -118,6 +118,30 @@ class MomentFormatterTest extends TestCase
         ], $labels);
     }
 
+    public function testDiscordLineNeutralizesMentions(): void
+    {
+        $moment = new Moment(
+            kind: MomentKind::FiftyPointGame,
+            key: 'fifty_point_game:2019-02-14:1',
+            date: '2019-02-14',
+            seasonYear: 2019,
+            pid: 1,
+            playerName: '@everyone',
+            teamId: 1,
+            teamName: 'Hawks',
+            opponentTeamId: 2,
+            opponentName: 'Celtics',
+            facts: ['points' => 52],
+        );
+
+        $line = $this->formatter->discordLine($moment, 2);
+
+        $this->assertStringContainsString("@\u{200B}everyone", $line);
+        $this->assertStringNotContainsString('@everyone', $line);
+        $this->assertStringStartsWith('On this day in IBL history (2 seasons ago, Feb 14, 2019): ', $line);
+        $this->assertLessThanOrEqual(1900, mb_strlen($line));
+    }
+
     public function testDateLabelFormatsMonthDayYear(): void
     {
         $this->assertSame('Feb 14, 2019', $this->formatter->dateLabel('2019-02-14'));

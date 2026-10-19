@@ -17,8 +17,11 @@ use OnThisDay\Contracts\OnThisDayRepositoryInterface;
  *
  * @see \Database\BaseMysqliRepository For base class documentation
  */
-class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnThisDayRepositoryInterface
+class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnThisDayRepositoryInterface, Contracts\SimPostClaimInterface
 {
+    /** ibl_settings key holding the last sim the Discord step posted for. */
+    public const LAST_POSTED_SIM_KEY = 'on_this_day_last_posted_sim';
+
     /**
      * Widest month/day window: radius 7 on each side of the center date.
      */
@@ -354,6 +357,27 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
         $endDate = $row['end_date'] ?? null;
 
         return is_string($endDate) && $endDate !== '' ? $endDate : null;
+    }
+
+    /**
+     * Single-statement upsert: only a strictly newer sim changes the stored
+     * value, so a re-run or an older sim affects 0 rows.
+     *
+     * @see Contracts\SimPostClaimInterface::claimSimPost()
+     */
+    public function claimSimPost(int $sim): bool
+    {
+        $affected = $this->execute(
+            "INSERT INTO `ibl_settings` (setting_key, setting_value, league)
+             VALUES (?, ?, 'ibl')
+             ON DUPLICATE KEY UPDATE setting_value = IF(CAST(setting_value AS UNSIGNED) < CAST(VALUES(setting_value) AS UNSIGNED),
+                                                        VALUES(setting_value), setting_value)",
+            'ss',
+            self::LAST_POSTED_SIM_KEY,
+            (string) $sim,
+        );
+
+        return $affected > 0;
     }
 
     /**

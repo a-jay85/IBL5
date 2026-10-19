@@ -70,6 +70,23 @@ final class MomentFormatter
         return (new \DateTimeImmutable($ymd))->format('M j, Y');
     }
 
+    /**
+     * One-line Discord post. Every `@` gets a zero-width space so a name can
+     * never ping @everyone or @here; the cut keeps it under Discord's
+     * 2000-character cap.
+     */
+    public function discordLine(Moment $m, int $seasonsAgo): string
+    {
+        $line = sprintf(
+            'On this day in IBL history (%s, %s): %s.',
+            $this->seasonsAgoLabel($seasonsAgo),
+            $this->dateLabel($m->date),
+            $this->describe($m),
+        );
+
+        return mb_substr(str_replace('@', "@\u{200B}", $line), 0, 1900);
+    }
+
     private function describeTrade(Moment $m): string
     {
         $text = sprintf('%s moved from the %s to the %s', $m->playerName, $m->opponentName, $m->teamName);

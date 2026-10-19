@@ -19,11 +19,30 @@ from harness.state import HarnessError, TerminalState, UsageLedger
 from harness import cifix, ciwatch, schemas
 from harness.armable import manual_testing_clearance
 from harness.classify import MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC, classify
+from harness.review import VERIFIER_PURPOSES
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+
+
+def _all_real(count): return json.dumps([{"n": i, "verdict": "real", "reason": "verified"} for i in range(1, count + 1)])
+
+
+def _verifier_replies(count):
+    return {p: _all_real(count) for p in VERIFIER_PURPOSES}
+
+
+@pytest.fixture(autouse=True)
+def _pin_verifier_worktree(monkeypatch, tmp_path):
+    """Replay passes no worktree to run(), which would take the keep-all fallback. Pin one on the
+    review phase so the canned verifier replies drive 4D. Requests standard_review_depth first
+    (when the module uses it) so this wrap sits on top of that patch."""
+    real = runner._review_phase_for
+    monkeypatch.setattr(runner, "_review_phase_for",
+                        lambda llm, gh, copy, meta, log, worktree=None: real(
+                            llm, gh, copy, meta, log, worktree=str(tmp_path)))
 
 
 def load(slug):
@@ -91,12 +110,12 @@ def test_manual_held_visual_pr():
 def test_finding_at_80_blocks_arming():
     canned = dict(CANNED)
     canned["review-agent-a"] = [{"path": "ibl5/x.php", "line": 3, "body": "real bug"}]
-    canned["score-findings"] = [{"n": 1, "score": 85}]
+    canned.update(_verifier_replies(1))
     res, out = run_slug("request-event-logging", canned)
     assert any(c.number == 2 for c in res.arm.holds)
     acts = _actions(out)
     posted = [a for a in acts if a["action"] == "pr_review_findings"]
-    assert posted and posted[0]["findings"][0]["score"] == 85
+    assert posted and posted[0]["findings"][0]["score"] == 100
 
 
 def test_llm_safety_verdict_can_add_hold():
@@ -288,7 +307,7 @@ def test_envelope_unwrap_reaches_findings():
     out = tempfile.mkdtemp()
     canned = dict(CANNED)
     canned["review-agent-a"] = {"findings": [{"path": "a.php", "line": 1, "body": "x"}]}
-    canned["score-findings"] = [{"n": 1, "score": 85}]   # finding survives (≥80 threshold)
+    canned.update(_verifier_replies(1))   # finding survives: three real votes
     llm = FixtureLlm(UsageLedger(), canned)
     res = runner.run(_fixture(), out, llm, mode="replay")
     assert res.terminal == TerminalState.SHIPPED_HELD   # surviving finding blocks arming
@@ -1295,7 +1314,7 @@ def test_background_watch_is_reaped_on_harness_error(monkeypatch, tmp_path):
                         lambda bg, **k: reaped.append(bg))
 
     class _ExplodingReviewPhase:
-        def __init__(self, llm, gh, depth=None):
+        def __init__(self, llm, gh, depth=None, **kw):
             pass
 
         def run(self, *a, **k):

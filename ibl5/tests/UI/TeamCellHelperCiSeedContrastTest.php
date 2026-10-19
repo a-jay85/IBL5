@@ -21,9 +21,8 @@ final class TeamCellHelperCiSeedContrastTest extends TestCase
         self::assertNotFalse($start, 'ibl_team_info INSERT not found in ci-seed.sql');
 
         $rest = substr($sql, $start);
-        // The statement ends at the first ";" (the last row closes with ");").
-        $end = strpos($rest, ';');
-        $block = $end === false ? $rest : substr($rest, 0, $end);
+        // The statement ends at the first line ending in ";" (the last row closes with ");").
+        $block = preg_split('/;\s*$/m', $rest, 2)[0];
 
         preg_match_all(
             '/^\s*\(\s*(\d+),\s*\'[^\']*\',\s*\'([^\']*)\',\s*\'([0-9A-Fa-f]{6})\',\s*\'([0-9A-Fa-f]{6})\',/m',
@@ -47,11 +46,8 @@ final class TeamCellHelperCiSeedContrastTest extends TestCase
 
         $this->assertCount(29, $pairs);
 
-        $byId = [];
-        foreach ($pairs as $tuple) {
-            $byId[$tuple[0]] = $tuple;
-        }
-        $this->assertSame(['4', 'Diesels', '006BB6', 'ED174C'], $byId['4'] ?? null);
+        $diesels = array_values(array_filter($pairs, static fn (array $tuple): bool => $tuple[0] === '4'));
+        $this->assertSame([['4', 'Diesels', '006BB6', 'ED174C']], $diesels);
     }
 
     public function testEveryCiSeedTeamPairRendersAtLeastFourPointFiveToOne(): void

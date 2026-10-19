@@ -1763,5 +1763,125 @@ run_tick
 no_file "$STATE_DIR/pending/legacy1" || fail "pending-legacy-3col: legacy pending file survived"
 end_case pending-legacy-3col
 
+# --- conflict re-try on a new master tip ---------------------------------------------------
+# Every flow runs real ticks: tick N launches, the stub hands tick N+1 the canned result, and
+# tick N+1 settles it and then qualifies.
+TODAY_STR="$(date +%F)"
+DIRTY101='101|branch-one|aaa1111|DIRTY|false'
+WAIT_NOTE='skip PR 101: retry cap (head aaa1111; rebase conflict, waiting for a new master tip)'
+CAP_NOTE='skip PR 101: retry cap (head aaa1111; rebase conflict, daily cap of 2 launches reached)'
+
+# conflict-same-tip-skipped (+ conflict-new-tip-launched, conflict-third-launch-skipped,
+# conflict-day-rollover as one continuing flow)
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "conflict-same-tip-skipped: tick 1 launches $(launch_count), want 1"
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "conflict-same-tip-skipped: relaunched on an unchanged tip"
+out_has "$WAIT_NOTE" || fail "conflict-same-tip-skipped: no waiting note: $OUT"
+end_case conflict-same-tip-skipped
+
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+set_tip e0002
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-new-tip-launched: launches $(launch_count), want 2"
+[[ "$(retries 101)" == "$TODAY_STR 2" ]] || fail "conflict-new-tip-launched: retries/101 is '$(retries 101)'"
+end_case conflict-new-tip-launched
+
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+set_tip e0002
+run_tick
+set_tip e0003
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-third-launch-skipped: launches $(launch_count), want 2"
+out_has "$CAP_NOTE" || fail "conflict-third-launch-skipped: no daily-cap note: $OUT"
+# conflict-day-rollover (invocation-2-only for the date: no seam fakes the clock): a stale-dated
+# counter at the cap reads as 0.
+printf '2000-01-01 2\n' > "$STATE_DIR/retries/101"
+set_tip e0004
+run_tick
+[[ "$(launch_count)" == "3" ]] || fail "conflict-day-rollover: launches $(launch_count), want 3"
+[[ "$(retries 101)" == "$TODAY_STR 1" ]] || fail "conflict-day-rollover: retries/101 is '$(retries 101)'"
+end_case conflict-third-launch-skipped
+
+# non-conflict-new-tip-skipped: a later held or failed settle clears the hold, and a red PR is
+# never a conflict hold, so a new master tip reopens none of them.
+for oc in "held\t-" "failed\tterminal=x"; do
+    reset; begin_case
+    mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
+    set_prs "$DIRTY101"; set_result "101\tfired\t$oc"
+    set_tip e0001
+    run_tick
+    set_tip e0002
+    run_tick
+    [[ "$(launch_count)" == "1" ]] || fail "non-conflict-new-tip-skipped($oc): relaunched on a new tip"
+    out_has 'skip PR 101: retry cap (head aaa1111)' || fail "non-conflict-new-tip-skipped($oc): no plain note: $OUT"
+    out_has 'rebase conflict' && fail "non-conflict-new-tip-skipped($oc): conflict wording on a non-conflict hold"
+    end_case non-conflict-new-tip-skipped
+done
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+set_tip e0002
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "non-conflict-new-tip-skipped(red): relaunched on a new tip"
+out_has 'skip PR 101: retry cap (head aaa1111)' || fail "non-conflict-new-tip-skipped(red): no plain note: $OUT"
+out_has 'rebase conflict' && fail "non-conflict-new-tip-skipped(red): conflict wording on a red PR"
+end_case non-conflict-new-tip-skipped
+
+# conflict-declined-still-skipped (invocation-2-only: a state reachable only across many runs):
+# the bypass opens only the attempted-key skip, the declined skip still holds.
+reset; begin_case
+mkdir -p "$STATE_DIR/attempts" "$STATE_DIR/declined" "$STATE_DIR/conflict-hold"
+key_of aaa1111 > "$STATE_DIR/attempts/101"; key_of aaa1111 > "$STATE_DIR/declined/101"
+key_of e0001 > "$STATE_DIR/conflict-hold/101"
+set_prs "$DIRTY101"
+set_tip e0002
+run_tick
+no_file "$SCRATCH/pr-cycle.log" || fail "conflict-declined-still-skipped: launched a declined head"
+out_has 'holdrepeat declined (head aaa1111)' || fail "conflict-declined-still-skipped: no declined note: $OUT"
+end_case conflict-declined-still-skipped
+
+# conflict-tip-unset-and-empty: an unset or empty seam selects the git default, the fixture has
+# no refs/remotes/origin/master, and an unreadable tip never opens the bypass.
+for mode in unset empty junk; do
+    reset; begin_case
+    set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+    set_tip e0001
+    run_tick
+    case "$mode" in
+        unset) E_MASTERTIP="$UNSET" ;;
+        empty) E_MASTERTIP="" ;;
+        junk)  E_MASTERTIP="$SCRATCH/mastertip-junk" ;;
+    esac
+    run_tick
+    [[ "$(launch_count)" == "1" ]] || fail "conflict-tip-unset-and-empty($mode): relaunched without a readable tip"
+    out_has "$WAIT_NOTE" || fail "conflict-tip-unset-and-empty($mode): no waiting note: $OUT"
+    end_case conflict-tip-unset-and-empty
+done
+
+# conflict-dry-run-no-ledger: an eligible conflict PR prints would-run and writes nothing.
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+run_tick
+set_tip e0002
+run_tick --dry-run
+out_has 'would run:' || fail "conflict-dry-run-no-ledger: dry run did not qualify the PR: $OUT"
+[[ "$(retries 101)" == "$TODAY_STR 1" ]] || fail "conflict-dry-run-no-ledger: retries/101 is '$(retries 101)'"
+[[ "$(pending_count)" == "0" ]] || fail "conflict-dry-run-no-ledger: dry run wrote pending/"
+[[ "$(launch_count)" == "1" ]] || fail "conflict-dry-run-no-ledger: dry run launched"
+end_case conflict-dry-run-no-ledger
+
 # --- summary -------------------------------------------------------------------------------
 h_done

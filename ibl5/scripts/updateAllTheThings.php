@@ -319,6 +319,7 @@ try {
             new \Season\SeasonQueryRepository($mysqli_db),
             \SimRecap\GitHubDispatchClient::fromConfig(),
         ));
+        $updaterService->addStep(\OnThisDay\OnThisDayFactory::createPostStep($mysqli_db));
     }
 
     $controller = new Updater\UpdaterController($updaterService, $view);

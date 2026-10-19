@@ -49,15 +49,7 @@ $controller = new \Topics\News\NewsController(
     new \LastSimRecap\LastSimRecapView(),
     new \Topics\News\NewsService($mysqli_db),
     new \Topics\News\NewsView(),
-    onThisDayService: new \OnThisDay\OnThisDayService(
-        new \OnThisDay\CachedOnThisDayRepository(
-            new \OnThisDay\OnThisDayRepository($mysqli_db),
-            new \Cache\DatabaseCache($mysqli_db),
-        ),
-        new \Season\SeasonQueryRepository($mysqli_db),
-        new \OnThisDay\WowScorer(),
-        new \OnThisDay\OnThisDayCalendar(),
-    ),
+    onThisDayService: \OnThisDay\OnThisDayFactory::createService($mysqli_db),
     onThisDayView: new \OnThisDay\OnThisDayView(),
 );
 

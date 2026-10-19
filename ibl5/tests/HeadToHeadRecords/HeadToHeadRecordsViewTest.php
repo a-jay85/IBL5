@@ -486,6 +486,31 @@ class HeadToHeadRecordsViewTest extends TestCase
 
         // TableStyles::sanitizeColor returns '000000' for invalid colors
         self::assertStringContainsString('--team-cell-bg: #000000', $html);
+        self::assertStringContainsString('--team-cell-color: #ffffff', $html);
+    }
+
+    public function testH2hFailingPairFallsBackToReadableColor(): void
+    {
+        $payload = $this->makePlayedPayload(['color1' => '006BB6', 'color2' => 'ED174C']);
+        $html    = $this->view->renderMatrix($payload, []);
+
+        self::assertStringContainsString('--team-cell-bg: #006BB6; --team-cell-color: #ffffff;', $html);
+        self::assertStringNotContainsString('ED174C', $html);
+    }
+
+    public function testH2hHostileColorInputYieldsOnlyHexInStyle(): void
+    {
+        $payload = $this->makePlayedPayload(['color1' => 'red;background:url(x)', 'color2' => '"><script>']);
+        $html    = $this->view->renderMatrix($payload, []);
+
+        self::assertSame(1, preg_match('/ style="([^"]*--team-cell-bg[^"]*)"/', $html, $m));
+        self::assertMatchesRegularExpression(
+            '/^--team-cell-bg: #[0-9a-fA-F]{6}; --team-cell-color: #[0-9a-fA-F]{6};$/',
+            $m[1],
+        );
+        self::assertSame('--team-cell-bg: #000000; --team-cell-color: #ffffff;', $m[1]);
+        self::assertStringNotContainsString('url(', $html);
+        self::assertStringNotContainsString('<script', $html);
     }
 
     // ---------------------------------------------------------------------------

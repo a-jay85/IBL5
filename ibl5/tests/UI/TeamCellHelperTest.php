@@ -15,7 +15,7 @@ class TeamCellHelperTest extends TestCase
 
         $this->assertStringContainsString('class="ibl-team-cell--colored"', $result);
         $this->assertStringContainsString('--team-cell-bg: #FF0000', $result);
-        $this->assertStringContainsString('--team-cell-color: #FFFFFF', $result);
+        $this->assertStringContainsString('--team-cell-color: #000000', $result);
         $this->assertStringContainsString('images/logo/new1.png', $result);
         $this->assertStringContainsString('ibl-team-cell__text', $result);
         $this->assertStringContainsString('Miami', $result);
@@ -125,7 +125,7 @@ class TeamCellHelperTest extends TestCase
         $result = TeamCellHelper::renderTeamCell(1, 'Miami', '#FF0000', '#FFFFFF');
 
         $this->assertStringContainsString('--team-cell-bg: #FF0000', $result);
-        $this->assertStringContainsString('--team-cell-color: #FFFFFF', $result);
+        $this->assertStringContainsString('--team-cell-color: #000000', $result);
     }
 
     public function testRenderTeamCellWithExtraStylesPrependsBeforeTeamCellBg(): void
@@ -151,5 +151,40 @@ class TeamCellHelperTest extends TestCase
         $withEmptyExtra = TeamCellHelper::renderTeamCell(1, 'Miami', 'FF0000', 'FFFFFF', '', '', '', '');
 
         $this->assertSame($withoutParam, $withEmptyExtra);
+    }
+
+    public function testFailingPairFallsBackToReadableColor(): void
+    {
+        $result = TeamCellHelper::renderTeamCell(4, 'Diesels', '006BB6', 'ED174C');
+
+        $this->assertStringContainsString('--team-cell-bg: #006BB6; --team-cell-color: #ffffff;', $result);
+        $this->assertStringNotContainsString('ED174C', $result);
+    }
+
+    public function testPassingPairKeepsSecondaryColorVerbatim(): void
+    {
+        $result = TeamCellHelper::renderTeamCell(1, 'Metros', '00653A', 'FFFFFF');
+
+        $this->assertStringContainsString('--team-cell-color: #FFFFFF;', $result);
+    }
+
+    public function testHostileColorInputYieldsOnlyHexInStyle(): void
+    {
+        foreach (['red;background:url(x)', '"><script>alert(1)</script>', '#FFF'] as $hostile) {
+            $html = TeamCellHelper::renderTeamCell(1, 'X', $hostile, $hostile);
+
+            $this->assertSame(1, preg_match('/ style="([^"]*)"/', $html, $m));
+            // sanitizeColor accepts 3-digit hex, so '#FFF' passes through as the 3-digit bg.
+            $this->assertMatchesRegularExpression(
+                '/^--team-cell-bg: #(?:[0-9a-fA-F]{3}){1,2}; --team-cell-color: #[0-9a-fA-F]{6};$/',
+                $m[1],
+            );
+            $this->assertStringNotContainsString('url(', $html);
+            $this->assertStringNotContainsString('<script', $html);
+            $expected = $hostile === '#FFF'
+                ? '--team-cell-bg: #FFF; --team-cell-color: #000000;'
+                : '--team-cell-bg: #000000; --team-cell-color: #ffffff;';
+            $this->assertSame($expected, $m[1]);
+        }
     }
 }

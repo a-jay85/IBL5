@@ -179,6 +179,8 @@ if [ "$HEADLESS" = 1 ]; then
         echo "postplan-fix: merge of origin/master failed without a conflict state" >&2
         exit 1
     fi
+    CONFLICTED0="$(git -C "$WT" diff --name-only --diff-filter=U)"
+    BRANCH_PATHS="$(git -C "$WT" diff --name-only "origin/master...$HEAD0")"
     cd "$WT"
     REPLY="$("${ARGV[@]}" "$PROMPT" 2>&1)" || true
     LAST="$(printf '%s\n' "$REPLY" | sed '/^[[:space:]]*$/d' | tail -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
@@ -211,6 +213,19 @@ if [ "$HEADLESS" = 1 ]; then
     if [ -n "$(git -C "$WT" diff --name-only --diff-filter=U)" ]; then
         fix_abort "unresolved paths remain"
     fi
+    # Remit: a changed path must be conflicted, a branch path, a test path, or
+    # identical to origin/master (a clean master-side change from the merge).
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        case $'\n'"$CONFLICTED0"$'\n'"$BRANCH_PATHS"$'\n' in
+            *$'\n'"$p"$'\n'*) continue ;;
+        esac
+        case "$p" in
+            ibl5/tests/*|bin/test-*|tools/postplan-harness/tests/*) continue ;;
+        esac
+        git -C "$WT" diff --quiet origin/master -- "$p" && continue
+        fix_abort "session touched $p outside its remit"
+    done < <(git -C "$WT" diff --name-only HEAD)
     git -C "$WT" add -u
     if ! COMMIT_OUT="$(git -C "$WT" commit --no-edit 2>&1)"; then
         printf '%s\n' "$COMMIT_OUT" >&2

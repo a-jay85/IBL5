@@ -124,9 +124,8 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
 
     /**
      * A record game strictly exceeded every earlier regular-season single-game
-     * value in league history at the time it was played. Chronology needs every
-     * earlier game, so the window and season filters apply only after the
-     * running maximum is computed.
+     * value in league history. The league's first game has no prior high, so it
+     * never counts. The window and season filters apply after the running maximum.
      *
      * @see OnThisDayRepositoryInterface::findRecordGames()
      */
@@ -159,7 +158,7 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
                       JOIN `ibl_plr` p ON p.pid = r.pid
                       LEFT JOIN `ibl_team_info` t ON t.teamid = r.teamid
                       LEFT JOIN `ibl_team_info` o ON o.teamid = r.opponent_teamid
-                      WHERE r." . $column . " > COALESCE(r.prior_max, 0)
+                      WHERE r.prior_max IS NOT NULL AND r." . $column . " > r.prior_max
                         AND r.season_year < ?
                         AND DATE_FORMAT(r.game_date, '%m-%d') IN (" . self::MONTH_DAY_LIST . ")";
 

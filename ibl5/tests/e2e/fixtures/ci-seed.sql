@@ -828,7 +828,14 @@ INSERT INTO ibl_box_scores (
    1,
    38, 8, 15, 4, 5, 0, 1,
    3, 9, 11, 1, 2, 1, 3,
-   '0e000000-0000-0000-0000-000000000002');
+   '0e000000-0000-0000-0000-000000000002'),
+  -- League-first game (outside the 03-07 window): sets the prior high so the two
+  -- rows above are not record games and keep their fifty_point / triple_double cards.
+  ('2020-01-15', 1, 'Test Player', 'SG', 2, 1, 1,
+   1,
+   42, 21, 30, 9, 10, 1, 3,
+   3, 12, 12, 2, 2, 2, 2,
+   '0e000000-0000-0000-0000-000000000003');
 
 -- Boxscore coverage: player-level rows for 2026-02-20 game 1 (Metros@Stars)
 -- 4 Metros (visitor, tid=1) + 3 Stars (home, tid=2) = 7 rows

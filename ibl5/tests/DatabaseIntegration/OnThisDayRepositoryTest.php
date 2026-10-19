@@ -94,12 +94,13 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(self::PID_A, 'Rebounder');
         // 1890 precedes every other box score, so these three games are the whole chronology.
+        // 01-03 is the league's first game: it has no prior high, so it is not a record.
         $this->insertGame('1890-01-03', self::PID_A, 1, 2, 1, orb: 5, drb: 15);
         $this->insertGame('1890-01-05', self::PID_A, 1, 2, 1, orb: 5, drb: 20);
         $this->insertGame('1890-01-07', self::PID_A, 1, 2, 1, orb: 5, drb: 20);
 
         $moments = array_values(array_filter(
-            $this->only($this->repo->findRecordGames(['01-05', '01-07'], 1891), self::PID_A),
+            $this->only($this->repo->findRecordGames(['01-03', '01-05', '01-07'], 1891), self::PID_A),
             static fn (Moment $m): bool => $m->statLabel === 'rebounds',
         ));
 

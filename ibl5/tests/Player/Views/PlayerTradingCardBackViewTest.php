@@ -97,7 +97,6 @@ class PlayerTradingCardBackViewTest extends TestCase
     }
 
     /**
-     * getStyles() is deprecated and always returns ''; it is not under test here.
      * This test exercises render() to maintain 4-test coverage.
      */
     public function testRenderContainsPlayerHighsSection(): void

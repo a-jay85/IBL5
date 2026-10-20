@@ -1,6 +1,6 @@
 ---
-description: A weekly tool-less model run reads an aggregate digest of ibl_events through the SELECT-only credential and DMs recommendations to the owner. Raw URIs, user agents and identities never leave the database.
-last_verified: 2026-10-03
+description: A weekly tool-less model run reads an aggregate digest of ibl_events through the SELECT-only credential and posts recommendations to the #reviews channel. Raw URIs, user agents and identities never leave the database.
+last_verified: 2026-10-20
 ---
 
 # 0168. Weekly product-analytics review from ibl_events
@@ -15,7 +15,7 @@ Accepted
 
 ## Decision
 
-One script, `bin/events-review`, reads `ibl_events` weekly through the ADR-0093 SELECT-only credential over an SSH tunnel and builds an aggregate digest. Raw `request_uri` and `user_agent` are never selected. `referer` leaves the database only as one of four literals, and identities leave only as counts. An awk allow-list prints a route only when an authenticated GM hit it that week, and folds every other token into `other`. A `claude -p` run with `--tools ""` and `--strict-mcp-config`, from a temp directory outside the repo, drafts 3 to 5 recommendations. The output is defanged and sent only to the owner through `bin/discord-dm`. Nothing is applied automatically. The job runs from launchd on the owner's Mac on the subscription, so the repo gains no API key. A week below the minimum human-event count sends one line and spawns no model.
+One script, `bin/events-review`, reads `ibl_events` weekly through the ADR-0093 SELECT-only credential over an SSH tunnel and builds an aggregate digest. Raw `request_uri` and `user_agent` are never selected. `referer` leaves the database only as one of four literals, and identities leave only as counts. An awk allow-list prints a route only when an authenticated GM hit it that week, and folds every other token into `other`. A `claude -p` run with `--tools ""` and `--strict-mcp-config`, from a temp directory outside the repo, drafts 3 to 5 recommendations. The output is defanged and posted to the #reviews channel through `bin/discord-dm` and the `~/.iblbot-reviews-webhook-url` webhook. Nothing is applied automatically. The job runs from launchd on the owner's Mac on the subscription, so the repo gains no API key. A week below the minimum human-event count sends one line and spawns no model. The job fires on Sunday at 16:03 UTC, the weekly Claude usage reset. launchd times are local only, so the plist holds two Sunday entries (08:03 and 09:03 local) and passes `--at-reset`; the script exits 0 unless the UTC hour is 16, so exactly one fire runs in both PDT and PST. Failure notices stay on the default #dev webhook.
 
 Enforcement lives in `bin/test-events-review`, which runs in CI and pins the SQL block, the allow-list, the tool lockdown, and the DM defanging.
 

@@ -34,6 +34,7 @@ cat > "$BINSTUB/discord-dm" <<STUB
 #!/bin/sh
 [ "\$1" = "--chunk" ] && [ "\$2" = "-" ] || exit 64
 cat > "$T/dm.out"
+printf '%s' "\${DISCORD_DM_WEBHOOK_FILE-<unset>}" > "$T/dm.wh"
 STUB
 cat > "$BINSTUB/claude" <<STUB
 #!/bin/sh
@@ -76,7 +77,7 @@ run_cdd() {
 }
 
 reset_case() {
-  rm -f "$T"/*.out "$T"/*.argv "$T"/*.stdin
+  rm -f "$T"/*.out "$T"/*.argv "$T"/*.stdin "$T"/*.wh
   rm -rf "${T:?}/reports" "${T:?}/home"
 }
 
@@ -307,6 +308,40 @@ case_empty_env() {
   assert_contains "no HOME, no report dir: DM" "comprehension-digest DEGRADED: no report dir" "$(cat "$T/dm.out" 2>/dev/null)"
 }
 
+case_reviews_webhook() {
+  reset_case; mk_prs_mixed
+  local rc=0
+  HOME="$T/home" run_cdd --date 2026-10-03 >/dev/null 2>&1 || rc=$?
+  assert_eq "webhook: exit" 0 "$rc"
+  assert_eq "webhook: brief uses the default reviews file" "$T/home/.iblbot-reviews-webhook-url" "$(cat "$T/dm.wh")"
+  reset_case; mk_prs_mixed
+  COMPREHENSION_DIGEST_WEBHOOK_FILE="$T/custom-hook" run_cdd --date 2026-10-03 >/dev/null 2>&1 || true
+  assert_eq "webhook: override seam" "$T/custom-hook" "$(cat "$T/dm.wh")"
+  reset_case; mk_prs_mixed
+  FAKE_GH_RC=1 COMPREHENSION_DIGEST_WEBHOOK_FILE="$T/custom-hook" run_cdd --date 2026-10-03 >/dev/null 2>&1 || true
+  assert_eq "webhook: DEGRADED alert stays on the default webhook" "<unset>" "$(cat "$T/dm.wh")"
+}
+
+case_at_reset() {
+  local h rc
+  for h in 00 08 09 15 17; do
+    reset_case; mk_prs_mixed; rc=0
+    COMPREHENSION_DIGEST_UTC_HOUR=$h run_cdd --at-reset --date 2026-10-03 >/dev/null 2>&1 || rc=$?
+    assert_eq "at-reset $h: exit 0" 0 "$rc"
+    assert_absent "at-reset $h: no DM" "$T/dm.out"
+    assert_absent "at-reset $h: no report" "$T/reports"
+    assert_absent "at-reset $h: model never called" "$T/claude.argv"
+  done
+  reset_case; mk_prs_mixed; rc=0
+  COMPREHENSION_DIGEST_UTC_HOUR=16 run_cdd --at-reset --date 2026-10-03 >/dev/null 2>&1 || rc=$?
+  assert_eq "at-reset 16: exit 0" 0 "$rc"
+  assert_exists "at-reset 16: DM sent" "$T/dm.out"
+  assert_exists "at-reset 16: report written" "$T/reports/2026-10-03-comprehension-digest.md"
+  reset_case; mk_prs_mixed; rc=0
+  COMPREHENSION_DIGEST_UTC_HOUR=03 run_cdd --date 2026-10-03 >/dev/null 2>&1 || rc=$?
+  assert_exists "at-reset absent: manual run ignores the hour" "$T/dm.out"
+}
+
 case_help() {
   local o
   o=$("$SCRIPT" --help)
@@ -322,6 +357,9 @@ case_cron_setup() {
   assert_contains "cron: homebrew on PATH" "/opt/homebrew/bin" "$p"
   assert_contains "cron: Weekday key" "Weekday" "$p"
   assert_contains "cron: label" "com.ibl5.automouse-comprehension-digest" "$p"
+  assert_contains "cron: passes --at-reset" "<string>--at-reset</string>" "$p"
+  assert_contains "cron: 08:03 Sunday entry" $'<dict>\n\t\t\t<key>Weekday</key>\n\t\t\t<integer>0</integer>\n\t\t\t<key>Hour</key>\n\t\t\t<integer>8</integer>\n\t\t\t<key>Minute</key>\n\t\t\t<integer>3</integer>\n\t\t</dict>' "$p"
+  assert_contains "cron: 09:03 Sunday entry" $'<dict>\n\t\t\t<key>Weekday</key>\n\t\t\t<integer>0</integer>\n\t\t\t<key>Hour</key>\n\t\t\t<integer>9</integer>\n\t\t\t<key>Minute</key>\n\t\t\t<integer>3</integer>\n\t\t</dict>' "$p"
   # shellcheck disable=SC2016
   assert_not_contains "cron: no unexpanded HOME" '$HOME' "$p"
   "$CRON_SETUP" --bogus >/dev/null 2>&1 || rc=$?
@@ -332,7 +370,7 @@ for c in case_classify_buckets case_window_edges case_rejected_flags case_dry_ru
          case_success_path case_degraded_gate_denied case_degraded_claude_missing \
          case_degraded_claude_fail case_degraded_empty case_degraded_malformed \
          case_default_gate_zone case_fence_integrity case_zero_prs case_gh_failure \
-         case_limit_warning case_env_unset_vs_empty case_empty_env case_help case_cron_setup; do
+         case_limit_warning case_env_unset_vs_empty case_empty_env case_reviews_webhook case_at_reset case_help case_cron_setup; do
   "$c"
 done
 

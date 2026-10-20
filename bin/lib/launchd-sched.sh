@@ -98,6 +98,35 @@ lsched_calendar() {
     printf '\t</dict>\n'
 }
 
+# lsched_calendar_multi <"Key=int,Key=int,...">... — StartCalendarInterval array of
+# dicts, one dict per argument, for jobs that fire at several calendar points.
+lsched_calendar_multi() {
+    local entry pair
+    if [ "$#" -eq 0 ]; then
+        printf 'lsched_calendar_multi: at least one entry required\n' >&2
+        return 2
+    fi
+    for entry in "$@"; do
+        local IFS=,
+        for pair in $entry; do
+            case "$pair" in
+                *=*) ;;
+                *) printf 'lsched_calendar_multi: expected Key=int, got: %s\n' "$pair" >&2; return 2 ;;
+            esac
+        done
+    done
+    printf '\t<key>StartCalendarInterval</key>\n\t<array>\n'
+    for entry in "$@"; do
+        printf '\t\t<dict>\n'
+        local IFS=,
+        for pair in $entry; do
+            printf '\t\t\t<key>%s</key>\n\t\t\t<integer>%s</integer>\n' "${pair%%=*}" "${pair#*=}"
+        done
+        printf '\t\t</dict>\n'
+    done
+    printf '\t</array>\n'
+}
+
 # lsched_env_open / lsched_env_close — EnvironmentVariables dict at depth 1.
 lsched_env_open() { printf '\t<key>EnvironmentVariables</key>\n\t<dict>\n'; }
 lsched_env_close() { printf '\t</dict>\n'; }

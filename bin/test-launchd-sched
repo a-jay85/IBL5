@@ -283,12 +283,27 @@ ${TAB}${TAB}<integer>3</integer>
 ${TAB}${TAB}<key>Minute</key>
 ${TAB}${TAB}<integer>30</integer>
 ${TAB}</dict>" "$(emit lsched_calendar Hour=3 Minute=30)"
+expect_eq "lib-calendar-multi" "${TAB}<key>StartCalendarInterval</key>
+${TAB}<array>
+${TAB}${TAB}<dict>
+${TAB}${TAB}${TAB}<key>Weekday</key>
+${TAB}${TAB}${TAB}<integer>0</integer>
+${TAB}${TAB}${TAB}<key>Hour</key>
+${TAB}${TAB}${TAB}<integer>8</integer>
+${TAB}${TAB}</dict>
+${TAB}${TAB}<dict>
+${TAB}${TAB}${TAB}<key>Weekday</key>
+${TAB}${TAB}${TAB}<integer>0</integer>
+${TAB}${TAB}${TAB}<key>Hour</key>
+${TAB}${TAB}${TAB}<integer>9</integer>
+${TAB}${TAB}</dict>
+${TAB}</array>" "$(emit lsched_calendar_multi Weekday=0,Hour=8 Weekday=0,Hour=9)"
 expect_eq "lib-env-open-close" "${TAB}<key>EnvironmentVariables</key>
 ${TAB}<dict>
 ${TAB}</dict>" "$(emit lsched_env_open; emit lsched_env_close)"
 
 # Rejections return 2 and write to stderr.
-for rej in "lsched_program_arguments" "lsched_calendar Hour" "lsched_key_bool RunAtLoad yes"; do
+for rej in "lsched_program_arguments" "lsched_calendar Hour" "lsched_calendar_multi" "lsched_calendar_multi Hour" "lsched_key_bool RunAtLoad yes"; do
   # shellcheck disable=SC2086
   err="$( ( set -uo pipefail; . "$LIB"; $rej ) 2>&1 >/dev/null )"
   # shellcheck disable=SC2086

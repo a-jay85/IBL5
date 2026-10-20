@@ -5,6 +5,8 @@ import { withPhases } from '../fixtures/phase';
 // Read-only: this spec never submits a form, so it writes nothing to ibl_fa_offers
 // (bin/check-e2e-fa-offers-owner keeps free-agency-submission.spec.ts the sole writer).
 // pid=11 is the CI-seed pure free agent the FA suites already negotiate with.
+// Approved visual targets for the manual walkthrough of both pilot pages live in
+// `~/claude-plans/_reports/daisyui-spike-2026-10-20/` (`after-*` and `fa-after-*`).
 
 const NEGOTIATE_URL = 'modules.php?name=FreeAgency&pa=negotiate&pid=11';
 
@@ -40,6 +42,8 @@ test.describe('daisyUI pilot -- FA negotiate page', () => {
       expect(fontSize).toBeCloseTo(rootSize * 0.875, 2);
     });
 
+    // Verified mutation: pointing the theme's --color-primary at `var(--color-navy-8000)`
+    // (an undefined token) makes this read rgb(249, 250, 251) and fail.
     test('primary button resolves the ibl theme navy', async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 900 });
       await page.goto(NEGOTIATE_URL);

@@ -61,8 +61,13 @@ new_env() {
     export IBL5_BURNDOWN_BACKLOG="$STUB/backlog"
     mkdir -p "$HOME/claude-plans/_reports" "$IBL5_USAGE_GATE_STATE_DIR/markers" "$STUB"
     unset IBL5_BURNDOWN_RESERVE_PCT IBL5_BURNDOWN_MAX_FAILS IBL5_BURNDOWN_BATCH_TIMEOUT_MIN \
-        IBL5_BURNDOWN_EMPTY_SLEEP_MIN
+        IBL5_BURNDOWN_EMPTY_SLEEP_MIN IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN IBL5_BURNDOWN_PR_CEILING \
+        IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN
     STATE="$HOME/.claude/burndown-loop"
+    # Existing cases never exercise the scout: a fresh cooldown keeps the empty arm on
+    # its old 240m sleep. Scout cases rm this file first and drive the cooldown themselves.
+    mkdir -p "$STATE"
+    date +%s > "$STATE/scout.last"
     REPORTS="$HOME/claude-plans/_reports"
     LAUNCH_DIR="$HOME/Library/LaunchAgents"
     PATH="$STUB:$TMPROOT/bin:/usr/bin:/bin"
@@ -74,12 +79,29 @@ make_stubs() {
     printf '#!/bin/sh\nexit 1\n' > "$STUB/security"
     printf '#!/bin/sh\necho call >> "%s/curl.calls"\nexit 7\n' "$T" > "$STUB/curl"
     printf '#!/bin/sh\necho "$1" >> "%s/sleep.calls"\nif [ -f "%s/sleep.hook" ]; then sh "%s/sleep.hook"; rm -f "%s/sleep.hook"; fi\nexit 0\n' "$T" "$T" "$T" "$T" > "$STUB/sleep"
-    printf '#!/bin/sh\necho "$*" >> "%s/launchctl.calls"\nexit 0\n' "$T" > "$STUB/launchctl"
+    printf '#!/bin/sh\necho "$*" >> "%s/launchctl.calls"\n[ "$1" = list ] && [ -f "%s/launchctl.list" ] && cat "%s/launchctl.list"\nexit 0\n' "$T" "$T" "$T" > "$STUB/launchctl"
     # caffeinate -s <cmd...>: run the command directly so the exit status is the stub's own.
     printf '#!/bin/sh\nshift\nexec "$@"\n' > "$STUB/caffeinate"
     printf '#!/bin/sh\n{ cat; echo ---; } >> "%s/dm.calls"\n' "$T" > "$T/dm"
     # backlog stub: logs its args, prints held.txt when present, exits with backlog.rc (default 0).
     printf '#!/bin/sh\necho "$*" >> "%s/backlog.calls"\n[ -f "%s/held.txt" ] && cat "%s/held.txt"\nexit "$(cat "%s/backlog.rc" 2>/dev/null || echo 0)"\n' "$T" "$T" "$T" "$T" > "$STUB/backlog"
+    cat > "$STUB/gh" <<'GH_EOF'
+#!/bin/sh
+# gh stub: logs argv; `pr list` pops "<rc> <file>" from gh.queue, else prints [] rc 0.
+T="@T@"
+echo "$*" >> "$T/gh.calls"
+if [ "$1 $2" != "pr list" ]; then exit 0; fi
+q="$T/gh.queue"
+if [ -s "$q" ]; then
+    spec=$(head -n 1 "$q")
+    tail -n +2 "$q" > "$q.tmp"
+    mv "$q.tmp" "$q"
+    cat "${spec#* }"
+    exit "${spec%% *}"
+fi
+echo '[]'
+exit 0
+GH_EOF
     cat > "$STUB/claude" <<'CLAUDE_EOF'
 #!/usr/bin/env bash
 T="@T@"
@@ -123,6 +145,18 @@ case "$act" in
         ;;
     exit3) echo "BURNDOWN-LOOP: abort-exit-3" ;;
     silent) ;;
+    scout-fired) echo "BURNDOWN-SCOUT: fired 2" ;;
+    scout-none) echo "BURNDOWN-SCOUT: none" ;;
+    none-wait)
+        sentinel
+        echo "BURNDOWN-LOOP: none-selected"
+        now=$(date +%s)
+        jq -cn --argjson t "$now" --argjson rs "$((now + 160 * 3600))" \
+            '{five_hour:{utilization:5},seven_day:{utilization:50,resets_at:($rs|todate)},fetched_at:$t}' \
+            > "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+        ;;
+    unblock-none) echo "BURNDOWN-UNBLOCK: none" ;;
+    unblock-bold) echo '**BURNDOWN-UNBLOCK: pushed 1**' ;;
     crash) exit 1 ;;
     alarm) kill -ALRM $$ ;;
     marker)
@@ -134,6 +168,8 @@ exit 0
 CLAUDE_EOF
     sed -i.bak -e "s|@T@|$T|" -e "s|@REPO@|$REPO_ROOT|" "$STUB/claude"
     rm -f "$STUB/claude.bak"
+    sed -i.bak -e "s|@T@|$T|" "$STUB/gh"
+    rm -f "$STUB/gh.bak"
     chmod +x "$STUB"/*
     chmod +x "$T/dm"
 }
@@ -193,10 +229,31 @@ run_tree_loop() {  # <args...>: like run_loop, against the copied tree
 
 queue() { printf '%s\n' "$@" > "$T/claude.queue"; }
 
+# gh_reply <rc> <json>: queue one `gh pr list` reply.
+gh_reply() {
+    local f
+    f=$(mktemp "$T/gh.reply.XXXXXX")
+    printf '%s\n' "$2" > "$f"
+    echo "$1 $f" >> "$T/gh.queue"
+}
+
+# prs_json <count>: <count> open, non-draft, mergeable, unarmed, green chore PRs.
+prs_json() {
+    jq -cn --argjson n "$1" '[range(1; $n + 1) | {number: ., title: "chore: pr \(.)",
+        isDraft: false, headRefName: "b\(.)", mergeable: "MERGEABLE",
+        autoMergeRequest: null, statusCheckRollup: []}]'
+}
+
 # run_loop <args...>: sets OUT (stdout+stderr) and RC.
 run_loop() {
     OUT=$("$LOOP" "$@" 2>&1)
     RC=$?
+}
+
+# capped_env: new_env with the opt-in PR ceiling at 15, for the cap and unblock cases.
+capped_env() {
+    new_env
+    export IBL5_BURNDOWN_PR_CEILING=15
 }
 
 calls() {  # <file>: line count, 0 when absent
@@ -245,6 +302,12 @@ test_env_knob_empty_default() {
     assert_eq knob_empty:rc 0 "$RC"
     assert_contains knob_empty:timeout "$OUT" "timeout=5400"
     assert_contains knob_empty:max_fails "$OUT" "max_fails=3"
+    IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN='' IBL5_BURNDOWN_PR_CEILING='' \
+        IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN='' run_loop run --dry-run
+    assert_eq knob_empty_new:rc 0 "$RC"
+    assert_contains knob_empty_new:ceiling "$OUT" "ceiling=0"
+    assert_contains knob_empty_new:scout "$OUT" "scout_cooldown=240m"
+    assert_contains knob_empty_new:unblock "$OUT" "unblock_cooldown=120m"
 }
 
 test_env_knob_invalid() {
@@ -258,6 +321,34 @@ test_env_knob_invalid() {
     IBL5_BURNDOWN_BATCH_TIMEOUT_MIN=-5 run_loop run --dry-run
     assert_eq knob_neg:rc 2 "$RC"
     assert_contains knob_neg:names-var "$OUT" "IBL5_BURNDOWN_BATCH_TIMEOUT_MIN"
+    IBL5_BURNDOWN_PR_CEILING=abc run_loop run --dry-run
+    assert_eq knob_ceiling_abc:rc 2 "$RC"
+    assert_contains knob_ceiling_abc:names-var "$OUT" "IBL5_BURNDOWN_PR_CEILING"
+    IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN=0 run_loop run --dry-run
+    assert_eq knob_scout_zero:rc 2 "$RC"
+    assert_contains knob_scout_zero:names-var "$OUT" "IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN"
+    IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN=-5 run_loop run --dry-run
+    assert_eq knob_unblock_neg:rc 2 "$RC"
+    assert_contains knob_unblock_neg:names-var "$OUT" "IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN"
+}
+
+test_env_knob_values_new() {
+    new_env
+    IBL5_BURNDOWN_PR_CEILING=7 IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN=30 run_loop run --dry-run
+    assert_eq knob_values:rc 0 "$RC"
+    assert_contains knob_values:ceiling "$OUT" "ceiling=7"
+    assert_contains knob_values:scout "$OUT" "scout_cooldown=30m"
+}
+
+test_start_rejects_invalid_knob() {
+    new_env
+    seed_usage 5 0 1
+    IBL5_BURNDOWN_PR_CEILING=abc run_loop start
+    assert_eq start_knob:rc 2 "$RC"
+    assert_contains start_knob:names-var "$OUT" "IBL5_BURNDOWN_PR_CEILING"
+    assert_no_file start_knob:no-runner "$STATE/runner.sh"
+    assert_no_file start_knob:no-plist "$LAUNCH_DIR/com.ibl5.burndown-loop.plist"
+    assert_no_file start_knob:no-launchctl "$T/launchctl.calls"
 }
 
 test_env_reserve_values() {
@@ -694,6 +785,64 @@ test_start_bootstraps() {
     if [ -x "$STATE/runner.sh" ]; then pass start:runner-exec; else fail start:runner-exec "runner not executable"; fi
     assert_contains start:runner-sid "$(cat "$STATE/runner.sh" 2>/dev/null)" "--loop-sid="
     assert_contains start:bootstrap "$(cat "$T/launchctl.calls" 2>/dev/null)" "bootstrap gui/"
+}
+
+test_runner_persists_set_knobs() {
+    new_env
+    seed_usage 5 0 1
+    IBL5_BURNDOWN_PR_CEILING=7 IBL5_BURNDOWN_RESERVE_PCT=20 run_loop start
+    assert_eq runner_knobs:rc 0 "$RC"
+    assert_contains runner_knobs:ceiling "$(cat "$STATE/runner.sh" 2>/dev/null)" "export IBL5_BURNDOWN_PR_CEILING=7"
+    assert_contains runner_knobs:reserve "$(cat "$STATE/runner.sh" 2>/dev/null)" "export IBL5_BURNDOWN_RESERVE_PCT=20"
+}
+
+test_runner_omits_internal_vars() {
+    new_env
+    seed_usage 5 0 1
+    # REEXEC_FUTURE is a name the loop never unsets at startup, so only the case filter drops it.
+    IBL5_BURNDOWN_REEXEC_FUTURE=1 IBL5_BURNDOWN_LOOP=1 IBL5_BURNDOWN_EMPTY_SENTINEL=/tmp/x \
+        IBL5_BURNDOWN_MAX_FAILS='' run_loop start
+    assert_eq runner_internal:rc 0 "$RC"
+    local body
+    body=$(cat "$STATE/runner.sh" 2>/dev/null)
+    assert_not_contains runner_internal:reexec "$body" "REEXEC_FUTURE"
+    assert_not_contains runner_internal:loop "$body" "IBL5_BURNDOWN_LOOP="
+    assert_not_contains runner_internal:sentinel "$body" "EMPTY_SENTINEL"
+    assert_not_contains runner_internal:empty-value "$body" "IBL5_BURNDOWN_MAX_FAILS"
+    assert_not_contains runner_internal:empty-quotes "$body" "=''"
+}
+
+test_runner_exports_under_empty_env() {
+    new_env
+    seed_usage 5 0 1
+    IBL5_BURNDOWN_DISCORD_DM="$T/a b'c/dm" run_loop start
+    assert_eq runner_roundtrip:rc 0 "$RC"
+    local got
+    got=$(env -i PATH=/usr/bin:/bin /bin/bash -c 'eval "$(grep "^export IBL5_BURNDOWN_" "$1")"; printf %s "$IBL5_BURNDOWN_DISCORD_DM"' _ "$STATE/runner.sh")
+    assert_eq runner_roundtrip:value "$T/a b'c/dm" "$got"
+}
+
+test_runner_resume_carries_env() {
+    new_env
+    seed_usage 5 0 1
+    IBL5_BURNDOWN_PR_CEILING=7 run_loop start
+    assert_eq runner_resume:start-rc 0 "$RC"
+    gate_do "usage_argv_save $SID_A start --no-dm"
+    marker_for "$SID_A" burndown-loop
+    run_loop --resume-paused "$SID_A"
+    assert_eq runner_resume:rc 0 "$RC"
+    assert_contains runner_resume:carried "$(cat "$STATE/runner.sh" 2>/dev/null)" "export IBL5_BURNDOWN_PR_CEILING=7"
+    assert_contains runner_resume:sid "$(cat "$STATE/runner.sh" 2>/dev/null)" "--loop-sid=$SID_A"
+}
+
+test_runner_fresh_start_drops_old_env() {
+    new_env
+    seed_usage 5 0 1
+    IBL5_BURNDOWN_PR_CEILING=7 run_loop start
+    assert_contains runner_fresh:first "$(cat "$STATE/runner.sh" 2>/dev/null)" "IBL5_BURNDOWN_PR_CEILING"
+    run_loop start
+    assert_eq runner_fresh:rc 0 "$RC"
+    assert_not_contains runner_fresh:dropped "$(cat "$STATE/runner.sh" 2>/dev/null)" "IBL5_BURNDOWN_PR_CEILING"
 }
 
 test_start_refuses_live_lock() {
@@ -1147,6 +1296,62 @@ test_empty_streak_survives_reexec() {
     assert_no_file test_empty_streak_survives_reexec:blank-env-unset "$T/claude.reexec-env"
 }
 
+# ceiling_dms: how many "at the ceiling" DMs the run sent.
+ceiling_dms() {
+    if [ -f "$T/dm.calls" ]; then
+        grep -c 'open PRs at the ceiling' "$T/dm.calls" || true
+    else
+        echo 0
+    fi
+}
+
+test_gate_state_survives_reexec() {
+    # Carried: the held tick is already announced, so no ceiling DM.
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 15)"
+    : > "$STATE/unblock-disabled"
+    stop_on_sleep
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_GATE_STATE=ceiling' run
+    assert_eq gate_state:carried-dm 0 "$(ceiling_dms)"
+    assert_no_file gate_state:carried-env-unset "$T/claude.reexec-env"
+
+    # Absent: a hand-off from older code carries nothing, so the DM is sent.
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 15)"
+    : > "$STATE/unblock-disabled"
+    stop_on_sleep
+    reexec_handoff ':' run
+    assert_eq gate_state:absent-dm 1 "$(ceiling_dms)"
+
+    # Invalid: an unknown value keeps the default.
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 15)"
+    : > "$STATE/unblock-disabled"
+    stop_on_sleep
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_GATE_STATE=bogus' run
+    assert_eq gate_state:invalid-dm 1 "$(ceiling_dms)"
+
+    # Blind: a carried blind state suppresses the repeat gh-failure DM.
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 1 ''
+    stop_on_sleep
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_GATE_STATE=blind' run
+    assert_eq gate_state:blind-no-dm 0 "$(grep -c 'open-PR count unavailable' "$T/dm.calls" 2>/dev/null || true)"
+
+    # Unset hygiene: a batch child launched after the hand-off must not inherit the var.
+    capped_env
+    seed_usage 5 0 1
+    queue none
+    stop_on_sleep
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_GATE_STATE=ceiling' run
+    assert_eq gate_state:batch-ran 1 "$(calls "$T/claude.calls")"
+    assert_no_file gate_state:batch-env-unset "$T/claude.reexec-env"
+}
+
 test_all_skipped_sleeps() {
     new_env
     seed_usage 5 0 1
@@ -1158,6 +1363,21 @@ test_all_skipped_sleeps() {
     assert_contains test_all_skipped_sleeps:line "$OUT" "every picked item skipped; re-check in 240m"
     assert_contains test_all_skipped_sleeps:sleep "$OUT" "sleep 14400s reason=all-skipped"
     assert_eq test_all_skipped_sleeps:one-batch 1 "$(calls "$T/claude.calls")"
+}
+
+test_all_skipped_scouts() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue ledger-skipped scout-fired
+    stop_on_sleep
+    run_loop run
+    assert_contains all_skipped_scout:line "$OUT" "every picked item skipped; scouting, then re-check in 15m"
+    assert_not_contains all_skipped_scout:no-240m "$OUT" "re-check in 240m"
+    assert_contains all_skipped_scout:decision "$OUT" "decision=scout launch"
+    assert_contains all_skipped_scout:result "$OUT" "result=BURNDOWN-SCOUT: fired 2"
+    assert_contains all_skipped_scout:recheck "$OUT" "sleep 900s reason=scout-recheck"
+    assert_not_contains all_skipped_scout:no-backoff "$OUT" "reason=all-skipped"
 }
 
 test_mixed_status_no_backoff() {
@@ -1188,6 +1408,415 @@ test_all_skipped_once_no_sleep() {
     assert_eq test_all_skipped_once_no_sleep:rc 0 "$RC"
     assert_contains test_all_skipped_once_no_sleep:line "$OUT" "every picked item skipped"
     assert_not_contains test_all_skipped_once_no_sleep:no-sleep "$OUT" "reason=all-skipped"
+}
+
+# ---------------------------------------------------------------- open-PR ceiling
+
+# ceiling_fix: 15 open PRs shaped for the unblock candidate filter. Expected candidates:
+# 3:conflict,5:red. Every other edited PR is one the filter must exclude.
+ceiling_fix() {
+    prs_json 15 | jq -c '
+        map(if .number == 3 then .mergeable = "CONFLICTING"
+            elif .number == 5 then .statusCheckRollup = [{conclusion: "FAILURE"}]
+            elif .number == 7 then .title = "feat: x" | .mergeable = "CONFLICTING"
+            elif .number == 8 then .isDraft = true | .mergeable = "CONFLICTING"
+            elif .number == 9 then .autoMergeRequest = {enabledAt: "x"} | .mergeable = "CONFLICTING"
+            elif .number == 10 then .mergeable = "UNKNOWN" | .statusCheckRollup = [{conclusion: "FAILURE"}]
+            else . end)'
+}
+
+test_ceiling_below_runs_batch() {
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 14)"
+    queue none
+    stop_on_sleep
+    run_loop run
+    assert_contains ceiling_below:decision "$OUT" "decision=batch open=14 ceiling=15"
+    assert_eq ceiling_below:one-claude 1 "$(calls "$T/claude.calls")"
+    assert_contains ceiling_below:gh-argv "$(cat "$T/gh.calls" 2>/dev/null)" "pr list --repo a-jay85/IBL5 --state open --author @me --limit 500"
+}
+
+# Default is no cap: 30 open PRs still launch a batch, and gh is never asked to count.
+test_ceiling_default_off() {
+    new_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 30)"
+    queue none
+    stop_on_sleep
+    run_loop run
+    assert_contains ceiling_off:decision "$OUT" "decision=batch ceiling=off"
+    assert_eq ceiling_off:one-claude 1 "$(calls "$T/claude.calls")"
+    assert_not_contains ceiling_off:no-pr-list "$(cat "$T/gh.calls" 2>/dev/null)" "pr list"
+    assert_eq ceiling_off:no-dm 0 "$(grep -c 'ceiling' "$T/dm.calls" 2>/dev/null || true)"
+}
+
+test_ceiling_knob_zero_and_bad() {
+    new_env
+    IBL5_BURNDOWN_PR_CEILING=0 run_loop run --dry-run
+    assert_eq ceiling_zero:rc 0 "$RC"
+    assert_contains ceiling_zero:off "$OUT" "work=batch ceiling=off"
+    IBL5_BURNDOWN_PR_CEILING=07 run_loop run --dry-run
+    assert_eq ceiling_octal:rc 2 "$RC"
+    assert_contains ceiling_octal:names-var "$OUT" "IBL5_BURNDOWN_PR_CEILING"
+    IBL5_BURNDOWN_PR_CEILING=-1 run_loop run --dry-run
+    assert_eq ceiling_neg:rc 2 "$RC"
+}
+
+test_ceiling_at_holds_batch() {
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 15)"
+    stop_on_sleep
+    run_loop run
+    assert_eq ceiling_at:no-claude 0 "$(calls "$T/claude.calls")"
+    assert_contains ceiling_at:decision "$OUT" "decision=hold ceiling-idle open=15 ceiling=15"
+    assert_contains ceiling_at:sleep "$OUT" "sleep 1800s reason=ceiling-idle"
+}
+
+test_ceiling_knob_applies() {
+    new_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 3)"
+    stop_on_sleep
+    IBL5_BURNDOWN_PR_CEILING=3 run_loop run
+    assert_eq ceiling_knob:no-claude 0 "$(calls "$T/claude.calls")"
+    assert_contains ceiling_knob:decision "$OUT" "decision=hold ceiling-idle open=3 ceiling=3"
+}
+
+test_prcount_gh_failure_no_work() {
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 1 ''
+    stop_on_sleep
+    run_loop run
+    assert_contains prcount_fail:decision "$OUT" "decision=hold pr-count-failed rc=1"
+    assert_eq prcount_fail:no-claude 0 "$(calls "$T/claude.calls")"
+    assert_contains prcount_fail:sleep "$OUT" "reason=pr-count-failed"
+}
+
+test_prcount_unparseable_no_work() {
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 0 '{"a":1}'
+    stop_on_sleep
+    run_loop run
+    assert_contains prcount_obj:decision "$OUT" "decision=hold pr-count-failed rc=2"
+    assert_eq prcount_obj:no-claude 0 "$(calls "$T/claude.calls")"
+    gh_reply 0 'not json'
+    stop_on_sleep
+    run_loop run
+    assert_contains prcount_text:decision "$OUT" "decision=hold pr-count-failed rc=2"
+    assert_eq prcount_text:no-claude 0 "$(calls "$T/claude.calls")"
+}
+
+test_pace_wait_skips_gh() {
+    new_env
+    seed_usage 5 50 160
+    run_loop run --once
+    assert_eq pace_wait:rc 0 "$RC"
+    assert_no_file pace_wait:no-gh "$T/gh.calls"
+}
+
+test_ceiling_dm_on_state_change() {
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(prs_json 15)"
+    gh_reply 0 "$(prs_json 15)"
+    run_loop run
+    assert_eq ceiling_dm:enter 1 "$(grep -c 'open PRs at the ceiling' "$T/dm.calls")"
+    assert_eq ceiling_dm:leave 1 "$(grep -c 'below the ceiling again' "$T/dm.calls")"
+}
+
+test_gh_failure_dm_once() {
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 1 ''
+    gh_reply 1 ''
+    run_loop run
+    assert_eq gh_fail_dm:once 1 "$(grep -c 'open-PR count unavailable' "$T/dm.calls")"
+}
+
+test_unblock_chosen_at_ceiling() {
+    capped_env
+    seed_usage 5 0 1
+    local fix calls_txt
+    fix=$(ceiling_fix)
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    queue unblock-none
+    stop_on_sleep
+    IBL5_BURNDOWN_LOOP=1 run_loop run
+    calls_txt=$(cat "$T/claude.calls" 2>/dev/null)
+    assert_contains unblock:decision "$OUT" "decision=unblock open=15 ceiling=15 prs=3:conflict,5:red"
+    assert_contains unblock:optin-unset "$calls_txt" "OPTIN=unset"
+    assert_contains unblock:deny "$calls_txt" "--disallowedTools Bash(gh pr merge:*)"
+    assert_contains unblock:model "$calls_txt" "--model claude-sonnet-5-5"
+    assert_contains unblock:name "$calls_txt" "--name burndown-unblock-"
+    assert_contains unblock:prs-in-prompt "$calls_txt" "3:conflict,5:red"
+    assert_file unblock:cooldown-file "$STATE/unblock.last"
+    assert_contains unblock:done "$OUT" "unblock done prs=3:conflict,5:red rc=0 result=BURNDOWN-UNBLOCK: none"
+    assert_contains unblock:recheck "$OUT" "sleep 1800s reason=unblock-recheck"
+    assert_not_contains unblock:no-merge "$(cat "$T/gh.calls" 2>/dev/null)" "pr merge"
+}
+
+# Mutation check: anchoring the marker sed at ^BURNDOWN (no decoration prefix) fails
+# the result assertion below.
+test_unblock_marker_decorated() {
+    capped_env
+    seed_usage 5 0 1
+    local fix
+    fix=$(ceiling_fix)
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    queue unblock-bold
+    stop_on_sleep
+    run_loop run
+    assert_contains unblock_marker:result "$OUT" "result=BURNDOWN-UNBLOCK: pushed 1"
+}
+
+test_unblock_inflight_excluded() {
+    capped_env
+    seed_usage 5 0 1
+    local fix
+    fix=$(ceiling_fix)
+    printf '123\t0\tcom.ibl5.postplan-now-b3-20261015-010203-999\n' > "$T/launchctl.list"
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    queue unblock-none
+    stop_on_sleep
+    run_loop run
+    assert_contains unblock_inflight:decision "$OUT" "prs=5:red"
+    assert_not_contains unblock_inflight:no-3 "$OUT" "3:conflict"
+}
+
+test_unblock_cooldown_suppresses() {
+    capped_env
+    seed_usage 5 0 1
+    local fix
+    fix=$(ceiling_fix)
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    queue unblock-none
+    run_loop run
+    assert_eq unblock_cooldown:one-session 1 "$(grep -c -- '--name burndown-unblock-' "$T/claude.calls")"
+    assert_contains unblock_cooldown:hold "$OUT" "decision=hold unblock-cooldown open=15 ceiling=15 left="
+}
+
+test_unblock_disabled_holds() {
+    capped_env
+    seed_usage 5 0 1
+    : > "$STATE/unblock-disabled"
+    gh_reply 0 "$(ceiling_fix)"
+    stop_on_sleep
+    run_loop run
+    assert_contains unblock_disabled:decision "$OUT" "decision=hold unblock-disabled"
+    assert_eq unblock_disabled:no-claude 0 "$(calls "$T/claude.calls")"
+}
+
+test_unblock_arm_violation_disarms() {
+    capped_env
+    seed_usage 5 0 1
+    local fix
+    fix=$(ceiling_fix)
+    gh_reply 0 "$fix"
+    gh_reply 0 "$(printf '%s' "$fix" | jq -c 'map(if .number == 3 then .autoMergeRequest = {enabledAt: "x"} else . end)')"
+    queue unblock-none
+    stop_on_sleep
+    run_loop run
+    assert_contains arm_violation:disarm "$(cat "$T/gh.calls" 2>/dev/null)" "pr merge --disable-auto 3 --repo a-jay85/IBL5"
+    assert_file arm_violation:disabled "$STATE/unblock-disabled"
+    assert_contains arm_violation:log "$OUT" "ARM-CHECK violation=3:armed"
+    assert_contains arm_violation:dm "$(cat "$T/dm.calls" 2>/dev/null)" "ARM-CHECK failed"
+}
+
+test_unblock_armcheck_gh_failure_disables() {
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 0 "$(ceiling_fix)"
+    gh_reply 1 ''
+    queue unblock-none
+    stop_on_sleep
+    run_loop run
+    assert_contains armcheck_fail:log "$OUT" "violation=unverifiable:rc=1"
+    assert_file armcheck_fail:disabled "$STATE/unblock-disabled"
+}
+
+test_unblock_candidate_vanished_disables() {
+    capped_env
+    seed_usage 5 0 1
+    local fix
+    fix=$(ceiling_fix)
+    gh_reply 0 "$fix"
+    gh_reply 0 "$(printf '%s' "$fix" | jq -c 'map(select(.number != 3))')"
+    queue unblock-none
+    stop_on_sleep
+    run_loop run
+    assert_contains vanished:log "$OUT" "violation=3:gone"
+    assert_file vanished:disabled "$STATE/unblock-disabled"
+}
+
+test_unblock_usage_pause() {
+    new_env
+    seed_usage 5 0 1
+    local fix
+    fix=$(ceiling_fix)
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    queue marker
+    run_loop run
+    assert_eq unblock_pause:rc 75 "$RC"
+    assert_contains unblock_pause:log "$OUT" "RESULT paused"
+}
+
+# ---------------------------------------------------------------- gate state across a code re-exec
+
+test_gate_state_exported_on_reexec() {
+    capped_env
+    seed_usage 5 0 1
+    make_tree
+    : > "$STATE/unblock-disabled"
+    gh_reply 0 "$(prs_json 15)"
+    gh_reply 0 "$(prs_json 15)"
+    tree_hook bin/lib/usage-fetch.sh '# changed'
+    run_tree_loop run
+    assert_eq gate_exported:rc 0 "$RC"
+    assert_contains gate_exported:resumed "$OUT" "re-exec resumed pid="
+    assert_eq gate_exported:one-dm 1 "$(ceiling_dms)"
+}
+
+test_unblock_cooldown_survives_reexec() {
+    capped_env
+    seed_usage 5 0 1
+    make_tree
+    local fix
+    fix=$(ceiling_fix)
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    queue unblock-none
+    tree_hook bin/lib/usage-fetch.sh '# changed'
+    run_tree_loop run
+    assert_eq unblock_reexec:rc 0 "$RC"
+    assert_contains unblock_reexec:resumed "$OUT" "re-exec resumed pid="
+    assert_eq unblock_reexec:one-session 1 "$(grep -c -- '--name burndown-unblock-' "$T/claude.calls")"
+    assert_contains unblock_reexec:hold "$OUT" "decision=hold unblock-cooldown"
+}
+
+# ---------------------------------------------------------------- empty-backlog scout
+
+test_scout_fires_when_empty() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue none scout-fired
+    stop_on_sleep
+    IBL5_BURNDOWN_LOOP=1 run_loop run
+    local scout_call
+    scout_call=$(grep -- '--name burndown-scout-' "$T/claude.calls" 2>/dev/null)
+    assert_contains scout:decision "$OUT" "decision=scout launch"
+    assert_contains scout:model "$scout_call" "--model claude-opus-5-5"
+    assert_contains scout:optin-unset "$scout_call" "OPTIN=unset"
+    assert_contains scout:skill "$scout_call" "/reset-ready"
+    assert_file scout:cooldown-file "$STATE/scout.last"
+    assert_contains scout:result "$OUT" "result=BURNDOWN-SCOUT: fired 2"
+    assert_contains scout:recheck "$OUT" "sleep 900s reason=scout-recheck"
+}
+
+test_scout_cooldown_skips() {
+    new_env
+    seed_usage 5 0 1
+    queue none
+    stop_on_sleep
+    run_loop run
+    assert_contains scout_cd:decision "$OUT" "decision=scout-skip cooldown left="
+    assert_eq scout_cd:no-scout 0 "$(grep -c -- '--name burndown-scout-' "$T/claude.calls")"
+    assert_contains scout_cd:sleep "$OUT" "reason=backlog-empty"
+}
+
+test_scout_cooldown_knob() {
+    new_env
+    seed_usage 5 0 1
+    echo $(( $(date +%s) - 120 )) > "$STATE/scout.last"
+    queue none scout-none
+    stop_on_sleep
+    IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN=1 run_loop run
+    assert_contains scout_knob:fires "$OUT" "decision=scout launch"
+}
+
+test_scout_cooldown_driven() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue none scout-none none
+    run_loop run
+    assert_eq scout_driven:one-scout 1 "$(grep -c -- '--name burndown-scout-' "$T/claude.calls")"
+    assert_contains scout_driven:second-skip "$OUT" "decision=scout-skip cooldown left="
+}
+
+test_scout_pace_skips() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue none-wait
+    stop_on_sleep
+    run_loop run
+    assert_contains scout_pace:skip "$OUT" "scout-skip pace sleep 1800 pace"
+    assert_eq scout_pace:no-scout 0 "$(grep -c -- '--name burndown-scout-' "$T/claude.calls")"
+}
+
+test_scout_never_under_once() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue none
+    run_loop run --once
+    assert_eq scout_once:rc 0 "$RC"
+    assert_eq scout_once:no-scout 0 "$(grep -c -- '--name burndown-scout-' "$T/claude.calls")"
+}
+
+test_scout_unconfirmed_marker() {
+    new_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    queue none silent
+    stop_on_sleep
+    run_loop run
+    assert_contains scout_marker:unconfirmed "$OUT" "scout done rc=0 result=unconfirmed"
+}
+
+test_dry_run_work_line() {
+    capped_env
+    seed_usage 5 0 1
+    rm -f "$STATE/scout.last"
+    gh_reply 0 "$(prs_json 15)"
+    run_loop run --dry-run
+    assert_eq dry_work:rc 0 "$RC"
+    assert_contains dry_work:verdict "$OUT" "DRY RUN work=hold ceiling-idle open=15 ceiling=15"
+    assert_contains dry_work:scout "$OUT" "scout=ready"
+    assert_no_file dry_work:no-claude "$T/claude.calls"
+    assert_no_file dry_work:no-scout-last "$STATE/scout.last"
+    assert_no_file dry_work:no-unblock-last "$STATE/unblock.last"
+    assert_eq dry_work:one-pr-list 1 "$(grep -c '^pr list' "$T/gh.calls")"
+    assert_contains dry_work:defaults "$OUT" "DRY RUN knobs ceiling=15 scout_cooldown=240m unblock_cooldown=120m"
+}
+
+test_dry_run_gh_failure() {
+    capped_env
+    seed_usage 5 0 1
+    gh_reply 1 ''
+    run_loop run --dry-run
+    assert_eq dry_gh_fail:rc 0 "$RC"
+    assert_contains dry_gh_fail:verdict "$OUT" "work=hold pr-count-failed rc=1"
+    assert_no_file dry_gh_fail:no-dm "$T/dm.calls"
+}
+
+test_dry_run_scout_cooldown() {
+    new_env
+    seed_usage 5 0 1
+    run_loop run --dry-run
+    assert_contains dry_scout_cd:cooldown "$OUT" "scout=cooldown left="
 }
 
 # ---------------------------------------------------------------- runner

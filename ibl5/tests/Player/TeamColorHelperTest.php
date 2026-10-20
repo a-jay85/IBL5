@@ -181,4 +181,21 @@ final class TeamColorHelperTest extends TestCase
         $this->assertLessThan(155, $rgb['g']);
         $this->assertLessThan(155, $rgb['b']);
     }
+
+    public function testGetReadableTextColorKeepsPreferredWhenContrastPasses(): void
+    {
+        $this->assertSame('ffffff', TeamColorHelper::getReadableTextColor('003DA5','ffffff'));
+    }
+
+    public function testGetReadableTextColorFallsBackWhenContrastFails(): void
+    {
+        $this->assertSame('000000', TeamColorHelper::getReadableTextColor('FF5733','003DA5'));
+    }
+
+    public function testGetReadableTextColorBoundaryAtMinRatio(): void
+    {
+        // On white: 767676 has ratio ~4.54 (kept), 777777 has ratio ~4.48 (falls back).
+        $this->assertSame('767676', TeamColorHelper::getReadableTextColor('ffffff', '767676'));
+        $this->assertSame('000000', TeamColorHelper::getReadableTextColor('ffffff', '777777'));
+    }
 }

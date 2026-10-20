@@ -188,6 +188,26 @@ class LeagueScheduleViewTest extends TestCase
         $this->assertStringContainsString('Playoffs', $html);
     }
 
+    public function testMonthHeaderCarriesIblCardHeaderClass(): void
+    {
+        $regular = $this->view->render($this->createPageData(gamesByMonth: [
+            '2025-11' => ['label' => 'November', 'dates' => []],
+        ]));
+        $this->assertStringContainsString('class="ibl-card__header schedule-month__header"', $regular);
+
+        $playoffs = $this->view->render($this->createPageData(
+            gamesByMonth: [
+                '2026-06' => ['label' => 'Playoffs', 'dates' => []],
+            ],
+            isPlayoffPhase: true,
+            playoffMonthKey: '2026-06',
+        ));
+        $this->assertStringContainsString(
+            'class="ibl-card__header schedule-month__header schedule-month__header--playoffs"',
+            $playoffs
+        );
+    }
+
     public function testRenderShowsDashForUnplayedScores(): void
     {
         $pageData = $this->createPageData(gamesByMonth: [

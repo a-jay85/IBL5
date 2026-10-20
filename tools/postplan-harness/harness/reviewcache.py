@@ -32,7 +32,7 @@ PROMPT_SOURCE_FILES = (
 # and runner.py so these cannot drift silently.
 MODEL_PINS = (
     "review-agent-a:sonnet", "review-agent-b:sonnet", "review-agent-d:sonnet",
-    "security-audit:sonnet", "score-findings:haiku", "body-check:sonnet",
+    "security-audit:sonnet", "verify-findings:sonnet", "body-check:sonnet",
 )
 REQUIRED_KEYS = ("schema_version", "slug", "pr_number", "run_id", "key", "per_file_ids")
 KEY_FIELDS = ("diff_id", "plan_hash", "version", "pr_title", "file_list")
@@ -286,7 +286,7 @@ def conflict_only_delta(record, key, current_files, pre_patch_id, manifest_paths
 
 
 REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
-                   "security-audit", "score-findings")
+                   "security-audit")
 
 
 def restore_body_check(record, version, input_hash, validator):

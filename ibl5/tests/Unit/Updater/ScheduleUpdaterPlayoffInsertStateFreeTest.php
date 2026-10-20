@@ -26,6 +26,14 @@ final class ScheduleUpdaterPlayoffInsertStateFreeTest extends TestCase
         'parsePlayoffGamesFromScheduleHtm', 'classifyPlayoffGame', 'insertPlayoffGame',
     ];
 
+    /** Helpers extracted from update(); each must stay a pure function of its scalar/array inputs. */
+    private const UPDATE_STEPS = [
+        'loadScheduledGames',
+        'resolveSlotDate',
+        'shouldSkipScheduledGame',
+        'insertScheduledGame',
+    ];
+
     /**
      * @param \ReflectionClass<object> $class
      * @return list<string>
@@ -64,6 +72,34 @@ final class ScheduleUpdaterPlayoffInsertStateFreeTest extends TestCase
                 self::assertContains($type->getName(), ['array', 'int', 'string']);
             }
         }
+    }
+
+    public function testUpdateStepsTakeOnlyScalarAndArrayParameters(): void
+    {
+        $class = new \ReflectionClass(ScheduleUpdater::class);
+
+        foreach (self::UPDATE_STEPS as $name) {
+            $method = $class->getMethod($name);
+            self::assertTrue($method->isPrivate(), "{$name}() must stay private");
+
+            foreach ($method->getParameters() as $parameter) {
+                $type = $parameter->getType();
+                self::assertInstanceOf(\ReflectionNamedType::class, $type);
+                self::assertTrue($type->isBuiltin(), "{$name}() must not take an object");
+                self::assertContains($type->getName(), ['array', 'int', 'string']);
+            }
+        }
+    }
+
+    public function testUpdateSeamIsPublicZeroArgAndReturnsVoid(): void
+    {
+        $method = new \ReflectionMethod(ScheduleUpdater::class, 'update');
+
+        self::assertTrue($method->isPublic());
+        self::assertSame(0, $method->getNumberOfParameters());
+        $type = $method->getReturnType();
+        self::assertInstanceOf(\ReflectionNamedType::class, $type);
+        self::assertSame('void', $type->getName());
     }
 
     public function testPlayoffInsertSeamIsPrivateZeroArgAndReturnsString(): void

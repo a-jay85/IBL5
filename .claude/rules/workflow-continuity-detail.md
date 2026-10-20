@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-14
+last_verified: 2026-10-18
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -115,7 +115,7 @@ arms. A failed proof stops before the push. When the patch-id is unchanged, the 
 the hold record's fingerprint so the next cycle still declines. A changed patch-id leaves the
 record alone, and the next cycle reviews the new tree. A failed rebase-only run never falls
 back to the skill. The fleet outcome word is `rebased`, and `bin/pr-cycle-tick` logs it
-without charging an attempt.
+without charging an attempt. The same tick also removes a `post-plan-running` label that is at least `PCW_STALE_LABEL_MIN` minutes old when no post-plan run for the PR is alive, so a run that died stops holding the PR out of the merge line; `bin/pr-cycle-tick --dry-run` shows what it would remove.
 
 ## What `--auto` adds
 
@@ -127,6 +127,7 @@ It does **not** hold post-plan for a "risky" plan. Post-plan **always** runs and
 the PR. Whether the PR then **auto-merges** is decided at `/post-plan` Phase 6.5, which
 honors a plan's `auto_merge: false` (see `/plan` Step 4) and otherwise leaves the PR open
 for a human to merge.
+A plan seeded by `bin/docfix-run` carries `auto_merge: docs-only-ready` instead; Phase 6.5 arms it only when the realized PR is a docs-only refresh with a two-way merge-danger line and a READY verdict, and holds it otherwise with the failed clause named.
 
 ## Ad-hoc branches
 

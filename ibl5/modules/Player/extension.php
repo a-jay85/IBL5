@@ -15,7 +15,7 @@ $serverName = is_string($serverNameRaw) ? $serverNameRaw : '';
 
 $controller = new \Extension\ExtensionController(
     new \Repositories\TeamIdentityRepository($mysqli_db),
-    new \Extension\ExtensionProcessor($mysqli_db, $serverName),
+    new \Extension\ExtensionService($mysqli_db, $serverName),
 );
 
 // NukeCompat::isUser()/cookieDecode() ignore their argument and read the $authService global

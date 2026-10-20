@@ -12,6 +12,7 @@ set_time_limit(0);
 
 $docRoot = dirname(__DIR__, 2);
 $_SERVER['DOCUMENT_ROOT'] = $docRoot;
+/** @var list<string> $argv */
 $serverName = in_array('--production', $argv, true) ? 'iblhoops.net' : 'localhost';
 $_SERVER['SERVER_NAME'] = $serverName;
 require $docRoot . '/ibl5/vendor/autoload.php';

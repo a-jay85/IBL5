@@ -573,7 +573,7 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         }
 
         $this->assertSame([
-            '$topic_title = \Security\HtmlSanitizer::safeHtmlOutput($topicText);',
+            '$safeTopicTitle = \Security\HtmlSanitizer::safeHtmlOutput($topicText);',
             '$title = \Security\HtmlSanitizer::safeHtmlOutput($row[\'title\']);',
             '$notes = \Security\HtmlSanitizer::safeHtmlOutput($row[\'notes\']);',
             '$topicname = \Security\HtmlSanitizer::e($topicRow[\'topicname\'] ?? \'\');',
@@ -643,8 +643,8 @@ class NewsControllerTest extends ModuleEntryPointTestCase
             }
         }
 
-        $this->assertSame(6, $echoes);
-        $this->assertSame(['OpenTable' => 1, 'CloseTable' => 1, 'blocks' => 1], $calls);
+        $this->assertSame(0, $echoes);
+        $this->assertSame(['OpenTable' => 0, 'CloseTable' => 0, 'blocks' => 1], $calls);
     }
 
     private function controllerSource(): string
@@ -704,8 +704,23 @@ class NewsControllerTest extends ModuleEntryPointTestCase
             $recapService ?? $this->recapServiceStub,
             $recapView ?? $this->recapViewStub,
             $news ?? $this->newsServiceStub,
-            $view ?? $this->newsViewStub,
+            $this->withRealChrome($view ?? $this->newsViewStub),
         );
+    }
+
+    /**
+     * Interface doubles return '' from the string-returning chrome methods; route them to the real NewsView
+     * so the page-level output stays comparable to the captured legacy bytes.
+     */
+    private function withRealChrome(\Topics\News\Contracts\NewsViewInterface $view): \Topics\News\Contracts\NewsViewInterface
+    {
+        if ($view instanceof \PHPUnit\Framework\MockObject\Stub) {
+            $real = new \Topics\News\NewsView();
+            $view->method('renderPageTitle')->willReturnCallback($real->renderPageTitle(...));
+            $view->method('renderTopicBanner')->willReturnCallback($real->renderTopicBanner(...));
+        }
+
+        return $view;
     }
 
     private function runMain(NewsController $controller, mixed $newTopic = 0): string

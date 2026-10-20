@@ -653,6 +653,9 @@ classify_unseen() {
         k=$((k + 1))
         classify_batch "$f" "$k"
         valid="$WORK/valid-$k.json"
+        if [ "$(jq '.assignments | length' "$valid")" -eq 0 ]; then
+            say "batch $k: the classifier assigned none of its $(wc -l < "$f" | tr -d ' ') threads"
+        fi
         # Classes made by this batch are visible to the next one, so keys stay
         # stable inside one run.
         # A thread the model skipped, or sent to a rejected class, is recorded
@@ -784,16 +787,16 @@ defang() {
 
 # threads_table <threads-json>: only validated rows get a line.
 threads_table() {
-    local row url pr path line res loc shown=0 total
-    total="$(jq 'length' <<< "$1")"
+    local row url pr path line res loc shown=0 valid=0
     printf '| Thread | PR | Location | Resolved |\n| --- | --- | --- | --- |\n'
     while IFS= read -r row; do
         [ -n "$row" ] || continue
-        # GitHub rejects a body over 65,536 characters; a row is about 190.
-        if [ "$shown" -ge "$TABLE_ROW_CAP" ]; then break; fi
         url="$(jq -r '.url // ""' <<< "$row")"; pr="$(jq -r '.pr // ""' <<< "$row")"
         [[ "$url" =~ ^https://github\.com/a-jay85/IBL5/pull/[0-9]+#discussion_r[0-9]+$ ]] || continue
         [[ "$pr" =~ ^[0-9]+$ ]] || continue
+        valid=$((valid + 1))
+        # GitHub rejects a body over 65,536 characters; a row is about 190.
+        if [ "$shown" -ge "$TABLE_ROW_CAP" ]; then continue; fi
         path="$(clean_inline "$(jq -r '.path // ""' <<< "$row")" 120)"
         line="$(jq -r '.line // ""' <<< "$row")"
         [[ "$line" =~ ^[0-9]+$ ]] || line=""
@@ -802,8 +805,8 @@ threads_table() {
         printf '| [thread](%s) | [#%s](https://github.com/a-jay85/IBL5/pull/%s) | `%s` | %s |\n' "$url" "$pr" "$pr" "$loc" "$res"
         shown=$((shown + 1))
     done < <(jq -c '.[]' <<< "$1")
-    if [ "$total" -gt "$TABLE_ROW_CAP" ]; then
-        printf '\n%s more threads are not listed here.\n' "$((total - TABLE_ROW_CAP))"
+    if [ "$valid" -gt "$shown" ]; then
+        printf '\n%s more threads are not listed here.\n' "$((valid - shown))"
     fi
 }
 

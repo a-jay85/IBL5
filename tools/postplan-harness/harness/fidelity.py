@@ -921,6 +921,130 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
     return parse_verdict(path2), read_reviewed_tree(path2), path2
 
 
+# --- Bounded body-only recheck: the Sonnet stand-in for re_review on a body-only round.
+# It can only remove an Opus spawn. Every decline writes nothing, and the caller falls
+# through to the unchanged re_review, so it never produces NOT READY or a hold.
+
+RECHECK_DECLINE_REASONS = (
+    "prior-verdict-unparsed", "prior-tree-unrecorded", "tree-changed",
+    "plan-hash-missing", "plan-changed", "not-pure-body",
+    "recheck-unresolved", "recheck-llm-invalid-output", "recheck-schema",
+    "recheck-llm-cli", "recheck-llm-empty", "recheck-harness-error",
+)
+
+
+def body_recheck_eligibility(prior_verdict_text: str, prior_tree: str | None,
+                             current_tree: str, plan_hash_at_review: str | None,
+                             plan_hash_now: str) -> tuple[list[str] | None, str | None]:
+    """Pure. (findings, None) when eligible; (None, reason) otherwise."""
+    words = VERDICT_RE.findall((prior_verdict_text or "").split(DIGEST_CUT, 1)[0])
+    if not words or words[-1] != "NOT READY":
+        return None, "prior-verdict-unparsed"
+    if prior_tree is None:
+        return None, "prior-tree-unrecorded"
+    if prior_tree != current_tree:
+        return None, "tree-changed"
+    if not plan_hash_at_review:
+        return None, "plan-hash-missing"
+    if plan_hash_at_review != plan_hash_now:
+        return None, "plan-changed"
+    findings = body_only_findings_text(prior_verdict_text)
+    if findings is None:
+        return None, "not-pure-body"
+    return findings, None
+
+
+def _name_status_paths(name_status: str) -> list[str]:
+    return [ln.split()[-1] for ln in (name_status or "").splitlines() if ln.split()]
+
+
+def body_recheck(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
+                 pr_body: str, prior_body: str, pr_number: int | str,
+                 prior_verdict_path: str, name_status: str,
+                 plan_hash_at_review: str | None, plan_hash_now: str, *,
+                 round_num: int = 1, log=None
+                 ) -> tuple[str | None, str | None, str | None, str | None]:
+    """(verdict, reviewed_tree, verdict_path, decline_reason).
+
+    Pass = ("READY", tree, path, None), with the verdict file written at re_review's
+    path for this round. Decline = (None, None, None, reason) with nothing written.
+    """
+    from . import schemas  # local: schemas is only needed on this path
+    log = log or _noop_log
+
+    def _decline(reason: str):
+        log(f"phase5.5 round {round_num}: body recheck declined ({reason})")
+        return None, None, None, reason
+
+    # Read once: the tree the predicate compares is the tree the verdict file records.
+    current_tree = gitad.head_tree()
+    try:
+        with open(prior_verdict_path) as fh:
+            prior_text = fh.read()
+    except OSError:
+        return _decline("prior-verdict-unparsed")
+    findings, reason = body_recheck_eligibility(
+        prior_text, read_reviewed_tree(prior_verdict_path), current_tree,
+        plan_hash_at_review, plan_hash_now)
+    if reason:
+        return _decline(reason)
+    fids = [f"F{i}" for i in range(1, len(findings) + 1)]
+    hunks = llm_calls.body_hunks(prior_body, pr_body)
+    hids = [h["id"] for h in hunks]
+    cited = {p for p in _name_status_paths(name_status)
+             if any(p in t for t in findings)
+             or any(p in ln for h in hunks for ln in h["new"])}
+    evidence = llm_calls.diff_sections_for(gitad.diff_vs_base(), cited)
+    prompt = llm_calls.pr_body_recheck_prompt(findings, hunks, prior_body, pr_body,
+                                              name_status, evidence)
+    purpose = f"plan-fidelity-body-recheck-{round_num + 1}"
+    audit = os.path.join(out_dir, f"body-recheck-{round_num + 1}.json")
+    try:
+        data = llm.call(purpose, "sonnet", prompt, schemas.body_recheck_validator(fids, hids),
+                        normalizer=schemas.unwrap_body_recheck_envelope)
+    except HarnessError as exc:
+        _write_audit(audit, {"error": exc.kind, "detail": str(exc.detail or "")[:2000]})
+        mapped = f"recheck-{exc.kind}"
+        return _decline(mapped if mapped in RECHECK_DECLINE_REASONS
+                        else "recheck-harness-error")
+    _write_audit(audit, data)
+    if not schemas.body_recheck_passed(data):
+        open_ids = [i["id"] for i in data.get("findings", []) + data.get("hunks", [])
+                    if i.get("status") in ("unresolved", "unsupported")]
+        log(f"phase5.5 round {round_num}: body recheck open ids {open_ids}")
+        return _decline("recheck-unresolved")
+
+    digest = prior_text.split(DIGEST_CUT, 1)[1] if DIGEST_CUT in prior_text else "\n"
+    digest = "\n".join(ln for ln in digest.splitlines()
+                       if not REVIEWED_TREE_RE.match(ln)).strip("\n")
+    path2 = verdict_path(f"{pr_number}-{round_num + 1}")
+    text = (
+        "REVIEW-COVERAGE: CURRENT\n"
+        f"Bounded body recheck ({purpose}, sonnet, no tools): tree {current_tree} is "
+        f"unchanged since the prior review; {len(fids)} prior body finding(s) resolved; "
+        f"{len(hids)} added body hunk(s) supported. No code was re-reviewed.\n"
+        "Passed: 1, 2, 3, 4, 5, 6.\n\n"
+        f"{FINDINGS_HEADING}\n\n"
+        "READY\n\n"
+        f"{DIGEST_CUT}\n{digest}\n"
+    )
+    try:
+        with open(path2, "w") as fh:
+            fh.write(text)
+    except OSError:
+        return _decline("recheck-harness-error")
+    record_reviewed_tree(path2, current_tree)
+    return parse_verdict(path2), read_reviewed_tree(path2), path2, None
+
+
+def _write_audit(path: str, data) -> None:
+    try:
+        with open(path, "w") as fh:
+            json.dump(data, fh, indent=2)
+    except (OSError, TypeError, ValueError):
+        pass
+
+
 def _norm_title(t: str) -> str:
     """Lowercase, strip non-alphanumeric-or-space, collapse spaces, first 60 chars."""
     t = t.lower()

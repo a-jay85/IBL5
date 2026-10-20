@@ -376,3 +376,195 @@ def test_body_recheck_passed_requires_all_resolved_and_supported():
         _reply(findings=(("F1", "resolved"), ("F2", "unresolved")))) is False
     assert schemas.body_recheck_passed(_reply(hunks=(("H1", "unsupported"),))) is False
     assert schemas.body_recheck_passed({"findings": [], "hunks": []}) is False
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: body_recheck orchestration
+# ---------------------------------------------------------------------------
+
+class _RecheckLlm(_ScriptedLlm):
+    """Adds the no-tools `call` path, mirroring ClaudeCli.call after its one re-ask."""
+
+    def __init__(self, ledger, scripts):
+        super().__init__(ledger, scripts)
+        self.prompts: dict[str, str] = {}
+
+    def call(self, purpose, model, prompt, validate, max_retries=1, normalizer=None):
+        self.calls.append((purpose, model))
+        self.prompts[purpose] = prompt
+        queue = self.scripts.get(purpose)
+        if queue is None:
+            raise HarnessError("llm-fixture-missing", purpose)
+        val = queue.pop(0) if len(queue) > 1 else queue[0]
+        if isinstance(val, dict) and "raise" in val:
+            raise HarnessError(val["raise"]["kind"], val["raise"].get("detail", ""))
+        if normalizer is not None:
+            val = normalizer(val)
+        try:
+            validate(val)
+        except HarnessError as e:
+            raise HarnessError("llm-invalid-output", e.detail) from e
+        return val
+
+
+class _FakeGit:
+    def __init__(self, tree=TREE_1, diff=TWO_FILE_DIFF):
+        self.tree = tree
+        self.diff = diff
+
+    def head_tree(self):
+        return self.tree
+
+    def diff_vs_base(self):
+        return self.diff
+
+
+PLAN_HASH = "a" * 64
+NAME_STATUS = "M\tibl5/tests/FooTest.php\nM\tibl5/classes/Bar.php\n"
+PASS_REPLY = {"findings": [_item("F1", "resolved")], "hunks": []}
+
+
+def _prior(tmp_path, text=VERDICT1_PURE_BODY, tree=TREE_1):
+    p = tmp_path / "v1.md"
+    p.write_text(text)
+    if tree:
+        fidelity.record_reviewed_tree(str(p), tree)
+    return str(p)
+
+
+def _recheck(tmp_path, pr, reply=PASS_REPLY, *, prior=None, git=None,
+             prior_body="Body says 26 cases.", pr_body="Body says 26 cases.",
+             hashes=(PLAN_HASH, PLAN_HASH)):
+    llm = _RecheckLlm(UsageLedger(), {"plan-fidelity-body-recheck-2": [reply]})
+    out = fidelity.body_recheck(
+        llm, git or _FakeGit(), str(tmp_path), str(tmp_path), _plan(), "dead" * 10,
+        pr_body, prior_body, pr, prior or _prior(tmp_path), NAME_STATUS,
+        hashes[0], hashes[1], round_num=1)
+    return out, llm
+
+
+def _path2(pr):
+    return fidelity.verdict_path(f"{pr}-2")
+
+
+def test_body_recheck_passes_and_writes_ready_verdict_file(tmp_path):
+    pr = 990001
+    try:
+        out, llm = _recheck(tmp_path, pr)
+        path2 = _path2(pr)
+        assert out == ("READY", TREE_1, path2, None)
+        assert fidelity.parse_verdict(path2) == "READY"
+        assert fidelity.read_reviewed_tree(path2) == TREE_1
+        assert fidelity.verdict_items(path2)["blocking"] == []
+        text = open(path2).read()
+        assert "Bounded body recheck" in text
+        assert "**What changed:** x" in text
+        assert llm.calls == [("plan-fidelity-body-recheck-2", "sonnet")]
+    finally:
+        _cleanup(f"{pr}-2")
+
+
+def test_body_recheck_declines_when_tree_changed(tmp_path):
+    pr = 990002
+    try:
+        out, llm = _recheck(tmp_path, pr, git=_FakeGit(tree="beef" * 10))
+        assert out == (None, None, None, "tree-changed")
+        assert llm.calls == []
+        assert not os.path.exists(_path2(pr))
+    finally:
+        _cleanup(f"{pr}-2")
+
+
+@pytest.mark.parametrize("hashes,reason", [
+    (("a" * 64, "b" * 64), "plan-changed"),
+    ((None, "b" * 64), "plan-hash-missing"),
+])
+def test_body_recheck_declines_when_plan_hash_changed_or_missing(tmp_path, hashes, reason):
+    pr = 990003
+    try:
+        out, llm = _recheck(tmp_path, pr, hashes=hashes)
+        assert out == (None, None, None, reason)
+        assert llm.calls == []
+    finally:
+        _cleanup(f"{pr}-2")
+
+
+def test_body_recheck_declines_when_prior_tree_unrecorded(tmp_path):
+    pr = 990004
+    try:
+        out, llm = _recheck(tmp_path, pr, prior=_prior(tmp_path, tree=None))
+        assert out == (None, None, None, "prior-tree-unrecorded")
+        assert llm.calls == []
+    finally:
+        _cleanup(f"{pr}-2")
+
+
+def test_body_recheck_declines_non_pure_body_without_calling_llm(tmp_path):
+    pr = 990005
+    try:
+        out, llm = _recheck(tmp_path, pr, prior=_prior(tmp_path, VERDICT1_CODE))
+        assert out == (None, None, None, "not-pure-body")
+        assert llm.calls == []
+    finally:
+        _cleanup(f"{pr}-2")
+
+
+def test_body_recheck_declines_on_unresolved_finding_and_writes_nothing(tmp_path):
+    pr = 990006
+    try:
+        out, _llm = _recheck(tmp_path, pr,
+                             {"findings": [_item("F1", "unresolved")], "hunks": []})
+        assert out == (None, None, None, "recheck-unresolved")
+        assert not os.path.exists(_path2(pr))
+    finally:
+        _cleanup(f"{pr}-2")
+
+
+def test_body_recheck_declines_on_unsupported_added_hunk(tmp_path):
+    pr = 990007
+    reply = {"findings": [_item("F1", "resolved")], "hunks": [_item("H1", "unsupported")]}
+    try:
+        out, llm = _recheck(tmp_path, pr, reply, prior_body="a\nb",
+                            pr_body="a\nb\nFollow-up filed.")
+        assert "H1 (insert)" in llm.prompts["plan-fidelity-body-recheck-2"]
+        assert out == (None, None, None, "recheck-unresolved")
+        assert not os.path.exists(_path2(pr))
+    finally:
+        _cleanup(f"{pr}-2")
+
+
+@pytest.mark.parametrize("reply,reason", [
+    ("not json", "recheck-llm-invalid-output"),
+    ([_item("F1", "resolved")], "recheck-llm-invalid-output"),
+    ({"raise": {"kind": "llm-cli"}}, "recheck-llm-cli"),
+    ({"raise": {"kind": "usage-limit"}}, "recheck-harness-error"),
+], ids=["string", "bare-list", "llm-cli", "unknown-kind"])
+def test_body_recheck_declines_on_invalid_reply_or_harness_error(tmp_path, reply, reason):
+    pr = 990008
+    try:
+        out, _llm = _recheck(tmp_path, pr, reply)
+        assert out == (None, None, None, reason)
+        assert not os.path.exists(_path2(pr))
+    finally:
+        _cleanup(f"{pr}-2")
+
+
+def test_body_recheck_result_envelope_still_passes(tmp_path):
+    pr = 990009
+    try:
+        out, _llm = _recheck(tmp_path, pr, {"result": PASS_REPLY})
+        assert out[0] == "READY" and out[3] is None
+    finally:
+        _cleanup(f"{pr}-2")
+
+
+def test_body_recheck_evidence_names_only_cited_files(tmp_path):
+    pr = 990010
+    try:
+        _out, llm = _recheck(tmp_path, pr)
+        prompt = llm.prompts["plan-fidelity-body-recheck-2"]
+        evidence = prompt.split("## DIFF EVIDENCE", 1)[1]
+        assert "testTwentySix" in evidence
+        assert "Bar.php" not in evidence
+    finally:
+        _cleanup(f"{pr}-2")

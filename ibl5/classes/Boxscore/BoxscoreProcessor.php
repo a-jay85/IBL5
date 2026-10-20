@@ -52,7 +52,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $this->leagueContext = $leagueContext;
         $this->repository = $repository ?? new BoxscoreRepository($db, $leagueContext);
         $this->auditRepository = $auditRepository ?? new BoxscoreAuditRepository($db, $leagueContext);
-        $this->season = $season ?? new Season($db);
+        $this->season = $season ?? \Season\SharedSeason::get($db);
         $this->progressReporter = $progressReporter ?? new FlushProgressReporter();
         $resolver = new GameUpsertResolver($this->repository);
         $writer = new GameLineWriter($db, $this->repository);

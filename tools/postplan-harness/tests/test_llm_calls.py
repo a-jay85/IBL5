@@ -5,7 +5,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-from harness.llm_calls import pr_body_check_prompt, pr_copy_prompt, retrospective_prompt
+from harness.llm_calls import (
+    PR_COPY_DIFF_CAP,
+    pr_body_check_prompt,
+    pr_copy_prompt,
+    retrospective_prompt,
+)
 from harness.schemas import validate_body_check
 from harness.state import Classification, HarnessError, PlanInfo
 
@@ -72,6 +77,38 @@ def test_pr_copy_prompt_states_gm_visible_files_and_keeps_feat_available():
     assert "GM-VISIBLE FILES: yes" in prompt
     assert "MUST NOT be feat" not in prompt
     assert "HAS_GM_VISIBLE=True" in prompt
+
+
+def test_pr_copy_prompt_forbids_counts_absent_from_packet():
+    prompt = pr_copy_prompt("some-slug", _cls(), PlanInfo(), "")
+    assert "COUNTS: state no exact count" in prompt
+    assert "Describe the change in words instead" in prompt
+
+
+def test_pr_copy_prompt_limits_claims_to_the_diff():
+    prompt = pr_copy_prompt("some-slug", _cls(), PlanInfo(), "")
+    assert "CLAIMS: every summary_md bullet claims only what the DIFF above shows" in prompt
+    assert "do not claim it" in prompt
+
+
+def test_pr_copy_prompt_notes_truncation_when_diff_exceeds_cap():
+    c = _cls()
+    c.filtered_diff = "x" * (PR_COPY_DIFF_CAP + 1)
+    prompt = pr_copy_prompt("some-slug", c, PlanInfo(), "")
+    assert "DIFF TRUNCATED" in prompt
+    assert "State no count that spans the full diff" in prompt
+    assert prompt.count("x" * PR_COPY_DIFF_CAP) == 1          # the slice is still applied
+    assert ("x" * (PR_COPY_DIFF_CAP + 1)) not in prompt
+
+
+def test_pr_copy_prompt_omits_truncation_note_at_or_below_cap():
+    c = _cls()
+    c.filtered_diff = "x" * PR_COPY_DIFF_CAP                  # exactly at the cap: shown whole
+    prompt = pr_copy_prompt("some-slug", c, PlanInfo(), "")
+    assert "DIFF TRUNCATED" not in prompt
+    assert ("x" * PR_COPY_DIFF_CAP) in prompt
+    short = pr_copy_prompt("some-slug", _cls(), PlanInfo(), "")
+    assert "DIFF TRUNCATED" not in short
 
 
 def test_retrospective_prompt_carries_fidelity_outcome():

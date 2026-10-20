@@ -32,6 +32,11 @@ def _gm_visible_rubric(cls: Classification) -> str:
             "on this diff anyway.\n")
 
 
+# pr-copy sees at most this many characters of the filtered diff. The prompt says so when
+# the diff is longer, so the model never states a count that spans text it was not shown.
+PR_COPY_DIFF_CAP = 60000
+
+
 def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt: str) -> str:
     """Commit/PR title + summary. Judgment retained: the feat-vs-chore GM test
     and a faithful summary of intent. Type rubric inlined from
@@ -56,6 +61,13 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
             "mechanical.\n\n"
             f"RETROSPECTIVE REGISTRY ROW:\n{cls.retro_registry_row}\n"
         )
+    diff_text = cls.filtered_diff[:PR_COPY_DIFF_CAP]
+    truncated = len(cls.filtered_diff) > PR_COPY_DIFF_CAP
+    truncation_note = (
+        "\n\nDIFF TRUNCATED: the DIFF above stops at the first "
+        f"{PR_COPY_DIFF_CAP} characters of a longer diff. State no count that spans the "
+        "full diff (total files, total tests, total call sites); describe the scope in words."
+        if truncated else "")
     return (
         "Write the commit/PR copy for this branch.\n\n"
         "TYPE RUBRIC — decision test: \"Would a league GM notice a new ability they "
@@ -67,7 +79,8 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         f"CLASSIFICATION:\n{cls.summary()}\n"
         + retro_block
         + (f"\nPLAN EXCERPT (intent):\n{plan_excerpt[:4000]}\n" if plan.found else "")
-        + "\nDIFF:\n" + cls.filtered_diff[:60000]
+        + "\nDIFF:\n" + diff_text
+        + truncation_note
         + '\n\nNEVER write a "## Manual Testing" heading or any manual-testing checklist '
         'inside summary_md. The runner owns that section and appends it after you; '
         'duplicating it corrupts the arming gate.'
@@ -83,6 +96,14 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         'those paths. Never write a second How to revert line.'
         + '\n\nA bare `#N` links to IBL5 PR/issue N. Cite a backlog issue as '
         '`a-jay85/IBL5-backlog#N`, never as a bare `#N`.'
+        + '\n\nCOUNTS: state no exact count (tests, cases, call sites, files, functions, rows, '
+        'lines) unless that number is visible in the CLASSIFICATION or DIFF text above. '
+        'Describe the change in words instead: "adds tests for the truncation note", never '
+        '"adds 3 tests". The reviewer verifies every number against the diff and rewrites a '
+        'wrong one.'
+        + '\n\nCLAIMS: every summary_md bullet claims only what the DIFF above shows. The PLAN '
+        'EXCERPT is intent; when the diff lacks something the plan intended, do not claim it '
+        'and do not describe it as done.'
         + '\n\nReturn ONLY JSON with exactly these four keys: {"type": "chore", '
         '"title": "chore(scope): ...", "commit_subject": "chore(scope): ...", '
         '"summary_md": "## Summary\\n- ..."}.\n'

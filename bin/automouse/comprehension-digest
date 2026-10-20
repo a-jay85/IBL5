@@ -6,7 +6,7 @@
 #   bin/automouse/comprehension-digest --dry-run         # print the facts block (no report, no send, no model)
 #   bin/automouse/comprehension-digest --classify-only   # print "<number><TAB><bucket>" per in-window PR
 #   bin/automouse/comprehension-digest --date YYYY-MM-DD # override the week-ending date
-#   bin/automouse/comprehension-digest --at-reset        # launchd mode: run only at 16:xx UTC, else exit 0
+#   bin/automouse/comprehension-digest --at-reset        # launchd mode: run at 16:xx UTC; a late fire runs as a catch-up (see below)
 #   bin/automouse/comprehension-digest -h|--help         # show this help
 #
 # The window is [D-7 00:00Z, D 00:00Z), anchored to the --date value (default: today),
@@ -26,7 +26,8 @@
 # --at-reset: the launchd plist fires twice on Sunday (08:03 and 09:03 local) so one fire lands
 # on 16:03 UTC (the weekly usage reset) in both PDT and PST; the other exits 0 without sending.
 # The brief posts to #reviews through the webhook file in COMPREHENSION_DIGEST_WEBHOOK_FILE
-# (default ~/.iblbot-reviews-webhook-url). DEGRADED alerts stay on the default #dev webhook.
+# (default ~/.iblbot-reviews-webhook-url). The facts-only DEGRADED brief (gate denial, model failure)
+# is the week's report, so it posts to #reviews too. Only the bare gh-failure line stays on the default #dev webhook.
 # A fire at any other hour (a late launchd wake) runs as a catch-up when no report for the date exists,
 # except Sunday hours before 16 UTC, which wait for the 16:xx fire.
 # Seams: COMPREHENSION_DIGEST_GH, _CLAUDE, _GATE, _REPORT_DIR, _UTC_HOUR, _UTC_DOW, _WEBHOOK_FILE, DISCORD_DM_BIN.

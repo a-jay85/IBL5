@@ -69,34 +69,10 @@ final class CachedRecordHoldersServiceTest extends TestCase
         $this->assertSame($staleRecords, $result);
     }
 
-    public function testColdCacheWithoutLockReturnsEmptyWithoutCallingInner(): void
+    public function testColdCacheBuildsOnceStoresAndReturnsRecords(): void
     {
-        // Cold cache + lock NOT acquired (a concurrent request is rebuilding):
-        // degrade to an empty structure, never call the expensive inner build.
-        $mockInner = $this->createMock(RecordHoldersServiceInterface::class);
-        $this->cache->lockAcquirable = false;
-        $service = new CachedRecordHoldersService($mockInner, $this->cache);
-
-        $mockInner->expects($this->never())->method('getAllRecords');
-
-        $result = $service->getAllRecords();
-
-        $this->assertSame([], $result['playerSingleGame']['regularSeason']);
-        $this->assertSame([], $result['playerSingleGame']['playoffs']);
-        $this->assertSame([], $result['playerSingleGame']['heat']);
-        $this->assertSame([], $result['quadrupleDoubles']);
-        $this->assertSame('', $result['allStarRecord']['name']);
-        $this->assertNull($result['allStarRecord']['pid']);
-        $this->assertSame([], $result['playerFullSeason']);
-        $this->assertSame([], $result['teamGameRecords']);
-        $this->assertSame([], $result['teamSeasonRecords']);
-        $this->assertSame([], $result['teamFranchise']);
-    }
-
-    public function testColdCacheWithLockCallsInnerOnceAndCachesAndReleasesLock(): void
-    {
-        // Cold cache + lock acquired: this request rebuilds inline exactly once,
-        // stores the result, and releases the lock afterward.
+        // Cold cache (no row at all): this request builds inline exactly once,
+        // stores the result under the cache key, and returns it.
         $mockInner = $this->createMock(RecordHoldersServiceInterface::class);
         $service = new CachedRecordHoldersService($mockInner, $this->cache);
 
@@ -109,8 +85,41 @@ final class CachedRecordHoldersServiceTest extends TestCase
         $result = $service->getAllRecords();
 
         $this->assertSame($records, $result);
-        $this->assertNotNull($this->cache->get('record_holders'));
-        $this->assertSame(1, $this->cache->releaseLockCount);
+        $this->assertSame($records, $this->cache->get('record_holders'));
+    }
+
+    public function testColdMissWithNoStaleRowCallsOnlyGetGetStaleAndSet(): void
+    {
+        $records = $this->createSampleRecords();
+
+        $mockInner = $this->createMock(RecordHoldersServiceInterface::class);
+        $mockInner->expects($this->once())->method('getAllRecords')->willReturn($records);
+
+        $mockCache = $this->createMock(DatabaseCacheInterface::class);
+        $mockCache->expects($this->once())->method('get')->with('record_holders')->willReturn(null);
+        $mockCache->expects($this->once())->method('getStale')->with('record_holders')->willReturn(null);
+        $mockCache->expects($this->once())->method('set')->with('record_holders', $records, 86400);
+        $mockCache->expects($this->never())->method('delete');
+
+        $service = new CachedRecordHoldersService($mockInner, $mockCache);
+
+        $this->assertSame($records, $service->getAllRecords());
+    }
+
+    public function testSecondCallAfterColdBuildServesCacheWithoutCallingInner(): void
+    {
+        $records = $this->createSampleRecords();
+
+        $mockInner = $this->createMock(RecordHoldersServiceInterface::class);
+        $mockInner->expects($this->once())->method('getAllRecords')->willReturn($records);
+
+        $service = new CachedRecordHoldersService($mockInner, $this->cache);
+
+        $first = $service->getAllRecords();
+        $second = $service->getAllRecords();
+
+        $this->assertSame($records, $first);
+        $this->assertSame($records, $second);
     }
 
     public function testCorruptCacheReturnsNullFromGet(): void

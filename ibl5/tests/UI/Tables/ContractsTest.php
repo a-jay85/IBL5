@@ -422,6 +422,196 @@ class ContractsTest extends TestCase
     }
 
     /**
+     * Free Agency header and salary pin: the first salary column reads 25-26 (endingYear 2025 shifted one
+     * year forward) and the six salary cells are read from the one-year-offset contract slots.
+     */
+    public function testRenderPinsFreeAgencyHeaderAndSalaryColumns(): void
+    {
+        $db = self::createStub(\mysqli::class);
+        $season = $this->createPhaseSeason('Free Agency');
+        $result = [
+            $this->buildPlayerRowWith(['salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 300, 'salary_yr4' => 400, 'salary_yr5' => 500, 'salary_yr6' => 600], pid: 101, cy: 2, cyt: 4),
+        ];
+
+        $html = Contracts::render($db, $result, $this->createMockTeam(), $season);
+
+        self::assertStringContainsString('<th class="col-salary">25-26</th>', $html);
+        $expected = <<<'HTML'
+        <table class="ibl-data-table team-table responsive-table contracts-table sortable" style="--team-color-primary: #FF0000; --team-color-secondary: #0000FF;">
+            <thead>
+                <tr>
+                    <th>Pos</th>
+                    <th class="sticky-col">Player</th>
+                    <th>Age</th>
+                    <th>Exp</th>
+                    <th class="sep-r-team">Bird</th>
+                    <th class="col-salary">25-26</th>
+                    <th class="col-salary">26-27</th>
+                    <th class="col-salary">27-28</th>
+                    <th class="col-salary">28-29</th>
+                    <th class="col-salary">29-30</th>
+                    <th class="col-salary sep-r-team">30-31</th>
+                    <th>Tal</th>
+                    <th>Skl</th>
+                    <th class="sep-r-team">Int</th>
+                    <th>Loy</th>
+                    <th>PFW</th>
+                    <th>PT</th>
+                    <th>Sec</th>
+                    <th>Trd</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>PG</td>
+                    <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=101"><img src="./images/player/101.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Test Player 101</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">T. Player 101</span></a></td>            <td>25</td>
+                    <td>1</td>
+                    <td class="sep-r-team">3</td>
+                    <td class="col-salary">300</td>
+                                <td class="col-salary">400</td>
+                    <td class="col-salary">500</td>
+                    <td class="col-salary">600</td>
+                    <td class="col-salary">0</td>
+                    <td class="col-salary sep-r-team">0</td>
+                                <td>75</td>
+                    <td>70</td>
+                    <td class="sep-r-team">65</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td></td>
+                    <td class="sticky-col">Cap Totals</td>
+                    <td></td>
+                    <td></td>
+                    <td class="sep-r-team"></td>
+                    <td class="col-salary">300</td>
+                    <td class="col-salary">400</td>
+                    <td class="col-salary">500</td>
+                    <td class="col-salary">600</td>
+                    <td class="col-salary">0</td>
+                    <td class="col-salary sep-r-team">0</td>
+                    <td></td>
+                    <td></td>
+                    <td class="sep-r-team"></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr class="tfoot-legend">
+                    <td colspan="19" class="text-left">
+                        Key: &nbsp; <em>(Waived)*</em> &nbsp; Becomes Free Agent^ &nbsp; Eligible for Rookie Option/Extension 0* (hover/tap to reveal link)
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+        HTML;
+        $this->assertRenderPinned($expected, $html);
+    }
+
+    /**
+     * Regular Season header and salary pin: the first salary column reads 24-25 and endingYear is untouched.
+     */
+    public function testRenderPinsRegularSeasonHeaderAndSalaryColumns(): void
+    {
+        $db = self::createStub(\mysqli::class);
+        $season = $this->createPhaseSeason('Regular Season');
+        $result = [
+            $this->buildPlayerRowWith(['salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 300, 'salary_yr4' => 400, 'salary_yr5' => 500, 'salary_yr6' => 600], pid: 101, cy: 2, cyt: 4),
+        ];
+
+        $html = Contracts::render($db, $result, $this->createMockTeam(), $season);
+
+        self::assertStringContainsString('<th class="col-salary">24-25</th>', $html);
+        self::assertSame(2025, $season->endingYear);
+        $expected = <<<'HTML'
+        <table class="ibl-data-table team-table responsive-table contracts-table sortable" style="--team-color-primary: #FF0000; --team-color-secondary: #0000FF;">
+            <thead>
+                <tr>
+                    <th>Pos</th>
+                    <th class="sticky-col">Player</th>
+                    <th>Age</th>
+                    <th>Exp</th>
+                    <th class="sep-r-team">Bird</th>
+                    <th class="col-salary">24-25</th>
+                    <th class="col-salary">25-26</th>
+                    <th class="col-salary">26-27</th>
+                    <th class="col-salary">27-28</th>
+                    <th class="col-salary">28-29</th>
+                    <th class="col-salary sep-r-team">29-30</th>
+                    <th>Tal</th>
+                    <th>Skl</th>
+                    <th class="sep-r-team">Int</th>
+                    <th>Loy</th>
+                    <th>PFW</th>
+                    <th>PT</th>
+                    <th>Sec</th>
+                    <th>Trd</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>PG</td>
+                    <td class="sticky-col ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=101"><img src="./images/player/101.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy"><span class="ibl-player-cell__name ibl-player-cell__name--full">Test Player 101</span><span class="ibl-player-cell__name ibl-player-cell__name--abbrev">T. Player 101</span></a></td>            <td>25</td>
+                    <td>1</td>
+                    <td class="sep-r-team">3</td>
+                    <td class="col-salary">200</td>
+                                <td class="col-salary">300</td>
+                    <td class="col-salary">400</td>
+                    <td class="col-salary">500</td>
+                    <td class="col-salary">600</td>
+                    <td class="col-salary sep-r-team">0</td>
+                                <td>75</td>
+                    <td>70</td>
+                    <td class="sep-r-team">65</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td></td>
+                    <td class="sticky-col">Cap Totals</td>
+                    <td></td>
+                    <td></td>
+                    <td class="sep-r-team"></td>
+                    <td class="col-salary">200</td>
+                    <td class="col-salary">300</td>
+                    <td class="col-salary">400</td>
+                    <td class="col-salary">500</td>
+                    <td class="col-salary">600</td>
+                    <td class="col-salary sep-r-team">0</td>
+                    <td></td>
+                    <td></td>
+                    <td class="sep-r-team"></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr class="tfoot-legend">
+                    <td colspan="19" class="text-left">
+                        Key: &nbsp; <em>(Waived)*</em> &nbsp; Becomes Free Agent^ &nbsp; Eligible for Rookie Option/Extension 0* (hover/tap to reveal link)
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+        HTML;
+        $this->assertRenderPinned($expected, $html);
+    }
+
+    /**
      * An extension-eligible row renders 0* and a negotiate link in season.
      */
     public function testRenderPinsExtensionEligibleRowAsLinkInRegularSeason(): void

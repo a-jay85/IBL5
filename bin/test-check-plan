@@ -3465,14 +3465,16 @@ _corpus_guard_ok() {
     # exit, and only when the failure is provably all-downgradeable. Read ONLY
     # the violations block: [W] advisories and the [N] coverage line print on a
     # clean run too, so a bare '^\[' match would flag passing plans.
+    # Gate [AB] is downgradeable too: it postdates every frozen corpus plan, and
+    # the plans it flags carry genuine plan-only negated greps (true positives).
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.

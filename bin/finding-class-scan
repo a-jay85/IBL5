@@ -32,6 +32,8 @@ set -euo pipefail
 #   FCS_STATE_DIR=$HOME/.local/state/ibl5-finding-class-scan
 #   FCS_MIN_OCCURRENCES=2    FCS_MAX_BUDGET_USD=3.00
 #   FCS_CLASSIFY_TIMEOUT=1500    FCS_VERIFY_TIMEOUT=1800
+#   FCS_MAX_BATCHES=10       Classifier batches (60 threads each) per run; the
+#                            rest wait for the next run.
 # Test seams: GH_CMD, REPO_SLUG, BACKLOG_SLUG, FCS_CLAUDE_BIN, FCS_DM_BIN,
 #   FCS_LAUNCHCTL_BIN.
 # ---
@@ -60,6 +62,7 @@ FCS_MIN_OCCURRENCES="${FCS_MIN_OCCURRENCES:-2}"
 FCS_MAX_BUDGET_USD="${FCS_MAX_BUDGET_USD:-3.00}"
 FCS_CLASSIFY_TIMEOUT="${FCS_CLASSIFY_TIMEOUT:-1500}"
 FCS_VERIFY_TIMEOUT="${FCS_VERIFY_TIMEOUT:-1800}"
+FCS_MAX_BATCHES="${FCS_MAX_BATCHES:-10}"
 
 PLIST_LABEL="com.ibl5.finding-class-scan"
 STATE_DIR=""
@@ -290,9 +293,15 @@ parse_args() {
 
 validate_env() {
     local n
-    for n in FCS_MIN_OCCURRENCES FCS_CLASSIFY_TIMEOUT FCS_VERIFY_TIMEOUT; do
+    for n in FCS_MIN_OCCURRENCES FCS_CLASSIFY_TIMEOUT FCS_VERIFY_TIMEOUT FCS_MAX_BATCHES; do
         if ! [[ "${!n}" =~ ^[0-9]{1,6}$ ]]; then
             log "$n must be a non-negative integer (got '${!n}')"
+            exit 2
+        fi
+    done
+    for n in FCS_CLASSIFY_TIMEOUT FCS_VERIFY_TIMEOUT FCS_MAX_BATCHES; do
+        if [ "$((10#${!n}))" -lt 1 ]; then # GNU timeout 0 means no limit
+            log "$n must be at least 1 (got '${!n}')"
             exit 2
         fi
     done
@@ -586,6 +595,7 @@ Rules:
 - Invent a new class only when no known class fits and the defect could recur. A new key is lowercase words joined by hyphens, 3 to 60 characters.
 - Set class_key to null for a thread that fits no recurring class.
 - For each new class give a title, a description, a proposed_check that says how a static check would find the defect, and a check_kind: "phpstan" for PHP app code under ibl5/, "bin-check" for shell, workflow or tooling, or "none" when no static check can encode the judgment.
+- A defect in how a script calls an external command can usually be found by a grep-style bin-check. Examples: a call with no timeout, or output parsed from a stream merged with stderr. Prefer "bin-check" for those. Use "none" only when the defect needs human judgment.
 - Set artifact_path for a phpstan class to ibl5/phpstan-rules/<Ban|Require><Name>Rule.php, for a bin-check class to bin/check-<name>, and for a none class to null.
 - Return JSON only, matching the schema you were given.
 
@@ -633,12 +643,20 @@ classify_unseen() {
     if [ ! -s "$WORK/unseen.jsonl" ]; then return 0; fi
     split -l 60 "$WORK/unseen.jsonl" "$WORK/batch-"
     for f in "$WORK"/batch-*; do
+        if [ "$k" -ge "$FCS_MAX_BATCHES" ]; then
+            say "batch cap $FCS_MAX_BATCHES reached; remaining threads wait for the next run"
+            break
+        fi
         k=$((k + 1))
         classify_batch "$f" "$k"
         valid="$WORK/valid-$k.json"
         # Classes made by this batch are visible to the next one, so keys stay
         # stable inside one run.
-        jq -c '.assignments[]' "$valid" >> "$WORK/run-assign-raw.jsonl"
+        # A thread the model skipped, or sent to a rejected class, is recorded
+        # as unclassed so later runs do not page it again.
+        jq -c --slurpfile b <(jq -c '.id' "$f") '
+            (.assignments | map(.thread_id)) as $got
+            | .assignments[], ($b | map(select(IN($got[]) | not)) | .[] | {thread_id: ., class_key: null})' "$valid" >> "$WORK/run-assign-raw.jsonl"
         jq -c --slurpfile v "$valid" '. + ($v[0].classes | map({key, number: null, state: null, title, description, check_kind}))' \
             "$WORK/classes-all.json" > "$WORK/classes-all.tmp" && mv "$WORK/classes-all.tmp" "$WORK/classes-all.json"
         jq -c --slurpfile v "$valid" '. + ($v[0].classes | map({key: .key, value: .}) | from_entries)' \
@@ -706,8 +724,11 @@ count_classes() {
 
 # plan_actions: file / comment / unchanged per candidate. No gh write here.
 plan_actions() {
-    local cand key known num state view reported
+    local cand key known num state view reported me
     : > "$WORK/actions.jsonl"
+    # Evidence comments come from whichever gh login filed them, or the backlog owner.
+    me="$("$GH_CMD" api user --jq .login 2>/dev/null | head -n 1 || true)"
+    [[ "$me" =~ ^[A-Za-z0-9][A-Za-z0-9-]*(\[bot\])?$ ]] || me=""
     while IFS= read -r cand; do
         [ -n "$cand" ] || continue
         key="$(jq -r .key <<< "$cand")"
@@ -726,7 +747,7 @@ plan_actions() {
             || ! jq -e 'type == "object"' <<< "$view" >/dev/null 2>&1; then
             die "backlog lookup failed; nothing filed"
         fi
-        reported="$(jq -c '[ ([.body // ""] + [(.comments // [])[] | select(.author.login == "a-jay85") | .body // ""])
+        reported="$(jq -c --arg owner "${BACKLOG_SLUG%%/*}" --arg me "$me" '[ ([.body // ""] + [(.comments // [])[] | select(.author.login == $owner or (.author.login == $me and $me != "")) | .body // ""])
             | .[] | match("finding-class-scan:threads=([A-Za-z0-9_,-]+)"; "g") | .captures[0].string | split(",")[] ] | unique' <<< "$view")"
         jq -c --argjson rep "$reported" --argjson n "$num" --arg st "$state" '
             (.threads | map(select((.thread_id | IN($rep[])) | not))) as $new

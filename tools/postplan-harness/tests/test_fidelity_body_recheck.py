@@ -223,3 +223,73 @@ def test_predicate_real_shape_fixtures(tmp_path):
     assert fidelity.body_only_findings(
         os.path.join(FIXTURES, "verdict-class-d-live.md")) is None
     assert fidelity.body_only_findings(str(tmp_path / "absent.md")) is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: body hunks, diff sections, recheck prompt
+# ---------------------------------------------------------------------------
+
+from harness import llm_calls  # noqa: E402
+from harness.adapters.llm import MAX_PROMPT_BYTES  # noqa: E402
+from harness.classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END,  # noqa: E402
+                              MERGE_DIGEST_BEGIN, MERGE_DIGEST_END)
+
+TWO_FILE_DIFF = (
+    "diff --git a/ibl5/tests/FooTest.php b/ibl5/tests/FooTest.php\n"
+    "--- a/ibl5/tests/FooTest.php\n+++ b/ibl5/tests/FooTest.php\n"
+    "@@ -1 +1,2 @@\n+    public function testTwentySix(): void {}\n"
+    "diff --git a/ibl5/classes/Bar.php b/ibl5/classes/Bar.php\n"
+    "--- a/ibl5/classes/Bar.php\n+++ b/ibl5/classes/Bar.php\n"
+    "@@ -1 +1 @@\n-old bar\n+new bar\n"
+)
+
+
+def test_body_hunks_numbers_inserts_and_replacements_in_order():
+    hunks = llm_calls.body_hunks("a\nb\nc", "a\nB\nc\nd")
+    assert hunks == [
+        {"id": "H1", "op": "replace", "old": ["b"], "new": ["B"]},
+        {"id": "H2", "op": "insert", "old": [], "new": ["d"]},
+    ]
+
+
+def test_body_hunks_ignores_pure_deletions_and_identical_bodies():
+    assert llm_calls.body_hunks("a\nb", "a") == []
+    assert llm_calls.body_hunks("a\nb", "a\nb") == []
+
+
+def test_body_hunks_strips_machine_blocks():
+    old = (f"Prose.\n{FILES_CHANGED_BEGIN}\n- a.py\n{FILES_CHANGED_END}\n"
+           f"{MERGE_DIGEST_BEGIN}\nold digest\n{MERGE_DIGEST_END}\nTail.")
+    new = (f"Prose.\n{FILES_CHANGED_BEGIN}\n- a.py\n- b.py\n{FILES_CHANGED_END}\n"
+           f"{MERGE_DIGEST_BEGIN}\nnew digest\n{MERGE_DIGEST_END}\nTail.")
+    assert llm_calls.body_hunks(old, new) == []
+
+
+def test_recheck_prompt_lists_every_id_once_and_states_the_contract():
+    hunks = llm_calls.body_hunks("a", "a\nfollow-up filed")
+    prompt = llm_calls.pr_body_recheck_prompt(
+        ["- [BLOCKING] Check 4: count", "- [NOTE] Check 4: wording"], hunks,
+        "a", "a\nfollow-up filed", "M\tx.py", "diff --git a/x.py b/x.py\n")
+    assert prompt.count("F1:") == 1
+    assert prompt.count("F2:") == 1
+    assert "F0:" not in prompt
+    assert prompt.count("H1 (") == 1
+    assert '"hunks": [] is required' in prompt
+    assert "unsupported" in prompt
+    assert "Include every F-id and every H-id exactly once" in prompt
+
+
+def test_recheck_prompt_caps_each_field_under_prompt_limit():
+    prompt = llm_calls.pr_body_recheck_prompt(
+        ["- [BLOCKING] Check 4: x"], [], "o" * 100_000, "n" * 200_000, "M\tx",
+        "e" * 200_000)
+    assert len(prompt.encode()) < MAX_PROMPT_BYTES
+    assert "[TRUNCATED]" in prompt
+
+
+def test_diff_sections_for_selects_only_named_paths():
+    got = llm_calls.diff_sections_for(TWO_FILE_DIFF, {"ibl5/tests/FooTest.php"})
+    assert "testTwentySix" in got
+    assert "Bar.php" not in got
+    head = llm_calls.diff_sections_for(TWO_FILE_DIFF, set())
+    assert head.startswith(TWO_FILE_DIFF.splitlines()[0])

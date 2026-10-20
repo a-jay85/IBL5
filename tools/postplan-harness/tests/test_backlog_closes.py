@@ -386,7 +386,6 @@ _REPLAY_CANNED = {
     "pr-copy": {"type": "chore", "title": "chore: backlog-closes-test",
                 "commit_subject": "chore: backlog closes test",
                 "summary_md": "## Summary\n- backlog closes test\n"},
-    "body-check": {"corrected_body": "## Summary\n- backlog closes test\n", "findings": []},
     "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
     "security-audit": [],
     "safety-verdict": {"holds": []},

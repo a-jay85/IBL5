@@ -1,9 +1,10 @@
 name: Weekly Flake Report
 
 on:
-  # Sunday 16:03 UTC = the weekly Claude usage reset. Odd minute: GitHub delays top-of-hour crons.
+  # Sunday 16:07 UTC = just after the weekly Claude usage reset. Odd minute: GitHub delays top-of-hour crons.
+  # Offset from log-review (16:03) so the two Discord posts to one webhook do not collide.
   schedule:
-    - cron: '3 16 * * 0'
+    - cron: '7 16 * * 0'
 
   workflow_dispatch: {}
 

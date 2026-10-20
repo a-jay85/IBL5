@@ -17,7 +17,7 @@ The weekly comprehension digest (`bin/automouse/comprehension-digest`) reads thi
 - The regular season is 82 games. It starts Nov 1. The All-Star break is Feb 1 to 4. Playoffs run Jun 1 to 30. (`Season\Season`, `League\League`)
 - Trades use next season's salary during Playoffs, Draft and Free Agency. (`Season\Season::advancesContractYears()`)
 - Waivers and the cap page use next season's salary only in Draft and Free Agency. Teams still sign waiver players during the Playoffs, so waivers stay on the current season until then.
-- A sim covers 1 to 180 days. The default is 3.
+- An admin sets the sim length by hand in the League Control Panel. It has changed over the league's history. It is 7 days right now. Preseason sims run up to 31 days. JSB can sim a whole season at once, but the league never does.
 - Season rollover only moves forward one year at a time. Any other jump halts without writing. (`Updater\SeasonRollover\SeasonRolloverDecision`)
 
 ## Teams and rosters
@@ -80,7 +80,7 @@ Full tables live in `.claude/rules/contract-rules.md`. The rules:
 
 - Only the team on the clock can pick. The pick on the clock is the first empty slot, and only the GM whose team owns that pick can submit it. A pick can only take an undrafted player. (`Draft\DraftController`)
 - The lottery covers picks 1 to 12. The admin enters the lottery result; the site does not draw it.
-- Round 1 order: non-playoff teams worst first, then wildcards, division winners and conference winners. Round 2 is all teams worst first.
+- Round 1 order: the lottery picks first, then the other playoff teams worst first, then division winners, then conference winners. Round 2 is all teams worst first. (`ProjectedDraftOrder\ProjectedDraftOrderService`)
 - Draft class uploads are admin-only. A file with any bad row is rejected whole.
 
 ## Standings and playoffs
@@ -116,4 +116,5 @@ The owner ruled on these on 2026-10-20. The rules above are correct. The code st
 - **Waiver roster count.** Waiver signings count only healthy players toward 15. They should count injured players too.
 - **Waiver veteran minimum.** The over-the-cap waiver signing allows only 103, the 10-year minimum. It should use the minimum for the player's experience.
 - **The 24-hour waiver wait.** The waiver page shows a 24-hour wait that the code never enforces. Remove it from the page.
+- **Wildcard naming.** The league has no wildcards. `ProjectedDraftOrder\PlayoffSeedingCalculator` and `ProjectedDraftOrder\ProjectedDraftOrderService` call the playoff teams that are not division winners `wildCards`. Rename them so the code matches the league's terms.
 - **Draft pick order.** `Draft\DraftController::submitSelection()` checks that the team owns the slot but not that the slot is on the clock. Any pick owner can pick early.

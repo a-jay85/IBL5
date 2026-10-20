@@ -3,7 +3,7 @@
 # check-run verdict logic (bin/lib/ci-checks-green.sh) and its callers
 # bin/check-master-ci-green and bin/check-pr-checks-green.
 #
-# C1-C4  run bin/check-master-ci-green end to end against fixture JSON via the
+# C1-C11 run bin/check-master-ci-green end to end against fixture JSON via the
 #        GH_API_CMD seam (a `gh` shim answers `auth status`; a throwaway git repo
 #        supplies the origin remote).
 # L1-L9  source the lib and call its functions directly.
@@ -103,6 +103,114 @@ if [ "$RC" -eq 0 ]; then
     ok "C4 latest-per-name wins"
 else
     fail "C4 latest-per-name wins (rc=$RC err=$(cat "$ERR"))"
+fi
+
+# --- C5-C11: IGNORE_FAILED_CHECKS -----------------------------------------
+HELPER="Keep the merge-line head current"
+cat > "$TMP/c5.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c5.json"
+if [ "$RC" -eq 0 ] \
+   && grep -qF "IGNORE_FAILED_CHECKS active — ignoring failed: Keep the merge-line head current (failure)" "$OUT" \
+   && grep -qF "PASS: 1 check-run(s) all green" "$OUT"; then
+    ok "C5 listed helper failure is logged and ignored"
+else
+    fail "C5 listed helper failure is logged and ignored (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+unset IGNORE_FAILED_CHECKS
+run_check "$TMP/c5.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks failed: Keep the merge-line head current (failure)" "$ERR" \
+   && ! grep -qF "IGNORE_FAILED_CHECKS" "$OUT"; then
+    ok "C6 unset IGNORE_FAILED_CHECKS: helper failure still fails"
+else
+    fail "C6 unset IGNORE_FAILED_CHECKS: helper failure still fails (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+IGNORE_FAILED_CHECKS="" run_check "$TMP/c5.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks failed: Keep the merge-line head current (failure)" "$ERR" \
+   && ! grep -qF "IGNORE_FAILED_CHECKS" "$OUT"; then
+    ok "C7 empty IGNORE_FAILED_CHECKS: no-op, helper failure still fails"
+else
+    fail "C7 empty IGNORE_FAILED_CHECKS: no-op, helper failure still fails (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c8.json" <<'JSON'
+{"total_count":3,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"Keep the merge-line head current","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c8.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks still running: Keep the merge-line head current" "$ERR" \
+   && grep -qF "IGNORE_FAILED_CHECKS active — ignoring failed: <none matched>" "$OUT"; then
+    ok "C8 pending listed helper still reports as running"
+else
+    fail "C8 pending listed helper still reports as running (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c9.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"Keep the merge-line head current (copy)","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c9.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks failed: Keep the merge-line head current (copy) (failure)" "$ERR" \
+   && grep -qF "IGNORE_FAILED_CHECKS active — ignoring failed: <none matched>" "$OUT"; then
+    ok "C9 near-miss name is not ignored (exact match only)"
+else
+    fail "C9 near-miss name is not ignored (exact match only) (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c10.json" <<'JSON'
+{"total_count":1,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c10.json"
+if [ "$RC" -eq 1 ] && grep -qF "FAIL: only 0 check-run(s) found on HEAD" "$ERR"; then
+    ok "C10 ignoring every run fails the floor rather than passing"
+else
+    fail "C10 ignoring every run fails the floor rather than passing (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+# C11: HEAD has only the failed helper, so TOTAL=0 and the script walks back.
+# The ancestor also carries a failed helper run; it must be dropped there too.
+WREPO="$TMP/wrepo"
+mkdir -p "$WREPO"
+git -C "$WREPO" init -q
+git -C "$WREPO" remote add origin https://github.com/a-jay85/IBL5.git
+git -C "$WREPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m parent
+git -C "$WREPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m head
+W_HEAD="$(git -C "$WREPO" rev-parse HEAD)"
+cat > "$TMP/c11-anc.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+cat > "$TMP/walkshim" <<SHIM
+#!/bin/sh
+case "\$1" in
+  *"/commits/$W_HEAD/"*) cat "$TMP/c10.json" ;;
+  *) cat "$TMP/c11-anc.json" ;;
+esac
+SHIM
+chmod +x "$TMP/walkshim"
+( cd "$WREPO" && PATH="$SHIMD:$PATH" GH_API_CMD="$TMP/walkshim" \
+    IGNORE_FAILED_CHECKS="$HELPER" "$CHECK" "$W_HEAD" >"$TMP/out" 2>"$TMP/err" )
+RC=$?
+if [ "$RC" -eq 0 ] \
+   && grep -qF "Falling back to ancestor" "$TMP/out" \
+   && grep -qF "PASS: 1 check-run(s) all green" "$TMP/out"; then
+    ok "C11 walk-back re-applies IGNORE_FAILED_CHECKS to the ancestor"
+else
+    fail "C11 walk-back re-applies IGNORE_FAILED_CHECKS to the ancestor (rc=$RC out=$(cat "$TMP/out") err=$(cat "$TMP/err"))"
 fi
 
 # --- L1-L9: lib unit cases ----------------------------------------------------

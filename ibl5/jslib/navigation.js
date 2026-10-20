@@ -63,6 +63,7 @@
         }, { signal: signal });
 
         var overlayShowTimer;
+        var overlayHideTimer;
 
         function openMenu() {
             // Slide in menu
@@ -76,6 +77,8 @@
 
             // Show overlay with fade
             if (menuOverlay) {
+                // A reopen inside the close fade must cancel the pending hide.
+                clearTimeout(overlayHideTimer);
                 menuOverlay.classList.remove('hidden');
                 overlayShowTimer = setTimeout(function() {
                     menuOverlay.classList.add('nav-overlay--visible');
@@ -100,11 +103,8 @@
                 // A close inside the 10ms open window must cancel the pending show.
                 clearTimeout(overlayShowTimer);
                 menuOverlay.classList.remove('nav-overlay--visible');
-                setTimeout(function() {
-                    // A reopen inside the fade window must not be re-hidden.
-                    if (!menuOverlay.classList.contains('nav-overlay--visible')) {
-                        menuOverlay.classList.add('hidden');
-                    }
+                overlayHideTimer = setTimeout(function() {
+                    menuOverlay.classList.add('hidden');
                 }, 300);
             }
 

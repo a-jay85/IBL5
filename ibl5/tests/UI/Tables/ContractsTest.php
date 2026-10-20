@@ -98,7 +98,7 @@ class ContractsTest extends TestCase
      * Build a Season in a given phase with endingYear 2025.
      *
      * The mock mirrors production's isOffseasonPhase() byte for byte, so Draft and
-     * Free Agency bump endingYear exactly as the real class would.
+     * Free Agency shift the header year exactly as the real class would.
      */
     private function createPhaseSeason(string $phase): \Tests\WideUnit\Mocks\Season
     {
@@ -609,6 +609,40 @@ class ContractsTest extends TestCase
         </table>
         HTML;
         $this->assertRenderPinned($expected, $html);
+    }
+
+    /**
+     * A Free Agency render leaves the injected Season untouched.
+     */
+    public function testRenderDoesNotMutateSeasonEndingYearInFreeAgency(): void
+    {
+        $db = self::createStub(\mysqli::class);
+        $season = $this->createPhaseSeason('Free Agency');
+        $result = [
+            $this->buildPlayerRowWith(['salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 300, 'salary_yr4' => 400, 'salary_yr5' => 500, 'salary_yr6' => 600], pid: 101, cy: 2, cyt: 4),
+        ];
+
+        Contracts::render($db, $result, $this->createMockTeam(), $season);
+
+        self::assertSame(2025, $season->endingYear);
+    }
+
+    /**
+     * Two renders with one shared Season produce identical HTML in Free Agency.
+     */
+    public function testRenderTwiceWithSameSeasonIsIdenticalInFreeAgency(): void
+    {
+        $db = self::createStub(\mysqli::class);
+        $season = $this->createPhaseSeason('Free Agency');
+        $result = [
+            $this->buildPlayerRowWith(['salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 300, 'salary_yr4' => 400, 'salary_yr5' => 500, 'salary_yr6' => 600], pid: 101, cy: 2, cyt: 4),
+        ];
+
+        $first = Contracts::render($db, $result, $this->createMockTeam(), $season);
+        $second = Contracts::render($db, $result, $this->createMockTeam(), $season);
+
+        self::assertSame($first, $second);
+        self::assertStringContainsString('<th class="col-salary">25-26</th>', $second);
     }
 
     /**
@@ -1380,13 +1414,12 @@ class ContractsTest extends TestCase
     }
 
     /**
-     * Draft and Free Agency bump the caller's Season::$endingYear and shift the header years.
+     * Draft and Free Agency shift the header years one season forward without touching the caller's Season.
      *
-     * The bump is kept as frozen and pinned. Callers that reach the contracts branch never read
-     * endingYear afterwards, except a Season shared with NextSimService during Draft / Free Agency,
-     * where the future-year schedule query returns nothing. Each render() call bumps again.
+     * The Season is request-shared, so render() computes the shifted label year locally. A second
+     * render() with the same Season reads the same year again.
      */
-    public function testRenderIncrementsSeasonEndingYearDuringOffseasonAndShiftsHeaderYears(): void
+    public function testRenderShiftsHeaderYearsDuringOffseasonWithoutMutatingSeason(): void
     {
         $db = self::createStub(\mysqli::class);
         $season = $this->createPhaseSeason('Free Agency');
@@ -1397,7 +1430,7 @@ class ContractsTest extends TestCase
 
         $html = Contracts::render($db, $result, $this->createMockTeam(), $season, markExpiringRows: true, showActionLinks: true);
 
-        self::assertSame(2026, $season->endingYear);
+        self::assertSame(2025, $season->endingYear);
         self::assertStringContainsString('<th class="col-salary">25-26</th>', $html);
         self::assertStringContainsString(' class="player-fa-expiring-row"', $html);
         self::assertStringContainsString('<span class="contract-hint-link" data-no-abbreviate>Contract Extension</span>', $html);
@@ -1502,8 +1535,8 @@ class ContractsTest extends TestCase
 
         $secondHtml = Contracts::render($db, $result, $this->createMockTeam(), $season, markExpiringRows: true, showActionLinks: true);
 
-        self::assertSame(2027, $season->endingYear);
-        self::assertStringContainsString('<th class="col-salary">26-27</th>', $secondHtml);
+        self::assertSame(2025, $season->endingYear);
+        self::assertStringContainsString('<th class="col-salary">25-26</th>', $secondHtml);
     }
 
     /**
@@ -1517,7 +1550,7 @@ class ContractsTest extends TestCase
 
         $html = Contracts::render($db, $result, $this->createMockTeam(), $season, showActionLinks: false, markExpiringRows: false);
 
-        self::assertSame(2026, $season->endingYear);
+        self::assertSame(2025, $season->endingYear);
         self::assertStringContainsString('<th class="col-salary">25-26</th>', $html);
         self::assertStringNotContainsString('player-fa-expiring-row', $html);
         self::assertStringNotContainsString('contract-hint-cell', $html);

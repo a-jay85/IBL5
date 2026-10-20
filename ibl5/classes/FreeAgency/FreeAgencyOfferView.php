@@ -73,12 +73,12 @@ class FreeAgencyOfferView
         ob_start();
         if ($error !== null) {
             ?>
-<div class="ibl-alert ibl-alert--error"><?= HtmlSanitizer::e($error) ?></div>
+<div role="alert" class="d-alert d-alert-error mb-4"><?= HtmlSanitizer::e($error) ?></div>
             <?php
         }
         if ($noRosterSpots) {
             ?>
-<div class="ibl-alert ibl-alert--warning">Sorry, you have no roster spots remaining and cannot offer a contract to this player.</div>
+<div role="alert" class="d-alert d-alert-warning mb-4">Sorry, you have no roster spots remaining and cannot offer a contract to this player.</div>
             <?php
         }
         return (string) ob_get_clean();
@@ -91,11 +91,11 @@ class FreeAgencyOfferView
     {
         ob_start();
         ?>
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title"><?= HtmlSanitizer::e($player->getPosition() ?? '') ?> <?= HtmlSanitizer::e($player->getName() ?? '') ?> - Contract Negotiation</h2>
+<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title text-(length:--text-2xl)"><?= HtmlSanitizer::e($player->getPosition() ?? '') ?> <?= HtmlSanitizer::e($player->getName() ?? '') ?> - Contract Negotiation</h2>
     </div>
-    <div class="ibl-card__body">
+    <div class="d-card-body">
         <div class="offer-player-info">
             <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->getPlayerID())) ?>" alt="<?= HtmlSanitizer::e($player->getName() ?? '') ?>" class="offer-player-img">
             <?= HtmlSanitizer::trusted($this->formView->renderPlayerRatings($player)) ?>
@@ -117,13 +117,13 @@ class FreeAgencyOfferView
     {
         ob_start();
         ?>
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Contract Offer</h2>
+<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title text-(length:--text-2xl)">Contract Offer</h2>
     </div>
-    <div class="ibl-card__body">
+    <div class="d-card-body">
         <div class="ibl-field-group">
-            <span class="ibl-label">Player Demands (base, before team modifiers):</span>
+            <span class="d-label">Player Demands (base, before team modifiers):</span>
             <div class="ibl-field-group__content">
                 <?= HtmlSanitizer::trusted($this->formView->renderDemandDisplay($demands)) ?>
             </div>
@@ -132,7 +132,7 @@ class FreeAgencyOfferView
         <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">
             <?= HtmlSanitizer::trusted($this->formView->renderCsrfInput()) ?>
             <div class="ibl-field-group">
-                <span class="ibl-label">Your Custom Offer:</span>
+                <span class="d-label">Your Custom Offer:</span>
                 <div class="ibl-field-group__content">
                     <?= HtmlSanitizer::trusted($this->formView->renderOfferInputs($existingOffer, $raisePercentage)) ?>
                 </div>
@@ -142,7 +142,7 @@ class FreeAgencyOfferView
             <input type="hidden" name="playerID" value="<?= (int) $player->getPlayerID() ?>">
             <input type="hidden" name="offerType" value="0">
 
-            <button type="submit" class="ibl-btn ibl-btn--primary">Offer / Amend Free Agent Contract</button>
+            <button type="submit" class="d-btn d-btn-primary">Offer / Amend Free Agent Contract</button>
         </form>
     </div>
 </div>
@@ -158,11 +158,11 @@ class FreeAgencyOfferView
     {
         ob_start();
         ?>
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Quick Offer Presets</h2>
+<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title text-(length:--text-2xl)">Quick Offer Presets</h2>
     </div>
-    <div class="ibl-card__body">
+    <div class="d-card-body">
         <?= HtmlSanitizer::trusted($this->renderOfferButtons($player, $team)) ?>
     </div>
 </div>
@@ -183,7 +183,7 @@ class FreeAgencyOfferView
         <?= HtmlSanitizer::trusted($this->formView->renderCsrfInput()) ?>
         <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($team->name) ?>">
         <input type="hidden" name="playerID" value="<?= (int) $player->getPlayerID() ?>">
-        <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>
+        <button type="submit" class="d-btn d-btn-error">Delete This Offer</button>
     </form>
 </div>
 <?php
@@ -255,11 +255,11 @@ class FreeAgencyOfferView
 
         ob_start();
         ?>
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Notes / Reminders</h2>
+<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title text-(length:--text-2xl)">Notes / Reminders</h2>
     </div>
-    <div class="ibl-card__body">
+    <div class="d-card-body">
         <ul class="ibl-notes">
             <li>The maximum contract permitted for this player (based on years of service) starts at <?= HtmlSanitizer::e($maxContract) ?> in Year 1.</li>
             <li>You have <strong><?= HtmlSanitizer::e($amendedCapSpace) ?></strong> in <strong>soft cap</strong> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>

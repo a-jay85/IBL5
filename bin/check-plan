@@ -1531,6 +1531,36 @@ if [ "$_y_tagged" -gt 0 ] && [ $((_y_tagged * 3)) -gt "$_y_total" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Gate AB: a post-impl CLI-executable row that asserts an absence with a negated
+# grep (`! grep`, `! rg`, `! git grep`) must name a durable in-repo check in its
+# location cell, or end its What-to-verify cell with (one-time-check: <reason>).
+# Post-plan Phase 5.0 runs the cell once and CI never re-runs it, so a later
+# master merge can reintroduce the deleted symbol with no signal (PR #2515:
+# $bgcolor2 was deleted, master grew a reader in News, CI stayed green).
+# Rows come from $GATEP_MATRIX (fence-aware) so a documented example never
+# trips it. Additive by construction: the gate only appends viol lines, shares
+# no state with any other gate, and reads _y_shape from gate Y above.
+# Detector is the narrow negated-grep form only. `grep -c ... = 0` and
+# `test -z "$(grep ...)"` are left alone: the 2026-10-20 corpus sample showed
+# them dominated by diff-hygiene counts and presence-and-absence mixes.
+# ---------------------------------------------------------------------------
+_ab_neg='(^|[;(&|])[[:space:]]*![[:space:]]*(grep|rg|git[[:space:]]+grep)([[:space:]]|$)'
+_ab_durable_tests='ibl5/tests/[A-Za-z0-9_./-]+\.(php|ts)|[A-Za-z0-9_./-]+_test\.go|vendor/bin/phpunit|npx playwright|vitest|go test'
+_ab_durable_bin='bin/(test|check)-[A-Za-z0-9_.-]+'
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    [ "$MC_TYPE" = "CLI-executable" ] || continue
+    case "$MC_TIME" in post-impl*) : ;; *) continue ;; esac
+    grep -qE "$_ab_neg" <<< "$MC_LOC" || continue
+    grep -qE "$_y_shape" <<< "${MC_WHAT//$MSEN/|}" && continue
+    _ab_durable="$_ab_durable_tests|$_ab_durable_bin"
+    case "$MC_LOC" in *'(one-shot)'*) _ab_durable="$_ab_durable_tests" ;; esac
+    grep -qE "$_ab_durable" <<< "$MC_LOC" && continue
+    viol "[AB] matrix row ${MC_NUM} asserts an absence with a plan-only negated grep; post-plan runs the cell once and CI never re-runs it, so a later master merge can bring the deleted symbol back unseen. Point the Test file / location cell at a durable in-repo check that holds the assertion (a test under ibl5/tests/, a bin/test-* harness, or a CI-wired bin/check-* script), or end the What-to-verify cell with (one-time-check: <reason>) when the absence is not worth a durable check: ${row}"
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
 # Gate Z: an untagged CLI-executable row whose command runs only outside the repo
 # or against a post-PR CI run. Two arms, checked in order:
 #  (1) ~/, $HOME, /tmp, or gh run|pr|api. A row that also runs a repo path or a

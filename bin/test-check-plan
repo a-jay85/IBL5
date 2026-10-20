@@ -4570,4 +4570,73 @@ for L_CASE in overflow verbatim; do
     fi
 done
 
+# ---------------------------------------------------------------------------
+# Gate [AB] fixtures (9 assert_viol cases + 1 deny-message case)
+# A post-impl CLI-executable row with a negated grep must name a durable
+# in-repo check or carry (one-time-check: <reason>). Rows are read from the
+# fence-aware matrix, so a fenced example never trips the gate.
+# ---------------------------------------------------------------------------
+AB_BASE="$FM$YHDR"'
+'"$YROW"
+AB_NOTE='<!-- no-test-methods: fixture rows are gate AB props -->'
+AB_CANARY=$(cat <<'AB_CANARY_EOF'
+| 7 | `grep -cE` for `bgcolor=`, `cellspacing=` and `cellpadding=` in `ibl5/themes/IBL/theme.php` prints 0, and no PHP file reads `bgcolor2`. Catches: restoring the `bgcolor=` echo in `OpenTable()` ⇒ count 1 | CLI-executable | post-impl (Phase 2) | ! grep -q -e 'bgcolor=' -e 'cellspacing=' -e 'cellpadding=' ibl5/themes/IBL/theme.php && ! grep -rq --include='*.php' 'bgcolor2' ibl5/themes ibl5/classes ibl5/modules ibl5/index.php ibl5/modules.php |
+AB_CANARY_EOF
+)
+AB_WHAT='no PHP file reads bgcolor2; the harness holds the assertion'
+
+# Negated grep next to a bin/test-* harness: durable.
+assert_viol "AB-pass-bin" 0 '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -rq bgcolor2 ibl5/modules && bin/test-check-plan` |
+'"$AB_NOTE"
+# Negated grep next to an explicit runner: durable.
+assert_viol "AB-pass-runner" 0 '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `vendor/bin/phpunit --filter testNoBgcolor2Reader && ! grep -rq bgcolor2 ibl5/modules` |
+'"$AB_NOTE"
+# The motivating css-legacy-markup-styles.md row 7: plan-only negated grep.
+assert_viol "AB-fail-canary" 1 '[AB]' "$AB_BASE"'
+'"$AB_CANARY"'
+'"$AB_NOTE"
+# The (one-shot) annotation drops the bin/ arm: not CI-run, not durable.
+assert_viol "AB-fail-one-shot" 1 '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -rq bgcolor2 ibl5/modules && bin/test-check-plan # (one-shot)` |
+'"$AB_NOTE"
+# Opt-out tag at the trailing end of the What cell.
+assert_viol "AB-optout" 0 '[AB]' "$AB_BASE"'
+'"${AB_CANARY/ count 1 | CLI-executable/ count 1 (one-time-check: ran once at plan time and printed nothing) | CLI-executable}"'
+'"$AB_NOTE"
+# pre-impl rows are characterization runs, not regression claims.
+assert_viol "AB-pre-impl-ignored" 0 '[AB]' "$AB_BASE"'
+'"${AB_CANARY/post-impl (Phase 2)/pre-impl (characterization)}"'
+'"$AB_NOTE"
+# Escaped pipe inside the location cell: the detector reads the whole cell.
+assert_viol "AB-escaped-pipe-fail" 1 '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -r bgcolor2 ibl5/modules \| grep -v fixtures` |
+'"$AB_NOTE"
+assert_viol "AB-escaped-pipe-pass" 0 '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -r bgcolor2 ibl5/modules \| grep -v fixtures; bin/test-check-plan` |
+'"$AB_NOTE"
+# A matrix header plus the canary inside a fence: invisible to the
+# fence-aware row source.
+assert_viol "AB-fenced-ignored" 0 '[AB]' "$AB_BASE"'
+'"$AB_NOTE"'
+
+```
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+'"$AB_CANARY"'
+```
+'
+
+# Deny message names the durable path and the opt-out tag.
+f="$TMP/AB-deny-message.md"; printf '%s\n' "$AB_BASE" "$AB_CANARY" "$AB_NOTE" > "$f"
+out="$("$GUARD" "$f" 2>&1)"; got=$?
+if [ "$got" -eq 1 ] \
+   && grep -qF 'Point the Test file / location cell at a durable in-repo check' <<< "$out" \
+   && grep -qF '(one-time-check: <reason>)' <<< "$out"; then
+    h_pass "AB-deny-message (exit $got)"
+else
+    h_fail "AB-deny-message" "expected exit 1 naming the durable path and the opt-out tag, got exit $got"
+fi
+
 h_done

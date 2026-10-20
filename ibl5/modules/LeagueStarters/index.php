@@ -33,7 +33,7 @@ if ($op === 'api') {
     $handler->handle();
     return;
 }
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 
 $module_name = basename(dirname(__FILE__));
 $pagetitle = "- $module_name";

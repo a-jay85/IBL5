@@ -87,7 +87,7 @@ if ($op === 'save_order') {
     }
 
     try {
-        $season = new \Season\Season($mysqli_db);
+        $season = \Season\SharedSeason::get($mysqli_db);
         $repository = new ProjectedDraftOrderRepository($mysqli_db);
         $service = new ProjectedDraftOrderService($repository);
         $service->saveLotteryOrder($season->endingYear, $intOrder);
@@ -101,7 +101,7 @@ if ($op === 'save_order') {
     return;
 }
 
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 $repository = new ProjectedDraftOrderRepository($mysqli_db);
 $service = new ProjectedDraftOrderService($repository);
 $view = new ProjectedDraftOrderView();

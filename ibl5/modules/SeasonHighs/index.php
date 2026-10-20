@@ -30,7 +30,7 @@ global $mysqli_db, $leagueContext;
 /** @var \League\LeagueContext $leagueContext */
 
 // Get current season info
-$season = new \Season\Season($mysqli_db, $leagueContext);
+$season = \Season\SharedSeason::get($mysqli_db, $leagueContext);
 
 // Determine season phase (from request or current phase)
 $seasonPhaseParam = $_GET['seasonPhase'] ?? null;

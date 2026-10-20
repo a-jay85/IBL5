@@ -52,7 +52,9 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $this->leagueContext = $leagueContext;
         $this->repository = $repository ?? new BoxscoreRepository($db, $leagueContext);
         $this->auditRepository = $auditRepository ?? new BoxscoreAuditRepository($db, $leagueContext);
-        $this->season = $season ?? \Season\SharedSeason::get($db);
+        // Fresh build, never the request-shared Season: this processor writes sim
+        // dates and reads them back, so a shared instance could be stale.
+        $this->season = $season ?? new Season($db);
         $this->progressReporter = $progressReporter ?? new FlushProgressReporter();
         $resolver = new GameUpsertResolver($this->repository);
         $writer = new GameLineWriter($db, $this->repository);

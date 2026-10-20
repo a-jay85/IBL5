@@ -83,7 +83,7 @@ class TradeExecutionService implements TradeExecutionServiceInterface
 
         $rows = $this->offerRepository->getTradesByOfferId($offerId);
         if ($rows === []) {
-            return ['success' => false, 'error' => 'No trade data found for this offer ID'];
+            return ['success' => false, 'error' => TradeProcessorInterface::NO_TRADE_DATA_ERROR];
         }
 
         $capValidation = $this->validateParties($offerId, $rows);

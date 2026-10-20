@@ -34,9 +34,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'season archive',
     'season highs',
     'team off/def stats',
-    // Kept 2026-10-17: .sos-summary text is fixed in design/components/strength-of-schedule.css.
-    // Remaining nodes are in design/components/schedule.css: .schedule-jump-btn (DB-configured
-    // team colors), .schedule-month__header--playoffs and .schedule-game__streak--win.
     // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
     // 2026-10-07 (IBL5-backlog#1270): 'free agency preview' and 'schedule' passed 10/10 and were removed (DELTA-OK).
     // Re-checked 2026-10-07 (IBL5-backlog#1270): kept, together with 'season leaderboards' below.

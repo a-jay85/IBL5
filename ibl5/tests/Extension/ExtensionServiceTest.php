@@ -160,7 +160,7 @@ class ExtensionServiceTest extends TestCase
     }
 
     /**
-     * @return array<string, array{array<string, int>, array<string, int>, bool}>
+     * @return array<string, array{array<string, int>, array{year1: int, year2: int, year3: int, year4: int, year5: int}, bool}>
      */
     public static function discordOutcomeProvider(): array
     {
@@ -180,7 +180,7 @@ class ExtensionServiceTest extends TestCase
 
     /**
      * @param array<string, int> $overrides
-     * @param array<string, int> $offer
+     * @param array{year1: int, year2: int, year3: int, year4: int, year5: int} $offer
      */
     #[DataProvider('discordOutcomeProvider')]
     public function testDiscordNotificationSentIsTrueOnBothOutcomes(array $overrides, array $offer, bool $expectedAccepted): void

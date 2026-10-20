@@ -517,6 +517,99 @@ def _plan_index(worktree: str, plan_path: str, timeout: float | None = None) -> 
     return proc.stdout
 
 
+# --- Body-only recheck eligibility: is every finding a PR-body (check 4) finding? ---
+# Derived here from what the reviewer already emits (numbered checks, the `Passed:`
+# line, the item-2a severity marker); the reviewer prompt carries no body/code tag.
+# Every unrecognised layout answers None, which routes to the full Opus re-review.
+
+BODY_CHECK_ID = "4"
+_COVERAGE_RE = re.compile(r"^REVIEW-COVERAGE:\s*(\S+)", re.M)
+_PASSED_LINE_RE = re.compile(r"^\s*\**Passed\**:\s*(.*)$", re.M)
+_SIX_D_RE = re.compile(r"^#{2,4}\s*6d\b", re.M)
+_CHECK_LINE_RE = re.compile(r"^\s*\**([1-6])[abc]?[.)]\s", re.M)
+_SIX_D_LINE_RE = re.compile(r"^\s*\**([1-6])([abc]?)[.)]\s+(.*)$")
+_SIX_D_PASS_RE = re.compile(
+    r"(?i)^(?:pass(?:es|ed)?|ok|clean|n/a|none)\b|no finding|no issue")
+_BULLET_CHECK_RE = re.compile(r"(?i)\bcheck\s*#?\s*([1-6])[abc]?\b")
+_ALL_CHECKS = {1, 2, 3, 4, 5, 6}
+
+
+def _six_d_failing(head: str) -> set[int] | None:
+    """Failing check numbers from a `## 6d` block, or None when it is not 1..6 once each."""
+    m = _SIX_D_RE.search(head)
+    if not m:
+        return None
+    seen: list[int] = []
+    failing: set[int] = set()
+    for ln in head[m.end():].splitlines():
+        lm = _SIX_D_LINE_RE.match(ln)
+        if not lm:
+            continue
+        num, sub, rest = int(lm.group(1)), lm.group(2), lm.group(3)
+        if not sub:
+            seen.append(num)
+        # Drop the `Label:` prefix; a sub-line that fails fails its parent check.
+        verdict = rest.split(":", 1)[1] if ":" in rest else rest
+        if not _SIX_D_PASS_RE.search(verdict.replace("*", "").strip()):
+            failing.add(num)
+    if sorted(seen) != sorted(_ALL_CHECKS):
+        return None
+    return failing
+
+
+def body_only_findings_text(text: str) -> list[str] | None:
+    """The finding bullets (marker included, document order) when EVERY finding
+    is a PR-body (check 4) finding, else None. None is the fail-closed answer:
+    any layout the parser does not recognise is None, never []."""
+    pre = text.split(DIGEST_CUT, 1)[0]
+    words = VERDICT_RE.findall(pre)
+    if not words or words[-1] != "NOT READY":
+        return None
+    cov = _COVERAGE_RE.search(pre)
+    if cov and cov.group(1).strip("*").upper() != "CURRENT":
+        return None
+    lines = pre.splitlines()
+    heading_at = next((i for i, ln in enumerate(lines)
+                       if ln.rstrip() == FINDINGS_HEADING), None)
+    if heading_at is None:
+        return None
+    head = "\n".join(lines[:heading_at])
+    passed_m = _PASSED_LINE_RE.search(head)
+    if passed_m:
+        passed = {int(d) for d in re.findall(r"[1-6]", passed_m.group(1))}
+        numbered = {int(n) for n in _CHECK_LINE_RE.findall(head)}
+        if numbered & passed or numbered | passed != _ALL_CHECKS:
+            return None
+        failing = numbered
+    else:
+        six_d = _six_d_failing(head)
+        if six_d is None:
+            return None
+        failing = six_d
+    if not failing or not failing <= {int(BODY_CHECK_ID)}:
+        return None
+    body = [ln for ln in lines if not VERDICT_RE.match(ln)]
+    items = _group_findings(_findings_section(body) or [])
+    if not items or any(marker is None for marker, _ in items):
+        return None
+    for _, item in items:
+        if any(c != BODY_CHECK_ID for c in _BULLET_CHECK_RE.findall(item)):
+            return None
+    return [item for _, item in items]
+
+
+def body_only_findings(verdict_path: str) -> list[str] | None:
+    """`body_only_findings_text` over a verdict file; unreadable or empty -> None."""
+    try:
+        with open(verdict_path) as fh:
+            text = fh.read()
+    except OSError:
+        return None
+    if not text.strip():
+        return None
+    return body_only_findings_text(text)
+
+
 def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: str,
                  pr_body: str, pr_number: int | str, phase4b_ran: bool, *,
                  worktree: str = ".", packet_name: str = "fidelity-packet",

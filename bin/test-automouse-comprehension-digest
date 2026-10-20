@@ -386,14 +386,32 @@ case_reviews_webhook() {
 
 case_at_reset() {
   local h rc
-  for h in 00 08 09 15 17; do
+  for h in 00 08 09 15; do
     reset_case; mk_prs_mixed; rc=0
-    COMPREHENSION_DIGEST_UTC_HOUR=$h run_cdd --at-reset --date 2026-10-03 >/dev/null 2>&1 || rc=$?
-    assert_eq "at-reset $h: exit 0" 0 "$rc"
-    assert_absent "at-reset $h: no DM" "$T/dm.out"
-    assert_absent "at-reset $h: no report" "$T/reports"
-    assert_absent "at-reset $h: model never called" "$T/claude.argv"
+    COMPREHENSION_DIGEST_UTC_DOW=0 COMPREHENSION_DIGEST_UTC_HOUR=$h \
+      run_cdd --at-reset --date 2026-10-03 >/dev/null 2>&1 || rc=$?
+    assert_eq "at-reset Sunday $h: exit 0" 0 "$rc"
+    assert_absent "at-reset Sunday $h: no DM" "$T/dm.out"
+    assert_absent "at-reset Sunday $h: no report" "$T/reports"
+    assert_absent "at-reset Sunday $h: model never called" "$T/claude.argv"
   done
+  # Late wake: any other hour with no report for the date runs as a catch-up.
+  for h in 17 03; do
+    reset_case; mk_prs_mixed; rc=0
+    COMPREHENSION_DIGEST_UTC_DOW=1 COMPREHENSION_DIGEST_UTC_HOUR=$h \
+      run_cdd --at-reset --date 2026-10-03 >/dev/null 2>&1 || rc=$?
+    assert_eq "at-reset catch-up $h: exit 0" 0 "$rc"
+    assert_exists "at-reset catch-up $h: DM sent" "$T/dm.out"
+    assert_exists "at-reset catch-up $h: report written" "$T/reports/2026-10-03-comprehension-digest.md"
+  done
+  # The second Sunday fire (17 UTC in PST) skips once the 16:xx fire wrote the report.
+  reset_case; mk_prs_mixed; rc=0
+  mkdir -p "$T/reports"; : > "$T/reports/2026-10-03-comprehension-digest.md"
+  COMPREHENSION_DIGEST_UTC_DOW=0 COMPREHENSION_DIGEST_UTC_HOUR=17 \
+    run_cdd --at-reset --date 2026-10-03 >/dev/null 2>&1 || rc=$?
+  assert_eq "at-reset 17 with report: exit 0" 0 "$rc"
+  assert_absent "at-reset 17 with report: no DM" "$T/dm.out"
+  assert_absent "at-reset 17 with report: model never called" "$T/claude.argv"
   reset_case; mk_prs_mixed; rc=0
   COMPREHENSION_DIGEST_UTC_HOUR=16 run_cdd --at-reset --date 2026-10-03 >/dev/null 2>&1 || rc=$?
   assert_eq "at-reset 16: exit 0" 0 "$rc"

@@ -27,8 +27,9 @@
 # on 16:03 UTC (the weekly usage reset) in both PDT and PST; the other exits 0 without sending.
 # The brief posts to #reviews through the webhook file in COMPREHENSION_DIGEST_WEBHOOK_FILE
 # (default ~/.iblbot-reviews-webhook-url). DEGRADED alerts stay on the default #dev webhook.
-# Seams: COMPREHENSION_DIGEST_GH, _CLAUDE, _GATE, _REPORT_DIR, _RULES_FILE, DISCORD_DM_BIN.
-# Seams: COMPREHENSION_DIGEST_GH, _CLAUDE, _GATE, _REPORT_DIR, _UTC_HOUR, _WEBHOOK_FILE, DISCORD_DM_BIN.
+# A fire at any other hour (a late launchd wake) runs as a catch-up when no report for the date exists,
+# except Sunday hours before 16 UTC, which wait for the 16:xx fire.
+# Seams: COMPREHENSION_DIGEST_GH, _CLAUDE, _GATE, _REPORT_DIR, _UTC_HOUR, _UTC_DOW, _WEBHOOK_FILE, DISCORD_DM_BIN.
 # Report: ~/claude-plans/_reports/<date>-comprehension-digest.md
 
 set -euo pipefail
@@ -73,12 +74,19 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# --at-reset gate: exactly one of the two Sunday fires lands on 16:xx UTC.
+# --at-reset gate: exactly one of the two Sunday fires lands on 16:xx UTC. A fire launchd ran
+# late (Mac asleep at both times) lands at any other hour; that is a catch-up unless this
+# week's report exists. The pre-reset Sunday hours wait for the 16:xx fire.
+CATCHUP_CHECK=0
 if [ "$AT_RESET" -eq 1 ]; then
   UTC_HOUR="${COMPREHENSION_DIGEST_UTC_HOUR:-$(date -u +%H)}"
+  UTC_DOW="${COMPREHENSION_DIGEST_UTC_DOW:-$(date -u +%w)}"
   if [ "$UTC_HOUR" != "16" ]; then
-    echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}, not 16; skipping this fire." >&2
-    exit 0
+    if [ "$UTC_DOW" = "0" ] && [ "$((10#$UTC_HOUR))" -lt 16 ]; then
+      echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}, not 16; skipping this fire." >&2
+      exit 0
+    fi
+    CATCHUP_CHECK=1
   fi
 fi
 
@@ -112,6 +120,13 @@ if [ "$DRY_RUN" -eq 0 ] && [ "$CLASSIFY_ONLY" -eq 0 ] && [ -z "$REPORT_DIR" ]; t
 fi
 
 D="${DATE_OVERRIDE:-$(date +%F)}"
+if [ "$CATCHUP_CHECK" -eq 1 ]; then
+  if [ -n "$REPORT_DIR" ] && [ -e "$REPORT_DIR/${D}-comprehension-digest.md" ]; then
+    echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}, not 16, and ${D} already has a report; skipping this fire." >&2
+    exit 0
+  fi
+  echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}; no report for ${D}, running as catch-up." >&2
+fi
 START="$(shift_date "$D" -7)"
 LAST="$(shift_date "$D" -1)"
 END="$D"

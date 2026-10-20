@@ -18,10 +18,13 @@ set -euo pipefail
 #                           stdout. Spawns no claude, sends no DM.
 #   --from-tsv=<path>       Skip SSH and SQL; feed this 4-column TSV to the
 #                           digest builder (CI and worktree exercise path).
-#   --at-reset              Launchd mode: run only when the UTC hour is 16 (Sunday
-#                           16:03 UTC, the weekly usage reset); otherwise log one
-#                           line and exit 0. The plist fires at 08:03 and 09:03
-#                           local so exactly one fire passes in both PDT and PST.
+#   --at-reset              Launchd mode: run when the UTC hour is 16 (Sunday
+#                           16:03 UTC, the weekly usage reset). Any other hour
+#                           logs one line and exits 0, unless no review went out
+#                           in the last 6 days (a late launchd fire after sleep)
+#                           and it is not a pre-reset Sunday hour. The plist fires
+#                           at 08:03 and 09:03 local so one fire hits 16:xx UTC
+#                           in both PDT and PST.
 #   --print-schedule        Print the launchd plist and exit (no side effect).
 #   --install-schedule      Write the plist and bootstrap it (main checkout only).
 #   --uninstall-schedule    Boot the job out and remove the plist (idempotent).
@@ -42,7 +45,8 @@ set -euo pipefail
 #   default #dev webhook)
 # Test seams: EVENTS_REVIEW_SSH_BIN, EVENTS_REVIEW_MYSQL_BIN,
 #   EVENTS_REVIEW_CLAUDE_BIN, EVENTS_REVIEW_DM_BIN, EVENTS_REVIEW_LAUNCHCTL_BIN,
-#   EVENTS_REVIEW_UTC_HOUR.
+#   EVENTS_REVIEW_UTC_HOUR, EVENTS_REVIEW_UTC_DOW, EVENTS_REVIEW_NOW_EPOCH,
+#   EVENTS_REVIEW_STATE_FILE (default ~/Library/Logs/ibl5/events-review.last-sent).
 #
 # Exit codes: 0 success (including an empty week), 1 run failure, 2 usage/env.
 
@@ -271,14 +275,37 @@ case "$MODE" in
     print|install|uninstall) schedule_main; exit 0 ;;
 esac
 
-# launchd fires twice on Sunday (08:03 and 09:03 local); only the 16:xx UTC fire runs.
+# launchd fires twice on Sunday (08:03 and 09:03 local); the 16:xx UTC fire runs.
+# A fire launchd ran late (Mac asleep at both times) lands at an arbitrary hour,
+# so any other hour is a catch-up when no review went out in the last 6 days,
+# except the pre-reset Sunday hours, which wait for the 16:xx fire.
+STATE_FILE="${EVENTS_REVIEW_STATE_FILE:-${HOME:-}/Library/Logs/ibl5/events-review.last-sent}"
 if [ "$AT_RESET" = 1 ]; then
     _utc_hour="${EVENTS_REVIEW_UTC_HOUR:-$(date -u +%H)}"
+    _utc_dow="${EVENTS_REVIEW_UTC_DOW:-$(date -u +%w)}"
     if [ "$_utc_hour" != "16" ]; then
-        log "--at-reset: UTC hour is ${_utc_hour}, not 16; skipping this fire"
-        exit 0
+        _last=""
+        [ -f "$STATE_FILE" ] && IFS= read -r _last < "$STATE_FILE" || true
+        case "$_last" in ''|*[!0-9]*) _last=0 ;; esac
+        _now="${EVENTS_REVIEW_NOW_EPOCH:-$(date -u +%s)}"
+        if [ "$_utc_dow" = "0" ] && [ "$((10#$_utc_hour))" -lt 16 ]; then
+            log "--at-reset: UTC hour is ${_utc_hour}, not 16; skipping this fire"
+            exit 0
+        fi
+        if [ $((_now - _last)) -le 518400 ]; then
+            log "--at-reset: UTC hour is ${_utc_hour}, not 16, and a review already went out; skipping this fire"
+            exit 0
+        fi
+        log "--at-reset: UTC hour is ${_utc_hour}; no review in the last 6 days, running as catch-up"
     fi
 fi
+
+# Records a delivered review (or skip line) so a late launchd fire is not re-run.
+mark_sent() {
+    [ "$AT_RESET" = 1 ] && [ "$DRY_RUN" != 1 ] || return 0
+    mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null || true
+    date -u +%s > "$STATE_FILE" 2>/dev/null || log "could not write $STATE_FILE"
+}
 
 if [ -z "$FROM_TSV" ]; then
     require_vars
@@ -695,6 +722,7 @@ if [ "$HUMAN" -lt "$EVENTS_REVIEW_MIN_ROWS" ]; then
         exit 0
     fi
     send_dm "$SKIP_LINE" "" "$EVENTS_REVIEW_WEBHOOK_FILE"
+    mark_sent
     exit 0
 fi
 
@@ -734,3 +762,4 @@ if [ "$CLAUDE_RC" -ne 0 ] || [ -z "${REVIEW//[[:space:]]/}" ]; then
 fi
 
 send_dm "$REVIEW" "IBL5 analytics review ${WSTART}..${WEND}" "$EVENTS_REVIEW_WEBHOOK_FILE"
+mark_sent

@@ -18,7 +18,7 @@ Without `--live`, every would-be side effect remains a typed intent record.
 
 | Owned by code (deterministic) | Retained LLM calls (bounded, typed, validated) |
 |---|---|
-| Phase sequencing + terminal states | `pr-copy`: commit/PR title + summary (haiku). Skipped when the PR is open and the tree is clean |
+| Phase sequencing + terminal states | `pr-copy`: commit/PR title + summary (sonnet). States no exact count its packet does not show; the diff is cut at `PR_COPY_DIFF_CAP` characters and the prompt says so when it is. Skipped when the PR is open and the tree is clean |
 | Phase 2 pre-push meta-check gate (rebase → gate → push) | `prose-fix`: rewrites the flagged lines when `check-prose-since` is the only failing check (sonnet, then opus; at most 2 tool-enabled calls with Read/Grep/Glob/Edit). A diff check enforces the line scope, and a re-run of the real gate decides success. Doc-staleness remediation stays mechanical |
 | Phase 3 diff classification (all flags) | `review-agent-a/b/d` — code review judgment (sonnet) |
 | Phase 5 verify aggregation | `security-audit` (sonnet) for security judgment |
@@ -28,6 +28,8 @@ Without `--live`, every would-be side effect remains a typed intent record.
 | Side-effect gating + audit log | `retrospective` — save-a-lesson-or-not (haiku) |
 
 Phase 2 rebases the branch onto origin/master, runs the local meta-check gate, then pushes to origin.
+
+Before the Phase 2 commit a mechanical body pass (`harness/body_numbers.py`) corrects file, line, migration and ADR numbers in the PR body and annotates test-count mismatches. No model reads the body in Phase 2; the Phase 5.5 fidelity review's check 4 is the body-vs-diff gate. A missing or malformed Merge danger line degrades the run as `merge-danger` and holds arming.
 
 Phase 5.0 resolves each plan path by exact-or-suffix match, then by unique basename (a directory the diff moved under one extra component still resolves; two same-named candidates stay `MISSING`). It re-runs once after a Phase 5.5 remediation commit, so a fix-up that authors the planned file clears arming condition (3) in the same run. Any path still `MISSING` is also handed to the Phase 5.5 fixer as a tagged work-list item.
 

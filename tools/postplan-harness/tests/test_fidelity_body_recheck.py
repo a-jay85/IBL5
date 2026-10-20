@@ -293,3 +293,86 @@ def test_diff_sections_for_selects_only_named_paths():
     assert "Bar.php" not in got
     head = llm_calls.diff_sections_for(TWO_FILE_DIFF, set())
     assert head.startswith(TWO_FILE_DIFF.splitlines()[0])
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: recheck reply schema
+# ---------------------------------------------------------------------------
+
+from harness import schemas  # noqa: E402
+from harness.state import HarnessError  # noqa: E402
+
+
+def _item(i, status, evidence="body line 3 matches diff line 12"):
+    return {"id": i, "status": status, "evidence": evidence}
+
+
+def _reply(findings=(("F1", "resolved"), ("F2", "resolved")), hunks=(("H1", "supported"),)):
+    return {"findings": [_item(i, s) for i, s in findings],
+            "hunks": [_item(i, s) for i, s in hunks]}
+
+
+def _raises_schema(data, finding_ids=("F1", "F2"), hunk_ids=("H1",)):
+    with pytest.raises(HarnessError) as ei:
+        schemas.validate_body_recheck(data, finding_ids=list(finding_ids),
+                                      hunk_ids=list(hunk_ids))
+    assert ei.value.kind == "schema"
+
+
+def test_validate_body_recheck_accepts_exact_ids():
+    schemas.validate_body_recheck(_reply(), finding_ids=["F1", "F2"], hunk_ids=["H1"])
+    schemas.body_recheck_validator(["F1", "F2"], ["H1"])(_reply())
+
+
+@pytest.mark.parametrize("reply", [
+    _reply(findings=(("F1", "resolved"),)),
+    _reply(findings=(("F1", "resolved"), ("F2", "resolved"), ("F3", "resolved"))),
+    _reply(findings=(("F1", "resolved"), ("F1", "resolved"))),
+    _reply(hunks=(("H9", "supported"),)),
+], ids=["omitted", "unknown", "duplicate", "unknown-hunk"])
+def test_validate_body_recheck_rejects_missing_extra_or_duplicate_ids(reply):
+    _raises_schema(reply)
+
+
+@pytest.mark.parametrize("status", ["maybe", "", 1, "supported"])
+def test_validate_body_recheck_rejects_unknown_status(status):
+    _raises_schema(_reply(findings=(("F1", status), ("F2", "resolved"))))
+
+
+def test_validate_body_recheck_rejects_non_object_and_extra_keys():
+    _raises_schema([_item("F1", "resolved")])
+    _raises_schema("resolved")
+    _raises_schema({**_reply(), "verdict": "READY"})
+    extra = _reply()
+    extra["findings"][0]["note"] = "x"
+    _raises_schema(extra)
+    missing = _reply()
+    del missing["findings"][0]["evidence"]
+    _raises_schema(missing)
+
+
+def test_unwrap_body_recheck_envelope_variations():
+    v = schemas.body_recheck_validator(["F1", "F2"], ["H1"])
+    v(schemas.unwrap_body_recheck_envelope({"result": _reply()}))
+    v(schemas.unwrap_body_recheck_envelope({"body_recheck": _reply()}))
+    padded = _reply()
+    padded["findings"][0]["status"] = " Resolved "
+    folded = schemas.unwrap_body_recheck_envelope(padded)
+    assert folded["findings"][0]["status"] == "resolved"
+    v(folded)
+    no_hunks = schemas.unwrap_body_recheck_envelope(
+        {"findings": [_item("F1", "resolved")]})
+    assert no_hunks["hunks"] == []
+    schemas.validate_body_recheck(no_hunks, finding_ids=["F1"], hunk_ids=[])
+    bare = [_item("F1", "resolved")]
+    assert schemas.unwrap_body_recheck_envelope(bare) is bare
+    _raises_schema(schemas.unwrap_body_recheck_envelope(bare))
+    _raises_schema(schemas.unwrap_body_recheck_envelope({"result": _reply(), "extra": 1}))
+
+
+def test_body_recheck_passed_requires_all_resolved_and_supported():
+    assert schemas.body_recheck_passed(_reply()) is True
+    assert schemas.body_recheck_passed(
+        _reply(findings=(("F1", "resolved"), ("F2", "unresolved")))) is False
+    assert schemas.body_recheck_passed(_reply(hunks=(("H1", "unsupported"),))) is False
+    assert schemas.body_recheck_passed({"findings": [], "hunks": []}) is False

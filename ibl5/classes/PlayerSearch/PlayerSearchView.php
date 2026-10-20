@@ -394,7 +394,7 @@ class PlayerSearchView implements PlayerSearchViewInterface
     {
         ob_start();
         ?>
-    <div class="flex flex-wrap items-center justify-center gap-4 gap-3">
+    <div class="flex flex-wrap items-center justify-center gap-3">
         <button type="button" class="d-btn d-btn-ghost" onclick="resetPlayerSearch();">Reset</button>
         <button type="submit" class="d-btn d-btn-primary">Search for Player</button>
     </div>

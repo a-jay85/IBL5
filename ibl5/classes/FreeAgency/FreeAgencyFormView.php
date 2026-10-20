@@ -150,7 +150,7 @@ class FreeAgencyFormView
     <?php for ($i = 1; $i <= 6; $i++): ?>
     <div class="offer-salary-cell">
         <label for="offeryear<?= HtmlSanitizer::e($i) ?>" class="d-label text-sm">Yr <?= HtmlSanitizer::e($i) ?></label>
-        <input type="number" id="offeryear<?= HtmlSanitizer::e($i) ?>" class="d-input d-input-sm offer-salary-input" name="offeryear<?= HtmlSanitizer::e($i) ?>" value="<?= HtmlSanitizer::e($prefills["offer{$i}"] !== 0 ? $prefills["offer{$i}"] : '') ?>" min="0" max="9999">
+        <input type="number" id="offeryear<?= HtmlSanitizer::e($i) ?>" class="d-input d-input-sm w-18 offer-salary-input" name="offeryear<?= HtmlSanitizer::e($i) ?>" value="<?= HtmlSanitizer::e($prefills["offer{$i}"] !== 0 ? $prefills["offer{$i}"] : '') ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>

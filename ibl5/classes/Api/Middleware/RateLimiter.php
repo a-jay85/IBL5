@@ -35,10 +35,9 @@ class RateLimiter implements RateLimiterInterface
         $tier = $apiKey['rate_limit_tier'];
         $limit = self::TIER_LIMITS[$tier] ?? self::TIER_LIMITS['standard'];
 
-        // Unlimited tier skips rate limiting
+        // Unlimited tier is never enforced, so it skips the counter write,
+        // the count read, and the probabilistic prune entirely.
         if ($limit === 0) {
-            $this->repository->increment($apiKey['key_hash']);
-            $this->maybePrune();
             return null;
         }
 

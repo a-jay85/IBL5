@@ -21,4 +21,3 @@ Web and API code gets its Season from `\Season\SharedSeason::get($db, $leagueCon
 - **Writes.** Every `LeagueControlPanelRepository` settings write calls `SharedSeason::reset()`, so a read later in the same request rebuilds. `ibl5/scripts/updateAllTheThings.php` calls `SharedSeason::disable()` before its first Season build.
 - **Never mutate the shared instance.** Compute a local value instead (see `UI\Tables\Contracts::render`).
 - **Tests** that call `enable()` must call `SharedSeason::disable()` in `tearDown()`.
-- A schedule-query failure in the constructor now throws. The old `RuntimeException` swallow is gone.

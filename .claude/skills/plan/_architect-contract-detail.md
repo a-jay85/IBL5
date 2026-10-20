@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-18
+last_verified: 2026-10-20
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -263,3 +263,13 @@ Gate `[PM]` catches three abuse shapes:
 - **Wrong type.** The tag sits on a row that is not `Truly-manual`, such as a PHPUnit row marked `post-merge: runs after deploy`. Automated rows run in CI on the open PR, so the tag has no meaning there.
 - **Thin or off-vocabulary reason.** `post-merge: easier after it ships` is under the vocabulary bar. A valid reason names the dependency, for example `post-merge: launchd scheduling on the live host only fires after deploy`.
 - **Look-and-feel row.** A row asking a human to judge a new layout carries the tag to avoid holding the merge. That judgment can happen on the open PR, so the row stays in the Manual-Testing window.
+
+## Durable absence checks
+
+PR #2515 deleted the `$bgcolor2` global and proved the deletion with a plan-only negated grep in its Verification Matrix. Post-plan Phase 5.0 ran that cell once and it passed. Master then added a reader in `ibl5/modules/News/index.php` (#3080). The branch merged master, CI stayed green because News fell back to its default, and the regression shipped. The assertion existed only in `~/claude-plans/`, which no CI job reads.
+
+The rule covers any `post-impl` `CLI-executable` row that uses a negated grep to assert that a deleted symbol, global, file, or pattern stays absent. A durable check is a PHPUnit or Playwright test under `ibl5/tests/`, a `bin/test-*` harness, or a CI-wired `bin/check-*` script that holds the assertion. A `bin/` token annotated `# (one-shot)` does not count, because that annotation says the script is not CI-run. When the absence is not worth a durable check, the row ends its "What to verify" cell with `(one-time-check: <reason>)`, and the one-third cap in gate `[Y]` still applies.
+
+The fix is a pointer to a durable check. The gate generates nothing. The row names an in-repo check that holds the absence assertion, and gate `[AB]` in `bin/check-plan` rejects a `post-impl` `CLI-executable` row whose command is a negated grep with no durable token. Gate `[G]` already proves a `bin/test-*` or `bin/check-*` token is CI-wired, so `[AB]` only requires that one be named. Auto-generating tests from matrix rows was rejected: the row is prose, and a generated test would pin the grep rather than the behaviour.
+
+The detector is deliberately narrow. The 2026-10-20 corpus scan over `~/claude-plans/*.md` found 326 `post-impl` CLI rows with a negated grep, 251 of them without a durable token. The `grep -c ... = 0` form (140 rows) and the `test -z "$(grep ...)"` form (20 rows) were sampled and found dominated by `git diff | grep -c` diff-hygiene counts and mixed presence-and-absence checks, so they are out of scope for the gate. Docs-only negated greps (about 51 of the 251) are in scope: a wording-absence check regresses the same way a symbol-absence check does, and the opt-out tag costs one clause.

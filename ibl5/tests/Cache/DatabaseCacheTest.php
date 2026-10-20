@@ -77,6 +77,9 @@ final class DatabaseCacheTest extends TestCase
         $this->assertNull($result);
     }
 
+    /**
+     * Negative path: `DatabaseCache::get()` returns null on corrupt JSON, unchanged by the lock-support removal.
+     */
     public function testGetReturnsNullOnCorruptJson(): void
     {
         $mockDb = new MockCacheDb();
@@ -291,6 +294,9 @@ final class DatabaseCacheTest extends TestCase
         $this->assertFalse($mockDb->wasWriteCalled());
     }
 
+    /**
+     * `DatabaseCache::getStale()` still serves an expired row through the trimmed `MockCacheStmt::get_result()`.
+     */
     public function testGetStaleReturnsExpiredValue(): void
     {
         // getStale must return a row even when its expiration is in the past.
@@ -324,6 +330,9 @@ final class DatabaseCacheTest extends TestCase
         $this->assertNull($cache->getStale('corrupt_key'));
     }
 
+    /**
+     * The single-flight lock API is gone: `DatabaseCache::releaseLock()` and `acquireLock()` no longer exist.
+     */
     public function testDatabaseCacheContractDeclaresNoLockMethods(): void
     {
         $interface = new \ReflectionClass(DatabaseCacheInterface::class);

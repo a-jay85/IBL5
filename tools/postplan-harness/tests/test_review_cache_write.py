@@ -21,14 +21,14 @@ from harness.review import ReviewPhase
 from harness.state import Finding, HarnessError, RunResult, TerminalState, UsageLedger
 from harness.adapters.llm import FixtureLlm
 from test_review_cache_hit import (ALPHA, BETA, CANNED_FINDINGS, FILES, FIXTURE, GATES, KEY, PR,
-                                   SLUG, _seed_from)
+                                   SLUG, _pin_verifier_worktree, _seed_from)  # noqa: F401 (autouse fixture)
 from test_runner_replay import DegradingLlm, ScriptedToolLlm, _verdict_doc
 
 # Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
-pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show", "standard_review_depth")
 
 REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
-                   "security-audit", "score-findings")
+                   "security-audit")
 RUN = "run-write"
 
 
@@ -68,7 +68,7 @@ def test_vet_review_rejects_each_degraded_purpose(purpose):
     assert reviewcache.vet_review(findings, _scored(findings), [], dict(GATES), RUN) is not None
 
 
-def test_vet_review_purpose_set_is_the_five_spec_purposes():
+def test_vet_review_purpose_set_is_the_four_agent_purposes():
     assert set(reviewcache.REVIEW_PURPOSES) == set(REVIEW_PURPOSES)
 
 

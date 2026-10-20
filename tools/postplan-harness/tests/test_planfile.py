@@ -66,8 +66,9 @@ def test_matrix_rejects_package_name_and_url_phantoms():
     """Two live rows from the plan corpus. e2e-phase-matrix's row named the npm
     package `@playwright/test` and its `lint:e2e` command tripped the E2E type match,
     so conformance reported the package missing from every diff. The other row's
-    Behavior cell held a URL ahead of the real test path. Only the first backticked
-    candidate is ever considered, so that row now plans nothing instead of a phantom."""
+    Behavior cell held a URL ahead of the real test path. Each cell is read on its own
+    and the URL fails _is_test_path, so the row plans the location cell's path and
+    never the URL (backlog#1501)."""
     content = (
         "## Verification Matrix\n\n"
         "| # | Behavior | Test type | When | Test |\n"
@@ -78,7 +79,7 @@ def test_matrix_rejects_package_name_and_url_phantoms():
         "| `ibl5/tests/BugPipeline/AttachmentInputValidatorTest.php` — NEW |\n"
     )
     planned, _, _ = parse_matrix(content)
-    assert planned == []
+    assert planned == ["ibl5/tests/BugPipeline/AttachmentInputValidatorTest.php"]
 
 
 def test_matrix_ignores_fenced_rows():

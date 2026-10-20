@@ -41,37 +41,11 @@ final class ScheduleReconciliationAudit
     {
         // Load the schedule index to count scheduled games and determine isEnabled.
         $scheduleIndex = $this->repository->fetchScheduledGameIndex($seasonYear);
-
-        $scheduledGames = 0;
-        foreach ($scheduleIndex as $visitors) {
-            foreach ($visitors as $homes) {
-                $scheduledGames += count($homes);
-            }
-        }
+        $scheduledGames = $this->countScheduledGames($scheduleIndex);
 
         // Fail-open: skip orphan checks for seasons with no schedule data.
         $isEnabled = $scheduleIndex !== [];
-
-        $findings = [];
-
-        if ($isEnabled) {
-            // Orphan direction: boxscore games with no matching schedule row (error).
-            foreach ($this->auditRepository->findOrphanBoxscoreGames($seasonYear) as $row) {
-                $findings[] = new AuditFinding(
-                    AuditFinding::KIND_ORPHAN,
-                    AuditFinding::SEVERITY_ERROR,
-                    (string) $row['game_date'],
-                    (int) $row['visitor_teamid'],
-                    (int) $row['home_teamid'],
-                    sprintf(
-                        'not in ibl_schedule for season %d (gotd %d, "%s")',
-                        $seasonYear,
-                        (int) $row['game_of_that_day'],
-                        (string) $row['name']
-                    )
-                );
-            }
-        }
+        $orphanFindings = $isEnabled ? $this->orphanFindings($seasonYear) : [];
 
         // Duplicate-triple direction: same (date, visitor, home) at >1 gotd (error).
         // This is a raw-table invariant — it compares ibl_box_scores_teams against
@@ -80,6 +54,79 @@ final class ScheduleReconciliationAudit
         // matchup twice on one date in any game type, so a repeated triple in a
         // playoff or HEAT month is a double-entered schedule row simmed twice,
         // exactly the 1993-06-04 case (ADR-0109, amended).
+        $duplicateFindings = $this->duplicateTripleFindings($seasonYear);
+
+        // Missing direction: scheduled and played games with no boxscore (warning).
+        // This runs even when the schedule is empty (returns 0 rows — safe).
+        $missingRows = $this->auditRepository->findScheduledGamesWithoutBoxscores($seasonYear);
+
+        $findings = array_merge(
+            $orphanFindings,
+            $duplicateFindings,
+            $this->missingBoxscoreFindings($missingRows),
+        );
+
+        // boxscoreGames: scheduled games that have matching boxscores.
+        // The missing-direction count is the definitive measure of games without boxscores;
+        // 0-0 (unplayed) schedule rows are excluded by the missing query and thus counted
+        // as "having" boxscores for summary purposes.
+        $boxscoreGames = $scheduledGames - count($missingRows);
+
+        return new ScheduleAuditReport(
+            $seasonYear,
+            $findings,
+            $scheduledGames,
+            $boxscoreGames,
+        );
+    }
+
+    /**
+     * @param array<string, array<int, array<int, true>>> $index
+     */
+    private function countScheduledGames(array $index): int
+    {
+        $scheduledGames = 0;
+        foreach ($index as $visitors) {
+            foreach ($visitors as $homes) {
+                $scheduledGames += count($homes);
+            }
+        }
+
+        return $scheduledGames;
+    }
+
+    /**
+     * @return list<AuditFinding>
+     */
+    private function orphanFindings(int $seasonYear): array
+    {
+        // Orphan direction: boxscore games with no matching schedule row (error).
+        $findings = [];
+        foreach ($this->auditRepository->findOrphanBoxscoreGames($seasonYear) as $row) {
+            $findings[] = new AuditFinding(
+                AuditFinding::KIND_ORPHAN,
+                AuditFinding::SEVERITY_ERROR,
+                (string) $row['game_date'],
+                (int) $row['visitor_teamid'],
+                (int) $row['home_teamid'],
+                sprintf(
+                    'not in ibl_schedule for season %d (gotd %d, "%s")',
+                    $seasonYear,
+                    (int) $row['game_of_that_day'],
+                    (string) $row['name']
+                )
+            );
+        }
+
+        return $findings;
+    }
+
+    /**
+     * @return list<AuditFinding>
+     */
+    private function duplicateTripleFindings(int $seasonYear): array
+    {
+        $findings = [];
         foreach ($this->auditRepository->findDuplicateTripleGames($seasonYear) as $row) {
             $findings[] = new AuditFinding(
                 AuditFinding::KIND_DUPLICATE_TRIPLE,
@@ -95,9 +142,16 @@ final class ScheduleReconciliationAudit
             );
         }
 
-        // Missing direction: scheduled and played games with no boxscore (warning).
-        // This runs even when the schedule is empty (returns 0 rows — safe).
-        $missingRows = $this->auditRepository->findScheduledGamesWithoutBoxscores($seasonYear);
+        return $findings;
+    }
+
+    /**
+     * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int}> $missingRows
+     * @return list<AuditFinding>
+     */
+    private function missingBoxscoreFindings(array $missingRows): array
+    {
+        $findings = [];
         foreach ($missingRows as $row) {
             $findings[] = new AuditFinding(
                 AuditFinding::KIND_MISSING_BOXSCORE,
@@ -113,17 +167,6 @@ final class ScheduleReconciliationAudit
             );
         }
 
-        // boxscoreGames: scheduled games that have matching boxscores.
-        // The missing-direction count is the definitive measure of games without boxscores;
-        // 0-0 (unplayed) schedule rows are excluded by the missing query and thus counted
-        // as "having" boxscores for summary purposes.
-        $boxscoreGames = $scheduledGames - count($missingRows);
-
-        return new ScheduleAuditReport(
-            $seasonYear,
-            $findings,
-            $scheduledGames,
-            $boxscoreGames,
-        );
+        return $findings;
     }
 }

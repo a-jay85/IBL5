@@ -891,6 +891,78 @@ rm -f "$NDIR/stub-plan-defect"
 check_present "case17c garbled sentinel: still queued" "$NDIR/queue/plan-garbled.md"
 check "case17c garbled sentinel: attempts file is 1" grep -qx 1 "$NDIR/queue/plan-garbled.md.attempts"
 
+# Cases L1-L2 — post-plan defers below MIN_PP_SECS and resumes post-plan only.
+# l_runner <name> <sed-expr>...: runner copy with constants rewritten, stubs that log.
+LSTUB="$ROOT/lstub"
+mkdir -p "$LSTUB"
+# Self-contained: cases 7-9 overwrite $STUBDIR/claude with a failing stub.
+printf '#!/usr/bin/env bash\nNDIR=%q\nROOT=%q\n' "$NDIR" "$ROOT" > "$LSTUB/claude"
+cat >> "$LSTUB/claude" <<'LCLAUDE'
+set -u
+[ "${1:-}" = "-p" ] || exit 0
+printf 'claude\n' >> "$ROOT/l-claude-calls"
+plan="$(printf '%s\n' "$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
+sleep 2
+[ -n "$plan" ] && printf '{"branch":"x","plan":"%s","worktree":"%s"}\n' "$plan" "$ROOT/wt" > "$NDIR/handoff/$plan.json"
+printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":2000,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+exit 0
+LCLAUDE
+printf '#!/usr/bin/env bash\nNDIR=%q\nROOT=%q\n' "$NDIR" "$ROOT" > "$LSTUB/post-plan-now"
+cat >> "$LSTUB/post-plan-now" <<'LPP'
+set -u
+printf 'post-plan-now\n' >> "$ROOT/l-pp-calls"
+plan="$(basename "${3:-}")"
+sleep 2
+if [ -n "$plan" ]; then
+    mv "$NDIR/queue/$plan" "$NDIR/done/$plan" 2>/dev/null || true
+    rm -f "$NDIR/handoff/$plan.json" "$NDIR/queue/$plan.attempts" 2>/dev/null || true
+fi
+exit 0
+LPP
+chmod +x "$LSTUB/claude" "$LSTUB/post-plan-now"
+l_runner() {
+    local out="$ROOT/run-$1" args=() expr
+    shift
+    for expr in "$@"; do args+=(-e "$expr"); done
+    sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
+        -e "s#^REPO=.*#REPO=\"$REPO\"#" \
+        -e "s#^SELF_DIR=.*#SELF_DIR=\"$REPO/bin/automouse\"#" \
+        -e "s#^export PATH=.*#export PATH=\"$LSTUB:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+        -e "s#\"\$SELF_DIR/../post-plan-now\"#\"$LSTUB/post-plan-now\"#" \
+        -e "s#\"\$SELF_DIR/../discord-dm\"#\"$ROOT/discord-dm\"#" \
+        "${args[@]}" "$REPO/bin/automouse/run" > "$out"
+    chmod +x "$out"
+}
+
+echo "--- case L1: under MIN_PP_SECS left defers and keeps the handoff ---"
+reset_state; rm -f "$ROOT/l-claude-calls" "$ROOT/l-pp-calls"
+seed_plan plan-defer
+l_runner defer 's/^MAX_ELAPSED=17100/MAX_ELAPSED=100/'
+check "L1 runner copy carries MAX_ELAPSED=100" grep -q '^MAX_ELAPSED=100 ' "$ROOT/run-defer"
+PLANS_DIR="$PDIR" "$ROOT/run-defer" plan plan-defer > "$ROOT/run.out" 2>&1 || true
+L1_LOG=$(cat "$NDIR"/logs/*.log 2>/dev/null)
+check_present "L1 handoff kept"        "$NDIR/handoff/plan-defer.md.json"
+check_absent  "L1 post-plan never ran" "$ROOT/l-pp-calls"
+check_present "L1 plan still queued"   "$NDIR/queue/plan-defer.md"
+check_absent  "L1 no attempts file (refunded)" "$NDIR/queue/plan-defer.md.attempts"
+check_absent  "L1 claim lock released" "$NDIR/queue/plan-defer.md.lock"
+check "L1 no paused-held file" test -z "$(find "$NDIR" -name 'paused-held' 2>/dev/null)"
+want "L1 log names the deferral" "$L1_LOG" "Post-plan deferred: "
+L1_NEXT=$(grep -A1 'Post-plan deferred: ' <<<"$L1_LOG" | sed -n 2p)
+check "L1 legacy line follows the deferral line" test "$L1_NEXT" = "Time guard between phases — will resume postplan next run."
+
+echo "--- case L2: the next run resumes as post-plan only ---"
+rm -f "$ROOT/l-claude-calls" "$ROOT/l-pp-calls"
+rm -rf "$NDIR/logs"; mkdir -p "$NDIR/logs"
+l_runner resume 's/^MIN_PP_SECS=2400/MIN_PP_SECS=1/'
+check "L2 runner copy carries MIN_PP_SECS=1" grep -q '^MIN_PP_SECS=1 ' "$ROOT/run-resume"
+PLANS_DIR="$PDIR" "$ROOT/run-resume" plan plan-defer > "$ROOT/run.out" 2>&1 || true
+L2_LOG=$(cat "$NDIR"/logs/*.log 2>/dev/null)
+want "L2 log skips impl" "$L2_LOG" "Handoff exists — skipping impl, proceeding to post-plan."
+check_absent "L2 impl never ran" "$ROOT/l-claude-calls"
+check "L2 post-plan ran exactly once" test "$(wc -l < "$ROOT/l-pp-calls" 2>/dev/null | tr -d ' ')" = 1
+check_present "L2 plan completed" "$NDIR/done/plan-defer.md"
+
 # ===========================================================================
 echo ""
 h_done

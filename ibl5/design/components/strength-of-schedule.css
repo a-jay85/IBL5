@@ -72,6 +72,7 @@
 
 /* SOS Summary Bar (remaining SOS for team schedule) */
 /* --gray-800 = body text (from tables.css .ibl-data-table td); --gray-600 = muted text, one step darker than tables.css footer/secondary so it clears 4.5:1 on #eee */
+/* --gray-800 = body text (from tables.css .ibl-data-table td); --gray-600 = muted text (gray-500 fails 4.5:1 on the tinted team-schedule background) */
 .sos-summary {
   text-align: center;
   padding: 4px 12px;

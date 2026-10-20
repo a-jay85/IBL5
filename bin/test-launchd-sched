@@ -46,7 +46,8 @@ bug-bot.plist|bin/bug-pipeline-cron-setup|--print-bot|$NODE_ENV_ASSIGN
 launchd-health-login.plist|bin/launchd-health-cron-setup|--print-schedule login|
 launchd-health-daily.plist|bin/launchd-health-cron-setup|--print-schedule daily|
 usage-gate-coordinator.plist|bin/usage-gate-cron-setup|--print|
-usage-gate-probe.plist|bin/usage-gate-cron-setup|--print-probe|"
+usage-gate-probe.plist|bin/usage-gate-cron-setup|--print-probe|
+finding-class-scan.plist|bin/finding-class-scan|--print-schedule|"
 
 # Scripts whose arg-parse failure branches are pinned in <name>.cli.txt.
 CLI_SCRIPTS="wt-gc|bin/wt-gc-cron-setup
@@ -57,7 +58,8 @@ pr-cycle-tick|bin/pr-cycle-tick-cron-setup
 morning-digest|bin/automouse/morning-digest-cron-setup
 comprehension-digest|bin/automouse/comprehension-digest-cron-setup
 backups-sync|bin/backups-sync-setup
-bug-pipeline|bin/bug-pipeline-cron-setup"
+bug-pipeline|bin/bug-pipeline-cron-setup
+finding-class-scan|bin/finding-class-scan"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -107,7 +109,8 @@ run_cli() {
 cli_block() {
   local script="$1"
   # backups-sync-setup with no args runs the rsync/Docker/SSH build path.
-  case "$script" in bin/backups-sync-setup) ;; *) run_cli "$script" "" ;; esac
+  # finding-class-scan with no args runs the whole scan pipeline.
+  case "$script" in bin/backups-sync-setup | bin/finding-class-scan) ;; *) run_cli "$script" "" ;; esac
   run_cli "$script" "--bogus-flag"
 }
 

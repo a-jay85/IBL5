@@ -64,6 +64,7 @@
 
         var overlayHideTimer = null;
         var overlayShowTimer;
+        var overlayHideTimer;
 
         function openMenu() {
             // Cancel any pending overlay hide from a recent closeMenu()
@@ -81,6 +82,8 @@
 
             // Show overlay with fade
             if (menuOverlay) {
+                // A reopen inside the close fade must cancel the pending hide.
+                clearTimeout(overlayHideTimer);
                 menuOverlay.classList.remove('hidden');
                 overlayShowTimer = setTimeout(function() {
                     menuOverlay.classList.add('nav-overlay--visible');

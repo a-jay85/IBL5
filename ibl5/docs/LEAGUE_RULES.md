@@ -1,6 +1,6 @@
 ---
 description: The league rules the site must enforce, owned by the league owner. Claude checks changes against this list; the weekly digest flags PRs that seem to change a rule.
-last_verified: 2026-10-15
+last_verified: 2026-10-20
 ---
 
 # League Rules
@@ -15,14 +15,15 @@ The weekly comprehension digest (`bin/automouse/comprehension-digest`) reads thi
 
 - The season has six phases: Preseason, HEAT, Regular Season, Playoffs, Draft, Free Agency. An admin sets the phase by hand in the League Control Panel.
 - The regular season is 82 games. It starts Nov 1. The All-Star break is Feb 1 to 4. Playoffs run Jun 1 to 30. (`Season\Season`, `League\League`)
-- During Playoffs, Draft and Free Agency, cap and roster math uses next season's salary. (`Season\Season::advancesContractYears()`)
+- Trades use next season's salary during Playoffs, Draft and Free Agency. (`Season\Season::advancesContractYears()`)
+- Waivers and the cap page use next season's salary only in Draft and Free Agency. Teams still sign waiver players during the Playoffs, so waivers stay on the current season until then.
 - A sim covers 1 to 180 days. The default is 3.
 - Season rollover only moves forward one year at a time. Any other jump halts without writing. (`Updater\SeasonRollover\SeasonRolloverDecision`)
 
 ## Teams and rosters
 
 - There are 28 teams in 2 conferences and 4 divisions. The map lives in `ibl_league_config`.
-- A roster holds at most 15 players. (`Team\Team::ROSTER_SPOTS_MAX`)
+- A roster holds at most 15 players. Injured players count toward the 15. JSB forces a waiver when a 16th player is signed. (`Team\Team::ROSTER_SPOTS_MAX`)
 - A player on waivers has an ordinal above 960. Waived players do not take a roster spot.
 - Outside the playoffs, a depth chart has exactly 12 active players, with at least 3 healthy players at each position. In the playoffs it has 10 to 12 active, with at least 2 per position. (`DepthChart\DepthChartValidator`)
 - A depth chart must list every rostered player once and nobody else.
@@ -44,6 +45,7 @@ Full tables live in `.claude/rules/contract-rules.md`. The rules:
 - The MLE pays 450 in year 1, rising to 675 in year 6. The LLE is one year at 145. Each team gets one MLE and one LLE per season.
 - Draft picks sign rookie deals: 3 years in round 1, 2 years in round 2.
 - A rookie option doubles the final-year salary. It adds year 4 for round 1 picks and year 3 for round 2 picks. Teams can exercise it only in Free Agency, Preseason or HEAT, and only at the experience level set for the round. (`Player\Contract\PlayerContractValidator`)
+- An extension adds at most 5 years. JSB holds 6 salary years: the current year plus 5. Free agency contracts can run 6 years, so the validator shared with free agency (`FreeAgency\CommonContractValidator`) accepts a sixth year. The extension form only sends 5.
 - Extensions are allowed in Preseason, Regular Season and Playoffs. A team gets one per season and one try per sim. A rejected offer still uses the try. (`Extension\ExtensionValidator`)
 
 ## Trades
@@ -60,9 +62,10 @@ Full tables live in `.claude/rules/contract-rules.md`. The rules:
 
 - Waivers are always open in HEAT, Regular Season and Playoffs, and always closed in the Draft. In Preseason and Free Agency, the "Allow Waiver Moves" setting decides. (`Season\Season::areWaiversAllowed()`)
 - A team can only waive its own players. A team over the hard cap with 12 or fewer players cannot waive anyone.
-- Signing off waivers or free agency needs an open healthy roster spot. A team with 12 or more healthy players cannot sign past the hard cap. A team with fewer than 12 may go over, but only for a veteran-minimum player.
+- Signing off waivers or free agency needs an open roster spot. Injured players count toward the 15. A team with 12 or more healthy players cannot sign past the hard cap. A team with fewer than 12 may go over, but only for a veteran-minimum player.
+- The veteran minimum in that exception is the minimum for the player's own experience, the same as in free agency.
 - A player with no contract signs for one year at the veteran minimum. A signing resets the player's Bird years to 0.
-- Signing is first come, first served. There is no claim order.
+- Signing is first come, first served. There is no claim order and no waiting period.
 
 ## Free agency
 
@@ -75,7 +78,7 @@ Full tables live in `.claude/rules/contract-rules.md`. The rules:
 
 ## Draft
 
-- Only the team that owns a pick can use it. A pick can only take an undrafted player. (`Draft\DraftController`)
+- Only the team on the clock can pick. The pick on the clock is the first empty slot, and only the GM whose team owns that pick can submit it. A pick can only take an undrafted player. (`Draft\DraftController`)
 - The lottery covers picks 1 to 12. The admin enters the lottery result; the site does not draw it.
 - Round 1 order: non-playoff teams worst first, then wildcards, division winners and conference winners. Round 2 is all teams worst first.
 - Draft class uploads are admin-only. A file with any bad row is rejected whole.
@@ -106,13 +109,11 @@ Full tables live in `.claude/rules/contract-rules.md`. The rules:
 - Every form that changes data carries a CSRF token.
 - The League Control Panel and the Updater are admin-only.
 
-## Open questions for the owner
+## Known bugs
 
-These are places where the code is inconsistent. Each needs a call: fix the code, or write the exception into the rules above.
+The owner ruled on these on 2026-10-20. The rules above are correct. The code still needs a fix.
 
-- **Injured players and the 15-man limit.** Trades count injured players toward 15. Waiver signings count only healthy players. Which one is right?
-- **Which phases use next season's salary.** Trades use it in Playoffs, Draft and Free Agency. Waivers and the cap page use it only in Draft and Free Agency.
-- **Veteran minimum for the waiver exception.** The over-the-cap waiver signing allows only 103, the 10-year minimum, whatever the player's experience.
-- **The 24-hour waiver wait.** The page shows a 24-hour wait, but signing is allowed right away.
-- **Extension length.** The demand math assumes at most 5 years. The validator allows a sixth.
-- **Draft pick order.** The site shows "on the clock" as the first empty slot, but any pick owner can pick at any time.
+- **Waiver roster count.** Waiver signings count only healthy players toward 15. They should count injured players too.
+- **Waiver veteran minimum.** The over-the-cap waiver signing allows only 103, the 10-year minimum. It should use the minimum for the player's experience.
+- **The 24-hour waiver wait.** The waiver page shows a 24-hour wait that the code never enforces. Remove it from the page.
+- **Draft pick order.** `Draft\DraftController::submitSelection()` checks that the team owns the slot but not that the slot is on the clock. Any pick owner can pick early.

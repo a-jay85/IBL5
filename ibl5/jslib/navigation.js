@@ -62,6 +62,8 @@
             }
         }, { signal: signal });
 
+        var overlayShowTimer;
+
         function openMenu() {
             // Slide in menu
             mobileMenu.classList.remove('translate-x-full');
@@ -75,7 +77,7 @@
             // Show overlay with fade
             if (menuOverlay) {
                 menuOverlay.classList.remove('hidden');
-                setTimeout(function() {
+                overlayShowTimer = setTimeout(function() {
                     menuOverlay.classList.add('nav-overlay--visible');
                 }, 10);
             }
@@ -95,6 +97,8 @@
 
             // Fade out and hide overlay
             if (menuOverlay) {
+                // A close inside the 10ms open window must cancel the pending show.
+                clearTimeout(overlayShowTimer);
                 menuOverlay.classList.remove('nav-overlay--visible');
                 setTimeout(function() {
                     // A reopen inside the fade window must not be re-hidden.

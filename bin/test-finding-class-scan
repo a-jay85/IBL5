@@ -687,7 +687,7 @@ case_table_row_cap() {
         rows="$rows{\"url\":\"https://github.com/a-jay85/IBL5/pull/$i#discussion_r$i\",\"pr\":$i,\"path\":\"a.php\",\"line\":$i,\"resolved\":false},"
     done
     rows="$rows{\"url\":\"https://example.com/bad\",\"pr\":9,\"path\":\"x\",\"line\":1,\"resolved\":false}]"
-    out="$(bash -c "clean_inline() { printf '%s' \"\$1\"; }; TABLE_ROW_CAP=3; $fn; threads_table '$rows'")"
+    out="$(bash -c "clean_inline() { printf '%s' \"\$1\"; }; TABLE_ROW_CAP=3; REPO_SLUG=a-jay85/IBL5; $fn; threads_table '$rows'")"
     expect_eq "cap: three rows listed" 3 "$(grep -c '^| \[thread\]' <<< "$out")"
     expect_has "cap: the overflow counts valid rows only" "$out" "2 more threads are not listed here."
 }

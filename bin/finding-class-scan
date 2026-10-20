@@ -111,9 +111,10 @@ xml_esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 # HOME is interpolated at generation time: launchd does not expand variables in
 # EnvironmentVariables, so a literal home-variable would bake in a dead path.
 build_plist() {
-    local label="$1" root="$2" variant="$3" log_path="${4:-}" home root_x path_val extra="" when="" since
+    local label="$1" root="$2" variant="$3" log_path="${4:-}" home root_x state_x path_val extra="" when="" since
     home="$(printf '%s' "${HOME:-}" | xml_esc)"
     root_x="$(printf '%s' "$root" | xml_esc)"
+    state_x="$(printf '%s' "$STATE_DIR" | xml_esc)"
     path_val="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${home}/.local/bin"
     if [ "$variant" = "weekly" ]; then
         log_path="${STATE_DIR}/logs/run.log"
@@ -158,6 +159,8 @@ ${when}
 		<string>${path_val}</string>
 		<key>HOME</key>
 		<string>${home}</string>
+		<key>FCS_STATE_DIR</key>
+		<string>${state_x}</string>
 	</dict>
 	<key>StandardOutPath</key>
 	<string>${log_path}</string>
@@ -235,7 +238,8 @@ verify_schedule() {
             echo "verify-schedule: fired ok ($line)"
             return 0
         fi
-        if grep -q -e 'nothing filed' -e 'filing failed' < "$vlog"; then break; fi
+        if grep -q -e 'nothing filed' -e 'filing failed' -e 'prose gate rejected' \
+            -e 'no timeout binary' -e 'jq is required' < "$vlog"; then break; fi
         sleep 1
     done
     echo "verify-schedule: FAILED ($(tail -n 5 "$vlog" | tr '\n' ' '))"
@@ -306,8 +310,8 @@ validate_env() {
             exit 2
         fi
     done
-    if ! [[ "$FCS_MAX_BUDGET_USD" =~ ^[0-9]{1,6}(\.[0-9]{1,2})?$ ]]; then
-        log "FCS_MAX_BUDGET_USD must be an amount like 3.00 (got '$FCS_MAX_BUDGET_USD')"
+    if ! [[ "$FCS_MAX_BUDGET_USD" =~ ^[0-9]{1,6}(\.[0-9]{1,2})?$ ]] || ! [[ "$FCS_MAX_BUDGET_USD" =~ [1-9] ]]; then
+        log "FCS_MAX_BUDGET_USD must be a positive amount like 3.00 (got '$FCS_MAX_BUDGET_USD')"
         exit 2
     fi
     if [ -z "$MIN_OCCURRENCES" ]; then
@@ -787,12 +791,12 @@ defang() {
 
 # threads_table <threads-json>: only validated rows get a line.
 threads_table() {
-    local row url pr path line res loc shown=0 valid=0
+    local row url pr path line res loc shown=0 valid=0 repo_re="${REPO_SLUG//./\\.}"
     printf '| Thread | PR | Location | Resolved |\n| --- | --- | --- | --- |\n'
     while IFS= read -r row; do
         [ -n "$row" ] || continue
         url="$(jq -r '.url // ""' <<< "$row")"; pr="$(jq -r '.pr // ""' <<< "$row")"
-        [[ "$url" =~ ^https://github\.com/a-jay85/IBL5/pull/[0-9]+#discussion_r[0-9]+$ ]] || continue
+        [[ "$url" =~ ^https://github\.com/${repo_re}/pull/[0-9]+#discussion_r[0-9]+$ ]] || continue
         [[ "$pr" =~ ^[0-9]+$ ]] || continue
         valid=$((valid + 1))
         # GitHub rejects a body over 65,536 characters; a row is about 190.
@@ -802,7 +806,7 @@ threads_table() {
         [[ "$line" =~ ^[0-9]+$ ]] || line=""
         loc="$path${line:+:$line}"
         res="no"; [ "$(jq -r '.resolved' <<< "$row")" = "true" ] && res="yes"
-        printf '| [thread](%s) | [#%s](https://github.com/a-jay85/IBL5/pull/%s) | `%s` | %s |\n' "$url" "$pr" "$pr" "$loc" "$res"
+        printf '| [thread](%s) | [#%s](https://github.com/%s/pull/%s) | `%s` | %s |\n' "$url" "$pr" "$REPO_SLUG" "$pr" "$loc" "$res"
         shown=$((shown + 1))
     done < <(jq -c '.[]' <<< "$1")
     if [ "$valid" -gt "$shown" ]; then
@@ -875,6 +879,22 @@ prose_ok() { # body-file
 }
 
 PROSE_FAILS=""
+PROSE_FAIL_KEYS=""
+# A rejected body leaves the class unfiled. Its assignments from this run are
+# dropped before they persist, so the next run classifies those threads again.
+drop_rejected_assignments() {
+    local k keys='[]'
+    for k in $PROSE_FAIL_KEYS; do keys="$(jq -c --arg k "$k" '. + [$k]' <<< "$keys")"; done
+    if [ -s "$WORK/run-assignments.jsonl" ]; then
+        jq -c --argjson d "$keys" 'select((.class_key // "") | IN($d[]) | not)' \
+            "$WORK/run-assignments.jsonl" > "$WORK/run-assignments.kept"
+        mv "$WORK/run-assignments.kept" "$WORK/run-assignments.jsonl"
+    fi
+    jq -c --argjson d "$keys" 'with_entries(select(.key | IN($d[]) | not))' \
+        "$WORK/run-classes.json" > "$WORK/run-classes.kept"
+    mv "$WORK/run-classes.kept" "$WORK/run-classes.json"
+}
+
 apply_actions() {
     local a action key kind label title bodyfile url num writes=0 skipped
     : > "$WORK/summary-extra.txt"
@@ -891,6 +911,7 @@ apply_actions() {
                 if ! prose_ok "$bodyfile"; then
                     log "prose gate rejected the body for $key"
                     PROSE_FAILS="${PROSE_FAILS}${PROSE_FAILS:+, }prose:$key"
+                    PROSE_FAIL_KEYS="${PROSE_FAIL_KEYS} $key"
                     FAILED_N=$((FAILED_N + 1))
                     continue
                 fi
@@ -915,6 +936,7 @@ apply_actions() {
                 if ! prose_ok "$bodyfile"; then
                     log "prose gate rejected the comment for $key"
                     PROSE_FAILS="${PROSE_FAILS}${PROSE_FAILS:+, }prose:$key"
+                    PROSE_FAIL_KEYS="${PROSE_FAIL_KEYS} $key"
                     FAILED_N=$((FAILED_N + 1))
                     continue
                 fi
@@ -937,6 +959,8 @@ apply_actions() {
     skipped="$SKIPPED_NONE"
     : "$skipped"
     if [ -n "$PROSE_FAILS" ]; then
+        drop_rejected_assignments
+        persist_assignments
         die "prose gate rejected: $PROSE_FAILS"
     fi
 }
@@ -1041,10 +1065,10 @@ run_pipeline() {
     select_threads
     load_known_classes
     classify_unseen
-    persist_assignments
     count_classes
     plan_actions
     apply_actions
+    persist_assignments
     write_watermark
     print_summary
 }

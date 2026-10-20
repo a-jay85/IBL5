@@ -215,7 +215,7 @@ img {
     overflow: hidden;
 }
 
-/* PHP-Nuke block wrappers emitted by OpenTable()/OpenTable2() in
+/* PHP-Nuke block wrappers emitted by OpenTable() in
    themes/IBL/theme.php. These rules replace the former bgcolor, cellspacing,
    cellpadding, border, width and align attributes. The inner fill tracks
    --page-bg, which theme.php sets on <body> from $bgcolor1 (host-dependent).
@@ -242,10 +242,6 @@ img {
 
 .nuke-block--full {
     width: 100%;
-}
-
-.nuke-block--centered {
-    margin-inline: auto;
 }
 
 body {

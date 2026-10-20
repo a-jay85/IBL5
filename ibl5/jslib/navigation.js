@@ -63,6 +63,7 @@
         }, { signal: signal });
 
         var overlayHideTimer = null;
+        var overlayShowTimer;
 
         function openMenu() {
             // Cancel any pending overlay hide from a recent closeMenu()
@@ -81,7 +82,7 @@
             // Show overlay with fade
             if (menuOverlay) {
                 menuOverlay.classList.remove('hidden');
-                setTimeout(function() {
+                overlayShowTimer = setTimeout(function() {
                     menuOverlay.classList.add('nav-overlay--visible');
                 }, 10);
             }
@@ -104,6 +105,8 @@
 
             // Fade out and hide overlay
             if (menuOverlay) {
+                // A close inside the 10ms open window must cancel the pending show.
+                clearTimeout(overlayShowTimer);
                 menuOverlay.classList.remove('nav-overlay--visible');
                 overlayHideTimer = setTimeout(function() {
                     menuOverlay.classList.add('hidden');

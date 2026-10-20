@@ -6,7 +6,7 @@
 # C1-C4  run bin/check-master-ci-green end to end against fixture JSON via the
 #        GH_API_CMD seam (a `gh` shim answers `auth status`; a throwaway git repo
 #        supplies the origin remote).
-# L1-L7  source the lib and call its functions directly.
+# L1-L9  source the lib and call its functions directly.
 # P1-P17 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
 #        (the Nth poll serves the Nth fixture; every case uses --interval-seconds=0).
 #
@@ -105,7 +105,7 @@ else
     fail "C4 latest-per-name wins (rc=$RC err=$(cat "$ERR"))"
 fi
 
-# --- L1-L7: lib unit cases ----------------------------------------------------
+# --- L1-L9: lib unit cases ----------------------------------------------------
 # shellcheck source=bin/lib/ci-checks-green.sh
 if [ -f "$LIB" ]; then
     source "$LIB"
@@ -183,8 +183,32 @@ if [ -f "$LIB" ]; then
     else
         fail "L7 drop_pending with an empty list keeps every run (got: $got)"
     fi
+
+    FAILDROP_IN='{"check_runs":[
+      {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure"},
+      {"name":"helper-null","status":"completed","conclusion":null},
+      {"name":"helper-pending","status":"in_progress","conclusion":null},
+      {"name":"helper-green","status":"completed","conclusion":"success"},
+      {"name":"Keep the merge-line head current (copy)","status":"completed","conclusion":"failure"},
+      {"name":"phpunit","status":"completed","conclusion":"failure"}]}'
+    FAILDROP_LIST='["Keep the merge-line head current","helper-null","helper-pending","helper-green"]'
+    got="$(printf '%s' "$FAILDROP_IN" | ccg_drop_failed "$FAILDROP_LIST" \
+      | jq -c '[.check_runs[] | .name + ":" + .status], .total_count')"
+    want="$(printf '%s\n%s' '["helper-pending:in_progress","helper-green:completed","Keep the merge-line head current (copy):completed","phpunit:completed"]' '4')"
+    if [ "$got" = "$want" ]; then
+        ok "L8 drop_failed drops only completed non-passing runs of exact listed names"
+    else
+        fail "L8 drop_failed drops only completed non-passing runs of exact listed names (got: $got)"
+    fi
+
+    got="$(printf '%s' "$FAILDROP_IN" | ccg_drop_failed '[]' | jq -c '.check_runs | length')"
+    if [ "$got" = "6" ]; then
+        ok "L9 drop_failed with an empty list keeps every run"
+    else
+        fail "L9 drop_failed with an empty list keeps every run (got: $got)"
+    fi
 else
-    fail "L1-L7 cannot run: $LIB is missing"
+    fail "L1-L9 cannot run: $LIB is missing"
 fi
 
 # --- P1-P17: bin/check-pr-checks-green (PR-head poller) ---------------------

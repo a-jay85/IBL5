@@ -26,6 +26,11 @@
 # run of either is still "checks failed:" and parks. Cases 12-15 pin the exact
 # list the canary passes and drive the real script through the extracted
 # function for green / red / non-listed-pending.
+# The canary also passes IGNORE_FAILED_CHECKS="Keep the merge-line head
+# current": a COMPLETED red run of that helper workflow (it tests no code) no
+# longer parks. Case 12 pins that exact list too; cases 16-18 drive the real
+# script for helper-red (green), helper-red plus real-red (parks), and
+# helper-pending (proceeds with a warning, as before).
 #
 # Cases 8 and 9 run the REAL bin/check-master-ci-green against fixture JSON via
 # its documented GH_API_CMD stub, so the two stderr strings the proceed/park
@@ -153,6 +158,7 @@ setup_case() {
 #!/bin/sh
 touch "$CI_SENTINEL"
 printf '%s\n' "\${IGNORE_PENDING_CHECKS-<unset>}" > "$SANDBOX/ci-env"
+printf '%s\n' "\${IGNORE_FAILED_CHECKS-<unset>}" > "$SANDBOX/ci-env-failed"
 echo "$1" >&2
 exit $2
 STUBEOF
@@ -390,6 +396,7 @@ setup_case "PASS: 3 check-run(s) all green" 0 0
 RC=0; run_between_plans_canary || RC=$?
 expect "ignore-list-stub-rc"         0 "$RC"
 same   "canary-passes-exact-ignore-list" "deploy,Promote master to production" "$(cat "$SANDBOX/ci-env")"
+same   "canary-passes-exact-failed-ignore-list" "Keep the merge-line head current" "$(cat "$SANDBOX/ci-env-failed")"
 
 # --- Cases 13-15: real script THROUGH the extracted canary function ----------
 # setup_case's stub is replaced by a wrapper that execs the real script against
@@ -428,5 +435,28 @@ real_canary_case '{"check_runs":[{"name":"e2e","status":"in_progress","conclusio
 RC=0; run_between_plans_canary || RC=$?
 expect "real-non-listed-pending-proceeds"   4 "$RC"
 want   "real-non-listed-pending-detail"     "$CANARY_DETAIL" "checks still running: e2e"
+
+# 16. helper "Keep the merge-line head current" completed failure, real tests
+# green, deploy pending -> green (rc 0). Reproduces the 2026-10-20 ci-red park.
+setup_case "unused" 0 0
+real_canary_case '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-09-06T10:00:00Z","started_at":"2026-09-06T09:00:00Z"},{"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-09-06T10:03:00Z","started_at":"2026-09-06T10:02:00Z"},{"name":"deploy","status":"in_progress","conclusion":null,"completed_at":null,"started_at":"2026-09-06T10:01:00Z"}]}'
+RC=0; run_between_plans_canary || RC=$?
+expect "real-helper-failure-is-green"       0 "$RC"
+want   "real-helper-failure-logs-ignore"    "$(cat "$LOG")" "IGNORE_FAILED_CHECKS active — ignoring failed: Keep the merge-line head current (failure)"
+want   "real-helper-failure-logs-pass"      "$(cat "$LOG")" "PASS: 1 check-run(s) all green"
+
+# 17. helper failure AND a real test failure -> the real one still parks (rc 1)
+setup_case "unused" 0 0
+real_canary_case '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"failure","completed_at":"2026-09-06T10:00:00Z","started_at":"2026-09-06T09:00:00Z"},{"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-09-06T10:03:00Z","started_at":"2026-09-06T10:02:00Z"}]}'
+RC=0; run_between_plans_canary || RC=$?
+expect "real-helper-plus-real-red-parks"    1 "$RC"
+want   "real-helper-plus-real-red-detail"   "$CANARY_DETAIL" "checks failed: phpunit (failure)"
+
+# 18. helper pending (newest run) -> still "checks still running" -> rc 4, as today
+setup_case "unused" 0 0
+real_canary_case '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-09-06T10:00:00Z","started_at":"2026-09-06T09:00:00Z"},{"name":"Keep the merge-line head current","status":"in_progress","conclusion":null,"completed_at":null,"started_at":"2026-09-06T10:02:00Z"}]}'
+RC=0; run_between_plans_canary || RC=$?
+expect "real-helper-pending-proceeds"       4 "$RC"
+want   "real-helper-pending-detail"         "$CANARY_DETAIL" "checks still running: Keep the merge-line head current"
 
 h_done

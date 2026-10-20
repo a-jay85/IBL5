@@ -110,8 +110,11 @@ lsched_calendar_multi() {
         local IFS=,
         for pair in $entry; do
             case "$pair" in
-                *=*) ;;
+                ?*=*) ;;
                 *) printf 'lsched_calendar_multi: expected Key=int, got: %s\n' "$pair" >&2; return 2 ;;
+            esac
+            case "${pair#*=}" in
+                ''|*[!0-9]*) printf 'lsched_calendar_multi: value must be a non-negative integer, got: %s\n' "$pair" >&2; return 2 ;;
             esac
         done
     done

@@ -306,7 +306,7 @@ ${TAB}<dict>
 ${TAB}</dict>" "$(emit lsched_env_open; emit lsched_env_close)"
 
 # Rejections return 2 and write to stderr.
-for rej in "lsched_program_arguments" "lsched_calendar Hour" "lsched_calendar_multi" "lsched_calendar_multi Hour" "lsched_key_bool RunAtLoad yes"; do
+for rej in "lsched_program_arguments" "lsched_calendar Hour" "lsched_calendar_multi" "lsched_calendar_multi Hour" "lsched_calendar_multi Hour=" "lsched_calendar_multi Hour=8x" "lsched_calendar_multi =8" "lsched_key_bool RunAtLoad yes"; do
   # shellcheck disable=SC2086
   err="$( ( set -uo pipefail; . "$LIB"; $rej ) 2>&1 >/dev/null )"
   # shellcheck disable=SC2086

@@ -20,7 +20,17 @@ use Topics\Contracts\TopicsRepositoryInterface;
  */
 class TopicsRepository extends BaseMysqliRepository implements TopicsRepositoryInterface
 {
-    /** @var string Database table prefix */
+    /**
+     * Table prefixes this repository may splice into table names. The prefix is
+     * an identifier (never bindable), so it is allowlisted here and the property
+     * below is typed as a member of this list; PHPStan then proves every table
+     * name built from it is a constant string (BanSqlStringConcatenationRule).
+     *
+     * @var list<string>
+     */
+    private const SUPPORTED_PREFIXES = ['nuke'];
+
+    /** @var value-of<self::SUPPORTED_PREFIXES> Table prefix for nuke_topics / nuke_stories / nuke_stories_cat */
     private string $prefix;
 
     /**
@@ -31,10 +41,10 @@ class TopicsRepository extends BaseMysqliRepository implements TopicsRepositoryI
     {
         parent::__construct($db);
         // The prefix is an operator-controlled config identifier spliced into table
-        // names (never a bindable value). Validate it against a conservative
-        // identifier pattern and fall back to the default 'nuke' so an unexpected
-        // value can never reach query text; real prefixes match unchanged.
-        $this->prefix = preg_match('/^[a-z0-9_]+$/i', $prefix) === 1 ? $prefix : 'nuke';
+        // names (never a bindable value). Only members of SUPPORTED_PREFIXES reach
+        // query text; anything else falls back to 'nuke', the only prefix the
+        // schema defines (see ibl5/docs/schema/current-schema.sql).
+        $this->prefix = in_array($prefix, self::SUPPORTED_PREFIXES, true) ? $prefix : 'nuke';
     }
 
     /**

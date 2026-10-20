@@ -514,6 +514,7 @@ B7="$(extract_block '# condition (7)')"
 B13="$(extract_block '# condition (13)')"
 B15="$(extract_block '# condition (15)')"
 B17="$(extract_block '# condition (17)')"
+B18="$(extract_block '# condition (18)')"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 S1X="$(extract_block '# phase 6 step 1 extract' "$P25_SKILL")"
@@ -598,6 +599,7 @@ else
 fi
 assert_self_contained '# condition (15)' "condition (15)"
 assert_self_contained '# condition (17)' "condition (17)"
+assert_self_contained '# condition (18)' "condition (18)"
 assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
 assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"
 
@@ -1297,7 +1299,7 @@ MXEOF
 MX_PY=$( cd "$REPO_ROOT/tools/postplan-harness" && python3 -c '
 import sys
 from harness.planfile import parse_matrix
-planned, manual = parse_matrix(open(sys.argv[1]).read())
+planned, manual, _ = parse_matrix(open(sys.argv[1]).read())
 print(",".join(planned) + "|" + str(len(manual)))
 ' "$MX_FIX" )
 if [ "$MX_PY" = "ibl5/tests/Unit/RealTest.php|0" ]; then
@@ -1359,6 +1361,50 @@ rm -f "$c7_dir"/myvar*.md
 printf '%s\n' '---' 'auto_merge: false' '---' '# drifted' > "$c7_dir/plan-myvar.md"
 expect_block "(7) drift-adopted plan declares auto_merge: false -> BLOCK" BLOCK \
     "$(run_cond7_slug "$B7" "myvar" "$c7_dir")"
+
+# condition (7), docs-only-ready — PR facts through the env seams (no gh shim).
+# run_cond7_token <block> <plan-value> <head-ref> <files-json> <body> <verdict-kind>
+# verdict-kind is a mk_verdict_fixture kind (ready, notes, absent).
+c7_two_way='**Merge danger:** Door: two-way · Blast radius: localized · Why: doc text only, no code path changes.'
+c7_one_way='**Merge danger:** Door: one-way · Blast radius: localized · Why: doc text only, no code path changes.'
+c7_docs_files='[{"path":"ibl5/docs/decisions/0086-x.md"},{"path":"ibl5/classes/Foo/README.md"}]'
+c7_have() { # name haystack needle (the shared have() is defined further down)
+    if grep -qF -- "$3" <<< "$2"; then echo "ok: $1"
+    else echo "FAIL: $1 — missing literal '$3' in: '$2'"; FAILED=1; fi
+}
+run_cond7_token() {
+    local plan_f="$BASE_TMP/c7-token-plan.md" vf="$BASE_TMP/c7-token-verdict.md"
+    printf '%s\n' '---' "auto_merge: $2" '---' '# Plan' > "$plan_f"
+    mk_verdict_fixture "$6" "$vf"
+    PLAN_DIR="$BASE_TMP/c7-empty-plans" PLAN_FILE="$plan_f" PR_NUM=0 PR_HEAD_REF="$3" \
+      PR_FILES_JSON="$4" PR_BODY="$5" FIDELITY_VERDICT_FILE="$vf" \
+      FIDELITY_VERDICT_FILE_2="$BASE_TMP/c7-no-verdict-2.md" bash -c "$1" 2>&1
+}
+expect_block "(7) docs-only-ready, qualifying PR -> NONE" NONE \
+    "$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" ready)"
+expect_block "(7) false with a qualifying PR -> BLOCK" BLOCK \
+    "$(run_cond7_token "$B7" false docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" ready)"
+c7_unknown="$(run_cond7_token "$B7" maybe docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" ready)"
+expect_block "(7) unknown value -> BLOCK" BLOCK "$c7_unknown"
+c7_have "(7) unknown value names it" "$c7_unknown" "unknown auto_merge value 'maybe'"
+c7_branch="$(run_cond7_token "$B7" docs-only-ready feature-x "$c7_docs_files" "$c7_two_way" ready)"
+expect_block "(7) token on a non-refresh branch -> BLOCK" BLOCK "$c7_branch"
+c7_have "(7) names the branch clause" "$c7_branch" 'docs-refresh:branch:feature-x'
+c7_paths="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 '[{"path":"ibl5/docs/a.md"},{"path":".claude/rules/x.md"}]' "$c7_two_way" ready)"
+expect_block "(7) token with a .claude/ path -> BLOCK" BLOCK "$c7_paths"
+c7_have "(7) names the paths clause" "$c7_paths" 'docs-refresh:paths:.claude/rules/x.md'
+c7_oneway="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_one_way" ready)"
+expect_block "(7) token with one-way door -> BLOCK" BLOCK "$c7_oneway"
+c7_have "(7) names the merge-danger clause" "$c7_oneway" 'docs-refresh:merge-danger:ONE-WAY'
+c7_nomd="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "body without the line" ready)"
+expect_block "(7) token with MISSING merge-danger line -> BLOCK" BLOCK "$c7_nomd"
+c7_have "(7) names MISSING" "$c7_nomd" 'docs-refresh:merge-danger:MISSING'
+c7_notes="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" notes)"
+expect_block "(7) token with READY WITH NOTES -> BLOCK" BLOCK "$c7_notes"
+c7_have "(7) names the verdict clause" "$c7_notes" 'docs-refresh:verdict:READY WITH NOTES'
+c7_noverdict="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" absent)"
+expect_block "(7) token with no verdict file -> BLOCK" BLOCK "$c7_noverdict"
+c7_have "(7) names <none>" "$c7_noverdict" 'docs-refresh:verdict:<none>'
 
 # condition (13) — slug-drift hold
 c13_dir="$BASE_TMP/c13-plans"
@@ -1524,6 +1570,57 @@ else
         echo "FAIL: (17) unreadable body should say 'cannot read the PR body', got: '$out'"
         FAILED=1
     fi
+fi
+
+# condition (18) — merge danger door. The block reads the PR body's Merge danger line
+# through pr_merge_danger_hold; only one well-formed two-way line passes.
+# run_cond18 <body|__fail__> — scratch repo with the real predicate library symlinked.
+MD_TWO='**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff'
+MD_ONE='**Merge danger:** Door: one-way · Blast radius: site-wide · Why: mechanical: arming-path:bin/lib/pr-armable.sh'
+run_cond18() {
+    local c18="$BASE_TMP/c18"
+    rm -rf "$c18"
+    mkdir -p "$c18/bin/lib"
+    git -C "$c18" init -q
+    ln -s "$REPO_ROOT/bin/lib/pr-armable.sh" "$c18/bin/lib/pr-armable.sh"
+    local fail=""
+    if [ "$1" = "__fail__" ]; then
+        fail=1
+        printf '{"number":2100,"body":""}' > "$BASE_TMP/fixture.json"
+    else
+        jq -n --arg b "$1" '{number: 2100, body: $b}' > "$BASE_TMP/fixture.json"
+    fi
+    ( cd "$c18" && PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        GH_PR_FAIL="$fail" bash -c "$B18" 2>&1 )
+}
+expect_c18_text() { # label out needle
+    if [[ "$2" == *"$3"* ]]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 should say '$3', got: '$2'"
+        FAILED=1
+    fi
+}
+
+if [ -z "$B18" ]; then
+    echo "FAIL: no block matching '# condition (18)' in $SKILL — marker drifted"
+    FAILED=1
+else
+    expect_block "(18) two-way line -> NONE" NONE "$(run_cond18 "## Summary"$'\n'"$MD_TWO")"
+    out="$(run_cond18 "## Summary"$'\n'"$MD_ONE")"
+    expect_block "(18) one-way line -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) one-way names the door" "$out" "Door is one-way"
+    out="$(run_cond18 "## Summary"$'\n'"no field here")"
+    expect_block "(18) no line -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) missing line names the field" "$out" "no **Merge danger:** line"
+    out="$(run_cond18 "$MD_TWO"$'\n'"$MD_TWO")"
+    expect_block "(18) two lines -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) two lines read as malformed" "$out" "malformed (MALFORMED)"
+    out="$(run_cond18 '**Merge danger:** Door: maybe · Blast radius: module · Why: twenty characters at least')"
+    expect_block "(18) bad door value -> BLOCK" BLOCK "$out"
+    out="$(run_cond18 __fail__)"
+    expect_block "(18) unreadable PR body -> BLOCK" BLOCK "$out"
+    expect_c18_text "(18) unreadable body is fail-closed" "$out" "fail-closed"
 fi
 
 # --- Phase 5.0d autonomy contract: run_p50d helper + D1..D6 cases ---------
@@ -2637,6 +2734,25 @@ mk_prior_body "READY (re-review) — findings remediated in abc1234 and re-revie
     "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
 cf_check cf-re-review-line "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-verdict-not-terminal"
 
+# pr3267 dual-layout: the full old (v1) and new (v2) sticky bodies, written over the
+# body mk_prior_body builds. mk_prior_body takes a terminal line, not a body, so it runs
+# first only to leave the digest and probe state in place. Both fixture terminal lines
+# are `READY (re-review) ...` forms, so neither carries. The fixture plan hash is the
+# 64 b's the cf cases already use.
+CF_FIXDIR="$REPO_ROOT/bin/fixtures/review-shared"
+CF_V1="$(jq -r '.comments[-1].body' "$CF_FIXDIR/post-plan-sticky-pr3267-v1.json")"
+CF_V2="$(jq -r '.comments[-1].body' "$CF_FIXDIR/post-plan-sticky-pr3267-v2.json")"
+mk_cf_digest 5; mk_cf_probe "SKIP-REVIEW $CF_T"
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+printf '%s\n' "$CF_V1" > "$CF_BODY"
+cf_check cf-pr3267-v1-re-review "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-verdict-not-terminal"
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+printf '%s\n' "$CF_V2" > "$CF_BODY"
+cf_check cf-pr3267-v2-re-review "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-verdict-not-terminal"
+mk_prior_body "READY" "$CF_BANNER_DEFAULT" "$CF_PLANLINE" "$CF_T"
+printf '%s\n' "$CF_V2" | sed 's/^READY WITH NOTES (re-review) — .*$/READY WITH NOTES/' > "$CF_BODY"
+cf_check cf-pr3267-v2-bare-notes-carries "$(cf_decide "$BCFD")" "FIDELITY_GATE=skip" "CARRY_WORD=READY WITH NOTES" "!FIDELITY_GATE_REASON=prior-verdict-not-terminal"
+
 mk_prior_body "READY" "**NOT READY** — 2026-10-01 00:00:00 UTC" "$CF_PLANLINE" "$CF_T"
 cf_check cf-banner-veto "$(cf_decide "$BCFD")" "FIDELITY_GATE=spawn" "FIDELITY_GATE_REASON=prior-banner-not-ready"
 
@@ -3241,6 +3357,38 @@ mk_lostwork_repo() {
     printf 'mine\n' >> "$d/f.txt"; git -C "$d" commit --quiet -am mine
     printf '%s' "$d"
 }
+# Baseline fixture for the second exemption (ADR-0174 addendum): X ignores a Foo path,
+# Y a Bar path. The branch trims X and (when $1 = 0) deletes Foo; the "resolution"
+# restores X, standing in for a rebase that dropped the branch's deletion.
+lw_neon_fixture() {
+    printf 'parameters:\n\tignoreErrors:\n'
+    local b; for b in "$@"; do
+        case "$b" in
+          X) printf '\t\t-\n\t\t\trawMessage: %s\n\t\t\tidentifier: foo.dead\n\t\t\tcount: 1\n\t\t\tpath: modules/Foo/index.php\n\n' "'Call to foo().'" ;;
+          Y) printf '\t\t-\n\t\t\trawMessage: %s\n\t\t\tidentifier: bar.live\n\t\t\tcount: 2\n\t\t\tpath: modules/Bar/index.php\n\n' "'Call to bar().'" ;;
+        esac
+    done
+}
+mk_lostwork_baseline_repo() {
+    local keep=$1 key=$2 d; d="$(mktemp -d "$BASE_TMP/lwb-XXXXXX")"
+    git -C "$d" init --quiet -b main
+    git -C "$d" config user.email 'postplan-test@example.invalid'
+    git -C "$d" config user.name  'postplan test'
+    mkdir -p "$d/ibl5/modules/Foo" "$d/ibl5/modules/Bar"
+    printf '<?php\n' > "$d/ibl5/modules/Foo/index.php"
+    printf '<?php\n' > "$d/ibl5/modules/Bar/index.php"
+    lw_neon_fixture X Y > "$d/ibl5/phpstan-baseline.neon"
+    git -C "$d" add -A; git -C "$d" commit --quiet -m base
+    git -C "$d" update-ref refs/remotes/origin/master "$(git -C "$d" rev-parse HEAD)"
+    [ "$keep" = 1 ] || git -C "$d" rm --quiet ibl5/modules/Foo/index.php
+    lw_neon_fixture Y > "$d/ibl5/phpstan-baseline.neon"
+    printf 'work\n' > "$d/branch-note.txt"
+    git -C "$d" add -A; git -C "$d" commit --quiet -m trim
+    git -C "$d" diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$key.patch"
+    lw_neon_fixture X Y > "$d/ibl5/phpstan-baseline.neon"
+    git -C "$d" commit --quiet -am 'resolution kept master entries'
+    printf '%s' "$d"
+}
 if [ ! -x "$LW" ]; then
     echo "FAIL: §5.9g — $LW missing or not executable"; FAILED=1
 else
@@ -3290,6 +3438,19 @@ else
           "/tmp/pr-ready-numstat-pre-$LWK2.txt" "/tmp/pr-ready-numstat-post-$LWK2.txt" \
           "/tmp/pr-ready-diff-pre-$LWK3.patch" "/tmp/pr-ready-diff-post-$LWK3.patch" \
           "/tmp/pr-ready-numstat-pre-$LWK3.txt" "/tmp/pr-ready-numstat-post-$LWK3.txt"
+
+    # §5.9g baseline exemption: a trimmed block whose path is gone at HEAD is not lost.
+    LWK4="lw-neon-dead-$$"; LWR4="$(mk_lostwork_baseline_repo 0 "$LWK4")"
+    LWO4="$(cd "$LWR4" && bash "$LW" "$LWK4" 2>&1 || true)"
+    have  "§5.9g: dead-path baseline block is exempt (TREE-EQUIVALENT)" "$LWO4" 'TREE-EQUIVALENT'
+    lacks "§5.9g: dead-path baseline block emits no LOST line"          "$LWO4" 'LOST:'
+    rm -f "/tmp/pr-ready-diff-pre-$LWK4.patch" "/tmp/pr-ready-diff-post-$LWK4.patch"
+    # §5.9g hard constraint: the same trimmed block with its path still at HEAD is lost.
+    LWK5="lw-neon-live-$$"; LWR5="$(mk_lostwork_baseline_repo 1 "$LWK5")"
+    LWO5="$(cd "$LWR5" && bash "$LW" "$LWK5" 2>&1 || true)"
+    have  "§5.9g: live-path baseline block is still LOST"  "$LWO5" "LOST: ibl5/phpstan-baseline.neon: -$(printf '\t\t\t')path: modules/Foo/index.php"
+    have  "§5.9g: live-path baseline block diverges"       "$LWO5" 'TREE DIVERGED — inspect before pushing'
+    rm -f "/tmp/pr-ready-diff-pre-$LWK5.patch" "/tmp/pr-ready-diff-post-$LWK5.patch"
 fi
 
 # §5.9h the BEHIND re-rebase loop. The loop body is orchestrator prose interleaved
@@ -3346,7 +3507,7 @@ done
 # §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
 # catches: a block can be perfect while the surrounding prose still claims twelve
 # conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
-have "§5.9k: SKILL.md counts fifteen conditions"         "$P25_TXT" '**All fifteen conditions**'
+have "§5.9k: SKILL.md counts eighteen conditions"        "$P25_TXT" '**All eighteen conditions**'
 have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
 have "§5.9k: the shared-predicate list carries (15)"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)/(15)'
 
@@ -3379,7 +3540,7 @@ else
     lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
 fi
 # §5.9l: the Phase 6.5 reference doc carries the (14) and (15) entries that
-# SKILL.md's "All fifteen conditions" count promises, as prose pointing at its block.
+# SKILL.md's "All eighteen conditions" count promises, as prose pointing at its block.
 ARM_TXT="$(cat "$SKILL")"
 have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
 have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'

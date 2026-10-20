@@ -45,52 +45,26 @@ class NewsController implements NewsControllerInterface
         private readonly \LastSimRecap\Contracts\LastSimRecapViewInterface $lastSimRecapView,
         private readonly \Topics\News\Contracts\NewsServiceInterface $newsService,
         private readonly \Topics\News\Contracts\NewsViewInterface $newsView,
+        private readonly \Api\Contracts\HtmlResponderInterface $htmlResponder = new \Api\Response\HtmlResponder(),
     ) {}
 
     public function main(mixed $new_topic): void
     {
         $storyhome = $this->config->storyHome;
-        $multilingual = $this->config->multilingual;
-        $currentlang = $this->config->currentLang;
-        $articlecomm = $this->config->articleComm;
         $sitename = $this->config->siteName;
         $user_news = $this->config->userNews;
         $userinfo = $this->authService->isAuthenticated() ? $this->authService->getUserInfo() : null;
-        $new_topic = intval($new_topic);
-        if ($multilingual == 1) {
-            $querylang = "AND (alanguage='$currentlang' OR alanguage='')";
-        } else {
-            $querylang = "";
-        }
-        \PageLayout\PageLayout::header();
-
-        if (defined('HOME_FILE')) {
-            echo '<h1 class="ibl-title">IBL: Internet Basketball League</h1>';
-        } else {
-            echo '<h1 class="ibl-title">News</h1>';
-        }
-
-        if ($this->authService->isAuthenticated()) {
-            $teamRepo = $this->teamIdentityRepository;
-            $teamName = $teamRepo->getTeamnameFromUsername($userinfo['username'] ?? null);
-            if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
-                $tid = $teamRepo->getTidFromTeamname($teamName);
-                if ($tid !== null && \League\League::isRealFranchise($tid)) {
-                    $recapService = $this->lastSimRecapService;
-                    $slate = $recapService->buildSlateForTeam($tid);
-                    if ($slate !== null) {
-                        echo $this->lastSimRecapView->render($slate);
-                    }
-                }
-            }
-        }
+        $new_topic = is_numeric($new_topic) ? (int) $new_topic : 0;
+        $this->renderHeader();
+        $this->renderSimRecap($userinfo);
 
         if (defined('HOME_FILE')) {
             blocks("Center");
         }
 
-        if (isset($userinfo['storynum']) and $user_news == 1) {
-            $storynum = $userinfo['storynum'];
+        $userStoryNum = $userinfo['storynum'] ?? null;
+        if (is_numeric($userStoryNum) && $user_news === 1) {
+            $storynum = (int) $userStoryNum;
         } else {
             $storynum = $storyhome;
         }
@@ -99,44 +73,112 @@ class NewsController implements NewsControllerInterface
 
         if ($new_topic !== 0) {
             $topicText = $newsService->getTopicText($new_topic);
-            OpenTable();
-            if ($topicText === null) {
-                echo "<center><font class=\"title\">$sitename</font><br><br>" . _NOINFO4TOPIC . "<br><br>[ <a href=\"modules.php?name=News\">" . _GOTONEWSINDEX . "</a> | <a href=\"modules.php?name=Topics\">" . _SELECTNEWTOPIC . "</a> ]</center>";
-            } else {
-                $topic_title = \Security\HtmlSanitizer::safeHtmlOutput($topicText);
+            $safeTopicTitle = null;
+            if ($topicText !== null) {
+                $safeTopicTitle = \Security\HtmlSanitizer::safeHtmlOutput($topicText);
                 $newsService->bumpAllTopics();
-                echo "<center><font class=\"title\">$sitename: $topic_title</font><br><br>"
-                    . "<form action=\"modules.php?name=Search\" method=\"post\">"
-                    . "<input type=\"hidden\" name=\"topic\" value=\"$new_topic\">"
-                    . "" . _SEARCHONTOPIC . ": <input type=\"name\" name=\"query\" size=\"30\">&nbsp;&nbsp;"
-                    . "<input type=\"submit\" value=\"" . _SEARCH . "\">"
-                    . "</form>"
-                    . "[ <a href=\"index.php\">" . _GOTOHOME . "</a> | <a href=\"modules.php?name=Topics\">" . _SELECTNEWTOPIC . "</a> ]</center>";
             }
-            CloseTable();
-            echo "<br>";
+            $this->htmlResponder->html($this->newsView->renderTopicBanner(
+                $sitename,
+                $safeTopicTitle,
+                $new_topic,
+                $this->config->tableBgcolor1,
+                $this->config->tableBgcolor2,
+            ));
         }
 
-        $stories = ($new_topic == 0)
-            ? $newsService->getHomePageStories((int) $storynum, $querylang)
-            : $newsService->getTopicPageStories((int) $new_topic, (int) $storynum, $querylang);
+        $stories = $this->queryStories($new_topic, $storynum);
+        $this->renderArticles($stories, $userinfo);
+        \PageLayout\PageLayout::footer();
+    }
+
+    private function renderHeader(): void
+    {
+        \PageLayout\PageLayout::header();
+
+        $this->htmlResponder->html($this->newsView->renderPageTitle(defined('HOME_FILE')));
+    }
+
+    /**
+     * @param array<string, mixed>|null $userinfo
+     */
+    private function renderSimRecap(?array $userinfo): void
+    {
+        if ($this->authService->isAuthenticated()) {
+            $teamRepo = $this->teamIdentityRepository;
+            $username = $userinfo['username'] ?? null;
+            $teamName = $teamRepo->getTeamnameFromUsername(is_string($username) ? $username : null);
+            if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
+                $tid = $teamRepo->getTidFromTeamname($teamName);
+                if ($tid !== null && \League\League::isRealFranchise($tid)) {
+                    $recapService = $this->lastSimRecapService;
+                    $slate = $recapService->buildSlateForTeam($tid);
+                    if ($slate !== null) {
+                        $this->htmlResponder->html($this->lastSimRecapView->render($slate));
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Pure SQL-fragment builder. Byte-identical to the historical interpolation for every value the
+     * language-file loader can produce (SecurityBootstrap::includeSafe charset, at most varchar(30)
+     * nuke_stories.alanguage); any other byte sequence fails closed to the empty-language match.
+     */
+    private static function buildLanguageClause(int $multilingual, string $currentlang): string
+    {
+        if ($multilingual !== 1) {
+            return "";
+        }
+        if (preg_match('/^[A-Za-z0-9_-]{0,30}\z/', $currentlang) !== 1) {
+            return "AND (alanguage='')";
+        }
+
+        return "AND (alanguage='$currentlang' OR alanguage='')";
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function queryStories(int $new_topic, int $storynum): array
+    {
+        $querylang = self::buildLanguageClause($this->config->multilingual, $this->config->currentLang);
+
+        return ($new_topic === 0)
+            ? $this->newsService->getHomePageStories($storynum, $querylang)
+            : $this->newsService->getTopicPageStories($new_topic, $storynum, $querylang);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $stories
+     * @param array<string, mixed>|null $userinfo
+     */
+    private function renderArticles(array $stories, ?array $userinfo): void
+    {
+        $articlecomm = $this->config->articleComm;
+        $newsService = $this->newsService;
         $viewModels = [];
+        /**
+         * nuke_stories row (per ibl5/docs/schema/current-schema.sql): sid int(11) NOT NULL, catid int(11) NOT NULL,
+         * aid varchar(30) NOT NULL, title varchar(80) NULL, time datetime NULL (normalizeStoryTime(int|string)
+         * already requires non-null; unchanged), hometext/bodytext/notes mediumtext NULL, comments int(11) NULL,
+         * counter mediumint NULL, topic int(11) NOT NULL, informant varchar(20) NOT NULL, acomm int(11) NOT NULL.
+         * @var array{sid: int, catid: int, aid: string, title: string|null, time: string, hometext: string|null, bodytext: string|null, comments: int|null, counter: int|null, topic: int, informant: string, notes: string|null, acomm: int} $row
+         */
         foreach ($stories as $row) {
-            $s_sid = intval($row['sid']);
-            $catid = intval($row['catid']);
-            /** @var string $aid nuke_stories.aid is NOT NULL varchar */
+            $s_sid = (int) $row['sid'];
+            $catid = (int) $row['catid'];
             $aid = $row['aid'];
             $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title']);
-            /** @var string|null $hometext nuke_stories.hometext is nullable mediumtext */
             $hometext = $row['hometext'];
             $bodytext = $row['bodytext'];
-            $comments = intval($row['comments']);
-            $counter = intval($row['counter']);
-            $topic = intval($row['topic']);
-            /** @var string $informant nuke_stories.informant is NOT NULL varchar */
+            $comments = (int) $row['comments'];
+            $counter = (int) $row['counter'];
+            $topic = (int) $row['topic'];
             $informant = $row['informant'];
             $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes']);
-            $acomm = intval($row['acomm']);
+            $acomm = (int) $row['acomm'];
             $topicRow = $newsService->getTopicForStory($s_sid);
             $topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
             $topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
@@ -147,27 +189,30 @@ class NewsController implements NewsControllerInterface
             $totalcount = $counts['total'];
             $c_count = $comments;
             $r_options = "";
-            if (isset($userinfo['umode'])) {$r_options .= "&amp;mode=" . $userinfo['umode'];}
-            if (isset($userinfo['uorder'])) {$r_options .= "&amp;order=" . $userinfo['uorder'];}
-            if (isset($userinfo['thold'])) {$r_options .= "&amp;thold=" . $userinfo['thold'];}
+            $umode = $userinfo['umode'] ?? null;
+            $uorder = $userinfo['uorder'] ?? null;
+            $thold = $userinfo['thold'] ?? null;
+            if (is_string($umode)) {$r_options .= "&amp;mode=" . $umode;}
+            if (is_int($uorder) || is_string($uorder)) {$r_options .= "&amp;order=" . $uorder;}
+            if (is_int($thold) || is_string($thold)) {$r_options .= "&amp;thold=" . $thold;}
             $story_url = "modules.php?name=News&amp;file=article&amp;sid=$s_sid$r_options";
             $morelink_parts = [];
-            if ($fullcount > 0 or $c_count > 0 or $articlecomm == 0 or $acomm == 1) {
+            if ($fullcount > 0 or $c_count > 0 or $articlecomm === 0 or $acomm === 1) {
                 $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">" . _READMORE . "</a>";
             }
             if ($fullcount > 0) {
                 $morelink_parts[] = "<span class=\"news-article__meta-item\">$totalcount " . _BYTESMORE . "</span>";
             }
-            if ($articlecomm == 1 and $acomm == 0) {
-                if ($c_count == 0) {
+            if ($articlecomm === 1 and $acomm === 0) {
+                if ($c_count === 0) {
                     $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">" . _COMMENTSQ . "</a>";
-                } elseif ($c_count == 1) {
+                } elseif ($c_count === 1) {
                     $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">$c_count " . _COMMENT . "</a>";
                 } elseif ($c_count > 1) {
                     $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">$c_count " . _COMMENTS . "</a>";
                 }
             }
-            if ($catid != 0) {
+            if ($catid !== 0) {
                 $catTitle = $newsService->getCategoryTitle($catid);
                 $title1 = \Security\HtmlSanitizer::safeHtmlOutput($catTitle ?? '');
                 $catLabel = $title1 !== '' ? $title1 : 'Category';
@@ -182,6 +227,5 @@ class NewsController implements NewsControllerInterface
             ];
         }
         $this->newsView->renderStories($viewModels);
-        \PageLayout\PageLayout::footer();
     }
 }

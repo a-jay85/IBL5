@@ -25,6 +25,7 @@ class TerminalState(str, Enum):
     NOTHING_TO_SHIP = "nothing-to-ship"      # clean tree, empty diff vs master
     ALREADY_SHIPPED = "already-shipped"      # diff vs master went empty AND the branch's PR is already MERGED
     HOLD_REPEAT_DECLINED = "hold-repeat-declined"  # condition-3 MISSING set equals the prior hold's; stopped before any LLM call
+    REBASED_HELD = "rebased-held"            # rebase-only mode: prior hold is human-only {3,7,8}; merged master, pushed, no review, never armed
     FAILED = "failed"                        # typed failure aborted the run
 
 
@@ -137,16 +138,20 @@ class PlanInfo:
     found: bool = False
     path: str = ""
     auto_merge_false: bool = False       # line-1 frontmatter `auto_merge: false`
+    auto_merge_value: Optional[str] = None  # raw line-1 `auto_merge:` value; None = absent
     has_matrix: bool = False
     has_security: bool = False
     has_reuse: bool = False
     planned_test_paths: list[str] = field(default_factory=list)
     no_change_test_paths: list[str] = field(default_factory=list)  # planned tokens every VR row marked `(no-change)`; conformance skips these
+    run_only_test_paths: list[str] = field(default_factory=list)  # planned tokens every row marked `(run-only)`; conformance skips MISSING for these when the file is tracked
     critical_files: list[tuple] = field(default_factory=list)  # (path, annotation, exempt)
     required_test_methods: list[str] = field(default_factory=list)
     backlog_issues: list[tuple] = field(default_factory=list)  # (kind, number); kind in {"closes", "refs"}
     deferral_hits: list[tuple] = field(default_factory=list)  # (text, line_no, key) from ## Out of Scope; see outofscope.py
     truly_manual_rows: list[ManualRow] = field(default_factory=list)
+    # Truly-manual rows tagged post-merge:; rendered under ## After merge, never under ## Manual Testing
+    post_merge_rows: list[ManualRow] = field(default_factory=list)
     # Verification Matrix rows whose Test type is PHPUnit / API-test / E2E /
     # Visual-regression / CLI-executable (planfile.count_executable_matrix_rows).
     # None = not parsed: plan-blind run, no matrix, or a PlanInfo(...) literal in a test.
@@ -311,14 +316,16 @@ class RunResult:
     run_id: str = ""                          # basename(out_dir); popped when empty
     reused_from: dict = field(default_factory=dict)  # arm -> producing run id; popped when empty
     review_delta: list[str] = field(default_factory=list)  # interdiff-reviewed paths; popped when empty
+    rearm: dict | None = None  # RunResult.rearm: Phase 7 re-arm outcome after the fix loop; None = never ran
     hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
+    rebase_only: dict | None = None  # rebase-only mode record (eligible, hold, pre/post patch-id, pushed, noop, record_refreshed); omitted from result.json when unset
     pause_edit_sid: Optional[str] = None  # S of a recorded interrupted edit (ADR-0143 addendum 2026-10-10); omitted from result.json when unset
     audit: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
         d = asdict(self)
         for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix",
-                    "pause_edit_sid", "conflict_rung"):   # unset → result.json byte-identical
+                    "pause_edit_sid", "conflict_rung", "rearm", "rebase_only"):   # unset → result.json byte-identical
             if not d.get(key):
                 d.pop(key, None)
         if self.classification:

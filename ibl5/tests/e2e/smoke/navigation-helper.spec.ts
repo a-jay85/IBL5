@@ -45,7 +45,9 @@ test.describe('gotoWithRetry helper', () => {
   });
 
   test('throws on persistently blank body', async ({ page }) => {
+    let hitCount = 0;
     await page.route('**/blank-body-fixture', (route) => {
+      hitCount++;
       route.fulfill({
         status: 200,
         contentType: 'text/html',
@@ -54,7 +56,47 @@ test.describe('gotoWithRetry helper', () => {
     });
 
     const url = 'http://localhost/blank-body-fixture';
-    await expect(gotoWithRetry(page, url)).rejects.toThrow(/blank content/);
+    const started = Date.now();
+    await expect(gotoWithRetry(page, url, 1)).rejects.toThrow(/blank content/);
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(hitCount).toBe(5);
+  });
+
+  test('rejects a negative backoffMs before navigating', async ({ page }) => {
+    let hitCount = 0;
+    await page.route('**/negative-backoff-fixture', (route) => {
+      hitCount++;
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<html><body>This is a valid page with enough content to pass the body check</body></html>',
+      });
+    });
+
+    await expect(
+      gotoWithRetry(page, 'http://localhost/negative-backoff-fixture', -1),
+    ).rejects.toThrow(/backoffMs must be a finite number/);
+    expect(hitCount).toBe(0);
+  });
+
+  test('default back-off waits before retrying a blank page', async ({ page }) => {
+    let hitCount = 0;
+    await page.route('**/blank-then-ok-fixture', (route) => {
+      hitCount++;
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body:
+          hitCount === 1
+            ? ''
+            : '<html><body>This is a valid page with enough content to pass the body check</body></html>',
+      });
+    });
+
+    const started = Date.now();
+    await gotoWithRetry(page, 'http://localhost/blank-then-ok-fixture');
+    expect(hitCount).toBe(2);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(950);
   });
 
   test('succeeds on HTTP 200 with non-blank body', async ({ page }) => {

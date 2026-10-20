@@ -1,6 +1,6 @@
 ---
-description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet."
-last_verified: 2026-10-09
+description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised; an advisory How to revert line follows it."
+last_verified: 2026-10-19
 ---
 
 # PR Body Claims
@@ -132,6 +132,51 @@ The post-plan harness checks these claims in `body_numbers.py`. It checks a clai
 Trigger: backlog#1060 (a scan of 23 merged PR bodies with test counts found 5 whose number disagreed with the declarations the diff added).
 
 **Headless.** Applies: an automouse or `/post-plan` run that writes a test count into a PR body takes it from a test run or a diff grep in the same session.
+
+## Merge danger rule
+
+Every `/post-plan` PR body carries exactly one Merge danger line. It starts at the beginning of a line and can sit anywhere in the body:
+
+```
+**Merge danger:** Door: one-way · Blast radius: external · Why: <one line, 20-200 chars>
+```
+
+`Door` is `one-way` or `two-way`. `Blast radius` is one of `localized`, `module`, `site-wide`, or `external`. The separator is ` · ` (U+00B7), and the three keys appear in that order. A body with no such line, or with two or more, is malformed. A quoted example inside a code fence counts as a line. The parser is `parse_merge_danger` in `tools/postplan-harness/harness/merge_danger.py`. Its Phase 6.5 shell twin is `pr_merge_danger_hold` in `bin/lib/pr-armable.sh`. Change both together.
+
+`/post-plan` Phase 2 injects the line mechanically, through `render_merge_danger` in the same module. The LLM writes only the `Why` text. A human editing the body may raise `Door` to `one-way` or widen `Blast radius`. Lowering a mechanical `one-way` is never allowed. Phase 6.5 reads the body at arm time and does not re-derive the door from the diff, so review is the only catch for a lowered line. The derivation in Phase 2 is the floor.
+
+Any one of these triggers forces `Door: one-way`:
+
+- Destructive migration. A changed `ibl5/migrations/*.sql` whose diff matches `armable.DESTRUCTIVE_SQL`, the same regex condition (9) uses. The `-- destructive-migration[trigger]:` bypass marker satisfies `bin/check-destructive-migrations` but does not lower the door, because a bypassed destructive migration is still irreversible.
+- Prod external state. A diff touching `bin/db-sync-prod` or `.github/workflows/promote-to-production.yml`.
+- Outbound notification senders. A diff touching `bin/discord-dm`, anything under `.github/actions/notify-discord/` or `ibl5/classes/Mail/`, or a changed `.github/workflows/*.yml` whose candidate text contains `notify-discord` or `DISCORD_`. A sent message cannot be recalled.
+- Self-governing merge machinery. A diff touching a path in `_ARMING_PATHS` in `harness/gate_backtest.py`: `harness/armable.py`, `bin/lib/pr-armable.sh`, or `_phase-6.5-arm-auto-merge.md`. This is the bootstrap hazard.
+- Gate removal. Any `detect_gate_changes` result whose state is `removed`: a deleted `bin/check-*`, lib gate, CI workflow, or arming path.
+
+An edited `bin/check-*`, `bin/lib/*`, or `.github/workflows/*.yml` stays two-way with `Blast radius: site-wide`. Condition (17) gate-backtest already holds the edits that flip past verdicts. On the 100 newest merged PRs (2026-10-11), these triggers mark 3 of 100 one-way from paths alone (#3114 arming path, #3058 and #3050 notify workflows). Treating every gate edit as one-way would have marked 38 of 100. That count takes any PR touching `.github/workflows/`, `bin/check-*`, `bin/lib/`, `.claude/hooks/`, or `tools/postplan-harness/harness/`.
+
+Blast radius is a mechanical floor too. The LLM or a human may widen it and never narrow it. It is `external` when a prod-external or notification trigger hit. It is `site-wide` when any gate, migration, workflow, arming path, `ibl5/.htaccess`, `ibl5/router.php`, or `ibl5/composer.json` changed. It is `localized` when at most 3 files changed and all share one parent directory. It is `module` when every path shares one module root: `ibl5/classes/<X>`, `ibl5/modules/<X>`, `tools/<X>`, or else the first path component. Anything else is `site-wide`.
+
+Phase 6.5 condition (18) refuses to arm when `Door: one-way`, when the line is missing or malformed, or when the body cannot be read. The merge digest DM opens a one-way merge with a `!! ONE-WAY DOOR` line and shortens the DM for a two-way localized merge. The harness body check marks a body without one well-formed line as degraded, which also holds arming.
+
+Trigger: backlog#1438.
+
+**Headless.** Applies: yes. The line is injected and validated mechanically; the only LLM input is the Why text.
+
+## How to revert rule
+
+Directly after the Merge danger line, the body carries one advisory `**How to revert:**` line. It says in one line how to undo the merge.
+
+- A normal change reads: Open a PR with `git revert <merge-sha>`.
+- A diff touching a migration (`ibl5/migrations/*.sql`) adds a step: write a new migration that undoes the schema change, since git revert does not roll back an applied migration.
+- A diff touching the prod sync (`bin/db-sync-prod` or `.github/workflows/promote-to-production.yml`) adds a step: rerun the previous prod sync or promotion.
+- A diff touching config (`ibl5/.htaccess`, `ibl5/composer.json`, or any `.github/workflows/*.yml`) adds a step: confirm the deploy picked up the restored config.
+
+The LLM writes the line in Phase 2. The harness module `tools/postplan-harness/harness/how_to_revert.py` keeps exactly one line after Merge danger. It swaps in the mechanical line when the LLM line is missing or shorter than 12 characters, and whenever the diff touches one of the paths above.
+
+The line is advisory. A body without it gets no finding and no hold, and the body check stays clean. No Phase 6.5 condition, shell reader, or digest reads it. Bodies written before this rule carry no line, and nothing flags them.
+
+**Headless.** Applies: yes. The runner writes the line mechanically when the LLM line is unusable.
 
 ## Backlog issue references
 

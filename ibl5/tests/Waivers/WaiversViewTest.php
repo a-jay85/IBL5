@@ -190,4 +190,63 @@ class WaiversViewTest extends TestCase
         $this->assertIsString($output);
         $this->assertStringContainsString('waivers', strtolower($output));
     }
+
+    public function testPlayerOptionsRenderAsOptionTags(): void
+    {
+        $output = $this->view->renderWaiverForm(
+            'Test Team',
+            1,
+            'add',
+            [
+                ['playerID' => 42, 'playerName' => 'Jane Doe', 'contract' => '103', 'waitTime' => ''],
+                ['playerID' => 43, 'playerName' => 'John Roe', 'contract' => '205', 'waitTime' => ''],
+            ],
+            5,
+            5
+        );
+
+        $this->assertStringContainsString('<option value="42">Jane Doe 103</option>', $output);
+        // Numeric values only: excludes the empty-value "Select player..." placeholder.
+        $this->assertSame(2, preg_match_all('/<option value="\d+">/', $output));
+        $this->assertStringNotContainsString('&lt;option', $output);
+    }
+
+    public function testRenderWaiverFormAppendsWaitTimeWhenPresent(): void
+    {
+        $output = $this->view->renderWaiverForm(
+            'Test Team',
+            1,
+            'add',
+            [['playerID' => 42, 'playerName' => 'Jane Doe', 'contract' => '103', 'waitTime' => '(Clears in 5 h)']],
+            5,
+            5
+        );
+
+        $this->assertStringContainsString('<option value="42">Jane Doe 103 (Clears in 5 h)</option>', $output);
+    }
+
+    public function testRenderWaiverFormRendersOneOptionPerPlayer(): void
+    {
+        $output = $this->view->renderWaiverForm(
+            'Test Team',
+            1,
+            'waive',
+            [
+                ['playerID' => 1, 'playerName' => 'A', 'contract' => '100', 'waitTime' => ''],
+                ['playerID' => 2, 'playerName' => 'B', 'contract' => '200', 'waitTime' => ''],
+            ],
+            5,
+            5
+        );
+
+        $this->assertStringContainsString('<option value="1">A 100</option>', $output);
+        $this->assertStringContainsString('<option value="2">B 200</option>', $output);
+    }
+
+    public function testEmptyWaitTimeOmitsTrailingSpace(): void
+    {
+        $option = $this->view->buildPlayerOption(5, 'Jane Doe', '103', '');
+
+        $this->assertSame('<option value="5">Jane Doe 103</option>', $option);
+    }
 }

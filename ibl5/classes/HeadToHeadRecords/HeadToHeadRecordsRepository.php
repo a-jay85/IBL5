@@ -103,8 +103,24 @@ GROUP BY self_id, opp_id';
     {
         /** @var Phase $phase */
         /** @var Scope $scope */
-        $maxTid = League::MAX_REAL_TEAMID;
+        return [
+            'dimension' => 'teams',
+            'phase'     => $phase,
+            'scope'     => $scope,
+            'axis'      => $this->fetchAxis($scope),
+            'records'   => $this->fetchRecords($phase, $scope),
+        ];
+    }
 
+    /**
+     * Teams-dimension win/loss records keyed by franchise identity on both sides.
+     *
+     * @param Phase $phase
+     * @param Scope $scope
+     * @return array<string, array<string, MatchupRecord>>
+     */
+    private function fetchRecords(string $phase, string $scope): array
+    {
         $sql = $this->buildBaseSql($phase, $scope) . '
 SELECT
     s.franchise_id AS self_franchise_id, s.team_city AS self_city, s.team_name AS self_name,
@@ -115,22 +131,35 @@ JOIN `ibl_franchise_seasons` s ON s.franchise_id = p.self_id AND s.season_ending
 JOIN `ibl_franchise_seasons` o ON o.franchise_id = p.opp_id  AND o.season_ending_year = p.season_year
 GROUP BY s.franchise_id, s.team_city, s.team_name, o.franchise_id, o.team_city, o.team_name';
 
-        $rows = $this->fetchRows($sql);
         $records = [];
-        foreach ($rows as $row) {
-            $selfFid  = self::intFromMixed($row['self_franchise_id']);
-            $selfCity = is_string($row['self_city']) ? $row['self_city'] : '';
-            $selfName = is_string($row['self_name']) ? $row['self_name'] : '';
-            $oppFid   = self::intFromMixed($row['opp_franchise_id']);
-            $oppCity  = is_string($row['opp_city']) ? $row['opp_city'] : '';
-            $oppName  = is_string($row['opp_name']) ? $row['opp_name'] : '';
-            $selfKey  = "{$selfFid}|{$selfCity}|{$selfName}";
-            $oppKey   = "{$oppFid}|{$oppCity}|{$oppName}";
+        foreach ($this->fetchRows($sql) as $row) {
+            $selfKey = self::franchiseKey(
+                self::intFromMixed($row['self_franchise_id']),
+                self::stringOrEmpty($row['self_city']),
+                self::stringOrEmpty($row['self_name']),
+            );
+            $oppKey = self::franchiseKey(
+                self::intFromMixed($row['opp_franchise_id']),
+                self::stringOrEmpty($row['opp_city']),
+                self::stringOrEmpty($row['opp_name']),
+            );
             $records[$selfKey][$oppKey] = [
                 'wins'   => self::intFromMixed($row['wins']),
                 'losses' => self::intFromMixed($row['losses']),
             ];
         }
+
+        return $records;
+    }
+
+    /**
+     * Teams-dimension axis: one entry per franchise identity, ordered by franchise then first season.
+     *
+     * @return list<AxisEntry>
+     */
+    private function fetchAxis(string $scope): array
+    {
+        $maxTid = League::MAX_REAL_TEAMID;
 
         $scopeAxisFilter = '';
         if ($scope === 'current') {
@@ -159,32 +188,24 @@ GROUP BY s.franchise_id, s.team_city, s.team_name, o.franchise_id, o.team_city, 
             $scopeAxisFilter,
         );
 
-        $axisRows = $this->fetchRows($axisSQL);
         $axis = [];
-        foreach ($axisRows as $row) {
+        foreach ($this->fetchRows($axisSQL) as $row) {
             $fid  = self::intFromMixed($row['franchise_id']);
-            $city = is_string($row['team_city']) ? $row['team_city'] : '';
-            $name = is_string($row['team_name']) ? $row['team_name'] : '';
-            $key  = "{$fid}|{$city}|{$name}";
+            $city = self::stringOrEmpty($row['team_city']);
+            $name = self::stringOrEmpty($row['team_name']);
             $axis[] = [
-                'key'               => $key,
+                'key'               => self::franchiseKey($fid, $city, $name),
                 'franchise_id'      => $fid,
                 'label'             => $city . ' ' . $name,
                 'sublabel'          => '',
-                'color1'            => is_string($row['color1']) ? $row['color1'] : '',
-                'color2'            => is_string($row['color2']) ? $row['color2'] : '',
+                'color1'            => self::stringOrEmpty($row['color1']),
+                'color2'            => self::stringOrEmpty($row['color2']),
                 'logo'              => ($this->logoResolver)($fid, $name),
                 'link_franchise_id' => $fid,
             ];
         }
 
-        return [
-            'dimension' => 'teams',
-            'phase'     => $phase,
-            'scope'     => $scope,
-            'axis'      => $axis,
-            'records'   => $records,
-        ];
+        return $axis;
     }
 
     /**
@@ -339,8 +360,43 @@ perspectives AS (
             return [];
         }
 
-        // Fetch best tenure per GM: current tenure first (end_season_year IS NULL),
-        // then most recent, then lowest id as tiebreaker.
+        $bestTenure = $this->loadBestTenures();
+        $teamInfo   = $this->loadTeamInfoIndex();
+        $fsBySeason = $this->loadFranchiseSeasonIndex();
+        $eraIndex   = $this->loadEraBrandingIndex();
+
+        $axis = [];
+        foreach ($gmNames as $gmName) {
+            if (!array_key_exists($gmName, $bestTenure)) {
+                continue;
+            }
+            $tenure = $bestTenure[$gmName];
+            $fid    = self::intFromMixed($tenure['franchise_id']);
+            $colors = $this->resolveAxisColors($tenure, $fid, $teamInfo, $fsBySeason, $eraIndex);
+
+            $axis[] = [
+                'key'               => $gmName,
+                'franchise_id'      => $fid,
+                'label'             => $gmName,
+                'sublabel'          => '',
+                'color1'            => $colors['color1'],
+                'color2'            => $colors['color2'],
+                'logo'              => $colors['logo'],
+                'link_franchise_id' => $tenure['end_season_year'] === null ? $fid : 0,
+            ];
+        }
+
+        return $axis;
+    }
+
+    /**
+     * Best tenure per GM: current tenure first (end_season_year IS NULL),
+     * then most recent, then lowest id as tiebreaker.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function loadBestTenures(): array
+    {
         $allTenures = $this->fetchRows(
             'SELECT gm_display_name, franchise_id, end_season_year, id
              FROM `ibl_gm_tenures`
@@ -359,7 +415,16 @@ perspectives AS (
             }
         }
 
-        // Fetch ibl_team_info for color/identity lookup.
+        return $bestTenure;
+    }
+
+    /**
+     * ibl_team_info rows for real franchises, keyed by teamid, for color/identity lookup.
+     *
+     * @return array<int, array<string, string>>
+     */
+    private function loadTeamInfoIndex(): array
+    {
         $tiRows = $this->fetchRows(sprintf(
             'SELECT teamid, team_city, team_name, color1, color2 FROM `ibl_team_info` WHERE teamid BETWEEN 1 AND %d',
             League::MAX_REAL_TEAMID,
@@ -376,7 +441,16 @@ perspectives AS (
             ];
         }
 
-        // Fetch franchise_seasons for retired-era team identity lookup.
+        return $teamInfo;
+    }
+
+    /**
+     * ibl_franchise_seasons identities keyed by "franchise_id:season_ending_year".
+     *
+     * @return array<string, array<string, string>>
+     */
+    private function loadFranchiseSeasonIndex(): array
+    {
         $fsRows = $this->fetchRows(sprintf(
             'SELECT franchise_id, season_ending_year, team_city, team_name FROM `ibl_franchise_seasons` WHERE franchise_id BETWEEN 1 AND %d',
             League::MAX_REAL_TEAMID,
@@ -393,7 +467,16 @@ perspectives AS (
             ];
         }
 
-        // Build era branding index keyed by "franchise_id|team_city|team_name".
+        return $fsBySeason;
+    }
+
+    /**
+     * Era branding colors keyed by "franchise_id|team_city|team_name".
+     *
+     * @return array<string, array<string, string>>
+     */
+    private function loadEraBrandingIndex(): array
+    {
         $eraRows = $this->fetchRows(
             'SELECT franchise_id, team_city, team_name, color1, color2 FROM `ibl_franchise_era_branding`',
         );
@@ -410,60 +493,54 @@ perspectives AS (
             ];
         }
 
-        $axis = [];
-        foreach ($gmNames as $gmName) {
-            if (!array_key_exists($gmName, $bestTenure)) {
-                continue;
-            }
-            $tenure = $bestTenure[$gmName];
-            $fid    = self::intFromMixed($tenure['franchise_id']);
+        return $eraIndex;
+    }
 
-            if ($tenure['end_season_year'] === null) {
-                // Current GM: use ibl_team_info colors.
-                $color1 = $teamInfo[$fid]['color1'] ?? '';
-                $color2 = $teamInfo[$fid]['color2'] ?? '';
-                $logo   = "new{$fid}.png";
-            } else {
-                // Retired GM: find the team identity they managed at end_season_year.
-                $endSeason = self::intFromMixed($tenure['end_season_year']);
-                $fsKey     = $fid . ':' . $endSeason;
-                $fsRow     = $fsBySeason[$fsKey] ?? null;
+    /**
+     * Colors and logo for one GM's best tenure.
+     *
+     * @param array<string, mixed> $tenure
+     * @param array<int, array<string, string>> $teamInfo
+     * @param array<string, array<string, string>> $fsBySeason
+     * @param array<string, array<string, string>> $eraIndex
+     * @return array{color1: string, color2: string, logo: string}
+     */
+    private function resolveAxisColors(array $tenure, int $fid, array $teamInfo, array $fsBySeason, array $eraIndex): array
+    {
+        if ($tenure['end_season_year'] === null) {
+            // Current GM: use ibl_team_info colors.
+            $color1 = $teamInfo[$fid]['color1'] ?? '';
+            $color2 = $teamInfo[$fid]['color2'] ?? '';
+            $logo   = "new{$fid}.png";
+        } else {
+            // Retired GM: find the team identity they managed at end_season_year.
+            $endSeason = self::intFromMixed($tenure['end_season_year']);
+            $fsKey     = $fid . ':' . $endSeason;
+            $fsRow     = $fsBySeason[$fsKey] ?? null;
 
-                if ($fsRow !== null) {
-                    $city   = $fsRow['team_city'];
-                    $name   = $fsRow['team_name'];
-                    $eraKey = $fid . '|' . $city . '|' . $name;
-                    $ti     = $teamInfo[$fid] ?? null;
+            if ($fsRow !== null) {
+                $city   = $fsRow['team_city'];
+                $name   = $fsRow['team_name'];
+                $eraKey = $fid . '|' . $city . '|' . $name;
+                $ti     = $teamInfo[$fid] ?? null;
 
-                    if ($ti !== null && $ti['team_city'] === $city && $ti['team_name'] === $name) {
-                        // Still the current identity.
-                        $color1 = $teamInfo[$fid]['color1'] ?? '';
-                        $color2 = $teamInfo[$fid]['color2'] ?? '';
-                    } else {
-                        $color1 = $eraIndex[$eraKey]['color1'] ?? '';
-                        $color2 = $eraIndex[$eraKey]['color2'] ?? '';
-                    }
-                    $logo = ($this->logoResolver)($fid, $name);
+                if ($ti !== null && $ti['team_city'] === $city && $ti['team_name'] === $name) {
+                    // Still the current identity.
+                    $color1 = $teamInfo[$fid]['color1'] ?? '';
+                    $color2 = $teamInfo[$fid]['color2'] ?? '';
                 } else {
-                    $color1 = '';
-                    $color2 = '';
-                    $logo   = "new{$fid}.png";
+                    $color1 = $eraIndex[$eraKey]['color1'] ?? '';
+                    $color2 = $eraIndex[$eraKey]['color2'] ?? '';
                 }
+                $logo = ($this->logoResolver)($fid, $name);
+            } else {
+                $color1 = '';
+                $color2 = '';
+                $logo   = "new{$fid}.png";
             }
-
-            $axis[] = [
-                'key'               => $gmName,
-                'franchise_id'      => $fid,
-                'label'             => $gmName,
-                'sublabel'          => '',
-                'color1'            => $color1,
-                'color2'            => $color2,
-                'logo'              => $logo,
-                'link_franchise_id' => $tenure['end_season_year'] === null ? $fid : 0,
-            ];
         }
 
-        return $axis;
+        return ['color1' => $color1, 'color2' => $color2, 'logo' => $logo];
     }
 
     /**
@@ -531,5 +608,22 @@ perspectives AS (
             return (int)$v;
         }
         return 0;
+    }
+
+    /**
+     * Identity key for one franchise era: "<franchise_id>|<city>|<name>".
+     * Shared by the records map (both sides) and the axis entries.
+     */
+    private static function franchiseKey(int $fid, string $city, string $name): string
+    {
+        return "{$fid}|{$city}|{$name}";
+    }
+
+    /**
+     * Narrow a mixed DB row value to string, defaulting to '' for any non-string.
+     */
+    private static function stringOrEmpty(mixed $v): string
+    {
+        return is_string($v) ? $v : '';
     }
 }

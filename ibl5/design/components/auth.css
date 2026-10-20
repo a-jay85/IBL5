@@ -89,19 +89,19 @@
 }
 
 .auth-links a {
-    color: var(--accent-500);
+    color: var(--accent-700);
     text-decoration: none;
     font-weight: var(--font-weight-medium);
     transition: color var(--transition-fast);
 }
 
 .auth-links a:hover {
-    color: var(--accent-600);
+    color: var(--accent-800);
     text-decoration: underline;
 }
 
 .auth-links__divider {
-    color: var(--gray-300);
+    color: var(--gray-500);
     user-select: none;
 }
 

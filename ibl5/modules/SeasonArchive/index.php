@@ -24,6 +24,8 @@ use SeasonArchive\SeasonArchiveService;
 use SeasonArchive\SeasonDetailView;
 
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext|null $leagueContext */
 
 PageLayout\PageLayout::header();
 
@@ -32,7 +34,7 @@ $service = new SeasonArchiveService($repository);
 $indexView = new SeasonArchiveIndexView();
 $detailView = new SeasonDetailView();
 
-$year = isset($_GET['year']) ? (int) $_GET['year'] : 0;
+$year = is_string($_GET['year'] ?? null) ? (int) $_GET['year'] : 0;
 
 if ($year > 0) {
     $seasonData = $service->getSeasonDetail($year);

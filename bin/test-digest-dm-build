@@ -12,6 +12,9 @@
 # of .claude/review-shared/scripts/digest.sh (the producer).
 
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+H_FAIL_FD=2  # FAIL: lines stay on stderr, as before migration
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -19,7 +22,7 @@ DRIVER="$SCRIPT_DIR/digest-dm-build"
 PRODUCER="$ROOT/.claude/review-shared/scripts/digest.sh"
 
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/tddb.XXXXXX")"
-trap 'rm -rf "$SCRATCH"' EXIT
+trap 'rm -rf "$SCRATCH"; h_cleanup' EXIT
 
 # Same UTF-8 locale selection as the driver, so ${#v} counts characters here too.
 for _l in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
@@ -28,10 +31,10 @@ for _l in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
     esac
 done
 
-PASS=0; FAILN=0; CASE=""
+CASE=""
 begin_case() { CASE="$1"; }
-ok()   { PASS=$((PASS + 1)); }
-fail() { FAILN=$((FAILN + 1)); printf 'FAIL [%s] %s\n' "$CASE" "$1" >&2; }
+ok()   { h_pass "$CASE"; }
+fail() { h_fail "[$CASE] $1"; }
 want() { case "$2" in *"$3"*) ok ;; *) fail "$1: expected to contain <<$3>>, got <<$2>>" ;; esac; }
 wantnot() { case "$2" in *"$3"*) fail "$1: expected NOT to contain <<$3>>" ;; *) ok ;; esac; }
 eq()   { [ "$2" = "$3" ] && ok || fail "$1: want <<$3>>, got <<$2>>"; }
@@ -362,6 +365,94 @@ WF="$ROOT/.github/workflows/tests.yml"
 [ -f "$WF" ] || fail "no tests.yml at $WF"
 eq "wired exactly once" "$(grep -cE '^[[:space:]]+bin/test-digest-dm-build( \\)?$' "$WF")" "1"
 
-printf '\n%s case(s) passed, %s failed\n' "$PASS" "$FAILN"
-[ "$FAILN" -eq 0 ] || exit 1
-printf 'All %s cases passed\n' "$PASS"
+# ---------------------------------------------------------------------------
+# 16-21 — Merge danger line from --pr-body-file.
+# ---------------------------------------------------------------------------
+_rep() { printf "$1%.0s" $(seq 1 "$2"); }
+DANGER_WHY='the rollback path is not reversible once it ships'
+DIGEST_FIX="$SCRATCH/danger-digest"
+{
+    printf '### Merge digest\n'
+    printf '**What changed:** %s\n' "$(_rep w 1000)"
+    printf '**Watch:** %s\n' "$(_rep t 650)"
+} > "$DIGEST_FIX"
+
+begin_case "one-way-prefix"
+printf '**Merge danger:** Door: one-way · Blast radius: external · Why: %s\n' "$DANGER_WHY" > "$SCRATCH/body.md"
+run "$SCRATCH/f1" --pr-body-file "$SCRATCH/body.md"
+eq "exit 0" "$RC" "0"
+eq "first line is the danger prefix" "$(printf '%s\n' "$OUT" | sed -n 1p)" '!! ONE-WAY DOOR (blast radius: external)'
+want "header follows" "$(printf '%s\n' "$OUT" | sed -n 2p)" '**Merged [#2200]'
+
+begin_case "two-way-localized-compressed"
+printf '**Merge danger:** Door: two-way · Blast radius: localized · Why: %s\n' "$DANGER_WHY" > "$SCRATCH/body.md"
+# Short title and URL: the 700 bound is What 400 + Watch 200 plus scaffolding, and the
+# shared run() URL alone pushes the DM to ~704.
+OUT="$(bash "$DRIVER" --pr-number 2200 --title 'Fix' --url 'https://x.io/2200' \
+        --pr-body-file "$SCRATCH/body.md" < "$DIGEST_FIX")"
+RC=$?
+eq "exit 0" "$RC" "0"
+want "compressed body is elided" "$OUT" '…'
+wantnot "no danger prefix" "$OUT" 'ONE-WAY'
+eq "DM under 700 chars" "$([ "${#OUT}" -lt 700 ] && echo under || echo over)" "under"
+
+begin_case "two-way-site-wide-unchanged"
+printf '**Merge danger:** Door: two-way · Blast radius: site-wide · Why: %s\n' "$DANGER_WHY" > "$SCRATCH/body.md"
+run "$DIGEST_FIX"
+_base="$OUT"
+run "$DIGEST_FIX" --pr-body-file "$SCRATCH/body.md"
+eq "output byte-equal to the no-flag call" "$OUT" "$_base"
+
+begin_case "malformed-line-no-prefix"
+printf '**Merge danger:** Door: maybe · Blast radius: external · Why: %s\n' "$DANGER_WHY" > "$SCRATCH/body.md"
+run "$DIGEST_FIX" --pr-body-file "$SCRATCH/body.md"
+eq "exit 0" "$RC" "0"
+wantnot "no prefix" "$OUT" 'ONE-WAY'
+
+begin_case "one-way-cap"
+printf '**Merge danger:** Door: one-way · Blast radius: external · Why: %s\n' "$DANGER_WHY" > "$SCRATCH/body.md"
+OUT="$(bash "$DRIVER" --pr-number 2200 --title "$(_rep T 80)" \
+        --url 'https://github.com/o/r/pull/2200' --branch "$(_rep b 60)" \
+        --pr-body-file "$SCRATCH/body.md" < "$DIGEST_FIX")"
+want "prefix present" "$OUT" '!! ONE-WAY DOOR (blast radius: external)'
+eq "whole DM under the Discord cap" "$([ "${#OUT}" -lt 2000 ] && echo under || echo over)" "under"
+
+# ---------------------------------------------------------------------------
+# pr3267 dual-layout — the old (v1) and new (v2) sticky layouts fold to the same five
+# label/value pairs, and none of the v2-only sections leaks into a value. _digest_labels
+# is a function inside the driver (it has no flag of its own), so lift it by name.
+# ---------------------------------------------------------------------------
+eval "$(sed -n '/^_digest_labels() {/,/^}/p' "$DRIVER")"
+PR3267_DIR="$ROOT/bin/fixtures/review-shared"
+PR3267_V1="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v1.json")"
+PR3267_V2="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v2.json")"
+PR3267_WANT="$(printf '%s\t%s\n' \
+    'What changed' 'a thing' \
+    'Why' 'a reason' \
+    'Watch' 'a page' \
+    'Touches' 'a file' \
+    'Machine-authored fixes' 'none (post-plan remediation: 009d537a1b2c)')"
+
+begin_case "pr3267-v1-digest-labels"
+PR3267_L1="$(_digest_labels <<< "$PR3267_V1")"
+eq "five label/value pairs" "$PR3267_L1" "$PR3267_WANT"
+wantnot "no Still open" "$PR3267_L1" 'Still open'
+wantnot "no Fixed in this PR" "$PR3267_L1" 'Fixed in this PR'
+wantnot "no Code review" "$PR3267_L1" 'Code review'
+
+begin_case "pr3267-v2-digest-labels"
+PR3267_L2="$(_digest_labels <<< "$PR3267_V2")"
+eq "equal to the v1 pairs" "$PR3267_L2" "$PR3267_L1"
+eq "five label/value pairs" "$PR3267_L2" "$PR3267_WANT"
+wantnot "no Still open" "$PR3267_L2" 'Still open'
+wantnot "no Fixed in this PR" "$PR3267_L2" 'Fixed in this PR'
+wantnot "no Code review" "$PR3267_L2" 'Code review'
+
+begin_case "unknown-flag-exit-2"
+run "$SCRATCH/f1" --merge-danger x
+eq "unknown flag exits 2" "$RC" "2"
+run "$SCRATCH/f1" --pr-body-file /nonexistent
+eq "unreadable body file exits 2" "$RC" "2"
+
+
+h_done

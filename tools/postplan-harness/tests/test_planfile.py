@@ -54,7 +54,7 @@ def test_frontmatter_gate():
 
 
 def test_matrix_and_critical_files():
-    planned, manual = parse_matrix(PLAN)
+    planned, manual, _ = parse_matrix(PLAN)
     assert planned == ["ibl5/tests/Unit/EventLoggerTest.php", "ibl5/tests/e2e/admin/events.spec.ts"]
     assert len(manual) == 1 and "eyeball" in manual[0].raw
     cf = parse_critical_files(PLAN)
@@ -66,8 +66,9 @@ def test_matrix_rejects_package_name_and_url_phantoms():
     """Two live rows from the plan corpus. e2e-phase-matrix's row named the npm
     package `@playwright/test` and its `lint:e2e` command tripped the E2E type match,
     so conformance reported the package missing from every diff. The other row's
-    Behavior cell held a URL ahead of the real test path. Only the first backticked
-    candidate is ever considered, so that row now plans nothing instead of a phantom."""
+    Behavior cell held a URL ahead of the real test path. Each cell is read on its own
+    and the URL fails _is_test_path, so the row plans the location cell's path and
+    never the URL (backlog#1501)."""
     content = (
         "## Verification Matrix\n\n"
         "| # | Behavior | Test type | When | Test |\n"
@@ -77,8 +78,8 @@ def test_matrix_rejects_package_name_and_url_phantoms():
         "| 13 | **NEG** `original_url` `https://evil.test/x` rejected | PHPUnit | post-impl "
         "| `ibl5/tests/BugPipeline/AttachmentInputValidatorTest.php` — NEW |\n"
     )
-    planned, _ = parse_matrix(content)
-    assert planned == []
+    planned, _, _ = parse_matrix(content)
+    assert planned == ["ibl5/tests/BugPipeline/AttachmentInputValidatorTest.php"]
 
 
 def test_matrix_ignores_fenced_rows():
@@ -100,7 +101,7 @@ def test_matrix_ignores_fenced_rows():
 | looks right | Truly-manual | eyeball it |
 ````
 """
-    planned, manual = parse_matrix(fenced)
+    planned, manual, _ = parse_matrix(fenced)
     # identical to the unfenced plan: the appendix contributes nothing
     assert planned == parse_matrix(PLAN)[0]
     assert len(manual) == len(parse_matrix(PLAN)[1])
@@ -236,7 +237,7 @@ echo hi
 |---|---|---|
 | real | PHPUnit | `ibl5/tests/Unit/RealTest.php` |
 """
-    planned, _ = parse_matrix(nested)
+    planned, _, _ = parse_matrix(nested)
     assert planned == ["ibl5/tests/Unit/RealTest.php"]
 
 
@@ -260,6 +261,8 @@ def test_conformance():
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 LIB = os.path.join(REPO_ROOT, "bin", "lib", "critical-files.sh")
+CF_CORPUS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "fixtures", "critical-files-corpus")
 
 # Shared cross-parser fixture. Every shape here is drawn from the real
 # ~/claude-plans corpus; a01-a16 must be EXEMPT, b01-b12 must be MUST_APPEAR
@@ -435,38 +438,42 @@ def test_lib_abs_prefix_pattern_sync():
     assert _ABS_PREFIX_RE.pattern.replace("(?:", "(") == m.group(1)
 
 
+# Args: $1 = critical-files.sh to source, $2 = plan directory, $3 = before.tsv
+# (cf_parse_section_raw, paths as written), $4 = after.tsv (cf_parse_section,
+# normalised). Neither the lib nor the corpus is hardcoded, so the same script
+# drives the committed fixture, the opt-in live corpus, and a mutated lib copy.
 _CORPUS_SNAP = r'''
 source "$1"
-for f in "$HOME"/claude-plans/*.md; do
-    cf_parse_section_raw "$f" | awk -v p="$(basename "$f")" '{ print p "\t" $0 }' >> "$2"
-    cf_parse_section "$f" | awk -v p="$(basename "$f")" '{ print p "\t" $0 }' >> "$3"
+for f in "$2"/*.md; do
+    cf_parse_section_raw "$f" | awk -v p="$(basename "$f")" '{ print p "\t" $0 }' >> "$3"
+    cf_parse_section "$f" | awk -v p="$(basename "$f")" '{ print p "\t" $0 }' >> "$4"
 done
 '''
 
 
-@pytest.mark.skipif(not os.path.isdir(os.path.expanduser("~/claude-plans")),
-                    reason="needs the machine-local ~/claude-plans corpus")
-def test_lib_corpus_normalisation_diff(tmp_path):
-    """backlog#1211: over every real plan, only in-repo absolute rows move, and each
-    moves to exactly what _normalise_cf_path yields.
+def _snapshot_corpus(lib, plans_dir, tmp_path):
+    """Run both shell parsers over every <plans_dir>/*.md; return (before, after) rows.
 
-    cf_parse_section_raw is byte-identical to the pre-#1211 parser, so it is the
-    stable "before" side and the test stays valid after this change merges.
+    Each row is "<plan basename>\t<KIND>:<path>". before = cf_parse_section_raw
+    (byte-identical to the pre-#1211 parser), after = cf_parse_section.
     """
     before_tsv = tmp_path / "before.tsv"
     after_tsv = tmp_path / "after.tsv"
     before_tsv.write_text("")
     after_tsv.write_text("")
-    subprocess.run(["bash", "-c", _CORPUS_SNAP, "_", LIB, str(before_tsv), str(after_tsv)],
+    subprocess.run(["bash", "-c", _CORPUS_SNAP, "_", str(lib), str(plans_dir),
+                    str(before_tsv), str(after_tsv)],
                    check=True, capture_output=True, text=True)
-    before = before_tsv.read_text().splitlines()
-    after = after_tsv.read_text().splitlines()
-    # Row 1: the baseline really contains the legacy absolute rows under test.
-    assert len(before) >= 5807, len(before)
-    n_abs = sum(1 for ln in before
-                if ln.split("\t", 1)[1].split(":", 1)[1].startswith("/"))
-    assert n_abs >= 117, n_abs
-    # Row 15: per-row comparison.
+    return before_tsv.read_text().splitlines(), after_tsv.read_text().splitlines()
+
+
+def _assert_corpus_rows(before, after):
+    """backlog#1211 per-row contract. Raises AssertionError on the first violation.
+
+    Only in-repo absolute rows may move, each to exactly _normalise_cf_path(old);
+    relative, out-of-repo and bare-root rows pass through; kind never changes;
+    no row is ever emitted with an empty path. Returns (changed, out_of_repo).
+    """
     assert len(after) == len(before)
     changed = out_of_repo = 0
     for old_row, new_row in zip(before, after):
@@ -488,7 +495,80 @@ def test_lib_corpus_normalisation_diff(tmp_path):
         else:
             assert new == exp, ("differs from _normalise_cf_path(old)", old_row, new_row)
             changed += 1
-    assert changed >= 103 and out_of_repo >= 14, (changed, out_of_repo)
+    return changed, out_of_repo
+
+
+def test_lib_corpus_normalisation_diff(tmp_path):
+    """backlog#1211: over the committed fixture corpus, only in-repo absolute rows
+    move, and each moves to exactly what _normalise_cf_path yields.
+
+    cf_parse_section_raw is byte-identical to the pre-#1211 parser, so it is the
+    stable "before" side and the test stays valid after this change merges.
+    """
+    before, after = _snapshot_corpus(LIB, CF_CORPUS_DIR, tmp_path)
+    # Exact counts, captured from one run of the unmodified lib over the fixture:
+    # 4 relative + 4 in-repo absolute + 4 out-of-repo + 1 bare root = 13. The p04
+    # fenced decoy and p05 (no section) contribute nothing.
+    assert len(before) == 13, before
+    n_abs = sum(1 for ln in before
+                if ln.split("\t", 1)[1].split(":", 1)[1].startswith("/"))
+    assert n_abs == 9, n_abs
+    changed, out_of_repo = _assert_corpus_rows(before, after)
+    assert (changed, out_of_repo) == (4, 4), (changed, out_of_repo)
+    # Kind survives normalisation on an EXEMPT absolute row.
+    assert "p02-in-repo-absolute.md\tEXEMPT:bin/check-plan" in after, after
+    # Bare root: the shell keeps the path where _normalise_cf_path yields "".
+    assert ("p03-out-of-repo-and-bare-root.md\tMUST_APPEAR:/Users/x/GitHub/IBL5/"
+            in after), after
+
+
+_LIVE_PLANS = os.path.expanduser("~/claude-plans")
+
+
+@pytest.mark.skipif(
+    os.environ.get("POSTPLAN_CORPUS_DIFF") != "1" or not os.path.isdir(_LIVE_PLANS),
+    reason="opt-in: set POSTPLAN_CORPUS_DIFF=1 on a machine with ~/claude-plans")
+def test_lib_corpus_normalisation_diff_live(tmp_path):
+    """Optional sweep of the machine-local plan corpus (about 3 minutes).
+
+    The corpus is mutable machine state, so this asserts only the per-row
+    contract and row-count parity. It carries no count floors.
+    """
+    before, after = _snapshot_corpus(LIB, _LIVE_PLANS, tmp_path)
+    assert len(after) == len(before)
+    _assert_corpus_rows(before, after)
+
+
+# Each mutation breaks exactly one cf_normalise_path branch, and the fixture
+# carries the row that trips it: M1 the p02 in-repo absolute rows, M2 the p03
+# bare root, M3 the p03 `/Users/x/claude-plans/z.md` out-of-repo row.
+_LIB_MUTATIONS = [
+    pytest.param(
+        r'''    stripped=$(printf '%s\n' "$1" | sed -E "s#${CF_ABS_PREFIX_ERE}##")''',
+        '    stripped="$1"',
+        "differs from _normalise_cf_path", id="M1-no-strip"),
+    pytest.param(
+        '    if [ -z "$stripped" ]; then', '    if false; then',
+        "empty path emitted", id="M2-no-empty-fallback"),
+    pytest.param(
+        "CF_ABS_PREFIX_ERE='^.*/IBL5(-worktrees/[^/]+)?/'",
+        "CF_ABS_PREFIX_ERE='^.*/(IBL5(-worktrees/[^/]+)?|claude-plans)/'",
+        "out-of-repo row changed", id="M3-widened-prefix"),
+]
+
+
+@pytest.mark.parametrize("old,new,fragment", _LIB_MUTATIONS)
+def test_lib_corpus_normalisation_diff_catches_mutation(tmp_path, old, new, fragment):
+    """The fixture is strong enough: each broken normalisation branch is caught."""
+    src = open(LIB).read()
+    assert src.count(old) == 1, "mutation anchor not unique in " + LIB
+    mutated = src.replace(old, new)
+    assert mutated != src, "mutation is a no-op"
+    lib = tmp_path / "critical-files.sh"
+    lib.write_text(mutated)
+    before, after = _snapshot_corpus(lib, CF_CORPUS_DIR, tmp_path)
+    with pytest.raises(AssertionError, match=re.escape(fragment)):
+        _assert_corpus_rows(before, after)
 
 
 def test_lib_pattern_sync():
@@ -1247,7 +1327,7 @@ def _plan_with_phpunit(test_expr: str) -> str:
 ])
 def test_shell_token_rejected(token, reason):
     """Each shell-shaped token yields planned == [] (Phase 5 D5 guard)."""
-    planned, _ = parse_matrix(_plan_with_phpunit(token))
+    planned, _, _ = parse_matrix(_plan_with_phpunit(token))
     assert planned == [], f"Expected empty planned for {reason!r}: got {planned!r}"
 
 
@@ -1260,7 +1340,7 @@ def test_real_path_lands_in_planned():
         "| spec runs | E2E | `ibl5/tests/e2e/admin/events.spec.ts` |\n"
         "| unit runs | PHPUnit | `tools/postplan-harness/tests/test_planfile.py` |\n"
     )
-    planned, _ = parse_matrix(plan)
+    planned, _, _ = parse_matrix(plan)
     assert "ibl5/tests/e2e/admin/events.spec.ts" in planned
     assert "tools/postplan-harness/tests/test_planfile.py" in planned
 

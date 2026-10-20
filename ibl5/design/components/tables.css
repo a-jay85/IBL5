@@ -1068,7 +1068,7 @@ td.ibl-team-cell--colored {
 .ibl-data-table td.ibl-stat-highlight {
     font-family: var(--font-display);
     font-weight: var(--font-weight-bold);
-    color: var(--accent-500);
+    color: var(--accent-700);
 }
 
 /* ==========================================================================

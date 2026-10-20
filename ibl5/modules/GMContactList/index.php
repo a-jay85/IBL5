@@ -25,6 +25,7 @@ $module_name = basename(dirname(__FILE__));
 $pagetitle = "- IBL GM Contact List";
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Initialize services
 $repository = new GMContactListRepository($mysqli_db);

@@ -24,6 +24,16 @@ final class PlayerSearchRepositoryTest extends TestCase
         $this->repository = new PlayerSearchRepository($this->mockDb);
     }
 
+    /**
+     * Bind types for the flag-guarded search WHERE: active flag, then a (flag, value)
+     * pair for name, college and pos, then (flag, value) integer pairs for the five
+     * range filters and the 26 rating filters.
+     */
+    private static function searchBindTypes(): string
+    {
+        return 'i' . 'isisis' . str_repeat('ii', 31);
+    }
+
     // ========== Query Building Tests ==========
 
     public function testSearchPlayersPreparesQueryWithNoFilters(): void
@@ -41,6 +51,11 @@ final class PlayerSearchRepositoryTest extends TestCase
                     && strpos($q, 'ORDER BY ibl_plr.retired ASC, ibl_plr.ordinal ASC, ibl_plr.pid ASC') !== false;
             }))
             ->willReturn($mockStmt);
+
+        $mockStmt->expects($this->once())
+            ->method('bind_param')
+            ->with(self::searchBindTypes(), self::anything())
+            ->willReturn(true);
 
         $mockStmt->expects($this->once())
             ->method('execute')
@@ -115,6 +130,11 @@ final class PlayerSearchRepositoryTest extends TestCase
             ->willReturn($mockStmt);
 
         $mockStmt->expects($this->once())
+            ->method('bind_param')
+            ->with(self::searchBindTypes(), self::anything())
+            ->willReturn(true);
+
+        $mockStmt->expects($this->once())
             ->method('execute')
             ->willReturn(true);
 
@@ -138,7 +158,7 @@ final class PlayerSearchRepositoryTest extends TestCase
     public function testSearchPlayersUsesLikeForNameSearch(): void
     {
         $mockResult = $this->createMock(\mysqli_result::class);
-        $mockStmt = $this->createMockStmt($mockResult, 's');
+        $mockStmt = $this->createMockStmt($mockResult, self::searchBindTypes());
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -160,7 +180,7 @@ final class PlayerSearchRepositoryTest extends TestCase
     public function testSearchPlayersUsesLikeForCollegeSearch(): void
     {
         $mockResult = $this->createMock(\mysqli_result::class);
-        $mockStmt = $this->createMockStmt($mockResult, 's');
+        $mockStmt = $this->createMockStmt($mockResult, self::searchBindTypes());
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -182,7 +202,7 @@ final class PlayerSearchRepositoryTest extends TestCase
     public function testSearchPlayersUsesExactMatchForPosition(): void
     {
         $mockResult = $this->createMock(\mysqli_result::class);
-        $mockStmt = $this->createMockStmt($mockResult, 's');
+        $mockStmt = $this->createMockStmt($mockResult, self::searchBindTypes());
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -204,7 +224,7 @@ final class PlayerSearchRepositoryTest extends TestCase
     public function testSearchPlayersUsesLessThanOrEqualForAge(): void
     {
         $mockResult = $this->createMock(\mysqli_result::class);
-        $mockStmt = $this->createMockStmt($mockResult, 'i');
+        $mockStmt = $this->createMockStmt($mockResult, self::searchBindTypes());
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -226,7 +246,7 @@ final class PlayerSearchRepositoryTest extends TestCase
     public function testSearchPlayersUsesGreaterThanOrEqualForRatings(): void
     {
         $mockResult = $this->createMock(\mysqli_result::class);
-        $mockStmt = $this->createMockStmt($mockResult, 'i');
+        $mockStmt = $this->createMockStmt($mockResult, self::searchBindTypes());
 
         $this->mockDb->expects($this->once())
             ->method('prepare')

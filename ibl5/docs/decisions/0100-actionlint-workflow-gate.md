@@ -1,6 +1,6 @@
 ---
 description: Validate every workflow and local composite action with actionlint (plus its shellcheck pass over run: blocks) via bin/lint-workflows, wired into the gate aggregator as a path-filtered actionlint job; the shell policy is single-sourced from the ShellCheck job.
-last_verified: 2026-08-13
+last_verified: 2026-10-12
 ---
 
 # ADR-0100: actionlint as the workflow-validation gate

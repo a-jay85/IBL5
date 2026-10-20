@@ -18,6 +18,8 @@ use Season\Season;
  * upsert logic (insert/skip/update), and sim date management.
  *
  * @see BoxscoreProcessorInterface
+ *
+ * @phpstan-type ImportCounters array{inserted: int, updated: int, skipped: int, rejected: int, linesProcessed: int, rejectedGames: list<RejectedGame>, outOfWindowDates: array<string, int>}
  */
 class BoxscoreProcessor implements BoxscoreProcessorInterface
 {
@@ -107,34 +109,16 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $scheduleGuard = $this->makeScheduleGuard($operatingSeasonEndingYear, $operatingSeasonPhase);
 
         if (strlen($data) < ScoFileParser::HEADER_OFFSET_BYTES) {
-            return [
-                'success' => false,
-                'gamesInserted' => 0,
-                'gamesUpdated' => 0,
-                'gamesSkipped' => 0,
-                'linesProcessed' => 0,
-                'messages' => $messages,
-                'error' => 'Data too short for .sco format',
-                'gamesRejected' => 0,
-                'rejectedGames' => [],
-                'operatingSeasonEndingYear' => $operatingSeasonEndingYear,
-                'operatingSeasonPhase' => $operatingSeasonPhase,
-                'rejectsRecorded' => 0,
-                'scheduleGuardEnabled' => $scheduleGuard->isEnabled(),
-                'sourceArchive' => $sourceArchive,
-            ];
+            return $this->buildTooShortResult(
+                $messages,
+                $operatingSeasonEndingYear,
+                $operatingSeasonPhase,
+                $scheduleGuard->isEnabled(),
+                $sourceArchive,
+            );
         }
 
-        $offset = ScoFileParser::HEADER_OFFSET_BYTES;
-        $gamesInserted = 0;
-        $gamesUpdated = 0;
-        $gamesSkipped = 0;
-        $linesProcessed = 0;
         $league = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'ibl';
-
-        $gamesRejected = 0;
-        /** @var list<RejectedGame> $rejectedGames */
-        $rejectedGames = [];
 
         if (!$scheduleGuard->isEnabled()) {
             $messages[] = "Schedule guard disabled: ibl_schedule has no rows for season {$operatingSeasonEndingYear}; importing without membership validation.";
@@ -143,6 +127,76 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         // Detector B: tally games whose decoded date falls outside the schedule window.
         // Skip entirely when the schedule index is empty (same fail-open as isEnabled()).
         $window = $scheduleGuard->scheduleDateWindow();
+
+        $counters = $this->importRecords(
+            $data,
+            $operatingSeasonEndingYear,
+            $operatingSeasonPhase,
+            $league,
+            $scheduleGuard,
+            $window,
+        );
+
+        $messages = array_merge($messages, $this->buildSummaryMessages(
+            $counters['linesProcessed'],
+            $counters['inserted'],
+            $counters['updated'],
+            $counters['skipped'],
+            $counters['rejected'],
+            $operatingSeasonEndingYear,
+            $counters['outOfWindowDates'],
+            $window,
+        ));
+
+        if (!$skipSimDates) {
+            $simDateMessages = $this->updateSimDates($operatingSeasonPhase);
+            $messages = array_merge($messages, $simDateMessages);
+        }
+
+        $rejectsRecorded = $this->auditRepository->recordRejectedGames(
+            $operatingSeasonEndingYear,
+            $counters['rejectedGames'],
+            $sourceArchive,
+        );
+
+        return $this->buildSuccessResult(
+            $messages,
+            $counters,
+            $operatingSeasonEndingYear,
+            $operatingSeasonPhase,
+            $rejectsRecorded,
+            $scheduleGuard->isEnabled(),
+            $sourceArchive,
+        );
+    }
+
+    /**
+     * Walk every .sco game record after the header and import it.
+     *
+     * Order inside each record is load-bearing: blank-slot skip, Detector B tally,
+     * guard evaluate, then the game processor. Progress is reported on the reject
+     * path and at the end of the loop body; skip and blank slots do not report.
+     *
+     * @param array{0: string, 1: string}|null $window
+     * @return ImportCounters
+     */
+    private function importRecords(
+        string $data,
+        int $operatingSeasonEndingYear,
+        string $operatingSeasonPhase,
+        string $league,
+        ScheduleMembershipGuard $scheduleGuard,
+        ?array $window,
+    ): array {
+        $offset = ScoFileParser::HEADER_OFFSET_BYTES;
+        $gamesInserted = 0;
+        $gamesUpdated = 0;
+        $gamesSkipped = 0;
+        $linesProcessed = 0;
+
+        $gamesRejected = 0;
+        /** @var list<RejectedGame> $rejectedGames */
+        $rejectedGames = [];
         /** @var array<string, int> $outOfWindowDates date => count */
         $outOfWindowDates = [];
 
@@ -171,19 +225,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             // is almost always also absent from the schedule index, so the guard rejects
             // it first. Tallying only accepted games would make this detector unreachable,
             // because an accepted game is in the index and therefore inside [min, max].
-            // Skip games that the guard exempts (All-Star/Rising Stars, and off-schedule months as the guard rules for this import phase)
-            // so we do not re-break the February All-Star import the Phase 3 whitelist protects.
-            // ISO dates compare correctly with plain string operators; no DateTime construction.
-            if ($window !== null
-                && !in_array($boxscoreGameInfo->visitor_teamid, ScheduleMembershipGuard::EXEMPT_TEAMIDS, true)
-                && !in_array($boxscoreGameInfo->home_teamid, ScheduleMembershipGuard::EXEMPT_TEAMIDS, true)
-                && !$scheduleGuard->exemptsOffScheduleMonth((int) $boxscoreGameInfo->gameMonth)
-            ) {
-                $gameDate = $boxscoreGameInfo->gameDate;
-                if ($gameDate < $window[0] || $gameDate > $window[1]) {
-                    $outOfWindowDates[$gameDate] = ($outOfWindowDates[$gameDate] ?? 0) + 1;
-                }
-            }
+            $outOfWindowDates = $this->tallyOutOfWindow($outOfWindowDates, $boxscoreGameInfo, $scheduleGuard, $window);
 
             $rejection = $scheduleGuard->evaluate($boxscoreGameInfo);
 
@@ -217,6 +259,131 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             $this->progressReporter->report($totalGames);
         }
 
+        return [
+            'inserted' => $gamesInserted,
+            'updated' => $gamesUpdated,
+            'skipped' => $gamesSkipped,
+            'rejected' => $gamesRejected,
+            'linesProcessed' => $linesProcessed,
+            'rejectedGames' => $rejectedGames,
+            'outOfWindowDates' => $outOfWindowDates,
+        ];
+    }
+
+    /**
+     * Result for a completed import. Key order is part of the contract and mirrors buildTooShortResult().
+     *
+     * @param list<string> $messages
+     * @param ImportCounters $counters
+     * @return array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<\Boxscore\RejectedGame>, operatingSeasonEndingYear?: int, operatingSeasonPhase?: string, outOfWindowGames?: int, rejectsRecorded: int, scheduleGuardEnabled: bool, sourceArchive: string|null}
+     */
+    private function buildSuccessResult(
+        array $messages,
+        array $counters,
+        int $operatingSeasonEndingYear,
+        string $operatingSeasonPhase,
+        int $rejectsRecorded,
+        bool $scheduleGuardEnabled,
+        ?string $sourceArchive,
+    ): array {
+        return [
+            'success' => true,
+            'gamesInserted' => $counters['inserted'],
+            'gamesUpdated' => $counters['updated'],
+            'gamesSkipped' => $counters['skipped'],
+            'linesProcessed' => $counters['linesProcessed'],
+            'messages' => $messages,
+            'gamesRejected' => $counters['rejected'],
+            'rejectedGames' => $counters['rejectedGames'],
+            'operatingSeasonEndingYear' => $operatingSeasonEndingYear,
+            'operatingSeasonPhase' => $operatingSeasonPhase,
+            'outOfWindowGames' => array_sum($counters['outOfWindowDates']),
+            'rejectsRecorded' => $rejectsRecorded,
+            'scheduleGuardEnabled' => $scheduleGuardEnabled,
+            'sourceArchive' => $sourceArchive,
+        ];
+    }
+
+    /**
+     * Result for data shorter than the .sco header. Key order is part of the contract.
+     *
+     * @param list<string> $messages
+     * @return array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<\Boxscore\RejectedGame>, operatingSeasonEndingYear?: int, operatingSeasonPhase?: string, outOfWindowGames?: int, rejectsRecorded: int, scheduleGuardEnabled: bool, sourceArchive: string|null}
+     */
+    private function buildTooShortResult(
+        array $messages,
+        int $operatingSeasonEndingYear,
+        string $operatingSeasonPhase,
+        bool $scheduleGuardEnabled,
+        ?string $sourceArchive,
+    ): array {
+        return [
+            'success' => false,
+            'gamesInserted' => 0,
+            'gamesUpdated' => 0,
+            'gamesSkipped' => 0,
+            'linesProcessed' => 0,
+            'messages' => $messages,
+            'error' => 'Data too short for .sco format',
+            'gamesRejected' => 0,
+            'rejectedGames' => [],
+            'operatingSeasonEndingYear' => $operatingSeasonEndingYear,
+            'operatingSeasonPhase' => $operatingSeasonPhase,
+            'rejectsRecorded' => 0,
+            'scheduleGuardEnabled' => $scheduleGuardEnabled,
+            'sourceArchive' => $sourceArchive,
+        ];
+    }
+
+    /**
+     * Detector B: count this game against its date when the date falls outside the schedule window.
+     *
+     * Skip games that the guard exempts (All-Star/Rising Stars, and off-schedule months as the guard rules for this import phase)
+     * so we do not re-break the February All-Star import the Phase 3 whitelist protects.
+     * ISO dates compare correctly with plain string operators; no DateTime construction.
+     *
+     * @param array<string, int> $outOfWindowDates date => count
+     * @param array{0: string, 1: string}|null $window
+     * @return array<string, int>
+     */
+    private function tallyOutOfWindow(
+        array $outOfWindowDates,
+        Boxscore $boxscoreGameInfo,
+        ScheduleMembershipGuard $scheduleGuard,
+        ?array $window,
+    ): array {
+        if ($window !== null
+            && !in_array($boxscoreGameInfo->visitor_teamid, ScheduleMembershipGuard::EXEMPT_TEAMIDS, true)
+            && !in_array($boxscoreGameInfo->home_teamid, ScheduleMembershipGuard::EXEMPT_TEAMIDS, true)
+            && !$scheduleGuard->exemptsOffScheduleMonth((int) $boxscoreGameInfo->gameMonth)
+        ) {
+            $gameDate = $boxscoreGameInfo->gameDate;
+            if ($gameDate < $window[0] || $gameDate > $window[1]) {
+                $outOfWindowDates[$gameDate] = ($outOfWindowDates[$gameDate] ?? 0) + 1;
+            }
+        }
+
+        return $outOfWindowDates;
+    }
+
+    /**
+     * Post-loop summary lines, in display order: lines processed, counters, reject notice, window WARNING.
+     *
+     * @param array<string, int> $outOfWindowDates date => count (sorted here on a local copy)
+     * @param array{0: string, 1: string}|null $window
+     * @return list<string>
+     */
+    private function buildSummaryMessages(
+        int $linesProcessed,
+        int $gamesInserted,
+        int $gamesUpdated,
+        int $gamesSkipped,
+        int $gamesRejected,
+        int $operatingSeasonEndingYear,
+        array $outOfWindowDates,
+        ?array $window,
+    ): array {
+        $messages = [];
         $messages[] = "Number of .sco lines processed: {$linesProcessed}";
         $messages[] = "Games inserted: {$gamesInserted} | Games updated: {$gamesUpdated} | Games skipped: {$gamesSkipped} | Games rejected: {$gamesRejected}";
 
@@ -238,33 +405,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             );
         }
 
-        if (!$skipSimDates) {
-            $simDateMessages = $this->updateSimDates($operatingSeasonPhase);
-            $messages = array_merge($messages, $simDateMessages);
-        }
-
-        $rejectsRecorded = $this->auditRepository->recordRejectedGames(
-            $operatingSeasonEndingYear,
-            $rejectedGames,
-            $sourceArchive,
-        );
-
-        return [
-            'success' => true,
-            'gamesInserted' => $gamesInserted,
-            'gamesUpdated' => $gamesUpdated,
-            'gamesSkipped' => $gamesSkipped,
-            'linesProcessed' => $linesProcessed,
-            'messages' => $messages,
-            'gamesRejected' => $gamesRejected,
-            'rejectedGames' => $rejectedGames,
-            'operatingSeasonEndingYear' => $operatingSeasonEndingYear,
-            'operatingSeasonPhase' => $operatingSeasonPhase,
-            'outOfWindowGames' => array_sum($outOfWindowDates),
-            'rejectsRecorded' => $rejectsRecorded,
-            'scheduleGuardEnabled' => $scheduleGuard->isEnabled(),
-            'sourceArchive' => $sourceArchive,
-        ];
+        return $messages;
     }
 
     /**

@@ -21,6 +21,14 @@ class ApiGameRepository extends \Database\BaseMysqliRepository
         'home_score' => 'home_score',
     ];
 
+    /** Flag-guarded filter WHERE: each group is TRUE when its leading flag is 0. */
+    private const GAME_FILTER_WHERE = ' WHERE (? = 0 OR season_year = ?) AND (? = 0 OR game_status = ?)'
+        . ' AND (? = 0 OR (visitor_uuid = ? OR home_uuid = ?)) AND (? = 0 OR game_date = ?)'
+        . ' AND (? = 0 OR game_date >= ?) AND (? = 0 OR game_date <= ?)';
+
+    /** Bind types matching GAME_FILTER_WHERE placeholder order (13 slots). */
+    private const GAME_FILTER_TYPES = 'iiisissisisis';
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
@@ -34,25 +42,21 @@ class ApiGameRepository extends \Database\BaseMysqliRepository
      */
     public function getGames(Paginator $paginator, array $filters = []): array
     {
-        $where = [];
-        $types = '';
-        $params = [];
+        $applied = $this->applyFilters($filters);
 
-        $this->applyFilters($filters, $where, $types, $params);
-
-        $whereClause = $where !== [] ? 'WHERE ' . implode(' AND ', $where) : '';
         $sortColumn = self::SORT_COLUMNS[$paginator->getSort()]
             ?? throw new \InvalidArgumentException('Invalid sort column: ' . $paginator->getSort());
         $direction = $paginator->getOrder() === 'desc' ? 'DESC' : 'ASC';
 
-        // IDENTIFIER: $whereClause = hardcoded fragments; $sortColumn = SORT_COLUMNS map value; $direction = literal ternary
-        $query = 'SELECT * FROM vw_schedule_upcoming ' . $whereClause . ' ORDER BY ' . $sortColumn . ' ' . $direction . ' LIMIT ? OFFSET ?';
-        $types .= 'ii';
-        $params[] = $paginator->getLimit();
-        $params[] = $paginator->getOffset();
+        // IDENTIFIER: $sortColumn = SORT_COLUMNS map value; $direction = literal ternary
+        $query = 'SELECT * FROM vw_schedule_upcoming' . self::GAME_FILTER_WHERE . ' ORDER BY ' . $sortColumn . ' ' . $direction . ' LIMIT ? OFFSET ?';
 
         /** @var list<GameViewRow> */
-        return $this->fetchAll($query, $types, ...$params);
+        return $this->fetchAll(
+            $query,
+            self::GAME_FILTER_TYPES . 'ii',
+            ...[...$applied['params'], $paginator->getLimit(), $paginator->getOffset()]
+        );
     }
 
     /**
@@ -62,17 +66,14 @@ class ApiGameRepository extends \Database\BaseMysqliRepository
      */
     public function countGames(array $filters = []): int
     {
-        $where = [];
-        $types = '';
-        $params = [];
-
-        $this->applyFilters($filters, $where, $types, $params);
-
-        $whereClause = $where !== [] ? 'WHERE ' . implode(' AND ', $where) : '';
+        $applied = $this->applyFilters($filters);
 
         /** @var array{total: int}|null $row */
-        // IDENTIFIER (already-validated): $whereClause built from hardcoded fragments only
-        $row = $this->fetchOne('SELECT COUNT(*) AS total FROM vw_schedule_upcoming ' . $whereClause, $types, ...$params);
+        $row = $this->fetchOne(
+            'SELECT COUNT(*) AS total FROM vw_schedule_upcoming' . self::GAME_FILTER_WHERE,
+            self::GAME_FILTER_TYPES,
+            ...$applied['params']
+        );
 
         return $row !== null ? $row['total'] : 0;
     }
@@ -131,49 +132,30 @@ class ApiGameRepository extends \Database\BaseMysqliRepository
     }
 
     /**
-     * Apply common filters to query building arrays.
+     * Build the bind list for GAME_FILTER_WHERE. Every predicate always binds a
+     * flag (1 when the filter is present, 0 otherwise) followed by its value(s).
      *
      * @param array<string, string> $filters
-     * @param list<string> $where
-     * @param list<mixed> $params
+     * @return array{params: list<int|string>}
      */
-    private function applyFilters(array $filters, array &$where, string &$types, array &$params): void
+    private function applyFilters(array $filters): array
     {
-        if (isset($filters['season']) && $filters['season'] !== '') {
-            $where[] = 'season_year = ?';
-            $types .= 'i';
-            $params[] = (int) $filters['season'];
-        }
+        $season = $filters['season'] ?? '';
+        $status = $filters['status'] ?? '';
+        $team = $filters['team'] ?? '';
+        $date = $filters['date'] ?? '';
+        $from = $filters['date_start'] ?? '';
+        $to = $filters['date_end'] ?? '';
 
-        if (isset($filters['status']) && $filters['status'] !== '') {
-            $where[] = 'game_status = ?';
-            $types .= 's';
-            $params[] = $filters['status'];
-        }
-
-        if (isset($filters['team']) && $filters['team'] !== '') {
-            $where[] = '(visitor_uuid = ? OR home_uuid = ?)';
-            $types .= 'ss';
-            $params[] = $filters['team'];
-            $params[] = $filters['team'];
-        }
-
-        if (isset($filters['date']) && $filters['date'] !== '') {
-            $where[] = 'game_date = ?';
-            $types .= 's';
-            $params[] = $filters['date'];
-        }
-
-        if (isset($filters['date_start']) && $filters['date_start'] !== '') {
-            $where[] = 'game_date >= ?';
-            $types .= 's';
-            $params[] = $filters['date_start'];
-        }
-
-        if (isset($filters['date_end']) && $filters['date_end'] !== '') {
-            $where[] = 'game_date <= ?';
-            $types .= 's';
-            $params[] = $filters['date_end'];
-        }
+        return [
+            'params' => [
+                $season !== '' ? 1 : 0, (int) $season,
+                $status !== '' ? 1 : 0, $status,
+                $team !== '' ? 1 : 0, $team, $team,
+                $date !== '' ? 1 : 0, $date,
+                $from !== '' ? 1 : 0, $from,
+                $to !== '' ? 1 : 0, $to,
+            ],
+        ];
     }
 }

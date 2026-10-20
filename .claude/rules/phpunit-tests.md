@@ -1,7 +1,7 @@
 ---
 description: PHPUnit testing rules: output parsing, behavior-focused patterns, PHPStan test-neon suppressions, integration test seeding.
 paths: ibl5/tests/**/*.php
-last_verified: 2026-10-11
+last_verified: 2026-10-14
 ---
 
 # PHPUnit Testing Rules
@@ -9,10 +9,10 @@ last_verified: 2026-10-11
 ## PHPUnit 13+ Syntax (run from `ibl5/`)
 
 ```bash
-vendor/bin/phpunit                          # full suite
-vendor/bin/phpunit --filter testMethodName  # single test
-vendor/bin/phpunit --display-all-issues     # show ALL issues (deprecations/warnings/notices)
-vendor/bin/phpunit | tail -n 3              # token-saving: just the pass/fail summary
+vendor/bin/phpunit # full suite
+vendor/bin/phpunit --filter testMethodName # single test
+vendor/bin/phpunit --display-all-issues # show ALL issues
+vendor/bin/phpunit | tail -n 3 # just the pass/fail summary
 ```
 
 `-v` / `--verbose` do NOT exist in 13.x. By default only summary counts show — use `--display-all-issues` (or `--display-deprecations`/`-warnings`/`-notices`) for details.
@@ -59,6 +59,10 @@ class ModuleServiceTest extends TestCase
 
 - Test behaviors through public APIs only; one behavior per test; descriptive names.
 - Use data providers for similar cases; `@see` not `{@inheritdoc}`.
+
+## Source-text reads
+
+Prefer executing code over reading its text. A test that calls `file_get_contents` on a production `.php`, `.js`, `.css`, or `.htaccess` file breaks on harmless refactors and passes when behavior regresses along a path its string match misses. Call the class, run the script through `proc_open`, or assert on what a mock recorded. A source guard is justified only when no seam exists (a script that exits at top level) or the property is the file's shape (a first-statement CLI guard, an `.htaccess` deny block). `bin/check-phpunit-hygiene` blocks new source-text reads (`source-text-read`). To keep a justified guard, list its path in `.phpunit-source-read-allowlist` with a `#` comment naming the property, or put `// phpunit-hygiene-allow: <reason>` on the read or the line above.
 
 ## DON'T
 
@@ -155,6 +159,8 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase {
 3. **On-demand full** — apply the `mutation-test` label.
 
 Thresholds: **100% MSI / 100% Covered MSI** (`ibl5/infection.json5`, `.github/workflows/mutation-pr.yml`). Config: `phpunit-mutation.xml`; per-file deferrals live in `infection.json5`.
+
+**Local run.** `bin/mutation-diff <base-ref>`; details in `.claude/rules/phpstan-invocation.md`.
 
 ## Completion Criteria
 

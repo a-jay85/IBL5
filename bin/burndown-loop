@@ -30,11 +30,19 @@
 # ---
 # Environment (unset and empty both take the default):
 #   IBL5_BURNDOWN_RESERVE_PCT         weekly percent kept free at reset (default 10)
+#   IBL5_BURNDOWN_PR_CEILING          open PRs by @me that pause new batches and scouts (0 = no cap, default)
+#   IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN  minimum gap between empty-backlog /reset-ready scouts (240)
+#   IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN minimum gap between unblock sessions (120)
 #   IBL5_BURNDOWN_MAX_FAILS           consecutive failed or aborted batches before giving up (3)
 #   IBL5_BURNDOWN_EMPTY_SLEEP_MIN     minutes between re-checks while the backlog is empty (240)
 #   IBL5_BURNDOWN_REEXEC_*            internal re-exec hand-off; ignored unless this PID set it
 #   IBL5_BURNDOWN_BATCH_TIMEOUT_MIN   per-batch wall clock in minutes (90)
 #   IBL5_BURNDOWN_DISCORD_DM          finish-DM sender (default bin/discord-dm)
+#   `start` writes every non-empty IBL5_BURNDOWN_* into the generated runner, so the
+#   launchd job runs with the knobs it was started with. With a ceiling set, at it the loop
+#   runs a no-arm unblock session on conflicting or red non-feat: PRs. A detected arm
+#   disarms the PR and writes $STATE/unblock-disabled; rm it to re-enable unblock. A
+#   failed gh count holds all new work (batches, scouts and unblock) until it recovers.
 #
 # Exit codes: 0 loop finished (stop requested, or --once done; an empty --once batch ends here).
 #             1 consecutive-failure cap hit. Failed batches and /burndown exit-3
@@ -71,6 +79,7 @@ BL_BACKOFF_PAD=5
 BL_BACKOFF_FLOOR=30
 BL_BACKOFF_CAP=300
 BL_FETCH_RETRY=120
+BL_PR_REPO="a-jay85/IBL5"
 BL_PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.bun/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 DISCORD_DM="${IBL5_BURNDOWN_DISCORD_DM:-$ROOT/bin/discord-dm}"
 BACKLOG_BIN="${IBL5_BURNDOWN_BACKLOG:-$ROOT/bin/backlog}"
@@ -86,6 +95,13 @@ UNITS=0
 FAILS=0
 LAST_FAIL=""
 EMPTY_STREAK=0
+GATE_STATE=open
+PR_JSON=""
+MAX_FAILS=3
+EMPTY_SLEEP_MIN=240
+SCOUT_COOLDOWN_MIN=240
+PR_CEILING=0
+UNBLOCK_COOLDOWN_MIN=120
 START_EPOCH=$(date +%s)
 
 # Re-exec hand-off (see bl_maybe_reexec). Read once, then unset, so batch children
@@ -103,11 +119,19 @@ RX_FAILS="${IBL5_BURNDOWN_REEXEC_FAILS:-}"
 RX_START="${IBL5_BURNDOWN_REEXEC_START:-}"
 RX_LAST_FAIL="${IBL5_BURNDOWN_REEXEC_LAST_FAIL:-}"
 RX_EMPTY_STREAK="${IBL5_BURNDOWN_REEXEC_EMPTY_STREAK:-}"
+RX_GATE_STATE="${IBL5_BURNDOWN_REEXEC_GATE_STATE:-}"
 unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
     IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
-    IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK
+    IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK \
+    IBL5_BURNDOWN_REEXEC_GATE_STATE
 
 BL_PROMPT='Invoke the /burndown skill now and run every step to completion. No human is present: never ask questions or wait for input. When the skill says to show or tell the user something, print it and continue. Make the safe choice and continue. If the first selection round in step 4 prints `LEDGER: none`, end your final message with this exact line on its own: BURNDOWN-LOOP: none-selected. If any bin/backlog command in the run exits 3 (fail-closed abort), stop the run and end your final message with this exact line on its own: BURNDOWN-LOOP: abort-exit-3'
+
+BL_SCOUT_RECHECK=900
+BL_SCOUT_PROMPT='Invoke the /reset-ready skill now and run every step to completion. No human is present: never ask questions or wait for input; print what you would have told the user and continue. Step 1 has no usage hook line here and the caller already checked pace, so treat usage as allowing work. In Step 6, skip the burndown-loop stop/start bullet because the loop is your caller; keep the other bullets. Pick no new frontend features. Picks that touch SQL, auth or destructive changes keep the skill routing to plan-architect-xhigh. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-SCOUT: fired <n> (n = prompts handed to bin/plan-now), BURNDOWN-SCOUT: none, or BURNDOWN-SCOUT: aborted'
+BL_UNBLOCK_MAX=5
+BL_UNBLOCK_DENY='Bash(gh pr merge:*),Bash(gh api:*),Bash(bin/post-plan-now:*),Bash(bin/post-plan-fleet:*),Bash(bin/pr-cycle:*),Bash(bin/pr-cycle-tick:*),Bash(bin/pr-triage:*),Bash(bin/postplan-fix:*)'
+BL_UNBLOCK_PROMPT='Unattended unblock pass for open pull requests in a-jay85/IBL5. No human is present: never ask questions or wait for input; make the safe choice and continue. Work only on these PRs (number:reason): @PRS@. For each one, read its head branch with `gh pr view <n> --json headRefName`, use its worktree from `git worktree list`, or create one with `bin/wt-new --existing <branch>`. reason=conflict: run `git fetch origin` and `git merge origin/master`, resolve every conflict keeping the intent of both sides, run the tests that cover the touched files, commit, and `git push` without force. reason=red: read the failures with `gh pr checks <n>` and `gh run view <run-id> --log-failed`, fix the cause, rerun the failing test locally, commit, and `git push` without force. Skip a PR whose fix needs a product or design decision. Hard rules: never enable auto-merge; never run `gh pr merge` or `gh api` in any form; never run bin/post-plan-now, bin/post-plan-fleet, bin/pr-cycle, bin/pr-cycle-tick, bin/pr-triage or bin/postplan-fix; never invoke the /post-plan or /ship skills; never mark a draft ready, close a PR, or push to master. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-UNBLOCK: pushed <n> (n = PRs you pushed a fix to), or BURNDOWN-UNBLOCK: none'
 
 bl_usage() {
     cat <<'USAGE_EOF'
@@ -156,6 +180,21 @@ bl_timeout_secs() {
     local m
     m=$(bl_posint_env IBL5_BURNDOWN_BATCH_TIMEOUT_MIN 90) || exit 2
     echo $((m * 60))
+}
+
+# bl_load_knobs: every integer knob, read once. Unset and empty take the default;
+# anything else exits 2 naming the variable. Called by run and start.
+bl_load_knobs() {
+    MAX_FAILS=$(bl_posint_env IBL5_BURNDOWN_MAX_FAILS 3) || exit 2
+    EMPTY_SLEEP_MIN=$(bl_posint_env IBL5_BURNDOWN_EMPTY_SLEEP_MIN 240) || exit 2
+    SCOUT_COOLDOWN_MIN=$(bl_posint_env IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN 240) || exit 2
+    PR_CEILING="${IBL5_BURNDOWN_PR_CEILING:-0}"
+    bl_nonneg_int "$PR_CEILING" || {
+        echo "burndown-loop: IBL5_BURNDOWN_PR_CEILING must be 0 or a positive integer (got '$PR_CEILING')" >&2
+        exit 2
+    }
+    UNBLOCK_COOLDOWN_MIN=$(bl_posint_env IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN 120) || exit 2
+    bl_timeout_secs >/dev/null || exit 2
 }
 
 # ------------------------------------------------------------ lock
@@ -384,6 +423,38 @@ bl_run_batch() {
     rm -f "$BL_EMPTY_SENTINEL"
 }
 
+# bl_run_session <kind> <model> <prompt> [claude args...]: one headless session in the
+# batch wrapper, minus the burndown opt-in (env -u keeps `post-plan-now --auto` inert).
+# Sets SESSION_RC and SESSION_LOG.
+bl_run_session() {
+    local kind="$1" model="$2" prompt="$3" ts timeout_secs caff=""
+    shift 3
+    ts=$(date -u +%Y%m%dT%H%M%SZ)
+    SESSION_LOG="$STATE/$kind-$ts.log"
+    timeout_secs=$(bl_timeout_secs)
+    if command -v caffeinate >/dev/null 2>&1; then caff="caffeinate -s"; fi
+    SESSION_RC=0
+    # shellcheck disable=SC2086
+    env -u IBL5_BURNDOWN_LOOP CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \
+        IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=burndown-loop \
+        IBL5_USAGE_GATE_MODEL="$model" \
+        IBL5_USAGE_GATE_RESUME_BIN="$ROOT/bin/burndown-loop" \
+        IBL5_USAGE_GATE_SESSION_ID="$LOOP_SID" \
+        perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$timeout_secs" \
+        $caff claude -p "$prompt" --dangerously-skip-permissions "$@" \
+        --model "$model" --effort high --name "burndown-$kind-$ts" \
+        >"$SESSION_LOG" 2>&1 || SESSION_RC=$?
+}
+
+# bl_session_marker <log> <prefix>: the last "<prefix>: ..." line, tolerating bold,
+# backtick and list decoration (.claude/rules/headless-marker-contract.md).
+bl_session_marker() {
+    local m
+    [ -r "$1" ] || { echo unconfirmed; return 0; }
+    m=$(sed -n "s/^[*\`> -]*\($2: [A-Za-z0-9 -]*\).*/\1/p" "$1" | tail -n 1)
+    echo "${m:-unconfirmed}"
+}
+
 # bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets BATCH_ITEMS to
 # this batch's item count, sets UNITS from each ledger's top-level units_used.
 # Never call it in $(...): the counters would update a subshell copy.
@@ -417,7 +488,7 @@ bl_all_skipped() {
 }
 
 bl_on_launch() {
-    local class reason new units tail3
+    local class reason new units tail3 scout
     bl_run_batch
     if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$BATCH_RC" "$BLOG"; then
         bl_log "RESULT paused (usage gate); auto-resumes after reset."
@@ -435,11 +506,25 @@ bl_on_launch() {
             bl_count_new
             bl_log "batch ran ledgers=$new items=$BATCH_ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
             # A batch that skipped every pick did no work. The next batch re-picks the
-            # same blocked items, so back off like an empty backlog.
+            # same blocked items, so treat it like an empty backlog: scout for new
+            # work when the gate allows, else back off.
             if bl_all_skipped; then
-                bl_log "every picked item skipped; re-check in ${EMPTY_SLEEP_MIN}m"
                 if [ "$ONCE" -eq 0 ]; then
-                    bl_sleep $((EMPTY_SLEEP_MIN * 60)) all-skipped || bl_stopped
+                    scout=$(bl_scout_gate)
+                    bl_log "decision=$scout"
+                    case "$scout" in
+                        scout\ *)
+                            bl_log "every picked item skipped; scouting, then re-check in $((BL_SCOUT_RECHECK / 60))m"
+                            bl_run_scout
+                            bl_sleep "$BL_SCOUT_RECHECK" scout-recheck || bl_stopped
+                            ;;
+                        *)
+                            bl_log "every picked item skipped; re-check in ${EMPTY_SLEEP_MIN}m"
+                            bl_sleep $((EMPTY_SLEEP_MIN * 60)) all-skipped || bl_stopped
+                            ;;
+                    esac
+                else
+                    bl_log "every picked item skipped; --once ends the run"
                 fi
             fi
             ;;
@@ -456,7 +541,15 @@ batches=$BATCHES items=$ITEMS
 log: $LOOP_LOG"
             fi
             EMPTY_STREAK=$((EMPTY_STREAK + 1))
-            bl_sleep $((EMPTY_SLEEP_MIN * 60)) backlog-empty || bl_stopped
+            scout=$(bl_scout_gate)
+            bl_log "decision=$scout"
+            case "$scout" in
+                scout\ *)
+                    bl_run_scout
+                    bl_sleep "$BL_SCOUT_RECHECK" scout-recheck || bl_stopped
+                    ;;
+                *) bl_sleep $((EMPTY_SLEEP_MIN * 60)) backlog-empty || bl_stopped ;;
+            esac
             ;;
         abort)
             # An abort batch can still have written ledgers; count them before retrying.
@@ -480,6 +573,166 @@ log: $LOOP_LOG"
             fi
             ;;
     esac
+}
+
+# ------------------------------------------------------------ open-PR ceiling
+
+# bl_cooldown_left <file> <minutes>: seconds left on a cooldown whose start epoch is
+# in <file>. Absent or garbled file: 0 (elapsed). A future epoch counts as just started.
+bl_cooldown_left() {
+    local last now span
+    span=$(( $2 * 60 ))
+    last=$(cat "$1" 2>/dev/null || true)
+    if ! bl_nonneg_int "$last"; then echo 0; return 0; fi
+    now=$(date +%s)
+    if [ "$last" -gt "$now" ]; then echo "$span"; return 0; fi
+    if [ $((now - last)) -ge "$span" ]; then echo 0; else echo $((span - (now - last))); fi
+}
+
+# bl_pr_snapshot: open PRs by the gh-authenticated owner (the account the loop runs
+# as) into PR_JSON. rc 1 when gh fails, rc 2 when the reply is not a JSON array.
+# Fail-closed probe (.claude/rules/shell-fail-open-probe.md): never `|| echo '[]'`.
+bl_pr_snapshot() {
+    local out
+    if ! out=$(gh pr list --repo "$BL_PR_REPO" --state open --author @me --limit 500 \
+        --json number,title,isDraft,headRefName,mergeable,autoMergeRequest,statusCheckRollup); then
+        return 1
+    fi
+    jq -e 'type == "array"' >/dev/null 2>&1 <<< "$out" || return 2
+    PR_JSON="$out"
+}
+
+# bl_unblock_candidates: reads PR_JSON and the loaded launchd labels, prints
+# N:conflict,M:red (at most BL_UNBLOCK_MAX), or nothing. Skips feat: titles, drafts,
+# armed PRs, mergeable=UNKNOWN, and PRs with a post-plan run or fleet rescue in flight.
+bl_unblock_candidates() {
+    local labels
+    labels=$(launchctl list 2>/dev/null | awk '{print $3}' || true)
+    jq -r --arg labels "$labels" --argjson max "$BL_UNBLOCK_MAX" '
+      ($labels | split("\n")) as $L
+      | [ .[]
+          | select((.title | test("^feat[(!:]")) | not)
+          | select(.isDraft | not)
+          | select(.autoMergeRequest == null)
+          | select(.mergeable != "UNKNOWN")
+          | .number as $n | .headRefName as $b
+          | select([$L[] | select(startswith("com.ibl5.postplan-now-" + $b + "-")
+                or . == ("com.ibl5.post-plan-fleet-" + ($n | tostring)))] | length == 0)
+          | (if .mergeable == "CONFLICTING" then "conflict"
+             elif ([.statusCheckRollup[]? | (.conclusion // .state // "")]
+                   | any(. == "FAILURE" or . == "ERROR" or . == "TIMED_OUT"
+                         or . == "CANCELLED" or . == "ACTION_REQUIRED" or . == "STARTUP_FAILURE"))
+             then "red" else empty end) as $why
+          | "\($n):\($why)" ]
+      | .[:$max] | join(",")' <<< "$PR_JSON"
+}
+
+# bl_work_gate: prints exactly one line and always returns 0 (it runs inside $(...)).
+#   batch ceiling=off | batch open=N ceiling=C | unblock open=N ceiling=C prs=<list> | hold <reason> ...
+# Ceiling 0 means no cap: batches run without the gh count.
+bl_work_gate() {
+    local n left cands src=0
+    if [ "$PR_CEILING" -eq 0 ]; then echo "batch ceiling=off"; return 0; fi
+    bl_pr_snapshot || src=$?
+    if [ "$src" -ne 0 ]; then echo "hold pr-count-failed rc=$src"; return 0; fi
+    n=$(jq 'length' <<< "$PR_JSON")
+    if [ "$n" -lt "$PR_CEILING" ]; then echo "batch open=$n ceiling=$PR_CEILING"; return 0; fi
+    if [ -e "$STATE/unblock-disabled" ]; then
+        echo "hold unblock-disabled open=$n ceiling=$PR_CEILING"; return 0
+    fi
+    left=$(bl_cooldown_left "$STATE/unblock.last" "$UNBLOCK_COOLDOWN_MIN")
+    if [ "$left" -gt 0 ]; then
+        echo "hold unblock-cooldown open=$n ceiling=$PR_CEILING left=${left}s"; return 0
+    fi
+    cands=$(bl_unblock_candidates)
+    if [ -z "$cands" ]; then echo "hold ceiling-idle open=$n ceiling=$PR_CEILING"; return 0; fi
+    echo "unblock open=$n ceiling=$PR_CEILING prs=$cands"
+}
+
+# bl_gate_note <work-line>: runs in the main shell; DMs only when the state changes.
+bl_gate_note() {
+    local new
+    case "$1" in
+        batch*) new=open ;;
+        "hold pr-count-failed"*) new=blind ;;
+        *) new=ceiling ;;
+    esac
+    [ "$new" != "$GATE_STATE" ] || return 0
+    case "$new" in
+        ceiling) bl_dm "burndown-loop: open PRs at the ceiling; new batches and scouts paused
+$1
+log: $LOOP_LOG" ;;
+        blind) bl_dm "burndown-loop: open-PR count unavailable (gh failed); no new work until it recovers
+log: $LOOP_LOG" ;;
+        open) bl_dm "burndown-loop: open PRs below the ceiling again; batches resume
+$1" ;;
+    esac
+    GATE_STATE="$new"
+}
+
+# bl_unblock_arm_check <prs>: every PR handed to the session must still be open and
+# unarmed. A violation disarms it, writes the sticky unblock-disabled file and DMs.
+# An unverifiable check (gh failed) disables too: fail closed.
+bl_unblock_arm_check() {
+    local bad src=0 n
+    bl_pr_snapshot || src=$?
+    if [ "$src" -eq 0 ]; then
+        bad=$(jq -r --arg prs "$1" '($prs | split(",") | map(split(":")[0] | tonumber)) as $want
+            | (map(.number)) as $open
+            | [ $want[] as $w | select((($open | index($w)) == null)) | "\($w):gone" ]
+              + [ .[] | select(.autoMergeRequest != null) | .number as $n
+                  | select(any($want[]; . == $n)) | "\($n):armed" ]
+            | join(" ")' <<< "$PR_JSON") || bad="jq-failed"
+    else
+        bad="unverifiable:rc=$src"
+    fi
+    [ -n "$bad" ] || return 0
+    for n in $bad; do
+        case "$n" in *:armed) gh pr merge --disable-auto "${n%%:*}" --repo "$BL_PR_REPO" \
+            || bl_log "disarm failed pr=${n%%:*}" ;; esac
+    done
+    : > "$STATE/unblock-disabled"
+    bl_log "unblock ARM-CHECK violation=$bad; unblock disabled until $STATE/unblock-disabled is removed"
+    bl_dm "burndown-loop: unblock ARM-CHECK failed ($bad); armed PRs were disarmed; unblock disabled until $STATE/unblock-disabled is removed
+log: $LOOP_LOG"
+}
+
+bl_on_unblock() {
+    local prs="${1##* prs=}" marker
+    # Cooldown starts at launch, so a crash or timeout never retries at once.
+    date +%s > "$STATE/unblock.last"
+    bl_run_session unblock claude-sonnet-5-5 "${BL_UNBLOCK_PROMPT//@PRS@/$prs}" \
+        --disallowedTools "$BL_UNBLOCK_DENY"
+    bl_unblock_arm_check "$prs"
+    if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$SESSION_RC" "$SESSION_LOG"; then
+        bl_log "RESULT paused (usage gate); auto-resumes after reset."
+        bl_finish paused 75
+    fi
+    marker=$(bl_session_marker "$SESSION_LOG" BURNDOWN-UNBLOCK)
+    bl_log "unblock done prs=$prs rc=$SESSION_RC result=$marker log=$SESSION_LOG"
+    if [ "$ONCE" -eq 0 ]; then bl_sleep "$BL_SLEEP_CAP" unblock-recheck || bl_stopped; fi
+}
+
+# bl_scout_gate: prints one line, scout <decision> or scout-skip <why>. The cooldown
+# is a file, so it survives re-exec and restart. The pace re-check runs here because
+# the batch that just ended may have spent the budget.
+bl_scout_gate() {
+    local left d
+    left=$(bl_cooldown_left "$STATE/scout.last" "$SCOUT_COOLDOWN_MIN")
+    if [ "$left" -gt 0 ]; then echo "scout-skip cooldown left=${left}s"; return 0; fi
+    d=$(bl_decide)
+    case "$d" in launch*) echo "scout $d" ;; *) echo "scout-skip pace $d" ;; esac
+}
+
+bl_run_scout() {
+    # Cooldown starts at launch, so a crash or timeout never retries at once.
+    date +%s > "$STATE/scout.last"
+    bl_run_session scout claude-opus-5-5 "$BL_SCOUT_PROMPT"
+    if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$SESSION_RC" "$SESSION_LOG"; then
+        bl_log "RESULT paused (usage gate); auto-resumes after reset."
+        bl_finish paused 75
+    fi
+    bl_log "scout done rc=$SESSION_RC result=$(bl_session_marker "$SESSION_LOG" BURNDOWN-SCOUT) log=$SESSION_LOG"
 }
 
 # ------------------------------------------------------------ usage-gate pause
@@ -530,6 +783,7 @@ bl_reexec_apply() {
         if bl_nonneg_int "$RX_EMPTY_STREAK" && [ "$RX_EMPTY_STREAK" -gt 0 ]; then
             EMPTY_STREAK=1
         fi
+        case "$RX_GATE_STATE" in open|ceiling|blind) GATE_STATE="$RX_GATE_STATE" ;; esac
     else
         bl_log "re-exec state invalid; counters reset"
     fi
@@ -570,7 +824,7 @@ bl_maybe_reexec() {
         IBL5_BURNDOWN_REEXEC_BATCHES="$BATCHES" IBL5_BURNDOWN_REEXEC_ITEMS="$ITEMS" \
         IBL5_BURNDOWN_REEXEC_UNITS="$UNITS" IBL5_BURNDOWN_REEXEC_FAILS="$FAILS" \
         IBL5_BURNDOWN_REEXEC_START="$START_EPOCH" IBL5_BURNDOWN_REEXEC_LAST_FAIL="$LAST_FAIL" \
-        IBL5_BURNDOWN_REEXEC_EMPTY_STREAK="$EMPTY_STREAK"
+        IBL5_BURNDOWN_REEXEC_EMPTY_STREAK="$EMPTY_STREAK" IBL5_BURNDOWN_REEXEC_GATE_STATE="$GATE_STATE"
     set -- run "--loop-sid=$LOOP_SID"
     if [ "$NO_DM" -eq 1 ]; then set -- "$@" --no-dm; fi
     # execfail: a failed exec returns here instead of killing the loop.
@@ -579,7 +833,8 @@ bl_maybe_reexec() {
     shopt -u execfail
     unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
         IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
-        IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK
+        IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK \
+        IBL5_BURNDOWN_REEXEC_GATE_STATE
     bl_log "re-exec failed rc=$xrc; continuing on the old code"
     CODE_HASH="$now_hash"
 }
@@ -587,7 +842,7 @@ bl_maybe_reexec() {
 # ------------------------------------------------------------ run
 
 bl_cmd_run() {
-    local dry=0 a decision action rest secs reason max_fails timeout_secs
+    local dry=0 a decision action rest secs reason max_fails timeout_secs work left s
     for a in "$@"; do
         case "$a" in
             --once) ONCE=1 ;;
@@ -601,14 +856,18 @@ bl_cmd_run() {
         esac
     done
 
-    MAX_FAILS=$(bl_posint_env IBL5_BURNDOWN_MAX_FAILS 3)
-    EMPTY_SLEEP_MIN=$(bl_posint_env IBL5_BURNDOWN_EMPTY_SLEEP_MIN 240) || exit 2
+    bl_load_knobs
     max_fails="$MAX_FAILS"
     timeout_secs=$(bl_timeout_secs)
 
     if [ "$dry" -eq 1 ]; then
         decision=$(bl_decide)
         echo "burndown-loop: DRY RUN reserve=$(usage_pace_reserve) timeout=$timeout_secs max_fails=$max_fails dm=$DISCORD_DM decision=$decision"
+        echo "burndown-loop: DRY RUN knobs ceiling=$PR_CEILING scout_cooldown=${SCOUT_COOLDOWN_MIN}m unblock_cooldown=${UNBLOCK_COOLDOWN_MIN}m empty_sleep=${EMPTY_SLEEP_MIN}m"
+        work=$(bl_work_gate)
+        left=$(bl_cooldown_left "$STATE/scout.last" "$SCOUT_COOLDOWN_MIN")
+        if [ "$left" -gt 0 ]; then s="cooldown left=${left}s"; else s=ready; fi
+        echo "burndown-loop: DRY RUN work=$work scout=$s"
         return 0
     fi
 
@@ -642,7 +901,19 @@ bl_cmd_run() {
                 bl_sleep "$secs" "$reason" || bl_stopped
                 ;;
             pause) bl_on_pause ;;
-            launch) bl_on_launch ;;
+            launch)
+                work=$(bl_work_gate)
+                bl_log "decision=$work"
+                bl_gate_note "$work"
+                case "${work%% *}" in
+                    batch) bl_on_launch ;;
+                    unblock) bl_on_unblock "$work" ;;
+                    *)
+                        rest="${work#hold }"
+                        bl_sleep "$BL_SLEEP_CAP" "${rest%% *}" || bl_stopped
+                        ;;
+                esac
+                ;;
         esac
         [ "$ONCE" -eq 0 ] || return 0
     done
@@ -684,11 +955,38 @@ bl_render_plist() {
 PLIST_EOF
 }
 
+# bl_runner_env: the export lines the runner carries. A fresh start takes every
+# non-empty IBL5_BURNDOWN_* var from this environment. A resume (RESUME_SID set) runs
+# in the coordinator's environment, so it re-emits the previous runner's lines instead.
+# Never persisted: the REEXEC_* hand-off, the LOOP opt-in, the batch-scoped sentinel.
+bl_runner_env() {
+    local name
+    if [ -n "$RESUME_SID" ]; then
+        [ -r "$RUNNER" ] || return 0
+        sed -n -e '/^export IBL5_BURNDOWN_REEXEC_/d' -e '/^export IBL5_BURNDOWN_LOOP=/d' \
+            -e '/^export IBL5_BURNDOWN_EMPTY_SENTINEL=/d' \
+            -e '/^export IBL5_BURNDOWN_[A-Z0-9_]*=/p' "$RUNNER"
+        return 0
+    fi
+    for name in $(compgen -e | LC_ALL=C sort); do
+        case "$name" in
+            IBL5_BURNDOWN_REEXEC_*|IBL5_BURNDOWN_LOOP|IBL5_BURNDOWN_EMPTY_SENTINEL) continue ;;
+            IBL5_BURNDOWN_*)
+                [ -n "${!name}" ] || continue
+                printf 'export %s=%q\n' "$name" "${!name}"
+                ;;
+        esac
+    done
+}
+
 bl_write_runner() {
+    local envlines
+    envlines=$(bl_runner_env)
     {
         printf '#!/usr/bin/env bash\n'
         printf '# Generated by bin/burndown-loop start at %s.\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         printf 'export PATH=%q\n' "$BL_PATH"
+        if [ -n "$envlines" ]; then printf '%s\n' "$envlines"; fi
         printf 'rc=0\n'
         printf '%q run --loop-sid=%s' "$ROOT/bin/burndown-loop" "$LOOP_SID"
         if [ "$NO_DM" -eq 1 ]; then printf ' --no-dm'; fi
@@ -708,6 +1006,7 @@ bl_cmd_start() {
             *) bl_unknown "$a" ;;
         esac
     done
+    bl_load_knobs
     pid=$(bl_lock_live_pid)
     if [ -n "$pid" ]; then
         echo "burndown-loop: already running (pid $pid); use: bin/burndown-loop stop" >&2

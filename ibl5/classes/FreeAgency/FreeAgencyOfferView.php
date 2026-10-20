@@ -41,34 +41,55 @@ class FreeAgencyOfferView
         $birdYears = $player->getTeamName() === $team->name ? ($player->getBirdYears() ?? 0) : 0;
         $raisePercentage = \League\ContractRules::getMaxRaisePercentage($birdYears);
 
-        // Generate a single CSRF token for all forms on this page.
-        // The negotiate page has 16+ forms (custom, delete, quick-offer buttons).
-        // CsrfGuard's MAX_TOKENS=10 would evict the custom form's token if each
-        // form generated its own. One shared token avoids this.
-        $csrfToken = \Security\CsrfGuard::generateRawToken('free_agency');
-        $csrfHtml = '<input type="hidden" name="_csrf_token" value="' . $csrfToken . '">';
-        $this->formView->setCsrfHtml($csrfHtml);
+        // One shared CSRF token for every form on this page (16+: custom, delete, quick-offer buttons).
+        // CsrfGuard's MAX_TOKENS=10 would evict the custom form's token if each form generated its own.
+        $this->formView->setCsrfToken(\Security\CsrfGuard::generateRawToken('free_agency'));
 
         ob_start();
-
         echo '<h1 class="ibl-title">Free Agency</h1>';
+        $noRosterSpots = $capMetrics['rosterSpots'][0] < 1 && !$hasExistingOffer;
+        echo HtmlSanitizer::trusted($this->renderAlerts($error, $noRosterSpots));
+        if ($noRosterSpots) {
+            return (string) ob_get_clean();
+        }
+        echo HtmlSanitizer::trusted($this->renderPlayerInfoCard($player));
+        echo HtmlSanitizer::trusted($this->renderOfferFormCard($player, $team, $demands, $existingOffer, $raisePercentage));
+        echo HtmlSanitizer::trusted($this->renderPresetsCard($player, $team));
+        ?>
+<?= HtmlSanitizer::trusted($this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $birdYears)) ?>
 
-        // Error banner from PRG redirect
+<?php if ($hasExistingOffer): ?>
+<?= HtmlSanitizer::trusted($this->renderDeleteOfferSection($player, $team)) ?>
+<?php endif; ?>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Error banner (from the PRG redirect) and the no-roster-spots warning.
+     */
+    private function renderAlerts(?string $error, bool $noRosterSpots): string
+    {
+        ob_start();
         if ($error !== null) {
             ?>
 <div class="ibl-alert ibl-alert--error"><?= HtmlSanitizer::e($error) ?></div>
             <?php
         }
-
-        // No roster spots warning
-        if ($capMetrics['rosterSpots'][0] < 1 && !$hasExistingOffer) {
+        if ($noRosterSpots) {
             ?>
 <div class="ibl-alert ibl-alert--warning">Sorry, you have no roster spots remaining and cannot offer a contract to this player.</div>
             <?php
-            return (string) ob_get_clean();
         }
+        return (string) ob_get_clean();
+    }
 
-        // Card 1: Player Info
+    /**
+     * Card 1: player headshot and ratings.
+     */
+    private function renderPlayerInfoCard(Player $player): string
+    {
+        ob_start();
         ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
@@ -77,12 +98,25 @@ class FreeAgencyOfferView
     <div class="ibl-card__body">
         <div class="offer-player-info">
             <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->getPlayerID())) ?>" alt="<?= HtmlSanitizer::e($player->getName() ?? '') ?>" class="offer-player-img">
-            <?= HtmlSanitizer::trusted(FreeAgencyFormView::renderPlayerRatings($player)) ?>
+            <?= HtmlSanitizer::trusted($this->formView->renderPlayerRatings($player)) ?>
         </div>
     </div>
 </div>
 
-<?php // Card 2: Demands + Custom Offer Form ?>
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Card 2: player demands and the custom offer form.
+     *
+     * @param array<string, int> $demands
+     * @param array<string, int> $existingOffer
+     */
+    private function renderOfferFormCard(Player $player, Team $team, array $demands, array $existingOffer, float $raisePercentage): string
+    {
+        ob_start();
+        ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
         <h2 class="ibl-card__title">Contract Offer</h2>
@@ -96,7 +130,7 @@ class FreeAgencyOfferView
         </div>
 
         <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">
-            <?= HtmlSanitizer::trusted($csrfHtml) ?>
+            <?= HtmlSanitizer::trusted($this->formView->renderCsrfInput()) ?>
             <div class="ibl-field-group">
                 <span class="ibl-label">Your Custom Offer:</span>
                 <div class="ibl-field-group__content">
@@ -113,7 +147,17 @@ class FreeAgencyOfferView
     </div>
 </div>
 
-<?php // Card 3: Quick Offer Presets ?>
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Card 3: quick offer preset buttons.
+     */
+    private function renderPresetsCard(Player $player, Team $team): string
+    {
+        ob_start();
+        ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
         <h2 class="ibl-card__title">Quick Offer Presets</h2>
@@ -123,21 +167,26 @@ class FreeAgencyOfferView
     </div>
 </div>
 
-<?php // Card 4: Notes & Reminders ?>
-<?= HtmlSanitizer::trusted($this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $birdYears)) ?>
+<?php
+        return (string) ob_get_clean();
+    }
 
-<?php // Delete Offer (conditional) ?>
-<?php if ($hasExistingOffer): ?>
+    /**
+     * Delete-offer form, shown only when the team already has an offer in.
+     */
+    private function renderDeleteOfferSection(Player $player, Team $team): string
+    {
+        ob_start();
+        ?>
 <div class="offer-delete-section">
     <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
-        <?= HtmlSanitizer::trusted($csrfHtml) ?>
+        <?= HtmlSanitizer::trusted($this->formView->renderCsrfInput()) ?>
         <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($team->name) ?>">
         <input type="hidden" name="playerID" value="<?= (int) $player->getPlayerID() ?>">
         <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>
     </form>
 </div>
-<?php endif; ?>
-        <?php
+<?php
         return (string) ob_get_clean();
     }
 
@@ -203,11 +252,6 @@ class FreeAgencyOfferView
         $exampleRaise = \League\ContractRules::calculateMaxRaise($exampleSalary, $birdYears);
 
         $hasBirdRights = \League\ContractRules::hasBirdRights($birdYears);
-        if ($hasBirdRights) {
-            $birdRightsText = "<strong>Bird Rights Player on Your Team:</strong> You may add no more than {$raisePercentageDisplay}% of the amount you offer in the first year as a raise between years (for instance, if you offer {$exampleSalary} in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
-        } else {
-            $birdRightsText = "<strong>For Players who do not have Bird Rights with your team:</strong> You may add no more than {$raisePercentageDisplay}% of the amount you offer in the first year as a raise between years (for instance, if you offer {$exampleSalary} in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
-        }
 
         ob_start();
         ?>
@@ -228,11 +272,23 @@ class FreeAgencyOfferView
             <li>Enter "0" for years you do not want to offer a contract.</li>
             <li>The amounts offered each year must equal or exceed the previous year.</li>
             <li>The first year of the contract must be at least the veteran's minimum (<?= HtmlSanitizer::e($veteranMinimum) ?> for this player).</li>
-            <li><?= HtmlSanitizer::trusted($birdRightsText) ?></li>
+            <li><?= HtmlSanitizer::trusted($this->renderBirdRightsNote($hasBirdRights, $raisePercentageDisplay, $exampleSalary, $exampleRaise)) ?></li>
         </ul>
     </div>
 </div>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the raise-limit note whose lead-in depends on Bird Rights.
+     */
+    private function renderBirdRightsNote(bool $hasBirdRights, string $raisePercentageDisplay, int $exampleSalary, int $exampleRaise): string
+    {
+        $leadIn = $hasBirdRights
+            ? '<strong>Bird Rights Player on Your Team:</strong>'
+            : '<strong>For Players who do not have Bird Rights with your team:</strong>';
+
+        return "{$leadIn} You may add no more than {$raisePercentageDisplay}% of the amount you offer in the first year as a raise between years (for instance, if you offer {$exampleSalary} in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
     }
 }

@@ -408,11 +408,11 @@
 }
 
 .schedule-game__streak--win {
-    color: var(--accent-500);
+    color: var(--accent-800);
 }
 
 .schedule-game__streak--loss {
-    color: var(--gray-400);
+    color: var(--gray-600);
 }
 
 /* Team Schedule - Color overrides using custom properties
@@ -423,7 +423,7 @@
 }
 
 .schedule-container--team .schedule-month__header--playoffs {
-    background: var(--accent-500);
+    background: var(--accent-700);
     color: white;
 }
 
@@ -434,7 +434,7 @@
 
 .schedule-container--team a.schedule-jump-btn {
     background: var(--team-primary);
-    color: var(--team-secondary);
+    color: var(--team-color-on-primary, var(--team-secondary));
     box-shadow: 0 2px 8px color-mix(in srgb, var(--team-primary) 40%, transparent);
 }
 

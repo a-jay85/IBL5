@@ -73,20 +73,9 @@ class TradeRosterPreviewApiHandler
 
         $display = $this->paramValidator->validateDisplay();
 
-        // Validate split parameter when display is 'split'
-        $split = null;
-        if ($display === 'split') {
-            if (isset($_GET['split']) && is_string($_GET['split'])) {
-                $splitRepo = new \Team\SplitStatsRepository($this->db);
-                if (in_array($_GET['split'], $splitRepo->getValidSplitKeys(), true)) {
-                    $split = $_GET['split'];
-                } else {
-                    $display = 'ratings';
-                }
-            } else {
-                $display = 'ratings';
-            }
-        }
+        // Resolve the split parameter when display is 'split' (shared allow-list gate)
+        $splitRepo = new \Team\SplitStatsRepository($this->db);
+        [$display, $split] = $splitRepo->resolveDisplayAndSplit($display, $_GET['split'] ?? null);
 
         $bufferLevel = ob_get_level();
 
@@ -94,57 +83,14 @@ class TradeRosterPreviewApiHandler
             $teamRepository = new TeamRepository($this->db);
             $teamTableService = new TeamTableService($this->db, $teamRepository);
 
-            // Get the base roster and starters
-            $rosterData = $teamTableService->getRosterAndStarters($teamid);
-            /** @var list<array<string, mixed>> $roster */
+            $rosterData = $this->buildPreviewRoster($teamTableService, $teamid, $addPids, $display);
             $roster = $rosterData['roster'];
-            /** @var list<int> $starterPids */
             $starterPids = $rosterData['starterPids'];
-
-            // Outgoing players stay in the roster — JS grays them out and
-            // moves them to the bottom. We only need to append incoming players.
-
-            // Fetch and append incoming players
-            if ($addPids !== []) {
-                $incomingPlayers = $this->tradeAssetRepository->getPlayersByIds($addPids);
-                foreach ($incomingPlayers as $incoming) {
-                    $roster[] = $incoming;
-                }
-            }
-
-            // Append cash rows when viewing contracts
-            if ($display === 'contracts') {
-                // Existing cash entries from the database
-                $cashRepo = new BuyoutLedgerRepository($this->db);
-                $existingCash = $cashRepo->getTeamCashConsiderations($teamid);
-                foreach ($existingCash as $cashRow) {
-                    $roster[] = \Team\TeamTableService::cashConsiderationToRosterRow($cashRow);
-                }
-
-                // Synthetic cash rows for the in-progress trade. cashStartYear and
-                // cashEndYear are contract-year indices (1–6), so the ceiling is the
-                // horizon constant directly — no Season access needed.
-                $tradeCashRows = $this->cashRowBuilder->buildCashRows(
-                    $teamid,
-                    TradeRosterPreviewCashRowBuilder::CASH_YEAR_FORWARD_HORIZON
-                );
-                foreach ($tradeCashRows as $cashRow) {
-                    $roster[] = $cashRow;
-                }
-            }
 
             $team = Team::initialize($this->db, $teamid);
             $season = $this->season ?? new Season($this->db);
 
-            // Build PID list for aggregate views
-            /** @var list<int> $rosterPids */
-            $rosterPids = [];
-            foreach ($roster as $row) {
-                $pid = $row['pid'] ?? null;
-                if (is_int($pid) && $pid > 0) {
-                    $rosterPids[] = $pid;
-                }
-            }
+            $rosterPids = $this->collectRosterPids($roster);
 
             // Only expose clickable eligibility links when rendering the
             // logged-in user's own roster. Opponent rosters in the trade
@@ -153,14 +99,7 @@ class TradeRosterPreviewApiHandler
 
             $tableHtml = $this->renderTable($display, $roster, $team, $season, $starterPids, $rosterPids, $split, $teamTableService, $removePids, $showActionLinks);
 
-            // Wrap with dropdown
-            $dropdownGroups = $teamTableService->buildDropdownGroups($season);
-            $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
-            $teamData = $teamRepository->getTeam($teamid);
-            $color1 = is_string($teamData['color1'] ?? null) ? $teamData['color1'] : '000000';
-            $color2 = is_string($teamData['color2'] ?? null) ? $teamData['color2'] : 'FFFFFF';
-            $dropdown = new TableViewDropdown($dropdownGroups, $activeValue, '', $color1, $color2);
-            $wrappedHtml = $dropdown->wrap($tableHtml);
+            $wrappedHtml = $this->wrapWithDropdown($tableHtml, $teamTableService, $teamRepository, $teamid, $display, $split, $season);
 
             $responder->json(['html' => $wrappedHtml]);
         } catch (\Throwable) {
@@ -170,6 +109,94 @@ class TradeRosterPreviewApiHandler
             }
             $responder->json(['html' => '']);
         }
+    }
+
+    /**
+     * Assemble the post-trade roster: the team's current roster, the incoming
+     * players appended, and (contracts display only) existing cash
+     * considerations plus the synthetic cash rows for the in-progress trade.
+     *
+     * @param list<int> $addPids Incoming player PIDs
+     * @return array{roster: list<array<string, mixed>>, starterPids: list<int>}
+     */
+    private function buildPreviewRoster(TeamTableService $teamTableService, int $teamid, array $addPids, string $display): array
+    {
+        // Get the base roster and starters
+        $rosterData = $teamTableService->getRosterAndStarters($teamid);
+        /** @var list<array<string, mixed>> $roster */
+        $roster = $rosterData['roster'];
+        /** @var list<int> $starterPids */
+        $starterPids = $rosterData['starterPids'];
+
+        // Outgoing players stay in the roster — JS grays them out and
+        // moves them to the bottom. We only need to append incoming players.
+
+        // Fetch and append incoming players
+        if ($addPids !== []) {
+            $incomingPlayers = $this->tradeAssetRepository->getPlayersByIds($addPids);
+            foreach ($incomingPlayers as $incoming) {
+                $roster[] = $incoming;
+            }
+        }
+
+        // Append cash rows when viewing contracts
+        if ($display === 'contracts') {
+            // Existing cash entries from the database
+            $cashRepo = new BuyoutLedgerRepository($this->db);
+            $existingCash = $cashRepo->getTeamCashConsiderations($teamid);
+            foreach ($existingCash as $cashRow) {
+                $roster[] = \Team\TeamTableService::cashConsiderationToRosterRow($cashRow);
+            }
+
+            // Synthetic cash rows for the in-progress trade. cashStartYear and
+            // cashEndYear are contract-year indices (1–6), so the ceiling is the
+            // horizon constant directly — no Season access needed.
+            $tradeCashRows = $this->cashRowBuilder->buildCashRows(
+                $teamid,
+                TradeRosterPreviewCashRowBuilder::CASH_YEAR_FORWARD_HORIZON
+            );
+            foreach ($tradeCashRows as $cashRow) {
+                $roster[] = $cashRow;
+            }
+        }
+
+        return ['roster' => $roster, 'starterPids' => $starterPids];
+    }
+
+    /**
+     * Build the PID list for aggregate views (cash rows carry pid 0 and are skipped).
+     *
+     * @param list<array<string, mixed>> $roster
+     * @return list<int>
+     */
+    private function collectRosterPids(array $roster): array
+    {
+        /** @var list<int> $rosterPids */
+        $rosterPids = [];
+        foreach ($roster as $row) {
+            $pid = $row['pid'] ?? null;
+            if (is_int($pid) && $pid > 0) {
+                $rosterPids[] = $pid;
+            }
+        }
+
+        return $rosterPids;
+    }
+
+    /**
+     * Wrap the rendered table with the view dropdown, using the team's colors
+     * when the team row is present and the black/white defaults otherwise.
+     */
+    private function wrapWithDropdown(string $tableHtml, TeamTableService $teamTableService, TeamRepository $teamRepository, int $teamid, string $display, ?string $split, Season $season): string
+    {
+        $dropdownGroups = $teamTableService->buildDropdownGroups($season);
+        $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
+        $teamData = $teamRepository->getTeam($teamid);
+        $color1 = is_string($teamData['color1'] ?? null) ? $teamData['color1'] : '000000';
+        $color2 = is_string($teamData['color2'] ?? null) ? $teamData['color2'] : 'FFFFFF';
+        $dropdown = new TableViewDropdown($dropdownGroups, $activeValue, '', $color1, $color2);
+
+        return $dropdown->wrap($tableHtml);
     }
 
     /**

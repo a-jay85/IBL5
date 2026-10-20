@@ -159,4 +159,60 @@ class MobileNavViewTest extends TestCase
         // Guests never see the logout footer
         $this->assertStringNotContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
     }
+
+    public function testHostileLinkFieldsEscapedExactlyOnce(): void
+    {
+        $view = $this->createView();
+        $hostile = 'O\'Neal <xss>&"q"';
+        $escaped = 'O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;';
+        $html = $view->render(
+            ['Season' => ['links' => [
+                ['label' => $hostile, 'url' => 'x"><script>', 'badge' => $hostile],
+            ]]],
+            null,
+            [],
+        );
+
+        $this->assertStringContainsString('href="x&quot;&gt;&lt;script&gt;"', $html);
+        $this->assertSame(2, substr_count($html, $escaped), 'label and badge each escaped once');
+        $this->assertStringContainsString('<span class="nav-badge">' . $escaped . '</span>', $html);
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringNotContainsString('&amp;quot;', $html);
+    }
+
+    public function testRawHtmlLinkRendersAsHtml(): void
+    {
+        $view = $this->createView();
+        $html = $view->render(
+            ['Season' => ['links' => [['rawHtml' => '<a href="#w">W</a>']]]],
+            null,
+            [],
+        );
+
+        $this->assertStringContainsString('<span class="mobile-dropdown-link"><a href="#w">W</a></span>', $html);
+    }
+
+    public function testExternalLinkCarriesTargetAndIconAndNoHtmx(): void
+    {
+        $view = $this->createView();
+        $external = $view->render(
+            ['Season' => ['links' => [['label' => 'Ext', 'url' => 'https://example.com', 'external' => true]]]],
+            null,
+            [],
+        );
+
+        $this->assertStringContainsString(' target="_blank" rel="noopener noreferrer"', $external);
+        $this->assertStringContainsString('w-3 h-3 opacity-40', $external);
+        $this->assertStringNotContainsString('href="https://example.com" hx-boost', $external);
+
+        $internal = $view->render(
+            ['Season' => ['links' => [['label' => 'Int', 'url' => 'modules.php?name=Standings', 'external' => false, 'noBoost' => false]]]],
+            null,
+            [],
+        );
+
+        $this->assertStringNotContainsString('target="_blank"', $internal);
+        $this->assertStringNotContainsString('w-3 h-3 opacity-40', $internal);
+        $this->assertStringContainsString('hx-boost="true" hx-target="#site-content"', $internal);
+    }
 }

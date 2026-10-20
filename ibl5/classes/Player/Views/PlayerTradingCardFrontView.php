@@ -20,20 +20,6 @@ use Security\HtmlSanitizer;
 class PlayerTradingCardFrontView
 {
     /**
-     * Get scoped custom styles for trading card with team colors
-     *
-     * @deprecated CSS is now centralized in design/components/player-cards.css.
-     *             Custom properties are set inline on the container element in render().
-     *
-     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
-     * @return string Empty string — styles are in centralized CSS
-     */
-    public static function getStyles(?array $colorScheme = null): string
-    {
-        return '';
-    }
-
-    /**
      * Render the complete trading card front
      * 
      * @param Player $player The player object
@@ -51,6 +37,20 @@ class PlayerTradingCardFrontView
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
         $cardTop = CardBaseStyles::renderCardTop($playerData);
 
+        return '<div class="trading-card" style="' . $cssProps . '">'
+            . "\n" . $cardTop
+            . self::renderRatingsSection($player)
+            . self::renderIntangiblesRow($player)
+            . self::renderFreeAgencySection($player)
+            . self::renderContractBar($player, $contractDisplay)
+            . "\n</div>";
+    }
+
+    /**
+     * Render the three rows of rating cells with their section heading
+     */
+    private static function renderRatingsSection(Player $player): string
+    {
         // Render rating cells inline
         $rc2ga  = self::renderRatingCell('2ga', $player->getRatingFieldGoalAttempts());
         $rc2gp  = self::renderRatingCell('2gp', $player->getRatingFieldGoalPercentage());
@@ -74,26 +74,7 @@ class PlayerTradingCardFrontView
         $rcPd   = self::renderRatingCell('pd', $player->getRatingPostDefense());
         $rcTd   = self::renderRatingCell('td', $player->getRatingTransitionDefense());
 
-        // Render pills inline
-        $pTal = self::renderPill('TAL', $player->getRatingTalent());
-        $pSkl = self::renderPill('SKL', $player->getRatingSkill());
-        $pInt = self::renderPill('INT', $player->getRatingIntangibles());
-        $pClu = self::renderPill('CLU', $player->getRatingClutch());
-        $pCon = self::renderPill('CON', $player->getRatingConsistency());
-        $pLoy = self::renderPill('LOY', $player->getFreeAgencyLoyalty(), true);
-        $pWin = self::renderPill('WIN', $player->getFreeAgencyPlayForWinner(), true);
-        $pPt  = self::renderPill('PT', $player->getFreeAgencyPlayingTime(), true);
-        $pSec = self::renderPill('SEC', $player->getFreeAgencySecurity(), true);
-        $pTrd = self::renderPill('TRD', $player->getFreeAgencyTradition(), true);
-
-        // Contract data
-        $expYears = $player->getYearsOfExperience() ?? 0;
-        $birdYears = $player->getBirdYears() ?? 0;
-        $contractSafe = HtmlSanitizer::e($contractDisplay);
-
-        return '<div class="trading-card" style="' . $cssProps . '">'
-            . "\n" . $cardTop
-            . "\n\n    <!-- RATINGS SECTION -->"
+        return "\n\n    <!-- RATINGS SECTION -->"
             . "\n    <div>"
             . "\n        <h3 class=\"section-title\">Player Ratings</h3>"
             . "\n        <!-- Row 1: Shooting (2ga 2gp fta ftp 3ga 3gp) -->"
@@ -127,16 +108,44 @@ class PlayerTradingCardFrontView
             . "\n            " . $rcPd
             . "\n            " . $rcTd
             . "\n        </div>"
-            . "\n    </div>"
-            . "\n\n    <!-- Intangibles Row -->"
+            . "\n    </div>";
+    }
+
+    /**
+     * Render the intangibles pill row (TAL SKL INT CLU CON)
+     */
+    private static function renderIntangiblesRow(Player $player): string
+    {
+        // Render pills inline
+        $pTal = self::renderPill('TAL', $player->getRatingTalent());
+        $pSkl = self::renderPill('SKL', $player->getRatingSkill());
+        $pInt = self::renderPill('INT', $player->getRatingIntangibles());
+        $pClu = self::renderPill('CLU', $player->getRatingClutch());
+        $pCon = self::renderPill('CON', $player->getRatingConsistency());
+
+        return "\n\n    <!-- Intangibles Row -->"
             . "\n    <div class=\"pills-row\">"
             . "\n        " . $pTal
             . "\n        " . $pSkl
             . "\n        " . $pInt
             . "\n        " . $pClu
             . "\n        " . $pCon
-            . "\n    </div>"
-            . "\n\n    <!-- Free Agency Preferences -->"
+            . "\n    </div>";
+    }
+
+    /**
+     * Render the free agency preference pills (LOY WIN PT SEC TRD)
+     */
+    private static function renderFreeAgencySection(Player $player): string
+    {
+        // Render pills inline
+        $pLoy = self::renderPill('LOY', $player->getFreeAgencyLoyalty(), true);
+        $pWin = self::renderPill('WIN', $player->getFreeAgencyPlayForWinner(), true);
+        $pPt  = self::renderPill('PT', $player->getFreeAgencyPlayingTime(), true);
+        $pSec = self::renderPill('SEC', $player->getFreeAgencySecurity(), true);
+        $pTrd = self::renderPill('TRD', $player->getFreeAgencyTradition(), true);
+
+        return "\n\n    <!-- Free Agency Preferences -->"
             . "\n    <div>"
             . "\n        <h3 class=\"section-title\">Free Agency Preferences</h3>"
             . "\n        <div class=\"pills-row\">"
@@ -146,8 +155,20 @@ class PlayerTradingCardFrontView
             . "\n            " . $pSec
             . "\n            " . $pTrd
             . "\n        </div>"
-            . "\n    </div>"
-            . "\n\n    <!-- Contract Info Footer -->"
+            . "\n    </div>";
+    }
+
+    /**
+     * Render the contract footer; escapes the raw contract string at the sink
+     */
+    private static function renderContractBar(Player $player, string $contractDisplay): string
+    {
+        // Contract data
+        $expYears = $player->getYearsOfExperience() ?? 0;
+        $birdYears = $player->getBirdYears() ?? 0;
+        $contractSafe = HtmlSanitizer::e($contractDisplay);
+
+        return "\n\n    <!-- Contract Info Footer -->"
             . "\n    <div class=\"contract-bar\">"
             . "\n        <div class=\"contract-flex\">"
             . "\n            <div>"
@@ -159,8 +180,7 @@ class PlayerTradingCardFrontView
             . "\n                <span class=\"contract-amount\">" . $contractSafe . '</span>'
             . "\n            </div>"
             . "\n        </div>"
-            . "\n    </div>"
-            . "\n</div>";
+            . "\n    </div>";
     }
 
     /**

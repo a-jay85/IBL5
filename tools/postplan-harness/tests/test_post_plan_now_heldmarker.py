@@ -146,3 +146,44 @@ def test_marker_call_site_exits_8_before_launch():
     assert any(re.fullmatch(r"\s*exit 8\s*", ln) for ln in window[echo_at:]), "exit 8 must follow"
     ts = next(k for k, ln in enumerate(lines) if ln.startswith("TS=$(date +%Y%m%d-%H%M%S)"))
     assert i < ts, "marker decline must precede the launch"
+
+
+def _git(cwd, *args):
+    return subprocess.run(["git", "-C", str(cwd), *args], check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def test_unrealised_marker_declines_only_at_marker_head(tmp_path):
+    row = "UNREALISED-ASSERTION: row V2 -- tests/test_x.py::test_y"
+    plans_dir = tmp_path / "plans"
+    plans_dir.mkdir()
+    plan = plans_dir / f"{SLUG}.md"
+    plan.write_text("# plan\n")
+    state = tmp_path / "state"
+    state.mkdir()
+    _observe(state, reason=row)
+    bare, seed, wt = tmp_path / "origin.git", tmp_path / "seed", tmp_path / "wt"
+    _git(tmp_path, "init", "-q", "--bare", "-b", "master", str(bare))
+    _git(tmp_path, "init", "-q", "-b", "master", str(seed))
+    _git(seed, "config", "user.email", "t@t")
+    _git(seed, "config", "user.name", "t")
+    (seed / "a.txt").write_text("base\n")
+    _git(seed, "add", "-A")
+    _git(seed, "commit", "-qm", "base")
+    _git(seed, "remote", "add", "origin", str(bare))
+    _git(seed, "push", "-q", "origin", "master")
+    _git(tmp_path, "clone", "-q", str(bare), str(wt))
+    _git(wt, "config", "user.email", "t@t")
+    _git(wt, "config", "user.name", "t")
+    head = _git(wt, "rev-parse", "HEAD")
+    assert hm.write(str(state), SLUG, plan_path=str(plan), now="t0", head_sha=head,
+                    missing_tokens=["token_zzz_absent"]) is not None
+    r = _decline(plans_dir, state, cwd=wt)
+    assert "heldmarker: SUPPRESSED" in r.stdout
+    assert "rc=0" in r.stdout
+    (wt / "b.txt").write_text("more\n")
+    _git(wt, "add", "-A")
+    _git(wt, "commit", "-qm", "another commit")
+    r = _decline(plans_dir, state, cwd=wt)
+    assert "rc=1" in r.stdout
+    assert "SUPPRESSED" not in r.stdout

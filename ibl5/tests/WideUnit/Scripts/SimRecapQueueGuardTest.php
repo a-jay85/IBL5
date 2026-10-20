@@ -76,13 +76,18 @@ final class SimRecapQueueGuardTest extends TestCase
         self::assertSame(1, substr_count($this->src, '(int)'), 'Exactly one (int) cast expected (only --sim)');
     }
 
-    public function testSnowflakesLeaveAsStrings(): void
+    public function testScriptPostsOnlyToAdminChat(): void
     {
-        // The mention-map path emits each id through (string), never (int).
-        self::assertTrue(
-            str_contains($this->src, '(string) $id'),
-            'Mention-map must cast the snowflake to string before it enters the JSON'
-        );
+        $calls = preg_match_all('/postToChannel\(\s*([^,]*),/', $this->src, $matches);
+        self::assertGreaterThan(0, $calls, 'The script must post status through postToChannel');
+        foreach ($matches[1] as $channel) {
+            self::assertSame("'admin-chat'", trim($channel), 'Every status post must target #admin-chat');
+        }
+    }
+
+    public function testScriptNeverPrintsExceptionMessage(): void
+    {
+        self::assertFalse(str_contains($this->src, 'getMessage()'), 'Exception text can carry secrets; log the class only');
     }
 
     // ── Htaccess tests ─────────────────────────────────────────────────────────

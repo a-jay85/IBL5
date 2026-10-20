@@ -75,6 +75,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0198](0198-post-merge-manual-rows-after-merge-section.md) | Post-merge manual rows move to an After merge section | Accepted | A Truly-manual row tagged `post-merge: <reason>` (gate `[PM]`) renders under `## After merge`, outside the Phase 6.5 condition (1) window; `bin/after-merge-checklist` posts it as a checklist comment on merge. |
 | [0194](0194-engine-freeze-gates.md) | Freeze engine/ and gate new decompile tokens | Accepted | `bin/check-engine-freeze` runs in the required meta-checks job on every PR; it fails additions to `engine/` and any added line carrying a decompile token; the cutover PR retires it. |
 | [0202](0202-review-depth-by-merge-danger.md) | Phase 4 review depth follows the Merge danger line | Accepted | Phase 4 review depth is standard or deep from the PR body's Merge danger line; one-way, site-wide, external, or a missing line selects deep, which raises agent tiers and never skips an agent. |
+| [0204](0204-fidelity-remediation-rules-file-carveout.md) | Phase 5.5 remediation may commit a small fix to a rules file a blocking finding names | Accepted | The harness fixer may edit and commit a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes, within line and frontmatter limits; every other gate-owning path stays denied. |
 
 ## When an ADR is Required
 

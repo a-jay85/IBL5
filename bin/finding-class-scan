@@ -340,6 +340,7 @@ new_nonce() { od -An -N8 -tx1 /dev/urandom | tr -d ' \n'; }
 # Counters for the summary and the DM.
 FETCH_MODE="incremental"
 FETCH_HIGH=""
+CAP_HIT=0
 CUTOFF=""
 THREADS_NEW=0
 FILED=0
@@ -595,7 +596,7 @@ Rules:
 - Invent a new class only when no known class fits and the defect could recur. A new key is lowercase words joined by hyphens, 3 to 60 characters.
 - Set class_key to null for a thread that fits no recurring class.
 - For each new class give a title, a description, a proposed_check that says how a static check would find the defect, and a check_kind: "phpstan" for PHP app code under ibl5/, "bin-check" for shell, workflow or tooling, or "none" when no static check can encode the judgment.
-- A defect in how a script calls an external command can usually be found by a grep-style bin-check. Examples: a call with no timeout, or output parsed from a stream merged with stderr. Prefer "bin-check" for those. Use "none" only when the defect needs human judgment.
+- A defect in how a script calls an external command can usually be found by a grep-style bin-check. Prefer "bin-check" for those. Use "none" only when the defect needs human judgment.
 - Set artifact_path for a phpstan class to ibl5/phpstan-rules/<Ban|Require><Name>Rule.php, for a bin-check class to bin/check-<name>, and for a none class to null.
 - Return JSON only, matching the schema you were given.
 
@@ -645,6 +646,7 @@ classify_unseen() {
     for f in "$WORK"/batch-*; do
         if [ "$k" -ge "$FCS_MAX_BATCHES" ]; then
             say "batch cap $FCS_MAX_BATCHES reached; remaining threads wait for the next run"
+            CAP_HIT=1
             break
         fi
         k=$((k + 1))
@@ -930,6 +932,12 @@ apply_actions() {
 
 write_watermark() {
     if [ "$DRY_RUN" -eq 1 ] || [ -z "$FETCH_HIGH" ]; then return 0; fi
+    # A capped run left threads unclassified. Moving the watermark would let the
+    # next incremental fetch skip the PRs they sit on.
+    if [ "$CAP_HIT" -eq 1 ]; then
+        say "watermark held: batch cap left threads unclassified"
+        return 0
+    fi
     local tmp
     tmp="$(mktemp "$STATE_DIR/.watermark.XXXXXX")"
     printf '%s\n' "$FETCH_HIGH" > "$tmp"

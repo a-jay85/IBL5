@@ -629,6 +629,44 @@ case_filing_failure_and_success() {
     expect_has "row 35: DM is marked truncated" "$(cat "$STUB_DIR/dm.txt")" "[truncated]"
 }
 
+# 125 trusted threads on one PR give three classifier batches of 60.
+many_threads_fixture() {
+    jq -c '.data.repository.pullRequests.pageInfo.hasNextPage = false
+        | .data.repository.pullRequests.nodes = [
+            (.data.repository.pullRequests.nodes[0]
+             | .reviewThreads.pageInfo.hasNextPage = false
+             | .reviewThreads.nodes = [range(1; 126) as $i
+                 | {id: ("M\($i)"), isResolved: false, isOutdated: false, path: "ibl5/classes/Foo/Bar.php", line: 10,
+                    comments: {nodes: [{author: {login: "a-jay85", __typename: "User"}, body: "finding body \($i)",
+                                        url: "https://github.com/a-jay85/IBL5/pull/101#discussion_r\(1000 + $i)",
+                                        createdAt: "2026-10-10T09:00:00Z"}]}}])]' \
+        "$STUB_DIR/fx/pr-page-1.json" > "$STUB_DIR/fx/pr-page-1.tmp" && mv "$STUB_DIR/fx/pr-page-1.tmp" "$STUB_DIR/fx/pr-page-1.json"
+}
+
+case_batch_cap_holds_the_watermark() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    many_threads_fixture
+    printf '2026-10-01T00:00:00Z\n' > "$STATE/watermark"
+    cp "$STATE/watermark" "$FX/watermark.before"
+    XENV="FCS_MAX_BATCHES=1"
+    fcs
+    expect_eq "cap: run exits 0" 0 "$RC"
+    expect_has "cap: the cap is announced" "$ALL" "batch cap 1 reached"
+    expect_eq "cap: one classifier call" 1 "$(count_lines claude.calls call)"
+    expect_has "cap: the held watermark is announced" "$ALL" "watermark held"
+    expect_same_file "cap: watermark byte-identical" "$STATE/watermark" "$FX/watermark.before"
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    many_threads_fixture
+    printf '2026-10-01T00:00:00Z\n' > "$STATE/watermark"
+    XENV="FCS_MAX_BATCHES=3"
+    fcs
+    expect_eq "no cap: run exits 0" 0 "$RC"
+    expect_eq "no cap: three classifier calls" 3 "$(count_lines claude.calls call)"
+    expect_eq "no cap: watermark moves" "2026-10-12T10:00:00Z" "$(cat "$STATE/watermark")"
+}
+
 case_dm_failure_keeps_exit_code() {
     new_fixture
     fcs

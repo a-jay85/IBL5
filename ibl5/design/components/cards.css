@@ -179,7 +179,7 @@
 }
 
 .ibl-alert--success { background: var(--success-50); color: var(--success-600); border: 1px solid var(--success-200); }
-.ibl-alert--error   { background: var(--error-50);   color: var(--error-600);   border: 1px solid var(--error-200); }
+.ibl-alert--error   { background: var(--error-50);   color: var(--error-700);   border: 1px solid var(--error-200); }
 .ibl-alert--info    { background: var(--info-50);    color: var(--info-600);    border: 1px solid var(--info-200); }
 .ibl-alert--warning { background: var(--warning-50); color: var(--warning-600); border: 1px solid var(--warning-200); }
 

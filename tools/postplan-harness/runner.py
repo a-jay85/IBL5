@@ -365,31 +365,17 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if qualified:
             log(f"phase2: qualified {qualified} bare backlog ref(s) as {BACKLOG_REPO}#N")
         copy["commit_subject"] = schemas.coerce_commit_subject(copy["commit_subject"], cls)
-        bc_cache: dict = {}
-        early_rec = reviewcache.load_record(_state_dir(out_dir, live, state_dir), slug)
-        if early_rec is not None:
-            try:
-                early_pr = gh.pr_number() if gh.pr_exists() else None
-            except (HarnessError, OSError, subprocess.SubprocessError):
-                early_pr = None
-            if not early_pr or not reviewcache.pr_matches(early_rec, early_pr):
-                early_rec = None
-        early_version = (_harness_version(worktree, _master_sha(worktree), HARNESS_ROOT, log)
-                         if early_rec is not None else "")
-        check, body_check_degraded = _body_check(
-            llm, git, gh, copy, copy_degraded, cls, log, worktree=worktree,
-            cache_rec=early_rec, cache_version=early_version, cache_out=bc_cache)
-        if bc_cache.get("reused_from"):
-            res.reused_from["body-check"] = bc_cache["reused_from"]
+        merge_danger_degraded = False
+        check = _mechanical_body_pass(git, gh, copy, copy_degraded, log, worktree=worktree)
         if copy["summary_md"] and check.get("corrected_body"):
             copy["summary_md"] = check["corrected_body"]
             for f in check.get("findings", []):
-                log(f"phase2 body-check finding: {f}")
+                log(f"phase2 finding: {f}")
         _inject_residual_phases(copy, plan, conf_files, log)
         log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         if _inject_merge_danger(copy, worktree, diff, log):
-            body_check_degraded = True
+            merge_danger_degraded = True
         _inject_how_to_revert(copy, diff, log)
         log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
@@ -526,8 +512,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # human must sanity-check was never model-reviewed.
             if copy_degraded:
                 degraded_agents = list(degraded_agents) + [schemas.PR_COPY_PURPOSE]
-            if body_check_degraded:
-                degraded_agents = list(degraded_agents) + ["body-check"]
+            if merge_danger_degraded:
+                degraded_agents = list(degraded_agents) + ["merge-danger"]
             res.findings = findings
             res.scored_findings = scored
             res.degraded_agents = degraded_agents
@@ -785,7 +771,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # never persists arms from a run that failed mid-way.
         if cache_key is not None and res.pr_number:
             _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug,
-                                out_dir, bc_cache, review_phase.gates(cls), log)
+                                out_dir, review_phase.gates(cls), log)
         if (live or state_dir is not None) and res.hold_repeat is None:
             res.hold_repeat = _record_hold_repeat(res, decision, slug, worktree,
                                                   _state_dir(out_dir, live, state_dir), log)
@@ -2190,7 +2176,7 @@ def _sweep_out_of_scope(gh, pr, plan, slug, log) -> list[int]:
 def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str]:
     """Phase 2: upsert `## Residual Phases` into copy["summary_md"] from phase-omission items.
 
-    Runs AFTER _body_check so an LLM-corrected body cannot drop the block, and BEFORE the
+    Runs AFTER _mechanical_body_pass so a corrected body cannot drop the block, and BEFORE the
     commit so the commit body and the PR body carry it. Idempotent: an empty item list
     removes a stale block. Never raises on a plan-blind run (phase_omission_items returns
     [] when plan.found is False). Returns the items for the caller's log line. Exemption
@@ -2213,8 +2199,8 @@ def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list
     """Phase 2: mechanical Merge danger floor; the LLM line in summary_md only supplies Why
     and may raise Door / Blast radius. Always runs, fixture or live, degraded or not.
 
-    Returns the body-check findings for the final body ([] when it carries one well-formed
-    line); a non-empty result marks the body check degraded, which holds arming.
+    Returns the merge-danger findings for the final body ([] when it carries one well-formed
+    line); a non-empty result marks the run degraded under `merge-danger`, which holds arming.
 
     An empty summary_md is the clean-tree rerun: the live body is left as is, and condition
     (18) reads that body at arm time."""
@@ -2223,7 +2209,7 @@ def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list
     copy["summary_md"] = _merge_danger_body(copy["summary_md"], worktree, diff_body, log, "phase2")
     findings = merge_danger.validate_merge_danger_field(copy["summary_md"])
     for f in findings:
-        log(f"phase2 body-check finding: {f}")
+        log(f"phase2 finding: {f}")
     return findings
 
 
@@ -2288,82 +2274,43 @@ def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_b
     return notes
 
 
-def _body_check(llm, git, gh, copy, copy_degraded, cls, log, worktree=None,
-                cache_rec=None, cache_version="", cache_out=None) -> tuple[dict, bool]:
-    """Phase 2 body-vs-diff verification: (result, body_check_degraded).
+def _mechanical_body_pass(git, gh, copy, copy_degraded, log, worktree=None) -> dict:
+    """Phase 2 mechanical body pass: {corrected_body, findings}, or {} when skipped.
 
-    Returns ({}, False) without calling the LLM when pr-copy was degraded (the
-    fallback body is a one-line stub with nothing to reconcile) or when the subject
-    text resolves to empty.  On a degraded model reply, returns the mechanically-
-    corrected body so number corrections survive the model failure.  Test-count
-    mismatches are annotated in the returned corrected_body and appended to
-    findings on both the LLM and degraded paths.
+    No model call. Skips when pr-copy was degraded (the fallback body is a one-line
+    stub with nothing to reconcile) or when the subject text resolves to empty. On the
+    clean-tree rerun summary_md is '' and the subject is the live PR body, read through
+    gh.pr_body_fresh() so a body edited on GitHub is what gets checked. Order is fixed:
+    body_numbers.correct_body_numbers first, body_numbers.annotate_test_count_mismatches
+    second, so the test-count note sits on the corrected text.
     """
     if copy_degraded:
-        log("phase2: body-check skipped (pr-copy degraded)")
-        return {}, False
+        log("phase2: body pass skipped (pr-copy degraded)")
+        return {}
 
     diff = git.diff_vs_base()
     ns = name_status_text(diff)
     nums = numstat_text(diff)
 
-    # Choose subject text: write-back path vs read-only path (clean-tree rerun)
     if copy["summary_md"]:
         subject = copy["summary_md"]
     else:
         subject = gh.pr_body_fresh() or ""
     if not subject:
-        log("phase2: body-check skipped (empty body)")
-        return {}, False
+        log("phase2: body pass skipped (empty body)")
+        return {}
 
-    # Mechanical pass — runs regardless of whether the LLM pass later degrades
-    mechanically_corrected = body_numbers.correct_body_numbers(subject, ns, nums)
-    if mechanically_corrected != subject:
-        log("phase2: body-check corrected numbers mechanically")
+    corrected = body_numbers.correct_body_numbers(subject, ns, nums)
+    if corrected != subject:
+        log("phase2: body pass corrected numbers mechanically")
 
-    # LLM pass. Reuse keys on the exact rendered prompt, so a regenerated body, a
-    # changed file list or a template edit each miss. `cache_out` receives the hash,
-    # the raw model result and the reusing run id for the Phase 7 cache write.
-    degraded = False
-    prompt = llm_calls.pr_body_check_prompt(
-        body_numbers.body_prose_for_check(mechanically_corrected), ns)
-    input_hash = hashlib.sha256(prompt.encode()).hexdigest()
-    reused = reviewcache.restore_body_check(cache_rec, cache_version, input_hash,
-                                            schemas.validate_body_check)
-    if cache_out is not None:
-        cache_out["input_hash"] = input_hash
-    try:
-        if reused is not None:
-            result, reuse_run = reused
-            if cache_out is not None:
-                cache_out["reused_from"] = reuse_run
-            log(f"phase2: body-check reused from {reuse_run} (no LLM call)")
-        else:
-            result = llm.call(
-                "body-check", "sonnet",
-                prompt,
-                schemas.validate_body_check)
-        if cache_out is not None:
-            cache_out["result"] = result
-        log(f"phase2: body-check findings: {len(result.get('findings', []))}")
-    except HarnessError as e:
-        if e.kind not in ("llm-invalid-output", "llm-fixture-missing"):
-            raise
-        log(f"phase2: body-check DEGRADED ({(e.detail or '')[:200]})")
-        result = {"corrected_body": mechanically_corrected, "findings": []}
-        degraded = True
-
-    # Test-count pass: mechanical, after the LLM so its rewrite cannot drop the note
     read_file = (None if worktree is None
                  else (lambda p: body_numbers.read_worktree_file(worktree, p)))
     annotated, tc_findings = body_numbers.annotate_test_count_mismatches(
-        result.get("corrected_body", ""), diff, read_file)
-    if tc_findings:
-        result = {**result, "corrected_body": annotated,
-                  "findings": list(result.get("findings", [])) + tc_findings}
-        for f in tc_findings:
-            log(f"phase2: body-check {f}")
-    return result, degraded
+        corrected, diff, read_file)
+    for f in tc_findings:
+        log(f"phase2 finding: {f}")
+    return {"corrected_body": annotated, "findings": list(tc_findings)}
 
 
 def _post_fix_meta_checks(worktree, pr, flag, *, live, fixture, log) -> int:
@@ -2702,7 +2649,7 @@ def _interdiff_review(review_phase, meta, cls, plan, delta, keep_findings, keep_
 
 
 def _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug, out_dir,
-                        bc_cache, gates, log) -> None:
+                        gates, log) -> None:
     """Vet each arm and save the record. A reused arm is re-written verbatim so its
     run_id keeps naming the run that paid for the LLM call; an interdiff review is a
     fresh producer. Never raises: a cache write must not fail a run."""
@@ -2712,20 +2659,16 @@ def _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug,
         rev_arm = (prior.get("review") if "review" in res.reused_from and not res.review_delta
                    else reviewcache.vet_review(res.findings, res.scored_findings,
                                                res.degraded_agents, gates, this_run))
-        bc_arm = (prior.get("body_check") if "body-check" in res.reused_from
-                  else reviewcache.vet_body_check(bc_cache.get("input_hash", ""),
-                                                  bc_cache.get("result"),
-                                                  res.degraded_agents, this_run))
         fid_arm = (prior.get("fidelity") if "fidelity" in res.reused_from
                    else reviewcache.vet_fidelity(res.fidelity, this_run))
         if "fidelity" in res.reused_from and fid_arm:
             fid_arm = dict(fid_arm, diff_id=cache_key["diff_id"])   # conflict-only: valid for the current diff
         doc = reviewcache.build_record(slug=slug, pr_number=int(res.pr_number), run_id=this_run,
                                        key=cache_key, per_file_ids=cache_files, review=rev_arm,
-                                       body_check=bc_arm, fidelity=fid_arm)
+                                       fidelity=fid_arm)
         reviewcache.save_record(cache_dir, slug, doc)
-        log("reviewcache: wrote record (review=%s body-check=%s fidelity=%s)" % tuple(
-            "ok" if a else "skipped" for a in (rev_arm, bc_arm, fid_arm)))
+        log("reviewcache: wrote record (review=%s fidelity=%s)" % tuple(
+            "ok" if a else "skipped" for a in (rev_arm, fid_arm)))
     except Exception as exc:  # fail-open on the write: the next run simply misses
         log(f"reviewcache: record write skipped ({exc})")
 

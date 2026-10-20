@@ -35,7 +35,7 @@ pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
 
 FIDELITY_PURPOSE = "plan-fidelity-review"
 PURPOSES = {FIDELITY_PURPOSE, "review-agent-a", "review-agent-b", "review-agent-d",
-            "security-audit", *VERIFIER_PURPOSES, "body-check"}
+            "security-audit", *VERIFIER_PURPOSES}
 SAMPLE_LEDGER = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                              "fixtures", "reviewcache", "sample-ledger.json")
 CANNED = dict(CANNED_FINDINGS, **{FIDELITY_PURPOSE: "6d checks\n\nREADY\n"})
@@ -123,7 +123,7 @@ def h(tmp_path, monkeypatch):
 
 
 def _all_arms_reused(run1, run2):
-    return {"review": run1.id, "fidelity": run1.id, "body-check": run1.id}
+    return {"review": run1.id, "fidelity": run1.id}
 
 
 # ---- same patch-id: every arm reused, arming unchanged --------------------------------------
@@ -154,7 +154,7 @@ def test_same_patch_id_reuses_all_arms_with_identical_arming(h):
     m = fidelity.STICKY_REUSED_FROM_RE.search(run2.sticky)
     assert m is not None
     assert m.group(1) == run1.id
-    assert set(m.group(2).split(", ")) == {"review", "fidelity", "body-check"}
+    assert set(m.group(2).split(", ")) == {"review", "fidelity"}
     assert "**Reused from:**" in run2.sticky
     assert "**Reused from:**" not in run1.sticky
 
@@ -217,8 +217,7 @@ def test_one_changed_line_reviews_that_file_only(h, monkeypatch):
     assert headers == [f"diff --git a/{ALPHA} b/{ALPHA}"]
     assert BETA not in seen[0] and SPEC not in seen[0]
     assert FIDELITY_PURPOSE in calls(run2.res)       # fidelity has no interdiff mode
-    assert run2.res.reused_from == {"review": run1.id, "body-check": run1.id}
-    assert "body-check" not in calls(run2.res)
+    assert run2.res.reused_from == {"review": run1.id}
 
 
 # ---- anything that must force a full run -----------------------------------------------------
@@ -228,12 +227,9 @@ def test_plan_file_edit_forces_full_run(h):
     with open(h.plan_path, "a") as fh:
         fh.write("\n")
     run2 = h.run("run2", prior_sticky=run1.sticky)
-    # Body-check keys on its rendered prompt only (Phase 5 key rule: neither diff_id nor
-    # plan_hash participates), and the replay PR copy is byte-identical across runs, so
-    # that arm alone stays reused. Review and fidelity both consume the plan and re-run.
-    assert PURPOSES - {"body-check"} <= set(calls(run2.res))
-    assert "body-check" not in calls(run2.res)
-    assert run2.res.reused_from == {"body-check": "live-run1"}
+    # Review and fidelity both consume the plan, so both re-run.
+    assert PURPOSES <= set(calls(run2.res))
+    assert run2.res.reused_from == {}
 
 
 def test_harness_version_bump_forces_full_run(h, monkeypatch):
@@ -259,7 +255,7 @@ def test_corrupted_cache_forces_full_run_and_rewrites(h):
     rec = reviewcache.load_record(h.state, SLUG)
     assert rec is not None
     assert rec["run_id"] == run2.id
-    for arm in ("review", "body_check", "fidelity"):
+    for arm in ("review", "fidelity"):
         assert isinstance(rec[arm], dict), arm
         assert rec[arm]["run_id"] == run2.id
 

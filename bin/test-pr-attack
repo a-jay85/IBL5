@@ -22,7 +22,7 @@ failcase() { h_fail "$@"; }
 
 # assert_match <name> <ERE> <output>
 assert_match() {
-    if printf '%s\n' "$3" | grep -qE "$2"; then
+    if grep -qE "$2" <<<"$3"; then
         pass "$1"
     else
         failcase "$1 - expected to match: $2"
@@ -32,7 +32,7 @@ assert_match() {
 
 # assert_absent <name> <ERE> <output>
 assert_absent() {
-    if printf '%s\n' "$3" | grep -qE "$2"; then
+    if grep -qE "$2" <<<"$3"; then
         failcase "$1 - expected NOT to match: $2"
         printf '%s\n' "$3" | sed 's/^/    /'
     else
@@ -880,14 +880,14 @@ assert_status "21 output-fidelity exits 0" 0 "$ST"
 # Find the row for #20 (the conflict-cost follower)
 ROW20="$(printf '%s\n' "$OUT" | grep '#20' | grep '^|' | head -1 || true)"
 if [ -n "$ROW20" ]; then
-    if printf '%s\n' "$ROW20" | grep -qF '(MUST)'; then
+    if grep -qF '(MUST)' <<<"$ROW20"; then
         failcase "21 conflict-cost PR #20 must not have (MUST) in constraint"
     else
         pass "21 conflict-cost PR #20 has no (MUST)"
     fi
 else
     # #20 might be positioned later; check full output
-    if printf '%s\n' "$OUT" | grep -qE '#20.*\(MUST\)'; then
+    if grep -qE '#20.*\(MUST\)' <<<"$OUT"; then
         failcase "21 conflict-cost constraint must not contain (MUST)"
     else
         pass "21 conflict-cost PR constraint has no (MUST)"
@@ -895,7 +895,7 @@ else
 fi
 
 # declared edge PR #40 should have (MUST)
-if printf '%s\n' "$OUT" | grep '#40' | grep '^|' | grep -q '(MUST)'; then
+if grep '#40' <<<"$OUT" | grep '^|' | grep -c '(MUST)' >/dev/null; then
     pass "21 declared edge PR #40 has (MUST)"
 else
     failcase "21 declared edge PR #40 should have (MUST) in constraint"

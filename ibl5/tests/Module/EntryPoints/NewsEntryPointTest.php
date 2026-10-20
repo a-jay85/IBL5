@@ -226,4 +226,23 @@ class NewsEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotSame('', $output);
     }
+
+    public function testTopicBannerUsesThemeBgcolorGlobals(): void
+    {
+        $this->mockDb->onQuery('topictext', [
+            ['topictext' => 'Some Topic'],
+        ]);
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule(
+            'News',
+            get: ['new_topic' => '1'],
+            extraGlobals: [
+                'storyhome' => 10, 'multilingual' => 0, 'user_news' => 0, 'articlecomm' => 0,
+                'bgcolor1' => '#BBBBBB', 'bgcolor2' => '#CCCCCC',
+            ],
+        );
+
+        $this->assertStringContainsString('bgcolor="#BBBBBB"', $output);
+        $this->assertStringNotContainsString('bgcolor="#EEEEEE"', $output);
+    }
 }

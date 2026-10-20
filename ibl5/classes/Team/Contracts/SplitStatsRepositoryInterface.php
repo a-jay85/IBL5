@@ -23,11 +23,45 @@ interface SplitStatsRepositoryInterface
     public function getSplitStats(int $teamid, int $seasonEndingYear, string $splitKey): array;
 
     /**
+     * Get per-game averages for a team's players over an inclusive game_date range.
+     *
+     * Serves BasketballStats\Tables\PeriodAverages. Unlike getSplitStats(), this query has
+     * no season_year/game_type filter and no NULLIF guards, so a 0-attempt player returns
+     * NULL for gameFGPavg / gameFTPavg / game3GPavg.
+     *
+     * @param int $teamid Team ID (must be > 0)
+     * @param string|null $startDate Inclusive lower bound, Y-m-d; null binds SQL NULL (matches no rows)
+     * @param string|null $endDate Inclusive upper bound, Y-m-d; null binds SQL NULL (matches no rows)
+     * @param list<int> $pidFilter Optional pid allow-list; [] means no pid restriction
+     * @return list<SplitStatsRow>
+     */
+    public function getPeriodStats(int $teamid, ?string $startDate, ?string $endDate, array $pidFilter = []): array;
+
+    /**
      * Get all valid split key strings for parameter validation
      *
      * @return list<string>
      */
     public function getValidSplitKeys(): array;
+
+    /**
+     * Resolve the requested display mode and raw split request value into
+     * the (display, split) pair the table renderers accept.
+     *
+     * Truth table (identical at every caller this replaces):
+     * - $display !== 'split': [$display, null], display untouched.
+     * - $display === 'split' and $rawSplit is a string in getValidSplitKeys()
+     *   under strict comparison: ['split', $rawSplit].
+     * - every other case (null, non-string, array, unknown or empty string):
+     *   ['ratings', null].
+     *
+     * Pure: reads no request state and runs no query.
+     *
+     * @param string $display Already-validated display mode (callers validate it)
+     * @param mixed $rawSplit Raw request value for `split`, any type
+     * @return array{string, ?string} [resolved display, validated split key or null]
+     */
+    public function resolveDisplayAndSplit(string $display, mixed $rawSplit): array;
 
     /**
      * Get a human-readable label for a split key

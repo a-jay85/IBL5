@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-10
+last_verified: 2026-10-19
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -194,7 +194,7 @@ Appending a metadata line is **not** editing the verdict: the word, the findings
 
 ## Step 4 — Remediation on `READY WITH NOTES` (and `NOT READY`)
 
-Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-5-5"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow.
+Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-5-5"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow. The harness engine adds one bounded exception to the gate-owning deny: a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes may be edited and committed, within the size and frontmatter limits in `tools/postplan-harness/harness/fidelity_filefix.py`; every other gate-owning path stays denied and a mixed commit is discarded whole. The skill engine keeps the full deny.
 
 Three post-plan-specific rules on top — these are where a re-spawn would otherwise creep in:
 
@@ -213,10 +213,13 @@ The last line of the sticky comment, immediately above the `<!-- pr-ready-verdic
 | `READY` | step 4 skipped | `READY` |
 | `READY WITH NOTES` | every `Mode: in-PR` finding fixed | `READY WITH NOTES — all notes remediated in <sha>; reviewer verdict covers tree <REVIEWED_TREE>, not the post-remediation head` |
 | `READY WITH NOTES` | something left unfixed | `READY WITH NOTES — <what remains, named>; remediated the rest in <sha>` |
-| `NOT READY` | all fixed; step 4b re-review returned `READY` or `READY WITH NOTES` | `READY (re-review) — findings remediated in <sha> and re-reviewed clean on tree <tree>; condition (12) arms on the next /post-plan Phase 6.5 run` |
+| `NOT READY` | all fixed; step 4b re-review returned `READY` | `READY (re-review) — findings remediated in <sha> and re-reviewed clean on tree <tree>; condition (12) arms on the next /post-plan Phase 6.5 run` |
+| `NOT READY` | all fixed; step 4b re-review returned `READY WITH NOTES` | `READY WITH NOTES (re-review) — findings remediated in <sha>; the re-review on tree <tree> left non-blocking notes open` |
 | `NOT READY` | all fixed; step 4b re-review returned `NOT READY` | `NOT READY (re-review) — <what the re-review still blocks on, named>; remediate and re-run /post-plan` |
 | `NOT READY` | all fixed; step 4b skipped (`auto_merge: false`) | `NOT READY — held for your final review` |
 | `NOT READY` | something left unfixed | `NOT READY — <what remains, named>` |
+
+A `(re-review)` terminal line never carries forward. Step 1's exact match on `READY` and `READY WITH NOTES` already rejects both re-review rows, and the harness guard `_RE_REVIEW_TERMINAL_RE` in `tools/postplan-harness/harness/fidelity.py` does the same on the harness path.
 
 **A `NOT READY` line carries action items only.** Its suffix names what the reader must still
 do to reach `READY` — nothing else. Remediation the run already completed is **not** an action
@@ -320,6 +323,14 @@ verdict word; when ## FINDINGS is empty, write `Findings: none.` in its place; k
 include-source: line when the fallback fired>
 
 <findings slot — when `$V2_FINDINGS` (extracted in step 4b) is non-empty, emit a blank line, then its content pasted VERBATIM (no condensing, no re-wording, no re-ordering), then a blank line, before the `### Merge digest` heading below. When `$V2_FINDINGS` is empty, or step 4b did not run, emit nothing here and leave the single blank line above `### Merge digest` exactly as it is.>
+
+<status sections, all above `### Merge digest`, in this order, each followed by one blank line:
+the `**Code review:**` line (the six rows from the harness `_code_review_line`, verbatim);
+`### Fixed in this PR` (`- [x] <title> (fixed in <sha12>)`, only when the final verdict passes);
+`### Still open (non-blocking)` or `### Still open (blocking)`
+(`- [ ] <title> (<backlog link | already tracked in the backlog | not filed>)`).
+The banner word on line 1 is the terminal line's leading word. The reviewer excerpt goes in a
+`<details><summary>Reviewer verdict</summary>` block whenever either section renders.>
 
 ### Merge digest
 **What changed:** <paste line 1 from /tmp/post-plan-digest-lines-<N>.txt>

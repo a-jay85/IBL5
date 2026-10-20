@@ -1,6 +1,6 @@
 ---
 description: Historical calibration record for Lever-2 foul-bucket team-quality compression (foulCompress = 0.45); off-side superseded by ADR-0061, def-side and foulCompress fully superseded by ADR-0084. Records the three-axis verdict and FTADispersionRatio target rationale.
-last_verified: 2026-08-12
+last_verified: 2026-10-12
 ---
 
 # ADR-0044: Foul-bucket team-quality compression (Lever-2)

@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
 from harness import fidelity, review, reviewcache
 from harness.adapters.llm import FixtureLlm
+from harness.review import VERIFIER_PURPOSES
 from harness.state import TerminalState, UsageLedger
 from test_review_cache_hit import ALPHA, BETA, CANNED_FINDINGS, FIXTURE, SLUG, SPEC
 
@@ -34,11 +35,21 @@ pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
 
 FIDELITY_PURPOSE = "plan-fidelity-review"
 PURPOSES = {FIDELITY_PURPOSE, "review-agent-a", "review-agent-b", "review-agent-d",
-            "security-audit", "score-findings", "body-check"}
+            "security-audit", *VERIFIER_PURPOSES, "body-check"}
 SAMPLE_LEDGER = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                              "fixtures", "reviewcache", "sample-ledger.json")
 CANNED = dict(CANNED_FINDINGS, **{FIDELITY_PURPOSE: "6d checks\n\nREADY\n"})
 PLAN_BODY = FIXTURE["plan_content"]
+
+
+@pytest.fixture(autouse=True)
+def _pin_verifier_worktree(monkeypatch, tmp_path):
+    """Replay passes no worktree to run(), which would take the keep-all fallback. Pin one on the
+    review phase so the canned verifier replies (from CANNED_FINDINGS) drive 4D."""
+    real = runner._review_phase_for
+    monkeypatch.setattr(runner, "_review_phase_for",
+                        lambda llm, gh, copy, meta, log, worktree=None: real(
+                            llm, gh, copy, meta, log, worktree=str(tmp_path)))
 
 
 def calls(res):
@@ -262,7 +273,9 @@ def test_replayed_hit_prices_avoided_cost(h):
 
     with open(SAMPLE_LEDGER) as fh:
         sample = json.load(fh)
-    assert {c["purpose"] for c in sample} >= PURPOSES      # the price list covers every arm
+    # The price list covers every arm; the verifier seats have no sampled price yet, so
+    # they are skipped here and avoided_cost() counts them as zero.
+    assert {c["purpose"] for c in sample} >= PURPOSES - set(VERIFIER_PURPOSES)
     saved = reviewcache.avoided_cost(sample, absent)
     total = sum(c["cost_usd"] for c in sample)
     assert saved > 0

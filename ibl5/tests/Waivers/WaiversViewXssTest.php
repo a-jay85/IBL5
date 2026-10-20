@@ -61,6 +61,7 @@ class WaiversViewXssTest extends TestCase
 
         $this->assertStringNotContainsString('<script>', $optionHtml);
         $this->assertStringContainsString('&lt;script&gt;', $optionHtml);
+        $this->assertStringNotContainsString('&amp;lt;', $optionHtml);
     }
 
     public function testBuildPlayerOptionEscapesContract(): void

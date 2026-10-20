@@ -12,15 +12,18 @@ declare(strict_types=1);
  * @see \Standings\StandingsView For HTML rendering
  */
 
-if (!preg_match('/modules\.php/i', $_SERVER['PHP_SELF'])) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (preg_match('/modules\.php/i', is_string($phpSelfGuard) ? $phpSelfGuard : '') !== 1) {
     die("You can't access this file directly...");
 }
 
 // Get database connection from the global context
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext $leagueContext */
 
 // Ensure database connection is available
-if (!isset($mysqli_db) || !$mysqli_db) {
+if (!isset($mysqli_db)) {
     echo '<p>Error: Database connection not available.</p>';
     return;
 }

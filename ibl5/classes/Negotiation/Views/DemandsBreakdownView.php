@@ -11,6 +11,8 @@ use Security\HtmlSanitizer;
 /**
  * Renders a detailed breakdown of the contract demands formula.
  *
+ * Section methods echo into the output buffer render() opens; they are private and never called outside it.
+ *
  * @phpstan-import-type DemandsBreakdown from ExtensionContractDemandCalculatorInterface
  */
 class DemandsBreakdownView
@@ -25,6 +27,30 @@ class DemandsBreakdownView
 <details class="debug-breakdown">
     <summary class="debug-breakdown__summary">Demands Formula Breakdown</summary>
 
+<?php self::renderRatingsSection($breakdown); ?>
+
+<?php self::renderScorePipelineSection($breakdown); ?>
+
+<?php self::renderFaPreferencesSection($breakdown); ?>
+
+<?php self::renderTeamFactorsSection($breakdown); ?>
+
+<?php self::renderModifierComponentsSection($breakdown); ?>
+
+<?php self::renderCombinedModifierSection($breakdown); ?>
+
+<?php self::renderFinalDemandsSection($breakdown); ?>
+</details>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param DemandsBreakdown $breakdown
+     */
+    private static function renderRatingsSection(array $breakdown): void
+    {
+        ?>
     <div class="debug-breakdown__section">
         <h3 class="debug-breakdown__heading">Ratings vs Market</h3>
         <table class="ibl-data-table">
@@ -48,20 +74,44 @@ class DemandsBreakdownView
             </tbody>
         </table>
     </div>
+<?php
+    }
 
+    /**
+     * @param DemandsBreakdown $breakdown
+     */
+    private static function renderScorePipelineSection(array $breakdown): void
+    {
+        /** @infection-ignore-all Equivalent: formatWithDecimals() casts to float itself, so dropping this cast cannot change output. */
+        $avgDemands = (float) $breakdown['avgDemands'];
+        /** @infection-ignore-all Equivalent: formatWithDecimals() casts to float itself, so dropping this cast cannot change output. */
+        $totalDemands = (float) $breakdown['totalDemands'];
+        /** @infection-ignore-all Equivalent: formatWithDecimals() casts to float itself, so dropping this cast cannot change output. */
+        $baseDemands = (float) $breakdown['baseDemands'];
+        /** @infection-ignore-all Equivalent: formatWithDecimals() casts to float itself, so dropping this cast cannot change output. */
+        $maxRaise = (float) $breakdown['maxRaise'];
+        ?>
     <div class="debug-breakdown__section">
         <h3 class="debug-breakdown__heading">Score Pipeline</h3>
         <dl class="debug-breakdown__kv">
             <div><dt>Total Raw Score</dt><dd><?= (int) $breakdown['totalRawScore'] ?></dd></div>
             <div><dt>Baseline</dt><dd>-<?= (int) $breakdown['baseline'] ?></dd></div>
             <div><dt>Adjusted Score</dt><dd><?= (int) $breakdown['adjustedScore'] ?></dd></div>
-            <div><dt>&times; 3 (demands factor) = Avg Demands</dt><dd><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals((float) $breakdown['avgDemands'], 1)) ?></dd></div>
-            <div><dt>&times; 5 = Total Demands</dt><dd><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals((float) $breakdown['totalDemands'], 1)) ?></dd></div>
-            <div><dt>&divide; 6 = Base Demands (Yr 1)</dt><dd><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals((float) $breakdown['baseDemands'], 1)) ?></dd></div>
-            <div><dt>10% Raise per Year</dt><dd><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals((float) $breakdown['maxRaise'], 1)) ?></dd></div>
+            <div><dt>&times; 3 (demands factor) = Avg Demands</dt><dd><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals($avgDemands, 1)) ?></dd></div>
+            <div><dt>&times; 5 = Total Demands</dt><dd><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals($totalDemands, 1)) ?></dd></div>
+            <div><dt>&divide; 6 = Base Demands (Yr 1)</dt><dd><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals($baseDemands, 1)) ?></dd></div>
+            <div><dt>10% Raise per Year</dt><dd><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals($maxRaise, 1)) ?></dd></div>
         </dl>
     </div>
+<?php
+    }
 
+    /**
+     * @param DemandsBreakdown $breakdown
+     */
+    private static function renderFaPreferencesSection(array $breakdown): void
+    {
+        ?>
     <div class="debug-breakdown__section">
         <h3 class="debug-breakdown__heading">Player FA Preferences</h3>
         <table class="ibl-data-table">
@@ -76,7 +126,15 @@ class DemandsBreakdownView
             </tbody>
         </table>
     </div>
+<?php
+    }
 
+    /**
+     * @param DemandsBreakdown $breakdown
+     */
+    private static function renderTeamFactorsSection(array $breakdown): void
+    {
+        ?>
     <div class="debug-breakdown__section">
         <h3 class="debug-breakdown__heading">Team Factors</h3>
         <table class="ibl-data-table">
@@ -92,7 +150,15 @@ class DemandsBreakdownView
             </tbody>
         </table>
     </div>
+<?php
+    }
 
+    /**
+     * @param DemandsBreakdown $breakdown
+     */
+    private static function renderModifierComponentsSection(array $breakdown): void
+    {
+        ?>
     <div class="debug-breakdown__section">
         <h3 class="debug-breakdown__heading">Modifier Components</h3>
         <table class="ibl-data-table">
@@ -116,12 +182,28 @@ class DemandsBreakdownView
             </tbody>
         </table>
     </div>
+<?php
+    }
 
+    /**
+     * @param DemandsBreakdown $breakdown
+     */
+    private static function renderCombinedModifierSection(array $breakdown): void
+    {
+        ?>
     <div class="debug-breakdown__section">
         <h3 class="debug-breakdown__heading">Combined Modifier</h3>
         <p class="debug-breakdown__formula">1 + PFW + tradition + loyalty + PT = <strong><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals($breakdown['totalModifier'], 4)) ?></strong></p>
     </div>
+<?php
+    }
 
+    /**
+     * @param DemandsBreakdown $breakdown
+     */
+    private static function renderFinalDemandsSection(array $breakdown): void
+    {
+        ?>
     <div class="debug-breakdown__section">
         <h3 class="debug-breakdown__heading">Final Demands</h3>
         <table class="ibl-data-table">
@@ -149,8 +231,6 @@ class DemandsBreakdownView
             </tbody>
         </table>
     </div>
-</details>
-        <?php
-        return (string) ob_get_clean();
+<?php
     }
 }

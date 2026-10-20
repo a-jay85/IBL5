@@ -41,7 +41,7 @@
     padding: 5px 10px;
     background: var(--accent-700);
     color: white;
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -168,7 +168,7 @@
     text-decoration: none;
     color: inherit;
     transition: background var(--transition-fast);
-    font-size: 1rem;
+    font-size: var(--text-base);
     border-bottom: 1px solid var(--gray-50);
 }
 
@@ -224,7 +224,7 @@
 
 /* Team record (W-L) - inline with team name */
 .schedule-game__record {
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
     color: var(--gray-600);
 }
@@ -262,7 +262,7 @@
 
 /* Score link */
 .schedule-game__score-link {
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-bold);
     color: var(--navy-600);
     text-align: center;
@@ -281,7 +281,7 @@
 .schedule-game__vs,
 .schedule-game__vs:link,
 .schedule-game__vs:visited {
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-semibold);
     color: var(--gray-300);
     text-align: center;
@@ -316,7 +316,7 @@
 
     .schedule-months__link {
         padding: 5px 2px;
-        font-size: 1rem;
+        font-size: var(--text-base);
     }
 
     .schedule-month {
@@ -338,17 +338,17 @@
     }
 
     .schedule-day__num {
-        font-size: 1rem;
+        font-size: var(--text-base);
     }
 
     .schedule-game {
         grid-template-columns: 10px 1fr 25px 24px 24px 24px 25px 1fr 10px;
         padding: 3px 4px;
-        font-size: 1rem;
+        font-size: var(--text-base);
     }
 
     .schedule-game__score-link {
-        font-size: 1rem;
+        font-size: var(--text-base);
     }
 
     .schedule-game__record {
@@ -406,11 +406,11 @@
 }
 
 .schedule-game__streak--win {
-    color: var(--accent-500);
+    color: var(--accent-800);
 }
 
 .schedule-game__streak--loss {
-    color: var(--gray-400);
+    color: var(--gray-600);
 }
 
 /* Team Schedule - Color overrides using custom properties
@@ -421,7 +421,7 @@
 }
 
 .schedule-container--team .schedule-month__header--playoffs {
-    background: var(--accent-500);
+    background: var(--accent-700);
     color: white;
 }
 
@@ -432,7 +432,7 @@
 
 .schedule-container--team a.schedule-jump-btn {
     background: var(--team-color-primary);
-    color: var(--team-color-secondary);
+    color: var(--team-color-on-primary, var(--team-color-secondary));
     box-shadow: 0 2px 8px color-mix(in srgb, var(--team-color-primary) 40%, transparent);
 }
 

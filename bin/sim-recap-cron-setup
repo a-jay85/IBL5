@@ -11,7 +11,7 @@
 #   bin/sim-recap-cron-setup --print-schedule      # emit the plist to stdout (no side effect; masks DB password)
 #   bin/sim-recap-cron-setup --install-schedule    # install + load the LaunchAgent
 #   bin/sim-recap-cron-setup --uninstall-schedule  # unload + remove the LaunchAgent
-#   bin/sim-recap-cron-setup --resume              # re-arm an existing plist after the phase-gate self-unloaded it
+#   bin/sim-recap-cron-setup --resume              # manually re-arm an existing plist that is not loaded
 #
 # Install AFTER this lands on master — the launchd Program points at the main
 # checkout's bin/sim-recap-tick, which must exist there.
@@ -85,6 +85,7 @@ PLIST
 		     EnvironmentVariables, so a literal $HOME would bake in a dead path. -->
 PLIST
   lsched_key_string PATH "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin" 2
+  lsched_key_string SIM_RECAP_HOST_MODE launchd 2
   lsched_key_string SIM_RECAP_SSH_HOST "${SIM_RECAP_SSH_HOST:-}" 2
   lsched_key_string SIM_RECAP_REMOTE_ROOT "${SIM_RECAP_REMOTE_ROOT:-}" 2
   lsched_key_string SIM_RECAP_DB_USER "${SIM_RECAP_DB_USER:-}" 2
@@ -146,9 +147,9 @@ case "$ACTION" in
     echo "Uninstalled ${PLIST_LABEL}."
     ;;
   resume)
-    # Re-arm an existing plist — intended for the case where the phase-gate in
-    # bin/sim-recap-tick self-unloaded the job when recaps were disabled and the
-    # HEAT or Regular Season phase has now begun.  No env vars required: the plist
+    # Manually re-arm an existing plist that is not loaded (for example after a
+    # manual bootout or a reboot problem).  bin/sim-recap-tick never unloads
+    # itself, so a phase change needs no re-arm.  No env vars required: the plist
     # already embeds everything it needs.
     if [ ! -f "$PLIST_PATH" ]; then
       echo "Error: ${PLIST_PATH} does not exist — run --install-schedule first." >&2

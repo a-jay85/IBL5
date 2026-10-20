@@ -105,11 +105,17 @@ def test_adr_placeholder_genuinely_missing_adr_still_missing():
     assert _missing(items, "NNNN-discord-dev-webhook-notify.md")
 
 
-def test_adr_placeholder_does_not_leak_into_migration_tier():
-    """Mutation caught: add `|NNN` to `_MIGRATION_RENUMBER`."""
+def test_migration_nnn_placeholder_resolves_to_numbered_same_suffix_file():
+    """Mutation caught: revert `_renumbered_migration`'s token match to `_MIGRATION_RENUMBER`.
+
+    The contract writes `ibl5/migrations/NNN_<slug>.sql`; the diff carries the number
+    `bin/next-migration` printed. One same-suffix hit resolves. The ADR-leak intent the
+    old test carried lives on in test_conformance_missing_file_placeholder_dir.py
+    `test_adr_nnnn_token_does_not_leak_into_migration_tier`.
+    """
     tok = "ibl5/migrations/NNN_add_thing.sql"
     items = check(_plan_with_critical(tok), ["ibl5/migrations/123_add_thing.sql"])
-    assert _missing(items, "NNN_add_thing.sql")
+    assert not _missing(items, "NNN_add_thing.sql")
 
 
 RENAME_DIFF = """\
@@ -220,3 +226,27 @@ def test_seam_uncommitted_rename_includes_source(seam_repo):
     sh("mv", "a.txt", "e.txt")
     got = _changed_files(d)
     assert "a.txt" in got and "e.txt" in got
+
+
+def test_seam_deleted_directory_resolves_full_path_dir_token(seam_repo):
+    """Mutation caught: guard the directory rule with `os.path.isdir(tok)`.
+
+    A Critical File directory whose every file the branch deleted still resolves,
+    because `_changed_files` (--no-renames --name-only) lists deleted paths and the
+    directory rule reads that list, never the disk. The sibling `ibl5/tests/Gone/`
+    forces the tier-2 ambiguity so the test is red before the rule exists.
+    """
+    d, sh = seam_repo
+    for rel in ("ibl5/classes/Gone/A.php", "ibl5/classes/Gone/B.php", "ibl5/tests/Gone/ATest.php"):
+        os.makedirs(os.path.join(d, os.path.dirname(rel)), exist_ok=True)
+        with open(os.path.join(d, rel), "w") as fh:
+            fh.write("<?php\n")
+    sh("add", "-A")
+    sh("commit", "-m", "add Gone")
+    sh("update-ref", "refs/remotes/origin/master", "HEAD")  # base now contains the tree
+    sh("rm", "-r", "-q", "ibl5/classes/Gone", "ibl5/tests/Gone")
+    sh("commit", "-m", "delete Gone")
+    files = _changed_files(d)
+    assert "ibl5/classes/Gone/A.php" in files
+    items = check(_plan_with_critical("ibl5/classes/Gone/"), files)
+    assert not _missing(items, "ibl5/classes/Gone/")

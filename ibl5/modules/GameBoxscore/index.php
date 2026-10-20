@@ -22,6 +22,8 @@ use GameBoxscore\GameBoxscoreView;
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext|null $leagueContext */
 
 $repository = new GameBoxscoreRepository($mysqli_db, $leagueContext);
 $service = new GameBoxscoreService($repository);

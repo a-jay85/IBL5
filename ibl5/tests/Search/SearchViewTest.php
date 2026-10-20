@@ -266,7 +266,7 @@ class SearchViewTest extends TestCase
         </label><label class="search-form__type" for="search-type-users">
             <input type="radio" name="type" value="users" id="search-type-users">
             <span class="search-form__type-label">Users</span>
-        </label></div></form><div class="search-results"><h3 class="search-results__heading">Search Results</h3><div class="search-results__list"><div class="search-result" style="--anim-delay: 0ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=1" class="search-result__title">Story One</a></div><div class="search-result__meta"><span class="search-result__meta-item">Contributed by reporter</span><span class="search-result__meta-item">Posted by admin on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">Topic: <a href="modules.php?name=Search&amp;query=&amp;topic=1">News</a></span><span class="search-result__meta-item">No comments</span></div></div><div class="search-result" style="--anim-delay: 40ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=2" class="search-result__title">Story Two</a></div><div class="search-result__meta"><span class="search-result__meta-item">Posted by editor on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">1 comment</span></div></div><div class="search-result" style="--anim-delay: 80ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=3" class="search-result__title">Story Three</a></div><div class="search-result__meta"><span class="search-result__meta-item">Contributed by contrib</span><span class="search-result__meta-item">Posted by writer on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">Topic: <a href="modules.php?name=Search&amp;query=&amp;topic=2">Sports</a></span><span class="search-result__meta-item">5 comments</span></div></div></div><div class="search-pagination"><a href="modules.php?name=Search&amp;author=&amp;topic=0&amp;min=10&amp;query=basketball&amp;type=stories&amp;category=0&amp;preset=" class="search-pagination__link search-pagination__link--next">Next Matches &rarr;</a></div></div></div>
+        </label></div></form><div class="search-results"><h2 class="search-results__heading">Search Results</h2><div class="search-results__list"><div class="search-result" style="--anim-delay: 0ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=1" class="search-result__title">Story One</a></div><div class="search-result__meta"><span class="search-result__meta-item">Contributed by reporter</span><span class="search-result__meta-item">Posted by admin on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">Topic: <a href="modules.php?name=Search&amp;query=&amp;topic=1">News</a></span><span class="search-result__meta-item">No comments</span></div></div><div class="search-result" style="--anim-delay: 40ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=2" class="search-result__title">Story Two</a></div><div class="search-result__meta"><span class="search-result__meta-item">Posted by editor on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">1 comment</span></div></div><div class="search-result" style="--anim-delay: 80ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=3" class="search-result__title">Story Three</a></div><div class="search-result__meta"><span class="search-result__meta-item">Contributed by contrib</span><span class="search-result__meta-item">Posted by writer on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">Topic: <a href="modules.php?name=Search&amp;query=&amp;topic=2">Sports</a></span><span class="search-result__meta-item">5 comments</span></div></div></div><div class="search-pagination"><a href="modules.php?name=Search&amp;author=&amp;topic=0&amp;min=10&amp;query=basketball&amp;type=stories&amp;category=0&amp;preset=" class="search-pagination__link search-pagination__link--next">Next Matches &rarr;</a></div></div></div>
 STORIES_GOLDEN;
 
         $this->assertSame($expected, $this->view->render($data));
@@ -295,7 +295,7 @@ STORIES_GOLDEN;
         </label><label class="search-form__type" for="search-type-users">
             <input type="radio" name="type" value="users" id="search-type-users">
             <span class="search-form__type-label">Users</span>
-        </label></div></form><div class="search-results"><h3 class="search-results__heading">Search Results</h3><div class="search-results__list"><div class="search-result" style="--anim-delay: 0ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;thold=-1&amp;mode=flat&amp;order=1&amp;sid=10#11" class="search-result__title">Comment One</a></div><div class="search-result__meta"><span class="search-result__meta-item">Posted by Alice on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">Attached Article: Article A</span><span class="search-result__meta-item">1 reply</span></div></div><div class="search-result" style="--anim-delay: 40ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;thold=-1&amp;mode=flat&amp;order=1&amp;sid=20#22" class="search-result__title">Comment Two</a></div><div class="search-result__meta"><span class="search-result__meta-item">Attached Article: Article B</span><span class="search-result__meta-item">3 replies</span></div></div></div></div></div>
+        </label></div></form><div class="search-results"><h2 class="search-results__heading">Search Results</h2><div class="search-results__list"><div class="search-result" style="--anim-delay: 0ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;thold=-1&amp;mode=flat&amp;order=1&amp;sid=10#11" class="search-result__title">Comment One</a></div><div class="search-result__meta"><span class="search-result__meta-item">Posted by Alice on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">Attached Article: Article A</span><span class="search-result__meta-item">1 reply</span></div></div><div class="search-result" style="--anim-delay: 40ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;thold=-1&amp;mode=flat&amp;order=1&amp;sid=20#22" class="search-result__title">Comment Two</a></div><div class="search-result__meta"><span class="search-result__meta-item">Attached Article: Article B</span><span class="search-result__meta-item">3 replies</span></div></div></div></div></div>
 COMMENTS_GOLDEN;
 
         $this->assertSame($expected, $this->view->render($data));
@@ -320,7 +320,7 @@ COMMENTS_GOLDEN;
         </label><label class="search-form__type" for="search-type-users">
             <input type="radio" name="type" value="users" id="search-type-users" checked>
             <span class="search-form__type-label">Users</span>
-        </label></div></form><div class="search-results"><h3 class="search-results__heading">Search Results</h3><div class="search-results__list"><div class="search-result search-result--compact" style="--anim-delay: 0ms"><div class="search-result__header"><span class="search-result__title">alice</span><span class="search-result__subtitle">Alice Smith</span></div></div><div class="search-result search-result--compact" style="--anim-delay: 40ms"><div class="search-result__header"><span class="search-result__title">bob</span><span class="search-result__subtitle">Anonymous</span></div></div></div></div></div>
+        </label></div></form><div class="search-results"><h2 class="search-results__heading">Search Results</h2><div class="search-results__list"><div class="search-result search-result--compact" style="--anim-delay: 0ms"><div class="search-result__header"><span class="search-result__title">alice</span><span class="search-result__subtitle">Alice Smith</span></div></div><div class="search-result search-result--compact" style="--anim-delay: 40ms"><div class="search-result__header"><span class="search-result__title">bob</span><span class="search-result__subtitle">Anonymous</span></div></div></div></div></div>
 USERS_GOLDEN;
 
         $this->assertSame($expected, $this->view->render($data));
@@ -341,7 +341,7 @@ USERS_GOLDEN;
         </label><label class="search-form__type" for="search-type-users">
             <input type="radio" name="type" value="users" id="search-type-users">
             <span class="search-form__type-label">Users</span>
-        </label></div></form><div class="search-results"><h3 class="search-results__heading">Search Results</h3><div class="ibl-empty-state"><p class="ibl-empty-state__text">No matches found</p></div></div></div>
+        </label></div></form><div class="search-results"><h2 class="search-results__heading">Search Results</h2><div class="ibl-empty-state"><p class="ibl-empty-state__text">No matches found</p></div></div></div>
 EMPTY_GOLDEN;
 
         $this->assertSame($expected, $this->view->render($data));
@@ -399,6 +399,8 @@ EMPTY_GOLDEN;
 
         $this->assertStringContainsString('search-results__heading', $html);
         $this->assertStringContainsString('Trade Story', $html);
+        $this->assertStringContainsString('<h2 class="search-results__heading">', $html);
+        $this->assertStringNotContainsString('<h3 class="search-results__heading"', $html);
     }
 
     public function testRenderHidesResultsForEmptyQueryWithoutPreset(): void
@@ -579,6 +581,48 @@ EMPTY_GOLDEN;
         ]));
 
         $this->assertStringContainsString('<div class="search-result search-result--compact" style="--anim-delay: 0ms">', $html);
+        // Body is emitted as HTML (tags intact), not double-escaped.
+        $this->assertStringContainsString('<div class="search-result__header"><span class="search-result__title">bob</span>', $html);
+        $this->assertStringNotContainsString('&lt;div class="search-result__header"', $html);
+    }
+
+    public function testResultItemModifierIsEscapedWhileBodyIsPassedThroughAsHtml(): void
+    {
+        $method = new \ReflectionMethod(SearchView::class, 'renderResultList');
+
+        $hostileModifier = ' x"><script>alert(1)</script>';
+        $trustedBody = '<span class="search-result__title">ok</span>';
+        $html = $method->invoke($this->view, [$trustedBody], $hostileModifier);
+        self::assertIsString($html);
+
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringContainsString('&lt;script&gt;', $html);
+        $this->assertStringNotContainsString('x"><', $html);
+        // Body is already-escaped HTML supplied by the caller and must not be re-escaped.
+        $this->assertStringContainsString('>' . $trustedBody . '</div>', $html);
+        $this->assertStringNotContainsString('&lt;span class="search-result__title"', $html);
+    }
+
+    public function testResultItemAnimDelayStepsBy40msAndCapsAt400ms(): void
+    {
+        $results = [];
+        for ($i = 0; $i < 13; $i++) {
+            $results[] = ['userId' => $i + 1, 'username' => 'user' . $i, 'name' => 'Name ' . $i];
+        }
+
+        $html = $this->view->render(self::createPageData([
+            'type' => 'users',
+            'query' => 'x',
+            'results' => $results,
+        ]));
+
+        $this->assertStringContainsString('--anim-delay: 0ms"', $html);
+        $this->assertStringContainsString('--anim-delay: 360ms"', $html);
+        $this->assertStringContainsString('--anim-delay: 400ms"', $html);
+        $this->assertStringNotContainsString('--anim-delay: 440ms"', $html);
+        $this->assertStringNotContainsString('--anim-delay: 480ms"', $html);
+        // Indexes 10, 11 and 12 all cap at 400ms.
+        $this->assertSame(3, substr_count($html, '--anim-delay: 400ms"'));
     }
 
     public function testLocalTimeKeepsTimeElementInStoryAndCommentResults(): void

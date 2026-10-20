@@ -649,6 +649,26 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('<link rel="stylesheet" href="/ibl5/themes/IBL/style/style.css">', $html);
         $this->assertStringContainsString("</head>\n<body>", $html);
         $this->assertStringNotContainsString('&lt;link', $html);
+
+        $googleApis = '<link rel="preconnect" href="https://fonts.googleapis.com">';
+        $gstatic = '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
+        $fontCss = '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed';
+        $siteCss = '<link rel="stylesheet" href="/ibl5/themes/IBL/style/style.css">';
+        $this->assertStringContainsString($googleApis, $html);
+        $this->assertStringContainsString($gstatic, $html);
+        $this->assertStringContainsString($fontCss, $html);
+
+        $googleApisPos = strpos($html, $googleApis);
+        $gstaticPos = strpos($html, $gstatic);
+        $fontCssPos = strpos($html, $fontCss);
+        $siteCssPos = strpos($html, $siteCss);
+        $this->assertNotFalse($googleApisPos);
+        $this->assertNotFalse($gstaticPos);
+        $this->assertNotFalse($fontCssPos);
+        $this->assertNotFalse($siteCssPos);
+        $this->assertLessThan($gstaticPos, $googleApisPos);
+        $this->assertLessThan($fontCssPos, $gstaticPos);
+        $this->assertLessThan($siteCssPos, $fontCssPos);
         $this->assertSame(1, substr_count($html, '<head>'));
     }
 }

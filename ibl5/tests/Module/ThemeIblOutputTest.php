@@ -105,15 +105,15 @@ namespace Tests\Module {
             return [
                 'index-transaction-with-icon' => [
                     'index-transaction-with-icon',
-                    ['GM', 'GM', 1700000000, '<font class="storycat">Cat</font> Big Trade', 12, 3, null, '', 'more', 'Trade Rumors', '33small.gif', 'Trade Rumors'],
+                    ['GM', 'GM', 1700000000, '<font class="storycat">Cat</font> Big Trade', 12, 3, null, '', 'more', '33small.gif', 'Trade Rumors'],
                 ],
                 'index-plain-with-note-and-attribution' => [
                     'index-plain-with-note-and-attribution',
-                    ['GM', 'Other', 1700000000, 'Plain Title', 5, 4, '<p>Body</p>', '<b>n</b>', 'more', 'Announcements', 'does-not-exist.png', 'Announcements'],
+                    ['GM', 'Other', 1700000000, 'Plain Title', 5, 4, '<p>Body</p>', '<b>n</b>', 'more', 'does-not-exist.png', 'Announcements'],
                 ],
                 'index-empty-topictext' => [
                     'index-empty-topictext',
-                    ['GM', 'GM', '1700000000', 'No Topic', 0, 5, 'text', '', '', '', 'does-not-exist.png', ''],
+                    ['GM', 'GM', '1700000000', 'No Topic', 0, 5, 'text', '', '', 'does-not-exist.png', ''],
                 ],
             ];
         }
@@ -139,15 +139,15 @@ namespace Tests\Module {
             return [
                 'article-int-time-informant-differs' => [
                     'article-int-time-informant-differs',
-                    ['GM', 'Other', 1700000000, 'Article Title', '<p>Body</p>', 3, 'Trades', '33small.gif', 'Trade Rumors'],
+                    ['GM', 'Other', 1700000000, 'Article Title', '<p>Body</p>', 3, '33small.gif', 'Trade Rumors'],
                 ],
                 'article-string-datetime-anonymous' => [
                     'article-string-datetime-anonymous',
-                    ['GM', '', '2024-01-02 03:04:05', 'Anon Title', null, 3, 'Trades', 'does-not-exist.png', 'Announcements'],
+                    ['GM', '', '2024-01-02 03:04:05', 'Anon Title', null, 3, 'does-not-exist.png', 'Announcements'],
                 ],
                 'article-same-author-no-contributor' => [
                     'article-same-author-no-contributor',
-                    ['GM', 'GM', 1700000000, 'Same Author', 'Body', 3, 'Trades', '33small.gif', 'Trade Rumors'],
+                    ['GM', 'GM', 1700000000, 'Same Author', 'Body', 3, '33small.gif', 'Trade Rumors'],
                 ],
             ];
         }
@@ -191,7 +191,7 @@ namespace Tests\Module {
 
         public function testThemeindexAcceptsNullThetext(): void
         {
-            $args = ['GM', 'GM', 1700000000, 'Title', 1, 3, null, '', '', 'Trades', 'does-not-exist.png', 'Trades'];
+            $args = ['GM', 'GM', 1700000000, 'Title', 1, 3, null, '', '', 'does-not-exist.png', 'Trades'];
 
             $output = $this->capture(static function () use ($args): void {
                 themeindex(...$args);
@@ -205,6 +205,42 @@ namespace Tests\Module {
             });
             $normalized = (string) preg_replace('/\s+/', ' ', $output);
             $this->assertStringContainsString('<div class="news-article__body">Some body</div>', $normalized);
+        }
+
+        public function testZeroStringNotesSuppressesNoteBlock(): void
+        {
+            $args = ['GM', 'GM', 1700000000, 'Title', 12, 3, 'text', '0', '', 'does-not-exist.png', 'Trades'];
+
+            $output = $this->capture(static function () use ($args): void {
+                themeindex(...$args);
+            });
+
+            $this->assertStringNotContainsString('news-article__note', $output);
+        }
+
+        public function testZeroStringInformantUsesAnonymousContributor(): void
+        {
+            $args = ['GM', '0', 1700000000, 'Title', 'text', 3, 'does-not-exist.png', 'Trades'];
+
+            $output = $this->capture(static function () use ($args): void {
+                themearticle(...$args);
+            });
+
+            $this->assertStringContainsString(
+                '<span class="news-article__meta-item">' . _CONTRIBUTEDBY . ' Anonymous</span>',
+                $output,
+            );
+        }
+
+        public function testNumericLookalikeInformantShowsAttribution(): void
+        {
+            $args = ['7', '007', 1700000000, 'Title', 12, 3, 'text', '', '', 'does-not-exist.png', 'Trades'];
+
+            $output = $this->capture(static function () use ($args): void {
+                themeindex(...$args);
+            });
+
+            $this->assertStringContainsString('news-article__attribution', $output);
         }
 
         /**
@@ -248,7 +284,7 @@ namespace Tests\Module {
         #[DataProvider('themeindexWrongTypeProvider')]
         public function testThemeindexRejectsWrongTypedArguments(int $index, mixed $value): void
         {
-            $args = ['GM', 'GM', 1700000000, 'Title', 12, 3, 'text', '', '', 'Trades', 'does-not-exist.png', 'Trades'];
+            $args = ['GM', 'GM', 1700000000, 'Title', 12, 3, 'text', '', '', 'does-not-exist.png', 'Trades'];
             $args[$index] = $value;
 
             $this->expectException(\TypeError::class);
@@ -273,7 +309,7 @@ namespace Tests\Module {
         #[DataProvider('themearticleWrongTypeProvider')]
         public function testThemearticleRejectsWrongTypedArguments(int $index, mixed $value): void
         {
-            $args = ['GM', 'Other', 1700000000, 'Title', 'text', 3, 'Trades', 'does-not-exist.png', 'Trades'];
+            $args = ['GM', 'Other', 1700000000, 'Title', 'text', 3, 'does-not-exist.png', 'Trades'];
             $args[$index] = $value;
 
             $this->expectException(\TypeError::class);
@@ -330,6 +366,23 @@ namespace Tests\Module {
             $output = $this->captureHeader();
 
             $this->assertGolden('header-logged-out', $output);
+        }
+
+        public function testThemeheaderLoggedInDecodesCookieAndRendersLogout(): void
+        {
+            $this->primeHeaderGlobals();
+            $authStub = self::createStub(AuthServiceInterface::class);
+            $authStub->method('isAuthenticated')->willReturn(true);
+            $authStub->method('isAdmin')->willReturn(false);
+            $authStub->method('getUsername')->willReturn('testgm');
+            $authStub->method('getCookieArray')->willReturn(['testgm', 'testgm', '']);
+            $GLOBALS['authService'] = $authStub;
+            unset($GLOBALS['cookie']);
+
+            $output = $this->captureHeader();
+
+            $this->assertSame(['testgm', 'testgm', ''], $GLOBALS['cookie']);
+            $this->assertStringContainsString('op=logout', $output);
         }
     }
 }

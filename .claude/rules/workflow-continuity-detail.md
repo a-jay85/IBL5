@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-11
+last_verified: 2026-10-18
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -37,6 +37,14 @@ branch; it survives you closing Claude Code. Engine selection:
   A skill re-run would hit the same wall on each one, so the run stops for a human.
   For a usage limit, re-run `bin/post-plan-now` after the limit resets. For an expired
   login, run `claude`, complete `/login`, then re-run it.
+  A conflict on a generated file flagged `regen_on_conflict` in the ladder's `GENERATED_FILES`
+  registry skips the LLM resolver. Today only `ibl5/phpstan-baseline.neon` carries the flag.
+  Once every other conflicted file resolves, the harness takes master's copy, runs
+  `bin/regen-baselines` on the merged tree and commits the output in the merge commit. It then
+  rewrites that file's section of the lost-work pre-patch to the master-to-merged diff, so the
+  proof checks every other file unchanged. A generator that fails, times out or writes a file
+  outside its registry outputs declines with `resolver declined: <path>`, the same exit-3 reason
+  as before. `conflict_rung` reads `regen` when no file needed the resolver.
   Before a rebase conflict reaches exit 3, a first resolution that fails the lost-work proof
   goes through the conflict ladder in `tools/postplan-harness/harness/conflict_ladder.py`.
   Rung 1 takes master's copy of each generated file and reruns its generator, with no model
@@ -67,12 +75,25 @@ It prints `RESULT: post-plan DECLINED` with this phrase:
 `declined: same hold as last run (<reason>), no tokens spent`.
 It DMs once per recorded hold. A strict subset (some files added) or a new
 missing item runs normally, and so do holds on conditions (7), (8) and (13).
+A hold whose condition (3) items are only `UNREALISED-ASSERTION: row` rows gets the same
+early decline. The harness re-runs `bin/lib/plan-matrix-assertions` on the pre-merge diff and
+declines only when the row set equals the recorded one, the worktree is clean, a fresh fetch
+of `origin/master` succeeds, and no missing token from the script's stderr appears in
+`origin/master`. Any of those failing means the run proceeds, because a pushed test, an
+uncommitted edit or a master merge can realise a row. A hold that mixes MISSING items with
+UNREALISED rows keeps the MISSING rule above.
 `bin/post-plan-now --force` passes `POSTPLAN_FORCE=1` to the harness and skips this check
 too; every other launch passes `POSTPLAN_FORCE=0`.
 The in-run decline also writes a held-unfixable marker through `harness/heldmarker.py`:
 `tools/postplan-harness/out/state/<slug>.held-unfixable.json` in the main checkout, which
-`.gitignore` already covers. It stores a hash of condition (3)'s missing set and the plan
-file's mtime. While both still match the live hold record, `bin/post-plan-now` exits **8**
+`.gitignore` already covers. It stores a hash of condition (3)'s MISSING items and
+UNREALISED-ASSERTION rows plus the plan file's mtime. For a hold with UNREALISED-ASSERTION
+rows it also stores the branch head SHA and the rows' missing tokens. That marker stays
+active only while the head SHA matches, the worktree (when checked from one) is clean, and a
+fresh `origin/master` carries none of the tokens. `bin/post-plan-now` reads the head from the
+worktree and `bin/pr-cycle` reads it from `headRefOid`. An unknown head means proceed.
+Markers written before schema version 2 read as inactive. While the hash and mtime still
+match the live hold record, `bin/post-plan-now` exits **8**
 before launching anything, and `bin/pr-cycle` Stage 1 skips the PR so its `--max-ready`
 slot goes to the next one. The decline DM names the marker. Editing the plan makes it
 stale, and so does a later run that arms or holds on a different reason. To clear it by
@@ -80,6 +101,21 @@ hand, delete the file. `--force` and `--state-changed` bypass it for one run, an
 run that holds on the same reason keeps it. Automouse treats exit **8** as terminal, so a
 decline in its resume path never trips the postplan env-breaker. The marker only
 suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming condition.
+
+**Rebase-only mode.** `bin/pr-cycle` fires a DIRTY PR with `--rebase-only-prs=<N>` when the
+PR's last hold record names only conditions (3), (7) and (8) and its patch-id still equals the
+sticky `**Reviewed diff:**`. `PR_CYCLE_REBASE_ONLY_HELD=0` turns this off. The flag reaches the
+harness as `--rebase-only` through `bin/post-plan-fleet` and `bin/post-plan-now`, where it also
+implies `--state-changed`. The harness re-checks the record with
+`python3 -m harness.holdrepeat rebase-eligible` and runs the full path when the record is
+absent or names any other condition. An eligible run merges `origin/master` with the usual
+conflict resolver and lost-work proof, pushes, and ends with terminal `rebased-held` and exit
+**0**. It runs no review, fidelity or manual-test call, never posts the sticky verdict and never
+arms. A failed proof stops before the push. When the patch-id is unchanged, the run refreshes
+the hold record's fingerprint so the next cycle still declines. A changed patch-id leaves the
+record alone, and the next cycle reviews the new tree. A failed rebase-only run never falls
+back to the skill. The fleet outcome word is `rebased`, and `bin/pr-cycle-tick` logs it
+without charging an attempt. The same tick also removes a `post-plan-running` label that is at least `PCW_STALE_LABEL_MIN` minutes old when no post-plan run for the PR is alive, so a run that died stops holding the PR out of the merge line; `bin/pr-cycle-tick --dry-run` shows what it would remove.
 
 ## What `--auto` adds
 
@@ -91,6 +127,7 @@ It does **not** hold post-plan for a "risky" plan. Post-plan **always** runs and
 the PR. Whether the PR then **auto-merges** is decided at `/post-plan` Phase 6.5, which
 honors a plan's `auto_merge: false` (see `/plan` Step 4) and otherwise leaves the PR open
 for a human to merge.
+A plan seeded by `bin/docfix-run` carries `auto_merge: docs-only-ready` instead; Phase 6.5 arms it only when the realized PR is a docs-only refresh with a two-way merge-danger line and a READY verdict, and holds it otherwise with the failed clause named.
 
 ## Ad-hoc branches
 

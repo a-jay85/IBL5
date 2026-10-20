@@ -7,6 +7,8 @@
 #               command, write no state, send no DM, launch nothing.
 #   --help      Print this header comment.
 # ---
+# The tick also removes a post-plan-running label older than PCW_STALE_LABEL_MIN minutes
+# when no post-plan run is live; --dry-run prints the would-remove set and removes nothing.
 # Fired every 1800s by the LaunchAgent that bin/pr-cycle-tick-cron-setup installs.
 # Reads open PRs with gh, drops the ones that do not need a rescue, and passes the rest
 # to `bin/pr-cycle --go --only <csv> --max-ready <n>`. An idle tick exits before
@@ -18,22 +20,32 @@
 #
 # Guards, cheapest first: stop file, usage zone, a live pr-cycle worker, then per PR:
 # post-plan in flight, post-plan finished under 30 minutes ago, checks pending or green,
-# stacked on another open PR's branch, and a one-rescue-per-head-SHA retry cap. At most
+# stacked on another open PR's branch, and a one-rescue-per-patch-id retry cap. At most
 # 3 PRs go to one run. Every skipped open PR is written to a results/<id>.skip-notes TSV
 # that the launch hands to bin/pr-cycle as PR_CYCLE_SKIP_NOTES for its your-turn DM.
+# The retry key is the PR's patch-id (pcw_patch_id), so the rescue's own rebase-and-push
+# does not reset the cap and a push that changes the diff does. When the patch-id cannot
+# be computed the key is the head SHA, the tick logs it, and one DM per (PR, head) says so.
+# A DIRTY PR whose last rescue settled as a rebase conflict may relaunch past the cap when
+# the origin/master tip differs from the one at that launch. The tick launches at most
+# PCW_CONFLICT_RETRY_DAILY_CAP DIRTY rescues per PR per local day.
 #
 # A launch is recorded as pending, not as an attempt: the detached worker outlives the tick.
 # A later tick with no live worker reads the worker's result file and settles each PR. A run
-# that reached post-plan counts as the one rescue. A holdrepeat decline is remembered per head.
-# A rescue that never reached post-plan is a strike, and two strikes per head stop the retries.
+# that reached post-plan counts as the one rescue. A holdrepeat decline is remembered per key.
+# A rescue that never reached post-plan is a strike, and two strikes per key stop the retries.
 #
 # Env seams (unset and empty both take the default):
 #   PR_CYCLE_STOP_FILE         default $HOME/.ibl5-pr-cycle.stop (same name bin/pr-cycle reads)
 #   PR_CYCLE_WATCH_STATE_DIR   default $HOME/.ibl5-pr-cycle-watch. Holds attempts/, dm-sent/,
-#                              pending/, results/, declined/, strikes/, dm-declined/ and
-#                              dm-strikes/.
+#                              pending/, results/, declined/, strikes/, dm-declined/,
+#                              dm-strikes/, dm-patchid/, conflict-hold/ and retries/.
 #   PR_CYCLE_TICK_PR_CYCLE_CMD default $ROOT/bin/pr-cycle
 #   PR_CYCLE_TICK_DM_CMD       default $ROOT/bin/discord-dm
+#   PR_CYCLE_PATCH_ID_CMD      default: the git computation in pcw_patch_id (fetch, diff
+#                              against the merge-base with origin/master, git patch-id)
+#   PR_CYCLE_MASTER_TIP_CMD    default: refs/remotes/origin/master via pcw_master_tip (no
+#                              fetch of its own). Unreadable output means no conflict re-try
 #   PR_CYCLE_TICK_USAGE_ZONE   empty means read the live usage zone
 #
 # See the ADR for bin/pr-cycle-tick (ibl5/docs/decisions/) for the design rationale.
@@ -82,6 +94,113 @@ if [[ -e "$STOP_FILE" ]]; then
     log "stop file present ($STOP_FILE)"; exit 0
 fi
 
+# ── (a2) Stale post-plan-running sweep ───────────────────────────────────────
+# A run that died leaves the label behind, and bin/merge-line-select skips any PR that
+# carries it. This removes the label only when nothing says a run is live. Every probe
+# is tri-state (see bin/lib/pr-cycle-watch.sh): 0 keeps, 2 (unevaluable) keeps, and only
+# an all-1 verdict removes. It spends no Claude, so it runs ahead of the usage gate. It
+# uses `return`, never `exit`: a sweep problem must not stop the rest of the tick.
+
+# Prints the worktree path holding branch $1. rc 0 found, 1 no worktree, 2 list failed.
+sweep_worktree_root() {
+    local list wt
+    list="$(git -C "$ROOT" worktree list --porcelain 2>/dev/null)" || return 2
+    wt="$(awk -v want="branch refs/heads/$1" '
+        /^worktree / { path = substr($0, 10) }
+        $0 == want && !f { print path; f=1 }' <<< "$list")"
+    [[ -n "$wt" ]] || return 1
+    printf '%s\n' "$wt"
+}
+
+stale_label_sweep() {
+    local sweep_json labelled snap ps_txt claude_pids crc lsof_txt="" lsof_ok=1
+    local pr branch draft labeled_at last age_min wt wrc rc dirs cwd_ev evidence
+    sweep_json="$(gh pr list --state open --author @me --limit 200 \
+        --json number,headRefName,isDraft,labels 2>/dev/null)" \
+        || { log "stale-label: gh pr list failed; sweep skipped"; return 0; }
+    labelled="$(jq -r '.[] | select(((.labels // []) | map(.name)) | index("post-plan-running"))
+        | [.number, .headRefName, (.isDraft | tostring)] | @tsv' <<< "$sweep_json" 2>/dev/null)" \
+        || { log "stale-label: unparseable pr list; sweep skipped"; return 0; }
+    [[ -n "$labelled" ]] || return 0
+
+    # Strict reads: ljob_snapshot swallows a launchctl failure and reads as "nothing live".
+    snap="$(launchctl list 2>/dev/null)" || snap=""
+    [[ -n "$snap" ]] || { log "stale-label: launchctl unreadable; sweep skipped"; return 0; }
+    ps_txt="$(ps -axww -o pid=,command= 2>/dev/null)" || ps_txt=""
+    [[ -n "$ps_txt" ]] || { log "stale-label: ps unreadable; sweep skipped"; return 0; }
+    claude_pids="$(pcw_claude_print_pids "$ps_txt")"; crc=$?
+    if [[ "$crc" -eq 0 ]]; then
+        lsof_txt="$(lsof -a -d cwd -p "$(paste -sd, - <<< "$claude_pids")" -Fn 2>/dev/null)" \
+            || lsof_txt=""
+        [[ -n "$lsof_txt" ]] || lsof_ok=0
+    fi
+
+    while IFS=$'\t' read -r pr branch draft; do
+        [[ -n "$pr" ]] || continue
+        age_min="?"
+        labeled_at="$(gh api "repos/{owner}/{repo}/issues/$pr/timeline" --paginate \
+            --jq '.[] | select(.event=="labeled" and .label.name=="post-plan-running") | .created_at' \
+            </dev/null 2>/dev/null)" || labeled_at=""
+        last="$(sed -n '$p' <<< "$labeled_at")"
+        if [[ -z "$last" ]]; then
+            log "stale-label: #$pr held (age ?m): label time unevaluable"; continue
+        fi
+        pcw_label_too_young "$last"; rc=$?
+        age_min="$(pcw_label_age_min "$last")" || age_min="?"
+        if [[ "$rc" -eq 0 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): too young"; continue
+        elif [[ "$rc" -ne 1 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): label time unparseable"; continue
+        fi
+        if pcw_inflight "$pr" "$branch" "$snap"; then
+            log "stale-label: #$pr held (age ${age_min}m): launchd job live"; continue
+        fi
+        wt="$(sweep_worktree_root "$branch")"; wrc=$?
+        if [[ "$wrc" -eq 2 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): git worktree list unevaluable"; continue
+        fi
+        # stale-label: argv probe
+        pcw_postplan_argv_live "$wt" "$(ljob_safe_slug "$branch")" "$ps_txt" "$$ $PPID"; rc=$?
+        if [[ "$rc" -eq 0 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): post-plan process live"; continue
+        elif [[ "$rc" -ne 1 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): ps unevaluable"; continue
+        fi
+        cwd_ev="n/a"
+        if [[ "$wrc" -eq 0 ]]; then
+            cwd_ev="none"
+            if [[ "$lsof_ok" -eq 0 ]]; then
+                log "stale-label: #$pr held (age ${age_min}m): lsof unevaluable"; continue
+            fi
+            if [[ "$crc" -eq 0 ]] && pcw_cwd_in_worktree "$wt" "$lsof_txt"; then
+                log "stale-label: #$pr held (age ${age_min}m): headless claude cwd in worktree"; continue
+            fi
+        fi
+        dirs=("$ROOT/tools/postplan-harness/out")
+        [[ "$wrc" -ne 0 ]] || dirs+=("$wt/tools/postplan-harness/out")
+        pcw_live_out_dir_fresh "$branch" "${dirs[@]}"; rc=$?
+        if [[ "$rc" -eq 0 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): out dir written <${PCW_STALE_LABEL_MIN}m ago"; continue
+        elif [[ "$rc" -ne 1 ]]; then
+            log "stale-label: #$pr held (age ${age_min}m): out dir root missing"; continue
+        fi
+        evidence="age=${age_min}m launchd=none argv=none claude-cwd=$cwd_ev out-dir=idle>=${PCW_STALE_LABEL_MIN}m draft=$draft"
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            log "dry-run: stale-label: would remove post-plan-running from #$pr ($evidence)"; continue
+        fi
+        # Own gh call, not postplan_label_remove: that helper ends in `|| true` and would
+        # hide the failure this log line has to report.
+        if gh api --method DELETE "repos/{owner}/{repo}/issues/$pr/labels/post-plan-running" \
+            </dev/null >/dev/null 2>&1; then
+            log "stale-label: removed post-plan-running from #$pr ($evidence)"
+        else
+            log "stale-label: DELETE failed for #$pr; label kept ($evidence)"
+        fi
+    done <<< "$labelled"
+    return 0
+}
+stale_label_sweep
+
 # ── (b) Usage gate ───────────────────────────────────────────────────────────
 # Read-only mirror of the first half of usage_prestart_gate. The gate itself writes a
 # resumable-session marker, and a tick has no session to resume.
@@ -121,53 +240,67 @@ done <<< "$SNAP"
 # `pr-cycle --go` detaches a launchd worker and returns, so the launch itself says nothing
 # about the outcome. The tick records a pending entry, and the first later tick that finds no
 # live worker (guard c) reads the file the worker wrote and settles each PR here.
-DECLINED_MSG='pr-cycle-watch: PR #%s on head %s was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until a new push.'
-STRIKE_MSG='pr-cycle-watch: PR #%s on head %s: the rescue never reached post-plan %s times (last: %s %s %s). Skipping it until a new push.'
+DECLINED_MSG='pr-cycle-watch: PR #%s on head %s was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until its diff changes.'
+STRIKE_MSG='pr-cycle-watch: PR #%s on head %s: the rescue never reached post-plan %s times (last: %s %s %s). Skipping it until its diff changes.'
+PATCHID_MSG='pr-cycle-watch: PR #%s on head %s: could not compute its patch-id, so its retry cap is keyed on the head SHA for now and a rebase-only push will re-qualify it. See the tick log.'
 
-# strike <pr> <sha> <status> <outcome> <reason>: one no-op rescue; DM once when the cap is hit.
+# strike <pr> <sha> <key> <status> <outcome> <reason>: one no-op rescue; DM once when the cap is hit.
 strike() {
     local n msg
-    n="$(pcw_add_strike "$STATE" "$1" "$2")"
-    log "PR $1: no-op rescue strike $n/$PCW_STRIKE_CAP (head ${2:0:7}): $3 $4 $5"
-    if [[ "$n" -eq "$PCW_STRIKE_CAP" ]] && pcw_kind_dm_due "$STATE" strikes "$1" "$2"; then
+    n="$(pcw_add_strike "$STATE" "$1" "$3" "$2")"
+    log "PR $1: no-op rescue strike $n/$PCW_STRIKE_CAP (head ${2:0:7}): $4 $5 $6"
+    if [[ "$n" -eq "$PCW_STRIKE_CAP" ]] && pcw_kind_dm_due "$STATE" strikes "$1" "$3" "$2"; then
         # shellcheck disable=SC2059  # the message is a fixed printf template
-        msg="$(printf "$STRIKE_MSG" "$1" "${2:0:7}" "$PCW_STRIKE_CAP" "$3" "$4" "$5")"
+        msg="$(printf "$STRIKE_MSG" "$1" "${2:0:7}" "$PCW_STRIKE_CAP" "$4" "$5" "$6")"
         dm_ping "$msg" || true
-        pcw_kind_mark_dm "$STATE" strikes "$1" "$2"
+        pcw_kind_mark_dm "$STATE" strikes "$1" "$3"
     fi
 }
 
-# settle_row <pr> <sha> <status> <outcome> <reason>: the outcome table, one PR.
+# settle_row <pr> <sha> <key> <status> <outcome> <reason> [<tip>]: the outcome table, one PR.
 settle_row() {
-    local pr="$1" sha="$2" status="$3" outcome="$4" reason="$5" msg
+    local pr="$1" sha="$2" key="$3" status="$4" outcome="$5" reason="$6" tip="${7:-}" t7 msg
+    # conflict-hold/<pr>: only a settled rebase conflict may later re-try on a new master tip.
+    # A paused rescue never ran, so it keeps any hold. Every other fired or holdrepeat
+    # outcome is a determinate result and drops the hold back to the plain retry cap.
+    case "$status:$outcome" in
+        fired:conflict)
+            pcw_record_conflict_hold "$STATE" "$pr" "$tip"
+            t7="${tip:-unknown}"
+            log "PR $pr: conflict hold recorded (master ${t7:0:7})" ;;
+        fired:paused) ;;
+        fired:*|holdrepeat:*) pcw_clear_conflict_hold "$STATE" "$pr" ;;
+    esac
     case "$status:$outcome" in
         fired:shipped|fired:held|fired:conflict|fired:timed-out)
-            pcw_record_attempt "$STATE" "$pr" "$sha"
+            pcw_record_attempt "$STATE" "$pr" "$key"
             log "PR $pr: rescue ran ($outcome); attempt recorded (head ${sha:0:7})" ;;
         fired:failed)
             case "$reason" in
                 kind=*|terminal=*)
-                    pcw_record_attempt "$STATE" "$pr" "$sha"
+                    pcw_record_attempt "$STATE" "$pr" "$key"
                     log "PR $pr: rescue ran and failed ($reason); attempt recorded (head ${sha:0:7})" ;;
-                *) strike "$pr" "$sha" "$status" "$outcome" "$reason" ;;
+                *) strike "$pr" "$sha" "$key" "$status" "$outcome" "$reason" ;;
             esac ;;
         fired:declined|holdrepeat:*)
-            pcw_record_declined "$STATE" "$pr" "$sha"
+            pcw_record_declined "$STATE" "$pr" "$key"
             log "PR $pr: holdrepeat declined (head ${sha:0:7})"
-            if pcw_kind_dm_due "$STATE" declined "$pr" "$sha"; then
+            if pcw_kind_dm_due "$STATE" declined "$pr" "$key" "$sha"; then
                 # shellcheck disable=SC2059  # the message is a fixed printf template
                 msg="$(printf "$DECLINED_MSG" "$pr" "${sha:0:7}")"
                 dm_ping "$msg" || true
-                pcw_kind_mark_dm "$STATE" declined "$pr" "$sha"
+                pcw_kind_mark_dm "$STATE" declined "$pr" "$key"
             fi ;;
+        fired:rebased)
+            log "PR $pr: rebase-only ran (merged master, still held for a human); no attempt recorded (head ${sha:0:7})" ;;
         fired:paused)
             log "PR $pr: paused by usage gate, retry later" ;;
-        *) strike "$pr" "$sha" "$status" "$outcome" "$reason" ;;
+        *) strike "$pr" "$sha" "$key" "$status" "$outcome" "$reason" ;;
     esac
 }
 
 reconcile_pending() {
-    local pf id rf started now hdr pr sha row status outcome reason all_reason=""
+    local pf id rf started now hdr pr sha key tip row status outcome reason all_reason=""
     [[ -d "$STATE/pending" ]] || return 0
     if [[ "$DRY_RUN" -eq 1 ]]; then
         local n=0
@@ -197,23 +330,26 @@ reconcile_pending() {
             log "pending $id: no result yet"
             continue
         fi
-        while IFS=$'\t' read -r pr sha; do
+        while IFS=$'\t' read -r pr sha key tip; do
             [[ -n "$pr" && -n "$sha" ]] || continue
+            # The key was captured at launch; a pending file from the pre-key tick has none.
+            [[ -n "$key" ]] || key="$sha"
             if [[ -n "$all_reason" ]]; then
-                strike "$pr" "$sha" pending - "$all_reason"; continue
+                strike "$pr" "$sha" "$key" pending - "$all_reason"; continue
             fi
             row="$(awk -F'\t' -v p="$pr" '$1 == p && !f { print; f = 1 }' "$rf")"
             if [[ -z "$row" ]]; then
-                strike "$pr" "$sha" no-row - -; continue
+                strike "$pr" "$sha" "$key" no-row - -; continue
             fi
             IFS=$'\t' read -r _ status outcome reason <<< "$row"
-            settle_row "$pr" "$sha" "$status" "$outcome" "${reason:--}"
+            settle_row "$pr" "$sha" "$key" "$status" "$outcome" "${reason:--}" "$tip"
         done < <(tail -n +2 "$pf")
         rm -f "$pf" "$rf"
     done
 }
 reconcile_pending
 
+TODAY="$(pcw_today)"   # local calendar day for the retries/ ledger, fixed for this tick
 # ── (d) Qualifying set ───────────────────────────────────────────────────────
 if ! PRS_JSON="$(gh pr list --state open --author @me --limit 200 \
         --json number,headRefName,headRefOid,mergeStateStatus,isDraft,baseRefName 2>/dev/null)"; then
@@ -250,7 +386,7 @@ worktree_out_dir() {
     return 0
 }
 
-QUALIFY=()      # "<pr>|<sha>"
+QUALIFY=()      # "<pr>|<sha>|<key>"
 while IFS=$'\t' read -r pr branch sha mstate base; do
     [[ -n "$pr" ]] || continue
     if pcw_inflight "$pr" "$branch" "$SNAP"; then
@@ -280,10 +416,42 @@ while IFS=$'\t' read -r pr branch sha mstate base; do
     if parent="$(pcw_stacked_on "$base" "$OPEN_HEADS")"; then
         skip "$pr" "stacked on #$parent"; continue
     fi
-    if pcw_attempted_head "$STATE" "$pr" "$sha"; then
-        skip "$pr" "retry cap (head ${sha:0:7})"
-        if pcw_dm_due "$STATE" "$pr" "$sha"; then
-            msg="pr-cycle-watch: PR #$pr is still $kind on head ${sha:0:7} after one rescue. Skipping it until a new push."
+    # Retry key: the PR's patch-id, which a clean rebase keeps, so a rescue's own
+    # rebase-and-push does not reset the cap. Captured here, before launch. Falls back to
+    # the head SHA (today's keying, which never strands a PR) and says so once per head.
+    key="$(pcw_patch_id "$ROOT" "$pr")"
+    pcw_drop_pr_ref "$ROOT" "$pr"
+    if [[ -z "$key" ]]; then
+        key="$sha"
+        log "PR $pr: patch-id unavailable; retry key falls back to head ${sha:0:7}"
+        if pcw_kind_dm_due "$STATE" patchid "$pr" "$sha"; then
+            # shellcheck disable=SC2059  # the message is a fixed printf template
+            msg="$(printf "$PATCHID_MSG" "$pr" "${sha:0:7}")"
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                log "would DM: $DM_CMD --ping $msg"
+            else
+                dm_ping "$msg" || true
+                pcw_kind_mark_dm "$STATE" patchid "$pr" "$sha"
+            fi
+        fi
+    fi
+    # origin/master tip now. pcw_patch_id above already fetched origin master. Empty means
+    # unreadable, which never makes a conflict hold eligible.
+    tip="$(pcw_master_tip "$ROOT")"
+    # A settled rebase conflict may re-try on a new origin/master tip, within the daily cap.
+    # Only a DIRTY PR qualifies. Every other capped PR keeps the until-the-diff-changes rule.
+    crd=1
+    if [[ "$kind" == DIRTY ]]; then
+        pcw_conflict_retry_due "$STATE" "$pr" "$tip" "$TODAY"; crd=$?
+    fi
+    if [[ "$crd" -ne 0 ]] && pcw_attempted_head "$STATE" "$pr" "$key" "$sha"; then
+        case "$crd" in
+            2) skip "$pr" "retry cap (head ${sha:0:7}; rebase conflict, waiting for a new master tip)" ;;
+            3) skip "$pr" "retry cap (head ${sha:0:7}; rebase conflict, daily cap of $PCW_CONFLICT_RETRY_DAILY_CAP launches reached)" ;;
+            *) skip "$pr" "retry cap (head ${sha:0:7})" ;;
+        esac
+        if pcw_dm_due "$STATE" "$pr" "$key" "$sha"; then
+            msg="pr-cycle-watch: PR #$pr is still $kind on head ${sha:0:7} after one rescue. Skipping it until its diff changes."
             # Name why the rescue stopped, so the DM is actionable without opening a log.
             IFS=$'\t' read -r run_dir why <<< "$(pcw_last_block "$branch" "${out_dirs[@]}")" || true
             if [[ -n "${why:-}" ]]; then
@@ -297,7 +465,7 @@ while IFS=$'\t' read -r pr branch sha mstate base; do
                 log "would DM: $DM_CMD --ping $msg"
             else
                 dm_ping "$msg" || true
-                pcw_mark_dm "$STATE" "$pr" "$sha"
+                pcw_mark_dm "$STATE" "$pr" "$key"
             fi
         fi
         continue
@@ -306,13 +474,13 @@ while IFS=$'\t' read -r pr branch sha mstate base; do
     if pcw_pending_has "$STATE" "$pr"; then
         skip "$pr" "rescue pending"; continue
     fi
-    if pcw_declined_head "$STATE" "$pr" "$sha"; then
+    if pcw_declined_head "$STATE" "$pr" "$key" "$sha"; then
         skip "$pr" "holdrepeat declined (head ${sha:0:7})"; continue
     fi
-    if [[ "$(pcw_strike_count "$STATE" "$pr" "$sha")" -ge "$PCW_STRIKE_CAP" ]]; then
+    if [[ "$(pcw_strike_count "$STATE" "$pr" "$key" "$sha")" -ge "$PCW_STRIKE_CAP" ]]; then
         skip "$pr" "no-op rescue cap (head ${sha:0:7})"; continue
     fi
-    QUALIFY+=("$pr|$sha")
+    QUALIFY+=("$pr|$sha|$key|$tip|$kind")
 done < <(jq -r 'sort_by(.number) | .[] | select(.isDraft | not)
                 | [.number, .headRefName, .headRefOid, .mergeStateStatus, .baseRefName] | @tsv' <<< "$PRS_JSON")
 
@@ -339,11 +507,17 @@ log "launching: $PR_CYCLE_CMD --go --only $csv --max-ready $count"
 # entry is written first so a killed tick never loses the launch; a failed launch removes it.
 pending_body="# result=$STATE/results/$id.tsv started=$(date +%s)"
 for entry in "${LAUNCH[@]}"; do
-    pending_body+=$'\n'"${entry%%|*}"$'\t'"${entry#*|}"
+    IFS='|' read -r l_pr l_sha l_key l_tip _ <<< "$entry"
+    pending_body+=$'\n'"$l_pr"$'\t'"$l_sha"$'\t'"$l_key"$'\t'"$l_tip"
 done
 _pcw_write "$STATE/pending/$id" "$pending_body"
 if PR_CYCLE_RESULT_FILE="$STATE/results/$id.tsv" PR_CYCLE_SKIP_NOTES="$SKIP_NOTES" "$PR_CYCLE_CMD" --go --only "$csv" --max-ready "$count"; then
     log "launched; pending $id"
+    # Count every DIRTY launch, so the daily cap bounds the conflict re-tries.
+    for entry in "${LAUNCH[@]}"; do
+        IFS='|' read -r l_pr _ _ _ l_kind <<< "$entry"
+        [[ "$l_kind" == DIRTY ]] && pcw_bump_retry "$STATE" "$l_pr" "$TODAY"
+    done
 else
     rm -f "$STATE/pending/$id"
     log "pr-cycle exited non-zero; no attempt recorded"

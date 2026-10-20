@@ -113,11 +113,7 @@ class Season
         $this->playoffsStartDate = new \DateTime("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-01");
         $this->playoffsEndDate = new \DateTime("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-30");
 
-        try {
-            $this->lastRegularSeasonGameDate = $this->queryRepo->getLastRegularSeasonGameDate($this->endingYear);
-        } catch (\RuntimeException) {
-            $this->lastRegularSeasonGameDate = null;
-        }
+        $this->lastRegularSeasonGameDate = $this->queryRepo->getLastRegularSeasonGameDate($this->endingYear);
 
         $arrayLastSimDates = $this->queryRepo->getLastSimDatesArray();
         $this->lastSimNumber = $arrayLastSimDates["sim"];

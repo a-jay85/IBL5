@@ -98,6 +98,10 @@ class RateLimiterTest extends TestCase
         $this->assertSame('300', $result['X-RateLimit-Limit']);
     }
 
+    /**
+     * The unlimited tier is never enforced, so check() makes no repository call:
+     * no RateLimitRepository::increment, getRequestCount, or pruneOldEntries.
+     */
     public function testUnlimitedTierNeverRejects(): void
     {
         $mockRepo = $this->createMock(RateLimitRepository::class);
@@ -115,6 +119,10 @@ class RateLimiterTest extends TestCase
         }
     }
 
+    /**
+     * The reject path still writes and reads the counter: increment('abc123hash')
+     * once, then getRequestCount('abc123hash') once, then the 429 header set.
+     */
     public function testLimitedTierOverLimitIncrementsCountsAndRejects(): void
     {
         $mockRepo = $this->createMock(RateLimitRepository::class);

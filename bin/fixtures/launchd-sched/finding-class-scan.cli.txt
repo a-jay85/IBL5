@@ -22,6 +22,8 @@ Environment (empty means default):
   FCS_STATE_DIR=$HOME/.local/state/ibl5-finding-class-scan
   FCS_MIN_OCCURRENCES=2    FCS_MAX_BUDGET_USD=3.00
   FCS_CLASSIFY_TIMEOUT=1500    FCS_VERIFY_TIMEOUT=1800
+  FCS_MAX_BATCHES=10       Classifier batches (60 threads each) per run; the
+                           rest wait for the next run.
 Test seams: GH_CMD, REPO_SLUG, BACKLOG_SLUG, FCS_CLAUDE_BIN, FCS_DM_BIN,
   FCS_LAUNCHCTL_BIN.
 ---

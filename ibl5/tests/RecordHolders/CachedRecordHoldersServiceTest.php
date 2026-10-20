@@ -227,12 +227,6 @@ class RecordHoldersInMemoryCache implements DatabaseCacheInterface
     /** @var array<string, array{data: array<mixed>, expiration: int}> */
     private array $store = [];
 
-    /** Controls what acquireLock() returns (defaults to acquired). */
-    public bool $lockAcquirable = true;
-
-    /** Number of times releaseLock() was invoked. */
-    public int $releaseLockCount = 0;
-
     /**
      * @return array<mixed>|null
      */
@@ -258,16 +252,6 @@ class RecordHoldersInMemoryCache implements DatabaseCacheInterface
     {
         // Ignore expiration entirely — return the stored value if a row exists.
         return $this->store[$key]['data'] ?? null;
-    }
-
-    public function acquireLock(string $key, int $timeoutSeconds): bool
-    {
-        return $this->lockAcquirable;
-    }
-
-    public function releaseLock(string $key): void
-    {
-        $this->releaseLockCount++;
     }
 
     /**

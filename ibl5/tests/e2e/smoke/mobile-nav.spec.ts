@@ -92,11 +92,14 @@ test.describe('Mobile nav interaction tests', () => {
   });
 
   test('reopening inside the close fade keeps the overlay visible', async ({ page }) => {
+    // Fake clock (scoped to this test) so the 300ms close-fade timer fires on demand.
+    await page.clock.install();
     await openMobileMenu(page);
     await page.keyboard.press('Escape');
     // Programmatic click so the fading overlay cannot intercept it.
     await page.evaluate(() => (document.getElementById('nav-hamburger') as HTMLElement).click());
-    await page.waitForTimeout(450);
+    // Run past the close-fade timer; a stale timer must not re-hide the overlay.
+    await page.clock.runFor(450);
     await expect(page.locator('#nav-overlay')).not.toHaveClass(HIDDEN_CLASS);
     await expect(page.locator('#nav-overlay')).toHaveCSS('opacity', '1');
   });

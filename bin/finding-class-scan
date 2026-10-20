@@ -63,6 +63,7 @@ FCS_MAX_BUDGET_USD="${FCS_MAX_BUDGET_USD:-3.00}"
 FCS_CLASSIFY_TIMEOUT="${FCS_CLASSIFY_TIMEOUT:-1500}"
 FCS_VERIFY_TIMEOUT="${FCS_VERIFY_TIMEOUT:-1800}"
 FCS_MAX_BATCHES="${FCS_MAX_BATCHES:-10}"
+TABLE_ROW_CAP=200
 
 PLIST_LABEL="com.ibl5.finding-class-scan"
 STATE_DIR=""
@@ -634,8 +635,8 @@ classify_batch() {
     jq -e "$JQ_PAYLOAD | (type == \"object\") and (.assignments | type == \"array\") and (.classes | type == \"array\")" \
         "$out" >/dev/null 2>&1 || fail_classify "payload malformed"
     ids="$(jq -sc 'map(.id)' "$batch")"
-    jq -c --argjson ids "$ids" --argjson known "$(cat "$WORK/classes-all.json")" \
-        "$JQ_PAYLOAD | $VALIDATE_JQ" "$out" > "$WORK/valid-$k.json" 2> "$WORK/validate.err" \
+    jq -c --argjson ids "$ids" --slurpfile known_a "$WORK/classes-all.json" \
+        '$known_a[0] as $known | '"$JQ_PAYLOAD | $VALIDATE_JQ" "$out" > "$WORK/valid-$k.json" 2> "$WORK/validate.err" \
         || fail_classify "payload failed validation"
 }
 
@@ -783,10 +784,13 @@ defang() {
 
 # threads_table <threads-json>: only validated rows get a line.
 threads_table() {
-    local row url pr path line res loc
+    local row url pr path line res loc shown=0 total
+    total="$(jq 'length' <<< "$1")"
     printf '| Thread | PR | Location | Resolved |\n| --- | --- | --- | --- |\n'
     while IFS= read -r row; do
         [ -n "$row" ] || continue
+        # GitHub rejects a body over 65,536 characters; a row is about 190.
+        if [ "$shown" -ge "$TABLE_ROW_CAP" ]; then break; fi
         url="$(jq -r '.url // ""' <<< "$row")"; pr="$(jq -r '.pr // ""' <<< "$row")"
         [[ "$url" =~ ^https://github\.com/a-jay85/IBL5/pull/[0-9]+#discussion_r[0-9]+$ ]] || continue
         [[ "$pr" =~ ^[0-9]+$ ]] || continue
@@ -796,7 +800,11 @@ threads_table() {
         loc="$path${line:+:$line}"
         res="no"; [ "$(jq -r '.resolved' <<< "$row")" = "true" ] && res="yes"
         printf '| [thread](%s) | [#%s](https://github.com/a-jay85/IBL5/pull/%s) | `%s` | %s |\n' "$url" "$pr" "$pr" "$loc" "$res"
+        shown=$((shown + 1))
     done < <(jq -c '.[]' <<< "$1")
+    if [ "$total" -gt "$TABLE_ROW_CAP" ]; then
+        printf '\n%s more threads are not listed here.\n' "$((total - TABLE_ROW_CAP))"
+    fi
 }
 
 thread_ids_csv() { jq -r '[.[] | .thread_id | select(test("^[A-Za-z0-9_-]+$"))] | join(",")' <<< "$1"; }
@@ -932,6 +940,12 @@ apply_actions() {
 
 write_watermark() {
     if [ "$DRY_RUN" -eq 1 ] || [ -z "$FETCH_HIGH" ]; then return 0; fi
+    # --since narrows the window to a range the watermark never covered, so
+    # moving it would hide the PRs between the old mark and the cutoff.
+    if [ -n "$SINCE" ]; then
+        say "watermark held: --since narrowed the window"
+        return 0
+    fi
     # A capped run left threads unclassified. Moving the watermark would let the
     # next incremental fetch skip the PRs they sit on.
     if [ "$CAP_HIT" -eq 1 ]; then
@@ -1013,7 +1027,7 @@ on_exit() {
 # ── Run pipeline ──────────────────────────────────────────────────────────────
 run_pipeline() {
     command -v jq >/dev/null 2>&1 || { log "jq is required"; exit 1; }
-    ensure_state_dir
+    if [ "$DRY_RUN" -eq 0 ]; then ensure_state_dir; fi
     init_work
     trap on_exit EXIT
     SCAN_ACTIVE=1

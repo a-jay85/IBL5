@@ -256,7 +256,8 @@ case_empty_env_means_default() {
     local fresh_home
     h_tmp fresh_home
     XENV="FCS_STATE_DIR= HOME=$fresh_home"
-    fcs --dry-run
+    set_payload "$EMPTY_PAYLOAD"
+    fcs
     if [ -d "$fresh_home/.local/state/ibl5-finding-class-scan" ]; then ok "row 9: empty FCS_STATE_DIR falls back to HOME"
     else fail "row 9: empty FCS_STATE_DIR falls back to HOME - dir absent"; fi
 }
@@ -665,6 +666,30 @@ case_batch_cap_holds_the_watermark() {
     expect_eq "no cap: run exits 0" 0 "$RC"
     expect_eq "no cap: three classifier calls" 3 "$(count_lines claude.calls call)"
     expect_eq "no cap: watermark moves" "2026-10-12T10:00:00Z" "$(cat "$STATE/watermark")"
+}
+
+case_since_holds_the_watermark() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    printf '2026-09-01T00:00:00Z\n' > "$STATE/watermark"
+    cp "$STATE/watermark" "$FX/watermark.before"
+    fcs --since=2026-10-01
+    expect_eq "since: run exits 0" 0 "$RC"
+    expect_has "since: the held watermark is announced" "$ALL" "watermark held: --since"
+    expect_same_file "since: watermark byte-identical" "$STATE/watermark" "$FX/watermark.before"
+}
+
+case_table_row_cap() {
+    local fn rows out i
+    fn="$(sed -n '/^threads_table() {/,/^}/p' "$FCS")"
+    rows="["
+    for i in 1 2 3 4 5; do
+        rows="$rows{\"url\":\"https://github.com/a-jay85/IBL5/pull/$i#discussion_r$i\",\"pr\":$i,\"path\":\"a.php\",\"line\":$i,\"resolved\":false},"
+    done
+    rows="${rows%,}]"
+    out="$(bash -c "clean_inline() { printf '%s' \"\$1\"; }; TABLE_ROW_CAP=3; $fn; threads_table '$rows'")"
+    expect_eq "cap: three rows listed" 3 "$(grep -c '^| \[thread\]' <<< "$out")"
+    expect_has "cap: the overflow is counted" "$out" "2 more threads are not listed here."
 }
 
 case_dm_failure_keeps_exit_code() {

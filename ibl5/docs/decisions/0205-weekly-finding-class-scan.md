@@ -20,7 +20,7 @@ The script pages every PR's review threads, keeps threads opened by the owner or
 
 A class becomes a candidate at 2 distinct threads (`FCS_MIN_OCCURRENCES`). Both seed classes have exactly 2 threads inside one PR, so a distinct-PR threshold would miss them. The issue reports the PR count instead. The classifier labels each class `phpstan`, `bin-check`, or `none`. A `none` class is reported in the run summary and DM and is never filed, because burndown cannot build a check for it. There is no per-run cap on issues. Every filable class at the threshold is filed.
 
-Class identity lives in a key marker on the backlog issue, read from open and closed issues each run. A known class with new evidence gets a comment and is never filed twice. A closed issue gets a comment and stays closed. Any GitHub or classifier failure exits 1 with nothing filed. Local state is a cache. Losing it triggers a full backfill that still files no duplicates.
+Class identity lives in a key marker on the backlog issue, read from open and closed issues each run. A known class with new evidence gets a comment and is never filed twice. A closed issue gets a comment and stays closed. A classifier failure exits 1 with nothing filed. A GitHub write failure stops the run and leaves earlier filings in place. A prose-gate rejection skips that class, files the rest, and exits 1. The watermark moves only after a clean run that is not capped and not narrowed by `--since`. Local state is a cache. Losing it triggers a full backfill that files no duplicate for a class whose key marker is already in the backlog.
 
 `--verify-schedule` proves the job fires under launchd by running a one-off dry-run plist. A merge-triggered watcher installs and verifies the weekly job on the main checkout after merge.
 
@@ -35,7 +35,7 @@ Class identity lives in a key marker on the backlog issue, read from open and cl
 
 - Positive: recurring classes reach burndown as executable issues that name a check to build.
 - Positive: the key marker and the evidence marker keep a class from being filed twice, even after local state is lost.
-- Negative: weekly Sonnet spend, capped by `--max-budget-usd` per batch.
+- Negative: weekly Sonnet spend, capped by `--max-budget-usd` per batch and by `FCS_MAX_BATCHES` batches per run. The default ceiling is 10 batches times the per-batch budget.
 - Negative: a class the model re-keys can still duplicate once.
 - Negative: `bin/launchd-health-check` alerts on the new expected job until the post-merge install runs.
 - Negative: the process runs under the owner's account and inherits the ambient `gh` login. The classifier has no tools, which limits what an injected comment can do.

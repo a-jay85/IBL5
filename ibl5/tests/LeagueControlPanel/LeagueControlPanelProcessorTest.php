@@ -757,6 +757,168 @@ class LeagueControlPanelProcessorTest extends TestCase
         $this->assertTrue($result['success']);
     }
 
+    public function testUpdateTraditionAveragesOnlyFirstFiveSeasonsWhenMoreRowsReturned(): void
+    {
+        $maintenanceMock = self::createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturn([
+            ['year' => 2023, 'wins' => 46, 'losses' => 36],
+            ['year' => 2022, 'wins' => 46, 'losses' => 36],
+            ['year' => 2021, 'wins' => 46, 'losses' => 36],
+            ['year' => 2020, 'wins' => 46, 'losses' => 36],
+            ['year' => 2019, 'wins' => 56, 'losses' => 26],
+            ['year' => 2018, 'wins' => 10, 'losses' => 72],
+            ['year' => 2017, 'wins' => 10, 'losses' => 72],
+        ]);
+        $maintenanceMock->expects($this->once())
+            ->method('updateTeamTradition')
+            ->with('Miami', 48, 34);
+        $processor = $this->createTraditionProcessor($maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testUpdateTraditionDropsCurrentYearNewestRowWithEightyOneGames(): void
+    {
+        $maintenanceMock = self::createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturn([
+            ['year' => 2024, 'wins' => 41, 'losses' => 40],
+            ['year' => 2023, 'wins' => 50, 'losses' => 32],
+        ]);
+        $maintenanceMock->expects($this->once())
+            ->method('updateTeamTradition')
+            ->with('Miami', 50, 32);
+        $processor = $this->createTraditionProcessor($maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertSame(['success' => true, 'message' => 'Free agency tradition factors updated for 1 team(s).'], $result);
+    }
+
+    public function testUpdateTraditionKeepsCurrentYearNewestRowWithEightyTwoGames(): void
+    {
+        $maintenanceMock = self::createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturn([
+            ['year' => 2024, 'wins' => 60, 'losses' => 22],
+            ['year' => 2023, 'wins' => 40, 'losses' => 42],
+        ]);
+        $maintenanceMock->expects($this->once())
+            ->method('updateTeamTradition')
+            ->with('Miami', 50, 32);
+        $processor = $this->createTraditionProcessor($maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testUpdateTraditionReportsShortNewestRowFromPriorYearAsAnomaly(): void
+    {
+        $maintenanceMock = self::createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturn([
+            ['year' => 2023, 'wins' => 41, 'losses' => 40],
+            ['year' => 2022, 'wins' => 50, 'losses' => 32],
+        ]);
+        $maintenanceMock->expects($this->never())->method('updateTeamTradition');
+        $processor = $this->createTraditionProcessor($maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertSame([
+            'success' => false,
+            'message' => 'Tradition update aborted — unexpected game counts in 1 season(s): Miami 2023: 81 games. No tradition factors were changed; fix the boxscore data and re-run.',
+        ], $result);
+    }
+
+    public function testUpdateTraditionRoundsHalfAveragesUp(): void
+    {
+        $maintenanceMock = self::createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturn([
+            ['year' => 2023, 'wins' => 41, 'losses' => 41],
+            ['year' => 2022, 'wins' => 42, 'losses' => 40],
+        ]);
+        $maintenanceMock->expects($this->once())
+            ->method('updateTeamTradition')
+            ->with('Miami', 42, 41);
+        $processor = $this->createTraditionProcessor($maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testUpdateTraditionAbortsWhenSeasonEndingYearSettingMissing(): void
+    {
+        $maintenanceMock = self::createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->expects($this->never())->method('getAllTeams');
+        $processor = $this->createTraditionProcessor($maintenanceMock, null);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertSame(
+            ['success' => false, 'message' => 'Tradition update aborted: Current Season Ending Year setting not found.'],
+            $result,
+        );
+    }
+
+    public function testUpdateTraditionJoinsMultipleAnomaliesWithSemicolonsAndWritesNothing(): void
+    {
+        $maintenanceMock = self::createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([
+            ['team_name' => 'Miami'],
+            ['team_name' => 'Boston'],
+            ['team_name' => 'Chicago'],
+        ]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturnMap([
+            ['Miami', 2024, 5, [
+                ['year' => 2023, 'wins' => 82, 'losses' => 37],
+                ['year' => 2022, 'wins' => 40, 'losses' => 40],
+            ]],
+            ['Boston', 2024, 5, [['year' => 2023, 'wins' => 50, 'losses' => 32]]],
+            ['Chicago', 2024, 5, [['year' => 2023, 'wins' => 41, 'losses' => 40]]],
+        ]);
+        $maintenanceMock->expects($this->never())->method('updateTeamTradition');
+        $processor = $this->createTraditionProcessor($maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertSame([
+            'success' => false,
+            'message' => 'Tradition update aborted — unexpected game counts in 3 season(s): Miami 2023: 119 games; Miami 2022: 80 games; Chicago 2023: 81 games. No tradition factors were changed; fix the boxscore data and re-run.',
+        ], $result);
+    }
+
+    public function testUpdateTraditionListsAllSkippedTeamsCommaSeparatedInSuccessMessage(): void
+    {
+        $maintenanceStub = self::createStub(MaintenanceRepositoryInterface::class);
+        $maintenanceStub->method('getAllTeams')->willReturn([
+            ['team_name' => 'Miami'],
+            ['team_name' => 'Boston'],
+            ['team_name' => 'Chicago'],
+            ['team_name' => 'Denver'],
+        ]);
+        $maintenanceStub->method('getTeamSeasonRecords')->willReturnMap([
+            ['Miami', 2024, 5, []],
+            ['Boston', 2024, 5, [['year' => 2023, 'wins' => 50, 'losses' => 32]]],
+            ['Chicago', 2024, 5, []],
+            ['Denver', 2024, 5, [['year' => 2023, 'wins' => 40, 'losses' => 42]]],
+        ]);
+        $processor = $this->createTraditionProcessor($maintenanceStub);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertSame([
+            'success' => true,
+            'message' => 'Free agency tradition factors updated for 2 team(s). Skipped (no completed seasons): Miami, Chicago',
+        ], $result);
+    }
+
     // --- simRecapPollerNotice ---
 
     public function testSimRecapPollerNoticeReturnsNullForPlayoffs(): void
@@ -808,6 +970,17 @@ class LeagueControlPanelProcessorTest extends TestCase
         $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
         $awardStub = self::createStub(LeagueControlPanelAwardGenerationServiceInterface::class);
         return new LeagueControlPanelProcessor($stub, $awardStub);
+    }
+
+    private function createTraditionProcessor(
+        MaintenanceRepositoryInterface $maintenanceRepository,
+        ?string $seasonEndingYear = '2024',
+    ): LeagueControlPanelProcessor {
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturn($seasonEndingYear);
+        $awardStub = self::createStub(LeagueControlPanelAwardGenerationServiceInterface::class);
+
+        return new LeagueControlPanelProcessor($stub, $awardStub, LeagueContext::LEAGUE_IBL, $maintenanceRepository);
     }
 
     private function createOlympicsProcessorWithStub(): LeagueControlPanelProcessor

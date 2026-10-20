@@ -20,7 +20,7 @@ failcase() { h_fail "$1"; }
 
 # assert_match <name> <ERE> <output>
 assert_match() {
-    if printf '%s\n' "$3" | grep -qE "$2"; then
+    if grep -qE "$2" <<<"$3"; then
         pass "$1"
     else
         failcase "$1 - expected to match: $2"
@@ -30,7 +30,7 @@ assert_match() {
 
 # assert_absent <name> <ERE> <output>
 assert_absent() {
-    if printf '%s\n' "$3" | grep -qE "$2"; then
+    if grep -qE "$2" <<<"$3"; then
         failcase "$1 - expected NOT to match: $2"
         printf '%s\n' "$3" | sed 's/^/    /'
     else

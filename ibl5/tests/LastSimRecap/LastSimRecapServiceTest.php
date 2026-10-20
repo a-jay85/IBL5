@@ -124,6 +124,129 @@ class LastSimRecapServiceTest extends TestCase
         self::assertStringContainsString('Minutemen', $slate->bestLabel);
     }
 
+    public function testEmptyGamesSlateZeroesTotalsAndSkipsTeamRecordLookup(): void
+    {
+        /** @var \ArrayObject<int, string> $log */
+        $log = new \ArrayObject();
+        $repo = $this->buildRepo(
+            games: [],
+            teamRecord: [1 => ['wins' => 40, 'losses' => 22]],
+            teamRecordCalls: $log,
+        );
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
+
+        $slate = $svc->buildSlateForTeam(1);
+
+        self::assertNotNull($slate);
+        self::assertSame([], $log->getArrayCopy());
+        self::assertSame(0, $slate->wins);
+        self::assertSame(0, $slate->losses);
+        self::assertSame(0, $slate->netMargin);
+        self::assertSame(0, $slate->teamWins);
+        self::assertSame(0, $slate->teamLosses);
+        self::assertSame('', $slate->bestLabel);
+        self::assertSame('', $slate->worstLabel);
+        self::assertSame([], $slate->games);
+        self::assertSame(1, $slate->teamTid);
+        self::assertSame('New York', $slate->teamCity);
+        self::assertSame('Metros', $slate->teamName);
+        self::assertSame(1, $slate->simNumber);
+        self::assertSame('2030-03-01', $slate->startDate);
+        self::assertSame('2030-03-31', $slate->endDate);
+    }
+
+    public function testTeamRecordIsLookedUpOnceAtWindowEndDate(): void
+    {
+        /** @var \ArrayObject<int, string> $log */
+        $log = new \ArrayObject();
+        $repo = $this->buildRepo(
+            games: [
+                $this->makeGameRow(schedId: 200, date: '2030-03-05', visitor: 1, vScore: 120, home: 2, hScore: 99),
+                $this->makeGameRow(schedId: 199, date: '2030-03-04', visitor: 3, vScore: 110, home: 1, hScore: 100),
+            ],
+            quarterLines: [
+                200 => $this->makeLines(),
+                199 => $this->makeLines(),
+            ],
+            teamRecord: [1 => ['wins' => 40, 'losses' => 22]],
+            teamRecordCalls: $log,
+        );
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
+
+        $slate = $svc->buildSlateForTeam(1);
+
+        self::assertNotNull($slate);
+        self::assertSame(40, $slate->teamWins);
+        self::assertSame(22, $slate->teamLosses);
+        self::assertSame(['1|2030-03-31'], $log->getArrayCopy());
+        self::assertNotSame(['1|2030-03-01'], $log->getArrayCopy()); // window start date must not be used
+    }
+
+    public function testSlateHeaderFieldsComeFromWindowAndTeamInfo(): void
+    {
+        $repo = $this->buildRepo(
+            window: ['sim' => 7, 'startDate' => '2030-04-02', 'endDate' => '2030-04-09'],
+            games: [
+                $this->makeGameRow(schedId: 500, date: '2030-04-05', visitor: 1, vScore: 110, home: 2, hScore: 100),
+            ],
+            quarterLines: [500 => $this->makeLines()],
+        );
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
+
+        $slate = $svc->buildSlateForTeam(1);
+
+        self::assertNotNull($slate);
+        self::assertSame(1, $slate->teamTid);
+        self::assertSame('New York', $slate->teamCity);
+        self::assertSame('Metros', $slate->teamName);
+        self::assertSame(7, $slate->simNumber);
+        self::assertSame('2030-04-02', $slate->startDate);
+        self::assertSame('2030-04-09', $slate->endDate);
+    }
+
+    public function testSlateWorstTieBreakKeepsFirstMinimum(): void
+    {
+        $repo = $this->buildRepo(
+            games: [
+                $this->makeGameRow(schedId: 302, date: '2030-03-07', visitor: 1, vScore: 100, home: 5, hScore: 107), // -7, OPP=5 (Minutemen)
+                $this->makeGameRow(schedId: 301, date: '2030-03-04', visitor: 1, vScore: 100, home: 6, hScore: 107), // -7, OPP=6 (Rage)
+            ],
+            quarterLines: [
+                302 => $this->makeLines(),
+                301 => $this->makeLines(),
+            ],
+        );
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
+
+        $slate = $svc->buildSlateForTeam(1);
+
+        self::assertNotNull($slate);
+        // Worst uses `<`, so the FIRST min (the most recent game) wins ties.
+        self::assertSame('−7 @ Minutemen', $slate->worstLabel);
+        self::assertNotSame('−7 @ Rage', $slate->worstLabel);
+    }
+
+    public function testSlateBestLabelPicksLaterGameWithLargerMargin(): void
+    {
+        $repo = $this->buildRepo(
+            games: [
+                $this->makeGameRow(schedId: 304, date: '2030-03-07', visitor: 1, vScore: 95, home: 5, hScore: 100),  // -5, OPP=5 (Minutemen)
+                $this->makeGameRow(schedId: 303, date: '2030-03-04', visitor: 1, vScore: 112, home: 6, hScore: 100), // +12, OPP=6 (Rage)
+            ],
+            quarterLines: [
+                304 => $this->makeLines(),
+                303 => $this->makeLines(),
+            ],
+        );
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
+
+        $slate = $svc->buildSlateForTeam(1);
+
+        self::assertNotNull($slate);
+        self::assertSame('+12 @ Rage', $slate->bestLabel);
+        self::assertSame('−5 @ Minutemen', $slate->worstLabel);
+    }
+
     public function testOtGameProducesFiveMargins(): void
     {
         $linesWithOt = $this->makeLines(visOt: 5, homeOt: 7);
@@ -610,6 +733,8 @@ class LastSimRecapServiceTest extends TestCase
      * @param array<string, PlayerLine> $playerLines
      * @param array<string, StarterMap> $boxScoreStarters key "<schedId>|<tid>"
      * @param \ArrayObject<int, string>|null $calls
+     * @param array<int, array{wins: int, losses: int}> $teamRecord
+     * @param \ArrayObject<int, string>|null $teamRecordCalls
      */
     private function buildRepo(
         ?array $window = ['sim' => 1, 'startDate' => '2030-03-01', 'endDate' => '2030-03-31'],
@@ -622,8 +747,11 @@ class LastSimRecapServiceTest extends TestCase
         array $playerLines = [],
         array $boxScoreStarters = [],
         ?\ArrayObject $calls = null,
+        array $teamRecord = [],
+        ?\ArrayObject $teamRecordCalls = null,
     ): LastSimRecapRepositoryInterface {
         $calls ??= new \ArrayObject();
+        $teamRecordCalls ??= new \ArrayObject();
         $teamInfo = [
             1 => ['tid' => 1, 'city' => 'New York', 'name' => 'Metros'],
             2 => ['tid' => 2, 'city' => 'Los Angeles', 'name' => 'Stars'],
@@ -635,7 +763,7 @@ class LastSimRecapServiceTest extends TestCase
         return new class(
             $window, $games, $quarterLines, $rosterByTid,
             $injuriesByPidAndDate, $lastSimStarters, $starterSnapshots, $playerLines, $teamInfo,
-            $boxScoreStarters, $calls,
+            $boxScoreStarters, $calls, $teamRecord, $teamRecordCalls,
         ) implements LastSimRecapRepositoryInterface {
             /**
              * @param array{sim: int, startDate: string, endDate: string}|null $window
@@ -649,6 +777,8 @@ class LastSimRecapServiceTest extends TestCase
              * @param array<int, array{tid:int,city:string,name:string}> $teamInfo
              * @param array<string, array{PG:int,SG:int,SF:int,PF:int,C:int}> $boxScoreStarters
              * @param \ArrayObject<int, string> $calls
+             * @param array<int, array{wins: int, losses: int}> $teamRecord
+             * @param \ArrayObject<int, string> $teamRecordCalls
              */
             public function __construct(
                 private ?array $window,
@@ -662,6 +792,8 @@ class LastSimRecapServiceTest extends TestCase
                 private array $teamInfo,
                 private array $boxScoreStarters,
                 private \ArrayObject $calls,
+                private array $teamRecord,
+                private \ArrayObject $teamRecordCalls,
             ) {}
 
             /** @return array{sim: int, startDate: string, endDate: string}|null */
@@ -698,7 +830,8 @@ class LastSimRecapServiceTest extends TestCase
             }
             public function getPlayerLineForGame(int $pid, int $schedId): ?array { return $this->playerLines[$pid . '|' . $schedId] ?? null; }
             public function getTeamRecordAsOf(int $tid, string $date): array {
-                return ['wins' => 0, 'losses' => 0];
+                $this->teamRecordCalls->append($tid . '|' . $date);
+                return $this->teamRecord[$tid] ?? ['wins' => 0, 'losses' => 0];
             }
             public function getTeamInfo(int $tid): ?array { return $this->teamInfo[$tid] ?? null; }
         };

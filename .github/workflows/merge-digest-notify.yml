@@ -126,7 +126,7 @@ jobs:
           # message-file defaults to /tmp/discord-msg.txt -- the path written above.
           # Merge notices go to #merged, not #dev (DISCORD_MERGED_WEBHOOK_URL).
           webhook-url: ${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}
-          ping: 'true'
+          ping: 'false'   # #merged posts never @mention the owner
           # A silently-dropped merge notification is indistinguishable from "nothing merged",
           # which is the exact failure the ledger had. Fail the run instead.
           fail-on-delivery: 'true'
@@ -179,5 +179,5 @@ jobs:
         with:
           message-file: ${{ runner.temp }}/discord-msg.txt
           webhook-url: ${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}
-          ping: 'false'   # the digest job already pinged for this merge
+          ping: 'false'   # #merged posts never @mention the owner
           fail-on-delivery: 'true'

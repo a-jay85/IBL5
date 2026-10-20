@@ -930,6 +930,7 @@ RECHECK_DECLINE_REASONS = (
     "plan-hash-missing", "plan-changed", "not-pure-body",
     "recheck-unresolved", "recheck-llm-invalid-output", "recheck-schema",
     "recheck-llm-cli", "recheck-llm-empty", "recheck-harness-error",
+    "prior-body-missing",
 )
 
 

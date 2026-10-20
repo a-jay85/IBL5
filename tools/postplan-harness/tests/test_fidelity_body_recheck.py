@@ -7,17 +7,19 @@ non-pass falls through to the unchanged ``fidelity.re_review`` call.
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
-from harness import fidelity
-from harness.state import UsageLedger
+from harness import armable, fidelity
+from harness.state import PlanInfo, UsageLedger
 
 from test_fidelity_body_only_round import _BodySeqGh
-from test_fidelity_rounds import (TREE_1, TREE_2, _cleanup, _CountingGit,  # noqa: F401
-                                   _plan, _Res, _ScriptedLlm, git_shim)
+from test_fidelity_rounds import (TREE_1, TREE_2, _cleanup, _counting_git,  # noqa: F401
+                                   _CountingGit, _drive, _plan, _Res, _ScriptedLlm,
+                                   git_shim)
 
 
 VERDICT1_PURE_BODY = """REVIEW-COVERAGE: CURRENT
@@ -59,11 +61,31 @@ def _body_only_git(trees=(TREE_1,)):
                         commit_returns=[""])
 
 
+class _HookGh(_BodySeqGh):
+    """Runs `hook()` on the first live body read, which comes after review 1."""
+
+    def __init__(self, out_dir, bodies, hook=None, **kw):
+        super().__init__(out_dir, bodies, **kw)
+        self._hook = hook
+
+    def pr_body_fresh(self):
+        if self._hook is not None and self.fresh_calls == 0:
+            self._hook()
+        return super().pr_body_fresh()
+
+
+def _found_plan(tmp_path):
+    """A readable plan file, so _plan_hash is non-empty (a plan-blind run never rechecks)."""
+    path = tmp_path / "plan.md"
+    path.write_text("# Plan\n\n## Phase 1\nDo the thing.\n")
+    return PlanInfo(found=True, path=str(path))
+
+
 def _drive_body_only(tmp_path, pr, verdict1, extra_scripts=None, bodies=None,
-                     git=None, plan=None):
-    gh = _BodySeqGh(str(tmp_path),
-                    bodies or ["BEFORE body prose", "AFTER body prose", "AFTER body prose"],
-                    fixture={"pr_number": pr})
+                     git=None, plan=None, hook=None):
+    gh = _HookGh(str(tmp_path),
+                 bodies or ["BEFORE body prose", "AFTER body prose", "AFTER body prose"],
+                 hook=hook, fixture={"pr_number": pr})
     git = git or _body_only_git()
     scripts = {
         "plan-fidelity-review": [verdict1],
@@ -71,9 +93,10 @@ def _drive_body_only(tmp_path, pr, verdict1, extra_scripts=None, bodies=None,
         "plan-fidelity-re-review-2": [RE_REVIEW_READY],
     }
     scripts.update(extra_scripts or {})
-    llm = _ScriptedLlm(UsageLedger(), scripts)
+    llm = _RecheckLlm(UsageLedger(), scripts)
     res = _Res()
-    runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, plan or _plan(),
+    runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh,
+                         plan or _found_plan(tmp_path),
                          "diff", "original-body", pr, "dead" * 10, TREE_1, False,
                          lambda _m: None, res)
     return res, llm
@@ -94,12 +117,21 @@ def test_body_only_round_with_code_finding_runs_full_re_review(tmp_path, git_shi
         _cleanup(9951, "9951-2")
 
 
-def test_body_only_round_with_pure_body_finding_runs_full_re_review_today(tmp_path,
-                                                                         git_shim):
+def test_pure_body_round_runs_recheck_not_opus_re_review(tmp_path, git_shim):
     try:
-        res, llm = _drive_body_only(tmp_path, 9952, VERDICT1_PURE_BODY)
-        assert ("plan-fidelity-re-review-2", "opus") in llm.calls
-        assert not [c for c in llm.calls if c[0].startswith("plan-fidelity-body-recheck")]
+        res, llm = _drive_body_only(tmp_path, 9952, VERDICT1_PURE_BODY,
+                                    {"plan-fidelity-body-recheck-2": [_pass_all]})
+        assert ("plan-fidelity-body-recheck-2", "sonnet") in llm.calls
+        assert not [c for c in llm.calls if c[0].startswith("plan-fidelity-re-review")]
+        rec = res.fidelity["rounds"][0]
+        assert rec["review_kind"] == "body-recheck"
+        assert rec["recheck_fallback_reason"] is None
+        assert res.fidelity["verdict_2"] == "READY"
+        assert res.fidelity["reviewed_tree_2"] == TREE_1
+        assert res.fidelity["rounds_completed"] == 1
+        assert armable.select_fidelity_verdict(
+            "NOT READY", res.fidelity["verdict_2"], res.fidelity["reviewed_tree_2"],
+            TREE_1) == ("READY", "verdict-2")
     finally:
         _cleanup(9952, "9952-2")
 
@@ -394,10 +426,12 @@ class _RecheckLlm(_ScriptedLlm):
         self.prompts[purpose] = prompt
         queue = self.scripts.get(purpose)
         if queue is None:
-            raise HarnessError("llm-fixture-missing", purpose)
+            return super().call(purpose, model, prompt, validate, max_retries, normalizer)
         val = queue.pop(0) if len(queue) > 1 else queue[0]
         if isinstance(val, dict) and "raise" in val:
             raise HarnessError(val["raise"]["kind"], val["raise"].get("detail", ""))
+        if callable(val):
+            val = val(prompt)
         if normalizer is not None:
             val = normalizer(val)
         try:
@@ -422,6 +456,13 @@ class _FakeGit:
 PLAN_HASH = "a" * 64
 NAME_STATUS = "M\tibl5/tests/FooTest.php\nM\tibl5/classes/Bar.php\n"
 PASS_REPLY = {"findings": [_item("F1", "resolved")], "hunks": []}
+
+
+def _pass_all(prompt):
+    """A passing reply for whatever hunks the drive's body edit produced."""
+    hids = re.findall(r"^(H\d+) \((?:insert|replace)\):", prompt, re.M)
+    return {"findings": [_item("F1", "resolved")],
+            "hunks": [_item(h, "supported") for h in hids]}
 
 
 def _prior(tmp_path, text=VERDICT1_PURE_BODY, tree=TREE_1):
@@ -568,3 +609,163 @@ def test_body_recheck_evidence_names_only_cited_files(tmp_path):
         assert "Bar.php" not in evidence
     finally:
         _cleanup(f"{pr}-2")
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: round-loop wiring in runner._run_fidelity
+# ---------------------------------------------------------------------------
+
+class _MovedTreeGit(_CountingGit):
+    """head_tree() answers a tree other than TREE_1, the one review 1 recorded.
+
+    _run_fidelity records verdict 1 against its `current_tree` argument, so the
+    recheck's own head_tree() read is the first one this double serves.
+    """
+
+    def head_tree(self):
+        return "beef" * 10
+
+
+def _recheck_calls(llm):
+    return [c for c in llm.calls if c[0].startswith("plan-fidelity-body-recheck")]
+
+
+def test_body_only_round_tree_changed_falls_back_to_full_re_review(tmp_path, git_shim):
+    git = _MovedTreeGit({"slug": "demo", "worktree_diff": "",
+                         "diff": "diff --git a/x b/x\n"}, commit_returns=[""])
+    try:
+        res, llm = _drive_body_only(tmp_path, 9961, VERDICT1_PURE_BODY,
+                                    {"plan-fidelity-body-recheck-2": [_pass_all]}, git=git)
+        rec = res.fidelity["rounds"][0]
+        assert rec["outcome"] == "body-only"
+        assert rec["recheck_fallback_reason"] == "tree-changed"
+        assert rec["review_kind"] == "full"
+        assert ("plan-fidelity-re-review-2", "opus") in llm.calls
+        assert _recheck_calls(llm) == []
+    finally:
+        _cleanup(9961, "9961-2")
+
+
+def test_body_only_round_with_code_note_falls_back(tmp_path, git_shim):
+    verdict1 = VERDICT1_PURE_BODY.replace(
+        "methods.\n", "methods.\n- [NOTE] Check 5: VR baseline missing.\n", 1)
+    try:
+        res, llm = _drive_body_only(tmp_path, 9962, verdict1,
+                                    {"plan-fidelity-body-recheck-2": [_pass_all]})
+        assert res.fidelity["rounds"][0]["recheck_fallback_reason"] == "not-pure-body"
+        assert ("plan-fidelity-re-review-2", "opus") in llm.calls
+    finally:
+        _cleanup(9962, "9962-2")
+
+
+NOT_READY_RE_REVIEW = "6d checks\n\n## FINDINGS\n- [BLOCKING] Check 4: still wrong.\n\nNOT READY\n"
+
+
+def test_recheck_unresolved_then_not_ready_re_review_holds_condition_12(tmp_path, git_shim):
+    try:
+        res, _llm = _drive_body_only(tmp_path, 9963, VERDICT1_PURE_BODY, {
+            "plan-fidelity-body-recheck-2": [lambda p: {**_pass_all(p),
+                                                        "findings": [_item("F1", "unresolved")]}],
+            "plan-fidelity-re-review-2": [NOT_READY_RE_REVIEW],
+        })
+        assert res.fidelity["rounds"][0]["recheck_fallback_reason"] == "recheck-unresolved"
+        assert res.fidelity["verdict_2"] == "NOT READY"
+        assert armable.select_fidelity_verdict(
+            "NOT READY", res.fidelity["verdict_2"], res.fidelity["reviewed_tree_2"],
+            TREE_1) == ("NOT READY", "verdict-2")
+    finally:
+        _cleanup(9963, "9963-2", "9963-3", "9963-4")
+
+
+def test_recheck_invalid_reply_falls_back_and_never_reads_ready(tmp_path, git_shim):
+    try:
+        res, _llm = _drive_body_only(tmp_path, 9964, VERDICT1_PURE_BODY, {
+            "plan-fidelity-body-recheck-2": ["garbage"],
+            "plan-fidelity-re-review-2": [NOT_READY_RE_REVIEW],
+        })
+        rec = res.fidelity["rounds"][0]
+        assert rec["recheck_fallback_reason"] == "recheck-llm-invalid-output"
+        assert res.fidelity["verdict_2"] == "NOT READY"
+    finally:
+        _cleanup(9964, "9964-2", "9964-3", "9964-4")
+
+
+def test_recheck_plan_hash_changed_falls_back(tmp_path, git_shim, monkeypatch):
+    def hook():
+        monkeypatch.setattr(runner, "_plan_hash", lambda plan: "f" * 64)
+    try:
+        res, llm = _drive_body_only(tmp_path, 9965, VERDICT1_PURE_BODY,
+                                    {"plan-fidelity-body-recheck-2": [_pass_all]},
+                                    hook=hook)
+        assert res.fidelity["rounds"][0]["recheck_fallback_reason"] == "plan-changed"
+        assert _recheck_calls(llm) == []
+    finally:
+        _cleanup(9965, "9965-2")
+
+
+def test_recheck_prior_body_missing_falls_back(tmp_path, git_shim):
+    def hook():
+        os.remove(os.path.join(str(tmp_path), "fidelity-packet", "pr-body.md"))
+    try:
+        res, llm = _drive_body_only(tmp_path, 9966, VERDICT1_PURE_BODY,
+                                    {"plan-fidelity-body-recheck-2": [_pass_all]},
+                                    hook=hook)
+        assert res.fidelity["rounds"][0]["recheck_fallback_reason"] == "prior-body-missing"
+        assert _recheck_calls(llm) == []
+        assert ("plan-fidelity-re-review-2", "opus") in llm.calls
+    finally:
+        _cleanup(9966, "9966-2")
+
+
+def test_commit_round_records_full_review_kind(tmp_path, git_shim):
+    llm = _RecheckLlm(UsageLedger(), {
+        "plan-fidelity-review": [VERDICT1_PURE_BODY],
+        "fidelity-remediation": ["edited"],
+        "plan-fidelity-body-recheck-2": [_pass_all],
+        "plan-fidelity-re-review-2": [RE_REVIEW_READY],
+    })
+    try:
+        res = _drive(tmp_path, llm, _counting_git(), 9967)
+        rec = res.fidelity["rounds"][0]
+        assert rec["outcome"] == "committed"
+        assert rec["review_kind"] == "full"
+        assert rec["recheck_fallback_reason"] is None
+        assert _recheck_calls(llm) == []
+    finally:
+        _cleanup(9967, "9967-2")
+
+
+class _SeqBodyGh(_BodySeqGh):
+    """Every live read returns a new body, so each round sees an edited body."""
+
+    def pr_body_fresh(self):
+        self._body_override = None
+        self.fresh_calls += 1
+        return f"body prose v{self.fresh_calls}"
+
+
+def test_round_two_body_only_uses_round_one_re_review_as_prior(tmp_path, git_shim):
+    git = _CountingGit({"slug": "demo", "worktree_diff": "",
+                        "diff": "diff --git a/x b/x\n", "head_trees": [TREE_1, TREE_2]},
+                       commit_returns=["round-sha-1", ""])
+    gh = _SeqBodyGh(str(tmp_path), ["unused"], fixture={"pr_number": 9968})
+    llm = _RecheckLlm(UsageLedger(), {
+        "plan-fidelity-review": [VERDICT1_PURE_BODY],
+        "fidelity-remediation": ["edited"],
+        "plan-fidelity-re-review-2": [VERDICT1_PURE_BODY],
+        "plan-fidelity-body-recheck-3": [_pass_all],
+    })
+    res = _Res()
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh,
+                             _found_plan(tmp_path), "diff",
+                             "original-body", 9968, "dead" * 10, TREE_1, False,
+                             lambda _m: None, res)
+        rounds = res.fidelity["rounds"]
+        assert rounds[0]["outcome"] == "committed"
+        assert rounds[1]["outcome"] == "body-only"
+        assert ("plan-fidelity-body-recheck-3", "sonnet") in llm.calls
+        assert rounds[1]["review_kind"] == "body-recheck"
+        assert rounds[1]["verdict_path"].endswith("-3.md")
+    finally:
+        _cleanup(9968, "9968-2", "9968-3")

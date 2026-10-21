@@ -320,6 +320,14 @@ def test_failed_delta_review_prunes_nothing():
     assert same_run_threads.dispositioned_keys(result) == set()
 
 
+def test_failed_delta_review_marks_degraded():
+    failed = {"delta_review": {"paths": ["a.php"], "new_findings": None}}
+    assert same_run_threads.delta_degraded(failed) == ["same-run-delta-review"]
+    assert same_run_threads.delta_degraded(
+        {"delta_review": {"paths": ["a.php"], "new_findings": 0}}) == []
+    assert same_run_threads.delta_degraded({}) == []
+
+
 def test_max_same_run_rounds_is_one():
     assert MAX_SAME_RUN_ROUNDS == 1
     src = inspect.getsource(run_same_run_pass)

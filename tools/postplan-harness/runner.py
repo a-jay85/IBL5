@@ -696,6 +696,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.thread_ingestion["same_run"] = sr
         res.findings, res.scored_findings = same_run_threads.prune_findings(
             res.findings, res.scored_findings, same_run_threads.dispositioned_keys(sr))
+        res.degraded_agents = list(res.degraded_agents) + [
+            p for p in same_run_threads.delta_degraded(sr) if p not in res.degraded_agents]
         if git.head() != head_before_45b:
             sha = git.head()
             files = git.changed_files()

@@ -80,6 +80,17 @@ def dispositioned_keys(result: dict) -> set[tuple[str, str]]:
             if row.get("outcome") in ("fixed", "declined")}
 
 
+DELTA_DEGRADED_PURPOSE = "same-run-delta-review"
+
+
+def delta_degraded(result: dict) -> list[str]:
+    """Degraded-agent marker when the fix delta went unreviewed, so arming holds."""
+    delta = (result or {}).get("delta_review")
+    if delta is not None and delta.get("new_findings") is None:
+        return [DELTA_DEGRADED_PURPOSE]
+    return []
+
+
 def prune_findings(findings, scored, keys) -> tuple[list, list]:
     """Drop the findings (and scored rows) whose thread the fixer dispositioned.
 
@@ -130,7 +141,7 @@ def run_same_run_pass(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log,
         if delta:
             try:
                 new_findings = review_delta(delta)
-            except Exception as e:  # noqa: BLE001 - indeterminate; posted threads hold via (11)
+            except Exception as e:  # noqa: BLE001 - indeterminate; the runner marks the review degraded
                 log(f"phase4.5b: delta re-review failed ({_redact(repr(e))[:200]})")
                 new_findings = None
         out["delta_review"] = {"paths": sorted(delta), "new_findings": new_findings}

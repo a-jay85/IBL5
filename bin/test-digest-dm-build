@@ -544,6 +544,11 @@ am T --manual-count 0 --auto-ci-count x --auto-mac-count 0 --auto-failed-count 0
 eq "exit 0 on bad auto count" "$RC" "0"
 eq "bad auto count pings" "$PING" "true"
 want "names the bad auto count" "$OUT" 'auto_ci_count=invalid'
+am T --manual-count '2;rm' --auto-ci-count '2;rm' --auto-mac-count 0 --auto-failed-count '2;rm' \
+    --run-url "$AM_RUN" --job-result after-merge-checklist=success
+eq "exit 0 on a shell-shaped count" "$RC" "0"
+eq "a shell-shaped count pings" "$PING" "true"
+wantnot "the raw count is never printed" "$OUT" '2;rm'
 am T --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
     --run-url "$AM_RUN" --job-result after-merge-checklist=success
 eq "all good does not ping" "$PING" "false"

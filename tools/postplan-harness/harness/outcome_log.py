@@ -48,7 +48,7 @@ def _clean_reason(reason) -> str:
 
 
 def build_event(*, pr, finding_id, agent, score, outcome, source, basis, pipeline,
-                reason="", sha=None, now=None) -> dict:
+                reason="", sha=None, origin=None, now=None) -> dict:
     ts_dt = now or datetime.datetime.now(datetime.timezone.utc)
     ts = ts_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     return {
@@ -64,11 +64,17 @@ def build_event(*, pr, finding_id, agent, score, outcome, source, basis, pipelin
         "pipeline": pipeline,
         "reason": _clean_reason(reason),
         "sha": sha,
+        "origin": origin,
     }
 
 
-def event_from_verdict(*, pr, thread, verdict, category, reason, sha, pipeline):
+ORIGINS = ("pre-existing", "same-run")
+
+
+def event_from_verdict(*, pr, thread, verdict, category, reason, sha, pipeline, origin="pre-existing"):
     """One Phase 4.5 event from a verdict and its thread row, or ``None`` to log nothing."""
+    if origin not in ORIGINS:
+        raise ValueError(f"unknown origin {origin!r}")
     mapped = map_outcome(verdict, category)
     if mapped is None:
         return None
@@ -80,7 +86,7 @@ def event_from_verdict(*, pr, thread, verdict, category, reason, sha, pipeline):
         basis = "category-missing"
     return build_event(pr=pr, finding_id=thread.get("commentId"), agent=thread.get("agent"),
                        score=thread.get("score"), outcome=mapped, source="phase4.5",
-                       basis=basis, pipeline=pipeline, reason=reason, sha=sha)
+                       basis=basis, pipeline=pipeline, reason=reason, sha=sha, origin=origin)
 
 
 def resolve_log_path(repo_dir, env=None) -> str:
@@ -244,7 +250,8 @@ def _cli_record(flags, log) -> None:
             continue  # a verdict for an id the thread file never listed is not logged
         event = event_from_verdict(pr=pr, thread=thread, verdict=v.get("verdict"),
                                    category=v.get("category"), reason=v.get("reason"),
-                                   sha=v.get("sha"), pipeline=pipeline)
+                                   sha=v.get("sha"), pipeline=pipeline,
+                                   origin=v.get("origin") or "pre-existing")
         if event is not None:
             events.append(event)
     if events:

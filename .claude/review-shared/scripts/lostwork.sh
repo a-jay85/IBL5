@@ -32,7 +32,7 @@ ADDS="$TMPD/adds"; DELS="$TMPD/dels"; MISS="$TMPD/missing"; KEEP="$TMPD/dels-che
 # significant changed lines, `B` marks it binary, `M<path>\t<mode>` carries the six-digit
 # mode of an entry with a `new file mode` header (used by the delete arm to recognise a
 # type-change pair). Exit 3 = git-quoted path, 4 = an entry
-# whose paths cannot be read. An entry with no ---/+++ lines (binary, empty new file,
+# whose paths cannot be read or a `new file mode` header that is not six octal digits. An entry with no ---/+++ lines (binary, empty new file,
 # mode-only, pure rename) takes its paths from the rename/copy headers or from a
 # `diff --git a/P b/P` line whose two halves match; anything else is unparseable.
 AWKRC=0

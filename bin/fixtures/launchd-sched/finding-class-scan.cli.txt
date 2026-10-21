@@ -1,0 +1,30 @@
+args=--bogus-flag exit=2
+finding-class-scan: unknown argument: --bogus-flag
+Usage: bin/finding-class-scan [flags]
+---
+Flags (= form only; "--since 2026-01-01" is rejected):
+  --help                  Print this help and exit 0.
+  --dry-run               Run the whole pipeline, file nothing, write no state.
+                          Prints what it would file or comment.
+  --backfill              Scan the whole thread history, ignoring the watermark.
+  --since=<YYYY-MM-DD>    Only page PRs updated since this date (overrides the
+                          watermark lookback).
+  --min-occurrences=<n>   Threads a class needs before it is filed, integer
+                          1..99 (default 2).
+  --max-budget-usd=<amt>  Classifier cost cap per batch (default 3.00).
+  --print-schedule        Print the weekly launchd plist and exit (no side effect).
+  --install-schedule      Write the plist and bootstrap it (main checkout only).
+  --uninstall-schedule    Boot the job out and remove the plist (idempotent).
+  --verify-schedule       Fire one throwaway launchd job (dry run) and wait for
+                          its summary line. Works from any checkout.
+---
+Environment (empty means default):
+  FCS_STATE_DIR=$HOME/.local/state/ibl5-finding-class-scan
+  FCS_MIN_OCCURRENCES=2    FCS_MAX_BUDGET_USD=3.00
+  FCS_CLASSIFY_TIMEOUT=1500    FCS_VERIFY_TIMEOUT=1800
+  FCS_MAX_BATCHES=10       Classifier batches (60 threads each) per run; the
+                           rest wait for the next run.
+Test seams: GH_CMD, REPO_SLUG, BACKLOG_SLUG, FCS_CLAUDE_BIN, FCS_DM_BIN,
+  FCS_LAUNCHCTL_BIN.
+---
+Exit codes: 0 success, 1 run failure, 2 usage.

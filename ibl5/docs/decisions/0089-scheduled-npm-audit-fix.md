@@ -1,6 +1,6 @@
 ---
 description: A weekly CI_PAT-credentialed scheduled npm audit fix workflow keeps ibl5's pre-existing transitive vulns fixed so the audit-js gate stops false-failing unrelated dependabot PRs; adds an IBL6 npm dependabot entry.
-last_verified: 2026-08-21
+last_verified: 2026-10-20
 ---
 
 # ADR-0089: Scheduled npm audit fix to keep the audit-js gate green
@@ -50,6 +50,10 @@ Separately, add an npm `/IBL6` weekly entry to `.github/dependabot.yml`, mirrori
 plain npm `/ibl5` block, so IBL6's dependencies are kept current alongside ibl5's.
 
 Scope narrowed to `ibl5/IBLbot` only. The `ibl5` entry is retired in favour of the bun-only lockfile collapse (ADR-0101); `IBL6` was already retired by ADR-0095.
+
+## Addendum: audit-js line references (2026-10-20)
+
+The Context cites `tests.yml:183-205` for the `audit-js` job and `tests.yml:691-697` for the aggregate gate. Today `audit-js` starts at `tests.yml:236` and the "Tests and Analysis" job is at `tests.yml:1094`. The workflow file grew since 2026-07-21, and `audit-js` now runs `bun install --frozen-lockfile` plus `bun audit` (ADR-0101, ADR-0186).
 
 ## Consequences
 

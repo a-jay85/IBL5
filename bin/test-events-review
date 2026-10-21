@@ -841,7 +841,7 @@ SH
             "EVENTS_REVIEW_DM_BIN=$REPO_ROOT/bin/discord-dm"
             "DISCORD_DM_TO=283183467804491776"
             "DISCORD_DM_CURL_BIN=$STUBS/curl"
-        "DISCORD_DM_SSH_BIN=$STUBS/dm-ssh"
+            "DISCORD_DM_SSH_BIN=$STUBS/dm-ssh"
             "DISCORD_DM_WEBHOOK_FILE=$wh"
             "DISCORD_DM_SPOOL=$T/e2e-spool.log"
         )

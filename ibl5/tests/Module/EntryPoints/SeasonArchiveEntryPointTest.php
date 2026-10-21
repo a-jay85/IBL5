@@ -65,4 +65,17 @@ class SeasonArchiveEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('IBL Season Archive', $output);
         $this->assertStringNotContainsString('season-archive-nav', $output);
     }
+
+    public function testYearWithTrailingJunkRendersSeasonDetail(): void
+    {
+        // (int)'1989abc' === 1989, so the detail branch renders.
+        $this->mockDb->onQuery('ibl_awards', [
+            ['year' => 1989, 'award' => 'Most Valuable Player (1st)', 'name' => 'Arvydas Sabonis', 'table_id' => 1],
+        ]);
+
+        $output = $this->runModule('SeasonArchive', get: ['year' => '1989abc']);
+
+        $this->assertStringContainsString('season-archive-nav', $output);
+        $this->assertStringNotContainsString('IBL Season Archive', $output);
+    }
 }

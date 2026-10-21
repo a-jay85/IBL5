@@ -123,12 +123,20 @@ h_eq "G5-silent-nonzero-fails-at-once attempts" "1" "$(count_of)"
 
 # --- G6 ---
 for pat in 'Gateway Time-out' 'Gateway Timeout' 'connection reset by peer' \
-           'connection refused' 'dial tcp: i/o timeout' 'request timed out'; do
+           'connection refused' 'dial tcp: i/o timeout' 'request timed out' \
+           'unexpected end of JSON input'; do
     reset_case "1|$pat|" '0||ok'
     run_case "0 0 0"
     h_eq "G6-transient-patterns [$pat] rc" "0" "$(slurp "$T/rc")"
     h_eq "G6-transient-patterns [$pat] attempts" "2" "$(count_of)"
 done
+
+# --- G6b ---
+# A 4xx still fails at once when gh also prints the truncated-body string.
+reset_case '1|HTTP 422: unexpected end of JSON input|'
+run_case "0 0 0"
+h_eq "G6b-4xx-beats-truncated-body rc" "1" "$(slurp "$T/rc")"
+h_eq "G6b-4xx-beats-truncated-body attempts" "1" "$(count_of)"
 
 # --- G7 ---
 reset_case '1|HTTP 503: Service Unavailable|'

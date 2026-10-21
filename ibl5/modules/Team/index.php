@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -12,7 +13,8 @@ $module_name = basename(dirname(__FILE__));
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
 // inputs are now read from $_REQUEST explicitly here.
 $op     = is_string($_REQUEST['op']     ?? null) ? $_REQUEST['op']     : '';
-$teamid = is_numeric($_REQUEST['teamid'] ?? null) ? (int) $_REQUEST['teamid'] : 0;
+$teamidInput = $_REQUEST['teamid'] ?? $_REQUEST['tid'] ?? null;
+$teamid = is_numeric($teamidInput) ? (int) $teamidInput : 0;
 
 $pagetitle = "- Team Pages";
 

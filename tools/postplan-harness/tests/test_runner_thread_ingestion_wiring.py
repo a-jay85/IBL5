@@ -317,3 +317,90 @@ def test_run_result_carries_thread_ingestion():
     assert "thread_ingestion" in parsed, (
         "thread_ingestion must appear in RunResult.to_json() output"
     )
+
+
+def test_thread_ingestion_phase_forwards_outcome_log_path(tmp_path, monkeypatch):
+    """Mutation caught: dropping the forward leaves the spy with None."""
+    seen: dict = {}
+
+    def _spy(*args, **kwargs):
+        seen["path"] = kwargs.get("outcome_log_path")
+        return {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None}
+
+    monkeypatch.setattr(runner, "run_thread_ingestion", _spy)
+    runner._run_thread_ingestion_phase(
+        _gh(tmp_path), None, _git(), str(tmp_path), None, {111}, str(tmp_path), _log(), _res(),
+        outcome_log_path="/x/o.jsonl")
+    assert seen["path"] == "/x/o.jsonl"
+
+
+def test_thread_ingestion_phase_unwritable_outcome_log_keeps_counts(tmp_path, monkeypatch):
+    """Mutation caught: an append_events that re-raises would reach the broad except
+    in the phase wrapper, which zeroes the counts and sets "error"."""
+    from harness.adapters.llm import FixtureLlm
+    from harness.thread_ingestion import PURPOSE
+
+    thread = {"commentId": 7, "path": "a.php", "line": 3, "body": "Bug", "score": 85,
+              "agent": "B", "authorLogin": "a-jay85", "authorType": "User",
+              "isResolved": False, "isOutdated": False}
+    gh = RecordingGh(str(tmp_path), {"trusted_threads": [thread], "pr_number": 1})
+    llm = FixtureLlm(_ledger(), {PURPOSE: '{"verdict":"FIX","reason":"done"}'})
+    monkeypatch.setattr(runner, "_commit_with_gate_fix", lambda *a, **k: "abc123")
+    monkeypatch.setattr(runner, "_push_with_gate_fix", lambda *a, **k: "def456")
+    blocker = tmp_path / "blocker"
+    blocker.write_text("x")
+
+    result = runner._run_thread_ingestion_phase(
+        gh, llm, _git(), str(tmp_path), 1, {7}, str(tmp_path), _log(), _res(),
+        outcome_log_path=str(blocker / "sub" / "o.jsonl"))
+
+    assert result["fixed"] == 1
+    assert "error" not in result
+
+
+def _sweep_gh(tmp_path, all_threads, trusted):
+    return RecordingGh(str(tmp_path), {"trusted_threads": trusted, "all_threads": all_threads,
+                                       "pr_number": 1})
+
+
+def _sweep_thread(cid, **kw):
+    base = {"commentId": cid, "path": "a.php", "line": 3, "body": "Bug", "score": 85,
+            "agent": "B", "authorLogin": "a-jay85", "authorType": "User",
+            "isResolved": False, "isOutdated": False}
+    base.update(kw)
+    return base
+
+
+def test_sweep_runs_after_ingestion_and_skips_just_declined(tmp_path, monkeypatch):
+    """Mutation caught: moving the sweep above run_thread_ingestion makes thread 7
+    log as resolved-no-reply from the sweep."""
+    import json
+
+    from harness.adapters.llm import FixtureLlm
+    from harness.thread_ingestion import PURPOSE
+
+    t7 = _sweep_thread(7)
+    gh = _sweep_gh(tmp_path, [_sweep_thread(7, isResolved=True),
+                              _sweep_thread(8, isOutdated=True)], [t7])
+    llm = FixtureLlm(_ledger(), {PURPOSE: '{"verdict":"DECLINE","reason":"ok","category":"wrong"}'})
+    log_path = tmp_path / "o.jsonl"
+
+    runner._run_thread_ingestion_phase(
+        gh, llm, _git(), str(tmp_path), 1, {7}, str(tmp_path), _log(), _res(),
+        outcome_log_path=str(log_path))
+
+    events = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert [(e["findingId"], e["source"]) for e in events] == [(7, "phase4.5"), (8, "sweep")]
+
+
+def test_sweep_adapter_failure_keeps_result(tmp_path, monkeypatch):
+    class _BoomGh(RecordingGh):
+        def review_threads_all(self, pr):
+            raise RuntimeError("graphql down")
+
+    gh = _BoomGh(str(tmp_path), {"trusted_threads": [], "pr_number": 1})
+    result = runner._run_thread_ingestion_phase(
+        gh, None, _git(), str(tmp_path), 1, set(), str(tmp_path), _log(), _res(),
+        outcome_log_path=str(tmp_path / "o.jsonl"))
+    assert result["found"] == 0
+    assert "error" not in result

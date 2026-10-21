@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-11
+last_verified: 2026-10-18
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -46,13 +46,14 @@ A keyword in surrounding prose does **not** exempt — only the parenthesized gr
 
 A bare path OR a path you annotate with a change-description is still checked; only the reference marker exempts. The `## Critical Files` section must be in **list form** (`- \`path\` (annotation)`); a markdown-table section is rejected by `bin/check-plan` gate `[F]` because a table parses to zero entries and silently voids the whole conformance check.
 
-**VR `-snapshots` directories.** A Visual Regression baseline directory changes only when CI sees a screenshot diff and the `update-baselines` label regenerates it (`.claude/rules/playwright-tests.md`). A plan that leaves rendered output byte-identical never touches the directory. An unmarked entry then holds post-plan arming condition (3) and Phase 6 check 5 with `MISSING-FILE:` forever (a-jay85/IBL5-backlog#1277, PR 2625). Gate `[VR]` in `bin/check-plan` accepts two forms and rejects the third:
+**VR `-snapshots` directories.** A Visual Regression baseline directory changes only when CI sees a screenshot diff and the `update-baselines` label regenerates it (`.claude/rules/playwright-tests.md`). The label is added after the PR exists, so regenerated PNGs are never in the pre-push diff that post-plan Phase 5.0 reads. Any MUST_APPEAR `-snapshots` entry therefore holds arming condition (3) and Phase 6 check 5 with `MISSING-FILE:` until CI commits baselines (a-jay85/IBL5-backlog#1277, PR 2625). PRs 3289, 3301, 3311 and 3329 held the same way after PR 2645, through a `vr-baseline-change` entry that named the CI label or a matrix row that named the directory. Gate `[VR]` in `bin/check-plan` enforces three Critical Files shapes and one matrix-row shape:
 
-- `` `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots` (conditional — only if VR baselines change) `` → EXEMPT. Use it whenever the plan does not intend a baseline change. <!-- slop-ok -->
-- `` `…-snapshots` (vr-baseline-change: deletes the contracts-hub baselines) `` → MUST_APPEAR, and `[VR]` passes. Use it when the plan deliberately regenerates or `git rm`s baselines. `vr-baseline-change` is a gate token and is absent from the canonical exempt list, so Phase 5.0 still requires the path in the diff. A planned regen that never lands keeps the hold, which is the correct outcome.
-- `` `…-snapshots` — VR baselines `` → MUST_APPEAR, and `[VR]` fails the plan. <!-- slop-ok -->
+- `` `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots` (conditional — only if VR baselines change) `` is EXEMPT. Use it when the plan leaves baselines alone, and also when CI regenerates them through the `update-baselines` label. The regenerated PNGs land in a CI commit, so the pre-push diff cannot carry them. <!-- slop-ok -->
+- `` `…-snapshots` (vr-baseline-change: deletes the contracts-hub baselines) `` is MUST_APPEAR and `[VR]` passes. Reserve it for baselines the diff itself `git rm`s. The token is absent from the canonical exempt list, so Phase 5.0 still requires the path in the diff, which a deletion satisfies. A `vr-baseline-change` line that mentions `update-baselines`, or `CI` together with `regen`/`regenerat…`, or `CI` followed by `label`, fails `[VR]`, because a CI regen can never put the path in the pre-push diff. Rewrite it in the conditional form above. <!-- slop-ok -->
+- `` `…-snapshots` — VR baselines `` is MUST_APPEAR and `[VR]` fails the plan. <!-- slop-ok -->
+- A Verification Matrix row whose planned test token contains `-snapshots` or ends in `.png` fails `[VR]` unless the token is directly followed by `(no-change)` or `(run-only)`. The token is the harness `_planned_token` pick: on a row with a whole `PHPUnit`, `API-test`, `E2E` or `Visual-regression` cell, the first backticked `test`/`spec`/`Test` path found scanning cells from the right. Phase 5.0 wants that token in the diff, and `MISSING:` holds the PR otherwise (PR 3289 held this way with an already-conditional Critical Files entry). Replacement shapes: for a CI regen, `` `ibl5/tests/e2e/smoke/visual-regression.spec.ts` (run-only) `` on the Visual-regression row (the spec is tracked on base, the harness exempts a tracked `(run-only)` token, gate `[RO]` accepts it); for an untouched baseline, `` `<png>` (no-change) `` (gate `[X]`); for a `git rm`, a CLI-executable row such as `git ls-files --error-unmatch <png>` exiting nonzero, which plans no test. <!-- slop-ok -->
 
-The gate is a hard fail. Every flagged plan holds deterministically whenever VR is green, and one marker clears it. The 2026-10-01 corpus scan flagged 3 of 1050 plans, all already shipped.
+The gate is a hard fail. Every flagged plan holds deterministically whenever VR is green, and one marker or one row rewrite clears it. The 2026-10-01 corpus scan flagged 3 of 1050 plans, all already shipped. The 2026-10-18 scan of 1109 plans found 12 plans carrying 16 unexempt snapshot or PNG matrix tokens, and 5 plans with a `vr-baseline-change` entry naming CI regeneration, every one already shipped or held.
 
 **Glob entries.** To name a file family without listing each member, write one glob entry such as `` `bin/test-automouse-*` (conditional) ``. `bin/lib/plan-scope-conformance` counts every matching path as planned, except a `.claude/` path. Keep a glob entry `(conditional)`, because Phase 5.0's `MISSING-FILE:` check matches entries literally.
 
@@ -193,6 +194,8 @@ A discharge never replaces a defense — the **Security** bullet (SQL prepared s
 
 ## Delegation packets — delegation economics
 
+The `Assertions:` field carries every property the phase's Verification Matrix rows assert. A sub-agent sees only the packet, so a property that stays in the matrix and never reaches the packet is a property the sub-agent will not ship. A source grep for the property name is green from birth and stays green through the exact regression it pins (the mutation statement in `_architect-contract.md`), so it never counts as running the test.
+
 For a phase that is **genuinely verbose or parallelizable**, delegate the **whole phase loop including its own verify/regen/fixup** — the sub-agent's tool output then accumulates in *its* context and returns as one summary, keeping the orchestrator's per-turn context flat. The win is **context localization** (the orchestrator stops re-reading a growing transcript every turn) — not a flat cost-percentage. Reserve packets for phases whose moved work clearly exceeds a sub-agent's fixed startup (~15K tokens); a packet for one tiny edit costs more than it saves, so keep small phases inline.
 
 This does **not** regress the ~15K economics: tiny sub-tier phases still stay inline because a sub-agent's fixed startup exceeds the work a one/two-edit phase moves. The rule changes only that such a phase is now *labeled* `(inline — …)` instead of left bare — zero new delegation is forced, only an explicit decision. The force applies solely to below-run-model phases whose moved work *already* clears ~15K, which the doctrine *already* says should be packets; the rule makes that latent "should" mechanically enforced.
@@ -249,3 +252,14 @@ A phase that cites only non-repo tokens (`/proc/...`, `~/...`, `origin/master`, 
 ## Context bounds rationale
 
 A sectioned delivery keeps one context across all turns, so what you read on turn 1 is still in front of you on turn 9. Re-Reading the contract re-pays ~7K tokens for text the architect already holds. Opening a `*-detail.md` companion costs ~5K tokens and changes no decision made while writing a plan. Re-reading a `$DRAFT` that grows each turn costs quadratically across the delivery.
+
+## Post-merge rows
+
+Tag only a row that cannot run before the merge. A row a human can perform on the open PR stays untagged, so the tag never empties the Manual-Testing window. A tagged row does not need `pre-prod-exception:` as well.
+
+`post-merge:` and `pre-prod-exception:` are not stacked on one row because they answer different questions. The pre-prod marker answers "where does the logic get exercised before merge". The post-merge tag answers "who confirms the deployed behavior afterwards". A tagged row already concedes the second, and gate 16 still demands a CLI row for the logic slice, so the pre-prod question is settled elsewhere in the matrix.
+
+Gate `[PM]` catches three abuse shapes:
+- **Wrong type.** The tag sits on a row that is not `Truly-manual`, such as a PHPUnit row marked `post-merge: runs after deploy`. Automated rows run in CI on the open PR, so the tag has no meaning there.
+- **Thin or off-vocabulary reason.** `post-merge: easier after it ships` is under the vocabulary bar. A valid reason names the dependency, for example `post-merge: launchd scheduling on the live host only fires after deploy`.
+- **Look-and-feel row.** A row asking a human to judge a new layout carries the tag to avoid holding the merge. That judgment can happen on the open PR, so the row stays in the Manual-Testing window.

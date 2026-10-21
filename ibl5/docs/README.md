@@ -1,6 +1,6 @@
 ---
 description: Index of all IBL5 project documentation.
-last_verified: 2026-10-04
+last_verified: 2026-10-15
 ---
 
 # IBL5 Documentation Index
@@ -20,6 +20,7 @@ This directory is the primary home for all project documentation.
 | Document | Description |
 |----------|-------------|
 | [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) | Development standards, priorities, and workflow |
+| [LEAGUE_RULES.md](LEAGUE_RULES.md) | The league rules the site must enforce, owned by the league owner |
 | [DATABASE_GUIDE.md](DATABASE_GUIDE.md) | Schema reference and query patterns |
 | [API_GUIDE.md](API_GUIDE.md) | REST API overview — auth, rate limiting, ETag caching, controller inventory |
 | [DEVELOPMENT_ENVIRONMENT.md](DEVELOPMENT_ENVIRONMENT.md) | Docker setup, dependency caching, database connection |

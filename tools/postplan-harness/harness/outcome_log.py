@@ -1,0 +1,375 @@
+"""Review-finding outcome log: taxonomy, mapping, path resolution, append.
+
+Pure standard library. Shared by the harness (in-process) and the skill-prose
+path (through ``bin/review-outcomes``) so the two pipelines cannot drift on the
+verdict-to-outcome mapping.
+"""
+from __future__ import annotations
+
+import datetime
+import json
+import os
+import subprocess
+import sys
+
+SCHEMA_VERSION = 1
+LOG_BASENAME = "review-outcomes.jsonl"
+ENV_OVERRIDE = "IBL_REVIEW_OUTCOMES_LOG"
+REASON_CAP = 300  # chars; keeps every line far below PIPE_BUF (4096)
+OUTCOMES = ("fixed", "declined-wrong", "intentional", "didnt-matter")
+DECLINE_CATEGORIES = {
+    "wrong": "declined-wrong",  # not a defect / the finding is mistaken
+    "intentional": "intentional",  # the flagged behavior is deliberate
+    "already-fixed": "fixed",  # a prior commit already addressed it
+    "not-worth-it": "didnt-matter",  # real but out of scope / not worth changing
+}
+
+
+class OutcomeLogError(Exception):
+    """The log path could not be resolved."""
+
+
+def map_outcome(verdict, category):
+    """Pure function of verdict + category. ``None`` means log nothing."""
+    if verdict == "FIX":
+        return "fixed"
+    if verdict == "DECLINE":
+        if isinstance(category, str):
+            return DECLINE_CATEGORIES.get(category, "didnt-matter")
+        return "didnt-matter"
+    return None
+
+
+def _clean_reason(reason) -> str:
+    text = str(reason if reason is not None else "")
+    for ch in ("\r", "\n", "\t"):
+        text = text.replace(ch, " ")
+    return text[:REASON_CAP]
+
+
+def build_event(*, pr, finding_id, agent, score, outcome, source, basis, pipeline,
+                reason="", sha=None, now=None) -> dict:
+    ts_dt = now or datetime.datetime.now(datetime.timezone.utc)
+    ts = ts_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {
+        "v": SCHEMA_VERSION,
+        "ts": ts,
+        "pr": int(pr),
+        "findingId": int(finding_id),
+        "agent": agent or "unknown",
+        "score": int(score) if score is not None else None,
+        "outcome": outcome,
+        "source": source,
+        "basis": basis,
+        "pipeline": pipeline,
+        "reason": _clean_reason(reason),
+        "sha": sha,
+    }
+
+
+def event_from_verdict(*, pr, thread, verdict, category, reason, sha, pipeline):
+    """One Phase 4.5 event from a verdict and its thread row, or ``None`` to log nothing."""
+    mapped = map_outcome(verdict, category)
+    if mapped is None:
+        return None
+    if verdict == "FIX":
+        basis = "fix-verdict"
+    elif isinstance(category, str) and category in DECLINE_CATEGORIES:
+        basis = category
+    else:
+        basis = "category-missing"
+    return build_event(pr=pr, finding_id=thread.get("commentId"), agent=thread.get("agent"),
+                       score=thread.get("score"), outcome=mapped, source="phase4.5",
+                       basis=basis, pipeline=pipeline, reason=reason, sha=sha)
+
+
+def resolve_log_path(repo_dir, env=None) -> str:
+    env = os.environ if env is None else env
+    override = env.get(ENV_OVERRIDE)
+    if override:
+        return override
+    try:
+        proc = subprocess.run(
+            ["git", "-C", repo_dir, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True, text=True, check=False,
+        )
+    except OSError as e:
+        raise OutcomeLogError(f"git unavailable: {e}") from e
+    common = proc.stdout.strip()
+    if proc.returncode != 0 or not common:
+        raise OutcomeLogError(f"not a git repository: {repo_dir}")
+    main = os.path.dirname(common.rstrip("/"))
+    return os.path.join(main, "tools", "postplan-harness", "out", "state", LOG_BASENAME)
+
+
+def append_events(path, events, log) -> int:
+    """Append one JSON line per event. Never raises; returns events written."""
+    written = 0
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        try:
+            for event in events:
+                line = json.dumps(event, ensure_ascii=True, sort_keys=True) + "\n"
+                os.write(fd, line.encode())
+                written += 1
+        finally:
+            os.close(fd)
+    except Exception as e:  # noqa: BLE001 - logging must never change a run
+        log(f"outcome-log: append failed ({e!r}); continuing")
+    return written
+
+
+def read_events(path) -> list:
+    """Parse the log; skip blank, corrupt, or foreign-version lines."""
+    if not os.path.exists(path):
+        return []
+    events = []
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for raw in fh:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+            except ValueError:
+                continue
+            if isinstance(obj, dict) and obj.get("v") == SCHEMA_VERSION:
+                events.append(obj)
+    return events
+
+
+def seen_finding_ids(path, pr) -> set:
+    return {e["findingId"] for e in read_events(path) if e.get("pr") == int(pr)}
+
+
+def sweep_events(threads, pr, seen, *, pipeline, now=None) -> list:
+    """Outcomes for findings Phase 4.5 never answered, from GitHub thread facts only."""
+    from .thread_ingestion import _is_trusted  # function-local: thread_ingestion imports this module
+    out = []
+    for t in threads or []:
+        cid = t.get("commentId")
+        if cid is None or t.get("score") is None:
+            continue  # no <!-- score --> marker: not a posted finding
+        if not _is_trusted(t.get("authorLogin") or "", t.get("authorType") or ""):
+            continue  # forged marker from an untrusted commenter
+        if int(cid) in seen:
+            continue  # already logged by 4.5 or an earlier sweep
+        if t.get("isOutdated"):
+            outcome, basis = "fixed", "outdated"
+        elif t.get("isResolved"):
+            outcome, basis = "didnt-matter", "resolved-no-reply"
+        else:
+            continue  # still open: no outcome yet
+        out.append(build_event(pr=pr, finding_id=cid, agent=t.get("agent"), score=t.get("score"),
+                               outcome=outcome, source="sweep", basis=basis,
+                               pipeline=pipeline, now=now))
+        seen.add(int(cid))
+    return out
+
+
+def run_sweep(threads, pr, path, log, *, pipeline) -> int:
+    """Log sweep events for unanswered findings. Never raises; returns events written."""
+    try:
+        seen = seen_finding_ids(path, pr)
+        return append_events(path, sweep_events(threads, pr, seen, pipeline=pipeline), log)
+    except Exception as e:  # noqa: BLE001 - logging must never change a run
+        log(f"outcome-log: sweep failed ({e!r}); continuing")
+        return 0
+
+
+# ---------------------------------------------------------------------------
+# CLI (bin/review-outcomes wraps `python3 -m harness.outcome_log`)
+# ---------------------------------------------------------------------------
+
+USAGE = (
+    "usage: review-outcomes record --pr=N --verdicts=PATH --threads=PATH [--pipeline=skill|harness] [--log=PATH]\n"
+    "       review-outcomes sweep --pr=N [--pipeline=skill|harness] [--log=PATH]  (thread JSONL on stdin)\n"
+    "       review-outcomes report [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--log=PATH] [--json]\n"
+    "flags take the --flag=value form only"
+)
+_FLAGS = {
+    "record": {"pr", "verdicts", "threads", "pipeline", "log"},
+    "sweep": {"pr", "pipeline", "log"},
+}
+
+
+def _parse_flags(subcommand, args):
+    """``--flag=value`` only. Returns a dict, or ``None`` on any usage error."""
+    allowed = _FLAGS[subcommand]
+    flags = {}
+    for arg in args:
+        if not arg.startswith("--") or "=" not in arg:
+            return None
+        name, _, value = arg[2:].partition("=")
+        if name not in allowed:
+            return None
+        flags[name] = value
+    if not flags.get("pr", "").isdigit():
+        return None
+    if flags.get("pipeline", "skill") not in ("skill", "harness"):
+        return None
+    if subcommand == "record" and not (flags.get("verdicts") and flags.get("threads")):
+        return None
+    return flags
+
+
+def _read_jsonl_text(text) -> list:
+    rows = []
+    for raw in text.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            obj = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(obj, dict):
+            rows.append(obj)
+    return rows
+
+
+def _cli_record(flags, log) -> None:
+    pr = int(flags["pr"])
+    pipeline = flags.get("pipeline", "skill")
+    path = flags.get("log") or resolve_log_path(os.getcwd())
+    with open(flags["verdicts"], encoding="utf-8", errors="replace") as fh:
+        verdicts = _read_jsonl_text(fh.read())
+    with open(flags["threads"], encoding="utf-8", errors="replace") as fh:
+        threads = {t.get("commentId"): t for t in _read_jsonl_text(fh.read())}
+    events = []
+    for v in verdicts:
+        thread = threads.get(v.get("commentId"))
+        if thread is None:
+            continue  # a verdict for an id the thread file never listed is not logged
+        event = event_from_verdict(pr=pr, thread=thread, verdict=v.get("verdict"),
+                                   category=v.get("category"), reason=v.get("reason"),
+                                   sha=v.get("sha"), pipeline=pipeline)
+        if event is not None:
+            events.append(event)
+    if events:
+        append_events(path, events, log)
+
+
+def _cli_sweep(flags, log) -> None:
+    pr = int(flags["pr"])
+    path = flags.get("log") or resolve_log_path(os.getcwd())
+    rows = _read_jsonl_text(sys.stdin.read())
+    run_sweep(rows, pr, path, log, pipeline=flags.get("pipeline", "skill"))
+
+
+_REPORT_KEYS = ("total",) + OUTCOMES + ("wrong_or_didnt_matter_share",)
+_REPORT_HEADER = "agent  total  fixed  wrong  intentional  didnt-matter  wrong+dm%"
+
+
+def _parse_report_flags(args):
+    """``--flag=value`` plus a bare ``--json``. ``None`` on any usage error."""
+    flags = {"json": False}
+    for arg in args:
+        if arg == "--json":
+            flags["json"] = True
+            continue
+        if not arg.startswith("--") or "=" not in arg:
+            return None
+        name, _, value = arg[2:].partition("=")
+        if name not in ("since", "until", "log"):
+            return None
+        if name in ("since", "until"):
+            try:
+                datetime.date.fromisoformat(value)
+            except ValueError:
+                return None
+        flags[name] = value
+    return flags
+
+
+def _agent_row(counts) -> dict:
+    row = {"total": sum(counts.get(o, 0) for o in OUTCOMES)}
+    for o in OUTCOMES:
+        row[o] = counts.get(o, 0)
+    bad = row["declined-wrong"] + row["didnt-matter"]
+    row["wrong_or_didnt_matter_share"] = round(bad / row["total"], 3) if row["total"] else None
+    return row
+
+
+def build_report(events, since=None, until=None) -> dict:
+    """Last event wins per (pr, findingId); the date filter applies to the winning event."""
+    latest = {}
+    for e in events:
+        latest[(e.get("pr"), e.get("findingId"))] = e
+    per_agent = {}
+    total = {}
+    for e in latest.values():
+        day = str(e.get("ts", ""))[:10]
+        if (since and day < since) or (until and day > until):
+            continue
+        outcome = e.get("outcome")
+        if outcome not in OUTCOMES:
+            continue
+        agent = e.get("agent") or "unknown"
+        counts = per_agent.setdefault(agent, {})
+        counts[outcome] = counts.get(outcome, 0) + 1
+        total[outcome] = total.get(outcome, 0) + 1
+    return {"since": since, "until": until,
+            "agents": {a: _agent_row(c) for a, c in per_agent.items()},
+            "total": _agent_row(total)}
+
+
+def format_report(report) -> str:
+    def line(name, row):
+        share = row["wrong_or_didnt_matter_share"]
+        pct = "-" if share is None else f"{share * 100:.1f}"
+        return (f"{name:<7}{row['total']:>5}  {row['fixed']:>5}  {row['declined-wrong']:>5}  "
+                f"{row['intentional']:>12}  {row['didnt-matter']:>12}  {pct:>9}")
+
+    names = sorted(report["agents"], key=lambda a: (a == "unknown", a))
+    lines = [_REPORT_HEADER]
+    lines += [line(a, report["agents"][a]) for a in names]
+    lines.append(line("TOTAL", report["total"]))
+    return "\n".join(lines)
+
+
+def _cli_report(flags) -> int:
+    try:
+        path = flags.get("log") or resolve_log_path(os.getcwd())
+        report = build_report(read_events(path), flags.get("since"), flags.get("until"))
+    except Exception as e:  # noqa: BLE001 - report is a human command; say what broke
+        print(f"review-outcomes: report failed ({e!r})", file=sys.stderr)
+        return 1
+    if flags["json"]:
+        print(json.dumps(report, sort_keys=True))
+    else:
+        print(format_report(report))
+    return 0
+
+
+def main(argv=None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "report":
+        flags = _parse_report_flags(argv[1:])
+        if flags is None:
+            print(USAGE, file=sys.stderr)
+            return 2
+        return _cli_report(flags)
+    handlers = {"record": _cli_record, "sweep": _cli_sweep}
+    if not argv or argv[0] not in handlers:
+        print(USAGE, file=sys.stderr)
+        return 2
+    subcommand = argv[0]
+    flags = _parse_flags(subcommand, argv[1:])
+    if flags is None:
+        print(USAGE, file=sys.stderr)
+        return 2
+
+    def log(msg):
+        print(msg, file=sys.stderr)
+
+    try:
+        handlers[subcommand](flags, log)
+    except Exception as e:  # noqa: BLE001 - logging must never fail the caller
+        print(f"review-outcomes: {subcommand} failed ({e!r})", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -77,7 +77,7 @@ def test_empty_rows_yields_empty_string():
 def test_fixture_yields_exactly_two_rows():
     with open(FIXTURE) as fh:
         content = fh.read()
-    _, manual_raw = parse_matrix(content)
+    _, manual_raw, _ = parse_matrix(content)
     rows = list(manual_raw)
     assert len(rows) == 2
     rendered = render_rows(rows)
@@ -94,7 +94,7 @@ def test_assert_no_sentinel_raises():
 def test_cli_parity_with_in_process():
     with open(FIXTURE) as fh:
         content = fh.read()
-    _, manual_raw = parse_matrix(content)
+    _, manual_raw, _ = parse_matrix(content)
     rows = list(manual_raw)
     expected = render_rows(rows)
 

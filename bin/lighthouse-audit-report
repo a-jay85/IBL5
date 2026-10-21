@@ -4,12 +4,14 @@
 declare(strict_types=1);
 
 use Cli\LighthouseAuditReportFormatter;
+use Cli\LighthouseBaselineCommitResolver;
 
 $manifestPath = null;
 $sha = null;
 $workflowUrl = null;
 $outTitle = null;
 $outBody = null;
+$baselineArtifactsPath = null;
 
 foreach ($argv as $i => $arg) {
     if ($i === 0) {
@@ -19,6 +21,8 @@ foreach ($argv as $i => $arg) {
         $manifestPath = substr($arg, strlen('--manifest='));
     } elseif (str_starts_with($arg, '--sha=')) {
         $sha = substr($arg, strlen('--sha='));
+    } elseif (str_starts_with($arg, '--baseline-artifacts=')) {
+        $baselineArtifactsPath = substr($arg, strlen('--baseline-artifacts='));
     } elseif (str_starts_with($arg, '--workflow-url=')) {
         $workflowUrl = substr($arg, strlen('--workflow-url='));
     } elseif (str_starts_with($arg, '--out-title=')) {
@@ -26,11 +30,11 @@ foreach ($argv as $i => $arg) {
     } elseif (str_starts_with($arg, '--out-body=')) {
         $outBody = substr($arg, strlen('--out-body='));
     } elseif ($arg === '--help') {
-        fwrite(STDOUT, "Usage: bin/lighthouse-audit-report --manifest=PATH [--sha=HASH] [--workflow-url=URL] [--out-title=PATH] [--out-body=PATH]\n");
+        fwrite(STDOUT, "Usage: bin/lighthouse-audit-report --manifest=PATH [--sha=HASH | --baseline-artifacts=PATH] [--workflow-url=URL] [--out-title=PATH] [--out-body=PATH]\n");
         exit(0);
     } else {
         fwrite(STDERR, "Unknown argument: $arg\n");
-        fwrite(STDERR, "Usage: bin/lighthouse-audit-report --manifest=PATH [--sha=HASH] [--workflow-url=URL] [--out-title=PATH] [--out-body=PATH]\n");
+        fwrite(STDERR, "Usage: bin/lighthouse-audit-report --manifest=PATH [--sha=HASH | --baseline-artifacts=PATH] [--workflow-url=URL] [--out-title=PATH] [--out-body=PATH]\n");
         exit(2);
     }
 }
@@ -49,13 +53,33 @@ if ($worktreeClasses !== false && is_link(__DIR__ . '/../ibl5/vendor')) {
 
 if ($manifestPath === null) {
     fwrite(STDERR, "--manifest is required\n");
-    fwrite(STDERR, "Usage: bin/lighthouse-audit-report --manifest=PATH [--sha=HASH] [--workflow-url=URL] [--out-title=PATH] [--out-body=PATH]\n");
+    fwrite(STDERR, "Usage: bin/lighthouse-audit-report --manifest=PATH [--sha=HASH | --baseline-artifacts=PATH] [--workflow-url=URL] [--out-title=PATH] [--out-body=PATH]\n");
     exit(2);
 }
 
 if (!file_exists($manifestPath)) {
     fwrite(STDERR, "Manifest file not found: $manifestPath\n");
     exit(2);
+}
+
+if ($baselineArtifactsPath !== null) {
+    if ($sha !== null) {
+        fwrite(STDERR, "--sha and --baseline-artifacts are mutually exclusive\n");
+        exit(2);
+    }
+    if ($baselineArtifactsPath === '' || !is_file($baselineArtifactsPath)) {
+        fwrite(STDERR, "Baseline artifacts file not found: $baselineArtifactsPath\n");
+        exit(2);
+    }
+    $artifactsJson = file_get_contents($baselineArtifactsPath);
+    if ($artifactsJson === false) {
+        fwrite(STDERR, "Could not read baseline artifacts file: $baselineArtifactsPath\n");
+        exit(2);
+    }
+    $sha = (new LighthouseBaselineCommitResolver())->resolve($artifactsJson);
+    if ($sha === null) {
+        fwrite(STDERR, "Warning: no audited commit found in baseline artifacts; footer omits the commit\n");
+    }
 }
 
 $manifestJson = file_get_contents($manifestPath);

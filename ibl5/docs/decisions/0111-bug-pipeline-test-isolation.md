@@ -1,6 +1,6 @@
 ---
 description: The bug-pipeline isolated test environment — three orthogonal barriers (separate Discord app, uniquely-named scratch DB, stubbed GH_BIN) and the guards that make isolation a runtime-enforced property rather than a prose claim.
-last_verified: 2026-08-21
+last_verified: 2026-10-20
 ---
 
 # ADR-0111: The bug-pipeline test-isolation boundary
@@ -35,6 +35,10 @@ Structural isolation via three orthogonal barriers, all asserted by `bin/bug-pip
 5. Run `bin/bug-pipeline-test-env` to bring up the environment.
 
 **A missing Add Reactions permission fails silently** — `handlers.ts` swallows a failed reaction so backfill cannot abort, meaning the absence of the bit presents as the pipeline working but never acknowledging reports. This is why `ibl5/IBLbot/src/bug-bot/server.e2e.test.ts` exists: it is the only mechanical proof that the role actually holds the bit.
+
+## Addendum: bug-pipeline-tick and config.ts line references (2026-10-20)
+
+The Decision cites `bin/bug-pipeline-tick:31` for the `DB_NAME` default and `bin/bug-pipeline-tick:36` for the `GH_BIN` seam. Today those are `bin/bug-pipeline-tick:49` and `bin/bug-pipeline-tick:54`. The Context says `config.ts:8` hardcodes the dotenv path as a bare filename. Today line 8 builds it with `path.resolve(process.cwd(), ...)`, still with no `override`. The files grew, and the three barriers are unchanged.
 
 ## Alternatives Considered
 

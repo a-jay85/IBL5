@@ -28,7 +28,7 @@
 # The brief posts to #reviews through the webhook file in COMPREHENSION_DIGEST_WEBHOOK_FILE
 # (default ~/.iblbot-reviews-webhook-url). The facts-only DEGRADED brief (gate denial, model failure)
 # is the week's report, so it posts to #reviews too. Only the bare gh-failure line stays on the default #dev webhook.
-# A fire at any other hour (a late launchd wake) runs as a catch-up when no report for the date exists,
+# A fire at any other hour (a late launchd wake) runs as a catch-up when no report from the last 6 days exists (a non-Sunday 16:xx too),
 # except Sunday hours before 16 UTC, which wait for the 16:xx fire.
 # Seams: COMPREHENSION_DIGEST_GH, _CLAUDE, _GATE, _REPORT_DIR, _UTC_HOUR, _UTC_DOW, _WEBHOOK_FILE, DISCORD_DM_BIN.
 # Report: ~/claude-plans/_reports/<date>-comprehension-digest.md
@@ -88,6 +88,9 @@ if [ "$AT_RESET" -eq 1 ]; then
       exit 0
     fi
     CATCHUP_CHECK=1
+  elif [ "$UTC_DOW" != "0" ]; then
+    # A late fire can land on 16:xx UTC on a later day; treat it as a catch-up too.
+    CATCHUP_CHECK=1
   fi
 fi
 
@@ -122,11 +125,13 @@ fi
 
 D="${DATE_OVERRIDE:-$(date +%F)}"
 if [ "$CATCHUP_CHECK" -eq 1 ]; then
-  if [ -n "$REPORT_DIR" ] && [ -e "$REPORT_DIR/${D}-comprehension-digest.md" ]; then
-    echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}, not 16, and ${D} already has a report; skipping this fire." >&2
+  # Any report from the last 6 days counts: a late fire on a later day has a new D.
+  if [ -n "$REPORT_DIR" ] && [ -d "$REPORT_DIR" ] && \
+     [ -n "$(find "$REPORT_DIR" -maxdepth 1 -name '*-comprehension-digest.md' -mtime -6 2>/dev/null)" ]; then
+    echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}, and a report from the last 6 days exists; skipping this fire." >&2
     exit 0
   fi
-  echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}; no report for ${D}, running as catch-up." >&2
+  echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}; no report in the last 6 days, running as catch-up." >&2
 fi
 START="$(shift_date "$D" -7)"
 LAST="$(shift_date "$D" -1)"

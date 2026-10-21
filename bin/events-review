@@ -283,11 +283,11 @@ STATE_FILE="${EVENTS_REVIEW_STATE_FILE:-${HOME:+$HOME/Library/Logs/ibl5/events-r
 if [ "$AT_RESET" = 1 ]; then
     _utc_hour="${EVENTS_REVIEW_UTC_HOUR:-$(date -u +%H)}"
     _utc_dow="${EVENTS_REVIEW_UTC_DOW:-$(date -u +%w)}"
+    _last=""
+    [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ] && IFS= read -r _last < "$STATE_FILE" || true
+    case "$_last" in ''|*[!0-9]*) _last=0 ;; esac
+    _now="${EVENTS_REVIEW_NOW_EPOCH:-$(date -u +%s)}"
     if [ "$_utc_hour" != "16" ]; then
-        _last=""
-        [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ] && IFS= read -r _last < "$STATE_FILE" || true
-        case "$_last" in ''|*[!0-9]*) _last=0 ;; esac
-        _now="${EVENTS_REVIEW_NOW_EPOCH:-$(date -u +%s)}"
         if [ "$_utc_dow" = "0" ] && [ "$((10#$_utc_hour))" -lt 16 ]; then
             log "--at-reset: UTC hour is ${_utc_hour}, not 16; skipping this fire"
             exit 0
@@ -297,6 +297,10 @@ if [ "$AT_RESET" = 1 ]; then
             exit 0
         fi
         log "--at-reset: UTC hour is ${_utc_hour}; no review in the last 6 days, running as catch-up"
+    elif [ "$_utc_dow" != "0" ] && [ $((_now - _last)) -le 518400 ]; then
+        # A late fire (Mac asleep Sunday) can land on 16:xx UTC on a later day.
+        log "--at-reset: UTC hour is 16 on a non-Sunday and a review already went out; skipping this fire"
+        exit 0
     fi
 fi
 

@@ -619,7 +619,6 @@ $(cat "$b1800")" "$(dm_payload 1)"
     expect_eq "reviews: the model-failure notice stays on the default webhook" "<unset>" "$(cat "$SD/dm.1.wh")"
 
     # --at-reset: only the 16:xx UTC fire runs.
-    local h
     # Sunday pre-reset hours skip even with no marker; later hours skip once a
     # review went out in the last 6 days.
     local h
@@ -667,6 +666,13 @@ $(cat "$b1800")" "$(dm_payload 1)"
     expect_eq "at-reset: 17:xx run after the 16:xx marker exits 0" 0 "$ER_RC"
     expect_eq "at-reset: 17:xx run after the 16:xx marker does not post again" 1 "$(cat "$SD/dm.n")"
     expect_has "at-reset: 17:xx run after the 16:xx marker logs the skip" "$ER_ERR" "a review already went out"
+    # A late Monday fire landing on 16:xx UTC must not re-post after Sunday's review.
+    new_case atreset-monday-16
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=16" "EVENTS_REVIEW_UTC_DOW=1" \
+        "EVENTS_REVIEW_NOW_EPOCH=1003600" "EVENTS_REVIEW_STATE_FILE=$T/sent-fresh")
+    run_er --at-reset "--from-tsv=$CORPUS"
+    expect_eq "at-reset: Monday 16:xx after a recent send exits 0" 0 "$ER_RC"
+    expect_eq "at-reset: Monday 16:xx after a recent send sends nothing" 0 "$(call_count "$SD/dm.n")"
     new_case atreset-absent
     tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=03")
     run_er "--from-tsv=$CORPUS"

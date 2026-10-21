@@ -236,6 +236,30 @@ def test_predicate_6d_layout_two_failing_checks_declines():
     assert fidelity.body_only_findings_text(text) is None
 
 
+import pytest
+
+
+@pytest.mark.parametrize("line", [
+    "3. Scope creep: None of these edits were planned.",
+    "5. Visual baselines: no issue with layout, but the baseline is missing.",
+    "1. Intent coverage: Pass with one gap: Phase 2 is absent.",
+    "3. Scope creep: FAIL. Unplanned edit, and there is no issue reference.",
+])
+def test_predicate_6d_loose_pass_wording_declines(line):
+    num = line.split(".")[0]
+    text = VERDICT1_SIX_D_PURE_BODY
+    old = next(ln for ln in text.splitlines() if ln.startswith(num + "."))
+    assert fidelity.body_only_findings_text(text.replace(old, line)) is None
+
+
+@pytest.mark.parametrize("cite", [
+    "Checks 3 and 4", "checks 3/4", "Check 4 and 3", "checks 4, 5", "Check 4 & 5",
+])
+def test_predicate_multi_check_bullet_declines(cite):
+    text = VERDICT1_SIX_D_PURE_BODY.replace("Check 4: the PR body", f"{cite}: the PR body")
+    assert fidelity.body_only_findings_text(text) is None
+
+
 def test_predicate_unparseable_layout_returns_none():
     text = ("Some prose about the checks with no Passed line.\n\n## FINDINGS\n"
             "- [BLOCKING] Check 4: body count is wrong.\n\nNOT READY\n")

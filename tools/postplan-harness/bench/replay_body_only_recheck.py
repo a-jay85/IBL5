@@ -11,7 +11,8 @@ eligible rounds the Opus re-review actually held (`NOT READY`), and how the pred
 compares with a content heuristic (`_CODE_SUBJECT_RE`) over the prior review's bullets.
 
 A run dir holds one plan hash, so the `plan-changed` arm is always passed (h, h) here and
-can never decline a replayed round.
+never fires. A plan-blind run (no `plan_hash` in result.json) is passed (h, "") instead and
+is counted under `plan-hash-missing`.
 
 Live mode adds the real Sonnet recheck call over the eligible rounds (it costs money):
   python3 replay_body_only_recheck.py --harness-root . --live [--limit N] --json PATH
@@ -176,7 +177,7 @@ def replay(harness_root: str, out_dir: str) -> dict:
             "content_heuristic_pure_body": heuristic_pure,
             "coverage_given_up": len(given_up), "coverage_given_up_rounds": given_up,
             "disagreements": disagreements, "eligible_rounds": eligible_rounds,
-            "plan_hash_note": "plan-changed arm passed (h, h): never declines here"}
+            "plan_hash_note": "plan-changed arm passed (h, h): never fires here; plan-blind runs show as plan-hash-missing"}
 
 
 def make_llm(out_dir: str):

@@ -528,9 +528,13 @@ _PASSED_LINE_RE = re.compile(r"^\s*\**Passed\**:\s*(.*)$", re.M)
 _SIX_D_RE = re.compile(r"^#{2,4}\s*6d\b", re.M)
 _CHECK_LINE_RE = re.compile(r"^\s*\**([1-6])[abc]?[.)]\s", re.M)
 _SIX_D_LINE_RE = re.compile(r"^\s*\**([1-6])([abc]?)[.)]\s+(.*)$")
+# The whole verdict must open with a pass word followed by end/punctuation. A pass word
+# that starts a longer clause ("None of these edits...", "Pass with one gap") is a fail.
 _SIX_D_PASS_RE = re.compile(
-    r"(?i)^(?:pass(?:es|ed)?|ok|clean|n/a|none)\b|no finding|no issue")
-_BULLET_CHECK_RE = re.compile(r"(?i)\bcheck\s*#?\s*([1-6])[abc]?\b")
+    r"(?i)^(?:pass(?:es|ed)?|ok|clean|n/a|none|no findings?|no issues?)\s*(?:[.!]|[-\u2013\u2014]|$)")
+# Every number in a citation like "check 4", "checks 3 and 4", "checks 3/4", "Check 4 & 3".
+_BULLET_CHECK_RE = re.compile(
+    r"(?i)\bchecks?\b\s*#?\s*([1-6][abc]?(?:\s*(?:,|/|&|and/or|and|or|to|-)\s*#?\s*[1-6][abc]?)*)\b")
 _ALL_CHECKS = {1, 2, 3, 4, 5, 6}
 
 
@@ -593,7 +597,8 @@ def body_only_findings_text(text: str) -> list[str] | None:
     if not items or any(marker is None for marker, _ in items):
         return None
     for _, item in items:
-        if any(c != BODY_CHECK_ID for c in _BULLET_CHECK_RE.findall(item)):
+        cited = [d for grp in _BULLET_CHECK_RE.findall(item) for d in re.findall(r"[1-6]", grp)]
+        if any(c != BODY_CHECK_ID for c in cited):
             return None
     return [item for _, item in items]
 

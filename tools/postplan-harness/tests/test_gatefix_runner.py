@@ -221,7 +221,7 @@ def test_commit_sites_use_gate_fix_wrapper():
                    if not s0 <= p < s1]
     assert len(remediation) == 1       # run_meta_checks_local, deliberately unwired
     fix = [p for p in _call_sites("_commit_with_gate_fix") if not s0 <= p < s1]
-    assert len(fix) == 4
+    assert len(fix) == 5               # includes the Phase 4.5b same-run pass
 
 
 # --- push wrapper --------------------------------------------------------------------
@@ -318,4 +318,4 @@ def test_push_sites_use_gate_fix_wrapper():
                  if not (s0 <= p < s1 or a0 <= p < a1)]
     assert adr_calls == []
     fix = [p for p in _call_sites("_push_with_gate_fix") if not s0 <= p < s1]
-    assert len(fix) == 5
+    assert len(fix) == 6               # includes the Phase 4.5b same-run pass

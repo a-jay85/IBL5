@@ -573,6 +573,33 @@ srt_run
 srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" "cause_store_rejected_flaky"
 srt_log_has "$STUB" tick.out "cause=flaky" "cause_store_rejected_flaky — log names the cause"
 
+# ── agent_cost_logged / agent_cost_unavailable ────────────────────────────────
+# agent-output stands in for claude's stdout+stderr: a stderr line before the
+# result object proves the last-result-line extraction; garbage proves fallback.
+srt_reset; srt_claim42
+printf '%s\n' 'some stderr warning' \
+    '{"type":"result","total_cost_usd":1.2345,"num_turns":7,"duration_ms":93400,"usage":{"input_tokens":11,"cache_read_input_tokens":2200,"cache_creation_input_tokens":330,"output_tokens":4400}}' \
+    > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out \
+    "sim 42: agent cost \$1.23, turns 7, duration 93s, input 11 (cache read 2200, cache write 330), output 4400 tokens, model test-model" \
+    "agent_cost_logged — result JSON yields the cost line"
+srt_reset; srt_claim42
+printf 'not json at all\n{broken\n' > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out "sim 42: agent cost unavailable" \
+    "agent_cost_unavailable — garbage output yields the fallback line"
+
+# A duration that breaks the arithmetic must hit the fallback, not log a blank line.
+srt_reset; srt_claim42
+printf '%s\n' '{"type":"result","total_cost_usd":1,"num_turns":1,"duration_ms":"1 2","usage":{}}' \
+    > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out "sim 42: agent cost unavailable" \
+    "agent_cost_unavailable — failed formatting yields the fallback line"
+srt_log_lacks "$STUB" tick.out "agent cost \$" \
+    "agent_cost_unavailable — failed formatting logs no partial cost line"
+
 # ── cause_usage_limit_epoch_form ──────────────────────────────────────────────
 srt_reset; srt_claim42
 printf 'Claude AI usage limit reached|1791000000\n' > "$STUB/agent-output"

@@ -248,10 +248,13 @@ def _cli_record(flags, log) -> None:
         thread = threads.get(v.get("commentId"))
         if thread is None:
             continue  # a verdict for an id the thread file never listed is not logged
+        origin = v.get("origin")
+        if origin not in ORIGINS:
+            origin = "pre-existing"  # a typo in the verdict line must not drop the batch
         event = event_from_verdict(pr=pr, thread=thread, verdict=v.get("verdict"),
                                    category=v.get("category"), reason=v.get("reason"),
                                    sha=v.get("sha"), pipeline=pipeline,
-                                   origin=v.get("origin") or "pre-existing")
+                                   origin=origin)
         if event is not None:
             events.append(event)
     if events:

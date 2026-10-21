@@ -123,7 +123,7 @@ class FreeAgencyOfferView
     </div>
     <div class="d-card-body">
         <div class="ibl-field-group">
-            <span class="d-label">Player Demands (base, before team modifiers):</span>
+            <span class="d-label whitespace-normal">Player Demands (base, before team modifiers):</span>
             <div class="ibl-field-group__content">
                 <?= HtmlSanitizer::trusted($this->formView->renderDemandDisplay($demands)) ?>
             </div>
@@ -132,7 +132,7 @@ class FreeAgencyOfferView
         <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">
             <?= HtmlSanitizer::trusted($this->formView->renderCsrfInput()) ?>
             <div class="ibl-field-group">
-                <span class="d-label">Your Custom Offer:</span>
+                <span class="d-label whitespace-normal">Your Custom Offer:</span>
                 <div class="ibl-field-group__content">
                     <?= HtmlSanitizer::trusted($this->formView->renderOfferInputs($existingOffer, $raisePercentage)) ?>
                 </div>

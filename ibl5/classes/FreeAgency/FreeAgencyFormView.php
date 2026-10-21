@@ -341,7 +341,7 @@ class FreeAgencyFormView
         ob_start();
         ?>
 <div class="offer-button-row">
-    <span class="d-label"><?= HtmlSanitizer::e($label) ?></span>
+    <span class="d-label whitespace-normal"><?= HtmlSanitizer::e($label) ?></span>
     <div class="offer-button-row__buttons">
         <?php foreach ($contractOfferConfigs as $index => $config): ?>
             <?php

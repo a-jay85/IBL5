@@ -20,7 +20,6 @@ use Season\Season;
  * - Successful add from waivers (with existing contract)
  * - Successful add from waivers (with veteran minimum)
  * - Validation failures (cap violations, roster violations)
- * - Waiver wait time calculations
  * - Contract determination logic
  *
  * @covers \Waivers\WaiversRepository
@@ -477,83 +476,6 @@ class WaiversWideUnitTest extends WideUnitTestCase
         // Assert - Should use salary_yr2 (next season) during Free Agency
         $this->assertTrue($result['hasExistingContract']);
         $this->assertSame(450, $result['salary']);
-    }
-
-    // ========== WAIVER WAIT TIME TESTS ==========
-
-    /**
-     * @group integration
-     * @group waivers
-     * @group timing
-     */
-    public function testWaiverWaitTimeReturnsCountdownWhenNotCleared(): void
-    {
-        // Arrange - Player dropped 12 hours ago
-        $currentTime = time();
-        $dropTime = $currentTime - (12 * 3600); // 12 hours ago
-
-        // Act
-        $result = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-
-        // Assert - Should show remaining time
-        $this->assertStringContainsString('Clears in', $result);
-        $this->assertStringContainsString('12 h', $result);
-    }
-
-    /**
-     * @group integration
-     * @group waivers
-     * @group timing
-     */
-    public function testWaiverWaitTimeReturnsEmptyWhenCleared(): void
-    {
-        // Arrange - Player dropped 25 hours ago (past 24-hour window)
-        $currentTime = time();
-        $dropTime = $currentTime - (25 * 3600); // 25 hours ago
-
-        // Act
-        $result = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-
-        // Assert - Should be empty (player cleared waivers)
-        $this->assertSame('', $result);
-    }
-
-    /**
-     * @group integration
-     * @group waivers
-     * @group timing
-     */
-    public function testWaiverWaitTimeReturnsEmptyAtExactly24Hours(): void
-    {
-        // Arrange - Player dropped exactly 24 hours ago
-        $currentTime = time();
-        $dropTime = $currentTime - 86400; // Exactly 24 hours
-
-        // Act
-        $result = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-
-        // Assert - Should be empty (player just cleared)
-        $this->assertSame('', $result);
-    }
-
-    /**
-     * @group integration
-     * @group waivers
-     * @group timing
-     */
-    public function testWaiverWaitTimeShowsCorrectMinutesAndSeconds(): void
-    {
-        // Arrange - Player dropped 23 hours and 30 minutes ago
-        $currentTime = time();
-        $dropTime = $currentTime - (23 * 3600 + 30 * 60); // 23h 30m ago
-
-        // Act
-        $result = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-
-        // Assert - Should show ~30 minutes remaining
-        $this->assertStringContainsString('Clears in', $result);
-        $this->assertStringContainsString('0 h', $result);
-        $this->assertStringContainsString('30 m', $result);
     }
 
     // ========== VETERAN MINIMUM CALCULATION TESTS ==========

@@ -108,26 +108,6 @@ class WaiversProcessor implements WaiversProcessorInterface
     }
 
     /**
-     * @see WaiversProcessorInterface::getWaiverWaitTime()
-     */
-    public function getWaiverWaitTime(int $dropTime, int $currentTime): string
-    {
-        $timeDiff = $currentTime - $dropTime;
-        $waitPeriod = 86400; // 24 hours in seconds
-
-        if ($timeDiff >= $waitPeriod) {
-            return '';
-        }
-
-        $remainingTime = $waitPeriod - $timeDiff;
-        $hours = floor($remainingTime / 3600);
-        $minutes = floor(($remainingTime - $hours * 3600) / 60);
-        $seconds = $remainingTime % 60;
-
-        return "(Clears in $hours h, $minutes m, $seconds s)";
-    }
-
-    /**
      * @see WaiversProcessorInterface::determineContractData()
      *
      * @param PlayerRow $playerData

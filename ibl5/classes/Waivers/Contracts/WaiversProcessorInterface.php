@@ -65,26 +65,6 @@ interface WaiversProcessorInterface
     public function getPlayerContractDisplay(Player $player, Season $season): string;
 
     /**
-     * Calculates wait time until a player clears waivers
-     * 
-     * Determines the remaining time before a player on waivers can be claimed
-     * without priority order. The standard waiver period is 24 hours.
-     * 
-     * @param int $dropTime Unix timestamp when player was dropped to waivers
-     * @param int $currentTime Current Unix timestamp
-     * @return string Formatted wait time (e.g., "(Clears in 5 h, 30 m, 15 s)") or empty string if cleared
-     * 
-     * **Behaviors:**
-     * - Returns empty string if 24+ hours have passed (player has cleared)
-     * - Returns formatted countdown string if still in waiver period
-     * - Uses h/m/s format for readability
-     * 
-     * **Constants:**
-     * - Waiver period: 86400 seconds (24 hours)
-     */
-    public function getWaiverWaitTime(int $dropTime, int $currentTime): string;
-
-    /**
      * Determines contract data for a waiver wire signing
      * 
      * Analyzes a player's existing contract situation to determine what

@@ -454,5 +454,157 @@ eq "unknown flag exits 2" "$RC" "2"
 run "$SCRATCH/f1" --pr-body-file /nonexistent
 eq "unreadable body file exits 2" "$RC" "2"
 
+# ---------------------------------------------------------------------------
+# After-merge mode (--ping-out). The ping decision is bin/lib/post-merge-rows.sh's
+# pmr_ping_decision; these cases pin how the driver wires it and what the top block says.
+# ---------------------------------------------------------------------------
+AM_URL='https://github.com/a-jay85/IBL5/pull/7'
+AM_CMT='https://github.com/a-jay85/IBL5/pull/7#issuecomment-99'
+AM_RUN='https://github.com/a-jay85/IBL5/actions/runs/123'
+PING_FILE="$SCRATCH/ping"
+
+# am <title> [flags...] -> OUT, RC, PING (file content, "<none>" when absent). Stdin is f1.
+am() {
+    local _title="$1"; shift
+    rm -f "$PING_FILE"
+    OUT="$(bash "$DRIVER" --pr-number 7 --title "$_title" --url "$AM_URL" \
+            --ping-out "$PING_FILE" "$@" < "$SCRATCH/f1" 2>"$SCRATCH/err")"
+    RC=$?
+    PING="<none>"
+    if [ -f "$PING_FILE" ]; then PING="$(cat "$PING_FILE")"; fi
+}
+_first_line() { printf '%s\n' "$1" | sed -n 1p; }
+
+begin_case "am-manual"
+am T --manual-count 2 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+    --comment-url "$AM_CMT" --run-url "$AM_RUN" \
+    --job-result after-merge-checklist=success
+eq "exit 0" "$RC" "0"
+eq "ping true" "$PING" "true"
+want "action line first" "$(_first_line "$OUT")" '**Action needed after merge:** 2 manual step(s).'
+want "directions is the sticky comment" "$(_first_line "$OUT")" "Directions: <$AM_CMT>"
+want "header still present" "$OUT" '**Merged [#7](<https://github.com/a-jay85/IBL5/pull/7>): T**'
+want "what changed still present" "$OUT" '**What changed:**'
+
+begin_case "am-none"
+am T --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+    --comment-url '' --run-url "$AM_RUN" --job-result after-merge-checklist=success
+eq "exit 0" "$RC" "0"
+eq "ping false" "$PING" "false"
+eq "output starts at the header" "$(_first_line "$OUT")" '**Merged [#7](<https://github.com/a-jay85/IBL5/pull/7>): T**'
+wantnot "no action line" "$OUT" 'Action needed'
+wantnot "no problem line" "$OUT" 'pipeline problem'
+
+begin_case "am-auto-only"
+am T --manual-count 0 --auto-ci-count 1 --auto-mac-count 2 --auto-failed-count 0 \
+    --comment-url "$AM_CMT" --run-url "$AM_RUN" --job-result after-merge-checklist=success
+eq "exit 0" "$RC" "0"
+eq "ping false" "$PING" "false"
+want "auto line" "$(_first_line "$OUT")" 'After merge: 1 CI and 2 Mac step(s) run automatically; Mac failures ping you in #dev.'
+wantnot "no action line" "$OUT" 'Action needed'
+
+begin_case "am-auto-failed"
+am T --manual-count 0 --auto-ci-count 1 --auto-mac-count 0 --auto-failed-count 1 \
+    --comment-url "$AM_CMT" --run-url "$AM_RUN" --job-result after-merge-checklist=success
+eq "exit 0" "$RC" "0"
+eq "ping true" "$PING" "true"
+want "failed line" "$OUT" '**Post-merge auto step failed:** 1. Run: <'"$AM_RUN"'>'
+
+begin_case "am-job-failed"
+am T --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+    --comment-url '' --run-url "$AM_RUN" --job-result after-merge-checklist=failure
+eq "exit 0" "$RC" "0"
+eq "ping true" "$PING" "true"
+want "problem line first" "$(_first_line "$OUT")" '**Post-merge pipeline problem** (job:after-merge-checklist=failure).'
+want "run link" "$(_first_line "$OUT")" "Run: <$AM_RUN>"
+want "directions fall back to the PR" "$(_first_line "$OUT")" "Directions: <$AM_URL>"
+
+begin_case "am-job-skipped"
+am T --manual-count '' --auto-ci-count '' --auto-mac-count '' --auto-failed-count 0 \
+    --run-url "$AM_RUN" --job-result after-merge-checklist=skipped
+eq "exit 0" "$RC" "0"
+eq "ping true" "$PING" "true"
+want "names the skipped job" "$OUT" 'job:after-merge-checklist=skipped'
+
+begin_case "am-job-cancelled"
+am T --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+    --run-url "$AM_RUN" --job-result after-merge-checklist=cancelled
+eq "exit 0" "$RC" "0"
+eq "ping true" "$PING" "true"
+want "names the cancelled job" "$OUT" 'job:after-merge-checklist=cancelled'
+
+begin_case "am-bad-count"
+am T --manual-count x --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+    --run-url "$AM_RUN" --job-result after-merge-checklist=success
+eq "exit 0" "$RC" "0"
+eq "bad manual count pings" "$PING" "true"
+want "names the bad count" "$OUT" 'bad-count:manual'
+am T --manual-count 0 --auto-ci-count x --auto-mac-count 0 --auto-failed-count 0 \
+    --run-url "$AM_RUN" --job-result after-merge-checklist=success
+eq "exit 0 on bad auto count" "$RC" "0"
+eq "bad auto count pings" "$PING" "true"
+want "names the bad auto count" "$OUT" 'auto_ci_count=invalid'
+am T --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+    --run-url "$AM_RUN" --job-result after-merge-checklist=success
+eq "all good does not ping" "$PING" "false"
+
+begin_case "am-mention-text"
+am '@everyone <@123> pwn' --manual-count 1 --auto-ci-count 0 --auto-mac-count 0 \
+    --auto-failed-count 0 --comment-url "$AM_CMT" --run-url "$AM_RUN" \
+    --branch '@here-branch' --job-result after-merge-checklist=success
+eq "exit 0" "$RC" "0"
+wantnot "no raw @everyone" "$OUT" '@everyone'
+wantnot "no raw @here" "$OUT" '@here'
+wantnot "no raw user mention" "$OUT" '<@123>'
+want "text survives with a zero-width space" "$OUT" "@$(printf '\342\200\213')everyone"
+
+begin_case "am-bad-comment-url"
+am T --manual-count 1 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+    --comment-url 'https://evil.example/x> @everyone <https://y' --run-url "$AM_RUN" \
+    --job-result after-merge-checklist=success
+eq "exit 0" "$RC" "0"
+want "directions fall back to the PR URL" "$(_first_line "$OUT")" "Directions: <$AM_URL>"
+wantnot "bad url never printed" "$OUT" 'evil.example'
+am T --manual-count 1 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+    --comment-url 'http://insecure.example/x' --run-url 'not a url' \
+    --job-result after-merge-checklist=failure
+want "insecure comment url falls back" "$(_first_line "$OUT")" "Directions: <$AM_URL>"
+want "bad run url reads unavailable" "$OUT" 'Run: (run link unavailable)'
+
+begin_case "am-ping-out-empty"
+OUT="$(bash "$DRIVER" --pr-number 7 --title T --url "$AM_URL" --ping-out '' < "$SCRATCH/f1" 2>/dev/null)"
+RC=$?
+eq "empty --ping-out exits 2" "$RC" "2"
+
+begin_case "am-no-ping-out-unchanged"
+run "$SCRATCH/f1"
+_plain="$OUT"
+run "$SCRATCH/f1" --manual-count 3 --job-result after-merge-checklist=failure
+eq "after-merge flags without --ping-out change nothing" "$OUT" "$_plain"
+
+begin_case "am-top-survives-cut"
+# A digest with a huge What and Watch. The ping line and directions link sit first, so
+# the 1900-character cut in notify-discord's send.sh can never take them.
+{
+    printf '### Merge digest\n'
+    printf '**What changed:** %s\n' "$(_rep w 3000)"
+    printf '**Why:** y\n'
+    printf '**Watch:** %s\n' "$(_rep v 3000)"
+    printf '**Touches:** t\n'
+    printf '**Machine-authored fixes:** none\n'
+} > "$SCRATCH/f-huge"
+rm -f "$PING_FILE"
+OUT="$(bash "$DRIVER" --pr-number 7 --title "$(_rep T 200)" --url "$AM_URL" \
+        --branch "$(_rep b 200)" --ping-out "$PING_FILE" --manual-count 4 \
+        --auto-ci-count 1 --auto-mac-count 1 --auto-failed-count 1 \
+        --comment-url "$AM_CMT" --run-url "$AM_RUN" \
+        --job-result after-merge-checklist=failure < "$SCRATCH/f-huge" 2>/dev/null)"
+RC=$?
+eq "exit 0" "$RC" "0"
+eq "whole DM under the send.sh cut" "$([ "${#OUT}" -le 1900 ] && echo under || echo over)" "under"
+want "problem line first" "$(_first_line "$OUT")" '**Post-merge pipeline problem**'
+want "action line within the top block" "$(printf '%s\n' "$OUT" | sed -n 1,4p)" '**Action needed after merge:** 4 manual step(s).'
+want "directions link within the top block" "$(printf '%s\n' "$OUT" | sed -n 1,4p)" "Directions: <$AM_CMT>"
+want "what changed still present" "$OUT" '**What changed:**'
 
 h_done

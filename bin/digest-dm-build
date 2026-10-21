@@ -10,6 +10,13 @@
 #   `**Merge danger:**` line, a one-way door adds a loud first line to the DM and a
 #   two-way localized change compresses the What/Watch budgets. An unreadable path
 #   exits 2; a missing or malformed danger line leaves the output unchanged.
+#   After-merge mode: [--ping-out FILE] [--manual-count N] [--auto-ci-count N]
+#   [--auto-mac-count N] [--auto-failed-count N] [--comment-url URL] [--run-url URL]
+#   [--job-result NAME=RESULT]...  --ping-out turns the mode on and receives `true` or
+#   `false`. The ping is true when manual or auto-failed rows exist, when any count is not
+#   all digits, or when any --job-result is not `success`. A bad count or a failed job
+#   writes `true` and still exits 0, so the merge is announced. `--ping-out ''` exits 2.
+#   The top of the message then carries the action line and the directions link.
 #
 # Consumed by .github/workflows/merge-digest-notify.yml, which pipes in the body of the
 # LAST comment carrying `<!-- pr-ready-verdict -->`.
@@ -29,8 +36,11 @@
 #   Watch              <=650
 #                      ------
 #                      ~1955
+#   The after-merge top block spends from the What-changed budget, floor 200.
 
 set -euo pipefail
+# shellcheck source=bin/lib/post-merge-rows.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/post-merge-rows.sh"
 
 TITLE_MAX=80
 WHAT_MAX=1000
@@ -64,6 +74,15 @@ TITLE=""
 URL=""
 BRANCH=""
 PR_BODY_FILE=""
+PING_OUT=""
+PING_OUT_SET=0
+AM_MANUAL=""
+AM_AUTO_CI=""
+AM_AUTO_MAC=""
+AM_FAILED=""
+AM_COMMENT_URL=""
+RUN_URL=""
+JOB_RESULTS=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --pr-number) PR_NUMBER="${2-}"; shift 2 ;;
@@ -71,6 +90,14 @@ while [ $# -gt 0 ]; do
         --url)       URL="${2-}";       shift 2 ;;
         --branch)    BRANCH="${2-}";    shift 2 ;;
         --pr-body-file) PR_BODY_FILE="${2-}"; shift 2 ;;
+        --ping-out)  PING_OUT="${2-}"; PING_OUT_SET=1; shift 2 ;;
+        --manual-count)      AM_MANUAL="${2-}";      shift 2 ;;
+        --auto-ci-count)     AM_AUTO_CI="${2-}";     shift 2 ;;
+        --auto-mac-count)    AM_AUTO_MAC="${2-}";    shift 2 ;;
+        --auto-failed-count) AM_FAILED="${2-}";      shift 2 ;;
+        --comment-url)       AM_COMMENT_URL="${2-}"; shift 2 ;;
+        --run-url)           RUN_URL="${2-}";        shift 2 ;;
+        --job-result)        JOB_RESULTS+=("${2-}"); shift 2 ;;
         -h|--help)
             sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)
@@ -88,6 +115,10 @@ case "$PR_NUMBER" in
         printf 'digest-dm-build: --pr-number must be digits, got: %s\n' "$PR_NUMBER" >&2
         exit 2 ;;
 esac
+if [ "$PING_OUT_SET" = 1 ] && [ -z "$PING_OUT" ]; then
+    printf 'digest-dm-build: --ping-out needs a value\n' >&2
+    exit 2
+fi
 
 # _digest_labels -- fold a `### Merge digest` block into "<label>\t<one-line value>" records.
 # Values spanning several lines are folded so each label yields exactly one record.
@@ -151,6 +182,15 @@ _label_value() {
 
 WHAT="$(_label_value 'What changed')"
 WATCH="$(_label_value 'Watch')"
+# A zero-width space after each `@` in PR-sourced text: it renders but never notifies. The
+# ping arms allowed_mentions.users=[owner] on some posts, so a `<@id>` or `@everyone` typed
+# into a title or digest must stay inert whatever the ping value. send.sh's own prepended
+# mention is added later and is never touched.
+ZWSP="$(printf '\342\200\213')"
+TITLE="${TITLE//@/@$ZWSP}"
+WHAT="${WHAT//@/@$ZWSP}"
+WATCH="${WATCH//@/@$ZWSP}"
+BRANCH="${BRANCH//@/@$ZWSP}"
 # Merge danger (optional): parsed from the PR body file with the same line shape that
 # bin/lib/pr-armable.sh pr_merge_danger_hold and harness/merge_danger.py accept.
 DANGER_LINE=""; MD_DOOR=""; MD_BLAST=""
@@ -170,6 +210,48 @@ elif [ "$MD_DOOR" = two-way ] && [ "$MD_BLAST" = localized ]; then
 fi
 TITLE_T="$(_trunc "$TITLE_MAX" "$TITLE")"
 
+# After-merge mode (--ping-out): decide the ping and build the top block. A bad VALUE never
+# exits non-zero, since a failed build step would skip the send and silence the merge.
+# Bad values ping instead.
+TOP=""
+if [ "$PING_OUT_SET" = 1 ]; then
+    _results=(${JOB_RESULTS[@]+"${JOB_RESULTS[@]}"})
+    # The two auto counts are display-only. A pseudo-result makes a bad value ping too.
+    if ! pmr_is_count "$AM_AUTO_CI"; then _results+=("auto_ci_count=invalid"); fi
+    if ! pmr_is_count "$AM_AUTO_MAC"; then _results+=("auto_mac_count=invalid"); fi
+    pmr_ping_decision "$AM_MANUAL" "$AM_FAILED" ${_results[@]+"${_results[@]}"}
+    printf '%s\n' "$PMR_PING" > "$PING_OUT"
+    printf 'ping=%s reasons=%s\n' "$PMR_PING" "${PMR_PING_REASONS:-none}" >&2
+    _url_re='^https://[^[:space:]<>]+$'
+    DIR_URL="$URL"
+    if [[ "$AM_COMMENT_URL" =~ $_url_re ]]; then DIR_URL="$AM_COMMENT_URL"; fi
+    RUN_REF='(run link unavailable)'
+    if [[ "$RUN_URL" =~ $_url_re ]]; then RUN_REF="<$RUN_URL>"; fi
+    _reasons=" ${PMR_PING_REASONS//@/@$ZWSP} "
+    _nz='[1-9]'
+    case "$_reasons" in
+        *" bad-count:"*|*" job:"*)
+            _shown="${_reasons# }"
+            TOP="**Post-merge pipeline problem** (${_shown% }). Run: $RUN_REF · Directions: <$DIR_URL>" ;;
+    esac
+    case "$_reasons" in
+        *" manual "*)
+            TOP="${TOP:+$TOP$'\n'}**Action needed after merge:** $AM_MANUAL manual step(s). Directions: <$DIR_URL>" ;;
+    esac
+    case "$_reasons" in
+        *" auto-failed "*)
+            TOP="${TOP:+$TOP$'\n'}**Post-merge auto step failed:** $AM_FAILED. Run: $RUN_REF" ;;
+    esac
+    if pmr_is_count "$AM_AUTO_CI" && pmr_is_count "$AM_AUTO_MAC" \
+            && { [[ "$AM_AUTO_CI" =~ $_nz ]] || [[ "$AM_AUTO_MAC" =~ $_nz ]]; }; then
+        TOP="${TOP:+$TOP$'\n'}After merge: $AM_AUTO_CI CI and $AM_AUTO_MAC Mac step(s) run automatically; Mac failures ping you in #dev."
+    fi
+    if [ -n "$TOP" ]; then
+        WHAT_MAX=$((WHAT_MAX - ${#TOP} - 2))
+        if [ "$WHAT_MAX" -lt 200 ]; then WHAT_MAX=200; fi
+    fi
+fi
+
 # The branch is the link text for the PR URL, so the brackets that would close the
 # link early are stripped, along with backticks. Without a branch, `#N` in the header
 # carries the link instead. Every URL is wrapped in <> -- Discord's embed-suppression
@@ -186,15 +268,15 @@ fi
 # A confirmed merge is ALWAYS announced. A missing or unparseable digest degrades the
 # message; it never suppresses it. (Same invariant bin/pr-cycle held for the ledger row.)
 if [ -z "$WHAT" ] && [ -z "$WATCH" ]; then
-    printf '**Merged %s: %s**%s\n\n(No /pr-ready digest — armed by triage sweep or no review pass run.)\n' \
-        "$PR_REF" "$TITLE_T" "$BRANCH_LINE"
+    printf '%s**Merged %s: %s**%s\n\n(No /pr-ready digest — armed by triage sweep or no review pass run.)\n' \
+        "${TOP:+$TOP$'\n\n'}" "$PR_REF" "$TITLE_T" "$BRANCH_LINE"
     exit 0
 fi
 # One label present and the other absent is a malformed-but-present digest: name the gap
 # per field rather than discarding the half that parsed.
 [ -n "$WHAT" ]  || WHAT='(missing)'
 [ -n "$WATCH" ] || WATCH='(missing)'
-printf '%s**Merged %s: %s**%s\n\n**What changed:** %s\n\n**Watch:** %s\n' \
-    "${DANGER_LINE:+$DANGER_LINE$'\n'}" "$PR_REF" "$TITLE_T" "$BRANCH_LINE" \
+printf '%s%s**Merged %s: %s**%s\n\n**What changed:** %s\n\n**Watch:** %s\n' \
+    "${TOP:+$TOP$'\n\n'}" "${DANGER_LINE:+$DANGER_LINE$'\n'}" "$PR_REF" "$TITLE_T" "$BRANCH_LINE" \
     "$(_trunc "$WHAT_MAX" "$WHAT")" \
     "$(_trunc "$WATCH_MAX" "$WATCH")"

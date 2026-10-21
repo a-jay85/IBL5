@@ -121,6 +121,27 @@ class WaiversSubmissionServiceTest extends TestCase
         $this->assertSame('Player added', $result['result'] ?? '');
     }
 
+    /**
+     * A team at 15 with two injured players posts rosterslots=0 and healthyrosterslots=2.
+     * The add path forwards only the healthy count today.
+     */
+    public function testSubmitForwardsHealthyRosterSlotsToProcessAdd(): void
+    {
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();
+        $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')
+            ->with('Chicago Bulls')->willReturn(75000000);
+        $processor->expects($this->once())->method('processAdd')
+            ->with(42, 'Chicago Bulls', 2, 75000000)
+            ->willReturn(['success' => true, 'result' => 'Player added']);
+
+        $result = $service->submit(
+            ['Action' => 'add', 'Player_ID' => 42, 'rosterslots' => 0, 'healthyrosterslots' => 2],
+            'Chicago Bulls'
+        );
+
+        $this->assertTrue($result['success']);
+    }
+
     public function testSubmitForwardsAuthorizedWaiveToProcessor(): void
     {
         [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();

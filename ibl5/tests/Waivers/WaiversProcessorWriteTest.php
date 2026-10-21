@@ -133,6 +133,38 @@ class WaiversProcessorWriteTest extends TestCase
         self::assertSame('Player not found.', $result['error'] ?? '');
     }
 
+    /**
+     * Pins the salary hand-off: the validator receives the determineContractData() salary,
+     * which is the veteran minimum for a no-contract player in-season.
+     */
+    public function testProcessAddPassesContractSalaryToValidator(): void
+    {
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
+            'name' => 'Test Player', 'pid' => 1, 'exp' => 3,
+            'cy' => 0, 'cyt' => 0,
+            'salary_yr1' => 0, 'salary_yr2' => 0, 'salary_yr3' => 0,
+            'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0,
+        ]);
+        $validatorMock = $this->createMock(WaiversValidatorInterface::class);
+        $validatorMock->expects($this->once())->method('validateAdd')
+            ->with(1, 5, 3000, \League\ContractRules::getVeteranMinimumSalary(3))
+            ->willReturn(ValidationResult::failure('stop'));
+        $processor = new WaiversProcessor(
+            $this->repoStub,
+            $this->teamIdentityRepoStub,
+            $this->playerLookupRepoStub,
+            $validatorMock,
+            $this->newsServiceStub,
+            self::createStub(\mysqli::class),
+            null,
+            new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class))
+        );
+
+        $result = $processor->processAdd(1, 'Test Team', 5, 3000);
+
+        self::assertFalse($result['success']);
+    }
+
     public function testProcessAddReturnsErrorWhenValidationFails(): void
     {
         $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([

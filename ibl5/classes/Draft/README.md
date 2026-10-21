@@ -1,6 +1,6 @@
 ---
 description: Annual IBL draft process — repository, validator, processor, view, service, and controller with interface-driven architecture.
-last_verified: 2026-10-06
+last_verified: 2026-10-21
 ---
 
 # Draft Module Architecture
@@ -54,8 +54,8 @@ Draft Module (Interface-Driven Architecture)
 
 **Public Methods:**
 ```php
-getCurrentDraftSelection(int $draftRound, int $draftPick): ?string
-updateDraftTable(string $playerName, string $date, int $draftRound, int $draftPick): bool
+getCurrentDraftSelection(int $draftYear, int $draftRound, int $draftPick): ?string
+updateDraftTable(string $playerName, string $date, int $draftYear, int $draftRound, int $draftPick): bool  // writes only when the slot's player is ''
 updateRookieTable(string $playerName, string $teamName): bool
 createPlayerFromDraftClass(string $playerName, string $teamName): bool
 isPlayerAlreadyDrafted(string $playerName): bool
@@ -144,13 +144,14 @@ handleDraftSelection(string $teamName, ?string $playerName, int $draftRound, int
 ```
 
 **Workflow (write path):**
-1. `submitSelection()` enforces auth + CSRF + ownership guards, narrows POST values, and delegates to `handleDraftSelection()`
+1. `submitSelection()` enforces five guards in order: logged in, CSRF token, POST team equals session team, session team owns the posted slot, posted slot is the first empty slot for the year (`getCurrentDraftPick()`). It narrows POST values, then delegates to `handleDraftSelection()`.
 2. Get current draft selection (if any)
 3. Check if player already drafted
 4. Validate selection (player, pick, status)
 5. If valid: update all three database tables
-6. Send Discord notifications to #general-chat and #draft-picks
-7. Return HTML response (success or error)
+6. The `ibl_draft` UPDATE carries `AND player = ''`. Zero affected rows means another submit filled the slot first, and the transaction rolls back.
+7. Send Discord notifications to #general-chat and #draft-picks
+8. Return HTML response (success or error)
 
 ---
 
@@ -225,9 +226,9 @@ vendor/bin/phpunit --testsuite "Draft Module Tests"
 - View layer responsible for output safety
 
 ### Authorization
-- Module assumes upstream authorization
-- Recommend checking team ownership before calling handler
-- No built-in permission checks (handled by module wrapper)
+- `submitSelection()` is the only entry point `ibl5/modules/Draft/index.php` calls for `op=select`, and it carries the five guards listed in the write workflow
+- `handleDraftSelection()` has no guards of its own; call it only from `submitSelection()`
+- The on-the-clock slot is read from `ibl_draft` on every submit; no POST field is trusted for it
 
 ---
 
@@ -266,7 +267,7 @@ echo $html;
 ### Handle Draft Selection
 ```php
 $controller = new Draft\DraftController($db, $commonRepository, $season);
-$html = $controller->submitSelection($_POST, $user);  // auth + CSRF + ownership guarded
+$html = $controller->submitSelection($_POST, $user);  // auth + CSRF + ownership + on-the-clock guarded
 echo $html;  // HTML response (success or error message)
 ```
 

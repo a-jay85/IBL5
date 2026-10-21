@@ -279,13 +279,13 @@ esac
 # A fire launchd ran late (Mac asleep at both times) lands at an arbitrary hour,
 # so any other hour is a catch-up when no review went out in the last 6 days,
 # except the pre-reset Sunday hours, which wait for the 16:xx fire.
-STATE_FILE="${EVENTS_REVIEW_STATE_FILE:-${HOME:-}/Library/Logs/ibl5/events-review.last-sent}"
+STATE_FILE="${EVENTS_REVIEW_STATE_FILE:-${HOME:+$HOME/Library/Logs/ibl5/events-review.last-sent}}"
 if [ "$AT_RESET" = 1 ]; then
     _utc_hour="${EVENTS_REVIEW_UTC_HOUR:-$(date -u +%H)}"
     _utc_dow="${EVENTS_REVIEW_UTC_DOW:-$(date -u +%w)}"
     if [ "$_utc_hour" != "16" ]; then
         _last=""
-        [ -f "$STATE_FILE" ] && IFS= read -r _last < "$STATE_FILE" || true
+        [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ] && IFS= read -r _last < "$STATE_FILE" || true
         case "$_last" in ''|*[!0-9]*) _last=0 ;; esac
         _now="${EVENTS_REVIEW_NOW_EPOCH:-$(date -u +%s)}"
         if [ "$_utc_dow" = "0" ] && [ "$((10#$_utc_hour))" -lt 16 ]; then
@@ -303,6 +303,10 @@ fi
 # Records a delivered review (or skip line) so a late launchd fire is not re-run.
 mark_sent() {
     [ "$AT_RESET" = 1 ] && [ "$DRY_RUN" != 1 ] || return 0
+    if [ -z "$STATE_FILE" ]; then
+        log "HOME is unset and EVENTS_REVIEW_STATE_FILE is not set; not recording the send"
+        return 0
+    fi
     mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null || true
     date -u +%s > "$STATE_FILE" 2>/dev/null || log "could not write $STATE_FILE"
 }

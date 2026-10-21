@@ -1702,6 +1702,30 @@ touch "$STUB/fail.simRecapContext"
 srt_run
 srt_log_has "$STUB" curl.log "post-to-thread" "webhook unset and empty both use bot path"
 srt_file_absent "$STUB/curl.stdin" "webhook empty leaves no curl stdin"
+
+# 8. webhook alone arms the alert; no thread id = webhook's own channel
+srt_reset
+export SIM_RECAP_OPS_WEBHOOK_URL="$WH_URL"
+export SIM_RECAP_OPS_ALERT_THREAD_ID=""
+printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+srt_expect_eq "webhook without thread id — exit 0" 0 "$SRT_RC"
+srt_count "webhook without thread id still pings once" 1 "$STUB/curl.log"
+srt_log_has "$STUB" curl.log "roster-blind" "webhook without thread id sends the onset body"
+srt_log_has "$STUB" curl.stdin "url = \"$WH_URL\"" \
+    "webhook without thread id posts to the bare webhook URL"
+srt_log_lacks "$STUB" curl.stdin "thread_id" "webhook without thread id adds no thread_id"
+
+# 9. existing query string, no thread id: URL left untouched
+srt_reset
+export SIM_RECAP_OPS_WEBHOOK_URL="${WH_URL}?wait=true"
+export SIM_RECAP_OPS_ALERT_THREAD_ID=""
+printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+srt_log_has "$STUB" curl.stdin "url = \"${WH_URL}?wait=true\"" \
+    "webhook with query and no thread id keeps the URL as-is"
 unset SIM_RECAP_OPS_WEBHOOK_URL
 
 # ── Public-log hygiene (Phase 7) ──

@@ -24,7 +24,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'franchise history',
     'franchise record book',
     'injuries',
-    'one on one game',
     'player movement',
     'projected draft order',
     // Search page with a transactions preset (modules.php?name=Search plus a preset).

@@ -420,6 +420,27 @@ assert_eq "E4-persistent-5xx-fails-closed exit" "$RC" "1"
 assert_match "E4-persistent-5xx-fails-closed message" 'GraphQL fetch failed' "$ERR"
 assert_eq "E4-persistent-5xx-fails-closed calls" "$(cat "$TMP/sgh.count")" "4"
 
+rm -f "$TMP/sgh.count"
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' SGH_COUNT="$TMP/sgh.count" GH_CMD="$TMP/scriptgh" \
+    SGH_FAILS=1 SGH_MSG='unexpected end of JSON input' \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+ERR=$(cat "$TMP/err")
+assert_match "E5-truncated-body-then-ok head" '^head=3$' "$OUT"
+assert_eq "E5-truncated-body-then-ok exit" "$RC" "0"
+assert_eq "E5-truncated-body-then-ok calls" "$(cat "$TMP/sgh.count")" "2"
+assert_match "E5-truncated-body-then-ok retry notice" 'gh-retry: attempt 1/4' "$ERR"
+
+rm -f "$TMP/sgh.count"
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' SGH_COUNT="$TMP/sgh.count" GH_CMD="$TMP/scriptgh" \
+    SGH_FAILS='' SGH_MSG='unexpected end of JSON input' \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+ERR=$(cat "$TMP/err")
+assert_eq "E6-persistent-truncated-body-fails-closed exit" "$RC" "1"
+assert_match "E6-persistent-truncated-body-fails-closed message" 'GraphQL fetch failed' "$ERR"
+assert_eq "E6-persistent-truncated-body-fails-closed calls" "$(cat "$TMP/sgh.count")" "4"
+
 # --- R: snapshot validation and record-and-replay ---
 
 r1_check() {

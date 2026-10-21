@@ -318,9 +318,9 @@ resolve_review_finding "$PR" <COMMENT_ID> "Fixed in $FULL_SHA — <what changed>
 
 **Link format (in `body` field):** `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}` — expand SHA from 4A beforehand, never use bash interpolation in the body string. Include 1 line of context before/after the anchor line.
 
-### 4.5: Remediate trusted threads (pre-existing and this run's)
+### 4.5: Remediate pre-existing trusted threads
 
-Runs after 4D has posted, before Phase 5. Canonical prose: `.claude/review-shared/_posting-procedure.md` § Remediating trusted threads. Candidates are every thread that is (a) unresolved and not outdated and (b) rooted by a trusted author (`a-jay85`, a GitHub `Bot`, or a `[bot]` login). A thread whose id is in the 4D snapshot is tagged origin pre-existing; one that is not was posted by this run's 4D and is tagged origin same-run. Both origins get the same FIX or DECLINE treatment under the same packet and trust contract. The trust filter is `list_trusted_open_threads`; do not widen it inline.
+Runs after 4D has posted, before Phase 5. Canonical prose: `.claude/review-shared/_posting-procedure.md` § Remediating trusted threads. Only threads that are (a) in the 4D snapshot, (b) unresolved and not outdated, and (c) rooted by a trusted author (`a-jay85`, a GitHub `Bot`, or a `[bot]` login) are candidates, and each is tagged origin pre-existing. This skill path keeps no ledger of what its own 4D posted, so it does not remediate same-run threads. The compiled harness does (Phase 4.5b); here they stay open and condition (11) holds them. The trust filter is `list_trusted_open_threads`; do not widen it inline.
 
 ```bash
 # phase 4.5 remediate
@@ -329,15 +329,17 @@ PRE4D_IDS="/tmp/post-plan-pre4d-thread-ids-$PPID.txt"
 P45_ALL="/tmp/post-plan-p45-all-$PPID.jsonl"
 P45_WORK="/tmp/post-plan-p45-work-$PPID.jsonl"
 : > "$P45_WORK"
-rc=0; list_trusted_open_threads "$PR" > "$P45_ALL" || rc=$?
-if [ "$rc" -eq 0 ]; then
-  jq -c --rawfile ids "$PRE4D_IDS" \
-     '. + {origin: (if (($ids | split("\n")) | index(.commentId|tostring)) != null then "pre-existing" else "same-run" end)}' \
-     "$P45_ALL" > "$P45_WORK"
-else
-  echo "phase 4.5: list_trusted_open_threads rc=$rc; skipping remediation (condition (11) keeps the hold)"
+if [ -s "$PRE4D_IDS" ]; then
+  rc=0; list_trusted_open_threads "$PR" > "$P45_ALL" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    jq -c --rawfile ids "$PRE4D_IDS" \
+       'select((($ids | split("\n")) | index(.commentId|tostring)) != null) | . + {origin: "pre-existing"}' \
+       "$P45_ALL" > "$P45_WORK"
+  else
+    echo "phase 4.5: list_trusted_open_threads rc=$rc; skipping remediation (condition (11) keeps the hold)"
+  fi
 fi
-echo "phase 4.5: $(wc -l < "$P45_WORK" | tr -d ' ') trusted thread(s) to disposition (pre-existing and same-run)"
+echo "phase 4.5: $(wc -l < "$P45_WORK" | tr -d ' ') pre-existing trusted thread(s) to disposition"
 ```
 
 If the count is 0, run the `# phase 4.5 outcome log` block below (the sweep still runs), then go to Phase 5. Otherwise spawn ONE `sonnet-5-5` agent (omit `model`) with this packet, then run the commit-and-resolve block.
@@ -389,4 +391,4 @@ rm -f "/tmp/post-plan-p45-all-$PPID.jsonl" "/tmp/post-plan-p45-done-$PPID.jsonl"
 echo "phase 4.5: outcome log done"
 ```
 
-A thread left open here is not an error: condition (11) holds it for a human. When `SHA` is non-empty, Phase 5 runs against the new head exactly as it does after any 4D follow-up commit (see SKILL.md's checkpoint rule). After that Phase 5, re-run the Phase 4 review once over `git diff <pre-fix sha>..<SHA>` only; post any new finding and leave it open. Never run 4.5 a second time in the same run.
+A thread left open here is not an error: condition (11) holds it for a human. When `SHA` is non-empty, Phase 5 runs against the new head exactly as it does after any 4D follow-up commit (see SKILL.md's checkpoint rule).

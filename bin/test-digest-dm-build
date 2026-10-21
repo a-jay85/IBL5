@@ -607,4 +607,47 @@ want "action line within the top block" "$(printf '%s\n' "$OUT" | sed -n 1,4p)" 
 want "directions link within the top block" "$(printf '%s\n' "$OUT" | sed -n 1,4p)" "Directions: <$AM_CMT>"
 want "what changed still present" "$OUT" '**What changed:**'
 
+# ---------------------------------------------------------------------------
+# workflow-contract — static assertions on merge-digest-notify.yml. The live event slice
+# cannot run before merge, so these pin the shape the ping decision depends on. Herestrings
+# throughout (.claude/rules/shell-pipefail-grep.md).
+# ---------------------------------------------------------------------------
+WF_TEXT="$(cat "$WF_NOTIFY")"
+_wf_count() { grep -cF -- "$1" <<< "$WF_TEXT" || true; }
+
+begin_case "wf-needs"
+want "digest job needs the checklist job" "$WF_TEXT" $'\n    needs: [after-merge-checklist]\n'
+
+begin_case "wf-always"
+_after_if="$(awk '/^  notify-merge-digest:/ {j=1} j && /^    if: >-$/ {getline; print; exit}' <<< "$WF_TEXT")"
+eq "first line of the digest if: is always()" "$_after_if" '      always() &&'
+
+begin_case "wf-ping-fail-closed"
+want "ping compares against false" "$WF_TEXT" "ping: \${{ steps.build.outputs.ping != 'false' }}"
+
+begin_case "wf-no-static-false"
+eq "no hard-coded ping: 'false'" "$(_wf_count "ping: 'false'")" "0"
+
+begin_case "wf-one-send"
+eq "exactly one notify-discord send" "$(_wf_count 'uses: ./.github/actions/notify-discord')" "1"
+
+begin_case "wf-outputs"
+for _k in status manual_count auto_ci_count auto_mac_count comment_url; do
+    want "output $_k" "$WF_TEXT" "      $_k: \${{ steps.checklist.outputs.$_k }}"
+done
+
+begin_case "wf-job-result"
+want "digest passes the checklist job result" "$WF_TEXT" '--job-result "after-merge-checklist=$AM_RESULT"'
+
+begin_case "wf-no-dm-out"
+eq "no --dm-out left" "$(_wf_count '--dm-out')" "0"
+eq "--title only on the digest call" "$(_wf_count '--title')" "1"
+
+begin_case "wf-default-branch"
+eq "both checkouts pin the default branch" \
+    "$(_wf_count 'ref: ${{ github.event.repository.default_branch }}')" "2"
+
+begin_case "wf-no-mention-rule-gone"
+eq "the old no-mention comment is gone" "$(_wf_count 'never @'"mention")" "0"
+
 h_done

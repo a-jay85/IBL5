@@ -175,9 +175,9 @@ cat > "$TMP/c10.json" <<'JSON'
 JSON
 IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c10.json"
 if [ "$RC" -eq 1 ] && grep -qF "FAIL: only 0 check-run(s) found on HEAD" "$ERR"; then
-    ok "C10 ignoring every run fails the floor rather than passing"
+    ok "C10 ignoring every run with no usable ancestor fails the floor"
 else
-    fail "C10 ignoring every run fails the floor rather than passing (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+    fail "C10 ignoring every run with no usable ancestor fails the floor (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
 fi
 
 # C11: HEAD has only the failed helper, so TOTAL=0 and the script walks back.

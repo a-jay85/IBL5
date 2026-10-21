@@ -179,8 +179,9 @@ JSON="$(echo "$JSON" | ccg_dedupe "$SKIP_JSON")"
 # Failed-only ignore list. Same "" -> [] derivation as SKIP_JSON, so an unset
 # or empty IGNORE_FAILED_CHECKS never enters this branch. Applied AFTER
 # ccg_dedupe so only the newest run per name is judged, and BEFORE the TOTAL
-# floor. A HEAD left with no runs falls back to an ancestor, and fails only
-# when no ancestor within the walk-back limit has enough runs.
+# floor. A HEAD left with no runs is treated as path-filtered and inherits the
+# verdict of the nearest ancestor with enough runs (the ancestor gets the same
+# drop). It fails only when no ancestor within the walk-back limit qualifies.
 IGNORE_FAILED_JSON="$(ccg_skip_json "$IGNORE_FAILED_CHECKS")"
 IGNORE_FAILED_ACTIVE=0
 

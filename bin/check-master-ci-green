@@ -74,8 +74,7 @@ Environment:
                         and BEFORE the MIN_REQUIRED_CHECKS floor. A HEAD left
                         with no runs falls back to an ancestor, and fails only
                         when none within the walk-back limit has enough runs.
-                        Matched names
-                        and conclusions are echoed to stdout.
+                        Matched names and conclusions are echoed to stdout.
 
 Trade-off: uses an "all-must-pass" model rather than a hardcoded check-name
 list. A new optional check that lands red will block. Use --skip-ci-check

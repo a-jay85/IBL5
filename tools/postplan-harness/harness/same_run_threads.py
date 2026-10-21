@@ -72,6 +72,9 @@ def this_run_only(keys):
 
 def dispositioned_keys(result: dict) -> set[tuple[str, str]]:
     """Keys of the threads the fixer FIXED or DECLINED. A skipped thread is never pruned."""
+    delta = (result or {}).get("delta_review")
+    if delta is not None and delta.get("new_findings") is None:
+        return set()  # the fix went unreviewed, so nothing is released from condition (2)
     return {_key(row.get("path"), row.get("body_head"))
             for row in (result or {}).get("threads") or ()
             if row.get("outcome") in ("fixed", "declined")}

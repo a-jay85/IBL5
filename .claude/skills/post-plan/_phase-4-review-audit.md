@@ -333,7 +333,7 @@ if [ -s "$PRE4D_IDS" ]; then
   rc=0; list_trusted_open_threads "$PR" > "$P45_ALL" || rc=$?
   if [ "$rc" -eq 0 ]; then
     jq -c --rawfile ids "$PRE4D_IDS" \
-       'select((($ids | split("\n")) | index(.commentId|tostring)) != null) | . + {origin: "pre-existing"}' \
+       '. as $t | select((($ids | split("\n")) | index($t.commentId|tostring)) != null) | . + {origin: "pre-existing"}' \
        "$P45_ALL" > "$P45_WORK"
   else
     echo "phase 4.5: list_trusted_open_threads rc=$rc; skipping remediation (condition (11) keeps the hold)"

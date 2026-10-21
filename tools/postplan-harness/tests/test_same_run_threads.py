@@ -313,6 +313,13 @@ def test_prune_findings_drops_fixed_and_declined_keeps_skipped():
     assert [r["path"] for r in kept_scored] == ["c.php"]
 
 
+def test_failed_delta_review_prunes_nothing():
+    result = {"threads": [{"commentId": 1, "outcome": "fixed", "path": "a.php",
+                           "body_head": "fixed body"}],
+              "delta_review": {"paths": ["a.php"], "new_findings": None}}
+    assert same_run_threads.dispositioned_keys(result) == set()
+
+
 def test_max_same_run_rounds_is_one():
     assert MAX_SAME_RUN_ROUNDS == 1
     src = inspect.getsource(run_same_run_pass)

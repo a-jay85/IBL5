@@ -633,7 +633,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                       meta_check_failures=res.meta_check_failures,
                       scored_findings=res.scored_findings,
                       cache_rec=cache_rec, cache_version=cache_key["version"],
-                      conflict_only=conflict_only)
+                      conflict_only=conflict_only,
+                      body_hash=reviewcache.body_hash_of(copy["summary_md"]))
         _join_review()
         # A remediation loop moved the head, up to MAX_FIDELITY_ROUNDS times. Phase 7
         # must watch CI for the last commit, which is what remediation_sha aliases after
@@ -771,7 +772,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # never persists arms from a run that failed mid-way.
         if cache_key is not None and res.pr_number:
             _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug,
-                                out_dir, review_phase.gates(cls), log)
+                                out_dir, review_phase.gates(cls), log,
+                                body_hash=reviewcache.body_hash_of(copy["summary_md"]))
         if (live or state_dir is not None) and res.hold_repeat is None:
             res.hold_repeat = _record_hold_repeat(res, decision, slug, worktree,
                                                   _state_dir(out_dir, live, state_dir), log)
@@ -2649,7 +2651,7 @@ def _interdiff_review(review_phase, meta, cls, plan, delta, keep_findings, keep_
 
 
 def _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug, out_dir,
-                        gates, log) -> None:
+                        gates, log, body_hash="") -> None:
     """Vet each arm and save the record. A reused arm is re-written verbatim so its
     run_id keeps naming the run that paid for the LLM call; an interdiff review is a
     fresh producer. Never raises: a cache write must not fail a run."""
@@ -2661,6 +2663,8 @@ def _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug,
                                                res.degraded_agents, gates, this_run))
         fid_arm = (prior.get("fidelity") if "fidelity" in res.reused_from
                    else reviewcache.vet_fidelity(res.fidelity, this_run))
+        if fid_arm and "fidelity" not in res.reused_from and body_hash:
+            fid_arm = dict(fid_arm, body_hash=body_hash)   # the prose check 4 graded
         if "fidelity" in res.reused_from and fid_arm:
             fid_arm = dict(fid_arm, diff_id=cache_key["diff_id"])   # conflict-only: valid for the current diff
         doc = reviewcache.build_record(slug=slug, pr_number=int(res.pr_number), run_id=this_run,
@@ -2707,7 +2711,7 @@ def _plan_hash(plan) -> str:
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                   reviewed_tree, live, log, res, before_remediation=None,
                   unresolved_conformance=(), meta_check_failures=(), scored_findings=(),
-                  cache_rec=None, cache_version="", conflict_only=False):
+                  cache_rec=None, cache_version="", conflict_only=False, body_hash=""):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
 
     `before_remediation` runs once, before `build_packet()`, so Phase 4 results are
@@ -2759,13 +2763,16 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             prior_sticky, reuse_diff, plan_hash)
         carry_reason = "conflict-only-delta" if carried else ""
     if carried:
-        reuse_run = reviewcache.fidelity_reusable(cache_rec, cache_version, reuse_diff, plan_hash)
+        reuse_run = reviewcache.fidelity_reusable(cache_rec, cache_version, reuse_diff, plan_hash,
+                                                 body_hash)
         if reuse_run is None:
             carried = None
             decline_reason = ("no-cache-record" if not cache_rec or not cache_rec.get("fidelity")
                               else "version-changed"
                               if (cache_rec.get("key") or {}).get("version") != cache_version
                               or not cache_version
+                              else "body-changed" if body_hash
+                              and (cache_rec.get("fidelity") or {}).get("body_hash") != body_hash
                               else "cache-arm-unusable")
     # The sticky composed after a carry still quotes verdict_path(pr). If /tmp lost it,
     # carrying would overwrite the prior sticky's real excerpt and digest with

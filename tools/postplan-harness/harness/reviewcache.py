@@ -227,8 +227,17 @@ def reusable_by_path(findings, scored, delta, current_files):
 FIDELITY_REUSABLE_VERDICTS = ("READY", "READY WITH NOTES")
 
 
-def fidelity_reusable(record, version, diff_id, plan_hash):
-    """The producing run id when the cached fidelity arm may stand in, else None."""
+def body_hash_of(summary_md):
+    """Hash of the Phase 2 PR-copy prose, or "" when Phase 2 wrote no body (clean-tree rerun)."""
+    return hashlib.sha256(summary_md.encode("utf-8")).hexdigest() if summary_md else ""
+
+
+def fidelity_reusable(record, version, diff_id, plan_hash, body_hash=""):
+    """The producing run id when the cached fidelity arm may stand in, else None.
+
+    `body_hash` is non-empty when this run's Phase 2 rewrote the PR body. Check 4 judges
+    the body against the diff, and the key does not cover body prose, so the arm stands in
+    only when it graded that same prose."""
     if not isinstance(record, dict):
         return None
     arm = record.get("fidelity")
@@ -240,6 +249,8 @@ def fidelity_reusable(record, version, diff_id, plan_hash):
     if not diff_id or not plan_hash:
         return None
     if arm.get("diff_id") != diff_id or arm.get("plan_hash") != plan_hash:
+        return None
+    if body_hash and arm.get("body_hash") != body_hash:
         return None
     if arm.get("verdict") not in FIDELITY_REUSABLE_VERDICTS or arm.get("remediated") is not False:
         return None

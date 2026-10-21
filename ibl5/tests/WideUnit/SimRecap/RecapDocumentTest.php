@@ -272,13 +272,13 @@ final class RecapDocumentTest extends TestCase
         self::assertSame($stored, RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored));
     }
 
-    public function testPostableTextTreatsThePinnedExemplarAsA46GameDocument(): void
+    public function testPostableTextTreatsThePinnedExemplarAsAnEightGameDocument(): void
     {
         $exemplar = file_get_contents(dirname(__DIR__, 4) . '/bin/lib/sim-recap-exemplar.txt');
         self::assertIsString($exemplar);
 
         $parts = [];
-        for ($i = 1; $i <= 45; $i++) {
+        for ($i = 1; $i <= 7; $i++) {
             $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
         }
 
@@ -395,6 +395,6 @@ final class RecapDocumentTest extends TestCase
 
         $count = preg_match_all('/^\*\*.+\s\d+\s@\s.+\s\d+\*\*$/m', str_replace("\r\n", "\n", $exemplar));
 
-        self::assertSame(46, $count, 'The pinned exemplar carries 46 game headers');
+        self::assertSame(8, $count, 'The pinned exemplar carries 8 game headers');
     }
 }

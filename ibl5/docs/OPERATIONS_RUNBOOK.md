@@ -418,7 +418,7 @@ php ibl5/bin/validate-schema   # config in ibl5/config/schema-assertions.php
 | Sim recap Claude token | GitHub Actions secret `CLAUDE_CODE_OAUTH_TOKEN` | From `claude setup-token`. Actions store only. |
 | Sim recap SSH key | GitHub Actions secret `SIM_RECAP_SSH_KEY` | Private half of the restricted `sim-recap-actions` ed25519 key (§ 8). The public half is installed on prod through `bin/sim-recap-ssh-gate --print-key-line`. |
 | Sim recap prod paths and DB | GitHub Actions secrets `SIM_RECAP_REMOTE_ROOT`, `SIM_RECAP_DB_USER`, `SIM_RECAP_DB_NAME`, `SIM_RECAP_DB_PASSWORD` | `SIM_RECAP_DB_PASSWORD` is the SELECT-only agent credential from ADR-0093. |
-| Sim recap ops alerts | GitHub Actions secrets `SIM_RECAP_OPS_WEBHOOK_URL`, `SIM_RECAP_OPS_ALERT_THREAD_ID` | Optional. Without them the tick sends no ops alerts. |
+| Sim recap ops alerts | GitHub Actions secrets `SIM_RECAP_OPS_WEBHOOK_URL`, `SIM_RECAP_OPS_ALERT_THREAD_ID` | Optional. The webhook alone turns ops alerts on and posts them to its own channel. Add the thread ID to post into a thread instead. Without the webhook the tick sends no ops alerts. |
 | Sim recap dispatch PAT | `ibl5/config/github-dispatch.config.php` on the production box | Untracked. Template: `ibl5/config/github-dispatch.config.example.php`. Fine-grained PAT for `a-jay85/IBL5` with Contents read and write. An empty token disables dispatch and the hourly schedule still drains the queue. |
 | Discord notification target | GitHub Actions secret `OWNER_DISCORD_ID` | Snowflake ID for DM delivery |
 | CI PAT (auto-revert push) | GitHub Actions secret `CI_PAT`, and the Dependabot secret of the same name | Scoped to push `production` branch. Duplicated because `dependabot-auto-merge.yml` fires on Dependabot's `pull_request`, and that run resolves `secrets.CI_PAT` from the Dependabot store. |
@@ -448,7 +448,7 @@ With no secrets set, the workflow skips every real step and ends green. Merging 
 
 ### Secrets
 
-Nine Actions secrets switch the workflow on: `CLAUDE_CODE_OAUTH_TOKEN`, `SIM_RECAP_SSH_KEY`, `SIM_RECAP_REMOTE_ROOT`, `SIM_RECAP_DB_USER`, `SIM_RECAP_DB_NAME`, `SIM_RECAP_DB_PASSWORD`, plus the existing `HOST` and `PORT` and `USERNAME`. Two more are optional ops-alert settings: `SIM_RECAP_OPS_WEBHOOK_URL` and `SIM_RECAP_OPS_ALERT_THREAD_ID`. The table in section 7 lists where each one lives. If any required secret is empty the workflow skips and prints `secrets not configured, skipping`.
+Nine Actions secrets switch the workflow on: `CLAUDE_CODE_OAUTH_TOKEN`, `SIM_RECAP_SSH_KEY`, `SIM_RECAP_REMOTE_ROOT`, `SIM_RECAP_DB_USER`, `SIM_RECAP_DB_NAME`, `SIM_RECAP_DB_PASSWORD`, plus the existing `HOST` and `PORT` and `USERNAME`. Two more are optional ops-alert settings. `SIM_RECAP_OPS_WEBHOOK_URL` turns alerts on, and `SIM_RECAP_OPS_ALERT_THREAD_ID` moves them from the webhook's channel into a thread. The table in section 7 lists where each one lives. If any required secret is empty the workflow skips and prints `secrets not configured, skipping`.
 
 ### Installing the restricted key
 

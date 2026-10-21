@@ -11,7 +11,9 @@ use PHPUnit\Framework\MockObject\Stub;
 use Waivers\WaiversSubmissionService;
 use Waivers\Contracts\WaiversProcessorInterface;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
+use Team\Contracts\TeamQueryRepositoryInterface;
 
 /**
  * Security deliverable for backlog 6.22 (Waivers half).
@@ -109,11 +111,11 @@ class WaiversSubmissionServiceTest extends TestCase
             ->with('Chicago Bulls')->willReturn(75000000);
         $processor->expects($this->never())->method('processDrop');
         $processor->expects($this->once())->method('processAdd')
-            ->with(42, 'Chicago Bulls', 0, 12, 75000000)
+            ->with(42, 'Chicago Bulls', 3, 3, 75000000)
             ->willReturn(['success' => true, 'result' => 'Player added']);
 
         $result = $service->submit(
-            ['Action' => 'add', 'Player_ID' => 42, 'healthyrosterslots' => 12],
+            ['Action' => 'add', 'Player_ID' => 42],
             'Chicago Bulls'
         );
 
@@ -122,12 +124,14 @@ class WaiversSubmissionServiceTest extends TestCase
     }
 
     /**
-     * A team at 15 with two injured players posts rosterslots=0 and healthyrosterslots=2.
-     * The add path forwards both counts, open first.
+     * A team at 15 with two injured players has 0 open slots and 2 healthy-open slots.
+     * The add path forwards both server-derived counts, open first, and ignores the
+     * client-posted rosterslots / healthyrosterslots (a forged rosterslots=1 must not
+     * reopen a full roster).
      */
-    public function testSubmitForwardsHealthyRosterSlotsToProcessAdd(): void
+    public function testSubmitForwardsServerCountedRosterSlotsToProcessAdd(): void
     {
-        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(false, 15, 13);
         $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')
             ->with('Chicago Bulls')->willReturn(75000000);
         $processor->expects($this->once())->method('processAdd')
@@ -135,11 +139,33 @@ class WaiversSubmissionServiceTest extends TestCase
             ->willReturn(['success' => true, 'result' => 'Player added']);
 
         $result = $service->submit(
-            ['Action' => 'add', 'Player_ID' => 42, 'rosterslots' => 0, 'healthyrosterslots' => 2],
+            ['Action' => 'add', 'Player_ID' => 42, 'rosterslots' => 1, 'healthyrosterslots' => 3],
             'Chicago Bulls'
         );
 
         $this->assertTrue($result['success']);
+    }
+
+    public function testSubmitRefusesWhenTeamIdCannotBeResolved(): void
+    {
+        $processor = $this->createMock(WaiversProcessorInterface::class);
+        $processor->expects($this->never())->method('processAdd');
+        $processor->expects($this->never())->method('processDrop');
+        $season = self::createStub(Season::class);
+        $teamIdentityRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepo->method('getTidFromTeamname')->willReturn(null);
+        $service = new WaiversSubmissionService(
+            $processor,
+            self::createStub(SalaryCapRepositoryInterface::class),
+            self::createStub(TeamQueryRepositoryInterface::class),
+            $teamIdentityRepo,
+            $season
+        );
+
+        $result = $service->submit(['Action' => 'add', 'Player_ID' => 42], 'Nowhere Nobodies');
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('Team not found.', $result['error'] ?? '');
     }
 
     public function testSubmitForwardsAuthorizedWaiveToProcessor(): void
@@ -149,7 +175,7 @@ class WaiversSubmissionServiceTest extends TestCase
             ->with('Chicago Bulls')->willReturn(75000000);
         $processor->expects($this->never())->method('processAdd');
         $processor->expects($this->once())->method('processDrop')
-            ->with(42, 'Chicago Bulls', 14, 75000000)
+            ->with(42, 'Chicago Bulls', 3, 75000000)
             ->willReturn(['success' => true, 'result' => 'Player waived']);
 
         $result = $service->submit(
@@ -182,8 +208,8 @@ class WaiversSubmissionServiceTest extends TestCase
 
         $processorMethod = $action === 'waive' ? 'processDrop' : 'processAdd';
         $expectedArguments = $action === 'waive'
-            ? [42, 'Miami Heat', 12, $expectedSalary]
-            : [42, 'Miami Heat', 12, 12, $expectedSalary];
+            ? [42, 'Miami Heat', 3, $expectedSalary]
+            : [42, 'Miami Heat', 3, 3, $expectedSalary];
         $processor->expects($this->once())
             ->method($processorMethod)
             ->with(...$expectedArguments)
@@ -212,13 +238,20 @@ class WaiversSubmissionServiceTest extends TestCase
     /**
      * @return array{0: WaiversSubmissionService, 1: WaiversProcessorInterface&MockObject, 2: SalaryCapRepositoryInterface&MockObject, 3: Season&Stub}
      */
-    private function buildServiceWithMocks(bool $advancesContractYears = false): array
+    private function buildServiceWithMocks(bool $advancesContractYears = false, int $rosterCount = 12, int $healthyCount = 12): array
     {
         $processor = $this->createMock(WaiversProcessorInterface::class);
         $salaryCapRepo = $this->createMock(SalaryCapRepositoryInterface::class);
         $season = self::createStub(Season::class);
         $season->method('advancesContractYears')->willReturn($advancesContractYears);
-        $service = new WaiversSubmissionService($processor, $salaryCapRepo, $season);
+        $teamQueryRepo = self::createStub(TeamQueryRepositoryInterface::class);
+        $teamQueryRepo->method('getHealthyAndInjuredPlayersOrderedByName')
+            ->willReturn(array_fill(0, $rosterCount, []));
+        $teamQueryRepo->method('getHealthyPlayersOrderedByName')
+            ->willReturn(array_fill(0, $healthyCount, []));
+        $teamIdentityRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepo->method('getTidFromTeamname')->willReturn(7);
+        $service = new WaiversSubmissionService($processor, $salaryCapRepo, $teamQueryRepo, $teamIdentityRepo, $season);
 
         return [$service, $processor, $salaryCapRepo, $season];
     }

@@ -132,12 +132,23 @@ class WaiversProcessor implements WaiversProcessorInterface
             ];
         }
 
-        $vetMinSalary = $this->calculateVeteranMinimumSalary($this->resolveContractExperience($playerData, $season));
+        $vetMinSalary = $this->resolveVeteranMinimum($playerData, $season);
 
         return [
             'hasExistingContract' => false,
             'salary' => $vetMinSalary
         ];
+    }
+
+    /**
+     * Single source for the veteran minimum, shared by the signed contract
+     * (determineContractData) and the validator's over-cap check (processAdd).
+     *
+     * @param PlayerRow $playerData
+     */
+    private function resolveVeteranMinimum(array $playerData, Season $season): int
+    {
+        return $this->calculateVeteranMinimumSalary($this->resolveContractExperience($playerData, $season));
     }
 
     /**
@@ -219,7 +230,7 @@ class WaiversProcessor implements WaiversProcessorInterface
         $contractData = $this->determineContractData($player, $season);
         $playerSalary = $contractData['salary'];
 
-        $veteranMinimum = $this->calculateVeteranMinimumSalary($this->resolveContractExperience($player, $season));
+        $veteranMinimum = $this->resolveVeteranMinimum($player, $season);
 
         $addValidation = $this->validator->validateAdd(
             $playerID,

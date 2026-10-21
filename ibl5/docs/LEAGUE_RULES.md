@@ -111,6 +111,4 @@ Full tables live in `.claude/rules/contract-rules.md`. The rules:
 
 ## Known bugs
 
-The owner ruled on these on 2026-10-20. The rules above are correct. The code still needs a fix.
-
-- **The 24-hour waiver wait.** The waiver page shows a 24-hour wait that the code never enforces. Remove it from the page.
+None open. The owner's 2026-10-20 rulings are all fixed in code.

@@ -1,0 +1,73 @@
+# shellcheck shell=bash
+# post-merge-rows.sh — sourced only, never executed.
+#
+# The single home of the `## After merge` row grammar (ADR-0198):
+#   - **Row N** [<tag>] — text
+# where <tag> is `manual`, `auto:ci <name>`, or `auto:mac <name>`. A row with no tag is
+# manual. Consumers: bin/after-merge-checklist and bin/digest-dm-build. Later units add the
+# CI executor and the writer gates. Tested by bin/test-post-merge-rows.
+#
+# Portable to bash 3.2: no associative arrays, no ${v,,}, no mapfile, no declare -n.
+
+PMR_END_ANCHOR='<!-- after-merge:end -->'
+PMR_NAME_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+# pmr_rows FILE -- print the raw row lines of the `## After merge` section.
+pmr_rows() {
+    local _s
+    _s="$(sed -n '/^## After merge/,/^## /p' "$1")"
+    _s="$(awk -v a="$PMR_END_ANCHOR" 'index($0, a) { exit } { print }' <<< "$_s")"
+    grep -E '^- (\[ \] )?\*\*Row' <<< "$_s" || true
+}
+
+# pmr_parse_row LINE -- sets PMR_KIND (manual|auto:ci|auto:mac), PMR_NAME,
+# PMR_LABEL (`**Row N**`), PMR_TEXT (text after the tag), PMR_VALID (1|0).
+# No tag => manual, valid (legacy #3264/#3286 shape). A malformed tag or a bad
+# name => manual, PMR_VALID=0, PMR_TEXT keeps the whole remainder. Fail closed:
+# anything unrecognised is a person's job, so it pings.
+pmr_parse_row() {
+    local _l="$1" _rest _tag _nm _after
+    local _re_head='^(\*\*Row [0-9]+\*\*)[[:space:]]*(.*)$'
+    local _re_tag='^\[([^]]*)\][[:space:]]*(.*)$'
+    _l="${_l%$'\r'}"; _l="${_l#- }"; _l="${_l#\[ \] }"
+    PMR_KIND=manual; PMR_NAME=""; PMR_LABEL=""; PMR_TEXT="$_l"; PMR_VALID=1
+    if [[ "$_l" =~ $_re_head ]]; then
+        PMR_LABEL="${BASH_REMATCH[1]}"; _rest="${BASH_REMATCH[2]}"; PMR_TEXT="$_rest"
+        if [[ "$_rest" =~ $_re_tag ]]; then
+            _tag="${BASH_REMATCH[1]}"; _after="${BASH_REMATCH[2]}"
+            case "$_tag" in
+                manual) PMR_TEXT="$_after" ;;
+                "auto:ci "*|"auto:mac "*)
+                    _nm="${_tag#* }"
+                    if [[ "$_nm" =~ $PMR_NAME_RE ]]; then
+                        PMR_KIND="${_tag%% *}"; PMR_NAME="$_nm"; PMR_TEXT="$_after"
+                    else
+                        PMR_VALID=0
+                    fi ;;
+                *) PMR_VALID=0 ;;
+            esac
+        fi
+    fi
+}
+
+# pmr_is_count VALUE -- 0 iff VALUE is one or more ASCII digits and nothing else.
+pmr_is_count() { local _re='^[0-9]+$'; [[ "${1-}" =~ $_re ]]; }
+
+# pmr_ping_decision MANUAL AUTO_FAILED [JOB=RESULT ...] -- sets PMR_PING (true|false)
+# and PMR_PING_REASONS (space-separated). Fail closed: a non-numeric count or any
+# result other than `success` pings. "> 0" is tested as "contains a 1-9 digit",
+# so a 25-digit count cannot overflow shell arithmetic.
+pmr_ping_decision() {
+    local _m="${1-}" _f="${2-}" _j _nz='[1-9]'
+    PMR_PING=false; PMR_PING_REASONS=""
+    shift 2 2>/dev/null || shift $#
+    if ! pmr_is_count "$_m"; then PMR_PING_REASONS+=" bad-count:manual"
+    elif [[ "$_m" =~ $_nz ]]; then PMR_PING_REASONS+=" manual"; fi
+    if ! pmr_is_count "$_f"; then PMR_PING_REASONS+=" bad-count:auto_failed"
+    elif [[ "$_f" =~ $_nz ]]; then PMR_PING_REASONS+=" auto-failed"; fi
+    for _j in "$@"; do
+        if [ "${_j#*=}" != success ]; then PMR_PING_REASONS+=" job:$_j"; fi
+    done
+    PMR_PING_REASONS="${PMR_PING_REASONS# }"
+    if [ -n "$PMR_PING_REASONS" ]; then PMR_PING=true; fi
+}

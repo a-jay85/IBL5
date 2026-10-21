@@ -81,6 +81,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0204](0204-fidelity-remediation-rules-file-carveout.md) | Phase 5.5 remediation may commit a small fix to a rules file a blocking finding names | Accepted | The harness fixer may edit and commit a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes, within line and frontmatter limits; every other gate-owning path stays denied. |
 | [0207](0207-same-run-review-thread-remediation.md) | Same-run review thread remediation | Accepted | Phase 4.5 also fixes or declines the review threads the same run posted, one round, then re-reviews the fix delta; arming predicates are unchanged. |
 | [0210](0210-required-context-payload-provable-job-skip.md) | Payload-provable job-level skips on PR label and edit events | Accepted | `human-signoff` and `auto-mergeable label` skip label and edit events their verdict cannot read, with the predicate copied into a per-run concurrency group; `Meta checks` stays unfiltered. |
+| [0208](0208-merged-digest-pings-owner-for-post-merge-steps.md) | The merge digest pings the owner when a post-merge step needs them | Accepted | `bin/digest-dm-build` @mentions the owner on the single #merged digest only for a manual row, a failed auto row, or a failed checklist job, decided by `pmr_ping_decision` from job outputs and never from PR text. |
 
 ## When an ADR is Required
 

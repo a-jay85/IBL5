@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# test-post-merge-rows — contract harness for bin/lib/post-merge-rows.sh.
+#
+# Usage: bin/test-post-merge-rows
+#
+# Sources the lib and drives its five functions. PMR_LIB overrides the lib path so a
+# mutated scratch copy can be checked; unset, the repo lib is used.
+
+set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/lib/harness.sh
+. "$SCRIPT_DIR/lib/harness.sh"
+H_FAIL_FD=2  # FAIL: lines stay on stderr, as in the sibling harnesses
+
+LIB="${PMR_LIB:-$SCRIPT_DIR/lib/post-merge-rows.sh}"
+[ -f "$LIB" ] || { echo "STOP: no lib at $LIB" >&2; exit 1; }
+# shellcheck source=bin/lib/post-merge-rows.sh
+. "$LIB"
+
+h_tmp SCRATCH
+trap 'h_cleanup' EXIT
+
+# --- 1-4: row parsing ---------------------------------------------------------------
+pmr_parse_row '- **Row 1** — run X'
+h_eq "legacy-untagged kind" manual "$PMR_KIND"
+h_eq "legacy-untagged valid" 1 "$PMR_VALID"
+h_eq "legacy-untagged label" '**Row 1**' "$PMR_LABEL"
+h_eq "legacy-untagged text" '— run X' "$PMR_TEXT"
+
+pmr_parse_row '- **Row 2** [manual] — set secret'
+h_eq "tag-manual kind" manual "$PMR_KIND"
+h_eq "tag-manual valid" 1 "$PMR_VALID"
+h_eq "tag-manual text" '— set secret' "$PMR_TEXT"
+
+pmr_parse_row '- **Row 3** [auto:ci check-301] — curl prod'
+h_eq "tag-auto-ci kind" auto:ci "$PMR_KIND"
+h_eq "tag-auto-ci name" check-301 "$PMR_NAME"
+h_eq "tag-auto-ci valid" 1 "$PMR_VALID"
+h_eq "tag-auto-ci text" '— curl prod' "$PMR_TEXT"
+
+pmr_parse_row '- [ ] **Row 4** [auto:mac sim-recap.install] — install'
+h_eq "tag-auto-mac-checkbox kind" auto:mac "$PMR_KIND"
+h_eq "tag-auto-mac-checkbox name" sim-recap.install "$PMR_NAME"
+
+# --- 5: bad names stay manual, invalid, and are never evaluated ---------------------
+rm -f /tmp/pmr-pwn
+while IFS= read -r _row; do
+    pmr_parse_row "$_row"
+    h_eq "bad-names kind [$_row]" manual "$PMR_KIND"
+    h_eq "bad-names valid [$_row]" 0 "$PMR_VALID"
+    h_eq "bad-names name [$_row]" "" "$PMR_NAME"
+done <<'ROWS'
+- **Row 1** [auto:ci ../x] — t
+- **Row 1** [auto:ci a/b] — t
+- **Row 1** [auto:ci $(touch /tmp/pmr-pwn)] — t
+- **Row 1** [auto:ci ] — t
+- **Row 1** [auto:ci  x] — t
+- **Row 1** [auto:foo x] — t
+- **Row 1** [Manual] — t
+ROWS
+h_absent "bad-names never evaluated" /tmp/pmr-pwn
+
+# --- 6: CRLF ------------------------------------------------------------------------
+pmr_parse_row $'- **Row 3** [auto:ci check-301] — curl prod\r'
+h_eq "crlf kind" auto:ci "$PMR_KIND"
+h_eq "crlf name" check-301 "$PMR_NAME"
+h_eq "crlf text" '— curl prod' "$PMR_TEXT"
+
+# --- 7-8: section extraction --------------------------------------------------------
+cat > "$SCRATCH/body.md" <<'BODY'
+- **Row 9** above the section
+## After merge
+- **Row 1** inside one
+- [ ] **Row 2** [manual] inside two
+prose line
+<!-- after-merge:end -->
+- **Row 3** after the anchor
+## Notes
+- **Row 4** after the next heading
+BODY
+h_eq "rows-section-bounds" '- **Row 1** inside one
+- [ ] **Row 2** [manual] inside two' "$(pmr_rows "$SCRATCH/body.md")"
+
+printf '# Summary\n- **Row 1** not in a section\n' > "$SCRATCH/absent.md"
+_out="$(bash -c 'set -euo pipefail; . "$1"; pmr_rows "$2"' _ "$LIB" "$SCRATCH/absent.md")"
+_rc=$?
+h_eq "rows-absent exit" 0 "$_rc"
+h_eq "rows-absent output" "" "$_out"
+
+# --- 9: count validation ------------------------------------------------------------
+for _v in 0 12 007; do
+    if pmr_is_count "$_v"; then h_pass "is-count accepts [$_v]"; else h_fail "is-count accepts [$_v]" "rejected"; fi
+done
+for _v in "" 1a -1 " 1" "1 " 1.0 $'1\n2'; do
+    if pmr_is_count "$_v"; then h_fail "is-count rejects [$_v]" "accepted"; else h_pass "is-count rejects [$_v]"; fi
+done
+
+# --- 10: ping table -----------------------------------------------------------------
+_pt() {  # label want-ping want-reasons args...
+    local _lbl="$1" _wp="$2" _wr="$3"
+    shift 3
+    pmr_ping_decision "$@"
+    h_eq "ping-table $_lbl ping" "$_wp" "$PMR_PING"
+    h_eq "ping-table $_lbl reasons" "$_wr" "$PMR_PING_REASONS"
+}
+_pt all-clear false "" 0 0 checklist=success
+_pt manual true manual 1 0 checklist=success
+_pt auto-failed true auto-failed 0 1 checklist=success
+_pt job-failure true job:checklist=failure 0 0 checklist=failure
+_pt job-cancelled true job:checklist=cancelled 0 0 checklist=cancelled
+_pt job-skipped true job:checklist=skipped 0 0 checklist=skipped
+_pt job-empty true job:checklist= 0 0 checklist=
+_pt bad-manual true bad-count:manual abc 0
+_pt empty-manual true bad-count:manual "" 0
+_pt bad-failed true bad-count:auto_failed 0 x
+_pt no-jobs false "" 0 0
+
+_err="$SCRATCH/huge.err"
+pmr_ping_decision 99999999999999999999999 0 2> "$_err"
+h_eq "ping-table huge ping" true "$PMR_PING"
+h_eq "ping-table huge reasons" manual "$PMR_PING_REASONS"
+h_not_contains "ping-table huge no arithmetic error" "$(cat "$_err")" "integer expression"
+
+# --- 11: no args under set -u -------------------------------------------------------
+_out="$(bash -c 'set -euo pipefail; . "$1"; pmr_ping_decision; printf "%s|%s" "$PMR_PING" "$PMR_PING_REASONS"' _ "$LIB")"
+_rc=$?
+h_eq "ping-no-args exit" 0 "$_rc"
+h_eq "ping-no-args result" "true|bad-count:manual bad-count:auto_failed" "$_out"
+
+h_done

@@ -44,6 +44,6 @@ Enforcement lives in `bin/test-events-review`, which runs in CI and pins the SQL
 
 The Decision above says the output is sent only to the owner through `bin/discord-dm`. That changed. The defanged output is now posted to the #reviews channel through `bin/discord-dm` and the `~/.iblbot-reviews-webhook-url` webhook. Failure notices stay on the default #dev webhook.
 
-The job also gained a fixed schedule. It fires on Sunday at 16:03 UTC, the weekly Claude usage reset. launchd times are local only, so the plist holds two Sunday entries (08:03 and 09:03 local) and passes `--at-reset`. The script exits 0 unless the UTC hour is 16, so exactly one fire runs in both PDT and PST.
+The job also gained a fixed schedule. It fires on Sunday at 16:03 UTC, the weekly Claude usage reset. launchd times are local only, so the plist holds two Sunday entries (08:03 and 09:03 local) and passes `--at-reset`. At any other UTC hour the script exits 0, so exactly one of the two fires runs in both PDT and PST. The exception is a catch-up: if launchd ran a fire late (the Mac was asleep) and no review went out in the last 6 days, the script runs at that hour, except on Sunday before 16 UTC, which waits for the 16:xx fire.
 
 Everything else in the Decision is unchanged, including the SELECT-only credential, the tool-less model run, and the defanging.

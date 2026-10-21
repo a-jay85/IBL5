@@ -315,6 +315,12 @@ for rej in "lsched_program_arguments" "lsched_calendar Hour" "lsched_calendar_mu
   if [ "$rrc" = "2" ] && [ -n "$err" ]; then pass "lib-reject: $rej"; else fail "lib-reject: $rej (rc=$rrc)"; fi
 done
 
+# An empty entry would emit <dict></dict> (fires every minute), so it must be rejected.
+err="$( ( set -uo pipefail; . "$LIB"; lsched_calendar_multi "Weekday=0,Hour=8" "" ) 2>&1 >/dev/null )"
+( set -uo pipefail; . "$LIB"; lsched_calendar_multi "Weekday=0,Hour=8" "" ) >/dev/null 2>&1
+rrc=$?
+if [ "$rrc" = "2" ] && [ -n "$err" ]; then pass "lib-reject: lsched_calendar_multi empty entry"; else fail "lib-reject: lsched_calendar_multi empty entry (rc=$rrc)"; fi
+
 # lsched_plist wraps the body function.
 sample_body() { printf '\t<key>Label</key>\n\t<string>com.x</string>\n'; }
 plist_out="$(set -euo pipefail; . "$LIB"; lsched_plist sample_body)"

@@ -107,6 +107,10 @@ lsched_calendar_multi() {
         return 2
     fi
     for entry in "$@"; do
+        if [ -z "$entry" ]; then
+            printf 'lsched_calendar_multi: empty entry\n' >&2
+            return 2
+        fi
         local IFS=,
         for pair in $entry; do
             case "$pair" in

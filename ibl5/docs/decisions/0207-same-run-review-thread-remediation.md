@@ -14,13 +14,13 @@ Phase 4.5 acts only on threads in the pre-posting snapshot, so findings the same
 
 ## Decision
 
-Widen the Phase 4.5 candidate set to this run's own threads. They are identified by a post-join thread-id snapshot minus the pre-posting snapshot, then restricted to threads whose `(path, body prefix)` the process itself posted. Reuse the existing fixer, packet, trust contract and commit/push/resolve path. One round only: after a fix commit, the code review runs once over the fix delta, and new findings are posted and left open. Fixed or declined findings are pruned from the in-memory list condition (2) reads, and the predicates themselves are unchanged. A fix commit re-keys CI to the new head, re-runs conformance, and re-pins fidelity verdict 2 once when one exists. Phase 5 verify is not re-run locally. CI verifies the new head, as it does for a fidelity remediation commit. Outcome-log events carry `origin` so the two sources can be reported apart. The skill fallback mirrors the candidate widening in prose only. This supersedes the sentence in `.claude/review-shared/_posting-procedure.md` that said a run never dispositions its own fresh findings.
+Widen the Phase 4.5 candidate set to this run's own threads. They are identified by a post-join thread-id snapshot minus the pre-posting snapshot, then restricted to threads whose `(path, body prefix)` the process itself posted. Reuse the existing fixer, packet, trust contract and commit/push/resolve path. One round only: after a fix commit, the code review runs once over the fix delta, and new findings are posted and left open. Fixed or declined findings are pruned from the in-memory list condition (2) reads, and the predicates themselves are unchanged. A fix commit re-keys CI to the new head, re-runs conformance, and re-pins fidelity verdict 2 once when one exists. Phase 5 verify is not re-run locally. CI verifies the new head, as it does for a fidelity remediation commit. Outcome-log events carry `origin` so the two sources can be reported apart. The skill fallback mirrors the candidate widening in prose only. It supersedes the old rule in `.claude/review-shared/_posting-procedure.md` that a run never dispositions its own fresh findings.
 
 ## Alternatives Considered
 
-- **Run the pass inside the fidelity remediation loop.** Reuses an existing fixer loop. Rejected because it couples two different gates and lets fidelity rounds consume the same-run budget.
+- **Inside the fidelity loop.** Run the pass inside the fidelity remediation loop, which reuses an existing fixer loop. Rejected because it couples two different gates and lets fidelity rounds consume the same-run budget.
 - **Move Phase 4.5 after the review join.** One pass for both sets. Rejected because it changes the pre-existing path's semantics and every existing wiring test.
-- **Edit conditions (11) and (2) to ignore same-run threads.** Frees the hold without a fixer. Rejected because it weakens the gate and the shell and Python twins would need matching edits.
+- **Predicate edit.** Edit conditions (11) and (2) to ignore same-run threads, which frees the hold without a fixer. Rejected because it weakens the gate and the shell and Python twins would need matching edits.
 
 ## Consequences
 

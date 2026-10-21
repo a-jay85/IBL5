@@ -632,9 +632,12 @@ $(cat "$b1800")" "$(dm_payload 1)"
         expect_has "at-reset: Sunday UTC hour $h logs one skip line" "$ER_ERR" "--at-reset: UTC hour is $h"
     done
     printf '%s\n' 1000000 > "$T/sent-fresh"
+    # Hour 09 runs on a Monday so the Sunday-morning rule does not exit first.
+    local dow
     for h in 17 09; do
+        dow=0; [ "$h" = 09 ] && dow=1
         new_case "atreset-fresh-$h"
-        tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=$h" "EVENTS_REVIEW_UTC_DOW=0" \
+        tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=$h" "EVENTS_REVIEW_UTC_DOW=$dow" \
             "EVENTS_REVIEW_NOW_EPOCH=1003600" "EVENTS_REVIEW_STATE_FILE=$T/sent-fresh")
         run_er --at-reset "--from-tsv=$CORPUS"
         expect_eq "at-reset: UTC hour $h after a recent send exits 0" 0 "$ER_RC"
@@ -653,6 +656,17 @@ $(cat "$b1800")" "$(dm_payload 1)"
     expect_eq "at-reset: UTC hour 16 exits 0" 0 "$ER_RC"
     expect_eq "at-reset: UTC hour 16 sends the review" 1 "$(cat "$SD/dm.n")"
     expect_eq "at-reset: UTC hour 16 writes the sent marker" 1 "$([ -s "$T/sent-16" ] && echo 1 || echo 0)"
+    # The marker the 16:xx run wrote must make the 17:xx run skip (PST double-post guard).
+    new_case atreset-16-then-17
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=16" "EVENTS_REVIEW_UTC_DOW=0" "EVENTS_REVIEW_STATE_FILE=$T/sent-chain")
+    rm -f "$T/sent-chain"
+    run_er --at-reset "--from-tsv=$CORPUS"
+    expect_eq "at-reset: 16:xx run sends before the 17:xx run" 1 "$(cat "$SD/dm.n")"
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=17" "EVENTS_REVIEW_UTC_DOW=0" "EVENTS_REVIEW_STATE_FILE=$T/sent-chain")
+    run_er --at-reset "--from-tsv=$CORPUS"
+    expect_eq "at-reset: 17:xx run after the 16:xx marker exits 0" 0 "$ER_RC"
+    expect_eq "at-reset: 17:xx run after the 16:xx marker does not post again" 1 "$(cat "$SD/dm.n")"
+    expect_has "at-reset: 17:xx run after the 16:xx marker logs the skip" "$ER_ERR" "a review already went out"
     new_case atreset-absent
     tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=03")
     run_er "--from-tsv=$CORPUS"

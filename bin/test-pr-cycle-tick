@@ -203,7 +203,14 @@ cat "$SCRATCH/key-\$1" 2>/dev/null
 PF_EOF
 printf '#!/usr/bin/env bash\nexit 1\n' > "$SCRATCH/patchid-fail"
 printf '#!/usr/bin/env bash\necho not-a-patch-id\n' > "$SCRATCH/patchid-junk"
-chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub" "$SCRATCH/pad40" "$SCRATCH/patchid-identity" "$SCRATCH/patchid-file" "$SCRATCH/patchid-fail" "$SCRATCH/patchid-junk"
+# mastertip-file: controllable origin/master tip; prints $SCRATCH/master-tip, fails when absent.
+cat > "$SCRATCH/mastertip-file" <<MT_EOF
+#!/usr/bin/env bash
+cat "$SCRATCH/master-tip" 2>/dev/null
+MT_EOF
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/mastertip-empty"
+printf '#!/usr/bin/env bash\necho not-a-sha\n' > "$SCRATCH/mastertip-junk"
+chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub" "$SCRATCH/pad40" "$SCRATCH/patchid-identity" "$SCRATCH/patchid-file" "$SCRATCH/patchid-fail" "$SCRATCH/patchid-junk" "$SCRATCH/mastertip-file" "$SCRATCH/mastertip-empty" "$SCRATCH/mastertip-junk"
 
 # --- per-case state ------------------------------------------------------------------------
 UNSET="__UNSET__"
@@ -211,6 +218,7 @@ E_ZONE=normal; E_STOP="$UNSET"; E_STATE="$UNSET"
 E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
 E_HOME="set"; E_STUB_RC=0
 E_PATCHID="$SCRATCH/patchid-identity"
+E_MASTERTIP="$SCRATCH/mastertip-file"
 
 reset() {
     rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
@@ -232,6 +240,8 @@ reset() {
     E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
     E_HOME="set"; E_STUB_RC=0
     E_PATCHID="$SCRATCH/patchid-identity"
+    E_MASTERTIP="$SCRATCH/mastertip-file"
+    "$SCRATCH/pad40" e0001 > "$SCRATCH/master-tip"
 }
 
 # set_prs "<num>|<branch>|<sha>|<mergeStateStatus>|<isDraft>[|<baseRefName>]" ...
@@ -358,6 +368,7 @@ run_tick() {
     _envv PR_CYCLE_TICK_PR_CYCLE_CMD "$E_PRCMD"
     _envv PR_CYCLE_TICK_DM_CMD "$E_DMCMD"
     _envv PR_CYCLE_PATCH_ID_CMD "$E_PATCHID"
+    _envv PR_CYCLE_MASTER_TIP_CMD "$E_MASTERTIP"
     if [[ "$E_HOME" == "set" ]]; then _SET+=("HOME=$HOME_DIR"); else _DROP+=(-u HOME); fi
     ERR="$SCRATCH/last.err"
     OUT="$(cd "$SCRATCH" && env ${_DROP[@]+"${_DROP[@]}"} ${_SET[@]+"${_SET[@]}"} \
@@ -393,6 +404,9 @@ pending_count() { find "$STATE_DIR/pending" -type f 2>/dev/null | wc -l | tr -d 
 dm_count() { if [[ -f "$SCRATCH/dm.log" ]]; then wc -l < "$SCRATCH/dm.log" | tr -d ' '; else echo 0; fi; }
 launch_count() { if [[ -f "$SCRATCH/pr-cycle.log" ]]; then wc -l < "$SCRATCH/pr-cycle.log" | tr -d ' '; else echo 0; fi; }
 strikes() { cat "$STATE_DIR/strikes/$1" 2>/dev/null; }
+conflict_hold() { cat "$STATE_DIR/conflict-hold/$1" 2>/dev/null; }
+retries() { cat "$STATE_DIR/retries/$1" 2>/dev/null; }
+set_tip() { "$SCRATCH/pad40" "$1" > "$SCRATCH/master-tip"; }
 key_of() { "$SCRATCH/pad40" "$1"; }
 set_key() { printf '%s\n' "$2" > "$SCRATCH/key-$1"; }
 pr_refs() { git -C "$REPO" for-each-ref refs/pr-cycle; }
@@ -1403,8 +1417,8 @@ E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"; K2="$(key_of 2222222)
 set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
 set_result "101\tfired\tfailed\tkind=test"
 run_tick
-grep -qxF "$(printf '101\taaa1111\t%s' "$K1")" "$STATE_DIR"/pending/* \
-    || fail "settle-uses-launch-key: pending line is not <pr>TAB<sha>TAB<key>: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+grep -qxF "$(printf '101\taaa1111\t%s\t%s' "$K1" "$(key_of e0001)")" "$STATE_DIR"/pending/* \
+    || fail "settle-uses-launch-key: pending line is not <pr>TAB<sha>TAB<key>TAB<tip>:$(cat "$STATE_DIR"/pending/* 2>/dev/null)"
 set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red; set_key 101 "$K2"
 run_tick
 [[ "$(attempt 101)" == "$K1" ]] || fail "settle-uses-launch-key: attempts/101 is '$(attempt 101)', want the launch-time key $K1"
@@ -1451,8 +1465,8 @@ grep -qF 'could not compute its patch-id' "$SCRATCH/dm.log" || fail "patchid-fal
 out_has 'patch-id unavailable; retry key falls back to head aaa1111' || fail "patchid-fallback-dm: no fallback log line: $OUT"
 [[ "$(cat "$STATE_DIR/dm-patchid/101" 2>/dev/null)" == "aaa1111" ]] \
     || fail "patchid-fallback-dm: dm-patchid/101 is '$(cat "$STATE_DIR/dm-patchid/101" 2>/dev/null)'"
-grep -qxF "$(printf '101\taaa1111\taaa1111')" "$STATE_DIR"/pending/* \
-    || fail "patchid-fallback-dm: pending line key is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+grep -qxF "$(printf '101\taaa1111\taaa1111\t%s' "$(key_of e0001)")" "$STATE_DIR"/pending/* \
+    || fail "patchid-fallback-dm:pending line key is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
 run_tick
 [[ "$(dm_count)" == "1" ]] || fail "patchid-fallback-dm: fallback DM resent for the same head ($(dm_count))"
 set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red
@@ -1466,8 +1480,8 @@ set_prs "$RED101"; set_checks aaa1111 red
 run_tick
 out_has 'patch-id unavailable' || fail "patchid-nonhex-falls-back: non-hex output was accepted: $OUT"
 [[ "$(dm_count)" == "1" ]] || fail "patchid-nonhex-falls-back: want 1 fallback DM, got $(dm_count)"
-grep -qxF "$(printf '101\taaa1111\taaa1111')" "$STATE_DIR"/pending/* \
-    || fail "patchid-nonhex-falls-back: pending key column is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+grep -qxF "$(printf '101\taaa1111\taaa1111\t%s' "$(key_of e0001)")" "$STATE_DIR"/pending/* \
+    || fail "patchid-nonhex-falls-back:pending key column is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
 grep -qF 'not-a-patch-id' "$STATE_DIR"/pending/* && fail "patchid-nonhex-falls-back: junk reached the pending file"
 end_case patchid-nonhex-falls-back
 
@@ -1608,6 +1622,266 @@ out_has 'patch-id unavailable' && fail "patch-id-real-git: the tick fell back de
 no_file "$STATE_DIR/pending" || fail "patch-id-real-git: dry-run wrote pending/"
 git -C "$REPO" remote remove origin
 end_case patch-id-real-git
+
+# master-tip-seam: unset and empty PR_CYCLE_MASTER_TIP_CMD both select the git default; a
+# junk, empty, or failing seam prints nothing and still returns 0.
+reset; begin_case
+MT="$SCRATCH/mt-repo"; MTB="$SCRATCH/mt-bare-repo"
+git init -q -b master "$MT"; git init -q -b master "$MTB"
+for r in "$MT" "$MTB"; do
+    git -C "$r" config user.email t@t.invalid; git -C "$r" config user.name t
+    git -C "$r" config commit.gpgsign false
+    git -C "$r" commit -q --allow-empty -m one
+done
+git -C "$MT" update-ref refs/remotes/origin/master HEAD
+MT_SHA="$(git -C "$MT" rev-parse HEAD)"
+set_tip e0002
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    unset PR_CYCLE_MASTER_TIP_CMD
+    pcw_master_tip "$MT" > "$SCRATCH/mt-unset"
+    pcw_master_tip "$MTB" > "$SCRATCH/mt-unset-bare"
+    PR_CYCLE_MASTER_TIP_CMD=""
+    pcw_master_tip "$MT" > "$SCRATCH/mt-empty"
+    pcw_master_tip "$MTB" > "$SCRATCH/mt-empty-bare"
+    PR_CYCLE_MASTER_TIP_CMD="$SCRATCH/mastertip-file"
+    pcw_master_tip "$MT" > "$SCRATCH/mt-file"
+    PR_CYCLE_MASTER_TIP_CMD="$SCRATCH/mastertip-empty"
+    pcw_master_tip "$MT" > "$SCRATCH/mt-seam-empty"; echo "$?" > "$SCRATCH/mt-seam-empty-rc"
+    PR_CYCLE_MASTER_TIP_CMD="$SCRATCH/mastertip-junk"
+    pcw_master_tip "$MT" > "$SCRATCH/mt-seam-junk"; echo "$?" > "$SCRATCH/mt-seam-junk-rc"
+    PR_CYCLE_MASTER_TIP_CMD=false
+    pcw_master_tip "$MT" > "$SCRATCH/mt-seam-false"; echo "$?" > "$SCRATCH/mt-seam-false-rc"
+)
+[[ "$(cat "$SCRATCH/mt-unset")" == "$MT_SHA" ]] || fail "master-tip-seam: unset did not select the git default"
+[[ "$(cat "$SCRATCH/mt-empty")" == "$MT_SHA" ]] || fail "master-tip-seam: empty did not select the git default"
+[[ "$(wc -c < "$SCRATCH/mt-unset-bare" | tr -d ' ')" == "0" ]] || fail "master-tip-seam: unset printed for a repo with no origin/master"
+[[ "$(wc -c < "$SCRATCH/mt-empty-bare" | tr -d ' ')" == "0" ]] || fail "master-tip-seam: empty printed for a repo with no origin/master"
+[[ "$(cat "$SCRATCH/mt-file")" == "$(key_of e0002)" ]] || fail "master-tip-seam: seam file tip not printed"
+for m in seam-empty seam-junk seam-false; do
+    [[ "$(wc -c < "$SCRATCH/mt-$m" | tr -d ' ')" == "0" ]] || fail "master-tip-seam: $m printed something"
+    [[ "$(cat "$SCRATCH/mt-$m-rc")" == "0" ]] || fail "master-tip-seam: $m returned non-zero"
+done
+end_case master-tip-seam
+
+# conflict-retry-due-codes: 1 no hold, 2 same or malformed tip, 0 new tip under the cap,
+# 3 at the cap, 0 again on a new day, `unknown` hold eligible, cleared hold back to 1.
+reset; begin_case
+CRD="$SCRATCH/crd"; rm -rf "$CRD"; mkdir -p "$CRD"
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    T1="$(key_of e0001)"; T2="$(key_of e0002)"
+    rc() { local r=0; "$@" || r=$?; printf '%s' "$r"; }
+    {
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+        pcw_record_conflict_hold "$CRD" 5 "$T1"
+        rc pcw_conflict_retry_due "$CRD" 5 "$T1" 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 not-a-sha 2026-10-19
+        pcw_bump_retry "$CRD" 5 2026-10-19; pcw_bump_retry "$CRD" 5 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-20
+        pcw_record_conflict_hold "$CRD" 6 ""
+        rc pcw_conflict_retry_due "$CRD" 6 "$T2" 2026-10-19
+        pcw_clear_conflict_hold "$CRD" 5
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+    } > "$SCRATCH/crd-codes"
+    cat "$CRD/conflict-hold/6" > "$SCRATCH/crd-hold6"
+)
+[[ "$(cat "$SCRATCH/crd-codes")" == "12023001" ]] || fail "conflict-retry-due-codes: want 1,2,0,2,3,0,0,1 got $(cat "$SCRATCH/crd-codes")"
+[[ "$(cat "$SCRATCH/crd-hold6")" == "unknown" ]] || fail "conflict-retry-due-codes: empty tip did not record unknown"
+end_case conflict-retry-due-codes
+
+# prune-conflict-ledgers: pcw_prune drops the new ledgers of a closed PR (999), keeps PR 101's.
+reset; begin_case
+for l in conflict-hold retries; do
+    mkdir -p "$STATE_DIR/$l"; echo x > "$STATE_DIR/$l/999"; echo x > "$STATE_DIR/$l/101"
+done
+set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
+run_tick
+no_file "$STATE_DIR/conflict-hold/999" || fail "prune-conflict-ledgers: conflict-hold/999 survived"
+no_file "$STATE_DIR/retries/999" || fail "prune-conflict-ledgers: retries/999 survived"
+[[ -f "$STATE_DIR/conflict-hold/101" ]] || fail "prune-conflict-ledgers: conflict-hold/101 was pruned"
+[[ -f "$STATE_DIR/retries/101" ]] || fail "prune-conflict-ledgers: retries/101 was pruned"
+end_case prune-conflict-ledgers
+
+# conflict-hold-launch-tip: the tip captured at launch rides the pending row and is what
+# settle records, even though master moved before the rescue settled.
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_tip e0001
+set_result "101\tfired\tconflict\trebase-conflict"
+run_tick
+PF="$(find "$STATE_DIR/pending" -type f | head -n 1)"
+[[ "$(sed -n '2p' "$PF" | awk -F'\t' '{print NF}')" == "4" ]] \
+    || fail "conflict-hold-launch-tip: pending row is not 4 fields: $(sed -n '2p' "$PF")"
+[[ "$(sed -n '2p' "$PF" | cut -f4)" == "$(key_of e0001)" ]] \
+    || fail "conflict-hold-launch-tip: pending tip is '$(sed -n '2p' "$PF" | cut -f4)'"
+set_tip e0002
+run_tick
+[[ "$(conflict_hold 101)" == "$(key_of e0001)" ]] \
+    || fail "conflict-hold-launch-tip: held tip is '$(conflict_hold 101)', want the launch tip"
+out_has 'PR 101: conflict hold recorded (master e000100)' \
+    || fail "conflict-hold-launch-tip: no hold log line: $OUT"
+end_case conflict-hold-launch-tip
+
+# conflict-hold-cleared-by-later-settle: a determinate later outcome clears the hold, a
+# paused rescue (which never ran) keeps it. The seeded hold is the only hand-written state.
+reset; begin_case
+mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_result "101\tfired\theld\t-"
+run_tick
+run_tick
+[[ -z "$(conflict_hold 101)" ]] || fail "conflict-hold-cleared-by-later-settle: held settle kept the hold: '$(conflict_hold 101)'"
+end_case conflict-hold-cleared-by-later-settle
+
+reset; begin_case
+mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_result "101\tfired\tpaused\t-"
+run_tick
+run_tick
+[[ "$(conflict_hold 101)" == "$(key_of e0009)" ]] \
+    || fail "conflict-hold-kept-by-paused-settle: paused settle dropped the hold: '$(conflict_hold 101)'"
+end_case conflict-hold-kept-by-paused-settle
+
+# pending-legacy-3col (invocation-2-only: legacy files exist only on disk): a pending row
+# written before the master-tip column still settles, records the attempt, and records the
+# hold as unknown.
+reset; begin_case
+mkdir -p "$STATE_DIR/pending" "$STATE_DIR/results"
+printf '# result=%s started=%s\n101\taaa1111\t%s\n' \
+    "$STATE_DIR/results/legacy1.tsv" "$(date +%s)" "$(key_of aaa1111)" > "$STATE_DIR/pending/legacy1"
+printf '# pr-cycle-result v1\n101\tfired\tconflict\trebase-conflict\n' > "$STATE_DIR/results/legacy1.tsv"
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+run_tick
+[[ "$(attempt 101)" == "$(key_of aaa1111)" ]] || fail "pending-legacy-3col: attempt is '$(attempt 101)'"
+[[ "$(conflict_hold 101)" == "unknown" ]] || fail "pending-legacy-3col: hold is '$(conflict_hold 101)', want unknown"
+no_file "$STATE_DIR/pending/legacy1" || fail "pending-legacy-3col: legacy pending file survived"
+end_case pending-legacy-3col
+
+# --- conflict re-try on a new master tip ---------------------------------------------------
+# Every flow runs real ticks: tick N launches, the stub hands tick N+1 the canned result, and
+# tick N+1 settles it and then qualifies.
+TODAY_STR="$(date +%F)"
+DIRTY101='101|branch-one|aaa1111|DIRTY|false'
+WAIT_NOTE='skip PR 101: retry cap (head aaa1111; rebase conflict, waiting for a new master tip)'
+CAP_NOTE='skip PR 101: retry cap (head aaa1111; rebase conflict, daily cap of 2 launches reached)'
+
+# conflict-same-tip-skipped (+ conflict-new-tip-launched, conflict-third-launch-skipped,
+# conflict-day-rollover as one continuing flow)
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "conflict-same-tip-skipped: tick 1 launches $(launch_count), want 1"
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "conflict-same-tip-skipped: relaunched on an unchanged tip"
+out_has "$WAIT_NOTE" || fail "conflict-same-tip-skipped: no waiting note: $OUT"
+end_case conflict-same-tip-skipped
+
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+set_tip e0002
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-new-tip-launched: launches $(launch_count), want 2"
+[[ "$(retries 101)" == "$TODAY_STR 2" ]] || fail "conflict-new-tip-launched: retries/101 is '$(retries 101)'"
+end_case conflict-new-tip-launched
+
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+set_tip e0002
+run_tick
+set_tip e0003
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-third-launch-skipped: launches $(launch_count), want 2"
+out_has "$CAP_NOTE" || fail "conflict-third-launch-skipped: no daily-cap note: $OUT"
+# conflict-day-rollover (invocation-2-only for the date: no seam fakes the clock): a stale-dated
+# counter at the cap reads as 0.
+printf '2000-01-01 2\n' > "$STATE_DIR/retries/101"
+set_tip e0004
+run_tick
+[[ "$(launch_count)" == "3" ]] || fail "conflict-day-rollover: launches $(launch_count), want 3"
+[[ "$(retries 101)" == "$TODAY_STR 1" ]] || fail "conflict-day-rollover: retries/101 is '$(retries 101)'"
+end_case conflict-third-launch-skipped
+
+# non-conflict-new-tip-skipped: a later held or failed settle clears the hold, and a red PR is
+# never a conflict hold, so a new master tip reopens none of them.
+for oc in "held\t-" "failed\tterminal=x"; do
+    reset; begin_case
+    mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
+    set_prs "$DIRTY101"; set_result "101\tfired\t$oc"
+    set_tip e0001
+    run_tick
+    set_tip e0002
+    run_tick
+    [[ "$(launch_count)" == "1" ]] || fail "non-conflict-new-tip-skipped($oc): relaunched on a new tip"
+    out_has 'skip PR 101: retry cap (head aaa1111)' || fail "non-conflict-new-tip-skipped($oc): no plain note: $OUT"
+    out_has 'rebase conflict' && fail "non-conflict-new-tip-skipped($oc): conflict wording on a non-conflict hold"
+    end_case non-conflict-new-tip-skipped
+done
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+set_tip e0002
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "non-conflict-new-tip-skipped(red): relaunched on a new tip"
+out_has 'skip PR 101: retry cap (head aaa1111)' || fail "non-conflict-new-tip-skipped(red): no plain note: $OUT"
+out_has 'rebase conflict' && fail "non-conflict-new-tip-skipped(red): conflict wording on a red PR"
+end_case non-conflict-new-tip-skipped
+
+# conflict-declined-still-skipped (invocation-2-only: a state reachable only across many runs):
+# the bypass opens only the attempted-key skip, the declined skip still holds.
+reset; begin_case
+mkdir -p "$STATE_DIR/attempts" "$STATE_DIR/declined" "$STATE_DIR/conflict-hold"
+key_of aaa1111 > "$STATE_DIR/attempts/101"; key_of aaa1111 > "$STATE_DIR/declined/101"
+key_of e0001 > "$STATE_DIR/conflict-hold/101"
+set_prs "$DIRTY101"
+set_tip e0002
+run_tick
+no_file "$SCRATCH/pr-cycle.log" || fail "conflict-declined-still-skipped: launched a declined head"
+out_has 'holdrepeat declined (head aaa1111)' || fail "conflict-declined-still-skipped: no declined note: $OUT"
+end_case conflict-declined-still-skipped
+
+# conflict-tip-unset-and-empty: an unset or empty seam selects the git default, the fixture has
+# no refs/remotes/origin/master, and an unreadable tip never opens the bypass.
+for mode in unset empty junk; do
+    reset; begin_case
+    set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+    set_tip e0001
+    run_tick
+    case "$mode" in
+        unset) E_MASTERTIP="$UNSET" ;;
+        empty) E_MASTERTIP="" ;;
+        junk)  E_MASTERTIP="$SCRATCH/mastertip-junk" ;;
+    esac
+    run_tick
+    [[ "$(launch_count)" == "1" ]] || fail "conflict-tip-unset-and-empty($mode): relaunched without a readable tip"
+    out_has "$WAIT_NOTE" || fail "conflict-tip-unset-and-empty($mode): no waiting note: $OUT"
+    end_case conflict-tip-unset-and-empty
+done
+
+# conflict-dry-run-no-ledger: an eligible conflict PR prints would-run and writes nothing.
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+run_tick
+set_tip e0002
+run_tick --dry-run
+out_has 'would run:' || fail "conflict-dry-run-no-ledger: dry run did not qualify the PR: $OUT"
+[[ "$(retries 101)" == "$TODAY_STR 1" ]] || fail "conflict-dry-run-no-ledger: retries/101 is '$(retries 101)'"
+[[ "$(pending_count)" == "0" ]] || fail "conflict-dry-run-no-ledger: dry run wrote pending/"
+[[ "$(launch_count)" == "1" ]] || fail "conflict-dry-run-no-ledger: dry run launched"
+end_case conflict-dry-run-no-ledger
 
 # --- summary -------------------------------------------------------------------------------
 h_done

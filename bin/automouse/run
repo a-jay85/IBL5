@@ -1864,7 +1864,15 @@ run_between_plans_canary() {
     # the verdict is "pending" at every plan boundary and master health goes
     # unchecked. They are ignored ONLY while pending: a completed red run of
     # either still lands in "checks failed:" below and parks. Exact names.
+    # IGNORE_FAILED_CHECKS lists helper workflows that test no code, whose
+    # FAILURE must not park the queue. "Keep the merge-line head current"
+    # (.github/workflows/update-behind-prs.yml) fails on transient GitHub API
+    # errors, and GitHub drops its next cron run for hours, so its red sticks.
+    # Only a completed non-passing run is ignored; a pending one still reads
+    # "checks still running". Exact names. Canary only: PR merge gating and
+    # bin/merge-master-to-prod never set it.
     ci_out=$(IGNORE_PENDING_CHECKS="deploy,Promote master to production" \
+        IGNORE_FAILED_CHECKS="Keep the merge-line head current" \
         "$REPO/bin/check-master-ci-green" 2>&1) || ci_rc=$?
     CANARY_DETAIL="$ci_out"
     printf '%s\n' "$ci_out" >> "$LOG"

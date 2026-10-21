@@ -1,6 +1,6 @@
 ---
 description: Watch a detached launchd run with bin/watch-run, keyed on the job's label disappearing — never `tail -f` its log.
-last_verified: 2026-08-20
+last_verified: 2026-10-19
 ---
 
 # ADR-0107: A Self-Terminating Watcher for Detached Run Logs

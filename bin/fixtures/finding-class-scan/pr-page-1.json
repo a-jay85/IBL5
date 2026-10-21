@@ -1,0 +1,146 @@
+{
+ "data": {
+  "repository": {
+   "pullRequests": {
+    "pageInfo": {
+     "hasNextPage": true,
+     "endCursor": "C1"
+    },
+    "nodes": [
+     {
+      "number": 101,
+      "updatedAt": "2026-10-12T10:00:00Z",
+      "reviewThreads": {
+       "pageInfo": {
+        "hasNextPage": true,
+        "endCursor": "TC1"
+       },
+       "nodes": [
+        {
+         "id": "T1",
+         "isResolved": false,
+         "isOutdated": false,
+         "path": "ibl5/classes/Foo/Bar.php",
+         "line": 10,
+         "comments": {
+          "nodes": [
+           {
+            "author": {
+             "login": "a-jay85",
+             "__typename": "User"
+            },
+            "body": "finding body",
+            "url": "https://github.com/a-jay85/IBL5/pull/101#discussion_r1",
+            "createdAt": "2026-10-10T09:00:00Z"
+           }
+          ]
+         }
+        },
+        {
+         "id": "T2",
+         "isResolved": true,
+         "isOutdated": false,
+         "path": "ibl5/classes/Foo/Bar.php",
+         "line": 10,
+         "comments": {
+          "nodes": [
+           {
+            "author": {
+             "login": "claude-reviewer",
+             "__typename": "Bot"
+            },
+            "body": "finding body",
+            "url": "https://github.com/a-jay85/IBL5/pull/101#discussion_r2",
+            "createdAt": "2026-10-10T09:00:00Z"
+           }
+          ]
+         }
+        },
+        {
+         "id": "T3",
+         "isResolved": false,
+         "isOutdated": false,
+         "path": "ibl5/classes/Foo/Bar.php",
+         "line": 10,
+         "comments": {
+          "nodes": [
+           {
+            "author": {
+             "login": "coderabbitai[bot]",
+             "__typename": "User"
+            },
+            "body": "finding body",
+            "url": "https://github.com/a-jay85/IBL5/pull/101#discussion_r3",
+            "createdAt": "2026-10-10T09:00:00Z"
+           }
+          ]
+         }
+        },
+        {
+         "id": "T4",
+         "isResolved": false,
+         "isOutdated": false,
+         "path": "ibl5/classes/Foo/Bar.php",
+         "line": 10,
+         "comments": {
+          "nodes": [
+           {
+            "author": {
+             "login": "dependabot[bot]",
+             "__typename": "Bot"
+            },
+            "body": "finding body",
+            "url": "https://github.com/a-jay85/IBL5/pull/101#discussion_r4",
+            "createdAt": "2026-10-10T09:00:00Z"
+           }
+          ]
+         }
+        },
+        {
+         "id": "T5",
+         "isResolved": false,
+         "isOutdated": false,
+         "path": "ibl5/classes/Foo/Bar.php",
+         "line": 10,
+         "comments": {
+          "nodes": [
+           {
+            "author": {
+             "login": "github-advanced-security",
+             "__typename": "Bot"
+            },
+            "body": "finding body",
+            "url": "https://github.com/a-jay85/IBL5/pull/101#discussion_r5",
+            "createdAt": "2026-10-10T09:00:00Z"
+           }
+          ]
+         }
+        },
+        {
+         "id": "T6",
+         "isResolved": false,
+         "isOutdated": false,
+         "path": "ibl5/classes/Foo/Bar.php",
+         "line": 10,
+         "comments": {
+          "nodes": [
+           {
+            "author": {
+             "login": "random-stranger",
+             "__typename": "User"
+            },
+            "body": "finding body",
+            "url": "https://github.com/a-jay85/IBL5/pull/101#discussion_r6",
+            "createdAt": "2026-10-10T09:00:00Z"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   }
+  }
+ }
+}

@@ -251,7 +251,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500;
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertTrue($result->isValid());
@@ -272,7 +272,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 103; // Veteran minimum
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert - Allowed because player salary is vet min
         $this->assertTrue($result->isValid());
@@ -295,7 +295,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500;
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -318,7 +318,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500;
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -340,7 +340,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500;
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -363,7 +363,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500; // Would push to 7300, over HARD_CAP_MAX
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -387,7 +387,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500; // Over vet min (103)
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -598,11 +598,11 @@ class WaiversWideUnitTest extends WideUnitTestCase
     public function testValidatorClearsErrorsBetweenValidations(): void
     {
         // Each call returns an independent result — no shared state
-        $failedResult = $this->validator->validateAdd(null, 5, 5000, 500);
+        $failedResult = $this->validator->validateAdd(null, 5, 5, 5000, 500, \League\ContractRules::getVeteranMinimumSalary(10));
         $this->assertNotSame([], $failedResult->getErrors());
 
         // Act - Second validation passes — completely independent result
-        $result = $this->validator->validateAdd(100, 5, 5000, 500);
+        $result = $this->validator->validateAdd(100, 5, 5, 5000, 500, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert - Independent result carries no errors from the prior call
         $this->assertTrue($result->isValid());
@@ -711,7 +711,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
     public function testClaimBlockedWhenRosterFull(): void
     {
         // Act
-        $result = $this->validator->validateAdd(100, 0, 5000, 500);
+        $result = $this->validator->validateAdd(100, 0, 0, 5000, 500, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -728,7 +728,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
     public function testClaimBlockedWhenOverCapWithHealthyRoster(): void
     {
         // Act - 3 slots = 12 healthy players, total 6800+500=7300 > 7000
-        $result = $this->validator->validateAdd(100, 3, 6800, 500);
+        $result = $this->validator->validateAdd(100, 3, 3, 6800, 500, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -745,7 +745,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
     public function testClaimAllowedAtVetMinWhenUnderRosterMinimum(): void
     {
         // Act - 5 slots = 10 healthy players (<12), at cap but vet min salary
-        $result = $this->validator->validateAdd(100, 5, 7000, 103);
+        $result = $this->validator->validateAdd(100, 5, 5, 7000, 103, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertTrue($result->isValid());

@@ -139,10 +139,8 @@ class WaiversProcessor implements WaiversProcessorInterface
 
         if ($season->isOffseasonPhase()) {
             $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerDataObj);
-            $experience = ($playerDataObj->yearsOfExperience ?? 0) + 1;
         } else {
             $currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($playerDataObj);
-            $experience = $playerDataObj->yearsOfExperience ?? 0;
         }
 
         $hasExistingContract = $currentSeasonSalary > 0;
@@ -154,12 +152,23 @@ class WaiversProcessor implements WaiversProcessorInterface
             ];
         }
 
-        $vetMinSalary = $this->calculateVeteranMinimumSalary($experience);
+        $vetMinSalary = $this->calculateVeteranMinimumSalary($this->resolveContractExperience($playerData, $season));
 
         return [
             'hasExistingContract' => false,
             'salary' => $vetMinSalary
         ];
+    }
+
+    /**
+     * Experience used for contract math: one extra year during the offseason phase.
+     *
+     * @param PlayerRow $playerData
+     */
+    private function resolveContractExperience(array $playerData, Season $season): int
+    {
+        $yearsOfExperience = PlayerDataConverter::arrayToPlayerData($playerData)->yearsOfExperience ?? 0;
+        return $season->isOffseasonPhase() ? $yearsOfExperience + 1 : $yearsOfExperience;
     }
 
     /**
@@ -214,7 +223,7 @@ class WaiversProcessor implements WaiversProcessorInterface
      *
      * @return array{success: bool, result?: string, error?: string}
      */
-    public function processAdd(?int $playerID, string $teamName, int $healthyRosterSlots, int $totalSalary): array
+    public function processAdd(?int $playerID, string $teamName, int $openRosterSlots, int $healthyRosterSlots, int $totalSalary): array
     {
         if ($playerID === null || $playerID === 0) {
             return ['success' => false, 'error' => "You didn't select a valid player. Please select a player and try again."];
@@ -230,7 +239,16 @@ class WaiversProcessor implements WaiversProcessorInterface
         $contractData = $this->determineContractData($player, $season);
         $playerSalary = $contractData['salary'];
 
-        $addValidation = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $veteranMinimum = $this->calculateVeteranMinimumSalary($this->resolveContractExperience($player, $season));
+
+        $addValidation = $this->validator->validateAdd(
+            $playerID,
+            $openRosterSlots,
+            $healthyRosterSlots,
+            $totalSalary,
+            $playerSalary,
+            $veteranMinimum
+        );
         if (!$addValidation->isValid()) {
             return ['success' => false, 'error' => implode(' ', $addValidation->getErrors())];
         }

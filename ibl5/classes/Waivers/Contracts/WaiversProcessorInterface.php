@@ -121,7 +121,9 @@ interface WaiversProcessorInterface
      * Validates, determines contract, writes to DB, creates news story,
      * sends email, posts Discord notification, and audits.
      *
+     * @param int $openRosterSlots Open roster spots counting injured players (15 minus every rostered player)
+     * @param int $healthyRosterSlots Healthy roster slots available; drives only the 12-healthy hard-cap rule
      * @return array{success: bool, result?: string, error?: string}
      */
-    public function processAdd(?int $playerID, string $teamName, int $healthyRosterSlots, int $totalSalary): array;
+    public function processAdd(?int $playerID, string $teamName, int $openRosterSlots, int $healthyRosterSlots, int $totalSalary): array;
 }

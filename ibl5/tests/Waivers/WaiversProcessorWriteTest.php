@@ -117,7 +117,7 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessAddReturnsErrorForNullPlayerID(): void
     {
-        $result = $this->processor->processAdd(null, 'Test Team', 5, 3000);
+        $result = $this->processor->processAdd(null, 'Test Team', 5, 5, 3000);
 
         self::assertFalse($result['success']);
         self::assertStringContainsString('valid player', $result['error'] ?? '');
@@ -127,7 +127,7 @@ class WaiversProcessorWriteTest extends TestCase
     {
         $this->playerLookupRepoStub->method('getPlayerByID')->willReturn(null);
 
-        $result = $this->processor->processAdd(999, 'Test Team', 5, 3000);
+        $result = $this->processor->processAdd(999, 'Test Team', 5, 5, 3000);
 
         self::assertFalse($result['success']);
         self::assertSame('Player not found.', $result['error'] ?? '');
@@ -147,7 +147,7 @@ class WaiversProcessorWriteTest extends TestCase
         ]);
         $validatorMock = $this->createMock(WaiversValidatorInterface::class);
         $validatorMock->expects($this->once())->method('validateAdd')
-            ->with(1, 5, 3000, \League\ContractRules::getVeteranMinimumSalary(3))
+            ->with(1, 4, 5, 3000, \League\ContractRules::getVeteranMinimumSalary(3), \League\ContractRules::getVeteranMinimumSalary(3))
             ->willReturn(ValidationResult::failure('stop'));
         $processor = new WaiversProcessor(
             $this->repoStub,
@@ -160,7 +160,75 @@ class WaiversProcessorWriteTest extends TestCase
             new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class))
         );
 
-        $result = $processor->processAdd(1, 'Test Team', 5, 3000);
+        $result = $processor->processAdd(1, 'Test Team', 4, 5, 3000);
+
+        self::assertFalse($result['success']);
+    }
+
+    /**
+     * Offseason (Draft / Free Agency) contracts use one extra year of experience, so the
+     * validator's veteran minimum comes from exp + 1.
+     */
+    public function testProcessAddPassesOffseasonVeteranMinimumToValidator(): void
+    {
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
+            'name' => 'Test Player', 'pid' => 1, 'exp' => 3,
+            'cy' => 0, 'cyt' => 0,
+            'salary_yr1' => 0, 'salary_yr2' => 0, 'salary_yr3' => 0,
+            'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0,
+        ]);
+        $validatorMock = $this->createMock(WaiversValidatorInterface::class);
+        $validatorMock->expects($this->once())->method('validateAdd')
+            ->with(1, 5, 5, 3000, \League\ContractRules::getVeteranMinimumSalary(4), \League\ContractRules::getVeteranMinimumSalary(4))
+            ->willReturn(ValidationResult::failure('stop'));
+        $season = new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class));
+        $season->phase = 'Free Agency';
+        $processor = new WaiversProcessor(
+            $this->repoStub,
+            $this->teamIdentityRepoStub,
+            $this->playerLookupRepoStub,
+            $validatorMock,
+            $this->newsServiceStub,
+            self::createStub(\mysqli::class),
+            null,
+            $season
+        );
+
+        $result = $processor->processAdd(1, 'Test Team', 5, 5, 3000);
+
+        self::assertFalse($result['success']);
+    }
+
+    /**
+     * A player with an existing contract hands that salary to the validator, and the
+     * veteran minimum still comes from the player's own experience.
+     */
+    public function testProcessAddPassesExistingContractSalaryAndOwnVeteranMinimum(): void
+    {
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
+            'name' => 'Test Player', 'pid' => 1, 'exp' => 2,
+            'cy' => 1, 'cyt' => 2,
+            'salary_yr1' => 500, 'salary_yr2' => 500, 'salary_yr3' => 0,
+            'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0,
+        ]);
+        $validatorMock = $this->createMock(WaiversValidatorInterface::class);
+        $validatorMock->expects($this->once())->method('validateAdd')
+            ->with(1, 5, 5, 3000, 500, \League\ContractRules::getVeteranMinimumSalary(2))
+            ->willReturn(ValidationResult::failure('stop'));
+        $season = new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class));
+        $season->phase = 'Regular Season';
+        $processor = new WaiversProcessor(
+            $this->repoStub,
+            $this->teamIdentityRepoStub,
+            $this->playerLookupRepoStub,
+            $validatorMock,
+            $this->newsServiceStub,
+            self::createStub(\mysqli::class),
+            null,
+            $season
+        );
+
+        $result = $processor->processAdd(1, 'Test Team', 5, 5, 3000);
 
         self::assertFalse($result['success']);
     }
@@ -172,7 +240,7 @@ class WaiversProcessorWriteTest extends TestCase
         ]);
         $this->validatorStub->method('validateAdd')->willReturn(ValidationResult::failure('Full roster'));
 
-        $result = $this->processor->processAdd(1, 'Test Team', 0, 3000);
+        $result = $this->processor->processAdd(1, 'Test Team', 0, 0, 3000);
 
         self::assertFalse($result['success']);
         self::assertStringContainsString('Full roster', $result['error'] ?? '');
@@ -186,7 +254,7 @@ class WaiversProcessorWriteTest extends TestCase
         $this->validatorStub->method('validateAdd')->willReturn(ValidationResult::success());
         $this->teamIdentityRepoStub->method('getTeamByName')->willReturn(null);
 
-        $result = $this->processor->processAdd(1, 'Fake Team', 5, 3000);
+        $result = $this->processor->processAdd(1, 'Fake Team', 5, 5, 3000);
 
         self::assertFalse($result['success']);
         self::assertSame('Team not found.', $result['error'] ?? '');
@@ -201,7 +269,7 @@ class WaiversProcessorWriteTest extends TestCase
         $this->teamIdentityRepoStub->method('getTeamByName')->willReturn(['team_name' => 'Test Team', 'teamid' => 1]);
         $this->repoStub->method('signPlayerFromWaivers')->willReturn(false);
 
-        $result = $this->processor->processAdd(1, 'Test Team', 5, 3000);
+        $result = $this->processor->processAdd(1, 'Test Team', 5, 5, 3000);
 
         self::assertFalse($result['success']);
         self::assertStringContainsString('something went wrong', $result['error'] ?? '');
@@ -216,7 +284,7 @@ class WaiversProcessorWriteTest extends TestCase
         $this->teamIdentityRepoStub->method('getTeamByName')->willReturn(['team_name' => 'Test Team', 'teamid' => 1]);
         $this->repoStub->method('signPlayerFromWaivers')->willReturn(true);
 
-        $result = $this->processor->processAdd(1, 'Test Team', 5, 3000);
+        $result = $this->processor->processAdd(1, 'Test Team', 5, 5, 3000);
 
         self::assertTrue($result['success']);
         self::assertSame('player_added', $result['result'] ?? '');

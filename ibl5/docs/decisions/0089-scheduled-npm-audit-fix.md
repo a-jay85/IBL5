@@ -51,7 +51,7 @@ plain npm `/ibl5` block, so IBL6's dependencies are kept current alongside ibl5'
 
 Scope narrowed to `ibl5/IBLbot` only. The `ibl5` entry is retired in favour of the bun-only lockfile collapse (ADR-0101); `IBL6` was already retired by ADR-0095.
 
-## Addendum — audit-js line references (2026-10-20)
+## Addendum: audit-js line references (2026-10-20)
 
 The Context cites `tests.yml:183-205` for the `audit-js` job and `tests.yml:691-697` for the aggregate gate. Today `audit-js` starts at `tests.yml:236` and the "Tests and Analysis" job is at `tests.yml:1094`. The workflow file grew since 2026-07-21, and `audit-js` now runs `bun install --frozen-lockfile` plus `bun audit` (ADR-0101, ADR-0186).
 

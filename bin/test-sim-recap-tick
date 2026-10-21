@@ -590,6 +590,16 @@ srt_run
 srt_log_has "$STUB" tick.out "sim 42: agent cost unavailable" \
     "agent_cost_unavailable — garbage output yields the fallback line"
 
+# A duration that breaks the arithmetic must hit the fallback, not log a blank line.
+srt_reset; srt_claim42
+printf '%s\n' '{"type":"result","total_cost_usd":1,"num_turns":1,"duration_ms":"1 2","usage":{}}' \
+    > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out "sim 42: agent cost unavailable" \
+    "agent_cost_unavailable — failed formatting yields the fallback line"
+srt_log_lacks "$STUB" tick.out "agent cost \$" \
+    "agent_cost_unavailable — failed formatting logs no partial cost line"
+
 # ── cause_usage_limit_epoch_form ──────────────────────────────────────────────
 srt_reset; srt_claim42
 printf 'Claude AI usage limit reached|1791000000\n' > "$STUB/agent-output"

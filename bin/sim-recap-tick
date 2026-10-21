@@ -595,9 +595,11 @@ log_agent_cost() { # sim
         return 0
     fi
     IFS=$'\t' read -r cost turns dur_ms in_tok cr_tok cw_tok out_tok <<< "$row"
-    log "$(printf 'sim %s: agent cost $%.2f, turns %s, duration %ss, input %s (cache read %s, cache write %s), output %s tokens, model %s' \
+    local line
+    line="$(printf 'sim %s: agent cost $%.2f, turns %s, duration %ss, input %s (cache read %s, cache write %s), output %s tokens, model %s' \
         "$sim" "$cost" "$turns" "$((${dur_ms%.*} / 1000))" "$in_tok" "$cr_tok" "$cw_tok" "$out_tok" "$SIM_RECAP_MODEL")" \
-        || log "sim $sim: agent cost unavailable"
+        || { log "sim $sim: agent cost unavailable"; return 0; }
+    log "$line"
     return 0
 }
 

@@ -112,11 +112,12 @@ cat > "$STUB/claude" <<STUBEOF
 #!/bin/bash
 pwd -P > "$TMP/claude.cwd"
 echo "\$#" > "$TMP/claude.argc"
-printf '%s' "\$1" > "$TMP/claude.prompt"
+if [ "\$1" = "-p" ]; then cat > "$TMP/claude.prompt"; else printf '%s' "\$1" > "$TMP/claude.prompt"; fi
 printf '%s\n' "\$@" >> "$TMP/claude.args"
 # CLAUDE_STUB_EFFECT / CLAUDE_STUB_REPLY are test-only: a script to run, a file to print.
 if [ -n "\${CLAUDE_STUB_EFFECT-}" ]; then bash "\$CLAUDE_STUB_EFFECT"; fi
 if [ -n "\${CLAUDE_STUB_REPLY-}" ]; then cat "\$CLAUDE_STUB_REPLY"; fi
+if [ -n "\${CLAUDE_STUB_STDERR-}" ]; then echo "\$CLAUDE_STUB_STDERR" >&2; fi
 exit 0
 STUBEOF
 cat > "$STUB/gh" <<STUBEOF
@@ -273,7 +274,7 @@ hl_reset() {
     git -C "$WTC" reset -q --hard "$TIP"
     git -C "$WTC" clean -fdq
     git -C "$MAIN" update-ref "refs/remotes/origin/$B_CONFLICT" "$INIT_SHA"
-    unset CLAUDE_STUB_REPLY CLAUDE_STUB_EFFECT
+    unset CLAUDE_STUB_REPLY CLAUDE_STUB_EFFECT CLAUDE_STUB_STDERR
 }
 no_merge() { ! git -C "$WTC" rev-parse -q --verify MERGE_HEAD >/dev/null; }
 origin_branch() { git --git-dir="$TMP/origin.git" rev-parse "refs/heads/$B_CONFLICT" 2>/dev/null || echo none; }
@@ -281,6 +282,7 @@ printf 'SUMMARY: kept both\nRESOLVED\n' > "$TMP/reply-resolved"
 printf 'SUMMARY: gave up\nFAILED\n' > "$TMP/reply-failed"
 printf 'printf "feature\\nmaster\\n" > a.txt\ngit add a.txt\n' > "$TMP/effects/resolve.sh"
 printf 'git update-ref "refs/remotes/origin/%s" HEAD\n' "$B_CONFLICT" > "$TMP/effects/moveref.sh"
+printf 'printf "feature\\nmaster\\n" > a.txt\ngit add a.txt\nprintf stray > stray.txt\n' > "$TMP/effects/untracked.sh"
 
 # 14
 hl_reset
@@ -374,6 +376,25 @@ need "stderr names moved refs" has_s "$ERR" "session moved refs"
 need "ref restored" test "$(git -C "$WTC" rev-parse "refs/remotes/origin/$B_CONFLICT")" = "$INIT_SHA"
 need "no MERGE_HEAD" no_merge
 case_end headless-moved-ref
+
+# 21b: a stray untracked file outside the remit aborts the run
+hl_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/untracked.sh"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "stderr names the stray path (got: $ERR)" has_s "$ERR" "session touched stray.txt outside its remit"
+need "no MERGE_HEAD" no_merge
+case_end headless-untracked-outside-remit
+
+# 21c: the prompt arrives on stdin, and stderr noise after RESOLVED does not flip the verdict
+hl_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/resolve.sh"
+export CLAUDE_STUB_STDERR="warning: late stderr line"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "prompt read from stdin" has_s "$PROMPT" "Headless remit"
+need "prompt is not an argv element" test "$(grep -c 'Headless remit' "$TMP/claude.args")" = 0
+case_end headless-stdin-and-stderr
 
 # 22
 hl_reset

@@ -156,6 +156,12 @@ if [ "$HEADLESS" = 1 ]; then
     ARGV=(claude -p --model claude-sonnet-5-5 --max-turns 100 --max-budget-usd 5
         --permission-prompts none --allowedTools "$ALLOWED" --tools "$ALLOWED"
         --disallowedTools "$DENIED")
+    # The prompt goes on stdin: the tool flags above are variadic, so a trailing positional
+    # prompt could be read as one more tool name. FIX_TIMEOUT mirrors harness conflict_fix.
+    FIX_TIMEOUT=1500
+    TMO=()
+    if command -v timeout >/dev/null 2>&1; then TMO=(timeout "$FIX_TIMEOUT")
+    elif command -v gtimeout >/dev/null 2>&1; then TMO=(gtimeout "$FIX_TIMEOUT"); fi
     if [ "$DRY_RUN" = 1 ]; then
         echo "argv:"
         printf '%s\n' "${ARGV[@]}"
@@ -182,7 +188,10 @@ if [ "$HEADLESS" = 1 ]; then
     CONFLICTED0="$(git -C "$WT" diff --name-only --diff-filter=U)"
     BRANCH_PATHS="$(git -C "$WT" diff --name-only "origin/master...$HEAD0")"
     cd "$WT"
-    REPLY="$("${ARGV[@]}" "$PROMPT" 2>&1)" || true
+    ERRLOG="$(mktemp "${TMPDIR:-/tmp}/postplan-fix-stderr.XXXXXX")"
+    trap 'rm -f "$ERRLOG"' EXIT
+    # stdout only: a stderr warning after the final message must not replace the verdict.
+    REPLY="$(printf '%s\n' "$PROMPT" | ${TMO[@]+"${TMO[@]}"} "${ARGV[@]}" 2>"$ERRLOG")" || true
     LAST="$(printf '%s\n' "$REPLY" | sed '/^[[:space:]]*$/d' | tail -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     SUMMARY="$(printf '%s\n' "$REPLY" | tr -cd '[:print:]\n' | sed '/^[[:space:]]*$/d' | tail -n 3 | tr '\n' ' ' | cut -c1-300)"
     fix_abort() {
@@ -223,19 +232,29 @@ if [ "$HEADLESS" = 1 ]; then
         fix_abort "unresolved paths remain"
     fi
     # Remit: a changed path must be conflicted, a branch path, a test path, or
-    # identical to origin/master (a clean master-side change from the merge).
+    # identical to origin/master (a clean master-side change from the merge). An
+    # untracked path is a new file, so the origin/master shortcut never applies to it.
+    remit_ok() {
+        case $'\n'"$CONFLICTED0"$'\n'"$BRANCH_PATHS"$'\n' in
+            *$'\n'"$1"$'\n'*) return 0 ;;
+        esac
+        case "$1" in
+            ibl5/tests/*|bin/test-*|tools/postplan-harness/tests/*) return 0 ;;
+        esac
+        return 1
+    }
     while IFS= read -r p; do
         [ -n "$p" ] || continue
-        case $'\n'"$CONFLICTED0"$'\n'"$BRANCH_PATHS"$'\n' in
-            *$'\n'"$p"$'\n'*) continue ;;
-        esac
-        case "$p" in
-            ibl5/tests/*|bin/test-*|tools/postplan-harness/tests/*) continue ;;
-        esac
+        remit_ok "$p" && continue
         git -C "$WT" diff --quiet origin/master -- "$p" && continue
         fix_abort "session touched $p outside its remit"
-    done < <(git -C "$WT" diff --name-only HEAD)
-    git -C "$WT" add -u
+    done < <(git -C "$WT" -c core.quotepath=off diff --name-only HEAD)
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        remit_ok "$p" && continue
+        fix_abort "session touched $p outside its remit"
+    done < <(git -C "$WT" -c core.quotepath=off ls-files --others --exclude-standard)
+    git -C "$WT" add -A
     if ! COMMIT_OUT="$(git -C "$WT" commit --no-edit 2>&1)"; then
         printf '%s\n' "$COMMIT_OUT" >&2
         echo "postplan-fix: commit refused; the merge is still in progress with your staged resolution. Finish by hand in $WT" >&2

@@ -681,7 +681,16 @@ class LiveGit:
         excludes = [f":(exclude){p}" for p in exempt]
         kept = self._run_bytes("diff", f"{master_sha}...{pre_rebase_sha}", "--", ".", *excludes)
         regen = self._run_bytes("diff", master_sha, "HEAD", "--", *exempt)
-        Path(lostwork_pre_path(key)).write_bytes(kept + regen)
+        path = Path(lostwork_pre_path(key))
+        old = path.read_bytes() if path.exists() else None
+        path.write_bytes(kept + regen)
+
+        def undo():
+            if old is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(old)
+        return undo
 
     def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
                              lostwork_path, conflicted, proof_out, regen_exempt=()):

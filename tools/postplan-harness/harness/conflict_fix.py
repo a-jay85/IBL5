@@ -128,6 +128,18 @@ def _fix_prompt(ctx: LadderContext, proof_out: str, branch_paths) -> str:
     )
 
 
+def _restore_refs(ctx: LadderContext, before: str, after: str) -> None:
+    """Put every branch and remote-tracking ref back to its pre-session value, so a moved
+    origin/<branch> cannot shift the base a later --force-with-lease push checks."""
+    old = dict(l.rsplit(" ", 1) for l in before.splitlines() if " " in l)
+    new = dict(l.rsplit(" ", 1) for l in after.splitlines() if " " in l)
+    for ref, sha in old.items():
+        if new.get(ref) != sha:
+            ctx.run("update-ref", ref, sha, check=False)
+    for ref in new.keys() - old.keys():
+        ctx.run("update-ref", "-d", ref, check=False)
+
+
 def make_fix_rung(branch: str) -> Rung:
     def fn(ctx: LadderContext, proof_out: str) -> RungAttempt:
         if not ctx.state_dir:
@@ -145,7 +157,9 @@ def make_fix_rung(branch: str) -> Rung:
                               "refs/heads", "refs/remotes")
         untracked_before = _untracked(ctx)
         branch_paths = ctx.run(
-            "diff", "--name-only", f"{ctx.master_sha}...{ctx.pre_rebase_sha}").split()
+            "diff", "--name-only", "-z",
+            f"{ctx.master_sha}...{ctx.pre_rebase_sha}").split("\0")
+        branch_paths = [p for p in branch_paths if p]
         Path(_stage_dir(ctx.key)).mkdir(parents=True, exist_ok=True)
         reply = ctx.llm.call_tooled(
             FIX_PURPOSE, FIX_MODEL, _fix_prompt(ctx, proof_out, branch_paths),
@@ -161,6 +175,7 @@ def make_fix_rung(branch: str) -> Rung:
                              "refs/heads", "refs/remotes")
         if refs_after != refs_before:
             differing = sorted(set(refs_before.splitlines()) ^ set(refs_after.splitlines()))
+            _restore_refs(ctx, refs_before, refs_after)
             raise RuntimeError(f"session moved refs: {differing[0] if differing else '?'}: "
                                f"{summary}")
         if ctx.run("rev-parse", "HEAD") != head_before:
@@ -170,8 +185,8 @@ def make_fix_rung(branch: str) -> Rung:
         if last_line != "RESOLVED":
             raise RuntimeError(f"session ended {last_line or 'without verdict'}: {summary}")
 
-        touched = sorted(set(ctx.run("diff", "--name-only", "HEAD").split())
-                         | (_untracked(ctx) - untracked_before))
+        tracked = [p for p in ctx.run("diff", "--name-only", "-z", "HEAD").split("\0") if p]
+        touched = sorted(set(tracked) | (_untracked(ctx) - untracked_before))
         generated = {g.path for g in GENERATED_FILES}
         for path in touched:
             if not touch_allowed(path, branch_paths, ctx.conflicted_files, generated):
@@ -183,9 +198,14 @@ def make_fix_rung(branch: str) -> Rung:
             if ctx.extend_pre_patch is None:
                 raise RuntimeError(
                     f"test edits outside the branch need the pre-patch seam: {summary}")
-            ctx.extend_pre_patch(tuple(extra_tests))
+            seam = ctx.extend_pre_patch
+            # The seam reads the adapted tests from HEAD, so it must run after the
+            # ladder amends them into the merge commit, not while they are uncommitted.
+            after_amend = lambda: seam(tuple(extra_tests))
+        else:
+            after_amend = None
 
         if not touched:
             return RungAttempt(False, (), f"session made no change: {summary}")
-        return RungAttempt(True, tuple(touched), summary)
+        return RungAttempt(True, tuple(touched), summary, after_amend=after_amend)
     return (RUNG_FIX, fn)

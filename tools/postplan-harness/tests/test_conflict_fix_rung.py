@@ -140,6 +140,7 @@ def test_fix_rung_blocks_moved_remote_ref(tmp_path, key):
     assert out.rung == ""
     assert out.trail[0].startswith("sonnet-fix: session moved refs: ")
     assert "refs/remotes/origin/feat" in out.trail[0]
+    assert _git(d, "rev-parse", "refs/remotes/origin/feat").stdout.strip() == pre
     _assert_untouched(d, merge)
 
 
@@ -164,6 +165,7 @@ def test_fix_rung_blocks_new_branch(tmp_path, key):
     out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
     assert out.rung == ""
     assert out.trail[0].startswith("sonnet-fix: session moved refs: refs/heads/rogue")
+    assert not _git(d, "branch", "--list", "rogue").stdout
     _assert_untouched(d, merge)
 
 
@@ -191,6 +193,39 @@ def test_fix_rung_allows_master_test_edit_and_extends_pre_patch(tmp_path, key):
     assert out.rung == "sonnet-fix"
     assert seam == [("ibl5/tests/FooTest.php",)]
     assert "ibl5/tests/FooTest.php" in out.resolved_files
+
+
+def test_fix_rung_seam_runs_after_amend_and_undoes_on_failed_proof(tmp_path, key):
+    def effect(cwd):
+        _edit_keepme(cwd)
+        (Path(cwd) / "ibl5/tests/FooTest.php").write_text("<?php // adapted to the branch\n")
+
+    d, pre, master, merge, llm, ctx, _ = _fix_ladder(
+        tmp_path, key, _OK_REPLY, effect, repo=_a_repo_with_master_test)
+    seen, undone = [], []
+
+    def seam(paths):
+        seen.append(_git(d, "show", "HEAD:ibl5/tests/FooTest.php").stdout)
+        return lambda: undone.append(paths)
+
+    ctx = dataclasses.replace(ctx, extend_pre_patch=seam,
+                              prove=lambda: (False, "LOST: still missing\n"))
+    out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
+    assert out.rung == ""
+    assert seen == ["<?php // adapted to the branch\n"]
+    assert undone == [("ibl5/tests/FooTest.php",)]
+
+
+def test_fix_rung_handles_paths_with_spaces(tmp_path, key):
+    def effect(cwd):
+        _edit_keepme(cwd)
+        (Path(cwd) / "ibl5/tests").mkdir(parents=True, exist_ok=True)
+        (Path(cwd) / "ibl5/tests/Foo Bar.php").write_text("<?php\n")
+
+    d, pre, master, merge, llm, ctx, seam = _fix_ladder(tmp_path, key, _OK_REPLY, effect)
+    out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
+    assert out.rung == "sonnet-fix", out.trail
+    assert seam == [("ibl5/tests/Foo Bar.php",)]
 
 
 def test_fix_rung_test_edit_without_seam_fails(tmp_path, key):

@@ -93,7 +93,11 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
         $injuries = $this->enrichInjuriesWithCurrentTeam($rawInjuries, $playerMap);
         $trades   = $this->getSimTrades($start, $end);
         $boxLines = $this->getPlayedBoxLines($start, $end);
-        $games    = $this->attachGameDetails($this->getGameFacts($start, $end), $boxLines, $injuries);
+        $games    = $this->attachGameDetails(
+            $this->getGameFacts($start, $end),
+            $boxLines,
+            $this->getWindowInjuries($start, $end)
+        );
 
         $keepSet = [];
         foreach ($boxLines as $line) {
@@ -234,6 +238,48 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
     }
 
     /**
+     * Injuries dated inside [start, end], including ones already healed by the
+     * window end. Feeds the per-game injury lists; active_injuries only holds
+     * injuries still open at $end.
+     *
+     * @return list<array{pid:int,name:string,date:string,injuryDescription:string,injuryGamesMissed:int}>
+     */
+    private function getWindowInjuries(string $start, string $end): array
+    {
+        $dateExpr = LastSimRecapRepository::TRANSACTION_DATE_SQL;
+
+        // $dateExpr is a fixed SQL fragment built from column refs and constants
+        // (no user input); concatenate rather than interpolate.
+        $sql = "SELECT t.pid,
+                       p.name,
+                       " . $dateExpr . " AS injury_date,
+                       t.injury_description,
+                       t.injury_games_missed
+                FROM `ibl_jsb_transactions` t
+                JOIN `ibl_plr` p ON p.pid = t.pid
+                WHERE t.transaction_type = 1
+                  AND t.injury_games_missed IS NOT NULL
+                  AND " . $dateExpr . " BETWEEN ? AND ?
+                ORDER BY injury_date ASC, t.id ASC";
+
+        /** @var list<array{pid:int,name:string,injury_date:string,injury_description:string|null,injury_games_missed:int}> $rows */
+        $rows = $this->fetchAll($sql, "ss", $start, $end);
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'pid'               => $row['pid'],
+                'name'              => $row['name'],
+                'date'              => $row['injury_date'],
+                'injuryDescription' => $row['injury_description'] ?? '',
+                'injuryGamesMissed' => $row['injury_games_missed'],
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Played schedule rows in the window, with names and the box-score ordinal.
      * Unplayed (0-0) rows are dropped. game_of_that_day comes from
      * ibl_box_scores_teams (MIN over the two team rows) and is null when the
@@ -349,7 +395,7 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
      *
      * @param list<GameRow> $games
      * @param list<BoxLine> $boxLines
-     * @param list<InjuryRow> $injuries
+     * @param list<array{pid:int,name:string,date:string,injuryDescription:string,injuryGamesMissed:int}> $injuries
      * @return list<GameFact>
      */
     private function attachGameDetails(array $games, array $boxLines, array $injuries): array

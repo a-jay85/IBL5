@@ -186,6 +186,16 @@ the first error is raised and every wrapped call in the same process makes a
 single attempt for the next 300 seconds. Each retry logs one warning on the
 `harness.netretry` logger.
 
+`gh pr create` also gets one retry after a GitHub API rate-limit error
+(`API rate limit exceeded` or `API rate limit already exceeded`). The harness
+reads the GraphQL reset time with `gh api rate_limit`, waits until two seconds
+after it, then lists open PRs for the head branch. A PR it finds is returned
+without a second create. Otherwise the create runs once more. A reset more than
+15 minutes away, an unreadable reset, a failed listing, or a second rate-limit
+error fails the run with the original `gh` error plus a note that names the rate
+limit and the reset time. The wait never reads or trips the 300-second outage
+latch. Other gh calls fail on a rate limit as before.
+
 The wrapped calls are `LiveGit.fetch_base`, the lease `ls-remote`, `push` and
 `push_ff` in `harness/adapters/gitad.py`, the fetch and `ls-remote` helpers in
 `harness/gitutil.py`, and `LiveGh._gh` in `harness/adapters/ghad.py`.

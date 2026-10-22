@@ -347,7 +347,7 @@ final class RefreshTeamSeasonRecordsDedupeTest extends DatabaseTestCase
     private function windowFor(FranchiseHistoryRepository $repo, array $names): array
     {
         $byName = [];
-        foreach ($repo->getFiveSeasonWindowRows(self::REGULAR_YEAR) as $row) {
+        foreach ($repo->getFiveSeasonWindowRows(2099) as $row) {
             $byName[$row['currentname']] = [
                 'wins' => (int) $row['five_season_wins'],
                 'losses' => (int) $row['five_season_losses'],

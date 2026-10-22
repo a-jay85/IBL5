@@ -53,6 +53,10 @@ test.describe('Records flow', () => {
     const headerText = await page.locator('.ibl-data-table thead').first().textContent();
     // [rendered] first table thead: 'POINTS'. PHP-emitted static label — env-independent.
     expect(headerText).toContain('POINTS');
+
+    // CI seed box scores always yield stat rows; an empty or stale tab fails here.
+    await expect(page.locator('.stat-table tbody tr').first()).toBeVisible();
+    await expect(page.locator('.value-cell').first()).toHaveText(/^\s*\d+(\.\d+)?\s*$/);
   });
 
   test('unknown tab falls back to All-Time', async ({ page }) => {

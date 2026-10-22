@@ -1254,8 +1254,9 @@ jobs:
           fi
           git commit -q -m "chore(vr-pages): prune ${REMOVED:-0} dir(s), migrate ${MIGRATED:-0} dir(s), gc blobs (7d age + 150-dir cap)"
           # Same shared-ref contention as the per-SHA deploy above: in-flight PR VR
-          # jobs push to gh-pages while we work, so a rejected push is contention and
-          # a rebase-then-retry resolves it.
+          # jobs push to gh-pages while we work, so a rejected push is usually
+          # contention and a rebase-then-retry resolves it. Migration rewrites index.html
+          # in place, so a rebase can also conflict; that fails the step cleanly instead.
           for attempt in 1 2 3; do
             if ! ./master-scripts/bin/check-vr-gallery-refs --root . > "$RUNNER_TEMP/vr-refs.txt"; then
               cat "$RUNNER_TEMP/vr-refs.txt"
@@ -1267,7 +1268,13 @@ jobs:
               exit 0
             fi
             echo "gh-pages push rejected (attempt ${attempt}/3) — rebasing onto the updated ref."
-            git pull --rebase origin gh-pages
+            # --migrate rewrites <sha>/visual-review/index.html in place, so a concurrent
+            # publish of the same SHA can conflict. Abort so the checkout is not left mid-rebase.
+            if ! git pull --rebase origin gh-pages; then
+              git rebase --abort || true
+              echo "::error::Rebase onto gh-pages conflicted (a concurrent publish touched a migrated gallery); gh-pages left unchanged. The next master push recomputes."
+              exit 1
+            fi
           done
           echo "::error::gh-pages cleanup push failed after 3 attempts."
           exit 1

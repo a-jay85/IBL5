@@ -86,8 +86,19 @@ while IFS= read -r dir; do
     case "$path" in (*.png) ;; (*) continue ;; esac
     refs=$(( refs + 1 ))
     if [[ ! -f "$dir/visual-review/$path" ]]; then
-      echo "DANGLING $b/visual-review/index.html -> $value"
-      dangling=$(( dangling + 1 ))
+      # vr-gallery.ts HTML-escapes names (& < > "), and vr-dedupe-gallery leaves a
+      # ref it cannot match byte-for-byte alone, so an unmigrated ref may carry
+      # entities for a file that exists under the decoded name. &amp; goes last.
+      decoded="$path"
+      case "$path" in
+        (*'&'*)
+          decoded="$(printf '%s\n' "$path" | sed -e 's/&quot;/"/g' -e 's/&lt;/</g' -e 's/&gt;/>/g' -e 's/&amp;/\&/g')"
+          ;;
+      esac
+      if [[ ! -f "$dir/visual-review/$decoded" ]]; then
+        echo "DANGLING $b/visual-review/index.html -> $value"
+        dangling=$(( dangling + 1 ))
+      fi
     fi
   done < <(awk "$EXTRACT_AWK" "$index")
 done < <(find "$root" -mindepth 1 -maxdepth 1 -type d | sort)

@@ -255,6 +255,22 @@ h_eq "refs-check-skips-external-and-pr: exit 0" "0" "$RC"
 h_contains "refs-check-skips-external-and-pr: OK line" "$OUT" "OK dirs=1"
 
 # ---------------------------------------------------------------------------
+# Case: refs-check-decodes-entities
+# vr-gallery.ts HTML-escapes names; an unmigrated ref x&amp;y.png points at x&y.png.
+# ---------------------------------------------------------------------------
+ROOT="$TMP/entity-root"
+VR="$ROOT/$SHA1/visual-review"
+mkdir -p "$VR"
+printf 'amp-bytes' > "$VR/x&y.after.png"
+printf '<html><body><img src="x&amp;y.after.png"></body></html>\n' > "$VR/index.html"
+run "$REFS" --root "$ROOT"
+h_eq "refs-check-decodes-entities: exit 0" "0" "$RC"
+h_eq "refs-check-decodes-entities: OK line" "OK dirs=1 refs=1" "$OUT"
+rm -f "$VR/x&y.after.png"
+run "$REFS" --root "$ROOT"
+h_eq "refs-check-decodes-entities: missing file still dangling" "1" "$RC"
+
+# ---------------------------------------------------------------------------
 # Case: rejects-bad-flags
 # ---------------------------------------------------------------------------
 ROOT="$TMP/flags-root"

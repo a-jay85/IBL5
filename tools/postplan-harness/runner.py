@@ -3707,6 +3707,9 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             log(f"phase2: {line}")
         if conflict_resolved.collapse_warn:
             log(f"phase2: {conflict_resolved.collapse_warn}")
+        res.retries.update(getattr(git, "conflict_review_retries", {}) or {})
+        if res.retries.get("conflict-review"):
+            log("phase2: conflict-review re-asked once (first reply carried no verdict token)")
     sha = git.head()
     if conflict_resolved is not None:
         auto_files = (f"; auto-resolved conflict in {', '.join(conflict_resolved.resolved_files)}"

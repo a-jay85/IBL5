@@ -214,7 +214,7 @@ describe('buildPrBodyBlock', () => {
     const spot = makeSpot({ title: 'a', sideFile: 'changed/a.1.side.png', stackFile: 'changed/a.1.stack.png' });
     const out = block({ spots: [spot] });
     const lines = out.split('\n');
-    const pic = lines.findIndex((l) => l.startsWith('<picture>'));
+    const pic = lines.findIndex((l) => l.includes('<picture>'));
     expect(lines[pic]).toBe(pairPicture(`${PAGES_URL}changed/a.1.side.png`, `${PAGES_URL}changed/a.1.stack.png`, 'a before and after'));
     // Its own paragraph: blank lines on both sides.
     expect([lines[pic - 1], lines[pic + 1]]).toEqual(['', '']);
@@ -402,14 +402,14 @@ describe('upsertAgentShots', () => {
     expect(e).not.toContain('**Before**');
     expect(e).not.toContain(agentShotUrl(SHOT_SHA, 'a', 'before'));
     // The end marker sits after a blank line, outside the <picture> paragraph.
-    expect(e).toMatch(/<\/picture>\n\n<!-- \/vr-agent-shot -->$/);
+    expect(e).toMatch(/<\/picture><\/a>\n\n<!-- \/vr-agent-shot -->$/);
   });
 });
 
 describe('pairPicture', () => {
   it('14a: desktop source is the side-by-side, the fallback img is the stack', () => {
     expect(pairPicture('S.png', 'T.png', 'x')).toBe(
-      '<picture><source media="(min-width: 768px)" srcset="S.png"><img src="T.png" alt="x"></picture>'
+      '<a href="S.png"><picture><source media="(min-width: 768px)" srcset="S.png"><img src="T.png" alt="x"></picture></a>'
     );
     expect(PAIR_MEDIA).toBe('(min-width: 768px)');
   });

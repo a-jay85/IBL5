@@ -42,12 +42,13 @@ export interface ChangedSpot {
 
 // Desktop-wide screens get the side-by-side composite (before left), narrow ones
 // the stacked composite (before above). GitHub's sanitizer keeps <source media>
-// with a width query (checked on PR #2950). One line, its own paragraph.
+// with a width query (checked on PR #2950). One line, its own paragraph. The
+// link opens the full-size side-by-side, since the column scales it down.
 export const PAIR_MEDIA = '(min-width: 768px)';
-export const PAIR_CAPTION = '_Before = red band · After = green band_';
+export const PAIR_CAPTION = '_Before: left or top, red band · After: right or bottom, green band_';
 
 export function pairPicture(sideUrl: string, stackUrl: string, alt: string): string {
-  return `<picture><source media="${PAIR_MEDIA}" srcset="${sideUrl}"><img src="${stackUrl}" alt="${alt}"></picture>`;
+  return `<a href="${sideUrl}"><picture><source media="${PAIR_MEDIA}" srcset="${sideUrl}"><img src="${stackUrl}" alt="${alt}"></picture></a>`;
 }
 
 // Lowercase, collapse runs outside [a-z0-9] to '-', trim '-', cut to 60; empty => null.

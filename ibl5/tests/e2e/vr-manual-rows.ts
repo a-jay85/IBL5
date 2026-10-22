@@ -213,7 +213,7 @@ export function buildManualSection(results: ManualRowResult[], pagesUrl: string)
       if (r.beforeStatus === 'ok' && r.composed === true) {
         const side = manualShotUrl(pagesUrl, r.label, 'side');
         const stack = manualShotUrl(pagesUrl, r.label, 'stack');
-        lines.push('_Before (base) = red band · After (PR) = green band_', '');
+        lines.push('_Before (base): left or top, red band · After (PR): right or bottom, green band_', '');
         lines.push(pairPicture(side, stack, `${r.label} before and after`), '');
         continue;
       }

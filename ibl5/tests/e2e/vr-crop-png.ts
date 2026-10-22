@@ -88,7 +88,7 @@ export function composePair(before: Buffer, after: Buffer, layout: PairLayout): 
     ? Math.max(a.height, b.height) + PAIR_BAND
     : a.height + b.height + 2 * PAIR_BAND + PAIR_GAP;
   const dst = new PNG({ width, height });
-  fill(dst, { x: 0, y: 0, w: width, h: height }, [255, 255, 255]);
+  dst.data.fill(255); // opaque white
 
   const bx = side ? a.width + PAIR_GAP : 0;
   const by = side ? 0 : a.height + PAIR_BAND + PAIR_GAP;

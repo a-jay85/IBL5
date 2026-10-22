@@ -305,9 +305,10 @@ describe('manual-row before/after', () => {
       PAGES_URL
     );
     expect(md).toContain(
-      '<picture><source media="(min-width: 768px)" ' +
+      `<a href="${PAGES_URL}manual-rows/team-page.side.png">` +
+        '<picture><source media="(min-width: 768px)" ' +
         `srcset="${PAGES_URL}manual-rows/team-page.side.png">` +
-        `<img src="${PAGES_URL}manual-rows/team-page.stack.png" alt="team-page before and after"></picture>`
+        `<img src="${PAGES_URL}manual-rows/team-page.stack.png" alt="team-page before and after"></picture></a>`
     );
     expect(md).not.toContain('team-page.before.png');
     expect(md).not.toContain(`(${PAGES_URL}manual-rows/team-page.png)`);

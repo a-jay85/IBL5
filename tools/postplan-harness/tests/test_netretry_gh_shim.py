@@ -19,6 +19,9 @@ from harness.state import Finding, HarnessError
 
 EOF_MSG = 'Post "https://api.github.com/graphql": EOF'
 TLS_MSG = "net/http: TLS handshake timeout"
+# Verbatim from /tmp/post-plan-now-gm-digest-league-rules-20261020-143516-68382.log
+RATE_MSG = "GraphQL: API rate limit already exceeded for user ID 10329097."
+FAKE_NOW = 1_800_000_000.0
 
 SHIM = f"""#!{sys.executable}
 import json, os, sys
@@ -69,6 +72,8 @@ elif args[0] == "api" and args[1].endswith("/reviews"):
 elif key == "pr view" and "--json" in args:
     field = opt("--json")
     out = json.dumps({{field: [{{"body": b}} for b in state.get(field, [])]}})
+elif key == "api rate_limit":
+    out = os.environ.get("GH_SHIM_RESET", "")
 elif key == "issue create":
     out = "https://github.com/a-jay85/IBL5-backlog/issues/9"
 if land_then_fail:
@@ -106,7 +111,7 @@ def shim(tmp_path, monkeypatch):
     monkeypatch.setenv("GH_SHIM_LOG", str(log))
     monkeypatch.setenv("GH_SHIM_STATE", str(state))
     for var in ("GH_SHIM_FAIL_ONCE", "GH_SHIM_LAND_THEN_FAIL", "GH_SHIM_ALWAYS_FAIL",
-                "GH_SHIM_ALWAYS_MSG", "GH_SHIM_MSG"):
+                "GH_SHIM_ALWAYS_MSG", "GH_SHIM_MSG", "GH_SHIM_RESET"):
         monkeypatch.delenv(var, raising=False)
     g = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
     return g, log, state
@@ -161,6 +166,19 @@ def test_pr_create_snapshot_failure_is_single_attempt(shim, monkeypatch, sleeps)
         g.pr_create("chore: t", "body", "master")
     assert ei.value.kind == "gh"
     assert _lines(log, "pr create") == 1
+    assert sleeps == []
+
+
+def test_pr_create_non_rate_limit_error_is_single_attempt(shim, monkeypatch, sleeps):
+    g, log, _ = shim
+    monkeypatch.setenv("GH_SHIM_ALWAYS_FAIL", "pr create")
+    monkeypatch.setenv("GH_SHIM_ALWAYS_MSG", "HTTP 422: Unprocessable Entity")
+    monkeypatch.setenv("GH_SHIM_RESET", str(int(FAKE_NOW) + 60))
+    with pytest.raises(HarnessError) as ei:
+        g.pr_create("chore: t", "body", "master")
+    assert ei.value.kind == "gh"
+    assert _lines(log, "pr create") == 1
+    assert _lines(log, "api rate_limit") == 0
     assert sleeps == []
 
 

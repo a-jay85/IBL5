@@ -60,13 +60,14 @@ jobs:
       fingerprint: ${{ steps.eval.outputs.fingerprint }}
       comment_body: ${{ steps.eval.outputs.comment_body }}
     steps:
-      # Check out the PR HEAD (not the default refs/pull/N/merge) with full
-      # history, so the fingerprint is the PR's own diff against its merge base.
-      - name: Checkout the PR head (shared classifier lib + diff fingerprint)
+      # Check out the PR HEAD (not the default refs/pull/N/merge), shallow. The
+      # eval step deepens history only for a feat: PR holding the label, so the
+      # fingerprint is the PR's own diff against its merge base.
+      - name: Checkout the PR head (shared classifier lib)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+          fetch-depth: 1
       - name: Evaluate human sign-off and the approved-diff fingerprint
         id: eval
         env:
@@ -87,22 +88,29 @@ jobs:
           # Every failure below leaves FP or COMMENTS empty/absent, and
           # hs_eval_approval turns that into a red gate for a feat: PR holding
           # the label. Non-feat PRs never read either value.
-          if ! git fetch --no-tags --quiet origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"; then
-            echo "::warning::could not fetch origin/$BASE_REF"
-          fi
+          # Only a feat: PR holding the label reads FP or COMMENTS. Every other
+          # PR skips the deep fetch, the diff, and the comment read.
           FP=""
-          if FP=$(hs_diff_fingerprint "origin/$BASE_REF" "$HEAD_SHA"); then
-            echo "Diff fingerprint: $FP (origin/$BASE_REF...$HEAD_SHA)"
-          else
-            FP=""
-            echo "Diff fingerprint: unavailable (origin/$BASE_REF...$HEAD_SHA)"
-          fi
-
           COMMENTS="$RUNNER_TEMP/hs-comments.json"
-          if ! { gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/comments" > "$RUNNER_TEMP/hs-pages.json" \
-                 && jq 'add // []' "$RUNNER_TEMP/hs-pages.json" > "$COMMENTS"; }; then
-            rm -f "$COMMENTS"
-            echo "Comment read failed; a feat: PR holding the label will fail closed"
+          if hs_is_feat_title "$TITLE" && printf '%s' ",$LABELS," | grep -q ',human-approved,'; then
+            if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+              git fetch --no-tags --quiet --unshallow origin || echo "::warning::could not deepen history"
+            fi
+            if ! git fetch --no-tags --quiet origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"; then
+              echo "::warning::could not fetch origin/$BASE_REF"
+            fi
+            if FP=$(hs_diff_fingerprint "origin/$BASE_REF" "$HEAD_SHA"); then
+              echo "Diff fingerprint: $FP (origin/$BASE_REF...$HEAD_SHA)"
+            else
+              FP=""
+              echo "Diff fingerprint: unavailable (origin/$BASE_REF...$HEAD_SHA)"
+            fi
+
+            if ! { gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/comments" > "$RUNNER_TEMP/hs-pages.json" \
+                   && jq 'add // []' "$RUNNER_TEMP/hs-pages.json" > "$COMMENTS"; }; then
+              rm -f "$COMMENTS"
+              echo "Comment read failed; a feat: PR holding the label will fail closed"
+            fi
           fi
 
           hs_eval_approval "$ACTION" "$EVENT_LABEL" "$TITLE" "$LABELS" "$FP" "$COMMENTS" || true

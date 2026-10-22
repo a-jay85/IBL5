@@ -247,7 +247,7 @@ mode_name() {
     fi
 }
 
-# Rotation state is written only by a real, unpinned run; --print-prompt never writes it.
+# Rotation state is written (and the run lock taken) only by a real, unpinned run (never --print-prompt).
 state_is_writable() { [ "$DRY_RUN" -eq 0 ] && [ -z "$SLICE" ] && [ "$MODE" != "prompt" ]; }
 
 # ── Rotation state (Phase 2) ──────────────────────────────────────────────────

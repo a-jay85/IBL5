@@ -134,6 +134,10 @@ class DepthChartSubmissionHandlerSplitCharacterizationTest extends WideUnitTestC
         $this->assertSame([], $this->getExecutedQueries());
     }
 
+    /**
+     * Mutation pin (pre-split master line numbers): deleting the `if ($teamName === '')`
+     * block at :79-86 makes the handler call getTidFromTeamname(''), which fails the never() expectation.
+     */
     #[DataProvider('strippedToEmptyProvider')]
     public function testRejectsSessionTeamThatStripsToEmptyWithNoTeamidLookup(string $sessionTeam): void
     {
@@ -173,6 +177,10 @@ class DepthChartSubmissionHandlerSplitCharacterizationTest extends WideUnitTestC
         $this->assertSame([], $this->getExecutedQueries());
     }
 
+    /**
+     * Mutation pin (pre-split master line numbers): deleting the `!$rosterResult->isValid()`
+     * return at :111-118 lets the foreign pid reach saveDepthChart.
+     */
     public function testRosterRejectionRendersValidatorErrorsAndWritesNothing(): void
     {
         $roster = $this->roster(15);
@@ -209,6 +217,10 @@ class DepthChartSubmissionHandlerSplitCharacterizationTest extends WideUnitTestC
         $this->assertSame([], $audit->records);
     }
 
+    /**
+     * Mutation pin (pre-split master line numbers): deleting the `!$validation->isValid()`
+     * return at :121-128 writes 15 UPDATE ibl_plr rows for an invalid lineup.
+     */
     public function testPhaseValidationRejectionRendersValidatorErrorsAndWritesNothing(): void
     {
         $roster = $this->roster(15);

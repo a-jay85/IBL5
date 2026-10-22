@@ -60,6 +60,18 @@ class TeamModeGuesserTest extends TestCase
         self::assertSame(TeamMode::Rebuild, $worst->mode);
     }
 
+    /**
+     * Same mid-table roster, opposite records: the record alone flips the mode.
+     */
+    public function testRecordDecidesForAMidTableRoster(): void
+    {
+        $winning = $this->guesser->guess(self::inputs(wins: 30, losses: 10, priorWins: 50, priorLosses: 32, rank: 14));
+        $losing = $this->guesser->guess(self::inputs(wins: 10, losses: 30, priorWins: 32, priorLosses: 50, rank: 14));
+
+        self::assertSame(TeamMode::WinNow, $winning->mode);
+        self::assertSame(TeamMode::Rebuild, $losing->mode);
+    }
+
     public function testGuessKeepsItsInputs(): void
     {
         $inputs = self::inputs(wins: 1, losses: 2, priorWins: 3, priorLosses: 4, rank: 5);

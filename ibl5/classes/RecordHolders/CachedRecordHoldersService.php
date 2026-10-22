@@ -12,7 +12,8 @@ use RecordHolders\Contracts\RecordHoldersServiceInterface;
  *
  * Wraps an inner service and caches the getAllRecords() result via DatabaseCacheInterface.
  * On cache hit, returns data from the cache without calling the inner service.
- * On cache miss or expiration, delegates to the inner service and stores the result.
+ * On expiration, serves the stale entry; the cron calls rebuildCache() to refresh it.
+ * On a cold miss (no row at all), delegates to the inner service and stores the result.
  *
  * @phpstan-import-type AllRecordsData from RecordHoldersServiceInterface
  */
@@ -20,8 +21,6 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
 {
     private const CACHE_KEY = 'record_holders';
     private const TTL_SECONDS = 86400; // 24 hours
-    private const LOCK_KEY = 'record_holders_rebuild';
-    private const LOCK_TIMEOUT_SECONDS = 10;
 
     private RecordHoldersServiceInterface $inner;
     private DatabaseCacheInterface $cache;
@@ -33,13 +32,13 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
     }
 
     /**
-     * Serve-stale-first, single-flight cold build.
+     * Serve-stale-first read.
      *
-     * 1. Fresh hit → return it.
-     * 2. Expired entry present → serve the stale value immediately; the cron (rebuildCache)
+     * 1. Fresh hit: return it.
+     * 2. Expired entry present: serve the stale value immediately. The cron (rebuildCache)
      *    is the refresher, so no heavy inline rebuild happens on a user's request.
-     * 3. Cold/empty → only the request that wins the single-flight lock rebuilds inline;
-     *    concurrent requests fall through to an empty structure (thundering-herd guard).
+     * 3. Cold (no row at all): build inline from the inner service, store it, return it.
+     *    Two concurrent cold requests may both build; the cache write is idempotent.
      *
      * @return AllRecordsData
      */
@@ -57,62 +56,10 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
             return $stale;
         }
 
-        if ($this->cache->acquireLock(self::LOCK_KEY, self::LOCK_TIMEOUT_SECONDS)) {
-            try {
-                // Another request may have built the entry while we waited for the lock.
-                $again = $this->cache->get(self::CACHE_KEY);
-                if ($again !== null) {
-                    /** @var AllRecordsData $again */
-                    return $again;
-                }
+        $records = $this->inner->getAllRecords();
+        $this->cache->set(self::CACHE_KEY, $records, self::TTL_SECONDS);
 
-                $records = $this->inner->getAllRecords();
-                $this->cache->set(self::CACHE_KEY, $records, self::TTL_SECONDS);
-
-                return $records;
-            } finally {
-                $this->cache->releaseLock(self::LOCK_KEY);
-            }
-        }
-
-        // Lock timed out — degrade: serve whatever a concurrent builder produced, else empty.
-        $again = $this->cache->get(self::CACHE_KEY);
-        if ($again !== null) {
-            /** @var AllRecordsData $again */
-            return $again;
-        }
-
-        return $this->emptyRecords();
-    }
-
-    /**
-     * Empty AllRecordsData structure served when the cache is cold and the single-flight
-     * lock could not be acquired (a concurrent request is already rebuilding).
-     *
-     * @return AllRecordsData
-     */
-    private function emptyRecords(): array
-    {
-        return [
-            'playerSingleGame' => [
-                'regularSeason' => [],
-                'playoffs' => [],
-                'heat' => [],
-            ],
-            'quadrupleDoubles' => [],
-            'allStarRecord' => [
-                'name' => '',
-                'pid' => null,
-                'teams' => '',
-                'teamTids' => '',
-                'amount' => 0,
-                'years' => '',
-            ],
-            'playerFullSeason' => [],
-            'teamGameRecords' => [],
-            'teamSeasonRecords' => [],
-            'teamFranchise' => [],
-        ];
+        return $records;
     }
 
     /**

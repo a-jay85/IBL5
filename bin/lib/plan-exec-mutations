@@ -260,6 +260,13 @@ fi
 # --- executor modes --------------------------------------------------------
 
 [ -n "$ROOT" ] || ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || usage
+if [ -n "$PLAN" ]; then
+    # Resolve before the cd: a relative plan path would point at the wrong file.
+    case "$PLAN" in
+        /*) : ;;
+        *) PLAN="$(cd "$(dirname "$PLAN")" && pwd)/$(basename "$PLAN")" ;;
+    esac
+fi
 cd "$ROOT" || usage
 GITDIR=$(git rev-parse --absolute-git-dir 2>/dev/null) || usage
 JDIR="$GITDIR/exec-mutations"

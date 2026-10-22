@@ -60,16 +60,22 @@ class GoogleSheetRefreshWorker
         $processed = 0;
         $failures = 0;
         $exportRows = null;
+        $buildFailure = null;
         foreach ($rows as $row) {
             if ($this->clock->now() - $start >= $budgetSeconds) {
                 break;
             }
 
-            try {
-                $exportRows ??= $this->export->buildRows();
-            } catch (\Throwable $e) {
-                $this->connections->markRefreshed($row['user_id'], 'error', 'internal: ' . $e::class);
-                $this->logger?->error('google sheet export rows build failed', ['exception' => $e::class]);
+            if ($buildFailure === null) {
+                try {
+                    $exportRows ??= $this->export->buildRows();
+                } catch (\Throwable $e) {
+                    $buildFailure = $e::class;
+                    $this->logger?->error('google sheet export rows build failed', ['exception' => $buildFailure]);
+                }
+            }
+            if ($buildFailure !== null) {
+                $this->connections->markRefreshed($row['user_id'], 'error', 'internal: ' . $buildFailure);
                 $out('user_id=' . $row['user_id'] . ' status=' . GoogleSheetExportService::RESULT_ERROR);
                 $processed++;
                 $failures++;

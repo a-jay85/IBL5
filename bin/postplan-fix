@@ -188,8 +188,8 @@ if [ "$HEADLESS" = 1 ]; then
         echo "postplan-fix: merge of origin/master failed without a conflict state" >&2
         exit 1
     fi
-    CONFLICTED0="$(git -C "$WT" diff --name-only --diff-filter=U)"
-    BRANCH_PATHS="$(git -C "$WT" diff --name-only "origin/master...$HEAD0")"
+    CONFLICTED0="$(git -C "$WT" -c core.quotepath=off diff --name-only --diff-filter=U)"
+    BRANCH_PATHS="$(git -C "$WT" -c core.quotepath=off diff --name-only "origin/master...$HEAD0")"
     cd "$WT"
     ERRLOG="$(mktemp "${TMPDIR:-/tmp}/postplan-fix-stderr.XXXXXX")"
     trap 'rm -f "$ERRLOG"' EXIT

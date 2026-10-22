@@ -216,27 +216,6 @@ def _apply_corrections(text: str, facts: BodyNumberFacts, body_adr_count: int) -
     return text
 
 
-def body_prose_for_check(body: str) -> str:
-    """Return body with both protected spans deleted and the result stripped.
-
-    Feeds the LLM body-check prompt: the model sees prose only, never the
-    machine-generated files-changed block or the runner-owned Manual Testing section.
-    Empty or whitespace-only input returns "".
-    """
-    if not body or not body.strip():
-        return ""
-    spans = sorted(_protected_spans(body))
-    parts: list[str] = []
-    pos = 0
-    for start, end in spans:
-        if pos < start:
-            parts.append(body[pos:start])
-        pos = end
-    if pos < len(body):
-        parts.append(body[pos:])
-    return "".join(parts).strip()
-
-
 def correct_body_numbers(body: str, name_status: str, numstat: str) -> str:
     """Rewrite wrong numbers in *body* to match ground-truth facts from the git outputs.
 

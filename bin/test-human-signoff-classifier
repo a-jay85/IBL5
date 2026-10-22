@@ -557,6 +557,7 @@ for t_title in "feat: x" "fix: x"; do
     done
     tbl "$AM_WF" edited "$t_title" - y - run
     tbl "$AM_WF" edited "$t_title" - b - skip
+    tbl "$AM_WF" edited "$t_title" - r - run
 done
 tbl "$AM_WF" opened "fix: x" - m - skip
 

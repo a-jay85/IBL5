@@ -215,6 +215,8 @@ expect_added_bad shape3-one-stage "$SH3"
 expect_added_bad shape3-tr-newline "echo \"\$x\" $PIPE tr ' ' '\\n' $PIPE $GQ -qx y"
 expect_added_bad shape3-two-stages "echo \"\$x\" $PIPE tr A-Z a-z $PIPE sed s/a/b/ $PIPE $GQ -q y"
 expect_added_bad shape3-printf-producer "printf '%s\\n' \"\$x\" $PIPE tr a b $PIPE $GQ -q y"
+expect_added_bad shape3-stderr-redirect-stage "echo \"\$x\" $PIPE tr a b 2>&1 $PIPE $GQ -q y"
+expect_added_bad shape3-amp-redirect-stage "echo \"\$x\" $PIPE tr a b &>/dev/null $PIPE $GQ -q y"
 
 # Decision: an aggregating stage (wc -l) drains the producer, so this exact line
 # cannot exit 141, but the gate stays conservative and flags it anyway.
@@ -236,6 +238,8 @@ expect_added_ok or-join-passes "echo \"\$x\" $PIPE$PIPE $GQ -q y"
 expect_added_ok stage-or-join-passes "echo \"\$x\" $PIPE tr a b $PIPE$PIPE $GQ -q y"
 expect_added_ok stage-grep-c-passes "echo \"\$x\" $PIPE tr a b $PIPE $GQ -c y"
 expect_added_ok stage-comment-passes "  # $SH3"
+expect_added_ok trailing-comment-passes "echo \"\$x\" $PIPE $GQ -c y  # not $PIPE $GQ -q"
+expect_added_ok backtick-eq-passes "[ \`echo \"\$x\" $PIPE $GQ -c y\` -eq 1 ]"
 
 # ── Scope: file kind, location, deletion ─────────────────────────────────────
 

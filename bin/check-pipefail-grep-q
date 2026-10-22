@@ -8,7 +8,12 @@
 #
 # What the gate flags: an added line under bin/ that pipes echo or printf into a grep
 # from the quiet family (-q, -qF, -Eq, -qx, --quiet, --silent), in a file that sets
-# pipefail. grep -c is never flagged: it reads to EOF, so its producer never gets SIGPIPE.
+# pipefail. The quiet flag may follow the pattern (grep -F "$p" -q), and the pipe may
+# pass through other stages first (echo "$x" | tr a b | grep -q y). An aggregating
+# stage such as wc -l is flagged too, even though it drains the producer; rewriting
+# it costs one line. grep -c is never flagged: it reads to EOF, so its producer never
+# gets SIGPIPE. Only echo and printf count as producers. The matcher is quote-blind
+# (see the comment above BAD_RE), so some quoted forms are missed.
 #
 # Only lines this branch adds are read, so older sites never block a PR. One exception:
 # when an added line is itself the pipefail setting and the file did not set pipefail at
@@ -81,15 +86,18 @@ SET_RE='^[[:space:]]*set([[:space:]]+[-+][A-Za-z]+([[:space:]]+[a-z]+)?)*[[:spac
 # Quiet-grep matcher, Bash 3.2 ERE only (no \s, \b, lookaround, non-greedy).
 # Producer: echo or printf, with any arguments up to the first single pipe.
 # Stages: zero or more intermediate pipeline stages (tr, sed, wc, ...). A stage
-#   holds no pipe and no ; & ( ) and must end on a non-pipe character, so a
-#   || join never reads as a pipe followed by an empty stage.
+#   holds no pipe, # (a trailing comment) or ; & ( ), except the >& and &>
+#   redirects, and must end on a non-pipe character, so a || join never reads
+#   as a pipe followed by an empty stage.
 # Grep args: any tokens between grep and the quiet flag, so a pattern operand
-#   may precede -q. A token never holds | ; & ( ) ` , never starts with # (a comment), and is never a bare --, so a
-#   -q after -- (a file operand) or after a closing ) (a test's -eq) is not
-#   read as grep's quiet flag.
+#   may precede -q. A token never holds | ; & ( ) or a backtick, never starts
+#   with # (a comment), and is never a bare --, so a -q after -- (a file
+#   operand) or after a closing ) (a test's -eq) is not read as grep's quiet flag.
+# The matcher does not parse quotes. A quoted ; & ( ) | or # inside a stage or a
+#   grep pattern ends the match early, so those lines are missed, never flagged.
 # Quiet: --quiet, --silent, or a short-flag cluster holding q (-q, -qF, -Eq).
 BAD_PRODUCER_RE='(^|[^[:alnum:]_.-])(echo|printf)[[:space:]]([^|]*[^|\\])?'
-BAD_STAGE_RE='[|][^|;&()]*[^|;&()\\]'
+BAD_STAGE_RE='[|]([^|;&()#]|>&|&>)*[^|;&()#\\]'
 BAD_ARG_RE='[[:space:]]+(-[^-[:space:]|;&()`][^[:space:]|;&()`]*|--[^[:space:]|;&()`]+|[^-#[:space:]|;&()`][^[:space:]|;&()`]*)'
 BAD_QUIET_RE='[[:space:]]+(--quiet|--silent|-[A-Za-z]*q)'
 BAD_RE="${BAD_PRODUCER_RE}(${BAD_STAGE_RE})*[|][[:space:]]*grep(${BAD_ARG_RE})*${BAD_QUIET_RE}"

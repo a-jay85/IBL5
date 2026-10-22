@@ -299,7 +299,7 @@ wt_sync_base() {
 }
 
 # Mint the one backup-branch name: backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>.
-# Slug first so a GC can pair the backup with its PR branch; dated so names
+# Slug first so a person can pair the backup with its PR branch; dated so names
 # never collide across runs. <reason> is kebab-case (pre-rebase, presquash,
 # local). A "/" in <slug> (feat/foo) flattens to "-" so the slug stays one ref
 # path component. Prints the name and returns 0; the caller runs `git branch`:

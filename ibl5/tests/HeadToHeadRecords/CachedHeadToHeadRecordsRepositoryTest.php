@@ -45,9 +45,10 @@ final class CachedHeadToHeadRecordsRepositoryTest extends TestCase
         $payload = $this->minimalPayload('franchises', 'regular', 'current');
 
         $cache = new H2hInMemoryCache();
-        $cache->set('h2h_records:franchises:regular:current', $payload, 86400);
+        $cache->set('h2h_records:franchises:regular:current', ['fingerprint' => 'fp', 'payload' => $payload], 86400);
 
         $inner = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
+        $inner->method('sourceFingerprint')->willReturn('fp');
         $inner->expects($this->never())->method('buildFranchisesMatrix');
         $inner->expects($this->never())->method('buildTeamsMatrix');
         $inner->expects($this->never())->method('buildGmsMatrix');
@@ -73,6 +74,7 @@ final class CachedHeadToHeadRecordsRepositoryTest extends TestCase
         $cache = new H2hInMemoryCache();
 
         $inner = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
+        $inner->method('sourceFingerprint')->willReturn('fp');
         $inner->expects($this->once())
             ->method('buildTeamsMatrix')
             ->with('playoffs', 'all')
@@ -87,6 +89,7 @@ final class CachedHeadToHeadRecordsRepositoryTest extends TestCase
         $stored = $cache->getStoredEntry('h2h_records:teams:playoffs:all');
         $this->assertNotNull($stored);
         $this->assertSame(86400, $stored['ttl']);
+        $this->assertSame(['fingerprint' => 'fp', 'payload' => $payload], $stored['data']);
     }
 
     // ---------------------------------------------------------------------------
@@ -146,10 +149,11 @@ final class CachedHeadToHeadRecordsRepositoryTest extends TestCase
         $franchisesRegularCurrent = $this->minimalPayload('franchises', 'regular', 'current');
         $teamsHeatAll             = $this->minimalPayload('teams', 'heat', 'all');
 
-        $cache->set('h2h_records:franchises:regular:current', $franchisesRegularCurrent, 86400);
-        $cache->set('h2h_records:teams:heat:all', $teamsHeatAll, 86400);
+        $cache->set('h2h_records:franchises:regular:current', ['fingerprint' => 'fp', 'payload' => $franchisesRegularCurrent], 86400);
+        $cache->set('h2h_records:teams:heat:all', ['fingerprint' => 'fp', 'payload' => $teamsHeatAll], 86400);
 
         $inner = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
+        $inner->method('sourceFingerprint')->willReturn('fp');
         // Inner must NOT be called for either key since both are cache hits.
         $inner->expects($this->never())->method('buildFranchisesMatrix');
         $inner->expects($this->never())->method('buildTeamsMatrix');
@@ -183,7 +187,7 @@ final class CachedHeadToHeadRecordsRepositoryTest extends TestCase
     /**
      * Fresh payload the inner repository returns on a recompute.
      *
-     * @return array<string, mixed>
+     * @return array{axis: list<never>, records: array<string, array<string, array{wins: int, losses: int}>>}
      */
     private function freshPayload(): array
     {
@@ -307,6 +311,27 @@ final class CachedHeadToHeadRecordsRepositoryTest extends TestCase
 
         $this->assertSame(24, $inner->buildCalls);
     }
+
+    /**
+     * An envelope whose payload is not an array (a corrupt cache row) is a miss.
+     */
+    public function testEnvelopeWhosePayloadIsNotAnArrayIsTreatedAsMiss(): void
+    {
+        $fresh = $this->freshPayload();
+
+        $cache = new H2hInMemoryCache();
+        $cache->set('h2h_records:franchises:all:current', ['fingerprint' => 'fp-live', 'payload' => 'corrupt'], 86400);
+
+        $inner = new H2hFakeInnerRepository();
+        $inner->payload     = $fresh;
+        $inner->fingerprint = 'fp-live';
+
+        $repo   = new CachedHeadToHeadRecordsRepository($inner, $cache);
+        $result = $repo->buildFranchisesMatrix('all', 'current');
+
+        $this->assertSame($fresh['records'], $result['records'] ?? null);
+        $this->assertSame(1, $inner->buildCalls);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -393,33 +418,31 @@ class H2hInMemoryCache implements DatabaseCacheInterface
 /**
  * Inner-repository fake: returns one configurable payload for every builder,
  * counts builder calls, and reports a configurable source fingerprint.
+ *
+ * @phpstan-import-type AxisEntry from HeadToHeadRecordsRepositoryInterface
+ * @phpstan-import-type MatchupRecord from HeadToHeadRecordsRepositoryInterface
+ * @phpstan-import-type MatrixPayload from HeadToHeadRecordsRepositoryInterface
  */
 class H2hFakeInnerRepository implements HeadToHeadRecordsRepositoryInterface
 {
     public string $fingerprint = 'fp-live';
     public int $buildCalls = 0;
-    /** @var array<string, mixed> */
-    public array $payload = [];
+    /** @var array{axis: list<AxisEntry>, records: array<array-key, array<array-key, MatchupRecord>>} */
+    public array $payload = ['axis' => [], 'records' => []];
 
-    /** @return array<string, mixed> */
     public function buildFranchisesMatrix(string $phase, string $scope): array
     {
-        $this->buildCalls++;
-        return $this->payload + ['dimension' => 'franchises', 'phase' => $phase, 'scope' => $scope];
+        return $this->build('franchises', $phase, $scope);
     }
 
-    /** @return array<string, mixed> */
     public function buildTeamsMatrix(string $phase, string $scope): array
     {
-        $this->buildCalls++;
-        return $this->payload + ['dimension' => 'teams', 'phase' => $phase, 'scope' => $scope];
+        return $this->build('teams', $phase, $scope);
     }
 
-    /** @return array<string, mixed> */
     public function buildGmsMatrix(string $phase, string $scope): array
     {
-        $this->buildCalls++;
-        return $this->payload + ['dimension' => 'gms', 'phase' => $phase, 'scope' => $scope];
+        return $this->build('gms', $phase, $scope);
     }
 
     public function currentSeasonHasGames(): bool
@@ -430,5 +453,17 @@ class H2hFakeInnerRepository implements HeadToHeadRecordsRepositoryInterface
     public function sourceFingerprint(): string
     {
         return $this->fingerprint;
+    }
+
+    /**
+     * @return MatrixPayload
+     */
+    private function build(string $dimension, string $phase, string $scope): array
+    {
+        $this->buildCalls++;
+
+        /** @var MatrixPayload $payload */
+        $payload = $this->payload + ['dimension' => $dimension, 'phase' => $phase, 'scope' => $scope];
+        return $payload;
     }
 }

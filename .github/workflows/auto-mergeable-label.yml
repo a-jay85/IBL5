@@ -16,12 +16,13 @@ name: Auto-mergeable Label
 #
 # Job-level skip (ADR 0210): the job skips a labeled/unlabeled event for any
 # label other than `human-approved` and `auto-mergeable`, and an `edited` event
-# that did not change the title. The verdict reads only auto_merge, the title,
-# and those two labels, so none of its inputs moved and the previous real run
-# already set the label. A base edit still runs: a PR retargeted onto master
-# never ran this workflow before, so no earlier run set its label. Skipped runs get a per-run concurrency group so they
-# never cancel a real queued run (ADR-0145). bin/test-human-signoff-classifier
-# asserts the `if:` and the group carry the same predicate.
+# that changed neither the title nor the base. The verdict reads only
+# auto_merge, the title, and those two labels, so none of its inputs moved and
+# the previous real run already set the label. A base edit still runs: a PR
+# retargeted onto master never ran this workflow before, so no earlier run set
+# its label. Skipped runs get a per-run concurrency group so they never cancel
+# a real queued run (ADR-0145). bin/test-human-signoff-classifier asserts the
+# `if:` and the group carry the same predicate.
 
 on:
   pull_request:

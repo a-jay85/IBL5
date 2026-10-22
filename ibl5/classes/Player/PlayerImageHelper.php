@@ -19,12 +19,17 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     private const PLACEHOLDER_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg==';
 
     /**
-     * Per-request cache of photo-file existence, keyed by player ID.
+     * Photo file extensions, in lookup order. A player with both files gets the first.
+     */
+    private const PHOTO_EXTENSIONS = ['jpg', 'png'];
+
+    /**
+     * Per-request cache of each player's photo extension (null = no photo), keyed by player ID.
      * A PHP request is one process, so a static array lives exactly one request.
      *
-     * @var array<int, bool>
+     * @var array<int, string|null>
      */
-    private static array $photoExistsCache = [];
+    private static array $photoExtensionCache = [];
 
     /**
      * Test-only override for the photo directory (absolute path, trailing slash).
@@ -36,7 +41,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
      * Generate a safe player image URL
      * 
      * Validates that playerID is a valid positive integer before generating the URL.
-     * Returns a data URI placeholder (1x1 transparent pixel) if playerID is missing, null, or invalid, or if images/player/<pid>.jpg does not exist on disk.
+     * Returns a data URI placeholder (1x1 transparent pixel) if playerID is missing, null, or invalid, or if neither images/player/<pid>.jpg nor <pid>.png exists on disk.
      * This approach prevents 404 errors entirely.
      * 
      * @param int|float|string|null $playerID The player's ID to use in the image path
@@ -65,11 +70,12 @@ class PlayerImageHelper implements PlayerImageHelperInterface
             return self::PLACEHOLDER_DATA_URI;
         }
 
-        if (!self::photoFileExists($playerID)) {
+        $extension = self::photoExtension($playerID);
+        if ($extension === null) {
             return self::PLACEHOLDER_DATA_URI;
         }
 
-        return HtmlSanitizer::e($basePath . $playerID . '.jpg');
+        return HtmlSanitizer::e($basePath . $playerID . '.' . $extension);
     }
 
     /**
@@ -81,19 +87,31 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     public static function usePhotoDirectory(?string $directory): void
     {
         self::$photoDirectoryOverride = $directory;
-        self::$photoExistsCache = [];
+        self::$photoExtensionCache = [];
     }
 
     /**
-     * Whether <pid>.jpg exists in the photo directory, checked once per request.
+     * The extension of the first <pid>.jpg / <pid>.png found in the photo directory,
+     * or null when neither exists. Checked once per request.
      * The directory is anchored to this file's location, never to $basePath,
      * because $basePath is a URL prefix relative to the requesting page.
      */
-    private static function photoFileExists(int $playerID): bool
+    private static function photoExtension(int $playerID): ?string
     {
-        $directory = self::$photoDirectoryOverride ?? dirname(__DIR__, 2) . '/images/player/';
+        if (array_key_exists($playerID, self::$photoExtensionCache)) {
+            return self::$photoExtensionCache[$playerID];
+        }
 
-        return self::$photoExistsCache[$playerID] ??= is_file($directory . $playerID . '.jpg');
+        $directory = self::$photoDirectoryOverride ?? dirname(__DIR__, 2) . '/images/player/';
+        $found = null;
+        foreach (self::PHOTO_EXTENSIONS as $extension) {
+            if (is_file($directory . $playerID . '.' . $extension)) {
+                $found = $extension;
+                break;
+            }
+        }
+
+        return self::$photoExtensionCache[$playerID] = $found;
     }
 
     /**

@@ -9,6 +9,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
+from harness import schemas
 from harness.adapters.llm import FixtureLlm, MODEL_MAP
 from harness.classify import FILES_CHANGED_BEGIN, TESTS_CHANGED_BEGIN, name_status_text, numstat_text
 from harness.state import HarnessError, TerminalState, UsageLedger
@@ -17,7 +18,6 @@ pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
 
 CANNED = {
     "pr-copy": {"type": "chore", "title": "chore: replay", "commit_subject": "chore: replay commit", "summary_md": "## Summary\n- x\n"},
-    "body-check": {"corrected_body": "## Summary\n- replay body\n", "findings": []},
     "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
     "security-audit": [],
     "safety-verdict": {"holds": []},
@@ -28,7 +28,7 @@ CANNED = {
 
 def _fixture(**over):
     fx = {
-        "slug": "body-check-test",
+        "slug": "body-pass-test",
         "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
         "pr_number": 9999,
         "pr_meta": {"number": 9999, "title": "fix: synthetic",
@@ -92,17 +92,16 @@ def test_numstat_text_marks_binary_files_with_dashes():
 
 # ── runner integration tests ──────────────────────────────────────────────────
 
-def test_body_check_skipped_when_pr_copy_degraded():
+def test_body_pass_skipped_when_pr_copy_degraded():
     out = tempfile.mkdtemp()
     llm = DegradingLlm(UsageLedger(), CANNED, {"pr-copy"})
     res = runner.run(_fixture(head_subject="fix: real"), out, llm, mode="replay")
     assert res.terminal != TerminalState.FAILED, res.error
-    assert "body-check" not in res.degraded_agents
-    assert "body-check" not in [c.purpose for c in res.ledger.calls]
+    assert res.degraded_agents == [schemas.PR_COPY_PURPOSE]
 
 
-def test_body_check_uses_pr_body_fresh_on_clean_rerun():
-    """On the pr-copy skip path, _body_check must call pr_body_fresh() exactly once and
+def test_body_pass_uses_pr_body_fresh_on_clean_rerun():
+    """On the pr-copy skip path, _mechanical_body_pass must call pr_body_fresh() exactly once and
     must not call pr_body() before pr_body_fresh() (row 22 mutation guard)."""
     body_reads: list[str] = []
 
@@ -132,14 +131,14 @@ def test_body_check_uses_pr_body_fresh_on_clean_rerun():
     assert body_reads.count("fresh") == 1, (
         f"pr_body_fresh() must be called exactly once, got {body_reads.count('fresh')}")
     assert body_reads[0] == "fresh", (
-        "_body_check must call pr_body_fresh() not pr_body(); "
+        "_mechanical_body_pass must call pr_body_fresh() not pr_body(); "
         f"first body read was {body_reads[0]!r}")
 
 
-def test_body_check_does_not_edit_live_body_on_skip_path():
-    """On the clean-tree rerun, summary_md stays '' so body-check correction is not
-    written back. Checks: (a) sentinel absent from pr_edit_body and (b) the commit
-    message body is empty — both required to catch the row 23 named mutation."""
+def test_body_pass_does_not_edit_live_body_on_skip_path():
+    """On the clean-tree rerun, summary_md stays '' so the body pass correction is
+    not written back. Checks: (a) sentinel absent from pr_edit_body and (b) the commit
+    message body is empty — both required to catch the named mutation."""
     sentinel = "99-files-changed-sentinel"
     commit_messages_log: list[str] = []
 
@@ -154,12 +153,7 @@ def test_body_check_does_not_edit_live_body_on_skip_path():
             return super().commit_all(message)
 
     out = tempfile.mkdtemp()
-    canned_with_correction = dict(CANNED)
-    canned_with_correction["body-check"] = {
-        "corrected_body": f"## Summary\n- {sentinel}\n",
-        "findings": ["file count was wrong"],
-    }
-    canned_no_copy = {k: v for k, v in canned_with_correction.items() if k != "pr-copy"}
+    canned_no_copy = {k: v for k, v in CANNED.items() if k != "pr-copy"}
     fx = _fixture(clean_tree=True, head_subject="feat: widget")
     fx["pr_meta"] = dict(fx["pr_meta"], title="feat: widget")
 
@@ -187,46 +181,26 @@ def test_body_check_does_not_edit_live_body_on_skip_path():
         f"commit message body is not empty — summary_md was written back: {msg_body[:100]!r}")
 
 
-def test_body_check_degradation_joins_degraded_agents_and_holds_arming():
-    """A body-check llm-invalid-output degrades the run and sets DEGRADED terminal."""
+def test_missing_merge_danger_line_holds_arming_under_merge_danger_label(monkeypatch):
+    """A body with no Merge danger line degrades the run under its own label, and
+    condition 9 holds with `review unavailable: merge-danger`."""
+    from harness import merge_danger
+    monkeypatch.setattr(merge_danger, "inject_merge_danger", lambda body, md: body)
     out = tempfile.mkdtemp()
-    llm = DegradingLlm(UsageLedger(), CANNED, {"body-check"})
-    res = runner.run(_fixture(), out, llm, mode="replay")
+    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
     assert res.terminal != TerminalState.FAILED, res.error
-    assert "body-check" in res.degraded_agents
+    assert "merge-danger" in res.degraded_agents
     assert res.terminal == TerminalState.DEGRADED
-
-
-def test_body_check_auth_expired_fails_closed():
-    """An expired login is not a degradable body-check failure: the run ends FAILED, exit 3."""
-    out = tempfile.mkdtemp()
-    llm = DegradingLlm(UsageLedger(), CANNED, {"body-check"}, kind="llm-auth-expired")
-    res = runner.run(_fixture(), out, llm, mode="replay")
-    assert res.terminal == TerminalState.FAILED
-    assert res.error_kind == "llm-auth-expired"
-    assert "body-check" not in res.degraded_agents
-    assert runner.exit_code_for(res) == 3
-
-
-def test_body_check_fixture_missing_degrades_instead_of_failing():
-    """An uncanned body-check label degrades rather than raising."""
-    out = tempfile.mkdtemp()
-    canned = {k: v for k, v in CANNED.items() if k != "body-check"}
-    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), canned), mode="replay")
-    assert res.terminal != TerminalState.FAILED, res.error
-    assert "body-check" in res.degraded_agents
+    assert not res.arm.armed
+    assert any("review unavailable: merge-danger" in (c.reason or "") for c in res.arm.holds)
 
 
 def test_corrected_body_reaches_pr_create():
-    """The body-check's corrected_body is written into the PR body on the write-back path."""
+    """The mechanically corrected body is what pr create receives."""
     out = tempfile.mkdtemp()
-    sentinel = "BODY-CHECK-APPLIED"
     canned = dict(CANNED)
-    canned["body-check"] = {
-        "corrected_body": f"## Summary\n- {sentinel}\n",
-        "findings": [],
-    }
-    # No existing PR: pr_number absent → goes to pr_create path
+    canned["pr-copy"] = dict(CANNED["pr-copy"], summary_md="## Summary\n- 7 files changed\n")
+    # No existing PR: pr_number absent -> goes to pr_create path
     fx = _fixture()
     fx.pop("pr_number", None)
     fx["pr_meta"] = None
@@ -235,7 +209,8 @@ def test_corrected_body_reaches_pr_create():
     create_actions = [a for a in _actions(out) if a.get("action") == "pr_create"]
     assert create_actions, "pr_create not found in recorded actions"
     body = create_actions[0].get("body", "")
-    assert sentinel in body, f"sentinel not found in pr_create body: {body[:200]!r}"
+    assert "7 files changed" not in body, f"seeded figure survived: {body[:200]!r}"
+    assert "- 1 files changed\n" in body
     for marker in (FILES_CHANGED_BEGIN, TESTS_CHANGED_BEGIN):
         assert marker not in body, f"retired block written to pr_create body: {body[:200]!r}"
 
@@ -275,46 +250,33 @@ class _TcGh:
         return ""
 
 
-def _tc_check(claim, degraded=False, diff=None, worktree=None):
+def _tc_check(claim, diff=None, worktree=None):
     body = f"- `{_TC_PATH}` adds {claim} tests\n"
-    canned = {"body-check": {"corrected_body": body, "findings": ["llm finding"]}}
-    llm = (DegradingLlm(UsageLedger(), canned, {"body-check"}) if degraded
-           else FixtureLlm(UsageLedger(), canned))
     copy = {"summary_md": body}
-    return runner._body_check(
-        llm, _TcGit(diff or _tc_diff()), _TcGh(), copy, False, None, lambda _m: None,
-        worktree=worktree)
+    return runner._mechanical_body_pass(
+        _TcGit(diff or _tc_diff()), _TcGh(), copy, False, lambda _m: None, worktree=worktree)
 
 
-def test_body_check_appends_test_count_finding_on_llm_path():
-    result, degraded = _tc_check(5)
-    assert degraded is False
+def test_body_pass_appends_test_count_finding():
+    result = _tc_check(5)
     assert f"5 tests [harness: measured 3 added / 3 total in `{_TC_PATH}`]" in result["corrected_body"]
-    assert result["findings"][0] == "llm finding"
     assert any("test-count claim mismatch" in f and "body says 5" in f for f in result["findings"])
 
 
-def test_body_check_test_count_finding_survives_degraded_llm():
-    result, degraded = _tc_check(5, degraded=True)
-    assert degraded is True
-    assert "[harness: measured 3 added / 3 total" in result["corrected_body"]
-    assert any("test-count claim mismatch" in f for f in result["findings"])
-
-
-def test_body_check_matching_test_count_adds_no_finding():
-    result, _ = _tc_check(3)
+def test_body_pass_matching_test_count_adds_no_finding():
+    result = _tc_check(3)
     assert result["corrected_body"] == f"- `{_TC_PATH}` adds 3 tests\n"
-    assert result["findings"] == ["llm finding"]
+    assert result["findings"] == []
 
 
-def test_body_check_uses_worktree_for_head_total(tmp_path):
+def test_body_pass_uses_worktree_for_head_total(tmp_path):
     """A claim of 9 against a 7-test file is flagged only when `worktree=worktree` reaches
-    _body_check from the runner.py:364 call site and `read_file` reads the working tree."""
+    _mechanical_body_pass from the runner call site and `read_file` reads the working tree."""
     target = tmp_path / _TC_PATH
     target.parent.mkdir(parents=True)
     target.write_text("\n".join(f"    public function testN{i}(): void {{}}" for i in range(7)))
     diff = _tc_diff(status="M")
-    clean, _ = _tc_check(7, diff=diff, worktree=str(tmp_path))
+    clean = _tc_check(7, diff=diff, worktree=str(tmp_path))
     assert "[harness: measured" not in clean["corrected_body"]
-    flagged, _ = _tc_check(9, diff=diff, worktree=str(tmp_path))
+    flagged = _tc_check(9, diff=diff, worktree=str(tmp_path))
     assert f"[harness: measured 3 added / 7 total in `{_TC_PATH}`]" in flagged["corrected_body"]

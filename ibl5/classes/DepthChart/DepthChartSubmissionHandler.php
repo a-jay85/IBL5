@@ -29,7 +29,7 @@ class DepthChartSubmissionHandler implements DepthChartSubmissionHandlerInterfac
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('app'). */
     private \Psr\Log\LoggerInterface $appLogger;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -59,7 +59,7 @@ class DepthChartSubmissionHandler implements DepthChartSubmissionHandlerInterfac
      */
     public function handleSubmission(array $postData, string $sessionUsername): array
     {
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
 
         // Derive the authoritative team from the session, not POST `Team_Name`
         // (IDOR fix D-09). A logged-in GM cannot replay a valid CSRF token with

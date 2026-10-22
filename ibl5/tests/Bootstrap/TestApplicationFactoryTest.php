@@ -22,4 +22,18 @@ final class TestApplicationFactoryTest extends TestCase
         self::assertInstanceOf(\Bootstrap\TestAliasesBootstrap::class, $steps[1]);
         self::assertInstanceOf(\Bootstrap\TestConfigBootstrap::class, $steps[2]);
     }
+
+    public function testBuildNeverRegistersSharedSeasonBootstrap(): void
+    {
+        $app = TestApplicationFactory::build(__DIR__ . '/../..');
+
+        $reflection = new \ReflectionClass($app);
+        $prop = $reflection->getProperty('steps');
+        $steps = $prop->getValue($app);
+
+        self::assertIsArray($steps);
+        foreach ($steps as $step) {
+            self::assertNotInstanceOf(\Bootstrap\SharedSeasonBootstrap::class, $step);
+        }
+    }
 }

@@ -1,7 +1,7 @@
 """Cross-run review cache keyed on the PR diff's patch-id.
 
-One record per slug, `<state_dir>/<slug>.reviewcache.json`, holds three
-independent reusable arms (review, body-check, fidelity) under one key: the
+One record per slug, `<state_dir>/<slug>.reviewcache.json`, holds two
+independent reusable arms (review, fidelity) under one key: the
 patch-id of the PR diff after Phase 4.5, the plan file hash, a computed
 harness/prompt version hash, the PR title and the sorted file list.
 
@@ -32,7 +32,7 @@ PROMPT_SOURCE_FILES = (
 # and runner.py so these cannot drift silently.
 MODEL_PINS = (
     "review-agent-a:sonnet", "review-agent-b:sonnet", "review-agent-d:sonnet",
-    "security-audit:sonnet", "verify-findings:sonnet", "body-check:sonnet",
+    "security-audit:sonnet", "verify-findings:sonnet",
 )
 REQUIRED_KEYS = ("schema_version", "slug", "pr_number", "run_id", "key", "per_file_ids")
 KEY_FIELDS = ("diff_id", "plan_hash", "version", "pr_title", "file_list")
@@ -227,8 +227,17 @@ def reusable_by_path(findings, scored, delta, current_files):
 FIDELITY_REUSABLE_VERDICTS = ("READY", "READY WITH NOTES")
 
 
-def fidelity_reusable(record, version, diff_id, plan_hash):
-    """The producing run id when the cached fidelity arm may stand in, else None."""
+def body_hash_of(summary_md):
+    """Hash of the Phase 2 PR-copy prose, or "" when Phase 2 wrote no body (clean-tree rerun)."""
+    return hashlib.sha256(summary_md.encode("utf-8")).hexdigest() if summary_md else ""
+
+
+def fidelity_reusable(record, version, diff_id, plan_hash, body_hash=""):
+    """The producing run id when the cached fidelity arm may stand in, else None.
+
+    `body_hash` is non-empty when this run's Phase 2 rewrote the PR body. Check 4 judges
+    the body against the diff, and the key does not cover body prose, so the arm stands in
+    only when it graded that same prose."""
     if not isinstance(record, dict):
         return None
     arm = record.get("fidelity")
@@ -240,6 +249,8 @@ def fidelity_reusable(record, version, diff_id, plan_hash):
     if not diff_id or not plan_hash:
         return None
     if arm.get("diff_id") != diff_id or arm.get("plan_hash") != plan_hash:
+        return None
+    if body_hash and arm.get("body_hash") != body_hash:
         return None
     if arm.get("verdict") not in FIDELITY_REUSABLE_VERDICTS or arm.get("remediated") is not False:
         return None
@@ -289,41 +300,15 @@ REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
                    "security-audit")
 
 
-def restore_body_check(record, version, input_hash, validator):
-    """(stored result, producing run id) when the body-check arm may stand in, else None."""
-    import copy
-
-    if not isinstance(record, dict) or not isinstance(record.get("key"), dict):
-        return None
-    if not version or record["key"].get("version") != version:
-        return None
-    arm = record.get("body_check")
-    if not isinstance(arm, dict) or not input_hash or arm.get("input_hash") != input_hash:
-        return None
-    result = arm.get("result")
-    if not isinstance(result, dict):
-        return None
-    try:
-        validated = validator(copy.deepcopy(result))
-    except Exception:
-        return None
-    if not isinstance(validated, dict):
-        validated = result
-    run_id = arm.get("run_id") or record.get("run_id")
-    if not isinstance(run_id, str) or not run_id:
-        return None
-    return validated, run_id
-
-
 def build_record(*, slug, pr_number, run_id, key, per_file_ids,
-                 review=None, body_check=None, fidelity=None, now=None) -> dict:
+                 review=None, fidelity=None, now=None) -> dict:
     import datetime
 
     now = now or datetime.datetime.now(datetime.timezone.utc)
     return {"schema_version": SCHEMA_VERSION, "slug": slug, "pr_number": int(pr_number),
             "run_id": run_id, "written_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "key": dict(key), "per_file_ids": dict(per_file_ids),
-            "review": review, "body_check": body_check, "fidelity": fidelity}
+            "review": review, "fidelity": fidelity}
 
 
 def vet_review(findings, scored, degraded_agents, gates, run_id):
@@ -342,14 +327,6 @@ def vet_review(findings, scored, degraded_agents, gates, run_id):
         out.append(d)
     return {"run_id": run_id, "gates": dict(gates), "findings": out,
             "scored_findings": [dict(s) for s in scored], "degraded_agents": []}
-
-
-def vet_body_check(input_hash, result, degraded_agents, run_id):
-    if "body-check" in (degraded_agents or ()) or not input_hash:
-        return None
-    if not isinstance(result, dict) or not isinstance(result.get("findings"), list):
-        return None
-    return {"run_id": run_id, "input_hash": input_hash, "result": result}
 
 
 def vet_fidelity(fid, run_id):

@@ -33,7 +33,7 @@ Usage: bin/merge-line-select (--input <file|-> | --live --repo <owner/name>)
 
 Source (exactly one):
   --input <file|->   Read a pullRequests GraphQL response from a file or stdin.
-  --live             Fetch the snapshot with one GraphQL call via $GH_CMD (default gh).
+  --live             Fetch the snapshot via $GH_CMD (default gh), 10 PRs per GraphQL call.
   --repo <o/n>       Required with --live. Rejected without it.
 Mode (at most one; default is the head-of-line pass):
   --list             Print the armed line as one compact JSON array, FIFO order.
@@ -223,10 +223,10 @@ SUMMARY_JQ='
 
 # shellcheck disable=SC2016  # GraphQL variables ($owner, $name) are not shell variables
 LIVE_QUERY='
-query($owner:String!, $name:String!) {
+query($owner:String!, $name:String!, $first:Int!, $after:String) {
   repository(owner:$owner, name:$name) {
-    pullRequests(states:OPEN, baseRefName:"master", first:100) {
-      pageInfo { hasNextPage }
+    pullRequests(states:OPEN, baseRefName:"master", first:$first, after:$after) {
+      pageInfo { hasNextPage endCursor }
       nodes {
         number isDraft baseRefName headRefOid mergeable mergeStateStatus
         autoMergeRequest { enabledAt }
@@ -240,15 +240,71 @@ query($owner:String!, $name:String!) {
   }
 }'
 
+# Pagination. A 10-PR page keeps each call near 3 s (one 100-PR call took
+# 6.7-8.9 s and timed out as a 504). 50 pages caps the line at 500 PRs; past
+# that the run fails closed instead of selecting from a partial line.
+PAGE_SIZE=10
+MAX_PAGES=50
+
+# require_pr_response <json> — exit 1 unless <json> is a pullRequests GraphQL
+# response. Runs on every live page and on the final snapshot, so a page that
+# carries .errors is never silently merged as zero nodes.
+require_pr_response() {
+    # shellcheck disable=SC2016
+    if ! printf '%s' "$1" | jq -e \
+            '((.errors // null) == null) and (.data.repository.pullRequests.nodes | type == "array")' \
+            >/dev/null 2>&1; then
+        echo "merge-line-select: snapshot is not a pullRequests GraphQL response" >&2
+        exit 1
+    fi
+}
+
+# fetch_page <cursor> — one page of LIVE_QUERY through gh_retry. An empty
+# cursor is page 1 and sends no after variable.
+fetch_page() {
+    # $GH_CMD is intentionally unquoted so a test seam can carry arguments.
+    if [ -z "$1" ]; then
+        # shellcheck disable=SC2086
+        gh_retry $GH_CMD api graphql -F first="$PAGE_SIZE" \
+            -f owner="$OWNER" -f name="$NAME" -f query="$LIVE_QUERY"
+    else
+        # shellcheck disable=SC2086
+        gh_retry $GH_CMD api graphql -F first="$PAGE_SIZE" \
+            -f owner="$OWNER" -f name="$NAME" -f after="$1" -f query="$LIVE_QUERY"
+    fi
+}
+
 if [ "$LIVE" = 1 ]; then
     OWNER="${REPO%/*}"
     NAME="${REPO#*/}"
-    # $GH_CMD is intentionally unquoted so a test seam can carry arguments.
-    # shellcheck disable=SC2086
-    if ! SNAPSHOT=$(gh_retry $GH_CMD api graphql -f owner="$OWNER" -f name="$NAME" -f query="$LIVE_QUERY"); then
-        echo "merge-line-select: GraphQL fetch failed" >&2
-        exit 1
-    fi
+    NODES='[]'
+    CURSOR=''
+    PAGE_NUM=0
+    while :; do
+        PAGE_NUM=$((PAGE_NUM + 1))
+        if [ "$PAGE_NUM" -gt "$MAX_PAGES" ]; then
+            echo "merge-line-select: more than $MAX_PAGES pages of $PAGE_SIZE open PRs; refusing a truncated line" >&2
+            exit 1
+        fi
+        if ! PAGE=$(fetch_page "$CURSOR"); then
+            echo "merge-line-select: GraphQL fetch failed" >&2
+            exit 1
+        fi
+        require_pr_response "$PAGE"
+        # Accumulate on stdin, never via --argjson, so a long line cannot hit ARG_MAX.
+        NODES=$(printf '%s\n%s\n' "$NODES" "$PAGE" \
+            | jq -cs '.[0] + .[1].data.repository.pullRequests.nodes')
+        if [ "$(printf '%s' "$PAGE" | jq -r '.data.repository.pullRequests.pageInfo.hasNextPage // false')" != "true" ]; then
+            break
+        fi
+        CURSOR=$(printf '%s' "$PAGE" | jq -r '.data.repository.pullRequests.pageInfo.endCursor // empty')
+        if [ -z "$CURSOR" ]; then
+            echo "merge-line-select: page $PAGE_NUM reports more PRs but no endCursor" >&2
+            exit 1
+        fi
+    done
+    SNAPSHOT=$(printf '%s' "$NODES" \
+        | jq -c '{data:{repository:{pullRequests:{pageInfo:{hasNextPage:false},nodes:.}}}}')
 elif [ "$INPUT" = "-" ]; then
     SNAPSHOT=$(cat)
 else
@@ -259,16 +315,12 @@ else
     SNAPSHOT=$(cat "$INPUT")
 fi
 
-# shellcheck disable=SC2016
-if ! printf '%s' "$SNAPSHOT" | jq -e \
-        '((.errors // null) == null) and (.data.repository.pullRequests.nodes | type == "array")' \
-        >/dev/null 2>&1; then
-    echo "merge-line-select: snapshot is not a pullRequests GraphQL response" >&2
-    exit 1
-fi
+require_pr_response "$SNAPSHOT"
 
+# Only an --input snapshot can still report hasNextPage:true; the live loop
+# always merges every page and writes hasNextPage:false.
 if [ "$(printf '%s' "$SNAPSHOT" | jq -r '.data.repository.pullRequests.pageInfo.hasNextPage // false')" = "true" ]; then
-    echo "warning: more than 100 open PRs; line truncated" >&2
+    echo "warning: snapshot reports hasNextPage=true; line truncated to the PRs it holds" >&2
 fi
 
 if [ "$MODE" = "pr" ]; then

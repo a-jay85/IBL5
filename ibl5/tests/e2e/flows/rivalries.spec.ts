@@ -47,7 +47,9 @@ test.describe('Rivalries flow', () => {
     await assertNoPhpErrors(page);
 
     await expect(page.locator('.ibl-title').first()).toContainText('GM TestUser');
-    await expect(page.locator('.ibl-empty-state')).toBeVisible();
+    await expect(page.locator('.ibl-empty-state')).toContainText(
+      'This general manager has no rival with 10 or more games yet.',
+    );
   });
 
   test('invalid pair input renders a clean empty state', async ({ page }) => {

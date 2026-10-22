@@ -424,7 +424,7 @@
 .ibl-segmented__option input:checked + .ibl-segmented__text {
     background: var(--accent-700); /* white on accent-500 is 2.8:1, fails WCAG AA */
     color: white;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .ibl-segmented__option input:focus-visible + .ibl-segmented__text {
@@ -461,7 +461,7 @@
     margin: 0;
     opacity: 0;
     cursor: pointer;
-    z-index: 1;
+    z-index: var(--z-raised);
 }
 
 .ibl-switch__track {

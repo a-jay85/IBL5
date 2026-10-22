@@ -60,6 +60,7 @@ d="${STUB_CASE_DIR:?STUB_CASE_DIR unset}"
 : > "$d/argv"
 for a in "$@"; do printf '%s\n' "$a" >> "$d/argv"; done
 pwd > "$d/cwd"
+if [ -n "${STUB_SKIP_LINES:-}" ]; then cat "$STUB_SKIP_LINES"; fi
 if [ "${STUB_NO_SUMMARY:-}" != 1 ]; then
     echo "Summary: ${STUB_CLEANED:-0} cleaned, ${STUB_SKIPPED:-3} skipped"
 fi
@@ -117,10 +118,71 @@ esac
 exit 0
 SH
 
-# docker stub: never touches a real daemon; every subcommand is a silent no-op.
+# docker stub: never touches a real daemon. Records argv (one call per line)
+# to $STUB_CASE_DIR/docker-argv. STUB_DOCKER_INFO_RC / STUB_DOCKER_IMAGE_RC /
+# STUB_DOCKER_RC set the exit codes of `info` / `image ...` / everything else.
 cat > "$STUBBIN/docker" <<'SH'
 #!/usr/bin/env bash
-exit 0
+if [ -n "${STUB_CASE_DIR:-}" ]; then printf '%s\n' "$*" >> "$STUB_CASE_DIR/docker-argv"; fi
+case "${1:-}" in
+    info)  exit "${STUB_DOCKER_INFO_RC:-0}" ;;
+    image) exit "${STUB_DOCKER_IMAGE_RC:-${STUB_DOCKER_RC:-0}}" ;;
+esac
+exit "${STUB_DOCKER_RC:-0}"
+SH
+
+# wt-status-rows: the two header rows, then the case's $STUB_WT_STATUS_ROWS.
+cat > "$STUBBIN/wt-status-rows" <<'SH'
+#!/usr/bin/env bash
+printf "%-12s %-30s %s\n" "STATUS" "WORKTREE" "DETAIL"
+printf "%-12s %-30s %s\n" "------------" "------------------------------" "------"
+if [ -n "${STUB_WT_STATUS_ROWS:-}" ] && [ -f "$STUB_WT_STATUS_ROWS" ]; then cat "$STUB_WT_STATUS_ROWS"; fi
+SH
+
+# gh-stub (reap steps, via WT_GC_GH): answers `pr view <n|branch>` from
+# $STUB_GH_DIR/<n>.json or $STUB_GH_DIR/by-head/<branch>.json, and
+# `pr list --head <stem>` from by-head/<stem>.json, verbatim (--jq ignored).
+# A missing fixture prints []. STUB_GH_FAIL=1 exits 1 with no stdout.
+cat > "$STUBBIN/gh-stub" <<'SH'
+#!/usr/bin/env bash
+if [ -n "${STUB_CASE_DIR:-}" ]; then printf '%s\n' "$*" >> "$STUB_CASE_DIR/gh-argv"; fi
+[ "${STUB_GH_FAIL:-}" = 1 ] && exit 1
+d="${STUB_GH_DIR:-/nonexistent}"
+key=""
+if [ "${1:-}" = pr ] && [ "${2:-}" = view ]; then
+    key="${3:-}"
+    if [ -f "$d/$key.json" ]; then cat "$d/$key.json"; exit 0; fi
+elif [ "${1:-}" = pr ] && [ "${2:-}" = list ]; then
+    while [ $# -gt 0 ]; do
+        if [ "$1" = --head ]; then key="${2:-}"; break; fi
+        shift
+    done
+else
+    exit 1
+fi
+if [ -n "$key" ] && [ -f "$d/by-head/$key.json" ]; then cat "$d/by-head/$key.json"; exit 0; fi
+echo '[]'
+SH
+
+# launchctl-stub (reap steps, via WT_GC_LAUNCHCTL): `list` prints the file
+# $STUB_LAUNCHCTL_LIST; anything else records argv and exits 1.
+cat > "$STUBBIN/launchctl-stub" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = list ]; then
+    if [ -n "${STUB_LAUNCHCTL_LIST:-}" ]; then cat "$STUB_LAUNCHCTL_LIST"; fi
+    exit 0
+fi
+if [ -n "${STUB_CASE_DIR:-}" ]; then printf '%s\n' "$*" >> "$STUB_CASE_DIR/launchctl-argv"; fi
+exit 1
+SH
+
+# lsof stub (first on PATH and via WT_GC_LSOF): prints $STUB_LSOF_OUT;
+# STUB_LSOF_ERR=1 writes an error and exits 1; else exits STUB_LSOF_RC (1).
+cat > "$STUBBIN/lsof" <<'SH'
+#!/usr/bin/env bash
+if [ "${STUB_LSOF_ERR:-}" = 1 ]; then echo 'lsof: error' >&2; exit 1; fi
+if [ -n "${STUB_LSOF_OUT:-}" ]; then cat "$STUB_LSOF_OUT"; fi
+exit "${STUB_LSOF_RC:-1}"
 SH
 
 # launchctl stub (emitter cases): records argv, succeeds.
@@ -194,6 +256,23 @@ run_tick() {
         WT_GC_CLEANUP="$STUBBIN/cleanup-stub"
         WT_GC_WT_STATUS="$STUBBIN/wt-status-stub"
         WT_GC_REPO_ROOT="$STUB_REPO"
+        # Reap steps: off unless a case turns them on; every binary stubbed.
+        WT_GC_REAP_EMPTY=0
+        WT_GC_REAP_DIRTY_MERGED=0
+        WT_GC_REAP_REFS=0
+        WT_GC_REAP_TMP_PACK=0
+        WT_GC_DOCKER_PRUNE=0
+        WT_GC_STALE_LIST=0
+        WT_GC_WT_REMOVE=/usr/bin/false
+        WT_GC_LAUNCHCTL="$STUBBIN/launchctl-stub"
+        WT_GC_LSOF="$STUBBIN/lsof"
+        WT_GC_GH="$STUBBIN/gh-stub"
+        WT_GC_DOCKER="$STUBBIN/docker"
+        WT_GC_QUEUE_DIR="$CD/queue"
+        WT_GC_SESSION_REGISTRY="$CD/registry.json"
+        WT_GC_TIPS_DIR="$CD/tips"
+        WT_GC_STALE_FILE="$CD/stale.tsv"
+        STUB_GH_DIR="$CD/gh"
     )
     if [ "${NOSTATE:-}" != 1 ]; then base+=(WT_GC_LOCK_DIR="$CD/state"); fi
     rm -f "$CD/argv" "$CD/cwd"
@@ -221,13 +300,22 @@ new_env() {
     cat > "$envdir/main/bin/wt-remove" <<'SH'
 #!/usr/bin/env bash
 # Harness stub of bin/wt-remove: remove the git worktree only (no Docker).
-# argv: --force --volumes <name>
+# argv: [--force] [--volumes] <name> in any order; recorded to wt-remove-argv.
 root="$(cd "$(dirname "$0")/.." && pwd)"
-exec git -C "$root" worktree remove --force "$(dirname "$root")/IBL5-worktrees/$3"
+name=""
+if [ -n "${STUB_CASE_DIR:-}" ]; then printf '%s\n' "$@" > "$STUB_CASE_DIR/wt-remove-argv"; fi
+for a in "$@"; do
+    case "$a" in --*) ;; *) [ -z "$name" ] && name="$a" ;; esac
+done
+exec git -C "$root" worktree remove --force "$(dirname "$root")/IBL5-worktrees/$name"
 SH
     chmod +x "$envdir/main/bin/wt-remove"
     git -C "$envdir/main" add README.md bin/wt-remove
-    git -C "$envdir/main" commit -qm init
+    # Backdated 30d so a worktree with no own commits takes its age from the
+    # directory mtime (mk_wt age_days=N).
+    GIT_AUTHOR_DATE="@$(( $(date +%s) - 30 * 86400 ))" \
+        GIT_COMMITTER_DATE="@$(( $(date +%s) - 30 * 86400 ))" \
+        git -C "$envdir/main" commit -qm init
     git -C "$envdir/main" branch -q -M master
     git -C "$envdir/main" push -q -u origin master >/dev/null 2>&1
     ENV_MAIN="$envdir/main"

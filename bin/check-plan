@@ -1642,7 +1642,7 @@ done < "$GATEP_MATRIX"
 # the helper would then report every token missing. Example tokens are kept out of this
 # comment on purpose: a literal one in tracked text would count as present to the helper.
 # ---------------------------------------------------------------------------
-_mu_cats='argument|arguments|arrayFilter|arrayValues|assign|assignOp|attribute|binaryOp|booleanAnd|booleanNot|booleanOr|callable|cast|catch|class|classConstant|constant|clone|closure|deadCode|doWhile|echo|elseif|empty|encapsedStringPart|enum|equal|for|foreach|function|generics|greater|greaterOrEqual|identical|if|ignore|impossibleType|include|includeOnce|instanceof|interface|isset|logicalAnd|logicalOr|logicalXor|match|method|methodTag|missingType|new|notEqual|notIdentical|nullCoalesce|nullsafe|offsetAccess|offsetAssign|parameter|paramOut|phpDoc|phpstanApi|postDec|postInc|preDec|preInc|print|property|propertyTag|readOnlyProperty|regexp|require|requireOnce|return|selfOut|smaller|smallerOrEqual|staticMethod|staticProperty|ternary|throw|throws|trait|typeAlias|unaryOp|unset|variable|varTag|while'
+_mu_cats='argument|arguments|arrayFilter|arrayValues|assign|assignOp|attribute|binaryOp|booleanAnd|booleanNot|booleanOr|callable|cast|catch|class|classConstant|constant|closure|deadCode|doWhile|echo|elseif|empty|encapsedStringPart|enum|equal|for|foreach|function|generics|greater|greaterOrEqual|identical|if|ignore|impossibleType|instanceof|interface|isset|logicalAnd|logicalOr|logicalXor|match|method|methodTag|missingType|new|notEqual|notIdentical|nullCoalesce|nullsafe|offsetAccess|offsetAssign|parameter|paramOut|phpDoc|phpstanApi|postDec|postInc|preDec|preInc|property|propertyTag|readOnlyProperty|regexp|return|selfOut|smaller|smallerOrEqual|staticMethod|staticProperty|ternary|throw|throws|trait|typeAlias|unaryOp|unset|variable|varTag|while'
 _mu_id_re="^(${_mu_cats})\.[a-z][A-Za-z]*(\.[a-z][A-Za-z]*)*\$"
 # A category stem with a file extension tail is a bare file name, never an identifier:
 # a common extension, or the extension of any tracked file.
@@ -1656,13 +1656,14 @@ if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$GATEP
     _mu_out="$(MATRIX_ASSERT_ROOT="$_mu_root" "$_mu_helper" "$PLAN_FILE" "$_mu_empty" 2>&1)" || true
     rm -f "$_mu_empty"
     _mu_files="$(git -C "$_mu_root" ls-files 2>/dev/null || true)"
+    _mu_exts="|$(sed -n 's/.*\.\([A-Za-z][A-Za-z]*\)$/\1/p' <<< "$_mu_files" | sort -u | tr '\n' '|')"
     _mu_is_file_name() {
         [[ "$1" =~ $_mu_ext_re ]] && return 0
-        grep -qE "\\.${1##*.}\$" <<< "$_mu_files"
+        case "$_mu_exts" in *"|${1##*.}|"*) return 0 ;; esac
+        return 1
     }
     # Bash 3.2 has no associative arrays: row id and token list are tab-separated lines.
     _mu_miss=""
-    _mu_seen="|"
     _mu_id=""
     while IFS= read -r _mu_line; do
         case "$_mu_line" in
@@ -1672,21 +1673,24 @@ if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$GATEP
                 [ -n "$_mu_id" ] && _mu_miss="${_mu_miss}${_mu_id}"$'\t'"${_mu_line#  missing:}"$'\n'; _mu_id="" ;;
         esac
     done <<< "$_mu_out"
+    # Blame the row the helper read. GATEP_MATRIX parses fences differently, so a
+    # same-id row in a fenced example could come first there. This awk copies the
+    # helper's row pick: any ``` or ~~~ line toggles a fence, rows count only under a
+    # What-to-verify header, and the first row per id wins.
+    _mu_rows="$(awk -F'|' '
+        /^[[:space:]]*(```|~~~)/ { fence = !fence; inm = 0; next }
+        fence { next }
+        /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm = 1; next }
+        inm && /^[[:space:]]*\|/ {
+            id = $2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id)
+            if (id == "" || seen[id]) next
+            seen[id] = 1; print
+        }' "$PLAN_FILE")"
     while IFS= read -r row; do
         matrix_split "$row" || continue
-        [ "$MC_NUM" != "#" ] || continue
-        case "$_mu_seen" in *"|${MC_NUM}|"*) continue ;; esac
         _mu_hit="$(awk -F'\t' -v n="$MC_NUM" '$1 == n { print $2; exit }' <<< "$_mu_miss")"
         [ -n "$_mu_hit" ] || continue
         read -ra _mu_toks <<< "$_mu_hit"
-        # The helper and GATEP_MATRIX parse fences differently, so a same-id row in a
-        # fenced example can come first: claim the id only for a row holding a token.
-        _mu_own=0
-        for _mu_tok in "${_mu_toks[@]}"; do
-            [[ "$row" == *"$_mu_tok"* ]] && { _mu_own=1; break; }
-        done
-        [ "$_mu_own" = 1 ] || continue
-        _mu_seen="${_mu_seen}${MC_NUM}|"
         for _mu_tok in "${_mu_toks[@]}"; do
             if [[ "$_mu_tok" =~ $_mu_id_re ]] && ! _mu_is_file_name "$_mu_tok"; then
                 viol "[MU] matrix token \`${_mu_tok}\` is a PHPStan error identifier that appears only in tool output: it is in no tracked file and a correct diff never adds it, so bin/lib/plan-matrix-assertions reports the row UNREALISED and Step 6.7 stops. Put the identifier in prose outside backticks and backtick the test name or the file the diff carries instead (a baseline entry or @phpstan-ignore line the diff adds is cited by its file path): ${row}"
@@ -1699,7 +1703,7 @@ if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$GATEP
                 viol "[MU] matrix token \`${_mu_tok}\` names a directory with no tracked file beneath it and no tracked text naming it; bin/lib/plan-matrix-assertions realises a directory only when the diff deletes it or a tracked or added line names it literally, so the row stays UNREALISED and Step 6.7 stops. Cite the path of a file the diff creates beneath it (for example \`${_mu_tok}index.php\`) instead: ${row}"
             fi
         done
-    done < "$GATEP_MATRIX"
+    done <<< "$_mu_rows"
 fi
 
 # ---------------------------------------------------------------------------

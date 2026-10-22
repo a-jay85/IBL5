@@ -3279,24 +3279,25 @@ assert_viol "gateMU-tracked-extension-file-silent" 0 '[MU]' "$FM$YHDR"'
 <!-- no-test-methods: fixture rows are gate MU props -->
 '
 # A ~~~ example matrix is kept by GATEP_MATRIX but skipped by the helper, so its row 1
-# comes first. The violation still lands on the real row 1, the one holding the token.
-_mu_name='gateMU-blames-row-holding-token'
+# comes first, and it holds one of the same tokens. Both violations still land on the
+# real row 1, the row the helper read.
+_mu_name='gateMU-blames-row-helper-read'
 _mu_body="$FM"'
 ~~~markdown'"$YHDR"'
-| 1 | example row with no token | PHPUnit | post-impl | `tests/XTest.php` |
+| 1 | example: no `if'"$MU_DOT"'alwaysTrue` finding | PHPUnit | post-impl | `tests/XTest.php` |
 ~~~
 '"$YHDR"'
-| 1 | REALROW no `if'"$MU_DOT"'alwaysTrue` finding | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+| 1 | REALROW no `if'"$MU_DOT"'alwaysTrue` finding in `modules/Zq'"$MU_SL"'` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
 '"$YROW"'
 '
 printf '%s\n' "$_mu_body" > "$TMP/$_mu_name.md"
 _mu_out="$("$GUARD" "$TMP/$_mu_name.md" 2>&1)"
 _mu_n="$(grep -c '^\[MU\] .*REALROW' <<< "$_mu_out")"
 _mu_all="$(grep -c '^\[MU\] ' <<< "$_mu_out")"
-if [ "$_mu_n" = "1" ] && [ "$_mu_all" = "1" ]; then
-    h_pass "$_mu_name (1 [MU] line, on the real row)"
+if [ "$_mu_n" = "2" ] && [ "$_mu_all" = "2" ]; then
+    h_pass "$_mu_name (2 [MU] lines, both on the real row)"
 else
-    h_fail "$_mu_name" "expected 1 [MU] line on REALROW, got $_mu_n of $_mu_all"
+    h_fail "$_mu_name" "expected 2 [MU] lines on REALROW, got $_mu_n of $_mu_all"
 fi
 # (b) a new directory: no tracked file beneath it, no tracked text names it (the
 # records-hub row 11 shape).

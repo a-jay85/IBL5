@@ -164,6 +164,10 @@ final class SplitStatsTest extends TestCase
         $this->assertStringContainsString('class="table-empty-message"', $html);
     }
 
+    /**
+     * A row with every gameXXXavg column null renders each default literal. The counts were
+     * captured once from the unmodified class.
+     */
     public function testNullStatsRowRendersEachDefaultLiteral(): void
     {
         $html = SplitStats::render([self::nullStatsRow(8, 'Null Stats', 'C')], $this->makeTeam(), 'Home');

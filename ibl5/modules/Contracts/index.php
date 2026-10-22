@@ -38,7 +38,7 @@ if ($activeTab === ContractsView::TAB_PLAYERS) {
     $service = new ContractListService(new ContractListRepository($mysqli_db));
     $tabContentHtml = (new ContractListView())->render($service->getContractsWithCalculations());
 } else {
-    $season = new \Season\Season($mysqli_db);
+    $season = \Season\SharedSeason::get($mysqli_db);
     $service = new CapSpaceService(new CapSpaceRepository($mysqli_db), $mysqli_db);
     $displayYears = $service->getDisplayYears($season);
     $tabContentHtml = (new CapSpaceView())->render(

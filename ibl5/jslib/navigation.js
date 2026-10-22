@@ -66,7 +66,13 @@
             }
         }, { signal: signal });
 
+        var overlayHideTimer = null;
+
         function openMenu() {
+            // Cancel any pending overlay hide from a recent closeMenu()
+            clearTimeout(overlayHideTimer);
+            overlayHideTimer = null;
+
             // Slide in menu
             mobileMenu.classList.remove('translate-x-full');
             mobileMenu.classList.add('translate-x-0');
@@ -109,7 +115,7 @@
             // Fade out and hide overlay
             if (menuOverlay) {
                 menuOverlay.style.opacity = '0';
-                setTimeout(function() {
+                overlayHideTimer = setTimeout(function() {
                     menuOverlay.classList.add('hidden');
                 }, 300);
             }

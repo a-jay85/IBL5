@@ -34,6 +34,9 @@ printf '%s\n' '#!/bin/sh' \
   "exit \"\$(cat \"$TMP/held-rc\" 2>/dev/null || echo 0)\"" > "$BINSTUB/pr-triage"
 chmod +x "$BINSTUB/pr-triage"
 export MORNING_DIGEST_PR_TRIAGE="$BINSTUB/pr-triage"
+# Stale-worktrees seam: default every row to a missing path so none reads the real
+# $HOME file. The stale rows below override it per call.
+export MORNING_DIGEST_STALE_WT="$TMP/no-such-stale.tsv"
 held_reset() { rm -f "$TMP/held-out" "$TMP/held-rc" "$TMP/held-sleep" "$TMP/held-calls.log"; }
 run_digest() { NIGHTLY_DIR="$NDIR" DISCORD_DM_BIN="$BINSTUB/discord-dm" MORNING_DIGEST_GH="$BINSTUB/gh" "$SCRIPT" "$@"; }
 
@@ -474,7 +477,7 @@ printf '%s\n' '#12  https://github.com/o/r/pull/12  Fix thing  needs review' > "
 rm -f "$TMP/dm-calls.log"
 mk_fixture_123
 body=$(run_digest --dry-run)
-assert_not_contains "row32: stub accepted --held" "unavailable" "$body"
+assert_not_contains "row32: stub accepted --held" "Held PRs: unavailable" "$body"
 [ "$(cat "$TMP/held-calls.log" 2>/dev/null)" = "HELD --held" ] || { h_fail "row32" "want exactly one 'HELD --held' call, got: $(cat "$TMP/held-calls.log" 2>/dev/null)"; }
 [ ! -f "$TMP/dm-calls.log" ] || { h_fail "row32" "dm-calls.log should not exist after --dry-run"; }
 run_digest > /dev/null 2>&1
@@ -483,4 +486,85 @@ status=$?
 [ "$(grep -c '^CALLED' "$TMP/dm-calls.log" 2>/dev/null)" = 1 ] || { h_fail "row32" "want exactly one CALLED line, got: $(cat "$TMP/dm-calls.log" 2>/dev/null)"; }
 assert_contains "row32: real send passes --chunk" "--chunk" "$(cat "$TMP/dm-calls.log" 2>/dev/null)"
 h_pass "row32 — call shape and no send"
+# --- Stale worktrees rows. Rows 28-32 above are the Held PRs rows, so these start at 33. ---
+stale_fixture() { printf '%s\n' "$@" > "$TMP/stale.tsv"; }
+# --- row33: Stale worktrees bullets, placed after Held PRs ---
+held_reset
+printf '%s\n' \
+  '#12  https://github.com/o/r/pull/12  Fix thing  needs review; CI red' \
+  '#15  https://github.com/o/r/pull/15  Two  spaces title  sticky hold' > "$TMP/held-out"
+printf '# generated 2026-10-22 08:26\nwt-alpha\tSTALLED\t12\nwt-beta\tUNPUSHED\t3\nwt-gamma\tSTALLED\t?\n' > "$TMP/stale.tsv"
+mk_fixture_123
+body33=$(MORNING_DIGEST_STALE_WT="$TMP/stale.tsv" run_digest --dry-run)
+status=$?
+[ $status -eq 0 ] || { h_fail "row33" "digest exit status $status, want 0"; }
+assert_contains "row33: Held PRs (2) present"  "Held PRs (2)" "$body33"
+assert_contains "row33: Stale header"          "Stale worktrees (3, as of 2026-10-22 08:26)" "$body33"
+assert_contains "row33: bullet 1"              "• wt-alpha (STALLED, 12d)" "$body33"
+assert_contains "row33: bullet 2"              "• wt-beta (UNPUSHED, 3d)" "$body33"
+assert_contains "row33: bullet 3"              "• wt-gamma (STALLED, ?d)" "$body33"
+pre_held=${body33%%Held PRs (2)*}
+pre_stale=${body33%%Stale worktrees (3*}
+[ "${#pre_stale}" -gt "${#pre_held}" ] || { h_fail "row33" "Stale worktrees is not after Held PRs (offsets ${#pre_stale} vs ${#pre_held})"; }
+h_pass "row33 — Stale worktrees bullets after Held PRs"
+# --- row34: missing, header-less and unreadable sources render unavailable ---
+held_reset
+mk_fixture_123
+body=$(MORNING_DIGEST_STALE_WT="$TMP/definitely-missing.tsv" run_digest --dry-run)
+status=$?
+[ $status -eq 0 ] || { h_fail "row34" "missing: digest exit status $status, want 0"; }
+assert_contains "row34: missing file" "Stale worktrees: unavailable" "$body"
+printf 'wt-alpha\tSTALLED\t12\nwt-beta\tUNPUSHED\t3\n' > "$TMP/stale-nohdr.tsv"
+body=$(MORNING_DIGEST_STALE_WT="$TMP/stale-nohdr.tsv" run_digest --dry-run)
+status=$?
+[ $status -eq 0 ] || { h_fail "row34" "no header: digest exit status $status, want 0"; }
+assert_contains     "row34: no header"          "Stale worktrees: unavailable" "$body"
+assert_not_contains "row34: no header, no rows" "wt-alpha" "$body"
+printf '# generated 2026-10-22 08:26\nwt-alpha\tSTALLED\t12\n' > "$TMP/stale-unreadable.tsv"
+chmod 000 "$TMP/stale-unreadable.tsv"
+body=$(MORNING_DIGEST_STALE_WT="$TMP/stale-unreadable.tsv" run_digest --dry-run)
+status=$?
+chmod 600 "$TMP/stale-unreadable.tsv"
+[ $status -eq 0 ] || { h_fail "row34" "unreadable: digest exit status $status, want 0"; }
+# root ignores file modes, so only assert the unreadable shape when the file really is unreadable.
+if [ "$(id -u)" -ne 0 ]; then
+  assert_contains "row34: unreadable file" "Stale worktrees: unavailable" "$body"
+fi
+# Empty MORNING_DIGEST_STALE_WT is legal and selects the default path under $HOME.
+mkdir -p "$TMP/fake-home34"
+body=$(HOME="$TMP/fake-home34" MORNING_DIGEST_STALE_WT="" run_digest --dry-run)
+status=$?
+[ $status -eq 0 ] || { h_fail "row34" "empty seam: digest exit status $status, want 0"; }
+assert_contains "row34: empty seam falls to default path" "Stale worktrees: unavailable" "$body"
+mkdir -p "$TMP/fake-home34/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc"
+printf '# generated 2026-10-22 08:26\nwt-default\tSTALLED\t5\n' > "$TMP/fake-home34/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc/stale-worktrees.tsv"
+body=$(HOME="$TMP/fake-home34" MORNING_DIGEST_STALE_WT="" run_digest --dry-run)
+assert_contains "row34: empty seam reads default file" "• wt-default (STALLED, 5d)" "$body"
+h_pass "row34 — missing, header-less, unreadable and empty-seam"
+# --- row35: header and zero rows ---
+held_reset
+mk_fixture_123
+printf '# generated 2026-10-22 08:26\n' > "$TMP/stale.tsv"
+body=$(MORNING_DIGEST_STALE_WT="$TMP/stale.tsv" run_digest --dry-run)
+status=$?
+[ $status -eq 0 ] || { h_fail "row35" "digest exit status $status, want 0"; }
+assert_contains     "row35: none"          "Stale worktrees: none" "$body"
+assert_not_contains "row35: no count form" "Stale worktrees (" "$body"
+h_pass "row35 — header with zero rows"
+# --- row36: byte budget and hidden count ---
+held_reset
+name40=$(printf 'n%.0s' $(seq 1 40))
+{ printf '# generated 2026-10-22 08:26\n'
+  i=1
+  while [ "$i" -le 80 ]; do printf '%s%02d\tSTALLED\t9\n' "${name40%??}" "$i"; i=$((i + 1)); done
+} > "$TMP/stale.tsv"
+mk_fixture_123
+body=$(MORNING_DIGEST_STALE_WT="$TMP/stale.tsv" run_digest --dry-run)
+bytes=$(printf '%s' "$body" | LC_ALL=C wc -c | tr -d ' ')
+[ "$bytes" -le 1900 ] || { h_fail "row36" "body is $bytes bytes, budget is 1900"; }
+shown=$(printf '%s\n' "$body" | grep -c '^• n' || true)
+[ "$shown" -ge 1 ] || { h_fail "row36" "no stale bullet shown under the budget"; }
+assert_contains "row36: header counts every row" "Stale worktrees (80, as of 2026-10-22 08:26)" "$body"
+assert_contains "row36: hidden count"            "…and $((80 - shown)) more" "$body"
+h_pass "row36 — byte budget and hidden count"
 h_done

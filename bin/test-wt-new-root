@@ -59,7 +59,23 @@ assert_eq() {
 
 git_q() { git -c user.email=t@t -c user.name=t -c init.defaultBranch=master "$@"; }
 
-# new_env — build <TMP>/env.XXXX/{origin.git,IBL5,IBL5-worktrees/feature}:
+# seed_tree <checkout> [nocompose] — the files wt-new's post-add setup reads, so a
+# default fixture run succeeds end to end: config examples for
+# materialize_worktree_config*, docker-compose.yml for wt_hide_compose, and the
+# real ignore files so the materialized configs and wt_link_shared links read as
+# ignored. `nocompose` omits docker-compose.yml: wt_hide_compose's
+# `git update-index --skip-worktree docker-compose.yml` then fails, a real
+# post-add failure of real code with no test seam in wt-new.
+seed_tree() {
+    mkdir -p "$1/ibl5"
+    cp "$SCRIPT_DIR/../.gitignore" "$1/.gitignore"
+    cp "$SCRIPT_DIR/../ibl5/.gitignore" "$1/ibl5/.gitignore"
+    echo '<?php $dbname = "x";' > "$1/ibl5/config.php.example"
+    echo '<?php' > "$1/ibl5/config.local.php.example"
+    [ "${2:-}" = nocompose ] || echo 'services: {}' > "$1/docker-compose.yml"
+}
+
+# new_env [nocompose] — build <TMP>/env.XXXX/{origin.git,IBL5,IBL5-worktrees/feature}:
 #   • origin/master is ONE commit ahead of the main checkout's local master
 #   • the worktree's branch has its own commit, so it has DIVERGED from origin/master
 # Echoes the env base path. This is the exact shape the defect needed.
@@ -72,8 +88,10 @@ new_env() {
     git_q clone -q "$base/origin.git" "$base/IBL5" >/dev/null 2>&1
     mkdir -p "$base/IBL5/bin/lib" "$base/IBL5/ibl5"
     cp "$WTNEW" "$base/IBL5/bin/wt-new"
+    cp "$SCRIPT_DIR/wt-remove" "$base/IBL5/bin/wt-remove"
     cp "$SCRIPT_DIR"/lib/*.sh "$base/IBL5/bin/lib/" 2>/dev/null
-    chmod +x "$base/IBL5/bin/wt-new"
+    chmod +x "$base/IBL5/bin/wt-new" "$base/IBL5/bin/wt-remove"
+    seed_tree "$base/IBL5" "${1:-}"
     git_q -C "$base/IBL5" add -A >/dev/null 2>&1
     git_q -C "$base/IBL5" commit -qm C1 >/dev/null 2>&1
     git_q -C "$base/IBL5" push -q -u origin master >/dev/null 2>&1
@@ -112,8 +130,10 @@ new_env_base_branch() {
     git_q clone -q "$base/origin.git" "$base/IBL5" >/dev/null 2>&1
     mkdir -p "$base/IBL5/bin/lib" "$base/IBL5/ibl5"
     cp "$WTNEW" "$base/IBL5/bin/wt-new"
+    cp "$SCRIPT_DIR/wt-remove" "$base/IBL5/bin/wt-remove"
     cp "$SCRIPT_DIR"/lib/*.sh "$base/IBL5/bin/lib/" 2>/dev/null
-    chmod +x "$base/IBL5/bin/wt-new"
+    chmod +x "$base/IBL5/bin/wt-new" "$base/IBL5/bin/wt-remove"
+    seed_tree "$base/IBL5"
     git_q -C "$base/IBL5" add -A >/dev/null 2>&1
     git_q -C "$base/IBL5" commit -qm M1 >/dev/null 2>&1
     git_q -C "$base/IBL5" push -q -u origin master >/dev/null 2>&1
@@ -372,6 +392,86 @@ elif [ -e "$GITDIR14/wt-new-session" ]; then
 else
     pass "case 14: --existing writes no marker"
 fi
+
+# Abort cleanup (plan cases 6-10): a post-add failure hands the worktree to
+# bin/wt-remove --if-empty, which removes it only when it holds no work.
+
+echo "== case 15 (abort 6): post-add failure removes the empty worktree, keeps the rc"
+ENV15="$(new_env nocompose)"
+OUT15="$("$ENV15/IBL5/bin/wt-new" abort-empty 2>&1)" && RC15=$? || RC15=$?
+if [ "$RC15" -ne 0 ]; then pass "case 15: exits non-zero"; else
+    failcase "case 15: exits non-zero — got 0"; fi
+assert_match "case 15: worktree removed" "Done. Worktree 'abort-empty' removed" "$OUT15"
+if [ -d "$ENV15/IBL5-worktrees/abort-empty" ]; then
+    failcase "case 15: IBL5-worktrees/abort-empty must be gone"
+else
+    pass "case 15: IBL5-worktrees/abort-empty is gone"
+fi
+if git -C "$ENV15/IBL5" show-ref --verify --quiet refs/heads/abort-empty; then
+    failcase "case 15: refs/heads/abort-empty must be gone"
+else
+    pass "case 15: refs/heads/abort-empty is gone"
+fi
+
+echo "== case 16 (abort 7): abort with a commit keeps the worktree"
+ENV16="$(new_env nocompose)"
+git_q -C "$ENV16/IBL5" branch has-work master >/dev/null 2>&1
+git_q clone -q "$ENV16/origin.git" "$ENV16/pusher-hw" >/dev/null 2>&1
+git_q -C "$ENV16/pusher-hw" checkout -qb has-work origin/master >/dev/null 2>&1
+echo hw > "$ENV16/pusher-hw/HW.txt"
+git_q -C "$ENV16/pusher-hw" add -A >/dev/null 2>&1
+git_q -C "$ENV16/pusher-hw" commit -qm HW >/dev/null 2>&1
+git_q -C "$ENV16/pusher-hw" push -q origin has-work >/dev/null 2>&1
+git_q -C "$ENV16/IBL5" branch -D has-work >/dev/null 2>&1
+OUT16="$("$ENV16/IBL5/bin/wt-new" --existing has-work 2>&1)" && RC16=$? || RC16=$?
+if [ "$RC16" -ne 0 ]; then pass "case 16: exits non-zero"; else
+    failcase "case 16: exits non-zero — got 0"; fi
+assert_match "case 16: kept with commit count" "kept 'has-work': 1 commit\(s\) ahead" "$OUT16"
+if [ -d "$ENV16/IBL5-worktrees/has-work" ]; then
+    pass "case 16: worktree dir present"
+else
+    failcase "case 16: worktree dir must survive"
+fi
+
+echo "== case 17 (abort 8): abort with an untracked file keeps the worktree"
+ENV17="$(new_env nocompose)"
+mkdir -p "$ENV17/IBL5/.git/hooks"
+printf '#!/bin/sh\necho stray > stray.txt\n' > "$ENV17/IBL5/.git/hooks/post-checkout"
+chmod +x "$ENV17/IBL5/.git/hooks/post-checkout"
+OUT17="$("$ENV17/IBL5/bin/wt-new" abort-dirty 2>&1)" && RC17=$? || RC17=$?
+if [ "$RC17" -ne 0 ]; then pass "case 17: exits non-zero"; else
+    failcase "case 17: exits non-zero — got 0"; fi
+assert_match "case 17: kept for untracked files" "kept 'abort-dirty': untracked files" "$OUT17"
+if [ -d "$ENV17/IBL5-worktrees/abort-dirty" ]; then
+    pass "case 17: worktree dir present"
+else
+    failcase "case 17: worktree dir must survive"
+fi
+
+echo "== case 18 (abort 9): abort leaves an existing _pool-1 slot untouched"
+ENV18="$(new_env nocompose)"
+git_q -C "$ENV18/IBL5" worktree add -q -b _pool-1 "$ENV18/IBL5-worktrees/_pool-1" master >/dev/null 2>&1
+OUT18="$("$ENV18/IBL5/bin/wt-new" abort-pool 2>&1)" && RC18=$? || RC18=$?
+if [ "$RC18" -ne 0 ]; then pass "case 18: exits non-zero"; else
+    failcase "case 18: exits non-zero — got 0"; fi
+if [ -d "$ENV18/IBL5-worktrees/_pool-1" ]; then
+    pass "case 18: _pool-1 dir present"
+else
+    failcase "case 18: _pool-1 dir must survive"
+fi
+assert_match "case 18: _pool-1 still registered" "IBL5-worktrees/_pool-1" \
+    "$(git -C "$ENV18/IBL5" worktree list)"
+
+echo "== case 19 (abort 10): a successful run keeps the worktree and calls no remover"
+ENV19="$(new_env)"
+OUT19="$("$ENV19/IBL5/bin/wt-new" ok-run 2>&1)" && RC19=$? || RC19=$?
+assert_eq "case 19: exits 0" "0" "$RC19"
+if [ -d "$ENV19/IBL5-worktrees/ok-run" ]; then
+    pass "case 19: worktree dir present"
+else
+    failcase "case 19: worktree dir missing"
+fi
+assert_absent "case 19: no wt-remove line" "wt-remove:" "$OUT19"
 
 echo "----"
 h_done

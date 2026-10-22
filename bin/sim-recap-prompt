@@ -2,8 +2,9 @@
 # bin/sim-recap-prompt
 #
 # Prints the assembled sim-recap Claude prompt to stdout.
-# Performs NO database access of any kind — the agent that receives this prompt
-# queries live game data itself via mysql.
+# Performs NO database access of any kind — the prompt carries a prefetched fact
+# sheet (from --roster) and the agent writes prose from it. The agent may run
+# mysql only for extra color the sheet lacks (a bench line, quarter scores).
 #
 # Usage:
 #   bin/sim-recap-prompt --sim=N --mentions=<path> --themes=<path> --roster=<path>

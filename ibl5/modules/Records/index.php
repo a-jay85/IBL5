@@ -51,9 +51,9 @@ $controller = new RecordsController([
     },
     /** @param array<mixed> $query */
     RecordsController::TAB_THISSEASON => static function (array $query) use ($mysqli_db, $leagueContext): string {
-        $season = new \Season\Season($mysqli_db, $leagueContext);
+        $season = \Season\SharedSeason::get($mysqli_db, $leagueContext);
         $rawPhase = $query['seasonPhase'] ?? null;
-        $seasonPhase = (is_string($rawPhase) && $rawPhase !== '') ? $rawPhase : $season->phase;
+        $seasonPhase = (is_string($rawPhase) && $rawPhase !== '' && $rawPhase !== '0') ? $rawPhase : $season->phase;
         $repository = new CachedSeasonHighsRepository(
             new SeasonHighsRepository($mysqli_db, $leagueContext),
             new DatabaseCache($mysqli_db),

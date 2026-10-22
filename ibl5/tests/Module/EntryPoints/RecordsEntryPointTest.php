@@ -11,8 +11,6 @@ final class RecordsEntryPointTest extends ModuleEntryPointTestCase
         parent::setUp();
         $this->mockDb->setMockData([]);
         $this->mockDb->onQuery('cache', []);
-        // Cold cache → single-flight rebuild: the request must win GET_LOCK to build inline.
-        $this->mockDb->onQuery('GET_LOCK', [['got' => 1]]);
         $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
         $this->mockDb->onQuery('ibl_schedule', []);
@@ -72,5 +70,13 @@ final class RecordsEntryPointTest extends ModuleEntryPointTestCase
         $output = $this->runModule('Records', ['tab' => 'thisseason', 'seasonPhase' => ['Playoffs']], [], $this->dbGlobals());
 
         $this->assertStringContainsString('data-tab="thisseason"', $output);
+    }
+
+    public function testZeroStringSeasonPhaseFallsBackToCurrentPhase(): void
+    {
+        $output = $this->runModule('Records', ['tab' => 'thisseason', 'seasonPhase' => '0'], [], $this->dbGlobals());
+
+        $this->assertStringContainsString('data-tab="thisseason"', $output);
+        $this->assertStringNotContainsString("Players' 0 Highs", $output);
     }
 }

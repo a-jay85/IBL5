@@ -66,7 +66,7 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
 
     /**
      * In the offseason the contract year rolls forward: a player in the last
-     * year of his deal has nothing left to trade, and one with a year to go
+     * year of a deal has nothing left to trade, and one with a year to go
      * has exactly one year left.
      */
     public function testOffseasonShiftsTheContractYear(): void
@@ -87,6 +87,29 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $offseason[200000012]->yearsRemaining);
         self::assertSame(900, $offseason[200000012]->currentSalary);
         self::assertSame(0, $offseason[200000012]->futureSalary);
+    }
+
+    /**
+     * The roster count must match TradeFormRepository::getTeamPlayerCount(),
+     * which in the offseason counts anyone with a salary next contract year,
+     * including a cy=0 player with salary_yr1 set.
+     */
+    public function testOffseasonRosterCountMatchesTheValidator(): void
+    {
+        $this->insertTestPlayer(200000031, 'Suggest Expiring', ['teamid' => 1, 'cy' => 2, 'cyt' => 2, 'salary_yr1' => 800, 'salary_yr2' => 900, 'salary_yr3' => 0]);
+        $this->insertTestPlayer(200000032, 'Suggest Signed Rookie', ['teamid' => 1, 'cy' => 0, 'cyt' => 3, 'salary_yr1' => 500]);
+
+        $offseason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), true)[1] ?? []);
+        $inSeason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false)[1] ?? []);
+
+        self::assertFalse($offseason[200000031]->countsOnRoster);
+        self::assertTrue($offseason[200000032]->countsOnRoster);
+        self::assertFalse($offseason[200000032]->tradeable);
+        self::assertTrue($inSeason[200000031]->countsOnRoster);
+
+        $validatorCount = (new \Trading\TradeFormRepository($this->db))->getTeamPlayerCount(1, true);
+        $engineCount = count(array_filter($offseason, static fn (SuggestionPlayer $p): bool => $p->countsOnRoster));
+        self::assertSame($validatorCount, $engineCount);
     }
 
     public function testWaivedPlayerIsLeftOutAndUnsignedPlayerIsNotTradeable(): void

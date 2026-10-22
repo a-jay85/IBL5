@@ -25,6 +25,7 @@ final readonly class SuggestionPlayer
         public int $yearsRemaining,
         public int $futureSalary,
         public bool $tradeable = true,
+        public bool $countsOnRoster = true,
     ) {
     }
 }

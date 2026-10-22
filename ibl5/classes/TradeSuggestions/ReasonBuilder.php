@@ -15,7 +15,6 @@ namespace TradeSuggestions;
  */
 final class ReasonBuilder
 {
-    public const int ROTATION_SIZE = 8;
     public const int VETERAN_AGE = 28;
 
     public function __construct(private readonly AssetValuer $valuer = new AssetValuer())
@@ -47,7 +46,7 @@ final class ReasonBuilder
         if ($best !== null) {
             $rank = self::rankOn($after, $best);
             $value = $this->valuer->playerValue($best, $mode);
-            if ($rank <= self::ROTATION_SIZE) {
+            if ($rank <= TeamModeGuesser::ROTATION_SIZE) {
                 $options[] = [$value, 'Adds ' . self::describe($best) . ', who would be the team\'s '
                     . ($rank === 1 ? 'best player' : self::ordinal($rank) . '-best player') . '.'];
             }
@@ -62,7 +61,7 @@ final class ReasonBuilder
                 $allRotation = true;
                 $sum = 0.0;
                 foreach ($inPlayers as $player) {
-                    $allRotation = $allRotation && self::rankOn($after, $player) <= self::ROTATION_SIZE;
+                    $allRotation = $allRotation && self::rankOn($after, $player) <= TeamModeGuesser::ROTATION_SIZE;
                     $sum += $this->valuer->playerValue($player, $mode);
                 }
                 if ($allRotation) {
@@ -91,7 +90,7 @@ final class ReasonBuilder
         $cleared = self::futureSalary($outPlayers) - self::futureSalary($inPlayers);
         if ($cleared > 0) {
             $strength = $mode === TeamMode::Rebuild ? $cleared * AssetValuer::REBUILD_SALARY_COST : 0.0;
-            $options[] = [$strength, 'Frees $' . \BasketballStats\StatsFormatter::formatTotal($cleared) . 'K of salary owed after this season.'];
+            $options[] = [$strength, 'Frees $' . \BasketballStats\StatsFormatter::formatTotal($cleared) . 'K of salary owed in later contract years.'];
         }
 
         if ($mode === TeamMode::Rebuild) {

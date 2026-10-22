@@ -211,6 +211,8 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
 
             self::assertInstanceOf(\ReflectionNamedType::class, $type);
             self::assertSame(LeagueContext::class, $type->getName());
+            self::assertTrue($type->allowsNull(), "{$class}: leagueContext stays optional.");
+            self::assertNotSame('object', $type->getName(), "{$class}: leagueContext must not be retyped to ?object.");
             self::assertFalse(
                 self::isActorIdentity('leagueContext', $type),
                 "{$class}: LeagueContext selects a league table set and is not actor identity. Re-classify deliberately if the regexes change."

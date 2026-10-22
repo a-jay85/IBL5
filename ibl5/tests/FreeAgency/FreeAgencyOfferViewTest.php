@@ -131,7 +131,7 @@ class FreeAgencyOfferViewTest extends TestCase
     {
         $html = $this->view->render($this->baseData(hasExistingOffer: false, rosterSpot0: 0), 'Offer rejected');
 
-        $this->assertStringContainsString('ibl-alert--error', $html);
+        $this->assertStringContainsString('role="alert" class="d-alert d-alert-error', $html);
         $this->assertStringContainsString('Offer rejected', $html);
     }
 

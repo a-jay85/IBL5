@@ -1,15 +1,19 @@
 #!/bin/bash
 
 # Decides whether every non-ignored check-run on a PR head SHA has settled green,
-# optionally polling until it has. The only thing .github/workflows/all-checks-green.yml
-# runs; that workflow's job is the required `All checks green` context (ADR-0149).
+# optionally polling until it has. Read by bin/settle-pr-status, which
+# .github/workflows/all-checks-settled.yml runs once per sibling completion and turns the
+# exit code into the `All checks settled` commit status (ADR-0149 addendum). The legacy
+# waiter .github/workflows/all-checks-green.yml still calls it with --wait until the
+# cutover retires it.
 #
 # Verdict logic is shared with bin/check-master-ci-green via bin/lib/ci-checks-green.sh.
-# Legacy commit statuses are deliberately NOT read: verified 2026-09-30 on PR #2564's
-# head, the combined-status endpoint returned total_count 0, every check on this repo
-# is a check-run, and none of master's required contexts is a status context.
+# Legacy commit statuses are deliberately NOT read. Every check on this repo is a
+# check-run, and the one status context that exists, `All checks settled`, is this
+# script's own output. Reading statuses would let the verdict see the aggregator's
+# status and loop on itself (--self only covers check-runs), so do not add it.
 #
-# Exit codes: 0 = settled green, 1 = failed / pending / deadline hit, 2 = usage or API error.
+# Exit codes: 0 = settled green, 1 = failed / stacked base / deadline hit, 2 = usage or API error, 3 = still pending (one-shot only).
 
 set -euo pipefail
 
@@ -17,8 +21,9 @@ usage() {
     cat <<'EOF'
 Usage: bin/check-pr-checks-green --repo=<owner/repo> --sha=<40-hex> [options]
 
-  --self=<name>            Exact check-run name of the calling job; always ignored.
+  --self=<csv>             Exact check-run names of the caller (job name and status context); always ignored.
   --ignore=<csv>           Extra exact check-run names to ignore (advisory-by-design).
+  --ignore-workflows=<csv>  Workflow display names whose ACTIVE runs never hold V4 (the legacy All checks green waiter during cutover).
   --anchor=<csv>           Exact names that MUST exist and be completed before any
                            PASS verdict (the other required contexts).
   --wait                   Poll until settled or deadline. Without it: one shot.
@@ -51,10 +56,10 @@ Environment:
                    Unset or empty means no self-exclusion.
 
 Exit codes: 0 = every non-ignored check settled in {success, skipped, neutral};
-            1 = a check failed, the base is stacked (--base-ref), a check is still
-                pending (one-shot), or the deadline
+            1 = a check failed, the base is stacked (--base-ref), or the deadline
                 hit with checks still pending (fail-closed);
-            2 = usage error, unparseable API response.
+            2 = usage error, unparseable API response;
+            3 = still pending (one-shot only; --wait polls instead).
 EOF
 }
 
@@ -62,6 +67,7 @@ REPO=""
 SHA=""
 SELF=""
 IGNORE=""
+IGNORE_WF=""
 ANCHOR=""
 WAIT=0
 INTERVAL=60
@@ -82,6 +88,7 @@ for arg in "$@"; do
         --sha=*)              SHA="${arg#--sha=}" ;;
         --self=*)             SELF="${arg#--self=}" ;;
         --ignore=*)           IGNORE="${arg#--ignore=}" ;;
+        --ignore-workflows=*) IGNORE_WF="${arg#--ignore-workflows=}" ;;
         --anchor=*)           ANCHOR="${arg#--anchor=}" ;;
         --wait)               WAIT=1 ;;
         --interval-seconds=*) INTERVAL="${arg#--interval-seconds=}" ;;
@@ -145,6 +152,7 @@ GH_API_CMD="${GH_API_CMD:-gh api}"
 SELF_WORKFLOW="${GITHUB_WORKFLOW:-}"
 SKIP_JSON="$(ccg_skip_json "$SELF,$IGNORE")"
 ANCHOR_JSON="$(ccg_skip_json "$ANCHOR")"
+IGNORE_WF_JSON="$(ccg_skip_json "$IGNORE_WF")"
 IGNORED_LIST="$(printf '%s' "$SKIP_JSON" | jq -r 'join(", ")')"
 ANCHOR_LIST="$(printf '%s' "$ANCHOR_JSON" | jq -r 'join(", ")')"
 
@@ -156,8 +164,8 @@ poll_once() {
         VERDICT=apierr; LINE="check-runs read failed"; return 0
     fi
     if ! runs_raw="$(bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/actions/runs?head_sha=$SHA&per_page=100\"" 2>/dev/null)" \
-        || ! active="$(printf '%s' "$runs_raw" | jq -er --arg self_wf "$SELF_WORKFLOW" \
-            '[.[].workflow_runs[] | select(.status != "completed") | select(.name != $self_wf)] | map(.name) | join(", ")' 2>/dev/null)"; then
+        || ! active="$(printf '%s' "$runs_raw" | jq -er --arg self_wf "$SELF_WORKFLOW" --argjson skipwf "$IGNORE_WF_JSON" \
+            '[.[].workflow_runs[] | select(.status != "completed") | select(.name != $self_wf) | select(.name as $n | $skipwf | index($n) | not)] | map(.name) | join(", ")' 2>/dev/null)"; then
         VERDICT=apierr; LINE="workflow-runs read failed"; return 0
     fi
     checks="$(printf '%s' "$checks" | ccg_dedupe "$SKIP_JSON")"
@@ -210,7 +218,7 @@ while :; do
             API_ERRORS=0
             if [ "$WAIT" -ne 1 ]; then
                 echo "$LINE" >&2
-                exit 1
+                exit 3
             fi
             ;;
     esac

@@ -74,6 +74,7 @@ test.describe('Cap Space flow', () => {
     await page.goto('modules.php?name=Contracts');
     await expect(page.locator('.ibl-tab--active')).toHaveText('Teams');
     await expect(page.locator('.ibl-title')).toContainText('Cap Info');
+    await expect(page.locator('.ibl-tab-panel .ibl-data-table').first()).toBeVisible();
   });
 
   test('unknown tab value falls back to teams tab', async ({ page }) => {
@@ -88,5 +89,6 @@ test.describe('Cap Space flow', () => {
     await page.locator('.ibl-tabs a.ibl-tab', { hasText: 'Players' }).click();
     await expect(page).toHaveURL(/tab=players/);
     await expect(page.locator('.ibl-title')).toContainText('Master Contract List');
+    await expect(page.locator('.ibl-tab-panel .ibl-data-table').first()).toBeVisible();
   });
 });

@@ -313,5 +313,30 @@ for B7_REASON in pre-rebase presquash local local-1729600000; do
     esac
 done
 
+echo "== case B8: the rule's fenced backup example works as written"
+B8_RULE="$REAL_ROOT/.claude/rules/linear-history-squash-merge.md"
+B8_BLOCK="$(awk '
+    /If you keep a backup branch/ { seen = 1; next }
+    seen && !inb && /^```bash$/ { inb = 1; next }
+    inb && /^```$/ { exit }
+    inb { print }
+' "$B8_RULE")"
+if [ -z "$B8_BLOCK" ]; then
+    h_fail "case B8: fenced bash block found after 'If you keep a backup branch'"
+else
+    h_pass "case B8: fenced bash block found after 'If you keep a backup branch'"
+    h_not_contains "case B8: no hand-typed backup branch" "$B8_BLOCK" "git branch backup/"
+    git -C "$MAIN" branch b8-branch HEAD >/dev/null 2>&1
+    B8_RUN="${B8_BLOCK//<your-branch>/b8-branch}"
+    (cd "$MAIN" && bash -c "$B8_RUN") >/dev/null 2>&1 && B8_RC=0 || B8_RC=$?
+    h_eq "case B8: example exits 0" 0 "$B8_RC"
+    B8_REFS="$(git -C "$MAIN" for-each-ref --format='%(refname)' refs/heads/backup/b8-branch/)"
+    if [[ "$B8_REFS" =~ ^refs/heads/backup/b8-branch/[0-9]{8}-[0-9]{6}-pre-rebase$ ]]; then
+        h_pass "case B8: minted ref has the dated shape"
+    else
+        h_fail "case B8: minted ref has the dated shape (got '$B8_REFS')"
+    fi
+fi
+
 echo "----"
 h_done

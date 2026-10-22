@@ -92,6 +92,9 @@
         }
 
         function closeMenu() {
+            // A second close within 300 ms must not orphan the first timer
+            clearTimeout(overlayHideTimer);
+
             // Remove stagger animation class first; a close inside the 50ms open window must cancel the pending add.
             clearTimeout(menuStaggerTimer);
             mobileMenu.classList.remove('mobile-menu-open');

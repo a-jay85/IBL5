@@ -46,8 +46,8 @@ run_pr "feat: x" "not-human-approved-yet";       expect "feat: + lookalike label
 # ---- workflow job `if:` characterization (event-payload fixtures) ----
 # These rows pin the invariant any label/event filter on the signoff workflows
 # must respect: a job runs on every event where the classifier would FAIL, and
-# on every event type whose payload cannot prove irrelevance. They pass on the
-# unfiltered workflows and must stay green once filters land.
+# on every event type whose payload cannot prove irrelevance. The workflows now
+# carry the filters (ADR-0210), and these rows must stay green with them.
 EVAL="$REPO_ROOT/bin/lib/gha-if-eval.py"
 WF_DIR="$REPO_ROOT/.github/workflows"
 

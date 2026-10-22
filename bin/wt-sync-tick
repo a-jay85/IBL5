@@ -140,6 +140,11 @@ is_stale_copy() {   # <wt> <branch> — 0 = every ahead commit has an origin twi
     [ -z "$unique" ]
 }
 
+# refs/wt-sync-backup/<branch> stays a ref namespace on purpose, outside the
+# backup/<slug>/<ts>-<reason> branch shape that wt_backup_branch_name
+# (bin/lib/git-helpers.sh) mints. An unattended tick writes it with a reflog;
+# keeping it out of refs/heads keeps tick-made refs out of every `git branch`
+# listing, and bin/test-wt-sync-tick pins this exact path at ~20 sites.
 backup_and_reset() {   # <wt> <branch> — 0 = backed up + reset; 1 = nothing changed
     local wt="$1" branch="$2" cur old_sha backup_sha
     cur="$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null)" || return 1

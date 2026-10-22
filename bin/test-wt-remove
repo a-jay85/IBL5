@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-wt-remove — scratch-repo harness for bin/wt-remove --if-empty.
+# bin/test-wt-remove — scratch-repo harness for worktree abort cleanup
+# (bin/wt-remove --if-empty and its callers) and backup-branch naming
+# (wt_backup_branch_name in bin/lib/git-helpers.sh).
 #
 # --if-empty is the one place every worktree-creating flow asks "is this
 # aborted worktree empty, so it is safe to remove?". Each case builds a real
@@ -240,6 +242,76 @@ h_eq "case 17: reap command present once" 1 \
     "$(grep -cF 'bin/wt-remove <slug> --if-empty' "$FP")"
 h_contains "case 17: same line as the /plan hand-off" \
     "$(grep -F 'bin/wt-remove <slug> --if-empty' "$FP")" 'hand off to `/plan`'
+
+# backup-name helper (bin/lib/git-helpers.sh wt_backup_branch_name)
+# shellcheck disable=SC1091  # the fixture copy of the real lib
+. "$MAIN/bin/lib/git-helpers.sh"
+# The date shim pins the clock and nothing else.
+mkdir -p "$TMP/dateshim"
+printf '%s\n' '#!/bin/sh' \
+    'if [ "$1" = "+%Y%m%d-%H%M%S" ]; then echo 20261022-120000; exit 0; fi' \
+    'exec /bin/date "$@"' > "$TMP/dateshim/date"
+chmod +x "$TMP/dateshim/date"
+
+# bk <repo> <slug> <reason> — run the helper from <repo>. Sets BK_OUT, BK_ERR, BK_RC.
+bk() {
+    BK_OUT="$(cd "$1" && PATH="$TMP/dateshim:$PATH" wt_backup_branch_name "$2" "$3" 2>"$TMP/bk.err")" \
+        && BK_RC=0 || BK_RC=$?
+    BK_ERR="$(cat "$TMP/bk.err")"
+}
+
+echo "== case B1: slug-first dated shape, and git can create it"
+bk "$MAIN" my-slug pre-rebase
+h_eq "case B1: rc 0" 0 "$BK_RC"
+h_eq "case B1: name" "backup/my-slug/20261022-120000-pre-rebase" "$BK_OUT"
+if git -C "$MAIN" branch "$BK_OUT" HEAD >/dev/null 2>&1; then
+    h_pass "case B1: git branch succeeds"
+else
+    h_fail "case B1: git branch succeeds"
+fi
+
+echo "== case B2: a slash in the slug flattens to a dash"
+bk "$MAIN" feat/x local
+h_eq "case B2: name" "backup/feat-x/20261022-120000-local" "$BK_OUT"
+
+echo "== case B3: a flat legacy backup/<slug> branch blocks"
+git -C "$MAIN" branch backup/flat-slug HEAD >/dev/null 2>&1
+bk "$MAIN" flat-slug presquash
+h_eq "case B3: rc 1" 1 "$BK_RC"
+h_eq "case B3: stdout empty" "" "$BK_OUT"
+h_contains "case B3: stderr names the blocker" "$BK_ERR" \
+    "branch 'backup/flat-slug' exists and blocks 'backup/flat-slug/20261022-120000-presquash'"
+
+echo "== case B4: a bare 'backup' branch blocks"
+git_q init -q "$TMP/bk2" >/dev/null 2>&1
+git_q -C "$TMP/bk2" commit -q --allow-empty -m C1 >/dev/null 2>&1
+git -C "$TMP/bk2" branch backup HEAD >/dev/null 2>&1
+bk "$TMP/bk2" any-slug local
+h_eq "case B4: rc 1" 1 "$BK_RC"
+h_contains "case B4: stderr names the blocker" "$BK_ERR" "branch 'backup' exists"
+
+echo "== case B5: a same-second duplicate fails"
+git -C "$MAIN" branch backup/dup/20261022-120000-local HEAD >/dev/null 2>&1
+bk "$MAIN" dup local
+h_eq "case B5: rc 1" 1 "$BK_RC"
+h_contains "case B5: already exists" "$BK_ERR" "already exists"
+
+echo "== case B6: bad input fails with nothing on stdout"
+bk "$MAIN" s "Pre Rebase"
+h_eq "case B6: non-kebab reason rc 1" 1 "$BK_RC"
+h_eq "case B6: non-kebab reason stdout empty" "" "$BK_OUT"
+bk "$MAIN" "" x
+h_eq "case B6: empty slug rc 1" 1 "$BK_RC"
+h_eq "case B6: empty slug stdout empty" "" "$BK_OUT"
+
+echo "== case B7: legacy reason shapes still mint slug-first, date-first"
+for B7_REASON in pre-rebase presquash local local-1729600000; do
+    bk "$MAIN" s "$B7_REASON"
+    case "$BK_OUT" in
+        "backup/s/20261022-120000-$B7_REASON") h_pass "case B7: $B7_REASON" ;;
+        *) h_fail "case B7: $B7_REASON (got '$BK_OUT')" ;;
+    esac
+done
 
 echo "----"
 h_done

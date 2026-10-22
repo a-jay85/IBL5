@@ -111,7 +111,8 @@ api_get() {
     local out err errfile
     errfile="$(mktemp)"
     if ! out="$(gh_retry_json bash -c "$GH_API_CMD \"$1\"" 2>"$errfile")"; then
-        err="$(sed -n '1p' "$errfile")"
+        # errfile holds every attempt's stderr; the last line is the error that ended the job.
+        err="$(tail -n 1 "$errfile")"
         rm -f "$errfile"
         echo "API read error: $1: ${err:-${out%%$'\n'*}}" >&2
         exit 2

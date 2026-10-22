@@ -159,6 +159,46 @@ class ExtensionServiceTest extends TestCase
         $this->assertSame('refuses', $result['refusalMessage']);
     }
 
+    /**
+     * @return array<string, array{array<string, int>, array{year1: int, year2: int, year3: int, year4: int, year5: int}, bool}>
+     */
+    public static function discordOutcomeProvider(): array
+    {
+        return [
+            'accepted' => [
+                ['loyalty' => 5, 'contract_wins' => 60, 'contract_losses' => 22],
+                ['year1' => 1000, 'year2' => 1100, 'year3' => 1200, 'year4' => 0, 'year5' => 0],
+                true,
+            ],
+            'rejected' => [
+                ['loyalty' => 1, 'winner' => 5, 'tradition' => 5, 'contract_wins' => 20, 'contract_losses' => 62, 'contract_avg_w' => 1200, 'contract_avg_l' => 3800],
+                ['year1' => 900, 'year2' => 950, 'year3' => 1000, 'year4' => 0, 'year5' => 0],
+                false,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, int> $overrides
+     * @param array{year1: int, year2: int, year3: int, year4: int, year5: int} $offer
+     */
+    #[DataProvider('discordOutcomeProvider')]
+    public function testDiscordNotificationSentIsTrueOnBothOutcomes(array $overrides, array $offer, bool $expectedAccepted): void
+    {
+        $this->mockDb->setMockData([$this->getFullMockData($overrides)]);
+        $service = new ExtensionService($this->mockDb);
+        $result = $service->processExtension([
+            'teamName' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offer' => $offer,
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame($expectedAccepted, $result['accepted']);
+        $this->assertTrue($result['discordNotificationSent']);
+        $this->assertSame('#extensions', $result['discordChannel']);
+    }
+
     // ============================================
     // EXTENSION YEAR COUNTING
     // ============================================

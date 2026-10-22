@@ -118,6 +118,22 @@ if [ -d "$WT_ROOT" ]; then
     exit 1
 fi
 
+# Abort cleanup. The guard above proved WT_ROOT did not exist, so any WT_ROOT
+# present at a non-zero exit was made by this run (cold add, --existing add, or
+# pool claim). bin/wt-remove --if-empty re-checks emptiness at removal time and
+# keeps anything with work. --pool-refill already exited above (`pool_refill;
+# exit $?`) and never reaches this trap, so _pool-* slots are never handed to it.
+# The worktree's own wt-remove is used (SCRIPT_ROOT), so the flag is guaranteed.
+wt_new_abort_cleanup() {
+    local rc=$?
+    if [ "$rc" != 0 ] && [ -d "$WT_ROOT" ]; then
+        cd "$REPO_ROOT" 2>/dev/null || cd /
+        "$SCRIPT_ROOT/bin/wt-remove" "${BRANCH_NAME:-$NAME}" --if-empty || true
+    fi
+    exit "$rc"
+}
+trap wt_new_abort_cleanup EXIT
+
 if [ -n "$EXISTING_BRANCH" ]; then
     BRANCH_NAME="$EXISTING_BRANCH"
 
@@ -228,6 +244,8 @@ else
     wt_build_css "$WT_IBL5" "$MAIN_IBL5"
 fi
 
+# Ready: a later step failing must never remove this worktree.
+trap - EXIT
 echo ""
 echo "================================================"
 echo "  Worktree ready!"

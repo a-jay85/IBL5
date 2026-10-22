@@ -1,0 +1,18 @@
+@layer components {
+
+/* Shared primitives. Imported right after base.css so every feature
+   partial overrides these at equal specificity. */
+
+/* Compact chip: shared chrome for small inline labels. Size, padding,
+   casing and letter-spacing stay in each feature file. */
+.ibl-chip {
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+}
+
+.ibl-chip--navy {
+    background: var(--navy-800);
+    color: white;
+}
+
+} /* end @layer components */

@@ -30,7 +30,6 @@ SLUG = "holdrepeat-early"
 CANNED = {
     "pr-copy": {"type": "chore", "title": "chore: replay", "commit_subject": "chore: replay commit",
                 "summary_md": "## Summary\n- x\n"},
-    "body-check": {"corrected_body": "## Summary\n- replay body\n", "findings": []},
     "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
     "security-audit": [],
     "safety-verdict": {"holds": []},
@@ -425,3 +424,180 @@ def test_proceed_writes_no_marker(tmp_path, dm, plan_file):
     res, _, _ = _run(tmp_path, 2, fixture=_fixture(plan=MISSING_PLAN_PLUS, diff=DIFF_XY))
     assert res.terminal != TerminalState.HOLD_REPEAT_DECLINED
     assert not _marker_file(tmp_path).exists()
+
+
+# --- UNREALISED-ASSERTION-only holds: head-keyed decline in a real checkout ----------------
+
+ROW_V2 = "UNREALISED-ASSERTION: row V2 -- tests/test_x.py::test_y"
+TOKEN = "zz_absent_token"
+CLEAN_PLAN = "# Synthetic plan\n\nNo critical files and no matrix.\n"
+
+
+def _fake_matrix(tmp_path, *, code=1, sentinel=None):
+    """Executable stand-in for bin/lib/plan-matrix-assertions: one row plus one token."""
+    path = tmp_path / "fake-matrix"
+    body = ["#!/bin/sh"]
+    if sentinel:
+        body.append(f"touch '{sentinel}'")
+    body.append(f"printf '%s\\n' '{ROW_V2}'")
+    body.append(f"printf '%s\\n' '  missing: {TOKEN}' >&2")
+    body.append(f"exit {code}")
+    path.write_text("\n".join(body) + "\n")
+    path.chmod(path.stat().st_mode | stat.S_IEXEC)
+    return str(path)
+
+
+def _seed_hold(tmp_path, reason):
+    cond = types.SimpleNamespace(number=3, name="plan_conformance", blocked=True, reason=reason)
+    holdrepeat.observe(str(tmp_path / "state"), SLUG, armed=False, conditions=[cond],
+                       fingerprint="fp-const", pr=4242, now="2026-10-02T12:00:00Z")
+
+
+def _unr_env(tmp_path, monkeypatch, *, plan_text=CLEAN_PLAN, reason=ROW_V2, code=1,
+             sentinel=None):
+    plans = tmp_path / "plans"
+    plans.mkdir()
+    (plans / f"{SLUG}.md").write_text(plan_text)
+    plan = locate_plan(SLUG, plans_dir=str(plans))
+    _seed_hold(tmp_path, reason)
+    wt = _real_repo(tmp_path)
+    monkeypatch.setattr(conformance, "_MATRIX_ASSERTIONS_SCRIPT",
+                        _fake_matrix(tmp_path, code=code, sentinel=sentinel))
+    return plan, wt
+
+
+def _early(tmp_path, plan, wt, log, n=1):
+    res = runner.RunResult(terminal=TerminalState.FAILED, slug=SLUG, plan=None,
+                           arm="SENTINEL", pr_number=4242)
+    done = runner._early_hold_repeat(res, plan, [], SLUG, str(tmp_path / f"out{n}"), False,
+                                     str(tmp_path / "state"), log.append,
+                                     diff_body="", worktree=str(wt))
+    return res, done
+
+
+def _head(wt):
+    return _git(wt, "rev-parse", "HEAD").stdout.strip()
+
+
+def test_early_unrealised_only_hold_declines_and_writes_head_keyed_marker(
+        tmp_path, dm, monkeypatch):
+    plan, wt = _unr_env(tmp_path, monkeypatch)
+    state, log = str(tmp_path / "state"), []
+    res1, done1 = _early(tmp_path, plan, wt, log, 1)
+    assert done1 is True
+    assert res1.terminal == TerminalState.HOLD_REPEAT_DECLINED
+    head = _head(wt)
+    marker = json.loads(_marker_file(tmp_path).read_text())
+    assert marker["head_sha"] == head
+    assert marker["missing_tokens"] == [TOKEN]
+    assert heldmarker.active(state, SLUG, plan.path, head_sha=head, repo=str(wt))[0] is True
+    res2, done2 = _early(tmp_path, plan, wt, log, 2)
+    assert done2 is True
+    assert res2.terminal == TerminalState.HOLD_REPEAT_DECLINED
+    assert dm.count() == 1
+    sent = dm.log.read_text()
+    assert "Push a test that realises these matrix rows" in sent
+    assert "the plan file, the branch head or this hold changes" in sent
+    assert any("same UNREALISED-ASSERTION set" in ln for ln in log)
+
+
+def test_early_unrealised_marker_stale_after_new_commit(tmp_path, dm, monkeypatch):
+    plan, wt = _unr_env(tmp_path, monkeypatch)
+    _, done = _early(tmp_path, plan, wt, [])
+    assert done is True
+    old = _head(wt)
+    _write(wt, "b.txt", "more\n")
+    _git(wt, "add", "-A")
+    _git(wt, "commit", "-qm", "another commit")
+    new = _head(wt)
+    assert new != old
+    state = str(tmp_path / "state")
+    assert heldmarker.active(state, SLUG, plan.path, head_sha=new, repo=str(wt))[0] is False
+    assert heldmarker.active(state, SLUG, plan.path, head_sha=old, repo=str(wt))[0] is True
+
+
+def test_early_unrealised_proceeds_when_check_unavailable(tmp_path, dm, monkeypatch):
+    plan, wt = _unr_env(tmp_path, monkeypatch, code=2)
+    log = []
+    res, done = _early(tmp_path, plan, wt, log)
+    assert done is False
+    assert res.terminal == TerminalState.FAILED
+    assert not _marker_file(tmp_path).exists()
+    assert any("unrealised: matrix check unavailable" in ln for ln in log)
+
+
+def test_early_unrealised_proceeds_when_master_gains_token(tmp_path, dm, monkeypatch):
+    plan, wt = _unr_env(tmp_path, monkeypatch)
+    other = tmp_path / "other"
+    _git(tmp_path, "clone", "-q", str(tmp_path / "origin.git"), str(other))
+    _git(other, "config", "user.email", "t@t")
+    _git(other, "config", "user.name", "t")
+    _write(other, f"tests/{TOKEN}.txt", "now realised\n")
+    _git(other, "add", "-A")
+    _git(other, "commit", "-qm", "master gains the token")
+    _git(other, "push", "-q", "origin", "master")
+    log = []
+    res, done = _early(tmp_path, plan, wt, log)
+    assert done is False
+    assert not _marker_file(tmp_path).exists()
+    assert any("unrealised: master carries a missing token" in ln for ln in log)
+
+
+def test_early_unrealised_proceeds_on_dirty_worktree(tmp_path, dm, monkeypatch):
+    plan, wt = _unr_env(tmp_path, monkeypatch)
+    _write(wt, "a.txt", "edited but uncommitted\n")
+    log = []
+    res, done = _early(tmp_path, plan, wt, log)
+    assert done is False
+    assert not _marker_file(tmp_path).exists()
+    assert any("unrealised: worktree dirty or unreadable" in ln for ln in log)
+
+
+def test_early_unrealised_proceeds_when_fetch_fails(tmp_path, dm, monkeypatch):
+    plan, wt = _unr_env(tmp_path, monkeypatch)
+    # The local origin/master ref stays and lacks the token, so only the fetch arm
+    # can make this run proceed.
+    _git(wt, "remote", "set-url", "origin", str(tmp_path / "missing.git"))
+    log = []
+    res, done = _early(tmp_path, plan, wt, log)
+    assert done is False
+    assert not _marker_file(tmp_path).exists()
+    assert any("unrealised: fetch failed" in ln for ln in log)
+
+
+def test_early_missing_only_log_line_unchanged(tmp_path, dm, monkeypatch):
+    sentinel = tmp_path / "sentinel"
+    plans = tmp_path / "plans"
+    plans.mkdir()
+    two = MISSING_PLAN
+    one = MISSING_PLAN.replace(f"## Critical Files\n\n- `{CRITICAL}` (new)\n\n", "")
+    (plans / f"{SLUG}.md").write_text(two)
+    plan = locate_plan(SLUG, plans_dir=str(plans))
+    prior = conformance.early_missing_items(locate_plan(SLUG, content_override=one), [])
+    assert len(prior) == 1
+    assert len(conformance.early_missing_items(plan, [])) == 2
+    _seed_hold(tmp_path, "; ".join(prior))
+    wt = _real_repo(tmp_path)
+    monkeypatch.setattr(conformance, "_MATRIX_ASSERTIONS_SCRIPT",
+                        _fake_matrix(tmp_path, sentinel=sentinel))
+    log = []
+    res, done = _early(tmp_path, plan, wt, log)
+    assert done is False
+    assert "phase2 early hold-repeat: proceed (2 MISSING item(s))" in log
+    assert not sentinel.exists()
+
+
+def test_run_wires_diff_and_worktree_into_unrealised_decline(tmp_path, dm, monkeypatch):
+    """runner.run() must hand the worktree to the early check, or the run never declines."""
+    plan, wt = _unr_env(tmp_path, monkeypatch)
+    _write(wt, "unrelated/new_file.txt", "unrelated\n")
+    _git(wt, "add", "-A")
+    _git(wt, "commit", "-qm", "feat: unrelated work")
+    ledger = UsageLedger()
+    llm = FixtureLlm(ledger, dict(CANNED))
+    res = runner.run(None, str(tmp_path / "out"), llm, mode="live", live=False,
+                     worktree=str(wt), plans_dir=str(tmp_path / "plans"),
+                     state_dir=str(tmp_path / "state"))
+    assert res.terminal == TerminalState.HOLD_REPEAT_DECLINED
+    assert _calls(ledger) == 0
+    assert json.loads(_marker_file(tmp_path).read_text())["head_sha"] == _head(wt)

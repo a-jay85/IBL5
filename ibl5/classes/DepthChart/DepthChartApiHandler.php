@@ -50,19 +50,9 @@ class DepthChartApiHandler
             }
         }
 
-        // Validate split parameter when display=split
-        $split = null;
-        if ($display === 'split' && isset($_GET['split']) && is_string($_GET['split'])) {
-            $splitRepo = new \Team\SplitStatsRepository($this->db);
-            $rawSplit = $_GET['split'];
-            if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
-                $split = $rawSplit;
-            } else {
-                $display = 'ratings';
-            }
-        } elseif ($display === 'split') {
-            $display = 'ratings';
-        }
+        // Resolve the split parameter when display=split (shared allow-list gate)
+        $splitRepo = new \Team\SplitStatsRepository($this->db);
+        [$display, $split] = $splitRepo->resolveDisplayAndSplit($display, $_GET['split'] ?? null);
 
         // Emit HX-Push-Url so HTMX pushes the user-friendly URL
         $pushUrl = 'modules.php?name=DepthChartEntry&display=' . $display;

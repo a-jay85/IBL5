@@ -63,12 +63,12 @@ class PlayoffSeedingCalculatorTest extends TestCase
         $result = $this->calculator->determinePlayoffTeams([], [], []);
 
         $this->assertSame(
-            ['wildCards' => [], 'divisionWinners' => [], 'conferenceWinner' => null, 'nonPlayoff' => []],
+            ['otherPlayoffTeams' => [], 'divisionWinners' => [], 'conferenceWinner' => null, 'nonPlayoff' => []],
             $result
         );
     }
 
-    // ── Full conference: 6 wild cards + division winners + non-playoff ────
+    // ── Full conference: 6 other playoff teams + division winners + non-playoff ────
 
     public function testFullConferenceSplit(): void
     {
@@ -102,8 +102,8 @@ class PlayoffSeedingCalculatorTest extends TestCase
         // Non-conf division winner: Central winner team8
         $this->assertSame([8], $this->ids($result['divisionWinners']));
 
-        // Wild cards: top-6 non-division-winners sorted best first
-        $this->assertSame([2, 9, 3, 10, 4, 11], $this->ids($result['wildCards']));
+        // Other playoff teams: top-6 non-division-winners sorted best first
+        $this->assertSame([2, 9, 3, 10, 4, 11], $this->ids($result['otherPlayoffTeams']));
 
         // Non-playoff: remaining 6 non-winners, worst-first in the sorted list
         $this->assertSame([5, 12, 6, 13, 7, 14], $this->ids($result['nonPlayoff']));
@@ -122,7 +122,7 @@ class PlayoffSeedingCalculatorTest extends TestCase
         $result = $this->calculator->determinePlayoffTeams([$team1, $team2], $h2h, []);
 
         $this->assertSame(1, $result['conferenceWinner']['teamid']);
-        $this->assertSame([2], $this->ids($result['wildCards']));
+        $this->assertSame([2], $this->ids($result['otherPlayoffTeams']));
     }
 
     // ── pct-based seeding (compareTeamsForPlayoffSeeding pct branch) ──────

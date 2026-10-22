@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-10-10
+last_verified: 2026-10-21
 ---
 
 # IBL5 Architecture Decision Records
@@ -70,7 +70,14 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0188](0188-workflow-run-interpolation-guard.md) | Ban env and string-input expressions inside workflow run: bodies | Accepted | `bin/check-workflow-run-interpolation` runs in `Static guards` and fails any `${{ env.* }}` or string-typed `${{ inputs.* }}` inside a `run:` body; values go through `env:` and a quoted `"$NAME"`. |
 | [0186](0186-memo-only-ci-gating.md) | Memo-only skip gating for Tests and Analysis PR jobs | Accepted | On `pull_request` the tests memo is the only skip gate for every test and analysis job; path filters remain only on `audit-php`, `audit-js` and `iblbot`, pinned by `bin/test-ci-memo` gate-topology assertion 7; the tests key is salted with `--extra gating=memo-only`. |
 | [0190](0190-db-root-credentials-env-overridable.md) | Env-overridable DB root credentials and default database name | Accepted | `bin/lib/db-helpers.sh` defines `DB_ROOT_USER`, `DB_ROOT_PASS` and `DB_DEFAULT_NAME` with env overrides and a `db_cmd` wrapper; `bin/test-db-sync-prod-argv` pins the `docker exec` argv the DB scripts send. |
+| [0196](0196-sim-recap-self-healing-routing.md) | Self-healing sim-recap routing across GitHub Actions and the Mac | Accepted | The prod queue routes each failed recap by cause (`ParkPolicy`, `SimSummaryRepository::parkByCause`): retry, wait for the usage reset, hand to the other host, back off, or stop; claims are host-scoped in SQL; prod posts one #admin-chat line per state change. |
+| [0197](0197-owner-owned-league-rules.md) | Owner-owned league rules file | Accepted | The owner owns `ibl5/docs/LEAGUE_RULES.md`; agents editing `ibl5/classes/` check it and ask before changing a rule; the weekly digest marks likely rule changes. |
+| [0200](0200-weekly-code-slice-review.md) | Weekly rotating review of existing code | Accepted | `bin/code-slice-review` reviews one `ibl5/classes` module a week on the owner's Mac with the PR-review prompts extracted at runtime, scores findings with a second call, de-dups by fingerprint, and files at most N backlog issues; it never fixes or opens PRs. |
+| [0198](0198-post-merge-manual-rows-after-merge-section.md) | Post-merge manual rows move to an After merge section | Accepted | A Truly-manual row tagged `post-merge: <reason>` (gate `[PM]`) renders under `## After merge`, outside the Phase 6.5 condition (1) window; `bin/after-merge-checklist` posts it as a checklist comment on merge. |
 | [0194](0194-engine-freeze-gates.md) | Freeze engine/ and gate new decompile tokens | Accepted | `bin/check-engine-freeze` runs in the required meta-checks job on every PR; it fails additions to `engine/` and any added line carrying a decompile token; the cutover PR retires it. |
+| [0202](0202-review-depth-by-merge-danger.md) | Phase 4 review depth follows the Merge danger line | Accepted | Phase 4 review depth is standard or deep from the PR body's Merge danger line; one-way, site-wide, external, or a missing line selects deep, which raises agent tiers and never skips an agent. |
+| [0204](0204-fidelity-remediation-rules-file-carveout.md) | Phase 5.5 remediation may commit a small fix to a rules file a blocking finding names | Accepted | The harness fixer may edit and commit a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes, within line and frontmatter limits; every other gate-owning path stays denied. |
+| [0207](0207-same-run-review-thread-remediation.md) | Same-run review thread remediation | Accepted | Phase 4.5 also fixes or declines the review threads the same run posted, one round, then re-reviews the fix delta; arming predicates are unchanged. |
 
 ## When an ADR is Required
 

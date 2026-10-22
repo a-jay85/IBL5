@@ -37,6 +37,33 @@ PRF_LIB = ARMABLE_LIB.parent / "post-review-findings.sh"
 # phase modules. tests/test_fidelity_carryforward.py asserts the two stay equal.
 PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
 
+# The heading `.claude/review-shared/scripts/4b-probe.sh` scans comments for. `\b` keeps
+# `## Code reviewer notes` from matching.
+CODE_REVIEW_RE = re.compile(r"(?m)^#{1,6} +Code review\b")
+
+
+def _last_code_review(data) -> dict:
+    """{"scanned": True, "comment": {created_at, url, summary} | None} from a comments fetch.
+
+    The last non-sticky comment whose body opens a `Code review` heading wins. Malformed
+    data scans as "found nothing".
+    """
+    found = None
+    try:
+        for c in (data.get("comments") or []):
+            body = c.get("body") or ""
+            if PR_STICKY_MARKER in body:
+                continue
+            m = CODE_REVIEW_RE.search(body)
+            if not m:
+                continue
+            rest = [ln.strip() for ln in body[m.end():].splitlines()[1:] if ln.strip()]
+            found = {"created_at": c.get("createdAt"), "url": c.get("url"),
+                     "summary": (rest[0] if rest else "")[:120]}
+    except (AttributeError, TypeError):
+        found = None
+    return {"scanned": True, "comment": found}
+
 
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
@@ -79,6 +106,9 @@ class RecordingGh:
 
     def trusted_open_threads(self, pr: int) -> list[dict] | None:
         return self.fixture.get("trusted_threads", [])
+
+    def review_threads_all(self, pr: int) -> list[dict] | None:
+        return self.fixture.get("all_threads", [])
 
     def resolve_review_thread(self, pr: int, comment_id: int, body: str) -> None:
         self.record("pr_resolve_thread", pr=pr, comment_id=int(comment_id), body=body[:2000])
@@ -266,6 +296,7 @@ class LiveGh(RecordingGh):
         self.branch = branch
         self.timeout = timeout
         self._meta: dict | None = None
+        self._code_review_seen: dict = {}
 
     def _gh(self, *args: str, input_text: str | None = None) -> str:
         """Every gh call. Retries network-transient failures only for argv on
@@ -399,11 +430,17 @@ class LiveGh(RecordingGh):
         return result
 
     def trusted_open_threads(self, pr: int) -> list[dict] | None:
+        return self._prf_rows("list_trusted_open_threads", pr)
+
+    def review_threads_all(self, pr: int) -> list[dict] | None:
+        return self._prf_rows("prf_review_threads", pr)
+
+    def _prf_rows(self, fn_name: str, pr: int) -> list[dict] | None:
         from .llm import _run_reaped
         if not PRF_LIB.exists():
             return None
-        argv = ["bash", "-c", 'source "$1"; list_trusted_open_threads "$2"', "_",
-                str(PRF_LIB), str(pr)]
+        argv = ["bash", "-c", 'source "$1"; "$2" "$3"', "_",
+                str(PRF_LIB), fn_name, str(pr)]
         env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
         try:
             proc = _run_reaped(argv, None, self.timeout, self.worktree, env)
@@ -483,13 +520,23 @@ class LiveGh(RecordingGh):
         try:
             data = json.loads(self._gh("pr", "view", str(pr), "--json", "comments"))
         except (HarnessError, ValueError, OSError):
+            self._code_review_seen[pr] = None
             return None
+        self._code_review_seen[pr] = _last_code_review(data)
         try:
             bodies = [c.get("body") or "" for c in (data.get("comments") or [])
                       if PR_STICKY_MARKER in (c.get("body") or "")]
         except (AttributeError, TypeError):
             return None
         return bodies[0] if len(bodies) == 1 else None
+
+    def code_review_seen(self, pr: int) -> dict | None:
+        """What the last `pr_sticky_body` fetch saw of a code-review comment.
+
+        Reads the cache that fetch filled and never calls `gh`. None means this run did
+        not read the comments (no fetch yet, or the fetch failed).
+        """
+        return self._code_review_seen.get(pr)
 
     def label_add(self, pr: int, label: str) -> None:
         self._gh("pr", "edit", str(pr), "--add-label", label)

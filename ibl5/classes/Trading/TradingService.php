@@ -31,7 +31,7 @@ class TradingService implements TradingServiceInterface
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepository;
     private \mysqli $mysqli_db;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -63,7 +63,7 @@ class TradingService implements TradingServiceInterface
     {
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $this->mysqli_db;
-        $season = $this->season ?? new Season($mysqliDb);
+        $season = $this->season ?? \Season\SharedSeason::get($mysqliDb);
 
         $userTeam = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
 
@@ -124,7 +124,7 @@ class TradingService implements TradingServiceInterface
 
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $this->mysqli_db;
-        $season = $this->season ?? new Season($mysqliDb);
+        $season = $this->season ?? \Season\SharedSeason::get($mysqliDb);
 
         $allTradeRows = $this->offerRepository->getAllTradeOffers();
         $tradeOffers = $this->offerGrouper->groupOffers($allTradeRows, $userTeam, $season->endingYear);

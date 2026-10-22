@@ -42,9 +42,9 @@ class Contracts implements ContractsTableInterface
         // span rather than a hyperlink to the negotiation form.
         $isExtensionActionablePhase = in_array($season->phase, ['Preseason', 'HEAT', 'Regular Season', 'Playoffs'], true);
 
-        if ($isFreeAgency) {
-            $season->endingYear++;
-        }
+        // Offseason (Draft / Free Agency) labels shift one year forward. Computed
+        // locally: the Season is request-shared and must never be mutated here.
+        $headerEndingYear = $season->endingYear + ($isFreeAgency ? 1 : 0);
 
         $cap1 = $cap2 = $cap3 = $cap4 = $cap5 = $cap6 = 0;
         /** @var list<ContractRow> $playerRows */
@@ -109,7 +109,7 @@ class Contracts implements ContractsTableInterface
         ob_start();
         ?>
 <table class="ibl-data-table team-table responsive-table contracts-table sortable" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
-<?= self::renderHeader($season) ?>
+<?= self::renderHeader($headerEndingYear) ?>
     <tbody>
 <?php foreach ($playerRows as $row): ?>
 <?= self::renderPlayerRow($row, $season, $starterPids, $showActionLinks, $markExpiringRows, $isExtensionActionablePhase) ?>
@@ -122,10 +122,10 @@ class Contracts implements ContractsTableInterface
     }
 
     /**
-     * Header row. Reads $season->endingYear AFTER render() has applied the
-     * offseason bump, so the year labels shift forward during Draft / Free Agency.
+     * Header row. $endingYear is the already-shifted label year: render() adds 1
+     * during Draft / Free Agency so the year labels move forward one season.
      */
-    private static function renderHeader(Season $season): string
+    private static function renderHeader(int $endingYear): string
     {
         ob_start();
         ?>
@@ -136,12 +136,12 @@ class Contracts implements ContractsTableInterface
             <th>Age</th>
             <th>Exp</th>
             <th class="sep-r-team">Bird</th>
-            <th class="col-salary"><?= substr((string) ($season->endingYear - 1), -2) ?>-<?= substr((string) $season->endingYear, -2) ?></th>
-            <th class="col-salary"><?= substr((string) $season->endingYear, -2) ?>-<?= substr((string) ($season->endingYear + 1), -2) ?></th>
-            <th class="col-salary"><?= substr((string) ($season->endingYear + 1), -2) ?>-<?= substr((string) ($season->endingYear + 2), -2) ?></th>
-            <th class="col-salary"><?= substr((string) ($season->endingYear + 2), -2) ?>-<?= substr((string) ($season->endingYear + 3), -2) ?></th>
-            <th class="col-salary"><?= substr((string) ($season->endingYear + 3), -2) ?>-<?= substr((string) ($season->endingYear + 4), -2) ?></th>
-            <th class="col-salary sep-r-team"><?= substr((string) ($season->endingYear + 4), -2) ?>-<?= substr((string) ($season->endingYear + 5), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($endingYear - 1), -2) ?>-<?= substr((string) $endingYear, -2) ?></th>
+            <th class="col-salary"><?= substr((string) $endingYear, -2) ?>-<?= substr((string) ($endingYear + 1), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($endingYear + 1), -2) ?>-<?= substr((string) ($endingYear + 2), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($endingYear + 2), -2) ?>-<?= substr((string) ($endingYear + 3), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($endingYear + 3), -2) ?>-<?= substr((string) ($endingYear + 4), -2) ?></th>
+            <th class="col-salary sep-r-team"><?= substr((string) ($endingYear + 4), -2) ?>-<?= substr((string) ($endingYear + 5), -2) ?></th>
             <th>Tal</th>
             <th>Skl</th>
             <th class="sep-r-team">Int</th>

@@ -24,7 +24,7 @@ class LeagueStartersApiHandler
     private TeamIdentityRepositoryInterface $commonRepo;
     private AuthServiceInterface $authService;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -55,7 +55,7 @@ class LeagueStartersApiHandler
         $userTeamName = $this->commonRepo->getTeamnameFromUsername($username);
         $userTeam = Team::initialize($this->db, $userTeamName ?? '');
 
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
         $league = new League($this->db);
         $service = new LeagueStartersService($this->db, $league);
         $view = new LeagueStartersView('LeagueStarters');

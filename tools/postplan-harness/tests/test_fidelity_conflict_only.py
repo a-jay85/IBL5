@@ -12,6 +12,7 @@ file under /tmp is removed afterwards.
 """
 import copy
 import dataclasses
+import json
 import os
 import sys
 import uuid
@@ -26,16 +27,29 @@ from harness.adapters import gitad
 from harness import conflict
 from harness.adapters.llm import FixtureLlm
 from harness.classify import classify, files_from_diff
-from harness.review import ReviewPhase
+from harness.review import VERIFIER_PURPOSES, ReviewPhase
 from harness.state import Finding, TerminalState, UsageLedger
 from test_fidelity_carryforward import (CANNED_READY, VERSION, _drive_cf, _record,  # noqa: F401
                                         _sticky, git_shim)
 from test_runner_replay import CANNED
 
-pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show", "standard_review_depth")
 
 REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
-                   "security-audit", "score-findings")
+                   "security-audit") + VERIFIER_PURPOSES
+
+
+def _all_real(count): return json.dumps([{"n": i, "verdict": "real", "reason": "verified"} for i in range(1, count + 1)])
+
+
+@pytest.fixture(autouse=True)
+def _pin_verifier_worktree(monkeypatch, tmp_path, standard_review_depth):
+    """Replay passes no worktree to run(), which would take the keep-all fallback. Pin one on the
+    review phase so the canned verifier replies drive 4D (after standard_review_depth's patch)."""
+    real = runner._review_phase_for
+    monkeypatch.setattr(runner, "_review_phase_for",
+                        lambda llm, gh, copy, meta, log, worktree=None: real(
+                            llm, gh, copy, meta, log, worktree=str(tmp_path)))
 
 # ---- pure rows ---------------------------------------------------------------------------
 
@@ -276,7 +290,7 @@ def test_conflict_delta_plus_unrelated_edit_runs_full_fidelity(monkeypatch, tmp_
     # The manifest lists only BETA, but the delta also touches SPEC.
     conflict_env.arm_proof(manifest_paths=[BETA])
     canned = dict(CANNED, **{"review-agent-a": [{"path": BETA, "line": 1, "body": "beta again"}],
-                             "score-findings": [{"n": 1, "score": 85}]})
+                             **{p: _all_real(1) for p in VERIFIER_PURPOSES}})
     res, out, seen = _replay(monkeypatch, tmp_path, conflict_env, UNRELATED_DIFF, canned)
     assert res.terminal != TerminalState.FAILED, res.error
     audit = "\n".join(res.audit)

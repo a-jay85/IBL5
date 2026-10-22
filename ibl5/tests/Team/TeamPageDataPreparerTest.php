@@ -554,6 +554,87 @@ class TeamPageDataPreparerTest extends TestCase
         $this->assertSame('Nets &amp; Co', $result['rounds'][0]['results'][0]['loser']);
     }
 
+    public function testPreparePlayoffDataKeepsRoundTotalsIsolatedAcrossRounds(): void
+    {
+        // Two populated rounds, interleaved input order, asymmetric game counts.
+        // Every paired column differs, so a leak into a neighbouring round or a
+        // win/loss column swap in any one round fails this single assertSame.
+        $preparer = $this->buildPreparer($this->repoReturning('getPlayoffResults', [
+            self::playoffRow(2014, 3, 'Bulls', 'Spurs', 4, 1),
+            self::playoffRow(2012, 1, 'Celtics', 'Bulls', 4, 0),
+            self::playoffRow(2013, 3, 'Lakers', 'Bulls', 4, 3),
+            self::playoffRow(2011, 1, 'Bulls', 'Heat', 4, 2),
+            self::playoffRow(2010, 1, 'Bulls', 'Nets', 4, 1),
+        ]));
+
+        $result = $preparer->preparePlayoffData(self::bullsTeam());
+
+        $this->assertSame([
+            'rounds' => [
+                [
+                    'name' => 'First Round',
+                    'gameWins' => 8,
+                    'gameLosses' => 7,
+                    'seriesWins' => 2,
+                    'seriesLosses' => 1,
+                    'results' => [
+                        ['year' => '2012', 'winner' => 'Celtics', 'loser' => 'Bulls', 'winnerGames' => 4, 'loserGames' => 0, 'isWin' => false],
+                        ['year' => '2011', 'winner' => 'Bulls', 'loser' => 'Heat', 'winnerGames' => 4, 'loserGames' => 2, 'isWin' => true],
+                        ['year' => '2010', 'winner' => 'Bulls', 'loser' => 'Nets', 'winnerGames' => 4, 'loserGames' => 1, 'isWin' => true],
+                    ],
+                ],
+                ['name' => 'Conference Semis', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+                [
+                    'name' => 'Conference Finals',
+                    'gameWins' => 7,
+                    'gameLosses' => 5,
+                    'seriesWins' => 1,
+                    'seriesLosses' => 1,
+                    'results' => [
+                        ['year' => '2014', 'winner' => 'Bulls', 'loser' => 'Spurs', 'winnerGames' => 4, 'loserGames' => 1, 'isWin' => true],
+                        ['year' => '2013', 'winner' => 'Lakers', 'loser' => 'Bulls', 'winnerGames' => 4, 'loserGames' => 3, 'isWin' => false],
+                    ],
+                ],
+                ['name' => 'IBL Finals', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+            ],
+            'totalGameWins' => 15,
+            'totalGameLosses' => 12,
+            'totalSeriesWins' => 3,
+            'totalSeriesLosses' => 2,
+        ], $result);
+    }
+
+    public function testPlayoffHelpersAreStateFreePrivateStatics(): void
+    {
+        // Security-surface discharge for the escaping move in preparePlayoffData:
+        // buildResultItem owns the three HtmlSanitizer::safeHtmlOutput calls and
+        // must stay a pure function. Static rules out $this (so no repository or
+        // db handle); builtin-only parameters rule out an injected collaborator.
+        $helpers = ['emptyRoundsMap', 'buildResultItem', 'addSeriesToRound', 'summarizeRounds'];
+
+        foreach ($helpers as $name) {
+            $method = new \ReflectionMethod(\Team\TeamPageDataPreparer::class, $name);
+
+            $this->assertTrue($method->isPrivate(), "$name must be private");
+            $this->assertTrue($method->isStatic(), "$name must be static so it cannot touch \$this");
+
+            foreach ($method->getParameters() as $parameter) {
+                $type = $parameter->getType();
+                $this->assertInstanceOf(\ReflectionNamedType::class, $type, "$name(\${$parameter->getName()}) must declare a type");
+                $this->assertTrue(
+                    $type->isBuiltin(),
+                    "$name(\${$parameter->getName()}) must be a builtin type, found {$type->getName()}",
+                );
+            }
+        }
+
+        $buildResultItem = new \ReflectionMethod(\Team\TeamPageDataPreparer::class, 'buildResultItem');
+        $this->assertSame(
+            ['playoff', 'teamName'],
+            array_map(static fn (\ReflectionParameter $p): string => $p->getName(), $buildResultItem->getParameters()),
+        );
+    }
+
     // -------------------------------------------------------------------------
     // prepareWinLossHistoryData
     // -------------------------------------------------------------------------
@@ -783,6 +864,29 @@ class TeamPageDataPreparerTest extends TestCase
 
         $this->assertSame('2027', $result[0]['year']);
         $this->assertSame(2, $result[0]['round']);
+    }
+
+    public function testPrepareDraftPicksDataFallsBackWhenOriginalTeamMissingFromLeagueTeams(): void
+    {
+        $preparer = $this->buildPreparer(
+            self::createStub(TeamRepositoryInterface::class),
+            $this->queryRepoWithPicks([self::draftPickRow(15, 'Bulls', 'Ghosts', '2028', '1', 'Defunct')]),
+            $this->leagueWithTeams(self::bullsAndLakersRows()),
+        );
+
+        $result = $preparer->prepareDraftPicksData(self::bullsTeam());
+
+        $this->assertSame(
+            [[
+                'originalTeamID' => 0,
+                'originalTeamCity' => '',
+                'originalTeamName' => 'Ghosts',
+                'year' => '2028',
+                'round' => '1',
+                'notes' => 'Defunct',
+            ]],
+            $result,
+        );
     }
 
     public function testPrepareDraftPicksDataRequestsPicksForTheTeamId(): void

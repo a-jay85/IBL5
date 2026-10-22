@@ -29,18 +29,23 @@ com.ibl5.db-backups-pull standard
 com.ibl5.db-sync-nightly standard
 com.ibl5.docfix-poll standard
 com.ibl5.events-review standard
+com.ibl5.code-slice-review standard
+com.ibl5.finding-class-scan standard
+com.ibl5.sim-recap-poll standard
 com.ibl5.usage-gate-coordinator standard
 com.ibl5.watch-pr-cycle standard
 com.ibl5.wt-gc standard
 com.ibl5.wt-sync standard'
 
 # One-shot runner label prefixes (bin/plan-now, bin/pr-review-now,
-# bin/docfix-run, bin/post-plan-now). Never alerted on; a leftover plist is
+# bin/docfix-run, bin/post-plan-now, bin/finding-class-scan --verify-schedule).
+# Never alerted on; a leftover plist is
 # reported as stale only.
 LEJ_TRANSIENT_PREFIXES='com.ibl5.plan-now-
 com.ibl5.pr-review-now-
 com.ibl5.docfix-run-
-com.ibl5.postplan-now-'
+com.ibl5.postplan-now-
+com.ibl5.finding-class-scan-verify-'
 
 # Labels a setup script installs that the health check deliberately does NOT
 # expect. One record per line: "<label> <reason>". bin/test-launchd-sched
@@ -48,7 +53,6 @@ com.ibl5.postplan-now-'
 # entry here has no reason, or when an entry here names no installed label.
 LEJ_EXEMPT_JOBS='com.ibl5.launchd-health-daily the health checker itself; it cannot report its own absence
 com.ibl5.launchd-health-login the health checker itself; it cannot report its own absence
-com.ibl5.sim-recap-poll retired from health expectations in PR 2934; installed on demand only
 com.ibl5.usage-gate-keychain-probe one-shot probe loaded and removed inside the install run'
 
 # Main-stack containers that must be running (`docker ps --format '{{.Names}}'`).

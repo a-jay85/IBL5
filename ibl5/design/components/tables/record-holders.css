@@ -43,13 +43,10 @@
     display: inline-block;
 }
 
-/* Mini-tables — override .ibl-data-table chrome for compact nested look */
+/* Mini-tables: outer chrome stripped via .ibl-data-table--borderless */
 .record-table {
     table-layout: fixed;
     max-width: 100%;
-    box-shadow: none;
-    border: none;
-    border-radius: 0;
     border-bottom: 1px solid var(--gray-200);
 }
 
@@ -98,7 +95,7 @@
 /* Team subsection headings (Game Records, Season Records, Franchise Records) */
 .record-section__subheading {
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-semibold);
     color: var(--gray-500);
     text-transform: uppercase;

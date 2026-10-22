@@ -123,6 +123,14 @@ done
 printf 'x\n' >> "$d/curl.calls"
 printf '\nHTTP=204'
 SH
+cat > "$STUBS/dm-ssh" <<'SH'
+#!/usr/bin/env bash
+# IBLbot DM-path ssh stub for the real discord-dm: records the call, answers HTTP 200.
+# A webhook miss falls back to this path, so the real ssh must never run in a test.
+cat > /dev/null
+printf 'x\n' >> "${STUB_DIR:?}/dm-ssh.calls"
+printf 'HTTP=200'
+SH
 chmod +x "$STUBS"/*
 
 PW_FILE="$T/pw"
@@ -605,12 +613,14 @@ $(cat "$b1800")" "$(dm_payload 1)"
         "STUB_CLAUDE_OUT=$hostile"
         "DISCORD_DM_TO=283183467804491776"
         "DISCORD_DM_CURL_BIN=$STUBS/curl"
+        "DISCORD_DM_SSH_BIN=$STUBS/dm-ssh"
         "DISCORD_DM_WEBHOOK_FILE=$wh"
         "DISCORD_DM_SPOOL=$T/spool.log"
     )
     run_er "--from-tsv=$CORPUS"
     expect_eq "row24: real discord-dm delivers" 0 "$ER_RC"
     expect_eq "row24: one webhook post" 1 "$(call_count "$SD/curl.calls")"
+    expect_eq "row24: no DM over ssh" 0 "$(call_count "$SD/dm-ssh.calls")"
     local content
     content="$(jq -r '.content' "$SD/curl.payload" 2>/dev/null)"
     expect_has "row24: posted content is the sanitized text" "$content" "(at)everyone"
@@ -831,6 +841,7 @@ SH
             "EVENTS_REVIEW_DM_BIN=$REPO_ROOT/bin/discord-dm"
             "DISCORD_DM_TO=283183467804491776"
             "DISCORD_DM_CURL_BIN=$STUBS/curl"
+            "DISCORD_DM_SSH_BIN=$STUBS/dm-ssh"
             "DISCORD_DM_WEBHOOK_FILE=$wh"
             "DISCORD_DM_SPOOL=$T/e2e-spool.log"
         )
@@ -838,6 +849,7 @@ SH
         expect_eq "row33: full live run exits 0" 0 "$ER_RC"
         expect_eq "row33: claude ran once" 1 "$(call_count "$SD/claude.calls")"
         expect_eq "row33: one webhook post" 1 "$(call_count "$SD/curl.calls")"
+        expect_eq "row33: no DM over ssh" 0 "$(call_count "$SD/dm-ssh.calls")"
         local actual_digest
         actual_digest="$(awk '/^<digest>$/{f=1;next} /^<\/digest>$/{f=0} f' "$SD/claude.stdin")"
         if [ "$actual_digest" = "$digest" ]; then ok "row33: claude stdin holds the dry-run digest"

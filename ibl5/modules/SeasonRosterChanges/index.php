@@ -21,8 +21,9 @@ use SeasonRosterChanges\SeasonRosterChangesRepository;
 use SeasonRosterChanges\SeasonRosterChangesView;
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 $previousSeasonEndingYear = $season->endingYear - 1;
 
 $pagetitle = "- Player Movement";

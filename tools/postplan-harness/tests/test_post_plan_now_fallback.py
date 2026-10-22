@@ -13,17 +13,6 @@ _LAUNCHCTL_OTHER_SLUG = (
     'printf "%s\\t%s\\t%s\\n" 12345 0 com.ibl5.postplan-now-wt-feature-extra-20260916-144924-99\n'
 )
 
-@pytest.fixture(autouse=True)
-def _private_log_dir(tmp_path, monkeypatch):
-    """Point post-plan-now's $LOG and .session sidecar at a per-test dir. A reaper that
-    deleted new /tmp/post-plan-now-wt-feature-* files after each test also deleted the
-    logs of a second pytest run going at the same time (another worktree, or a
-    post-plan run's own suite), and that run's test then failed on a missing log."""
-    d = tmp_path / "ppn-logs"
-    d.mkdir()
-    monkeypatch.setenv("POSTPLAN_LOG_DIR", str(d))
-    return d
-
 
 def _fb(code):
     r = subprocess.run(

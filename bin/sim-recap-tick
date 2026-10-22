@@ -15,11 +15,10 @@
 #
 # Phase gate (RecapPhasePolicy): sim recaps are enabled only during HEAT and
 # Regular Season. When claim-next reports recaps_enabled=false and there is no
-# pending sim (nothing to drain), the tick self-unloads via `launchctl bootout` rather
-# than spinning every 300s doing nothing. Run `bin/sim-recap-cron-setup --resume`
-# to re-arm the poller when HEAT begins (Discord #admin-chat posts a
-# reminder automatically when the phase is changed via LeagueControlPanel).
-# Self-unload never fires in --dry-run mode or when --sim=N is supplied.
+# pending sim (nothing to drain), the tick logs and exits cheap. It never
+# unloads itself: the job stays loaded through disabled phases and resumes on
+# the first tick after the phase becomes HEAT or Regular Season. No manual
+# re-arm is needed.
 #
 # Trust split (ADR-0092): the Mac holds ONE credential — a SELECT-only MySQL
 # user reached over an SSH tunnel — handed only to the generation agent for game
@@ -30,8 +29,9 @@
 # generation path) — the poller runs unattended, so nothing else can.
 #
 # NOT set -e: one sim's failure must never abort the tick before its park branch
-# runs. Backoff and stale-lease timers are computed SERVER-side by parkOrFail /
-# reclaimStaleClaim, so this file needs no local timestamp math.
+# runs. Routes, backoff, and stale-lease timers are computed SERVER-side by
+# parkByCause / reclaimStaleClaim. The only local time math is reading a usage-limit
+# reset time (claude_reset_epoch) and the Actions step budget for a retry pass.
 
 set -u
 
@@ -44,7 +44,7 @@ launchd LaunchAgent (bin/sim-recap-cron-setup).
 
 Options:
   --dry-run      Regenerate a recap for tuning without touching the queue,
-                 writing to the DB, or self-unloading. Requires --sim=<id>.
+                 or writing to the DB. Requires --sim=<id>.
   --sim=<id>     Specify the sim ID to process (used with --dry-run, or to
                  force-process a particular sim on a live tick).
 
@@ -53,7 +53,9 @@ Key environment overrides (all have production defaults):
   SIM_RECAP_SSH_HOST     SSH host for queue access.
   SIM_RECAP_MODEL        Model to use for generation.
 
-Exit codes: 0 success, 1 tick failure, 2 unknown argument.
+Exit codes: 0 success (a hand-off, wait, or backoff is still 0), 1 tick
+failure, an unknown SIM_RECAP_HOST_MODE, or a terminal sim in actions mode,
+2 unknown argument.
 EOF
     exit 0
 fi
@@ -84,7 +86,8 @@ SIM_RECAP_CURL_BIN="${SIM_RECAP_CURL_BIN:-curl}"
 SIM_RECAP_BOT_BASE_URL="${SIM_RECAP_BOT_BASE_URL:-http://127.0.0.1:50001}"
 SIM_RECAP_OPS_ALERT_THREAD_ID="${SIM_RECAP_OPS_ALERT_THREAD_ID:-}"
 # Discord webhook URL (secret; embeds its token). Non-empty = post ops alerts
-# straight to Discord (Actions host). Empty = Mac bot at SIM_RECAP_BOT_BASE_URL.
+# straight to Discord (Actions host), into SIM_RECAP_OPS_ALERT_THREAD_ID when set
+# and the webhook's own channel when not. Empty = Mac bot at SIM_RECAP_BOT_BASE_URL.
 # Travels to curl via `-K -` on stdin, never argv, never a log line.
 SIM_RECAP_OPS_WEBHOOK_URL="${SIM_RECAP_OPS_WEBHOOK_URL:-}"
 # Where the ops-alert edge state lives. Deliberately NOT under WORKDIR (mktemp -d,
@@ -97,12 +100,23 @@ SIM_RECAP_OPS_WEBHOOK_URL="${SIM_RECAP_OPS_WEBHOOK_URL:-}"
 # not set it — so a bare $HOME would abort the tick at expansion time, on EVERY
 # poll, if launchd ever handed us an environment without it.
 SIM_RECAP_OPS_ALERT_STATE="${SIM_RECAP_OPS_ALERT_STATE:-${HOME:-/tmp}/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/ops-alert.json}"
-SIM_RECAP_LAUNCHCTL_BIN="${SIM_RECAP_LAUNCHCTL_BIN:-launchctl}"
 SIM_RECAP_DB_SYNC_BIN="${SIM_RECAP_DB_SYNC_BIN:-$REPO_ROOT/ibl5/bin/db-sync-now}"
 SIM_RECAP_DB_SYNC_LOG="${SIM_RECAP_DB_SYNC_LOG:-${HOME:-/tmp}/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/logs/db-sync.log}"
 # launchd (Mac poller, default) | actions (GitHub Actions runner). Host-specific
-# steps key on this, never on hostname: bootout, db-sync, ops transport (Phase 2).
+# steps key on this, never on hostname: db-sync, ops transport (Phase 2).
 SIM_RECAP_HOST_MODE="${SIM_RECAP_HOST_MODE:-launchd}"
+# HOST_ID is the queue's name for this host (the --host= flag). Unset and empty
+# both took the launchd default above and mean the Mac. Anything else is refused
+# here, before any ssh call: a typo must never claim a sim under the wrong host.
+case "$SIM_RECAP_HOST_MODE" in
+    launchd) HOST_ID=mac ;;
+    actions) HOST_ID=actions ;;
+    *)
+        printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" \
+            "ERROR: SIM_RECAP_HOST_MODE must be launchd or actions — aborting tick (no sim claimed)" >&2
+        exit 1
+        ;;
+esac
 DRY_RUN=0
 # SIM_RECAP_DB_PASSWORD is read from the environment ONLY (never defaulted, never
 # argv, never logged). require_password() enforces its presence on the live path.
@@ -119,6 +133,23 @@ WORKDIR=""
 # Set by dry_run() before it fetches anything. Global rather than main()'s local
 # DRY_RUN because roster_health_transition() — five frames down — has to know.
 DRY_RUN_MODE=0
+
+# Set by park() for every outcome except 'none' (a lost claim).
+TICK_PARKED=0
+# Set by park() when prod says no route is left ('failed') or answers with an
+# outcome this tick does not know. main() turns it into exit 1 in actions mode,
+# so a red run means a human is needed and nothing else does.
+TICK_TERMINAL=0
+# Set by park() on 'retry_now'; main() re-enters the claim loop on this host.
+# Reset at the top of every pass.
+PARK_RETRY=0
+# Passes per tick: one more than ParkPolicy's two retry_now slots, so a prod-side
+# bug can never spin the tick. main()'s `for pass in 1 2 3` must match it.
+readonly MAX_PASSES=3
+# The actions `Run tick` step's timeout-minutes (35) in seconds. Another pass is
+# started only when a full claude run still fits inside it.
+readonly ACTIONS_STEP_BUDGET=2100
+TICK_START=0
 cleanup_workdir() {
     [ -n "${SIM_RECAP_KEEP_WORKDIR:-}" ] && return 0
     [ -n "$WORKDIR" ] && rm -rf "$WORKDIR"
@@ -156,8 +187,12 @@ log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >&2; }
 ops_post() { # message — fault-tolerant by contract; never fails the tick
     if [ -n "$SIM_RECAP_OPS_WEBHOOK_URL" ]; then
         local url="$SIM_RECAP_OPS_WEBHOOK_URL" sep='?'
-        case "$url" in *\?*) sep='&' ;; esac
-        url="${url}${sep}thread_id=${SIM_RECAP_OPS_ALERT_THREAD_ID}"
+        # No thread ID = post to the webhook's own channel, so the parameter is
+        # left off rather than sent empty.
+        if [ -n "$SIM_RECAP_OPS_ALERT_THREAD_ID" ]; then
+            case "$url" in *\?*) sep='&' ;; esac
+            url="${url}${sep}thread_id=${SIM_RECAP_OPS_ALERT_THREAD_ID}"
+        fi
         printf 'url = "%s"\n' "$url" | "$SIM_RECAP_CURL_BIN" -s -K - -X POST \
             -H 'Content-Type: application/json' \
             -d "$("$SIM_RECAP_JQ_BIN" -nc --arg m "$1" '{content:$m}')" \
@@ -194,7 +229,9 @@ ops_state_write() { # degraded_since  degraded_count
 }
 
 roster_health_transition() { # sim  ok|degraded
-    [ -z "${SIM_RECAP_OPS_ALERT_THREAD_ID:-}" ] && return 0
+    # Armed by either setting. The webhook alone posts to its own channel; the
+    # Mac bot path has no default channel, so it still needs a thread ID.
+    [ -z "${SIM_RECAP_OPS_ALERT_THREAD_ID:-}" ] && [ -z "$SIM_RECAP_OPS_WEBHOOK_URL" ] && return 0
     # --dry-run must never touch the shared edge state. A human regenerating a
     # recap while the endpoint is down would consume the onset edge and silence
     # the real alert; a dry-run while it is up would clear state and fire a false
@@ -231,10 +268,72 @@ roster_health_transition() { # sim  ok|degraded
     return 0
 }
 
-# ── Usage/rate-limit detector (regex copied from bin/bug-pipeline-tick:76-79) ──
+# ── Loud signal on Actions: a run annotation, never in launchd mode ──────────
+# Every interpolated value is a sim integer, a cause/outcome enum, or a
+# blocked_until timestamp. Never pass a webhook, token, password, or raw JSON.
+# Written to stderr: the workflow sends stdout to /dev/null, and the runner
+# reads workflow commands from both streams.
+gha_annotate() { # level message
+    [ "$SIM_RECAP_HOST_MODE" = actions ] || return 0
+    printf '::%s title=sim-recap::%s\n' "$1" "$2" >&2
+    return 0
+}
+
+# ── Usage/rate-limit detector (regex adapted from bin/bug-pipeline-tick:76-79) ──
+# 401/403 are NOT here: a rejected token is an auth error, not a quota error.
 claude_env_error() {
     printf '%s' "$1" | grep -qiE \
-        "hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error"
+        "hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(429|529)|overloaded_error|rate_limit_error"
+}
+
+# ── Usage-limit reset time → epoch (prints an epoch or nothing; never fails) ──
+# Form A: "usage limit reached|<10-digit epoch>".
+# Form B: "resets <h>[:<mm>] am|pm" with an optional "(<Area/City>)" zone; the
+#   zone is used only when it looks like Area/City, else the host's local zone.
+#   Today's epoch at that clock time; when it is not in the future, +86400.
+# No match prints nothing, and the queue applies its 60-minute default. Prod
+# clamps whatever arrives to (now, now+6h], so a misparse costs an early retry.
+claude_reset_epoch() { # agent_output
+    local text="$1" m h mm ap zone hhmmss epoch now
+    m="$(printf '%s' "$text" | grep -oiE 'usage limit reached\|[0-9]{10}' | sed -n '1p')"
+    if [ -n "$m" ]; then
+        printf '%s\n' "${m##*|}"
+        return 0
+    fi
+    local re='resets[[:space:]]+([0-9]{1,2})(:([0-9]{2}))?[[:space:]]*([AaPp][Mm])([[:space:]]*\(([^)]*)\))?'
+    [[ $text =~ $re ]] || return 0
+    h="${BASH_REMATCH[1]}"; mm="${BASH_REMATCH[3]:-00}"; ap="${BASH_REMATCH[4]}"; zone="${BASH_REMATCH[6]:-}"
+    h=$((10#$h))
+    if [ "$h" -lt 1 ] || [ "$h" -gt 12 ] || [ "$((10#$mm))" -gt 59 ]; then
+        return 0
+    fi
+    case "$ap" in
+        [Aa][Mm]) [ "$h" -eq 12 ] && h=0 ;;
+        *)        [ "$h" -ne 12 ] && h=$((h + 12)) ;;
+    esac
+    hhmmss="$(printf '%02d:%s:00' "$h" "$mm")"
+    printf '%s' "$zone" | grep -qE '^[A-Za-z_]+/[A-Za-z_]+$' || zone=""
+    # Same platform test as _date_ago in bin/automouse/run: BSD first, then GNU.
+    # TZ is set only when a zone was named; an empty TZ means UTC, not local.
+    if [ -n "$zone" ]; then
+        epoch="$(TZ="$zone" date -j -f '%H:%M:%S' "$hhmmss" +%s 2>/dev/null \
+            || TZ="$zone" date -d "$hhmmss" +%s 2>/dev/null)"
+    else
+        epoch="$(date -j -f '%H:%M:%S' "$hhmmss" +%s 2>/dev/null \
+            || date -d "$hhmmss" +%s 2>/dev/null)"
+    fi
+    case "$epoch" in ''|*[!0-9]*) return 0 ;; esac
+    now="$(date +%s)"
+    [ "$epoch" -le "$now" ] && epoch=$((epoch + 86400))
+    printf '%s\n' "$epoch"
+    return 0
+}
+
+# ── Auth-failure detector: a bad or expired CLAUDE_CODE_OAUTH_TOKEN ───────────
+# Real output: "Failed to authenticate. API Error: 401 OAuth access token is invalid."
+claude_auth_error() {
+    printf '%s' "$1" | grep -qiE \
+        "api error:[[:space:]]*(401|403)|failed to authenticate|oauth access token is invalid|invalid api key"
 }
 
 # ── One seam for every prod-side queue call ───────────────────────────────────
@@ -281,19 +380,122 @@ require_password() {
     fi
 }
 
-# ── Park a failed sim, branching on the three-valued queue outcome ────────────
+# ── Park a failed sim with its cause; prod's ParkPolicy picks the route ───────
+# The tick only names the cause (flaky|usage_limit|auth|transport|prompt). The
+# flag order is fixed: the forced-command ssh gate matches it exactly.
 # 'none' is a DISTINCT outcome (lost claim — another run owns the sim now), not
 # an error and not a retry. Never collapse it into a failure path.
-park() { # sim
-    local sim="$1" resp outcome
-    resp="$(q park --sim="$sim")"
+park() { # sim cause [reset_epoch]
+    local sim="$1" cause="$2" reset="${3:-}" resp rc outcome route blocked notified
+    if [ -n "$reset" ]; then
+        resp="$(q park --sim="$sim" --host="$HOST_ID" --cause="$cause" --reset="$reset")"
+    else
+        resp="$(q park --sim="$sim" --host="$HOST_ID" --cause="$cause")"
+    fi
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        # Prod is unreachable from this host. The row stays 'generating';
+        # reclaim-stale frees it after 45 minutes and the other host's backup
+        # claim takes it, so this is a workaround in progress, not terminal.
+        TICK_PARKED=1
+        park_unreachable "$sim" "$cause"
+        return 0
+    fi
     outcome="$(printf '%s' "$resp" | "$SIM_RECAP_JQ_BIN" -r '.outcome // empty' 2>/dev/null)"
+    route="$(printf '%s' "$resp" | "$SIM_RECAP_JQ_BIN" -r '.route // empty' 2>/dev/null)"
+    blocked="$(printf '%s' "$resp" | "$SIM_RECAP_JQ_BIN" -r '.blocked_until // empty' 2>/dev/null \
+        | tr -cd '0-9:T -')"
+    notified="$(printf '%s' "$resp" | "$SIM_RECAP_JQ_BIN" -r '.notified // empty' 2>/dev/null)"
+    case "$route" in mac|actions|any) ;; *) route="the other host" ;; esac
     case "$outcome" in
-        pending) log "sim $sim: parked — re-queued with backoff; a later tick retries" ;;
-        failed)  log "sim $sim: parked FAILED — attempt ceiling reached; terminal" ;;
-        none)    log "sim $sim: park returned 'none' — lost the claim; another run owns it now, stopping" ;;
-        *)       log "sim $sim: park returned an unexpected outcome '$outcome'" ;;
+        retry_now)
+            TICK_PARKED=1; PARK_RETRY=1
+            log "sim $sim: retrying now on this host (cause $cause)" ;;
+        waiting)
+            TICK_PARKED=1
+            log "sim $sim: usage limit — waiting until $blocked; no hand-off (same Claude account on both hosts)"
+            gha_annotate warning "sim $sim: Claude usage limit; waiting until $blocked (cause $cause)" ;;
+        handed)
+            TICK_PARKED=1
+            log "sim $sim: handed to $route (cause $cause)"
+            gha_annotate warning "sim $sim: handed to $route (cause $cause)" ;;
+        backoff)
+            TICK_PARKED=1
+            log "sim $sim: backing off until $blocked (cause $cause)"
+            gha_annotate warning "sim $sim: backing off until $blocked (cause $cause)" ;;
+        failed)
+            TICK_PARKED=1; TICK_TERMINAL=1
+            log "sim $sim: TERMINAL — no route left (cause $cause)"
+            gha_annotate error "sim $sim has no route left (cause $cause); #admin-chat told" ;;
+        none)
+            log "sim $sim: park returned 'none' — lost the claim; another run owns it now, stopping"
+            return 0 ;;
+        *)
+            # An old prod answering 'pending' lands here and fails loud. The raw
+            # value goes to the log only, never into an annotation.
+            TICK_PARKED=1; TICK_TERMINAL=1
+            log "sim $sim: park returned an unexpected outcome '$outcome'"
+            gha_annotate error "sim $sim: park returned an unexpected outcome (cause $cause); see the run log" ;;
     esac
+    case "$notified" in
+        ''|unchanged|skipped) : ;;
+        failed)
+            log "WARNING: sim $sim: admin-chat post from the league server failed ($outcome) — falling back to the ops thread"
+            gha_annotate warning "sim $sim: admin-chat post failed (cause $cause)"
+            ops_post "Sim $sim recap: $(park_outcome_words "$outcome") (cause $cause). The #admin-chat post from the league server failed." ;;
+        *)  log "admin-chat: told the commissioner ($outcome)" ;;
+    esac
+    return 0
+}
+
+# Plain-text words for a park outcome (ops fallback message only).
+park_outcome_words() { # outcome
+    case "$1" in
+        retry_now) printf 'retrying now on the same host' ;;
+        waiting)   printf 'waiting for the Claude usage limit to reset' ;;
+        handed)    printf 'handed to the other host' ;;
+        backoff)   printf 'backing off before the next retry' ;;
+        failed)    printf 'no route left, recaps are not available' ;;
+        none)      printf 'lost the claim to another run' ;;
+        *)         printf 'unexpected park result' ;;
+    esac
+}
+
+# ── Prod unreachable on park: tell the ops thread once per sim ────────────────
+# De-dup lines (park-unreachable-<sim>) live next to the ops-alert edge state, in
+# a sibling file rather than inside it: ops_state_write rewrites that JSON via
+# temp+mv and recovery rm's it, either of which would erase the lines and
+# re-post. The sibling sits in the same directory, which the Actions cache steps
+# already persist, and needs no new env var.
+park_unreachable() { # sim cause
+    local sim="$1" cause="$2" who state="$SIM_RECAP_OPS_ALERT_STATE.park-unreachable"
+    log "WARNING: sim $sim: park did not reach the league server (cause $cause) — the row stays claimed; reclaim-stale frees it and the other host takes over"
+    gha_annotate warning "sim $sim: could not reach the league server to park (cause $cause); the other host will take over"
+    if grep -qxF "park-unreachable-$sim" "$state" 2>/dev/null; then
+        return 0
+    fi
+    mkdir -p "$(dirname "$state")" 2>/dev/null
+    printf 'park-unreachable-%s\n' "$sim" >> "$state" 2>/dev/null \
+        || log "WARNING: could not write $state — the unreachable notice may repeat"
+    if [ "$HOST_ID" = actions ]; then who="GitHub"; else who="the Mac"; fi
+    ops_post "Sim $sim recap: $who couldn't reach the league server. The other host will take over."
+    return 0
+}
+
+# ── Success post: prod tells #admin-chat the recaps are up ────────────────────
+# Prod builds the message from the row; this host sends only enums. A failed
+# call or post is a WARNING, never a failed tick.
+admin_status_done() { # sim
+    local sim="$1" resp rc notified
+    resp="$(q notify --sim="$sim" --host="$HOST_ID" --event=done)"
+    rc=$?
+    notified="$(printf '%s' "$resp" | "$SIM_RECAP_JQ_BIN" -r '.notified // empty' 2>/dev/null)"
+    if [ "$rc" -ne 0 ] || [ "$notified" = failed ]; then
+        log "WARNING: sim $sim: admin-chat success post failed"
+        gha_annotate warning "sim $sim: admin-chat success post failed"
+    elif [ -n "$notified" ] && [ "$notified" != unchanged ] && [ "$notified" != skipped ]; then
+        log "admin-chat: told the commissioner (done)"
+    fi
     return 0
 }
 
@@ -375,6 +577,32 @@ run_agent() { # sim prompt
     return $?
 }
 
+# ── log_agent_cost <sim> — one log line with what the agent run cost ──────────
+# The workdir (and agent.json with it) is deleted later, so this is the only
+# record of the spend. agent.json also captures stderr (2>&1), so it may not be
+# pure JSON: take the last line that parses as a type=="result" object. Purely
+# informational — always returns 0 so it can never alter the tick's exit path.
+log_agent_cost() { # sim
+    local sim="$1" row cost turns dur_ms in_tok cr_tok cw_tok out_tok
+    row="$("$SIM_RECAP_JQ_BIN" -rR '
+        fromjson? | select(type == "object" and .type == "result")
+        | [(.total_cost_usd // 0), (.num_turns // 0), (.duration_ms // 0),
+           (.usage.input_tokens // 0), (.usage.cache_read_input_tokens // 0),
+           (.usage.cache_creation_input_tokens // 0), (.usage.output_tokens // 0)]
+        | @tsv' "$WORKDIR/agent.json" 2>/dev/null | tail -n 1)"
+    if [ -z "$row" ]; then
+        log "sim $sim: agent cost unavailable"
+        return 0
+    fi
+    IFS=$'\t' read -r cost turns dur_ms in_tok cr_tok cw_tok out_tok <<< "$row"
+    local line
+    line="$(printf 'sim %s: agent cost $%.2f, turns %s, duration %ss, input %s (cache read %s, cache write %s), output %s tokens, model %s' \
+        "$sim" "$cost" "$turns" "$((${dur_ms%.*} / 1000))" "$in_tok" "$cr_tok" "$cw_tok" "$out_tok" "$SIM_RECAP_MODEL")" \
+        || { log "sim $sim: agent cost unavailable"; return 0; }
+    log "$line"
+    return 0
+}
+
 # ── generate <sim> — inject, prompt, run agent, store or park ─────────────────
 generate() { # sim
     local sim="$1"
@@ -382,7 +610,7 @@ generate() { # sim
     log "workdir $WORKDIR for sim $sim"
 
     if ! fetch_agent_inputs "$sim"; then
-        park "$sim"; return 0
+        park "$sim" transport; return 0
     fi
 
     local prompt
@@ -390,29 +618,36 @@ generate() { # sim
             --mentions="$WORKDIR/mentions.json" --themes="$WORKDIR/themes-ledger.json" \
             --roster="$WORKDIR/roster-context.json")"; then
         log "sim $sim: prompt build failed (missing exemplar?) — parking"
-        park "$sim"; return 0
+        park "$sim" prompt; return 0
     fi
 
     # Before spawning claude — a dead tunnel means every mysql call it makes
     # fails, burning a full agent run to produce nothing.
     if ! ensure_tunnel; then
         log "sim $sim: no DB tunnel — parking without spawning the agent"
-        park "$sim"; return 0
+        park "$sim" transport; return 0
     fi
 
     local agent_rc
     run_agent "$sim" "$prompt"; agent_rc=$?
+    log_agent_cost "$sim"
+
+    if claude_auth_error "$(cat "$WORKDIR/agent.json" 2>/dev/null)"; then
+        log "sim $sim: agent auth failed (401/403) — CLAUDE_CODE_OAUTH_TOKEN is invalid or expired; parking"
+        park "$sim" auth; return 0
+    fi
 
     if claude_env_error "$(cat "$WORKDIR/agent.json" 2>/dev/null)"; then
         log "sim $sim: agent hit a usage limit — parking with a backoff"
-        park "$sim"; return 0
+        park "$sim" usage_limit "$(claude_reset_epoch "$(cat "$WORKDIR/agent.json" 2>/dev/null)")"; return 0
     fi
 
     if [ ! -f "$WORKDIR/payload.json" ] || \
        ! "$SIM_RECAP_JQ_BIN" -e '(.games | type == "array") and (.games | length > 0)' \
             "$WORKDIR/payload.json" >/dev/null 2>&1; then
+        # A claude timeout (rc 124) lands here too and counts as flaky.
         log "sim $sim: agent produced no valid payload.json (rc=$agent_rc) — parking"
-        park "$sim"; return 0
+        park "$sim" flaky; return 0
     fi
 
     # Store: pipe the payload on stdin (never argv — multi-KB, ps-visible).
@@ -444,6 +679,8 @@ generate() { # sim
         elif [ "$SIM_RECAP_HOST_MODE" = actions ]; then
             log "sim $sim: db-sync skipped (host mode: actions)"
         fi
+        # After the db-sync trigger, so the success post never delays it.
+        admin_status_done "$sim"
         local avg_len
         avg_len="$("$SIM_RECAP_JQ_BIN" -r \
             '[.games[].recap_text | length] | if length == 0 then 0 else (add / length | floor) end' \
@@ -458,8 +695,14 @@ generate() { # sim
         esac
         return 0
     fi
-    log "sim $sim: store failed (rc=$store_rc): $store — parking"
-    park "$sim"
+    # ssh's own connection failure (255) or no answer at all is transport;
+    # prod answering with anything but ok:true is a bad result (flaky).
+    local store_cause=flaky
+    if [ "$store_rc" -eq 255 ] || [ -z "$store" ]; then
+        store_cause=transport
+    fi
+    log "sim $sim: store failed (rc=$store_rc, cause=$store_cause): $store — parking"
+    park "$sim" "$store_cause"
     return 0
 }
 
@@ -514,6 +757,7 @@ dry_run() {
 
 # ── main — flag parse, then the claim loop with the empty-tick invariant ──────
 main() {
+    TICK_START="$(date +%s)"
     DRY_RUN=0
     DRY_SIM=""
     local arg
@@ -524,15 +768,12 @@ main() {
             *) log "unknown argument: $arg"; exit 2 ;;
         esac
     done
-    case "$SIM_RECAP_HOST_MODE" in
-        launchd|actions) ;;
-        *) log "ERROR: unknown SIM_RECAP_HOST_MODE '$SIM_RECAP_HOST_MODE' (expected launchd|actions) — aborting tick (no sim claimed)"; return 2 ;;
-    esac
+    # SIM_RECAP_HOST_MODE was validated at load time, where HOST_ID is set.
 
     # Preflight: the agent binary must actually resolve, BEFORE anything claims a
     # sim. An unresolvable $SIM_RECAP_CLAUDE_BIN makes `timeout` exit 127, which
     # generate() cannot tell apart from "the agent ran and produced nothing" — so
-    # it parks and burns an attempt, every poll, until parkOrFail's ceiling marks
+    # it parks and burns an attempt, every poll, until parkByCause's budget marks
     # the sim permanently `failed`. That is exactly what happened when the Claude
     # Code native installer moved `claude` to ~/.local/bin, off the launchd PATH
     # (sim 721, 2026-07-25). Abort loudly instead: a broken environment must cost
@@ -580,77 +821,110 @@ main() {
             log "reclaimed stale sim $sim_rec back to pending"
     fi
 
-    local claim normalized sim
-    local claim_verb="claim-next"
-    if [ -n "$DRY_SIM" ]; then
-        claim_verb="claim --sim=$DRY_SIM"
-        claim="$(q claim --sim="$DRY_SIM")"
-    else
-        claim="$(q claim-next)"
-    fi
-    rc=$?
-    # This check MUST precede the empty-tick guard below: a failed call returns
-    # empty stdout, so the guard would swallow it and report an idle queue. That
-    # is not hypothetical — the poller logged 342 consecutive "exiting cheap"
-    # ticks while simRecapQueue.php was simply absent from the remote root.
-    if [ "$rc" -ne 0 ]; then
-        log "ERROR: $claim_verb did not complete — aborting tick (no claude spawned)"
-        return 1
-    fi
-    normalized="$(printf '%s' "$claim" | tr -d '[:space:]')"
+    # ── Claim → generate, re-entered on this host only after a 'retry_now' park.
+    # `for pass in 1 2 3` is MAX_PASSES spelled out: a fixed loop, never `while`,
+    # so a prod that answers retry_now forever still ends the tick.
+    local claim normalized sim="" claim_verb pass now
+    for pass in 1 2 3; do
+        PARK_RETRY=0
+        # A retry pass makes a fresh WORKDIR; the EXIT trap only sees the last.
+        cleanup_workdir
+        WORKDIR=""
+        claim_verb="claim-next --host=$HOST_ID"
+        if [ -n "$DRY_SIM" ]; then
+            claim_verb="claim --sim=$DRY_SIM --host=$HOST_ID"
+            claim="$(q claim --sim="$DRY_SIM" --host="$HOST_ID")"
+        else
+            claim="$(q claim-next --host="$HOST_ID")"
+        fi
+        rc=$?
+        # This check MUST precede the empty-tick guard below: a failed call returns
+        # empty stdout, so the guard would swallow it and report an idle queue. That
+        # is not hypothetical — the poller logged 342 consecutive "exiting cheap"
+        # ticks while simRecapQueue.php was simply absent from the remote root.
+        if [ "$rc" -ne 0 ]; then
+            log "ERROR: $claim_verb did not complete — aborting tick (no claude spawned)"
+            return 1
+        fi
+        normalized="$(printf '%s' "$claim" | tr -d '[:space:]')"
 
-    # ★ EMPTY-TICK COST GUARD — no work, spawn zero `claude`, exit cheap.
-    if [ -z "$normalized" ]; then
-        log "no pending sim — exiting cheap"
-        return 0
-    fi
-
-    # Fail-closed: a truncated ssh, an HTML error page, or a stub returning
-    # garbage must NOT be parsed into a bogus sim number and spawn the agent.
-    if ! jq_ok "$claim" 'type == "object" and .ok == true'; then
-        log "ERROR: $claim_verb did not return a valid queue object — aborting tick (no claude spawned)"
-        return 1
-    fi
-
-    # `claim --sim=N` echoes N back even when the row was not claimed (already
-    # done, or another host holds it). Generating anyway would overwrite a stored
-    # recap and re-post it, so only an explicit claimed:true proceeds.
-    if [ -n "$DRY_SIM" ] && ! jq_ok "$claim" '.claimed == true'; then
-        log "ERROR: sim $DRY_SIM was not claimable (not pending) — aborting tick (no claude spawned)"
-        return 1
-    fi
-
-    sim="$(printf '%s' "$claim" | "$SIM_RECAP_JQ_BIN" -r '.sim // empty' 2>/dev/null)"
-    if [ -z "$sim" ] || [ "$sim" = "null" ]; then
-        # Phase gate: if recaps are disabled and there is nothing left to drain,
-        # self-unload rather than spinning every 300s for nothing. Fail-safe:
-        # a missing/unparseable recaps_enabled field = treat as true (no unload).
-        # Skipped when --sim=N was supplied (a human drove this tick by hand);
-        # --dry-run never reaches here at all — it returns from dry_run() above.
-        #
-        # A self-initiated bootout SIGTERMs this very process, so the `return 0`
-        # below is unreachable in production (verified 2026-08-10: the job leaves
-        # `launchctl print` and stays gone past a StartInterval window). Log
-        # BEFORE the call, and keep this branch free of cleanup that must run —
-        # WORKDIR is still empty here, so the EXIT trap has nothing to lose.
-        if [ -z "$DRY_SIM" ] && jq_ok "$claim" '.recaps_enabled == false'; then
-            local phase_log
-            phase_log="$(printf '%s' "$claim" | \
-                "$SIM_RECAP_JQ_BIN" -r '.phase // "unknown"' 2>/dev/null)"
-            if [ "$SIM_RECAP_HOST_MODE" = actions ]; then
-                log "recaps disabled (phase: ${phase_log}) and no pending sim — host mode actions: leaving the hourly schedule armed (no bootout)"
-                return 0
-            fi
-            log "recaps disabled (phase: ${phase_log}) and no pending sim — booting out poller (label: com.ibl5.sim-recap-poll)"
-            "$SIM_RECAP_LAUNCHCTL_BIN" bootout "gui/$(id -u)/com.ibl5.sim-recap-poll"
+        # ★ EMPTY-TICK COST GUARD — no work, spawn zero `claude`, exit cheap.
+        if [ -z "$normalized" ]; then
+            log "no pending sim — exiting cheap"
             return 0
         fi
-        log "no pending sim — exiting cheap"
-        return 0
-    fi
 
-    log "claimed sim $sim"
-    generate "$sim"
+        # Fail-closed: a truncated ssh, an HTML error page, or a stub returning
+        # garbage must NOT be parsed into a bogus sim number and spawn the agent.
+        if ! jq_ok "$claim" 'type == "object" and .ok == true'; then
+            log "ERROR: $claim_verb did not return a valid queue object — aborting tick (no claude spawned)"
+            return 1
+        fi
+
+        # `claim --sim=N` echoes N back even when the row was not claimed (already
+        # done, or another host holds it). Generating anyway would overwrite a stored
+        # recap and re-post it, so only an explicit claimed:true proceeds.
+        if [ -n "$DRY_SIM" ] && ! jq_ok "$claim" '.claimed == true'; then
+            log "ERROR: sim $DRY_SIM was not claimable (not pending) — aborting tick (no claude spawned)"
+            return 1
+        fi
+
+        sim="$(printf '%s' "$claim" | "$SIM_RECAP_JQ_BIN" -r '.sim // empty' 2>/dev/null)"
+        if [ -z "$sim" ] || [ "$sim" = "null" ]; then
+            # Phase gate: if recaps are disabled and there is nothing left to drain,
+            # log and exit cheap. The poller stays armed and resumes by itself on the
+            # first tick after the phase enables recaps. Fail-safe: a missing or
+            # unparseable recaps_enabled field is treated as true (falls through to
+            # the plain idle exit). Skipped when --sim=N was supplied (a human drove
+            # this tick by hand); --dry-run never reaches here, it returns from
+            # dry_run() above.
+            if [ -z "$DRY_SIM" ] && jq_ok "$claim" '.recaps_enabled == false'; then
+                local phase_log
+                phase_log="$(printf '%s' "$claim" | \
+                    "$SIM_RECAP_JQ_BIN" -r '.phase // "unknown"' 2>/dev/null)"
+                log "recaps disabled (phase: ${phase_log}) and no pending sim — poller stays armed; it resumes on its own when the phase enables recaps"
+                return 0
+            fi
+            log "no pending sim — exiting cheap"
+            return 0
+        fi
+
+        log "claimed sim $sim (pass $pass of $MAX_PASSES)"
+        generate "$sim"
+
+        [ "$PARK_RETRY" -eq 1 ] || break
+        if [ "$pass" -ge "$MAX_PASSES" ]; then
+            log "sim $sim: retry cap of $MAX_PASSES passes reached — a later tick takes it"
+            continue
+        fi
+        # Actions only: another pass must fit a full claude run inside the step's
+        # timeout. When it cannot, ask the workflow to re-dispatch; the cron is the
+        # backstop if that dispatch fails. launchd never overlaps one job's
+        # instances, so it has no budget.
+        if [ "$SIM_RECAP_HOST_MODE" = actions ]; then
+            local timeout_s="$SIM_RECAP_CLAUDE_TIMEOUT"
+            case "$timeout_s" in ''|*[!0-9]*) timeout_s=1800 ;; esac
+            now="$(date +%s)"
+            if [ $((now - TICK_START + timeout_s + 120)) -gt "$ACTIONS_STEP_BUDGET" ]; then
+                if [ -n "${GITHUB_OUTPUT:-}" ]; then
+                    printf 'redispatch=true\n' >> "$GITHUB_OUTPUT"
+                fi
+                log "sim $sim: no time left in this run — asking the workflow to re-dispatch"
+                break
+            fi
+        fi
+    done
+
+    # Only a terminal sim turns an Actions run red: a hand-off, wait, or backoff
+    # is a workaround in progress (warning annotation + #admin-chat post).
+    if [ "$SIM_RECAP_HOST_MODE" = actions ] && [ "$TICK_TERMINAL" -eq 1 ]; then
+        log "sim $sim: terminal — exiting 1 so the Actions run shows red (host mode: actions)"
+        return 1
+    fi
+    if [ "$TICK_PARKED" -eq 1 ]; then
+        log "sim $sim: parked, not terminal — exiting 0; the workaround is in progress"
+    fi
+    return 0
 }
 
 main "$@"

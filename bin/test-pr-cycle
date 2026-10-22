@@ -2631,6 +2631,32 @@ PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker --max-read
 grep -qF '#101 — held-unfixable marker active' <<< "$OUT" || fail "marker M-H: 101 skip line missing"
 grep -qF '#102 — over --max-ready cap' <<< "$OUT" && fail "marker M-H: 102 was capped out"
 hm_cleanup
+# M-I: an UNREALISED-ASSERTION marker written at another head never suppresses the PR, and an
+# empty headRefOid means the head is unknown, so the PR fires too.
+HM_UNREALISED="UNREALISED-ASSERTION: row V2 -- tests/test_x.py::test_y"
+for _hm_oid in bbbb2222 ""; do
+    reset_state
+    printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+    triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+    install_harness_result 101 first-slug hold-repeat-declined "3" CLEAN
+    mkdir -p "$HMPLANS" "$HMSTATE"
+    echo "# plan first-slug" > "$HMPLANS/first-slug.md"
+    hm_observe first-slug "$HM_UNREALISED"
+    env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$HMSTATE" first-slug "$HMPLANS/first-slug.md" <<'PY'
+import sys
+from harness import heldmarker
+sd, slug, plan = sys.argv[1:4]
+assert heldmarker.write(sd, slug, plan_path=plan, now="t0", head_sha="aaaa1111",
+                        missing_tokens=["test_y"]) is not None, "marker seed refused"
+PY
+    jq --arg oid "$_hm_oid" '.[0].headRefOid = $oid' "$SCRATCH/armed-state.json" \
+        > "$SCRATCH/armed-state.tmp" && mv "$SCRATCH/armed-state.tmp" "$SCRATCH/armed-state.json"
+    PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
+    hm_fires "M-I headRefOid='$_hm_oid'"
+    grep -qF 'held-unfixable marker active' <<< "$OUT" && fail "marker M-I: skip line printed for headRefOid='$_hm_oid'"
+    hm_cleanup
+done
+echo "PASS: heldmarker unrealised head mismatch proceeds"
 end_case "case held-unfixable marker pre-fire skip"
 
 # ==========================================================================================
@@ -3108,6 +3134,49 @@ run --worker
 _fix5_bare="$(calls ready)"
 [[ "$_fix5_legacy" == "$_fix5_bare" ]] || fail "fix5 READY WITH NOTES: suffix form ran fleet $_fix5_legacy time(s), bare form $_fix5_bare"
 end_case "case fix5 details-shaped harness sticky"
+
+# pr3267 dual-layout: the same sticky rendered in the old (v1) and new (v2) layout must
+# classify identically through _precheck_verdict. Fixture diff sha is DIFF_A.
+PR3267_FIX_DIR="$SCRIPT_DIR/fixtures/review-shared"
+install_fixture_verdict() {  # $1 = PR number, $2 = body, $3 = patch-id
+    local n="$1" body="$2" adiff="$3" oid
+    oid="deadbeefcafe$(printf '%028d' "$n")"
+    printf '{"comments":[{"body":%s}],"headRefOid":"%s"}' \
+        "$(printf '%s' "$body" | jq -Rs .)" "$oid" > "$SCRATCH/verdictview-$n.json"
+    printf '%s\n' "$adiff" > "$SCRATCH/patchid-$n.txt"
+    printf '%s\n' "$TREE_A" > "$SCRATCH/tree-$oid"
+}
+PR3267_V1="$(jq -r '.comments[-1].body' "$PR3267_FIX_DIR/post-plan-sticky-pr3267-v1.json")"
+PR3267_V2="$(jq -r '.comments[-1].body' "$PR3267_FIX_DIR/post-plan-sticky-pr3267-v2.json")"
+
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_fixture_verdict 101 "$PR3267_V1" "$DIFF_A"
+run --worker
+[[ "$(calls ready)" == "0" ]] || fail "pr3267-v1-precheck-ready: fleet ran $(calls ready) time(s), want 0 (READY)"
+grep -qF 'skipping pr-ready' <<< "$OUT" || fail "pr3267-v1-precheck-ready: skip line missing"
+end_case "pr3267-v1-precheck-ready"
+
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_fixture_verdict 101 "$PR3267_V2" "$DIFF_A"
+run --worker
+[[ "$(calls ready)" == "0" ]] || fail "pr3267-v2-precheck-ready: fleet ran $(calls ready) time(s), want 0 (READY)"
+grep -qF 'skipping pr-ready' <<< "$OUT" || fail "pr3267-v2-precheck-ready: skip line missing"
+end_case "pr3267-v2-precheck-ready"
+
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_fixture_verdict 101 "$(printf '%s\n' "$PR3267_V2" | sed 's/^READY WITH NOTES (re-review) — .*$/NOT READY (re-review) — x/')" "$DIFF_A"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "pr3267-v2-not-ready-terminal: fleet ran $(calls ready) time(s), want 1 (empty precheck)"
+end_case "pr3267-v2-not-ready-terminal"
 
 # bin/pr-cycle-tick hands bin/pr-cycle the exact argv shape `--go --only <csv> --max-ready <n>`.
 # Pin the dry-run form of it here, so a _normalize_prs change that drops comma input fails

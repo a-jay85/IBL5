@@ -1,6 +1,6 @@
 ---
 description: Schema reference and query patterns for IBL5 database work.
-last_verified: 2026-10-06
+last_verified: 2026-10-14
 ---
 
 # IBL5 Database Guide
@@ -41,7 +41,7 @@ last_verified: 2026-10-06
    - `vw_player_current` - Current season player data
    - `vw_team_standings` - Real-time standings
    - `vw_team_awards` - All team awards (Div/Conf/Lottery from `ibl_team_awards`, IBL Champions from `vw_playoff_series_results`, HEAT Champions from `ibl_box_scores_teams`)
-   - `vw_franchise_summary` - All-time wins/losses/winpct/playoffs/titles per team
+   - `vw_franchise_summary` - All-time wins/losses/winpct/playoffs/titles per team. Wins and losses are summed from `ibl_team_season_records` (game_type 1), which `RefreshTeamSeasonRecordsStep` refreshes each sim. Totals can lag a box-score edit by one sim cycle, the same window as ADR-0015. After a one-off box-score repair, run the refresher (or the next sim) to bring them current.
    - `vw_playoff_series_results` - Playoff series outcomes derived from box scores
    - `vw_current_salary` - Salary resolution (replaces CASE pattern)
    - `vw_career_totals` - Regular season career totals

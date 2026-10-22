@@ -55,13 +55,14 @@ require_once __DIR__ . '/../db/db.php';
 /** @var \mysqli $mysqli_db */
 
 // ── Parse CLI options ───────────────────────────────────────────────────────
-$dryRun = in_array('--dry-run', $argv, true);
-$verify = in_array('--verify', $argv, true);
+$cliArgs = $argv ?? [];
+$dryRun = in_array('--dry-run', $cliArgs, true);
+$verify = in_array('--verify', $cliArgs, true);
 
 $fileTypeFilter = null;
 $seasonFilter = null;
 
-foreach ($argv as $arg) {
+foreach ($cliArgs as $arg) {
     if (str_starts_with($arg, '--file-type=')) {
         $fileTypeFilter = substr($arg, strlen('--file-type='));
         $fileType = JsbFileType::tryFrom($fileTypeFilter);

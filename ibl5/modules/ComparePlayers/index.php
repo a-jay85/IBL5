@@ -11,7 +11,8 @@ declare(strict_types=1);
  * @see ComparePlayers\ComparePlayersView For HTML rendering
  */
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -24,6 +25,7 @@ $httpRequest = \Http\HttpRequest::fromGlobals();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
 global $mysqli_db, $user;
+/** @var \mysqli $mysqli_db */
 
 $repository = new \ComparePlayers\ComparePlayersRepository($mysqli_db);
 $service    = new \ComparePlayers\ComparePlayersService($repository);

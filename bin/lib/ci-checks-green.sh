@@ -34,3 +34,30 @@ ccg_failed() { jq -r '[.check_runs[] | select(.status == "completed" and ((.conc
 # ccg_skip_json <csv> — CSV of exact names -> JSON array, trimming spaces,
 #   dropping empties ("" -> []). Former SKIP_JSON derivation.
 ccg_skip_json() { printf '%s\n' "$1" | jq -R 'split(",") | map(sub("^ +";"") | sub(" +$";"")) | map(select(length > 0))'; }
+
+# ccg_drop_pending <ignore-json-array> — drop every run whose name is an EXACT
+#   match in $1 AND whose .status != "completed". A completed run of a listed
+#   name is kept whatever its conclusion, so a red (or cancelled) deploy still
+#   fails the verdict. Input/output: {check_runs:[...]} (total_count
+#   recomputed). Callers apply it BEFORE ccg_dedupe: dedupe keeps the newest run
+#   per name, and a pending re-run is newer than the completed-red run of the
+#   same name it would otherwise replace. Dropping the pending re-run first
+#   leaves the older red run in place, which is the fail-closed reading.
+#   An empty list is a no-op apart from total_count being recomputed.
+ccg_drop_pending() { jq --argjson ignore "$1" '
+  [ .check_runs[] | select(((.name | IN($ignore[])) and (.status != "completed")) | not) ]
+  | { total_count: length, check_runs: . }'; }
+
+# ccg_drop_failed <ignore-json-array> — drop every run whose name is an EXACT
+#   match in $1, whose .status == "completed", AND whose conclusion is outside
+#   the ccg_failed pass set {success, skipped, neutral}. A null conclusion
+#   counts as non-passing, as in ccg_failed. A pending or passing run of a
+#   listed name is kept, so a still-running helper still reports as running.
+#   Callers apply it AFTER ccg_dedupe so only the newest run per name is
+#   judged: a newer pending re-run hides an older red run, which is today's
+#   behavior. Input/output: {check_runs:[...]} (total_count recomputed). An
+#   empty list is a no-op apart from total_count being recomputed.
+ccg_drop_failed() { jq --argjson ignore "$1" '
+  [ .check_runs[] | select(((.name | IN($ignore[])) and (.status == "completed")
+      and ((.conclusion // "unknown") | IN("success","skipped","neutral") | not)) | not) ]
+  | { total_count: length, check_runs: . }'; }

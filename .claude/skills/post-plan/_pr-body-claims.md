@@ -1,6 +1,6 @@
 ---
-description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised."
-last_verified: 2026-10-11
+description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised; an advisory How to revert line follows it; pr-copy writes no exact count its packet does not show."
+last_verified: 2026-10-20
 ---
 
 # PR Body Claims
@@ -123,6 +123,12 @@ If you cannot produce the evidence, drop the claim. Describe what the PR changes
 
 This rule has no mechanical check. The claims it covers are free-form prose, and the same phrases appear in design descriptions and quoted plans, so a pattern match would flag too many honest lines. The diff is the record of which files changed, so never list changed files by hand. The `<!-- merge-digest:begin -->` block at the top of the body is runner-owned: it mirrors the sticky verdict, so never edit it by hand.
 
+## Unseen-count rule
+
+The harness's pr-copy call writes no exact count (tests, cases, call sites, files, functions, rows) that its input packet does not show, and it claims only what the diff shows. When the number is not in front of it, it describes the change in words. The Phase 5.5 fidelity review's check 4 is the body-vs-diff gate for every count that reaches the body. `body_numbers.py` still corrects file, line, migration and ADR numbers and adds the test-count note described below.
+
+**Headless.** Applies: the prompt rule runs on every harness pr-copy call.
+
 ## Test-count claims rule
 
 A PR body that says how many tests a change adds takes the number from a measurement and names its unit. Do not count test functions by hand. Copy the count from the runner's own summary line (`N passed` from pytest, `Tests: N` from PHPUnit, the total a `bin/test-*` harness prints) or from a grep of the diff for the declarations you added. Say which unit the number counts: tests the diff adds, or the file's total after the change. Put the number in the same bullet as the one test file it describes, with the path in backticks, so the harness can check it.
@@ -162,6 +168,21 @@ Phase 6.5 condition (18) refuses to arm when `Door: one-way`, when the line is m
 Trigger: backlog#1438.
 
 **Headless.** Applies: yes. The line is injected and validated mechanically; the only LLM input is the Why text.
+
+## How to revert rule
+
+Directly after the Merge danger line, the body carries one advisory `**How to revert:**` line. It says in one line how to undo the merge.
+
+- A normal change reads: Open a PR with `git revert <merge-sha>`.
+- A diff touching a migration (`ibl5/migrations/*.sql`) adds a step: write a new migration that undoes the schema change, since git revert does not roll back an applied migration.
+- A diff touching the prod sync (`bin/db-sync-prod` or `.github/workflows/promote-to-production.yml`) adds a step: rerun the previous prod sync or promotion.
+- A diff touching config (`ibl5/.htaccess`, `ibl5/composer.json`, or any `.github/workflows/*.yml`) adds a step: confirm the deploy picked up the restored config.
+
+The LLM writes the line in Phase 2. The harness module `tools/postplan-harness/harness/how_to_revert.py` keeps exactly one line after Merge danger. It swaps in the mechanical line when the LLM line is missing or shorter than 12 characters, and whenever the diff touches one of the paths above.
+
+The line is advisory. A body without it gets no finding and no hold, and the body check stays clean. No Phase 6.5 condition, shell reader, or digest reads it. Bodies written before this rule carry no line, and nothing flags them.
+
+**Headless.** Applies: yes. The runner writes the line mechanically when the LLM line is unusable.
 
 ## Backlog issue references
 

@@ -32,6 +32,7 @@ $module_name = basename(dirname(__FILE__));
 $pagetitle = "- $module_name";
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Initialize classes
 $validator = new \PlayerSearch\PlayerSearchValidator();
@@ -41,7 +42,11 @@ $service = new \PlayerSearch\PlayerSearchService($validator, $repository, $playe
 $view = new \PlayerSearch\PlayerSearchView();
 
 // Get and validate search parameters from POST
-$searchResult = $service->search($_POST);
+$postData = [];
+foreach ($_POST as $key => $value) {
+    $postData[(string) $key] = $value;
+}
+$searchResult = $service->search($postData);
 
 // Render page
 PageLayout\PageLayout::header();
@@ -52,7 +57,7 @@ echo '<h1 class="ibl-title">Player Search</h1>';
 echo $view->renderSearchForm($searchResult['params']);
 
 // Render results if form was submitted
-if (!empty($_POST)) {
+if ($_POST !== []) {
     echo $view->renderTableHeader();
     
     if ($searchResult['count'] > 0) {

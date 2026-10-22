@@ -147,7 +147,10 @@ if ($tab === 'career') {
 $rawBody = ob_get_clean();
 $tabBody = $rawBody === false ? '' : $rawBody;
 
-echo '<div class="leaderboards-page"><h1 class="ibl-title">Leaderboards</h1>'
-    . $tabs->renderTabBar($tab, 'modules.php?name=Leaderboards') . $tabs->wrapPanel($tabBody, $tab) . '</div>';
+// .ibl-tab-card: one white card with the tab strip as its header; title and tab body inside
+echo '<div class="leaderboards-page"><div class="ibl-tab-card">'
+    . $tabs->renderTabBar($tab, 'modules.php?name=Leaderboards')
+    . $tabs->wrapPanel('<h1 class="ibl-title">Leaderboards</h1>' . $tabBody, $tab)
+    . '</div></div>';
 
 PageLayout\PageLayout::footer();

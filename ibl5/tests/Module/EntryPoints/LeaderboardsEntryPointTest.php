@@ -21,7 +21,8 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="season"', $output);
         $this->assertStringContainsString('class="ibl-tabs"', $output);
-        $this->assertStringContainsString('<div class="leaderboards-page"><h1 class="ibl-title">Leaderboards</h1><div class="ibl-tabs">', $output);
+        $this->assertStringContainsString('<div class="leaderboards-page"><div class="ibl-tab-card"><div class="ibl-tabs">', $output);
+        $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="season"><h1 class="ibl-title">Leaderboards</h1>', $output);
         $this->assertStringContainsString('<form name="Leaderboards"', $output);
         $this->assertStringNotContainsString('ibl-data-table', $output);
     }

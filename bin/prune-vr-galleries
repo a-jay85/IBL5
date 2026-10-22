@@ -18,6 +18,10 @@ Options:
 Directories matching ./<40-hex-char SHA> whose most-recent commit date is
 older than N days are pruned. Directories with no git history are skipped.
 Dirs with no git history are never cap-pruned (intentional fail-closed behaviour).
+
+After pruning, blobs in _vr-blobs/ that no surviving gallery index references
+(dirs pruned in the same run do not count; keep-file dirs do) and whose newest
+commit is older than --cutoff-days are removed. --dry-run prints WOULD GC lines.
 EOF
     exit 0
 fi
@@ -46,6 +50,10 @@ Directories matching ./<40-hex-char SHA> whose most-recent commit date is
 older than N days are pruned. Directories with no git history are skipped.
 Dirs with no git history are never cap-pruned (they are skipped before they
 can enter the survivor list — intentional fail-closed behaviour).
+
+After pruning, blobs in _vr-blobs/ that no surviving gallery index references
+(dirs pruned in the same run do not count; keep-file dirs do) and whose newest
+commit is older than --cutoff-days are removed. --dry-run prints WOULD GC lines.
 EOF
 }
 
@@ -145,6 +153,9 @@ now=$(date +%s)
 cutoff=$(( now - days * 86400 ))
 
 removed=0
+# Dirs pruned by this run (live or simulated), newline-delimited for bash 3.2.
+# Pass 3 (blob GC) treats them as no longer referencing any blob.
+pruned_set=$'\n'
 
 # survivors collects "$ts<TAB>$dir" for every dir that survives the age filter.
 # Dirs with no git history are skipped before they reach this list, so they are
@@ -177,6 +188,7 @@ while IFS= read -r dir; do
   age=$(( (now - ts) / 86400 ))
   if [ "$ts" -lt "$cutoff" ]; then
     removed=$(( removed + 1 ))
+    pruned_set+="$b"$'\n'
     if [[ "$dry_run" -eq 1 ]]; then
       echo "WOULD PRUNE: $dir (age=${age}d)"
     else
@@ -220,12 +232,88 @@ if [[ -n "$max_dirs" && ${#survivors[@]} -gt 0 ]]; then
     [[ -n "$cap_dir" ]] || continue
     cap_age=$(( (now - cap_ts) / 86400 ))
     removed=$(( removed + 1 ))
+    pruned_set+="${cap_dir#./}"$'\n'
     if [[ "$dry_run" -eq 1 ]]; then
       echo "WOULD PRUNE: $cap_dir (age=${cap_age}d)"
     else
       git rm -rq "$cap_dir"
     fi
   done < <(printf '%s\n' "$ranked" | tail -n +$(( max_dirs + 1 )))
+fi
+
+# Pass 3: blob GC. A blob in _vr-blobs/ is removed only when no surviving
+# gallery index references it and its newest commit is older than the cutoff.
+# Dirs this run pruned (pruned_set) no longer count as referrers; keep-file and
+# no-history dirs never enter pruned_set, so their references always count.
+# GC messages go to stderr in live mode, stdout under --dry-run, and never
+# change the stdout integer (it counts pruned dirs only).
+if [[ -d _vr-blobs ]]; then
+  gc_tmp=$(mktemp -d)
+  trap 'rm -rf "$gc_tmp"' EXIT
+  index_list="$gc_tmp/indexes"
+  : > "$index_list"
+  while IFS= read -r dir; do
+    b="${dir#./}"
+    [ "${#b}" -eq 40 ] || continue
+    case "$b" in (*[!0-9a-f]*) continue ;; esac
+    case "$pruned_set" in (*$'\n'"$b"$'\n'*) continue ;; esac
+    if [[ -f "$dir/visual-review/index.html" ]]; then
+      printf '%s\n' "$dir/visual-review/index.html" >> "$index_list"
+    fi
+  done < <(find . -mindepth 1 -maxdepth 1 -type d)
+  if [[ -d pr ]]; then
+    find pr -mindepth 3 -maxdepth 3 -path 'pr/*/visual-review/index.html' -type f >> "$index_list"
+  fi
+
+  # Fail closed: grep exit 1 means no matches (fine); exit >= 2 is a read error.
+  refset="$gc_tmp/refset"
+  : > "$refset.raw"
+  while IFS= read -r idx; do
+    rc=0
+    grep -ohE '_vr-blobs/[0-9a-f]{64}\.png' "$idx" >> "$refset.raw" || rc=$?
+    if [ "$rc" -ge 2 ]; then
+      echo "prune-vr-galleries: blob reference scan failed" >&2
+      exit 1
+    fi
+  done < "$index_list"
+  sed -e 's|^_vr-blobs/||' -e 's|\.png$||' "$refset.raw" | sort -u > "$refset"
+
+  cands="$gc_tmp/cands"
+  : > "$cands"
+  while IFS= read -r blob; do
+    h="${blob##*/}"
+    h="${h%.png}"
+    [ "${#h}" -eq 64 ] || continue
+    case "$h" in (*[!0-9a-f]*) continue ;; esac
+    printf '%s\n' "$h" >> "$cands"
+  done < <(find _vr-blobs -mindepth 1 -maxdepth 1 -type f -name '*.png')
+  sort -o "$cands" "$cands"
+
+  gc_total=$(wc -l < "$cands" | tr -d ' ')
+  gc_unref=0
+  gc_young=0
+  gc_removed=0
+  while IFS= read -r h; do
+    [[ -n "$h" ]] || continue
+    gc_unref=$(( gc_unref + 1 ))
+    blob="_vr-blobs/$h.png"
+    bts=$(git log -1 --format=%ct -- "$blob")
+    if [[ -z "$bts" ]]; then
+      echo "WARN: no git history for $blob, skipping" >&2
+      continue
+    fi
+    if [ "$bts" -ge "$cutoff" ]; then
+      gc_young=$(( gc_young + 1 ))
+      continue
+    fi
+    gc_removed=$(( gc_removed + 1 ))
+    if [[ "$dry_run" -eq 1 ]]; then
+      echo "WOULD GC: $blob (age=$(( (now - bts) / 86400 ))d)"
+    else
+      git rm -q "$blob"
+    fi
+  done < <(comm -23 "$cands" "$refset")
+  echo "GC: referenced=$(( gc_total - gc_unref )) unreferenced=$gc_unref young=$gc_young gc=$gc_removed" >&2
 fi
 
 echo "$removed"

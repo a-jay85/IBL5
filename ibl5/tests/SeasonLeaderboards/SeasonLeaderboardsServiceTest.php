@@ -638,6 +638,40 @@ final class SeasonLeaderboardsServiceTest extends TestCase
         ], $stats);
     }
 
+    public function testProcessPlayerRowKeepsColorNearDefaultUnchanged(): void
+    {
+        $row = [
+            'pid' => 123,
+            'name' => 'Test Player',
+            'year' => 2024,
+            'team' => 'Test Team',
+            'teamid' => 1,
+            'games' => 10,
+            'minutes' => 300,
+            'fgm' => 50,
+            'fga' => 100,
+            'ftm' => 20,
+            'fta' => 25,
+            'tgm' => 15,
+            'tga' => 40,
+            'orb' => 30,
+            'reb' => 80,
+            'ast' => 40,
+            'stl' => 10,
+            'tvr' => 15,
+            'blk' => 5,
+            'pf' => 20,
+            'team_city' => 'Boston',
+            'color1' => 'FFFFF0',
+            'color2' => '000001',
+        ];
+
+        $stats = $this->service->processPlayerRow($row);
+
+        $this->assertSame('FFFFF0', $stats['color1']);
+        $this->assertSame('000001', $stats['color2']);
+    }
+
     public function testQualityAssessmentCalculation(): void
     {
         $row = [

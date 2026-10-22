@@ -1,6 +1,6 @@
 ---
-description: A required aggregator check, All checks green, blocks auto-merge on any red check on the PR head; condition (15) demotes to a warning only while protection lists it.
-last_verified: 2026-10-11
+description: A required aggregator blocks auto-merge on any red check on the PR head; the 2026-10-21 addendum replaces the polling All checks green job with the All checks settled commit status. Condition (15) demotes to a warning only while protection lists the aggregator. A 2026-10-22 addendum retries the settle job's API reads and closes an empty-body fail-open.
+last_verified: 2026-10-22
 owner: ajaynicolas
 ---
 
@@ -154,3 +154,82 @@ A retarget alone starts no CI, because `tests.yml` and `e2e-tests.yml` do not li
 Correction to `## Re-run recovery (stale aggregator)`: the aggregator now reads `base.ref` from the event payload as well as the head SHA. A `gh run rerun` replays the frozen payload, so re-running a stacked-base failure after the retarget still sees the old base and fails again. Push instead. The re-run recipe above stays correct for a master-based PR.
 
 `bin/check-composite-contracts` A5 pins the wiring: the step passes `--base-ref="$BASE_REF"`, and the base-ref expression appears only on the `BASE_REF:` env line, never inline in `run:`.
+
+## Addendum 2026-10-21: event-driven commit-status aggregator
+
+**Context.** The repo is public, so Actions runs under the 20-concurrent-job cap. On
+2026-10-21 17 of the 20 running jobs were `All checks green` waiters, some 40 minutes old,
+with 109 runs queued across 55 open PRs. The waiters held the slots the checks they were
+waiting on needed; several hit the 45-minute deadline, went red, and the re-push added load.
+
+**Decision.** The required aggregator becomes a commit status named `All checks settled`,
+written by `.github/workflows/all-checks-settled.yml` through `bin/settle-pr-status`.
+The workflow runs from master on `workflow_run: completed` of every PR-triggered workflow
+and on `workflow_dispatch` with a PR number, takes seconds, and never waits. Each run
+re-reads the live check-runs and workflow runs for the PR head SHA through
+`bin/check-pr-checks-green` in one-shot mode (exit 0 success, 1 failure, 3 pending) and
+posts the mapped state. A commit status is keyed to one SHA, which answers the
+"check-run attachment unclear" objection in the original Alternatives section.
+
+**What stays.** Pass/fail rule V1-V5; the four anchors; the `--ignore=` list; the
+stacked-base fast-fail and its retarget-and-push message; fail-closed on API error
+(nothing is posted and the run goes red). A new SHA starts with no status, so a push
+can never inherit `success`. A late event for a superseded SHA is refused by comparing
+the event head with the PR's current head from the API. Fork PRs are settled from
+master code only; their head is resolved through `commits/{sha}/pulls`.
+
+**What changes.** Decision items 1 (triggers) and 4 (bounded wait) are superseded.
+Recovery for a stuck status is `gh workflow run all-checks-settled.yml -f pr_number=N`;
+`gh run rerun` on a sibling also re-settles, since its completion fires the event.
+Branch protection keeps one aggregator entry; the status needs an any-source entry
+(`app_id` null), which the append-only `POST .../required_status_checks/contexts` creates.
+The protection entry for `All checks green` is pinned to the Actions app and cannot be
+satisfied by a status, so the two aggregators coexist until the runbook below completes.
+
+**Cutover runbook.** A human runs these steps after this PR merges under the legacy gate.
+1. `gh run list --workflow all-checks-settled.yml --limit 10` shows completed runs
+   once any open PR's sibling finishes.
+2. Backfill every open PR:
+   `gh pr list --state open --limit 100 --json number -q '.[].number' | xargs -n1 -I{} gh workflow run all-checks-settled.yml -f pr_number={}`
+3. Throwaway PR: a docs-only change goes pending then success; a push with a failing
+   PHPUnit assertion goes failure; the fix push shows a fresh pending then success.
+4. `gh api repos/a-jay85/IBL5/branches/master/protection > pre.json`, then
+   `gh api -X POST repos/a-jay85/IBL5/branches/master/protection/required_status_checks/contexts -f 'contexts[]=All checks settled'`,
+   `gh api repos/a-jay85/IBL5/branches/master/protection > post.json`, and
+   `bin/check-composite-contracts --protection-readback=post.json --pre-image=pre.json --context='All checks settled'`.
+5. `gh api -X DELETE repos/a-jay85/IBL5/branches/master/protection/required_status_checks/contexts -f 'contexts[]=All checks green'`; the readback in step 4 against a fresh dump shows only that entry gone.
+6. Open the retirement PR (delete `all-checks-green.yml`, drop its three remaining
+   tokens; see the plan's Out of Scope). It merges under the new gate.
+
+**Escape hatch.** If `All checks settled` stops settling repo-wide, undo steps 5 and 4.
+A POST re-adds `All checks green` as an any-source entry, which the legacy check-run
+satisfies. A DELETE then removes `All checks settled`. Both are single API calls.
+
+**Interim window.** Condition (15) reads `All checks settled` from live protection. From
+this merge until runbook step 4 adds that entry, condition (15) blocks arming on any red
+check, as it did before ADR-0149. That is the safe direction. The legacy waiter still
+gates merge in that window.
+
+**Contract renumbering.** `bin/check-composite-contracts` A1-A6 now pin
+`all-checks-settled.yml`: the triggers, the context literal shared with `bin/lib/pr-armable.sh`
+and the harness, the no-wait job shape, least-privilege wiring, the four anchors with the
+legacy ignore shim, and the listed-versus-derived PR workflow names. The base-ref pin from
+the 2026-10-11 addendum went with the old A-block. The `branches: [master]` filter on
+`promote-to-production.yml` is pinned as P9, since P1 already names the force-push guard.
+
+**Residual risks.** `ccg_dedupe` in `bin/lib/ci-checks-green.sh` keeps the last run per
+name after sorting on `completed_at // started_at`. A cancelled run often completes in the
+same second its replacement starts, and on that tie the API order decides. On PR 3421 the
+cancelled `Meta checks` run won. The cancellation itself fires `workflow_run: completed`,
+so the status can read `failure` while `gh pr checks` shows pending. The replacement's
+completion re-settles it. The lib is unchanged here, and the fix is a follow-up. A workflow added
+later with a `pull_request` trigger but left out of the `workflows:` list would never
+fire a settle; A6 fails the PR that adds it.
+
+## Addendum 2026-10-22: API read retry in the settle job
+
+On 2026-10-22, 25 of about 220 `all-checks-settled.yml` runs exited 2 with `API read error: ...: unexpected end of JSON input` during a GitHub incident. A failed run posts no status, so the PR kept a stale one until a sibling completion re-settled it.
+
+`bin/settle-pr-status` and `bin/check-pr-checks-green` now send their GitHub API reads through `gh_retry_json` in `bin/lib/gh-retry.sh` (ADR-0195 addendum 2026-10-22). Each read gets 3 attempts, with 2s and then 5s between them. A read retries on a non-zero exit, an empty body, a body that does not parse as JSON, HTTP 5xx and HTTP 429. Any other HTTP 4xx fails at once. Both scripts set the budget with `: "${IBL5_GH_RETRY_DELAYS:=2 5}"`, so the workflow file and the A-block of `bin/check-composite-contracts` are unchanged. The added sleep is at most 7s per read and under 30s for the whole job, well inside `timeout-minutes: 5`.
+
+The job stays fail-closed. An exhausted read still exits 2 and writes no status. The `--head-sha` path now also rejects a `commits/<sha>/pulls` body that is not a JSON array. Before this, an empty body reached the `NOTHING: no open PR has head` exit 0 and silently skipped the PR. The status POST is not retried, because its payload arrives on stdin and a rerun would send an empty body. Cases S11-S16 and P25-P29 in `bin/test-ci-checks-green` pin this.

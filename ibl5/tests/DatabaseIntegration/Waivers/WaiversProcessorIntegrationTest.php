@@ -85,7 +85,7 @@ class WaiversProcessorIntegrationTest extends DatabaseTestCase
             'droptime' => 1000000,
         ]);
 
-        $result = $this->processor->processAdd($pid, 'Metros', 4, 3000);
+        $result = $this->processor->processAdd($pid, 'Metros', 4, 4, 3000);
 
         $this->assertTrue($result['success']);
         $this->assertSame('player_added', $result['result']);
@@ -119,7 +119,7 @@ class WaiversProcessorIntegrationTest extends DatabaseTestCase
             'droptime' => 1000000,
         ]);
 
-        $result = $this->processor->processAdd($pid, 'Metros', 4, 3000);
+        $result = $this->processor->processAdd($pid, 'Metros', 4, 4, 3000);
 
         $this->assertTrue($result['success']);
         $this->assertSame('player_added', $result['result']);

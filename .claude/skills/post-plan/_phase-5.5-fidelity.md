@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-19
+last_verified: 2026-10-20
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -243,6 +243,8 @@ Skip this step entirely when `FIDELITY=READY`.
 ## Step 4b — Bounded re-review on a fully remediated tree
 
 Run this step only when step 4 addressed **every** `Mode: in-PR` finding. Skip it when `FIDELITY=READY` (step 4 never ran) or when any finding was left unfixed.
+
+**Harness body-only recheck.** The compiled harness (`tools/postplan-harness/runner.py`) takes a shorter path when the round changed only the PR body, the head tree equals the tree the prior review recorded, the plan hash is unchanged, and every prior finding was a check-4 (PR body) finding. It runs one single-turn Sonnet call over the prior findings, the numbered added body hunks, and the diff sections they cite, and it writes a `READY` verdict file at the re-review path only when every finding is resolved and every hunk is supported. Any other result runs the full re-review below. This skill fallback has no recheck path; when it runs, it always spawns the full re-review. Details: `tools/postplan-harness/README.md`.
 
 **Skip gate first.** Reuse the existing condition-(7) resolver rather than re-implementing plan lookup — `bin/lib/plan-resolve.sh` sets `$PLAN_FILE`, and the `awk` below is the same line-1-frontmatter parse condition (7) uses. The `</dev/null` is load-bearing: macOS `awk` with a program and no file argument reads STDIN and hangs.
 

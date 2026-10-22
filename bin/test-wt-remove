@@ -181,5 +181,51 @@ run_rm plain-1
 h_eq "case 13: rc 0" 0 "$RC"
 h_absent "case 13: dir gone" "$WTS/plain-1"
 
+echo "== case 14: automouse reap_empty_worktree removes only an empty worktree"
+REAP_SRC="$(awk '/^reap_empty_worktree\(\) \{/,/^\}/' "$SCRIPT_DIR/automouse/run")"
+if [ -z "$REAP_SRC" ]; then
+    h_fail "case 14: reap_empty_worktree found in bin/automouse/run"
+else
+    eval "$REAP_SRC"
+    # shellcheck disable=SC2034  # read by the eval'd reap_empty_worktree
+    REPO="$MAIN"
+    LOG="$TMP/am.log"
+    : > "$LOG"
+    mkwt reap-empty reap-empty
+    mkwt reap-commit reap-commit
+    git_q -C "$WTS/reap-commit" commit -q --allow-empty -m work >/dev/null 2>&1
+    mkwt reap-untracked reap-untracked
+    echo stray > "$WTS/reap-untracked/stray.txt"
+    mkwt _pool-3 _pool-3
+    reap_empty_worktree reap-empty; R14a=$?
+    reap_empty_worktree reap-commit; R14b=$?
+    reap_empty_worktree reap-untracked; R14c=$?
+    reap_empty_worktree _pool-3; R14d=$?
+    h_eq "case 14: rc 0 on every call" "0 0 0 0" "$R14a $R14b $R14c $R14d"
+    h_absent "case 14: empty worktree removed" "$WTS/reap-empty"
+    if ref_exists reap-empty; then h_fail "case 14: empty worktree's branch deleted"; else h_pass "case 14: empty worktree's branch deleted"; fi
+    h_exists "case 14: commit worktree kept" "$WTS/reap-commit"
+    h_exists "case 14: untracked worktree kept" "$WTS/reap-untracked"
+    h_exists "case 14: _pool-3 kept" "$WTS/_pool-3"
+    h_eq "case 14: three kept lines in the log" 3 "$(grep -c 'kept' "$LOG")"
+fi
+
+echo "== case 15: every skipped/ disposal in bin/automouse/run reaps"
+R15="$(awk '
+    { line[NR] = $0 }
+    END {
+        n = 0; miss = 0
+        for (i = 1; i <= NR; i++) {
+            if (line[i] ~ /mv .*"\$NIGHTLY_DIR\/skipped\/"/) {
+                n++; hit = 0
+                for (j = i + 1; j <= i + 15 && j <= NR; j++)
+                    if (index(line[j], "reap_empty_worktree ")) hit = 1
+                if (!hit) { miss++; printf "MISS line %d\n", i }
+            }
+        }
+        printf "sites=%d missing=%d\n", n, miss
+    }' "$SCRIPT_DIR/automouse/run")"
+h_contains "case 15: 5 sites, 0 missing" "$R15" "sites=5 missing=0"
+
 echo "----"
 h_done

@@ -170,7 +170,10 @@ if [ "$SWEEP_SET" -eq 1 ]; then
         if ! [[ "$n" =~ ^[0-9]{1,7}$ ]] || ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "SWEEP: PR ${n:-?}: skip: head.sha or number malformed"; continue
         fi
-        combined="$(api_get "repos/$REPO/commits/$sha/status")"
+        # api_get exits 2 inside the substitution; one bad PR read must not end the sweep.
+        if ! combined="$(api_get "repos/$REPO/commits/$sha/status")"; then
+            failed=$((failed + 1)); echo "SWEEP: PR $n head $sha: status read failed" >&2; continue
+        fi
         verdict="$(jq -r --arg ctx "$CONTEXT" --argjson now "$now" --argjson w "$window" '
             ([.statuses[]? | select(.context == $ctx)] | first) as $s
             | if $s == null then "skip: no \($ctx) status"

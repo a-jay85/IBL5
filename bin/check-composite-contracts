@@ -813,7 +813,7 @@ else
       _a7_bad="on: has no schedule cron"
     elif ! grep -qE '^  workflow_dispatch:' <<< "$swp_on"; then
       _a7_bad="on: has no workflow_dispatch trigger (operators re-run it by hand)"
-    elif grep -qE '^  (pull_request|pull_request_target|push|workflow_run|issue_comment|merge_group):' <<< "$swp_on"; then
+    elif grep -E '^  [A-Za-z_]+:' <<< "$swp_on" | grep -qvE '^  (schedule|workflow_dispatch):'; then
       _a7_bad="on: has a trigger other than schedule/workflow_dispatch; the sweep holds actions: write"
     elif [ "$_a7_writes" != "actions " ]; then
       _a7_bad="write scopes are '${_a7_writes}', want only actions"

@@ -214,7 +214,8 @@
    Tab Card (hub pages, e.g. DraftInfo)
 
    One white card: the .ibl-tabs strip is its navy header, the title and
-   tab body sit inside. Tables run edge to edge with a light header.
+   tab body sit inside. Title and tables keep their base centering and
+   natural width; tables drop their own chrome and get a light header.
    Scoped to .ibl-tab-card so team tabs, leaders, and other tables keep
    their own look. overflow: clip (not hidden) rounds the corners without
    making the card a scroll container, so sticky table headers still work.
@@ -233,33 +234,43 @@
 }
 
 .ibl-tab-card > .ibl-tab-panel {
-    padding-top: var(--space-4);
-    text-align: left;
+    padding-block: var(--space-4);
 }
 
-/* Title and text line up with the tables' first column (16px inset) */
-.ibl-tab-card .ibl-title {
-    display: inline-block;
-    width: auto;
-    margin: 0 var(--space-4) var(--space-3);
-    text-align: left;
-}
-
+/* The panel has no side padding (wide tables use the full card), so the
+   text gets its own inset from the card edge. */
 .ibl-tab-card .ibl-table-title,
 .ibl-tab-card .ibl-tab-panel > p {
     padding-inline: var(--space-4);
-    text-align: left;
 }
 
-/* Tables and their scroll wrappers: no own chrome, full card width */
+@media (max-width: 768px) {
+    .ibl-tab-card .ibl-title {
+        margin-inline: var(--space-4);
+    }
+}
+
+/* Tables and their scroll wrappers: no own chrome, natural width, centered
+   by their base rules. */
 .ibl-tab-card :is(.ibl-data-table, .draft-pick-table),
 .ibl-tab-card :is(.sticky-scroll-wrapper, .table-scroll-wrapper) {
     border: none;
     border-radius: 0;
     box-shadow: none;
+    margin-bottom: var(--space-4);
+}
+
+/* The card clips, so wrappers must stay inside it and scroll. JS caps
+   .table-scroll-wrapper with an inline max-width measured to the viewport,
+   which is wider than the card; width: 100% holds it to the card (the
+   table inside stays centered). .sticky-scroll-wrapper's desktop base cap
+   is also viewport-based. */
+.ibl-tab-card .table-scroll-wrapper {
     width: 100%;
-    max-width: none;
-    margin: 0 0 var(--space-4);
+}
+
+.ibl-tab-card .sticky-scroll-wrapper {
+    max-width: 100%;
 }
 
 .ibl-tab-card :is(.sticky-scroll-wrapper, .table-scroll-wrapper) :is(.ibl-data-table, .draft-pick-table) {
@@ -298,11 +309,6 @@
     border-bottom: 2px solid var(--accent-500);
 }
 
-.ibl-tab-card :is(.ibl-data-table, .draft-pick-table) thead tr:first-child th:first-child,
-.ibl-tab-card :is(.ibl-data-table, .draft-pick-table) tbody td:first-child {
-    padding-left: var(--space-4);
-}
-
 /* .sticky-header rounds and masks its corner cells against the page
    background; inside the card the corners are square and the bg is white. */
 .ibl-tab-card .sticky-header thead th:is(:first-child, :last-child),
@@ -316,13 +322,6 @@
 @media (max-width: 768px) {
     .ibl-tab-card .ibl-tab-panel .ibl-data-table.responsive-table thead th[class*="sticky-col"] {
         background: var(--gray-100);
-    }
-
-    /* .sticky-col-2 sticks at left: 36px, so .sticky-col-1 keeps its
-       base 0.75rem inset; the extra 16px would slide it under col 2. */
-    .ibl-tab-card .ibl-tab-panel .ibl-data-table.responsive-table thead tr th.sticky-col-1,
-    .ibl-tab-card .ibl-tab-panel .ibl-data-table.responsive-table tbody tr td.sticky-col-1 {
-        padding-left: 0.75rem;
     }
 }
 

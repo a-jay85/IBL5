@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
+use BasketballStats\StatsSanitizer;
 use Database\BaseMysqliRepository;
 use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 
@@ -122,7 +123,7 @@ class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedge
             default => 0,
         };
 
-        return is_numeric($value) ? (int) $value : 0;
+        return StatsSanitizer::toInt($value);
     }
 
     /**

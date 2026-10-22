@@ -245,11 +245,31 @@ def run_ladder(ctx: LadderContext, proof_out: str, rungs) -> LadderOutcome:
     return LadderOutcome("", (), current_proof, tuple(trail))
 
 
+LADDER_TRAIL_CAP = 800
+LADDER_TRAIL_ELISION = " ...; "
+
+
+def _trail_text(trail) -> str:
+    """Join the trail within LADDER_TRAIL_CAP chars, always keeping the last entry.
+
+    A trail that fits is returned unchanged, so short reasons stay byte-identical.
+    Otherwise the earlier entries are cut from their end and the last entry (capped at
+    half the budget) follows an elision marker."""
+    entries = tuple(trail)
+    joined = "; ".join(entries)
+    if len(joined) <= LADDER_TRAIL_CAP or len(entries) < 2:
+        return joined[:LADDER_TRAIL_CAP]
+    last = entries[-1][:LADDER_TRAIL_CAP // 2]
+    head_room = LADDER_TRAIL_CAP - len(LADDER_TRAIL_ELISION) - len(last)
+    head = "; ".join(entries[:-1])[:head_room]
+    return head + LADDER_TRAIL_ELISION + last
+
+
 def ladder_failure_reason(first_proof: str, trail) -> str:
     """Same `tree proof failed: ` prefix and 400-char cut as `_prove_tree_equivalent`,
-    so rebase_cause.py classifies the block unchanged."""
+    so rebase_cause.py classifies the block unchanged. The trail keeps its last entry."""
     return (f"tree proof failed: {first_proof.strip()[:400]}"
-            f" | ladder: {'; '.join(trail)[:800]}")
+            f" | ladder: {_trail_text(trail)}")
 
 
 # --- Rung 1: generated-file regeneration (no model call) -------------------------

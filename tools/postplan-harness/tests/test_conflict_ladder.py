@@ -26,6 +26,7 @@ from harness.adapters.llm import MODEL_MAP, FixtureLlm
 from harness.conflict import extract_stages, resolve_one
 from harness.conflict_ladder import (
     GENERATED_FILES,
+    LADDER_TRAIL_CAP,
     OPUS_MAX_FILES,
     GeneratedFile,
     LadderContext,
@@ -758,6 +759,38 @@ def test_ladder_failure_reason_keeps_proof_prefix():
             run_git=lambda args: (0, ""), run_gh=lambda args: (0, ""))
 
     assert classify(reason).cause == classify(old).cause == CAUSE_TREE_PROOF
+
+
+def test_ladder_failure_reason_keeps_last_trail_entry():
+    proof = "".join(f"LOST: f.txt: +line {i} padding padding\n" for i in range(30))
+    trail = tuple(f"opus-retry: {'x' * 290} {i}" for i in range(4)) + (
+        "sonnet-fix: already attempted head abc1234 on master def5678",)
+    reason = ladder_failure_reason(proof, trail)
+    assert reason.endswith(trail[-1])
+    assert " ...; " in reason
+    assert len(reason.split(" | ladder: ", 1)[1]) <= LADDER_TRAIL_CAP
+    assert reason.startswith("tree proof failed: ")
+    cause = classify_rebase_block(
+        ("f.txt",), reason, head_sha="h", branch="feat",
+        run_git=lambda args: (0, ""), run_gh=lambda args: (0, "")).cause
+    assert cause == CAUSE_TREE_PROOF
+
+
+def test_ladder_failure_reason_short_trail_unchanged():
+    proof = "LOST: f.txt: +line padding\n"
+    trail = ("regen: skipped (no generated file involved)", "opus-retry: boom")
+    reason = ladder_failure_reason(proof, trail)
+    assert reason == (f"tree proof failed: {proof.strip()[:400]}"
+                      f" | ladder: {'; '.join(trail)}")
+    assert ladder_failure_reason(proof, ()).endswith(" | ladder: ")
+
+
+def test_ladder_failure_reason_caps_oversized_last_entry():
+    trail = ("regen: skipped", "sonnet-fix: " + "y" * 1000)
+    ladder = ladder_failure_reason("LOST: f.txt\n", trail).split(" | ladder: ", 1)[1]
+    assert len(ladder) <= LADDER_TRAIL_CAP
+    assert ladder.startswith("regen: skipped")
+    assert "sonnet-fix: yyy" in ladder
 
 
 # --- pre-resolver regen selection (gitad._rebase_onto) ----------------------------

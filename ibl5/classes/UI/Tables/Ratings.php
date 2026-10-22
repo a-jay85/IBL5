@@ -40,10 +40,10 @@ class Ratings implements RatingsInterface
         ob_start();
         ?>
 <table class="ibl-data-table team-table responsive-table sortable"<?= $ariaLabel !== '' ? ' aria-label="' . \Security\HtmlSanitizer::e($ariaLabel) . '"' : '' ?> style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
-<?= HtmlSanitizer::trusted(self::renderHeader($withTeam)) ?>
+<?= self::renderHeader($withTeam) ?>
     <tbody>
 <?php foreach ($players as $player): ?>
-<?= HtmlSanitizer::trusted(self::renderPlayerRow($player, $season, $withTeam, $starterPids, $markExpiringRows)) ?>
+<?= self::renderPlayerRow($player, $season, $withTeam, $starterPids, $markExpiringRows) ?>
 <?php endforeach; ?>
     </tbody>
 </table>

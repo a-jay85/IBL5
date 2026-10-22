@@ -137,9 +137,9 @@ def test_body_pass_uses_pr_body_fresh_on_clean_rerun():
 
 def test_body_pass_does_not_edit_live_body_on_skip_path():
     """On the clean-tree rerun, summary_md stays '' so the body pass correction is
-    not written back. Checks: (a) sentinel absent from pr_edit_body and (b) the commit
-    message body is empty — both required to catch the named mutation."""
-    sentinel = "99-files-changed-sentinel"
+    not written back. Checks: (a) every pr_edit_body action carries the live PR body
+    unchanged (the fixture body) and there is at least one, and (b) the commit message
+    body is empty — both required to catch the named mutation."""
     commit_messages_log: list[str] = []
 
     class _TrackingGh(runner.RecordingGh):
@@ -168,11 +168,14 @@ def test_body_pass_does_not_edit_live_body_on_skip_path():
         runner.ReplayGit = orig_git
 
     assert res.terminal != TerminalState.FAILED, res.error
-    # (a) sentinel must NOT appear in any pr_edit_body action
-    for act in _actions(out):
-        if act.get("action") == "pr_edit_body":
-            assert sentinel not in act.get("body", ""), (
-                f"sentinel leaked into pr_edit_body: {act.get('body', '')[:200]!r}")
+    # (a) the live body is rewritten unchanged: the body pass's corrected text (which would
+    # say "1 file changed") must never reach pr_edit_body
+    live_body = fx["pr_meta"]["body"]
+    edits = [a for a in _actions(out) if a.get("action") == "pr_edit_body"]
+    assert edits, "expected the live body to be re-published unchanged; no pr_edit_body action"
+    for act in edits:
+        assert act.get("body") == live_body, (
+            f"pr_edit_body altered the live body: {act.get('body', '')[:200]!r}")
     # (b) commit message body must be empty — summary_md stayed ""
     assert commit_messages_log, "commit_all was never called"
     msg_body = (commit_messages_log[0].split("\n\n", 1)[1]

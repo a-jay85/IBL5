@@ -258,6 +258,41 @@ publicTest.describe('Sign-in divider contrast (WCAG 1.4.3)', () => {
   });
 });
 
+// --- Search pagination link contrast ---
+// The CI seed paginates the transactions preset (10 results plus a Next link). Pin the
+// link colour to --accent-800 (#9a3412) and its ratio on the page background, so a
+// revert to --accent-500 (2.41:1 on #eee) fails here directly. The VR baselines cannot
+// catch it: two recoloured words fall under the 0.5% maxDiffPixelRatio.
+
+publicTest.describe('Search pagination link contrast (WCAG 1.4.3)', () => {
+  publicTest('.search-pagination__link uses accent-800 and meets 4.5:1', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await gotoWithRetry(page, 'modules.php?name=Search&preset=transactions');
+
+    const link = page.locator('.search-pagination__link').first();
+    await expect(link).toBeVisible();
+
+    const { color, backgrounds } = await link.evaluate((el) => {
+      const chain: string[] = [];
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        chain.push(getComputedStyle(node).backgroundColor);
+      }
+      return { color: getComputedStyle(el).color, backgrounds: chain };
+    });
+
+    expect(color).toBe('rgb(154, 52, 18)');
+
+    const solid = backgrounds.map(parseCssRgb).find(({ alpha }) => alpha > 0);
+    const background: Rgb = solid?.rgb ?? [255, 255, 255];
+
+    const ratio = contrastRatio(parseCssRgb(color).rgb, background);
+    expect(
+      ratio,
+      `pagination link color ${color} on rgb(${background.join(', ')}) = ${ratio.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
 // --- Authenticated pages ---
 
 const authPages: Array<{

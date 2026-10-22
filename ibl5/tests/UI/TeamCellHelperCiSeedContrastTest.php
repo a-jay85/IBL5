@@ -57,10 +57,11 @@ final class TeamCellHelperCiSeedContrastTest extends TestCase
 
             $this->assertSame(
                 1,
-                preg_match('/--team-cell-bg: #([0-9a-fA-F]{6}); --team-cell-color: #([0-9a-fA-F]{6});/', $html, $m),
+                preg_match('/--team-cell-bg: #([0-9a-fA-F]{6}); --team-cell-color: #([0-9a-fA-F]{6}); --team-cell-shadow: #([0-9a-fA-F]{6});/', $html, $m),
                 "team $id $name: style not found",
             );
             $this->assertSame($c1, $m[1], "team $id $name: bg changed");
+            $this->assertSame($c2, $m[3], "team $id $name: shadow is not color2");
             $this->assertGreaterThanOrEqual(
                 4.5,
                 \Player\Views\TeamColorHelper::getContrastRatio($m[1], $m[2]),

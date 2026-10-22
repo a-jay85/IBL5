@@ -88,7 +88,8 @@ class HeadToHeadRecordsViewTest extends TestCase
         $html    = $this->view->renderMatrix($payload, []);
 
         self::assertStringContainsString('--team-cell-bg: #00653A', $html);
-        self::assertStringContainsString('--team-cell-color: #FFFFFF', $html);
+        self::assertStringContainsString('--team-cell-color: #ffffff', $html);
+        self::assertStringContainsString('--team-cell-shadow: #FFFFFF', $html);
         self::assertStringContainsString('class="sticky-col h2h-row-label ibl-team-cell--colored"', $html);
     }
 
@@ -489,13 +490,16 @@ class HeadToHeadRecordsViewTest extends TestCase
         self::assertStringContainsString('--team-cell-color: #ffffff', $html);
     }
 
-    public function testH2hFailingPairFallsBackToReadableColor(): void
+    public function testH2hFailingPairUsesReadableTextWithSecondaryShadow(): void
     {
         $payload = $this->makePlayedPayload(['color1' => '006BB6', 'color2' => 'ED174C']);
         $html    = $this->view->renderMatrix($payload, []);
 
-        self::assertStringContainsString('--team-cell-bg: #006BB6; --team-cell-color: #ffffff;', $html);
-        self::assertStringNotContainsString('ED174C', $html);
+        self::assertStringContainsString(
+            '--team-cell-bg: #006BB6; --team-cell-color: #ffffff; --team-cell-shadow: #ED174C;',
+            $html,
+        );
+        self::assertStringNotContainsString('--team-cell-color: #ED174C', $html);
     }
 
     public function testH2hHostileColorInputYieldsOnlyHexInStyle(): void
@@ -505,10 +509,10 @@ class HeadToHeadRecordsViewTest extends TestCase
 
         self::assertSame(1, preg_match('/ style="([^"]*--team-cell-bg[^"]*)"/', $html, $m));
         self::assertMatchesRegularExpression(
-            '/^--team-cell-bg: #[0-9a-fA-F]{6}; --team-cell-color: #[0-9a-fA-F]{6};$/',
+            '/^--team-cell-bg: #[0-9a-fA-F]{6}; --team-cell-color: #[0-9a-fA-F]{6}; --team-cell-shadow: #[0-9a-fA-F]{6};$/',
             $m[1],
         );
-        self::assertSame('--team-cell-bg: #000000; --team-cell-color: #ffffff;', $m[1]);
+        self::assertSame('--team-cell-bg: #000000; --team-cell-color: #ffffff; --team-cell-shadow: #000000;', $m[1]);
         self::assertStringNotContainsString('url(', $html);
         self::assertStringNotContainsString('<script', $html);
     }
@@ -537,7 +541,8 @@ class HeadToHeadRecordsViewTest extends TestCase
         $html    = $this->view->renderMatrix($payload, []);
 
         self::assertStringContainsString('--team-cell-bg: #00653A', $html);
-        self::assertStringContainsString('--team-cell-color: #FFFFFF', $html);
+        self::assertStringContainsString('--team-cell-color: #ffffff', $html);
+        self::assertStringContainsString('--team-cell-shadow: #FFFFFF', $html);
     }
 
     public function testRowLabelWithoutColorsHasNoStyleAttribute(): void

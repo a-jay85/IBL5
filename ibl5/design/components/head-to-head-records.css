@@ -99,14 +99,6 @@
     }
 }
 
-/* The shared .ibl-team-cell--colored rule paints the label text in the team's
-   secondary colour, which on this page lands green-on-purple, blue-on-red and
-   pink-on-cyan. White reads on every primary. Scoped to the row-label cell so
-   standings, free agency, trading and the draft tables keep the team colour. */
-.h2h-matrix .h2h-row-label.ibl-team-cell--colored .ibl-team-cell__name {
-    color: var(--white);
-}
-
 /* Corner cell: reading-direction hint (arrows point at columns, up at rows) */
 .h2h-matrix .h2h-corner {
     vertical-align: bottom;

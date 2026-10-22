@@ -430,7 +430,7 @@ class DraftViewTest extends TestCase
             <tbody><tr class="drafted">
                     <td class="sticky-col"></td>
                     <td class="sticky-col-2">Test Player</td>
-            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
+            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff; --team-cell-shadow: #BB9753;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
             <td>22</td>
             <td>50</td>
             <td>51</td>
@@ -498,7 +498,7 @@ class DraftViewTest extends TestCase
             <tbody><tr>
                     <td class="sticky-col"><input type="radio" name="player" value="Test Player" aria-label="Test Player"></td>
                     <td class="sticky-col-2">Test Player</td>
-            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
+            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff; --team-cell-shadow: #BB9753;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
             <td>22</td>
             <td>50</td>
             <td>51</td>
@@ -566,7 +566,7 @@ class DraftViewTest extends TestCase
             <tbody><tr>
                     <td class="sticky-col"></td>
                     <td class="sticky-col-2">Test Player</td>
-            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
+            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff; --team-cell-shadow: #BB9753;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
             <td>22</td>
             <td>50</td>
             <td>51</td>
@@ -702,7 +702,7 @@ class DraftViewTest extends TestCase
             <tbody><tr>
                     <td class="sticky-col"><input type="radio" name="player" value="Test Player" aria-label="Test Player"></td>
                     <td class="sticky-col-2">Test Player</td>
-            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #FFFFFF; --team-cell-color: #000000;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
+            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #FFFFFF; --team-cell-color: #000000; --team-cell-shadow: #000000;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
             <td>22</td>
             <td>50</td>
             <td>51</td>
@@ -770,7 +770,7 @@ class DraftViewTest extends TestCase
             <tbody><tr>
                     <td class="sticky-col"><input type="radio" name="player" value="&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; O&apos;Neil" aria-label="&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; O&apos;Neil"></td>
                     <td class="sticky-col-2">&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; O&apos;Neil</td>
-            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
+            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff; --team-cell-shadow: #BB9753;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
             <td>22</td>
             <td>50</td>
             <td>51</td>
@@ -838,7 +838,7 @@ class DraftViewTest extends TestCase
             <tbody><tr class="drafted">
                     <td class="sticky-col"></td>
                     <td class="sticky-col-2">First</td>
-            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
+            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff; --team-cell-shadow: #BB9753;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
             <td>22</td>
             <td>50</td>
             <td>51</td>
@@ -866,7 +866,7 @@ class DraftViewTest extends TestCase
             </tr><tr>
                     <td class="sticky-col"><input type="radio" name="player" value="Second" aria-label="Second"></td>
                     <td class="sticky-col-2">Second</td>
-            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
+            <td>PG</td><td class="ibl-team-cell--colored" style="--team-cell-bg: #008348; --team-cell-color: #ffffff; --team-cell-shadow: #BB9753;"><a href="modules.php?name=Team&amp;op=team&amp;teamid=5" class="ibl-team-cell__name" aria-label="Boston"><img src="images/logo/new5.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">Boston</span></a></td>
             <td>22</td>
             <td>50</td>
             <td>51</td>

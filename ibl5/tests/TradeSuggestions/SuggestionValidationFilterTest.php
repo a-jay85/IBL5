@@ -94,6 +94,40 @@ class SuggestionValidationFilterTest extends TestCase
         $this->assertSame([12, 21], $checked);
     }
 
+    /**
+     * A deal naming an asset the form does not list (sold, waived) would leave
+     * the validator judging a smaller trade than the one shown.
+     */
+    public function testRejectsDealTheFormCannotFullyTick(): void
+    {
+        $validator = self::createMock(TradeValidatorInterface::class);
+        $validator->expects($this->never())->method('validateSalaryCaps');
+        $filter = $this->buildFilter($validator);
+        $candidate = new TradeCandidate(1, 2, [12, 99], [], [21], []);
+
+        $data = $filter->buildTradeFormData('Usermen', 'Partners', 1, 2, $candidate);
+
+        $this->assertSame(SuggestionValidationFilter::FAIL_FORM, $filter->rejection($data, 1, 2, $candidate));
+    }
+
+    public function testCapRoomUsesTheValidatorsCapMathWithNothingTicked(): void
+    {
+        $formRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $formRepo->method('getTeamPlayersForTrading')->willReturn([self::playerRow(11, 1, 400)]);
+        $formRepo->method('getTeamDraftPicksForTrading')->willReturn([]);
+
+        $capCalculator = self::createMock(TradeCapCalculator::class);
+        $capCalculator->expects($this->once())->method('calculateSalaryCapData')
+            ->with(self::callback(static fn (array $form): bool => $form['offeringTeam'] === 'Usermen'
+                && $form['listeningTeam'] === 'Usermen'
+                && !in_array('on', $form['check'], true)))
+            ->willReturn(['userCurrentSeasonCapTotal' => 6650, 'partnerCurrentSeasonCapTotal' => 6650, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0]);
+
+        $filter = new SuggestionValidationFilter(self::createStub(TradeValidatorInterface::class), $capCalculator, $formRepo, new Season(self::createStub(\mysqli::class)));
+
+        $this->assertSame(\League\League::HARD_CAP_MAX - 6650, $filter->capRoom('Usermen', 1));
+    }
+
     private function runPasses(TradeValidatorInterface $validator): bool
     {
         $filter = $this->buildFilter($validator);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TradeSuggestions;
 
+use Negotiation\Contracts\NegotiationRepositoryInterface;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
 use Season\Season;
 use Settings\Contracts\SettingsServiceInterface;
@@ -15,9 +16,11 @@ use TradeSuggestions\Contracts\TradeSuggestionsServiceInterface;
 /**
  * Composes the trade suggestion engine for one GM's homepage panel.
  *
- * Load (batched) -> resolve modes -> generate -> both-sides filter -> rank and
- * run the real trade validation -> build display items. No per-candidate SQL:
- * only the ranker's bounded validation calls reach the database.
+ * Load (batched) -> resolve every team's mode from the same inputs -> generate
+ * -> gates and both-sides scoring -> rank and run the real trade validation ->
+ * build display items. No per-candidate SQL: only the ranker's bounded
+ * validation calls reach the database. Each stage's drop count is returned as
+ * SuggestionDiagnostics.
  *
  * @see TradeSuggestionsServiceInterface
  */
@@ -36,6 +39,7 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
         private readonly TradeImpactEvaluator $evaluator,
         private readonly SuggestionValidationFilter $filter,
         private readonly SuggestionRanker $ranker,
+        private readonly NegotiationRepositoryInterface $ratingMaximums,
     ) {
     }
 
@@ -60,7 +64,8 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
         }
 
         $endingYear = $this->season->endingYear;
-        $rosters = $this->assetRepo->getRostersForTeams($allTids);
+        $advances = $this->season->advancesContractYears();
+        $rosters = $this->assetRepo->getRostersForTeams($allTids, $this->ratingMaximums->getMarketMaximums(), $advances);
         $pickRows = $this->assetRepo->getPicksForTeams($allTids, $endingYear);
         $order = $this->draftOrderService->calculateDraftOrder($endingYear);
         $slotIndex = $this->pickValuer->buildSlotIndex($order);
@@ -68,10 +73,13 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
         /** @var array<int, TeamAssets> $assets */
         $assets = [];
         foreach ($allTids as $teamId) {
+            $players = $rosters[$teamId] ?? [];
             $assets[$teamId] = new TeamAssets(
                 $teamId,
-                $rosters[$teamId] ?? [],
+                $players,
                 $this->pickValuer->toPicks($pickRows[$teamId] ?? [], $slotIndex, $endingYear),
+                self::rosterCount($players, $advances),
+                $this->filter->capRoom($teamNames[$teamId] ?? '', $teamId),
             );
         }
 
@@ -79,52 +87,59 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
         foreach ($order['round1'] as $slot) {
             $records[$slot['teamId']] = ['wins' => $slot['wins'], 'losses' => $slot['losses']];
         }
-
-        $userMode = $this->teamModeService->resolve($tid);
+        $inputs = TeamModeGuesser::inputsForLeague($assets, $records, $this->assetRepo->getRegularSeasonRecords($endingYear - 1));
         $storedSettings = $this->teamModeRepo->getAllStoredSettings();
 
+        /** @var array<int, ResolvedTeamMode> $modes */
+        $modes = [];
+        foreach ($allTids as $teamId) {
+            $modes[$teamId] = $this->teamModeService->resolveFromInputs(
+                $storedSettings[$teamId] ?? TeamModeSetting::Auto,
+                $inputs[$teamId],
+            );
+        }
+        $userMode = $modes[$tid];
+
         $partners = [];
-        /** @var array<int, TeamMode> $partnerModes */
-        $partnerModes = [];
         foreach ($allTids as $partnerTid) {
-            if ($partnerTid === $tid) {
-                continue;
+            if ($partnerTid !== $tid) {
+                $partners[] = $assets[$partnerTid];
             }
-            $partnerAssets = $assets[$partnerTid];
-            $partners[] = $partnerAssets;
-            $record = $records[$partnerTid] ?? ['wins' => 0, 'losses' => 0];
-            $partnerModes[$partnerTid] = $this->teamModeService->resolveFromInputs(
-                $storedSettings[$partnerTid] ?? TeamModeSetting::Auto,
-                $record['wins'],
-                $record['losses'],
-                self::averageAge($partnerAssets->players),
-            )->mode;
         }
 
         $userAssets = $assets[$tid];
+        $generated = 0;
+        /** @var array<string, int> $rejections */
+        $rejections = [];
+        foreach (RejectReason::cases() as $reason) {
+            $rejections[$reason->value] = 0;
+        }
         $scored = [];
         foreach ($this->generator->generate($userAssets, $partners) as $candidate) {
+            $generated++;
             $partnerTid = $candidate->partnerTid;
-            if (!isset($assets[$partnerTid], $partnerModes[$partnerTid])) {
-                continue;
-            }
             $result = $this->evaluator->evaluate(
                 $candidate,
                 $userAssets,
                 $assets[$partnerTid],
                 $userMode->mode,
-                $partnerModes[$partnerTid],
+                $modes[$partnerTid]->mode,
             );
-            if ($result !== null) {
+            if ($result instanceof RejectReason) {
+                $rejections[$result->value]++;
+            } else {
                 $scored[] = $result;
             }
         }
 
         $userTeamName = $teamNames[$tid] ?? '';
         $filter = $this->filter;
+        $validated = 0;
+        /** @var array<string, int> $validatorRejections */
+        $validatorRejections = [];
         $selected = $this->ranker->select(
             $scored,
-            static function (ScoredCandidate $s) use ($filter, $userTeamName, $teamNames, $tid): bool {
+            static function (ScoredCandidate $s) use ($filter, $userTeamName, $teamNames, $tid, &$validated, &$validatorRejections): bool {
                 $c = $s->candidate;
                 $tradeData = $filter->buildTradeFormData(
                     $userTeamName,
@@ -134,7 +149,13 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
                     $c,
                 );
 
-                return $filter->passes($tradeData, $tid, $c->partnerTid, $c);
+                $validated++;
+                $failure = $filter->rejection($tradeData, $tid, $c->partnerTid, $c);
+                if ($failure !== null) {
+                    $validatorRejections[$failure] = ($validatorRejections[$failure] ?? 0) + 1;
+                }
+
+                return $failure === null;
             },
         );
 
@@ -152,26 +173,26 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
             );
         }
 
-        return new TradeSuggestionsPanelData($userMode, $items);
+        return new TradeSuggestionsPanelData(
+            $userMode,
+            $items,
+            new SuggestionDiagnostics($generated, count($scored), $rejections, $validated, $validatorRejections),
+        );
     }
 
     /**
-     * Mean age of a loaded roster, ignoring unknown (zero) ages.
+     * Players the Trading roster-limit check counts: everyone in season; in the
+     * offseason only players still under contract (TradeFormRepository::getTeamPlayerCount()).
      *
      * @param list<SuggestionPlayer> $players
      */
-    private static function averageAge(array $players): float
+    private static function rosterCount(array $players, bool $advancesContractYears): int
     {
-        $sum = 0;
-        $count = 0;
-        foreach ($players as $player) {
-            if ($player->age > 0) {
-                $sum += $player->age;
-                $count++;
-            }
+        if (!$advancesContractYears) {
+            return count($players);
         }
 
-        return $count === 0 ? 0.0 : $sum / $count;
+        return count(array_filter($players, static fn (SuggestionPlayer $p): bool => $p->yearsRemaining > 0));
     }
 
     /**

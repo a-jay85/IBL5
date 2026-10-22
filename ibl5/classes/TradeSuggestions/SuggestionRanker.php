@@ -7,14 +7,17 @@ namespace TradeSuggestions;
 /**
  * Orders scored candidates and keeps up to MAX_SUGGESTIONS that pass validation.
  *
- * Sort: min(userGain, partnerGain) desc, then userGain desc, then generation order.
+ * Sort: min(userGain, partnerGain) + SIGNIFICANCE_WEIGHT * significance desc,
+ * then userGain desc, then generation order. The significance term favors deals
+ * that move a real player over bench swaps.
  * At most one suggestion per partner, and no user asset is offered twice.
  * $passes is called at most MAX_VALIDATIONS times, which bounds validator SQL.
  */
 final class SuggestionRanker
 {
     public const int MAX_SUGGESTIONS = 3;
-    public const int MAX_VALIDATIONS = 8;
+    public const int MAX_VALIDATIONS = 40;
+    public const float SIGNIFICANCE_WEIGHT = 0.1;
 
     /**
      * @param list<ScoredCandidate> $scored
@@ -28,8 +31,8 @@ final class SuggestionRanker
             $sa = $scored[$a];
             $sb = $scored[$b];
 
-            return [min($sb->userGain, $sb->partnerGain), $sb->userGain, $a]
-                <=> [min($sa->userGain, $sa->partnerGain), $sa->userGain, $b];
+            return [self::rankScore($sb), $sb->userGain, $a]
+                <=> [self::rankScore($sa), $sa->userGain, $b];
         });
 
         $kept = [];
@@ -75,5 +78,10 @@ final class SuggestionRanker
         }
 
         return $kept;
+    }
+
+    public static function rankScore(ScoredCandidate $s): float
+    {
+        return min($s->userGain, $s->partnerGain) + self::SIGNIFICANCE_WEIGHT * $s->significance;
     }
 }

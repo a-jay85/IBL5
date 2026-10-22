@@ -25,19 +25,19 @@ class PickValuerTest extends TestCase
     {
         $index = $this->valuer->buildSlotIndex(self::draftOrder(28));
 
-        $this->assertSame(12.0, $this->valuer->value(self::ENDING_YEAR, 1, 1, $index, self::ENDING_YEAR));
-        $this->assertSame(3.0, $this->valuer->value(self::ENDING_YEAR, 1, 28, $index, self::ENDING_YEAR));
-        $this->assertSame(2.0, $this->valuer->value(self::ENDING_YEAR, 2, 1, $index, self::ENDING_YEAR));
-        $this->assertSame(0.5, $this->valuer->value(self::ENDING_YEAR, 2, 28, $index, self::ENDING_YEAR));
+        $this->assertSame(30.0, $this->valuer->value(self::ENDING_YEAR, 1, 1, $index, self::ENDING_YEAR));
+        $this->assertSame(8.0, $this->valuer->value(self::ENDING_YEAR, 1, 28, $index, self::ENDING_YEAR));
+        $this->assertSame(4.0, $this->valuer->value(self::ENDING_YEAR, 2, 1, $index, self::ENDING_YEAR));
+        $this->assertSame(1.0, $this->valuer->value(self::ENDING_YEAR, 2, 28, $index, self::ENDING_YEAR));
     }
 
     public function testFutureAndUnknownSlotUseFlatValues(): void
     {
         $index = $this->valuer->buildSlotIndex(self::draftOrder(28));
 
-        $this->assertSame(6.0, $this->valuer->value(self::ENDING_YEAR + 1, 1, 1, $index, self::ENDING_YEAR));
-        $this->assertSame(1.0, $this->valuer->value(self::ENDING_YEAR + 1, 2, 1, $index, self::ENDING_YEAR));
-        $this->assertSame(6.0, $this->valuer->value(self::ENDING_YEAR, 1, 99, $index, self::ENDING_YEAR));
+        $this->assertSame(14.0, $this->valuer->value(self::ENDING_YEAR + 1, 1, 1, $index, self::ENDING_YEAR));
+        $this->assertSame(2.0, $this->valuer->value(self::ENDING_YEAR + 1, 2, 1, $index, self::ENDING_YEAR));
+        $this->assertSame(14.0, $this->valuer->value(self::ENDING_YEAR, 1, 99, $index, self::ENDING_YEAR));
     }
 
     public function testPastYearAndThirdRoundAreWorthless(): void
@@ -58,7 +58,7 @@ class PickValuerTest extends TestCase
         $this->assertSame(1, $picks[0]->originalTid);
         $this->assertSame(self::ENDING_YEAR, $picks[0]->year);
         $this->assertSame(1, $picks[0]->round);
-        $this->assertSame(12.0, $picks[0]->value);
+        $this->assertSame(30.0, $picks[0]->value);
     }
 
     public function testSlotIndexUsesListPositionNotPickNumber(): void

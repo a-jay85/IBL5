@@ -9,90 +9,113 @@ use TradeSuggestions\CandidateGenerator;
 use TradeSuggestions\SuggestionPick;
 use TradeSuggestions\SuggestionPlayer;
 use TradeSuggestions\TeamAssets;
-use TradeSuggestions\TradeCandidate;
 
 class CandidateGeneratorTest extends TestCase
 {
-    public function testGeneratesThreeShapesInFixedOrder(): void
+    /**
+     * v1 only built 1-for-1 swaps and single-pick deals. Every shape the owner
+     * asked for must now come out.
+     */
+    public function testGeneratesEveryDealShape(): void
     {
-        $user = new TeamAssets(1, [self::player(11, 20), self::player(12, 15)], [self::pick(101, 6.0)]);
-        $partner = new TeamAssets(2, [self::player(21, 20), self::player(22, 15)], [self::pick(201, 6.0)]);
+        $user = new TeamAssets(1, [self::player(11, 70), self::player(12, 60), self::player(13, 58)], [self::pick(101, 20.0), self::pick(102, 10.0)]);
+        $partner = new TeamAssets(2, [self::player(21, 72), self::player(22, 61), self::player(23, 57)], [self::pick(201, 20.0), self::pick(202, 10.0)]);
 
-        $candidates = (new CandidateGenerator())->generate($user, [$partner]);
+        $shapes = [];
+        foreach ((new CandidateGenerator())->generate($user, [$partner]) as $c) {
+            $shapes[$c->shape()] = true;
+        }
 
-        $this->assertCount(8, $candidates);
-        $shapes = array_map(static fn (TradeCandidate $c): array => [$c->userPids, $c->userPickIds, $c->partnerPids, $c->partnerPickIds], $candidates);
-        $this->assertSame([
-            [[11], [], [21], []],
-            [[11], [], [22], []],
-            [[12], [], [21], []],
-            [[12], [], [22], []],
-            [[11], [], [], [201]],
-            [[12], [], [], [201]],
-            [[], [101], [21], []],
-            [[], [101], [22], []],
-        ], $shapes);
-        foreach ($candidates as $candidate) {
-            $this->assertSame(1, $candidate->userTid);
-            $this->assertSame(2, $candidate->partnerTid);
+        foreach ([
+            '1 player for 1 player',
+            '2 players for 1 player',
+            '1 player for 2 players',
+            '1 player for 1 pick',
+            '1 player for 2 picks',
+            '1 pick for 1 player',
+            '2 picks for 1 player',
+            '1 player + 1 pick for 1 player',
+            '1 player for 1 player + 1 pick',
+        ] as $shape) {
+            self::assertArrayHasKey($shape, $shapes, $shape);
         }
     }
 
-    public function testPoolTruncatesToTopPlayersByQuality(): void
+    public function testTwoForOneNeedsTheOnePlayerToOutrateBoth(): void
     {
-        $players = [];
-        for ($pid = 1; $pid <= 10; $pid++) {
-            $players[] = self::player($pid, 30 - $pid);
+        $user = new TeamAssets(1, [self::player(11, 70), self::player(12, 60)], []);
+        $partner = new TeamAssets(2, [self::player(21, 65), self::player(22, 75)], []);
+
+        $twoForOne = [];
+        foreach ((new CandidateGenerator())->generate($user, [$partner]) as $c) {
+            if (count($c->userPids) === 2) {
+                $twoForOne[] = $c->partnerPids;
+            }
         }
-        $user = new TeamAssets(1, $players, []);
-        $partner = new TeamAssets(2, [self::player(50, 10)], []);
 
-        $candidates = (new CandidateGenerator())->generate($user, [$partner]);
-
-        $userPids = array_values(array_unique(array_merge(...array_map(static fn (TradeCandidate $c): array => $c->userPids, $candidates))));
-        sort($userPids);
-        $this->assertSame([1, 2, 3, 4, 5, 6, 7, 8], $userPids);
+        self::assertSame([[22]], $twoForOne);
     }
 
-    public function testStopsAtMaxCandidates(): void
+    public function testUntradeablePlayersStayOut(): void
     {
-        $user = new TeamAssets(1, [self::player(11, 20), self::player(12, 15)], [self::pick(101, 6.0)]);
-        $partner = new TeamAssets(2, [self::player(21, 20), self::player(22, 15)], [self::pick(201, 6.0)]);
+        $locked = new SuggestionPlayer(12, 'Locked', 'SF', 26, 80, false, 1000, 2, 1000, tradeable: false);
+        $user = new TeamAssets(1, [self::player(11, 60), $locked], []);
+        $partner = new TeamAssets(2, [self::player(21, 60)], []);
 
-        $candidates = (new CandidateGenerator(maxCandidates: 5))->generate($user, [$partner]);
+        foreach ((new CandidateGenerator())->generate($user, [$partner]) as $c) {
+            self::assertNotContains(12, $c->userPids);
+        }
+    }
 
-        $this->assertCount(5, $candidates);
+    /**
+     * v1 capped candidates league-wide, so teams late in tid order got none.
+     * The cap is per partner now.
+     */
+    public function testCapIsPerPartner(): void
+    {
+        $user = new TeamAssets(1, [self::player(11, 70), self::player(12, 60)], [self::pick(101, 6.0)]);
+        $partners = [
+            new TeamAssets(3, [self::player(31, 70), self::player(32, 60)], []),
+            new TeamAssets(2, [self::player(21, 70), self::player(22, 60)], []),
+        ];
+
+        $byPartner = [];
+        foreach ((new CandidateGenerator(maxPerPartner: 3))->generate($user, $partners) as $c) {
+            $byPartner[$c->partnerTid] = ($byPartner[$c->partnerTid] ?? 0) + 1;
+        }
+
+        self::assertSame([2 => 3, 3 => 3], $byPartner);
     }
 
     public function testSkipsPartnerWithUserTid(): void
     {
-        $user = new TeamAssets(1, [self::player(11, 20)], [self::pick(101, 6.0)]);
-        $same = new TeamAssets(1, [self::player(21, 20)], [self::pick(201, 6.0)]);
+        $user = new TeamAssets(1, [self::player(11, 60)], [self::pick(101, 6.0)]);
+        $same = new TeamAssets(1, [self::player(21, 60)], [self::pick(201, 6.0)]);
 
-        $this->assertSame([], (new CandidateGenerator())->generate($user, [$same]));
+        self::assertSame([], iterator_to_array((new CandidateGenerator())->generate($user, [$same]), false));
     }
 
-    public function testAfterTradeMovesAssetsWithoutMutatingOriginal(): void
+    public function testAfterTradeMovesAssetsSalaryAndRosterCount(): void
     {
-        $outgoing = self::player(11, 20);
-        $keeper = self::player(12, 15);
-        $incoming = self::player(21, 18);
+        $outgoing = self::player(11, 60);
+        $keeper = self::player(12, 55);
+        $incoming = new SuggestionPlayer(21, 'In', 'SF', 26, 58, false, 1500, 2, 1000);
         $pick = self::pick(101, 6.0);
         $incomingPick = self::pick(201, 1.0);
-        $original = new TeamAssets(1, [$outgoing, $keeper], [$pick]);
+        $original = new TeamAssets(1, [$outgoing, $keeper], [$pick], 14, 300);
 
         $after = $original->afterTrade([11], [101], [$incoming], [$incomingPick]);
 
-        $this->assertSame([$outgoing, $keeper], $original->players);
-        $this->assertSame([$pick], $original->picks);
-        $this->assertSame([$keeper, $incoming], $after->players);
-        $this->assertSame([$incomingPick], $after->picks);
-        $this->assertSame(1, $after->tid);
+        self::assertSame([$outgoing, $keeper], $original->players);
+        self::assertSame([$keeper, $incoming], $after->players);
+        self::assertSame([$incomingPick], $after->picks);
+        self::assertSame(14, $after->rosterCount());
+        self::assertSame(300 + 1000 - 1500, $after->capRoom);
     }
 
-    private static function player(int $pid, int $quality): SuggestionPlayer
+    private static function player(int $pid, int $ovr): SuggestionPlayer
     {
-        return new SuggestionPlayer($pid, 'Player ' . $pid, 'SF', 26, $quality, false, 1000, 2, 1000);
+        return new SuggestionPlayer($pid, 'Player ' . $pid, 'SF', 26, $ovr, false, 1000, 2, 1000);
     }
 
     private static function pick(int $pickId, float $value): SuggestionPick

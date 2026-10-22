@@ -26,12 +26,4 @@ interface TeamModeRepositoryInterface
      * Persist the mode setting for exactly one team.
      */
     public function saveSetting(int $tid, TeamModeSetting $setting): void;
-
-    /**
-     * Inputs for the win-now/rebuild guess: the team's current record and
-     * the average age of its active roster.
-     *
-     * @return array{wins: int, losses: int, avgAge: float}
-     */
-    public function getModeInputs(int $tid): array;
 }

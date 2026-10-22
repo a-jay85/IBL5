@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\TradeSuggestions;
 
 use PHPUnit\Framework\TestCase;
-use TradeSuggestions\HorizonScores;
+use TradeSuggestions\AssetValuer;
 use TradeSuggestions\SuggestionPick;
 use TradeSuggestions\SuggestionPlayer;
 use TradeSuggestions\TeamAssets;
@@ -21,92 +21,64 @@ class TeamNeedsScorerTest extends TestCase
         $this->scorer = new TeamNeedsScorer();
     }
 
-    public function testNowSumsHealthyRotationOnly(): void
+    public function testTopSlotsWeighMoreThanBench(): void
     {
-        $players = [
-            self::player(1, 'C', 25, injured: true),
-            self::player(2, 'PG', 20),
-            self::player(3, 'SG', 19),
-            self::player(4, 'G', 18),
-            self::player(5, 'SF', 17),
-            self::player(6, 'GF', 16),
-            self::player(7, 'F', 15),
-            self::player(8, 'PF', 14),
-            self::player(9, 'C', 13),
-        ];
+        // Two guards, two wings, two bigs: no holes. Values 10 each (ovr 55).
+        $players = [];
+        foreach (['PG', 'SG', 'SF', 'GF', 'PF', 'C', 'C', 'C', 'C', 'C', 'C'] as $i => $pos) {
+            $players[] = self::player($i + 1, $pos, 55);
+        }
 
-        $scores = $this->scorer->score(new TeamAssets(1, $players, []));
+        $score = $this->scorer->score(new TeamAssets(1, $players, []), TeamMode::WinNow);
 
-        $this->assertSame(20.0 + 19 + 18 + 17 + 16 + 15 + 14 + 13, $scores->now);
-        $this->assertSame([], $scores->positionHoles);
+        // 5 x 1.0 + 3 x 0.6 + 2 x 0.25 + 1 x 0.1, times 10.
+        self::assertEqualsWithDelta(10 * (5 + 1.8 + 0.5 + 0.1), $score->total, 1e-9);
+        self::assertSame([], $score->positionHoles);
     }
 
-    public function testPositionHolePenalised(): void
+    public function testPositionHoleCountsTopEightOnlyAndCostsMoreWhenWinningNow(): void
     {
-        $players = [
-            self::player(1, 'PG', 20),
-            self::player(2, 'SG', 20),
-            self::player(3, 'G', 20),
-            self::player(4, 'PG', 20),
-            self::player(5, 'SF', 20),
-            self::player(6, 'GF', 20),
-            self::player(7, 'F', 20),
-            self::player(8, 'C', 20),
-        ];
+        $players = [];
+        foreach (['PG', 'SG', 'G', 'PG', 'SF', 'GF', 'F', 'C'] as $i => $pos) {
+            $players[] = self::player($i + 1, $pos, 60);
+        }
+        // A ninth big sits outside the top eight, so the big-man hole stays.
+        $players[] = self::player(9, 'C', 50);
+        $assets = new TeamAssets(1, $players, []);
 
-        $scores = $this->scorer->score(new TeamAssets(1, $players, []));
+        $winNow = $this->scorer->score($assets, TeamMode::WinNow);
+        $rebuild = $this->scorer->score($assets, TeamMode::Rebuild);
 
-        $this->assertSame(['big' => 1], $scores->positionHoles);
-        $this->assertSame(160.0 - 6.0, $scores->now);
+        self::assertSame(['big' => 1], $winNow->positionHoles);
+        self::assertSame(1, $winNow->groupCounts['big']);
+        self::assertSame(4, $winNow->groupCounts['guard']);
+        $winNowValues = 22.5 * (5 + 3 * 0.6) + 2.5 * 0.25;
+        self::assertEqualsWithDelta($winNowValues - TeamNeedsScorer::WIN_NOW_HOLE_PENALTY, $winNow->total, 1e-9);
+        self::assertSame(['big' => 1], $rebuild->positionHoles);
     }
 
-    public function testShortDiscountsExpiringAndAging(): void
+    public function testPicksAddTheirModeValue(): void
     {
-        $veteran = self::player(1, 'C', 20, age: 31, yearsRemaining: 1);
-        $signed = self::player(2, 'PG', 10, age: 25, yearsRemaining: 2);
+        $pick = new SuggestionPick(100, 1, 2027, 1, 10.0);
 
-        $scores = $this->scorer->score(new TeamAssets(1, [$veteran, $signed], []));
+        $winNow = $this->scorer->score(new TeamAssets(1, [], [$pick]), TeamMode::WinNow);
+        $rebuild = $this->scorer->score(new TeamAssets(1, [], [$pick]), TeamMode::Rebuild);
 
-        $this->assertEqualsWithDelta(20 * 0.5 * 0.6 + 10.0, $scores->short, 1e-9);
+        $holes = 3 * TeamNeedsScorer::MIN_PER_GROUP;
+        self::assertEqualsWithDelta(10 * AssetValuer::WIN_NOW_PICK_FACTOR - $holes * TeamNeedsScorer::WIN_NOW_HOLE_PENALTY, $winNow->total, 1e-9);
+        self::assertEqualsWithDelta(10 * AssetValuer::REBUILD_PICK_FACTOR - $holes * TeamNeedsScorer::REBUILD_HOLE_PENALTY, $rebuild->total, 1e-9);
     }
 
-    public function testLongRewardsYouthPicksAndCapRoom(): void
+    public function testPositionGroupMapsEveryPosition(): void
     {
-        $young = self::player(1, 'SF', 17, age: 22, futureSalary: 15000);
-        $pick = new SuggestionPick(100, 1, 2027, 1, 5.0);
-
-        $scores = $this->scorer->score(new TeamAssets(1, [$young], [$pick]));
-
-        $this->assertEqualsWithDelta(17.0 + 5.0 + 5.0, $scores->long, 1e-9);
+        self::assertSame('guard', TeamNeedsScorer::positionGroup('G'));
+        self::assertSame('wing', TeamNeedsScorer::positionGroup('GF'));
+        self::assertSame('big', TeamNeedsScorer::positionGroup('PF'));
+        self::assertNull(TeamNeedsScorer::positionGroup(''));
     }
 
-    public function testWeightedFollowsMode(): void
+    private static function player(int $pid, string $pos, int $ovr): SuggestionPlayer
     {
-        $scores = new HorizonScores(10.0, 20.0, 40.0, []);
-
-        $this->assertEqualsWithDelta(6.0 + 6.0 + 4.0, $scores->weighted(TeamMode::WinNow), 1e-9);
-        $this->assertEqualsWithDelta(1.0 + 6.0 + 24.0, $scores->weighted(TeamMode::Rebuild), 1e-9);
-    }
-
-    public function testEmptyRosterScoresZeroWithFullHoles(): void
-    {
-        $scores = $this->scorer->score(new TeamAssets(1, [], []));
-
-        $this->assertSame(-36.0, $scores->now);
-        $this->assertSame(0.0, $scores->short);
-        $this->assertEqualsWithDelta(20.0, $scores->long, 1e-9);
-        $this->assertSame(['guard' => 2, 'wing' => 2, 'big' => 2], $scores->positionHoles);
-    }
-
-    private static function player(
-        int $pid,
-        string $pos,
-        int $quality,
-        int $age = 27,
-        bool $injured = false,
-        int $yearsRemaining = 3,
-        int $futureSalary = 0,
-    ): SuggestionPlayer {
-        return new SuggestionPlayer($pid, 'Player ' . $pid, $pos, $age, $quality, $injured, 1000, $yearsRemaining, $futureSalary);
+        return new SuggestionPlayer($pid, 'Player ' . $pid, $pos, 27, $ovr, false, 1000, 3, 2000);
     }
 }

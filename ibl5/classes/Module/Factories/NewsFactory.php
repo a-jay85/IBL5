@@ -64,6 +64,7 @@ final class NewsFactory implements ModuleFactoryInterface
                 $season,
             ),
             new \TradeSuggestions\SuggestionRanker(),
+            new \Negotiation\NegotiationRepository($db, $this->services->salaryCap()),
         );
 
         return new \Topics\News\NewsController(

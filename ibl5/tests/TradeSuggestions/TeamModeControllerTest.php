@@ -174,11 +174,6 @@ class TeamModeControllerTest extends TestCase
             {
                 $this->saves[] = ['tid' => $tid, 'setting' => $setting];
             }
-
-            public function getModeInputs(int $tid): array
-            {
-                return ['wins' => 0, 'losses' => 0, 'avgAge' => 0.0];
-            }
         };
     }
 

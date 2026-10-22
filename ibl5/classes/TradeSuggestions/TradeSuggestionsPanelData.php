@@ -16,6 +16,7 @@ final readonly class TradeSuggestionsPanelData
     public function __construct(
         public ResolvedTeamMode $mode,
         public array $items,
+        public ?SuggestionDiagnostics $diagnostics = null,
     ) {
     }
 }

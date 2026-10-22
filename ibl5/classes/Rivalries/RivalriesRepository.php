@@ -292,52 +292,56 @@ per_game AS (
     GROUP BY bs.pid, bs.teamid, bs.game_date, bs.game_of_that_day, side
 )';
 
-        $totalRows = $this->fetchAll(
-            $perGame . '
-SELECT pg.pid, p.name, pg.side, COUNT(*) AS games, SUM(pg.pts) AS total_points
-FROM per_game pg
-JOIN `ibl_plr` p ON p.pid = pg.pid
-GROUP BY pg.pid, p.name, pg.side
-ORDER BY total_points DESC, pg.pid ASC
-LIMIT 5',
-            $types,
-            ...$params,
-        );
-
-        $highRows = $this->fetchAll(
+        // One pass over the CTE chain; the top-5 totals and top-3 highs are both derived from these rows.
+        $rows = $this->fetchAll(
             $perGame . '
 SELECT pg.pid, p.name, pg.side, pg.pts AS points, pg.game_date
 FROM per_game pg
 JOIN `ibl_plr` p ON p.pid = pg.pid
-ORDER BY pg.pts DESC, pg.game_date ASC, pg.pid ASC
-LIMIT 3',
+ORDER BY pg.pts DESC, pg.game_date ASC, pg.pid ASC',
             $types,
             ...$params,
         );
 
-        $totals = [];
-        foreach ($totalRows as $row) {
-            $totals[] = [
-                'pid' => self::int($row['pid'] ?? null),
-                'name' => self::str($row['name'] ?? null),
-                'side' => self::str($row['side'] ?? null),
-                'games' => self::int($row['games'] ?? null),
-                'total_points' => self::int($row['total_points'] ?? null),
-            ];
-        }
-
         $highs = [];
-        foreach ($highRows as $row) {
-            $highs[] = [
-                'pid' => self::int($row['pid'] ?? null),
-                'name' => self::str($row['name'] ?? null),
-                'side' => self::str($row['side'] ?? null),
-                'points' => self::int($row['points'] ?? null),
-                'game_date' => self::str($row['game_date'] ?? null),
-            ];
+        $totalsByKey = [];
+        foreach ($rows as $row) {
+            $pid = self::int($row['pid'] ?? null);
+            $name = self::str($row['name'] ?? null);
+            $side = self::str($row['side'] ?? null);
+            $points = self::int($row['points'] ?? null);
+
+            if (count($highs) < 3) {
+                $highs[] = [
+                    'pid' => $pid,
+                    'name' => $name,
+                    'side' => $side,
+                    'points' => $points,
+                    'game_date' => self::str($row['game_date'] ?? null),
+                ];
+            }
+
+            $key = $pid . '|' . $side;
+            if (!isset($totalsByKey[$key])) {
+                $totalsByKey[$key] = [
+                    'pid' => $pid,
+                    'name' => $name,
+                    'side' => $side,
+                    'games' => 0,
+                    'total_points' => 0,
+                ];
+            }
+            $totalsByKey[$key]['games']++;
+            $totalsByKey[$key]['total_points'] += $points;
         }
 
-        return ['totals' => $totals, 'highs' => $highs];
+        $totals = array_values($totalsByKey);
+        usort(
+            $totals,
+            static fn (array $x, array $y): int => [$y['total_points'], $x['pid']] <=> [$x['total_points'], $y['pid']],
+        );
+
+        return ['totals' => array_slice($totals, 0, 5), 'highs' => $highs];
     }
 
     /**

@@ -164,7 +164,13 @@ def post_rung_guard(ctx: LadderContext, touched) -> GuardVerdict:
     if sweep_rc != 1:
         return GuardVerdict(False, False,
                             f"marker sweep failed rc={sweep_rc}: {sweep_out.strip()[:200]}", "")
-    text_reason = assert_text_only(ctx.worktree, tuple(touched) + tuple(ctx.conflicted_files))
+    # A glob-matched copy-only path (a VR PNG) is master's bytes or a session-written
+    # screenshot, never a text merge, so the UTF-8 guard does not apply to it.
+    checked = tuple(dict.fromkeys(tuple(touched) + tuple(ctx.conflicted_files)))
+    binary_exempt = {g.path for g in match_generated(checked)
+                     if g.command is None and _is_glob_match(g.path)}
+    text_reason = assert_text_only(
+        ctx.worktree, [p for p in checked if p not in binary_exempt])
     if text_reason:
         return GuardVerdict(False, False, text_reason, "")
     ok, out = ctx.prove()
@@ -314,6 +320,11 @@ def match_generated(paths, *, registry=None) -> tuple["GeneratedFile", ...]:
     return tuple(out)
 
 
+def _is_glob_match(path: str) -> bool:
+    """True when `path` is covered by a pattern (glob) registry entry."""
+    return any(is_pattern(g.path) and path_matches(g.path, path) for g in GENERATED_FILES)
+
+
 def matching_paths(paths, *, registry=None) -> frozenset[str]:
     """The subset of `paths` that is a registered generated file (exact or by glob)."""
     return frozenset(g.path for g in match_generated(paths, registry=registry))
@@ -386,7 +397,11 @@ def make_regen_rung(registry=GENERATED_FILES, timeout: int = REGEN_TIMEOUT) -> R
         lost, structural = parse_lost_lines(proof_out)
         involved = (set(ctx.conflicted_files) | set(lost)
                     | {line.rsplit(": ", 1)[1] for line in structural if ": " in line})
-        candidates = list(match_generated(involved, registry=registry))
+        # A glob (VR PNG) entry applies only to a file that conflicted; a path that is
+        # merely named in LOST lines keeps the branch's bytes.
+        conflicted = set(ctx.conflicted_files)
+        candidates = [g for g in match_generated(involved, registry=registry)
+                      if g.path in conflicted or not _is_glob_match(g.path)]
         if not candidates:
             return RungAttempt(False, (), "no generated file involved")
         notes = regenerate(ctx.run, ctx.run_out, worktree=ctx.worktree,

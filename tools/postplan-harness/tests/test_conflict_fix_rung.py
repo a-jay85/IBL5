@@ -189,10 +189,10 @@ def test_fix_rung_allows_vr_snapshot_png_via_glob(tmp_path, key):
         _edit_keepme(cwd)
         target = Path(cwd) / png
         target.parent.mkdir(parents=True, exist_ok=True)
-        # ASCII body: the ladder's post-resolution UTF-8 guard rejects real PNG bytes
-        target.write_bytes(b"png-placeholder-session")
+        target.write_bytes(b"\x89PNG\r\n\x1a\nsession")
 
     d, pre, master, merge, llm, ctx, _ = _fix_ladder(tmp_path, key, _OK_REPLY, effect)
+    ctx = dataclasses.replace(ctx, conflicted_files=("a.txt", png))
     out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
     assert not any("outside its remit" in t for t in out.trail)
     assert out.rung == "sonnet-fix"

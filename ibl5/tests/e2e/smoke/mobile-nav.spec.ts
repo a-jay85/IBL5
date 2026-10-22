@@ -53,7 +53,9 @@ test.describe('Mobile nav interaction tests', () => {
     // timer never fired.
     // eslint-disable-next-line playwright/no-wait-for-timeout -- must outlast the 300 ms overlayHideTimer to prove it was cleared
     await page.waitForTimeout(500);
-    await expect(overlay).not.toHaveClass(/\bhidden\b/);
+    // Match `hidden` as a whole class token; `\b` would also match the
+    // overlay's permanent `lg:hidden` class.
+    await expect(overlay).not.toHaveClass(/(^|\s)hidden(\s|$)/);
     await expect(overlay).toBeVisible();
     await expect(page.locator('#nav-hamburger')).toHaveAttribute('aria-expanded', 'true');
   });

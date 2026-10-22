@@ -532,9 +532,11 @@ _SIX_D_LINE_RE = re.compile(r"^\s*\**([1-6])([abc]?)[.)]\s+(.*)$")
 # that starts a longer clause ("None of these edits...", "Pass with one gap") is a fail.
 # A dash counts only at end of line ("None —"); "None — the test row is missing" is a fail.
 # A reason after "." or "!" passes ("pass. No UI surface.") unless it reads as a failure
-# ("None. But the diff drops X"). A false fail only costs the body-only fast path.
+# ("None. But the diff drops X"). A false fail only costs the body-only fast path. The word
+# list is a denylist: a failure reason worded outside it still passes, as it did before.
 _SIX_D_FAIL_WORDS = (r"but|however|except|although|though|yet|missing|absent|lacks?|lacking"
-                     r"|fail\w*|drops?|dropped|gaps?|wrong|broken|not|cannot|\w+n't")
+                     r"|fail\w*|drops?|dropped|omit\w*|unrealised|contradict\w*"
+                     r"|mismatch\w*|gaps?|wrong|broken|not|cannot|\w+n['’]t")
 _SIX_D_PASS_RE = re.compile(
     r"(?i)^(?:pass(?:es|ed)?|ok|clean|n/a|none|no findings?|no issues?)\s*"
     r"(?:[.!](?!.*\b(?:" + _SIX_D_FAIL_WORDS + r")\b)|[-\u2013\u2014]\s*$|$)")

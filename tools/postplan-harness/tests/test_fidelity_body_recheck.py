@@ -247,7 +247,9 @@ import pytest
     "6. Tests named by the matrix: None \u2014 the plan's test row is missing",
     "2. Plan text kept: No findings. But the diff drops plan Phase 3 text.",
     "6. Tests named by the matrix: None. The plan's test row is missing.",
-    "3. Scope creep: Pass! Except the unplanned edit to bin/foo.",
+    "3. Scope creep: Pass! Except the edit to bin/foo.",
+    "6. Tests named by the matrix: None. The test row doesn’t exist.",
+    "5. Plan text kept: OK. Phase 3 text was omitted.",
 ])
 def test_predicate_6d_loose_pass_wording_declines(line):
     num = line.split(".")[0]

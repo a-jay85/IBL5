@@ -7,9 +7,10 @@
 #   header's #N is that link. The URL is never printed bare. A missing or unparseable
 #   digest is NOT an error: it degrades the message body and still exits 0.
 #   --pr-body-file is optional; when it names a readable PR body carrying a valid
-#   `**Merge danger:**` line, a one-way door adds a loud first line to the DM and a
-#   two-way localized change compresses the What/Watch budgets. An unreadable path
-#   exits 2; a missing or malformed danger line leaves the output unchanged.
+#   `**Merge danger:**` line, a one-way door adds a loud line above the PR header (any
+#   after-merge lines print first) and a two-way localized change compresses the
+#   What/Watch budgets. An unreadable path exits 2; a missing or malformed danger
+#   line leaves the output unchanged.
 #   After-merge mode: [--ping-out FILE] [--manual-count N] [--auto-ci-count N]
 #   [--auto-mac-count N] [--auto-failed-count N] [--comment-url URL] [--run-url URL]
 #   [--job-result NAME=RESULT]...  --ping-out turns the mode on and receives `true` or

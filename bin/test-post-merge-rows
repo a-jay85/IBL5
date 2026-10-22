@@ -42,6 +42,11 @@ pmr_parse_row '- [ ] **Row 4** [auto:mac sim-recap.install] — install'
 h_eq "tag-auto-mac-checkbox kind" auto:mac "$PMR_KIND"
 h_eq "tag-auto-mac-checkbox name" sim-recap.install "$PMR_NAME"
 
+pmr_parse_row '- **Row 5** [the runbook](https://example.com/doc) — follow it'
+h_eq "leading-link kind" manual "$PMR_KIND"
+h_eq "leading-link valid" 1 "$PMR_VALID"
+h_eq "leading-link text kept" '[the runbook](https://example.com/doc) — follow it' "$PMR_TEXT"
+
 # --- 5: bad names stay manual, invalid, and are never evaluated ---------------------
 rm -f /tmp/pmr-pwn
 while IFS= read -r _row; do

@@ -32,11 +32,15 @@ pmr_parse_row() {
     local _l="$1" _rest _tag _nm _after
     local _re_head='^(\*\*Row [0-9]+\*\*)[[:space:]]*(.*)$'
     local _re_tag='^\[([^]]*)\][[:space:]]*(.*)$'
+    local _re_link='^\[[^]]*\]\('
     _l="${_l%$'\r'}"; _l="${_l#- }"; _l="${_l#\[ \] }"
     PMR_KIND=manual; PMR_NAME=""; PMR_LABEL=""; PMR_TEXT="$_l"; PMR_VALID=1
     if [[ "$_l" =~ $_re_head ]]; then
         PMR_LABEL="${BASH_REMATCH[1]}"; _rest="${BASH_REMATCH[2]}"; PMR_TEXT="$_rest"
-        if [[ "$_rest" =~ $_re_tag ]]; then
+        # A row whose text opens with a markdown link `[text](url)` carries no tag.
+        if [[ "$_rest" =~ $_re_link ]]; then
+            :
+        elif [[ "$_rest" =~ $_re_tag ]]; then
             _tag="${BASH_REMATCH[1]}"; _after="${BASH_REMATCH[2]}"
             case "$_tag" in
                 manual) PMR_TEXT="$_after" ;;
@@ -57,6 +61,9 @@ pmr_parse_row() {
 # file in PMR_BIN_DIR: post-merge-ci-run for auto:ci (unit 2), post-merge-run for auto:mac (unit 3).
 # `-f`, not `-x`: callers run executors as `bash bin/...`, so the exec bit is not trusted.
 # Fail closed: until the file lands, a row with that tag is a person's job, so it pings.
+# Contract for the executor units: the file lands in the same PR that wires it to run
+# (unit 2 also replaces the workflow's literal --auto-failed-count 0), because its
+# presence on master is what turns the rows automatic.
 pmr_executor_ready() {
     local _f
     case "${1-}" in

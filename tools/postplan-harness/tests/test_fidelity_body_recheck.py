@@ -239,12 +239,22 @@ def test_predicate_6d_layout_two_failing_checks_declines():
 import pytest
 
 
+@pytest.mark.parametrize("verdict", [
+    "None.", "None", "Pass.", "OK", "No findings.", "n/a", "Clean!", "None -", "None \u2014",
+])
+def test_six_d_pass_re_accepts_bare_pass_verdicts(verdict):
+    assert fidelity._SIX_D_PASS_RE.search(verdict)
+
+
 @pytest.mark.parametrize("line", [
     "3. Scope creep: None of these edits were planned.",
     "5. Visual baselines: no issue with layout, but the baseline is missing.",
     "1. Intent coverage: Pass with one gap: Phase 2 is absent.",
     "3. Scope creep: FAIL. Unplanned edit, and there is no issue reference.",
     "6. Tests named by the matrix: None \u2014 the plan's test row is missing",
+    "2. Plan text kept: None - the check fails because Phase 3 text is missing.",
+    "2. Plan text kept: None \u2014 failed to cover phase 3.",
+    "2. Plan text kept: No findings \u2013 but the diff drops plan Phase 3 text.",
 ])
 def test_predicate_6d_loose_pass_wording_declines(line):
     num = line.split(".")[0]

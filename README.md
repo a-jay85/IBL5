@@ -79,3 +79,5 @@ Deeper docs live in [`ibl5/docs/`](ibl5/docs/README.md):
 | [TESTING_STANDARDS.md](ibl5/docs/TESTING_STANDARDS.md) | Testing patterns and gotchas |
 | [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md) | Module-by-module modernization timeline |
 | [decisions/](ibl5/docs/decisions/) | Architecture Decision Records (ADRs) |
+
+<!-- settle canary, throwaway -->

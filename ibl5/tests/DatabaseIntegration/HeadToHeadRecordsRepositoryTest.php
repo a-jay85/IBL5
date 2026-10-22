@@ -546,7 +546,7 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
         $seattleKey = '22|Seattle|Supersonics';
         $spursKey   = '17|San Antonio|Spurs';
 
-        self::assertArrayHasKey($seattleKey, $payload['records']);
+        self::assertArrayHasKey('22|Seattle|Supersonics', $payload['records']);
         self::assertArrayHasKey($spursKey, $payload['records'][$seattleKey]);
         self::assertSame(1, $payload['records'][$seattleKey][$spursKey]['wins']);
         self::assertSame(0, $payload['records'][$seattleKey][$spursKey]['losses']);
@@ -613,6 +613,72 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
         self::assertNotNull($found, "Expected current-identity axis entry for {$currentKey}");
         self::assertSame($ti['color1'], $found['color1'], 'color1 should come from ibl_team_info');
         self::assertSame($ti['color2'], $found['color2'], 'color2 should come from ibl_team_info');
+    }
+
+    public function testCurrentScopeTeamsAxisListsOnlyCurrentSeasonIdentitiesInFranchiseOrder(): void
+    {
+        $axis = $this->repo->buildTeamsMatrix('regular', 'current')['axis'];
+
+        // scope='current' keeps only season_ending_year=1901 rows: the two fixture identities,
+        // ordered by franchise_id. Real data has no 1901 franchise_seasons rows.
+        self::assertSame(['17|San Antonio|Spurs', '22|Seattle|Supersonics'], array_column($axis, 'key'));
+
+        // Full entry shape for the retired Seattle identity (era colors from migration 182,
+        // default logo resolver, label = "city name", empty sublabel, link = franchise id).
+        self::assertSame([
+            'key'               => '22|Seattle|Supersonics',
+            'franchise_id'      => 22,
+            'label'             => 'Seattle Supersonics',
+            'sublabel'          => '',
+            'color1'            => '00653A',
+            'color2'            => 'FFC200',
+            'logo'              => 'new22.png',
+            'link_franchise_id' => 22,
+        ], $axis[1]);
+    }
+
+    public function testTeamsAxisOrdersIdentitiesOfOneFranchiseByFirstSeason(): void
+    {
+        // A second, earlier identity for franchise 17. Its MIN(season_ending_year)=1899 sorts it
+        // before the 1901 Spurs identity within franchise 17 under ORDER BY fs.franchise_id, MIN(...).
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id'       => 17,
+            'season_year'        => 1898,
+            'season_ending_year' => 1899,
+            'team_city'          => 'Nowhere',
+            'team_name'          => 'Nobodies',
+        ]);
+
+        $axis = $this->repo->buildTeamsMatrix('regular', 'all')['axis'];
+
+        $fids = array_column($axis, 'franchise_id');
+        $sortedFids = $fids;
+        sort($sortedFids);
+        self::assertSame($sortedFids, $fids, 'axis must be ordered by franchise_id');
+
+        $franchise17Keys = array_values(array_filter(
+            array_column($axis, 'key'),
+            static fn (string $key): bool => str_starts_with($key, '17|'),
+        ));
+        self::assertSame('17|Nowhere|Nobodies', $franchise17Keys[0], 'earliest first season sorts first');
+        self::assertSame('17|San Antonio|Spurs', $franchise17Keys[1]);
+    }
+
+    public function testCustomLogoResolverReceivesFranchiseIdAndTeamNameForEveryTeamsAxisEntry(): void
+    {
+        /** @var list<array{int, string}> $calls */
+        $calls = [];
+        $resolver = static function (int $id, string $name) use (&$calls): string {
+            $calls[] = [$id, $name];
+            return "custom-{$id}-{$name}.svg";
+        };
+
+        $repo = new HeadToHeadRecordsRepository($this->db, 1901, $resolver);
+        $axis = $this->axisByKey($repo->buildTeamsMatrix('regular', 'current')['axis']);
+
+        self::assertSame('custom-17-Spurs.svg', $axis['17|San Antonio|Spurs']['logo']);
+        self::assertSame('custom-22-Supersonics.svg', $axis['22|Seattle|Supersonics']['logo']);
+        self::assertSame([[17, 'Spurs'], [22, 'Supersonics']], $calls);
     }
 
     // -------------------------------------------------------------------------

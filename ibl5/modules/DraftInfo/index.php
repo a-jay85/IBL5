@@ -89,7 +89,7 @@ if ($op === 'save_order') {
     }
 
     try {
-        $season = new \Season\Season($mysqli_db);
+        $season = \Season\SharedSeason::get($mysqli_db);
         $orderRepository = new ProjectedDraftOrderRepository($mysqli_db);
         $orderService = new ProjectedDraftOrderService($orderRepository);
         $orderService->saveLotteryOrder($season->endingYear, $intOrder);
@@ -118,7 +118,7 @@ $tab = $tabs->resolve($_GET['tab'] ?? null);
 $trailingHtml = '';
 
 if ($tab === DraftInfoView::TAB_PICKS) {
-    $season = new \Season\Season($mysqli_db);
+    $season = \Season\SharedSeason::get($mysqli_db);
     $picksRepository = new DraftPickLocatorRepository($mysqli_db);
     $picksService = new DraftPickLocatorService($picksRepository);
     $picksView = new DraftPickLocatorView();
@@ -151,7 +151,7 @@ if ($tab === DraftInfoView::TAB_PICKS) {
     }
 } else {
     // order tab (default)
-    $season = new \Season\Season($mysqli_db);
+    $season = \Season\SharedSeason::get($mysqli_db);
     $orderRepository = new ProjectedDraftOrderRepository($mysqli_db);
     $orderService = new ProjectedDraftOrderService($orderRepository);
     $orderView = new ProjectedDraftOrderView();

@@ -51,7 +51,7 @@ final class RecordTableRenderer
     {
         $output = '<div class="record-category">';
         $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading ' . $modifierClass . '" data-no-responsive>';
+        $output .= '<table class="ibl-data-table ibl-data-table--borderless record-table ibl-table-subheading ' . $modifierClass . '" data-no-responsive>';
         $output .= '<colgroup>' . $colgroup . '</colgroup>';
         $output .= '<thead><tr>' . $thead . '</tr></thead>';
         $output .= '<tbody>' . $rows . '</tbody></table></div>';

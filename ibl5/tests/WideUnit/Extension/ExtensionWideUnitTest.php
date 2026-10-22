@@ -16,7 +16,6 @@ use Extension\ExtensionService;
  * - Edge cases and special conditions
  * 
  * @covers \Extension\ExtensionService
- * @covers \Extension\ExtensionProcessor
  * @covers \Extension\ExtensionValidator
  * @covers \Extension\ExtensionOfferEvaluator
  * @covers \Extension\ExtensionRepository

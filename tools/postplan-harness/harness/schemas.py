@@ -105,6 +105,68 @@ def validate_scores(data) -> None:
             raise HarnessError("schema", f"score[{i}].score must be int 0-100")
 
 
+VERDICT_VALUES = {"real", "not-real"}
+_VERDICT_LIST_KEYS = ("verdicts", "votes", "results", "findings", "items")
+_VERDICT_KEY_ALIASES = ("verdict", "vote", "decision")
+_REAL_WORDS = {"real", "true", "valid", "confirmed", "yes"}
+_NOT_REAL_WORDS = {"not-real", "notreal", "false", "invalid", "false-positive",
+                   "rejected", "no", "fp"}
+
+
+def _normalize_verdict_item(item):
+    if not isinstance(item, dict):
+        return item
+    out = dict(item)
+    if "n" in out and isinstance(out["n"], str) and out["n"].strip().isdigit():
+        out["n"] = int(out["n"].strip())
+    if "verdict" not in out:
+        for k in _VERDICT_KEY_ALIASES[1:]:
+            if k in out:
+                out["verdict"] = out.pop(k)
+                break
+    if "verdict" not in out and isinstance(out.get("real"), bool):
+        out["verdict"] = "real" if out.pop("real") else "not-real"
+    v = out.get("verdict")
+    if isinstance(v, bool):
+        out["verdict"] = "real" if v else "not-real"
+    elif isinstance(v, str):
+        w = v.strip().lower().replace("_", "-").replace(" ", "-")
+        if w in _REAL_WORDS:
+            out["verdict"] = "real"
+        elif w in _NOT_REAL_WORDS:
+            out["verdict"] = "not-real"
+    if "reason" not in out:
+        out["reason"] = ""
+    return out
+
+
+def unwrap_verdicts_envelope(data):
+    """Tolerant pre-pass for the 4D verifier reply. Unwraps a one-key dict envelope and
+    folds verdict aliases; anything else reaches validate_verdicts unchanged."""
+    if isinstance(data, dict):
+        lists = [k for k in _VERDICT_LIST_KEYS if isinstance(data.get(k), list)]
+        if len(lists) == 1:
+            data = data[lists[0]]
+    if isinstance(data, list):
+        return [_normalize_verdict_item(i) for i in data]
+    return data
+
+
+def validate_verdicts(data) -> None:
+    """[{n, verdict, reason}] — one verifier's votes over a numbered finding chunk."""
+    if not isinstance(data, list):
+        raise HarnessError("schema", "verdicts must be a JSON array")
+    for i, v in enumerate(data):
+        if not isinstance(v, dict) or "n" not in v or "verdict" not in v:
+            raise HarnessError("schema", f"verdict[{i}] needs n and verdict")
+        if not isinstance(v["n"], int) or isinstance(v["n"], bool) or v["n"] < 1:
+            raise HarnessError("schema", f"verdict[{i}].n must be a positive int")
+        if v["verdict"] not in VERDICT_VALUES:
+            raise HarnessError("schema", f"verdict[{i}].verdict {v['verdict']!r} not in {sorted(VERDICT_VALUES)}")
+        if not isinstance(v.get("reason", ""), str):
+            raise HarnessError("schema", f"verdict[{i}].reason must be a string")
+
+
 def validate_manual_classification(data) -> None:
     """[{step, category, rationale}] — Phase 6 QA classification."""
     if not isinstance(data, list):
@@ -267,19 +329,6 @@ def extract_pr_copy_json(text: str):
         return salvaged
     raise ValueError(
         f"no parseable JSON in pr-copy reply ({parse_err}); {PR_COPY_JSON_HINT}")
-
-
-def validate_body_check(data) -> None:
-    """{corrected_body, findings} — PR-body-vs-diff verification."""
-    if not isinstance(data, dict):
-        raise HarnessError("schema", "body check must be a JSON object")
-    if "corrected_body" not in data or not isinstance(data["corrected_body"], str):
-        raise HarnessError("schema", "body check missing string field 'corrected_body'")
-    if "findings" not in data or not isinstance(data["findings"], list):
-        raise HarnessError("schema", "body check findings must be a JSON array")
-    for i, item in enumerate(data["findings"]):
-        if not isinstance(item, str):
-            raise HarnessError("schema", f"body check finding[{i}] must be a string")
 
 
 def coerce_commit_subject(subject: str, cls: Classification) -> str:

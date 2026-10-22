@@ -195,6 +195,12 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
     /**
      * The eight <script src> tags, each cache-busted with the file's mtime (0 when the file is missing).
      * Order is load-bearing: htmx first, htmx-init after the libraries it wires.
+     * Every tag carries `defer` so the parser does not block on them before first paint.
+     * Deferred scripts still run in document order, after parsing finishes (readyState
+     * 'interactive') and before DOMContentLoaded. Each library that self-initialises either
+     * listens for DOMContentLoaded or runs immediately when readyState is not 'loading', so
+     * both paths see a fully parsed DOM. Code outside these files calls their globals only
+     * from event handlers or fetch callbacks, behind a typeof/window guard.
      */
     private static function renderScriptTags(string $iblRootPath): string
     {
@@ -213,7 +219,7 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
             $fullPath = $iblRootPath . '/' . $jsFile;
             $mtime = is_file($fullPath) ? filemtime($fullPath) : false;
             $version = is_int($mtime) ? $mtime : 0;
-            $html .= "<script src=\"{$jsFile}?v={$version}\"></script>";
+            $html .= "<script src=\"{$jsFile}?v={$version}\" defer></script>";
         }
 
         return $html;

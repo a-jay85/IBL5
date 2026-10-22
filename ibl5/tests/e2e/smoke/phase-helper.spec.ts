@@ -8,7 +8,7 @@
 //
 // Instead this spec uses a phase-driven *content* observable: the Team ratings
 // page marks expiring-contract rows with `player-fa-expiring-row` only when
-// Season::isOffseasonPhase() holds (TeamTableService.php:65 — phase only, no
+// Season::isOffseasonPhase() holds (TeamTableService.php:49 — phase only, no
 // login or ownership term). The page itself is public-readable.
 //
 // The CI seed's default phase is 'Free Agency' (fixtures/ci-seed.sql:46), which

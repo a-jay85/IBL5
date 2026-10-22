@@ -51,6 +51,7 @@ class TeamScheduleViewTest extends TestCase
         $this->assertStringNotContainsString('<style>', $result);
         $this->assertStringContainsString('--team-color-primary:', $result);
         $this->assertStringContainsString('--team-color-secondary:', $result);
+        $this->assertStringContainsString('--team-color-on-primary: #', $result);
     }
 
     public function testRenderContainsTeamLogo(): void
@@ -97,6 +98,20 @@ class TeamScheduleViewTest extends TestCase
         $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
         $this->assertStringContainsString('October', $result);
+    }
+
+    public function testMonthHeaderCarriesIblCardHeaderClass(): void
+    {
+        $mockTeam = $this->createMockTeam();
+
+        $regular = $this->view->render($mockTeam, [$this->createMockGame('October', '2025-10-15')], 7, 'Regular Season');
+        $this->assertStringContainsString('class="ibl-card__header schedule-month__header"', $regular);
+
+        $playoffs = $this->view->render($mockTeam, [$this->createMockGame('June', '2026-06-05')], 7, 'Playoffs');
+        $this->assertStringContainsString(
+            'class="ibl-card__header schedule-month__header schedule-month__header--playoffs"',
+            $playoffs
+        );
     }
 
     public function testRenderWithMultipleMonthsShowsMultipleHeaders(): void

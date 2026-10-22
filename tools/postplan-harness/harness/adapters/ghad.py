@@ -107,6 +107,9 @@ class RecordingGh:
     def trusted_open_threads(self, pr: int) -> list[dict] | None:
         return self.fixture.get("trusted_threads", [])
 
+    def review_threads_all(self, pr: int) -> list[dict] | None:
+        return self.fixture.get("all_threads", [])
+
     def resolve_review_thread(self, pr: int, comment_id: int, body: str) -> None:
         self.record("pr_resolve_thread", pr=pr, comment_id=int(comment_id), body=body[:2000])
 
@@ -427,11 +430,17 @@ class LiveGh(RecordingGh):
         return result
 
     def trusted_open_threads(self, pr: int) -> list[dict] | None:
+        return self._prf_rows("list_trusted_open_threads", pr)
+
+    def review_threads_all(self, pr: int) -> list[dict] | None:
+        return self._prf_rows("prf_review_threads", pr)
+
+    def _prf_rows(self, fn_name: str, pr: int) -> list[dict] | None:
         from .llm import _run_reaped
         if not PRF_LIB.exists():
             return None
-        argv = ["bash", "-c", 'source "$1"; list_trusted_open_threads "$2"', "_",
-                str(PRF_LIB), str(pr)]
+        argv = ["bash", "-c", 'source "$1"; "$2" "$3"', "_",
+                str(PRF_LIB), fn_name, str(pr)]
         env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
         try:
             proc = _run_reaped(argv, None, self.timeout, self.worktree, env)

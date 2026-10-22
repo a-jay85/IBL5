@@ -420,6 +420,175 @@ assert_eq "E4-persistent-5xx-fails-closed exit" "$RC" "1"
 assert_match "E4-persistent-5xx-fails-closed message" 'GraphQL fetch failed' "$ERR"
 assert_eq "E4-persistent-5xx-fails-closed calls" "$(cat "$TMP/sgh.count")" "4"
 
+rm -f "$TMP/sgh.count"
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' SGH_COUNT="$TMP/sgh.count" GH_CMD="$TMP/scriptgh" \
+    SGH_FAILS=1 SGH_MSG='unexpected end of JSON input' \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+ERR=$(cat "$TMP/err")
+assert_match "E5-truncated-body-then-ok head" '^head=3$' "$OUT"
+assert_eq "E5-truncated-body-then-ok exit" "$RC" "0"
+assert_eq "E5-truncated-body-then-ok calls" "$(cat "$TMP/sgh.count")" "2"
+assert_match "E5-truncated-body-then-ok retry notice" 'gh-retry: attempt 1/4' "$ERR"
+
+rm -f "$TMP/sgh.count"
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' SGH_COUNT="$TMP/sgh.count" GH_CMD="$TMP/scriptgh" \
+    SGH_FAILS='' SGH_MSG='unexpected end of JSON input' \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+ERR=$(cat "$TMP/err")
+assert_eq "E6-persistent-truncated-body-fails-closed exit" "$RC" "1"
+assert_match "E6-persistent-truncated-body-fails-closed message" 'GraphQL fetch failed' "$ERR"
+assert_eq "E6-persistent-truncated-body-fails-closed calls" "$(cat "$TMP/sgh.count")" "4"
+
+# --- E7-E13: paged live fetch ---
+# pagegh serves $PG_DIR/page-<key>.json, where <key> is the value of the
+# after= argument ("first" when absent). It counts calls in $PG_DIR/count,
+# logs each call's argv (minus the query text) as one line in $PG_DIR/argv,
+# and fails with HTTP 503 when $PG_DIR/fail-<key> exists. Past 60 calls it
+# fails with a non-retryable error so a runaway loop cannot hang the harness.
+cat > "$TMP/pagegh" <<'STUB'
+#!/usr/bin/env bash
+key=first
+line=''
+for a in "$@"; do
+    case "$a" in
+        after=*) key="${a#after=}"; line="$line $a" ;;
+        query=*) ;;
+        *) line="$line $a" ;;
+    esac
+done
+n=$(cat "$PG_DIR/count" 2>/dev/null || true); n=$(( ${n:-0} + 1 ))
+printf '%s\n' "$n" > "$PG_DIR/count"
+printf '%s\n' "$line" >> "$PG_DIR/argv"
+if [ "$n" -gt 60 ]; then
+    echo 'pagegh: runaway loop' >&2
+    exit 1
+fi
+if [ -e "$PG_DIR/fail-$key" ]; then
+    echo 'HTTP 503: Service Unavailable' >&2
+    exit 1
+fi
+cat "$PG_DIR/page-$key.json"
+STUB
+chmod +x "$TMP/pagegh"
+
+# pg_slice <file> <from> <to> <hasNextPage> <endCursor-json> — nodes[from:to]
+# of a pullRequests response, as one page with the given pageInfo.
+pg_slice() {
+    jq -c --argjson a "$2" --argjson b "$3" --argjson has "$4" --argjson cur "$5" \
+        '.data.repository.pullRequests |= {pageInfo: {hasNextPage: $has, endCursor: $cur},
+                                           nodes: .nodes[$a:$b]}' "$1"
+}
+
+# pg_run <dir> [selector args...] — run --live through pagegh; sets OUT RC ERR.
+pg_run() {
+    local d="$1"; shift
+    rm -f "$d/count" "$d/argv"
+    RC=0
+    OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' PG_DIR="$d" GH_CMD="$TMP/pagegh" \
+        "$SEL" --live --repo a-jay85/IBL5 "$@" 2>"$TMP/err") || RC=$?
+    ERR=$(cat "$TMP/err")
+}
+
+C5_WHOLE=$("$SEL" --input "$TMP/c5.json" 2>/dev/null)
+
+# E7: two pages merge to the same decision as the unsplit snapshot.
+mkdir -p "$TMP/pg7"
+pg_slice "$TMP/c5.json" 0 2 true '"CUR1"' > "$TMP/pg7/page-first.json"
+pg_slice "$TMP/c5.json" 2 3 false null > "$TMP/pg7/page-CUR1.json"
+pg_run "$TMP/pg7"
+assert_eq "E7-two-page-merge exit" "$RC" "0"
+assert_eq "E7-two-page-merge output" "$OUT" "$C5_WHOLE"
+assert_eq "E7-two-page-merge calls" "$(cat "$TMP/pg7/count")" "2"
+assert_absent "E7-two-page-merge page 1 has no cursor" 'after=' "$(sed -n 1p "$TMP/pg7/argv")"
+assert_match "E7-two-page-merge page 2 sends cursor" 'after=CUR1( |$)' "$(sed -n 2p "$TMP/pg7/argv")"
+assert_match "E7-two-page-merge page size" 'first=10( |$)' "$(sed -n 1p "$TMP/pg7/argv")"
+assert_absent "E7-two-page-merge no truncation warning" 'truncated' "$ERR"
+pg_run "$TMP/pg7" --list
+assert_eq "E7-two-page-merge list" "$OUT" "[1,2,3]"
+
+# E8: a page-2 failure after gh_retry exhausts fails the whole run.
+mkdir -p "$TMP/pg8"
+pg_slice "$TMP/c5.json" 0 2 true '"CUR1"' > "$TMP/pg8/page-first.json"
+pg_slice "$TMP/c5.json" 2 3 false null > "$TMP/pg8/page-CUR1.json"
+touch "$TMP/pg8/fail-CUR1"
+pg_run "$TMP/pg8"
+assert_eq "E8-page2-failure-fails-closed exit" "$RC" "1"
+assert_match "E8-page2-failure-fails-closed message" '^merge-line-select: GraphQL fetch failed$' "$ERR"
+assert_eq "E8-page2-failure-fails-closed no partial line" "$OUT" ""
+assert_eq "E8-page2-failure-fails-closed calls" "$(cat "$TMP/pg8/count")" "5"
+
+# E9: hasNextPage:true with a null or empty endCursor fails closed.
+mkdir -p "$TMP/pg9"
+pg_slice "$TMP/c5.json" 0 2 true null > "$TMP/pg9/page-first.json"
+pg_run "$TMP/pg9"
+assert_eq "E9-missing-endcursor-fails-closed exit" "$RC" "1"
+assert_match "E9-missing-endcursor-fails-closed message" 'page 1 reports more PRs but no endCursor' "$ERR"
+assert_eq "E9-missing-endcursor-fails-closed no partial line" "$OUT" ""
+assert_eq "E9-missing-endcursor-fails-closed calls" "$(cat "$TMP/pg9/count")" "1"
+pg_slice "$TMP/c5.json" 0 2 true '""' > "$TMP/pg9/page-first.json"
+pg_run "$TMP/pg9"
+assert_eq "E9-empty-endcursor-fails-closed exit" "$RC" "1"
+assert_match "E9-empty-endcursor-fails-closed message" 'page 1 reports more PRs but no endCursor' "$ERR"
+assert_eq "E9-empty-endcursor-fails-closed no partial line" "$OUT" ""
+assert_eq "E9-empty-endcursor-fails-closed calls" "$(cat "$TMP/pg9/count")" "1"
+
+# E10: a server that always reports more pages stops at the cap.
+mkdir -p "$TMP/pg10"
+pg_slice "$TMP/c5.json" 0 1 true '"LOOP"' > "$TMP/pg10/page-first.json"
+pg_slice "$TMP/c5.json" 1 2 true '"LOOP"' > "$TMP/pg10/page-LOOP.json"
+pg_run "$TMP/pg10"
+assert_eq "E10-page-cap-fails-closed exit" "$RC" "1"
+assert_match "E10-page-cap-fails-closed message" 'more than 50 pages of 10 open PRs' "$ERR"
+assert_eq "E10-page-cap-fails-closed no partial line" "$OUT" ""
+assert_eq "E10-page-cap-fails-closed calls" "$(cat "$TMP/pg10/count")" "50"
+
+# E11: a page carrying .errors fails closed instead of merging as zero nodes.
+mkdir -p "$TMP/pg11"
+pg_slice "$TMP/c5.json" 0 2 true '"CUR1"' > "$TMP/pg11/page-first.json"
+printf '%s\n' '{"errors":[{"message":"timeout"}],"data":null}' > "$TMP/pg11/page-CUR1.json"
+pg_run "$TMP/pg11"
+assert_eq "E11-page-shape-fails-closed exit" "$RC" "1"
+assert_match "E11-page-shape-fails-closed message" 'is not a pullRequests GraphQL response' "$ERR"
+assert_eq "E11-page-shape-fails-closed no partial line" "$OUT" ""
+
+# E12: the recorded 28-node live snapshot split into 3 pages equals the whole.
+mkdir -p "$TMP/pg12"
+L="$FIXTURES/live-snapshot.json"
+pg_slice "$L" 0 10 true '"P1"' > "$TMP/pg12/page-first.json"
+pg_slice "$L" 10 20 true '"P2"' > "$TMP/pg12/page-P1.json"
+pg_slice "$L" 20 1000 false null > "$TMP/pg12/page-P2.json"
+L_WHOLE=$("$SEL" --input "$L" 2>/dev/null)
+L_LIST=$("$SEL" --input "$L" --list 2>/dev/null)
+pg_run "$TMP/pg12"
+assert_eq "E12-live-snapshot-paged-equivalence exit" "$RC" "0"
+assert_eq "E12-live-snapshot-paged-equivalence output" "$OUT" "$L_WHOLE"
+assert_eq "E12-live-snapshot-paged-equivalence calls" "$(cat "$TMP/pg12/count")" "3"
+pg_run "$TMP/pg12" --list
+assert_eq "E12-live-snapshot-paged-equivalence list" "$OUT" "$L_LIST"
+
+# E13: the query pages and keeps contexts(first:100); the two constants are pinned.
+e13_ok=1
+e13_msg=""
+for tok in \
+    'pullRequests(states:OPEN, baseRefName:"master", first:$first, after:$after)' \
+    'pageInfo { hasNextPage endCursor }' \
+    'contexts(first:100)' \
+    'PAGE_SIZE=10' \
+    'MAX_PAGES=50'; do
+    cnt=$(grep -cF -- "$tok" "$SEL" || true)
+    if [ "$cnt" != "1" ]; then
+        e13_ok=0
+        e13_msg="$e13_msg [$tok count=$cnt]"
+    fi
+done
+if [ "$e13_ok" = 1 ]; then
+    pass "E13-query-paging-shape"
+else
+    failcase "E13-query-paging-shape —$e13_msg"
+fi
+
 # --- R: snapshot validation and record-and-replay ---
 
 r1_check() {

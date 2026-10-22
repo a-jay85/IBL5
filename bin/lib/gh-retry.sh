@@ -19,7 +19,9 @@
 #   2. `HTTP 4xx` present                        -> fail at once (never retried)
 #   3. 5xx, Bad Gateway, Service Unavailable,
 #      Gateway Time-out, timeout, timed out,
-#      connection reset, connection refused      -> retry after the next delay
+#      connection reset, connection refused,
+#      unexpected end of JSON input (a truncated
+#      body gh could not parse)                  -> retry after the next delay
 #   4. anything else (including silent non-zero) -> fail at once
 #
 # Return codes: the final attempt's exit code, unchanged; 64 for a bad
@@ -32,7 +34,7 @@ _gh_retry_is_transient() {
   if grep -qE 'HTTP 4[0-9][0-9]' "$1"; then
     return 1
   fi
-  grep -qiE 'HTTP 5[0-9][0-9]|Bad Gateway|Service Unavailable|Gateway Time-?out|timed out|timeout|connection reset|connection refused' "$1"
+  grep -qiE 'HTTP 5[0-9][0-9]|Bad Gateway|Service Unavailable|Gateway Time-?out|timed out|timeout|connection reset|connection refused|unexpected end of JSON input' "$1"
 }
 
 # gh_retry <cmd> [args...]

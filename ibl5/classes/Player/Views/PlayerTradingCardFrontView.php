@@ -20,20 +20,6 @@ use Security\HtmlSanitizer;
 class PlayerTradingCardFrontView
 {
     /**
-     * Get scoped custom styles for trading card with team colors
-     *
-     * @deprecated CSS is now centralized in design/components/player-cards.css.
-     *             Custom properties are set inline on the container element in render().
-     *
-     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
-     * @return string Empty string — styles are in centralized CSS
-     */
-    public static function getStyles(?array $colorScheme = null): string
-    {
-        return '';
-    }
-
-    /**
      * Render the complete trading card front
      * 
      * @param Player $player The player object

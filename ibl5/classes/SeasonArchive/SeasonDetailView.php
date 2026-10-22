@@ -70,8 +70,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
         /** @var array<string, int> $teamIds */
         $teamIds = $seasonData['teamIds'];
 
-        $html = $this->renderStyles();
-        $html .= '<div class="season-archive-nav">';
+        $html = '<div class="season-archive-nav">';
         $html .= '<a href="modules.php?name=SeasonArchive">&larr; Back to Season Archive</a>';
         $html .= '<a href="modules.php?name=SeasonLeaderboards">Season Leaders &rarr;</a>';
         $html .= '</div>';

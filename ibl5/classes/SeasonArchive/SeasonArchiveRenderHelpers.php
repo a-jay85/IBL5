@@ -59,12 +59,4 @@ trait SeasonArchiveRenderHelpers
 
         return '<td>' . self::esc($teamName) . '</td>';
     }
-
-    /**
-     * Styles are now centralized in design/components/season-archive.css.
-     */
-    private function renderStyles(): string
-    {
-        return '';
-    }
 }

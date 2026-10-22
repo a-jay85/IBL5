@@ -3521,7 +3521,7 @@ assert_viol "gateBX-ibl5-prefixed-path-in-critical-files-ok" 0 '[BX]' "$FM"'
 '
 
 # A variable prefix and a ./ prefix in Critical Files still excuse bin/foo.
-# (Absolute paths never reach [BX]: gate [F] rejects them first.)
+# (An absolute path would also excuse bin/foo here, but gate [F] flags it separately.)
 assert_viol "gateBX-var-prefix-path-in-critical-files-ok" 0 '[BX]' "$FM"'
 ## Critical Files
 

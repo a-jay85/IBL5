@@ -1686,7 +1686,12 @@ while IFS= read -r row; do
         [ "$_bx_tok" != "bin/" ] || continue
         [ -e "$REPO_ROOT/$_bx_tok" ] && continue
         [ -e "$REPO_ROOT/ibl5/$_bx_tok" ] && continue
-        grep -qF -- "$_bx_tok" <<< "$CF_SECTION" && continue
+        # Whole-token match: a listed bin/foo-bar must not excuse a missing bin/foo.
+        # Not preceded by a path char; followed by end/non-path char, or a `.` that
+        # itself ends the token (sentence period), so "`bin/foo` (new)" still counts.
+        # An optional `ibl5/` prefix is allowed, so `ibl5/bin/foo` excuses `bin/foo`.
+        _bx_esc="${_bx_tok//./\\.}"
+        grep -qE -- "(^|[^A-Za-z0-9_./-])(ibl5/)?${_bx_esc}(\\.?\$|\\.?[^A-Za-z0-9_./-])" <<< "$CF_SECTION" && continue
         viol "[BX] matrix row runs $_bx_tok, which does not exist at the repo root or under ibl5/ and is not named in ## Critical Files — fix the path, or list the script in ## Critical Files if this plan creates it: ${row}"
     done < <(grep -oE "$_bx_tok_re" <<< "$cell" || true)
 done < "$MATRIX_FILE"

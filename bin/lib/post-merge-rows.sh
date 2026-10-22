@@ -5,12 +5,15 @@
 #   - **Row N** [<tag>] — text
 # where <tag> is `manual`, `auto:ci <name>`, or `auto:mac <name>`. A row with no tag is
 # manual. Consumers: bin/after-merge-checklist and bin/digest-dm-build. Later units add the
-# CI executor and the writer gates. Tested by bin/test-post-merge-rows.
+# executors (see pmr_executor_ready) and the writer gates. Tested by bin/test-post-merge-rows.
 #
 # Portable to bash 3.2: no associative arrays, no ${v,,}, no mapfile, no declare -n.
 
 PMR_END_ANCHOR='<!-- after-merge:end -->'
 PMR_NAME_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
+# The bin/ directory that holds this lib. Executors are looked up here, so a checkout
+# that carries the executor file turns its rows automatic and one that lacks it does not.
+PMR_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # pmr_rows FILE -- print the raw row lines of the `## After merge` section.
 pmr_rows() {
@@ -48,6 +51,20 @@ pmr_parse_row() {
             esac
         fi
     fi
+}
+
+# pmr_executor_ready KIND -- 0 iff the executor that runs KIND rows exists as a regular
+# file in PMR_BIN_DIR: post-merge-ci-run for auto:ci (unit 2), post-merge-run for auto:mac (unit 3).
+# `-f`, not `-x`: callers run executors as `bash bin/...`, so the exec bit is not trusted.
+# Fail closed: until the file lands, a row with that tag is a person's job, so it pings.
+pmr_executor_ready() {
+    local _f
+    case "${1-}" in
+        auto:ci)  _f=post-merge-ci-run ;;
+        auto:mac) _f=post-merge-run ;;
+        *) return 1 ;;
+    esac
+    [ -f "$PMR_BIN_DIR/$_f" ]
 }
 
 # pmr_is_count VALUE -- 0 iff VALUE is one or more ASCII digits and nothing else.

@@ -127,4 +127,24 @@ _rc=$?
 h_eq "ping-no-args exit" 0 "$_rc"
 h_eq "ping-no-args result" "true|bad-count:manual bad-count:auto_failed" "$_out"
 
+# --- 12: executor lookup ------------------------------------------------------------
+# A scratch bin/ holding a copy of the lib: the lib finds executors next to itself.
+mkdir -p "$SCRATCH/bin/lib"
+cp "$LIB" "$SCRATCH/bin/lib/post-merge-rows.sh"
+_ready() {
+    bash -c '. "$1"; if pmr_executor_ready "$2"; then echo yes; else echo no; fi' _ "$SCRATCH/bin/lib/post-merge-rows.sh" "$1"
+}
+h_eq "executor-none ci" no "$(_ready auto:ci)"
+h_eq "executor-none mac" no "$(_ready auto:mac)"
+: > "$SCRATCH/bin/post-merge-ci-run"
+h_eq "executor-ci ci" yes "$(_ready auto:ci)"
+h_eq "executor-ci mac still absent" no "$(_ready auto:mac)"
+: > "$SCRATCH/bin/post-merge-run"
+h_eq "executor-mac mac" yes "$(_ready auto:mac)"
+h_eq "executor-unknown kind" no "$(_ready manual)"
+h_eq "executor-no-arg" no "$(_ready '')"
+mkdir -p "$SCRATCH/bin2/lib" "$SCRATCH/bin2/post-merge-ci-run"
+cp "$LIB" "$SCRATCH/bin2/lib/post-merge-rows.sh"
+h_eq "executor-directory is not a file" no "$(bash -c '. "$1"; if pmr_executor_ready auto:ci; then echo yes; else echo no; fi' _ "$SCRATCH/bin2/lib/post-merge-rows.sh")"
+
 h_done

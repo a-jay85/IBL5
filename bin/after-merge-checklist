@@ -5,13 +5,16 @@
 #   `manual`, `auto:ci <name>` or `auto:mac <name>`; an untagged row is manual. The row
 #   grammar lives in bin/lib/post-merge-rows.sh. The section ends at
 #   `<!-- after-merge:end -->`, the next `## ` heading, or EOF.
-#   Manual rows get a checkbox. Auto rows say they run automatically.
+#   Manual rows get a checkbox. Auto rows say they run automatically, but only when
+#   their executor is on this checkout (pmr_executor_ready). An auto row with no
+#   executor yet is a manual row: it gets a checkbox and counts in manual_count.
 #   --comment-out defaults to /tmp/after-merge-comment.md.
 #   Prints `key=value` lines on stdout, and appends the same lines to the file named by
 #   $GITHUB_OUTPUT when that variable is set and non-empty. Keys:
 #     manual_count    rows a person must do, including rows with an unrecognised tag
-#     auto_ci_count   rows tagged auto:ci
-#     auto_mac_count  rows tagged auto:mac
+#                     and auto rows whose executor is not on this checkout yet
+#     auto_ci_count   rows tagged auto:ci that post-merge-ci-run (unit 2) will run
+#     auto_mac_count  rows tagged auto:mac that post-merge-run (unit 3) will run
 #     comment_url     the checklist comment URL, or the PR URL when none can be read,
 #                     or empty when there are no rows
 #     status          always the last key printed:
@@ -119,12 +122,19 @@ while IFS= read -r line; do
             else
                 LINES+=("- [ ] $PMR_LABEL $PMR_TEXT _(unrecognised tag, treated as a manual step)_")
             fi ;;
-        auto:ci)
-            AUTO_CI=$((AUTO_CI + 1))
-            LINES+=("- $PMR_LABEL $PMR_TEXT _(runs automatically in CI: \`$PMR_NAME\`)_") ;;
-        auto:mac)
-            AUTO_MAC=$((AUTO_MAC + 1))
-            LINES+=("- $PMR_LABEL $PMR_TEXT _(runs automatically on the owner's Mac: \`$PMR_NAME\`; a failure pings in #dev)_") ;;
+        auto:ci|auto:mac)
+            # An auto row counts as automatic only once its executor is on this checkout.
+            # Until then nothing runs it, so it is a manual step and the digest pings.
+            if ! pmr_executor_ready "$PMR_KIND"; then
+                MANUAL=$((MANUAL + 1))
+                LINES+=("- [ ] $PMR_LABEL $PMR_TEXT _(tagged \`$PMR_KIND $PMR_NAME\`, but nothing runs $PMR_KIND rows yet, so a person must do it)_")
+            elif [ "$PMR_KIND" = auto:ci ]; then
+                AUTO_CI=$((AUTO_CI + 1))
+                LINES+=("- $PMR_LABEL $PMR_TEXT _(runs automatically in CI: \`$PMR_NAME\`)_")
+            else
+                AUTO_MAC=$((AUTO_MAC + 1))
+                LINES+=("- $PMR_LABEL $PMR_TEXT _(runs automatically on the owner's Mac: \`$PMR_NAME\`; a failure pings in #dev)_")
+            fi ;;
     esac
 done <<< "$ROWS_RAW"
 

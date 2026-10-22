@@ -31,8 +31,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         'OneOnOneGame',
         'AwardHistory',
         'FranchiseRecordBook',
-        'CareerLeaderboards',
-        'SeasonLeaderboards',
+        'Leaderboards',
         'RecordHolders',
     ];
 
@@ -99,8 +98,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Record Holders', 'url' => 'modules.php?name=RecordHolders'],
                     ['label' => 'Franchise Record Book', 'url' => 'modules.php?name=FranchiseRecordBook'],
                     ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=RecordHolders&op=allstar'],
-                    ['label' => 'Season Leaderboards', 'url' => 'modules.php?name=SeasonLeaderboards'],
-                    ['label' => 'Career Leaderboards', 'url' => 'modules.php?name=CareerLeaderboards'],
+                    ['label' => 'Leaderboards', 'url' => 'modules.php?name=Leaderboards'],
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=SeasonArchive'],
                     ['label' => '1-On-1 Game', 'url' => 'modules.php?name=OneOnOneGame'],
                 ],

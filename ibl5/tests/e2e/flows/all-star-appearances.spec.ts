@@ -46,6 +46,9 @@ test.describe('All-Star Appearances flow', () => {
     });
 
     expect(response.status()).toBe(200);
-    expect((await response.body()).length).toBeGreaterThan(0);
+    const html = await response.text();
+    expect(html).toMatch(/All-Star Appearances/i);
+    expect(html).toContain('ibl-data-table');
+    expect(html).not.toContain('Fatal error');
   });
 });

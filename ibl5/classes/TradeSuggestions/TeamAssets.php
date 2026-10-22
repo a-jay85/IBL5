@@ -12,12 +12,21 @@ final readonly class TeamAssets
     /**
      * @param list<SuggestionPlayer> $players
      * @param list<SuggestionPick> $picks
+     * @param int|null $rosterCount Players the roster-limit check counts; null counts $players
+     * @param int|null $capRoom Salary this season before the hard cap (negative when over it); null skips the check
      */
     public function __construct(
         public int $tid,
         public array $players,
         public array $picks,
+        public ?int $rosterCount = null,
+        public ?int $capRoom = null,
     ) {
+    }
+
+    public function rosterCount(): int
+    {
+        return $this->rosterCount ?? count($this->players);
     }
 
     /**
@@ -31,13 +40,18 @@ final readonly class TeamAssets
     public function afterTrade(array $outPids, array $outPickIds, array $inPlayers, array $inPicks): TeamAssets
     {
         $players = [];
+        $salaryOut = 0;
         foreach ($this->players as $player) {
             if (!in_array($player->pid, $outPids, true)) {
                 $players[] = $player;
+            } else {
+                $salaryOut += $player->currentSalary;
             }
         }
+        $salaryIn = 0;
         foreach ($inPlayers as $player) {
             $players[] = $player;
+            $salaryIn += $player->currentSalary;
         }
 
         $picks = [];
@@ -50,6 +64,11 @@ final readonly class TeamAssets
             $picks[] = $pick;
         }
 
-        return new TeamAssets($this->tid, $players, $picks);
+        $removed = count($this->players) + count($inPlayers) - count($players);
+        $rosterCount = $this->rosterCount === null ? null : $this->rosterCount - $removed + count($inPlayers);
+
+        $capRoom = $this->capRoom === null ? null : $this->capRoom + $salaryOut - $salaryIn;
+
+        return new TeamAssets($this->tid, $players, $picks, $rosterCount, $capRoom);
     }
 }

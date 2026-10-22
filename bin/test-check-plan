@@ -4573,11 +4573,26 @@ for L_CASE in overflow verbatim; do
 done
 
 # ---------------------------------------------------------------------------
-# Gate [AB] fixtures (9 assert_viol cases + 1 deny-message case)
+# Gate [AB] fixtures (20 assert_viol cases + 1 deny-message case)
 # A post-impl CLI-executable row with a negated grep must name a durable
-# in-repo check or carry (one-time-check: <reason>). Rows are read from the
-# fence-aware matrix, so a fenced example never trips the gate.
+# in-repo check that contains the grepped token, or carry
+# (one-time-check: <reason>). Rows are read from the fence-aware matrix, so a
+# fenced example never trips the gate. The cases run a copy of bin/ inside a
+# scratch repo, so which named checks exist and what they hold is fixed here.
 # ---------------------------------------------------------------------------
+AB_REPO="$(mktemp -d)"
+: > "$AB_REPO/.git"
+cp -R "$SCRIPT_DIR" "$AB_REPO/bin"
+mkdir -p "$AB_REPO/vendor/bin" "$AB_REPO/ibl5/tests/Ab" "$AB_REPO/.github/workflows"
+# Gate [G] wants every named bin/test-* wired in a workflow.
+printf '%s\n' 'jobs:' '  ab:' '    steps:' '      - run: bin/test-ab-holds && bin/test-ab-other' \
+    > "$AB_REPO/.github/workflows/ab.yml"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-holds"
+printf '%s\n' '#!/bin/sh' 'echo unrelated' > "$AB_REPO/bin/test-ab-other"
+printf '%s\n' '#!/bin/sh' 'echo bgcolor2' > "$AB_REPO/vendor/bin/test-ab-holds"
+printf '%s\n' '<?php // asserts no reader of bgcolor2' > "$AB_REPO/ibl5/tests/Ab/NoBgcolor2Test.php"
+AB_GUARD_SAVED="$GUARD"
+GUARD="$AB_REPO/bin/check-plan"
 AB_BASE="$FM$YHDR"'
 '"$YROW"
 AB_NOTE='<!-- no-test-methods: fixture rows are gate AB props -->'
@@ -4586,23 +4601,43 @@ AB_CANARY=$(cat <<'AB_CANARY_EOF'
 AB_CANARY_EOF
 )
 AB_WHAT='no PHP file reads bgcolor2; the harness holds the assertion'
+# ab_row <name> <want> <location cell> — one-row [AB] fixture.
+ab_row() {
+    assert_viol "$1" "$2" '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `'"$3"'` |
+'"$AB_NOTE"
+}
 
-# Negated grep next to a bin/test-* harness: durable.
-assert_viol "AB-pass-bin" 0 '[AB]' "$AB_BASE"'
-| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -rq bgcolor2 ibl5/modules && bin/test-check-plan` |
-'"$AB_NOTE"
-# Negated grep next to an explicit runner: durable.
-assert_viol "AB-pass-runner" 0 '[AB]' "$AB_BASE"'
-| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `vendor/bin/phpunit --filter testNoBgcolor2Reader && ! grep -rq bgcolor2 ibl5/modules` |
-'"$AB_NOTE"
+# A bin/test-* harness that holds the grepped token: durable.
+ab_row "AB-pass-bin" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-holds'
+# A harness that exists but never mentions the token is not durable.
+ab_row "AB-fail-bin-unrelated" 1 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-other'
+# A named harness that does not exist is not durable.
+ab_row "AB-fail-bin-missing" 1 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-nope'
+# vendor/bin/test-* is not bin/test-*, even when it holds the token.
+ab_row "AB-fail-vendor-bin" 1 '! grep -rq bgcolor2 ibl5/modules && vendor/bin/test-ab-holds'
+# A bare runner names no file that could hold the assertion.
+ab_row "AB-fail-runner-bare" 1 'vendor/bin/phpunit --filter testNoBgcolor2Reader && ! grep -rq bgcolor2 ibl5/modules'
+# A runner given a test file that holds the token: durable (cd ibl5 path).
+ab_row "AB-pass-runner-path" 0 'cd ibl5 && vendor/bin/phpunit tests/Ab/NoBgcolor2Test.php && ! grep -rq bgcolor2 modules'
+# A bare vitest / go test word anywhere in the cell is not durable.
+ab_row "AB-fail-vitest-word" 1 '! grep -rq bgcolor2 ibl5/modules && echo vitest go test-free'
+ab_row "AB-fail-runner-anchored" 1 '! grep -rq bgcolor2 ibl5/modules; npx vitest run; go test ./...'
+# A test path that is only the grep target is not durable.
+ab_row "AB-fail-grep-target" 1 '! grep -rq bgcolor2 ibl5/tests/Ab/NoBgcolor2Test.php'
 # The motivating css-legacy-markup-styles.md row 7: plan-only negated grep.
 assert_viol "AB-fail-canary" 1 '[AB]' "$AB_BASE"'
 '"$AB_CANARY"'
 '"$AB_NOTE"
-# The (one-shot) annotation drops the bin/ arm: not CI-run, not durable.
-assert_viol "AB-fail-one-shot" 1 '[AB]' "$AB_BASE"'
-| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -rq bgcolor2 ibl5/modules && bin/test-check-plan # (one-shot)` |
-'"$AB_NOTE"
+# The (one-shot) annotation voids the token it annotates.
+ab_row "AB-fail-one-shot" 1 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-holds # (one-shot)'
+# A (one-shot) note on one token does not void a different durable token.
+ab_row "AB-pass-one-shot-other-token" 0 'bin/test-ab-holds && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
+# The token comes from the -e pattern, not from a path or flag value.
+ab_row "AB-pass-e-pattern" 0 "! grep -rq --include='*.php' -e 'bgcolor2' ibl5/modules && bin/test-ab-holds"
+ab_row "AB-fail-path-word" 1 '! grep -rq nosuchtoken ibl5/bgcolor2 && bin/test-ab-holds'
+# Each | alternative of a quoted pattern is its own token.
+ab_row "AB-pass-alternation" 0 "! grep -rqE 'getStyles\\|bgcolor2' ibl5/modules && bin/test-ab-holds"
 # Opt-out tag at the trailing end of the What cell.
 assert_viol "AB-optout" 0 '[AB]' "$AB_BASE"'
 '"${AB_CANARY/ count 1 | CLI-executable/ count 1 (one-time-check: ran once at plan time and printed nothing) | CLI-executable}"'
@@ -4612,12 +4647,8 @@ assert_viol "AB-pre-impl-ignored" 0 '[AB]' "$AB_BASE"'
 '"${AB_CANARY/post-impl (Phase 2)/pre-impl (characterization)}"'
 '"$AB_NOTE"
 # Escaped pipe inside the location cell: the detector reads the whole cell.
-assert_viol "AB-escaped-pipe-fail" 1 '[AB]' "$AB_BASE"'
-| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -r bgcolor2 ibl5/modules \| grep -v fixtures` |
-'"$AB_NOTE"
-assert_viol "AB-escaped-pipe-pass" 0 '[AB]' "$AB_BASE"'
-| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -r bgcolor2 ibl5/modules \| grep -v fixtures; bin/test-check-plan` |
-'"$AB_NOTE"
+ab_row "AB-escaped-pipe-fail" 1 '! grep -r bgcolor2 ibl5/modules \| grep -v fixtures'
+ab_row "AB-escaped-pipe-pass" 0 '! grep -r bgcolor2 ibl5/modules \| grep -v fixtures; bin/test-ab-holds'
 # A matrix header plus the canary inside a fence: invisible to the
 # fence-aware row source.
 assert_viol "AB-fenced-ignored" 0 '[AB]' "$AB_BASE"'
@@ -4640,5 +4671,7 @@ if [ "$got" -eq 1 ] \
 else
     h_fail "AB-deny-message" "expected exit 1 naming the durable path and the opt-out tag, got exit $got"
 fi
+GUARD="$AB_GUARD_SAVED"
+rm -rf "$AB_REPO"
 
 h_done

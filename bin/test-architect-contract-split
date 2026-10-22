@@ -588,7 +588,7 @@ check_mutation_rule() {
 }
 
 # -- Assertion 8: the whole-matrix mutation pointers stay resident ------------
-# The bullet and its pointer live in _architect-contract.md (30099 of 30208 B), the counter-example
+# The bullet and its pointer live in _architect-contract.md (30151 of 30208 B), the counter-example
 # section lives in _architect-contract-detail.md, and SKILL.md gate 9 points at both. Losing
 # any one leaves the mutation rule unreachable from the place a plan author reads.
 MUTATION_LEAD='**The mutation statement extends to the whole matrix, not just the negative-path rows above:**'

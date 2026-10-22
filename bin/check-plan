@@ -1543,10 +1543,86 @@ fi
 # Detector is the narrow negated-grep form only. `grep -c ... = 0` and
 # `test -z "$(grep ...)"` are left alone: the 2026-10-20 corpus sample showed
 # them dominated by diff-hygiene counts and presence-and-absence mixes.
+# Durable means: a command segment outside the negated greps names a file
+# (bin/test-*, bin/check-*, a test under ibl5/tests/, or a *_test.go) that
+# exists under $REPO_ROOT and contains the longest literal run of one grepped
+# pattern. That shows the check plausibly carries the assertion; it cannot
+# show the check asserts absence. A bare runner (`vendor/bin/phpunit
+# --filter X`, `vitest`, `go test`) names no file, so it never counts. A
+# segment carrying `(one-shot)` is dropped on its own; the rest still count.
 # ---------------------------------------------------------------------------
 _ab_neg='(^|[;(&|])[[:space:]]*![[:space:]]*(grep|rg|git[[:space:]]+grep)([[:space:]]|$)'
-_ab_durable_tests='ibl5/tests/[A-Za-z0-9_./-]+\.(php|ts)|[A-Za-z0-9_./-]+_test\.go|vendor/bin/phpunit|npx playwright|vitest|go test'
-_ab_durable_bin='bin/(test|check)-[A-Za-z0-9_.-]+'
+_ab_seg_neg='^[[:space:](]*![[:space:]]*(grep|rg|git[[:space:]]+grep)([[:space:]]|$)'
+_ab_durable='(^|[[:space:]`(])(\./)?(bin/(test|check)-[A-Za-z0-9_.-]+|(ibl5/)?tests/[A-Za-z0-9_./-]+\.(php|ts)|[A-Za-z0-9_./-]*_test\.go)'
+# _ab_split <cell> — one command segment per line, split on ; & | outside quotes.
+_ab_split() {
+    awk '{
+        n = length($0); seg = ""; q = ""
+        for (i = 1; i <= n; i++) {
+            c = substr($0, i, 1)
+            if (q != "") { seg = seg c; if (c == q) q = ""; continue }
+            if (c == "\047" || c == "\"") { q = c; seg = seg c; continue }
+            if (c == ";" || c == "&" || c == "|") { print seg; seg = ""; continue }
+            seg = seg c
+        }
+        print seg
+    }' <<< "$1"
+}
+# _ab_cores <negated-grep segment> — print the longest identifier-like run
+# (3+ chars) of each `|` alternative of each pattern the grep searches for.
+# Patterns are the -e / --regexp values, else the first non-option word. xargs does the shell-style unquoting; an
+# unbalanced quote prints nothing, so the row stays undurable (fail-closed).
+_ab_cores() {
+    _abc_words="$(printf '%s\n' "$1" | xargs -n1 printf '%s\n' 2>/dev/null)" || return 0
+    _abc_pats=""; _abc_first=""; _abc_take=0; _abc_skip=0; _abc_e=0
+    while IFS= read -r _abc_w; do
+        if [ "$_abc_take" = 1 ]; then _abc_pats+="$_abc_w"$'\n'; _abc_take=0; continue; fi
+        if [ "$_abc_skip" = 1 ]; then _abc_skip=0; continue; fi
+        case "$_abc_w" in
+            '!'|'(!'|grep|rg|git) : ;;
+            -e|--regexp) _abc_take=1; _abc_e=1 ;;
+            --regexp=*) _abc_pats+="${_abc_w#--regexp=}"$'\n'; _abc_e=1 ;;
+            -f|-m|-A|-B|-C|-g|-t|-T|--include|--exclude|--exclude-dir|--glob|--type|--max-count) _abc_skip=1 ;;
+            -*) : ;;
+            *) [ -n "$_abc_first" ] || _abc_first="$_abc_w" ;;
+        esac
+    done <<< "$_abc_words"
+    [ "$_abc_e" = 1 ] || _abc_pats="$_abc_first"
+    while IFS= read -r _abc_p; do
+        [ -n "$_abc_p" ] || continue
+        _abc_p="${_abc_p//\\|/|}"
+        while IFS= read -r _abc_alt; do
+            grep -oE '[A-Za-z0-9_$][A-Za-z0-9_$-]{2,}' <<< "$_abc_alt" \
+                | awk '{ if (length($0) > length(b)) b = $0 } END { if (b != "") print b }'
+        done <<< "${_abc_p//|/$'\n'}"
+    done <<< "$_abc_pats"
+}
+# _ab_is_durable <cell> — 0 when a durable file named outside the negated
+# greps contains one of their pattern cores.
+_ab_is_durable() {
+    _abd_cores=""; _abd_rest=""
+    while IFS= read -r _abd_seg; do
+        case "$_abd_seg" in *'(one-shot)'*) continue ;; esac
+        if grep -qE "$_ab_seg_neg" <<< "$_abd_seg"; then
+            _abd_cores+="$(_ab_cores "$_abd_seg")"$'\n'
+        else
+            _abd_rest+="$_abd_seg"$'\n'
+        fi
+    done < <(_ab_split "$1")
+    [ -n "${_abd_cores//[[:space:]]/}" ] || return 1
+    while IFS= read -r _abd_p; do
+        _abd_p="${_abd_p#[[:space:]\`(]}"; _abd_p="${_abd_p#./}"
+        [ -n "$_abd_p" ] || continue
+        _abd_f="$REPO_ROOT/$_abd_p"
+        case "$_abd_p" in tests/*) [ -f "$_abd_f" ] || _abd_f="$REPO_ROOT/ibl5/$_abd_p" ;; esac
+        [ -f "$_abd_f" ] || continue
+        while IFS= read -r _abd_c; do
+            [ -n "$_abd_c" ] || continue
+            grep -qF -- "$_abd_c" "$_abd_f" && return 0
+        done <<< "$_abd_cores"
+    done < <(grep -oE "$_ab_durable" <<< "$_abd_rest")
+    return 1
+}
 while IFS= read -r row; do
     matrix_split "$row" || continue
     [ "$MC_NUM" != "#" ] || continue
@@ -1554,10 +1630,8 @@ while IFS= read -r row; do
     case "$MC_TIME" in post-impl*) : ;; *) continue ;; esac
     grep -qE "$_ab_neg" <<< "$MC_LOC" || continue
     grep -qE "$_y_shape" <<< "${MC_WHAT//$MSEN/|}" && continue
-    _ab_durable="$_ab_durable_tests|$_ab_durable_bin"
-    case "$MC_LOC" in *'(one-shot)'*) _ab_durable="$_ab_durable_tests" ;; esac
-    grep -qE "$_ab_durable" <<< "$MC_LOC" && continue
-    viol "[AB] matrix row ${MC_NUM} asserts an absence with a plan-only negated grep; post-plan runs the cell once and CI never re-runs it, so a later master merge can bring the deleted symbol back unseen. Point the Test file / location cell at a durable in-repo check that holds the assertion (a test under ibl5/tests/, a bin/test-* harness, or a CI-wired bin/check-* script), or end the What-to-verify cell with (one-time-check: <reason>) when the absence is not worth a durable check: ${row}"
+    _ab_is_durable "$MC_LOC" && continue
+    viol "[AB] matrix row ${MC_NUM} asserts an absence with a plan-only negated grep; post-plan runs the cell once and CI never re-runs it, so a later master merge can bring the deleted symbol back unseen. Point the Test file / location cell at a durable in-repo check that holds the assertion (a test under ibl5/tests/, a bin/test-* harness, or a CI-wired bin/check-* script, named by path in its own command and containing the grepped token), or end the What-to-verify cell with (one-time-check: <reason>) when the absence is not worth a durable check: ${row}"
 done < "$GATEP_MATRIX"
 
 # ---------------------------------------------------------------------------

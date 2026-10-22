@@ -305,7 +305,7 @@ ev_expr "$EV_OPENED" "github.event.pull_request.title =="
 expect "dangling expression exits 2" 2 "$EV_RC"
 
 # ---- awk helper smoke: negative, positive, not-found, multi-line ----
-HS_JOB_IF_RC_EXPECTED=1 # human-signoff job has no `if:` on master; flips to 0 when the job gains a filter
+HS_JOB_IF_RC_EXPECTED=0 # human-signoff carries the payload-provable skip (ADR-0210)
 out=$(wf_job_if "$WF_DIR/human-signoff.yml" needs-a-human-label)
 rc=$?
 if [ "$rc" -eq 0 ] && [ "${out#always()}" != "$out" ]; then
@@ -313,13 +313,23 @@ if [ "$rc" -eq 0 ] && [ "${out#always()}" != "$out" ]; then
 else
     h_fail "wf_job_if needs-a-human-label prints always()..." "rc=$rc out=[$out]"
 fi
-wf_job_if "$WF_DIR/human-signoff.yml" human-signoff > /dev/null 2>&1
-expect "wf_job_if human-signoff exit code (expected-rc variable)" "$HS_JOB_IF_RC_EXPECTED" "$?"
+out=$(wf_job_if "$WF_DIR/human-signoff.yml" human-signoff 2>&1)
+rc=$?
+expect "wf_job_if human-signoff exit code (expected-rc variable)" "$HS_JOB_IF_RC_EXPECTED" "$rc"
+if [ "${out#'!('}" != "$out" ]; then
+    h_pass "wf_job_if human-signoff prints !(..."
+else
+    h_fail "wf_job_if human-signoff prints !(..." "out=[$out]"
+fi
+# Negative path: a scratch copy of auto-mergeable-label.yml with the job `if:` deleted.
+sed '/^    if: /d' "$WF_DIR/auto-mergeable-label.yml" > "$EV_DIR/am-noif.yml"
+wf_job_if "$EV_DIR/am-noif.yml" sync-label > /dev/null 2>&1
+expect "wf_job_if sync-label without if: exits 1" 1 "$?"
 wf_job_if "$WF_DIR/human-signoff.yml" no-such-job > /dev/null 2>&1
 expect "wf_job_if no-such-job exits 2" 2 "$?"
 out=$(wf_job_if "$WF_DIR/auto-mergeable-label.yml" sync-label)
 rc=$?
-if [ "$rc" -eq 0 ] && [ "$out" = "github.event.pull_request.merged != true" ]; then
+if [ "$rc" -eq 0 ] && [ "${out#'github.event.pull_request.merged != true && !('}" != "$out" ]; then
     h_pass "wf_job_if sync-label positive path"
 else
     h_fail "wf_job_if sync-label positive path" "rc=$rc out=[$out]"
@@ -332,7 +342,7 @@ wf_job_if "$EV_DIR/multi.yml" b > /dev/null 2>&1
 expect "wf_job_if multi-line (unbalanced paren) exits 3" 3 "$?"
 out=$(wf_concurrency_group "$WF_DIR/human-signoff.yml")
 rc=$?
-if [ "$rc" -eq 0 ] && [ "${out#human-signoff-}" != "$out" ]; then
+if [ "$rc" -eq 0 ] && [[ "$out" == *"|| format('human-signoff-{0}', github.event.pull_request.number)" ]]; then
     h_pass "wf_concurrency_group human-signoff"
 else
     h_fail "wf_concurrency_group human-signoff" "rc=$rc out=[$out]"

@@ -34,6 +34,30 @@ test.describe('Mobile nav interaction tests', () => {
     await expect(page.locator('#nav-mobile-menu')).not.toBeVisible();
   });
 
+  test('reopening within the 300 ms overlay hide window keeps the overlay visible', async ({ page }) => {
+    const overlay = page.locator('#nav-overlay');
+    await openMobileMenu(page);
+    await expect(page.locator('#nav-mobile-menu')).toBeVisible();
+    await expect(overlay).toBeVisible();
+
+    // Close then reopen in one synchronous task so the gap is 0 ms, not a
+    // racy pair of Playwright clicks. The close arms the 300 ms hide timer;
+    // the reopen must clear it.
+    await page.evaluate(() => {
+      const hamburger = document.getElementById('nav-hamburger')!;
+      hamburger.click(); // close
+      hamburger.click(); // reopen
+    });
+
+    // Wait past the original 300 ms hide deadline, then assert the stale
+    // timer never fired.
+    // eslint-disable-next-line playwright/no-wait-for-timeout -- must outlast the 300 ms overlayHideTimer to prove it was cleared
+    await page.waitForTimeout(500);
+    await expect(overlay).not.toHaveClass(/\bhidden\b/);
+    await expect(overlay).toBeVisible();
+    await expect(page.locator('#nav-hamburger')).toHaveAttribute('aria-expanded', 'true');
+  });
+
   test('exclusive dropdowns — opening one closes the other', async ({ page }) => {
     await openMobileMenu(page);
 

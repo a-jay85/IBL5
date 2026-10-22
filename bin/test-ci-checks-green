@@ -591,8 +591,8 @@ else fail "P22 --self CSV excludes both names (rc=$RC out=$(cat "$OUT") err=$(ca
 
 # P23: --ignore-workflows drops a named active workflow run from V4.
 new_case p23
-cr 1 "[{\"name\":\"A\",$G}]"; wr 1 '[{"name":"All checks green","status":"in_progress"}]'
-run_poll --anchor=A --ignore-workflows='All checks green'
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 '[{"name":"Legacy waiter","status":"in_progress"}]'
+run_poll --anchor=A --ignore-workflows='Legacy waiter'
 p23_with=$RC
 run_poll --anchor=A
 p23_without=$RC
@@ -603,7 +603,7 @@ else fail "P23 --ignore-workflows drops the legacy waiter from V4 (with=$p23_wit
 # P24: the space form of --ignore-workflows is an unknown flag.
 new_case p24
 cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
-run_poll --ignore-workflows 'All checks green'
+run_poll --ignore-workflows 'Legacy waiter'
 if [ "$RC" -eq 2 ] && grep -qF 'unknown flag' "$ERR"; then
     ok "P24 space-form --ignore-workflows is rejected"
 else fail "P24 space-form --ignore-workflows is rejected (rc=$RC err=$(head -1 "$ERR"))"; fi

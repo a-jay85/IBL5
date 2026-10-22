@@ -212,9 +212,11 @@ legacy ignore shim, and the listed-versus-derived PR workflow names. The base-re
 the 2026-10-11 addendum went with the old A-block. The `branches: [master]` filter on
 `promote-to-production.yml` is pinned as P9, since P1 already names the force-push guard.
 
-**Residual risks.** `ccg_dedupe` in `bin/lib/ci-checks-green.sh` orders a queued re-run
-with a null timestamp before the cancelled run it replaces. A settle that lands in that
-window can post `failure` while `gh pr checks` shows pending. The next completion
-re-settles it. The lib is unchanged here, and the fix is a follow-up. A workflow added
+**Residual risks.** `ccg_dedupe` in `bin/lib/ci-checks-green.sh` keeps the last run per
+name after sorting on `completed_at // started_at`. A cancelled run often completes in the
+same second its replacement starts, and on that tie the API order decides. On PR 3421 the
+cancelled `Meta checks` run won. The cancellation itself fires `workflow_run: completed`,
+so the status can read `failure` while `gh pr checks` shows pending. The replacement's
+completion re-settles it. The lib is unchanged here, and the fix is a follow-up. A workflow added
 later with a `pull_request` trigger but left out of the `workflows:` list would never
 fire a settle; A6 fails the PR that adds it.

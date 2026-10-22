@@ -555,6 +555,38 @@ class TeamStatsCalculatorTest extends TestCase
         $this->assertSame(5, $result['awayWins']);
     }
 
+    public function testNonOpponentStatsStableWhenStandingsRowsRegistered(): void
+    {
+        $db = new MockDatabase();
+        $db->onQuery('FROM ibl_standings', [
+            ['teamid' => 2, 'win' => 30, 'loss' => 10],
+            ['teamid' => 3, 'win' => 20, 'loss' => 20],
+        ]);
+        $calculator = new TeamStatsCalculator($db);
+        $calculator->preloadTeamRecords();
+
+        $games = [
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 3, 'visitor_score' => 110, 'home_teamid' => 1, 'home_score' => 105],
+            ['visitor_teamid' => 4, 'visitor_score' => 90, 'home_teamid' => 1, 'home_score' => 99],
+            ['visitor_teamid' => 1, 'visitor_score' => 88, 'home_teamid' => 5, 'home_score' => 92],
+            ['visitor_teamid' => 1, 'visitor_score' => 101, 'home_teamid' => 2, 'home_score' => 100],
+        ];
+
+        $result = $calculator->calculate($games, 1);
+
+        $this->assertSame(3, $result['wins']);
+        $this->assertSame(2, $result['losses']);
+        $this->assertSame(1, $result['homeWins']);
+        $this->assertSame(1, $result['homeLosses']);
+        $this->assertSame(2, $result['awayWins']);
+        $this->assertSame(1, $result['awayLosses']);
+        $this->assertSame(3, $result['winsInLast10Games']);
+        $this->assertSame(2, $result['lossesInLast10Games']);
+        $this->assertSame(1, $result['streak']);
+        $this->assertSame('W', $result['streakType']);
+    }
+
     // ============================================
     // WIN/LOSS POINTS EDGE CASES
     // ============================================

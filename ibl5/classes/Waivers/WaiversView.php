@@ -14,7 +14,7 @@ class WaiversView implements WaiversViewInterface
     /**
      * @see WaiversViewInterface::renderWaiverForm()
      *
-     * @param array<int, array{playerID: int, playerName: string, contract: string, waitTime: string}> $players
+     * @param array<int, array{playerID: int, playerName: string, contract: string}> $players
      */
     public function renderWaiverForm(
         string $teamName,
@@ -48,7 +48,7 @@ class WaiversView implements WaiversViewInterface
                             <select name="Player_ID" class="ibl-select" aria-label="Select player">
                                 <option value="">Select player...</option>
                                 <?php foreach ($players as $option): ?>
-                                <?= \Security\HtmlSanitizer::trusted($this->buildPlayerOption($option['playerID'], $option['playerName'], $option['contract'], $option['waitTime'])) ?>
+                                <?= \Security\HtmlSanitizer::trusted($this->buildPlayerOption($option['playerID'], $option['playerName'], $option['contract'])) ?>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -73,17 +73,12 @@ class WaiversView implements WaiversViewInterface
     public function buildPlayerOption(
         int $playerID,
         string $playerName,
-        string $contract,
-        string $waitTime = ''
+        string $contract
     ): string {
         $playerNameEscaped = \Security\HtmlSanitizer::safeHtmlOutput($playerName);
         $contractEscaped = \Security\HtmlSanitizer::safeHtmlOutput($contract);
-        $waitTimeEscaped = \Security\HtmlSanitizer::safeHtmlOutput($waitTime);
 
         $displayText = "{$playerNameEscaped} {$contractEscaped}";
-        if ($waitTime !== '') {
-            $displayText .= " {$waitTimeEscaped}";
-        }
 
         return "<option value=\"{$playerID}\">{$displayText}</option>";
     }

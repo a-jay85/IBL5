@@ -245,7 +245,8 @@ img {
 }
 
 body {
-    background-color: var(--page-bg);
+    /* --page-bg is set inline by themeheader(); standalone pages keep the UA default. */
+    background-color: var(--page-bg, transparent);
 }
 
 } /* end @layer base (legacy) */

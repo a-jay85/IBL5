@@ -140,6 +140,7 @@ class GoogleSheetsClientTest extends TestCase
     {
         $this->http->queue(200, []);
         $this->http->queue(200, []);
+        $this->http->queue(200, []);
 
         $rows = [];
         for ($i = 0; $i < GoogleSheetsClient::WRITE_CHUNK_ROWS + 3; $i++) {
@@ -147,13 +148,22 @@ class GoogleSheetsClientTest extends TestCase
         }
         $this->client->overwriteTab(self::TOKEN, self::SHEET_ID, 'Players', $rows);
 
-        $data = $this->body(0)['data'];
-        self::assertCount(2, $data);
-        self::assertSame("'Players'!A1", $data[0]['range']);
-        self::assertCount(GoogleSheetsClient::WRITE_CHUNK_ROWS, $data[0]['values']);
-        self::assertSame("'Players'!A" . (GoogleSheetsClient::WRITE_CHUNK_ROWS + 1), $data[1]['range']);
-        self::assertCount(3, $data[1]['values']);
-        self::assertSame(['r' . GoogleSheetsClient::WRITE_CHUNK_ROWS], $data[1]['values'][0]);
+        // One batchUpdate request per chunk, then the tail clear.
+        self::assertCount(3, $this->http->requests);
+        self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[0]['url']);
+        self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[1]['url']);
+        self::assertStringEndsWith(':clear', $this->http->requests[2]['url']);
+
+        $first = $this->body(0)['data'];
+        self::assertCount(1, $first);
+        self::assertSame("'Players'!A1", $first[0]['range']);
+        self::assertCount(GoogleSheetsClient::WRITE_CHUNK_ROWS, $first[0]['values']);
+
+        $second = $this->body(1)['data'];
+        self::assertCount(1, $second);
+        self::assertSame("'Players'!A" . (GoogleSheetsClient::WRITE_CHUNK_ROWS + 1), $second[0]['range']);
+        self::assertCount(3, $second[0]['values']);
+        self::assertSame(['r' . GoogleSheetsClient::WRITE_CHUNK_ROWS], $second[0]['values'][0]);
     }
 
     public function testMissingSpreadsheetRaisesSheetMissingException(): void

@@ -137,21 +137,19 @@ class GoogleSheetsClient
             return;
         }
 
-        $data = [];
-        foreach (array_chunk($rows, self::WRITE_CHUNK_ROWS) as $index => $chunk) {
-            $data[] = [
-                'range' => $range . '!A' . (($index * self::WRITE_CHUNK_ROWS) + 1),
-                'majorDimension' => 'ROWS',
-                'values' => $chunk,
-            ];
-        }
-
         // Write first, then clear only the rows below the new data: a failed write
-        // leaves the previous export intact instead of an empty tab.
-        $this->send($accessToken, 'POST', $base . '/values:batchUpdate', [
-            'valueInputOption' => 'RAW',
-            'data' => $data,
-        ], true);
+        // leaves the previous export intact instead of an empty tab. One request per
+        // chunk keeps each body under Google's payload limit.
+        foreach (array_chunk($rows, self::WRITE_CHUNK_ROWS) as $index => $chunk) {
+            $this->send($accessToken, 'POST', $base . '/values:batchUpdate', [
+                'valueInputOption' => 'RAW',
+                'data' => [[
+                    'range' => $range . '!A' . (($index * self::WRITE_CHUNK_ROWS) + 1),
+                    'majorDimension' => 'ROWS',
+                    'values' => $chunk,
+                ]],
+            ], true);
+        }
         $this->clearRange($accessToken, $base, $range . '!A' . (count($rows) + 1) . ':ZZZ');
     }
 

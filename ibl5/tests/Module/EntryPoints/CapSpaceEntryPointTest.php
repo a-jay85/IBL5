@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Module\EntryPoints;
 
 /**
- * The CapSpace module is a redirect stub. ModuleRedirect::sendWithPassthrough() returns,
+ * The CapSpace module is a redirect stub. ModuleRedirect::send() returns,
  * so the stub must `return` immediately after — these are source-contract tests;
  * E2E covers the HTTP redirect.
  */
@@ -18,7 +18,7 @@ class CapSpaceEntryPointTest extends ModuleEntryPointTestCase
         $source = (string) file_get_contents(self::STUB);
         $this->assertSame(
             1,
-            substr_count($source, "\\Module\\ModuleRedirect::sendWithPassthrough('modules.php?name=Contracts&tab=teams', [], \$_GET + \$_POST);\nreturn;")
+            substr_count($source, "\\Module\\ModuleRedirect::send('CapSpace');\nreturn;")
         );
     }
 

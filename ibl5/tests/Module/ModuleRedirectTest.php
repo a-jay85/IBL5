@@ -19,6 +19,8 @@ class ModuleRedirectTest extends TestCase
             'modules.php?name=RecordHolders&op=allstar',
             ModuleRedirect::targetFor('AllStarAppearances')
         );
+        $this->assertSame('modules.php?name=Contracts&tab=teams', ModuleRedirect::targetFor('CapSpace'));
+        $this->assertSame('modules.php?name=Contracts&tab=players', ModuleRedirect::targetFor('ContractList'));
     }
 
     public function testTargetForReturnsNullForUnknownModule(): void

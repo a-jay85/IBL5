@@ -14,5 +14,5 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-\Module\ModuleRedirect::sendWithPassthrough('modules.php?name=Contracts&tab=teams', [], $_GET + $_POST);
+\Module\ModuleRedirect::send('CapSpace');
 return;

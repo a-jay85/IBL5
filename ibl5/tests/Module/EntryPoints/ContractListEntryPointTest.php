@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Module\EntryPoints;
 
 /**
- * The ContractList module is a redirect stub. ModuleRedirect::sendWithPassthrough() returns,
+ * The ContractList module is a redirect stub. ModuleRedirect::send() returns,
  * so the stub must `return` immediately after — these are source-contract tests;
  * E2E covers the HTTP redirect.
  */
@@ -18,7 +18,7 @@ class ContractListEntryPointTest extends ModuleEntryPointTestCase
         $source = (string) file_get_contents(self::STUB);
         $this->assertSame(
             1,
-            substr_count($source, "\\Module\\ModuleRedirect::sendWithPassthrough('modules.php?name=Contracts&tab=players', [], \$_GET + \$_POST);\nreturn;")
+            substr_count($source, "\\Module\\ModuleRedirect::send('ContractList');\nreturn;")
         );
     }
 

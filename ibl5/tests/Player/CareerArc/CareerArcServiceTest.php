@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Player\CareerArc;
 
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Player\CareerArc\ArcEvent;
 use Player\CareerArc\CareerArc;
@@ -423,5 +424,174 @@ final class CareerArcServiceTest extends TestCase
             [ArcEvent::DRAFT, ArcEvent::TRADE, ArcEvent::AWARD, ArcEvent::RETIRED],
             $types,
         );
+    }
+
+    public function testUnknownTransactionTypeIgnoredAndDoesNotExtendAxis(): void
+    {
+        $arc = self::service([self::row(2022), self::row(2023)], [self::move(2024, 1)])->build(1, false);
+
+        self::assertNotNull($arc);
+        self::assertSame([], $arc->events);
+        self::assertSame(2023, $arc->axisEnd);
+    }
+
+    public function testNullFactsSkipsAwardsLookupAndKeepsAwardsVisible(): void
+    {
+        $arc = self::service([self::row(2023)], [], null, null)->build(1, false);
+
+        self::assertNotNull($arc);
+        self::assertFalse($arc->awardsHidden);
+        self::assertSame([], self::eventsOfType($arc, ArcEvent::AWARD));
+        self::assertSame([], self::eventsOfType($arc, ArcEvent::DRAFT));
+        self::assertSame(2023, $arc->axisStart);
+    }
+
+    public function testDraftRoundWithoutDraftYearHasNoDraftMarker(): void
+    {
+        $arc = self::service([self::row(2023)], [], self::facts(0, 1, 5, 'Team 3'))->build(1, false);
+
+        self::assertNotNull($arc);
+        self::assertSame([], self::eventsOfType($arc, ArcEvent::DRAFT));
+        self::assertSame(2023, $arc->axisStart);
+    }
+
+    #[DataProvider('moveWindowBoundaryProvider')]
+    public function testMoveWindowBoundaries(int $moveYear, int $expectedTrades, int $expectedAxisEnd): void
+    {
+        $arc = self::service([self::row(2022), self::row(2023)], [self::move($moveYear, 2)])->build(1, false);
+
+        self::assertNotNull($arc);
+        self::assertCount($expectedTrades, self::eventsOfType($arc, ArcEvent::TRADE));
+        self::assertSame($expectedAxisEnd, $arc->axisEnd);
+    }
+
+    /**
+     * @return array<string, array{int, int, int}>
+     */
+    public static function moveWindowBoundaryProvider(): array
+    {
+        return [
+            'one year before axis start' => [2021, 0, 2023],
+            'at axis start' => [2022, 1, 2023],
+            'two years after last season' => [2025, 0, 2023],
+        ];
+    }
+
+    public function testMoveInDraftLeadWindowKept(): void
+    {
+        $arc = self::service([self::row(2023)], [self::move(2021, 2)], self::facts(2020, 1, 1, ''))->build(1, false);
+
+        self::assertNotNull($arc);
+        self::assertSame(2020, $arc->axisStart);
+        $trades = self::eventsOfType($arc, ArcEvent::TRADE);
+        self::assertCount(1, $trades);
+        self::assertSame(2021, $trades[0]->year);
+    }
+
+    public function testWaiverInYearAfterLastSeasonExtendsAxis(): void
+    {
+        $arc = self::service([self::row(2022), self::row(2023)], [self::move(2024, 3)])->build(1, false);
+
+        self::assertNotNull($arc);
+        self::assertCount(1, self::eventsOfType($arc, ArcEvent::WAIVER));
+        self::assertSame(2024, $arc->axisEnd);
+    }
+
+    public function testAwardWindowIncludesFirstAndLastSeason(): void
+    {
+        $arc = self::service(
+            [self::row(2022), self::row(2023), self::row(2024)],
+            [],
+            self::facts(),
+            [
+                ['year' => 2021, 'award' => 'A'],
+                ['year' => 2022, 'award' => 'B'],
+                ['year' => 2024, 'award' => 'C'],
+                ['year' => 2025, 'award' => 'D'],
+            ],
+        )->build(1, false);
+
+        self::assertNotNull($arc);
+        $awards = self::eventsOfType($arc, ArcEvent::AWARD);
+        self::assertSame([2022, 2024], array_map(static fn (ArcEvent $event): int => $event->year, $awards));
+        self::assertSame(['B', 'C'], array_map(static fn (ArcEvent $event): string => $event->text, $awards));
+    }
+
+    public function testAwardInDraftLeadWindowDropped(): void
+    {
+        $arc = self::service(
+            [self::row(2022)],
+            [],
+            self::facts(2020, 1, 1, ''),
+            [['year' => 2021, 'award' => 'Rookie of the Year']],
+        )->build(1, false);
+
+        self::assertNotNull($arc);
+        self::assertSame(2020, $arc->axisStart);
+        self::assertSame([], self::eventsOfType($arc, ArcEvent::AWARD));
+    }
+
+    public function testRepeatedYearRowOverwritesSeasonAndKeepsBothStints(): void
+    {
+        $arc = self::buildArc([self::row(2023, 1), self::row(2023, 2)]);
+
+        self::assertCount(1, $arc->seasonsByYear);
+        self::assertSame(2, $arc->seasonsByYear[2023]->teamid);
+        self::assertCount(2, $arc->stints);
+        self::assertSame([1, 2], array_map(static fn ($stint): int => $stint->teamid, $arc->stints));
+    }
+
+    public function testSameYearSameTypeEventsKeepRepositoryOrder(): void
+    {
+        $arc = self::service(
+            [self::row(2023)],
+            [self::move(2023, 2, 'Team 3', 'Team 1'), self::move(2023, 2, 'Team 1', 'Team 2')],
+        )->build(1, false);
+
+        self::assertNotNull($arc);
+        $texts = array_map(static fn (ArcEvent $event): string => $event->text, self::eventsOfType($arc, ArcEvent::TRADE));
+        self::assertSame(
+            ['Traded 3/14/2023: Team 3 to Team 1', 'Traded 3/14/2023: Team 1 to Team 2'],
+            $texts,
+        );
+    }
+
+    public function testEventsSortedByYearBeforeType(): void
+    {
+        $arc = self::service(
+            [self::row(2022), self::row(2023)],
+            [self::move(2023, 2)],
+            self::facts(),
+            [['year' => 2022, 'award' => 'MVP']],
+        )->build(1, false);
+
+        self::assertNotNull($arc);
+        self::assertSame(
+            [ArcEvent::AWARD, ArcEvent::TRADE],
+            array_map(static fn (ArcEvent $event): string => $event->type, $arc->events),
+        );
+        self::assertSame([2022, 2023], array_map(static fn (ArcEvent $event): int => $event->year, $arc->events));
+    }
+
+    public function testBestPpgAndBestRatingTrackedIndependently(): void
+    {
+        $arc = self::buildArc([
+            self::row(2021, 1, 10, 300, 25, 1),
+            self::row(2022, 1, 10, 100, 26, 3),
+        ]);
+
+        self::assertSame(2021, $arc->bestPpgYear);
+        self::assertSame(2022, $arc->bestRatingYear);
+    }
+
+    public function testDraftAfterDebutKeepsDraftYearOnMarker(): void
+    {
+        $arc = self::service([self::row(2023)], [], self::facts(2024, 1, 2, ''))->build(1, false);
+
+        self::assertNotNull($arc);
+        self::assertSame(2023, $arc->axisStart);
+        $drafts = self::eventsOfType($arc, ArcEvent::DRAFT);
+        self::assertCount(1, $drafts);
+        self::assertSame(2024, $drafts[0]->year);
     }
 }

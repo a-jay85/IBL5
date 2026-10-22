@@ -43,4 +43,299 @@ run_pr "fix: a bug" "";                          expect "fix: -> PASS" 0 "$?"
 run_pr "ci: plumb merge queue" "";               expect "ci: -> PASS" 0 "$?"
 run_pr "feat: x" "not-human-approved-yet";       expect "feat: + lookalike label -> FAIL" 1 "$?"
 
+# ---- workflow job `if:` characterization (event-payload fixtures) ----
+# These rows pin the invariant any label/event filter on the signoff workflows
+# must respect: a job runs on every event where the classifier would FAIL, and
+# on every event type whose payload cannot prove irrelevance. They pass on the
+# unfiltered workflows and must stay green once filters land.
+EVAL="$REPO_ROOT/bin/lib/gha-if-eval.py"
+WF_DIR="$REPO_ROOT/.github/workflows"
+
+# wf_job_if <workflow-file> <job-id> — print the job's one-line `if:` expression
+# (the `${{ }}` wrapper stripped). Exit 0 = printed, 1 = job has no `if:`,
+# 2 = job id not found, 3 = the `if:` is multi-line (unsupported).
+wf_job_if() {
+    awk -v job="$2" '
+        BEGIN { start = "  " job ":"; state = 0; hasif = 0 }
+        state == 0 { if ($0 == start) state = 1; next }
+        state == 1 {
+            if ($0 ~ /^  [A-Za-z0-9_-]+:$/ || $0 ~ /^[A-Za-z_]/) { exit }
+            if (!hasif && index($0, "    if: ") == 1) {
+                hasif = 1
+                expr = substr($0, 9)
+            }
+        }
+        END {
+            if (state == 0) exit 2
+            if (!hasif) exit 1
+            sub(/[ \t]+$/, "", expr)
+            if (expr ~ /[|>][-+]?$/) { multi = 1 }
+            sub(/^\$\{\{[ ]*/, "", expr)
+            sub(/[ ]*\}\}$/, "", expr)
+            open = gsub(/\(/, "(", expr)
+            close_n = gsub(/\)/, ")", expr)
+            if (open != close_n) { multi = 1 }
+            if (multi) {
+                print "multi-line if: not supported" > "/dev/stderr"
+                exit 3
+            }
+            print expr
+            exit 0
+        }
+    ' "$1"
+}
+
+# wf_concurrency_group <workflow-file> — print the first `group:` value after the
+# top-level `concurrency:` line, `${{ }}` stripped. Exit 0 = printed, 1 = none.
+wf_concurrency_group() {
+    awk '
+        BEGIN { state = 0; found = 0 }
+        state == 0 { if ($0 == "concurrency:") state = 1; next }
+        state == 1 {
+            if ($0 ~ /^[A-Za-z_]/) { exit }
+            if ($0 ~ /^ +group: /) {
+                found = 1
+                val = $0
+                sub(/^ +group: /, "", val)
+                sub(/[ \t]+$/, "", val)
+                gsub(/\$\{\{[ ]*/, "", val)
+                gsub(/[ ]*\}\}/, "", val)
+                exit
+            }
+        }
+        END {
+            if (!found) exit 1
+            print val
+            exit 0
+        }
+    ' "$1"
+}
+
+h_tmp EV_DIR
+
+# mk_event <action> <title> <label-name|-> <changes-title: y|n|b> <pr-labels csv|->
+# Writes a pull_request event payload under $EV_DIR and prints its path.
+# changes-title: y = title edited, n = no `changes` keys, b = body-only edit.
+# Built by python3 from positional args (never string interpolation) so a title
+# cannot inject.
+mk_event() {
+    local path
+    path=$(mktemp "$EV_DIR/ev.XXXXXX") || return 1
+    python3 -I -c '
+import json, sys
+action, title, label, ch, labels, path = sys.argv[1:7]
+ev = {"event_name": "pull_request", "action": action}
+if label != "-":
+    ev["label"] = {"name": label}
+if ch == "y":
+    ev["changes"] = {"title": {"from": "old title"}}
+elif ch == "b":
+    ev["changes"] = {"body": {"from": "old body"}}
+else:
+    ev["changes"] = {}
+names = [] if labels == "-" else labels.split(",")
+ev["pull_request"] = {
+    "number": 1,
+    "title": title,
+    "merged": False,
+    "auto_merge": None,
+    "labels": [{"name": n} for n in names],
+}
+with open(path, "w") as fh:
+    json.dump(ev, fh)
+' "$1" "$2" "$3" "$4" "$5" "$path" || return 1
+    printf '%s\n' "$path"
+}
+
+# job_would_run <workflow-file> <job-id> <event.json> — sets JOB_RESULT to `run`,
+# `skip`, or `error`. A global rather than stdout so h_fail runs in this shell
+# (a $(...) subshell would lose the failure count).
+JOB_RESULT=""
+job_would_run() {
+    local expr rc out erc
+    JOB_RESULT="error"
+    expr=$(wf_job_if "$1" "$2" 2>&1)
+    rc=$?
+    if [ "$rc" -eq 1 ]; then
+        JOB_RESULT="run"
+        return 0
+    fi
+    if [ "$rc" -ne 0 ]; then
+        h_fail "job_would_run $(basename "$1") $2" "wf_job_if rc=$rc: $expr"
+        return 0
+    fi
+    out=$(python3 -I "$EVAL" "$3" <<< "$expr" 2>&1)
+    erc=$?
+    if [ "$erc" -ne 0 ]; then
+        h_fail "job_would_run $(basename "$1") $2" "evaluator rc=$erc for [$expr]: $out"
+        return 0
+    fi
+    case "$out" in
+        true) JOB_RESULT="run" ;;
+        false) JOB_RESULT="skip" ;;
+        *) h_fail "job_would_run $(basename "$1") $2" "unexpected evaluator output [$out] for [$expr]" ;;
+    esac
+    return 0
+}
+
+# Fixture rows: action|label|changes-title|pr-labels (each runs with a feat: and
+# a fix: title). changes-title: y = title edited, n = none, b = body-only edit.
+HS_FIXTURES="
+opened|-|n|-
+reopened|-|n|-
+synchronize|-|n|-
+ready_for_review|-|n|-
+labeled|human-approved|n|human-approved
+unlabeled|human-approved|n|-
+labeled|needs-a-human|n|needs-a-human
+unlabeled|needs-a-human|n|-
+labeled|auto-mergeable|n|auto-mergeable
+unlabeled|auto-mergeable|n|-
+labeled|mutation-test|n|mutation-test
+unlabeled|mutation-test|n|-
+edited|-|y|-
+edited|-|b|-
+auto_merge_enabled|-|n|-
+auto_merge_disabled|-|n|-
+"
+# Title-superset probes (regex-vs-contains), labeled|mutation-test only.
+HS_VARIANT_TITLES="feat(ui): x|FEAT: x|feat!: x"
+
+# check_fixture <action> <title> <label> <changes-title> <pr-labels>
+check_fixture() {
+    local action=$1 title=$2 label=$3 ch=$4 prl=$5 ev tag cls_labels nonfilt hs_rc
+    ev=$(mk_event "$action" "$title" "$label" "$ch" "$prl") || {
+        h_fail "mk_event $action $title $label"
+        return 0
+    }
+    tag="$action $title $label"
+    cls_labels=$prl
+    [ "$cls_labels" = "-" ] && cls_labels=""
+
+    # Run invariant: wherever the classifier FAILS, the human-signoff job runs.
+    run_pr "$title" "$cls_labels"
+    hs_rc=$?
+    if [ "$hs_rc" -eq 1 ]; then
+        job_would_run "$WF_DIR/human-signoff.yml" human-signoff "$ev"
+        if [ "$JOB_RESULT" = "run" ]; then
+            h_pass "hs run-invariant $tag"
+        else
+            h_fail "hs run-invariant $tag" "classifier FAILS but job result is $JOB_RESULT"
+        fi
+    else
+        h_pass "hs run-invariant $tag (classifier passes; no constraint)"
+    fi
+
+    # Non-filterable events: payload cannot prove irrelevance.
+    nonfilt=0
+    case "$action" in
+        opened | reopened | synchronize | ready_for_review | auto_merge_enabled | auto_merge_disabled) nonfilt=1 ;;
+    esac
+    [ "$label" = "human-approved" ] && nonfilt=1
+    { [ "$action" = "edited" ] && [ "$ch" = "y" ]; } && nonfilt=1
+    if [ "$nonfilt" -eq 1 ]; then
+        case "$action" in
+            auto_merge_*) ;; # human-signoff.yml lists no auto_merge_* types
+            *)
+                job_would_run "$WF_DIR/human-signoff.yml" human-signoff "$ev"
+                if [ "$JOB_RESULT" = "run" ]; then
+                    h_pass "nonfilterable human-signoff.yml human-signoff $tag"
+                else
+                    h_fail "nonfilterable human-signoff.yml human-signoff $tag" "result $JOB_RESULT"
+                fi
+                ;;
+        esac
+    fi
+    if [ "$nonfilt" -eq 1 ] || [ "$label" = "auto-mergeable" ]; then
+        job_would_run "$WF_DIR/auto-mergeable-label.yml" sync-label "$ev"
+        if [ "$JOB_RESULT" = "run" ]; then
+            h_pass "nonfilterable auto-mergeable-label.yml sync-label $tag"
+        else
+            h_fail "nonfilterable auto-mergeable-label.yml sync-label $tag" "result $JOB_RESULT"
+        fi
+    fi
+}
+
+while IFS='|' read -r fx_action fx_label fx_ch fx_prl; do
+    [ -n "$fx_action" ] || continue
+    check_fixture "$fx_action" "feat: x" "$fx_label" "$fx_ch" "$fx_prl"
+    check_fixture "$fx_action" "fix: x" "$fx_label" "$fx_ch" "$fx_prl"
+done <<< "$HS_FIXTURES"
+
+while IFS= read -r fx_title; do
+    check_fixture labeled "$fx_title" mutation-test n mutation-test
+done <<< "$(tr '|' '\n' <<< "$HS_VARIANT_TITLES")"
+
+# `Meta checks` is never filtered: no job-level `if:`.
+wf_job_if "$WF_DIR/pr-meta-checks.yml" meta-checks > /dev/null 2>&1
+expect "meta-checks has no job if" 1 "$?"
+
+# ---- evaluator self-tests (pure expressions) ----
+EV_OPENED=$(mk_event opened "feat: x" - n -)
+EV_TITLE_Y=$(mk_event edited "feat: x" - y -)
+
+# ev_expr <event.json> <expression> — sets EV_OUT (stdout) and EV_RC.
+EV_OUT=""
+EV_RC=0
+ev_expr() {
+    EV_OUT=$(python3 -I "$EVAL" "$1" <<< "$2" 2> /dev/null)
+    EV_RC=$?
+}
+# ev_check <name> <event.json> <expression> <expected-output>
+ev_check() {
+    ev_expr "$2" "$3"
+    if [ "$EV_RC" -eq 0 ] && [ "$EV_OUT" = "$4" ]; then
+        h_pass "$1"
+    else
+        h_fail "$1" "expected [$4] got rc=$EV_RC out=[$EV_OUT] for [$3]"
+    fi
+}
+ev_check "contains case-insensitive: Feature flags" "$EV_OPENED" "contains('Feature flags', 'feat')" true
+ev_check "contains case-insensitive: FEAT: x" "$EV_OPENED" "contains('FEAT: x', 'feat')" true
+ev_check "== string case-insensitive" "$EV_OPENED" "'A' == 'a'" true
+ev_check "changes.title == null on n fixture" "$EV_OPENED" "github.event.changes.title == null" true
+ev_check "changes.title == null on y fixture" "$EV_TITLE_Y" "github.event.changes.title == null" false
+ev_check "absent label.name != 'human-approved' is true" "$EV_OPENED" "github.event.label.name != 'human-approved'" true
+ev_check "|| returns deciding operand" "$EV_OPENED" "github.event.label.name || 'x' == 'X'" true
+ev_check "contains over label list" "$(mk_event labeled "feat: x" human-approved n human-approved)" \
+    "contains(github.event.pull_request.labels.*.name, 'HUMAN-APPROVED')" true
+ev_expr "$EV_OPENED" "nope()"
+expect "unknown function exits 2" 2 "$EV_RC"
+ev_expr "$EV_OPENED" "github.event.pull_request.title =="
+expect "dangling expression exits 2" 2 "$EV_RC"
+
+# ---- awk helper smoke: negative, positive, not-found, multi-line ----
+HS_JOB_IF_RC_EXPECTED=1 # human-signoff job has no `if:` on master; flips to 0 when the job gains a filter
+out=$(wf_job_if "$WF_DIR/human-signoff.yml" needs-a-human-label)
+rc=$?
+if [ "$rc" -eq 0 ] && [ "${out#always()}" != "$out" ]; then
+    h_pass "wf_job_if needs-a-human-label prints always()..."
+else
+    h_fail "wf_job_if needs-a-human-label prints always()..." "rc=$rc out=[$out]"
+fi
+wf_job_if "$WF_DIR/human-signoff.yml" human-signoff > /dev/null 2>&1
+expect "wf_job_if human-signoff exit code (expected-rc variable)" "$HS_JOB_IF_RC_EXPECTED" "$?"
+wf_job_if "$WF_DIR/human-signoff.yml" no-such-job > /dev/null 2>&1
+expect "wf_job_if no-such-job exits 2" 2 "$?"
+out=$(wf_job_if "$WF_DIR/auto-mergeable-label.yml" sync-label)
+rc=$?
+if [ "$rc" -eq 0 ] && [ "$out" = "github.event.pull_request.merged != true" ]; then
+    h_pass "wf_job_if sync-label positive path"
+else
+    h_fail "wf_job_if sync-label positive path" "rc=$rc out=[$out]"
+fi
+# shellcheck disable=SC2016 # literal workflow expression text, not shell expansion
+printf 'jobs:\n  a:\n    if: |\n      x\n  b:\n    if: ${{ (x &&\n' > "$EV_DIR/multi.yml"
+wf_job_if "$EV_DIR/multi.yml" a > /dev/null 2>&1
+expect "wf_job_if multi-line (block scalar) exits 3" 3 "$?"
+wf_job_if "$EV_DIR/multi.yml" b > /dev/null 2>&1
+expect "wf_job_if multi-line (unbalanced paren) exits 3" 3 "$?"
+out=$(wf_concurrency_group "$WF_DIR/human-signoff.yml")
+rc=$?
+if [ "$rc" -eq 0 ] && [ "${out#human-signoff-}" != "$out" ]; then
+    h_pass "wf_concurrency_group human-signoff"
+else
+    h_fail "wf_concurrency_group human-signoff" "rc=$rc out=[$out]"
+fi
+
 h_done

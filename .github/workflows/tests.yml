@@ -885,6 +885,11 @@ jobs:
       - name: Run automouse postplan worktree-resolution regression test
         if: ${{ !cancelled() }}
         run: bin/test-automouse-postplan-worktree
+      # Moved here from its own job in e2e-tests.yml. The step name keeps the old
+      # job name because ADR-0070 cites it. Runs on every PR via this job.
+      - name: Playwright version drift guard
+        if: ${{ !cancelled() }}
+        run: bin/check-playwright-pinning
 
   harness-tests:
     name: Shell harness regression tests

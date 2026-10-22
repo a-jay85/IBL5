@@ -184,14 +184,6 @@ jobs:
           MEMO_RESULT: ${{ steps.lookup.outputs.cache-hit == 'true' && 'hit' || 'miss' }}
         run: bin/ci-memo report e2e "$MEMO_HASH" "$MEMO_RESULT" .ci-memo-sentinel
 
-  playwright-version-drift:
-    name: Playwright version drift guard
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Verify Playwright image tag is derived, never hardcoded
-        run: bin/check-playwright-pinning
-
   e2e:
     name: Visual Regression
     needs: [changes, ci-memo-check, mirror-ready]

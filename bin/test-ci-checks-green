@@ -1296,6 +1296,7 @@ else fail "S26 (plan S20) rejected sweep forms exit 2 (n=$(dispatched))"; fi
 
 # S27 (plan S21): a malformed head sha is skipped without a dispatch; the sweep carries on.
 new_case s27
+rm -f "$PFIX/calls.log"
 sw_open "$(sw_pr 9 not-a-sha)" "$(sw_pr 7 "$P_SHA")"
 sw_status "$P_SHA" pending "$T0"
 CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
@@ -1304,5 +1305,8 @@ if [ "$RC" -eq 0 ] && [ "$(dispatched)" = "1" ] \
         && grep -qF 'SWEEP: PR 9: skip: head.sha or number malformed' "$OUT"; then
     ok "S27 (plan S21) malformed head is skipped without dispatch"
 else fail "S27 (plan S21) malformed head is skipped without dispatch (rc=$RC n=$(dispatched) out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+s27_reads="$(calls_of 'commits/not-a-sha/status')"
+if [ "$s27_reads" = "0" ]; then ok "S27 (plan S21) malformed head gets no commits/not-a-sha/status read"
+else fail "S27 (plan S21) malformed head gets no commits/not-a-sha/status read (reads=$s27_reads)"; fi
 
 h_done

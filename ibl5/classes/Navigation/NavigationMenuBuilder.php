@@ -30,9 +30,8 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         'AllStarAppearances',
         'OneOnOneGame',
         'AwardHistory',
-        'FranchiseRecordBook',
+        'Records',
         'Leaderboards',
-        'RecordHolders',
     ];
 
     private NavigationConfig $config;
@@ -83,7 +82,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                 'links' => [
                     ['label' => 'League Starters', 'url' => 'modules.php?name=LeagueStarters'],
                     ['label' => 'Compare Players', 'url' => 'modules.php?name=ComparePlayers'],
-                    ['label' => 'Season Highs', 'url' => 'modules.php?name=SeasonHighs'],
                     ['label' => 'Head-to-Head Records', 'url' => 'modules.php?name=HeadToHeadRecords'],
                     ['label' => 'Team Off/Def Stats', 'url' => 'modules.php?name=TeamOffDefStats'],
                 ],
@@ -95,9 +93,8 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Transaction History', 'url' => 'modules.php?name=Search&preset=transactions'],
                     ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory'],
                     ['label' => 'Award History', 'url' => 'modules.php?name=AwardHistory'],
-                    ['label' => 'Record Holders', 'url' => 'modules.php?name=RecordHolders'],
-                    ['label' => 'Franchise Record Book', 'url' => 'modules.php?name=FranchiseRecordBook'],
-                    ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=RecordHolders&op=allstar'],
+                    ['label' => 'Records', 'url' => 'modules.php?name=Records'],
+                    ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=AllStarAppearances'],
                     ['label' => 'Leaderboards', 'url' => 'modules.php?name=Leaderboards'],
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=SeasonArchive'],
                     ['label' => '1-On-1 Game', 'url' => 'modules.php?name=OneOnOneGame'],
@@ -119,6 +116,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
 
         if ($this->config->currentLeague === 'olympics') {
             $menus = $this->filterOlympicsMenus($menus);
+            $menus['Stats']['links'][] = ['label' => 'Season Highs', 'url' => 'modules.php?name=SeasonHighs'];
         }
 
         return $menus;

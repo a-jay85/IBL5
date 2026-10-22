@@ -1,0 +1,177 @@
+#!/bin/bash
+#
+# bin/check-pipefail-grep-q — keep new echo/printf-pipe-into-grep-q lines out of pipefail scripts.
+#
+# Under pipefail, a producer piped into a quiet grep gets SIGPIPE when grep matches
+# and exits early. The pipeline then reports 141 even though grep succeeded, which
+# flakes on Linux CI and passes on macOS. See .claude/rules/shell-pipefail-grep.md.
+#
+# What the gate flags: an added line under bin/ that pipes echo or printf into a grep
+# from the quiet family (-q, -qF, -Eq, -qx, --quiet, --silent), in a file that sets
+# pipefail. grep -c is never flagged: it reads to EOF, so its producer never gets SIGPIPE.
+#
+# Only lines this branch adds are read, so older sites never block a PR. One exception:
+# when an added line is itself the pipefail setting and the file did not set pipefail at
+# the merge-base, the whole current file is scanned, because that edit is what arms every
+# older site in the file.
+#
+# The base is always passed in with --since=<ref> (CI passes the PR base sha), never
+# derived from repo state. Diffs compare the working tree against the merge-base, so
+# staged and unstaged tracked changes count. Untracked files do not.
+#
+# Comment-only lines are skipped, so this header may describe the pattern. Fixtures in
+# the harness are built by concatenation, so no line there holds the literal shape.
+#
+# gate-backtest-argv: --since={base}
+#
+# Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
+#
+# Exit codes: 0 = pass, 1 = violation found, 2 = usage or git error.
+
+set -euo pipefail
+
+usage() {
+    echo "usage: bin/check-pipefail-grep-q --since=<ref>"
+}
+
+die() {
+    echo "check-pipefail-grep-q: $1" >&2
+    exit 2
+}
+
+since=""
+if [ "$#" -eq 0 ]; then
+    usage >&2
+    die "use --since=<ref>"
+fi
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) usage; exit 0 ;;
+        --since=?*) since="${arg#--since=}" ;;
+        --since=|--since) die "use --since=<ref>" ;;
+        -*) die "unknown option: $arg" ;;
+        *) die "use --since=<ref> (unexpected argument: $arg)" ;;
+    esac
+done
+[ -n "$since" ] || die "use --since=<ref>"
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
+cd "$root"
+
+git rev-parse --verify --quiet "${since}^{commit}" >/dev/null || die "cannot resolve ref: $since"
+mb=$(git merge-base "$since" HEAD 2>/dev/null) || die "no merge-base (shallow clone?)"
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+gitdiff() {
+    git -c core.quotePath=false diff --no-color --no-ext-diff --no-textconv \
+        --src-prefix=a/ --dst-prefix=b/ "$@"
+}
+
+# Run a diff into a file. A non-zero git exit is a usage or git error, never a pass.
+diff_to() {
+    local out="$1"
+    shift
+    gitdiff "$@" >"$out" || die "git diff failed: $*"
+}
+
+SHEBANG_RE='^#!.*[/[:space:]](bash|sh)([[:space:]]|$)'
+SET_RE='^[[:space:]]*set([[:space:]]+[-+][A-Za-z]+([[:space:]]+[a-z]+)?)*[[:space:]]+-[A-Za-z]*o[[:space:]]+pipefail'
+BAD_RE='(^|[^[:alnum:]_.-])(echo|printf)[[:space:]]([^|]*[^|\\])?[|][[:space:]]*grep([[:space:]]+-[A-Za-z]+)*[[:space:]]+(--quiet|--silent|-[A-Za-z]*q)'
+HUNK_RE='^@@ -[0-9,]+ \+([0-9]+)'
+
+# --no-renames: a file moved into bin/ shows every line as added.
+diff_to "$tmp/full.diff" --no-renames -U0 "$mb" -- bin/
+rc=0
+grep -E '^(\+|@@ )' "$tmp/full.diff" >"$tmp/added.diff" || rc=$?
+[ "$rc" -le 1 ] || die "grep failed on the diff"
+
+: >"$tmp/hits"
+: >"$tmp/fullscan"
+
+path=""
+line=0
+elig=0
+while IFS= read -r l; do
+    case "$l" in
+        '+++ /dev/null')
+            path=""
+            elig=0
+            ;;
+        '+++ b/'*)
+            path="${l#+++ b/}"
+            elig=0
+            f="$root/$path"
+            if [ -f "$f" ]; then
+                first=""
+                IFS= read -r first <"$f" || true
+                shell=0
+                if [[ $first =~ $SHEBANG_RE ]] || [[ $path == *.sh ]]; then
+                    shell=1
+                fi
+                if [ "$shell" -eq 1 ]; then
+                    while IFS= read -r x || [ -n "$x" ]; do
+                        [[ $x =~ ^[[:space:]]*# ]] && continue
+                        if [[ $x =~ $SET_RE ]]; then
+                            elig=1
+                            break
+                        fi
+                    done <"$f"
+                fi
+            fi
+            ;;
+        '@@ '*)
+            if [[ $l =~ $HUNK_RE ]]; then
+                line=${BASH_REMATCH[1]}
+            fi
+            ;;
+        '+'*)
+            c="${l#+}"
+            if [ "$elig" -eq 1 ] && ! [[ $c =~ ^[[:space:]]*# ]]; then
+                if [[ $c =~ $SET_RE ]]; then
+                    echo "$path" >>"$tmp/fullscan"
+                fi
+                if [[ $c =~ $BAD_RE ]]; then
+                    echo "$path:$line: ${c#"${c%%[![:space:]]*}"}" >>"$tmp/hits"
+                fi
+            fi
+            line=$((line + 1))
+            ;;
+    esac
+done <"$tmp/added.diff"
+
+# Pipefail newly armed: scan every line of the current file.
+if [ -s "$tmp/fullscan" ]; then
+    sort -u "$tmp/fullscan" >"$tmp/fullscan.u"
+    while IFS= read -r p; do
+        # Already armed at the merge-base: an edit to the set line arms nothing new.
+        armed=0
+        if git show "$mb:$p" >"$tmp/base.file" 2>/dev/null; then
+            while IFS= read -r x || [ -n "$x" ]; do
+                [[ $x =~ ^[[:space:]]*# ]] && continue
+                if [[ $x =~ $SET_RE ]]; then
+                    armed=1
+                    break
+                fi
+            done <"$tmp/base.file"
+        fi
+        [ "$armed" -eq 1 ] && continue
+        n=0
+        while IFS= read -r x || [ -n "$x" ]; do
+            n=$((n + 1))
+            [[ $x =~ ^[[:space:]]*# ]] && continue
+            if [[ $x =~ $BAD_RE ]]; then
+                echo "$p:$n: ${x#"${x%%[![:space:]]*}"}" >>"$tmp/hits"
+            fi
+        done <"$root/$p"
+    done <"$tmp/fullscan.u"
+fi
+
+if [ -s "$tmp/hits" ]; then
+    sort -t: -k1,1 -k2,2n -u "$tmp/hits"
+    echo 'fix: feed grep a herestring, e.g. grep -qF -- "$pat" <<< "$var" (see .claude/rules/shell-pipefail-grep.md)'
+    exit 1
+fi
+
+echo "check-pipefail-grep-q: OK"

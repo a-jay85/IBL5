@@ -78,6 +78,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0202](0202-review-depth-by-merge-danger.md) | Phase 4 review depth follows the Merge danger line | Accepted | Phase 4 review depth is standard or deep from the PR body's Merge danger line; one-way, site-wide, external, or a missing line selects deep, which raises agent tiers and never skips an agent. |
 | [0204](0204-fidelity-remediation-rules-file-carveout.md) | Phase 5.5 remediation may commit a small fix to a rules file a blocking finding names | Accepted | The harness fixer may edit and commit a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes, within line and frontmatter limits; every other gate-owning path stays denied. |
 | [0207](0207-same-run-review-thread-remediation.md) | Same-run review thread remediation | Accepted | Phase 4.5 also fixes or declines the review threads the same run posted, one round, then re-reviews the fix delta; arming predicates are unchanged. |
+| [0209](0209-launchd-per-run-jobs-write-no-plist.md) | Per-run launchd jobs write no LaunchAgents plist | Accepted | `ljob_submit` replaces per-run plists for plan-now and post-plan-now; tests sandbox HOME and assert the real agents dir stays unchanged. |
 
 ## When an ADR is Required
 

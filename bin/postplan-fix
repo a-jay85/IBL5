@@ -161,7 +161,10 @@ if [ "$HEADLESS" = 1 ]; then
     FIX_TIMEOUT=1500
     TMO=()
     if command -v timeout >/dev/null 2>&1; then TMO=(timeout "$FIX_TIMEOUT")
-    elif command -v gtimeout >/dev/null 2>&1; then TMO=(gtimeout "$FIX_TIMEOUT"); fi
+    elif command -v gtimeout >/dev/null 2>&1; then TMO=(gtimeout "$FIX_TIMEOUT")
+    # Stock macOS ships neither; perl does. alarm survives exec, so SIGALRM ends claude.
+    elif command -v perl >/dev/null 2>&1; then TMO=(perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$FIX_TIMEOUT")
+    else echo "postplan-fix: warning: no timeout, gtimeout or perl on PATH; the session has no wall-clock cap" >&2; fi
     if [ "$DRY_RUN" = 1 ]; then
         echo "argv:"
         printf '%s\n' "${ARGV[@]}"

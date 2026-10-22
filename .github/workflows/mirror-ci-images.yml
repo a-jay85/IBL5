@@ -49,8 +49,9 @@ jobs:
       # Every consumer workflow calls this file from its own mirror-ready job, so a
       # head SHA can run it several times. The probe makes every call after the first
       # a login plus one inspect per ref: Buildx setup (a BuildKit pull from Docker
-      # Hub) and the copy run only when a ref is missing. Called-only: a schedule,
-      # push, or dispatch run has no only-missing input here and re-copies every ref.
+      # Hub) and the copy run only when a ref is missing. The probe runs only when
+      # only-missing is true: schedule and push runs have no such input, and a
+      # dispatch defaults it to false, so those re-copy every ref.
       - name: Probe mirror refs
         id: probe
         if: ${{ inputs.only-missing }}

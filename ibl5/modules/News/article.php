@@ -138,7 +138,7 @@ if ($catid !== 0) {
         /** @var string $title1 */
         $title1 = \Security\HtmlSanitizer::safeHtmlOutput($catTitle);
         // Keep the <font> tag: themearticle() in themes/IBL/theme.php rewrites exactly '<font class="storycat">' into the ibl-badge span.
-        $title ="<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
+        $title = "<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
     }
 }
 

@@ -479,8 +479,9 @@ SESSION_DENIED = (
     "Bash(gh:*)", "Bash(curl:*)", "Bash(wget:*)", "Bash(ssh:*)", "Bash(scp:*)",
     "Bash(bin/post-plan-now:*)", "Bash(bin/discord-dm:*)",
     # Forms the prefix entries above miss (headless probe, 2026-10-21): an absolute-path
-    # binary, and git global options before the subcommand (`git -c k=v push`). The
-    # bash -c, sh -c, env and command wrappers are already matched by the entries above.
+    # binary, git global options before the subcommand (`git -c k=v push`), and nested
+    # `bash -c`, `sh -c` and `zsh -c` shells. PUSH_WRAPPER_DENIED lists them.
+    # `Bash(git * push *)` also blocks read-only calls like `git log --grep push`; accepted.
     *PUSH_WRAPPER_DENIED,
 )
 

@@ -405,6 +405,26 @@ jobs:
             date -u +%Y-%m-%dT%H:%M:%SZ > ibl5/vr-gallery/refreshed-at.txt
           fi
 
+      # Re-shape the gallery for gh-pages: <key>/visual-review/ keeps index.html and
+      # every subdir (new-screens/, manual-rows/, playwright-report/, changed/), while
+      # the per-cell before/after/diff PNGs move to the shared content-addressed
+      # _vr-blobs/ store at the gh-pages root (bin/vr-dedupe-gallery). The stage is
+      # root-shaped, so the deploy steps below publish it with no destination_dir.
+      # continue-on-error: a failed stage leaves no stage dir, every deploy attempt
+      # then fails, and the assert step below fails the job, the same loud path as a
+      # missing gallery tree.
+      - name: Stage VR gallery in blob-store form
+        id: vr-stage
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && env.VRCTX_SAME_REPO == 'true'
+        continue-on-error: true
+        run: |
+          rm -rf ibl5/vr-pages-stage
+          bin/vr-dedupe-gallery \
+            --gallery-dir ibl5/vr-gallery \
+            --key "$VRCTX_KEY" \
+            --stage-dir ibl5/vr-pages-stage
+          bin/check-vr-gallery-refs --root ibl5/vr-pages-stage
+
       # gh-pages is a single shared ref and EVERY open PR's VR job pushes its own
       # <sha>/visual-review/ dir to it, so runs that finish together collide on the
       # ref lock ("cannot lock ref 'refs/heads/gh-pages': is at X but expected Y").
@@ -424,11 +444,12 @@ jobs:
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # The change-driven gallery; the Playwright report is preserved under
-          # <sha>/visual-review/playwright-report/ (copied in by bin/vr-build-gallery).
-          publish_dir: ibl5/vr-gallery
-          # One subdirectory per commit SHA so multiple open PRs/SHAs coexist.
-          destination_dir: ${{ env.VRCTX_KEY }}/visual-review
+          # Root-shaped stage from "Stage VR gallery in blob-store form": it holds
+          # <sha>/visual-review/ (one subdirectory per commit SHA so open PRs coexist;
+          # the Playwright report stays under playwright-report/) plus _vr-blobs/.
+          # No destination_dir: the stage lands at the gh-pages root, and keep_files
+          # leaves every other SHA dir and existing blob in place.
+          publish_dir: ibl5/vr-pages-stage
           keep_files: true
 
       # Retries: identical inputs, guarded on the previous attempt having FAILED (a
@@ -440,8 +461,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ibl5/vr-gallery
-          destination_dir: ${{ env.VRCTX_KEY }}/visual-review
+          publish_dir: ibl5/vr-pages-stage
           keep_files: true
 
       - name: Deploy VR gallery to per-SHA GitHub Pages (retry 2)
@@ -451,8 +471,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ibl5/vr-gallery
-          destination_dir: ${{ env.VRCTX_KEY }}/visual-review
+          publish_dir: ibl5/vr-pages-stage
           keep_files: true
 
       # Restores the pre-retry failure semantics: three exhausted attempts is not a

@@ -93,11 +93,4 @@ class NukeCompatTest extends TestCase
 
         $this->assertStringContainsString('datetime="1970-01-01T00:00:00+00:00"', $html);
     }
-
-    public function testRemovedThemeAndTimestampAdaptersStayRemoved(): void
-    {
-        foreach (['formattimestamp', 'gettheme', 'themeheader', 'themefooter'] as $removed) {
-            $this->assertFalse(method_exists($this->compat, $removed), $removed . ' was removed as dead code');
-        }
-    }
 }

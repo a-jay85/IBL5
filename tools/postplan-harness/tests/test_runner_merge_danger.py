@@ -1,5 +1,5 @@
 """Runner wiring for the Merge danger field: `_inject_merge_danger` (Phase 2 injection plus the
-body-check validator) and the `pr_copy_prompt` request."""
+merge-danger validator) and the `pr_copy_prompt` request."""
 import os
 import sys
 
@@ -112,7 +112,7 @@ def test_validator_flags_missing_line_when_injection_is_bypassed(tmp_path, monke
     copy = {"summary_md": "## Summary\n- docs"}
     findings, logs = _run(copy, wt, _diff("docs/a.md"))
     assert len(findings) == 1 and findings[0].startswith("merge-danger: MISSING")
-    assert any(ln.startswith("phase2 body-check finding: merge-danger: MISSING") for ln in logs)
+    assert any(ln.startswith("phase2 finding: merge-danger: MISSING") for ln in logs)
 
     line = "**Merge danger:** Door: two-way · Blast radius: module · Why: twenty plus chars of reason"
     copy = {"summary_md": f"## Summary\n\n{line}\n{line}"}

@@ -52,6 +52,8 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $this->leagueContext = $leagueContext;
         $this->repository = $repository ?? new BoxscoreRepository($db, $leagueContext);
         $this->auditRepository = $auditRepository ?? new BoxscoreAuditRepository($db, $leagueContext);
+        // Fresh build, never the request-shared Season: this processor writes sim
+        // dates and reads them back, so a shared instance could be stale.
         $this->season = $season ?? new Season($db);
         $this->progressReporter = $progressReporter ?? new FlushProgressReporter();
         $resolver = new GameUpsertResolver($this->repository);
@@ -176,6 +178,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
      * Order inside each record is load-bearing: blank-slot skip, Detector B tally,
      * guard evaluate, then the game processor. Progress is reported on the reject
      * path and at the end of the loop body; skip and blank slots do not report.
+     * The loop owns every report() call and every continue; decodeGameInfo() and buildImportCounters() never report.
      *
      * @param array{0: string, 1: string}|null $window
      * @return ImportCounters
@@ -209,16 +212,12 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             $line = substr($data, $offset, ScoFileParser::RECORD_SIZE);
             $offset += ScoFileParser::RECORD_SIZE;
 
-            $gameInfoLine = ScoFileParser::extractGameInfo($line);
+            $boxscoreGameInfo = $this->decodeGameInfo($line, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
 
-            // JSB pre-allocates every game slot; an unused one is all spaces. It decodes to
-            // "<season ending year>-10-01, team 1 @ team 1" and writes nothing, so it must not
-            // reach the guard or Detector B (a Preseason-phase import would reject every one).
-            if (trim($gameInfoLine) === '') {
+            // Blank JSB slot: no Detector B tally, no guard, no progress report.
+            if ($boxscoreGameInfo === null) {
                 continue;
             }
-
-            $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
 
             // Detector B: check this game's decoded date against the schedule window.
             // Tallied BEFORE the reject continue on purpose: a game outside the window
@@ -259,6 +258,51 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             $this->progressReporter->report($totalGames);
         }
 
+        return $this->buildImportCounters(
+            $gamesInserted,
+            $gamesUpdated,
+            $gamesSkipped,
+            $gamesRejected,
+            $linesProcessed,
+            $rejectedGames,
+            $outOfWindowDates,
+        );
+    }
+
+    /**
+     * Decode one .sco record's game-info line, or return null for an unused slot.
+     *
+     * JSB pre-allocates every game slot; an unused one is all spaces. It decodes to
+     * "<season ending year>-10-01, team 1 @ team 1" and writes nothing, so it must not
+     * reach the guard or Detector B (a Preseason-phase import would reject every one).
+     */
+    private function decodeGameInfo(string $line, int $operatingSeasonEndingYear, string $operatingSeasonPhase, string $league): ?Boxscore
+    {
+        $gameInfoLine = ScoFileParser::extractGameInfo($line);
+
+        if (trim($gameInfoLine) === '') {
+            return null;
+        }
+
+        return Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
+    }
+
+    /**
+     * Counters returned by importRecords(). Key order matches the ImportCounters alias.
+     *
+     * @param list<RejectedGame> $rejectedGames
+     * @param array<string, int> $outOfWindowDates date => count
+     * @return ImportCounters
+     */
+    private function buildImportCounters(
+        int $gamesInserted,
+        int $gamesUpdated,
+        int $gamesSkipped,
+        int $gamesRejected,
+        int $linesProcessed,
+        array $rejectedGames,
+        array $outOfWindowDates,
+    ): array {
         return [
             'inserted' => $gamesInserted,
             'updated' => $gamesUpdated,

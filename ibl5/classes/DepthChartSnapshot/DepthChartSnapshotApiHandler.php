@@ -22,7 +22,7 @@ class DepthChartSnapshotApiHandler
     private DepthChartSnapshotRepository $repository;
     private \Api\Response\HtmlResponder $responder;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -71,7 +71,7 @@ class DepthChartSnapshotApiHandler
 
     private function handleList(int $teamid): void
     {
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
         $options = $this->service->getDropdownOptions($teamid, $season);
 
         $depthCharts = [];
@@ -192,7 +192,7 @@ class DepthChartSnapshotApiHandler
             $newName = mb_substr($newName, 0, 100);
         }
 
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
         $result = $this->service->nameOrCreateActive($teamid, $username, $newName, $season);
 
         $this->responder->json($result);
@@ -258,7 +258,7 @@ class DepthChartSnapshotApiHandler
             return '';
         }
         $team = Team::initialize($this->db, $teamid);
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
 
         return \BasketballStats\Tables\PeriodAverages::render($this->db, $team, $season, $startDate, $endDate);
     }

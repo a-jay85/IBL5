@@ -348,13 +348,13 @@ def _canned_run_fixture():
 @pytest.mark.usefixtures("stub_ambient_git_show")
 def test_runner_retrospective_site_swallows_pause(tmp_path, monkeypatch):
     """Phase 9 is the one runner site that swallows a pause: the run keeps its real
-    terminal (degraded for this fixture) and exits 0 (ADR-0143 addendum)."""
+    terminal (shipped-held for this fixture) and exits 0 (ADR-0143 addendum)."""
     monkeypatch.setattr(usage_pause, "marker_exists", lambda ctx: True)
     canned = dict(_CANNED_RUN, retrospective={"kind": "usage-pause"})
     out = tmp_path / "out"
     res = runner.run(_canned_run_fixture(), str(out),
                      FixtureLlm(UsageLedger(), canned), mode="replay")
-    assert res.terminal == TerminalState.DEGRADED
+    assert res.terminal == TerminalState.SHIPPED_HELD
     assert res.error is None and res.error_kind is None
     assert res.retrospective == {"save": False, "skipped": "usage-pause"}
     assert runner.exit_code_for(res) == 0

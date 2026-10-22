@@ -40,6 +40,8 @@ class LadderContext:
     pre_rebase_sha: str
     conflicted_files: tuple[str, ...]
     trail: tuple[str, ...] = ()
+    state_dir: str = ""                                         # cost-guard marker dir; "" = guard unavailable, rung skips
+    extend_pre_patch: Optional[Callable[[tuple[str, ...]], None]] = None  # gitad._rewrite_pre_patch_for_regen wrapper
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,9 @@ class RungAttempt:
     applied: bool                     # False = rung had nothing to do; ladder skips the guard
     touched: tuple[str, ...]          # repo-relative paths the rung wrote
     note: str = ""
+    # Runs once the ladder has amended the rung's edits into the merge commit. Returns an
+    # undo callable (or None) the ladder calls if the rung is then discarded.
+    after_amend: Optional[Callable[[], Optional[Callable[[], None]]]] = None
 
 
 @dataclass(frozen=True)
@@ -104,7 +109,8 @@ def _parents_reason(ctx: LadderContext) -> str:
 
 
 def _untracked(ctx: LadderContext) -> set[str]:
-    return set(ctx.run("ls-files", "--others", "--exclude-standard").split())
+    out = ctx.run("ls-files", "--others", "--exclude-standard", "-z")
+    return {p for p in out.split("\0") if p}
 
 
 def _reset(ctx: LadderContext, sha: str, untracked_before: set[str]) -> None:
@@ -209,6 +215,15 @@ def run_ladder(ctx: LadderContext, proof_out: str, rungs) -> LadderOutcome:
             _reset(ctx, base_sha, untracked_before)
             continue
 
+        undo = None
+        if attempt.after_amend is not None:
+            try:
+                undo = attempt.after_amend()
+            except Exception as exc:
+                trail.append(f"{name}: post-amend step failed: {exc}")
+                _reset(ctx, base_sha, untracked_before)
+                continue
+
         verdict = post_rung_guard(ctx, attempt.touched)
         if verdict.ok:
             trail.append(f"{name}: passed")
@@ -223,6 +238,8 @@ def run_ladder(ctx: LadderContext, proof_out: str, rungs) -> LadderOutcome:
             trail.append(f"{name}: partial ({lost_count(current_proof)} LOST left)")
             continue
         trail.append(f"{name}: {verdict.reason or 'proof still failed'}")
+        if callable(undo):
+            undo()
         _reset(ctx, base_sha, untracked_before)
 
     return LadderOutcome("", (), current_proof, tuple(trail))
@@ -489,4 +506,5 @@ def make_session_rung(branch: str) -> Rung:
 
 
 def default_rungs(branch: str) -> tuple[Rung, ...]:
-    return (make_regen_rung(), make_opus_rung(), make_session_rung(branch))
+    from .conflict_fix import make_fix_rung
+    return (make_regen_rung(), make_opus_rung(), make_session_rung(branch), make_fix_rung(branch))

@@ -57,6 +57,26 @@ def test_build_event_unknown_agent_and_null_score():
     assert ev["score"] is None
 
 
+def test_build_event_origin_defaults_to_null_and_is_passed_through():
+    ev = _ev()
+    assert "origin" in ev and ev["origin"] is None
+    assert _ev(origin="same-run")["origin"] == "same-run"
+
+
+def _verdict_event(**kw):
+    base = dict(pr=1, thread={"commentId": 5, "agent": "B", "score": 80}, verdict="FIX",
+                category=None, reason="r", sha="abc", pipeline="harness")
+    base.update(kw)
+    return ol.event_from_verdict(**base)
+
+
+def test_event_from_verdict_origin_default_and_same_run():
+    assert _verdict_event()["origin"] == "pre-existing"
+    assert _verdict_event(origin="same-run")["origin"] == "same-run"
+    with pytest.raises(ValueError):
+        _verdict_event(origin="later")
+
+
 def test_append_events_appends_not_truncates(tmp_path):
     path = str(tmp_path / "state" / "log.jsonl")
     assert ol.append_events(path, [_ev()], lambda m: None) == 1
@@ -136,6 +156,28 @@ def test_sweep_outdated_is_fixed():
     events = ol.sweep_events([_th(1, isOutdated=True, isResolved=True)], 9, set(), pipeline="harness")
     assert [(e["outcome"], e["basis"], e["source"]) for e in events] == [("fixed", "outdated", "sweep")]
     assert events[0]["score"] == 82 and events[0]["agent"] == "B"
+
+
+def test_sweep_events_carry_null_origin():
+    events = ol.sweep_events([_th(1, isOutdated=True, isResolved=True)], 9, set(), pipeline="harness")
+    assert len(events) == 1
+    assert "origin" in events[0]
+    assert events[0]["origin"] is None
+
+
+def test_read_events_still_reads_pre_origin_lines(tmp_path):
+    """SCHEMA_VERSION stays 1: events written before the origin key are still read and counted."""
+    assert ol.SCHEMA_VERSION == 1
+    old = _ev()
+    del old["origin"]
+    assert "origin" not in old and old["v"] == 1
+    path = tmp_path / "log.jsonl"
+    path.write_text(json.dumps(old) + "\n")
+    events = ol.read_events(str(path))
+    assert events == [old]
+    report = ol.build_report(events)
+    assert report["total"]["total"] == 1
+    assert report["agents"]["B"]["fixed"] == 1
 
 
 def test_sweep_resolved_not_outdated_is_didnt_matter():

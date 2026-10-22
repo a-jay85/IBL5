@@ -216,16 +216,6 @@ class H2hInMemoryCache implements DatabaseCacheInterface
         unset($this->store[$key]);
     }
 
-    public function acquireLock(string $key, int $timeoutSeconds): bool
-    {
-        return true;
-    }
-
-    public function releaseLock(string $key): void
-    {
-        // no-op
-    }
-
     /**
      * Return the raw stored entry so tests can inspect the TTL.
      *

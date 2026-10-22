@@ -326,7 +326,7 @@ def _drive_runner(fx, llm, monkeypatch, tmp_path):
     monkeypatch.setattr(runner, "_pr_copy", lambda *a, **k: ({
         "type": "chore", "title": "chore: ladder", "commit_subject": "chore: ladder",
         "summary_md": "## Summary\n- x\n"}, False))
-    monkeypatch.setattr(runner, "_body_check", lambda *a, **k: ({}, False))
+    monkeypatch.setattr(runner, "_mechanical_body_pass", lambda *a, **k: {})
     monkeypatch.setattr(runner, "LiveGh", lambda out_dir, worktree, slug: RecordingGh(out_dir))
 
     # The fixture branch is already committed, so the commit step has nothing to do and the

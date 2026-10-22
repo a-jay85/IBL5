@@ -84,7 +84,7 @@ if (is_string($requestName) && $requestName !== '') {
 
     // Phase-based access control
     global $mysqli_db, $leagueContext;
-    $season = new \Season\Season($mysqli_db);
+    $season = \Season\SharedSeason::get($mysqli_db);
     $accessControl = new Module\ModuleAccessControl($season, $leagueContext, $mysqli_db);
 
     $isModuleAccessible = $accessControl->isModuleAccessible($name);

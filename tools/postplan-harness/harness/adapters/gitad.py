@@ -137,8 +137,10 @@ def lostwork_pre_path(key: str) -> str:
 
 
 class LiveGit:
-    def __init__(self, worktree: str, push_remote: str | None = None, llm=None):
+    def __init__(self, worktree: str, push_remote: str | None = None, llm=None,
+                 state_dir: str | None = None):
         self.worktree = worktree
+        self.state_dir = state_dir or ""  # "" = cost-guard marker dir unavailable
         self.push_remote = push_remote  # None = pushing disabled (typed failure)
         self.llm = llm
         self.last_conflict_resolution: Optional["StackedRebaseResult"] = None
@@ -679,16 +681,29 @@ class LiveGit:
         excludes = [f":(exclude){p}" for p in exempt]
         kept = self._run_bytes("diff", f"{master_sha}...{pre_rebase_sha}", "--", ".", *excludes)
         regen = self._run_bytes("diff", master_sha, "HEAD", "--", *exempt)
-        Path(lostwork_pre_path(key)).write_bytes(kept + regen)
+        path = Path(lostwork_pre_path(key))
+        old = path.read_bytes() if path.exists() else None
+        path.write_bytes(kept + regen)
+
+        def undo():
+            if old is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(old)
+        return undo
 
     def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
-                             lostwork_path, conflicted, proof_out):
+                             lostwork_path, conflicted, proof_out, regen_exempt=()):
         from ..conflict_ladder import LadderContext, default_rungs, run_ladder
         ctx = LadderContext(
             llm=self.llm, run=self._run, run_out=self._run_out,
             prove=lambda: self._run_proof(lostwork_path, key),
             worktree=self.worktree, key=key, master_sha=master_sha,
-            pre_rebase_sha=pre_rebase_sha, conflicted_files=conflicted)
+            pre_rebase_sha=pre_rebase_sha, conflicted_files=conflicted,
+            state_dir=self.state_dir,
+            extend_pre_patch=lambda paths: self._rewrite_pre_patch_for_regen(
+                key, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha,
+                exempt=tuple(dict.fromkeys([*regen_exempt, *paths]))))
         return run_ladder(ctx, proof_out, rungs=default_rungs(branch))
 
     def _record_resolution(
@@ -799,6 +814,7 @@ class LiveGit:
         self.last_conflict_files = ()
         self.last_conflict_resolution = None
         self.last_conflict_rung = ""
+        self.last_conflict_fix_summary = ""
         master_sha = self._run("rev-parse", base).strip()
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
@@ -913,7 +929,8 @@ class LiveGit:
                         outcome = self._run_conflict_ladder(
                             key=key, branch=branch, master_sha=master_sha,
                             pre_rebase_sha=pre_rebase_sha, lostwork_path=lostwork_path,
-                            conflicted=tuple(inventory.files), proof_out=first_proof)
+                            conflicted=tuple(inventory.files), proof_out=first_proof,
+                            regen_exempt=regen_exempt)
                     except HarnessError as exc:
                         # The outer `except HarnessError: raise` does not restore, so a
                         # HarnessError escaping the ladder restores here.
@@ -925,6 +942,12 @@ class LiveGit:
                                               adapt_trail + (f"ladder error: {exc.kind}: {exc.detail}",)))
                     if not outcome.rung:
                         self.last_conflict_rung = "exhausted"
+                        # Only entries from a run where the guard reached the proof:
+                        # the DM line says the proof still failed.
+                        self.last_conflict_fix_summary = next(
+                            (t for t in outcome.trail
+                             if t == "sonnet-fix: proof still failed"
+                             or t.startswith("sonnet-fix: partial (")), "")
                         abort_and_restore(self._run, worktree=self.worktree,
                                           pre_rebase_sha=pre_rebase_sha,
                                           reason=ladder_failure_reason(first_proof, adapt_trail + tuple(outcome.trail)))

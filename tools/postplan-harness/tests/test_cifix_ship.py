@@ -273,8 +273,8 @@ def _meta_run(monkeypatch, tmp_path, gh, *, failed, recorded):
     return r, llm
 
 
-def test_char_meta_body_check_failure_still_runs_cifix(monkeypatch, tmp_path):
-    """Body checks skip in phase 2, so nothing is recorded; ci-fix owns the proposal flow."""
+def test_char_meta_body_pass_skipped_still_runs_cifix(monkeypatch, tmp_path):
+    """The body pass skips in phase 2, so nothing is recorded; ci-fix owns the proposal flow."""
     gh = MetaLogGh(logs={"9001": META_BODY_LOG})
     gh.checks = [META_CHECKS_ROW]
     _r, llm = _meta_run(monkeypatch, tmp_path, gh,

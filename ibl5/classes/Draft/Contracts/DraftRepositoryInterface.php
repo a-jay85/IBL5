@@ -243,7 +243,7 @@ interface DraftRepositoryInterface
      * Examples:
      *  $pick = $repo->getCurrentDraftPick(2025);
      *  // Returns ['team' => 'New York', 'round' => '1', 'pick' => '5']
-     *  // Used to check whose turn it is
+     *  // Used by the draft board and by DraftController::submitSelection() gate 5 (on the clock)
      *
      *  $pick = $repo->getCurrentDraftPick(2025);
      *  // Returns null if draft complete (all picks filled)

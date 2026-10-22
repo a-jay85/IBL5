@@ -1,0 +1,244 @@
+#!/bin/bash
+set -euo pipefail
+
+# Test harness for bin/check-pipefail-grep-q (the pipefail + quiet-grep differential gate).
+# Follows bin/test-check-engine-freeze style.
+#
+# One fixture repo lives in a mktemp dir. Each case resets it to the base commit,
+# applies a change, and asserts the gate's exit code plus an output substring.
+# Nothing is written inside the IBL5 tree.
+#
+# Fixture lines are built by concatenation, so this file holds no literal producer,
+# pipe, and quiet grep together and the gate passes on its own PR.
+
+PASS=0
+FAIL=0
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-pipefail-grep-q"
+
+pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+PIPE='|'
+GQ='gr''ep'
+BAD="echo \"\$x\" $PIPE $GQ -q y"
+GOOD="$GQ -q y <<< \"\$x\""
+CNT="echo \"\$x\" $PIPE $GQ -c y"
+
+REPO=$(mktemp -d)
+NOREPO=$(mktemp -d)
+trap 'rm -rf "$REPO" "$NOREPO"' EXIT
+
+git -C "$REPO" init -q
+git -C "$REPO" config user.email "test@example.com"
+git -C "$REPO" config user.name "check-pipefail-grep-q test"
+git -C "$REPO" config commit.gpgsign false
+mkdir -p "$REPO/bin" "$REPO/scripts"
+cp "$SCRIPT" "$REPO/bin/check-pipefail-grep-q"
+chmod +x "$REPO/bin/check-pipefail-grep-q"
+
+printf '%s\n' '#!/bin/bash' 'set -euo pipefail' 'x=1' >"$REPO/bin/p.sh"
+printf '%s\n' '#!/bin/bash' 'set -eu' 'x=1' >"$REPO/bin/np.sh"
+printf '%s\n' '#!/bin/bash' 'set -euo pipefail' "$BAD" >"$REPO/bin/old.sh"
+printf '%s\n' '#!/bin/bash' 'set -eu' "$BAD" >"$REPO/bin/arm.sh"
+printf '%s\n' '#!/usr/bin/env python3' '# set -o pipefail' 'x = 1' >"$REPO/bin/tool.py"
+printf '%s\n' '#!/bin/bash' 'set -euo pipefail' 'x=1' >"$REPO/scripts/s.sh"
+git -C "$REPO" add -A
+git -C "$REPO" commit -q -m base
+BASE=$(git -C "$REPO" rev-parse HEAD)
+
+reset_repo() {
+    git -C "$REPO" reset -q --hard "$BASE"
+    git -C "$REPO" clean -qfd
+}
+
+commit_all() {
+    git -C "$REPO" add -A
+    git -C "$REPO" commit -q -m "case"
+}
+
+add() { printf '%s\n' "$2" >>"$REPO/$1"; } # add <path> <line>
+
+check_out() { # <label> <rc> <want_rc> <want_substring> <out>
+    local label="$1" rc="$2" want="$3" sub="$4" out="$5"
+    if [ "$rc" -ne "$want" ]; then
+        fail "$label: exit $rc, wanted $want"
+        echo "$out" | sed 's/^/    /'
+    elif [ -n "$sub" ] && ! grep -qF -- "$sub" <<< "$out"; then
+        fail "$label: output lacks '$sub'"
+        echo "$out" | sed 's/^/    /'
+    else
+        pass "$label"
+    fi
+}
+
+# expect <label> <want_rc> <want_substring> <gate args...>
+expect() {
+    local label="$1" want="$2" sub="$3" out rc=0
+    shift 3
+    out=$(cd "$REPO" && bin/check-pipefail-grep-q "$@" 2>&1) || rc=$?
+    check_out "$label" "$rc" "$want" "$sub" "$out"
+}
+
+# expect_env: same as expect, run under an empty environment.
+expect_env() {
+    local label="$1" want="$2" sub="$3" out rc=0
+    shift 3
+    out=$(cd "$REPO" && env -i PATH=/usr/bin:/bin /bin/bash -o pipefail bin/check-pipefail-grep-q "$@" 2>&1) || rc=$?
+    check_out "$label" "$rc" "$want" "$sub" "$out"
+}
+
+expect_since() { # <label> <want_rc> <want_substring>
+    expect "$1" "$2" "$3" --since="$BASE"
+}
+
+# ── Added-line checks ────────────────────────────────────────────────────────
+
+reset_repo
+add bin/p.sh "$BAD"
+commit_all
+expect_since bad-added-line 1 'bin/p.sh:4:'
+expect_since bad-added-hint 1 'shell-pipefail-grep.md'
+
+reset_repo
+add bin/p.sh "$GOOD"
+commit_all
+expect_since herestring-passes 0 'OK'
+
+reset_repo
+add bin/np.sh "$BAD"
+commit_all
+expect_since non-pipefail-passes 0 'OK'
+
+reset_repo
+add bin/p.sh "  # $BAD"
+commit_all
+expect_since comment-only-passes 0 'OK'
+
+reset_repo
+add bin/p.sh "$CNT"
+commit_all
+expect_since grep-c-passes 0 'OK'
+
+# Differential property: an old bad line outside the diff is never read.
+reset_repo
+add bin/old.sh 'x=2'
+commit_all
+expect_since preexisting-untouched-passes 0 'OK'
+
+# ── Pipefail newly armed ─────────────────────────────────────────────────────
+
+reset_repo
+printf '%s\n' '#!/bin/bash' 'set -euo pipefail' "$BAD" >"$REPO/bin/arm.sh"
+commit_all
+expect_since pipefail-newly-armed 1 'bin/arm.sh:3:'
+
+reset_repo
+sed -i.bak 's/^set -euo pipefail$/set -Eeuo pipefail/' "$REPO/bin/old.sh"
+rm -f "$REPO/bin/old.sh.bak"
+commit_all
+expect_since set-line-reworded-already-armed 0 'OK'
+
+reset_repo
+printf '%s\n' '#!/usr/bin/env bash' 'set -o pipefail' "$BAD" >"$REPO/bin/v1.sh"
+commit_all
+expect_since set-o-variant 1 'bin/v1.sh:3:'
+
+reset_repo
+printf '%s\n' '#!/bin/sh' 'set -uo pipefail' "$BAD" >"$REPO/bin/v2.sh"
+commit_all
+expect_since set-uo-variant 1 'bin/v2.sh:3:'
+
+reset_repo
+printf '%s\n' '#!/bin/bash' 'set -o errexit -o nounset -o pipefail' "$BAD" >"$REPO/bin/v3.sh"
+commit_all
+expect_since set-long-form-variant 1 'bin/v3.sh:3:'
+
+reset_repo
+printf '%s\n' '#!/usr/bin/env bash' 'set -o pipefail' "$BAD" >"$REPO/bin/v1.sh"
+commit_all
+out=$(cd "$REPO" && bin/check-pipefail-grep-q --since="$BASE" 2>&1) || true
+n=$(grep -c 'bin/v1.sh:3:' <<< "$out" || true)
+if [ "$n" = "1" ]; then
+    pass "full-scan-no-dup"
+else
+    fail "full-scan-no-dup: bin/v1.sh:3: printed $n times, wanted 1"
+    echo "$out" | sed 's/^/    /'
+fi
+
+# ── Flag variants ────────────────────────────────────────────────────────────
+
+for flag in -qF -Eq -qx '-E -q' --quiet --silent; do
+    reset_repo
+    add bin/p.sh "echo \"\$x\" $PIPE $GQ $flag y"
+    commit_all
+    expect_since "flag-variants: $flag" 1 'bin/p.sh:4:'
+done
+
+reset_repo
+add bin/p.sh "if echo \"\$x\" $PIPE $GQ -q y; then :; fi"
+commit_all
+expect_since "flag-variants: if prefix" 1 'bin/p.sh:4:'
+
+reset_repo
+add bin/p.sh "if ! echo \"\$x\" $PIPE $GQ -q y; then :; fi"
+commit_all
+expect_since "flag-variants: bang prefix" 1 'bin/p.sh:4:'
+
+# ── Scope: file kind, location, deletion ─────────────────────────────────────
+
+reset_repo
+add bin/tool.py "$BAD"
+commit_all
+expect_since non-shell-passes 0 'OK'
+
+reset_repo
+add scripts/s.sh "$BAD"
+commit_all
+expect_since outside-bin-passes 0 'OK'
+
+reset_repo
+git -C "$REPO" rm -q bin/old.sh
+commit_all
+expect_since deleted-file-passes 0 'OK'
+
+# ── Working-tree and index handling ──────────────────────────────────────────
+
+reset_repo
+add bin/p.sh "$BAD"
+expect_since unstaged-edit-counts 1 'bin/p.sh:4:'
+
+reset_repo
+printf '%s\n' '#!/bin/bash' 'set -euo pipefail' "$BAD" >"$REPO/bin/u.sh"
+expect_since untracked-not-seen 0 'OK'
+
+git -C "$REPO" add bin/u.sh
+expect_since staged-new-file-seen 1 'bin/u.sh:3:'
+
+reset_repo
+expect empty-range 0 'OK' --since=HEAD
+
+# ── Usage and git errors ─────────────────────────────────────────────────────
+
+expect usage-no-args 2 'use --since'
+expect usage-empty-since 2 'use --since' --since=
+expect usage-unknown-flag 2 'unknown option' --bogus
+expect usage-bad-ref 2 'cannot resolve ref' --since=no-such-ref
+expect help-exits-0 0 'usage:' --help
+
+rc=0
+out=$(cd "$NOREPO" && "$SCRIPT" --since=HEAD 2>&1) || rc=$?
+check_out not-a-repo "$rc" 2 'not inside a git repository' "$out"
+
+# ── Empty environment ────────────────────────────────────────────────────────
+
+reset_repo
+add bin/p.sh "$BAD"
+commit_all
+expect_env empty-env-bad 1 'bin/p.sh:4:' --since="$BASE"
+
+reset_repo
+expect_env empty-env-clean 0 'OK' --since="$BASE"
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ] || exit 1

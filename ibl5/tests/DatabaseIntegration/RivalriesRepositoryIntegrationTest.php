@@ -26,6 +26,14 @@ final class RivalriesRepositoryIntegrationTest extends DatabaseTestCase
         $this->repo = new RivalriesRepository($this->db);
     }
 
+    public function testFindGmNameReturnsStoredSpellingForAnyCase(): void
+    {
+        $this->insertGmTenureRow(1, 'Mover Gm', 2001, 2002);
+
+        self::assertSame('Mover Gm', $this->repo->findGmName('mover gm'));
+        self::assertSame('Mover Gm', $this->repo->findGmName('Mover Gm'));
+    }
+
     public function testGmRivalryFollowsGmAcrossFranchises(): void
     {
         $this->insertGmTenureRow(1, 'Mover Gm', 2001, 2002);
@@ -146,7 +154,7 @@ final class RivalriesRepositoryIntegrationTest extends DatabaseTestCase
         self::assertSame(['totals' => [], 'highs' => []], $this->repo->getFranchiseTopPerformers(5, 9));
         self::assertSame([], $this->repo->getGmPairGames('Nobody Here', 'Nobody Else'));
         self::assertSame([], $this->repo->getGmPlayoffSeries('Nobody Here', 'Nobody Else'));
-        self::assertFalse($this->repo->gmExists('Nobody Here'));
+        self::assertNull($this->repo->findGmName('Nobody Here'));
     }
 
     /**

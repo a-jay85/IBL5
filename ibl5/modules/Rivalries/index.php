@@ -29,7 +29,7 @@ if ($leagueContext !== null && $leagueContext->isOlympics()) {
     return;
 }
 
-$season  = new \Season\Season($mysqli_db, $leagueContext);
+$season  = \Season\SharedSeason::get($mysqli_db, $leagueContext);
 $docRoot = is_string($_SERVER['DOCUMENT_ROOT'] ?? null) ? $_SERVER['DOCUMENT_ROOT'] : '';
 
 // $user is the raw PHP-Nuke cookie string, not an object. Decode it to the

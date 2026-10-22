@@ -30,7 +30,7 @@ $docRoot = is_string($_SERVER['DOCUMENT_ROOT'] ?? null) ? $_SERVER['DOCUMENT_ROO
 $rivalsCardBuilder = $leagueContext->isOlympics()
     ? null
     : new Team\RivalsCardBuilder(
-        \Rivalries\RivalriesServiceFactory::create($mysqli_db, new \Season\Season($mysqli_db, $leagueContext), $docRoot . '/ibl5/images/logo'),
+        \Rivalries\RivalriesServiceFactory::create($mysqli_db, \Season\SharedSeason::get($mysqli_db, $leagueContext), $docRoot . '/ibl5/images/logo'),
         fn (int $tid): ?string => $commonRepo->getOwnerName($tid),
     );
 $service = new Team\TeamService($mysqli_db, $teamRepository, $leagueContext, rivalsCardBuilder: $rivalsCardBuilder);

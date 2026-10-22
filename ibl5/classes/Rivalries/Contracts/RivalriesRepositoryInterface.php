@@ -43,5 +43,9 @@ interface RivalriesRepositoryInterface
     /** @return array{totals: list<PerformerTotal>, highs: list<PerformerHigh>} */
     public function getGmTopPerformers(string $a, string $b): array;
 
-    public function gmExists(string $gmName): bool;
+    /**
+     * The stored spelling of a GM name, or null when no tenure has it. The lookup
+     * ignores case (column collation), so callers must use the returned name.
+     */
+    public function findGmName(string $gmName): ?string;
 }

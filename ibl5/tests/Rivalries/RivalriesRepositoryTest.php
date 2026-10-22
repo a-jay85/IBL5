@@ -61,12 +61,12 @@ final class RivalriesRepositoryTest extends TestCase
         self::assertCount(3, $this->mockDb->getPreparedQueries());
     }
 
-    public function testGmExistsBindsName(): void
+    public function testFindGmNameBindsName(): void
     {
-        $this->repo->gmExists('Some Gm');
+        $this->repo->findGmName('Some Gm');
 
-        self::assertSame('s', $this->mockDb->getLastBoundTypes());
-        self::assertSame(['Some Gm'], $this->mockDb->getLastBoundParams());
+        self::assertSame('ss', $this->mockDb->getLastBoundTypes());
+        self::assertSame(['Some Gm', 'Some Gm'], $this->mockDb->getLastBoundParams());
     }
 
     public function testPairQueriesCarryDedupeAndTenureRule(): void

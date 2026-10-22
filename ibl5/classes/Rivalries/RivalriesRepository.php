@@ -217,17 +217,21 @@ pair_games AS (
     }
 
     /**
-     * @see RivalriesRepositoryInterface::gmExists()
+     * @see RivalriesRepositoryInterface::findGmName()
      */
-    public function gmExists(string $gmName): bool
+    public function findGmName(string $gmName): ?string
     {
+        // An exact-case match wins if two stored names differ only by case.
+        /** @var array{gm_display_name: string}|null $row */
         $row = $this->fetchOne(
-            'SELECT 1 AS hit FROM `ibl_gm_tenures` WHERE gm_display_name = ? LIMIT 1',
-            's',
+            'SELECT gm_display_name FROM `ibl_gm_tenures` WHERE gm_display_name = ?
+             ORDER BY BINARY gm_display_name = BINARY ? DESC, id ASC LIMIT 1',
+            'ss',
+            $gmName,
             $gmName,
         );
 
-        return $row !== null;
+        return $row !== null ? $row['gm_display_name'] : null;
     }
 
     /**
@@ -245,7 +249,7 @@ pair_games AS (
     FROM `ibl_box_scores_teams` b
     WHERE b.game_type IN (1, 2, 3)
       AND b.visitor_teamid BETWEEN 1 AND %d
-      AND b.home_teamid   BETWEEN 1 AND %d' . $extraWhere . '
+      AND b.home_teamid   BETWEEN 1 AND %d%s
     GROUP BY b.game_date, b.visitor_teamid, b.home_teamid, b.game_of_that_day
 ),
 games AS (
@@ -265,6 +269,7 @@ games AS (
 )',
             $maxTid,
             $maxTid,
+            $extraWhere,
         );
     }
 

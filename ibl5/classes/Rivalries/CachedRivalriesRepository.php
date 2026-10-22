@@ -190,9 +190,9 @@ final class CachedRivalriesRepository implements RivalriesRepositoryInterface
      * Pass-through: one indexed-row lookup, and caching a miss would hide a GM
      * added by the next import.
      */
-    public function gmExists(string $gmName): bool
+    public function findGmName(string $gmName): ?string
     {
-        return $this->inner->gmExists($gmName);
+        return $this->inner->findGmName($gmName);
     }
 
     /**

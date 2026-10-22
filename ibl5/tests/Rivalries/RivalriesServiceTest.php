@@ -228,9 +228,9 @@ final class ServiceFakeRepository implements RivalriesRepositoryInterface
         return ['totals' => [], 'highs' => []];
     }
 
-    public function gmExists(string $gmName): bool
+    public function findGmName(string $gmName): string
     {
-        return true;
+        return $gmName;
     }
 }
 

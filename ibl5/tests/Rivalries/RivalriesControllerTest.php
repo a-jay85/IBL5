@@ -23,10 +23,15 @@ final class RivalriesControllerTest extends TestCase
             /** @var list<string> */
             public array $known = ['Mover Gm', 'Rival Gm'];
 
-            public function gmExists(string $gmName): bool
+            public function findGmName(string $gmName): ?string
             {
-                parent::gmExists($gmName);
-                return in_array($gmName, $this->known, true);
+                parent::findGmName($gmName);
+                foreach ($this->known as $stored) {
+                    if (strcasecmp($stored, $gmName) === 0) {
+                        return $stored;
+                    }
+                }
+                return null;
             }
         };
         $this->controller = new RivalriesController($this->service, new ControllerFakeView(), $this->repo);
@@ -85,6 +90,17 @@ final class RivalriesControllerTest extends TestCase
 
         self::assertSame('EMPTY:No general manager by that name.', $out);
         self::assertSame([], $this->repo->calls);
+    }
+
+    public function testGmNamesReachServiceInStoredSpelling(): void
+    {
+        self::assertSame('GM:Mover Gm', $this->controller->handle(['op' => 'gm', 'gm' => 'mover gm'], null, null));
+        $this->controller->handle(['op' => 'gms', 'a' => 'MOVER GM', 'b' => 'rival gm'], null, null);
+
+        self::assertSame(
+            [['getTopGmRivals', 'Mover Gm', RivalriesController::TOP_LIMIT], ['getGmPair', 'Mover Gm', 'Rival Gm']],
+            $this->service->calls,
+        );
     }
 
     public function testUnknownGmRendersEmptyState(): void

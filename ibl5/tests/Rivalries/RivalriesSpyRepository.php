@@ -69,10 +69,10 @@ class RivalriesSpyRepository implements RivalriesRepositoryInterface
         return ['totals' => [], 'highs' => []];
     }
 
-    public function gmExists(string $gmName): bool
+    public function findGmName(string $gmName): ?string
     {
         $this->record(__FUNCTION__, [$gmName]);
-        return false;
+        return null;
     }
 
     /** @param list<int|string> $args */

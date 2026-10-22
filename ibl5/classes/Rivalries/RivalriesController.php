@@ -20,7 +20,6 @@ final class RivalriesController
     public const OPS = ['index', 'teams', 'gms', 'gm'];
     public const MAX_GM_NAME_LENGTH = 60;
     public const TOP_LIMIT = 10;
-    public const TEAM_CARD_LIMIT = 3;
 
     public function __construct(
         private readonly RivalriesServiceInterface $service,
@@ -94,6 +93,6 @@ final class RivalriesController
             return null;
         }
 
-        return $this->repo->gmExists($name) ? $name : null;
+        return $this->repo->findGmName($name);
     }
 }

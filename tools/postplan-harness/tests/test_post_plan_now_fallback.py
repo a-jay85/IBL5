@@ -1749,7 +1749,11 @@ def test_detached_cmd_carries_postplan_force(tmp_path):
 @pytest.mark.parametrize("argv_log_mode", ["unset", "empty"])
 @pytest.mark.parametrize("submit_rc_mode", ["unset", "empty"])
 def test_recording_stub_env_unset_and_empty(tmp_path, argv_log_mode, submit_rc_mode):
-    """LCTL_ARGV_LOG and LCTL_SUBMIT_RC: unset and empty both mean no log, rc 0."""
+    """LCTL_ARGV_LOG and LCTL_SUBMIT_RC: unset and empty both mean no log, rc 0.
+
+    An empty LCTL_SUBMIT_RC must never reach int(""), which raises ValueError, and an
+    empty LCTL_ARGV_LOG must never be opened as a path.
+    """
     stub = tmp_path / "launchctl"
     stub.write_text(ppn_launch.RECORDING_LAUNCHCTL)
     stub.chmod(0o755)

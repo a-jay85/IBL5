@@ -917,7 +917,7 @@ SB_NOEXEC="$SUB_DIR/noexec.sh"
 printf '#!/bin/bash\nexit 0\n' > "$SB_NOEXEC"
 chmod -x "$SB_NOEXEC"
 SB_OK=1
-for SB_CASE in none badlabel relscript noexec; do
+for SB_CASE in none badlabel otherns relscript noexec; do
     reset_ctl
     RC=0
     (
@@ -927,6 +927,7 @@ for SB_CASE in none badlabel relscript noexec; do
         case "$SB_CASE" in
             none)     ljob_submit ;;
             badlabel) ljob_submit "bad.label-1" "$SUB_LOG" "$SUB_SCRIPT" ;;
+            otherns)  ljob_submit "com.other.x" "$SUB_LOG" "$SUB_SCRIPT" ;;
             relscript) ljob_submit "$SUB_LABEL" "$SUB_LOG" "S.sh" ;;
             noexec)   ljob_submit "$SUB_LABEL" "$SUB_LOG" "$SB_NOEXEC" ;;
         esac

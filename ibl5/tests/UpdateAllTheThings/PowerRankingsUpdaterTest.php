@@ -262,6 +262,44 @@ class PowerRankingsUpdaterTest extends TestCase
         $this->assertSame(3, $result['lossesInLast10Games']);
     }
 
+    public function testCalculateTeamStatsWeightsOpponentRecordFromStandings(): void
+    {
+        $this->mockDb->onQuery('FROM ibl_standings WHERE teamid', [['win' => 30, 'loss' => 10]]);
+        $games = [
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 2, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 95],
+        ];
+
+        $result = $this->powerRankingsUpdater->publicCalculateTeamStats($games, 1);
+
+        $this->assertSame(30, $result['winPoints']);
+        $this->assertSame(10, $result['lossPoints']);
+        $this->assertSame(1, $result['wins']);
+        $this->assertSame(1, $result['losses']);
+        $this->assertSame(
+            73.8,
+            TeamStatsCalculator::calculateRankingScore($result['wins'], $result['losses'], $result['winPoints'], $result['lossPoints'])
+        );
+    }
+
+    public function testDefaultCalculatorUsesOlympicsStandingsWithOlympicsContext(): void
+    {
+        $context = self::createStub(\League\LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+        $updater = new TestablePowerRankingsUpdater($this->mockDb, $this->mockSeason, null, $context);
+
+        $updater->publicCalculateTeamStats([
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+        ], 1);
+
+        $queries = $this->mockDb->getPreparedQueries();
+        $this->assertContains('SELECT wins AS win, losses AS loss FROM ibl_olympics_standings WHERE teamid = ?', $queries);
+        $this->assertCount(
+            0,
+            array_filter($queries, static fn (string $q): bool => str_contains($q, 'FROM ibl_standings WHERE'))
+        );
+    }
+
     public function testConstructorAcceptsOptionalLeagueContext(): void
     {
         $leagueContext = self::createStub(\League\LeagueContext::class);

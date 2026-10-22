@@ -1154,6 +1154,11 @@ jobs:
   #     Pages artifact: pages-deploy.yml uploads the whole tree, and at ~30 MB per
   #     dir the 300 cap reached 9.6 GB (measured 2026-10-15) and every deploy
   #     failed near the 10 GB limit. Re-measure dir size before raising this number.
+  # Pass 3 (blob GC, same script): remove _vr-blobs/ files no surviving gallery
+  #   references whose newest commit is older than 7 days.
+  # Then bin/vr-dedupe-gallery --migrate moves any per-SHA before/after/diff PNGs
+  #   still in legacy form into _vr-blobs/ (idempotent; a no-op once migrated).
+  # Measured 2026-10-22: 95% of the tree was those PNGs, 97.5% of them duplicates.
   vr-pages-cleanup:
     name: VR Pages retention cleanup
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -1205,37 +1210,69 @@ jobs:
         if: steps.checkout-pages.outcome == 'success' && steps.vr-keep.outcome == 'failure'
         run: echo "::error::Open-PR keep-list failed; pruning skipped this run so no linked gallery is deleted."
 
-      - name: Prune per-SHA report dirs (7-day age prune + 150-dir count cap)
+      - name: Prune per-SHA report dirs and GC unreferenced blobs (7-day age + 150-dir cap)
         id: prune
         if: steps.checkout-pages.outcome == 'success' && steps.vr-keep.outcome == 'success'
         run: |
+          removed=$(./master-scripts/bin/prune-vr-galleries --cutoff-days 7 --max-dirs 150 --keep-file "$RUNNER_TEMP/vr-keep.txt")
+          echo "Pruned ${removed} per-SHA dir(s)."
+          echo "removed=${removed}" >> "$GITHUB_OUTPUT"
+
+      # Independent of the keep-list: migration moves and re-points images and never
+      # deletes a referenced file, so it is safe on a run whose prune was skipped.
+      - name: Migrate legacy galleries to the shared blob store
+        id: migrate
+        if: steps.checkout-pages.outcome == 'success'
+        run: |
+          migrated=$(./master-scripts/bin/vr-dedupe-gallery --migrate --root .)
+          echo "Migrated ${migrated} gallery dir(s) to _vr-blobs/."
+          echo "migrated=${migrated}" >> "$GITHUB_OUTPUT"
+
+      # Commit whenever the tree is dirty (prune, GC, or migration), not only when a
+      # dir was pruned. Staging is scoped: `git add -u` takes tracked edits and
+      # deletions, and only _vr-blobs/ may hold new files. `git add -A .` would also
+      # stage master-scripts/ (a nested checkout) as an embedded repo.
+      # The refs check runs on the exact tree about to be pushed, after every rebase,
+      # so a PR publish that raced a blob GC can never reach gh-pages dangling.
+      - name: Commit and push gh-pages
+        id: push
+        if: steps.checkout-pages.outcome == 'success'
+        env:
+          REMOVED: ${{ steps.prune.outputs.removed }}
+          MIGRATED: ${{ steps.migrate.outputs.migrated }}
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          removed=$(./master-scripts/bin/prune-vr-galleries --cutoff-days 7 --max-dirs 150 --keep-file "$RUNNER_TEMP/vr-keep.txt")
-          if [ "$removed" -gt 0 ]; then
-            git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) (7d age + 150-dir cap)"
-            # Same shared-ref contention as the per-SHA deploy above: in-flight PR VR
-            # jobs push their own <sha>/ dirs to gh-pages while we prune. Those commits
-            # add paths we never touch, so a rejected push is always contention and a
-            # rebase-then-retry resolves it.
-            for attempt in 1 2 3; do
-              if git push origin gh-pages; then
-                echo "pruned=true" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-              echo "gh-pages push rejected (attempt ${attempt}/3) — rebasing onto the updated ref."
-              git pull --rebase origin gh-pages
-            done
-            echo "::error::gh-pages prune push failed after 3 attempts."
-            exit 1
-          else
-            echo "Nothing to prune."
+          git add -u
+          if [ -d _vr-blobs ]; then git add -A -- _vr-blobs; fi
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+            exit 0
           fi
+          git commit -q -m "chore(vr-pages): prune ${REMOVED:-0} dir(s), migrate ${MIGRATED:-0} dir(s), gc blobs (7d age + 150-dir cap)"
+          # Same shared-ref contention as the per-SHA deploy above: in-flight PR VR
+          # jobs push to gh-pages while we work, so a rejected push is contention and
+          # a rebase-then-retry resolves it.
+          for attempt in 1 2 3; do
+            if ! ./master-scripts/bin/check-vr-gallery-refs --root . > "$RUNNER_TEMP/vr-refs.txt"; then
+              cat "$RUNNER_TEMP/vr-refs.txt"
+              echo "::error::Dangling gallery reference(s) in the tree to push; gh-pages left unchanged. The next master push recomputes."
+              exit 1
+            fi
+            if git push origin gh-pages; then
+              echo "pushed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "gh-pages push rejected (attempt ${attempt}/3) — rebasing onto the updated ref."
+            git pull --rebase origin gh-pages
+          done
+          echo "::error::gh-pages cleanup push failed after 3 attempts."
+          exit 1
 
-      # A prune only reaches the SERVED site when pages-deploy.yml re-publishes the tree. Under the
+      # A prune, blob GC, or migration only reaches the SERVED site when pages-deploy.yml re-publishes the tree. Under the
       # old workflow_run trigger the master E2E completion did that implicitly; now it is explicit.
       - name: Re-serve the gh-pages tree (dispatch Pages deploy)
-        if: steps.prune.outputs.pruned == 'true'
+        if: steps.push.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

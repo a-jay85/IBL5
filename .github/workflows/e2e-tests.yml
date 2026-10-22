@@ -410,14 +410,17 @@ jobs:
       # the per-cell before/after/diff PNGs move to the shared content-addressed
       # _vr-blobs/ store at the gh-pages root (bin/vr-dedupe-gallery). The stage is
       # root-shaped, so the deploy steps below publish it with no destination_dir.
-      # continue-on-error: a failed stage leaves no stage dir, every deploy attempt
-      # then fails, and the assert step below fails the job, the same loud path as a
-      # missing gallery tree.
+      # continue-on-error: a failed stage removes the stage dir (the trap below, so a
+      # partial dedupe or a failed refs check never leaves a tree to publish), every
+      # deploy attempt then fails, and the assert step below fails the job, the same
+      # loud path as a missing gallery tree.
       - name: Stage VR gallery in blob-store form
         id: vr-stage
         if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && env.VRCTX_SAME_REPO == 'true'
         continue-on-error: true
         run: |
+          set -e
+          trap 'rc=$?; [ "$rc" -eq 0 ] || rm -rf ibl5/vr-pages-stage' EXIT
           rm -rf ibl5/vr-pages-stage
           bin/vr-dedupe-gallery \
             --gallery-dir ibl5/vr-gallery \

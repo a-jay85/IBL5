@@ -57,7 +57,10 @@ test.describe('Olympics module gating', () => {
 
     await page.goto('modules.php?name=SeasonHighs&league=olympics');
     await assertNoPhpErrors(page, 'on SeasonHighs in Olympics');
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    expect(page.url()).toContain('name=SeasonHighs');
+    expect(page.url()).not.toContain('name=Records');
+    await expect(page.locator('h1.ibl-title')).toContainText('Season Highs');
+    await expect(page.locator('.ibl-data-table .value-cell').first()).toBeVisible();
   });
 
   test('Team page renders in Olympics context', async ({ page }) => {

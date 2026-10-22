@@ -41,7 +41,11 @@ class ContractsView implements ContractsViewInterface
     {
         $tabs = self::pageTabs();
         $tab = $tabs->resolve($activeTab);
-        return $tabs->renderTabBar($tab, self::BASE_URL) . $tabs->wrapPanel($tabContentHtml, $tab);
+        // .ibl-tab-card: one white card with the tab strip as its header (hub-only styling)
+        return '<div class="ibl-tab-card">'
+            . $tabs->renderTabBar($tab, self::BASE_URL)
+            . $tabs->wrapPanel($tabContentHtml, $tab)
+            . '</div>';
     }
 
     private static function pageTabs(): PageTabs

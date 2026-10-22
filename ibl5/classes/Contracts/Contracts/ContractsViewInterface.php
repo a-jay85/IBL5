@@ -12,7 +12,8 @@ namespace Contracts\Contracts;
 interface ContractsViewInterface
 {
     /**
-     * Wrap the active tab's already-rendered body in the Contracts tab nav
+     * Wrap the active tab's already-rendered body in the Contracts tab nav,
+     * both inside one .ibl-tab-card wrapper
      *
      * @param string $activeTab Tab key; unknown values fall back to the default tab
      * @param string $tabContentHtml Pre-escaped HTML from the active tab's view

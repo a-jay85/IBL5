@@ -126,16 +126,24 @@ final class PlrBulkEditSession
         clearstatcache();
         $sourceSize = filesize($this->plrPath);
         $backupSize = filesize($backupPath);
+        if ($sourceSize === false || $backupSize === false) {
+            @unlink($backupPath);
+            throw new \RuntimeException("Could not read file size to verify backup: {$this->plrPath} / $backupPath");
+        }
         if ($backupSize !== $sourceSize) {
             @unlink($backupPath);
-            throw new \RuntimeException("Backup size mismatch: source $sourceSize, backup " . var_export($backupSize, true));
+            throw new \RuntimeException("Backup size mismatch: source $sourceSize, backup $backupSize");
         }
 
         $sourceHash = hash_file('sha256', $this->plrPath);
         $backupHash = hash_file('sha256', $backupPath);
+        if ($sourceHash === false || $backupHash === false) {
+            @unlink($backupPath);
+            throw new \RuntimeException("Could not hash file to verify backup: {$this->plrPath} / $backupPath");
+        }
         if ($backupHash !== $sourceHash) {
             @unlink($backupPath);
-            throw new \RuntimeException("Backup hash mismatch: source $sourceHash, backup " . var_export($backupHash, true));
+            throw new \RuntimeException("Backup hash mismatch: source $sourceHash, backup $backupHash");
         }
 
         $this->backupPath = $backupPath;

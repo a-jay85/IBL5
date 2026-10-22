@@ -3182,7 +3182,7 @@ assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
-# Gate [MU] fixtures (19 cases)
+# Gate [MU] fixtures (22 cases)
 # ---------------------------------------------------------------------------
 # A throwaway repo: one tracked file under e2e/, one tracked PHPStan identifier,
 # one directory named only in tracked text. The helper's tree arm reads this repo
@@ -3299,6 +3299,33 @@ if [ "$_mu_n" = "2" ] && [ "$_mu_all" = "2" ]; then
 else
     h_fail "$_mu_name" "expected 2 [MU] lines on REALROW, got $_mu_n of $_mu_all"
 fi
+# A placeholder row with an empty-looking What cell is skipped by the helper, so the
+# violation lands on the next row with the same id.
+_mu_name='gateMU-skips-placeholder-row'
+_mu_body="$FM$YHDR"'
+| 1 | - | PHPUnit | post-impl | `tests/XTest.php` |
+| 1 | REALROW no `if'"$MU_DOT"'alwaysTrue` finding | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+printf '%s\n' "$_mu_body" > "$TMP/$_mu_name.md"
+_mu_out="$("$GUARD" "$TMP/$_mu_name.md" 2>&1)"
+_mu_n="$(grep -c '^\[MU\] .*REALROW' <<< "$_mu_out")"
+if [ "$_mu_n" = "1" ]; then
+    h_pass "$_mu_name (on the real row)"
+else
+    h_fail "$_mu_name" "expected 1 [MU] line on REALROW, got $_mu_n"
+fi
+# require is not a category: a Node name like require.main stays silent, while
+# requireOnce is one and fires.
+assert_viol "gateMU-require-code-name-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | reads `require'"$MU_DOT"'main` | CLI-executable | post-impl | `go test ./...` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+assert_viol "gateMU-requireonce-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | no `requireOnce'"$MU_DOT"'fileNotFound` finding | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
 # (b) a new directory: no tracked file beneath it, no tracked text names it (the
 # records-hub row 11 shape).
 assert_viol "gateMU-new-dir-fires" 1 '[MU]' "$FM$YHDR"'

@@ -1634,15 +1634,15 @@ done < "$GATEP_MATRIX"
 # The tokens come from the helper itself: it runs on the plan with an EMPTY diff and
 # MATRIX_ASSERT_ROOT set to the toplevel, so fence skipping, duplicate-id skipping,
 # the one-time-check tag, Mutation-clause blanking and the name=value cut are the
-# helper's own and cannot drift from it. Only tokens it prints after `  missing:` are
-# classified; every other token it reports is one the diff is expected to carry and
-# stays silent here. The helper runs only when some cell holds a candidate token, so
-# a plan without one pays nothing. Root: the git toplevel of CHECK_PLAN_MT_GIT_ROOT
+# helper's own; only the row pick below is a copy. Only tokens it prints after
+# `  missing:` are classified; every other token it reports is one the diff is
+# expected to carry and stays silent here. The helper runs only when the plan holds a
+# candidate token, so a plan without one pays nothing. Root: the git toplevel of CHECK_PLAN_MT_GIT_ROOT
 # (the gate MT seam) or $REPO_ROOT; outside a git repo the gate is skipped, because
 # the helper would then report every token missing. Example tokens are kept out of this
 # comment on purpose: a literal one in tracked text would count as present to the helper.
 # ---------------------------------------------------------------------------
-_mu_cats='argument|arguments|arrayFilter|arrayValues|assign|assignOp|attribute|binaryOp|booleanAnd|booleanNot|booleanOr|callable|cast|catch|class|classConstant|constant|closure|deadCode|doWhile|echo|elseif|empty|encapsedStringPart|enum|equal|for|foreach|function|generics|greater|greaterOrEqual|identical|if|ignore|impossibleType|instanceof|interface|isset|logicalAnd|logicalOr|logicalXor|match|method|methodTag|missingType|new|notEqual|notIdentical|nullCoalesce|nullsafe|offsetAccess|offsetAssign|parameter|paramOut|phpDoc|phpstanApi|postDec|postInc|preDec|preInc|property|propertyTag|readOnlyProperty|regexp|return|selfOut|smaller|smallerOrEqual|staticMethod|staticProperty|ternary|throw|throws|trait|typeAlias|unaryOp|unset|variable|varTag|while'
+_mu_cats='argument|arguments|arrayFilter|arrayValues|assign|assignOp|attribute|binaryOp|booleanAnd|booleanNot|booleanOr|callable|cast|catch|class|classConstant|constant|clone|closure|deadCode|doWhile|echo|elseif|empty|encapsedStringPart|enum|equal|for|foreach|function|generics|greater|greaterOrEqual|identical|if|ignore|impossibleType|includeOnce|instanceof|interface|isset|logicalAnd|logicalOr|logicalXor|match|method|methodTag|missingType|new|notEqual|notIdentical|nullCoalesce|nullsafe|offsetAccess|offsetAssign|parameter|paramOut|phpDoc|phpstanApi|postDec|postInc|preDec|preInc|property|propertyTag|readOnlyProperty|regexp|requireOnce|return|selfOut|smaller|smallerOrEqual|staticMethod|staticProperty|ternary|throw|throws|trait|typeAlias|unaryOp|unset|variable|varTag|while'
 _mu_id_re="^(${_mu_cats})\.[a-z][A-Za-z]*(\.[a-z][A-Za-z]*)*\$"
 # A category stem with a file extension tail is a bare file name, never an identifier:
 # a common extension, or the extension of any tracked file.
@@ -1651,7 +1651,7 @@ _mu_dir_re='^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*/$'
 _mu_cand_re='`(('"${_mu_cats}"')\.[a-z][A-Za-z.]*|[A-Za-z0-9_./-]+/)`'
 _mu_helper="$SCRIPT_DIR/lib/plan-matrix-assertions"
 _mu_root="$(git -C "${CHECK_PLAN_MT_GIT_ROOT:-$REPO_ROOT}" rev-parse --show-toplevel 2>/dev/null)" || _mu_root=""
-if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$GATEP_MATRIX"; then
+if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$PLAN_FILE"; then
     _mu_empty="$(mktemp)"
     _mu_out="$(MATRIX_ASSERT_ROOT="$_mu_root" "$_mu_helper" "$PLAN_FILE" "$_mu_empty" 2>&1)" || true
     rm -f "$_mu_empty"
@@ -1676,14 +1676,18 @@ if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$GATEP
     # Blame the row the helper read. GATEP_MATRIX parses fences differently, so a
     # same-id row in a fenced example could come first there. This awk copies the
     # helper's row pick: any ``` or ~~~ line toggles a fence, rows count only under a
-    # What-to-verify header, and the first row per id wins.
+    # What-to-verify header, an empty or separator What cell is skipped, and the first
+    # row per id wins. Keep it in step with the row extraction in the helper.
     _mu_rows="$(awk -F'|' '
         /^[[:space:]]*(```|~~~)/ { fence = !fence; inm = 0; next }
         fence { next }
         /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm = 1; next }
         inm && /^[[:space:]]*\|/ {
-            id = $2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id)
-            if (id == "" || seen[id]) next
+            line = $0; gsub(/\\\|/, "\001", line)
+            n = split(line, f, "|"); if (n < 3) next
+            id = f[2]; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id)
+            cell = f[3]; gsub(/^[[:space:]]+|[[:space:]]+$/, "", cell)
+            if (cell ~ /^[[:space:]:-]*$/ || seen[id]) next
             seen[id] = 1; print
         }' "$PLAN_FILE")"
     while IFS= read -r row; do

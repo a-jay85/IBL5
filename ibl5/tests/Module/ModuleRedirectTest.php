@@ -24,6 +24,8 @@ class ModuleRedirectTest extends TestCase
             'modules.php?name=Leaderboards&tab=career',
             ModuleRedirect::targetFor('CareerLeaderboards')
         );
+        $this->assertSame('modules.php?name=Contracts&tab=teams', ModuleRedirect::targetFor('CapSpace'));
+        $this->assertSame('modules.php?name=Contracts&tab=players', ModuleRedirect::targetFor('ContractList'));
     }
 
     public function testTargetForReturnsNullForUnknownModule(): void

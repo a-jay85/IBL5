@@ -1,0 +1,285 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+set -euo pipefail
+
+# Move a VR gallery's before/after/diff PNGs into a shared content-addressed
+# blob store (_vr-blobs/<sha256>.png at the gh-pages root) and re-point the
+# gallery's index.html at it. See the ADR for the shared VR gallery blob store.
+#
+# Publish mode stages one fresh gallery for the peaceiris deploy step.
+# Migrate mode dedupes every existing per-SHA gallery in place; it is idempotent.
+# Only images the index.html references by exact quoted filename ever move, so
+# a dangling reference cannot be produced by construction.
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: vr-dedupe-gallery --gallery-dir DIR --key SHA --stage-dir DIR [--dry-run]
+       vr-dedupe-gallery --migrate --root DIR [--dry-run]
+
+Publish mode copies DIR into STAGE/<SHA>/visual-review/ and dedupes it into
+STAGE/_vr-blobs/. --key must be 40 lowercase hex. STAGE must be absent or empty.
+
+Migrate mode dedupes in place every top-level 40-hex dir under ROOT that has
+visual-review/index.html, into ROOT/_vr-blobs/. Live stdout is one integer: the
+number of dirs that moved at least one image.
+
+--dry-run writes nothing and prints one "DIR <sha> before= after= moved=" line
+per dir plus a "TOTAL ..." line projecting the post-dedupe size.
+EOF
+}
+
+die_usage() {
+  echo "vr-dedupe-gallery: $1" >&2
+  usage
+  exit 2
+}
+
+migrate=0
+dry_run=0
+gallery_dir=""
+key=""
+stage_dir=""
+root=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --migrate)
+      migrate=1
+      shift
+      ;;
+    --dry-run)
+      dry_run=1
+      shift
+      ;;
+    --gallery-dir|--key|--stage-dir|--root)
+      flag="$1"
+      shift
+      if [[ $# -eq 0 || -z "${1:-}" ]]; then
+        die_usage "$flag needs a value"
+      fi
+      case "$flag" in
+        --gallery-dir) gallery_dir="$1" ;;
+        --key) key="$1" ;;
+        --stage-dir) stage_dir="$1" ;;
+        --root) root="$1" ;;
+      esac
+      shift
+      ;;
+    *)
+      die_usage "unknown option: $1"
+      ;;
+  esac
+done
+
+is_key() {
+  [ "${#1}" -eq 40 ] || return 1
+  case "$1" in (*[!0-9a-f]*) return 1 ;; esac
+  return 0
+}
+
+if [[ "$migrate" -eq 1 ]]; then
+  if [[ -n "$gallery_dir" || -n "$key" || -n "$stage_dir" ]]; then
+    die_usage "--migrate cannot be combined with --gallery-dir, --key, or --stage-dir"
+  fi
+  [[ -n "$root" ]] || die_usage "--migrate needs --root"
+  [[ -d "$root" ]] || die_usage "root not a directory: $root"
+else
+  if [[ -n "$root" ]]; then
+    die_usage "--root is only valid with --migrate"
+  fi
+  [[ -n "$gallery_dir" ]] || die_usage "publish mode needs --gallery-dir"
+  [[ -n "$key" ]] || die_usage "publish mode needs --key"
+  [[ -n "$stage_dir" ]] || die_usage "publish mode needs --stage-dir"
+  is_key "$key" || die_usage "--key must be 40 lowercase hex: $key"
+  [[ -d "$gallery_dir" ]] || die_usage "gallery dir not a directory: $gallery_dir"
+  if [[ -e "$stage_dir" ]]; then
+    if [[ ! -d "$stage_dir" ]] || [[ -n "$(ls -A "$stage_dir" 2>/dev/null)" ]]; then
+      echo "vr-dedupe-gallery: stage dir not empty: $stage_dir" >&2
+      exit 1
+    fi
+  fi
+fi
+
+TMPROOT="$(mktemp -d)"
+trap 'rm -rf "$TMPROOT"' EXIT
+
+# Print the 64-hex sha256 of a file. sha256sum on Linux, /usr/bin/shasum on macOS.
+hash_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
+  else
+    shasum -a 256 "$1" | cut -d' ' -f1
+  fi
+}
+
+# Byte size of one file.
+file_bytes() {
+  wc -c < "$1" | tr -d ' '
+}
+
+# Sum of every regular file's bytes under a directory (0 when absent or empty).
+tree_bytes() {
+  if [[ ! -d "$1" ]]; then
+    echo 0
+    return 0
+  fi
+  find "$1" -type f -exec wc -c {} + | awk '{ if (!($2 == "total" && NF == 2)) s += $1 } END { print s + 0 }'
+}
+
+# Blob-new bookkeeping. Live mode checks the blob file itself; dry-run records
+# each distinct would-be-new hash as a marker file so it is counted once.
+seen_dir="$TMPROOT/seen"
+mkdir -p "$seen_dir"
+blobs_new=0
+store_added=0
+
+# Rewrites index.html: every (src|href)="<name>" whose value is in the map
+# becomes ../../_vr-blobs/<hash>.png; every other byte passes through. The same
+# match() walk is used by bin/check-vr-gallery-refs, keep the two copies in step.
+REWRITE_AWK='
+NR == FNR { split($0, kv, "\t"); map[kv[1]] = kv[2]; next }
+{
+  line = $0
+  out = ""
+  while (match(line, /(src|href)="[^"]*"/)) {
+    attr_end = RSTART + RLENGTH
+    full = substr(line, RSTART, RLENGTH)
+    eq = index(full, "=")
+    attr = substr(full, 1, eq - 1)
+    val = substr(full, eq + 2, length(full) - eq - 2)
+    out = out substr(line, 1, RSTART - 1)
+    if (val in map) {
+      out = out attr "=\"../../_vr-blobs/" map[val] ".png\""
+    } else {
+      out = out full
+    }
+    line = substr(line, attr_end)
+  }
+  print out line
+}
+'
+
+# dedupe_dir <vr_dir> <blob_dir>
+# Sets DD_MOVED (images moved) and DD_MOVED_BYTES (bytes they held).
+dedupe_dir() {
+  local vr_dir="$1" blob_dir="$2"
+  local index="$vr_dir/index.html"
+  DD_MOVED=0
+  DD_MOVED_BYTES=0
+  if [[ ! -f "$index" ]]; then
+    echo "WARN: no index.html in $vr_dir, skipping" >&2
+    return 0
+  fi
+  local idx
+  idx="$(cat "$index")"
+  local map="$TMPROOT/map.$$"
+  : > "$map"
+
+  local f name hash
+  while IFS= read -r f; do
+    name="${f##*/}"
+    case "$name" in
+      (*.before.png|*.after.png|*.diff.png) ;;
+      (*) continue ;;
+    esac
+    case "$idx" in
+      (*'src="'"$name"'"'*|*'href="'"$name"'"'*) ;;
+      (*) continue ;;
+    esac
+    hash="$(hash_file "$f")"
+    printf '%s\t%s\n' "$name" "$hash" >> "$map"
+    DD_MOVED=$(( DD_MOVED + 1 ))
+    DD_MOVED_BYTES=$(( DD_MOVED_BYTES + $(file_bytes "$f") ))
+    if [[ "$dry_run" -eq 1 ]]; then
+      if [[ ! -e "$blob_dir/$hash.png" && ! -e "$seen_dir/$hash" ]]; then
+        : > "$seen_dir/$hash"
+        store_added=$(( store_added + $(file_bytes "$f") ))
+      fi
+    fi
+  done < <(find "$vr_dir" -mindepth 1 -maxdepth 1 -type f | sort)
+
+  if [[ "$dry_run" -eq 1 || "$DD_MOVED" -eq 0 ]]; then
+    rm -f "$map"
+    return 0
+  fi
+
+  mkdir -p "$blob_dir"
+  while IFS=$'\t' read -r name hash; do
+    if [[ ! -e "$blob_dir/$hash.png" ]]; then
+      cp "$vr_dir/$name" "$blob_dir/$hash.png.tmp.$$"
+      mv "$blob_dir/$hash.png.tmp.$$" "$blob_dir/$hash.png"
+      blobs_new=$(( blobs_new + 1 ))
+    fi
+  done < "$map"
+
+  awk "$REWRITE_AWK" "$map" "$index" > "$index.tmp.$$"
+  mv "$index.tmp.$$" "$index"
+
+  while IFS=$'\t' read -r name hash; do
+    rm -f "$vr_dir/$name"
+  done < "$map"
+  rm -f "$map"
+}
+
+total_dirs=0
+total_before=0
+total_after=0
+
+# report_dry <sha> <before_bytes>
+report_dry() {
+  local after=$(( $2 - DD_MOVED_BYTES ))
+  echo "DIR $1 before=$2 after=$after moved=$DD_MOVED"
+  total_dirs=$(( total_dirs + 1 ))
+  total_before=$(( total_before + $2 ))
+  total_after=$(( total_after + after ))
+}
+
+print_total() {
+  local store_before="$1"
+  echo "TOTAL dirs=$total_dirs before=$total_before after=$total_after store_before=$store_before store_after=$(( store_before + store_added ))"
+}
+
+if [[ "$migrate" -eq 1 ]]; then
+  migrated=0
+  blob_dir="$root/_vr-blobs"
+  while IFS= read -r dir; do
+    b="${dir##*/}"
+    [ "${#b}" -eq 40 ] || continue
+    case "$b" in (*[!0-9a-f]*) continue ;; esac
+    vr_dir="$dir/visual-review"
+    [[ -f "$vr_dir/index.html" ]] || continue
+    if [[ "$dry_run" -eq 1 ]]; then
+      before="$(tree_bytes "$dir")"
+      dedupe_dir "$vr_dir" "$blob_dir"
+      report_dry "$b" "$before"
+    else
+      dedupe_dir "$vr_dir" "$blob_dir"
+      if [[ "$DD_MOVED" -gt 0 ]]; then
+        migrated=$(( migrated + 1 ))
+        echo "migrated $b: moved=$DD_MOVED" >&2
+      fi
+    fi
+  done < <(find "$root" -mindepth 1 -maxdepth 1 -type d | sort)
+  if [[ "$dry_run" -eq 1 ]]; then
+    print_total "$(tree_bytes "$blob_dir")"
+  else
+    echo "$migrated"
+  fi
+else
+  blob_dir="$stage_dir/_vr-blobs"
+  if [[ "$dry_run" -eq 1 ]]; then
+    dedupe_dir "$gallery_dir" "$blob_dir"
+    report_dry "$key" "$(tree_bytes "$gallery_dir")"
+    print_total 0
+  else
+    vr_dir="$stage_dir/$key/visual-review"
+    mkdir -p "$vr_dir"
+    cp -R "$gallery_dir/." "$vr_dir/"
+    dedupe_dir "$vr_dir" "$blob_dir"
+    echo "staged $key: moved=$DD_MOVED blobs_new=$blobs_new" >&2
+  fi
+fi

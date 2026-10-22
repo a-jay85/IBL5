@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# Fixture-tree harness for bin/vr-dedupe-gallery and bin/check-vr-gallery-refs.
+# Placeholder until the Phase 5 cases land.
+set -euo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+h_pass "placeholder"
+h_done

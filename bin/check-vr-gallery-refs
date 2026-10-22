@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+set -euo pipefail
+
+# Detect dangling image references in the per-SHA VR galleries of a gh-pages
+# checkout. Blob refs (../../_vr-blobs/<hash>.png) and legacy per-SHA refs go
+# through one filesystem check. The pr/<N>/ preview tree and every other
+# non-40-hex dir are skipped.
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: check-vr-gallery-refs [--root DIR]
+
+Checks every top-level 40-hex dir under ROOT (default: .) that has
+visual-review/index.html. Prints "DANGLING <sha>/visual-review/index.html -> <value>"
+for each relative .png reference whose target file is missing.
+
+Exit 0 and "OK dirs=<n> refs=<m>" when clean; exit 1 on any dangling reference;
+exit 2 on a usage error.
+EOF
+}
+
+root="."
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --root)
+      shift
+      if [[ $# -eq 0 || -z "${1:-}" ]]; then
+        echo "check-vr-gallery-refs: --root needs a value" >&2
+        usage
+        exit 2
+      fi
+      root="$1"
+      shift
+      ;;
+    *)
+      echo "check-vr-gallery-refs: unknown option: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [[ ! -d "$root" ]]; then
+  echo "check-vr-gallery-refs: root not a directory: $root" >&2
+  exit 2
+fi
+
+# Prints every (src|href)="<value>" value in the file, one per line. The same
+# match() walk is used by bin/vr-dedupe-gallery, keep the two copies in step.
+EXTRACT_AWK='
+{
+  line = $0
+  while (match(line, /(src|href)="[^"]*"/)) {
+    full = substr(line, RSTART, RLENGTH)
+    eq = index(full, "=")
+    print substr(full, eq + 2, length(full) - eq - 2)
+    line = substr(line, RSTART + RLENGTH)
+  }
+}
+'
+
+dirs=0
+refs=0
+dangling=0
+
+while IFS= read -r dir; do
+  b="${dir##*/}"
+  [ "${#b}" -eq 40 ] || continue
+  case "$b" in (*[!0-9a-f]*) continue ;; esac
+  index="$dir/visual-review/index.html"
+  [[ -f "$index" ]] || continue
+  dirs=$(( dirs + 1 ))
+  while IFS= read -r value; do
+    [[ -n "$value" ]] || continue
+    case "$value" in
+      (http:*|https:*|//*|data:*|/*|'#'*) continue ;;
+    esac
+    path="${value%%[?#]*}"
+    case "$path" in (*.png) ;; (*) continue ;; esac
+    refs=$(( refs + 1 ))
+    if [[ ! -f "$dir/visual-review/$path" ]]; then
+      echo "DANGLING $b/visual-review/index.html -> $value"
+      dangling=$(( dangling + 1 ))
+    fi
+  done < <(awk "$EXTRACT_AWK" "$index")
+done < <(find "$root" -mindepth 1 -maxdepth 1 -type d | sort)
+
+if [[ "$dangling" -gt 0 ]]; then
+  echo "check-vr-gallery-refs: $dangling dangling reference(s)" >&2
+  exit 1
+fi
+echo "OK dirs=$dirs refs=$refs"

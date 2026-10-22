@@ -227,5 +227,19 @@ R15="$(awk '
     }' "$SCRIPT_DIR/automouse/run")"
 h_contains "case 15: 5 sites, 0 missing" "$R15" "sites=5 missing=0"
 
+echo "== case 16: burndown's failed-item block names the reap"
+BD="$REAL_ROOT/.claude/skills/burndown/SKILL.md"
+h_eq "case 16: reap command present" 1 \
+    "$(grep -cF 'cd /Users/ajaynicolas/GitHub/IBL5 && bin/wt-remove <slug> --if-empty' "$BD")"
+h_eq "case 16: stays-dirty sentence gone" 0 \
+    "$(grep -cF 'Its worktree stays dirty and keeps the issue in flight' "$BD")"
+
+echo "== case 17: fix-and-prevent Step 0 names the reap on the /plan hand-off line"
+FP="$REAL_ROOT/.claude/skills/fix-and-prevent/SKILL.md"
+h_eq "case 17: reap command present once" 1 \
+    "$(grep -cF 'bin/wt-remove <slug> --if-empty' "$FP")"
+h_contains "case 17: same line as the /plan hand-off" \
+    "$(grep -F 'bin/wt-remove <slug> --if-empty' "$FP")" 'hand off to `/plan`'
+
 echo "----"
 h_done

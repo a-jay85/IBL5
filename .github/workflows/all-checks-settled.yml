@@ -46,8 +46,10 @@ permissions:
   actions: read
   checks: read
 
+# The trigger event is in the group key so a sibling completion that the job `if:` skips
+# (pull_request_target, push) lands in its own group and cannot cancel a live settle.
 concurrency:
-  group: all-checks-settled-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number || github.event.workflow_run.head_sha }}
+  group: all-checks-settled-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number || github.event.workflow_run.head_sha }}-${{ github.event.workflow_run.event || 'dispatch' }}
   cancel-in-progress: true
 
 jobs:

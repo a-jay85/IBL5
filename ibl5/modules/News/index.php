@@ -38,7 +38,7 @@ $newsPageConfig = new \Topics\News\NewsPageConfig(
     tableBgcolor2: is_string($bgcolor2) ? $bgcolor2 : '#CCCCCC',
 );
 
-$newsSeason = new \Season\Season($mysqli_db);
+$newsSeason = \Season\SharedSeason::get($mysqli_db);
 $newsTeamIdentityRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
 $tradeFormRepo = new \Trading\TradeFormRepository($mysqli_db);
 $tradeValidator = new \Trading\TradeValidator($mysqli_db, $newsSeason);

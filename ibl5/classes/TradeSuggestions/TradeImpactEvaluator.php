@@ -22,7 +22,6 @@ final class TradeImpactEvaluator
     public const float MIN_GAIN = 1.0;
     public const float BALANCE_TOLERANCE = 0.15;
     public const float BALANCE_SLACK = 2.0;
-    public const int ROTATION_SIZE = 8;
 
     /** @var \WeakMap<TeamAssets, array<string, TeamScore>> */
     private \WeakMap $beforeScores;

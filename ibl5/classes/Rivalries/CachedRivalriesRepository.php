@@ -24,6 +24,9 @@ use Rivalries\Contracts\RivalriesRepositoryInterface;
 final class CachedRivalriesRepository implements RivalriesRepositoryInterface
 {
     private const TTL_SECONDS = 86400; // 24 hours
+    // Stats keys feed every Team page view and cost a full-history scan. The import's
+    // rebuildCache() refreshes them, so a long TTL only matters as a safety net.
+    private const STATS_TTL_SECONDS = 2592000; // 30 days
     private const KEY_PREFIX = 'rivalries';
     private const PAIR_PARTS = ['games', 'series', 'performers'];
 
@@ -46,7 +49,7 @@ final class CachedRivalriesRepository implements RivalriesRepositoryInterface
         }
 
         $data = $this->inner->getFranchisePairStats($recentFromSeasonYear);
-        $this->cache->set($key, $data, self::TTL_SECONDS);
+        $this->cache->set($key, $data, self::STATS_TTL_SECONDS);
 
         return $data;
     }
@@ -64,7 +67,7 @@ final class CachedRivalriesRepository implements RivalriesRepositoryInterface
         }
 
         $data = $this->inner->getGmPairStats($recentFromSeasonYear);
-        $this->cache->set($key, $data, self::TTL_SECONDS);
+        $this->cache->set($key, $data, self::STATS_TTL_SECONDS);
 
         return $data;
     }
@@ -201,9 +204,9 @@ final class CachedRivalriesRepository implements RivalriesRepositoryInterface
     public function rebuildCache(int $recentFromSeasonYear): int
     {
         $franchiseStats = $this->inner->getFranchisePairStats($recentFromSeasonYear);
-        $this->cache->set(self::KEY_PREFIX . ":franchises:{$recentFromSeasonYear}", $franchiseStats, self::TTL_SECONDS);
+        $this->cache->set(self::KEY_PREFIX . ":franchises:{$recentFromSeasonYear}", $franchiseStats, self::STATS_TTL_SECONDS);
         $gmStats = $this->inner->getGmPairStats($recentFromSeasonYear);
-        $this->cache->set(self::KEY_PREFIX . ":gms:{$recentFromSeasonYear}", $gmStats, self::TTL_SECONDS);
+        $this->cache->set(self::KEY_PREFIX . ":gms:{$recentFromSeasonYear}", $gmStats, self::STATS_TTL_SECONDS);
         $count = 2;
 
         foreach ($franchiseStats as $stat) {

@@ -21,14 +21,14 @@ final class CachedRivalriesRepositoryTest extends TestCase
         $this->repo = new CachedRivalriesRepository($this->inner, $this->cache);
     }
 
-    public function testStatsMissStoresWithDayTtlAndHitSkipsInner(): void
+    public function testStatsMissStoresWithMonthTtlAndHitSkipsInner(): void
     {
         $first = $this->repo->getFranchisePairStats(2022);
         $second = $this->repo->getFranchisePairStats(2022);
 
         self::assertSame($first, $second);
         self::assertSame(1, $this->inner->calls['getFranchisePairStats'] ?? 0);
-        self::assertSame(86400, $this->cache->ttls['rivalries:franchises:2022'] ?? null);
+        self::assertSame(2592000, $this->cache->ttls['rivalries:franchises:2022'] ?? null);
     }
 
     public function testPairKeysAreCanonicalAcrossArgumentOrder(): void

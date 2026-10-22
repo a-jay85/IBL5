@@ -99,6 +99,12 @@
     }
 }
 
+/* Keep the row label's white/black name on hover. Without this the global
+   .ibl-data-table a:hover recolors it to the accent over the team color. */
+.h2h-matrix .h2h-row-label.ibl-team-cell--colored .ibl-team-cell__name {
+    color: var(--team-cell-color);
+}
+
 /* Corner cell: reading-direction hint (arrows point at columns, up at rows) */
 .h2h-matrix .h2h-corner {
     vertical-align: bottom;

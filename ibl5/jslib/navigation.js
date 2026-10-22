@@ -62,6 +62,7 @@
             }
         }, { signal: signal });
 
+        var menuStaggerTimer;
         var overlayShowTimer;
         var overlayHideTimer;
 
@@ -71,7 +72,7 @@
             mobileMenu.classList.add('translate-x-0');
 
             // Add class for staggered animations
-            setTimeout(function() {
+            menuStaggerTimer = setTimeout(function() {
                 mobileMenu.classList.add('mobile-menu-open');
             }, 50);
 
@@ -91,7 +92,8 @@
         }
 
         function closeMenu() {
-            // Remove stagger animation class first
+            // Remove stagger animation class first; a close inside the 50ms open window must cancel the pending add.
+            clearTimeout(menuStaggerTimer);
             mobileMenu.classList.remove('mobile-menu-open');
 
             // Slide out menu

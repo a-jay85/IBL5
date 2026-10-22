@@ -176,7 +176,7 @@ class NewsLegacyPagesEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertStringContainsString('<h1 class="ibl-title">Story One</h1>', $output);
         $this->assertStringContainsString(
-            '<a href="modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=15"><span class="storycat">Trades</span></a>: Story One',
+            '<a href="modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=15"><font class="storycat">Trades</font></a>: Story One',
             $output,
         );
         $this->assertStringContainsString("home\n\nbody\n\n<b>Note:</b> <i>Hot take</i>", $output);

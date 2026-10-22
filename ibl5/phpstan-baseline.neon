@@ -55,15 +55,6 @@ parameters:
 			path: classes/Trading/TradingController.php
 
 		-
-			rawMessage: '''
-				Instantiation of deprecated class Extension\ExtensionProcessor:
-				Use ExtensionService instead
-			'''
-			identifier: new.deprecatedClass
-			count: 1
-			path: modules/Player/extension.php
-
-		-
 			rawMessage: 'Direct is_admin() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1

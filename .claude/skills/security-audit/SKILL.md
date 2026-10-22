@@ -5,7 +5,7 @@ name: security-audit
 description: Token-efficient security audit for pull requests
 disable-model-invocation: true
 model: claude-sonnet-5-5
-last_verified: 2026-09-28
+last_verified: 2026-10-19
 ---
 
 Perform a security audit on the given pull request. This command optimizes token usage by fetching the diff once and passing it to a single merged security agent.
@@ -52,7 +52,7 @@ Store all of these results — they will be passed as context to agents below.
 
 **Read** `.claude/review-shared/_security-agents.md` for the canonical pattern-detection bash block and agent definition.
 
-Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Haiku agent** with the categories line and the PHP-only diff from Step 2c. Do not forward CLAUDE.md content (auto-loaded).
+Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Sonnet 5.5 agent** (`subagent_type: "sonnet-5-5"`, omit `model`) with the categories line and the PHP-only diff from Step 2c. Do not forward CLAUDE.md content (auto-loaded).
 
 **XSS and Input Validation are NOT audited here** — they're deterministically enforced by `RequireEscapedOutputRule` and `BanRawSuperglobalsRule`. Any finding those rules would catch is out of scope.
 

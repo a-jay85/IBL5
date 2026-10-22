@@ -1,0 +1,14 @@
+[
+ {
+  "number": 901,
+  "state": "OPEN",
+  "title": "class-scan: two threads",
+  "body": "Evidence.\n<!-- finding-class-scan:threads=T1 -->\n<!-- finding-class-scan:key=two-threads-one-pr -->"
+ },
+ {
+  "number": 900,
+  "state": "OPEN",
+  "title": "unrelated issue",
+  "body": "No marker here."
+ }
+]

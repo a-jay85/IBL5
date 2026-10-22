@@ -107,12 +107,12 @@ def test_what_cell_post_merge_text_stays_manual():
     assert post_merge == []
 
 
-def test_post_merge_row_outside_what_to_verify_table_stays_manual():
+def test_post_merge_row_outside_typed_table_yields_no_row():
     other = (
         "\n## Notes\n\n| # | Item | Type | Timing | Where |\n|---|---|---|---|---|\n"
         "| 5 | operator checks the nightly job | Truly-manual | post-impl"
         " | post-merge: launchd scheduling on the live host only fires after deploy |\n"
     )
     _, manual, post_merge = parse_matrix(HDR + PLAIN + other)
-    assert sorted(r.number for r in manual) == ["29", "5"]
+    assert [r.number for r in manual] == ["29"]
     assert post_merge == []

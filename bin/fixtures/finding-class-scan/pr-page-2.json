@@ -1,0 +1,46 @@
+{
+ "data": {
+  "repository": {
+   "pullRequests": {
+    "pageInfo": {
+     "hasNextPage": false,
+     "endCursor": null
+    },
+    "nodes": [
+     {
+      "number": 102,
+      "updatedAt": "2026-10-05T10:00:00Z",
+      "reviewThreads": {
+       "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": null
+       },
+       "nodes": [
+        {
+         "id": "T8",
+         "isResolved": false,
+         "isOutdated": false,
+         "path": "ibl5/classes/Foo/Bar.php",
+         "line": 10,
+         "comments": {
+          "nodes": [
+           {
+            "author": {
+             "login": "a-jay85",
+             "__typename": "User"
+            },
+            "body": "finding body",
+            "url": "https://github.com/a-jay85/IBL5/pull/102#discussion_r8",
+            "createdAt": "2026-10-10T09:00:00Z"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   }
+  }
+ }
+}

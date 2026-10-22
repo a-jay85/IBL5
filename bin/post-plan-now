@@ -557,12 +557,13 @@ fi
 # the --foreground exec and re-fires past its own headless guard.
 unset IBL5_BURNDOWN_LOOP
 
-# Reap abandoned post-plan-now jobs (loaded but idle, or unloaded, with no live
-# process) before adding another. Skipped under the test-only root overrides so a
-# test run can never touch the real LaunchAgents dir. Never fatal.
+# Reap per-run scripts left by killed post-plan-now runs (SIGKILL, reboot) before
+# adding another. A submitted job never sits loaded-idle (ADR: per-run launchd jobs
+# write no LaunchAgents file), so only the script file can be orphaned. Skipped under
+# the test-only root overrides. Never fatal.
 if [ "$FOREGROUND" -eq 0 ] && [ -z "${POST_PLAN_MAIN_ROOT:-}${POST_PLAN_SELF_BIN:-}" ]; then
-    _pp_alive() { ljob_pgrep_alive "$1"; }
-    ljob_reap_idle com.ibl5.postplan-now- _pp_alive 10 "$(ljob_snapshot)" || true
+    ljob_reap_orphan_scripts "${POSTPLAN_LOG_DIR:-/tmp}" post-plan-now- \
+        com.ibl5.postplan-now- 10 "$(ljob_snapshot)" || true
 fi
 
 # In-flight duplicate-run guard. The launchd job for this slug is still loaded, so a peer

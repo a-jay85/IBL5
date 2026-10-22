@@ -318,26 +318,27 @@ xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>
 shq() { local q="'\\''"; printf "'%s'" "${1//\'/$q}"; }
 
 # ---------------------------------------------------------------------------
-# ljob_reap_idle <label_prefix> <alive_fn> <min_age_min> <snapshot>
-# Reaps <agents_dir>/<prefix>*.plist whose job is provably idle:
-#   - plist mtime older than <min_age_min> minutes (guards the bootstrap->spawn window);
-#   - the snapshot row whose 3rd tab field EQUALS the label is absent, or its PID is "-";
-#   - <alive_fn> <label> returns 1 (no process carries the label).
-# A loaded-idle label is booted out before its plist is removed. LJOB_REAP_DRY=1 prints
-# "would reap <label>" and changes nothing. Always returns 0.
-ljob_reap_idle() {
-    local prefix="$1" alive_fn="$2" age="$3" snap="$4" f label row pid
-    for f in "$(ljob_agents_dir)/${prefix}"*.plist; do
+# ljob_reap_orphan_scripts <dir> <file_prefix> <label_prefix> <min_age_min> <snapshot>
+# Deletes <dir>/<file_prefix>*.sh (and its .once marker) when the file is older
+# than <min_age_min> minutes AND the label <label_prefix><stem after file_prefix>
+# is absent from <snapshot>. A finished ljob_submit run deletes its own script,
+# so such a file belongs to a run killed by SIGKILL, reboot or logout.
+# An empty snapshot reaps nothing: a failed `launchctl list` must never read as
+# "nothing is running". LJOB_REAP_DRY=1 prints "would reap <file>" and changes
+# nothing. Always returns 0.
+# ---------------------------------------------------------------------------
+ljob_reap_orphan_scripts() {
+    local dir="$1" fpre="$2" lpre="$3" age="$4" snap="$5" f stem label
+    [[ -n "$snap" ]] || return 0
+    for f in "$dir/$fpre"*.sh; do
         [[ -e "$f" ]] || continue
-        label="$(basename "$f" .plist)"
         [[ -n "$(find "$f" -mmin "-${age}" 2>/dev/null)" ]] && continue   # too young
-        row="$(awk -F'\t' -v l="$label" '$3 == l {print; exit}' <<< "$snap")"
-        pid="${row%%$'\t'*}"
-        [[ -n "$row" && "$pid" != "-" ]] && continue                      # running
-        "$alive_fn" "$label" && continue                                   # live process
-        if [[ -n "${LJOB_REAP_DRY:-}" ]]; then echo "would reap $label"; continue; fi
-        [[ -n "$row" ]] && { launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true; }
-        rm -f "$f"; echo "reaped stale job $label"
+        stem="$(basename "$f" .sh)"
+        label="${lpre}${stem#"$fpre"}"
+        awk -F'\t' -v l="$label" '$3 == l {f=1} END {exit !f}' <<< "$snap" && continue   # still loaded
+        if [[ -n "${LJOB_REAP_DRY:-}" ]]; then echo "would reap $f"; continue; fi
+        rm -f "$f"; rmdir "$f.once" 2>/dev/null || true
+        echo "reaped orphan script $f"
     done
     return 0
 }

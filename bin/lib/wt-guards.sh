@@ -156,3 +156,29 @@ has_untracked_files() {
     out=$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null)
     [ -n "$out" ]
 }
+
+# Print the reason a worktree must be kept; print nothing when it is empty.
+# Empty = HEAD has 0 commits not on origin/master AND no tracked diff AND no
+# untracked non-ignored file. Fail-closed (shell-fail-open-probe.md): when
+# rev-list cannot run, that is a keep reason, never "0 ahead". The rev-list
+# probe runs first so a broken gitdir never reaches the two helpers below,
+# which treat a broken gitdir as clean.
+worktree_keep_reason() {
+    local wt="$1" ahead
+    if ! ahead=$(git -C "$wt" rev-list --count origin/master..HEAD 2>/dev/null); then
+        echo "cannot verify emptiness (origin/master or HEAD unresolvable)"
+        return 0
+    fi
+    if [ "$ahead" != "0" ]; then
+        echo "$ahead commit(s) ahead of origin/master"
+        return 0
+    fi
+    if has_uncommitted_changes "$wt"; then
+        echo "uncommitted changes"
+        return 0
+    fi
+    if has_untracked_files "$wt"; then
+        echo "untracked files"
+        return 0
+    fi
+}

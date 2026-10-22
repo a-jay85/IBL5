@@ -7,7 +7,7 @@
 #
 # --if-empty is the one place every worktree-creating flow asks "is this
 # aborted worktree empty, so it is safe to remove?". Each case builds a real
-# worktree in a throwaway origin/main pair under mktemp and runs the real
+# worktree in a throwaway origin/master pair under mktemp and runs the real
 # bin/wt-remove (copied with bin/lib/ and bin/wt-down; no stubs) against it.
 #
 # The test never sets or reads HOME, so the empty-environment run
@@ -101,6 +101,16 @@ h_eq "case 4: rc 0" 0 "$RC"
 h_contains "case 4: kept" "$OUT" "kept 'untracked-1'"
 h_contains "case 4: reason" "$OUT" "untracked files"
 h_exists "case 4: dir present" "$WTS/untracked-1"
+
+echo "== case 4b: a tracked edit git cannot read keeps (fail-closed)"
+mkwt unreadable-1 unreadable-1
+echo changed >> "$WTS/unreadable-1/tracked.txt"
+chmod 000 "$WTS/unreadable-1/tracked.txt"
+run_rm unreadable-1 --if-empty
+chmod u+rw "$WTS/unreadable-1/tracked.txt" 2>/dev/null
+h_eq "case 4b: rc 0" 0 "$RC"
+h_contains "case 4b: kept" "$OUT" "kept 'unreadable-1'"
+h_exists "case 4b: dir present" "$WTS/unreadable-1"
 
 echo "== case 5: gitignored wt_link_shared symlinks are not work"
 mkwt links-1 links-1

@@ -388,6 +388,14 @@ case_empty_slice_advances_without_claude() {
     grep -qx 'reviewed Aaa' "$STATE/rotation.state" && ok "empty module is marked reviewed" || fail "empty module is marked reviewed"
 }
 
+case_print_prompt_empty_slice_does_not_advance() {
+    new_fixture
+    mkdir -p "$CLASSES/Aaa"
+    csr --print-prompt
+    expect_has "empty slice named" "$OUT" "empty slice"
+    expect_absent "print-prompt on empty slice writes no state" "$STATE/rotation.state"
+}
+
 case_byte_budget_partial() {
     new_fixture
     local f

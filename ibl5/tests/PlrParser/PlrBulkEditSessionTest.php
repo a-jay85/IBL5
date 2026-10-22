@@ -221,6 +221,36 @@ final class PlrBulkEditSessionTest extends TestCase
         }
     }
 
+    public function testLiveRunOnReadOnlyFileAbortsWithoutBackup(): void
+    {
+        chmod($this->plrPath, 0444);
+        $session = $this->session([]);
+
+        try {
+            $session->open();
+            self::fail('open() should have thrown');
+        } catch (\RuntimeException $e) {
+            self::assertStringContainsString('not writable', $e->getMessage());
+            self::assertSame(['IBL5.plr'], $this->plrFiles());
+        } finally {
+            chmod($this->plrPath, 0644);
+        }
+    }
+
+    public function testDryRunOnReadOnlyFileStillOpens(): void
+    {
+        chmod($this->plrPath, 0444);
+        $session = $this->session(['--dry-run']);
+
+        try {
+            $handle = $session->open();
+            self::assertSame(['IBL5.plr'], $this->plrFiles());
+            fclose($handle);
+        } finally {
+            chmod($this->plrPath, 0644);
+        }
+    }
+
     public function testPhpstanBaselineHasNoEntryForSessionClass(): void
     {
         $baseline = file_get_contents(dirname(__DIR__, 2) . '/phpstan-baseline.neon');

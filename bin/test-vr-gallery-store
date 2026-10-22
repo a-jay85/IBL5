@@ -1,9 +1,299 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Fixture-tree harness for bin/vr-dedupe-gallery and bin/check-vr-gallery-refs.
-# Placeholder until the Phase 5 cases land.
+#
+# bin/test-vr-gallery-store — fixture-tree harness for bin/vr-dedupe-gallery and
+# bin/check-vr-gallery-refs.
+#
+# Run: bin/test-vr-gallery-store  (exit 0 = all pass, 1 = a case failed)
+
 set -euo pipefail
+
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
-h_pass "placeholder"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEDUPE="$SCRIPT_DIR/vr-dedupe-gallery"
+REFS="$SCRIPT_DIR/check-vr-gallery-refs"
+
+h_tmp TMP
+
+SHA1="1111111111111111111111111111111111111111"
+SHA2="2222222222222222222222222222222222222222"
+BLOBS="_vr-blobs"
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+# run <cmd…>  — sets OUT (stdout), ERR (stderr), RC without tripping set -e
+run() {
+    RC=0
+    OUT="$("$@" 2>"$TMP/run_err")" || RC=$?
+    ERR="$(cat "$TMP/run_err")"
+}
+
+# sha_of <file>  — 64-hex sha256
+sha_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 "$1" | cut -d' ' -f1
+    fi
+}
+
+# snap <root>  — sorted cksum listing of every file under root
+snap() {
+    (cd "$1" && find . -type f -exec cksum {} + | sort -k3)
+}
+
+# make_cell <vr_dir> <title> <seed>  — three fixed-length PNG stand-ins
+make_cell() {
+    local d="$1" title="$2" seed="$3"
+    mkdir -p "$d"
+    printf '%s' "$seed-before-xxxxxxxx" > "$d/$title.before.png"
+    printf '%s' "$seed-after-xxxxxxxxx" > "$d/$title.after.png"
+    printf '%s' "$seed-diff-xxxxxxxxxx" > "$d/$title.diff.png"
+}
+
+# make_index <vr_dir> <title>…  — index.html using the real gallery cell markup
+make_index() {
+    local d="$1" title
+    shift
+    {
+        printf '<html><body>\n'
+        for title in "$@"; do
+            printf '<figure><figcaption>Before (master)</figcaption><img loading="lazy" src="%s.before.png" alt="Before (master)"></figure>\n' "$title"
+            printf '<figure><figcaption>After (this PR)</figcaption><img loading="lazy" src="%s.after.png" alt="After (this PR)"></figure>\n' "$title"
+            printf '<figure><figcaption>Diff</figcaption><img loading="lazy" src="%s.diff.png" alt="Diff"></figure>\n' "$title"
+        done
+        printf '</body></html>\n'
+    } > "$d/index.html"
+}
+
+# make_extras <vr_dir> <title>  — files the tool must never touch
+make_extras() {
+    local d="$1" title="$2"
+    mkdir -p "$d/new-screens" "$d/manual-rows" "$d/playwright-report"
+    printf 'new-%s' "$title" > "$d/new-screens/$title.png"
+    printf 'manual-row' > "$d/manual-rows/x.png"
+    printf '<html>report</html>\n' > "$d/playwright-report/index.html"
+}
+
+# build_gallery <vr_dir> <seed> <title>…  — cells, index, and extras for a dir
+build_gallery() {
+    local d="$1" seed="$2" title
+    shift 2
+    for title in "$@"; do
+        make_cell "$d" "$title" "$seed-$title"
+        make_extras "$d" "$title"
+    done
+    make_index "$d" "$@"
+}
+
+# build_shared_root <root>  — two SHA dirs sharing a byte-identical a.after.png
+build_shared_root() {
+    local root="$1"
+    build_gallery "$root/$SHA1/visual-review" s1 a
+    build_gallery "$root/$SHA2/visual-review" s2 a
+    cp "$root/$SHA1/visual-review/a.after.png" "$root/$SHA2/visual-review/a.after.png"
+}
+
+# count_blobs <root>  — number of 64-hex blobs in root/_vr-blobs
+count_blobs() {
+    find "$1/$BLOBS" -maxdepth 1 -type f -name '*.png' 2>/dev/null | wc -l | tr -d ' '
+}
+
+# ---------------------------------------------------------------------------
+# Case: publish-stages-root-shape
+# ---------------------------------------------------------------------------
+GAL="$TMP/pub-gallery"
+STAGE="$TMP/pub-stage"
+build_gallery "$GAL" pub a b
+KEY="cccccccccccccccccccccccccccccccccccccccc"
+run "$DEDUPE" --gallery-dir "$GAL" --key "$KEY" --stage-dir "$STAGE"
+VR="$STAGE/$KEY/visual-review"
+h_eq "publish-stages-root-shape: exit 0" "0" "$RC"
+h_exists "publish-stages-root-shape: index.html staged" "$VR/index.html"
+PNG_LEFT="$(find "$VR" -maxdepth 1 -type f \( -name '*.before.png' -o -name '*.after.png' -o -name '*.diff.png' \) | wc -l | tr -d ' ')"
+h_eq "publish-stages-root-shape: no cell PNGs left in vr dir" "0" "$PNG_LEFT"
+h_eq "publish-stages-root-shape: one blob per distinct image" "6" "$(count_blobs "$STAGE")"
+BAD_NAME="$(find "$STAGE/$BLOBS" -maxdepth 1 -type f | sed 's|.*/||' | grep -cvE '^[0-9a-f]{64}\.png$' || true)"
+h_eq "publish-stages-root-shape: blob names are 64-hex" "0" "$BAD_NAME"
+UNREWRITTEN="$(grep -oE '(src|href)="[^"]*\.png"' "$VR/index.html" | grep -cvF '"../../_vr-blobs/' || true)"
+h_eq "publish-stages-root-shape: every image ref rewritten" "0" "$UNREWRITTEN"
+SAME=1
+for f in new-screens/a.png new-screens/b.png manual-rows/x.png playwright-report/index.html; do
+    cmp -s "$GAL/$f" "$VR/$f" || SAME=0
+done
+h_eq "publish-stages-root-shape: extras byte-identical" "1" "$SAME"
+run "$REFS" --root "$STAGE"
+h_eq "publish-stages-root-shape: refs check exit 0" "0" "$RC"
+
+# ---------------------------------------------------------------------------
+# Case: migrate-dedupes-across-dirs
+# ---------------------------------------------------------------------------
+ROOT="$TMP/migrate-root"
+build_shared_root "$ROOT"
+SHARED_HASH="$(sha_of "$ROOT/$SHA1/visual-review/a.after.png")"
+run "$DEDUPE" --migrate --root "$ROOT"
+h_eq "migrate-dedupes-across-dirs: stdout is 2" "2" "$OUT"
+h_eq "migrate-dedupes-across-dirs: one shared blob among five" "5" "$(count_blobs "$ROOT")"
+h_exists "migrate-dedupes-across-dirs: shared blob exists" "$ROOT/$BLOBS/$SHARED_HASH.png"
+for s in "$SHA1" "$SHA2"; do
+    IDX="$(cat "$ROOT/$s/visual-review/index.html")"
+    h_contains "migrate-dedupes-across-dirs: $s index points at shared blob" "$IDX" "src=\"../../_vr-blobs/$SHARED_HASH.png\""
+done
+
+# ---------------------------------------------------------------------------
+# Case: collision-free-blob-naming
+# Same title, different bytes: two blobs, each dir's ref resolves to its own bytes.
+# ---------------------------------------------------------------------------
+ROOT="$TMP/collide-root"
+build_gallery "$ROOT/$SHA1/visual-review" c1 a
+build_gallery "$ROOT/$SHA2/visual-review" c2 a
+mkdir -p "$TMP/collide-orig"
+cp "$ROOT/$SHA1/visual-review/a.after.png" "$TMP/collide-orig/1.after.png"
+cp "$ROOT/$SHA2/visual-review/a.after.png" "$TMP/collide-orig/2.after.png"
+run "$DEDUPE" --migrate --root "$ROOT"
+h_eq "collision-free-blob-naming: six distinct blobs" "6" "$(count_blobs "$ROOT")"
+for n in 1 2; do
+    case "$n" in 1) S="$SHA1" ;; *) S="$SHA2" ;; esac
+    H="$(sha_of "$TMP/collide-orig/$n.after.png")"
+    IDX="$(cat "$ROOT/$S/visual-review/index.html")"
+    h_contains "collision-free-blob-naming: dir $n ref names its own hash" "$IDX" "src=\"../../_vr-blobs/$H.png\""
+    if cmp -s "$ROOT/$BLOBS/$H.png" "$TMP/collide-orig/$n.after.png"; then
+        h_pass "collision-free-blob-naming: dir $n blob bytes match original"
+    else
+        h_fail "collision-free-blob-naming: dir $n blob bytes match original"
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# Case: migrate-rerun-is-noop
+# ---------------------------------------------------------------------------
+BEFORE="$(snap "$ROOT")"
+run "$DEDUPE" --migrate --root "$ROOT"
+AFTER="$(snap "$ROOT")"
+h_eq "migrate-rerun-is-noop: stdout is 0" "0" "$OUT"
+h_eq "migrate-rerun-is-noop: tree unchanged" "$BEFORE" "$AFTER"
+
+# ---------------------------------------------------------------------------
+# Case: dry-run-projects-per-dir-size
+# ---------------------------------------------------------------------------
+ROOT="$TMP/dry-root"
+build_shared_root "$ROOT"
+BEFORE="$(snap "$ROOT")"
+run "$DEDUPE" --migrate --dry-run --root "$ROOT"
+WANT_DRY="DIR $SHA1 before=455 after=395 moved=3
+DIR $SHA2 before=455 after=395 moved=3
+TOTAL dirs=2 before=910 after=790 store_before=0 store_after=100"
+h_eq "dry-run-projects-per-dir-size: exact projection" "$WANT_DRY" "$OUT"
+AFTER="$(snap "$ROOT")"
+h_eq "dry-run-projects-per-dir-size: tree unchanged" "$BEFORE" "$AFTER"
+h_absent "dry-run-projects-per-dir-size: no _vr-blobs created" "$ROOT/$BLOBS"
+
+# ---------------------------------------------------------------------------
+# Case: index-without-refs-left-alone
+# ---------------------------------------------------------------------------
+ROOT="$TMP/norefs-root"
+VR="$ROOT/$SHA1/visual-review"
+make_cell "$VR" a n1
+printf '<html><body>no images here</body></html>\n' > "$VR/index.html"
+cp "$VR/index.html" "$TMP/norefs-index.orig"
+run "$DEDUPE" --migrate --root "$ROOT"
+h_eq "index-without-refs-left-alone: stdout is 0" "0" "$OUT"
+KEPT=1
+for f in a.before.png a.after.png a.diff.png; do
+    [ -f "$VR/$f" ] || KEPT=0
+done
+h_eq "index-without-refs-left-alone: every PNG kept" "1" "$KEPT"
+if cmp -s "$VR/index.html" "$TMP/norefs-index.orig"; then
+    h_pass "index-without-refs-left-alone: index byte-identical"
+else
+    h_fail "index-without-refs-left-alone: index byte-identical"
+fi
+run "$REFS" --root "$ROOT"
+h_eq "index-without-refs-left-alone: refs check" "OK dirs=1 refs=0" "$OUT"
+
+# ---------------------------------------------------------------------------
+# Case: unreferenced-png-stays
+# The index names a%20b.after.png; the file is "a b.after.png", so no exact match.
+# ---------------------------------------------------------------------------
+ROOT="$TMP/unref-root"
+VR="$ROOT/$SHA1/visual-review"
+mkdir -p "$VR"
+printf 'spaced-bytes' > "$VR/a b.after.png"
+printf '<html><body><img src="a%%20b.after.png"></body></html>\n' > "$VR/index.html"
+run "$DEDUPE" --migrate --root "$ROOT"
+h_eq "unreferenced-png-stays: stdout is 0" "0" "$OUT"
+h_exists "unreferenced-png-stays: file not moved" "$VR/a b.after.png"
+h_absent "unreferenced-png-stays: no blob store" "$ROOT/$BLOBS"
+
+# ---------------------------------------------------------------------------
+# Case: refs-check-detects-dangling
+# ---------------------------------------------------------------------------
+ROOT="$TMP/dangle-root"
+build_shared_root "$ROOT"
+GONE_HASH="$(sha_of "$ROOT/$SHA1/visual-review/a.before.png")"
+run "$DEDUPE" --migrate --root "$ROOT"
+rm -f "$ROOT/$BLOBS/$GONE_HASH.png"
+run "$REFS" --root "$ROOT"
+h_eq "refs-check-detects-dangling: exit 1" "1" "$RC"
+h_contains "refs-check-detects-dangling: names the missing blob" "$OUT" "DANGLING $SHA1/visual-review/index.html -> ../../_vr-blobs/$GONE_HASH.png"
+
+# ---------------------------------------------------------------------------
+# Case: refs-check-skips-external-and-pr
+# ---------------------------------------------------------------------------
+ROOT="$TMP/skip-root"
+VR="$ROOT/$SHA1/visual-review"
+mkdir -p "$VR" "$ROOT/pr/7/visual-review"
+printf '<html><body><img src="https://example.com/remote.png"></body></html>\n' > "$VR/index.html"
+printf '<html><body><img src="../../_vr-blobs/%s.png"></body></html>\n' \
+    "0000000000000000000000000000000000000000000000000000000000000000" > "$ROOT/pr/7/visual-review/index.html"
+run "$REFS" --root "$ROOT"
+h_eq "refs-check-skips-external-and-pr: exit 0" "0" "$RC"
+h_contains "refs-check-skips-external-and-pr: OK line" "$OUT" "OK dirs=1"
+
+# ---------------------------------------------------------------------------
+# Case: rejects-bad-flags
+# ---------------------------------------------------------------------------
+ROOT="$TMP/flags-root"
+build_gallery "$ROOT/$SHA1/visual-review" f a
+check_usage_exit() {
+    local label="$1"
+    shift
+    run "$@"
+    h_eq "rejects-bad-flags: $label exit 2" "2" "$RC"
+    h_eq "rejects-bad-flags: $label empty stdout" "" "$OUT"
+}
+check_usage_exit "unknown flag" "$DEDUPE" --bogus
+check_usage_exit "migrate with key" "$DEDUPE" --migrate --key "$SHA1" --root "$ROOT"
+check_usage_exit "non-hex key" "$DEDUPE" --key nothex --gallery-dir "$ROOT/$SHA1/visual-review" --stage-dir "$TMP/flags-stage"
+check_usage_exit "nonexistent refs root" "$REFS" --root /nonexistent
+check_usage_exit "nonexistent migrate root" "$DEDUPE" --migrate --root /nonexistent
+mkdir -p "$TMP/flags-busy"
+printf 'x' > "$TMP/flags-busy/x"
+run "$DEDUPE" --gallery-dir "$ROOT/$SHA1/visual-review" --key "$SHA1" --stage-dir "$TMP/flags-busy"
+h_eq "rejects-bad-flags: non-empty stage dir exit 1" "1" "$RC"
+h_contains "rejects-bad-flags: non-empty stage dir message" "$ERR" "stage dir not empty"
+
+# ---------------------------------------------------------------------------
+# Case: runs-under-scrubbed-env
+# Two copies of one fixture: one migrated in the normal env, one under env -i.
+# ---------------------------------------------------------------------------
+ROOT_N="$TMP/env-normal"
+ROOT_S="$TMP/env-scrubbed"
+build_shared_root "$ROOT_N"
+build_shared_root "$ROOT_S"
+run "$DEDUPE" --migrate --root "$ROOT_N"
+NORMAL_OUT="$OUT"
+run env -i PATH=/usr/bin:/bin bash "$DEDUPE" --migrate --root "$ROOT_S"
+h_eq "runs-under-scrubbed-env: migrate exit 0" "0" "$RC"
+h_eq "runs-under-scrubbed-env: migrate stdout matches normal env" "$NORMAL_OUT" "$OUT"
+run "$REFS" --root "$ROOT_N"
+NORMAL_OUT="$OUT"
+run env -i PATH=/usr/bin:/bin bash "$REFS" --root "$ROOT_S"
+h_eq "runs-under-scrubbed-env: refs check exit 0" "0" "$RC"
+h_eq "runs-under-scrubbed-env: refs stdout matches normal env" "$NORMAL_OUT" "$OUT"
+
 h_done

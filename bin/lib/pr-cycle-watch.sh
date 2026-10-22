@@ -29,6 +29,14 @@ PCW_STALE_LABEL_MIN=180
 # shellcheck disable=SC2034  # read by bin/pr-cycle-tick
 # DIRTY rescue launches per PR per local calendar day. Bounds the conflict re-try spend.
 PCW_CONFLICT_RETRY_DAILY_CAP=2
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+# Gate-timeout reruns per (PR, head SHA). Kept in gate-reruns/, apart from strikes/, so a
+# rerun never spends the no-op rescue cap.
+PCW_GATE_RERUN_CAP=2
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+PCW_GATE_CHECK="All checks green"         # job name of .github/workflows/all-checks-green.yml
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+PCW_GATE_WORKFLOW="all-checks-green.yml"  # the --workflow value for the run-list call
 
 # State dir: PR_CYCLE_WATCH_STATE_DIR when non-empty, else $HOME/.ibl5-pr-cycle-watch.
 # Unset and empty both mean "use the default". rc 1 when neither it nor HOME is set.
@@ -54,6 +62,55 @@ pcw_check_verdict() {
     [[ -z "$pending" ]] || { echo pending; return 0; }
     failed="$(ccg_failed <<< "$json")"
     if [[ -n "$failed" ]]; then echo red; else echo green; fi
+}
+
+# pcw_gate_failed: {check_runs:[...]} on stdin. rc 0 when the latest check-run named
+# $PCW_GATE_CHECK is completed with conclusion failure. Any other state, or bad JSON, is 1.
+pcw_gate_failed() {
+    local json
+    json="$(ccg_dedupe '[]' 2>/dev/null)" || return 1
+    jq -e --arg g "$PCW_GATE_CHECK" \
+        'any(.check_runs[]; .name == $g and .status == "completed" and .conclusion == "failure")' \
+        >/dev/null 2>&1 <<< "$json"
+}
+# pcw_gate_run_pick <sha>: the run-list JSON (fields databaseId,conclusion,status,headSha,createdAt)
+# on stdin. Prints "<databaseId> <status> <conclusion>" for the newest run whose headSha is
+# <sha>. rc 1 on bad JSON or no such run.
+pcw_gate_run_pick() {
+    local out
+    out="$(jq -r --arg s "$1" '[.[] | select(.headSha == $s)] | sort_by(.createdAt) | last
+        | select(. != null) | "\(.databaseId) \(.status) \(.conclusion // "null")"' 2>/dev/null)" || return 1
+    [[ "$out" =~ ^[0-9]+\ [a-z_]+\ [a-z_]+$ ]] || return 1
+    printf '%s\n' "$out"
+}
+# pcw_gate_timeout_anchors: the failed-log text of a run (--log-failed) on stdin. Prints the anchor
+# names from the first "TIMEOUT: WAIT: anchors not reported/completed: <a>, <b> <dash>
+# failing closed after Ns" line, one per line. rc 1 when no line carries that marker or the
+# list parses empty. The dash is U+2014; the sed matches it as one non-space run, so the
+# parse does not depend on the locale.
+pcw_gate_timeout_anchors() {
+    local line list
+    line="$(grep -F 'TIMEOUT: WAIT: anchors not reported/completed: ' | sed -n '1p')" || return 1
+    [[ -n "$line" ]] || return 1
+    list="${line#*anchors not reported/completed: }"
+    list="$(sed -E 's/ [^ ]+ failing closed after [0-9]+s.*$//' <<< "$list")"
+    list="$(jq -Rr 'split(", ") | map(sub("^ +";"") | sub(" +$";"")) | map(select(length > 0)) | .[]' <<< "$list")" || return 1
+    [[ -n "$list" ]] || return 1
+    printf '%s\n' "$list"
+}
+# pcw_anchors_green <names>: {check_runs:[...]} on stdin, <names> newline separated. rc 0
+# only when every named anchor's latest check-run is completed with conclusion success.
+# Missing, pending, failure, cancelled and skipped all return 1.
+pcw_anchors_green() {
+    local json
+    json="$(ccg_dedupe '[]' 2>/dev/null)" || return 1
+    jq -e --arg names "$1" '
+        . as $root
+        | ($names | split("\n") | map(select(length > 0))) as $want
+        | ($want | length) > 0
+          and all($want[]; . as $n | any($root.check_runs[]; .name == $n
+              and .status == "completed" and .conclusion == "success"))' \
+        >/dev/null 2>&1 <<< "$json"
 }
 
 # pcw_inflight <pr> <branch> <launchctl-snapshot>: 0 when a fleet rescue for the PR
@@ -238,19 +295,32 @@ pcw_mark_dm()        { _pcw_write "$1/dm-sent/$2" "$3"; }
 pcw_declined_head()  { _pcw_holds "$1/declined/$2" "$3" "${4:-}"; }
 pcw_record_declined() { _pcw_write "$1/declined/$2" "$3"; }
 # strikes/<pr> holds "<key> <n>": rescues that never reached post-plan for that key.
-pcw_strike_count() {   # <dir> <pr> <key> [<sha>]: prints n when strikes/<pr> holds the key or sha, else 0
-    local f="$1/strikes/$2" s="" n=""
-    if [[ -f "$f" ]]; then read -r s n < "$f" || true; fi
-    if [[ -n "$s" && ( "$s" == "$3" || "$s" == "${4:-}" ) && "$n" =~ ^[0-9]+$ ]]; then
+# _pcw_keyed_count <file> <key> [<alt-key>]: the n of a "<key> <n>" ledger line when its key
+# equals <key> or <alt-key>, else 0. Shared by strikes/ and gate-reruns/.
+_pcw_keyed_count() {
+    local s="" n=""
+    if [[ -f "$1" ]]; then read -r s n < "$1" || true; fi
+    if [[ -n "$s" && ( "$s" == "$2" || "$s" == "${3:-}" ) && "$n" =~ ^[0-9]+$ ]]; then
         printf '%s\n' "$n"
     else
         printf '0\n'
     fi
 }
+pcw_strike_count() {   # <dir> <pr> <key> [<sha>]: prints n when strikes/<pr> holds the key or sha, else 0
+    _pcw_keyed_count "$1/strikes/$2" "$3" "${4:-}"
+}
 pcw_add_strike() {     # <dir> <pr> <key> [<sha>]: writes "<key> <count+1>" and prints the new count
     local n
     n=$(( $(pcw_strike_count "$1" "$2" "$3" "${4:-}") + 1 ))
     _pcw_write "$1/strikes/$2" "$3 $n" && printf '%s\n' "$n"
+}
+# gate-reruns/<pr> holds "<head-sha> <n>": gate-timeout reruns issued for that head. A new
+# head SHA resets the count, because the gate re-runs on its own for a new push.
+pcw_gate_rerun_count() { _pcw_keyed_count "$1/gate-reruns/$2" "$3"; }   # <dir> <pr> <sha>
+pcw_add_gate_rerun() {  # <dir> <pr> <sha>: writes "<sha> <count+1>", prints the new count
+    local n
+    n=$(( $(pcw_gate_rerun_count "$1" "$2" "$3") + 1 ))
+    _pcw_write "$1/gate-reruns/$2" "$3 $n" && printf '%s\n' "$n"
 }
 # Per-kind DM ledger, same shape as dm-sent/: dm-<kind>/<pr> holds the key last DM'd about.
 # Kinds: declined, strikes, patchid. The patchid ledger stores the head SHA, because it
@@ -372,7 +442,7 @@ pcw_prune() {
     local dir="$1" open="$2" f
     for f in "$dir"/attempts/* "$dir"/dm-sent/* "$dir"/declined/* "$dir"/strikes/* \
              "$dir"/dm-declined/* "$dir"/dm-strikes/* "$dir"/dm-patchid/* \
-             "$dir"/conflict-hold/* "$dir"/retries/*; do
+             "$dir"/conflict-hold/* "$dir"/retries/* "$dir"/gate-reruns/*; do
         [[ -f "$f" ]] || continue
         grep -qxF "$(basename "$f")" <<< "$open" || rm -f "$f"
     done

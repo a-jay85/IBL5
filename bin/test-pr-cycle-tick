@@ -1773,7 +1773,7 @@ end_case conflict-retry-due-codes
 
 # prune-conflict-ledgers: pcw_prune drops the new ledgers of a closed PR (999), keeps PR 101's.
 reset; begin_case
-for l in conflict-hold retries; do
+for l in conflict-hold retries gate-reruns; do
     mkdir -p "$STATE_DIR/$l"; echo x > "$STATE_DIR/$l/999"; echo x > "$STATE_DIR/$l/101"
 done
 set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
@@ -1782,7 +1782,46 @@ no_file "$STATE_DIR/conflict-hold/999" || fail "prune-conflict-ledgers: conflict
 no_file "$STATE_DIR/retries/999" || fail "prune-conflict-ledgers: retries/999 survived"
 [[ -f "$STATE_DIR/conflict-hold/101" ]] || fail "prune-conflict-ledgers: conflict-hold/101 was pruned"
 [[ -f "$STATE_DIR/retries/101" ]] || fail "prune-conflict-ledgers: retries/101 was pruned"
+no_file "$STATE_DIR/gate-reruns/999" || fail "prune-conflict-ledgers: gate-reruns/999 survived"
+[[ -f "$STATE_DIR/gate-reruns/101" ]] || fail "prune-conflict-ledgers: gate-reruns/101 was pruned"
 end_case prune-conflict-ledgers
+
+# gate-lib-helpers (matrix rows 3, 4, 5): the pure gate helpers, sourced from the fixture
+# copy of the lib. The timeout log is the line captured from run 39712872847.
+reset; begin_case
+set_gate_log 39712872847 timeout; set_gate_log 39712872848 other
+printf 'All checks green\tWait\t2026-10-22T03:38:07Z TIMEOUT: WAIT: checks still running: ci \342\200\224 failing closed after 2426s\n' \
+    > "$SCRATCH/runlog-39712872849.txt"
+set_checks aaa1111 gate-timeout; set_checks bbb2222 red; set_checks ccc3333 gate-anchor-failed
+set_gate_run aaa1111 39712872847 completed failure
+GD="$SCRATCH/gate-ledger"; rm -rf "$GD"; mkdir -p "$GD"
+res="$(
+    . "$REPO/bin/lib/pr-cycle-watch.sh"
+    a="$(pcw_gate_timeout_anchors < "$SCRATCH/runlog-39712872847.txt")"; echo "anchors-rc=$?"
+    echo "anchors=$(tr '\n' '|' <<< "$a")"
+    o="$(pcw_gate_timeout_anchors < "$SCRATCH/runlog-39712872848.txt")"; echo "other-rc=$?"; echo "other-out=[$o]"
+    o="$(pcw_gate_timeout_anchors < "$SCRATCH/runlog-39712872849.txt")"; echo "running-rc=$?"; echo "running-out=[$o]"
+    echo "count0=$(pcw_gate_rerun_count "$GD" 101 aaa1111)"
+    echo "add1=$(pcw_add_gate_rerun "$GD" 101 aaa1111)"
+    echo "add2=$(pcw_add_gate_rerun "$GD" 101 aaa1111)"
+    echo "ledger=$(cat "$GD/gate-reruns/101")"
+    echo "add-new-head=$(pcw_add_gate_rerun "$GD" 101 bbb2222)"
+    pcw_gate_run_pick aaa1111 <<< '[]' >/dev/null; echo "pick-empty-rc=$?"
+    echo "pick=$(pcw_gate_run_pick aaa1111 < "$SCRATCH/runs-aaa1111.json")"
+    pcw_gate_failed < "$SCRATCH/checks-aaa1111.json"; echo "failed-gate-rc=$?"
+    pcw_gate_failed < "$SCRATCH/checks-bbb2222.json"; echo "failed-red-rc=$?"
+    names="$(printf 'Tests and Analysis\nE2E Tests')"
+    pcw_anchors_green "$names" < "$SCRATCH/checks-aaa1111.json"; echo "green-ok-rc=$?"
+    pcw_anchors_green "$names" < "$SCRATCH/checks-ccc3333.json"; echo "green-failed-rc=$?"
+    pcw_anchors_green "" < "$SCRATCH/checks-aaa1111.json"; echo "green-empty-rc=$?"
+)"
+for want in 'anchors-rc=0' 'anchors=Tests and Analysis|E2E Tests|' 'other-rc=1' 'other-out=[]' \
+            'running-rc=1' 'running-out=[]' 'count0=0' 'add1=1' 'add2=2' 'ledger=aaa1111 2' \
+            'add-new-head=1' 'pick-empty-rc=1' 'pick=39712872847 completed failure' \
+            'failed-gate-rc=0' 'failed-red-rc=1' 'green-ok-rc=0' 'green-failed-rc=1' 'green-empty-rc=1'; do
+    grep -qxF -- "$want" <<< "$res" || fail "gate-lib-helpers: missing '$want' in: $res"
+done
+end_case gate-lib-helpers
 
 # conflict-hold-launch-tip: the tip captured at launch rides the pending row and is what
 # settle records, even though master moved before the rescue settled.

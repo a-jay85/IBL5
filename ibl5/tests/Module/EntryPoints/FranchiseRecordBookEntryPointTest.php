@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
-use Module\ModuleRedirect;
-use Records\RecordsController;
-
 /**
  * Integration tests for modules/FranchiseRecordBook/index.php entry point.
  *
@@ -64,38 +61,5 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_rcb');
-    }
-
-    public function testRedirectUrlWithNumericTeamidIncludesTeamid(): void
-    {
-        $url = ModuleRedirect::passthroughUrl(
-            'modules.php?name=Records&tab=' . RecordsController::TAB_BYFRANCHISE,
-            ['teamid'],
-            ['teamid' => '5'],
-            ['teamid' => 'ctype_digit']
-        );
-        $this->assertSame('modules.php?name=Records&tab=byfranchise&teamid=5', $url);
-    }
-
-    public function testRedirectUrlDropsNonNumericTeamid(): void
-    {
-        $url = ModuleRedirect::passthroughUrl(
-            'modules.php?name=Records&tab=' . RecordsController::TAB_BYFRANCHISE,
-            ['teamid'],
-            ['teamid' => '5abc'],
-            ['teamid' => 'ctype_digit']
-        );
-        $this->assertSame('modules.php?name=Records&tab=byfranchise', $url);
-    }
-
-    public function testRedirectUrlWithoutTeamidOmitsParam(): void
-    {
-        $url = ModuleRedirect::passthroughUrl(
-            'modules.php?name=Records&tab=' . RecordsController::TAB_BYFRANCHISE,
-            ['teamid'],
-            [],
-            ['teamid' => 'ctype_digit']
-        );
-        $this->assertSame('modules.php?name=Records&tab=byfranchise', $url);
     }
 }

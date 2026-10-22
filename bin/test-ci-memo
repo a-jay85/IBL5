@@ -56,7 +56,7 @@ vr_if_shape() {
 # images. mirror-ready reads no path-filter output, so it adds no filter skip.
 CHANGES_ALLOWLIST="audit-js,audit-php,iblbot"
 MEMO_ONLY_JOBS="test harness-tests harness-tests-isolated db-integration phpstan shellcheck ibl5-ts-unit"
-UNCONDITIONAL_JOBS="phpunit-hygiene host-mariadb-guard automouse-impl-model-test actionlint"
+UNCONDITIONAL_JOBS="static-guards"
 filter_free_topology() {
     local wf="$1" got bad=0 j
     got=$(awk '
@@ -638,7 +638,7 @@ if should_run gate-topology-mutants; then
     # 7b: harness job re-adds changes to needs
     sed "/^  harness-tests:/,/^    needs:/ s|^    needs: \[ci-memo-check|    needs: [changes, ci-memo-check|" "$WF_TESTS" > "$m/tests-7b.yml"
     # 7c: an unconditional job regains a job-level needs:
-    awk '/^  actionlint:/{a=1} a && /^    runs-on:/{print "    needs: [changes]"; a=0} {print}' "$WF_TESTS" > "$m/tests-7c.yml"
+    awk '/^  static-guards:/{a=1} a && /^    runs-on:/{print "    needs: [changes]"; a=0} {print}' "$WF_TESTS" > "$m/tests-7c.yml"
     # 7d: iblbot loses its filter, so the allowlist no longer matches exactly
     sed "/^  iblbot:/,/^    if:/ s|^    if: needs.changes.outputs.iblbot == 'true' \&\& |    if: |" "$WF_TESTS" > "$m/tests-7d.yml"
     mt_check() {

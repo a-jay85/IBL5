@@ -113,6 +113,29 @@ expect_exit "empty manifest" 2 "$RC"
 run --dry-run --manifest="$TMP/does-not-exist.txt"
 expect_exit "missing manifest" 2 "$RC"
 
+# 7. --check with one ref present and the rest missing: exit 3, nothing copied
+reset
+run --check --manifest="$REAL_MANIFEST"
+expect_exit "check with a missing ref" 3 "$RC"
+expect_eq "check reports the present ref" 1 \
+    "$(printf '%s\n' "$OUT" | grep -c '^present ghcr.io/a-jay85/mirror/mariadb')"
+expect_eq "check reports each other ref as missing" 2 "$(printf '%s\n' "$OUT" | grep -c '^missing ')"
+expect_eq "check never runs imagetools create" 0 "$(grep -c 'imagetools create' "$LOG" || true)"
+
+# 8. --check with every ref present: exit 0, no missing line
+reset
+grep mariadb "$REAL_MANIFEST" > "$TMP/m-present.txt"
+run --check --manifest="$TMP/m-present.txt"
+expect_exit "check with every ref present" 0 "$RC"
+expect_eq "check prints no missing line when all present" 0 "$(printf '%s\n' "$OUT" | grep -c '^missing ' || true)"
+
+# 9. --check rejected forms, each exit 2
+reset
+run --check --dry-run --manifest="$REAL_MANIFEST"
+expect_exit "check with dry-run" 2 "$RC"
+run --check=yes --manifest="$REAL_MANIFEST"
+expect_exit "check=yes form" 2 "$RC"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "test-ci-image-mirror: FAILED"
     exit 1

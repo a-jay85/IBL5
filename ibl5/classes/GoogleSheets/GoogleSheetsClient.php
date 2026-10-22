@@ -79,7 +79,10 @@ class GoogleSheetsClient
                 if (($props['title'] ?? null) !== $tab) {
                     continue;
                 }
-                $sheetId = is_int($props['sheetId'] ?? null) ? $props['sheetId'] : 0;
+                $sheetId = $props['sheetId'] ?? null;
+                if (!is_int($sheetId)) {
+                    throw new GoogleApiException('Google API error (tab has no sheet id)', 200, 'no_sheet_id');
+                }
                 $grid = is_array($props['gridProperties'] ?? null) ? $props['gridProperties'] : [];
                 $currentRows = is_int($grid['rowCount'] ?? null) ? $grid['rowCount'] : 0;
                 $currentColumns = is_int($grid['columnCount'] ?? null) ? $grid['columnCount'] : 0;
@@ -114,10 +117,14 @@ class GoogleSheetsClient
         $replies = $added['replies'] ?? null;
         $newId = is_array($replies) && is_array($replies[0] ?? null) && is_array($replies[0]['addSheet'] ?? null)
             && is_array($replies[0]['addSheet']['properties'] ?? null)
-            ? ($replies[0]['addSheet']['properties']['sheetId'] ?? 0)
-            : 0;
+            ? ($replies[0]['addSheet']['properties']['sheetId'] ?? null)
+            : null;
 
-        return is_int($newId) ? $newId : 0;
+        if (!is_int($newId)) {
+            throw new GoogleApiException('Google API error (addSheet returned no sheet id)', 200, 'no_sheet_id');
+        }
+
+        return $newId;
     }
 
     /**

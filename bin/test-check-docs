@@ -399,7 +399,7 @@ claims_present() { echo "$1" | grep -qF 'FAIL required-status claims drift'; }
 claims_absent()  { ! claims_present "$1"; }
 
 READBACK="gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'"
-DOC_OK="Live list: \`${READBACK}\`. Auto-merge waits on \`All checks green\`."
+DOC_OK="Live list: \`${READBACK}\`. Auto-merge waits on \`All checks settled\`."
 DOC_ENUM="${DOC_OK} Required: Tests and Analysis, E2E Tests, Meta checks."
 
 make_claims_fixture() {   # make_claims_fixture <repo> <ignore-csv> <doc-body>
@@ -409,7 +409,7 @@ make_claims_fixture() {   # make_claims_fixture <repo> <ignore-csv> <doc-body>
         '          bin/check-pr-checks-green \' \
         "            --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \\" \
         "            --ignore='${ignore}'" \
-        > "$repo/.github/workflows/all-checks-green.yml"
+        > "$repo/.github/workflows/all-checks-settled.yml"
     printf '%s\n' 'jobs:' '  engine:' '    name: Go build, vet, lint, test' \
         '  gate:' '    name: Engine' \
         > "$repo/.github/workflows/engine.yml"

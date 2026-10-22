@@ -6,6 +6,7 @@
 #   bin/automouse/comprehension-digest --dry-run         # print the facts block (no report, no send, no model)
 #   bin/automouse/comprehension-digest --classify-only   # print "<number><TAB><bucket>" per in-window PR
 #   bin/automouse/comprehension-digest --date YYYY-MM-DD # override the week-ending date
+#   bin/automouse/comprehension-digest --at-reset        # launchd mode: run at 16:xx UTC; a late fire runs as a catch-up (see below)
 #   bin/automouse/comprehension-digest -h|--help         # show this help
 #
 # The window is [D-7 00:00Z, D 00:00Z), anchored to the --date value (default: today),
@@ -22,7 +23,14 @@
 # One tool-less headless Sonnet call writes the conceptual brief from the facts and the
 # fenced PR text. A gate denial or a model failure sends a facts-only DEGRADED brief and
 # exits 2. A gh failure sends a bare DEGRADED line and exits 1.
-# Seams: COMPREHENSION_DIGEST_GH, _CLAUDE, _GATE, _REPORT_DIR, _RULES_FILE, DISCORD_DM_BIN.
+# --at-reset: the launchd plist fires twice on Sunday (08:03 and 09:03 local) so one fire lands
+# on 16:03 UTC (the weekly usage reset) in both PDT and PST; the other exits 0 without sending.
+# The brief posts to #reviews through the webhook file in COMPREHENSION_DIGEST_WEBHOOK_FILE
+# (default ~/.iblbot-reviews-webhook-url). The facts-only DEGRADED brief (gate denial, model failure)
+# is the week's report, so it posts to #reviews too. Only the bare gh-failure line stays on the default #dev webhook.
+# A fire at any other hour (a late launchd wake) runs as a catch-up when no report from the last 6 days exists (a non-Sunday 16:xx too),
+# except Sunday hours before 16 UTC, which wait for the 16:xx fire.
+# Seams: COMPREHENSION_DIGEST_GH, _CLAUDE, _GATE, _REPORT_DIR, _UTC_HOUR, _UTC_DOW, _WEBHOOK_FILE, DISCORD_DM_BIN.
 # Report: ~/claude-plans/_reports/<date>-comprehension-digest.md
 
 set -euo pipefail
@@ -32,6 +40,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DRY_RUN=0
 CLASSIFY_ONLY=0
 DATE_OVERRIDE=""
+AT_RESET=0
 
 # shift_date <YYYY-MM-DD> <days, may be negative>: BSD date first, then GNU date.
 # Prints nothing when neither accepts the input.
@@ -47,6 +56,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
     --classify-only) CLASSIFY_ONLY=1; shift ;;
+    --at-reset) AT_RESET=1; shift ;;
     --date)
       if [ $# -lt 2 ] || [[ "$2" == --* ]]; then
         echo "comprehension-digest: --date requires a value" >&2; exit 1
@@ -65,11 +75,32 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# --at-reset gate: exactly one of the two Sunday fires lands on 16:xx UTC. A fire launchd ran
+# late (Mac asleep at both times) lands at any other hour; that is a catch-up unless this
+# week's report exists. The pre-reset Sunday hours wait for the 16:xx fire.
+CATCHUP_CHECK=0
+if [ "$AT_RESET" -eq 1 ]; then
+  UTC_HOUR="${COMPREHENSION_DIGEST_UTC_HOUR:-$(date -u +%H)}"
+  UTC_DOW="${COMPREHENSION_DIGEST_UTC_DOW:-$(date -u +%w)}"
+  if [ "$UTC_HOUR" != "16" ]; then
+    if [ "$UTC_DOW" = "0" ] && [ "$((10#$UTC_HOUR))" -lt 16 ]; then
+      echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}, not 16; skipping this fire." >&2
+      exit 0
+    fi
+    CATCHUP_CHECK=1
+  elif [ "$UTC_DOW" != "0" ]; then
+    # A late fire can land on 16:xx UTC on a later day; treat it as a catch-up too.
+    CATCHUP_CHECK=1
+  fi
+fi
+
 # Seams: ${VAR:-default}, so unset and empty both fall back to the default.
 GH="${COMPREHENSION_DIGEST_GH:-gh}"
 CLAUDE_BIN="${COMPREHENSION_DIGEST_CLAUDE:-claude}"
 GATE="${COMPREHENSION_DIGEST_GATE:-}"
 DM_BIN="${DISCORD_DM_BIN:-$REPO_ROOT/bin/discord-dm}"
+# The brief goes to #reviews; fail_loud alerts keep the default #dev webhook. ${HOME:+...} survives `env -i`.
+REVIEWS_WEBHOOK_FILE="${COMPREHENSION_DIGEST_WEBHOOK_FILE:-${HOME:+$HOME/.iblbot-reviews-webhook-url}}"
 # ${HOME:+...} is empty when HOME is unset or empty, so `set -u` survives `env -i`.
 REPORT_DIR="${COMPREHENSION_DIGEST_REPORT_DIR:-${HOME:+$HOME/claude-plans/_reports}}"
 RULES_FILE="${COMPREHENSION_DIGEST_RULES_FILE:-$REPO_ROOT/ibl5/docs/LEAGUE_RULES.md}"
@@ -93,6 +124,15 @@ if [ "$DRY_RUN" -eq 0 ] && [ "$CLASSIFY_ONLY" -eq 0 ] && [ -z "$REPORT_DIR" ]; t
 fi
 
 D="${DATE_OVERRIDE:-$(date +%F)}"
+if [ "$CATCHUP_CHECK" -eq 1 ]; then
+  # Any report from the last 6 days counts: a late fire on a later day has a new D.
+  if [ -n "$REPORT_DIR" ] && [ -d "$REPORT_DIR" ] && \
+     [ -n "$(find "$REPORT_DIR" -maxdepth 1 -name '*-comprehension-digest.md' -mtime -6 2>/dev/null)" ]; then
+    echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}, and a report from the last 6 days exists; skipping this fire." >&2
+    exit 0
+  fi
+  echo "comprehension-digest: --at-reset: UTC hour is ${UTC_HOUR}; no report in the last 6 days, running as catch-up." >&2
+fi
 START="$(shift_date "$D" -7)"
 LAST="$(shift_date "$D" -1)"
 END="$D"
@@ -178,7 +218,7 @@ fi
 send_brief() {
   mkdir -p "$REPORT_DIR" || fail_loud "report dir not writable: ${REPORT_DIR}"
   printf '%s\n%s\n' "$1" "${2:-}" > "$REPORT_DIR/${D}-comprehension-digest.md"
-  printf '%s\n' "$1" | "$DM_BIN" --chunk -
+  printf '%s\n' "$1" | DISCORD_DM_WEBHOOK_FILE="$REVIEWS_WEBHOOK_FILE" "$DM_BIN" --chunk -
 }
 
 if [ "$N" -eq 0 ]; then

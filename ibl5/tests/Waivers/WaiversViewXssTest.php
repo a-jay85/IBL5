@@ -87,7 +87,7 @@ class WaiversViewXssTest extends TestCase
             'Test Team',
             1,
             'waive',
-            [['playerID' => 1, 'playerName' => $xssPayload, 'contract' => '$100', 'waitTime' => '']],
+            [['playerID' => 1, 'playerName' => $xssPayload, 'contract' => '$100']],
             5,
             5
         );

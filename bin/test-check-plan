@@ -3296,6 +3296,125 @@ assert_viol "gateG-non-bin-command-ok" 0 '[G]' "$FM"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate XM: executable mutation claims (ADR-0199). The grammar lives in
+# bin/lib/plan-exec-mutations; these fixtures pin the gate's wiring. Fixture
+# plans sit in $TMP, so --root falls back to this repo and `bin/check-docs`
+# is a real target on disk.
+# ---------------------------------------------------------------------------
+XF='```'
+XM_MATRIX='| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | `bin/check-docs` |
+'
+xm_block() {
+    printf '%smutation\nrow: 1\nfile: %s\n' "$XF" "$1"
+    [ -z "${2:-}" ] || printf 'check: %s\n' "$2"
+    printf 'match: set -u\nreplace: set +u\n%s\n' "$XF"
+}
+
+assert_viol "xm-wellformed-clean" 0 '[XM]' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+assert_viol "xm-missing-key" 1 'missing key' "$FM$XM_MATRIX
+## Executable Mutations
+
+${XF}mutation
+row: 1
+file: bin/check-docs
+replace: set +u
+${XF}
+"
+
+assert_viol "xm-target-absent" 1 '[XM]' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/no-such-xm-target)
+"
+
+assert_viol "xm-target-in-critical-files" 0 '[XM]' "$FM$XM_MATRIX
+## Critical Files
+
+- \`bin/no-such-xm-target\` — NEW
+
+## Executable Mutations
+
+$(xm_block bin/no-such-xm-target)
+"
+
+assert_viol "xm-check-override-not-runnable" 1 'check override is not runnable' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs 'Phase 3')
+"
+
+assert_viol "xm-legacy-silent" 0 '[XM]' "$FM"'| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean. Mutation: delete the arm ⇒ fails | CLI-executable | post-impl | `bin/check-docs` |
+'
+
+XM_TWO='| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | `bin/check-docs` |
+'
+assert_viol "xm-coverage-uncovered" 1 'carries neither' "$FM$XM_TWO| 2 | docs again | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+assert_viol "xm-coverage-prose-ok" 0 '[XM]' "$FM$XM_TWO| 2 | docs again (mutation-prose: needs a running Docker DB) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+assert_viol "xm-coverage-prose-short" 1 'too short' "$FM$XM_TWO| 2 | docs again (mutation-prose: db) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+assert_viol "xm-coverage-one-time-exempt" 0 '[XM]' "$FM$XM_TWO| 2 | docs again (one-time-check: corpus diff printed zero) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+| 3 | docs third (mutation-prose: needs a running Docker DB) | CLI-executable | post-impl | \`bin/check-docs --no-staleness\` |
+| 4 | docs fourth (mutation-prose: needs a running Docker DB) | CLI-executable | post-impl | \`bin/check-docs --help\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+# Gate survival: the row-20 shape block (a workflow line full of braces,
+# dollars and colons) sits in a fence under its own heading, so gates N, V, Y,
+# Z and MT never see it.
+XM_SURV="$TMP/xm-survival.md"
+printf '%s' "$FM"'| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | checkout pinned. Mutation: point ref at head ⇒ fails | CLI-executable | post-impl | `bin/test-after-merge-checklist` |
+
+## Executable Mutations
+
+```mutation
+row: 1
+file: .github/workflows/merge-digest-notify.yml
+match: ref: ${{ github.event.pull_request.base.ref }}
+replace: ref: ${{ github.event.pull_request.head.sha }}
+```
+' > "$XM_SURV"
+XM_SURV_OUT="$("$GUARD" "$XM_SURV" 2>&1)"; XM_SURV_RC=$?
+if [ "$XM_SURV_RC" -eq 0 ] \
+    && ! grep -vF '[N] checked' <<< "$XM_SURV_OUT" | grep -qE '\[(N|V|Y|Z|MT|XM)\]'; then
+    h_pass "xm-gate-survival (exit 0)"
+else
+    h_fail "xm-gate-survival" "expected a clean run, got exit $XM_SURV_RC: $XM_SURV_OUT"
+fi
+
+# ---------------------------------------------------------------------------
 # Gate V: a CLI-executable row's location cell must be ONE runnable command.
 # Every fixture carries "$FM" (impl_model: sonnet) so a 0-manual matrix does
 # not reattribute the exit code to gate 13 — the trap the header comment at

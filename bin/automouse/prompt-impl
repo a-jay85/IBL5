@@ -399,6 +399,8 @@ When the verdict is still `unrealised` or `unavailable` after your fix attempts,
 
 This step has no budget-wall fallback and no waiver. An unresolved row never proceeds to Step 7. Never add a `WAIVE-MATRIX-ROW:` line, and never edit the plan's Verification Matrix to make this check pass.
 
+The same holds for the plan's `## Executable Mutations` entries: /post-plan Phase 5.0 applies each one and requires its check to exit non-zero. A `HELD` result means the mutation claim was wrong and the check is fine. Report it in the PR body and leave the entry as written.
+
 ## Step 7: Write Handoff File
 
 After all implementation is complete and the final checkpoint is pushed, write a handoff file so the post-plan agent can pick up:

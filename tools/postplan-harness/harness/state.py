@@ -31,6 +31,7 @@ class TerminalState(str, Enum):
 
 OUTPUT_KEEP = 4000   # HarnessError.output keeps this many trailing characters
 SUBPROCESS_TIMEOUT = "subprocess-timeout"   # HarnessError.kind for a bounded subprocess that hung
+MUTATION_JOURNAL_PENDING = "mutation-journal-pending"  # exec-mutation journal holds an unreverted edit (ADR-0199)
 
 
 class HarnessError(Exception):

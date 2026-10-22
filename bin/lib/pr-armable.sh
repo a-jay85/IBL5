@@ -410,6 +410,8 @@ pr_unresolved_findings_hold() {
 #   only pending rows still returns an empty list. Any `gh` error also returns
 #   nothing (fail-open), so a network hiccup at arm time does not block the merge.
 #
+#   Condition (19) exec-mutations is run-local too (it applies edits in the
+#   post-plan worktree), so it has no twin here either.
 #   Why (15) lives in this shared predicate while the run-local conflict-resolved
 #   hold does not: the conflict-resolved hold's evidence is a run-local flag in a
 #   /tmp directory keyed to the current branch, invisible to any other checkout.

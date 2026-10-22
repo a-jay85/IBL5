@@ -6,6 +6,7 @@ namespace Tests\Negotiation;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Negotiation\ExtensionContractDemandCalculator;
 use Player\Player;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
@@ -1236,6 +1237,8 @@ class ExtensionContractDemandCalculatorTest extends TestCase
         $player = $this->createPlayerWithRatings(50, [
             'winner' => 5, 'tradition' => 1, 'loyalty' => 4, 'playing_time' => 2,
         ]);
+        // ftp => 0 is clamped to 1 by NegotiationRepository::computeMarketMaximums (see
+        // testBreakdownZeroMarketMaxYieldsZeroRawScore for the calculator's own `$max > 0` guard).
         $this->setupMarketMaximums(100, ['fgp' => 75, 'ftp' => 0, 'tgp' => 150, 'orb' => 80]);
         $teamFactors = ['wins' => 60, 'tradition_losses' => 30, 'money_committed_at_position' => 1200];
 
@@ -1462,6 +1465,34 @@ class ExtensionContractDemandCalculatorTest extends TestCase
           ),
         );
         self::assertSame($expected, $actual);
+    }
+
+    public function testBreakdownZeroMarketMaxYieldsZeroRawScore(): void
+    {
+        // The real repository clamps every max to >= 1, so inject a stub that returns a true 0
+        // to reach the calculator's `$max > 0` guard in buildRatingsBreakdown().
+        $maximums = [
+            'fga' => 100, 'fgp' => 100, 'fta' => 100, 'ftp' => 0,
+            'tga' => 100, 'tgp' => 100, 'orb' => 100, 'drb' => 100,
+            'ast' => 100, 'stl' => 100, 'tov' => 100, 'blk' => 100,
+            'foul' => 100, 'oo' => 100, 'od' => 100, 'do' => 100,
+            'dd' => 100, 'po' => 100, 'pd' => 100, 'to' => 100, 'td' => 100,
+        ];
+        $repository = self::createStub(NegotiationRepositoryInterface::class);
+        $repository->method('getMarketMaximums')->willReturn($maximums);
+        $property = new \ReflectionProperty(ExtensionContractDemandCalculator::class, 'repository');
+        $property->setValue($this->calculator, $repository);
+
+        $player = $this->createPlayerWithRatings(50);
+        $actual = $this->calculator->calculateDemandsWithBreakdown($player, $this->getDefaultTeamFactors());
+
+        $ftp = $actual['ratings'][3];
+        self::assertSame('FT Percentage', $ftp['name']);
+        self::assertSame(50, $ftp['playerValue']);
+        self::assertSame(0, $ftp['marketMax']);
+        self::assertSame(0, $ftp['rawScore']);
+        // 20 ratings at 50/100 contribute 50 each; the zero-max rating contributes 0.
+        self::assertSame(1000, $actual['totalRawScore']);
     }
 
     public function testBreakdownCharacterizationNegativeScoreEmptyTeamFactorsNullPreferences(): void

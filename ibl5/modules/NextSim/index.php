@@ -31,7 +31,7 @@ if (!$nukeCompat->isUser($user)) {
     /** @var \mysqli $mysqli_db */
     /** @var \Auth\Contracts\AuthServiceInterface $authService */
     $commonRepository = new Repositories\TeamIdentityRepository($mysqli_db);
-    $season = new \Season\Season($mysqli_db);
+    $season = \Season\SharedSeason::get($mysqli_db);
 
     $module_name = basename(dirname(__FILE__));
     $pagetitle = "- $module_name";

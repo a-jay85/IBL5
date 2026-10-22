@@ -62,7 +62,7 @@ class TradeProcessor implements TradeProcessorInterface
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = $cashRepository ?? new TradeCashRepository($db);
         $this->cashConsiderationRepository = $cashConsiderationRepository ?? new BuyoutLedgerRepository($db);
-        $this->season = $season ?? new Season($db);
+        $this->season = $season ?? \Season\SharedSeason::get($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
         $this->newsService = new \Topics\News\NewsRepository($db);
         $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');

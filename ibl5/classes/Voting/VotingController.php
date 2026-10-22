@@ -180,7 +180,7 @@ class VotingController implements VotingControllerInterface
     private function showBallot(string $username, array $errors = [], array $selections = []): void
     {
         $commonRepository = $this->teamIdentityRepository;
-        $season = new \Season\Season($this->db);
+        $season = \Season\SharedSeason::get($this->db);
         $league = new \League\League($this->db);
 
         $voterTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';

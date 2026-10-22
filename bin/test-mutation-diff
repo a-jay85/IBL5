@@ -59,6 +59,32 @@ for a in "\$@"; do printf '%s\n' "\$a"; done >"\$LOG/$name.args"
 if [ "$name" = phpunit ]; then
     if [ -e "\${LOCK_UNDER_TEST:-}/pid" ]; then echo yes >"\$LOG/lock.seen"; else echo no >"\$LOG/lock.seen"; fi
 fi
+if [ "$name" = infection ]; then
+    base=""
+    for a in "\$@"; do
+        case "\$a" in --git-diff-base=*) base="\${a#--git-diff-base=}" ;; esac
+    done
+    top="\$(git rev-parse --show-toplevel)"
+    : >"\$LOG/infection.found"
+    : >"\$LOG/infection.missing"
+    git -C . --no-pager diff "\$base" --no-ext-diff --no-color --name-only --diff-filter=AM -- classes |
+    while IFS= read -r p; do
+        if [ -f "\$top/\$p" ]; then echo "\$p" >>"\$LOG/infection.found"; else echo "\$p" >>"\$LOG/infection.missing"; fi
+    done
+    n="\$(wc -l <"\$LOG/infection.found" | tr -d ' ')"
+    case "\${STUB_INFECTION_SAY:-}" in
+        nosource) n=0 ;;
+        nomodified)
+            echo ' [OK] Could not find any modified files in the configured sources.'
+            exit "\${$rcvar:-0}"
+            ;;
+    esac
+    if [ "\$n" -eq 0 ]; then
+        echo ' [OK] No source file found for the filter applied to the configured sources. The git filter used was: "AM"'
+    else
+        echo "\$n mutations were generated:"
+    fi
+fi
 exit "\${$rcvar:-0}"
 EOF
     chmod +x "$path"
@@ -83,6 +109,9 @@ EOF
     write_tool_stub "$REPO/ibl5/vendor/bin/phpunit" phpunit STUB_PHPUNIT_RC
     write_tool_stub "$REPO/ibl5/vendor/bin/infection" infection STUB_INFECTION_RC
     chmod +x "$REPO/bin/mutation-diff" "$REPO/bin/db-test-up"
+    if [ "${1:-}" = ignored-vendor ]; then
+        printf '/ibl5/vendor/\n' >"$REPO/.gitignore"
+    fi
     git -C "$REPO" add -A
     git -C "$REPO" commit -q -m base
     git -C "$REPO" tag base
@@ -94,6 +123,17 @@ EOF
 
 modify_class() {
     printf '// changed\n' >>"$REPO/ibl5/classes/Alpha/Foo.php"
+}
+
+# Worktree layout, as bin/wt-new builds it: a linked worktree (its .git is a
+# file) whose ibl5/vendor is a symlink to the main repo's untracked vendor.
+# Sets MAIN_REPO to the main checkout and REPO to the worktree.
+make_worktree_layout() {
+    make_repo ignored-vendor
+    MAIN_REPO="$REPO"
+    REPO="$TMP/case$CASE_N/wt"
+    git -C "$MAIN_REPO" worktree add -q -b "case$CASE_N-wt" "$REPO" base
+    ln -s "$MAIN_REPO/ibl5/vendor" "$REPO/ibl5/vendor"
 }
 
 # run_md <args...>: runs the copied runner with stubs first on PATH.
@@ -114,6 +154,7 @@ make_repo
 run_md --help
 h_eq "help exits 0 with usage: exit" 0 "$RC"
 h_contains "help exits 0 with usage" "$OUT" "Usage: bin/mutation-diff"
+h_contains "help lists exit 5 for an empty filter" "$OUT" "5  Infection matched no source files"
 
 # 2
 make_repo
@@ -247,8 +288,8 @@ h_eq "happy path: infection argv matches CI" \
 --min-msi=100
 --ignore-msi-with-no-mutations" "$(logline "$LOG/infection.args")"
 IENV="$(logline "$LOG/infection.env")"
-h_contains "happy path: diff.relative key by env" "$IENV" "GIT_CONFIG_KEY_0=diff.relative"
-h_contains "happy path: diff.relative value by env" "$IENV" "GIT_CONFIG_VALUE_0=true"
+h_eq "happy path: no diff.relative key in env" "GIT_CONFIG_KEY_0=" "$(grep '^GIT_CONFIG_KEY_0=' <<<"$IENV")"
+h_eq "happy path: no diff.relative value in env" "GIT_CONFIG_VALUE_0=" "$(grep '^GIT_CONFIG_VALUE_0=' <<<"$IENV")"
 if git -C "$REPO" config --get diff.relative >/dev/null 2>&1; then
     h_fail "happy path: shared git config untouched" "diff.relative was written to .git/config"
 else
@@ -296,5 +337,52 @@ h_contains "untracked new class is marked intent-to-add" "$OUT" "marked 1 untrac
 h_not_contains "untracked new class does not skip" "$OUT" "SKIP:"
 h_contains "untracked new class is visible to git diff" \
     "$(git -C "$REPO" diff --name-only)" "ibl5/classes/Beta/Bar.php"
+
+# 19 main-checkout layout: Infection's path join finds the changed class
+make_repo
+modify_class
+run_md base
+h_eq "main layout finds the changed class: exit" 0 "$RC"
+h_eq "main layout finds the changed class" "ibl5/classes/Alpha/Foo.php" "$(logline "$LOG/infection.found")"
+h_eq "main layout: no unjoinable path" "" "$(cat "$LOG/infection.missing" 2>/dev/null)"
+h_not_contains "main layout: not an empty run" "$OUT" "No source file found"
+h_contains "main layout: mutants generated" "$OUT" "1 mutations were generated"
+
+# 20 worktree layout: linked worktree, symlinked untracked vendor
+make_worktree_layout
+if [ -L "$REPO/ibl5/vendor" ] && [ -f "$REPO/.git" ]; then
+    h_pass "worktree layout fixture: vendor symlink and .git file"
+else
+    h_fail "worktree layout fixture: vendor symlink and .git file" "fixture is not a linked worktree with a vendor symlink"
+fi
+modify_class
+run_md base
+h_eq "worktree layout finds the changed class: exit" 0 "$RC"
+h_eq "worktree layout finds the changed class" "ibl5/classes/Alpha/Foo.php" "$(logline "$LOG/infection.found")"
+h_not_contains "worktree layout: not an empty run" "$OUT" "No source file found"
+h_contains "worktree layout: mutants generated" "$OUT" "1 mutations were generated"
+
+# 21 zero-match guard: changed class, filter matches nothing
+make_repo
+modify_class
+STUB_INFECTION_SAY=nosource run_md base
+h_eq "empty filter with changed class exits 5" 5 "$RC"
+h_contains "empty filter names the cause" "$ERR" "Infection matched no source files"
+h_contains "empty filter lists the changed class" "$ERR" "classes/Alpha/Foo.php"
+h_contains "empty filter names the excludes case" "$ERR" "source.excludes"
+
+# 22 zero-match guard: the 'Could not find any modified files' wording
+make_repo
+modify_class
+STUB_INFECTION_SAY=nomodified run_md base
+h_eq "no-modified-files message exits 5" 5 "$RC"
+h_contains "no-modified-files message names the cause" "$ERR" "Infection matched no source files"
+
+# 23 a failing Infection keeps its own exit code
+make_repo
+modify_class
+STUB_INFECTION_RC=7 STUB_INFECTION_SAY=nosource run_md base
+h_eq "non-zero Infection exit wins over the guard" 7 "$RC"
+h_not_contains "non-zero Infection exit: no guard message" "$ERR" "Infection matched no source files"
 
 h_done

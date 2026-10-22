@@ -65,7 +65,7 @@ class TradeOffer implements TradeOfferInterface
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = $cashRepository ?? new TradeCashRepository($db);
         $this->cashConsiderationRepository = $cashConsiderationRepository ?? new BuyoutLedgerRepository($db);
-        $this->season = $season ?? new Season($db);
+        $this->season = $season ?? \Season\SharedSeason::get($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
         $this->validator = $validator ?? new TradeValidator($db);
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('trade');

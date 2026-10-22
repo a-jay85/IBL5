@@ -276,13 +276,11 @@ class ExtensionService implements ExtensionProcessorInterface
             'details' => $offerDetails,
         ]);
 
-        if (class_exists(Discord::class)) {
-            $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
-            Discord::postToChannel('#extensions', $hometext);
+        $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
+        Discord::postToChannel('#extensions', $hometext);
 
-            if ($this->serverName !== 'localhost' && $this->serverName !== '127.0.0.1') {
-                Discord::postToChannel('#general-chat', $hometext);
-            }
+        if ($this->serverName !== 'localhost' && $this->serverName !== '127.0.0.1') {
+            Discord::postToChannel('#general-chat', $hometext);
         }
 
         $emailsubject = "Successful Extension - " . $playerName;
@@ -302,7 +300,7 @@ class ExtensionService implements ExtensionProcessorInterface
             'extensionYears' => $offerYears,
             'offerInMillions' => $offerInMillions,
             'offerDetails' => $offerDetails,
-            'discordNotificationSent' => class_exists(Discord::class),
+            'discordNotificationSent' => true,
             'discordChannel' => '#extensions',
         ];
     }
@@ -332,10 +330,8 @@ class ExtensionService implements ExtensionProcessorInterface
             'total_millions' => $offerInMillions,
         ]);
 
-        if (class_exists(Discord::class)) {
-            $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years.";
-            Discord::postToChannel('#extensions', $hometext);
-        }
+        $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years.";
+        Discord::postToChannel('#extensions', $hometext);
 
         $emailsubject = "Unsuccessful Extension - " . $playerName;
         $filetext = "{$playerName} refuses an extension offer from the {$teamName} of $offerTotal for $offerYears years.\n";
@@ -354,7 +350,7 @@ class ExtensionService implements ExtensionProcessorInterface
             'extensionYears' => $offerYears,
             'offerInMillions' => $offerInMillions,
             'offerDetails' => $offerDetails,
-            'discordNotificationSent' => class_exists(Discord::class),
+            'discordNotificationSent' => true,
             'discordChannel' => '#extensions',
         ];
     }

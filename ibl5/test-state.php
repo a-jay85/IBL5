@@ -146,6 +146,7 @@ $knownActions = [
     'set-eoy-votes',
     'set-leaders-htm',
     'set-player-name',
+    'shadow-log',
 ];
 
 // A named-but-unrecognised action is a client mistake, not a method mistake.
@@ -614,6 +615,48 @@ if ($method === 'GET' && $action === 'count-shadow-rows') {
         'players' => $playersRow !== null ? (int) $playersRow['cnt'] : 0,
         'teams' => $teamsRow !== null ? (int) $teamsRow['cnt'] : 0,
     ]);
+    $db->close();
+    exit;
+}
+
+// GET ?action=shadow-log&offset=N — read-only view of the detached engine-shadow
+// run's log. ShadowProcessLauncher appends the run's STDOUT/STDERR to this fixed
+// path (scripts/updateAllTheThings.php). `offset` is the byte size the caller
+// recorded before triggering the updater: only bytes after it come back, capped
+// at the last 8192 so the terminal line is always included. `enabled` repeats the
+// spawn gate from updateAllTheThings.php, so the E2E can tell "shadow is off on
+// this stack" apart from "the spawn never happened".
+if ($method === 'GET' && $action === 'shadow-log') {
+    $offsetRaw = $_GET['offset'] ?? '0';
+    if (!is_string($offsetRaw) || !ctype_digit($offsetRaw)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'offset must be a non-negative integer']);
+        $db->close();
+        exit;
+    }
+    $logPath = sys_get_temp_dir() . '/ibl5-engine-shadow.log';
+    clearstatcache(true, $logPath);
+    $fileSize = is_file($logPath) ? filesize($logPath) : false;
+    $size = $fileSize === false ? 0 : $fileSize;
+    $offset = (int) $offsetRaw;
+    if ($offset > $size) {
+        $offset = 0; // the log was truncated or replaced after the caller read its size
+    }
+    $start = max($offset, $size - 8192);
+    $tail = '';
+    if ($size > $start) {
+        $read = file_get_contents($logPath, false, null, $start, $size - $start);
+        $tail = $read === false ? '' : $read;
+    }
+    $shadowFlag = getenv('ENGINE_SHADOW_ENABLED');
+    echo json_encode(
+        [
+            'enabled' => filter_var($shadowFlag === false ? '' : $shadowFlag, FILTER_VALIDATE_BOOLEAN),
+            'size' => $size,
+            'tail' => $tail,
+        ],
+        JSON_INVALID_UTF8_SUBSTITUTE,
+    );
     $db->close();
     exit;
 }

@@ -113,7 +113,7 @@
     align-items: center;
     gap: var(--space-1);
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -239,7 +239,7 @@
     min-width: 0;
     padding: var(--space-2) var(--space-2);
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-semibold);
     color: var(--gray-600);
     text-align: center;
@@ -329,7 +329,7 @@
 .nav-dropdown-item {
     display: block;
     padding: 0.625rem 1rem; /* py-2.5 px-4 */
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     border-left: 2px solid transparent;
     opacity: 0;
@@ -409,7 +409,7 @@
 nav .group > a:link,
 nav .group > a:visited {
     color: var(--gray-200);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-medium);
 }
 
@@ -468,7 +468,7 @@ span.nav-dropdown-item a:hover {
 .mobile-dropdown-link {
     display: block;
     padding: 0.75rem 1.25rem 0.75rem 3.5rem; /* py-3 px-5 pl-14 */
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     border-left: 2px solid transparent;
     transition: all 0.15s ease-out;
@@ -604,7 +604,7 @@ span.nav-dropdown-item a:hover {
         width: 100%;
         padding: var(--space-2) var(--space-3);
         font-family: var(--font-display);
-        font-size: 1rem;
+        font-size: var(--text-base);
         font-weight: var(--font-weight-semibold);
         color: var(--navy-800);
         background: var(--white);
@@ -873,13 +873,25 @@ span.nav-dropdown-item a:hover {
     display: inline-flex;
     align-items: center;
     padding: 0.125rem 0.375rem;
-    border-radius: var(--radius-sm);
-    font-size: 1rem;
-    font-weight: var(--font-weight-bold);
+    font-size: var(--text-base);
     background: var(--accent-500);
     color: white;
     margin-left: 0.5rem;
     letter-spacing: var(--tracking-display);
+}
+
+/* Section label in nav dropdown footers (league switcher, username).
+   Replaces the utility string: block text-base font-semibold
+   tracking-widest uppercase text-gray-500 mb-2. */
+.nav-section-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: var(--text-base);
+    line-height: 1.5;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-gray-500);
 }
 
 .nav-login-input {
@@ -888,7 +900,7 @@ span.nav-dropdown-item a:hover {
     border: 1px solid var(--white-alpha-10);
     border-radius: var(--radius-xl);
     padding: 0.75rem 1rem 0.75rem 2.75rem;
-    font-size: 1rem;
+    font-size: var(--text-base);
     color: white;
     transition: all var(--transition-fast);
 }
@@ -924,7 +936,7 @@ span.nav-dropdown-item a:hover {
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-accent-lift);
     transition: all var(--transition-base);
-    font-size: 1rem;
+    font-size: var(--text-base);
     letter-spacing: var(--tracking-display);
 }
 

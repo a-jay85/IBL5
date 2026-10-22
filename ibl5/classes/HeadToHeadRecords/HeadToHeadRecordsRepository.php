@@ -103,8 +103,24 @@ GROUP BY self_id, opp_id';
     {
         /** @var Phase $phase */
         /** @var Scope $scope */
-        $maxTid = League::MAX_REAL_TEAMID;
+        return [
+            'dimension' => 'teams',
+            'phase'     => $phase,
+            'scope'     => $scope,
+            'axis'      => $this->fetchAxis($scope),
+            'records'   => $this->fetchRecords($phase, $scope),
+        ];
+    }
 
+    /**
+     * Teams-dimension win/loss records keyed by franchise identity on both sides.
+     *
+     * @param Phase $phase
+     * @param Scope $scope
+     * @return array<string, array<string, MatchupRecord>>
+     */
+    private function fetchRecords(string $phase, string $scope): array
+    {
         $sql = $this->buildBaseSql($phase, $scope) . '
 SELECT
     s.franchise_id AS self_franchise_id, s.team_city AS self_city, s.team_name AS self_name,
@@ -115,22 +131,35 @@ JOIN `ibl_franchise_seasons` s ON s.franchise_id = p.self_id AND s.season_ending
 JOIN `ibl_franchise_seasons` o ON o.franchise_id = p.opp_id  AND o.season_ending_year = p.season_year
 GROUP BY s.franchise_id, s.team_city, s.team_name, o.franchise_id, o.team_city, o.team_name';
 
-        $rows = $this->fetchRows($sql);
         $records = [];
-        foreach ($rows as $row) {
-            $selfFid  = self::intFromMixed($row['self_franchise_id']);
-            $selfCity = is_string($row['self_city']) ? $row['self_city'] : '';
-            $selfName = is_string($row['self_name']) ? $row['self_name'] : '';
-            $oppFid   = self::intFromMixed($row['opp_franchise_id']);
-            $oppCity  = is_string($row['opp_city']) ? $row['opp_city'] : '';
-            $oppName  = is_string($row['opp_name']) ? $row['opp_name'] : '';
-            $selfKey  = "{$selfFid}|{$selfCity}|{$selfName}";
-            $oppKey   = "{$oppFid}|{$oppCity}|{$oppName}";
+        foreach ($this->fetchRows($sql) as $row) {
+            $selfKey = self::franchiseKey(
+                self::intFromMixed($row['self_franchise_id']),
+                self::stringOrEmpty($row['self_city']),
+                self::stringOrEmpty($row['self_name']),
+            );
+            $oppKey = self::franchiseKey(
+                self::intFromMixed($row['opp_franchise_id']),
+                self::stringOrEmpty($row['opp_city']),
+                self::stringOrEmpty($row['opp_name']),
+            );
             $records[$selfKey][$oppKey] = [
                 'wins'   => self::intFromMixed($row['wins']),
                 'losses' => self::intFromMixed($row['losses']),
             ];
         }
+
+        return $records;
+    }
+
+    /**
+     * Teams-dimension axis: one entry per franchise identity, ordered by franchise then first season.
+     *
+     * @return list<AxisEntry>
+     */
+    private function fetchAxis(string $scope): array
+    {
+        $maxTid = League::MAX_REAL_TEAMID;
 
         $scopeAxisFilter = '';
         if ($scope === 'current') {
@@ -159,32 +188,24 @@ GROUP BY s.franchise_id, s.team_city, s.team_name, o.franchise_id, o.team_city, 
             $scopeAxisFilter,
         );
 
-        $axisRows = $this->fetchRows($axisSQL);
         $axis = [];
-        foreach ($axisRows as $row) {
+        foreach ($this->fetchRows($axisSQL) as $row) {
             $fid  = self::intFromMixed($row['franchise_id']);
-            $city = is_string($row['team_city']) ? $row['team_city'] : '';
-            $name = is_string($row['team_name']) ? $row['team_name'] : '';
-            $key  = "{$fid}|{$city}|{$name}";
+            $city = self::stringOrEmpty($row['team_city']);
+            $name = self::stringOrEmpty($row['team_name']);
             $axis[] = [
-                'key'               => $key,
+                'key'               => self::franchiseKey($fid, $city, $name),
                 'franchise_id'      => $fid,
                 'label'             => $city . ' ' . $name,
                 'sublabel'          => '',
-                'color1'            => is_string($row['color1']) ? $row['color1'] : '',
-                'color2'            => is_string($row['color2']) ? $row['color2'] : '',
+                'color1'            => self::stringOrEmpty($row['color1']),
+                'color2'            => self::stringOrEmpty($row['color2']),
                 'logo'              => ($this->logoResolver)($fid, $name),
                 'link_franchise_id' => $fid,
             ];
         }
 
-        return [
-            'dimension' => 'teams',
-            'phase'     => $phase,
-            'scope'     => $scope,
-            'axis'      => $axis,
-            'records'   => $records,
-        ];
+        return $axis;
     }
 
     /**
@@ -587,5 +608,22 @@ perspectives AS (
             return (int)$v;
         }
         return 0;
+    }
+
+    /**
+     * Identity key for one franchise era: "<franchise_id>|<city>|<name>".
+     * Shared by the records map (both sides) and the axis entries.
+     */
+    private static function franchiseKey(int $fid, string $city, string $name): string
+    {
+        return "{$fid}|{$city}|{$name}";
+    }
+
+    /**
+     * Narrow a mixed DB row value to string, defaulting to '' for any non-string.
+     */
+    private static function stringOrEmpty(mixed $v): string
+    {
+        return is_string($v) ? $v : '';
     }
 }

@@ -53,7 +53,7 @@ class DraftControllerOwnershipTest extends DatabaseTestCase
         parent::tearDown();
     }
 
-    private function metrosController(?\Clock\ClockInterface $clock = null): DraftController
+    private function metrosController(?\Clock\ClockInterface $clock = null, ?DraftRepository $repository = null): DraftController
     {
         $session = self::createStub(TeamIdentityRepositoryInterface::class);
         $session->method('getTeamnameFromUsername')->willReturn('Metros');
@@ -75,7 +75,7 @@ class DraftControllerOwnershipTest extends DatabaseTestCase
             $session,
             $season,
             new DraftValidator(),
-            new DraftRepository($this->db, new TeamIdentityRepository($this->db)),
+            $repository ?? new DraftRepository($this->db, new TeamIdentityRepository($this->db)),
             new DraftProcessor(),
             new DraftView(),
             self::createStub(DraftServiceInterface::class),
@@ -86,9 +86,9 @@ class DraftControllerOwnershipTest extends DatabaseTestCase
         );
     }
 
-    private function submit(int $round, int $pick, string $player, ?\Clock\ClockInterface $clock = null): string
+    private function submit(int $round, int $pick, string $player, ?\Clock\ClockInterface $clock = null, ?DraftRepository $repository = null): string
     {
-        return $this->metrosController($clock)->submitSelection(
+        return $this->metrosController($clock, $repository)->submitSelection(
             ['teamname' => 'Metros', 'player' => $player, 'draft_round' => (string) $round, 'draft_pick' => (string) $pick],
             'user-cookie'
         );
@@ -119,6 +119,42 @@ class DraftControllerOwnershipTest extends DatabaseTestCase
         return $row['player'];
     }
 
+    /**
+     * A repository whose isPlayerAlreadyDrafted() (the last read before the transaction
+     * opens) commits a rival pick into the same slot, reproducing a concurrent GM's
+     * submit landing between this request's validation and its UPDATE.
+     */
+    private function raceRepository(int $round, int $pick, string $rivalPlayer): DraftRepository
+    {
+        $year = self::YEAR;
+        return new class($this->db, new TeamIdentityRepository($this->db), $year, $round, $pick, $rivalPlayer) extends DraftRepository {
+            public function __construct(
+                \mysqli $db,
+                TeamIdentityRepository $teams,
+                private int $raceYear,
+                private int $raceRound,
+                private int $racePick,
+                private string $rivalPlayer,
+            ) {
+                parent::__construct($db, $teams);
+            }
+
+            public function isPlayerAlreadyDrafted(string $playerName): bool
+            {
+                $this->execute(
+                    "UPDATE `ibl_draft` SET `player` = ? WHERE `year` = ? AND `round` = ? AND `pick` = ?",
+                    'siii',
+                    $this->rivalPlayer,
+                    $this->raceYear,
+                    $this->raceRound,
+                    $this->racePick
+                );
+
+                return parent::isPlayerAlreadyDrafted($playerName);
+            }
+        };
+    }
+
     public function testOwnerSubmittingOwnSlotLandsThePick(): void
     {
         $this->insertDraftClassRow('OwnershipTest Own', 'PG');
@@ -130,6 +166,30 @@ class DraftControllerOwnershipTest extends DatabaseTestCase
         self::assertStringNotContainsString('You do not own this draft pick.', $result);
         self::assertSame('OwnershipTest Own', $this->draftedPlayerInSlot(1, 1));
         self::assertSame(1, $this->playerRowCount('OwnershipTest Own'));
+    }
+
+    public function testSecondWriteToFilledSlotAffectsNoRowsAndRollsBack(): void
+    {
+        $this->insertDraftClassRow('OwnershipTest Second', 'SG');
+        $this->insertDraftRow(self::YEAR, 1, 1, 1, '');
+        $this->insertDraftPickRow(1, 1, self::YEAR, 1);
+
+        $result = $this->submit(1, 1, 'OwnershipTest Second', null, $this->raceRepository(1, 1, 'OwnershipTest Rival'));
+
+        self::assertStringContainsString((new DraftProcessor())->getDatabaseErrorMessage(), $result);
+        self::assertSame('OwnershipTest Rival', $this->draftedPlayerInSlot(1, 1));
+        self::assertSame(0, $this->playerRowCount('OwnershipTest Second'));
+    }
+
+    public function testUpdateDraftTableRefusesFilledSlot(): void
+    {
+        $this->insertDraftRow(self::YEAR, 1, 1, 1, 'OwnershipTest Taken');
+        $repository = new DraftRepository($this->db, new TeamIdentityRepository($this->db));
+
+        $updated = $repository->updateDraftTable('OwnershipTest Late', '2098-06-15 10:30:00', self::YEAR, 1, 1);
+
+        self::assertFalse($updated);
+        self::assertSame('OwnershipTest Taken', $this->draftedPlayerInSlot(1, 1));
     }
 
     public function testSubmittedPickStoresWellFormedDateTime(): void

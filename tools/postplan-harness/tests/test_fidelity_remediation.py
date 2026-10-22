@@ -550,6 +550,60 @@ def test_round2_ready(tmp_path, git_shim):
         _cleanup(991, "991-2")
 
 
+def test_filefix_commit_round_re_reviews_new_head(tmp_path, git_shim, monkeypatch):
+    """A round that lands a file-fix commit is re-reviewed against that commit's head."""
+    events = []
+    rules_path = ".claude/rules/visual-review-prs.md"
+
+    class _FileFixGit(_CountingGit):
+        def changed_files(self, base="origin/master"):
+            # Only the post-commit `<sha>^` probe sees the rules file.
+            return [rules_path] if str(base).endswith("^") else super().changed_files(base)
+
+        def push(self):
+            events.append("push")
+            return super().push()
+
+        def diff_vs_base(self, base="origin/master"):
+            events.append("diff_vs_base")
+            return super().diff_vs_base(base)
+
+    seen = []
+    real_re_review = fidelity.re_review
+
+    def spy(*args, **kwargs):
+        events.append("re_review")
+        seen.append(args[8])
+        return real_re_review(*args, **kwargs)
+
+    monkeypatch.setattr(fidelity.fidelity_filefix, "permit", lambda *a, **k: True)
+    monkeypatch.setattr(fidelity, "re_review", spy)
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "READY\n",
+    }
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    fx = _FileFixGit({"slug": "demo", "worktree_diff": "",
+                      "diff": "diff --git a/x b/x\n",
+                      "head_trees": [TREE_1, TREE_2, TREE_3, TREE_4]})
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), fx, gh, _plan(),
+            "diff", "body", 9911, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert seen == ["round-sha-1"]
+        rec = res.fidelity["rounds"][0]
+        assert rec["outcome"] == "committed"
+        assert rec["remediation_sha"] == "round-sha-1"
+        assert events.index("push") < events.index("re_review")
+        assert "diff_vs_base" in events[events.index("re_review"):]
+    finally:
+        _cleanup(9911, "9911-2")
+
+
 def test_round2_no_verdict_overwrites_last_round_fields(tmp_path, git_shim):
     """Round 1 re-review NOT READY, round 2 re-review produces no verdict: the
     last-round fields describe round 2 (no stale round-1 verdict or tree)."""

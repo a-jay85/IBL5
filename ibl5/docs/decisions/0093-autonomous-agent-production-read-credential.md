@@ -1,6 +1,6 @@
 ---
 description: An unattended agent is given a production-reaching credential safely by starving it to one SELECT-only MySQL user over an SSH tunnel while every privileged write happens prod-side behind a CLI guard.
-last_verified: 2026-10-20
+last_verified: 2026-10-21
 ---
 
 # ADR-0093: An autonomous agent holding a production read-only credential
@@ -44,7 +44,11 @@ The agent is made **incapable by construction**, not trusted to behave. Four str
 
 The Decision limited `--allowedTools` to `Bash(mysql:*)` and `Write`. That rule matches the literal command prefix. The prompt runs mysql by absolute path, so on the GitHub Actions runner every query was denied and sim 739 parked as flaky. The Mac never hit it because its user settings allow Bash.
 
-`bin/sim-recap-tick` now also allows `Bash(<absolute mysql path>:*)` and passes `--permission-mode acceptEdits`. The extra mode lets the agent redirect query output into scratch files inside its temp workdir. The credential is unchanged: still SELECT-only over the tunnel. The tick also logs which tools were denied when no payload comes back.
+Allowing the raw client would have broken this ADR's boundary. The mysql client runs shell commands (`system`, `\!`), writes any file (`tee`), and reads any file (`source`). On the Actions runner that reaches the runner env, secrets, ssh identity, and tunnel config.
+
+So the agent's whole allow-list is now `Bash(<repo>/bin/sim-recap-mysql:*)`. That wrapper takes SQL only, by `-e` or stdin, plus a few output flags. It refuses every other argument and any client command in the SQL. It then runs the pinned client with `--no-defaults --skip-system-command --binary-mode --batch --local-infile=0` and fixed connection flags. `--binary-mode` turns off every client command in non-interactive input. Both flags were proved against Ubuntu's mysql-client 8.0.46, the client the workflow installs. Claude Code denies an env-prefixed, chained, or `$(...)` form of the wrapper command. The bare `Write` rule is gone because it matched any path, including files outside the workdir.
+
+The tick also passes `--permission-mode acceptEdits`. That mode auto-approves Edit and Write, plus common filesystem Bash commands (`mkdir`, `touch`, `cp`, `mv`, redirects), inside the agent's temp workdir only. The agent uses it for scratch files and `payload.json`. The boundary is still the SELECT-only credential over the tunnel. These flags confine the agent on Actions only. The Mac's user settings allow bare `Bash`, so there the credential split stays the only boundary, as the Decision says. The tick also logs which tools were denied when no payload comes back.
 
 ## References
 

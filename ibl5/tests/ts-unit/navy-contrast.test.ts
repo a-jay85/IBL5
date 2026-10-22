@@ -301,6 +301,10 @@ describe('navy source hygiene', () => {
     expect(placeholder).toContain('var(--gray-400)');
     expect(placeholder).not.toContain('gray-500');
 
+    const sectionLabel = ruleBody(nav, '.nav-section-label');
+    expect(sectionLabel).toContain('color: var(--gray-400)');
+    expect(sectionLabel).not.toContain('gray-500');
+
     const card = ruleBody(nav, '.nav-dropdown__card');
     expect(card).toContain('color-mix(in srgb, var(--navy-800) 95%, transparent)');
     expect(card).not.toContain('rgba(30, 41, 59');

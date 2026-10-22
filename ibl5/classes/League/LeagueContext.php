@@ -185,6 +185,7 @@ class LeagueContext
                 'FranchiseRecordBook',
                 'CareerLeaderboards',
                 'SeasonLeaderboards',
+                'Leaderboards',
                 'RecordHolders',
             ];
 

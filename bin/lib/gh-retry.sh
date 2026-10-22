@@ -34,8 +34,9 @@
 # Classification per attempt:
 #   1. exit 0 and the body parses as JSON (jq -e 'true')  -> done, return 0
 #   2. exit 0 and the body is empty or not JSON           -> retry
-#   3. non-zero and stderr names HTTP 4xx other than 429  -> fail at once
-#   4. any other non-zero (5xx, 429, network error,
+#   3. non-zero and stderr names HTTP 4xx other than 429
+#      (a 403 that says "rate limit" counts as 429)       -> fail at once
+#   4. any other non-zero (5xx, 429, rate-limit 403, network error,
 #      silent non-zero with no stderr)                    -> retry
 # Exhaustion: the last attempt's non-zero exit code, or 65 when the last
 # attempt exited 0 with an empty or non-JSON body (stdout is then empty).
@@ -53,7 +54,11 @@ _gh_retry_is_transient() {
 }
 
 # _gh_retry_is_hard_4xx <stderr-file>: 0 when stderr names an HTTP 4xx other than 429.
+# A 403 that mentions a rate limit is GitHub's secondary rate limit, so it retries.
 _gh_retry_is_hard_4xx() {
+  if grep -qE 'HTTP 403' "$1" && grep -qiE 'rate limit' "$1"; then
+    return 1
+  fi
   grep -qE 'HTTP 4([01][0-9]|2[0-8]|[3-9][0-9])' "$1"
 }
 

@@ -942,10 +942,12 @@ class LiveGit:
                                               adapt_trail + (f"ladder error: {exc.kind}: {exc.detail}",)))
                     if not outcome.rung:
                         self.last_conflict_rung = "exhausted"
+                        # Only entries from a run where the guard reached the proof:
+                        # the DM line says the proof still failed.
                         self.last_conflict_fix_summary = next(
                             (t for t in outcome.trail
-                             if t.startswith("sonnet-fix: ")
-                             and not t.startswith("sonnet-fix: skipped")), "")
+                             if t == "sonnet-fix: proof still failed"
+                             or t.startswith("sonnet-fix: partial (")), "")
                         abort_and_restore(self._run, worktree=self.worktree,
                                           pre_rebase_sha=pre_rebase_sha,
                                           reason=ladder_failure_reason(first_proof, adapt_trail + tuple(outcome.trail)))

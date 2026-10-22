@@ -465,7 +465,7 @@ def test_rebase_onto_fix_rung_failure_restores_branch(make_repo, tmp_path):
     assert live.last_conflict_rung == "exhausted"
 
 
-def test_rebase_onto_records_fix_summary_on_exhaustion(make_repo, tmp_path):
+def test_rebase_onto_omits_fix_summary_when_proof_never_ran(make_repo, tmp_path):
     fx = _compose_repo(make_repo)
     llm = _fix_handlers(fx, _writer(_COMPOSE, fx.partial, reply="SUMMARY: gave up\nFAILED"))
     live = LiveGit(fx.d, llm=llm, state_dir=str(tmp_path / "state"))
@@ -473,7 +473,8 @@ def test_rebase_onto_records_fix_summary_on_exhaustion(make_repo, tmp_path):
     with pytest.raises(HarnessError):
         live.rebase_onto()
 
-    assert live.last_conflict_fix_summary.startswith("sonnet-fix: session ended FAILED")
+    # The session ended FAILED, so the guard never ran the proof; the DM must not claim it did.
+    assert live.last_conflict_fix_summary == ""
 
 
 def test_fix_rung_not_called_on_clean_merge(make_repo, tmp_path):

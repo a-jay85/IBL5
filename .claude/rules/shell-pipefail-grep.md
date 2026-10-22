@@ -1,6 +1,6 @@
 ---
 description: Avoid printf-pipe-grep-q under set -o pipefail — use herestring to prevent SIGPIPE false failures on Linux.
-last_verified: 2026-10-06
+last_verified: 2026-10-22
 paths: "bin/**"
 ---
 
@@ -30,7 +30,7 @@ PR #2174's `bin/test-architect-contract-split` used the printf-pipe form under `
 
 ## Applies to
 
-Any shell script with `set -o pipefail` (or `set -euo pipefail`) that pipes into `grep -q` or `grep -c`. The same fix applies to `grep -qE`, `grep -qP`, etc.
+Any shell script with `set -o pipefail` (or `set -euo pipefail`) that pipes `echo` or `printf` into a `grep -q`-family call (`-qF`, `-qE`, `-qP`, `--quiet`). `grep -c` reads to EOF and is safe (`bin/test-sigpipe-grep-q-guard` case 2). `bin/check-pipefail-grep-q` fails a PR that adds a new instance under `bin/`.
 
 ShellCheck does not catch this pattern — it passes SC lint.
 

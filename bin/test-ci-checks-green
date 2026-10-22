@@ -11,6 +11,7 @@
 #        (the Nth poll serves the Nth fixture; every case uses --interval-seconds=0).
 # S1-S10 run bin/settle-pr-status against a `gh` shim that dispatches on the API path
 #        and records the commit-status POST body in $PFIX/posted.json.
+# S11-S16 pin the API read retry and the fail-closed body guard in bin/settle-pr-status.
 #
 # Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
 set -uo pipefail
@@ -28,6 +29,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHECK="$SCRIPT_DIR/check-master-ci-green"
 LIB="$SCRIPT_DIR/lib/ci-checks-green.sh"
 TMP="$(mktemp -d)"
+# Retries re-invoke the gh shims: retry at once, never really sleep.
+export IBL5_GH_RETRY_DELAYS="0 0"
 trap 'rm -rf "$TMP"; h_cleanup' EXIT
 
 ok()   { h_pass "$1"; }
@@ -615,20 +618,29 @@ S_SHA2="fedcba9876543210fedcba9876543210fedcba98"
 # The shim dispatches on the API path. Fixtures live in $PFIX: assoc.json (commits/S/pulls),
 # pull.json (pulls/N), cr.json (check-runs, slurped), wr.json (actions/runs, slurped).
 # A -X POST to statuses copies stdin to $PFIX/posted.json. $PFIX/cr-fail makes check-runs exit 1.
+# $PFIX/assoc-fail-once makes the first commits/S/pulls read fail with a truncated-body error;
+# $PFIX/assoc-empty-once makes the first one print nothing and exit 0; $PFIX/pull-404 makes
+# pulls/N fail with HTTP 404. Every call is appended to $PFIX/calls.log.
 SSHIM_DIR="$TMP/sshim"
 mkdir -p "$SSHIM_DIR"
 cat > "$SSHIM_DIR/gh" <<'SHIM'
 #!/bin/bash
+echo "$*" >> "$PFIX/calls.log"
 case "$*" in
     *"-X POST"*statuses*) cat > "$PFIX/posted.json" ;;
-    *commits/*/pulls*)    cat "$PFIX/assoc.json" ;;
-    */pulls/[0-9]*)       cat "$PFIX/pull.json" ;;
+    *commits/*/pulls*)    if [ -f "$PFIX/assoc-fail-once" ]; then rm -f "$PFIX/assoc-fail-once"; echo 'unexpected end of JSON input' >&2; exit 1; fi
+                          if [ -f "$PFIX/assoc-empty-once" ]; then rm -f "$PFIX/assoc-empty-once"; exit 0; fi; cat "$PFIX/assoc.json" ;;
+    */pulls/[0-9]*)       [ -f "$PFIX/pull-404" ] && { echo 'gh: Not Found (HTTP 404)' >&2; exit 1; }
+                          cat "$PFIX/pull.json" ;;
     *check-runs*)         [ -f "$PFIX/cr-fail" ] && exit 1; cat "$PFIX/cr.json" ;;
     *actions/runs*)       cat "$PFIX/wr.json" ;;
     *)                    echo "sshim: unexpected: $*" >&2; exit 1 ;;
 esac
 SHIM
 chmod +x "$SSHIM_DIR/gh"
+mkdir -p "$TMP/sleepstub"
+printf '#!/bin/bash\necho "$1" >> "$PFIX/sleeps"\n' > "$TMP/sleepstub/sleep"
+chmod +x "$TMP/sleepstub/sleep"
 
 # s_case <name> [base-ref] [pull-head-sha] — fresh fixtures: one open PR #7 with an all-green
 # check-run set for the anchors A,B.
@@ -643,6 +655,7 @@ s_case() {
     cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
     wr 1 "$RUNS_DONE"
     cp "$PFIX/1-runs.json" "$PFIX/wr.json"
+    rm -f "$PFIX/calls.log"
 }
 
 # run_settle <args...> — sets OUT, ERR, RC; always passes --repo and the anchors A,B.
@@ -749,5 +762,80 @@ if [ "$RC" -eq 0 ] && [ "$(s_state)" = "pending" ] \
         && [ "$(jq -r .description "$PFIX/posted.json" | wc -c)" -le 141 ]; then
     ok "S10 description is capped at 140 bytes"
 else fail "S10 description is capped at 140 bytes (rc=$RC state=$(s_state) len=$(jq -r .description "$PFIX/posted.json" | wc -c))"; fi
+
+# calls_of <ere> — how many shim calls matched the pattern in this case.
+calls_of() { if [ -f "$PFIX/calls.log" ]; then grep -cE "$1" "$PFIX/calls.log" || true; else echo 0; fi; }
+ASSOC_RE='commits/[0-9a-f]+/pulls'
+
+# S11: the default read budget is 2s then 5s whether the var is unset or empty.
+s_case s11
+printf '' > "$PFIX/assoc.json"
+s11_ok=1
+for form in unset empty; do
+    rm -f "$PFIX/sleeps" "$PFIX/calls.log" "$PFIX/posted.json"
+    if [ "$form" = unset ]; then
+        env -u IBL5_GH_RETRY_DELAYS PATH="$TMP/sleepstub:$PATH" GITHUB_WORKFLOW="" \
+            GH_API_CMD="$SSHIM_DIR/gh api" PFIX="$PFIX" \
+            "$SETTLE" --repo=a-jay85/IBL5 --anchor=A,B --head-sha="$P_SHA" >"$TMP/s-out" 2>"$TMP/s-err"
+    else
+        env IBL5_GH_RETRY_DELAYS="" PATH="$TMP/sleepstub:$PATH" GITHUB_WORKFLOW="" \
+            GH_API_CMD="$SSHIM_DIR/gh api" PFIX="$PFIX" \
+            "$SETTLE" --repo=a-jay85/IBL5 --anchor=A,B --head-sha="$P_SHA" >"$TMP/s-out" 2>"$TMP/s-err"
+    fi
+    rc=$?
+    sleeps="$(cat "$PFIX/sleeps" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')"
+    if [ "$rc" -ne 2 ] || [ "$sleeps" != "2 5" ] || [ "$(calls_of "$ASSOC_RE")" != 3 ] \
+            || [ -f "$PFIX/posted.json" ]; then
+        s11_ok=0; echo "  S11 $form -> rc=$rc sleeps='$sleeps' calls=$(calls_of "$ASSOC_RE")" >&2
+    fi
+done
+if [ "$s11_ok" -eq 1 ]; then ok "S11 default read budget is 2s then 5s (unset and empty)"
+else fail "S11 default read budget is 2s then 5s (unset and empty)"; fi
+
+# S12: an empty commits/S/pulls body on every attempt fails closed, never NOTHING.
+s_case s12
+printf '' > "$PFIX/assoc.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 2 ] && [ ! -f "$PFIX/posted.json" ] && ! grep -qF 'NOTHING:' "$OUT" \
+        && grep -qF 'API read error: repos/a-jay85/IBL5/commits/' "$ERR" \
+        && [ "$(calls_of "$ASSOC_RE")" = 3 ]; then
+    ok "S12 empty assoc body fails closed after 3 reads"
+else fail "S12 empty assoc body fails closed after 3 reads (rc=$RC calls=$(calls_of "$ASSOC_RE") out=$(cat "$OUT") err=$(head -2 "$ERR"))"; fi
+
+# S13: a valid non-array assoc body fails closed and is not retried.
+s_case s13
+printf '{"message":"x"}' > "$PFIX/assoc.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 2 ] && [ ! -f "$PFIX/posted.json" ] && ! grep -qF 'NOTHING:' "$OUT" \
+        && grep -qF 'body is not a JSON array' "$ERR" \
+        && [ "$(calls_of "$ASSOC_RE")" = 1 ]; then
+    ok "S13 non-array assoc body fails closed without retry"
+else fail "S13 non-array assoc body fails closed without retry (rc=$RC calls=$(calls_of "$ASSOC_RE") out=$(cat "$OUT") err=$(head -2 "$ERR"))"; fi
+
+# S14: one transient read error, then success (the 2026-10-22 incident shape).
+s_case s14
+: > "$PFIX/assoc-fail-once"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] && [ "$(calls_of "$ASSOC_RE")" = 2 ] \
+        && grep -qF 'gh-retry: attempt 1/3 failed (transient)' "$ERR"; then
+    ok "S14 one transient read error is retried and settles success"
+else fail "S14 one transient read error is retried and settles success (rc=$RC state=$(s_state) calls=$(calls_of "$ASSOC_RE") err=$(head -3 "$ERR"))"; fi
+
+# S15: a persistent HTTP 404 on pulls/N is read once and fails closed.
+s_case s15
+: > "$PFIX/pull-404"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 2 ] && [ ! -f "$PFIX/posted.json" ] && [ "$(calls_of '/pulls/7')" = 1 ]; then
+    ok "S15 persistent 404 is not retried and posts nothing"
+else fail "S15 persistent 404 is not retried and posts nothing (rc=$RC calls=$(calls_of '/pulls/7') err=$(head -2 "$ERR"))"; fi
+
+# S16: one empty assoc body, then a good one.
+s_case s16
+: > "$PFIX/assoc-empty-once"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] && [ "$(calls_of "$ASSOC_RE")" = 2 ] \
+        && grep -qF 'returned an empty or non-JSON body' "$ERR"; then
+    ok "S16 one empty assoc body is retried and settles success"
+else fail "S16 one empty assoc body is retried and settles success (rc=$RC state=$(s_state) calls=$(calls_of "$ASSOC_RE") err=$(head -3 "$ERR"))"; fi
 
 h_done

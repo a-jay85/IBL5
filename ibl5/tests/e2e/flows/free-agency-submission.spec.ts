@@ -553,7 +553,7 @@ test.describe('Free Agency -- validation errors', () => {
     const form = offerForm(page);
     await form.locator('input[name="offeryear1"]').fill('0');
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    await expect(page.locator('.ibl-alert--error')).toContainText('must enter an amount greater than zero');
+    await expect(page.locator('.d-alert-error')).toContainText('must enter an amount greater than zero');
   });
 
   test('below veteran minimum shows error', async ({ page }) => {
@@ -561,7 +561,7 @@ test.describe('Free Agency -- validation errors', () => {
     // FA Center exp=8, vet min=89; offer 1 is below that
     await form.locator('input[name="offeryear1"]').fill('1');
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    await expect(page.locator('.ibl-alert--error')).toContainText("Veteran's Minimum");
+    await expect(page.locator('.d-alert-error')).toContainText("Veteran's Minimum");
   });
 
   test('hard cap exceeded shows error', async ({ page }) => {
@@ -569,7 +569,7 @@ test.describe('Free Agency -- validation errors', () => {
     // Offer 9999 — exceeds hard cap space for any team
     await form.locator('input[name="offeryear1"]').fill('9999');
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    const alert = page.locator('.ibl-alert--error');
+    const alert = page.locator('.d-alert-error');
     await expect(alert).toBeVisible();
     const text = await alert.textContent() ?? '';
     // Either hard cap or max contract error fires (both are valid for 9999)
@@ -583,7 +583,7 @@ test.describe('Free Agency -- validation errors', () => {
     // Use 1500 which exceeds all max contract tiers
     await form.locator('input[name="offeryear1"]').fill('1500');
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    const alert = page.locator('.ibl-alert--error');
+    const alert = page.locator('.d-alert-error');
     await expect(alert).toBeVisible();
     const text = await alert.textContent() ?? '';
     // Cap space error may fire before max contract check if team is over the cap
@@ -595,7 +595,7 @@ test.describe('Free Agency -- validation errors', () => {
     await form.locator('input[name="offeryear1"]').fill('500');
     await form.locator('input[name="offeryear2"]').fill('700');
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    const alert = page.locator('.ibl-alert--error');
+    const alert = page.locator('.d-alert-error');
     await expect(alert).toBeVisible();
     const text = await alert.textContent() ?? '';
     // CI seed has Metros under hard cap — raise validation fires (not cap space error)
@@ -608,7 +608,7 @@ test.describe('Free Agency -- validation errors', () => {
     await form.locator('input[name="offeryear2"]').fill('0');
     await form.locator('input[name="offeryear3"]').fill('200');
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    const alert = page.locator('.ibl-alert--error');
+    const alert = page.locator('.d-alert-error');
     await expect(alert).toBeVisible();
     const text = await alert.textContent() ?? '';
     // CI seed has Metros under hard cap — gap validation fires (not cap space error)
@@ -638,8 +638,8 @@ test.describe('Free Agency -- Bird Rights negotiation', () => {
     // pid=10 has bird=4 (Bird Rights) in CI seed
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=10');
 
-    const notesCard = page.locator('.ibl-card').filter({
-      has: page.locator('.ibl-card__title', { hasText: 'Notes / Reminders' }),
+    const notesCard = page.locator('.d-card').filter({
+      has: page.locator('.d-card-title', { hasText: 'Notes / Reminders' }),
     });
     await expect(notesCard).toBeVisible();
 

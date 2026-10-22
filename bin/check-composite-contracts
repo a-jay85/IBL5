@@ -12,10 +12,10 @@
 #                   pins the default only; it does NOT verify that no caller passes
 #                   fail-on-delivery: false on an alert path — that intent is not
 #                   mechanizable from the composite alone.)
-#   promote-to-production: eight invariants (P1-P8) that guard the unattended
+#   promote-to-production: nine invariants (P1-P9) that guard the unattended
 #                   fast-forward push path — force-push flags, permissions, PAT
 #                   credential, kill-switch count, walkback setting, fork guard,
-#                   SKIP_CHECKS/job-name sync, and merge-script parity.
+#                   SKIP_CHECKS/job-name sync, merge-script parity, and the workflow_run branches filter (P9).
 #   required PR workflows (R1): tests.yml, e2e-tests.yml, human-signoff.yml,
 #                   pr-meta-checks.yml and mutation.yml must keep a block-style
 #                   `on: pull_request:` trigger with no `paths:` or
@@ -25,14 +25,20 @@
 #                   starts (no filters, no `labeled`), M2 exact context shared with
 #                   the ADR and unique, M3 never job-skipped (no job-level `if:` or
 #                   `continue-on-error`), M4 the --min-msi=100 threshold intact.
-#   all-checks-green: five invariants (A1-A5) that keep the required aggregator
-#                   check `All checks green` (ADR-0149) reporting on every PR and
-#                   failing closed: A1 always starts (no filters; synchronize,
-#                   labeled, unlabeled and edited types), A2 one context literal
-#                   shared by the workflow job, bin/lib/pr-armable.sh, the harness
-#                   armable.py and the ADR, and unique across workflows, A3 never
-#                   job-skipped, A4 bounded wait (timeout-minutes, --wait,
-#                   --self, --timeout-seconds) and no write permission.
+#   all-checks-settled: six invariants (A1-A6) that keep the event-driven
+#                   aggregator `All checks settled` (ADR-0149 addendum) safe and
+#                   complete: A1 only workflow_run (completed) and workflow_dispatch
+#                   (pr_number) start it, no pull_request trigger, no head-branch
+#                   filter; A2 one context literal shared by --context, --self,
+#                   bin/lib/pr-armable.sh, the harness armable.py and the ADR, and
+#                   no job named after it; A3 never waits (no --wait, timeout <= 10,
+#                   cancel-in-progress keyed on the PR, exact job if:); A4 only
+#                   statuses: write, no ${{ }} inside run:, a master checkout
+#                   without persisted credentials, event fields only via env; A5 the
+#                   four ADR-0149 anchors and the legacy-waiter ignore shim exactly
+#                   while all-checks-green.yml exists; A6 workflow_run.workflows
+#                   equals every PR-triggered workflow name. P9 (promote) pins the
+#                   workflow_run `branches: [master]` filter.
 #   step DB env (D1): every step-scoped DB_HOST/DB_USER/DB_PASS/DB_NAME value
 #                   in any workflow must equal the ${DB_*:-default} that
 #                   setup-php-env writes into config.local.php, so DatabaseIntegration
@@ -55,7 +61,7 @@
 #   Compares two saved `gh api repos/<owner>/<repo>/branches/master/protection`
 #   responses (R0-R4) to prove the manual activation POST added exactly the
 #   `Infection PHP (per-PR diff)` context (or the --context=<name> one, e.g.
-#   `All checks green` for ADR-0149) and changed nothing else. Exit 0 = OK,
+#   `All checks settled` for ADR-0149) and changed nothing else. Exit 0 = OK,
 #   1 = an R check failed, 2 = bad usage or unreadable input.
 set -eu
 
@@ -64,10 +70,10 @@ set -eu
 # and --protection-readback compares branch protection to it.
 MUT_CONTEXT='Infection PHP (per-PR diff)'
 
-# Required aggregator context emitted by all-checks-green.yml (ADR-0149). The same
+# Required aggregator commit status posted by all-checks-settled.yml (ADR-0149 addendum). The same
 # literal lives in bin/lib/pr-armable.sh (PR_ARMABLE_AGGREGATOR_CONTEXT) and
 # tools/postplan-harness/harness/armable.py (AGGREGATOR_CONTEXT); A2 pins all three.
-AGG_CONTEXT='All checks green'
+AGG_CONTEXT='All checks settled'
 
 # protection_readback <post.json> <pre.json> [context]
 # Read-only proof that the manual append-only POST to branch protection added
@@ -321,6 +327,25 @@ else
     fi
   fi
 
+  # P9: the workflow_run trigger carries a head-branch filter `branches: [master]`.
+  # Every listed workflow also runs on pull_request; without the filter each PR
+  # completion starts a promote run that only cancels or skips, and floods the
+  # promote-to-production concurrency group (ADR-0149 addendum 2026-10-21).
+  pp_wr="$(awk '
+    { sub(/\r$/, "") }
+    /^on:/ { inon=1; next }
+    inon && /^[^[:space:]#]/ { exit }
+    inon && /^  workflow_run:/ { inwr=1; next }
+    inwr && /^  [^[:space:]#]/ { inwr=0 }
+    inwr { print }
+  ' "$pp_file")"
+  if grep -qE '^    branches:[[:space:]]*\[[[:space:]]*master[[:space:]]*\][[:space:]]*(#.*)?$' <<< "$pp_wr"; then
+    echo "composite-contracts: promote-to-production workflow_run is filtered to branches: [master] (P9)"
+  else
+    echo "composite-contracts: promote-to-production (P9) — on.workflow_run has no 'branches: [master]' filter; every PR completion of a listed workflow would start a promote run ($pp_file)" >&2
+    fail=1
+  fi
+
 fi  # end pp_file present
 
 # R1: required PR workflows must not carry a workflow-level pull_request path
@@ -485,13 +510,14 @@ else
 fi  # end mp_file present
 
 # ---------------------------------------------------------------------------
-# all-checks-green invariants (A1-A5, ADR-0149). The aggregator is a required
-# context, so a run that never starts or never ends blocks every merge, and a
-# name that drifts from the predicates' literal silently re-arms condition (15).
+# all-checks-settled invariants (A1-A6, ADR-0149 addendum 2026-10-21). The
+# aggregator writes the required `All checks settled` commit status from a
+# workflow_run event with statuses: write, so a trigger that runs PR code, an
+# event field that reaches a shell line, or a dropped sibling breaks the merge gate.
 # ---------------------------------------------------------------------------
-agg_file="$WORKFLOWS/all-checks-green.yml"
+agg_file="$WORKFLOWS/all-checks-settled.yml"
 if [ ! -f "$agg_file" ]; then
-  echo "composite-contracts: all-checks-green absent — skipped"
+  echo "composite-contracts: all-checks-settled absent — skipped"
 else
   agg_on="$(awk '
     { sub(/\r$/, "") }
@@ -499,9 +525,20 @@ else
     inblk && /^[A-Za-z]/ { exit }
     inblk { print }
   ' "$agg_file")"
+  agg_wr="$(awk '
+    /^  workflow_run:/ { inwr=1; next }
+    inwr && /^  [^[:space:]#]/ { inwr=0 }
+    inwr { print }
+  ' <<< "$agg_on")"
   agg_perms="$(awk '
     { sub(/\r$/, "") }
     /^permissions:/ { inblk=1; print; next }
+    inblk && /^[A-Za-z]/ { exit }
+    inblk { print }
+  ' "$agg_file")"
+  agg_conc="$(awk '
+    { sub(/\r$/, "") }
+    /^concurrency:/ { inblk=1; print; next }
     inblk && /^[A-Za-z]/ { exit }
     inblk { print }
   ' "$agg_file")"
@@ -511,33 +548,58 @@ else
     inblk && /^[A-Za-z]/ { exit }
     inblk { print }
   ' "$agg_file")"
+  # Text of every run: step (block scalar bodies and one-line forms).
+  agg_run="$(awk '
+    {
+      match($0, /^[[:space:]]*/); ind=RLENGTH
+      if (inrun && $0 !~ /^[[:space:]]*$/ && ind <= runind) inrun=0
+      if (inrun) { print; next }
+      if ($0 ~ /^[[:space:]]*(-[[:space:]]+)?run:/) {
+        line=$0; sub(/^[[:space:]]*(-[[:space:]]+)?run:[[:space:]]*/, "", line)
+        if (line ~ /^[|>]/) { inrun=1; runind=ind } else { print line }
+      }
+    }
+  ' <<< "$agg_jobs")"
+  # _agg_flag <name> — the quoted value of --<name>='...' (or "...") in the run text.
+  _agg_flag() {
+    grep -oE -- "--$1=('[^']*'|\"[^\"]*\")" <<< "$agg_run" | head -1 \
+      | sed -E "s/^--$1=//; s/^['\"]//; s/['\"]\$//"
+  }
+  # _agg_csv_has <csv> <member> — exact CSV membership.
+  _agg_csv_has() {
+    tr ',' '\n' <<< "$1" | grep -qxF -- "$2"
+  }
 
-  # A1: always starts, and re-settles on every event that starts a sibling job.
+  # A1: only workflow_run (completed) and workflow_dispatch(pr_number) start it.
+  # A pull_request trigger would run PR-branch code with statuses: write; a
+  # head-branch filter would drop a fork PR whose branch is named master.
   _a1_bad=""
-  if ! grep -qE '^  pull_request:' <<< "$agg_on"; then
-    _a1_bad="on: has no block-style pull_request trigger"
-  elif grep -qE '^[[:space:]]+(paths|paths-ignore|branches|branches-ignore):' <<< "$agg_on"; then
-    _a1_bad="on: carries a paths/branches filter"
-  else
-    for _t in synchronize labeled unlabeled edited; do
-      if ! grep -qE "^[[:space:]]+types:.*(\[|[[:space:],])${_t}([],[:space:]]|\$)" <<< "$agg_on"; then
-        _a1_bad="pull_request types lack '$_t'"
-        break
-      fi
-    done
+  if grep -qE '^[[:space:]]*(-[[:space:]]*)?pull_request(_target)?([[:space:]]*:|[[:space:]]*$|[],[:space:]])' <<< "$agg_on" \
+     || grep -qE '^on:.*pull_request' <<< "$agg_on"; then
+    _a1_bad="on: declares a pull_request or pull_request_target trigger"
+  elif ! grep -qE '^  workflow_run:' <<< "$agg_on"; then
+    _a1_bad="on: has no block-style workflow_run trigger"
+  elif ! grep -qE '^    types:[[:space:]]*\[[[:space:]]*completed[[:space:]]*\][[:space:]]*$' <<< "$agg_wr"; then
+    _a1_bad="workflow_run types is not exactly [completed]"
+  elif grep -qE '^[[:space:]]+(branches|branches-ignore):' <<< "$agg_wr"; then
+    _a1_bad="workflow_run carries a branches/branches-ignore filter"
+  elif ! grep -qE '^  workflow_dispatch:' <<< "$agg_on" \
+       || ! grep -qE '^      pr_number:' <<< "$agg_on"; then
+    _a1_bad="on: has no workflow_dispatch trigger with a pr_number input"
   fi
   if [ -n "$_a1_bad" ]; then
-    echo "composite-contracts: all-checks-green (A1) — $_a1_bad; the required aggregator would not report or re-settle on every PR event ($agg_file)" >&2
+    echo "composite-contracts: all-checks-settled (A1) — $_a1_bad; the aggregator could run PR code with a write token or skip a PR ($agg_file)" >&2
     fail=1
   else
-    echo "composite-contracts: all-checks-green starts on every PR event and re-settles on synchronize/labeled/unlabeled/edited (A1)"
+    echo "composite-contracts: all-checks-settled starts only on workflow_run completed and workflow_dispatch (A1)"
   fi
 
-  # A2: one context literal in every home, and exactly one job emitting it.
+  # A2: one context literal in every home, and no check-run shares its name.
   _a2_bad=""
-  _agg_names="$(sed -n 's/^    name:[[:space:]]*//p' <<< "$agg_jobs" | sed "s/^[\"']//; s/[\"']\$//")"
-  if [ "$(grep -cxF -- "$AGG_CONTEXT" <<< "$_agg_names" || true)" -ne 1 ]; then
-    _a2_bad="expected exactly one job named '$AGG_CONTEXT', job names are: $(tr '\n' '|' <<< "$_agg_names")"
+  if [ "$(_agg_flag context)" != "$AGG_CONTEXT" ]; then
+    _a2_bad="--context= is '$(_agg_flag context)', expected '$AGG_CONTEXT'"
+  elif ! _agg_csv_has "$(_agg_flag self)" "$AGG_CONTEXT"; then
+    _a2_bad="--self= does not list '$AGG_CONTEXT', so the aggregator could read its own context"
   elif ! grep -qF "PR_ARMABLE_AGGREGATOR_CONTEXT='$AGG_CONTEXT'" "$ROOT/bin/lib/pr-armable.sh" 2>/dev/null; then
     _a2_bad="bin/lib/pr-armable.sh does not set PR_ARMABLE_AGGREGATOR_CONTEXT='$AGG_CONTEXT'"
   elif ! grep -qF "AGGREGATOR_CONTEXT = \"$AGG_CONTEXT\"" "$ROOT/tools/postplan-harness/harness/armable.py" 2>/dev/null; then
@@ -550,14 +612,13 @@ else
     done
     if [ "${#_agg_adrs[@]}" -ne 1 ]; then
       _a2_bad="expected exactly one ADR $DECISIONS/*-required-ci-aggregator*.md, found ${#_agg_adrs[@]}"
-    elif ! grep -qF -- "$AGG_CONTEXT" "${_agg_adrs[0]}"; then
-      _a2_bad="ADR ${_agg_adrs[0]} does not carry the literal '$AGG_CONTEXT'"
+    elif ! grep -qF -- "\`$AGG_CONTEXT\`" "${_agg_adrs[0]}"; then
+      _a2_bad="ADR ${_agg_adrs[0]} does not carry the backticked literal \`$AGG_CONTEXT\`"
     fi
   fi
   if [ -z "$_a2_bad" ]; then
     for _wf in "$WORKFLOWS"/*.yml; do
       [ -f "$_wf" ] || continue
-      [ "$_wf" = "$agg_file" ] && continue
       if awk -v ctx="$AGG_CONTEXT" '
         { sub(/\r$/, "") }
         /^    name:/ {
@@ -566,71 +627,133 @@ else
         }
         END { exit !found }
       ' "$_wf"; then
-        _a2_bad="$_wf also names a job '$AGG_CONTEXT'; two check runs would share one required context"
+        _a2_bad="$_wf names a job '$AGG_CONTEXT'; a check-run and the commit status would share one required context"
         break
       fi
     done
   fi
   if [ -n "$_a2_bad" ]; then
-    echo "composite-contracts: all-checks-green (A2) — $_a2_bad; the required context and the condition (15) predicates would disagree ($agg_file)" >&2
+    echo "composite-contracts: all-checks-settled (A2) — $_a2_bad; the required context and the condition (15) predicates would disagree ($agg_file)" >&2
     fail=1
   else
-    echo "composite-contracts: all-checks-green context literal matches pr-armable.sh, armable.py and the ADR, and is unique (A2)"
+    echo "composite-contracts: all-checks-settled context literal matches --context, --self, pr-armable.sh, armable.py and the ADR, and no job shares it (A2)"
   fi
 
-  # A3: never job-skipped. A skipped or fail-green job would satisfy the context
-  # without checking anything. Step-level keys sit at 6 spaces and stay legal.
-  if grep -qE '^    (if|continue-on-error):' <<< "$agg_jobs"; then
-    echo "composite-contracts: all-checks-green (A3) — job-level 'if:' or 'continue-on-error:' present; the required check could pass without polling ($agg_file)" >&2
+  # A3: never waits. One recompute per event, a short job, the newest event wins,
+  # and the skip condition is exactly dispatch-or-PR-event.
+  _a3_bad=""
+  _a3_timeout="$(sed -nE 's/^    timeout-minutes:[[:space:]]*([0-9]+)[[:space:]]*$/\1/p' <<< "$agg_jobs" | head -1)"
+  _a3_if="$(sed -n 's/^    if:[[:space:]]*//p' <<< "$agg_jobs")"
+  # shellcheck disable=SC2016  # literal workflow expression text, not a shell expansion
+  _a3_want_if="github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'"
+  if grep -qE -- '(^|[[:space:]])--wait([[:space:]\\]|$)' <<< "$agg_jobs"; then
+    _a3_bad="a --wait token is present; the aggregator would poll instead of settling once per event"
+  elif [ -z "$_a3_timeout" ] || [ "$_a3_timeout" -gt 10 ]; then
+    _a3_bad="job timeout-minutes is '${_a3_timeout:-<unset>}', want at most 10"
+  elif ! grep -qE '^  cancel-in-progress:[[:space:]]*true[[:space:]]*$' <<< "$agg_conc"; then
+    _a3_bad="concurrency has no cancel-in-progress: true"
+  elif ! grep -qE '^  group:.*pull_requests\[0\]\.number' <<< "$agg_conc"; then
+    _a3_bad="concurrency group is not keyed on workflow_run.pull_requests[0].number"
+  elif [ "$_a3_if" != "$_a3_want_if" ]; then
+    _a3_bad="job if: is '${_a3_if:-<unset>}', want exactly: $_a3_want_if"
+  fi
+  if [ -n "$_a3_bad" ]; then
+    echo "composite-contracts: all-checks-settled (A3) — $_a3_bad ($agg_file)" >&2
     fail=1
   else
-    echo "composite-contracts: all-checks-green has no job-level if/continue-on-error (A3)"
+    echo "composite-contracts: all-checks-settled never waits, is bounded, cancels stale runs and keeps its exact job if (A3)"
   fi
 
-  # A4: fails closed. A bounded job, a waiting poller that ignores only itself by
-  # exact name, a script deadline, and no write scope.
+  # A4: trust boundary. statuses: write is the only write; no expression reaches a
+  # shell line; the checkout is master with no persisted token; event fields cross
+  # into the step only through env.
   _a4_bad=""
-  if ! grep -qE '^    timeout-minutes:[[:space:]]*[0-9]+' <<< "$agg_jobs"; then
-    _a4_bad="job has no timeout-minutes"
-  elif ! grep -qE -- '(^|[[:space:]])--wait([[:space:]\\]|$)' <<< "$agg_jobs"; then
-    _a4_bad="bin/check-pr-checks-green is not called with --wait"
-  elif ! grep -qF -- "--self='$AGG_CONTEXT'" <<< "$agg_jobs"; then
-    _a4_bad="bin/check-pr-checks-green is not called with --self='$AGG_CONTEXT'"
-  elif ! grep -qE -- '--timeout-seconds=[0-9]+' <<< "$agg_jobs"; then
-    _a4_bad="bin/check-pr-checks-green is not called with --timeout-seconds="
-  elif grep -qE ':[[:space:]]*write' <<< "$agg_perms$(printf '\n')$(grep -E '^[[:space:]]+[a-z-]+:[[:space:]]*write' <<< "$agg_jobs" || true)"; then
-    _a4_bad="permissions grant a write scope"
-  # PR-controlled text (github.event.pull_request.title|body|head.ref|labels) must never
-  # reach the workflow: it would be a script-injection path into the run block.
-  elif grep -qE 'github\.event\.pull_request\.(title|body|head\.ref|labels)' "$agg_file"; then
-    _a4_bad="interpolates PR-controlled text (title, body, head.ref or labels)"
+  _a4_writes="$(grep -E '^[[:space:]]+[a-z-]+:[[:space:]]*write' <<< "$agg_perms$(printf '\n')$agg_jobs" | sed -E 's/^[[:space:]]+//; s/:.*//' | sort -u | tr '\n' ' ')"
+  # Step blocks: from a `      - ` line to the next one.
+  _a4_checkout="$(awk '
+    /^      - / { if (blk ~ /actions\/checkout@/) print blk; blk="" }
+    { blk = blk $0 "\n" }
+    END { if (blk ~ /actions\/checkout@/) print blk }
+  ' <<< "$agg_jobs")"
+  # shellcheck disable=SC2016  # literal workflow expression opener, not a shell expansion
+  _a4_expr='${{'
+  if ! grep -qE '^  statuses:[[:space:]]*write[[:space:]]*$' <<< "$agg_perms" \
+     || ! grep -qE '^  contents:[[:space:]]*read[[:space:]]*$' <<< "$agg_perms"; then
+    _a4_bad="permissions lack statuses: write or contents: read"
+  elif [ "$_a4_writes" != "statuses " ]; then
+    _a4_bad="write scopes are '${_a4_writes}', want only statuses"
+  elif grep -qF -- "$_a4_expr" <<< "$agg_run"; then
+    _a4_bad="a $_a4_expr }} expression sits inside a run: block"
+  elif [ -z "$_a4_checkout" ]; then
+    _a4_bad="no actions/checkout step"
+  elif grep -qE '^[[:space:]]+ref:' <<< "$_a4_checkout"; then
+    _a4_bad="the checkout step sets ref:, which could check out PR-head code"
+  elif ! grep -qE '^[[:space:]]+persist-credentials:[[:space:]]*false[[:space:]]*$' <<< "$_a4_checkout"; then
+    _a4_bad="the checkout step does not set persist-credentials: false"
+  elif grep -E 'github\.event\.workflow_run\.head_sha' <<< "$agg_jobs" | grep -qvE '^[[:space:]]+EVENT_HEAD_SHA:[[:space:]]*\$\{\{'; then
+    _a4_bad="github.event.workflow_run.head_sha appears outside the EVENT_HEAD_SHA env line"
+  elif grep -E 'github\.event\.inputs\.pr_number' <<< "$agg_jobs" | grep -qvE '^[[:space:]]+PR_NUMBER:[[:space:]]*\$\{\{'; then
+    _a4_bad="github.event.inputs.pr_number appears outside the PR_NUMBER env line"
   fi
   if [ -n "$_a4_bad" ]; then
-    echo "composite-contracts: all-checks-green (A4) — $_a4_bad; the aggregator would not fail closed or would hold more privilege than it reads with ($agg_file)" >&2
+    echo "composite-contracts: all-checks-settled (A4) — $_a4_bad; event data or PR code could reach a step holding statuses: write ($agg_file)" >&2
     fail=1
   else
-    echo "composite-contracts: all-checks-green is bounded, waits, ignores only itself, and is read-only (A4)"
+    echo "composite-contracts: all-checks-settled holds only statuses: write, keeps expressions out of run:, and checks out master without credentials (A4)"
   fi
 
-  # A5: the poller gets the PR base, so a PR stacked on a non-master branch fails
-  # in seconds instead of waiting out the deadline (ADR-0149 Addendum 2026-10-11).
-  # base.ref is PR-author-chosen text, so it reaches the shell only through a step
-  # env var; an inline ${{ }} in run: would be a script-injection path.
+  # A5: verdict inputs. The anchors are the four ADR-0149 contexts; the legacy
+  # waiter is ignored exactly while its workflow file exists.
   _a5_bad=""
-  _a5_refs="$(grep -E 'github\.event\.pull_request\.base\.ref' "$agg_file" || true)"
-  # shellcheck disable=SC2016  # $BASE_REF is the literal workflow text, not a shell expansion
-  if ! grep -qF -- '--base-ref="$BASE_REF"' <<< "$agg_jobs"; then
-    _a5_bad='bin/check-pr-checks-green is not called with --base-ref="$BASE_REF"'
-  elif ! grep -qE '^[[:space:]]+BASE_REF:[[:space:]]*\$\{\{[[:space:]]*github\.event\.pull_request\.base\.ref[[:space:]]*\}\}[[:space:]]*$' <<< "$agg_jobs"; then
-    _a5_bad='no step env line BASE_REF: ${{ github.event.pull_request.base.ref }}'
-  elif [ -n "$_a5_refs" ] && grep -vqE '^[[:space:]]+BASE_REF:' <<< "$_a5_refs"; then
-    _a5_bad="github.event.pull_request.base.ref appears outside the BASE_REF env line"
+  _a5_want_anchor="$(printf '%s\n' 'Tests and Analysis' 'E2E Tests' 'Meta checks' 'Infection PHP (per-PR diff)' | sort)"
+  _a5_anchor="$(_agg_flag anchor | tr ',' '\n' | sort)"
+  if [ "$_a5_anchor" != "$_a5_want_anchor" ]; then
+    _a5_bad="--anchor= is '$(_agg_flag anchor)', want exactly the four ADR-0149 anchors"
+  elif [ -f "$WORKFLOWS/all-checks-green.yml" ]; then
+    if ! _agg_csv_has "$(_agg_flag ignore)" 'All checks green' \
+       || ! _agg_csv_has "$(_agg_flag ignore-workflows)" 'All checks green'; then
+      _a5_bad="all-checks-green.yml exists but --ignore= or --ignore-workflows= lacks 'All checks green'"
+    fi
+  elif _agg_csv_has "$(_agg_flag ignore)" 'All checks green' \
+       || _agg_csv_has "$(_agg_flag ignore-workflows)" 'All checks green'; then
+    _a5_bad="all-checks-green.yml is gone but --ignore= or --ignore-workflows= still lists 'All checks green'"
   fi
   if [ -n "$_a5_bad" ]; then
-    echo "composite-contracts: all-checks-green (A5) — $_a5_bad; a stacked PR would wait out the deadline or the base ref would reach run: unquoted ($agg_file)" >&2
+    echo "composite-contracts: all-checks-settled (A5) — $_a5_bad ($agg_file)" >&2
     fail=1
   else
-    echo "composite-contracts: all-checks-green passes the PR base via env to --base-ref (A5)"
+    echo "composite-contracts: all-checks-settled anchors are the four ADR-0149 contexts and the legacy-waiter shim matches the tree (A5)"
+  fi
+
+  # A6: coverage. workflow_run.workflows equals the names of every other workflow
+  # with a pull_request/pull_request_target trigger, so no PR completion is missed.
+  _a6_listed="$(awk '
+    /^    workflows:/ { inl=1; next }
+    inl && /^      -/ { v=$0; sub(/^      -[[:space:]]*/, "", v); sub(/[[:space:]]+#.*$/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]+$/, "", v); print v; next }
+    inl && /^[[:space:]]*#/ { next }
+    inl { inl=0 }
+  ' <<< "$agg_wr" | LC_ALL=C sort)"
+  _a6_derived="$(for _wf in "$WORKFLOWS"/*.yml; do
+    [ -f "$_wf" ] || continue
+    [ "$_wf" = "$agg_file" ] && continue
+    awk '
+      { sub(/\r$/, "") }
+      !nm && /^name:/ { v=$0; sub(/^name:[[:space:]]*/, "", v); sub(/[[:space:]]+#.*$/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]+$/, "", v); nm=v }
+      /^on:/ { inon=1; if ($0 ~ /pull_request/) pr=1; next }
+      inon && /^[A-Za-z]/ { inon=0 }
+      inon && /^[[:space:]]*(-[[:space:]]*)?pull_request(_target)?[[:space:]]*:?[[:space:]]*$/ { pr=1 }
+      END { if (pr && nm != "") print nm }
+    ' "$_wf"
+  done | LC_ALL=C sort)"
+  if [ -z "$_a6_listed" ]; then
+    echo "composite-contracts: all-checks-settled (A6) — workflow_run.workflows lists no workflow ($agg_file)" >&2
+    fail=1
+  elif ! _a6_diff="$(diff <(printf '%s\n' "$_a6_listed") <(printf '%s\n' "$_a6_derived"))"; then
+    echo "composite-contracts: all-checks-settled (A6) — workflow_run.workflows (<) differs from the PR-triggered workflow names (>); a PR completion would never settle the status ($agg_file):" >&2
+    printf '%s\n' "$_a6_diff" >&2
+    fail=1
+  else
+    echo "composite-contracts: all-checks-settled workflow_run.workflows equals every PR-triggered workflow name (A6)"
   fi
 
 fi  # end agg_file present

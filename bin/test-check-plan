@@ -3182,7 +3182,7 @@ assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
-# Gate [MU] fixtures (17 cases)
+# Gate [MU] fixtures (19 cases)
 # ---------------------------------------------------------------------------
 # A throwaway repo: one tracked file under e2e/, one tracked PHPStan identifier,
 # one directory named only in tracked text. The helper's tree arm reads this repo
@@ -3193,6 +3193,7 @@ git -C "$MU_REPO" init -q
 printf "test('x', async () => {});\n" > "$MU_REPO/e2e/vr.spec.ts"
 printf 'parameters:\n  ignoreErrors:\n    -\n      identifier: argument.type\n' > "$MU_REPO/baseline.neon"
 printf 'The modules/Old/ tree was retired.\n' > "$MU_REPO/README.md"
+printf 'snapshot\n' > "$MU_REPO/snap.golden"
 git -C "$MU_REPO" add -A
 export CHECK_PLAN_MT_GIT_ROOT="$MU_REPO"
 # Tokens the realiser would find in this very file are spliced from variables, so no
@@ -3270,6 +3271,32 @@ if [ "$_mu_n" = "3" ]; then
     h_pass "$_mu_name (3 [MU] lines)"
 else
     h_fail "$_mu_name" "expected 3 [MU] lines, got $_mu_n"
+fi
+# An extension only a tracked file uses (snap.golden) also marks a file name: silent.
+assert_viol "gateMU-tracked-extension-file-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | writes `match'"$MU_DOT"'golden` | CLI-executable | post-impl | `go test ./...` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# A ~~~ example matrix is kept by GATEP_MATRIX but skipped by the helper, so its row 1
+# comes first. The violation still lands on the real row 1, the one holding the token.
+_mu_name='gateMU-blames-row-holding-token'
+_mu_body="$FM"'
+~~~markdown'"$YHDR"'
+| 1 | example row with no token | PHPUnit | post-impl | `tests/XTest.php` |
+~~~
+'"$YHDR"'
+| 1 | REALROW no `if'"$MU_DOT"'alwaysTrue` finding | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+printf '%s\n' "$_mu_body" > "$TMP/$_mu_name.md"
+_mu_out="$("$GUARD" "$TMP/$_mu_name.md" 2>&1)"
+_mu_n="$(grep -c '^\[MU\] .*REALROW' <<< "$_mu_out")"
+_mu_all="$(grep -c '^\[MU\] ' <<< "$_mu_out")"
+if [ "$_mu_n" = "1" ] && [ "$_mu_all" = "1" ]; then
+    h_pass "$_mu_name (1 [MU] line, on the real row)"
+else
+    h_fail "$_mu_name" "expected 1 [MU] line on REALROW, got $_mu_n of $_mu_all"
 fi
 # (b) a new directory: no tracked file beneath it, no tracked text names it (the
 # records-hub row 11 shape).

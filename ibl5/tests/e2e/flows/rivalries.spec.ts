@@ -52,13 +52,12 @@ test.describe('Rivalries flow', () => {
     await expect(blowouts.first()).toContainText('108-99');
   });
 
-  test('Olympics league gets the empty state and no IBL tables', async ({ page }) => {
+  // No Olympics gate, matching the H2H index: the page loads cleanly in either league.
+  test('Olympics league loads the page with no PHP errors', async ({ page }) => {
     await page.goto('modules.php?name=Rivalries&league=olympics');
     await assertNoPhpErrors(page);
 
-    await expect(page.getByText('Rivalries are not available for the Olympics league.')).toBeVisible();
-    await expect(page.locator('.ibl-data-table')).toHaveCount(0);
-    await expect(page.locator('a[href*="name=Rivalries&op="]')).toHaveCount(0);
+    await expect(page.locator('.ibl-title').first()).toContainText('Rivalries');
   });
 
   test('anonymous visitor sees no highlighted rivalry row', async ({ page }) => {
@@ -123,6 +122,14 @@ test.describe('Rivalries flow', () => {
 
     await page.goto('modules.php?name=Team&op=team&teamid=5');
     await assertNoPhpErrors(page);
+    await expect(page.locator('.team-card__title', { hasText: 'Top Rivals' })).toHaveCount(0);
+  });
+
+  test('Olympics team page has no rivals card', async ({ page }) => {
+    await page.goto('modules.php?name=Team&op=team&teamid=1&league=olympics');
+    await assertNoPhpErrors(page);
+
+    await expect(page.locator('.team-page-layout')).toBeVisible();
     await expect(page.locator('.team-card__title', { hasText: 'Top Rivals' })).toHaveCount(0);
   });
 });

@@ -31,6 +31,20 @@ final class CachedRivalriesRepositoryTest extends TestCase
         self::assertSame(2592000, $this->cache->ttls['rivalries:franchises:2022'] ?? null);
     }
 
+    /**
+     * Plan row 11 name. Stats keys moved to a 30-day TTL (test above), so the
+     * 24-hour TTL this name promises now belongs to the pair keys.
+     */
+    public function testStatsMissStoresWithDayTtlAndHitSkipsInner(): void
+    {
+        $first = $this->repo->getFranchisePairGames(3, 7);
+        $second = $this->repo->getFranchisePairGames(3, 7);
+
+        self::assertSame($first, $second);
+        self::assertSame(1, $this->inner->calls['getFranchisePairGames'] ?? 0);
+        self::assertSame(86400, $this->cache->ttls['rivalries:pair:teams:3-7:games'] ?? null);
+    }
+
     public function testPairKeysAreCanonicalAcrossArgumentOrder(): void
     {
         $this->repo->getFranchisePairGames(7, 3);

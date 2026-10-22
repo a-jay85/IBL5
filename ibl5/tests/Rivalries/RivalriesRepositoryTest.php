@@ -62,7 +62,8 @@ final class RivalriesRepositoryTest extends TestCase
         self::assertCount(3, $this->mockDb->getPreparedQueries());
     }
 
-    public function testFindGmNameBindsName(): void
+    /** Plan row 7 name; the plan's `gmExists` shipped as `findGmName`. */
+    public function testGmExistsBindsName(): void
     {
         $this->repo->findGmName('Some Gm');
 

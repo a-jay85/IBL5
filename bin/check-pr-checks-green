@@ -8,9 +8,10 @@
 # cutover retires it.
 #
 # Verdict logic is shared with bin/check-master-ci-green via bin/lib/ci-checks-green.sh.
-# Legacy commit statuses are deliberately NOT read: verified 2026-09-30 on PR #2564's
-# head, the combined-status endpoint returned total_count 0, every check on this repo
-# is a check-run, and none of master's required contexts is a status context.
+# Legacy commit statuses are deliberately NOT read. Every check on this repo is a
+# check-run, and the one status context that exists, `All checks settled`, is this
+# script's own output. Reading statuses would let the verdict see the aggregator's
+# status and loop on itself (--self only covers check-runs), so do not add it.
 #
 # Exit codes: 0 = settled green, 1 = failed / stacked base / deadline hit, 2 = usage or API error, 3 = still pending (one-shot only).
 

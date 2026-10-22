@@ -1488,33 +1488,77 @@ else
 fi
 unset SIM_RECAP_KEEP_WORKDIR
 
-# ── negative_roster_fetch_failure_does_not_park ──────────────────────────────
-# If simRecapContext.php fails (exit 255), the tick continues and writes {}.
+# ── context_fetch_failure_parks_transport ────────────────────────────────────
+# The fact-sheet context is mandatory: if simRecapContext.php fails (exit 255),
+# the sim parks transport before the prompt is built and before any agent spend.
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
 touch "$STUB/fail.simRecapContext"
-export SIM_RECAP_KEEP_WORKDIR=1
 srt_run
-srt_expect_eq "negative_roster_fetch_failure_does_not_park — exit 0" 0 "$SRT_RC"
+srt_expect_eq "context fetch failure — exit 0" 0 "$SRT_RC"
 srt_log_has "$STUB" curl.log "/post-to-thread" \
     "degraded_path_discord_alert — alert fires on qctx failure"
-# Phase 3 interim: with no fact sheet the tick cannot assemble payload.json, so it
-# parks flaky. Phase 4 replaces this case with context_fetch_failure_parks_transport.
-srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" \
-    "negative_roster_fetch_failure_does_not_park — no fact sheet to assemble from parks flaky (Phase 4 rewrites)"
-WORKDIR_PATH=$(sed -n 's/.*\] workdir \(\/[^ ]*\) .*/\1/p' "$STUB/tick.out" | head -1)
-if [ -n "$WORKDIR_PATH" ] && [ -f "$WORKDIR_PATH/roster-context.json" ]; then
-    _fallback=$(cat "$WORKDIR_PATH/roster-context.json")
-    if [ "$_fallback" = '{}' ]; then
-        srt_ok "negative_roster_fetch_failure_does_not_park — fallback {} written"
-    else
-        srt_fail "negative_roster_fetch_failure_does_not_park — expected {}, got: $_fallback"
-    fi
-    rm -rf "$WORKDIR_PATH"
-else
-    srt_fail "negative_roster_fetch_failure_does_not_park — workdir not found or roster-context.json missing (KEEP_WORKDIR=1 set)"
-fi
-unset SIM_RECAP_KEEP_WORKDIR
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
+    "context_fetch_failure_parks_transport — parks transport"
+srt_file_absent "$STUB/claude.sentinel" \
+    "context fetch failure — claude never spawned"
+srt_log_lacks "$STUB" ssh.log "storeSimRecap.php" \
+    "context fetch failure — no storeSimRecap.php call"
+
+# ── context_empty_games_parks_transport ──────────────────────────────────────
+# Schedule scores not posted yet: a context with no games cannot carry a recap.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+printf '{"sim":42,"roster":{},"active_injuries":[],"sim_trades":[],"games":[],"standings":[]}\n' \
+    > "$STUB/resp.simRecapContext"
+srt_run
+srt_expect_eq "context empty games — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
+    "context_empty_games_parks_transport — parks transport"
+srt_file_absent "$STUB/claude.sentinel" \
+    "context empty games — claude never spawned"
+
+# ── context_null_ordinal_parks_transport ─────────────────────────────────────
+# A game whose team box row is not imported yet has a null game_of_that_day;
+# the tick never infers it, so it parks until the ordinal exists.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+printf '{"sim":42,"roster":{},"active_injuries":[],"sim_trades":[],"games":[{"key":"g1","season_year":2008,"game_date":"2026-07-23","box_id":null,"game_of_that_day":null,"visitor_teamid":1,"visitor_name":"Team A","visitor_score":101,"home_teamid":2,"home_name":"Team B","home_score":99,"visitor_top":[],"home_top":[],"injuries":[]}],"standings":[]}\n' \
+    > "$STUB/resp.simRecapContext"
+srt_run
+srt_expect_eq "context null ordinal — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
+    "context_null_ordinal_parks_transport — parks transport"
+srt_file_absent "$STUB/claude.sentinel" \
+    "context null ordinal — claude never spawned"
+
+# ── onset_alert_full_wording ─────────────────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+srt_log_has "$STUB" curl.log \
+    "WARNING: sim 42 recap parked: simRecapContext.php fact-sheet fetch failed or returned no usable games. Further parked sims will NOT re-alert; expect a single RECOVERED message when it comes back." \
+    "onset_alert_full_wording — exact onset string"
+
+# ── recovery_alert_full_wording ──────────────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+printf '{"degraded_since":"2026-08-14T00:00:00","degraded_count":2}\n' > "$STUB/ops-alert.json"
+srt_run
+srt_log_has "$STUB" curl.log \
+    "RECOVERED: simRecapContext.php fact sheet is answering again (sim 42). 2 sim recap(s) parked waiting for it since 2026-08-14T00:00:00" \
+    "recovery_alert_full_wording — exact recovery string with seeded count and timestamp"
+
+# ── dry_run_without_context_exits_1_without_agent ────────────────────────────
+srt_reset
+touch "$STUB/fail.simRecapContext"
+srt_run --dry-run --sim=42
+srt_expect_eq "dry_run_without_context_exits_1_without_agent — exit 1" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "fact-sheet context unavailable" \
+    "dry run without context — logs the refusal"
+srt_file_absent "$STUB/claude.sentinel" \
+    "dry run without context — claude never spawned"
 
 # ── phase_gate_stays_armed_when_recaps_disabled ───────────────────────────────
 # When claim-next reports recaps_enabled:false and sim is null (nothing left to
@@ -1614,7 +1658,7 @@ srt_log_lacks "$STUB" curl.log "/post-to-thread" \
     "degraded_path_alert_noop_when_no_thread_id — no curl call when thread ID empty"
 
 # ── degraded_path_alert_fault_tolerant ────────────────────────────────────────
-# Tick must succeed (exit 0, no park) even when curl fails.
+# Tick must succeed (exit 0) even when curl fails.
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
 touch "$STUB/fail.simRecapContext"
@@ -1627,10 +1671,10 @@ SH
 chmod +x "$STUB/curl"
 srt_run
 srt_expect_eq "degraded_path_alert_fault_tolerant — exit 0" 0 "$SRT_RC"
-# Phase 3 interim: no fact sheet means no assembly, so the tick parks flaky; the
-# point of this case (a failing curl never fails the tick) is the exit 0 above.
-srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" \
-    "degraded_path_alert_fault_tolerant — tick completes and parks when curl fails (Phase 4 rewrites)"
+# A missing fact sheet parks transport; the point of this case (a failing curl
+# never fails the tick) is the exit 0 above.
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
+    "degraded_path_alert_fault_tolerant — tick completes and parks when curl fails"
 # Restore working curl stub for any tests that follow.
 cat > "$STUB/curl" <<'SH'
 #!/usr/bin/env bash
@@ -1655,7 +1699,7 @@ srt_run
 srt_run
 srt_expect_eq "ops_alert_second_degraded_sim_is_silent — one post across two degraded ticks" \
     1 "$(srt_matches curl.log '/post-to-thread')"
-srt_log_has "$STUB" curl.log "roster-blind" \
+srt_log_has "$STUB" curl.log "fact-sheet fetch failed" \
     "ops_alert_second_degraded_sim_is_silent — the single post is the onset warning"
 
 # ── ops_alert_recovery_ping_on_healthy_after_degraded ─────────────────────────
@@ -1728,8 +1772,8 @@ touch "$STUB/fail.simRecapContext"
 printf '{"degraded_since":"2026-08-14T00:00:00","degraded_count":"lots"}\n' > "$STUB/ops-alert.json"
 srt_run
 srt_expect_eq "ops_alert_corrupt_count_does_not_kill_the_tick — exit 0" 0 "$SRT_RC"
-srt_count "ops_alert_corrupt_count_does_not_kill_the_tick — the recap still ran" \
-    1 "$STUB/claude.log"
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
+    "ops_alert_corrupt_count_does_not_kill_the_tick — the tick still reached its park"
 
 # ══ DB-SYNC HOOK CASES ═══════════════════════════════════════════════════════
 
@@ -1889,10 +1933,10 @@ cat "$STUB/tick.out" >> "$STUB/wh.out1"
 srt_count "webhook: exactly two pings across onset and recovery" 2 "$STUB/curl.log"
 srt_expect_eq "webhook: exactly two pings — two url lines on stdin" \
     2 "$(srt_matches curl.stdin '^url = ')"
-srt_log_has "$STUB" curl.log "roster-blind" "webhook: onset body is roster-blind"
+srt_log_has "$STUB" curl.log "fact-sheet fetch failed" "webhook: onset body is the fact-sheet warning"
 srt_log_has "$STUB" curl.log "RECOVERED" "webhook: recovery body is RECOVERED"
 srt_expect_eq "webhook: first ping is the onset" 1 \
-    "$(sed -n 1p "$STUB/curl.log" | grep -c 'roster-blind')"
+    "$(sed -n 1p "$STUB/curl.log" | grep -c 'fact-sheet fetch failed')"
 srt_expect_eq "webhook: second ping is the recovery" 1 \
     "$(sed -n 2p "$STUB/curl.log" | grep -c 'RECOVERED')"
 
@@ -1925,9 +1969,9 @@ printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
 touch "$STUB/fail.simRecapContext"
 STUB_CURL_FAIL=1 srt_run
 srt_expect_eq "webhook curl failure never fails the tick — exit 0" 0 "$SRT_RC"
-# Phase 3 interim: no fact sheet means no assembly, so the tick parks flaky
-# instead of storing; exit 0 above is the property under test (Phase 4 rewrites).
-srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" "webhook curl failure never fails the tick — tick completes and parks"
+# A missing fact sheet parks transport instead of storing; exit 0 above is the
+# property under test.
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" "webhook curl failure never fails the tick — tick completes and parks"
 
 # 7. unset and empty both use the bot path
 srt_reset
@@ -1954,7 +1998,7 @@ touch "$STUB/fail.simRecapContext"
 srt_run
 srt_expect_eq "webhook without thread id — exit 0" 0 "$SRT_RC"
 srt_count "webhook without thread id still pings once" 1 "$STUB/curl.log"
-srt_log_has "$STUB" curl.log "roster-blind" "webhook without thread id sends the onset body"
+srt_log_has "$STUB" curl.log "fact-sheet fetch failed" "webhook without thread id sends the onset body"
 srt_log_has "$STUB" curl.stdin "url = \"$WH_URL\"" \
     "webhook without thread id posts to the bare webhook URL"
 srt_log_lacks "$STUB" curl.stdin "thread_id" "webhook without thread id adds no thread_id"

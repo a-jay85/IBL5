@@ -18,10 +18,9 @@
 #                            \G, ...) in non-interactive input; SQL still runs
 #   --batch --local-infile=0
 # Proved against the runner's client (Ubuntu mysql-client 8.0.46) on PR #3379.
-# NOT proved against the Mac default (Homebrew mysql@8.4): 8.4.11 lists both
-# flags in --help, but the system/tee block was not run against a server. The
-# pre-client check below is the only block there; the Mac's user settings allow
-# bare Bash anyway, so this wrapper is not the Mac's boundary.
+# Also proved against the Mac default (Homebrew mysql@8.4, 8.4.11) on a MariaDB
+# 10.11 server: with these flags `system`, `\!`, `tee`, `\T`, and `source` ran
+# nothing and wrote no file; without them all four wrote their file.
 #
 # Env (set by bin/sim-recap-tick, never by the agent — Claude Code denies an
 # env-prefixed command): SIM_RECAP_MYSQL_BIN, SIM_RECAP_DB_HOST, SIM_RECAP_DB_PORT,

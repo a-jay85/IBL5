@@ -132,6 +132,18 @@ class DraftController implements DraftControllerInterface
             return $this->view->renderValidationError('You do not own this draft pick.');
         }
 
+        // (5) On the clock — the posted slot must be the first empty slot this year.
+        // Read from ibl_draft every time; no POST field names the on-the-clock slot.
+        $onTheClock = $this->repository->getCurrentDraftPick($this->season->endingYear);
+        if ($onTheClock === null) {
+            return $this->view->renderValidationError('The draft is complete. No picks remain.');
+        }
+        $clockRound = is_numeric($onTheClock['round'] ?? null) ? (int) $onTheClock['round'] : 0;
+        $clockPick = is_numeric($onTheClock['pick'] ?? null) ? (int) $onTheClock['pick'] : 0;
+        if ($clockRound !== $draftRound || $clockPick !== $draftPick) {
+            return $this->view->renderValidationError('That pick is not on the clock yet. Wait for your turn.');
+        }
+
         return $this->handleDraftSelection($teamName, $playerName, $draftRound, $draftPick);
     }
 

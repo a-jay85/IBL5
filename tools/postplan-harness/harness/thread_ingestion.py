@@ -21,13 +21,21 @@ from .state import HarnessError
 TRUSTED_LOGIN = "a-jay85"
 PURPOSE = "thread-remediation"
 VERDICTS = ("FIX", "DECLINE")
+ORIGIN_PRE_EXISTING = "pre-existing"
+ORIGIN_SAME_RUN = "same-run"
 
 
 def _is_trusted(login: str, typename: str) -> bool:
     return login == TRUSTED_LOGIN or typename == "Bot" or login.endswith("[bot]")
 
 
-def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int]) -> list[dict] | None:
+def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None) -> list[dict] | None:
+    """Open, current, trusted threads whose id is in the candidate id set.
+
+    ``pre_posting_ids`` is the candidate id set: the pre-posting snapshot for the
+    pre-existing pass, this run's new ids for the same-run pass. ``keep`` is an optional
+    per-row predicate applied after the trust check, so it never sees an untrusted row.
+    """
     # None = cap/API failure: caller skips ingestion; condition (11) keeps the hold.
     if not pre_posting_ids:
         # Empty or failed snapshot: the snapshot filter below drops every row, so the
@@ -37,7 +45,7 @@ def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int]) -> list[dict] | Non
     rows = gh.trusted_open_threads(pr)
     if rows is None:
         return None
-    keep = []
+    kept = []
     for t in rows:
         cid = t.get("commentId")
         if cid is None or int(cid) not in pre_posting_ids:
@@ -46,8 +54,17 @@ def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int]) -> list[dict] | Non
             continue
         if not _is_trusted(t.get("authorLogin") or "", t.get("authorType") or ""):
             continue
-        keep.append({k: t.get(k) for k in ("commentId", "path", "line", "body", "score", "authorLogin", "agent")})
-    return keep
+        if keep is not None and not keep(t):
+            continue
+        kept.append({k: t.get(k) for k in ("commentId", "path", "line", "body", "score", "authorLogin", "agent")})
+    return kept
+
+
+def result_basename(origin: str) -> str:
+    """The run-dir file name for one ingestion pass, so the two passes never clobber."""
+    if origin == ORIGIN_SAME_RUN:
+        return "thread-ingestion-same-run.json"
+    return "thread-ingestion.json"
 
 
 def thread_prompt(thread: dict, file_excerpt: str) -> str:
@@ -168,12 +185,16 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
 
 
 def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, *, commit, push, model="sonnet",
-                         outcome_log_path: str | None = None) -> dict:
-    """Run the thread ingestion loop and write thread-ingestion.json to out_dir."""
-    threads = fetch_trusted_threads(gh, pr, pre_posting_ids)
+                         outcome_log_path: str | None = None, origin: str = ORIGIN_PRE_EXISTING,
+                         keep=None) -> dict:
+    """Run the thread ingestion loop and write the pass's result file to out_dir."""
+    if origin not in (ORIGIN_PRE_EXISTING, ORIGIN_SAME_RUN):
+        raise ValueError(f"unknown origin {origin!r}")
+    threads = fetch_trusted_threads(gh, pr, pre_posting_ids, keep=keep)
     if threads is None:
-        result: dict = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None, "reason": "cap-or-api-error"}
-        with open(os.path.join(out_dir, "thread-ingestion.json"), "w") as fh:
+        result: dict = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None, "reason": "cap-or-api-error",
+                        "origin": origin}
+        with open(os.path.join(out_dir, result_basename(origin)), "w") as fh:
             json.dump(result, fh)
         return result
 
@@ -217,13 +238,14 @@ def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, l
             declined += 1
         else:
             skipped += 1
-        per_thread.append({"commentId": cid, "outcome": outcome, "sha": post_sha})
+        per_thread.append({"commentId": cid, "outcome": outcome, "sha": post_sha,
+                           "path": thread.get("path"), "body_head": (thread.get("body") or "")[:160]})
         if outcome_log_path and outcome in ("fixed", "declined") and thread_info.get("verdict"):
             try:
                 event = outcome_log.event_from_verdict(
                     pr=pr, thread=thread, verdict=thread_info["verdict"],
                     category=thread_info.get("category"), reason=thread_info["reason"],
-                    sha=post_sha, pipeline="harness")
+                    sha=post_sha, pipeline="harness", origin=origin)
                 if event is not None:
                     events.append(event)
             except Exception as e:  # noqa: BLE001 - logging must never change the run result
@@ -247,7 +269,8 @@ def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, l
         "skipped": skipped,
         "last_sha": last_sha_box[0],
         "threads": per_thread,
+        "origin": origin,
     }
-    with open(os.path.join(out_dir, "thread-ingestion.json"), "w") as fh:
+    with open(os.path.join(out_dir, result_basename(origin)), "w") as fh:
         json.dump(result, fh)
     return result

@@ -27,7 +27,7 @@ interface DraftControllerInterface
     public function displayDraftBoard(string $username): void;
 
     /**
-     * Enforce auth + CSRF + ownership guards, then narrow and delegate a
+     * Enforce auth + CSRF + ownership + on-the-clock guards, then narrow and delegate a
      * draft-selection POST submission.
      *
      * @param array<string, mixed> $post

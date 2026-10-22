@@ -50,7 +50,7 @@ class DraftRepository extends \Database\BaseMysqliRepository implements DraftRep
     public function updateDraftTable(string $playerName, string $date, int $draftYear, int $draftRound, int $draftPick): bool
     {
         $affected = $this->execute(
-            "UPDATE `ibl_draft` SET `player` = ?, `date` = ? WHERE `year` = ? AND `round` = ? AND `pick` = ?",
+            "UPDATE `ibl_draft` SET `player` = ?, `date` = ? WHERE `year` = ? AND `round` = ? AND `pick` = ? AND `player` = ''",
             "ssiii",
             $playerName,
             $date,

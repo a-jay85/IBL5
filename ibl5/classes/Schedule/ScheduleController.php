@@ -35,7 +35,7 @@ class ScheduleController implements ScheduleControllerInterface
     {
         $db = $this->db;
         $commonRepository = $this->commonRepository;
-        $season = new \Season\Season($db, $this->leagueContext);
+        $season = \Season\SharedSeason::get($db, $this->leagueContext);
         $league = new \League\League($db);
 
         // Load power rankings for SOS tier indicators

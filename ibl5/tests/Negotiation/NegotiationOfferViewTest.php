@@ -51,7 +51,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('<form', $html);
@@ -78,7 +78,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('name="maxyr1"', $html);
@@ -104,7 +104,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringNotContainsString('<script>', $html);
@@ -125,7 +125,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert — the injected tag's angle brackets are escaped, preventing injection
         $this->assertStringContainsString('&lt;img', $html);
@@ -145,7 +145,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, 1000, $maxYearOneSalary);
+        $html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, 1000, $maxYearOneSalary);
 
         // Assert
         $escaped = 'O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;';
@@ -178,7 +178,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('name="maxyr1"', $html);
@@ -210,7 +210,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('value="1063"', $html); // Max year 1
@@ -230,7 +230,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('12.5%', $html); // Bird rights percentage
@@ -249,7 +249,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('10%', $html); // No bird rights percentage
@@ -268,7 +268,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = (new NegotiationOfferView())->renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('1234', $html);
@@ -358,7 +358,7 @@ class NegotiationOfferViewTest extends TestCase
         $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
         $cardHtml = '<div class="card-flip-container">SENTINEL</div>';
 
-        $html = NegotiationOfferView::renderNegotiationForm(
+        $html = (new NegotiationOfferView())->renderNegotiationForm(
             $player,
             $this->getDefaultDemands(),
             1000,
@@ -375,13 +375,61 @@ class NegotiationOfferViewTest extends TestCase
         $this->assertStringNotContainsString('offer-ratings', $html);
 
         // Boundary: with no card, the view emits no card wrapper.
-        $htmlNoCard = NegotiationOfferView::renderNegotiationForm(
+        $htmlNoCard = (new NegotiationOfferView())->renderNegotiationForm(
             $player,
             $this->getDefaultDemands(),
             1000,
             $maxYearOneSalary
         );
         $this->assertStringNotContainsString('card-flip-container', $htmlNoCard);
+    }
+
+    public function testCardHtmlRendersBeforeContractOfferCard(): void
+    {
+        $html = (new NegotiationOfferView())->renderNegotiationForm(
+            $this->createTestPlayer(),
+            $this->getDefaultDemands(),
+            1000,
+            \League\ContractRules::getMaxContractSalary(0),
+            '<div id="card-fixture">C</div>'
+        );
+
+        $cardPos = strpos($html, '<div id="card-fixture">C</div>');
+        $this->assertNotFalse($cardPos);
+        $this->assertLessThan(strpos($html, 'Contract Offer'), $cardPos);
+        $this->assertStringNotContainsString('&lt;div id=', $html);
+    }
+
+    public function testNullCardHtmlStillRendersOfferCard(): void
+    {
+        $html = (new NegotiationOfferView())->renderNegotiationForm(
+            $this->createTestPlayer(),
+            $this->getDefaultDemands(),
+            1000,
+            \League\ContractRules::getMaxContractSalary(0)
+        );
+
+        $this->assertStringStartsWith('<div class="ibl-card">', ltrim($html));
+        $this->assertStringContainsString('Contract Offer', $html);
+        $this->assertStringContainsString('Player Demands:', $html);
+    }
+
+    public function testDemandDisplayAndOfferFieldsRenderAsHtml(): void
+    {
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary(0);
+        $demands = $this->getDefaultDemands();
+
+        $html = (new NegotiationOfferView())->renderNegotiationForm($this->createTestPlayer(), $demands, 1000, $maxYearOneSalary);
+        $this->assertStringContainsString('<div class="offer-salary-row">', $html);
+        $this->assertStringContainsString('<input type="number" id="offerYear1"', $html);
+        $this->assertStringNotContainsString('&lt;input', $html);
+        $this->assertStringNotContainsString('&lt;div', $html);
+
+        $demands['year1'] = $maxYearOneSalary;
+        $atMax = (new NegotiationOfferView())->renderNegotiationForm($this->createTestPlayer(), $demands, 1000, $maxYearOneSalary);
+        $this->assertStringContainsString('name="maxyr1"', $atMax);
+        $this->assertStringContainsString('value="' . $maxYearOneSalary . '" min="0" max="9999"', $atMax);
+        $this->assertStringNotContainsString('&lt;input', $atMax);
     }
 
     /**

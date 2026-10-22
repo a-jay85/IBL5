@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Cache;
 
+use Cache\Contracts\DatabaseCacheInterface;
 use Cache\DatabaseCache;
 use PHPUnit\Framework\TestCase;
 use Tests\Clock\FixedClock;
@@ -76,6 +77,9 @@ final class DatabaseCacheTest extends TestCase
         $this->assertNull($result);
     }
 
+    /**
+     * Negative path: `DatabaseCache::get()` returns null on corrupt JSON, unchanged by the lock-support removal.
+     */
     public function testGetReturnsNullOnCorruptJson(): void
     {
         $mockDb = new MockCacheDb();
@@ -290,6 +294,9 @@ final class DatabaseCacheTest extends TestCase
         $this->assertFalse($mockDb->wasWriteCalled());
     }
 
+    /**
+     * `DatabaseCache::getStale()` still serves an expired row through the trimmed `MockCacheStmt::get_result()`.
+     */
     public function testGetStaleReturnsExpiredValue(): void
     {
         // getStale must return a row even when its expiration is in the past.
@@ -323,104 +330,24 @@ final class DatabaseCacheTest extends TestCase
         $this->assertNull($cache->getStale('corrupt_key'));
     }
 
-    public function testAcquireLockReturnsTrueWhenLockGranted(): void
+    /**
+     * The single-flight lock API is gone: `DatabaseCache::releaseLock()` and `acquireLock()` no longer exist.
+     */
+    public function testDatabaseCacheContractDeclaresNoLockMethods(): void
     {
-        $mockDb = new MockCacheDb();
-        $cache = new DatabaseCache($mockDb);
+        $interface = new \ReflectionClass(DatabaseCacheInterface::class);
+        $implementation = new \ReflectionClass(DatabaseCache::class);
 
-        $mockDb->setLockResult(1);
+        // Positive control: reflection sees the methods that do exist.
+        $this->assertTrue($interface->hasMethod('getStale'));
+        $this->assertTrue($implementation->hasMethod('getStale'));
 
-        $this->assertTrue($cache->acquireLock('rebuild_lock', 10));
+        foreach (['acquireLock', 'releaseLock'] as $removed) {
+            $this->assertFalse($interface->hasMethod($removed), "DatabaseCacheInterface still declares {$removed}()");
+            $this->assertFalse($implementation->hasMethod($removed), "DatabaseCache still defines {$removed}()");
+        }
     }
 
-    public function testAcquireLockReturnsFalseOnTimeout(): void
-    {
-        $mockDb = new MockCacheDb();
-        $cache = new DatabaseCache($mockDb);
-
-        $mockDb->setLockResult(0);
-
-        $this->assertFalse($cache->acquireLock('rebuild_lock', 10));
-    }
-
-    public function testAcquireLockReturnsFalseWhenLockResultNull(): void
-    {
-        $mockDb = new MockCacheDb();
-        $cache = new DatabaseCache($mockDb);
-
-        $mockDb->setLockResult(null); // GET_LOCK returned NULL (error/killed)
-
-        $this->assertFalse($cache->acquireLock('rebuild_lock', 10));
-    }
-
-    public function testAcquireLockReturnsFalseOnPrepareFailure(): void
-    {
-        $mockDb = new MockCacheDb();
-        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
-        $logger->expects($this->once())->method('error')->with('cache_lock_acquire_failed', \PHPUnit\Framework\Assert::anything());
-        $cache = new DatabaseCache($mockDb, $logger);
-
-        $mockDb->setPrepareShouldFail(true);
-
-        $this->assertFalse($cache->acquireLock('rebuild_lock', 10));
-    }
-
-    public function testReleaseLockExecutesReleaseStatement(): void
-    {
-        $mockDb = new MockCacheDb();
-        $cache = new DatabaseCache($mockDb);
-
-        $cache->releaseLock('rebuild_lock');
-
-        $this->assertTrue($mockDb->wasReleaseLockCalled());
-    }
-
-    public function testReleaseLockLogsOnPrepareFailure(): void
-    {
-        $mockDb = new MockCacheDb();
-        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
-        $logger->expects($this->once())->method('error')->with('cache_lock_release_failed', \PHPUnit\Framework\Assert::anything());
-        $cache = new DatabaseCache($mockDb, $logger);
-
-        $mockDb->setPrepareShouldFail(true);
-        $cache->releaseLock('rebuild_lock');
-
-        $this->assertFalse($mockDb->wasReleaseLockCalled());
-    }
-
-    public function testAcquireLockBindsHostileKeyAsParameter(): void
-    {
-        // Security: the lock name must NEVER be interpolated into the SQL string.
-        $hostileKey = "x') OR SLEEP(5) -- ";
-        $mockDb = new MockCacheDb();
-        $mockDb->setLockResult(1);
-        $cache = new DatabaseCache($mockDb);
-
-        $cache->acquireLock($hostileKey, 10);
-
-        $stmt = $mockDb->findPreparedStatement('GET_LOCK');
-        $this->assertNotNull($stmt);
-        $this->assertSame('SELECT GET_LOCK(?, ?) AS got', $stmt->getQuery());
-        $this->assertSame('si', $stmt->getBoundTypes());
-        $this->assertSame([$hostileKey, 10], $stmt->getBoundParams());
-        $this->assertStringNotContainsString($hostileKey, $stmt->getQuery());
-    }
-
-    public function testReleaseLockBindsHostileKeyAsParameter(): void
-    {
-        $hostileKey = "x') OR SLEEP(5) -- ";
-        $mockDb = new MockCacheDb();
-        $cache = new DatabaseCache($mockDb);
-
-        $cache->releaseLock($hostileKey);
-
-        $stmt = $mockDb->findPreparedStatement('RELEASE_LOCK');
-        $this->assertNotNull($stmt);
-        $this->assertSame('DO RELEASE_LOCK(?)', $stmt->getQuery());
-        $this->assertSame('s', $stmt->getBoundTypes());
-        $this->assertSame([$hostileKey], $stmt->getBoundParams());
-        $this->assertStringNotContainsString($hostileKey, $stmt->getQuery());
-    }
 }
 
 /**
@@ -437,9 +364,6 @@ class MockCacheDb extends \mysqli
     private bool $deleteCalled = false;
     private bool $prepareShouldFail = false;
     private int $lastWrittenExpiration = 0;
-    /** Value GET_LOCK returns: 1 = acquired, 0 = timeout, null = error/killed. */
-    private ?int $lockResult = 1;
-    private bool $releaseLockCalled = false;
     /** @var list<MockCacheStmt> */
     private array $preparedStatements = [];
 
@@ -468,26 +392,6 @@ class MockCacheDb extends \mysqli
     public function wasDeleteCalled(): bool
     {
         return $this->deleteCalled;
-    }
-
-    public function setLockResult(?int $result): void
-    {
-        $this->lockResult = $result;
-    }
-
-    public function getLockResult(): ?int
-    {
-        return $this->lockResult;
-    }
-
-    public function markReleaseLockCalled(): void
-    {
-        $this->releaseLockCalled = true;
-    }
-
-    public function wasReleaseLockCalled(): bool
-    {
-        return $this->releaseLockCalled;
     }
 
     public function getLastWrittenExpiration(): int
@@ -619,19 +523,11 @@ class MockCacheStmt
             $this->db->markDeleteCalled();
             $this->db->deleteKey($this->boundKey);
         }
-        if (str_contains($this->query, 'RELEASE_LOCK')) {
-            $this->db->markReleaseLockCalled();
-        }
         return true;
     }
 
     public function get_result(): MockCacheResult
     {
-        if (str_contains($this->query, 'GET_LOCK')) {
-            $lock = $this->db->getLockResult();
-            return new MockCacheResult($lock === null ? null : ['got' => $lock]);
-        }
-
         $entry = $this->db->getCacheEntry($this->boundKey);
         return new MockCacheResult($entry);
     }

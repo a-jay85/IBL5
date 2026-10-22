@@ -1,7 +1,7 @@
 # Base images. Defaults are Docker Hub for local builds; CI passes the
 # ghcr.io/a-jay85/mirror/* refs (.github/ci-image-mirror.txt) as build-args.
 ARG GO_BASE_IMAGE=golang:1.27
-ARG PHP_BASE_IMAGE=php:8.5-apache
+ARG PHP_BASE_IMAGE=php:8.5.12-apache
 
 # ── Engine builder stage ────────────────────────────────────────────────────
 # Compile the native Go sim binary used by the PR8 shadow loader. Pinned to the

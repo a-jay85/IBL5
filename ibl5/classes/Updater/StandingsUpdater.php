@@ -30,6 +30,7 @@ use Standings\Contracts\StandingsRepositoryInterface;
  *     div_losses: int
  * }
  * @phpstan-import-type TeamMapping from StandingsRepositoryInterface
+ * @phpstan-import-type UpsertStandingsParams from StandingsRepositoryInterface
  */
 class StandingsUpdater {
     /**
@@ -276,7 +277,48 @@ class StandingsUpdater {
             $byDivision[$team['division']][] = $team;
         }
 
-        $pctSorter = static function (array $a, array $b): int {
+        $confLeaderGB = self::leaderGamesBackByGroup($byConference);
+        $divLeaderGB = self::leaderGamesBackByGroup($byDivision);
+
+        foreach ($standings as $team) {
+            $this->repository->upsertStandings(self::buildStandingsRow(
+                $team,
+                $confLeaderGB[$team['conference']],
+                $divLeaderGB[$team['division']],
+            ));
+        }
+    }
+
+    /**
+     * Games-behind value of each group's best-pct team, keyed by group name.
+     * Only the first team after sorting is read, so ties resolve by input order.
+     *
+     * @param array<string, list<TeamStanding>> $groups
+     * @return array<string, float>
+     */
+    private static function leaderGamesBackByGroup(array $groups): array
+    {
+        $pctSorter = self::pctSorter();
+
+        /** @var array<string, float> $leaderGB */
+        $leaderGB = [];
+        foreach ($groups as $name => $teams) {
+            usort($teams, $pctSorter);
+            $leader = $teams[0];
+            $leaderGB[$name] = ($leader['wins'] - $leader['losses']) / 2.0;
+        }
+
+        return $leaderGB;
+    }
+
+    /**
+     * Descending win-percentage comparator for usort; zero-game teams count as .000
+     *
+     * @return \Closure(array<string, mixed>, array<string, mixed>): int
+     */
+    private static function pctSorter(): \Closure
+    {
+        return static function (array $a, array $b): int {
             /** @var int $winsA */
             $winsA = $a['wins'];
             /** @var int $lossesA */
@@ -291,64 +333,55 @@ class StandingsUpdater {
             $pctB = $totalB > 0 ? $winsB / $totalB : 0.0;
             return $pctB <=> $pctA;
         };
+    }
 
-        /** @var array<string, float> $confLeaderGB */
-        $confLeaderGB = [];
-        foreach ($byConference as $conf => $teams) {
-            usort($teams, $pctSorter);
-            $leader = $teams[0];
-            $confLeaderGB[$conf] = ($leader['wins'] - $leader['losses']) / 2.0;
-        }
+    /**
+     * Build one `ibl_standings` upsert payload from a tallied team
+     *
+     * @param TeamStanding $team
+     * @return UpsertStandingsParams
+     */
+    private static function buildStandingsRow(array $team, float $confLeaderGB, float $divLeaderGB): array
+    {
+        $totalGames = $team['wins'] + $team['losses'];
+        $pct = $totalGames > 0 ? round($team['wins'] / $totalGames, 3) : 0.000;
+        $gamesUnplayed = League::REGULAR_SEASON_GAMES - $team['home_wins'] - $team['home_losses'] - $team['away_wins'] - $team['away_losses'];
 
-        /** @var array<string, float> $divLeaderGB */
-        $divLeaderGB = [];
-        foreach ($byDivision as $div => $teams) {
-            usort($teams, $pctSorter);
-            $leader = $teams[0];
-            $divLeaderGB[$div] = ($leader['wins'] - $leader['losses']) / 2.0;
-        }
+        $leagueRecord = $team['wins'] . '-' . $team['losses'];
+        $confRecord = $team['conf_wins'] . '-' . $team['conf_losses'];
+        $divRecord = $team['div_wins'] . '-' . $team['div_losses'];
+        $homeRecord = $team['home_wins'] . '-' . $team['home_losses'];
+        $awayRecord = $team['away_wins'] . '-' . $team['away_losses'];
 
-        foreach ($standings as $team) {
-            $totalGames = $team['wins'] + $team['losses'];
-            $pct = $totalGames > 0 ? round($team['wins'] / $totalGames, 3) : 0.000;
-            $gamesUnplayed = League::REGULAR_SEASON_GAMES - $team['home_wins'] - $team['home_losses'] - $team['away_wins'] - $team['away_losses'];
+        $teamGB = ($team['wins'] - $team['losses']) / 2.0;
+        $confGb = $confLeaderGB - $teamGB;
+        $divGb = $divLeaderGB - $teamGB;
 
-            $leagueRecord = $team['wins'] . '-' . $team['losses'];
-            $confRecord = $team['conf_wins'] . '-' . $team['conf_losses'];
-            $divRecord = $team['div_wins'] . '-' . $team['div_losses'];
-            $homeRecord = $team['home_wins'] . '-' . $team['home_losses'];
-            $awayRecord = $team['away_wins'] . '-' . $team['away_losses'];
-
-            $teamGB = ($team['wins'] - $team['losses']) / 2.0;
-            $confGb = $confLeaderGB[$team['conference']] - $teamGB;
-            $divGb = $divLeaderGB[$team['division']] - $teamGB;
-
-            $this->repository->upsertStandings([
-                'teamid' => $team['teamid'],
-                'teamName' => $team['teamName'],
-                'leagueRecord' => $leagueRecord,
-                'wins' => $team['wins'],
-                'losses' => $team['losses'],
-                'pct' => $pct,
-                'gamesUnplayed' => $gamesUnplayed,
-                'conference' => $team['conference'],
-                'confGb' => $confGb,
-                'confRecord' => $confRecord,
-                'division' => $team['division'],
-                'divGb' => $divGb,
-                'divRecord' => $divRecord,
-                'homeRecord' => $homeRecord,
-                'awayRecord' => $awayRecord,
-                'confWins' => $team['conf_wins'],
-                'confLosses' => $team['conf_losses'],
-                'divWins' => $team['div_wins'],
-                'divLosses' => $team['div_losses'],
-                'homeWins' => $team['home_wins'],
-                'homeLosses' => $team['home_losses'],
-                'awayWins' => $team['away_wins'],
-                'awayLosses' => $team['away_losses'],
-            ]);
-        }
+        return [
+            'teamid' => $team['teamid'],
+            'teamName' => $team['teamName'],
+            'leagueRecord' => $leagueRecord,
+            'wins' => $team['wins'],
+            'losses' => $team['losses'],
+            'pct' => $pct,
+            'gamesUnplayed' => $gamesUnplayed,
+            'conference' => $team['conference'],
+            'confGb' => $confGb,
+            'confRecord' => $confRecord,
+            'division' => $team['division'],
+            'divGb' => $divGb,
+            'divRecord' => $divRecord,
+            'homeRecord' => $homeRecord,
+            'awayRecord' => $awayRecord,
+            'confWins' => $team['conf_wins'],
+            'confLosses' => $team['conf_losses'],
+            'divWins' => $team['div_wins'],
+            'divLosses' => $team['div_losses'],
+            'homeWins' => $team['home_wins'],
+            'homeLosses' => $team['home_losses'],
+            'awayWins' => $team['away_wins'],
+            'awayLosses' => $team['away_losses'],
+        ];
     }
 
     private function updateMagicNumbers(string $region): void {

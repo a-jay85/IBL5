@@ -6,14 +6,10 @@ namespace BasketballStats\Tables;
 
 use BasketballStats\StatsFormatter;
 use Player\Player;
-use Player\PlayerImageHelper;
 use Player\Stats\PlayerStats;
-use TeamOffDefStats\TeamOffDefStatsRepository;
 use UI\Tables\PlayerRowTransformer;
-use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 use Team\Team;
-use Season\Season;
 
 /**
  * SeasonTotals - Displays season totals statistics table
@@ -39,24 +35,16 @@ class SeasonTotals
     {
         $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 
-        $season = new Season($db);
-        $seasonYear = ($yr !== '') ? (int) $yr : $season->endingYear;
-        $offDefRepo = new TeamOffDefStatsRepository($db);
-        $bothStats = $offDefRepo->getTeamBothStats($team->name, $seasonYear)
-            ?? $offDefRepo->getTeamBothStats($team->name, $seasonYear, false);
+        $bothStats = TeamStatsTableContext::resolveBothStats($db, $team, $yr);
 
         ob_start();
+        // "\n" restores the template line break: PHP swallows the newline right after the closing PHP tag.
+        // @phpstan-ignore ibl.trustedVariable (openTag() escapes the aria-label and sanitizes the colors)
+        echo HtmlSanitizer::trusted(TeamStatsTableContext::openTag($team, $ariaLabel)), "\n";
         ?>
-<table class="ibl-data-table team-table responsive-table sortable"<?= $ariaLabel !== '' ? ' aria-label="' . \Security\HtmlSanitizer::e($ariaLabel) . '"' : '' ?> style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
-<?php if ($moduleName === "LeagueStarters"): ?>
-            <th>Team</th>
-<?php endif; ?>
-            <th>Pos</th>
-            <th class="sticky-col">Player</th>
-            <th>g</th>
-            <th>gs</th>
+<?= TeamStatsRowHelper::headPrefix($moduleName) ?>
             <th class="sep-r-team">min</th>
             <th>fgm</th>
             <th>fga</th>
@@ -76,89 +64,71 @@ class SeasonTotals
     </thead>
     <tbody>
 <?php foreach ($playerRows as $row):
-    /** @var Player $player */
-    $player = $row['player'];
-    /** @var PlayerStats $playerStats */
-    $playerStats = $row['playerStats'];
-?>
-        <tr>
-<?php if ($moduleName === "LeagueStarters"):
-    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->getTeamid() ?? 0, $player->getTeamName() ?? '', $player->getTeamColor1() ?? 'FFFFFF', $player->getTeamColor2() ?? '000000');
-endif; ?>
-            <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
-            <?= PlayerImageHelper::renderPlayerCell($player->getPlayerID() ?? 0, $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass()) ?>
-            <td><?= $playerStats->seasonGamesPlayed ?></td>
-            <td><?= $playerStats->seasonGamesStarted ?></td>
-            <td class="sep-r-team"><?= $playerStats->seasonMinutes ?></td>
-            <td><?= $playerStats->seasonFieldGoalsMade ?></td>
-            <td class="sep-r-weak"><?= $playerStats->seasonFieldGoalsAttempted ?></td>
-            <td><?= $playerStats->seasonFreeThrowsMade ?></td>
-            <td class="sep-r-weak"><?= $playerStats->seasonFreeThrowsAttempted ?></td>
-            <td><?= $playerStats->seasonThreePointersMade ?></td>
-            <td class="sep-r-team"><?= $playerStats->seasonThreePointersAttempted ?></td>
-            <td><?= $playerStats->seasonOffensiveRebounds ?></td>
-            <td><?= $playerStats->seasonTotalRebounds ?></td>
-            <td><?= $playerStats->seasonAssists ?></td>
-            <td><?= $playerStats->seasonSteals ?></td>
-            <td><?= $playerStats->seasonTurnovers ?></td>
-            <td><?= $playerStats->seasonBlocks ?></td>
-            <td><?= $playerStats->seasonPersonalFouls ?></td>
-            <td><?= $playerStats->seasonPoints ?></td>
-        </tr>
-<?php endforeach; ?>
+    echo self::renderPlayerRow($row['player'], $row['playerStats'], $starterPids, $moduleName);
+endforeach; ?>
     </tbody>
     <tfoot>
 <?php if ($bothStats !== null):
-    $labelColspan = ($moduleName === "LeagueStarters") ? 3 : 2;
-    $off = $bothStats['offense'];
-    $def = $bothStats['defense'];
-    $offPts = StatsFormatter::calculatePoints($off['fgm'], $off['ftm'], $off['tgm']);
-    $defPts = StatsFormatter::calculatePoints($def['fgm'], $def['ftm'], $def['tgm']);
-?>
-        <tr>
-            <td colspan="<?= $labelColspan ?>"><?= HtmlSanitizer::e($team->name) ?> Offense</td>
-            <td><?= $off['games'] ?></td>
-            <td><?= $off['games'] ?></td>
-            <td class="sep-r-team"></td>
-            <td><?= StatsFormatter::formatTotal($off['fgm']) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatTotal($off['fga']) ?></td>
-            <td><?= StatsFormatter::formatTotal($off['ftm']) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatTotal($off['fta']) ?></td>
-            <td><?= StatsFormatter::formatTotal($off['tgm']) ?></td>
-            <td class="sep-r-team"><?= StatsFormatter::formatTotal($off['tga']) ?></td>
-            <td><?= StatsFormatter::formatTotal($off['orb']) ?></td>
-            <td><?= StatsFormatter::formatTotal($off['reb']) ?></td>
-            <td><?= StatsFormatter::formatTotal($off['ast']) ?></td>
-            <td><?= StatsFormatter::formatTotal($off['stl']) ?></td>
-            <td><?= StatsFormatter::formatTotal($off['tvr']) ?></td>
-            <td><?= StatsFormatter::formatTotal($off['blk']) ?></td>
-            <td><?= StatsFormatter::formatTotal($off['pf']) ?></td>
-            <td><?= StatsFormatter::formatTotal($offPts) ?></td>
-        </tr>
-        <tr>
-            <td colspan="<?= $labelColspan ?>"><?= HtmlSanitizer::e($team->name) ?> Defense</td>
-            <td><?= $def['games'] ?></td>
-            <td><?= $def['games'] ?></td>
-            <td class="sep-r-team"></td>
-            <td><?= StatsFormatter::formatTotal($def['fgm']) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatTotal($def['fga']) ?></td>
-            <td><?= StatsFormatter::formatTotal($def['ftm']) ?></td>
-            <td class="sep-r-weak"><?= StatsFormatter::formatTotal($def['fta']) ?></td>
-            <td><?= StatsFormatter::formatTotal($def['tgm']) ?></td>
-            <td class="sep-r-team"><?= StatsFormatter::formatTotal($def['tga']) ?></td>
-            <td><?= StatsFormatter::formatTotal($def['orb']) ?></td>
-            <td><?= StatsFormatter::formatTotal($def['reb']) ?></td>
-            <td><?= StatsFormatter::formatTotal($def['ast']) ?></td>
-            <td><?= StatsFormatter::formatTotal($def['stl']) ?></td>
-            <td><?= StatsFormatter::formatTotal($def['tvr']) ?></td>
-            <td><?= StatsFormatter::formatTotal($def['blk']) ?></td>
-            <td><?= StatsFormatter::formatTotal($def['pf']) ?></td>
-            <td><?= StatsFormatter::formatTotal($defPts) ?></td>
-        </tr>
-<?php endif; ?>
+    echo self::renderTeamFooterRow($team, 'Offense', $bothStats['offense'], $moduleName);
+    echo self::renderTeamFooterRow($team, 'Defense', $bothStats['defense'], $moduleName);
+endif; ?>
     </tfoot>
 </table>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * One `<tbody>` row: the shared prefix, then the season-total stat cells.
+     *
+     * @param list<int> $starterPids
+     */
+    private static function renderPlayerRow(Player $player, PlayerStats $playerStats, array $starterPids, string $moduleName): string
+    {
+        return TeamStatsRowHelper::playerRowPrefix($player, $playerStats, $starterPids, $moduleName)
+            . '            <td class="sep-r-team">' . $playerStats->seasonMinutes . "</td>\n"
+            . '            <td>' . $playerStats->seasonFieldGoalsMade . "</td>\n"
+            . '            <td class="sep-r-weak">' . $playerStats->seasonFieldGoalsAttempted . "</td>\n"
+            . '            <td>' . $playerStats->seasonFreeThrowsMade . "</td>\n"
+            . '            <td class="sep-r-weak">' . $playerStats->seasonFreeThrowsAttempted . "</td>\n"
+            . '            <td>' . $playerStats->seasonThreePointersMade . "</td>\n"
+            . '            <td class="sep-r-team">' . $playerStats->seasonThreePointersAttempted . "</td>\n"
+            . '            <td>' . $playerStats->seasonOffensiveRebounds . "</td>\n"
+            . '            <td>' . $playerStats->seasonTotalRebounds . "</td>\n"
+            . '            <td>' . $playerStats->seasonAssists . "</td>\n"
+            . '            <td>' . $playerStats->seasonSteals . "</td>\n"
+            . '            <td>' . $playerStats->seasonTurnovers . "</td>\n"
+            . '            <td>' . $playerStats->seasonBlocks . "</td>\n"
+            . '            <td>' . $playerStats->seasonPersonalFouls . "</td>\n"
+            . '            <td>' . $playerStats->seasonPoints . "</td>\n"
+            . "        </tr>\n";
+    }
+
+    /**
+     * One `<tfoot>` row: the shared label cells, then the season-total team stat cells.
+     *
+     * @param 'Offense'|'Defense' $label
+     * @param TeamOffenseStatsRow|TeamDefenseStatsRow $stats
+     */
+    private static function renderTeamFooterRow(Team $team, string $label, array $stats, string $moduleName): string
+    {
+        $pts = StatsFormatter::calculatePoints($stats['fgm'], $stats['ftm'], $stats['tgm']);
+
+        return TeamStatsRowHelper::footerLabelCells($team, $label, $stats['games'], $moduleName)
+            . '            <td>' . StatsFormatter::formatTotal($stats['fgm']) . "</td>\n"
+            . '            <td class="sep-r-weak">' . StatsFormatter::formatTotal($stats['fga']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatTotal($stats['ftm']) . "</td>\n"
+            . '            <td class="sep-r-weak">' . StatsFormatter::formatTotal($stats['fta']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatTotal($stats['tgm']) . "</td>\n"
+            . '            <td class="sep-r-team">' . StatsFormatter::formatTotal($stats['tga']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatTotal($stats['orb']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatTotal($stats['reb']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatTotal($stats['ast']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatTotal($stats['stl']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatTotal($stats['tvr']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatTotal($stats['blk']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatTotal($stats['pf']) . "</td>\n"
+            . '            <td>' . StatsFormatter::formatTotal($pts) . "</td>\n"
+            . "        </tr>\n";
     }
 }

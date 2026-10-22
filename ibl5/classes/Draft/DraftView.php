@@ -17,6 +17,15 @@ use Security\HtmlSanitizer;
 class DraftView implements DraftViewInterface
 {
     /**
+     * Stat columns rendered after the Team cell, in table order. Every entry is an
+     * int-typed key of DraftClassPlayerRow; order must match the <thead> in renderPlayerTable().
+     */
+    private const STAT_COLUMNS = [
+        'age', 'fga', 'fgp', 'fta', 'ftp', 'r_3ga', 'r_3gp', 'orb', 'drb', 'ast', 'stl', 'tvr',
+        'blk', 'oo', 'r_drive_off', 'po', 'r_trans_off', 'od', 'dd', 'pd', 'td', 'talent', 'skill', 'intangibles',
+    ];
+
+    /**
      * @see DraftViewInterface::renderValidationError()
      */
     public function renderValidationError(string $errorMessage): string
@@ -103,71 +112,61 @@ class DraftView implements DraftViewInterface
             </thead>
             <tbody>';
 
+        $isPickOwner = ($teamLogo === $pickOwner);
         foreach ($players as $player) {
-            $isPlayerDrafted = $player['drafted'];
-            $playerName = HtmlSanitizer::safeHtmlOutput($player['name']);
-            $rowClass = ($isPlayerDrafted !== 0 && $isPlayerDrafted !== null) ? ' class="drafted"' : '';
-
-            if ($teamLogo === $pickOwner && ($isPlayerDrafted === 0 || $isPlayerDrafted === null)) {
-                $html .= '<tr' . $rowClass . '>
-                    <td class="sticky-col"><input type="radio" name="player" value="' . HtmlSanitizer::e($player['name']) . '" aria-label="' . $playerName . '"></td>
-                    <td class="sticky-col-2">' . $playerName . '</td>';
-            } elseif ($isPlayerDrafted === 1) {
-                $html .= '<tr' . $rowClass . '>
-                    <td class="sticky-col"></td>
-                    <td class="sticky-col-2">' . $playerName . '</td>';
-            } else {
-                $html .= '<tr' . $rowClass . '>
-                    <td class="sticky-col"></td>
-                    <td class="sticky-col-2">' . $playerName . '</td>';
-            }
-
-            $safePos = HtmlSanitizer::safeHtmlOutput($player['pos']);
-            $teamTid = $player['team_tid'];
-            $html .= '
-            <td>' . $safePos . '</td>';
-
-            if ($teamTid !== null) {
-                $html .= TeamCellHelper::renderTeamCell(
-                    $teamTid,
-                    $player['team'],
-                    $player['color1'] ?? 'FFFFFF',
-                    $player['color2'] ?? '000000',
-                );
-            } else {
-                $safeTeam = HtmlSanitizer::safeHtmlOutput($player['team']);
-                $html .= '<td>' . $safeTeam . '</td>';
-            }
-
-            $html .= '
-            <td>' . (int) $player['age'] . '</td>
-            <td>' . (int) $player['fga'] . '</td>
-            <td>' . (int) $player['fgp'] . '</td>
-            <td>' . (int) $player['fta'] . '</td>
-            <td>' . (int) $player['ftp'] . '</td>
-            <td>' . (int) $player['r_3ga'] . '</td>
-            <td>' . (int) $player['r_3gp'] . '</td>
-            <td>' . (int) $player['orb'] . '</td>
-            <td>' . (int) $player['drb'] . '</td>
-            <td>' . (int) $player['ast'] . '</td>
-            <td>' . (int) $player['stl'] . '</td>
-            <td>' . (int) $player['tvr'] . '</td>
-            <td>' . (int) $player['blk'] . '</td>
-            <td>' . (int) $player['oo'] . '</td>
-            <td>' . (int) $player['r_drive_off'] . '</td>
-            <td>' . (int) $player['po'] . '</td>
-            <td>' . (int) $player['r_trans_off'] . '</td>
-            <td>' . (int) $player['od'] . '</td>
-            <td>' . (int) $player['dd'] . '</td>
-            <td>' . (int) $player['pd'] . '</td>
-            <td>' . (int) $player['td'] . '</td>
-            <td>' . (int) $player['talent'] . '</td>
-            <td>' . (int) $player['skill'] . '</td>
-            <td>' . (int) $player['intangibles'] . '</td>
-            </tr>';
+            $html .= $this->renderPlayerRow($player, $isPickOwner);
         }
 
         $html .= '</tbody></table></div></div>'; // Close table, scroll container, and wrapper
+
+        return $html;
+    }
+
+    /**
+     * Renders one <tr> for the draft table. Radio input appears only when the viewing
+     * team owns the current pick and the player is still undrafted.
+     *
+     * @param DraftClassPlayerRow $player
+     */
+    private function renderPlayerRow(array $player, bool $isPickOwner): string
+    {
+        $isPlayerDrafted = $player['drafted'];
+        $playerName = HtmlSanitizer::safeHtmlOutput($player['name']);
+        $rowClass = ($isPlayerDrafted !== 0 && $isPlayerDrafted !== null) ? ' class="drafted"' : '';
+
+        $draftCell = '';
+        if ($isPickOwner && ($isPlayerDrafted === 0 || $isPlayerDrafted === null)) {
+            $draftCell = '<input type="radio" name="player" value="' . HtmlSanitizer::e($player['name']) . '" aria-label="' . $playerName . '">';
+        }
+
+        $html = '<tr' . $rowClass . '>
+                    <td class="sticky-col">' . $draftCell . '</td>
+                    <td class="sticky-col-2">' . $playerName . '</td>';
+
+        $safePos = HtmlSanitizer::safeHtmlOutput($player['pos']);
+        $teamTid = $player['team_tid'];
+        $html .= '
+            <td>' . $safePos . '</td>';
+
+        if ($teamTid !== null) {
+            $html .= TeamCellHelper::renderTeamCell(
+                $teamTid,
+                $player['team'],
+                $player['color1'] ?? 'FFFFFF',
+                $player['color2'] ?? '000000',
+            );
+        } else {
+            $safeTeam = HtmlSanitizer::safeHtmlOutput($player['team']);
+            $html .= '<td>' . $safeTeam . '</td>';
+        }
+
+        foreach (self::STAT_COLUMNS as $statKey) {
+            $html .= '
+            <td>' . (int) $player[$statKey] . '</td>';
+        }
+
+        $html .= '
+            </tr>';
 
         return $html;
     }

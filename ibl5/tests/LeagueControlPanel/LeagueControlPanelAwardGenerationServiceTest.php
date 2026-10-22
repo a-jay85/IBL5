@@ -23,6 +23,98 @@ class LeagueControlPanelAwardGenerationServiceTest extends TestCase
     private LeagueControlPanelAwardGenerationService $service;
     private string $tempDir;
 
+    /** @var list<string> */
+    private const EXPECTED_CALL_SEQUENCE = [
+        'upsertAward|Most Valuable Player (1st)|Player1',
+        'upsertAward|Most Valuable Player (2nd)|Player2',
+        'upsertAward|Most Valuable Player (3rd)|Player3',
+        'upsertAward|Most Valuable Player (4th)|Player4',
+        'upsertAward|Most Valuable Player (5th)|Player5',
+        'upsertAward|6th Man Award (1st)|Six1',
+        'upsertAward|6th Man Award (2nd)|Six2',
+        'upsertAward|Rookie of the Year (1st)|Rook1',
+        'upsertAward|Rookie of the Year (2nd)|Rook2',
+        'upsertAward|Rookie of the Year (3rd)|Rook3',
+        'upsertAward|Rookie of the Year (4th)|Rook4',
+        'upsertAward|Rookie of the Year (5th)|Rook5',
+        'upsertGmAward|BestGM',
+        'upsertAward|Defensive Player of the Year (1st)|DPOY1',
+        'upsertAward|Defensive Player of the Year (2nd)|DPOY2',
+        'upsertAward|Defensive Player of the Year (3rd)|DPOY3',
+        'upsertAward|Defensive Player of the Year (4th)|DPOY4',
+        'upsertAward|Defensive Player of the Year (5th)|DPOY5',
+        'upsertAward|Scoring Leader (1st)|S1',
+        'upsertAward|Scoring Leader (2nd)|S2',
+        'upsertAward|Scoring Leader (3rd)|S3',
+        'upsertAward|Scoring Leader (4th)|S4',
+        'upsertAward|Scoring Leader (5th)|S5',
+        'upsertAward|Rebounding Leader (1st)|S1',
+        'upsertAward|Rebounding Leader (2nd)|S2',
+        'upsertAward|Rebounding Leader (3rd)|S3',
+        'upsertAward|Rebounding Leader (4th)|S4',
+        'upsertAward|Rebounding Leader (5th)|S5',
+        'upsertAward|Assists Leader (1st)|S1',
+        'upsertAward|Assists Leader (2nd)|S2',
+        'upsertAward|Assists Leader (3rd)|S3',
+        'upsertAward|Assists Leader (4th)|S4',
+        'upsertAward|Assists Leader (5th)|S5',
+        'upsertAward|Steals Leader (1st)|S1',
+        'upsertAward|Steals Leader (2nd)|S2',
+        'upsertAward|Steals Leader (3rd)|S3',
+        'upsertAward|Steals Leader (4th)|S4',
+        'upsertAward|Steals Leader (5th)|S5',
+        'upsertAward|Blocks Leader (1st)|S1',
+        'upsertAward|Blocks Leader (2nd)|S2',
+        'upsertAward|Blocks Leader (3rd)|S3',
+        'upsertAward|Blocks Leader (4th)|S4',
+        'upsertAward|Blocks Leader (5th)|S5',
+        'upsertAward|All-League First Team|Player1',
+        'upsertAward|All-League First Team|Player2',
+        'upsertAward|All-League First Team|Player3',
+        'upsertAward|All-League First Team|Player4',
+        'upsertAward|All-League First Team|Player5',
+        'upsertAward|All-League Second Team|Player6',
+        'upsertAward|All-League Second Team|Player7',
+        'upsertAward|All-League Second Team|JsbB1',
+        'upsertAward|All-League Second Team|JsbB2',
+        'upsertAward|All-League Second Team|JsbB3',
+        'upsertAward|All-League Third Team|JsbC1',
+        'upsertAward|All-League Third Team|JsbC2',
+        'upsertAward|All-League Third Team|JsbC3',
+        'upsertAward|All-League Third Team|JsbC4',
+        'upsertAward|All-League Third Team|JsbC5',
+        'upsertAward|All-Rookie Team (1st)|Rook1',
+        'upsertAward|All-Rookie Team (1st)|Rook2',
+        'upsertAward|All-Rookie Team (1st)|Rook3',
+        'upsertAward|All-Rookie Team (1st)|Rook4',
+        'upsertAward|All-Rookie Team (1st)|Rook5',
+        'upsertAward|All-Rookie Team (2nd)|Rook6',
+        'upsertAward|All-Rookie Team (2nd)|All Rookie1P1',
+        'upsertAward|All-Rookie Team (2nd)|All Rookie1P2',
+        'upsertAward|All-Rookie Team (2nd)|All Rookie1P3',
+        'upsertAward|All-Rookie Team (2nd)|All Rookie1P4',
+        'upsertAward|All-Rookie Team (3rd)|All Rookie2P1',
+        'upsertAward|All-Rookie Team (3rd)|All Rookie2P2',
+        'upsertAward|All-Rookie Team (3rd)|All Rookie2P3',
+        'upsertAward|All-Rookie Team (3rd)|All Rookie2P4',
+        'upsertAward|All-Rookie Team (3rd)|All Rookie2P5',
+        'upsertAward|All-Defensive Team (1st)|All Defense0P1',
+        'upsertAward|All-Defensive Team (1st)|All Defense0P2',
+        'upsertAward|All-Defensive Team (1st)|All Defense0P3',
+        'upsertAward|All-Defensive Team (1st)|All Defense0P4',
+        'upsertAward|All-Defensive Team (1st)|All Defense0P5',
+        'upsertAward|All-Defensive Team (2nd)|All Defense1P1',
+        'upsertAward|All-Defensive Team (2nd)|All Defense1P2',
+        'upsertAward|All-Defensive Team (2nd)|All Defense1P3',
+        'upsertAward|All-Defensive Team (2nd)|All Defense1P4',
+        'upsertAward|All-Defensive Team (2nd)|All Defense1P5',
+        'upsertAward|All-Defensive Team (3rd)|All Defense2P1',
+        'upsertAward|All-Defensive Team (3rd)|All Defense2P2',
+        'upsertAward|All-Defensive Team (3rd)|All Defense2P3',
+        'upsertAward|All-Defensive Team (3rd)|All Defense2P4',
+        'upsertAward|All-Defensive Team (3rd)|All Defense2P5',
+    ];
+
     protected function setUp(): void
     {
         $this->stubRepository = self::createStub(LeagueControlPanelRepositoryInterface::class);
@@ -261,6 +353,389 @@ class LeagueControlPanelAwardGenerationServiceTest extends TestCase
         $this->assertGreaterThan(0, $result['inserted']);
         $this->assertGreaterThan(0, $result['skipped']);
         $this->assertSame($result['inserted'] + $result['skipped'], (int) preg_replace('/.*Total: (\d+)\..*/', '$1', $result['message']));
+    }
+
+    public function testRepositoryCallSequenceIsPinned(): void
+    {
+        $mvpRows = [];
+        for ($i = 1; $i <= 7; $i++) {
+            $mvpRows[] = ['name' => 'Player' . $i . ', T' . $i, 'votes' => 30 - $i, 'pid' => $i];
+        }
+        $this->stubVotingService->method('getEndOfYearResults')->willReturn([
+            ['title' => 'Most Valuable Player', 'rows' => $mvpRows],
+            [
+                'title' => 'Sixth Man of the Year',
+                'rows' => [
+                    ['name' => 'Six1, T', 'votes' => 5, 'pid' => 21],
+                    ['name' => 'Six2, T', 'votes' => 4, 'pid' => 22],
+                ],
+            ],
+            [
+                'title' => 'Rookie of the Year',
+                'rows' => [
+                    ['name' => 'Rook1, T', 'votes' => 9, 'pid' => 31],
+                    ['name' => 'Rook2, T', 'votes' => 8, 'pid' => 32],
+                    ['name' => 'Rook3, T', 'votes' => 7, 'pid' => 33],
+                    ['name' => 'Rook4, T', 'votes' => 6, 'pid' => 34],
+                    ['name' => 'Rook5, T', 'votes' => 5, 'pid' => 35],
+                    ['name' => 'Rook6, T', 'votes' => 4, 'pid' => 36],
+                ],
+            ],
+            [
+                'title' => 'GM of the Year',
+                'rows' => [
+                    ['name' => 'BestGM', 'votes' => 20, 'pid' => 0],
+                ],
+            ],
+        ]);
+
+        /** @var list<string> $calls */
+        $calls = [];
+        $this->stubRepository->method('upsertAward')
+            ->willReturnCallback(function (int $year, string $award, string $name) use (&$calls): int {
+                $calls[] = "upsertAward|{$award}|{$name}";
+                return 1;
+            });
+        $this->stubRepository->method('upsertGmAward')
+            ->willReturnCallback(function (int $year, string $name) use (&$calls): int {
+                $calls[] = "upsertGmAward|{$name}";
+                return 1;
+            });
+
+        $leadersPath = $this->writeLeadersHtmWithTeams();
+        $this->service->generateSeasonAwards(2025, $leadersPath);
+
+        $this->assertSame(self::EXPECTED_CALL_SEQUENCE, $calls);
+    }
+
+    public function testGmAwardAlreadyExistingCountsAsSkipped(): void
+    {
+        $this->stubVotingService->method('getEndOfYearResults')->willReturn([
+            ['title' => 'Most Valuable Player', 'rows' => []],
+            ['title' => 'Sixth Man of the Year', 'rows' => []],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            [
+                'title' => 'GM of the Year',
+                'rows' => [
+                    ['name' => 'BestGM', 'votes' => 20, 'pid' => 0],
+                ],
+            ],
+        ]);
+
+        $awardCalls = 0;
+        $this->stubRepository->method('upsertGmAward')->willReturn(2);
+        $this->stubRepository->method('upsertAward')
+            ->willReturnCallback(function () use (&$awardCalls): int {
+                $awardCalls++;
+                return 1;
+            });
+
+        $leadersPath = $this->writeMinimalLeadersHtm();
+        $result = $this->service->generateSeasonAwards(2025, $leadersPath);
+
+        $this->assertSame(1, $result['skipped']);
+        $this->assertSame($awardCalls, $result['inserted']);
+    }
+
+    public function testMissingLeadersHtmWritesNothing(): void
+    {
+        $mockRepository = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mockRepository->expects($this->never())->method('upsertAward');
+        $mockRepository->expects($this->never())->method('upsertGmAward');
+
+        $stubVotingService = self::createStub(VotingResultsServiceInterface::class);
+        $stubVotingService->method('getEndOfYearResults')->willReturn([
+            ['title' => 'Most Valuable Player', 'rows' => []],
+            ['title' => 'Sixth Man of the Year', 'rows' => []],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            [
+                'title' => 'GM of the Year',
+                'rows' => [
+                    ['name' => 'BestGM', 'votes' => 20, 'pid' => 0],
+                ],
+            ],
+        ]);
+        $service = new LeagueControlPanelAwardGenerationService($mockRepository, $stubVotingService);
+
+        $result = $service->generateSeasonAwards(2025, '/nonexistent/Leaders.htm');
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(0, $result['inserted']);
+        $this->assertSame(0, $result['skipped']);
+    }
+
+    public function testVoteGettersBeyondFifteenNeverReachTeamAwards(): void
+    {
+        $mvpRows = [];
+        for ($i = 1; $i <= 17; $i++) {
+            $mvpRows[] = ['name' => 'Player' . $i . ', T' . $i, 'votes' => 40 - $i, 'pid' => $i];
+        }
+        $this->stubVotingService->method('getEndOfYearResults')->willReturn([
+            ['title' => 'Most Valuable Player', 'rows' => $mvpRows],
+            ['title' => 'Sixth Man of the Year', 'rows' => []],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            ['title' => 'GM of the Year', 'rows' => []],
+        ]);
+
+        /** @var array<string, list<string>> $awardsByTeam */
+        $awardsByTeam = [];
+        $this->stubRepository->method('upsertAward')
+            ->willReturnCallback(function (int $year, string $award, string $name) use (&$awardsByTeam): int {
+                if (str_starts_with($award, 'All-League')) {
+                    $awardsByTeam[$award][] = $name;
+                }
+                return 1;
+            });
+
+        $leadersPath = $this->writeLeadersHtmWithTeams();
+        $this->service->generateSeasonAwards(2025, $leadersPath);
+
+        $this->assertSame(
+            ['Player11', 'Player12', 'Player13', 'Player14', 'Player15'],
+            $awardsByTeam['All-League Third Team'] ?? []
+        );
+
+        $allLeague = array_merge(...array_values($awardsByTeam));
+        $this->assertCount(15, $allLeague);
+        $this->assertNotContains('Player16', $allLeague);
+        $this->assertNotContains('Player17', $allLeague);
+    }
+
+    public function testEmptyVoteCategoriesFillTeamsFromJsbAndWriteNoRankedVoteAwards(): void
+    {
+        $mockRepository = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $stubVotingService = self::createStub(VotingResultsServiceInterface::class);
+        $service = new LeagueControlPanelAwardGenerationService($mockRepository, $stubVotingService);
+
+        $stubVotingService->method('getEndOfYearResults')->willReturn([
+            ['title' => 'Most Valuable Player', 'rows' => []],
+            ['title' => 'Sixth Man of the Year', 'rows' => []],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            ['title' => 'GM of the Year', 'rows' => []],
+        ]);
+
+        $mockRepository->expects($this->never())->method('upsertGmAward');
+
+        /** @var list<array{string, string}> $captured */
+        $captured = [];
+        $mockRepository->method('upsertAward')
+            ->willReturnCallback(function (int $year, string $award, string $name) use (&$captured): int {
+                $captured[] = [$award, $name];
+                return 1;
+            });
+
+        $leadersPath = $this->writeLeadersHtmWithTeams();
+        $service->generateSeasonAwards(2025, $leadersPath);
+
+        /** @var array<string, list<string>> $awardsByTeam */
+        $awardsByTeam = [];
+        foreach ($captured as [$award, $name]) {
+            $this->assertFalse(str_starts_with($award, 'Most Valuable Player'), $award);
+            $this->assertFalse(str_starts_with($award, '6th Man Award'), $award);
+            $this->assertFalse(str_starts_with($award, 'Rookie of the Year'), $award);
+            if (str_starts_with($award, 'All-League')) {
+                $awardsByTeam[$award][] = $name;
+            }
+        }
+
+        $this->assertSame(['JsbA1', 'JsbA2', 'JsbA3', 'JsbA4', 'JsbA5'], $awardsByTeam['All-League First Team'] ?? []);
+        $this->assertSame(['JsbB1', 'JsbB2', 'JsbB3', 'JsbB4', 'JsbB5'], $awardsByTeam['All-League Second Team'] ?? []);
+        $this->assertSame(['JsbC1', 'JsbC2', 'JsbC3', 'JsbC4', 'JsbC5'], $awardsByTeam['All-League Third Team'] ?? []);
+    }
+
+    public function testRankedAwardsStopAtAvailableNames(): void
+    {
+        $this->stubVotingService->method('getEndOfYearResults')->willReturn([
+            ['title' => 'Most Valuable Player', 'rows' => []],
+            [
+                'title' => 'Sixth Man of the Year',
+                'rows' => [
+                    ['name' => 'Six1, T', 'votes' => 5, 'pid' => 21],
+                    ['name' => 'Six2, T', 'votes' => 4, 'pid' => 22],
+                ],
+            ],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            ['title' => 'GM of the Year', 'rows' => []],
+        ]);
+
+        /** @var list<string> $captured */
+        $captured = [];
+        $this->stubRepository->method('upsertAward')
+            ->willReturnCallback(function (int $year, string $award, string $name) use (&$captured): int {
+                if (str_starts_with($award, '6th Man Award')) {
+                    $captured[] = $award;
+                }
+                return 1;
+            });
+
+        $leadersPath = $this->writeMinimalLeadersHtm();
+        $this->service->generateSeasonAwards(2025, $leadersPath);
+
+        $this->assertSame(['6th Man Award (1st)', '6th Man Award (2nd)'], $captured);
+    }
+
+    public function testAllDefensiveTeamsAreWrittenFromLeadersHtmInOrder(): void
+    {
+        $this->stubVotingService->method('getEndOfYearResults')->willReturn([
+            ['title' => 'Most Valuable Player', 'rows' => []],
+            ['title' => 'Sixth Man of the Year', 'rows' => []],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            ['title' => 'GM of the Year', 'rows' => []],
+        ]);
+
+        /** @var array<string, list<string>> $awardsByTeam */
+        $awardsByTeam = [];
+        $this->stubRepository->method('upsertAward')
+            ->willReturnCallback(function (int $year, string $award, string $name) use (&$awardsByTeam): int {
+                if (str_starts_with($award, 'All-Defensive')) {
+                    $awardsByTeam[$award][] = $name;
+                }
+                return 1;
+            });
+
+        $leadersPath = $this->writeLeadersHtmWithTeams();
+        $this->service->generateSeasonAwards(2025, $leadersPath);
+
+        $this->assertSame(
+            ['All Defense0P1', 'All Defense0P2', 'All Defense0P3', 'All Defense0P4', 'All Defense0P5'],
+            $awardsByTeam['All-Defensive Team (1st)'] ?? []
+        );
+        $this->assertSame(
+            ['All Defense1P1', 'All Defense1P2', 'All Defense1P3', 'All Defense1P4', 'All Defense1P5'],
+            $awardsByTeam['All-Defensive Team (2nd)'] ?? []
+        );
+        $this->assertSame(
+            ['All Defense2P1', 'All Defense2P2', 'All Defense2P3', 'All Defense2P4', 'All Defense2P5'],
+            $awardsByTeam['All-Defensive Team (3rd)'] ?? []
+        );
+    }
+
+    public function testSuccessMessageReportsExactCounts(): void
+    {
+        $this->stubVotingService->method('getEndOfYearResults')->willReturn([
+            ['title' => 'Most Valuable Player', 'rows' => []],
+            ['title' => 'Sixth Man of the Year', 'rows' => []],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            [
+                'title' => 'GM of the Year',
+                'rows' => [
+                    ['name' => 'BestGM', 'votes' => 20, 'pid' => 0],
+                ],
+            ],
+        ]);
+
+        $this->stubRepository->method('upsertGmAward')->willReturn(1);
+        $awardCalls = 0;
+        $this->stubRepository->method('upsertAward')
+            ->willReturnCallback(function () use (&$awardCalls): int {
+                $awardCalls++;
+                return $awardCalls === 1 ? 1 : 2;
+            });
+
+        $leadersPath = $this->writeMinimalLeadersHtm();
+        $result = $this->service->generateSeasonAwards(2025, $leadersPath);
+
+        $this->assertSame('Season awards generated: 2 inserted, 74 already existed. Total: 76.', $result['message']);
+    }
+
+    public function testConstructorTakesOnlyRepositoryAndVotingService(): void
+    {
+        $constructor = (new \ReflectionClass(LeagueControlPanelAwardGenerationService::class))->getConstructor();
+        $this->assertNotNull($constructor);
+
+        $typeNames = [];
+        foreach ($constructor->getParameters() as $param) {
+            $type = $param->getType();
+            $this->assertInstanceOf(\ReflectionNamedType::class, $type);
+            $typeNames[] = $type->getName();
+        }
+
+        $this->assertSame(
+            [LeagueControlPanelRepositoryInterface::class, VotingResultsServiceInterface::class],
+            $typeNames
+        );
+    }
+
+    public function testServiceHoldsOnlyRepositoryAndVotingServiceProperties(): void
+    {
+        $propertyTypes = [];
+        foreach ((new \ReflectionClass(LeagueControlPanelAwardGenerationService::class))->getProperties() as $prop) {
+            $type = $prop->getType();
+            $this->assertInstanceOf(\ReflectionNamedType::class, $type);
+            $propertyTypes[$prop->getName()] = $type->getName();
+        }
+
+        $this->assertSame(
+            [
+                'repository' => LeagueControlPanelRepositoryInterface::class,
+                'votingResultsService' => VotingResultsServiceInterface::class,
+            ],
+            $propertyTypes
+        );
+    }
+
+    public function testOnlyPublicMethodIsGenerateSeasonAwards(): void
+    {
+        $names = array_map(
+            static fn (\ReflectionMethod $method): string => $method->getName(),
+            (new \ReflectionClass(LeagueControlPanelAwardGenerationService::class))
+                ->getMethods(\ReflectionMethod::IS_PUBLIC)
+        );
+        sort($names);
+
+        $this->assertSame(['__construct', 'generateSeasonAwards'], $names);
+    }
+
+    public function testServiceCallsOnlyUpsertRepositoryMethods(): void
+    {
+        $mockRepository = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mockRepository->expects($this->never())->method(
+            self::logicalNot(self::logicalOr(self::equalTo('upsertAward'), self::equalTo('upsertGmAward')))
+        );
+        $mockRepository->method('upsertAward')->willReturn(1);
+        $mockRepository->method('upsertGmAward')->willReturn(1);
+
+        $stubVoting = self::createStub(VotingResultsServiceInterface::class);
+        $stubVoting->method('getEndOfYearResults')->willReturn([
+            [
+                'title' => 'Most Valuable Player',
+                'rows' => [['name' => 'Player1, T1', 'votes' => 10, 'pid' => 1]],
+            ],
+            ['title' => 'Sixth Man of the Year', 'rows' => []],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            [
+                'title' => 'GM of the Year',
+                'rows' => [['name' => 'BestGM', 'votes' => 5, 'pid' => 0]],
+            ],
+        ]);
+
+        $service = new LeagueControlPanelAwardGenerationService($mockRepository, $stubVoting);
+        $result = $service->generateSeasonAwards(2025, $this->writeMinimalLeadersHtm());
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testEmptyVoteCategoriesReportZeroInsertedWhenAllAwardsExist(): void
+    {
+        $this->stubVotingService->method('getEndOfYearResults')->willReturn([
+            ['title' => 'Most Valuable Player', 'rows' => []],
+            ['title' => 'Sixth Man of the Year', 'rows' => []],
+            ['title' => 'Rookie of the Year', 'rows' => []],
+            ['title' => 'GM of the Year', 'rows' => []],
+        ]);
+
+        $awardCalls = 0;
+        $this->stubRepository->method('upsertAward')
+            ->willReturnCallback(function () use (&$awardCalls): int {
+                $awardCalls++;
+                return 2;
+            });
+
+        $leadersPath = $this->writeMinimalLeadersHtm();
+        $result = $this->service->generateSeasonAwards(2025, $leadersPath);
+
+        $this->assertSame(0, $result['inserted']);
+        $this->assertSame($awardCalls, $result['skipped']);
     }
 
     /**

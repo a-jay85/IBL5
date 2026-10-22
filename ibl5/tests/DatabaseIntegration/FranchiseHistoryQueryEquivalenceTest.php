@@ -7,6 +7,7 @@ namespace Tests\DatabaseIntegration;
 use FranchiseHistory\FranchiseHistoryRepository;
 use League\League;
 use PHPUnit\Framework\Attributes\Group;
+use Updater\Steps\RefreshTeamSeasonRecordsStep;
 
 /**
  * Results-equality characterization for the four FranchiseHistoryRepository queries.
@@ -64,6 +65,26 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
             FROM `ibl_heat_win_loss`
             GROUP BY currentname";
 
+    /**
+     * Frozen from migration 174 section C (the wl arm before the franchise-summary-reads-season-records migration).
+     * Never edit to match the view.
+     */
+    private const FROZEN_LEGACY_WL_SUMMARY_SQL = "SELECT `ti`.`teamid` AS teamid,
+            COALESCE(`wl`.`totwins`, 0) AS totwins,
+            COALESCE(`wl`.`totloss`, 0) AS totloss,
+            CASE
+                WHEN COALESCE(`wl`.`totwins`, 0) + COALESCE(`wl`.`totloss`, 0) = 0 THEN 0.000
+                ELSE ROUND(COALESCE(`wl`.`totwins`, 0) / (COALESCE(`wl`.`totwins`, 0) + COALESCE(`wl`.`totloss`, 0)), 3)
+            END AS winpct
+     FROM `ibl_team_info` `ti`
+     LEFT JOIN (
+         SELECT `currentname`, SUM(`wins`) AS `totwins`, SUM(`losses`) AS `totloss`
+         FROM `ibl_team_win_loss`
+         GROUP BY `currentname`
+     ) `wl` ON `wl`.`currentname` = `ti`.`team_name`
+     WHERE `ti`.`teamid` BETWEEN 1 AND 30
+     ORDER BY `ti`.`teamid`";
+
     private FranchiseHistoryRepository $repository;
 
     protected function setUp(): void
@@ -88,6 +109,41 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
         self::assertNotSame([], $anyWins, 'no summary row has totwins > 0');
 
         $this->assertAllFourMatchFrozen($year);
+    }
+
+    public function testSummaryWinLossMatchesFrozenLegacyAggregateOnProdScaleSeed(): void
+    {
+        $this->seedProdScaleVolume();
+
+        $legacy = $this->runFrozen(self::FROZEN_LEGACY_WL_SUMMARY_SQL, '');
+        $current = $this->runFrozen('SELECT teamid, totwins, totloss, winpct FROM vw_franchise_summary ORDER BY teamid', '');
+
+        self::assertGreaterThanOrEqual(
+            20,
+            count(array_filter($legacy, static fn (array $row): bool => (int) $row['totwins'] > 0)),
+            'legacy golden is vacuous'
+        );
+        self::assertSame($this->stringifyRows($legacy), $this->stringifyRows($current));
+    }
+
+    public function testSummaryTotalsSurviveTeamRenameWithoutRefresh(): void
+    {
+        [$t1, $t2] = $this->firstTwoTeams();
+
+        $this->insertTeamBoxscoreRow('2013-11-05', 'Visitor', 3, $t1, $t2);
+        $this->insertTeamBoxscoreRow('2013-11-05', 'Home', 3, $t1, $t2);
+        $this->refreshRegularSeasonRecordsInTransaction();
+
+        $before = $this->summaryTotalsFor($t1);
+        self::assertGreaterThanOrEqual(1, $before['totwins'] + $before['totloss']);
+
+        $stmt = $this->db->prepare("UPDATE ibl_team_info SET team_name = 'Renamed FC' WHERE teamid = ?");
+        self::assertNotFalse($stmt, 'prepare failed: ' . $this->db->error);
+        $stmt->bind_param('i', $t1);
+        $stmt->execute();
+        $stmt->close();
+
+        self::assertSame($before, $this->summaryTotalsFor($t1));
     }
 
     public function testDuplicateGameOfThatDayReplayCountedOnce(): void
@@ -384,6 +440,45 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
     }
 
     /**
+     * Runs the refresher's own regular-season INSERT inside the open per-test transaction.
+     * execute() would call begin_transaction() and implicitly commit the seed.
+     */
+    private function refreshRegularSeasonRecordsInTransaction(): void
+    {
+        self::assertTrue(
+            $this->db->query('DELETE FROM ibl_team_season_records WHERE game_type = 1'),
+            'clear regular-season records failed: ' . $this->db->error
+        );
+        self::assertTrue(
+            $this->db->query(RefreshTeamSeasonRecordsStep::INSERT_REGULAR_SEASON_SQL),
+            'refresh regular-season records failed: ' . $this->db->error
+        );
+    }
+
+    /**
+     * @return array{totwins: int, totloss: int}
+     */
+    private function summaryTotalsFor(int $teamId): array
+    {
+        $rows = $this->runFrozen('SELECT totwins, totloss FROM vw_franchise_summary WHERE teamid = ?', 'i', $teamId);
+        self::assertCount(1, $rows);
+
+        return ['totwins' => (int) $rows[0]['totwins'], 'totloss' => (int) $rows[0]['totloss']];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, string>>
+     */
+    private function stringifyRows(array $rows): array
+    {
+        return array_map(
+            static fn (array $row): array => array_map(static fn (mixed $v): string => self::stringOf($v), $row),
+            $rows
+        );
+    }
+
+    /**
      * @return array{0: int, 1: int, 2: string, 3: string}
      */
     private function firstTwoTeams(): array
@@ -551,6 +646,7 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
         }
 
         $this->bulkInsertBoxScores($rows);
+        $this->refreshRegularSeasonRecordsInTransaction();
 
         return [
             'teams' => $teamCount,

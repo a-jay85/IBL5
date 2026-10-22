@@ -14,6 +14,8 @@
 # Run: bin/test-ci-memo [--case <name>]   (exit 0 = all pass, 1 = any failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 unset GITHUB_OUTPUT GITHUB_STEP_SUMMARY 2>/dev/null || true
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -22,7 +24,6 @@ REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 WF_TESTS="$REPO_ROOT/.github/workflows/tests.yml"
 WF_E2E="$REPO_ROOT/.github/workflows/e2e-tests.yml"
 
-PASS=0; FAIL=0
 ONLY_CASE=""
 
 case "${1:-}" in
@@ -33,11 +34,10 @@ case "${1:-}" in
     *) echo "usage: bin/test-ci-memo [--case <name>]" >&2; exit 2 ;;
 esac
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
-pass() { echo "PASS: $1"; PASS=$((PASS+1)); }
-fail() { echo "FAIL: $1"; FAIL=$((FAIL+1)); }
+pass() { h_pass "$1"; }
+fail() { h_fail "$1"; }
 should_run() { [[ -z "$ONLY_CASE" || "$ONLY_CASE" == "$1" ]]; }
 
 # ---- gate-topology assertion functions (reused by gate-topology-mutants) -
@@ -55,7 +55,7 @@ vr_if_shape() {
 # A memo-only job may also need mirror-ready (ADR-0191) to pull GHCR mirror
 # images. mirror-ready reads no path-filter output, so it adds no filter skip.
 CHANGES_ALLOWLIST="audit-js,audit-php,iblbot"
-MEMO_ONLY_JOBS="test harness-tests db-integration phpstan shellcheck ibl5-ts-unit"
+MEMO_ONLY_JOBS="test harness-tests harness-tests-isolated db-integration phpstan shellcheck ibl5-ts-unit"
 UNCONDITIONAL_JOBS="phpunit-hygiene host-mariadb-guard automouse-impl-model-test actionlint"
 filter_free_topology() {
     local wf="$1" got bad=0 j
@@ -791,9 +791,8 @@ fi
 echo ""
 # A --case typo used to select zero cases and exit 0, so a CI step naming a
 # renamed case would pass while asserting nothing.
-if [[ -n "$ONLY_CASE" && $((PASS + FAIL)) -eq 0 ]]; then
+if [[ -n "$ONLY_CASE" && $((H_PASS + H_FAIL)) -eq 0 ]]; then
     echo "FAIL: unknown --case name: $ONLY_CASE (zero cases ran)" >&2
     exit 2
 fi
-echo "Results: $PASS passed, $FAIL failed"
-[[ $FAIL -eq 0 ]] || exit 1
+h_done

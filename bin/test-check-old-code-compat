@@ -8,6 +8,8 @@
 # Exit codes: 0 = all cases passed, 1 = a case failed, 2 = usage error.
 
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 usage() {
     cat <<'EOF'
@@ -48,11 +50,9 @@ HARNESS_DIR="$(cd "$(dirname "$0")" && pwd)"
 SUT="$HARNESS_DIR/check-old-code-compat"
 REPO_ROOT="$(git -C "$HARNESS_DIR" rev-parse --show-toplevel)"
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+h_tmp WORK
 
 TOTAL=0
-FAILED=0
 STDIN_TEXT=""
 LAST_OUT=""
 RUN_ENV_I=0
@@ -165,10 +165,9 @@ run_case() {
     fi
 
     if [ -z "$bad" ]; then
-        echo "ok $label"
+        h_pass "$label"
     else
-        FAILED=$((FAILED + 1))
-        echo "FAIL $label: $bad"
+        h_fail "$label" "$bad"
         printf '%s\n' "$out" | sed 's/^/    | /'
     fi
 }
@@ -177,10 +176,9 @@ check_equal() {
     local label="$1" a="$2" b="$3"
     TOTAL=$((TOTAL + 1))
     if [ "$a" = "$b" ]; then
-        echo "ok $label"
+        h_pass "$label"
     else
-        FAILED=$((FAILED + 1))
-        echo "FAIL $label: state changed"
+        h_fail "$label" "state changed"
         echo "    before: $a"
         echo "    after:  $b"
     fi
@@ -223,12 +221,11 @@ if [ "$MODE" = "db" ]; then
     db_repo A 999_oldcompat_selftest.sql "$ADD_NOTE"
     db_args A "$FILTER"
     run_case A 0 'PASS (' "" "${DB_ARGS[@]}"
-    if [ "$FAILED" -eq 0 ]; then
+    if [ "$H_FAIL" -eq 0 ]; then
         if [[ "$LAST_OUT" =~ PASS\ \(([0-9]+)\ tests\ executed\) ]] && [ "${BASH_REMATCH[1]}" -ge 1 ]; then
-            echo "ok A executed ${BASH_REMATCH[1]} tests"
+            h_pass "A executed ${BASH_REMATCH[1]} tests"
         else
-            FAILED=$((FAILED + 1))
-            echo "FAIL A: expected PASS (N tests executed) with N >= 1"
+            h_fail "A" "expected PASS (N tests executed) with N >= 1"
             printf '%s\n' "$LAST_OUT" | sed 's/^/    | /'
         fi
     fi
@@ -264,11 +261,11 @@ if [ "$MODE" = "db" ]; then
     db_args F2 "$FILTER"
     run_case F2 3 'was not applied' "" "${DB_ARGS[@]}"
 
-    if [ "$FAILED" -eq 0 ]; then
+    if [ "$H_FAIL" -eq 0 ]; then
         echo "ALL $TOTAL DB CASES PASSED"
         exit 0
     fi
-    echo "$FAILED of $TOTAL DB CASES FAILED"
+    echo "$H_FAIL of $TOTAL DB CASES FAILED"
     exit 1
 fi
 
@@ -393,10 +390,9 @@ check_has() {
     local label="$1" haystack="$2" token="$3"
     TOTAL=$((TOTAL + 1))
     if grep -qF -- "$token" <<< "$haystack"; then
-        echo "ok $label"
+        h_pass "$label"
     else
-        FAILED=$((FAILED + 1))
-        echo "FAIL $label: missing: $token"
+        h_fail "$label" "missing: $token"
         printf '%s\n' "$haystack" | sed 's/^/    | /'
     fi
 }
@@ -466,9 +462,7 @@ check_has pipe-zero-tests-args "$(cat "$WORK/phpunit.args")" "NoSuchTest"
 REPO_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain)"
 check_equal repo-untouched "$REPO_STATUS_BEFORE" "$REPO_STATUS_AFTER"
 
-if [ "$FAILED" -eq 0 ]; then
+if [ "$H_FAIL" -eq 0 ]; then
     echo "ALL $TOTAL CASES PASSED"
-    exit 0
 fi
-echo "$FAILED of $TOTAL CASES FAILED"
-exit 1
+h_done

@@ -13,22 +13,24 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SRC_TICK="$SCRIPT_DIR/pr-cycle-tick"
 [[ -x "$SRC_TICK" ]] || { echo "FAIL: $SRC_TICK missing or not executable" >&2; exit 1; }
 REAL_TOP="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
 
 SCRATCH="$(mktemp -d)"
-trap 'rm -rf "$SCRATCH"' EXIT
+trap 'rm -rf "$SCRATCH"; h_cleanup' EXIT
 
-FAILED=0
 CASE_BASE=0
-fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
-begin_case() { CASE_BASE=$FAILED; }
+fail() { h_fail "$*"; }
+begin_case() { CASE_BASE=$H_FAIL; }
 end_case() {  # $1 = case name; prints "<name> OK" only if the case added no failures
     # The tick must never spend: every case, pass or fail, proves the claude shim stayed cold.
     [[ ! -e "$SCRATCH/claude.log" ]] || fail "$1: claude was invoked"
-    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+    if [[ $H_FAIL -eq $CASE_BASE ]]; then h_pass "$1"; else echo "$1 FAILED" >&2; fi
 }
 
 # --- fixture repo --------------------------------------------------------------------------
@@ -48,19 +50,44 @@ git -C "$REPO" config user.name t
 git -C "$REPO" add -A >/dev/null 2>&1
 git -C "$REPO" commit -qm seed >/dev/null 2>&1
 git -C "$REPO" worktree add -q -b branch-one "$WT" >/dev/null 2>&1
+# git reports the physical path (macOS: /private/var/...), and the sweep cases name $WT in
+# fake ps and lsof rows that must match it. Resolve it once, here.
+WT="$(cd "$WT" && pwd -P)"
 
 # --- shims ---------------------------------------------------------------------------------
 cat > "$SHIMS/gh" <<GH_EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$SCRATCH/gh.log"
 if [[ "\${1:-}" == "pr" && "\${2:-}" == "list" ]]; then
-    cat "$SCRATCH/prs.json"
+    st=""; prev=""
+    for a in "\$@"; do [[ "\$prev" == "--state" ]] && st="\$a"; prev="\$a"; done
+    if [[ "\$st" == "open" ]]; then
+        cat "$SCRATCH/prs.json"
+    else
+        jq -s 'add' "$SCRATCH/prs.json" "$SCRATCH/prs-closed.json"
+    fi
     exit 0
 fi
 if [[ "\${1:-}" == "api" ]]; then
-    case "\${2:-}" in
+    # The endpoint is the first repos/ argument: a DELETE puts --method before it.
+    ep=""
+    for a in "\$@"; do [[ -z "\$ep" && "\$a" == repos/* ]] && ep="\$a"; done
+    case "\$ep" in
+        repos/*/issues/*/timeline*)
+            n="\${ep#*/issues/}"; n="\${n%%/*}"
+            [[ ! -e "$SCRATCH/timeline-fail-\$n" ]] || exit 1
+            [[ -f "$SCRATCH/timeline-\$n.json" ]] || exit 1
+            expr=""; prev=""
+            for a in "\$@"; do [[ "\$prev" == "--jq" ]] && expr="\$a"; prev="\$a"; done
+            if [[ -n "\$expr" ]]; then jq -r "\$expr" "$SCRATCH/timeline-\$n.json"; else cat "$SCRATCH/timeline-\$n.json"; fi
+            exit 0 ;;
+        repos/*/issues/*/labels/*)
+            n="\${ep#*/issues/}"; n="\${n%%/*}"; lbl="\${ep##*/labels/}"
+            printf '%s %s %s\n' "\$(printf '%s ' "\$@" | grep -oE -- '--method [A-Z]+' | cut -d' ' -f2)" "\$n" "\$lbl" >> "$SCRATCH/gh-label.log"
+            [[ ! -e "$SCRATCH/delete-fail-\$n" ]] || exit 1
+            exit 0 ;;
         repos/*/commits/*/check-runs*)
-            sha="\${2#*/commits/}"; sha="\${sha%%/*}"
+            sha="\${ep#*/commits/}"; sha="\${sha%%/*}"
             [[ -f "$SCRATCH/checks-\$sha.json" ]] || exit 1
             cat "$SCRATCH/checks-\$sha.json"
             exit 0 ;;
@@ -76,6 +103,7 @@ GH_EOF
 cat > "$SHIMS/launchctl" <<LC_EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$SCRATCH/launchctl.log"
+[[ ! -e "$SCRATCH/launchctl-fail" ]] || exit 1
 if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
     cat "$SCRATCH/launchctl-list.txt"
     i=0
@@ -101,6 +129,34 @@ printf '%s\n' "\$*" >> "$SCRATCH/claude.log"
 exit 0
 CL_EOF
 
+cat > "$SHIMS/ps" <<PS_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/ps.log"
+[[ ! -e "$SCRATCH/ps-fail" ]] || exit 1
+cat "$SCRATCH/ps.txt"
+exit 0
+PS_EOF
+
+cat > "$SHIMS/lsof" <<LS_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/lsof.log"
+[[ ! -e "$SCRATCH/lsof-fail" ]] || exit 1
+cat "$SCRATCH/lsof.txt"
+exit 0
+LS_EOF
+
+# git: passes through, except `git worktree list` fails while the flag file exists.
+REAL_GIT="$(command -v git)"
+cat > "$SHIMS/git" <<GIT_EOF
+#!/usr/bin/env bash
+if [[ -e "$SCRATCH/git-worktree-fail" && "\${1:-}" != "" ]]; then
+    for a in "\$@"; do
+        if [[ "\$a" == worktree ]]; then exit 128; fi
+    done
+fi
+exec "$REAL_GIT" "\$@"
+GIT_EOF
+
 cat > "$SCRATCH/pr-cycle-stub" <<PC_EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$SCRATCH/pr-cycle.log"
@@ -124,24 +180,68 @@ msg="\$*"; nl=\$'\n'
 printf '%s\n' "\${msg//\$nl/\\\\n}" >> "$SCRATCH/dm.log"
 exit 0
 DM_EOF
-chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub"
+# pad40 <sha>: the fixture's patch-id for a head. Fixture SHAs are 7 hex chars and the
+# tick's pcw_patch_id accepts only 40 hex, so the identity seam pads with 0 to 40.
+# This is the ONE definition; the shim and key_of both call it.
+cat > "$SCRATCH/pad40" <<'PAD_EOF'
+#!/usr/bin/env bash
+s="$1"; z="0000000000000000000000000000000000000000"
+[[ "$s" =~ ^[0-9a-f]{1,40}$ ]] || exit 1
+printf '%s%s\n' "$s" "${z:${#s}}"
+PAD_EOF
+# Default PR_CYCLE_PATCH_ID_CMD: patch-id == pad40(current head SHA of PR $1).
+cat > "$SCRATCH/patchid-identity" <<PID_EOF
+#!/usr/bin/env bash
+s="\$(jq -r --argjson n "\$1" '.[] | select(.number == \$n) | .headRefOid' "$SCRATCH/prs.json" 2>/dev/null)"
+[[ -n "\$s" ]] || exit 1
+exec "$SCRATCH/pad40" "\$s"
+PID_EOF
+# patchid-file: per-PR controllable patch-id; prints $SCRATCH/key-<pr>, fails when absent.
+cat > "$SCRATCH/patchid-file" <<PF_EOF
+#!/usr/bin/env bash
+cat "$SCRATCH/key-\$1" 2>/dev/null
+PF_EOF
+printf '#!/usr/bin/env bash\nexit 1\n' > "$SCRATCH/patchid-fail"
+printf '#!/usr/bin/env bash\necho not-a-patch-id\n' > "$SCRATCH/patchid-junk"
+# mastertip-file: controllable origin/master tip; prints $SCRATCH/master-tip, fails when absent.
+cat > "$SCRATCH/mastertip-file" <<MT_EOF
+#!/usr/bin/env bash
+cat "$SCRATCH/master-tip" 2>/dev/null
+MT_EOF
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/mastertip-empty"
+printf '#!/usr/bin/env bash\necho not-a-sha\n' > "$SCRATCH/mastertip-junk"
+chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub" "$SCRATCH/pad40" "$SCRATCH/patchid-identity" "$SCRATCH/patchid-file" "$SCRATCH/patchid-fail" "$SCRATCH/patchid-junk" "$SCRATCH/mastertip-file" "$SCRATCH/mastertip-empty" "$SCRATCH/mastertip-junk"
 
 # --- per-case state ------------------------------------------------------------------------
 UNSET="__UNSET__"
 E_ZONE=normal; E_STOP="$UNSET"; E_STATE="$UNSET"
 E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
 E_HOME="set"; E_STUB_RC=0
+E_PATCHID="$SCRATCH/patchid-identity"
+E_MASTERTIP="$SCRATCH/mastertip-file"
 
 reset() {
     rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
     rm -f "$SCRATCH/pr-cycle-skip-notes-env" "$SCRATCH/pr-cycle-skip-notes-copy"
+    rm -f "$SCRATCH"/key-*
+    rm -f "$SCRATCH/prs-closed.json" "$SCRATCH"/timeline-*.json "$SCRATCH"/timeline-fail-* \
+        "$SCRATCH"/delete-fail-* "$SCRATCH/ps-fail" "$SCRATCH/lsof-fail" \
+        "$SCRATCH/launchctl-fail" "$SCRATCH/lsof.txt"
     rm -rf "$HOME_DIR" "$REPO/tools" "$WT/tools" "$SCRATCH/usage-gate" "$SCRATCH/watch-state"
     mkdir -p "$HOME_DIR"
     : > "$SCRATCH/launchctl-list.txt"
     echo '[]' > "$SCRATCH/prs.json"
+    echo '[]' > "$SCRATCH/prs-closed.json"
+    printf '%s\n' '1 /sbin/launchd' '77 /usr/bin/login -fp t' > "$SCRATCH/ps.txt"
+    : > "$SCRATCH/lsof.txt"
+    rm -f "$SCRATCH/git-worktree-fail" "$REPO/bin/pr-cycle-tick-mut"
+    TICK_OVERRIDE=""
     E_ZONE=normal; E_STOP="$UNSET"; E_STATE="$UNSET"
     E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
     E_HOME="set"; E_STUB_RC=0
+    E_PATCHID="$SCRATCH/patchid-identity"
+    E_MASTERTIP="$SCRATCH/mastertip-file"
+    "$SCRATCH/pad40" e0001 > "$SCRATCH/master-tip"
 }
 
 # set_prs "<num>|<branch>|<sha>|<mergeStateStatus>|<isDraft>[|<baseRefName>]" ...
@@ -177,6 +277,83 @@ set_jobs() {
     done
 }
 
+# set_labels <num> <label>...: sets .labels on the prs.json entry. PRs never given a call
+# carry no labels key, which the sweep must tolerate.
+set_labels() {
+    local n="$1" names
+    shift
+    names="$(printf '%s\n' "$@" | jq -R '{name: .}' | jq -sc '.')"
+    jq -c --argjson n "$n" --argjson l "$names" \
+        'map(if .number == $n then . + {labels: $l} else . end)' "$SCRATCH/prs.json" > "$SCRATCH/prs.json.tmp" \
+        && mv "$SCRATCH/prs.json.tmp" "$SCRATCH/prs.json"
+}
+
+# set_closed_prs "<num>|<branch>|<sha>|<state>|<isDraft>": the PRs a call without
+# `--state open` would also see.
+set_closed_prs() {
+    local e out="[]" n b s m d
+    for e in "$@"; do
+        IFS='|' read -r n b s m d <<< "$e"
+        out="$(jq -c --argjson n "$n" --arg b "$b" --arg s "$s" --arg m "$m" --argjson d "$d" \
+            '. + [{number:$n, headRefName:$b, headRefOid:$s, mergeStateStatus:$m, isDraft:$d, baseRefName:"master"}]' <<< "$out")"
+    done
+    printf '%s\n' "$out" > "$SCRATCH/prs-closed.json"
+}
+
+# set_label_age <num> <minutes-ago> [extra-older-minutes]: the timeline for PR <num>. With
+# the third argument an older labeled event, an unlabeled event and an unrelated labeled
+# event precede the last one, so "last labeled event for THIS label wins" is tested.
+set_label_age() {
+    local n="$1" m="$2" older="${3-}" now t ev
+    now="$(date +%s)"
+    t="$(jq -rn --argjson t $(( now - m * 60 )) '$t | todate')"
+    ev="[]"
+    if [[ -n "$older" ]]; then
+        local to
+        to="$(jq -rn --argjson t $(( now - older * 60 )) '$t | todate')"
+        ev="$(jq -nc --arg to "$to" '[
+            {event:"labeled", label:{name:"post-plan-running"}, created_at:$to},
+            {event:"unlabeled", label:{name:"post-plan-running"}, created_at:$to},
+            {event:"labeled", label:{name:"auto-mergeable"}, created_at:$to}]')"
+    fi
+    jq -c --arg t "$t" '. + [{event:"labeled", label:{name:"post-plan-running"}, created_at:$t}]' <<< "$ev" \
+        > "$SCRATCH/timeline-$n.json"
+}
+set_closed_labels() {  # <num> <label>...: set_labels, pointed at prs-closed.json
+    local n="$1" names
+    shift
+    names="$(printf '%s\n' "$@" | jq -R '{name: .}' | jq -sc '.')"
+    jq -c --argjson n "$n" --argjson l "$names" \
+        'map(if .number == $n then . + {labels: $l} else . end)' "$SCRATCH/prs-closed.json" > "$SCRATCH/prs-closed.json.tmp" \
+        && mv "$SCRATCH/prs-closed.json.tmp" "$SCRATCH/prs-closed.json"
+}
+set_git_worktree_fail() { touch "$SCRATCH/git-worktree-fail"; }
+set_timeline_fail() { touch "$SCRATCH/timeline-fail-$1"; }
+set_delete_fail() { touch "$SCRATCH/delete-fail-$1"; }
+
+# set_ps <line>...: the `ps -axww -o pid=,command=` output the ps shim prints.
+set_ps() { printf '%s\n' "$@" > "$SCRATCH/ps.txt"; }
+set_ps_fail() { touch "$SCRATCH/ps-fail"; }
+set_lsof() { printf '%s\n' "$@" > "$SCRATCH/lsof.txt"; }
+set_lsof_fail() { touch "$SCRATCH/lsof-fail"; }
+set_launchctl_fail() { touch "$SCRATCH/launchctl-fail"; }
+
+# _stamp_at <epoch>: touch -t stamp. The one platform branch in this harness: BSD date -r
+# on macOS, GNU date -d @ on Linux CI.
+_stamp_at() { date -r "$1" +%Y%m%d%H%M.%S 2>/dev/null || date -d "@$1" +%Y%m%d%H%M.%S; }
+set_out_root() { mkdir -p "$REPO/tools/postplan-harness/out"; }
+# set_live_dir <branch> <minutes-ago> [wt]: a harness run dir with one file, both back-dated.
+set_live_dir() {
+    local branch="$1" m="$2" base="$REPO" run st
+    [[ -z "${3-}" ]] || base="$WT"
+    run="$base/tools/postplan-harness/out/live-$branch-20261018-000000"
+    mkdir -p "$run"
+    : > "$run/phase.log"
+    st="$(_stamp_at $(( $(date +%s) - m * 60 )))"
+    touch -t "$st" "$run/phase.log" "$run"
+}
+label_log() { cat "$SCRATCH/gh-label.log" 2>/dev/null || true; }
+
 _DROP=(); _SET=()
 _envv() { if [[ "$2" == "$UNSET" ]]; then _DROP+=(-u "$1"); else _SET+=("$1=$2"); fi; }
 
@@ -190,13 +367,15 @@ run_tick() {
     _envv PR_CYCLE_WATCH_STATE_DIR "$E_STATE"
     _envv PR_CYCLE_TICK_PR_CYCLE_CMD "$E_PRCMD"
     _envv PR_CYCLE_TICK_DM_CMD "$E_DMCMD"
+    _envv PR_CYCLE_PATCH_ID_CMD "$E_PATCHID"
+    _envv PR_CYCLE_MASTER_TIP_CMD "$E_MASTERTIP"
     if [[ "$E_HOME" == "set" ]]; then _SET+=("HOME=$HOME_DIR"); else _DROP+=(-u HOME); fi
     ERR="$SCRATCH/last.err"
     OUT="$(cd "$SCRATCH" && env ${_DROP[@]+"${_DROP[@]}"} ${_SET[@]+"${_SET[@]}"} \
         PATH="$SHIMS:$PATH" \
         IBL5_USAGE_GATE_STATE_DIR="$SCRATCH/usage-gate" \
         STUB_RC="$E_STUB_RC" \
-        "$TICK" "$@" 2>"$ERR")"
+        "${TICK_OVERRIDE:-$TICK}" "$@" 2>"$ERR")"
     RC=$?
     return 0
 }
@@ -204,11 +383,33 @@ run_tick() {
 out_has() { grep -qF -- "$1" <<< "$OUT"; }
 err_has() { grep -qF -- "$1" "$ERR"; }
 no_file() { [[ ! -e "$1" ]]; }
+# True when gh was never called, or only for reads the tick makes on the way to a launch: the
+# stale-label sweep's `pr list ... isDraft,labels`, the rescue path's `pr list ...
+# isDraft,baseRefName`, and its `api repos/.../commits/<sha>/check-runs?per_page=100`. Any
+# other call (a timeline read, a label DELETE) is not accepted.
+gh_sweep_only() {
+    [[ ! -e "$SCRATCH/gh.log" ]] && return 0
+    ! grep -vE '^(pr list .*isDraft,(labels|baseRefName)|api repos/[^ ]*/commits/[^ ]+/check-runs\?per_page=100)$' \
+        "$SCRATCH/gh.log" | grep -q .
+}
+# Stricter: gh was never called, or only for the stale-label sweep's `pr list ... isDraft,labels`.
+# For the early-exit cases (usage pause, live worker), which must stop before the rescue path's
+# `isDraft,baseRefName` list and `check-runs` read.
+gh_stale_label_only() {
+    [[ ! -e "$SCRATCH/gh.log" ]] && return 0
+    ! grep -vE '^pr list .*isDraft,labels$' "$SCRATCH/gh.log" | grep -q .
+}
 attempt() { cat "$STATE_DIR/attempts/$1" 2>/dev/null; }
 pending_count() { find "$STATE_DIR/pending" -type f 2>/dev/null | wc -l | tr -d ' '; }
 dm_count() { if [[ -f "$SCRATCH/dm.log" ]]; then wc -l < "$SCRATCH/dm.log" | tr -d ' '; else echo 0; fi; }
 launch_count() { if [[ -f "$SCRATCH/pr-cycle.log" ]]; then wc -l < "$SCRATCH/pr-cycle.log" | tr -d ' '; else echo 0; fi; }
 strikes() { cat "$STATE_DIR/strikes/$1" 2>/dev/null; }
+conflict_hold() { cat "$STATE_DIR/conflict-hold/$1" 2>/dev/null; }
+retries() { cat "$STATE_DIR/retries/$1" 2>/dev/null; }
+set_tip() { "$SCRATCH/pad40" "$1" > "$SCRATCH/master-tip"; }
+key_of() { "$SCRATCH/pad40" "$1"; }
+set_key() { printf '%s\n' "$2" > "$SCRATCH/key-$1"; }
+pr_refs() { git -C "$REPO" for-each-ref refs/pr-cycle; }
 # set_result "<pr>\t<status>\t<outcome>\t<reason>" ...: the file the stub hands the tick.
 set_result() {
     { echo "# pr-cycle-result v1"; printf '%b\n' "$@"; } > "$SCRATCH/result-canned"
@@ -256,7 +457,7 @@ for z in drain stop; do
     run_tick
     [[ $RC -eq 0 ]] || fail "usage-pause($z): rc $RC, want 0"
     out_has 'usage zone' || fail "usage-pause($z): no 'usage zone' line: $OUT"
-    no_file "$SCRATCH/gh.log" || fail "usage-pause($z): gh was called"
+    gh_stale_label_only || fail "usage-pause($z): gh was called beyond the stale-label read"
     no_file "$SCRATCH/pr-cycle.log" || fail "usage-pause($z): pr-cycle was launched"
 done
 end_case usage-pause
@@ -278,7 +479,7 @@ set_jobs 123 com.ibl5.pr-cycle-20261003-120000
 run_tick
 [[ $RC -eq 0 ]] || fail "live-worker: rc $RC, want 0"
 out_has 'worker running' || fail "live-worker: no 'worker running' line: $OUT"
-no_file "$SCRATCH/gh.log" || fail "live-worker: gh was called"
+gh_stale_label_only || fail "live-worker: gh was called beyond the stale-label read"
 no_file "$SCRATCH/pr-cycle.log" || fail "live-worker: pr-cycle was launched"
 end_case live-worker
 
@@ -349,6 +550,34 @@ run_tick
 grep -qF "$(printf '101\taaa1111')" "$STATE_DIR"/pending/* 2>/dev/null \
     || fail "red-qualifies: pending entry lacks the 101/aaa1111 line"
 end_case red-qualifies
+
+# gh_sweep_only accepts the rescue path's own reads and still rejects any other gh call.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+grep -E -- '^pr list ' "$SCRATCH/gh.log" | grep -qE -- 'isDraft,baseRefName$' \
+    || fail "gh-sweep-widened: no baseRefName read in gh.log"
+grep -qE -- '^api repos/.*/commits/aaa1111/check-runs\?per_page=100$' "$SCRATCH/gh.log" \
+    || fail "gh-sweep-widened: no check-runs call in gh.log"
+gh_sweep_only || fail "gh-sweep-widened: helper rejected the sweep, baseRefName and check-runs calls"
+echo 'api --method DELETE repos/{owner}/{repo}/issues/41/labels/post-plan-running' >> "$SCRATCH/gh.log"
+gh_sweep_only && fail "gh-sweep-widened: helper accepted a DELETE call"
+sed -i.bak '$d' "$SCRATCH/gh.log"
+gh_sweep_only || fail "gh-sweep-widened: helper rejected the log after the DELETE line was removed"
+echo 'api repos/{owner}/{repo}/issues/41/timeline --paginate' >> "$SCRATCH/gh.log"
+gh_sweep_only && fail "gh-sweep-widened: helper accepted a timeline call"
+# gh_stale_label_only accepts the stale-label read alone and rejects the rescue path's reads.
+grep -E -- '^pr list ' "$SCRATCH/gh.log" | grep -E -- 'isDraft,labels$' > "$SCRATCH/gh.log.strict"
+[[ -s "$SCRATCH/gh.log.strict" ]] || fail "gh-sweep-widened: no stale-label read in gh.log"
+cp "$SCRATCH/gh.log" "$SCRATCH/gh.log.full"
+cp "$SCRATCH/gh.log.strict" "$SCRATCH/gh.log"
+gh_stale_label_only || fail "gh-sweep-widened: strict helper rejected the stale-label read"
+grep -E -- '^pr list ' "$SCRATCH/gh.log.full" | grep -E -- 'isDraft,baseRefName$' >> "$SCRATCH/gh.log"
+gh_stale_label_only && fail "gh-sweep-widened: strict helper accepted a baseRefName read"
+cp "$SCRATCH/gh.log.strict" "$SCRATCH/gh.log"
+grep -E -- '^api repos/.*/check-runs\?per_page=100$' "$SCRATCH/gh.log.full" >> "$SCRATCH/gh.log"
+gh_stale_label_only && fail "gh-sweep-widened: strict helper accepted a check-runs call"
+end_case gh-sweep-widened
 
 reset; begin_case
 set_prs '101|branch-one|aaa1111|DIRTY|false'
@@ -424,7 +653,7 @@ reset; begin_case
 set_prs "$RED101"; set_checks aaa1111 red
 mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
 run_tick
-grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until a new push.\nOr paste this to have Claude fix it:\n'"$REPO/bin/postplan-fix 101" \
+grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until its diff changes.\nOr paste this to have Claude fix it:\n'"$REPO/bin/postplan-fix 101" \
     "$SCRATCH/dm.log" 2>/dev/null \
     || fail "still-red-dm-full-wording: DM was '$(cat "$SCRATCH/dm.log" 2>/dev/null)'"
 end_case still-red-dm-full-wording
@@ -495,11 +724,11 @@ set_result "112\tholdrepeat\t-\t-"
 run_tick
 [[ "$(launch_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: tick 1 did not launch"
 run_tick
-[[ "$(cat "$STATE_DIR/declined/112" 2>/dev/null)" == "bbb2222" ]] \
+[[ "$(cat "$STATE_DIR/declined/112" 2>/dev/null)" == "$(key_of bbb2222)" ]] \
     || fail "holdrepeat-skip-no-attempt: declined/112 is '$(cat "$STATE_DIR/declined/112" 2>/dev/null)'"
 no_file "$STATE_DIR/attempts/112" || fail "holdrepeat-skip-no-attempt: a declined PR was charged an attempt"
 [[ "$(dm_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: want 1 DM, got $(dm_count)"
-grep -qF 'pr-cycle-watch: PR #112 on head bbb2222 was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until a new push.' "$SCRATCH/dm.log" \
+grep -qF 'pr-cycle-watch: PR #112 on head bbb2222 was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until its diff changes.' "$SCRATCH/dm.log" \
     || fail "holdrepeat-skip-no-attempt: declined DM wording: $(cat "$SCRATCH/dm.log")"
 [[ "$(pending_count)" == "0" ]] || fail "holdrepeat-skip-no-attempt: settled entry still pending"
 run_tick
@@ -513,14 +742,14 @@ set_prs "$RED101"; set_checks aaa1111 red
 set_result "101\tfired\tfailed\tno-result"
 run_tick
 run_tick
-[[ "$(strikes 101)" == "aaa1111 1" ]] || fail "fleet-no-result-strike: tick 2 strikes/101 is '$(strikes 101)'"
+[[ "$(strikes 101)" == "$(key_of aaa1111) 1" ]] || fail "fleet-no-result-strike: tick 2 strikes/101 is '$(strikes 101)'"
 [[ "$(attempt 101)" == "" ]] || fail "fleet-no-result-strike: a no-op rescue was charged an attempt"
 [[ "$(dm_count)" == "0" ]] || fail "fleet-no-result-strike: DM on the first strike"
 [[ "$(launch_count)" == "2" ]] || fail "fleet-no-result-strike: want a relaunch on tick 2, got $(launch_count) launches"
 run_tick
-[[ "$(strikes 101)" == "aaa1111 2" ]] || fail "fleet-no-result-strike: tick 3 strikes/101 is '$(strikes 101)'"
+[[ "$(strikes 101)" == "$(key_of aaa1111) 2" ]] || fail "fleet-no-result-strike: tick 3 strikes/101 is '$(strikes 101)'"
 [[ "$(dm_count)" == "1" ]] || fail "fleet-no-result-strike: want 1 cap DM on tick 3, got $(dm_count)"
-grep -qF 'pr-cycle-watch: PR #101 on head aaa1111: the rescue never reached post-plan 2 times (last: fired failed no-result). Skipping it until a new push.' "$SCRATCH/dm.log" \
+grep -qF 'pr-cycle-watch: PR #101 on head aaa1111: the rescue never reached post-plan 2 times (last: fired failed no-result). Skipping it until its diff changes.' "$SCRATCH/dm.log" \
     || fail "fleet-no-result-strike: cap DM wording: $(cat "$SCRATCH/dm.log")"
 [[ "$(launch_count)" == "2" ]] || fail "fleet-no-result-strike: relaunched at the cap"
 run_tick
@@ -534,10 +763,10 @@ set_prs "$RED101"; set_checks aaa1111 red
 set_result "101\tfired\tfailed\tkind=test"
 run_tick
 run_tick
-[[ "$(attempt 101)" == "aaa1111" ]] || fail "real-run-still-red-attempt: attempts/101 is '$(attempt 101)'"
+[[ "$(attempt 101)" == "$(key_of aaa1111)" ]] || fail "real-run-still-red-attempt: attempts/101 is '$(attempt 101)'"
 no_file "$STATE_DIR/strikes/101" || fail "real-run-still-red-attempt: a real run was struck"
 [[ "$(launch_count)" == "1" ]] || fail "real-run-still-red-attempt: relaunched after a real run"
-grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until a new push.' "$SCRATCH/dm.log" \
+grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until its diff changes.' "$SCRATCH/dm.log" \
     || fail "real-run-still-red-attempt: still-red DM wording: $(cat "$SCRATCH/dm.log" 2>/dev/null)"
 run_tick
 [[ "$(dm_count)" == "1" ]] || fail "real-run-still-red-attempt: still-red DM sent twice"
@@ -561,7 +790,7 @@ rf="$(sed -n '1s/^# result=\(.*\) started=.*$/\1/p' "$pf")"
 { printf '# result=%s started=%s\n' "$rf" "$(( $(date +%s) - 14400 ))"; tail -n +2 "$pf"; } > "$pf.new" \
     && mv "$pf.new" "$pf"
 run_tick
-[[ "$(strikes 101)" == "aaa1111 1" ]] || fail "stale-pending-strikes: strikes/101 is '$(strikes 101)'"
+[[ "$(strikes 101)" == "$(key_of aaa1111) 1" ]] || fail "stale-pending-strikes: strikes/101 is '$(strikes 101)'"
 no_file "$pf" || fail "stale-pending-strikes: the stale entry was not removed"
 out_has 'no result file after' || fail "stale-pending-strikes: no stale log line: $OUT"
 end_case stale-pending-strikes
@@ -576,6 +805,39 @@ no_file "$STATE_DIR/strikes/101" || fail "paused-no-burn: a paused run was struc
 out_has 'paused by usage gate, retry later' || fail "paused-no-burn: no paused log line: $OUT"
 [[ "$(launch_count)" == "2" ]] || fail "paused-no-burn: want a retry on tick 2, got $(launch_count) launches"
 end_case paused-no-burn
+
+# A rebase-only run merged master and stays held for a human: log it, charge nothing.
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_result "101\tfired\trebased\trebase-only"
+run_tick
+# The rebase cleaned the PR, so it no longer qualifies and tick 2 only reconciles.
+set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
+run_tick
+[[ "$(attempt 101)" == "" ]] || fail "rebased-no-attempt-no-strike: a rebase-only run was charged an attempt"
+no_file "$STATE_DIR/attempts/101" || fail "rebased-no-attempt-no-strike: attempts/101 exists"
+no_file "$STATE_DIR/declined/101" || fail "rebased-no-attempt-no-strike: declined/101 exists"
+no_file "$STATE_DIR/strikes/101" || fail "rebased-no-attempt-no-strike: a rebase-only run was struck"
+[[ "$(dm_count)" == "0" ]] || fail "rebased-no-attempt-no-strike: want 0 DMs, got $(dm_count)"
+out_has 'rebase-only ran (merged master, still held for a human)' \
+    || fail "rebased-no-attempt-no-strike: no rebase-only log line: $OUT"
+[[ "$(pending_count)" == "0" ]] || fail "rebased-no-attempt-no-strike: want 0 pending entries after reconcile, got $(pending_count)"
+end_case rebased-no-attempt-no-strike
+
+# A result row naming a PR the tick never launched (absent from set_prs) settles nothing.
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_result "101\tfired\trebased\trebase-only" "999\tfired\tshipped\t-"
+run_tick
+set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
+run_tick
+no_file "$STATE_DIR/attempts/999" || fail "unknown-pr-no-attempt: attempts/999 written for a PR the tick never launched"
+no_file "$STATE_DIR/strikes/999" || fail "unknown-pr-no-attempt: strikes/999 written for an unknown PR"
+no_file "$STATE_DIR/declined/999" || fail "unknown-pr-no-attempt: declined/999 written for an unknown PR"
+no_file "$STATE_DIR/attempts/101" || fail "unknown-pr-no-attempt: attempts/101 exists"
+out_has 'PR 999' && fail "unknown-pr-no-attempt: tick logged a settlement for unknown PR 999: $OUT"
+[[ "$(pending_count)" == "0" ]] || fail "unknown-pr-no-attempt: want 0 pending entries after reconcile, got $(pending_count)"
+end_case unknown-pr-no-attempt
 
 reset; begin_case
 set_prs "$RED101"; set_checks aaa1111 red
@@ -656,8 +918,8 @@ rf="$(find "$STATE_DIR/results" -type f 2>/dev/null | head -1)"
 [[ -n "$rf" && "$(sed -n 1p "$rf")" == "# pr-cycle-result v1" ]] \
     || fail "integration-real-worker-reconcile: the real worker wrote no result file (out: $OUT)"
 run_tick
-[[ "$(attempt 11)" == "aaa1111" ]] || fail "integration-real-worker-reconcile: attempts/11 is '$(attempt 11)' (file: $(cat "$rf" 2>/dev/null))"
-[[ "$(cat "$STATE_DIR/declined/12" 2>/dev/null)" == "bbb2222" ]] \
+[[ "$(attempt 11)" == "$(key_of aaa1111)" ]] || fail "integration-real-worker-reconcile: attempts/11 is '$(attempt 11)' (file: $(cat "$rf" 2>/dev/null))"
+[[ "$(cat "$STATE_DIR/declined/12" 2>/dev/null)" == "$(key_of bbb2222)" ]] \
     || fail "integration-real-worker-reconcile: declined/12 is '$(cat "$STATE_DIR/declined/12" 2>/dev/null)'"
 no_file "$STATE_DIR/strikes/11" || fail "integration-real-worker-reconcile: 11 was struck"
 rm -rf "$RW" /tmp/pr-cycle-tpt*
@@ -800,6 +1062,273 @@ if grep -qE '\$\{PR_CYCLE_[A-Z_]+-[^}]*\}' <<< "$stripped"; then
 fi
 end_case invariants
 
+# --- stale post-plan-running sweep ----------------------------------------------------------
+iso_ago() { jq -rn --argjson t $(( $(date +%s) - $1 * 60 )) '$t | todate'; }
+rc_is() {  # rc_is <label> <want-rc> <cmd>...
+    local label="$1" want="$2" got
+    shift 2
+    "$@" >/dev/null 2>&1; got=$?
+    [[ $got -eq $want ]] || fail "$label: rc $got, want $want"
+}
+# sweep_fixture: PR 41 (worktree $WT) carries the label, 240 min old; PR 42 has no worktree
+# and no label. Zone cooldown makes guard (b) exit right after the sweep, so every case also
+# pins placement: the block moved below guard (b) loses its output.
+sweep_fixture() {
+    reset; set_out_root; E_ZONE=cooldown
+    set_prs "41|branch-one|aaaaaaa|BEHIND|false" "42|branch-two|bbbbbbb|BEHIND|false"
+    set_labels 41 post-plan-running auto-mergeable
+    set_label_age 41 240
+}
+no_label_call() { [[ -z "$(label_log)" ]]; }
+one_delete_41() { [[ "$(label_log)" == "DELETE 41 post-plan-running" ]]; }
+
+reset; begin_case
+# shellcheck source=/dev/null
+. "$REPO/bin/lib/pr-cycle-watch.sh"
+rc_is "label-too-young 179" 0 pcw_label_too_young "$(iso_ago 179)"
+rc_is "label-too-young 180" 1 pcw_label_too_young "$(iso_ago 180)"
+rc_is "label-too-young 240" 1 pcw_label_too_young "$(iso_ago 240)"
+rc_is "label-too-young empty" 2 pcw_label_too_young ""
+rc_is "label-too-young garbage" 2 pcw_label_too_young garbage
+rc_is "label-age empty" 2 pcw_label_age_min ""
+rc_is "label-age garbage" 2 pcw_label_age_min garbage
+[[ "$(pcw_label_age_min "$(iso_ago 90)")" == "90" ]] || fail "label-age: 90 min old did not print 90"
+PS_LINES="$(printf '%s\n' "11 /bin/bash -lc cd /wt/foo-bar && x" "12 sleep 1")"
+rc_is "argv foo vs foo-bar" 1 pcw_postplan_argv_live /wt/foo s "$PS_LINES"
+rc_is "argv foo exact" 0 pcw_postplan_argv_live /wt/foo-bar s "$PS_LINES"
+rc_is "argv foo child path" 0 pcw_postplan_argv_live /wt/foo-bar s "13 /bin/bash -lc cd /wt/foo-bar/ibl5 && x"
+rc_is "argv foo exact (no foo-bar)" 0 pcw_postplan_argv_live /wt/foo s "13 /bin/bash -lc cd /wt/foo && x"
+rc_is "argv /x/foo vs /x/foo-bar" 1 pcw_postplan_argv_live /x/foo s "13 /bin/bash -lc cd /x/foo-bar && x"
+rc_is "argv /x/foo exact" 0 pcw_postplan_argv_live /x/foo s "13 /bin/bash -lc cd /x/foo && x"
+rc_is "argv /x/foo child /x/foo/ibl5" 0 pcw_postplan_argv_live /x/foo s "13 /bin/bash -lc cd /x/foo/ibl5 && x"
+rc_is "argv log token" 0 pcw_postplan_argv_live "" foo "14 tail /logs/post-plan-now-foo-20261018-004740-25853.log"
+rc_is "argv run-dir token" 0 pcw_postplan_argv_live "" foo "15 py tools/postplan-harness/out/live-foo-20261018-004740"
+rc_is "argv slug boundary" 1 pcw_postplan_argv_live "" foo "16 tail /logs/post-plan-now-foo-bar-20261018-004740-25853.log"
+rc_is "argv empty text" 2 pcw_postplan_argv_live "" foo ""
+rc_is "argv excluded pid" 1 pcw_postplan_argv_live "" foo "77 py out/live-foo-20261018-004740" "77 5"
+rc_is "argv not-excluded pid" 0 pcw_postplan_argv_live "" foo "78 py out/live-foo-20261018-004740" "77 5"
+CLP="$(pcw_claude_print_pids "$(printf '%s\n' "4242 /usr/local/bin/claude -p prompt --session-id x" "4243 claude" "4244 /opt/claude-launcher --print")")"
+[[ "$CLP" == "4242" ]] || fail "claude-print-pids: printed '$CLP', want 4242"
+rc_is "claude-print-pids interactive" 1 pcw_claude_print_pids "4243 claude"
+rc_is "claude-print-pids launcher" 1 pcw_claude_print_pids "4244 /opt/claude-launcher --print"
+rc_is "claude-print-pids --print" 0 pcw_claude_print_pids "4245 claude --print hi"
+rc_is "claude-print-pids empty" 2 pcw_claude_print_pids ""
+rc_is "cwd in worktree" 0 pcw_cwd_in_worktree /wt/foo "$(printf 'p4242\nfcwd\nn/wt/foo/ibl5')"
+rc_is "cwd in worktree root" 0 pcw_cwd_in_worktree /wt/foo "$(printf 'p4242\nfcwd\nn/wt/foo')"
+rc_is "cwd foo-bar" 1 pcw_cwd_in_worktree /wt/foo "$(printf 'p4242\nfcwd\nn/wt/foo-bar')"
+rc_is "cwd empty text" 2 pcw_cwd_in_worktree /wt/foo ""
+rc_is "cwd empty root" 2 pcw_cwd_in_worktree "" "$(printf 'n/wt/foo')"
+POUT="$SCRATCH/pout"
+rm -rf "$POUT"
+rc_is "out-dir root absent" 2 pcw_live_out_dir_fresh foo "$POUT"
+mkdir -p "$POUT/live-foo-20261018-000000"
+: > "$POUT/live-foo-20261018-000000/f"
+OLD_ST="$(_stamp_at $(( $(date +%s) - 240 * 60 )))"
+touch -t "$OLD_ST" "$POUT/live-foo-20261018-000000/f" "$POUT/live-foo-20261018-000000"
+rc_is "out-dir 4h old" 1 pcw_live_out_dir_fresh foo "$POUT"
+touch "$POUT/live-foo-20261018-000000/f"
+rc_is "out-dir touched" 0 pcw_live_out_dir_fresh foo "$POUT"
+rc_is "out-dir other branch" 1 pcw_live_out_dir_fresh baz "$POUT"
+rm -rf "$POUT"
+# gh shim self-tests: a later edit that breaks the shim must fail here, not in the tick.
+set_label_age 7 240 600
+SHIM_TL="$(env PATH="$SHIMS:$PATH" gh api repos/o/r/issues/7/timeline --paginate \
+    --jq '.[] | select(.event=="labeled" and .label.name=="post-plan-running") | .created_at')"
+[[ "$(wc -l <<< "$SHIM_TL" | tr -d ' ')" == "2" ]] || fail "gh-shim: --jq timeline printed '$SHIM_TL', want two dates"
+set_timeline_fail 7
+SHIM_OUT="$(env PATH="$SHIMS:$PATH" gh api repos/o/r/issues/7/timeline --paginate 2>/dev/null)"; SHIM_RC=$?
+[[ $SHIM_RC -eq 1 && -z "$SHIM_OUT" ]] || fail "gh-shim: timeline-fail gave rc $SHIM_RC out '$SHIM_OUT'"
+end_case sweep-predicates
+
+# (a) stale label, no live run: removed. Also the unlabeled PR is never touched (N-1).
+sweep_fixture; begin_case
+run_tick
+one_delete_41 || fail "S-a: label log is '$(label_log)', want one DELETE 41 post-plan-running"
+out_has "stale-label: removed post-plan-running from #41 (age=240m launchd=none argv=none claude-cwd=none out-dir=idle>=180m draft=false)" \
+    || fail "S-a: no removal line: $OUT"
+out_has "usage zone cooldown" || fail "S-a: guard (b) output missing after the sweep: $OUT"
+grep -E -- 'pr list' "$SCRATCH/gh.log" | grep -qF -- '--state open' || fail "S-a: sweep read was not --state open"
+grep -E -- 'pr list' "$SCRATCH/gh.log" | grep -qF -- 'labels' || fail "S-a: sweep read did not ask for labels"
+grep -qF 'issues/41/timeline' "$SCRATCH/gh.log" || fail "S-a: no timeline call for #41"
+grep -qF 'issues/42/timeline' "$SCRATCH/gh.log" && fail "S-a: timeline call for the unlabeled #42"
+grep -qF ' 42 ' "$SCRATCH/gh-label.log" 2>/dev/null && fail "S-a: DELETE issued for the unlabeled #42"
+end_case sweep-a-removed
+
+# (b) older than the threshold but a live post-plan process names the worktree or the slug.
+for ps_line in \
+    "5555 /bin/bash -lc cd $WT && caffeinate -s tools/postplan-harness/run isolated $WT x --live" \
+    "5555 tail -f /logs/post-plan-now-branch-one-20261018-004740-25853.log" \
+    "5555 python3 runner.py tools/postplan-harness/out/live-branch-one-20261018-004740 --live"; do
+    sweep_fixture; begin_case
+    set_ps "$ps_line"
+    run_tick
+    no_label_call || fail "S-b: label removed despite a live process ($ps_line)"
+    out_has "stale-label: #41 held (age 240m): post-plan process live" || fail "S-b: no held line ($ps_line): $OUT"
+    out_has "usage zone cooldown" || fail "S-b: guard (b) output missing: $OUT"
+    end_case sweep-b-live-process
+done
+
+# (c) live skill fallback: a wrapper argv, or an orphan headless claude whose cwd is the worktree.
+sweep_fixture; begin_case
+set_ps "5556 /bin/bash -lc cd $WT && x claude -p y --session-id 0f0f"
+run_tick
+no_label_call || fail "S-c wrapper: label removed"
+out_has "stale-label: #41 held (age 240m): post-plan process live" || fail "S-c wrapper: no held line: $OUT"
+end_case sweep-c-wrapper
+sweep_fixture; begin_case
+set_ps "4242 /usr/local/bin/claude -p prompt --session-id x"; set_lsof "p4242" "fcwd" "n$WT"
+run_tick
+no_label_call || fail "S-c orphan: label removed"
+out_has "stale-label: #41 held (age 240m): headless claude cwd in worktree" || fail "S-c orphan: no held line: $OUT"
+grep -qF -- '-p 4242' "$SCRATCH/lsof.log" 2>/dev/null || fail "S-c orphan: lsof was not asked about pid 4242"
+end_case sweep-c-orphan
+sweep_fixture; begin_case
+set_ps "4243 claude"; set_lsof "p4243" "fcwd" "n$WT"
+run_tick
+one_delete_41 || fail "S-c interactive: an idle interactive claude pinned the label: '$(label_log)'"
+no_file "$SCRATCH/lsof.log" || fail "S-c interactive: lsof was called with no headless claude"
+end_case sweep-c-interactive
+
+# (d) younger than the threshold stays; exactly the threshold goes.
+sweep_fixture; begin_case
+set_label_age 41 179
+run_tick
+no_label_call || fail "S-d: 179 min label removed"
+out_has "stale-label: #41 held (age 179m): too young" || fail "S-d: no too-young line: $OUT"
+set_label_age 41 180
+run_tick
+one_delete_41 || fail "S-d: 180 min label not removed: '$(label_log)'"
+end_case sweep-d-threshold
+
+# (e) every lookup failure keeps the label.
+sweep_fixture; begin_case
+set_launchctl_fail; run_tick
+no_label_call || fail "S-e launchctl: label removed"
+out_has "stale-label: launchctl unreadable; sweep skipped" || fail "S-e launchctl: no skip line: $OUT"
+end_case sweep-e-launchctl
+sweep_fixture; begin_case
+set_ps_fail; run_tick
+no_label_call || fail "S-e ps: label removed"
+out_has "stale-label: ps unreadable; sweep skipped" || fail "S-e ps: no skip line: $OUT"
+end_case sweep-e-ps
+sweep_fixture; begin_case
+set_ps "4242 claude -p x"; set_lsof_fail; run_tick
+no_label_call || fail "S-e lsof: label removed"
+out_has "stale-label: #41 held (age 240m): lsof unevaluable" || fail "S-e lsof: no held line: $OUT"
+end_case sweep-e-lsof
+sweep_fixture; begin_case
+set_timeline_fail 41; run_tick
+no_label_call || fail "S-e timeline: label removed"
+out_has "stale-label: #41 held (age ?m): label time unevaluable" || fail "S-e timeline: no held line: $OUT"
+end_case sweep-e-timeline
+sweep_fixture; begin_case
+set_git_worktree_fail; run_tick
+no_label_call || fail "S-e git: label removed"
+out_has "stale-label: #41 held (age 240m): git worktree list unevaluable" || fail "S-e git: no held line: $OUT"
+end_case sweep-e-git-worktree
+
+# (f) --dry-run names the PR and removes nothing.
+sweep_fixture; begin_case
+run_tick --dry-run
+out_has "dry-run: stale-label: would remove post-plan-running from #41" || fail "S-f: no would-remove line: $OUT"
+no_label_call || fail "S-f: dry-run issued a DELETE"
+grep -qF 'DELETE' "$SCRATCH/gh.log" && fail "S-f: gh.log holds a DELETE"
+out_has "usage zone cooldown" || fail "S-f: dry-run did not continue into guard (b): $OUT"
+end_case sweep-f-dry-run
+
+# N-2: only post-plan-running is ever deleted.
+sweep_fixture; begin_case
+set_labels 41 post-plan-running auto-mergeable human-signoff
+run_tick
+one_delete_41 || fail "N-2: label log is '$(label_log)'"
+[[ "$(grep -cE 'auto-mergeable|human-signoff' "$SCRATCH/gh-label.log")" == "0" ]] || fail "N-2: another label was deleted"
+end_case sweep-n2-only-this-label
+
+# N-3: a merged PR carrying an old label is never listed or deleted.
+sweep_fixture; begin_case
+set_closed_prs "43|branch-two|ccccccc|MERGED|false"; set_closed_labels 43 post-plan-running; set_label_age 43 600
+run_tick
+out_has "#43" && fail "N-3: the merged PR #43 was swept: $OUT"
+grep -qF ' 43 ' "$SCRATCH/gh-label.log" 2>/dev/null && fail "N-3: DELETE issued for the merged PR"
+end_case sweep-n3-merged-pr
+
+# N-4: a process in a sibling worktree whose name extends this one does not keep the label.
+sweep_fixture; begin_case
+set_ps "5557 /bin/bash -lc cd ${WT}-bar && caffeinate x"
+run_tick
+one_delete_41 || fail "N-4: wt-one-bar kept the wt-one PR: '$(label_log)'"
+set_ps "5557 /bin/bash -lc cd $WT/ibl5 && caffeinate x"
+rm -f "$SCRATCH/gh-label.log"
+run_tick
+no_label_call || fail "N-4: a process in wt-one/ibl5 did not keep the PR"
+end_case sweep-n4-slug-boundary
+
+# N-5: the LAST labeled event for this label wins.
+sweep_fixture; begin_case
+set_label_age 41 60 600
+run_tick
+no_label_call || fail "N-5: an older labeled event aged the label out"
+out_has "stale-label: #41 held (age 60m): too young" || fail "N-5: no too-young line: $OUT"
+end_case sweep-n5-last-label-event
+
+# N-6: a failed DELETE is reported, not swallowed.
+sweep_fixture; begin_case
+set_delete_fail 41
+run_tick
+out_has "stale-label: DELETE failed for #41; label kept" || fail "N-6: no failure line: $OUT"
+out_has "stale-label: removed" && fail "N-6: logged a removal that did not happen"
+end_case sweep-n6-delete-failure
+
+# N-7: the harness out dir is evidence.
+sweep_fixture; begin_case
+set_live_dir branch-one 30
+run_tick
+no_label_call || fail "N-7: a 30 min old run dir did not keep the label"
+out_has "stale-label: #41 held (age 240m): out dir written <180m ago" || fail "N-7: no fresh-out-dir line: $OUT"
+set_live_dir branch-one 300
+run_tick
+one_delete_41 || fail "N-7: a 300 min old run dir kept the label: '$(label_log)'"
+end_case sweep-n7-out-dir
+sweep_fixture; begin_case
+rm -rf "$REPO/tools"
+set_labels 41 auto-mergeable; set_labels 42 post-plan-running; set_label_age 42 240
+run_tick
+no_label_call || fail "N-7 root: label removed with no out dir root"
+out_has "stale-label: #42 held (age 240m): out dir root missing" || fail "N-7 root: no held line: $OUT"
+end_case sweep-n7-out-root-missing
+sweep_fixture; begin_case
+set_labels 41 auto-mergeable; set_labels 42 post-plan-running; set_label_age 42 240
+run_tick
+out_has "claude-cwd=n/a" || fail "no-worktree branch: evidence lacks claude-cwd=n/a: $OUT"
+grep -qxF 'DELETE 42 post-plan-running' <<< "$(label_log)" || fail "no-worktree branch: #42 not removed: '$(label_log)'"
+end_case sweep-no-worktree-branch
+
+# Threshold pin: the stale-label age stays at least twice the per-phase post-plan cap.
+reset; begin_case
+MAXPP="$(grep -oE '^MAX_PP_SECS=[0-9]+' "$SCRIPT_DIR/automouse/run" | cut -d= -f2)"
+[[ "$MAXPP" =~ ^[1-9][0-9]*$ ]] || fail "threshold-pin: MAX_PP_SECS not found in bin/automouse/run"
+STALE_MIN="$(. "$REPO/bin/lib/pr-cycle-watch.sh"; printf '%s' "$PCW_STALE_LABEL_MIN")"
+[[ "$STALE_MIN" =~ ^[1-9][0-9]*$ ]] || fail "threshold-pin: PCW_STALE_LABEL_MIN not found"
+if [[ "$MAXPP" =~ ^[1-9][0-9]*$ && "$STALE_MIN" =~ ^[1-9][0-9]*$ ]]; then
+    (( STALE_MIN * 60 >= 2 * MAXPP )) || fail "threshold-pin: PCW_STALE_LABEL_MIN=$STALE_MIN is under 2x MAX_PP_SECS=$MAXPP"
+fi
+end_case sweep-threshold-pin
+
+# Mutated copy: the always-dead override flips case (b), so (b) is driven by the real predicate.
+sweep_fixture; begin_case
+[[ "$(grep -c '# stale-label: argv probe' "$TICK")" == "1" ]] || fail "mutated-copy: argv-probe anchor is not unique"
+awk '{print} /# stale-label: argv probe/ {print "pcw_postplan_argv_live() { return 1; }"}' "$TICK" \
+    > "$REPO/bin/pr-cycle-tick-mut"
+chmod +x "$REPO/bin/pr-cycle-tick-mut"
+set_ps "5555 /bin/bash -lc cd $WT && caffeinate x"
+run_tick
+no_label_call || fail "mutated-copy: unmutated tick removed the label"
+TICK_OVERRIDE="$REPO/bin/pr-cycle-tick-mut"
+run_tick
+one_delete_41 || fail "mutated-copy: an always-dead probe did not flip (b) to removed: '$(label_log)'"
+TICK_OVERRIDE=""
+end_case sweep-mutated-copy
+
 reset; begin_case
 # Run from the linked worktree: Program must still name the MAIN checkout.
 MAIN_REAL="$(cd "$REPO" && pwd -P)"
@@ -842,10 +1371,517 @@ no_file "$LABEL_PLIST" || fail "cron-setup-cli: uninstall left the plist"
 grep -qF 'bootout' "$SCRATCH/launchctl.log" 2>/dev/null || fail "cron-setup-cli: no bootout in launchctl.log"
 end_case cron-setup-cli
 
+reset; begin_case
+set_prs "$RED101"
+got="$("$SCRATCH/patchid-identity" 101)"
+[[ "$got" =~ ^[0-9a-f]{40}$ ]] || fail "identity-seam-shape: shim printed '$got', want 40 hex"
+[[ "$got" == "$(key_of aaa1111)" && "$got" == aaa1111* ]] \
+    || fail "identity-seam-shape: shim '$got' != key_of aaa1111"
+"$SCRATCH/patchid-identity" 999 >/dev/null 2>&1 \
+    && fail "identity-seam-shape: shim succeeded for an unknown PR"
+"$SCRATCH/pad40" 'not-hex' >/dev/null 2>&1 \
+    && fail "identity-seam-shape: pad40 accepted a non-hex SHA"
+end_case identity-seam-shape
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"; K2="$(key_of 2222222)"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "101\tfired\tfailed\tkind=test"
+run_tick
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "rebase-keeps-cap: want 1 launch before the rebase, got $(launch_count)"
+[[ "$(attempt 101)" == "$K1" ]] || fail "rebase-keeps-cap: attempts/101 is '$(attempt 101)', want the patch-id key"
+[[ "$(dm_count)" == "1" ]] || fail "rebase-keeps-cap: want 1 retry-cap DM before the rebase, got $(dm_count)"
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "rebase-keeps-cap: relaunched after a rebase that kept the patch-id"
+out_has 'retry cap' || fail "rebase-keeps-cap: no retry-cap skip line: $OUT"
+[[ "$(dm_count)" == "1" ]] || fail "rebase-keeps-cap: retry-cap DM resent for the rebased head ($(dm_count))"
+grep -qF "PR #101 is still red on head aaa1111 after one rescue. Skipping it until its diff changes." "$SCRATCH/dm.log" \
+    || fail "rebase-keeps-cap: retry-cap DM wording: $(cat "$SCRATCH/dm.log")"
+end_case rebase-keeps-cap
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"; K2="$(key_of 2222222)"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "101\tfired\tfailed\tkind=test"
+run_tick
+run_tick
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red; set_key 101 "$K2"
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "content-change-requalifies: want a second launch for a new patch-id, got $(launch_count)"
+end_case content-change-requalifies
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"; K2="$(key_of 2222222)"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "101\tfired\tfailed\tkind=test"
+run_tick
+grep -qxF "$(printf '101\taaa1111\t%s\t%s' "$K1" "$(key_of e0001)")" "$STATE_DIR"/pending/* \
+    || fail "settle-uses-launch-key: pending line is not <pr>TAB<sha>TAB<key>TAB<tip>:$(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red; set_key 101 "$K2"
+run_tick
+[[ "$(attempt 101)" == "$K1" ]] || fail "settle-uses-launch-key: attempts/101 is '$(attempt 101)', want the launch-time key $K1"
+end_case settle-uses-launch-key
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"
+set_prs '112|b12|bbb2222|BLOCKED|false'; set_checks bbb2222 red; set_key 112 "$K1"
+set_result "112\tfired\tdeclined\tholdrepeat"
+run_tick
+run_tick
+[[ "$(cat "$STATE_DIR/declined/112" 2>/dev/null)" == "$K1" ]] \
+    || fail "declined-survives-rebase: declined/112 is '$(cat "$STATE_DIR/declined/112" 2>/dev/null)', want the key"
+[[ "$(dm_count)" == "1" ]] || fail "declined-survives-rebase: want 1 decline DM, got $(dm_count)"
+set_prs '112|b12|fff6666|BLOCKED|false'; set_checks fff6666 red
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "declined-survives-rebase: relaunched a declined PR after a rebase"
+out_has 'holdrepeat declined' || fail "declined-survives-rebase: no decline skip line: $OUT"
+[[ "$(dm_count)" == "1" ]] || fail "declined-survives-rebase: decline DM resent ($(dm_count))"
+end_case declined-survives-rebase
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "999\tfired\tshipped\t-"
+run_tick
+run_tick
+run_tick
+[[ "$(strikes 101)" == "$K1 2" ]] || fail "strikes-survive-rebase: strikes/101 is '$(strikes 101)', want '$K1 2'"
+[[ "$(launch_count)" == "2" ]] || fail "strikes-survive-rebase: want 2 launches before the rebase, got $(launch_count)"
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "strikes-survive-rebase: launched past the strike cap after a rebase"
+out_has 'no-op rescue cap' || fail "strikes-survive-rebase: no cap skip line: $OUT"
+end_case strikes-survive-rebase
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-fail"
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "patchid-fallback-dm: a failed patch-id stranded the PR (launches: $(launch_count))"
+[[ "$(dm_count)" == "1" ]] || fail "patchid-fallback-dm: want 1 fallback DM, got $(dm_count)"
+grep -qF 'could not compute its patch-id' "$SCRATCH/dm.log" || fail "patchid-fallback-dm: DM wording: $(cat "$SCRATCH/dm.log" 2>/dev/null)"
+out_has 'patch-id unavailable; retry key falls back to head aaa1111' || fail "patchid-fallback-dm: no fallback log line: $OUT"
+[[ "$(cat "$STATE_DIR/dm-patchid/101" 2>/dev/null)" == "aaa1111" ]] \
+    || fail "patchid-fallback-dm: dm-patchid/101 is '$(cat "$STATE_DIR/dm-patchid/101" 2>/dev/null)'"
+grep -qxF "$(printf '101\taaa1111\taaa1111\t%s' "$(key_of e0001)")" "$STATE_DIR"/pending/* \
+    || fail "patchid-fallback-dm:pending line key is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+run_tick
+[[ "$(dm_count)" == "1" ]] || fail "patchid-fallback-dm: fallback DM resent for the same head ($(dm_count))"
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red
+run_tick
+[[ "$(dm_count)" == "2" ]] || fail "patchid-fallback-dm: want one DM per head (2), got $(dm_count)"
+end_case patchid-fallback-dm
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-junk"
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+out_has 'patch-id unavailable' || fail "patchid-nonhex-falls-back: non-hex output was accepted: $OUT"
+[[ "$(dm_count)" == "1" ]] || fail "patchid-nonhex-falls-back: want 1 fallback DM, got $(dm_count)"
+grep -qxF "$(printf '101\taaa1111\taaa1111\t%s' "$(key_of e0001)")" "$STATE_DIR"/pending/* \
+    || fail "patchid-nonhex-falls-back:pending key column is not the head SHA: $(cat "$STATE_DIR"/pending/* 2>/dev/null)"
+grep -qF 'not-a-patch-id' "$STATE_DIR"/pending/* && fail "patchid-nonhex-falls-back: junk reached the pending file"
+end_case patchid-nonhex-falls-back
+
+begin_case
+for mode in unset empty; do
+    reset
+    if [[ "$mode" == unset ]]; then E_PATCHID="$UNSET"; else E_PATCHID=""; fi
+    set_prs "$RED101"; set_checks aaa1111 red
+    run_tick
+    out_has 'patch-id unavailable' || fail "patchid-default-unset-and-empty ($mode): no fallback log line: $OUT"
+    [[ "$(launch_count)" == "1" ]] || fail "patchid-default-unset-and-empty ($mode): want 1 launch, got $(launch_count)"
+    [[ "$(dm_count)" == "1" ]] || fail "patchid-default-unset-and-empty ($mode): want 1 DM, got $(dm_count)"
+    [[ -z "$(pr_refs)" ]] || fail "patchid-default-unset-and-empty ($mode): left refs/pr-cycle refs: $(pr_refs)"
+done
+end_case patchid-default-unset-and-empty
+
+# Hand-written state: the point of the legacy cases is reading what the pre-key tick left.
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"
+mkdir -p "$STATE_DIR/pending" "$STATE_DIR/results"
+printf '# result=%s started=%s\n101\taaa1111\n' "$STATE_DIR/results/legacy-1.tsv" "$(date +%s)" > "$STATE_DIR/pending/legacy-1"
+printf '# pr-cycle-result v1\n101\tfired\tfailed\tkind=test\n' > "$STATE_DIR/results/legacy-1.tsv"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+run_tick
+[[ "$(attempt 101)" == "aaa1111" ]] || fail "legacy-pending-no-key: attempts/101 is '$(attempt 101)', want the head SHA for a keyless line"
+[[ "$(pending_count)" == "0" ]] || fail "legacy-pending-no-key: the legacy entry did not settle"
+[[ "$(launch_count)" == "0" ]] || fail "legacy-pending-no-key: relaunched a head the legacy record covers"
+end_case legacy-pending-no-key
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"
+mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+run_tick
+[[ "$(launch_count)" == "0" ]] || fail "legacy-sha-state-one-reset: the legacy SHA record did not hold the cap on the same head"
+set_prs '101|branch-one|fff6666|BLOCKED|false'; set_checks fff6666 red
+set_result "101\tfired\tfailed\tkind=test"
+run_tick
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "legacy-sha-state-one-reset: want one rescue after the push, got $(launch_count)"
+[[ "$(attempt 101)" == "$K1" ]] || fail "legacy-sha-state-one-reset: attempts/101 is '$(attempt 101)', want the key"
+set_prs '101|branch-one|9999999|BLOCKED|false'; set_checks 9999999 red
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "legacy-sha-state-one-reset: the key did not hold the cap after the one reset"
+end_case legacy-sha-state-one-reset
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"
+mkdir -p "$STATE_DIR/strikes"; echo 'aaa1111 1' > "$STATE_DIR/strikes/101"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "999\tfired\tshipped\t-"
+run_tick
+run_tick
+[[ "$(strikes 101)" == "$K1 2" ]] || fail "legacy-strike-carries-over: strikes/101 is '$(strikes 101)', want '$K1 2'"
+out_has 'no-op rescue cap' || fail "legacy-strike-carries-over: no cap skip line: $OUT"
+end_case legacy-strike-carries-over
+
+reset; begin_case
+E_PATCHID="$UNSET"
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick --dry-run
+out_has 'would DM:' || fail "dry-run-patchid-inert: no 'would DM:' line: $OUT"
+out_has 'could not compute its patch-id' || fail "dry-run-patchid-inert: the would-DM line lacks the patch-id text: $OUT"
+[[ "$(dm_count)" == "0" ]] || fail "dry-run-patchid-inert: sent a DM in dry-run"
+[[ "$(launch_count)" == "0" ]] || fail "dry-run-patchid-inert: launched in dry-run"
+no_file "$STATE_DIR/dm-patchid" || fail "dry-run-patchid-inert: wrote dm-patchid/"
+no_file "$STATE_DIR/attempts" || fail "dry-run-patchid-inert: wrote attempts/"
+no_file "$STATE_DIR/pending" || fail "dry-run-patchid-inert: wrote pending/"
+[[ -z "$(pr_refs)" ]] || fail "dry-run-patchid-inert: left refs/pr-cycle refs: $(pr_refs)"
+end_case dry-run-patchid-inert
+
+# The real git default, no network: a local bare repo is origin.
+reset; begin_case
+BARE="$SCRATCH/rg-origin.git"; W="$SCRATCH/rg-work"; C="$SCRATCH/rg-consumer"
+RGLIB="$SCRIPT_DIR/lib/pr-cycle-watch.sh"
+wg() { git -C "$W" "$@"; }
+sub() { sed "s/^$2\$/$3/" "$W/$1" > "$W/$1.tmp" && mv "$W/$1.tmp" "$W/$1"; }
+git init -q --bare -b master "$BARE"
+git init -q -b master "$W"
+wg config user.email t@t.invalid; wg config user.name t; wg config commit.gpgsign false
+wg remote add origin "$BARE"
+seq 1 20 | sed 's/^/l/' > "$W/a.txt"; echo x > "$W/b.txt"
+wg add -A; wg commit -qm base
+wg checkout -q -b p7
+sub a.txt l10 l10-pr; wg commit -qam p7
+P7="$(wg rev-parse HEAD)"
+wg checkout -q master
+wg push -q origin master p7:refs/pull/7/head
+echo y > "$W/b.txt"; wg commit -qam m2; wg push -q origin master
+wg checkout -q -b p8 master; wg cherry-pick "$P7" >/dev/null; wg push -q origin p8:refs/pull/8/head
+wg checkout -q -b p9 master; sub a.txt l10 l10-other; wg commit -qam p9; wg push -q origin p9:refs/pull/9/head
+wg checkout -q master; sub a.txt l8 l8-m; wg commit -qam m3; wg push -q origin master
+wg checkout -q -b p10 master; wg cherry-pick "$P7" >/dev/null; wg push -q origin p10:refs/pull/10/head
+git clone -q "$BARE" "$C"
+(
+    unset PR_CYCLE_PATCH_ID_CMD
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    pcw_patch_id "$C" 7 > "$SCRATCH/rg-id7"
+    pcw_patch_id "$C" 8 > "$SCRATCH/rg-id8"
+    pcw_patch_id "$C" 9 > "$SCRATCH/rg-id9"
+    pcw_patch_id "$C" 10 > "$SCRATCH/rg-id10"
+    pcw_patch_id "$C" 404 > "$SCRATCH/rg-id404"
+    pcw_patch_id "$C" 'x;y' > "$SCRATCH/rg-idxy"
+)
+id7="$(cat "$SCRATCH/rg-id7")"; id8="$(cat "$SCRATCH/rg-id8")"
+id9="$(cat "$SCRATCH/rg-id9")"; id10="$(cat "$SCRATCH/rg-id10")"
+[[ "$id7" =~ ^[0-9a-f]{40}$ ]] || fail "patch-id-real-git: id7 '$id7' is not 40 hex"
+[[ "$id8" == "$id7" ]] || fail "patch-id-real-git: a clean rebase changed the id ($id8 != $id7)"
+[[ "$id9" != "$id7" ]] || fail "patch-id-real-git: a content change kept the id"
+[[ "$id10" != "$id7" ]] || fail "patch-id-real-git: an edit inside the hunk's context kept the id (documented limit)"
+[[ "$(wc -c < "$SCRATCH/rg-id404" | tr -d ' ')" == "0" ]] || fail "patch-id-real-git: unknown PR 404 printed something"
+[[ "$(wc -c < "$SCRATCH/rg-idxy" | tr -d ' ')" == "0" ]] || fail "patch-id-real-git: non-numeric PR printed something"
+[[ "$(git -C "$C" for-each-ref refs/pr-cycle | wc -l | tr -d ' ')" == "4" ]] \
+    || fail "patch-id-real-git: want refs 7..10 only, got: $(git -C "$C" for-each-ref refs/pr-cycle)"
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    pcw_drop_pr_ref "$C" 7
+)
+git -C "$C" rev-parse -q --verify refs/pr-cycle/7 >/dev/null 2>&1 && fail "patch-id-real-git: pcw_drop_pr_ref left refs/pr-cycle/7"
+git -C "$C" rev-parse -q --verify refs/pr-cycle/8 >/dev/null 2>&1 || fail "patch-id-real-git: pcw_drop_pr_ref swept refs/pr-cycle/8"
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    pcw_drop_pr_ref "$C" 8; pcw_drop_pr_ref "$C" 9; pcw_drop_pr_ref "$C" 10
+)
+[[ -z "$(git -C "$C" for-each-ref refs/pr-cycle)" ]] || fail "patch-id-real-git: refs left after dropping all: $(git -C "$C" for-each-ref refs/pr-cycle)"
+# Tick wiring, dry-run: the real default against a local origin.
+git -C "$REPO" remote add origin "$BARE"
+E_PATCHID="$UNSET"
+p7sha="$(git ls-remote "$BARE" refs/pull/7/head | cut -f1)"
+set_prs "7|p7|$p7sha|BLOCKED|false"; set_checks "$p7sha" red
+run_tick --dry-run
+out_has 'would run:' || fail "patch-id-real-git: dry-run did not qualify PR 7: $OUT"
+out_has 'patch-id unavailable' && fail "patch-id-real-git: the tick fell back despite a reachable origin: $OUT"
+[[ -z "$(pr_refs)" ]] || fail "patch-id-real-git: dry-run left refs/pr-cycle refs: $(pr_refs)"
+no_file "$STATE_DIR/pending" || fail "patch-id-real-git: dry-run wrote pending/"
+git -C "$REPO" remote remove origin
+end_case patch-id-real-git
+
+# master-tip-seam: unset and empty PR_CYCLE_MASTER_TIP_CMD both select the git default; a
+# junk, empty, or failing seam prints nothing and still returns 0.
+reset; begin_case
+MT="$SCRATCH/mt-repo"; MTB="$SCRATCH/mt-bare-repo"
+git init -q -b master "$MT"; git init -q -b master "$MTB"
+for r in "$MT" "$MTB"; do
+    git -C "$r" config user.email t@t.invalid; git -C "$r" config user.name t
+    git -C "$r" config commit.gpgsign false
+    git -C "$r" commit -q --allow-empty -m one
+done
+git -C "$MT" update-ref refs/remotes/origin/master HEAD
+MT_SHA="$(git -C "$MT" rev-parse HEAD)"
+set_tip e0002
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    unset PR_CYCLE_MASTER_TIP_CMD
+    pcw_master_tip "$MT" > "$SCRATCH/mt-unset"
+    pcw_master_tip "$MTB" > "$SCRATCH/mt-unset-bare"
+    PR_CYCLE_MASTER_TIP_CMD=""
+    pcw_master_tip "$MT" > "$SCRATCH/mt-empty"
+    pcw_master_tip "$MTB" > "$SCRATCH/mt-empty-bare"
+    PR_CYCLE_MASTER_TIP_CMD="$SCRATCH/mastertip-file"
+    pcw_master_tip "$MT" > "$SCRATCH/mt-file"
+    PR_CYCLE_MASTER_TIP_CMD="$SCRATCH/mastertip-empty"
+    pcw_master_tip "$MT" > "$SCRATCH/mt-seam-empty"; echo "$?" > "$SCRATCH/mt-seam-empty-rc"
+    PR_CYCLE_MASTER_TIP_CMD="$SCRATCH/mastertip-junk"
+    pcw_master_tip "$MT" > "$SCRATCH/mt-seam-junk"; echo "$?" > "$SCRATCH/mt-seam-junk-rc"
+    PR_CYCLE_MASTER_TIP_CMD=false
+    pcw_master_tip "$MT" > "$SCRATCH/mt-seam-false"; echo "$?" > "$SCRATCH/mt-seam-false-rc"
+)
+[[ "$(cat "$SCRATCH/mt-unset")" == "$MT_SHA" ]] || fail "master-tip-seam: unset did not select the git default"
+[[ "$(cat "$SCRATCH/mt-empty")" == "$MT_SHA" ]] || fail "master-tip-seam: empty did not select the git default"
+[[ "$(wc -c < "$SCRATCH/mt-unset-bare" | tr -d ' ')" == "0" ]] || fail "master-tip-seam: unset printed for a repo with no origin/master"
+[[ "$(wc -c < "$SCRATCH/mt-empty-bare" | tr -d ' ')" == "0" ]] || fail "master-tip-seam: empty printed for a repo with no origin/master"
+[[ "$(cat "$SCRATCH/mt-file")" == "$(key_of e0002)" ]] || fail "master-tip-seam: seam file tip not printed"
+for m in seam-empty seam-junk seam-false; do
+    [[ "$(wc -c < "$SCRATCH/mt-$m" | tr -d ' ')" == "0" ]] || fail "master-tip-seam: $m printed something"
+    [[ "$(cat "$SCRATCH/mt-$m-rc")" == "0" ]] || fail "master-tip-seam: $m returned non-zero"
+done
+end_case master-tip-seam
+
+# conflict-retry-due-codes: 1 no hold, 2 same or malformed tip, 0 new tip under the cap,
+# 3 at the cap, 0 again on a new day, `unknown` hold eligible, cleared hold back to 1.
+reset; begin_case
+CRD="$SCRATCH/crd"; rm -rf "$CRD"; mkdir -p "$CRD"
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    T1="$(key_of e0001)"; T2="$(key_of e0002)"
+    rc() { local r=0; "$@" || r=$?; printf '%s' "$r"; }
+    {
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+        pcw_record_conflict_hold "$CRD" 5 "$T1"
+        rc pcw_conflict_retry_due "$CRD" 5 "$T1" 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 not-a-sha 2026-10-19
+        pcw_bump_retry "$CRD" 5 2026-10-19; pcw_bump_retry "$CRD" 5 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-20
+        pcw_record_conflict_hold "$CRD" 6 ""
+        rc pcw_conflict_retry_due "$CRD" 6 "$T2" 2026-10-19
+        pcw_clear_conflict_hold "$CRD" 5
+        rc pcw_conflict_retry_due "$CRD" 5 "$T2" 2026-10-19
+    } > "$SCRATCH/crd-codes"
+    cat "$CRD/conflict-hold/6" > "$SCRATCH/crd-hold6"
+)
+[[ "$(cat "$SCRATCH/crd-codes")" == "12023001" ]] || fail "conflict-retry-due-codes: want 1,2,0,2,3,0,0,1 got $(cat "$SCRATCH/crd-codes")"
+[[ "$(cat "$SCRATCH/crd-hold6")" == "unknown" ]] || fail "conflict-retry-due-codes: empty tip did not record unknown"
+end_case conflict-retry-due-codes
+
+# prune-conflict-ledgers: pcw_prune drops the new ledgers of a closed PR (999), keeps PR 101's.
+reset; begin_case
+for l in conflict-hold retries; do
+    mkdir -p "$STATE_DIR/$l"; echo x > "$STATE_DIR/$l/999"; echo x > "$STATE_DIR/$l/101"
+done
+set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
+run_tick
+no_file "$STATE_DIR/conflict-hold/999" || fail "prune-conflict-ledgers: conflict-hold/999 survived"
+no_file "$STATE_DIR/retries/999" || fail "prune-conflict-ledgers: retries/999 survived"
+[[ -f "$STATE_DIR/conflict-hold/101" ]] || fail "prune-conflict-ledgers: conflict-hold/101 was pruned"
+[[ -f "$STATE_DIR/retries/101" ]] || fail "prune-conflict-ledgers: retries/101 was pruned"
+end_case prune-conflict-ledgers
+
+# conflict-hold-launch-tip: the tip captured at launch rides the pending row and is what
+# settle records, even though master moved before the rescue settled.
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_tip e0001
+set_result "101\tfired\tconflict\trebase-conflict"
+run_tick
+PF="$(find "$STATE_DIR/pending" -type f | head -n 1)"
+[[ "$(sed -n '2p' "$PF" | awk -F'\t' '{print NF}')" == "4" ]] \
+    || fail "conflict-hold-launch-tip: pending row is not 4 fields: $(sed -n '2p' "$PF")"
+[[ "$(sed -n '2p' "$PF" | cut -f4)" == "$(key_of e0001)" ]] \
+    || fail "conflict-hold-launch-tip: pending tip is '$(sed -n '2p' "$PF" | cut -f4)'"
+set_tip e0002
+run_tick
+[[ "$(conflict_hold 101)" == "$(key_of e0001)" ]] \
+    || fail "conflict-hold-launch-tip: held tip is '$(conflict_hold 101)', want the launch tip"
+out_has 'PR 101: conflict hold recorded (master e000100)' \
+    || fail "conflict-hold-launch-tip: no hold log line: $OUT"
+end_case conflict-hold-launch-tip
+
+# conflict-hold-cleared-by-later-settle: a determinate later outcome clears the hold, a
+# paused rescue (which never ran) keeps it. The seeded hold is the only hand-written state.
+reset; begin_case
+mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_result "101\tfired\theld\t-"
+run_tick
+run_tick
+[[ -z "$(conflict_hold 101)" ]] || fail "conflict-hold-cleared-by-later-settle: held settle kept the hold: '$(conflict_hold 101)'"
+end_case conflict-hold-cleared-by-later-settle
+
+reset; begin_case
+mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_result "101\tfired\tpaused\t-"
+run_tick
+run_tick
+[[ "$(conflict_hold 101)" == "$(key_of e0009)" ]] \
+    || fail "conflict-hold-kept-by-paused-settle: paused settle dropped the hold: '$(conflict_hold 101)'"
+end_case conflict-hold-kept-by-paused-settle
+
+# pending-legacy-3col (invocation-2-only: legacy files exist only on disk): a pending row
+# written before the master-tip column still settles, records the attempt, and records the
+# hold as unknown.
+reset; begin_case
+mkdir -p "$STATE_DIR/pending" "$STATE_DIR/results"
+printf '# result=%s started=%s\n101\taaa1111\t%s\n' \
+    "$STATE_DIR/results/legacy1.tsv" "$(date +%s)" "$(key_of aaa1111)" > "$STATE_DIR/pending/legacy1"
+printf '# pr-cycle-result v1\n101\tfired\tconflict\trebase-conflict\n' > "$STATE_DIR/results/legacy1.tsv"
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+run_tick
+[[ "$(attempt 101)" == "$(key_of aaa1111)" ]] || fail "pending-legacy-3col: attempt is '$(attempt 101)'"
+[[ "$(conflict_hold 101)" == "unknown" ]] || fail "pending-legacy-3col: hold is '$(conflict_hold 101)', want unknown"
+no_file "$STATE_DIR/pending/legacy1" || fail "pending-legacy-3col: legacy pending file survived"
+end_case pending-legacy-3col
+
+# --- conflict re-try on a new master tip ---------------------------------------------------
+# Every flow runs real ticks: tick N launches, the stub hands tick N+1 the canned result, and
+# tick N+1 settles it and then qualifies.
+TODAY_STR="$(date +%F)"
+DIRTY101='101|branch-one|aaa1111|DIRTY|false'
+WAIT_NOTE='skip PR 101: retry cap (head aaa1111; rebase conflict, waiting for a new master tip)'
+CAP_NOTE='skip PR 101: retry cap (head aaa1111; rebase conflict, daily cap of 2 launches reached)'
+
+# conflict-same-tip-skipped (+ conflict-new-tip-launched, conflict-third-launch-skipped,
+# conflict-day-rollover as one continuing flow)
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "conflict-same-tip-skipped: tick 1 launches $(launch_count), want 1"
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "conflict-same-tip-skipped: relaunched on an unchanged tip"
+out_has "$WAIT_NOTE" || fail "conflict-same-tip-skipped: no waiting note: $OUT"
+end_case conflict-same-tip-skipped
+
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+set_tip e0002
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-new-tip-launched: launches $(launch_count), want 2"
+[[ "$(retries 101)" == "$TODAY_STR 2" ]] || fail "conflict-new-tip-launched: retries/101 is '$(retries 101)'"
+end_case conflict-new-tip-launched
+
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+set_tip e0002
+run_tick
+set_tip e0003
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-third-launch-skipped: launches $(launch_count), want 2"
+out_has "$CAP_NOTE" || fail "conflict-third-launch-skipped: no daily-cap note: $OUT"
+# conflict-day-rollover (invocation-2-only for the date: no seam fakes the clock): a stale-dated
+# counter at the cap reads as 0.
+printf '2000-01-01 2\n' > "$STATE_DIR/retries/101"
+set_tip e0004
+run_tick
+[[ "$(launch_count)" == "3" ]] || fail "conflict-day-rollover: launches $(launch_count), want 3"
+[[ "$(retries 101)" == "$TODAY_STR 1" ]] || fail "conflict-day-rollover: retries/101 is '$(retries 101)'"
+end_case conflict-third-launch-skipped
+
+# non-conflict-new-tip-skipped: a later held or failed settle clears the hold, and a red PR is
+# never a conflict hold, so a new master tip reopens none of them.
+for oc in "held\t-" "failed\tterminal=x"; do
+    reset; begin_case
+    mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
+    set_prs "$DIRTY101"; set_result "101\tfired\t$oc"
+    set_tip e0001
+    run_tick
+    set_tip e0002
+    run_tick
+    [[ "$(launch_count)" == "1" ]] || fail "non-conflict-new-tip-skipped($oc): relaunched on a new tip"
+    out_has 'skip PR 101: retry cap (head aaa1111)' || fail "non-conflict-new-tip-skipped($oc): no plain note: $OUT"
+    out_has 'rebase conflict' && fail "non-conflict-new-tip-skipped($oc): conflict wording on a non-conflict hold"
+    end_case non-conflict-new-tip-skipped
+done
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+set_tip e0002
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "non-conflict-new-tip-skipped(red): relaunched on a new tip"
+out_has 'skip PR 101: retry cap (head aaa1111)' || fail "non-conflict-new-tip-skipped(red): no plain note: $OUT"
+out_has 'rebase conflict' && fail "non-conflict-new-tip-skipped(red): conflict wording on a red PR"
+end_case non-conflict-new-tip-skipped
+
+# conflict-declined-still-skipped (invocation-2-only: a state reachable only across many runs):
+# the bypass opens only the attempted-key skip, the declined skip still holds.
+reset; begin_case
+mkdir -p "$STATE_DIR/attempts" "$STATE_DIR/declined" "$STATE_DIR/conflict-hold"
+key_of aaa1111 > "$STATE_DIR/attempts/101"; key_of aaa1111 > "$STATE_DIR/declined/101"
+key_of e0001 > "$STATE_DIR/conflict-hold/101"
+set_prs "$DIRTY101"
+set_tip e0002
+run_tick
+no_file "$SCRATCH/pr-cycle.log" || fail "conflict-declined-still-skipped: launched a declined head"
+out_has 'holdrepeat declined (head aaa1111)' || fail "conflict-declined-still-skipped: no declined note: $OUT"
+end_case conflict-declined-still-skipped
+
+# conflict-tip-unset-and-empty: an unset or empty seam selects the git default, the fixture has
+# no refs/remotes/origin/master, and an unreadable tip never opens the bypass.
+for mode in unset empty junk; do
+    reset; begin_case
+    set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+    set_tip e0001
+    run_tick
+    case "$mode" in
+        unset) E_MASTERTIP="$UNSET" ;;
+        empty) E_MASTERTIP="" ;;
+        junk)  E_MASTERTIP="$SCRATCH/mastertip-junk" ;;
+    esac
+    run_tick
+    [[ "$(launch_count)" == "1" ]] || fail "conflict-tip-unset-and-empty($mode): relaunched without a readable tip"
+    out_has "$WAIT_NOTE" || fail "conflict-tip-unset-and-empty($mode): no waiting note: $OUT"
+    end_case conflict-tip-unset-and-empty
+done
+
+# conflict-dry-run-no-ledger: an eligible conflict PR prints would-run and writes nothing.
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick
+run_tick
+set_tip e0002
+run_tick --dry-run
+out_has 'would run:' || fail "conflict-dry-run-no-ledger: dry run did not qualify the PR: $OUT"
+[[ "$(retries 101)" == "$TODAY_STR 1" ]] || fail "conflict-dry-run-no-ledger: retries/101 is '$(retries 101)'"
+[[ "$(pending_count)" == "0" ]] || fail "conflict-dry-run-no-ledger: dry run wrote pending/"
+[[ "$(launch_count)" == "1" ]] || fail "conflict-dry-run-no-ledger: dry run launched"
+end_case conflict-dry-run-no-ledger
+
 # --- summary -------------------------------------------------------------------------------
-if [[ $FAILED -eq 0 ]]; then
-    echo "test-pr-cycle-tick: ALL PASS"
-    exit 0
-fi
-echo "test-pr-cycle-tick: $FAILED failure(s)" >&2
-exit 1
+h_done

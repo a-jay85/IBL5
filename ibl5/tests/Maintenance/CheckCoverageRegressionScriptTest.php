@@ -207,4 +207,14 @@ final class CheckCoverageRegressionScriptTest extends TestCase
         self::assertSame(1, $oneArg['code']);
         self::assertStringContainsString($usage, $oneArg['stderr']);
     }
+
+    #[Test]
+    public function testTooFewArgumentsPrintsUsageAndExitsOne(): void
+    {
+        $result = $this->runScript([$this->createCloverXml(100, 80)]);
+
+        self::assertSame(1, $result['code']);
+        self::assertStringContainsString('Usage: php bin/check-coverage-regression <clover-file> <baseline-json>', $result['stderr']);
+        self::assertSame('', $result['stdout']);
+    }
 }

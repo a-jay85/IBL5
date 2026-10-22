@@ -374,7 +374,28 @@ When the verdict is still `unrealised` or `unavailable` after your fix attempts,
 1. Do NOT write the handoff file. No handoff means no post-plan run, no PR, and no merge.
 2. Leave the worktree as it is. Do not revert, reset, or discard any work.
 3. Write `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-error-<slug>.md` (derive `<slug>` from the plan title) with the title `Matrix realisation failed: <plan title>`. List every `UNREALISED-ASSERTION:` line, its `missing:` tokens, and what you tried.
-4. STOP.
+4. Decide whether this stop is a plan defect, meaning a retry of the same plan cannot fix it. It is one only when ALL of these hold:
+   - the final verdict is `unrealised`. An `unavailable` verdict is never a plan defect, because the checker itself failed to run;
+   - you are NOT stopping because of the time budget. You finished your fix attempts with time left;
+   - every test, lint, and static-analysis run you did in this attempt passed on its last run. A run that is still red means a retry may help.
+
+   If all three hold, write the plan-defect sentinel with this exact block. It re-runs both checks so the sentinel carries their lines verbatim. Line 1 must be exactly `automouse-plan-defect: v1`; the runner ignores the file otherwise.
+   ```bash
+   MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')
+   MATRIX_SCRIPT="${MATRIX_SCRIPT:-$MAIN_CHECKOUT/bin/lib/plan-matrix-assertions}"
+   HARNESS="$MAIN_CHECKOUT/tools/postplan-harness"
+   PD_DIFF=$(mktemp "${TMPDIR:-/tmp}/matrix-diff.XXXXXX")
+   git diff origin/master...HEAD >"$PD_DIFF"
+   {
+       printf 'automouse-plan-defect: v1\n'
+       "$MATRIX_SCRIPT" "$PLAN_PATH" "$PD_DIFF" 2>&1 | grep -E '^(UNREALISED-ASSERTION:|missing:)' || true
+       PYTHONPATH="$HARNESS" python3 -m harness.conformance "$PLAN_PATH" "$(git rev-parse --show-toplevel)" 2>/dev/null \
+           | grep -E '^(MISSING-FILE:|MISSING:)' || true
+   } > "$NIGHTLY_DIR/queue/$PLAN_FILE.plan-defect"
+   rm -f "$PD_DIFF"
+   ```
+   If any condition fails, write no sentinel; the plan is retried as before. Either way, add one line to the error report from item 3: `plan-defect sentinel: written` or `plan-defect sentinel: not written (<which condition failed>)`.
+5. STOP. The bash loop reads the sentinel. With a valid one it moves the plan to skipped/ after this attempt and names the rows in the skipped report. Without one it retries the plan.
 
 This step has no budget-wall fallback and no waiver. An unresolved row never proceeds to Step 7. Never add a `WAIVE-MATRIX-ROW:` line, and never edit the plan's Verification Matrix to make this check pass.
 

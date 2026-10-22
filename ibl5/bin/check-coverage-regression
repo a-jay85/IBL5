@@ -19,7 +19,8 @@ if (is_link(__DIR__ . '/../vendor')) {
     }
 }
 
-if ($argc < 3) {
+/** @var list<string> $argv */
+if (count($argv) < 3) {
     fwrite(STDERR, "Usage: php bin/check-coverage-regression <clover-file> <baseline-json>\n");
     exit(1);
 }

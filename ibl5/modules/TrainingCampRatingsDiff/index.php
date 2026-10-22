@@ -11,9 +11,11 @@ use TrainingCampRatingsDiff\TrainingCampRatingsDiffService;
 use TrainingCampRatingsDiff\TrainingCampRatingsDiffView;
 
 global $mysqli_db, $user;
+/** @var \mysqli $mysqli_db */
+$nukeCompat = new \Utilities\NukeCompat();
 
-if (!is_user($user)) {
-    loginbox();
+if (!$nukeCompat->isUser($user)) {
+    $nukeCompat->loginBox();
 }
 
 $overrideYear = null;
@@ -29,7 +31,7 @@ if (isset($_GET['status']) && is_string($_GET['status']) && in_array($_GET['stat
     $filterStatus = $_GET['status'];
 }
 
-$season     = new \Season\Season($mysqli_db);
+$season     = \Season\SharedSeason::get($mysqli_db);
 $repository = new TrainingCampRatingsDiffRepository($mysqli_db);
 $service    = new TrainingCampRatingsDiffService($repository, $season->endingYear);
 $view       = new TrainingCampRatingsDiffView();

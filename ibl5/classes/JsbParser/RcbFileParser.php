@@ -184,83 +184,104 @@ class RcbFileParser implements RcbFileParserInterface
 
             // Process each group (0 = league, 1-28 = teams, 29-32 = reserved)
             for ($group = 0; $group <= 28; $group++) {
-                $scope = $group === 0 ? 'league' : 'team';
-                $teamId = $group;
-
                 // Process each entry within the group
                 for ($entryIdx = 0; $entryIdx < self::ENTRIES_PER_GROUP; $entryIdx++) {
-                    $globalEntryIdx = $group * self::ENTRIES_PER_GROUP + $entryIdx;
-                    $charOffset = $globalEntryIdx * self::ALLTIME_ENTRY_SIZE;
-                    $entryData = substr($line, $charOffset, self::ALLTIME_ENTRY_SIZE);
-
-                    if (strlen($entryData) < self::ALLTIME_ENTRY_SIZE) {
-                        continue;
-                    }
-
-                    $isEven = $entryIdx % 2 === 0;
-
-                    if ($isEven) {
-                        // Single-season record
-                        if (!isset(self::SINGLE_SEASON_STATS[$entryIdx])) {
-                            continue;
-                        }
-                        $statCategory = self::SINGLE_SEASON_STATS[$entryIdx];
-                        $parsed = self::parseAlltimeSingleSeasonEntry($entryData);
-                        if ($parsed === null) {
-                            continue;
-                        }
-
-                        $records[] = [
-                            'scope' => $scope,
-                            'teamid' => $teamId,
-                            'record_type' => 'single_season',
-                            'stat_category' => $statCategory,
-                            'ranking' => $ranking + 1,
-                            'player_name' => $parsed['player_name'],
-                            'car_block_id' => $parsed['car_block_id'],
-                            'stat_value' => self::decodeStatValue($parsed['stat_raw'], $statCategory),
-                            'stat_raw' => $parsed['stat_raw'],
-                            'team_of_record' => $parsed['team_of_record'],
-                            'season_year' => $parsed['season_year'],
-                            'career_total' => null,
-                        ];
-                    } else {
-                        // Career record — but for team groups 1-28, odd entries are team season records
-                        if ($group >= 1) {
-                            // Team season stat records (odd entries in team groups)
-                            // These have a different format — skip for now as they're less useful
-                            continue;
-                        }
-
-                        if (!isset(self::CAREER_STATS[$entryIdx])) {
-                            continue;
-                        }
-                        $statCategory = self::CAREER_STATS[$entryIdx];
-                        $parsed = self::parseAlltimeCareerEntry($entryData);
-                        if ($parsed === null) {
-                            continue;
-                        }
-
-                        $records[] = [
-                            'scope' => $scope,
-                            'teamid' => $teamId,
-                            'record_type' => 'career',
-                            'stat_category' => $statCategory,
-                            'ranking' => $ranking + 1,
-                            'player_name' => $parsed['player_name'],
-                            'car_block_id' => $parsed['car_block_id'],
-                            'stat_value' => self::decodeStatValue($parsed['stat_raw'], $statCategory),
-                            'stat_raw' => $parsed['stat_raw'],
-                            'team_of_record' => $parsed['team_of_record'],
-                            'season_year' => null,
-                            'career_total' => $parsed['career_total'],
-                        ];
+                    $record = self::decodeAlltimeEntry($line, $group, $entryIdx, $ranking);
+                    if ($record !== null) {
+                        $records[] = $record;
                     }
                 }
             }
         }
 
         return $records;
+    }
+
+    /**
+     * Decode one 51-char all-time entry at ($group, $entryIdx) of a ranking line.
+     *
+     * Returns null when the slice is shorter than ALLTIME_ENTRY_SIZE, when it is an odd
+     * entry in a team group (1-28), when the index has no stat mapping, or when the
+     * entry parser rejects the slice. $ranking is the 0-based line index; the stored
+     * ranking is 1-based.
+     *
+     * @return array{scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}|null
+     */
+    public static function decodeAlltimeEntry(string $line, int $group, int $entryIdx, int $ranking): ?array
+    {
+        $globalEntryIdx = $group * self::ENTRIES_PER_GROUP + $entryIdx;
+        $charOffset = $globalEntryIdx * self::ALLTIME_ENTRY_SIZE;
+        $entryData = substr($line, $charOffset, self::ALLTIME_ENTRY_SIZE);
+
+        if (strlen($entryData) < self::ALLTIME_ENTRY_SIZE) {
+            return null;
+        }
+
+        $isEven = $entryIdx % 2 === 0;
+
+        if ($isEven) {
+            // Single-season record
+            if (!isset(self::SINGLE_SEASON_STATS[$entryIdx])) {
+                return null;
+            }
+            $statCategory = self::SINGLE_SEASON_STATS[$entryIdx];
+            $parsed = self::parseAlltimeSingleSeasonEntry($entryData);
+            if ($parsed === null) {
+                return null;
+            }
+
+            return self::buildAlltimeRecord($group, 'single_season', $statCategory, $ranking, $parsed, $parsed['season_year'], null);
+        }
+
+        // Career record — but for team groups 1-28, odd entries are team season records
+        if ($group >= 1) {
+            // Team season stat records (odd entries in team groups)
+            // These have a different format — skip for now as they're less useful
+            return null;
+        }
+
+        if (!isset(self::CAREER_STATS[$entryIdx])) {
+            return null;
+        }
+        $statCategory = self::CAREER_STATS[$entryIdx];
+        $parsed = self::parseAlltimeCareerEntry($entryData);
+        if ($parsed === null) {
+            return null;
+        }
+
+        return self::buildAlltimeRecord($group, 'career', $statCategory, $ranking, $parsed, null, $parsed['career_total']);
+    }
+
+    /**
+     * Build one all-time record. Single-season and career records differ only in
+     * record_type, season_year, and career_total.
+     *
+     * @param array{player_name: string, car_block_id: int, stat_raw: int, team_of_record: int|null, season_year?: int, career_total?: int} $parsed
+     * @return array{scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}
+     */
+    private static function buildAlltimeRecord(
+        int $group,
+        string $recordType,
+        string $statCategory,
+        int $ranking,
+        array $parsed,
+        ?int $seasonYear,
+        ?int $careerTotal,
+    ): array {
+        return [
+            'scope' => $group === 0 ? 'league' : 'team',
+            'teamid' => $group,
+            'record_type' => $recordType,
+            'stat_category' => $statCategory,
+            'ranking' => $ranking + 1,
+            'player_name' => $parsed['player_name'],
+            'car_block_id' => $parsed['car_block_id'],
+            'stat_value' => self::decodeStatValue($parsed['stat_raw'], $statCategory),
+            'stat_raw' => $parsed['stat_raw'],
+            'team_of_record' => $parsed['team_of_record'],
+            'season_year' => $seasonYear,
+            'career_total' => $careerTotal,
+        ];
     }
 
     /**

@@ -389,6 +389,8 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     /**
      * Returns a Discord notice to post to #admin-chat when the season phase is
      * changed to one that enables sim recaps, or null for phases that disable them.
+     * The poller never unloads itself, so the notice is informational: it resumes
+     * on its own on the first tick after the phase change.
      *
      * When the approver Discord ID is empty (unconfigured), the ping prefix is
      * omitted and the message is sent without a mention.
@@ -402,9 +404,8 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         $approverId = Discord::getBugPipelineApproverDiscordId();
         $ping = $approverId !== '' ? "<@{$approverId}> " : '';
 
-        return "{$ping}Season phase is now **{$phase}** — sim recap poller is enabled. "
-            . 'Run `bin/sim-recap-cron-setup --resume` to restart the LaunchAgent '
-            . '(label: `com.ibl5.sim-recap-poll`).';
+        return "{$ping}Season phase is now **{$phase}** — sim recaps are enabled. "
+            . 'The poller picks this up on its own within about 5 minutes; no action needed.';
     }
 
     /**
@@ -415,7 +416,8 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
      */
     private function updateTradition(): array
     {
-        if ($this->maintenanceRepository === null) {
+        $maintenanceRepository = $this->maintenanceRepository;
+        if ($maintenanceRepository === null) {
             return ['success' => false, 'message' => 'Tradition update is unavailable: maintenance repository not configured.'];
         }
 
@@ -425,16 +427,42 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         }
         $year = (int) $yearSetting;
 
-        // Phase 1: gather and validate — collect anomalies before writing anything.
+        $collected = $this->collectTeamSeasons($maintenanceRepository, $year);
+
+        if ($collected['anomalies'] !== []) {
+            return [
+                'success' => false,
+                'message' => 'Tradition update aborted — unexpected game counts in ' . count($collected['anomalies']) . ' season(s): ' . implode('; ', $collected['anomalies']) . '. No tradition factors were changed; fix the boxscore data and re-run.',
+            ];
+        }
+
+        $updated = $this->writeTraditionAverages($maintenanceRepository, $collected['seasons']);
+
+        $message = 'Free agency tradition factors updated for ' . $updated . ' team(s).';
+        if ($collected['skipped'] !== []) {
+            $message .= ' Skipped (no completed seasons): ' . implode(', ', $collected['skipped']);
+        }
+
+        return ['success' => true, 'message' => $message];
+    }
+
+    /**
+     * Gather each team's last five complete seasons and flag every season
+     * whose game count is not 82. Writes nothing.
+     *
+     * @return array{seasons: array<string, array<int, array{year: int, wins: int, losses: int}>>, skipped: list<string>, anomalies: list<string>}
+     */
+    private function collectTeamSeasons(MaintenanceRepositoryInterface $maintenanceRepository, int $year): array
+    {
         $anomalies = [];
         $skipped = [];
         /** @var array<string, array<int, array{year: int, wins: int, losses: int}>> $teamSeasons */
         $teamSeasons = [];
 
-        $teams = $this->maintenanceRepository->getAllTeams();
+        $teams = $maintenanceRepository->getAllTeams();
         foreach ($teams as $team) {
             $teamName = $team['team_name'];
-            $rows = $this->maintenanceRepository->getTeamSeasonRecords($teamName, $year, 5);
+            $rows = $maintenanceRepository->getTeamSeasonRecords($teamName, $year, 5);
 
             // Drop an in-progress current season: newest row is the current year
             // but has fewer than 82 games played.
@@ -459,14 +487,18 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             $teamSeasons[$teamName] = $rows;
         }
 
-        if ($anomalies !== []) {
-            return [
-                'success' => false,
-                'message' => 'Tradition update aborted — unexpected game counts in ' . count($anomalies) . ' season(s): ' . implode('; ', $anomalies) . '. No tradition factors were changed; fix the boxscore data and re-run.',
-            ];
-        }
+        return ['seasons' => $teamSeasons, 'skipped' => $skipped, 'anomalies' => $anomalies];
+    }
 
-        // Phase 2: write — only reached when every season validated cleanly.
+    /**
+     * Persist each team's rounded average W/L over the given seasons.
+     * Called only after every season validated cleanly.
+     *
+     * @param array<string, array<int, array{year: int, wins: int, losses: int}>> $teamSeasons
+     * @return int Number of teams written
+     */
+    private function writeTraditionAverages(MaintenanceRepositoryInterface $maintenanceRepository, array $teamSeasons): int
+    {
         $updated = 0;
         foreach ($teamSeasons as $teamName => $seasons) {
             $seasonCount = count($seasons);
@@ -479,15 +511,10 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
 
             $avgWins = (int) round($totalWins / $seasonCount);
             $avgLosses = (int) round($totalLosses / $seasonCount);
-            $this->maintenanceRepository->updateTeamTradition($teamName, $avgWins, $avgLosses);
+            $maintenanceRepository->updateTeamTradition($teamName, $avgWins, $avgLosses);
             $updated++;
         }
 
-        $message = 'Free agency tradition factors updated for ' . $updated . ' team(s).';
-        if ($skipped !== []) {
-            $message .= ' Skipped (no completed seasons): ' . implode(', ', $skipped);
-        }
-
-        return ['success' => true, 'message' => $message];
+        return $updated;
     }
 }

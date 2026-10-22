@@ -21,6 +21,8 @@ use LeagueStarters\LeagueStartersService;
 use LeagueStarters\LeagueStartersView;
 
 global $mysqli_db, $authService;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 
 // Route HTMX API requests (no PageLayout, returns HTML fragment only)
 $op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
@@ -31,7 +33,7 @@ if ($op === 'api') {
     $handler->handle();
     return;
 }
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 
 $module_name = basename(dirname(__FILE__));
 $pagetitle = "- $module_name";

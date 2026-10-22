@@ -10,6 +10,7 @@ call.  After run() returns we assert:
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -18,7 +19,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.review import ReviewPhase
+from harness.review import VERIFIER_PURPOSES, ReviewPhase
 from harness.state import Classification, Finding, HarnessError, LlmCallRecord, PlanInfo, UsageLedger
 from harness import schemas
 
@@ -29,14 +30,23 @@ from harness import schemas
 AGENT_SLEEP = 0.15   # seconds per simulated agent call
 
 
+def _all_real(count): return json.dumps([{"n": i, "verdict": "real", "reason": "verified"} for i in range(1, count + 1)])
+
+
 class _SleepingLlm:
     """LLM adapter that sleeps briefly, records timing/thread info, and returns canned data."""
 
-    def __init__(self, ledger: UsageLedger, canned: dict, sleep: float = AGENT_SLEEP):
+    def __init__(self, ledger: UsageLedger, canned: dict, sleep: float = AGENT_SLEEP,
+                 finish_after: dict | None = None):
         self.ledger = ledger
         self.canned = canned
         self.sleep = sleep
-        self.log: list[tuple[str, int, float, float]] = []   # (purpose, tid, start, end)
+        # purpose -> purpose whose call() must have finished first (forces a finish order
+        # without relying on sleep timing, which is jittery on a loaded machine)
+        self.finish_after = finish_after or {}
+        self._done = {p: threading.Event() for p in set(self.finish_after) | set(self.finish_after.values())}
+        self.log: list[tuple[str, int, float, float]] = []   # (purpose, tid, start, end) of call()
+        self.tooled_log: list[tuple[str, int, float, float]] = []   # same, of call_tooled()
         self._log_lock = threading.Lock()
 
     def call(self, purpose: str, model: str, prompt: str, validate,
@@ -44,9 +54,13 @@ class _SleepingLlm:
         tid = threading.get_ident()
         start = time.monotonic()
         time.sleep(self.sleep)
+        if purpose in self.finish_after:
+            assert self._done[self.finish_after[purpose]].wait(10), "predecessor never finished"
         end = time.monotonic()
         with self._log_lock:
             self.log.append((purpose, tid, start, end))
+        if purpose in self._done:
+            self._done[purpose].set()
 
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
@@ -56,6 +70,21 @@ class _SleepingLlm:
         validate(data)
         self.ledger.add(LlmCallRecord(purpose=purpose, model=f"sleep:{model}"))
         return data
+
+    def call_tooled(self, purpose, model, prompt, *, cwd, allowed_tools=(), **kw):
+        tid = threading.get_ident()
+        start = time.monotonic()
+        time.sleep(self.sleep)
+        end = time.monotonic()
+        with self._log_lock:
+            self.tooled_log.append((purpose, tid, start, end))
+        if purpose not in self.canned:
+            raise HarnessError("llm-fixture-missing", purpose)
+        val = self.canned[purpose]
+        if isinstance(val, dict) and "raise" in val:
+            raise HarnessError(val["raise"]["kind"], val["raise"].get("detail", ""))
+        self.ledger.add(LlmCallRecord(purpose=purpose, model=f"sleep:{model}"))
+        return val
 
 
 class _NullGh:
@@ -90,12 +119,13 @@ def _php_cls(**kwargs) -> Classification:
 
 def _make_canned(findings_by_agent=None):
     findings_by_agent = findings_by_agent or {}
-    return {
+    total = sum(len(v) for v in findings_by_agent.values())
+    verdicts = {p: _all_real(total) for p in VERIFIER_PURPOSES}
+    return {**verdicts,
         "review-agent-a": findings_by_agent.get("A", []),
         "review-agent-b": findings_by_agent.get("B", []),
         "review-agent-d": findings_by_agent.get("D", []),
         "security-audit": findings_by_agent.get("security", []),
-        "score-findings": [],
     }
 
 
@@ -104,14 +134,14 @@ def _make_canned(findings_by_agent=None):
 # ---------------------------------------------------------------------------
 
 
-def test_agents_overlap_in_time():
+def test_agents_overlap_in_time(tmp_path):
     """Phase 4 review agents run concurrently — verified by overlapping time windows."""
     ledger = UsageLedger()
     canned = _make_canned()
     llm = _SleepingLlm(ledger, canned, sleep=AGENT_SLEEP)
     gh = _NullGh()
 
-    ReviewPhase(llm, gh).run({}, _php_cls(), PlanInfo())
+    ReviewPhase(llm, gh, worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
 
     # Three agents ran (A, B, security); D gate is off.
     review_calls = [entry for entry in llm.log if entry[0] in
@@ -132,14 +162,14 @@ def test_agents_overlap_in_time():
     )
 
 
-def test_agents_run_in_distinct_threads():
+def test_agents_run_in_distinct_threads(tmp_path):
     """Each concurrent agent call must use a different OS thread."""
     ledger = UsageLedger()
     canned = _make_canned()
     llm = _SleepingLlm(ledger, canned, sleep=AGENT_SLEEP)
     gh = _NullGh()
 
-    ReviewPhase(llm, gh).run({}, _php_cls(), PlanInfo())
+    ReviewPhase(llm, gh, worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
 
     review_calls = [entry for entry in llm.log if entry[0] in
                     ("review-agent-a", "review-agent-b", "security-audit")]
@@ -150,47 +180,39 @@ def test_agents_run_in_distinct_threads():
     )
 
 
-def test_ledger_has_entry_for_every_agent():
+def test_ledger_has_entry_for_every_agent(tmp_path):
     """UsageLedger must contain one record per executed agent, thread-safely accumulated."""
     ledger = UsageLedger()
     canned = _make_canned()
     llm = _SleepingLlm(ledger, canned, sleep=AGENT_SLEEP)
     gh = _NullGh()
 
-    ReviewPhase(llm, gh).run({}, _php_cls(), PlanInfo())
+    ReviewPhase(llm, gh, worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
 
     purposes = {r.purpose for r in ledger.calls}
     for expected in ("review-agent-a", "review-agent-b", "security-audit"):
         assert expected in purposes, f"{expected!r} missing from ledger — {purposes}"
 
 
-def test_security_audit_tier_is_sonnet_scoring_stays_haiku():
-    """security-audit runs on sonnet (Haiku price cliff); score-findings stays haiku."""
-
-    class _TierLlm(_SleepingLlm):
-        def __init__(self, *a, **kw):
-            super().__init__(*a, **kw)
-            self.models = {}
-
-        def call(self, purpose, model, prompt, validate, max_retries=1, normalizer=None):
-            self.models[purpose] = model
-            return super().call(purpose, model, prompt, validate,
-                                max_retries=max_retries, normalizer=normalizer)
-
+def test_security_audit_and_verifiers_are_sonnet(tmp_path):
+    """security-audit and every verifier seat run on sonnet (Haiku price cliff, code-reading votes)."""
     canned = _make_canned({
         "security": [{"path": "ibl5/s.php", "line": 3, "body": "security issue"}],
     })
-    canned["score-findings"] = [{"n": 1, "score": 90}]
-    llm = _TierLlm(UsageLedger(), canned, sleep=0)
+    ledger = UsageLedger()
+    llm = _SleepingLlm(ledger, canned, sleep=0)
 
-    ReviewPhase(llm, _NullGh()).run({}, _php_cls(), PlanInfo())
+    ReviewPhase(llm, _NullGh(), worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
 
-    assert llm.models["security-audit"] == "sonnet"
-    assert llm.models["score-findings"] == "haiku"
-    assert llm.models["review-agent-a"] == "sonnet"
+    models = {r.purpose: r.model for r in ledger.calls}
+    assert models["security-audit"] == "sleep:sonnet"
+    assert models["review-agent-a"] == "sleep:sonnet"
+    verifier_records = [r for r in ledger.calls if r.purpose.startswith("verify-findings-")]
+    assert {r.purpose for r in verifier_records} == set(VERIFIER_PURPOSES)
+    assert all(r.model == "sleep:sonnet" for r in verifier_records)
 
 
-def test_findings_from_all_agents_are_returned():
+def test_findings_from_all_agents_are_returned(tmp_path):
     """Findings from each concurrent agent must appear in the result, in A→B→security order."""
     ledger = UsageLedger()
     findings_by_agent = {
@@ -202,23 +224,7 @@ def test_findings_from_all_agents_are_returned():
     llm = _SleepingLlm(ledger, canned, sleep=AGENT_SLEEP)
     gh = _NullGh()
 
-    # Inject score-findings so all findings survive thresholds
-    def _scoring_llm_call(purpose, model, prompt, validate, max_retries=1, normalizer=None):
-        if purpose == "score-findings":
-            # Score all findings well above both thresholds (80/75)
-            data = [{"n": i + 1, "score": 90} for i in range(3)]
-            validate(data)
-            ledger.add(LlmCallRecord(purpose=purpose, model="sleep:haiku"))
-            return data
-        return llm.call(purpose, model, prompt, validate, max_retries, normalizer)
-
-    class _ComboLlm:
-        def call(self_, purpose, model, prompt, validate, max_retries=1, normalizer=None):
-            if purpose == "score-findings":
-                return _scoring_llm_call(purpose, model, prompt, validate, max_retries, normalizer)
-            return llm.call(purpose, model, prompt, validate, max_retries, normalizer)
-
-    surviving, gates, scored, degraded = ReviewPhase(_ComboLlm(), gh).run(
+    surviving, gates, scored, degraded = ReviewPhase(llm, gh, worktree=str(tmp_path)).run(
         {"number": 1, "headRefOid": "abc"}, _php_cls(), PlanInfo()
     )
 
@@ -261,7 +267,7 @@ def test_raw_files_written_for_every_agent(tmp_path):
         assert open(p).read() == f"reply from {purpose}"
 
 
-def test_degraded_agent_does_not_block_others():
+def test_degraded_agent_does_not_block_others(tmp_path):
     """An llm-invalid-output from one agent must not suppress the other agents' findings."""
     ledger = UsageLedger()
     gh = _NullGh()
@@ -282,14 +288,14 @@ def test_degraded_agent_does_not_block_others():
             return data
 
     llm = _OneFailLlm()
-    _, gates, scored, degraded = ReviewPhase(llm, gh).run({}, _php_cls(), PlanInfo())
+    _, gates, scored, degraded = ReviewPhase(llm, gh, worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
     assert "review-agent-a" in degraded
     # B and security must still have been called
     assert "review-agent-b" in llm.calls
     assert "security-audit" in llm.calls
 
 
-def test_all_four_agents_preserve_submission_order():
+def test_all_four_agents_preserve_submission_order(tmp_path):
     """With agent D enabled, findings appear in A → B → D → security order."""
     ledger = UsageLedger()
     findings_by_agent = {
@@ -300,18 +306,9 @@ def test_all_four_agents_preserve_submission_order():
     }
     canned = _make_canned(findings_by_agent)
     gh = _NullGh()
-    base_llm = _SleepingLlm(ledger, canned, sleep=0)
+    llm = _SleepingLlm(ledger, canned, sleep=0)
 
-    class _ComboLlm:
-        def call(self_, purpose, model, prompt, validate, max_retries=1, normalizer=None):
-            if purpose == "score-findings":
-                data = [{"n": i + 1, "score": 90} for i in range(4)]
-                validate(data)
-                ledger.add(LlmCallRecord(purpose=purpose, model="sleep:haiku"))
-                return data
-            return base_llm.call(purpose, model, prompt, validate, max_retries, normalizer)
-
-    surviving, _, _, _ = ReviewPhase(_ComboLlm(), gh).run(
+    surviving, _, _, _ = ReviewPhase(llm, gh, worktree=str(tmp_path)).run(
         {"number": 1, "headRefOid": "abc"}, _php_cls(has_e2e_specs=True), PlanInfo()
     )
 
@@ -321,7 +318,7 @@ def test_all_four_agents_preserve_submission_order():
     assert agents.index("D") < agents.index("security"), f"D before security; got {agents}"
 
 
-def test_terminal_error_propagates():
+def test_terminal_error_propagates(tmp_path):
     """A non-llm-invalid-output HarnessError must propagate out of run() unchanged."""
     import pytest
 
@@ -333,5 +330,68 @@ def test_terminal_error_propagates():
             raise HarnessError("llm-fixture-missing", purpose)
 
     with pytest.raises(HarnessError) as exc_info:
-        ReviewPhase(_TerminalLlm(), gh).run({}, _php_cls(), PlanInfo())
+        ReviewPhase(_TerminalLlm(), gh, worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
     assert exc_info.value.kind == "llm-fixture-missing"
+
+
+# ---------------------------------------------------------------------------
+# Verifier fan-out (Phase 4D)
+# ---------------------------------------------------------------------------
+
+_FOUR_FINDINGS = {
+    "A": [{"path": "ibl5/a.php", "line": 1, "body": "a"}],
+    "B": [{"path": "ibl5/b.php", "line": 2, "body": "b"}],
+    "D": [{"path": "ibl5/d.php", "line": 3, "body": "d"}],
+    "security": [{"path": "ibl5/s.php", "line": 4, "body": "s"}],
+}
+
+
+def test_verifiers_overlap_in_time(tmp_path):
+    """The three verifier seats run concurrently: every pair of (start, end) windows overlaps."""
+    canned = _make_canned({"A": [{"path": "ibl5/a.php", "line": 1, "body": "a"}]})
+    llm = _SleepingLlm(UsageLedger(), canned, sleep=AGENT_SLEEP)
+
+    ReviewPhase(llm, _NullGh(), worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
+
+    seats = llm.tooled_log
+    assert {p for p, *_ in seats} == set(VERIFIER_PURPOSES), f"expected one call per seat, got {seats}"
+    assert len(seats) == len(VERIFIER_PURPOSES)
+    for i, (_, _, s1, e1) in enumerate(seats):
+        for _, _, s2, e2 in seats[i + 1:]:
+            assert s1 < e2 and s2 < e1, (
+                f"verifier seats did not overlap - {[(p, f'{s:.3f}-{e:.3f}') for p, _, s, e in seats]}")
+
+
+def test_all_four_agents_then_verifiers_preserve_submission_order(tmp_path):
+    """Agents finish in reverse order, findings still aggregate A, B, D, security, then verifiers run."""
+    canned = _make_canned(_FOUR_FINDINGS)
+    # security finishes first, A last: only possible if all four calls are in flight together
+    finish_after = {"review-agent-d": "security-audit", "review-agent-b": "review-agent-d",
+                    "review-agent-a": "review-agent-b"}
+    llm = _SleepingLlm(UsageLedger(), canned, sleep=0.02, finish_after=finish_after)
+
+    surviving, _, _, _ = ReviewPhase(llm, _NullGh(), worktree=str(tmp_path)).run(
+        {"number": 1, "headRefOid": "abc"}, _php_cls(has_e2e_specs=True), PlanInfo())
+
+    assert [p for p, *_ in llm.log] == [
+        "security-audit", "review-agent-d", "review-agent-b", "review-agent-a"]
+    assert [f.agent for f in surviving] == ["A", "B", "D", "security"]
+    assert {p for p, *_ in llm.tooled_log} == set(VERIFIER_PURPOSES)
+    last_agent_end = max(end for *_, end in llm.log)
+    assert all(start >= last_agent_end for _, _, start, _ in llm.tooled_log), \
+        "a verifier started before every agent had finished"
+
+
+def test_verifier_failure_does_not_stop_other_seats(tmp_path):
+    """A non-terminal failure in one seat abstains that seat; the other seats still vote."""
+    canned = _make_canned({"A": [{"path": "ibl5/a.php", "line": 1, "body": "a"}]})
+    canned["verify-findings-2"] = {"raise": {"kind": "llm-invalid-output"}}
+    llm = _SleepingLlm(UsageLedger(), canned, sleep=0)
+
+    surviving, _, scored, _ = ReviewPhase(llm, _NullGh(), worktree=str(tmp_path)).run(
+        {}, _php_cls(), PlanInfo())
+
+    assert {p for p, *_ in llm.tooled_log} == set(VERIFIER_PURPOSES)
+    assert len(surviving) == 1
+    assert surviving[0].score == 93      # 80 + round(20 * 2 / 3): two valid real votes remain
+    assert scored[0]["score"] == 93

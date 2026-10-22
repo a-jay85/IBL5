@@ -19,7 +19,7 @@ if (!$mysqli_db instanceof \mysqli || !$leagueContext instanceof \League\LeagueC
 $leagueConfig = $leagueContext->getConfig();
 $imagesPath = $leagueConfig['images_path'];
 
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 $lastSimStartDate = $season->lastSimStartDate;
 $lastSimEndDate = $season->lastSimEndDate;
 $simNumber = $season->lastSimNumber;

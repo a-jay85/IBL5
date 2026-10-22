@@ -40,6 +40,8 @@ class LadderContext:
     pre_rebase_sha: str
     conflicted_files: tuple[str, ...]
     trail: tuple[str, ...] = ()
+    state_dir: str = ""                                         # cost-guard marker dir; "" = guard unavailable, rung skips
+    extend_pre_patch: Optional[Callable[[tuple[str, ...]], None]] = None  # gitad._rewrite_pre_patch_for_regen wrapper
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,9 @@ class RungAttempt:
     applied: bool                     # False = rung had nothing to do; ladder skips the guard
     touched: tuple[str, ...]          # repo-relative paths the rung wrote
     note: str = ""
+    # Runs once the ladder has amended the rung's edits into the merge commit. Returns an
+    # undo callable (or None) the ladder calls if the rung is then discarded.
+    after_amend: Optional[Callable[[], Optional[Callable[[], None]]]] = None
 
 
 @dataclass(frozen=True)
@@ -104,7 +109,8 @@ def _parents_reason(ctx: LadderContext) -> str:
 
 
 def _untracked(ctx: LadderContext) -> set[str]:
-    return set(ctx.run("ls-files", "--others", "--exclude-standard").split())
+    out = ctx.run("ls-files", "--others", "--exclude-standard", "-z")
+    return {p for p in out.split("\0") if p}
 
 
 def _reset(ctx: LadderContext, sha: str, untracked_before: set[str]) -> None:
@@ -209,6 +215,15 @@ def run_ladder(ctx: LadderContext, proof_out: str, rungs) -> LadderOutcome:
             _reset(ctx, base_sha, untracked_before)
             continue
 
+        undo = None
+        if attempt.after_amend is not None:
+            try:
+                undo = attempt.after_amend()
+            except Exception as exc:
+                trail.append(f"{name}: post-amend step failed: {exc}")
+                _reset(ctx, base_sha, untracked_before)
+                continue
+
         verdict = post_rung_guard(ctx, attempt.touched)
         if verdict.ok:
             trail.append(f"{name}: passed")
@@ -223,6 +238,8 @@ def run_ladder(ctx: LadderContext, proof_out: str, rungs) -> LadderOutcome:
             trail.append(f"{name}: partial ({lost_count(current_proof)} LOST left)")
             continue
         trail.append(f"{name}: {verdict.reason or 'proof still failed'}")
+        if callable(undo):
+            undo()
         _reset(ctx, base_sha, untracked_before)
 
     return LadderOutcome("", (), current_proof, tuple(trail))
@@ -244,12 +261,13 @@ class GeneratedFile:
     command: Optional[tuple[str, ...]]       # run from the worktree root; None = master-copy-only
     requires: tuple[str, ...] = ()           # repo-relative paths that must exist to run `command`
     why_copy_only: str = ""
+    regen_on_conflict: bool = False          # regenerate before the LLM resolver (gitad._rebase_onto)
 
 
 _BASELINES = ("bin/regen-baselines",)
 _VENDOR = ("ibl5/vendor/autoload.php",)
 GENERATED_FILES: tuple[GeneratedFile, ...] = (
-    GeneratedFile("ibl5/phpstan-baseline.neon", _BASELINES, _VENDOR),
+    GeneratedFile("ibl5/phpstan-baseline.neon", _BASELINES, _VENDOR, regen_on_conflict=True),
     GeneratedFile("ibl5/phpstan-tests-baseline.neon", _BASELINES, _VENDOR),
     GeneratedFile("ibl5/phpstan-baseline-counts.json", _BASELINES, _VENDOR),
     GeneratedFile(".claude/rules/codebase-map.md", ("bin/generate-codebase-map",)),
@@ -261,6 +279,58 @@ GENERATED_FILES: tuple[GeneratedFile, ...] = (
 REGEN_TIMEOUT = 900   # bin/regen-baselines runs two PHPStan passes, about 2-3 min
 
 
+def regenerate(run, run_out, *, worktree: str, master_sha: str,
+               candidates, timeout: int = REGEN_TIMEOUT) -> tuple[str, ...]:
+    """Take master's copy of each candidate, then run each distinct generator command
+    once from the worktree root. Returns the copy-only notes. Raises RuntimeError on a
+    non-zero generator exit; subprocess.TimeoutExpired propagates unchanged."""
+    for g in candidates:
+        rc, _ = run_out("cat-file", "-e", f"{master_sha}:{g.path}")
+        if rc == 0:
+            run("checkout", master_sha, "--", g.path)
+    notes: list[str] = []
+    commands: list[tuple[str, ...]] = []
+    for g in candidates:
+        if g.command is None:
+            notes.append(f"{g.path}: master copy only ({g.why_copy_only})")
+            continue
+        missing = [r for r in g.requires
+                   if not os.path.exists(os.path.join(worktree, r))]
+        if missing:
+            notes.append(f"{g.path}: master copy only (missing {missing[0]})")
+            continue
+        if g.command not in commands:
+            commands.append(g.command)
+    for command in commands:
+        proc = subprocess.run(list(command), cwd=worktree, capture_output=True,
+                              text=True, errors="replace", timeout=timeout)
+        if proc.returncode != 0:
+            tail = (proc.stderr or proc.stdout).strip()[-300:]
+            raise RuntimeError(f"regen {command[0]} exit {proc.returncode}: {tail}")
+    return tuple(notes)
+
+
+def pre_resolve_targets(files, *, worktree: str, registry=None) -> tuple[GeneratedFile, ...]:
+    """Registry entries to regenerate before the resolver: path is in `files`,
+    regen_on_conflict is set, command is not None, and every `requires` path exists.
+    An entry whose requirement is missing is NOT returned, so that file falls through
+    to the ordinary LLM resolver exactly as before this change."""
+    registry = GENERATED_FILES if registry is None else registry
+    wanted = set(files)
+    return tuple(
+        g for g in registry
+        if g.path in wanted and g.regen_on_conflict and g.command is not None
+        and all(os.path.exists(os.path.join(worktree, r)) for r in g.requires))
+
+
+def command_outputs(targets, *, registry=None) -> frozenset[str]:
+    """Every registry path whose command equals some target's command. These are the
+    only paths a generator run may change (bin/regen-baselines owns three files)."""
+    registry = GENERATED_FILES if registry is None else registry
+    commands = {t.command for t in targets if t.command is not None}
+    return frozenset(g.path for g in registry if g.command in commands)
+
+
 def make_regen_rung(registry=GENERATED_FILES, timeout: int = REGEN_TIMEOUT) -> Rung:
     def fn(ctx: LadderContext, proof_out: str) -> RungAttempt:
         lost, structural = parse_lost_lines(proof_out)
@@ -269,29 +339,9 @@ def make_regen_rung(registry=GENERATED_FILES, timeout: int = REGEN_TIMEOUT) -> R
         candidates = [g for g in registry if g.path in involved]
         if not candidates:
             return RungAttempt(False, (), "no generated file involved")
-        for g in candidates:
-            rc, _ = ctx.run_out("cat-file", "-e", f"{ctx.master_sha}:{g.path}")
-            if rc == 0:
-                ctx.run("checkout", ctx.master_sha, "--", g.path)
-        notes: list[str] = []
-        commands: list[tuple[str, ...]] = []
-        for g in candidates:
-            if g.command is None:
-                notes.append(f"{g.path}: master copy only ({g.why_copy_only})")
-                continue
-            missing = [r for r in g.requires
-                       if not os.path.exists(os.path.join(ctx.worktree, r))]
-            if missing:
-                notes.append(f"{g.path}: master copy only (missing {missing[0]})")
-                continue
-            if g.command not in commands:
-                commands.append(g.command)
-        for command in commands:
-            proc = subprocess.run(list(command), cwd=ctx.worktree, capture_output=True,
-                                  text=True, errors="replace", timeout=timeout)
-            if proc.returncode != 0:
-                tail = (proc.stderr or proc.stdout).strip()[-300:]
-                raise RuntimeError(f"regen {command[0]} exit {proc.returncode}: {tail}")
+        notes = regenerate(ctx.run, ctx.run_out, worktree=ctx.worktree,
+                           master_sha=ctx.master_sha, candidates=candidates,
+                           timeout=timeout)
         touched = tuple(ctx.run("diff", "--name-only", "HEAD").split())
         return RungAttempt(True, touched, "; ".join(notes))
     return (RUNG_REGEN, fn)
@@ -456,4 +506,5 @@ def make_session_rung(branch: str) -> Rung:
 
 
 def default_rungs(branch: str) -> tuple[Rung, ...]:
-    return (make_regen_rung(), make_opus_rung(), make_session_rung(branch))
+    from .conflict_fix import make_fix_rung
+    return (make_regen_rung(), make_opus_rung(), make_session_rung(branch), make_fix_rung(branch))

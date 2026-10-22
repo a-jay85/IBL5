@@ -460,6 +460,17 @@ class DepthChartViewTest extends TestCase
     // Mobile view tests
     // =====================================================================
 
+    public function testPositionBadgeCarriesChipClasses(): void
+    {
+        $player = $this->buildTestPlayer();
+
+        ob_start();
+        $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('<span class="ibl-chip ibl-chip--navy dc-card__pos-badge">', $output);
+    }
+
     public function testRenderMobileViewContainsCardContainer(): void
     {
         $players = [$this->buildTestPlayer()];
@@ -802,5 +813,20 @@ class DepthChartViewTest extends TestCase
         preg_match('/<select name="sg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
         $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
+    }
+
+    public function testHostilePlayerNameEscapedExactlyOnceNextToThumbnail(): void
+    {
+        $player = $this->buildTestPlayer(77, 'O\'Neal <xss>&"q"');
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        $this->assertMatchesRegularExpression(
+            '#<a href="\./modules\.php\?name=Player&amp;pa=showpage&amp;pid=77"><img src="[^"]*" alt="" class="ibl-player-photo"[^>]*>O&apos;Neal &lt;xss&gt;&amp;&quot;q&quot;</a>#',
+            $output
+        );
+        $this->assertStringNotContainsString('&amp;lt;', $output);
     }
 }

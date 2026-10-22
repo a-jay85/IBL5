@@ -132,9 +132,7 @@ class MobileNavView implements MobileNavViewInterface
         <div class="mobile-section">
             <button class="mobile-dropdown-btn">
                 <span class="flex items-center gap-3">
-                    <?php if ($icon !== ''): ?>
-                        <span class="text-accent-500"><?= HtmlSanitizer::trusted($icon) ?></span>
-                    <?php endif; ?>
+                    <?= HtmlSanitizer::trusted($this->renderDropdownIcon($icon)) ?>
                     <span class="font-display text-lg font-semibold"><?= HtmlSanitizer::e($title) ?></span>
                 </span>
                 <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -148,24 +146,16 @@ class MobileNavView implements MobileNavViewInterface
 
                 <?php foreach ($links as $link): ?>
                     <?php if (isset($link['rawHtml'])): ?>
-                        <span class="mobile-dropdown-link"><?= HtmlSanitizer::trusted($link['rawHtml']) ?></span>
+                        <?= HtmlSanitizer::trusted($this->renderRawHtmlLink($link['rawHtml'])) ?>
                     <?php else: ?>
                         <?php
-                        $label = HtmlSanitizer::e($link['label'] ?? '');
-                        $url = HtmlSanitizer::e($link['url'] ?? '');
                         $external = $link['external'] ?? false;
                         $noBoost = $link['noBoost'] ?? false;
                         $badge = $link['badge'] ?? null;
-                        $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
-                        $htmxAttrs = ($external || $noBoost) ? '' : ' hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content"';
-                        $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
-                        $badgeHtml = $badge !== null
-                            ? '<span class="nav-badge">' . HtmlSanitizer::e($badge) . '</span>'
-                            : '';
                         ?>
-                        <a href="<?= HtmlSanitizer::trusted($url) ?>"<?= HtmlSanitizer::trusted($target) ?><?= HtmlSanitizer::trusted($htmxAttrs) ?> class="mobile-dropdown-link flex items-center justify-between">
-                            <span><?= HtmlSanitizer::trusted($label . $badgeHtml) ?></span>
-                            <?= HtmlSanitizer::trusted($externalIcon) ?>
+                        <a href="<?= HtmlSanitizer::e($link['url'] ?? '') ?>"<?= HtmlSanitizer::trusted($this->renderLinkAttrs($external, $noBoost)) ?> class="mobile-dropdown-link flex items-center justify-between">
+                            <span><?= HtmlSanitizer::e($link['label'] ?? '') ?><?= HtmlSanitizer::trusted($this->renderBadge($badge)) ?></span>
+                            <?= HtmlSanitizer::trusted($this->renderExternalIcon($external)) ?>
                         </a>
                     <?php endif; ?>
                 <?php endforeach; ?>
@@ -184,6 +174,63 @@ class MobileNavView implements MobileNavViewInterface
     }
 
     /**
+     * Render the accent-colored icon wrapper for a dropdown header.
+     *
+     * @param string $icon Builder-authored SVG/HTML (`NavigationMenuBuilder` `icon` entries)
+     */
+    private function renderDropdownIcon(string $icon): string
+    {
+        if ($icon === '') {
+            return '';
+        }
+
+        // Whitespace reproduces the original template bytes (pinned by ThemeIblOutputTest).
+        return str_repeat(' ', 24) . '<span class="text-accent-500">' . $icon . "</span>\n"
+            . str_repeat(' ', 20);
+    }
+
+    /**
+     * Render a raw-HTML link row.
+     *
+     * @param string $rawHtml Builder-authored HTML (`NavigationMenuBuilder` `rawHtml` entries)
+     */
+    private function renderRawHtmlLink(string $rawHtml): string
+    {
+        return '<span class="mobile-dropdown-link">' . $rawHtml . "</span>\n";
+    }
+
+    /**
+     * Render the target/rel/htmx attributes for a link anchor.
+     */
+    private function renderLinkAttrs(bool $external, bool $noBoost): string
+    {
+        $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
+        $htmxAttrs = ($external || $noBoost) ? '' : ' hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content"';
+
+        return $target . $htmxAttrs;
+    }
+
+    /**
+     * Render the badge span; the badge text is escaped here.
+     */
+    private function renderBadge(mixed $badge): string
+    {
+        if ($badge === null) {
+            return '';
+        }
+
+        return '<span class="ibl-chip nav-badge">' . HtmlSanitizer::e($badge) . '</span>';
+    }
+
+    /**
+     * Render the external-link icon (leading space included) or nothing.
+     */
+    private function renderExternalIcon(bool $external): string
+    {
+        return $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
+    }
+
+    /**
      * Render the league switcher for inside a mobile dropdown menu.
      */
     private function renderLeagueSwitcher(): string
@@ -194,7 +241,7 @@ class MobileNavView implements MobileNavViewInterface
         ob_start();
         ?>
         <div class="px-5 py-3 border-t border-white/10 mt-1">
-            <label for="mobile-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
+            <label for="mobile-league-select" class="nav-section-label">League</label>
             <div class="relative">
                 <select id="mobile-league-select" name="league" onchange="window.location.href=this.value" class="nav-select">
                     <option value="index.php?league=ibl"<?= HtmlSanitizer::e($iblSelected) ?> class="bg-navy-800 text-white">IBL</option>
@@ -219,7 +266,7 @@ class MobileNavView implements MobileNavViewInterface
         ob_start();
         ?>
         <div class="px-5 py-3 border-t border-white/10 mt-1">
-            <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2"><?= HtmlSanitizer::e($username) ?></div>
+            <div class="nav-section-label"><?= HtmlSanitizer::e($username) ?></div>
             <a href="modules.php?name=YourAccount&amp;op=logout" hx-boost="false" class="nav-logout-btn">Logout</a>
         </div>
         <?php

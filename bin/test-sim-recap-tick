@@ -11,18 +11,19 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SRT_DRIVER="$SCRIPT_DIR/sim-recap-tick"
 SRT_PROMPT_BIN="$SCRIPT_DIR/sim-recap-prompt"
 SRT_EXEMPLAR="$SCRIPT_DIR/lib/sim-recap-exemplar.txt"
 
-FAILED=0
-SRT_NFAIL=0
 SRT_RC=0
 SRT_PROMPT_RC=0
 
-srt_ok()   { echo "ok: $1"; }
-srt_fail() { echo "FAIL: $1"; FAILED=1; SRT_NFAIL=$((SRT_NFAIL + 1)); }
+srt_ok()   { h_pass "$1"; }
+srt_fail() { h_fail "$1"; }
 
 # srt_expect_eq <name> <want> <got>
 srt_expect_eq() {
@@ -54,7 +55,7 @@ srt_count() {
 # ── One-time scaffolding ───────────────────────────────────────────────────────
 srt_setup() {
     STUB="$(mktemp -d)"
-    trap 'rm -rf "$STUB"' EXIT
+    trap 'rm -rf "$STUB"; h_cleanup' EXIT
 
     # ssh stub: log every call; dispatch on storeSimRecap.php vs verb.
     # $STUB is exported and available to the stub at exec time.
@@ -79,6 +80,10 @@ if printf '%s' "$cmd" | grep -q 'storeSimRecap\.php'; then
     if [ -f "$STUB/store-fails" ]; then
         printf '{"ok":false,"error":"stub store failure"}\n'
         exit 1
+    fi
+    # store-unreachable: ssh's own connection failure — exit 255, empty stdout.
+    if [ -f "$STUB/store-unreachable" ]; then
+        exit 255
     fi
     # store-banner: real ssh writes non-JSON banners to STDERR while still
     # exiting 0 with good JSON on stdout (OpenSSH 10.2's post-quantum-KEX
@@ -111,6 +116,16 @@ verb=$(printf '%s' "$cmd" | grep -oE 'simRecapQueue\.php [a-z-]+' | awk '{print 
 if [ -f "$STUB/fail.$verb" ]; then
     exit 255
 fi
+# seq.<verb>/: ordered responses. Cat and delete the lowest-numbered file; once
+# the directory is empty, fall back to resp.<verb> / the default below.
+if [ -d "$STUB/seq.$verb" ]; then
+    next=$(ls "$STUB/seq.$verb" | sort -n | sed -n '1p')
+    if [ -n "$next" ]; then
+        cat "$STUB/seq.$verb/$next"
+        rm -f "$STUB/seq.$verb/$next"
+        exit 0
+    fi
+fi
 if [ -f "$STUB/resp.$verb" ]; then
     cat "$STUB/resp.$verb"
 else
@@ -125,7 +140,8 @@ else
         claim)         printf '{"ok":true,"cmd":"claim","sim":null}\n' ;;
         mention-map)   printf '{"ok":true,"cmd":"mention-map","teams":{}}\n' ;;
         recent-themes) printf '{"ok":true,"cmd":"recent-themes","themes":[]}\n' ;;
-        park)          printf '{"ok":true,"cmd":"park","sim":42,"outcome":"pending"}\n' ;;
+        park)          printf '{"ok":true,"cmd":"park","sim":42,"outcome":"backoff","route":"any","blocked_until":"2026-10-15 03:00:00","notified":"unchanged"}\n' ;;
+        notify)        printf '{"ok":true,"cmd":"notify","sim":42,"notified":"posted"}\n' ;;
         *)             printf '{"error":"unknown verb %s"}\n' "$verb"; exit 1 ;;
     esac
 fi
@@ -145,8 +161,22 @@ if [ "${STUB_SENTINEL:-0}" = 1 ]; then
     printf 'AGENT-STDOUT-SENTINEL\n'
     printf 'AGENT-STDERR-SENTINEL\n' >&2
 fi
+if [ -f "$STUB/agent-auth-fail" ]; then
+    printf 'Failed to authenticate. API Error: 401 OAuth access token is invalid.\n'
+    exit 0
+fi
 if [ -f "$STUB/agent-usage-limit" ]; then
     printf 'api error: 429 rate_limit_error\n'
+    exit 0
+fi
+# agent-output: print its contents as the agent's output, write no payload.
+if [ -f "$STUB/agent-output" ]; then
+    cat "$STUB/agent-output"
+    exit 0
+fi
+# agent-fails-once: fail this run (no payload), then behave normally.
+if [ -f "$STUB/agent-fails-once" ]; then
+    rm -f "$STUB/agent-fails-once"
     exit 0
 fi
 if [ ! -f "$STUB/agent-fails" ]; then
@@ -177,6 +207,7 @@ SH
     cat > "$STUB/prompt" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$@" > "$STUB/prompt.argv"
+[ -f "$STUB/prompt-fails" ] && exit 1
 printf 'PROMPT_MARKER_SIM_RECAP\n'
 SH
 
@@ -198,10 +229,10 @@ case " $* " in *" -K - "*) cat >> "$STUB/curl.stdin" ;; esac
 exit 0
 SH
 
-    # launchctl stub: log every call; always exit 0 (real bootout would SIGTERM
-    # the caller, but the stub lets the script's `return 0` exit cleanly so the
-    # test harness can see the call happened without killing itself).
-    cat > "$STUB/launchctl" <<'SH'
+    # launchctl stub, first on PATH: the tick must never call launchctl (it no
+    # longer boots itself out), so every case asserts launchctl.log is absent.
+    mkdir -p "$STUB/pathbin"
+    cat > "$STUB/pathbin/launchctl" <<'SH'
 #!/usr/bin/env bash
 echo "launchctl $*" >> "$STUB/launchctl.log"
 exit 0
@@ -215,14 +246,14 @@ printf 'fired %s\n' "$(date +%s%N)" >> "$STUB_CALLS"
 EOF
     chmod +x "$STUB/db-sync-now"
 
-    chmod +x "$STUB/ssh" "$STUB/claude" "$STUB/prompt" "$STUB/mysql" "$STUB/curl" "$STUB/launchctl"
+    chmod +x "$STUB/ssh" "$STUB/claude" "$STUB/prompt" "$STUB/mysql" "$STUB/curl" "$STUB/pathbin/launchctl"
 
     export STUB
     export SIM_RECAP_SSH_BIN="$STUB/ssh"
     export SIM_RECAP_CLAUDE_BIN="$STUB/claude"
     export SIM_RECAP_PROMPT_BIN="$STUB/prompt"
     export SIM_RECAP_MYSQL_BIN="$STUB/mysql"
-    export SIM_RECAP_LAUNCHCTL_BIN="$STUB/launchctl"
+    export PATH="$STUB/pathbin:$PATH"
     export SIM_RECAP_SSH_HOST="test-host"
     export SIM_RECAP_REMOTE_ROOT=""
     export SIM_RECAP_DB_HOST="127.0.0.1"
@@ -239,18 +270,24 @@ EOF
     # read and WRITE the developer's real ~/.claude state file, and every degraded
     # case would then depend on whatever the last real tick left behind.
     export SIM_RECAP_OPS_ALERT_STATE="$STUB/ops-alert.json"
+    # Under CI every actions-mode case would otherwise append to the real
+    # runner's step-output file. Only the redispatch case sets it.
+    unset GITHUB_OUTPUT
 }
 
 # Per-case reset: wipe logs and all per-case control sentinels.
 srt_reset() {
     rm -f "$STUB"/ssh.log "$STUB"/claude.log "$STUB"/claude.sentinel \
-          "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit \
+          "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit "$STUB"/agent-auth-fail \
           "$STUB"/store-fails "$STUB"/store-banner "$STUB"/resp.* "$STUB"/fail.* \
           "$STUB"/record-stdin "$STUB"/store.cmd "$STUB"/store.stdin \
           "$STUB"/curl.log "$STUB"/prompt.argv "$STUB"/claude.argv "$STUB"/tick.stdout "$STUB"/tick.stderr "$STUB"/launchctl.log "$STUB"/launchctl.sentinel \
           "$STUB"/ops-alert.json "$STUB"/ops-alert.json.tmp* "$STUB"/curl.stdin \
           "$STUB_CALLS" \
+          "$STUB"/prompt-fails "$STUB"/agent-output "$STUB"/agent-fails-once \
+          "$STUB"/store-unreachable "$STUB"/gh-output "$STUB"/ops-alert.json.park-unreachable \
           2>/dev/null
+    rm -rf "$STUB"/seq.* 2>/dev/null
     export SIM_RECAP_DB_PASSWORD="test_db_password"
     export SIM_RECAP_MYSQL_BIN="$STUB/mysql"
     unset SIM_RECAP_KEEP_WORKDIR 2>/dev/null || true
@@ -391,7 +428,7 @@ touch "$STUB/agent-fails"
 printf '{"ok":true,"cmd":"park","sim":42,"outcome":"failed"}' > "$STUB/resp.park"
 srt_run
 srt_expect_eq "park_failed_is_terminal — exit 0" 0 "$SRT_RC"
-srt_log_has "$STUB" tick.out "terminal" "park_failed_is_terminal — terminal log line"
+srt_log_has "$STUB" tick.out "TERMINAL — no route left" "park_failed_is_terminal — terminal log line"
 
 # ── missing_payload_parks_not_stores ─────────────────────────────────────────
 srt_reset
@@ -399,6 +436,8 @@ printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
 touch "$STUB/agent-fails"
 srt_run
 srt_log_has  "$STUB" ssh.log "park"         "missing_payload_parks_not_stores — park in ssh.log"
+srt_log_has  "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" \
+    "missing_payload_parks_not_stores — parks with --cause=flaky"
 srt_log_lacks "$STUB" ssh.log "storeSimRecap" "missing_payload_parks_not_stores — no store"
 
 # ── usage_limit_parks_with_reason ─────────────────────────────────────────────
@@ -408,6 +447,385 @@ touch "$STUB/agent-usage-limit"
 srt_run
 srt_log_has "$STUB" tick.out "usage limit" "usage_limit_parks_with_reason — logged"
 srt_log_has "$STUB" ssh.log  "park"        "usage_limit_parks_with_reason — park in ssh.log"
+srt_log_lacks "$STUB" tick.out "auth failed" "usage_limit_parks_with_reason — not mislabelled as auth failure"
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=usage_limit" \
+    "usage_limit_parks_with_reason — parks with --cause=usage_limit"
+
+# ── auth_error_parks_with_own_reason ──────────────────────────────────────────
+# A rejected CLAUDE_CODE_OAUTH_TOKEN (401) must log its own line, never the
+# "usage limit" one, and still park.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-auth-fail"
+srt_run
+srt_log_has   "$STUB" tick.out "auth failed" "auth_error_parks_with_own_reason — logged as auth failed"
+srt_log_lacks "$STUB" tick.out "usage limit" "auth_error_parks_with_own_reason — not logged as usage limit"
+srt_log_has   "$STUB" ssh.log  "park"        "auth_error_parks_with_own_reason — park in ssh.log"
+srt_log_lacks "$STUB" ssh.log  "storeSimRecap" "auth_error_parks_with_own_reason — no store"
+srt_log_has   "$STUB" ssh.log  "park --sim=42 --host=mac --cause=auth" \
+    "auth_error_parks_with_own_reason — parks with --cause=auth"
+
+# ── parked_sim_exit_code_by_host_mode ─────────────────────────────────────────
+# actions + a parking path (no payload, default park outcome backoff) -> exit 0:
+# a backoff is a workaround in progress, not a red run.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "parked_actions_pending — exit 0 on backoff" 0 "$SRT_RC"
+srt_log_lacks "$STUB" tick.out "exiting 1" "parked_actions_pending — no exiting 1 line"
+srt_log_has "$STUB" tick.out "backing off until" "parked_actions_pending — logs the backoff"
+srt_log_has "$STUB" ssh.log  "park"      "parked_actions_pending — park in ssh.log"
+
+# launchd (default) with the same parking path stays exit 0.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-fails"
+( unset SIM_RECAP_HOST_MODE; srt_run; echo "$SRT_RC" > "$STUB/hm.rc" )
+srt_expect_eq "parked_launchd_pending — exit 0" 0 "$(cat "$STUB/hm.rc")"
+srt_log_lacks "$STUB" tick.out "exiting 1" "parked_launchd_pending — no exiting 1 line"
+srt_log_has   "$STUB" tick.out "backing off until 2026-10-15 03:00:00 (cause flaky)" \
+    "parked_launchd_pending — new backoff log text"
+srt_log_has   "$STUB" ssh.log  "park"      "parked_launchd_pending — park in ssh.log"
+
+# actions + park outcome 'none' (lost claim) is not a failure -> exit 0.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+printf '{"ok":true,"cmd":"park","sim":42,"outcome":"none"}' > "$STUB/resp.park"
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "parked_actions_none — exit 0" 0 "$SRT_RC"
+srt_log_has   "$STUB" tick.out "lost the claim" "parked_actions_none — lost-claim log line"
+srt_log_lacks "$STUB" tick.out "exiting 1"      "parked_actions_none — no exiting 1 line"
+
+# actions + park outcome 'failed' (attempt ceiling) is a failure -> exit 1.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+printf '{"ok":true,"cmd":"park","sim":42,"outcome":"failed"}' > "$STUB/resp.park"
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "parked_actions_failed — exit 1" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "exiting 1" "parked_actions_failed — logs exiting 1"
+
+# actions + successful store -> exit 0, nothing parked.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "actions_store_success — exit 0" 0 "$SRT_RC"
+srt_log_has   "$STUB" ssh.log  "storeSimRecap" "actions_store_success — store called"
+srt_log_lacks "$STUB" tick.out "exiting 1"     "actions_store_success — no exiting 1 line"
+
+# ══ SELF-HEALING: cause classification, routes, posts, annotations ═══════════
+
+# srt_claim42 — queue hands out sim 42 on claim-next.
+srt_claim42() { printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"; }
+# srt_park_resp <outcome> [notified] [route] — fixed park answer for every park call.
+srt_park_resp() {
+    printf '{"ok":true,"cmd":"park","sim":42,"outcome":"%s","route":"%s","blocked_until":"2026-10-15 03:00:00","notified":"%s"}\n' \
+        "$1" "${3:-any}" "${2:-unchanged}" > "$STUB/resp.park"
+}
+# srt_ops_posts — ops-thread posts recorded by the curl stub (bot path).
+srt_ops_posts() { srt_matches curl.log '/post-to-thread'; }
+
+# ── cause_fetch_inputs_transport ──────────────────────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/fail.recent-themes"
+srt_run
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" "cause_fetch_inputs_transport"
+
+# ── cause_prompt ──────────────────────────────────────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/prompt-fails"
+srt_run
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=prompt" "cause_prompt"
+srt_file_absent "$STUB/claude.sentinel" "cause_prompt — no claude invocation"
+
+# ── cause_no_tunnel_transport ─────────────────────────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/fail.tunnel"
+srt_run
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" "cause_no_tunnel_transport"
+srt_file_absent "$STUB/claude.sentinel" "cause_no_tunnel_transport — no claude invocation"
+
+# ── cause_auth ────────────────────────────────────────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/agent-auth-fail"
+srt_run
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=auth" "cause_auth"
+
+# ── cause_no_payload_flaky ────────────────────────────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/agent-fails"
+srt_run
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" "cause_no_payload_flaky"
+
+# ── cause_store_transport ─────────────────────────────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/store-unreachable"
+srt_run
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" "cause_store_transport"
+srt_log_has "$STUB" tick.out "cause=transport" "cause_store_transport — log names the cause"
+
+# ── cause_store_rejected_flaky ────────────────────────────────────────────────
+srt_reset; srt_claim42
+printf '{"ok":false}\n' > "$STUB/resp.store"
+srt_run
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" "cause_store_rejected_flaky"
+srt_log_has "$STUB" tick.out "cause=flaky" "cause_store_rejected_flaky — log names the cause"
+
+# ── agent_cost_logged / agent_cost_unavailable ────────────────────────────────
+# agent-output stands in for claude's stdout+stderr: a stderr line before the
+# result object proves the last-result-line extraction; garbage proves fallback.
+srt_reset; srt_claim42
+printf '%s\n' 'some stderr warning' \
+    '{"type":"result","total_cost_usd":1.2345,"num_turns":7,"duration_ms":93400,"usage":{"input_tokens":11,"cache_read_input_tokens":2200,"cache_creation_input_tokens":330,"output_tokens":4400}}' \
+    > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out \
+    "sim 42: agent cost \$1.23, turns 7, duration 93s, input 11 (cache read 2200, cache write 330), output 4400 tokens, model test-model" \
+    "agent_cost_logged — result JSON yields the cost line"
+srt_reset; srt_claim42
+printf 'not json at all\n{broken\n' > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out "sim 42: agent cost unavailable" \
+    "agent_cost_unavailable — garbage output yields the fallback line"
+
+# A duration that breaks the arithmetic must hit the fallback, not log a blank line.
+srt_reset; srt_claim42
+printf '%s\n' '{"type":"result","total_cost_usd":1,"num_turns":1,"duration_ms":"1 2","usage":{}}' \
+    > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out "sim 42: agent cost unavailable" \
+    "agent_cost_unavailable — failed formatting yields the fallback line"
+srt_log_lacks "$STUB" tick.out "agent cost \$" \
+    "agent_cost_unavailable — failed formatting logs no partial cost line"
+
+# ── cause_usage_limit_epoch_form ──────────────────────────────────────────────
+srt_reset; srt_claim42
+printf 'Claude AI usage limit reached|1791000000\n' > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=usage_limit --reset=1791000000" \
+    "cause_usage_limit_epoch_form"
+
+# ── cause_usage_limit_clock_form ──────────────────────────────────────────────
+srt_reset; srt_claim42
+printf "You've hit your limit · resets 3pm (America/Los_Angeles)\n" > "$STUB/agent-output"
+srt_now=$(date +%s)
+srt_run
+srt_reset_e=$(sed -n 's/.*--cause=usage_limit --reset=\([0-9][0-9]*\).*/\1/p' "$STUB/ssh.log" | sed -n '1p')
+srt_in_window=no
+if [ -n "$srt_reset_e" ] && [ "$srt_reset_e" -gt "$srt_now" ] \
+   && [ "$srt_reset_e" -le $((srt_now + 86400 + 60)) ]; then
+    srt_in_window=yes
+fi
+srt_expect_eq "cause_usage_limit_clock_form — reset inside (now, now+24h]" yes "$srt_in_window"
+# Same platform test as the tick: BSD `date -r`, then GNU `date -d @E`.
+srt_la=$(TZ=America/Los_Angeles date -r "${srt_reset_e:-0}" +%H:%M 2>/dev/null \
+    || TZ=America/Los_Angeles date -d "@${srt_reset_e:-0}" +%H:%M 2>/dev/null)
+srt_expect_eq "cause_usage_limit_clock_form — renders 15:00 in America/Los_Angeles" "15:00" "$srt_la"
+
+# ── cause_usage_limit_unparseable ─────────────────────────────────────────────
+srt_reset; srt_claim42
+printf 'Claude AI usage limit reached\n' > "$STUB/agent-output"
+srt_run
+srt_log_has   "$STUB" ssh.log "park --sim=42 --host=mac --cause=usage_limit" "cause_usage_limit_unparseable"
+srt_log_lacks "$STUB" ssh.log "--reset=" "cause_usage_limit_unparseable — no --reset"
+
+# ── host_mode_empty_defaults_mac ──────────────────────────────────────────────
+srt_reset; srt_claim42
+SIM_RECAP_HOST_MODE="" srt_run
+srt_log_has "$STUB" ssh.log "--host=mac" "host_mode_empty_defaults_mac"
+
+# ── host_mode_rejects_unknown ─────────────────────────────────────────────────
+srt_reset; srt_claim42
+SIM_RECAP_HOST_MODE=bogus srt_run
+srt_expect_eq "host_mode_rejects_unknown — exit 1" 1 "$SRT_RC"
+srt_file_absent "$STUB/ssh.log" "host_mode_rejects_unknown — no ssh call"
+
+# ── route_retry_now_loops_same_tick ───────────────────────────────────────────
+srt_reset; srt_claim42
+mkdir -p "$STUB/seq.park"
+printf '{"ok":true,"cmd":"park","sim":42,"outcome":"retry_now","route":"mac","blocked_until":null,"notified":"retrying"}\n' \
+    > "$STUB/seq.park/1"
+touch "$STUB/agent-fails-once"
+srt_run
+srt_expect_eq "route_retry_now_loops_same_tick — exit 0" 0 "$SRT_RC"
+srt_expect_eq "route_retry_now_loops_same_tick — claude ran twice" 2 "$(srt_matches claude.log 'claude')"
+srt_expect_eq "route_retry_now_loops_same_tick — store ran once" 1 "$(srt_matches ssh.log 'storeSimRecap')"
+srt_log_has "$STUB" tick.out "retrying now on this host (cause flaky)" "route_retry_now_loops_same_tick — logs the retry"
+
+# ── route_retry_now_capped_at_three_passes ────────────────────────────────────
+srt_reset; srt_claim42
+srt_park_resp retry_now retrying mac
+touch "$STUB/agent-fails"
+srt_run
+srt_expect_eq "route_retry_now_capped_at_three_passes — exit 0" 0 "$SRT_RC"
+srt_expect_eq "route_retry_now_capped_at_three_passes — claude ran 3 times" 3 "$(srt_matches claude.log 'claude')"
+
+# ── route_retry_now_actions_out_of_budget_redispatches ────────────────────────
+srt_reset; srt_claim42
+srt_park_resp retry_now retrying actions
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions SIM_RECAP_CLAUDE_TIMEOUT=2100 GITHUB_OUTPUT="$STUB/gh-output" srt_run
+srt_expect_eq "route_retry_now_actions_out_of_budget_redispatches — exit 0" 0 "$SRT_RC"
+srt_expect_eq "route_retry_now_actions_out_of_budget_redispatches — claude ran once" 1 "$(srt_matches claude.log 'claude')"
+srt_log_has "$STUB" gh-output "redispatch=true" "route_retry_now_actions_out_of_budget_redispatches — GITHUB_OUTPUT"
+srt_log_has "$STUB" tick.out "no time left in this run" \
+    "route_retry_now_actions_out_of_budget_redispatches — logs the re-dispatch"
+# Same path with GITHUB_OUTPUT unset: no error, still exit 0.
+srt_reset; srt_claim42
+srt_park_resp retry_now retrying actions
+touch "$STUB/agent-fails"
+( unset GITHUB_OUTPUT; SIM_RECAP_HOST_MODE=actions SIM_RECAP_CLAUDE_TIMEOUT=2100 srt_run; echo "$SRT_RC" > "$STUB/hm.rc" )
+srt_expect_eq "route_retry_now_actions_out_of_budget_redispatches — GITHUB_OUTPUT unset exits 0" 0 "$(cat "$STUB/hm.rc")"
+srt_log_lacks "$STUB" tick.out "unbound variable" \
+    "route_retry_now_actions_out_of_budget_redispatches — GITHUB_OUTPUT unset, no error"
+
+# ── route_waiting_no_second_claim ─────────────────────────────────────────────
+srt_reset; srt_claim42
+srt_park_resp waiting waiting actions
+printf 'Claude AI usage limit reached\n' > "$STUB/agent-output"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "route_waiting_no_second_claim — exit 0" 0 "$SRT_RC"
+srt_expect_eq "route_waiting_no_second_claim — one claim-next" 1 "$(srt_matches ssh.log 'claim-next')"
+srt_log_has "$STUB" tick.out "waiting until 2026-10-15 03:00:00" "route_waiting_no_second_claim — log names the wait"
+
+# ── route_handed_actions_green ────────────────────────────────────────────────
+srt_reset; srt_claim42
+srt_park_resp handed handed_mac mac
+touch "$STUB/agent-auth-fail"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "route_handed_actions_green — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "handed to mac (cause auth)" "route_handed_actions_green — log names the route"
+
+# ── route_failed_actions_red ──────────────────────────────────────────────────
+srt_reset; srt_claim42
+srt_park_resp failed unavailable
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "route_failed_actions_red — exit 1" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "TERMINAL — no route left (cause flaky)" "route_failed_actions_red — terminal log"
+
+# ── route_unexpected_outcome_red ──────────────────────────────────────────────
+srt_reset; srt_claim42
+printf '{"ok":true,"cmd":"park","sim":42,"outcome":"pending"}\n' > "$STUB/resp.park"
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "route_unexpected_outcome_red — exit 1" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "unexpected outcome 'pending'" "route_unexpected_outcome_red — log names the outcome"
+
+# ── claim_scope_* ─────────────────────────────────────────────────────────────
+srt_reset
+srt_run
+srt_log_has "$STUB" ssh.log "claim-next --host=mac" "claim_scope_launchd_sends_mac"
+srt_reset
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_log_has "$STUB" ssh.log "claim-next --host=actions" "claim_scope_actions_sends_actions"
+srt_reset
+printf '{"ok":true,"cmd":"claim","sim":null}\n' > "$STUB/resp.claim"
+srt_run --sim=42
+srt_log_has "$STUB" ssh.log "claim --sim=42 --host=mac" "claim_scope_dry_sim_sends_host"
+
+# ── post_done_calls_notify ────────────────────────────────────────────────────
+srt_reset; srt_claim42
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_log_has "$STUB" ssh.log "notify --sim=42 --host=actions --event=done" "post_done_calls_notify"
+srt_log_has "$STUB" tick.out "admin-chat: told the commissioner (done)" "post_done_calls_notify — logs the post"
+
+# ── post_done_absent_on_park ──────────────────────────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_log_lacks "$STUB" ssh.log "notify" "post_done_absent_on_park"
+
+# ── post_notify_failure_never_fails_tick ──────────────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/fail.notify"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "post_notify_failure_never_fails_tick — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "WARNING: sim 42: admin-chat success post failed" \
+    "post_notify_failure_never_fails_tick — WARNING logged"
+
+# ── post_park_failed_falls_back_to_ops ────────────────────────────────────────
+srt_reset; srt_claim42
+srt_park_resp backoff failed
+touch "$STUB/agent-fails"
+srt_run
+srt_expect_eq "post_park_failed_falls_back_to_ops — exactly one ops post" 1 "$(srt_ops_posts)"
+srt_log_has "$STUB" curl.log "The #admin-chat post from the league server failed." \
+    "post_park_failed_falls_back_to_ops — ops message names the failure"
+
+# ── post_park_unchanged_is_silent ─────────────────────────────────────────────
+srt_reset; srt_claim42
+srt_park_resp backoff unchanged
+touch "$STUB/agent-fails"
+srt_run
+srt_expect_eq "post_park_unchanged_is_silent — zero ops posts" 0 "$(srt_ops_posts)"
+srt_log_lacks "$STUB" tick.out "WARNING" "post_park_unchanged_is_silent — no warning"
+
+# ── post_park_unreachable_once_per_sim ────────────────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/fail.park" "$STUB/agent-fails"
+srt_run
+srt_run
+srt_expect_eq "post_park_unreachable_once_per_sim — one ops post after two runs" 1 "$(srt_ops_posts)"
+srt_log_has "$STUB" curl.log "couldn't reach the league server" \
+    "post_park_unreachable_once_per_sim — ops message names the outage"
+srt_expect_eq "post_park_unreachable_once_per_sim — exit 0" 0 "$SRT_RC"
+
+# ── annotate_terminal_error_actions ───────────────────────────────────────────
+srt_reset; srt_claim42
+srt_park_resp failed unavailable
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_log_has "$STUB" tick.out "::error title=sim-recap::sim 42 has no route left (cause flaky); #admin-chat told" \
+    "annotate_terminal_error_actions"
+
+# ── annotate_handoff_warning_actions ──────────────────────────────────────────
+srt_reset; srt_claim42
+srt_park_resp handed handed_mac mac
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_log_has "$STUB" tick.out "::warning title=sim-recap::" "annotate_handoff_warning_actions"
+srt_expect_eq "annotate_handoff_warning_actions — exit 0" 0 "$SRT_RC"
+
+# ── annotate_survives_workflow_stdout_discard ─────────────────────────────────
+# The workflow runs the tick with stdout sent to /dev/null, so an annotation
+# only reaches the run if it is written to stderr.
+srt_reset; srt_claim42
+srt_park_resp handed handed_mac mac
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions "$SRT_DRIVER" > /dev/null 2> "$STUB/tick.out"
+srt_log_has "$STUB" tick.out "::warning title=sim-recap::" "annotate_survives_workflow_stdout_discard"
+
+# ── annotate_silent_in_launchd ────────────────────────────────────────────────
+# Terminal outcome plus a failed admin-chat post: both annotation paths fire in
+# actions mode, so launchd staying silent here is a real check.
+srt_reset; srt_claim42
+srt_park_resp failed failed
+touch "$STUB/agent-fails"
+srt_run
+srt_log_lacks "$STUB" tick.out "::error" "annotate_silent_in_launchd — no ::error"
+srt_log_lacks "$STUB" tick.out "::warning" "annotate_silent_in_launchd — no ::warning"
+srt_log_has   "$STUB" tick.out "TERMINAL" "annotate_silent_in_launchd — still logged in launchd"
+
+# ── secrets_never_in_argv_or_logs ─────────────────────────────────────────────
+# Drive the webhook ops_post path (a failed admin-chat post) so the check is not
+# vacuous: curl must run with `-K -`, and the URL travels only on its stdin.
+srt_reset; srt_claim42
+srt_park_resp backoff failed
+touch "$STUB/agent-fails"
+SIM_RECAP_HOST_MODE=actions SIM_RECAP_OPS_WEBHOOK_URL="https://example.invalid/hook-SECRETMARK" \
+    SIM_RECAP_DB_PASSWORD=PWMARK srt_run
+srt_log_has   "$STUB" curl.log " -K - "      "secrets_never_in_argv_or_logs — webhook path ran with -K -"
+srt_log_has   "$STUB" curl.stdin "SECRETMARK" "secrets_never_in_argv_or_logs — webhook went via stdin"
+srt_log_lacks "$STUB" curl.log "SECRETMARK"  "secrets_never_in_argv_or_logs — webhook not in curl argv"
+srt_log_lacks "$STUB" ssh.log  "SECRETMARK"  "secrets_never_in_argv_or_logs — webhook not in ssh argv"
+srt_log_lacks "$STUB" tick.out "SECRETMARK"  "secrets_never_in_argv_or_logs — webhook not in tick output"
+srt_log_lacks "$STUB" curl.log "PWMARK"      "secrets_never_in_argv_or_logs — password not in curl argv"
+srt_log_lacks "$STUB" ssh.log  "PWMARK"      "secrets_never_in_argv_or_logs — password not in ssh argv"
+srt_log_lacks "$STUB" tick.out "PWMARK"      "secrets_never_in_argv_or_logs — password not in tick output"
+
 
 # ── tunnel_attached_before_agent ──────────────────────────────────────────────
 # The generation path must attach the SELECT-only MySQL forward to the existing
@@ -887,70 +1305,89 @@ else
 fi
 unset SIM_RECAP_KEEP_WORKDIR
 
-# ── phase_gate_boots_out_when_recaps_disabled ─────────────────────────────────
+# ── phase_gate_stays_armed_when_recaps_disabled ───────────────────────────────
 # When claim-next reports recaps_enabled:false and sim is null (nothing left to
-# drain), the tick must log the reason, call launchctl bootout, and exit 0.
-# Real launchctl would SIGTERM the caller; the stub exits 0 so the script's
-# `return 0` after the bootout call gives us a clean exit to inspect.
+# drain), the tick logs the reason and exits 0. It never unloads itself, so the
+# first tick after the phase flips can resume work.
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Playoffs","recaps_enabled":false}\n' \
     > "$STUB/resp.claim-next"
 srt_run
-srt_expect_eq "phase_gate_boots_out_when_recaps_disabled — exit 0" 0 "$SRT_RC"
-srt_log_has "$STUB" tick.out "booting out poller" \
-    "phase_gate_boots_out_when_recaps_disabled — logged reason"
-srt_log_has "$STUB" launchctl.log "bootout" \
-    "phase_gate_boots_out_when_recaps_disabled — launchctl bootout called"
-srt_log_has "$STUB" launchctl.log "com.ibl5.sim-recap-poll" \
-    "phase_gate_boots_out_when_recaps_disabled — correct label"
+srt_expect_eq "phase_gate_stays_armed_when_recaps_disabled — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "poller stays armed" \
+    "phase_gate_stays_armed_when_recaps_disabled — logged reason"
+srt_log_has "$STUB" tick.out "phase: Playoffs" \
+    "phase_gate_stays_armed_when_recaps_disabled — logged phase"
+srt_count "phase_gate_stays_armed_when_recaps_disabled — zero claude" 0 "$STUB/claude.log"
+srt_file_absent "$STUB/launchctl.log" \
+    "phase_gate_stays_armed_when_recaps_disabled — launchctl never called"
 
-# ── phase_gate_no_bootout_when_recaps_enabled ─────────────────────────────────
+# ── phase_gate_resumes_when_recaps_enabled ────────────────────────────────────
+# A disabled tick followed by an enabled tick with a pending sim: the second
+# tick claims and generates normally, with no re-arm step in between.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Preseason","recaps_enabled":false}\n' \
+    > "$STUB/resp.claim-next"
+srt_run
+srt_log_has "$STUB" tick.out "poller stays armed" \
+    "phase_gate_resumes_when_recaps_enabled — disabled tick stays armed"
+printf '{"ok":true,"cmd":"claim-next","sim":"42","phase":"HEAT","recaps_enabled":true}\n' \
+    > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq "phase_gate_resumes_when_recaps_enabled — enabled tick exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "claimed sim 42" \
+    "phase_gate_resumes_when_recaps_enabled — enabled tick claims"
+srt_count "phase_gate_resumes_when_recaps_enabled — one claude" 1 "$STUB/claude.log"
+srt_file_absent "$STUB/launchctl.log" \
+    "phase_gate_resumes_when_recaps_enabled — launchctl never called"
+
+# ── phase_gate_never_unloads_when_recaps_enabled ─────────────────────────────────
 # Regular Season (recaps_enabled:true) with no pending sim → cheap exit, no
 # unload. The poller should stay running and wait for the next sim.
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Regular Season","recaps_enabled":true}\n' \
     > "$STUB/resp.claim-next"
 srt_run
-srt_expect_eq "phase_gate_no_bootout_when_recaps_enabled — exit 0" 0 "$SRT_RC"
+srt_expect_eq "phase_gate_never_unloads_when_recaps_enabled — exit 0" 0 "$SRT_RC"
 srt_log_has "$STUB" tick.out "no pending sim — exiting cheap" \
-    "phase_gate_no_bootout_when_recaps_enabled — cheap exit"
+    "phase_gate_never_unloads_when_recaps_enabled — cheap exit"
 srt_file_absent "$STUB/launchctl.log" \
-    "phase_gate_no_bootout_when_recaps_enabled — launchctl never called"
+    "phase_gate_never_unloads_when_recaps_enabled — launchctl never called"
 
-# ── phase_gate_no_bootout_in_dry_run ─────────────────────────────────────────
+# ── phase_gate_never_unloads_in_dry_run ─────────────────────────────────────────
 # --dry-run goes to dry_run(), which never calls claim-next or touches the phase
 # gate. Even if we put a hostile resp.claim-next, launchctl must never be called.
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Playoffs","recaps_enabled":false}\n' \
     > "$STUB/resp.claim-next"
 srt_run --dry-run --sim=42
-srt_expect_eq "phase_gate_no_bootout_in_dry_run — exit 0" 0 "$SRT_RC"
+srt_expect_eq "phase_gate_never_unloads_in_dry_run — exit 0" 0 "$SRT_RC"
 srt_file_absent "$STUB/launchctl.log" \
-    "phase_gate_no_bootout_in_dry_run — launchctl never called in dry-run mode"
+    "phase_gate_never_unloads_in_dry_run — launchctl never called in dry-run mode"
 
-# ── unclaimed_sim_aborts_before_bootout_gate ──────────────────────────────────
+# ── unclaimed_sim_aborts_before_phase_gate ──────────────────────────────────
 # When --sim=N is supplied and the queue returns claimed:false, the
-# unclaimable-sim guard exits 1 before the bootout gate runs. The launchctl
-# assertion confirms the bootout never fires even though recaps_enabled:false.
+# unclaimable-sim guard exits 1 before the phase gate runs. The launchctl
+# assertion confirms nothing unloads even though recaps_enabled:false.
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Playoffs","recaps_enabled":false}\n' \
     > "$STUB/resp.claim"
 srt_run --sim=42
-srt_expect_eq "unclaimed_sim_aborts_before_bootout_gate — exit 1" 1 "$SRT_RC"
+srt_expect_eq "unclaimed_sim_aborts_before_phase_gate — exit 1" 1 "$SRT_RC"
 srt_file_absent "$STUB/launchctl.log" \
-    "unclaimed_sim_aborts_before_bootout_gate — launchctl not called"
+    "unclaimed_sim_aborts_before_phase_gate — launchctl not called"
 
 # ── phase_gate_fail_safe_missing_field ────────────────────────────────────────
 # If claim-next returns a response without the recaps_enabled field (e.g. the
 # remote script was not yet deployed), jq evaluates `.recaps_enabled == false`
-# as `null == false` → false, so jq_ok returns non-zero → no bootout.
+# as `null == false` → false, so jq_ok returns non-zero → plain idle exit.
 # Fail-safe: absence of the field must be treated as "recaps enabled."
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":null}\n' > "$STUB/resp.claim-next"
 srt_run
 srt_expect_eq "phase_gate_fail_safe_missing_field — exit 0" 0 "$SRT_RC"
 srt_log_has "$STUB" tick.out "no pending sim — exiting cheap" \
-    "phase_gate_fail_safe_missing_field — cheap exit (not bootout)"
+    "phase_gate_fail_safe_missing_field — cheap exit (not the disabled branch)"
 srt_file_absent "$STUB/launchctl.log" \
     "phase_gate_fail_safe_missing_field — launchctl never called on missing field"
 
@@ -1143,34 +1580,34 @@ pkill -f "$STUB/db-sync-slow" 2>/dev/null || true
 # ── Host mode (Phase 1, sim-recap-github-actions) ──
 HM_DISABLED='{"ok":true,"sim":null,"recaps_enabled":false,"phase":"Playoffs"}'
 
-# 1. actions bootout no-op
+# 1. actions: stays armed
 srt_reset
 printf '%s\n' "$HM_DISABLED" > "$STUB/resp.claim-next"
 SIM_RECAP_HOST_MODE=actions srt_run
 srt_expect_eq "HM-1 exit 0" 0 "$SRT_RC"
-srt_log_has "$STUB" tick.out "leaving the hourly schedule armed" "actions bootout no-op"
+srt_log_has "$STUB" tick.out "poller stays armed" "actions stays armed"
 srt_file_absent "$STUB/launchctl.log" "HM-1 launchctl never called"
 
-# 2. launchd bootout unchanged (seam unset)
+# 2. launchd: same line, no bootout (seam unset)
 srt_reset
 printf '%s\n' "$HM_DISABLED" > "$STUB/resp.claim-next"
 ( unset SIM_RECAP_HOST_MODE; srt_run; echo "$SRT_RC" > "$STUB/hm.rc" )
 srt_expect_eq "HM-2 exit 0" 0 "$(cat "$STUB/hm.rc")"
-srt_log_has "$STUB" tick.out "booting out poller" "launchd bootout unchanged (unset)"
-srt_log_has "$STUB" launchctl.log "bootout" "HM-2 launchctl bootout called"
+srt_log_has "$STUB" tick.out "poller stays armed" "launchd stays armed (unset)"
+srt_file_absent "$STUB/launchctl.log" "HM-2 launchctl never called"
 
 # 3. empty seam = launchd
 srt_reset
 printf '%s\n' "$HM_DISABLED" > "$STUB/resp.claim-next"
 SIM_RECAP_HOST_MODE="" srt_run
-srt_log_has "$STUB" tick.out "booting out poller" "empty seam = launchd"
-srt_log_has "$STUB" launchctl.log "bootout" "HM-3 launchctl bootout called"
+srt_log_has "$STUB" tick.out "poller stays armed" "empty seam stays armed"
+srt_file_absent "$STUB/launchctl.log" "HM-3 launchctl never called"
 
-# 4. bogus seam aborts before any ssh call
+# 4. bogus seam aborts before any ssh call (exit 1 since HOST_ID derivation)
 srt_reset
 SIM_RECAP_HOST_MODE=cron srt_run
-srt_expect_eq "HM-4 exit 2" 2 "$SRT_RC"
-srt_log_has "$STUB" tick.out "unknown SIM_RECAP_HOST_MODE" "bogus seam aborts"
+srt_expect_eq "HM-4 exit 1" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "SIM_RECAP_HOST_MODE must be launchd or actions" "bogus seam aborts"
 srt_file_absent "$STUB/ssh.log" "HM-4 no ssh call made"
 
 # 5. actions db-sync skipped
@@ -1193,7 +1630,7 @@ srt_reset
 touch "$STUB/fail.claim-next"
 SIM_RECAP_HOST_MODE=actions srt_run
 srt_expect_eq "HM-7 exit 1" 1 "$SRT_RC"
-srt_log_has "$STUB" tick.out "claim-next did not complete" "actions queue failure still errors"
+srt_log_has "$STUB" tick.out "claim-next --host=actions did not complete" "actions queue failure still errors"
 srt_count "HM-7 zero claude" 0 "$STUB/claude.log"
 
 # 8. live --sim=N uses the claim verb
@@ -1292,6 +1729,30 @@ touch "$STUB/fail.simRecapContext"
 srt_run
 srt_log_has "$STUB" curl.log "post-to-thread" "webhook unset and empty both use bot path"
 srt_file_absent "$STUB/curl.stdin" "webhook empty leaves no curl stdin"
+
+# 8. webhook alone arms the alert; no thread id = webhook's own channel
+srt_reset
+export SIM_RECAP_OPS_WEBHOOK_URL="$WH_URL"
+export SIM_RECAP_OPS_ALERT_THREAD_ID=""
+printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+srt_expect_eq "webhook without thread id — exit 0" 0 "$SRT_RC"
+srt_count "webhook without thread id still pings once" 1 "$STUB/curl.log"
+srt_log_has "$STUB" curl.log "roster-blind" "webhook without thread id sends the onset body"
+srt_log_has "$STUB" curl.stdin "url = \"$WH_URL\"" \
+    "webhook without thread id posts to the bare webhook URL"
+srt_log_lacks "$STUB" curl.stdin "thread_id" "webhook without thread id adds no thread_id"
+
+# 9. existing query string, no thread id: URL left untouched
+srt_reset
+export SIM_RECAP_OPS_WEBHOOK_URL="${WH_URL}?wait=true"
+export SIM_RECAP_OPS_ALERT_THREAD_ID=""
+printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+srt_log_has "$STUB" curl.stdin "url = \"${WH_URL}?wait=true\"" \
+    "webhook with query and no thread id keeps the URL as-is"
 unset SIM_RECAP_OPS_WEBHOOK_URL
 
 # ── Public-log hygiene (Phase 7) ──
@@ -1315,29 +1776,29 @@ srt_lacks_both() {
 # srt_group_ok <name> <nfail-before> — summary line that stays honest: ok only
 # when no sub-check since <nfail-before> failed.
 srt_group_ok() {
-    if [ "$SRT_NFAIL" -eq "$2" ]; then srt_ok "$1"; else srt_fail "$1"; fi
+    if [ "$H_FAIL" -eq "$2" ]; then srt_ok "$1"; else srt_fail "$1"; fi
 }
 
 srt_reset
 SIM_RECAP_HOST_MODE=actions STUB_SENTINEL=1 SIM_RECAP_DB_PASSWORD=PW-SENTINEL-9f3 srt_run_split
 srt_log_has "$STUB" tick.stderr "stored" "hygiene sub-check: fixture reaches the store path"
 
-n0=$SRT_NFAIL
+n0=$H_FAIL
 # 1.
 srt_lacks_both "AGENT-STDOUT-SENTINEL" "agent stdout"
 srt_group_ok "actions: agent stdout never reaches job streams" "$n0"
 # 2.
-n0=$SRT_NFAIL
+n0=$H_FAIL
 srt_lacks_both "AGENT-STDERR-SENTINEL" "agent stderr"
 srt_group_ok "actions: agent stderr never reaches job streams" "$n0"
 # 3.
-n0=$SRT_NFAIL
+n0=$H_FAIL
 srt_lacks_both "PAYLOAD-SENTINEL" "payload"
 srt_lacks_both "ROSTER-SENTINEL" "roster"
 srt_lacks_both "DB-OUTPUT-SENTINEL" "db output"
 srt_group_ok "actions: payload, roster, db output never reach job streams" "$n0"
 # 4.
-n0=$SRT_NFAIL
+n0=$H_FAIL
 srt_lacks_both "PW-SENTINEL-9f3" "db password"
 srt_log_lacks "$STUB" ssh.log "PW-SENTINEL-9f3" "hygiene sub-check: db password never in ssh argv"
 srt_log_has "$STUB" claude.argv "--model" "hygiene sub-check: claude argv was recorded"
@@ -1347,7 +1808,7 @@ srt_group_ok "actions: db password never reaches job streams or ssh argv" "$n0"
 srt_expect_eq "actions: tick stdout is empty on the live path" 0 \
     "$(wc -c < "$STUB/tick.stdout" | tr -d '[:space:]')"
 # 6.
-n0=$SRT_NFAIL
+n0=$H_FAIL
 srt_log_lacks "$STUB" tick.stderr "PHASE-SENTINEL" "hygiene sub-check: phase absent when recaps are enabled"
 srt_reset
 printf '%s\n' '{"ok":true,"cmd":"claim-next","sim":null,"recaps_enabled":false,"phase":"PHASE-SENTINEL"}' \
@@ -1516,6 +1977,4 @@ if [ -n "${SRT_CHECK_PR_RUN:-}" ]; then
     srt_expect_eq "PR-RUN-DONE: log holds no masked T7 line" 0 "$pr_run_masked"
 fi
 
-echo "----"
-[ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
-exit "$FAILED"
+h_done

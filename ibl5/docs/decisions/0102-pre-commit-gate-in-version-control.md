@@ -1,6 +1,6 @@
 ---
 description: Moves the git pre-commit gate body out of the untracked common hooks dir into bin/pre-commit-hook, installed via a fail-closed shim; amends the untracked-hook enumerations in ADR-0064 and ADR-0075.
-last_verified: 2026-08-14
+last_verified: 2026-10-13
 ---
 
 # ADR-0102: Version-control the pre-commit gate body
@@ -20,6 +20,10 @@ Move the hook body to `bin/pre-commit-hook`, tracked and executable, with the fo
 
 The shim resolves `REPO_ROOT` per invocation via `git rev-parse --show-toplevel`, so one install serves every worktree and each gets its own branch's copy of the gate. It **fails closed**: if `$REPO_ROOT/bin/pre-commit-hook` is missing or non-executable it prints why and exits 1 rather than committing ungated.
 
+## Addendum — codebase-map gate moved to CI (2026-10-13) <!-- slop-ok -->
+
+The Context lists four commit-time gates, including codebase-map regeneration. Today `bin/pre-commit-hook` runs six blocks: `gofmt`, `bin/check-docs`, `bin/check-rules-byte-budget`, a staged `shellcheck` pass, `bin/check-destructive-migrations`, and the `bin/adr-check --commit` ADR gate. The codebase-map is regenerated on master by the `regen-codebase-map` job in `tests.yml`.
+
 ## Alternatives Considered
 
 - **Fail open when `bin/pre-commit-hook` is absent** (warn and exit 0) — Rejected because: a silently skipped gate is the precise failure class this change exists to close, and it is invisible by construction. A blocked commit is loud and has an obvious escape (`--no-verify`); a skipped one is discovered at CI or not at all. The pre-push shim already fails closed the same way — `exec` of a missing `bin/pre-push-adr-hook` exits non-zero — so this is the established behavior, not a new stance.
@@ -36,7 +40,7 @@ The shim resolves `REPO_ROOT` per invocation via `git rev-parse --show-toplevel`
 
 ## References
 
-- `bin/pre-commit-hook` — the tracked gate body (codebase-map regen, gofmt, check-docs, rules byte budget).
+- `bin/pre-commit-hook`: the tracked gate body (gofmt, check-docs, rules byte budget, shellcheck, destructive-migration scan, ADR gate).
 - `bin/install-git-hooks` — the idempotent installer (common-dir target, sentinel, backup-once, fail-closed shim).
 - `bin/check-docs` — the doc gate the hook runs in both `--no-staleness` and `--since` modes.
 - `bin/check-rules-byte-budget` — the always-loaded rules byte cap.

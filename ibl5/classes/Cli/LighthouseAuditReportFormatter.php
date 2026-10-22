@@ -36,27 +36,7 @@ final class LighthouseAuditReportFormatter
         $ranked = $this->rankByComposite($manifest);
         $flagged = $this->filterFlagged($ranked);
 
-        $totalUrls = count($manifest);
-        $errorCount = 0;
-        $warnCount = 0;
-        $passCount = 0;
-
-        foreach ($ranked as $entry) {
-            $status = self::classifyEntry($entry['summary']);
-            if ($status === 'error') {
-                $errorCount++;
-            } elseif ($status === 'warn') {
-                $warnCount++;
-            } else {
-                $passCount++;
-            }
-        }
-
-        $body = "## Summary\n\n";
-        $body .= "- **URLs audited:** $totalUrls\n";
-        $body .= "- \u{2705} **Pass:** $passCount\n";
-        $body .= "- \u{1F7E1} **Warn:** $warnCount\n";
-        $body .= "- \u{1F534} **Error:** $errorCount\n\n";
+        $body = $this->renderSummary(count($manifest), $this->tallyStatuses($ranked));
 
         if ($flagged !== []) {
             $body .= "## Flagged Pages\n\n";
@@ -68,12 +48,64 @@ final class LighthouseAuditReportFormatter
         $body .= $this->renderTable($ranked);
         $body .= "\n";
 
-        $body .= "## Caveats\n\n";
+        $body .= $this->renderCaveats();
+        $body .= $this->renderFooter($sha, $workflowUrl, $durationSeconds);
+
+        return [
+            'title' => $title,
+            'body' => $body,
+        ];
+    }
+
+    /**
+     * @param list<array{url: string, summary: array<string, float>, composite: float}> $ranked
+     * @return array{pass: int, warn: int, error: int}
+     */
+    private function tallyStatuses(array $ranked): array
+    {
+        $tally = ['pass' => 0, 'warn' => 0, 'error' => 0];
+
+        foreach ($ranked as $entry) {
+            $status = self::classifyEntry($entry['summary']);
+            if ($status === 'error') {
+                $tally['error']++;
+            } elseif ($status === 'warn') {
+                $tally['warn']++;
+            } else {
+                $tally['pass']++;
+            }
+        }
+
+        return $tally;
+    }
+
+    /**
+     * @param array{pass: int, warn: int, error: int} $tally
+     */
+    private function renderSummary(int $totalUrls, array $tally): string
+    {
+        $body = "## Summary\n\n";
+        $body .= "- **URLs audited:** $totalUrls\n";
+        $body .= "- \u{2705} **Pass:** {$tally['pass']}\n";
+        $body .= "- \u{1F7E1} **Warn:** {$tally['warn']}\n";
+        $body .= "- \u{1F534} **Error:** {$tally['error']}\n\n";
+
+        return $body;
+    }
+
+    private function renderCaveats(): string
+    {
+        $body = "## Caveats\n\n";
         $body .= "- Phase-gated modules (Draft, FreeAgency, Waivers) may render a ";
         $body .= "\"not active\" gate page \u{2014} still audited for accessibility/best-practices.\n";
         $body .= "- All pages audited in anonymous context (no authenticated user).\n\n";
 
-        $body .= "---\n\n";
+        return $body;
+    }
+
+    private function renderFooter(?string $sha, ?string $workflowUrl, ?float $durationSeconds): string
+    {
+        $footer = "---\n\n";
         $footerParts = [];
         if ($sha !== null) {
             $footerParts[] = "Commit: `$sha`";
@@ -86,13 +118,10 @@ final class LighthouseAuditReportFormatter
             $footerParts[] = "Duration: {$minutes}m";
         }
         if ($footerParts !== []) {
-            $body .= implode(' | ', $footerParts) . "\n";
+            $footer .= implode(' | ', $footerParts) . "\n";
         }
 
-        return [
-            'title' => $title,
-            'body' => $body,
-        ];
+        return $footer;
     }
 
     /**

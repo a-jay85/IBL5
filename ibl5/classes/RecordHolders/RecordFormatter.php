@@ -57,7 +57,7 @@ class RecordFormatter implements RecordFormatterInterface
         24 => ['abbr' => 'gsw', 'name' => 'Warriors'],
         25 => ['abbr' => 'det', 'name' => 'Pistons'],
         26 => ['abbr' => 'sac', 'name' => 'Kings'],
-        27 => ['abbr' => 'was', 'name' => 'Bullets'],
+        27 => ['abbr' => 'wsh', 'name' => 'Bullets'],
         28 => ['abbr' => 'dal', 'name' => 'Mavericks'],
     ];
 

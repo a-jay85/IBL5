@@ -20,6 +20,7 @@ $module_name = basename(dirname(__FILE__));
 $pagetitle = "- $module_name";
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Initialize classes
 $validator = new \AwardHistory\AwardHistoryValidator();
@@ -28,7 +29,11 @@ $service = new \AwardHistory\AwardHistoryService($validator, $repository);
 $view = new \AwardHistory\AwardHistoryView($service);
 
 // Get and validate search parameters from POST
-$searchResult = $service->search($_POST);
+$postData = [];
+foreach ($_POST as $key => $value) {
+    $postData[(string) $key] = $value;
+}
+$searchResult = $service->search($postData);
 
 // Render page
 PageLayout\PageLayout::header();

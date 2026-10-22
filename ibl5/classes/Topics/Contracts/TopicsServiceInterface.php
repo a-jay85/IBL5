@@ -29,7 +29,7 @@ interface TopicsServiceInterface
      *     searchFilters: array{
      *         topics: list<array{topicId: int, topicText: string}>,
      *         categories: list<array{catId: int, title: string}>,
-     *         authors: array<int, string>,
+     *         authors: list<string>,
      *         articleComm: bool
      *     }
      * }

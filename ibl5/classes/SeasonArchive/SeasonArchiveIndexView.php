@@ -36,9 +36,6 @@ class SeasonArchiveIndexView implements SeasonArchiveIndexViewInterface
         array $teamIds = []
     ): string {
         $html = '';
-        if ($teamColors !== [] || $playerIds !== []) {
-            $html .= $this->renderStyles();
-        }
         $html .= '<h1 class="ibl-title">IBL Season Archive</h1>';
         $html .= '<table class="sortable ibl-data-table season-archive-index-table" data-no-responsive>';
         $html .= '<thead><tr><th>Season</th><th>HEAT Champion</th><th>IBL Champion</th><th>MVP</th></tr></thead>';

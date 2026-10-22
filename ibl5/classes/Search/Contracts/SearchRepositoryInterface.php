@@ -119,7 +119,7 @@ interface SearchRepositoryInterface
     /**
      * Get all authors for the search filter dropdown.
      *
-     * @return array<int, string>
+     * @return list<string>
      */
     public function getAuthors(): array;
 

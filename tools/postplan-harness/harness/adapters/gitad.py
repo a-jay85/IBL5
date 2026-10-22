@@ -137,8 +137,10 @@ def lostwork_pre_path(key: str) -> str:
 
 
 class LiveGit:
-    def __init__(self, worktree: str, push_remote: str | None = None, llm=None):
+    def __init__(self, worktree: str, push_remote: str | None = None, llm=None,
+                 state_dir: str | None = None):
         self.worktree = worktree
+        self.state_dir = state_dir or ""  # "" = cost-guard marker dir unavailable
         self.push_remote = push_remote  # None = pushing disabled (typed failure)
         self.llm = llm
         self.last_conflict_resolution: Optional["StackedRebaseResult"] = None
@@ -624,14 +626,84 @@ class LiveGit:
         rc, proof_out = self._run_lostwork(lostwork_path, key)
         return ("TREE-EQUIVALENT" in proof_out and rc == 0), proof_out
 
+    def _pre_resolve_generated(self, inventory, *, master_sha, pre_rebase_sha):
+        """Split flagged generated files out of `inventory`. Returns
+        (remaining_inventory, targets). `targets` is () when nothing qualifies, and the
+        caller then runs exactly today's path. Never runs the generator; see
+        _regen_generated."""
+        from .. import conflict_ladder
+        targets = conflict_ladder.pre_resolve_targets(inventory.files, worktree=self.worktree)
+        if not targets:
+            return inventory, ()
+        skip = {t.path for t in targets}
+        remaining = _dc_replace(
+            inventory,
+            files=tuple(p for p in inventory.files if p not in skip),
+            stage_sets={p: s for p, s in inventory.stage_sets.items() if p not in skip})
+        return remaining, targets
+
+    def _regen_generated(self, targets, *, master_sha, pre_rebase_sha):
+        """Regenerate `targets` in the in-progress merge and stage the output. Returns the
+        exempt paths (targets plus any sibling output the generator changed). Every
+        failure calls abort_and_restore, which raises HarnessError."""
+        from .. import conflict_ladder
+        from ..conflict import abort_and_restore
+        untracked_before = set(self._run("ls-files", "--others", "--exclude-standard").split())
+        try:
+            conflict_ladder.regenerate(
+                self._run, self._run_out, worktree=self.worktree,
+                master_sha=master_sha, candidates=targets)
+        except (RuntimeError, subprocess.TimeoutExpired) as exc:
+            abort_and_restore(self._run, worktree=self.worktree,
+                              pre_rebase_sha=pre_rebase_sha,
+                              reason=f"resolver declined: {targets[0].path} "
+                                     f"(regen failed: {str(exc)[:300]})")
+        # Every auto-merged and LLM-resolved file is staged, so the worktree-vs-index
+        # diff holds only generator writes.
+        changed = (set(self._run("diff", "--name-only").split())
+                   | (set(self._run("ls-files", "--others", "--exclude-standard").split())
+                      - untracked_before))
+        allowed = conflict_ladder.command_outputs(targets)
+        stray = sorted(changed - allowed)
+        if stray:
+            abort_and_restore(self._run, worktree=self.worktree,
+                              pre_rebase_sha=pre_rebase_sha,
+                              reason=f"resolver declined: {targets[0].path} "
+                                     f"(regen touched unexpected paths: {', '.join(stray)[:300]})")
+        exempt = tuple(sorted({t.path for t in targets} | changed))
+        self._run("add", "-A", "--", *exempt)
+        return exempt
+
+    def _rewrite_pre_patch_for_regen(self, key, *, master_sha, pre_rebase_sha, exempt):
+        """Rewrite lostwork_pre_path(key) so each exempt path's section is the
+        master-to-merged diff of the regenerated file. Every other file's section stays
+        byte-identical to the original capture."""
+        excludes = [f":(exclude){p}" for p in exempt]
+        kept = self._run_bytes("diff", f"{master_sha}...{pre_rebase_sha}", "--", ".", *excludes)
+        regen = self._run_bytes("diff", master_sha, "HEAD", "--", *exempt)
+        path = Path(lostwork_pre_path(key))
+        old = path.read_bytes() if path.exists() else None
+        path.write_bytes(kept + regen)
+
+        def undo():
+            if old is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(old)
+        return undo
+
     def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
-                             lostwork_path, conflicted, proof_out):
+                             lostwork_path, conflicted, proof_out, regen_exempt=()):
         from ..conflict_ladder import LadderContext, default_rungs, run_ladder
         ctx = LadderContext(
             llm=self.llm, run=self._run, run_out=self._run_out,
             prove=lambda: self._run_proof(lostwork_path, key),
             worktree=self.worktree, key=key, master_sha=master_sha,
-            pre_rebase_sha=pre_rebase_sha, conflicted_files=conflicted)
+            pre_rebase_sha=pre_rebase_sha, conflicted_files=conflicted,
+            state_dir=self.state_dir,
+            extend_pre_patch=lambda paths: self._rewrite_pre_patch_for_regen(
+                key, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha,
+                exempt=tuple(dict.fromkeys([*regen_exempt, *paths]))))
         return run_ladder(ctx, proof_out, rungs=default_rungs(branch))
 
     def _record_resolution(
@@ -735,13 +807,14 @@ class LiveGit:
             abort_and_restore, assert_text_only, inventory_conflicts,
             purge_verdict_artifacts, resolve_all,
         )
-        from ..conflict_ladder import ladder_failure_reason
+        from ..conflict_ladder import RUNG_REGEN, ladder_failure_reason
 
         branch = self.branch()
         key = branch.replace("/", "-")
         self.last_conflict_files = ()
         self.last_conflict_resolution = None
         self.last_conflict_rung = ""
+        self.last_conflict_fix_summary = ""
         master_sha = self._run("rev-parse", base).strip()
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
@@ -777,14 +850,21 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=inventory.unresolvable_reason)
 
+                llm_inventory, regen_targets = self._pre_resolve_generated(
+                    inventory, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha)
                 resolve_result = resolve_all(self.llm, self._run, worktree=self.worktree,
-                                            key=key, inventory=inventory,
+                                            key=key, inventory=llm_inventory,
                                             branch_stage=2, master_sha=master_sha,
                                             pre_sha=pre_rebase_sha)
                 if not resolve_result.success:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=resolve_result.reason)
+
+                regen_exempt = ()
+                if regen_targets:
+                    regen_exempt = self._regen_generated(
+                        regen_targets, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha)
 
                 # The merge commit runs bin/pre-commit-hook; a hook denial lands here
                 # and restores the tree with the hook's own text in the reason.
@@ -819,6 +899,10 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=text_reason)
 
+                if regen_exempt:
+                    self._rewrite_pre_patch_for_regen(
+                        key, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha,
+                        exempt=regen_exempt)
                 lostwork_path = self._load_lostwork(master_sha, key)
                 if lostwork_path is None:
                     abort_and_restore(self._run, worktree=self.worktree,
@@ -831,8 +915,10 @@ class LiveGit:
                     adaptations=resolve_result.adaptations,
                     pre_rebase_sha=pre_rebase_sha, master_sha=master_sha,
                 )
-                resolved_files = resolve_result.resolved_files
+                resolved_files = tuple(sorted(set(resolve_result.resolved_files) | set(regen_exempt)))
                 self.last_conflict_rung = "first-pass"
+                if regen_exempt and not llm_inventory.files:
+                    self.last_conflict_rung = RUNG_REGEN
                 if not proof_ok:
                     # The ladder needs the full LOST list; proof_out is the 400-char
                     # reason string when the adaptation path rejected. Re-run the strict proof.
@@ -843,7 +929,8 @@ class LiveGit:
                         outcome = self._run_conflict_ladder(
                             key=key, branch=branch, master_sha=master_sha,
                             pre_rebase_sha=pre_rebase_sha, lostwork_path=lostwork_path,
-                            conflicted=tuple(inventory.files), proof_out=first_proof)
+                            conflicted=tuple(inventory.files), proof_out=first_proof,
+                            regen_exempt=regen_exempt)
                     except HarnessError as exc:
                         # The outer `except HarnessError: raise` does not restore, so a
                         # HarnessError escaping the ladder restores here.
@@ -855,6 +942,12 @@ class LiveGit:
                                               adapt_trail + (f"ladder error: {exc.kind}: {exc.detail}",)))
                     if not outcome.rung:
                         self.last_conflict_rung = "exhausted"
+                        # Only entries from a run where the guard reached the proof:
+                        # the DM line says the proof still failed.
+                        self.last_conflict_fix_summary = next(
+                            (t for t in outcome.trail
+                             if t == "sonnet-fix: proof still failed"
+                             or t.startswith("sonnet-fix: partial (")), "")
                         abort_and_restore(self._run, worktree=self.worktree,
                                           pre_rebase_sha=pre_rebase_sha,
                                           reason=ladder_failure_reason(first_proof, adapt_trail + tuple(outcome.trail)))

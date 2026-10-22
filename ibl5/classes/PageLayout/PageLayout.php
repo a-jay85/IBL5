@@ -88,17 +88,7 @@ class PageLayout
 
         // Use AppPaths::root() for reliable path calculation across worktrees
         $iblRoot = \Bootstrap\AppPaths::root();
-        $relativePath = '';
-
-        // If we're in a subdirectory of ibl5, calculate the relative path back to root
-        if (strpos($currentFile, $iblRoot) === 0) {
-            $relativeFromIblRoot = substr(dirname($currentFile), strlen($iblRoot));
-            if ($relativeFromIblRoot !== '') {
-                // Count directory levels and build relative path
-                $levels = substr_count(trim($relativeFromIblRoot, '/'), '/') + 1;
-                $relativePath = str_repeat('../', $levels);
-            }
-        }
+        $relativePath = self::calculateRelativeBasePath($currentFile, $iblRoot);
 
         echo '<!DOCTYPE html>';
         echo '<html lang="en">';
@@ -108,65 +98,17 @@ class PageLayout
         }
         echo "<title>" . \Security\HtmlSanitizer::e($sitename . ' ' . $pagetitle) . "</title>\n";
         echo '<meta name="google-site-verification" content="3y3xJYDHSYUitn7cbfFfI6C2BiK_q66dtRfykpzHW5w" />';
-        $jsFiles = [
-            'jslib/htmx.min.js',
-            'jslib/sorttable.js',
-            'jslib/responsive-tables.js',
-            'jslib/name-abbreviation.js',
-            'jslib/user-team-highlighter.js',
-            'jslib/sticky-page-header.js',
-            'jslib/htmx-init.js',
-            'jslib/local-time.js',
-        ];
-        $iblRootPath = \Bootstrap\AppPaths::root();
-        foreach ($jsFiles as $jsFile) {
-            $fullPath = $iblRootPath . '/' . $jsFile;
-            $mtime = is_file($fullPath) ? filemtime($fullPath) : false;
-            $version = is_int($mtime) ? $mtime : 0;
-            echo "<script src=\"{$jsFile}?v={$version}\"></script>";
-        }
+        echo self::renderScriptTags($iblRoot);
 
         // Meta tags (inlined from includes/meta.php)
-        echo "<meta charset=\"utf-8\">\n";
-        echo "<meta id=\"viewport-meta\" name=\"viewport\" content=\"width=device-width, initial-scale=1.0, viewport-fit=cover\">\n";
-        echo "<script>(function(){try{if(localStorage.getItem('ibl_desktop_view')==='1'){document.getElementById('viewport-meta').setAttribute('content','width=1440');document.documentElement.classList.add('desktop-view-active');}}catch(e){}})()</script>\n";
-        echo "<META HTTP-EQUIV=\"EXPIRES\" CONTENT=\"0\">\n";
-        echo "<META NAME=\"RESOURCE-TYPE\" CONTENT=\"DOCUMENT\">\n";
-        echo "<META NAME=\"DISTRIBUTION\" CONTENT=\"GLOBAL\">\n";
-        echo "<META NAME=\"AUTHOR\" CONTENT=\"" . \Security\HtmlSanitizer::e($sitename) . "\">\n";
-        echo "<META NAME=\"COPYRIGHT\" CONTENT=\"Copyright (c) by " . \Security\HtmlSanitizer::e($sitename) . "\">\n";
-        echo "<META NAME=\"KEYWORDS\" CONTENT=\"basketball, fantasy basketball, basketball league, IBL, Internet Basketball League, basketball simulation, basketball stats, NBA, basketball draft, free agency, basketball trading, basketball standings, basketball schedule\">\n";
-        echo "<META NAME=\"DESCRIPTION\" CONTENT=\"" . \Security\HtmlSanitizer::e($slogan) . "\">\n";
-        echo "<META NAME=\"ROBOTS\" CONTENT=\"INDEX, FOLLOW\">\n";
-        echo "<META NAME=\"REVISIT-AFTER\" CONTENT=\"1 DAYS\">\n";
-        echo "<META NAME=\"RATING\" CONTENT=\"GENERAL\">\n";
+        echo self::renderMetaTags($sitename, $slogan);
 
         // Open Graph meta tags (for LinkedIn, Facebook, etc.)
         // Host is used ONLY to select the preprod og:image variant -- never interpolated into output.
         // Output host is always a hardcoded literal, so a poisoned Host header (cached + served to all
         // anonymous visitors via PageCache, which does not key on Host) cannot reach the meta tags.
         $requestHost = is_string($_SERVER['HTTP_HOST'] ?? null) ? $_SERVER['HTTP_HOST'] : '';
-        $ogHost = ($requestHost === 'pre.iblhoops.net') ? 'pre.iblhoops.net' : 'www.iblhoops.net';
-        $ogBaseUrl = "https://{$ogHost}/ibl5";
-        $ogTitle = "IBL \xe2\x80\x94 Internet Basketball League";
-        $ogDescription = 'The Internet Basketball League (IBL) is an online fantasy basketball league powered by the Jump Shot Basketball simulation engine.';
-        if ($ogHost === 'pre.iblhoops.net') {
-            $ogImage = "{$ogBaseUrl}/images/ibl/logocorner.jpg";
-            $ogImageWidth = '150';
-            $ogImageHeight = '150';
-        } else {
-            $ogImage = "{$ogBaseUrl}/images/og-basketball.png";
-            $ogImageWidth = '1200';
-            $ogImageHeight = '630';
-        }
-        echo "<meta property=\"og:title\" content=\"{$ogTitle}\">\n";
-        echo "<meta property=\"og:description\" content=\"{$ogDescription}\">\n";
-        echo "<meta property=\"og:type\" content=\"website\">\n";
-        echo "<meta property=\"og:url\" content=\"{$ogBaseUrl}/index.php\">\n";
-        echo "<meta property=\"og:image\" content=\"{$ogImage}\">\n";
-        echo "<meta property=\"og:image:width\" content=\"{$ogImageWidth}\">\n";
-        echo "<meta property=\"og:image:height\" content=\"{$ogImageHeight}\">\n";
-        echo "<meta property=\"og:site_name\" content=\"{$ogTitle}\">\n";
+        echo self::renderOpenGraphMetaTags($requestHost);
 
         // JavaScript functions (inlined from includes/javascript.php)
         $nameStr = is_string($name) ? $name : '';
@@ -221,15 +163,130 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
 </script>';
 
         // CSS stylesheet — loaded once (fixes duplicate CSS loading bug)
-        $cssPath = "themes/$ThemeSel/style/style.css";
+        echo self::renderStylesheetLink($ThemeSel);
+
+        echo "\n\n\n</head>\n\n";
+        themeheader();
+    }
+
+    /**
+     * Relative path from the executing script's directory back to the ibl5 root.
+     * Returns '' when the script sits at the root or outside it (no <base> tag is emitted then).
+     * Pure: reads no superglobals; the caller resolves $_SERVER['SCRIPT_FILENAME'] and AppPaths::root().
+     */
+    private static function calculateRelativeBasePath(string $currentFile, string $iblRoot): string
+    {
+        if (strpos($currentFile, $iblRoot) !== 0) {
+            return '';
+        }
+
+        // If we're in a subdirectory of ibl5, calculate the relative path back to root
+        $relativeFromIblRoot = substr(dirname($currentFile), strlen($iblRoot));
+        if ($relativeFromIblRoot === '') {
+            return '';
+        }
+
+        // Count directory levels and build relative path
+        $levels = substr_count(trim($relativeFromIblRoot, '/'), '/') + 1;
+
+        return str_repeat('../', $levels);
+    }
+
+    /**
+     * The eight <script src> tags, each cache-busted with the file's mtime (0 when the file is missing).
+     * Order is load-bearing: htmx first, htmx-init after the libraries it wires.
+     * Every tag carries `defer` so the parser does not block on them before first paint.
+     * Deferred scripts still run in document order, after parsing finishes (readyState
+     * 'interactive') and before DOMContentLoaded. Each library that self-initialises either
+     * listens for DOMContentLoaded or runs immediately when readyState is not 'loading', so
+     * both paths see a fully parsed DOM. Code outside these files calls their globals only
+     * from event handlers or fetch callbacks, behind a typeof/window guard.
+     */
+    private static function renderScriptTags(string $iblRootPath): string
+    {
+        $jsFiles = [
+            'jslib/htmx.min.js',
+            'jslib/sorttable.js',
+            'jslib/responsive-tables.js',
+            'jslib/name-abbreviation.js',
+            'jslib/user-team-highlighter.js',
+            'jslib/sticky-page-header.js',
+            'jslib/htmx-init.js',
+            'jslib/local-time.js',
+        ];
+        $html = '';
+        foreach ($jsFiles as $jsFile) {
+            $fullPath = $iblRootPath . '/' . $jsFile;
+            $mtime = is_file($fullPath) ? filemtime($fullPath) : false;
+            $version = is_int($mtime) ? $mtime : 0;
+            $html .= "<script src=\"{$jsFile}?v={$version}\" defer></script>";
+        }
+
+        return $html;
+    }
+
+    /**
+     * Charset, viewport, desktop-view toggle and the legacy META block (inlined from includes/meta.php).
+     * $sitename and $slogan are escaped here; the caller passes the raw globals.
+     */
+    private static function renderMetaTags(string $sitename, string $slogan): string
+    {
+        return "<meta charset=\"utf-8\">\n"
+            . "<meta id=\"viewport-meta\" name=\"viewport\" content=\"width=device-width, initial-scale=1.0, viewport-fit=cover\">\n"
+            . "<script>(function(){try{if(localStorage.getItem('ibl_desktop_view')==='1'){document.getElementById('viewport-meta').setAttribute('content','width=1440');document.documentElement.classList.add('desktop-view-active');}}catch(e){}})()</script>\n"
+            . "<META HTTP-EQUIV=\"EXPIRES\" CONTENT=\"0\">\n"
+            . "<META NAME=\"RESOURCE-TYPE\" CONTENT=\"DOCUMENT\">\n"
+            . "<META NAME=\"DISTRIBUTION\" CONTENT=\"GLOBAL\">\n"
+            . "<META NAME=\"AUTHOR\" CONTENT=\"" . \Security\HtmlSanitizer::e($sitename) . "\">\n"
+            . "<META NAME=\"COPYRIGHT\" CONTENT=\"Copyright (c) by " . \Security\HtmlSanitizer::e($sitename) . "\">\n"
+            . "<META NAME=\"KEYWORDS\" CONTENT=\"basketball, fantasy basketball, basketball league, IBL, Internet Basketball League, basketball simulation, basketball stats, NBA, basketball draft, free agency, basketball trading, basketball standings, basketball schedule\">\n"
+            . "<META NAME=\"DESCRIPTION\" CONTENT=\"" . \Security\HtmlSanitizer::e($slogan) . "\">\n"
+            . "<META NAME=\"ROBOTS\" CONTENT=\"INDEX, FOLLOW\">\n"
+            . "<META NAME=\"REVISIT-AFTER\" CONTENT=\"1 DAYS\">\n"
+            . "<META NAME=\"RATING\" CONTENT=\"GENERAL\">\n";
+    }
+
+    /**
+     * Open Graph block. $requestHost only selects the preprod image variant; the emitted host is always
+     * one of two hardcoded literals (XSS fix #1106), so the request header never reaches the output.
+     */
+    private static function renderOpenGraphMetaTags(string $requestHost): string
+    {
+        $ogHost = ($requestHost === 'pre.iblhoops.net') ? 'pre.iblhoops.net' : 'www.iblhoops.net';
+        $ogBaseUrl = "https://{$ogHost}/ibl5";
+        $ogTitle = "IBL \xe2\x80\x94 Internet Basketball League";
+        $ogDescription = 'The Internet Basketball League (IBL) is an online fantasy basketball league powered by the Jump Shot Basketball simulation engine.';
+        if ($ogHost === 'pre.iblhoops.net') {
+            $ogImage = "{$ogBaseUrl}/images/ibl/logocorner.jpg";
+            $ogImageWidth = '150';
+            $ogImageHeight = '150';
+        } else {
+            $ogImage = "{$ogBaseUrl}/images/og-basketball.png";
+            $ogImageWidth = '1200';
+            $ogImageHeight = '630';
+        }
+
+        return "<meta property=\"og:title\" content=\"{$ogTitle}\">\n"
+            . "<meta property=\"og:description\" content=\"{$ogDescription}\">\n"
+            . "<meta property=\"og:type\" content=\"website\">\n"
+            . "<meta property=\"og:url\" content=\"{$ogBaseUrl}/index.php\">\n"
+            . "<meta property=\"og:image\" content=\"{$ogImage}\">\n"
+            . "<meta property=\"og:image:width\" content=\"{$ogImageWidth}\">\n"
+            . "<meta property=\"og:image:height\" content=\"{$ogImageHeight}\">\n"
+            . "<meta property=\"og:site_name\" content=\"{$ogTitle}\">\n";
+    }
+
+    /**
+     * The single theme stylesheet, cache-busted with its cwd-relative mtime ('' when the file is absent).
+     */
+    private static function renderStylesheetLink(string $themeSel): string
+    {
+        $cssPath = "themes/$themeSel/style/style.css";
         $cssVersion = file_exists($cssPath) ? filemtime($cssPath) : '';
         // FOUT-prevention invariant: this tag must remain render-blocking.
         // The .fonts-loading { visibility: hidden } rule lives in design/base.css (compiled here).
         // Making it async, lazy, or rel="preload" will silently reintroduce FOUT — no test catches it.
-        echo "<LINK REL=\"StyleSheet\" HREF=\"{$cssPath}?v={$cssVersion}\" TYPE=\"text/css\">\n";
-
-        echo "\n\n\n</head>\n\n";
-        themeheader();
+        return "<LINK REL=\"StyleSheet\" HREF=\"{$cssPath}?v={$cssVersion}\" TYPE=\"text/css\">\n";
     }
 
     public static function renderFontPreconnectLinks(): string

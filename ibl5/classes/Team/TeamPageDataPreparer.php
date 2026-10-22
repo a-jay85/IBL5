@@ -25,6 +25,7 @@ use Team\Contracts\TeamQueryRepositoryInterface;
  * @phpstan-import-type CurrentSeasonData from Contracts\TeamServiceInterface
  * @phpstan-import-type DraftPickItemData from Contracts\TeamServiceInterface
  * @phpstan-import-type FranchiseSeasonRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type PlayoffResultRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type GMTenureRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type GMAwardRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type TeamAwardRow from Contracts\TeamRepositoryInterface
@@ -182,78 +183,110 @@ class TeamPageDataPreparer
         $teamName = $team->name;
         $playoffResults = $this->repository->getPlayoffResults($teamName);
 
-        $totalGameWins = 0;
-        $totalGameLosses = 0;
-
-        /** @var array<int, array{name: string, gameWins: int, gameLosses: int, seriesWins: int, seriesLosses: int, results: list<PlayoffResultItem>}> $roundsMap */
-        $roundsMap = [
-            1 => ['name' => 'First Round', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
-            2 => ['name' => 'Conference Semis', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
-            3 => ['name' => 'Conference Finals', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
-            4 => ['name' => 'IBL Finals', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
-        ];
+        $roundsMap = self::emptyRoundsMap();
 
         foreach ($playoffResults as $playoff) {
             $round = $playoff['round'];
-            $winner = $playoff['winner'];
 
             if (!isset($roundsMap[$round])) {
                 continue;
             }
 
-            $isWin = ($winner === $teamName);
-
-            $year = \Security\HtmlSanitizer::safeHtmlOutput((string) $playoff['year']);
-            $winnerSafe = \Security\HtmlSanitizer::safeHtmlOutput($playoff['winner_name_that_year']);
-            $loserSafe = \Security\HtmlSanitizer::safeHtmlOutput($playoff['loser_name_that_year']);
-            $winnerGames = $playoff['winner_games'];
-            $loserGames = $playoff['loser_games'];
-
-            /** @var PlayoffResultItem $resultItem */
-            $resultItem = [
-                'year' => $year,
-                'winner' => $winnerSafe,
-                'loser' => $loserSafe,
-                'winnerGames' => $winnerGames,
-                'loserGames' => $loserGames,
-                'isWin' => $isWin,
-            ];
-
-            $roundsMap[$round]['results'][] = $resultItem;
-
-            if ($isWin) {
-                $totalGameWins += $winnerGames;
-                $totalGameLosses += $loserGames;
-                $roundsMap[$round]['gameWins'] += $winnerGames;
-                $roundsMap[$round]['gameLosses'] += $loserGames;
-                $roundsMap[$round]['seriesWins']++;
-            } else {
-                $totalGameLosses += $winnerGames;
-                $totalGameWins += $loserGames;
-                $roundsMap[$round]['gameLosses'] += $winnerGames;
-                $roundsMap[$round]['gameWins'] += $loserGames;
-                $roundsMap[$round]['seriesLosses']++;
-            }
+            self::addSeriesToRound($roundsMap[$round], self::buildResultItem($playoff, $teamName));
         }
 
-        /** @var list<PlayoffRoundData> $rounds */
-        $rounds = [];
-        foreach ($roundsMap as $r) {
-            $rounds[] = [
-                'name' => $r['name'],
-                'gameWins' => $r['gameWins'],
-                'gameLosses' => $r['gameLosses'],
-                'seriesWins' => $r['seriesWins'],
-                'seriesLosses' => $r['seriesLosses'],
-                'results' => $r['results'],
-            ];
-        }
+        return self::summarizeRounds($roundsMap);
+    }
 
+    /**
+     * The four playoff rounds keyed by round number, with zeroed tallies.
+     *
+     * @return array<int, PlayoffRoundData>
+     */
+    private static function emptyRoundsMap(): array
+    {
+        return [
+            1 => ['name' => 'First Round', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+            2 => ['name' => 'Conference Semis', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+            3 => ['name' => 'Conference Finals', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+            4 => ['name' => 'IBL Finals', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+        ];
+    }
+
+    /**
+     * Shape one repository row into a view-ready result item.
+     *
+     * The year and both historical team names are escaped here and nowhere
+     * else; the view layer renders these strings as-is.
+     *
+     * @param PlayoffResultRow $playoff
+     * @return PlayoffResultItem
+     */
+    private static function buildResultItem(array $playoff, string $teamName): array
+    {
+        $winner = $playoff['winner'];
+        $isWin = ($winner === $teamName);
+
+        $year = \Security\HtmlSanitizer::safeHtmlOutput((string) $playoff['year']);
+        $winnerSafe = \Security\HtmlSanitizer::safeHtmlOutput($playoff['winner_name_that_year']);
+        $loserSafe = \Security\HtmlSanitizer::safeHtmlOutput($playoff['loser_name_that_year']);
+        $winnerGames = $playoff['winner_games'];
+        $loserGames = $playoff['loser_games'];
+
+        return [
+            'year' => $year,
+            'winner' => $winnerSafe,
+            'loser' => $loserSafe,
+            'winnerGames' => $winnerGames,
+            'loserGames' => $loserGames,
+            'isWin' => $isWin,
+        ];
+    }
+
+    /**
+     * Fold one series into its round's tallies.
+     *
+     * Game columns are from this team's point of view: on a loss the
+     * winner's games count as this team's game losses.
+     *
+     * @param PlayoffRoundData $round
+     * @param PlayoffResultItem $item
+     */
+    private static function addSeriesToRound(array &$round, array $item): void
+    {
+        $round['results'][] = $item;
+
+        if ($item['isWin']) {
+            $round['gameWins'] += $item['winnerGames'];
+            $round['gameLosses'] += $item['loserGames'];
+            $round['seriesWins']++;
+        } else {
+            $round['gameLosses'] += $item['winnerGames'];
+            $round['gameWins'] += $item['loserGames'];
+            $round['seriesLosses']++;
+        }
+    }
+
+    /**
+     * Flatten the rounds map into PlayoffData and derive the grand totals
+     * from the per-round tallies.
+     *
+     * @param array<int, PlayoffRoundData> $roundsMap
+     * @return PlayoffData
+     */
+    private static function summarizeRounds(array $roundsMap): array
+    {
+        $rounds = array_values($roundsMap);
+
+        $totalGameWins = 0;
+        $totalGameLosses = 0;
         $totalSeriesWins = 0;
         $totalSeriesLosses = 0;
-        foreach ($rounds as $r) {
-            $totalSeriesWins += $r['seriesWins'];
-            $totalSeriesLosses += $r['seriesLosses'];
+        foreach ($rounds as $round) {
+            $totalGameWins += $round['gameWins'];
+            $totalGameLosses += $round['gameLosses'];
+            $totalSeriesWins += $round['seriesWins'];
+            $totalSeriesLosses += $round['seriesLosses'];
         }
 
         return [
@@ -364,9 +397,11 @@ class TeamPageDataPreparer
         foreach ($resultPicks as $draftPickRow) {
             $draftPick = new \Draft\DraftPick($draftPickRow);
 
+            $originalTeam = $teamsArray[$draftPick->originalTeam] ?? null;
+
             $draftPicks[] = [
-                'originalTeamID' => $teamsArray[$draftPick->originalTeam]->teamid,
-                'originalTeamCity' => $teamsArray[$draftPick->originalTeam]->city,
+                'originalTeamID' => $originalTeam !== null ? $originalTeam->teamid : 0,
+                'originalTeamCity' => $originalTeam !== null ? $originalTeam->city : '',
                 'originalTeamName' => $draftPick->originalTeam,
                 'year' => (string) $draftPick->year,
                 'round' => $draftPick->round,

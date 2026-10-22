@@ -461,7 +461,7 @@ done
 IMPL_RP_LINE=$(grep -nF -- "$IMPL_START_C" "$RUN_SCRIPT" | head -1 | cut -d: -f1)
 IMPL_SPAWN_LINE=$(grep -nF 'claude -p "$IMPL_PROMPT"' "$RUN_SCRIPT" | head -1 | cut -d: -f1)
 PP_RP_LINE=$(grep -nF -- "$PP_START_C" "$RUN_SCRIPT" | head -1 | cut -d: -f1)
-PP_SPAWN_LINE=$(grep -nF '"$SELF_DIR/../post-plan-now"' "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+PP_SPAWN_LINE=$(grep -nF '"$PP_WORKTREE" "$SELF_DIR/../post-plan-now"' "$RUN_SCRIPT" | head -1 | cut -d: -f1)
 if [ -n "$IMPL_RP_LINE" ] && [ -n "$IMPL_SPAWN_LINE" ] && [ -n "$PP_RP_LINE" ] && [ -n "$PP_SPAWN_LINE" ] \
     && [ "$IMPL_RP_LINE" -gt "$ATTEMPT_LINE" ] && [ "$IMPL_RP_LINE" -lt "$IMPL_SPAWN_LINE" ] \
     && [ "$PP_RP_LINE" -lt "$PP_SPAWN_LINE" ]; then

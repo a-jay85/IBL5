@@ -463,7 +463,6 @@ def test_exit_code_for_unconfirmed_and_dirty_are_3():
 CANNED = {
     "pr-copy": {"type": "chore", "title": "chore: replay", "commit_subject": "chore: replay commit",
                 "summary_md": "## Summary\n- x\n"},
-    "body-check": {"corrected_body": "## Summary\n- replay body\n", "findings": []},
     "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
     "security-audit": [],
     "safety-verdict": {"holds": []},
@@ -565,6 +564,18 @@ def test_non_pause_exit_clears_stray_marker(gate, tmp_path, monkeypatch, capsys,
         want_rc = 3
     rc, _stdout, _ = _main(tmp_path, monkeypatch, capsys, over if want_rc == 0 else {})
     assert rc == want_rc
+    assert gate.read_text().count(f"clear {S}") == 1
+
+
+def test_retrospective_pause_exits_zero_and_clears_marker(gate, tmp_path, monkeypatch,
+                                                          capsys, ambient):
+    """A pause in the record-only retrospective ends rc 0, so post-plan-now sends no
+    fail DM, and _settle_pause_marker clears the marker the gate wrote."""
+    monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
+    rc, stdout, _ = _main(tmp_path, monkeypatch, capsys,
+                          {"retrospective": {"kind": "usage-pause"}})
+    assert rc == 0
+    assert "RESULT: post-plan PAUSED" not in stdout
     assert gate.read_text().count(f"clear {S}") == 1
 
 

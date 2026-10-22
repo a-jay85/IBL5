@@ -26,8 +26,8 @@ interface WaiversViewInterface
      * @param string $teamName Team name for display and form submission
      * @param int $teamid Team ID for logo display
      * @param string $action Action type ('add' or 'waive')
-     * @param array<int, string> $players Array of pre-built HTML option strings for dropdown
-     *   Each element should be output from buildPlayerOption()
+     * @param array<int, array{playerID: int, playerName: string, contract: string, waitTime: string}> $players Plain option data for the dropdown
+     *   Each element is rendered through buildPlayerOption()
      * @param int $openRosterSpots Number of open roster spots (0-15)
      * @param int $healthyOpenRosterSpots Number of healthy open roster spots (0-15)
      * @param ?string $result PRG result key (e.g. 'player_added', 'player_dropped')

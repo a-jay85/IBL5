@@ -381,6 +381,187 @@ class RcbFileParserTest extends TestCase
         }
     }
 
+    public function testParseReadsGroup28AndIgnoresReservedGroups29Through32(): void
+    {
+        $specs = [];
+        foreach ([28, 29, 30, 31, 32] as $group) {
+            $specs[] = ['group' => $group, 'entry' => 0, 'data' => $this->buildAlltimeSingleSeasonEntry('Last Team Guard')];
+        }
+
+        $alltime = RcbFileParser::parse($this->buildRcbFile([$this->buildAlltimeLine($specs)], []))['alltime'];
+
+        $this->assertSame([28], array_column($alltime, 'teamid'));
+        $this->assertSame(['team'], array_column($alltime, 'scope'));
+    }
+
+    public function testParseSkipsAlltimeEntryShorterThan51Chars(): void
+    {
+        $line = substr($this->buildAlltimeSingleSeasonEntry(), 0, 50);
+
+        $alltime = RcbFileParser::parse($this->buildRcbFile([$line], []))['alltime'];
+
+        $this->assertSame([], $alltime);
+    }
+
+    public function testParseReadsAlltimeEntryOfExactly51Chars(): void
+    {
+        $line = $this->buildAlltimeSingleSeasonEntry();
+
+        $alltime = RcbFileParser::parse($this->buildRcbFile([$line], []))['alltime'];
+
+        $this->assertCount(1, $alltime);
+        $this->assertSame('Stephen Curry', $alltime[0]['player_name']);
+    }
+
+    public function testParseMapsEveryLeagueEntryIndexToItsStatCategory(): void
+    {
+        $specs = [];
+        for ($i = 0; $i < 16; $i++) {
+            $specs[] = [
+                'group' => 0,
+                'entry' => $i,
+                'data' => $i % 2 === 0 ? $this->buildAlltimeSingleSeasonEntry() : $this->buildAlltimeCareerEntry(),
+            ];
+        }
+
+        $alltime = RcbFileParser::parse($this->buildRcbFile([$this->buildAlltimeLine($specs)], []))['alltime'];
+
+        $this->assertSame(
+            ['ppg', 'pts', 'rpg', 'trb', 'apg', 'ast', 'spg', 'stl',
+             'bpg', 'blk', 'fg_pct', 'fg_pct', 'ft_pct', 'ft_pct', 'three_pct', 'three_pct'],
+            array_column($alltime, 'stat_category'),
+        );
+        $this->assertSame(
+            array_merge(...array_fill(0, 8, ['single_season', 'career'])),
+            array_column($alltime, 'record_type'),
+        );
+    }
+
+    public function testParseMapsEveryTeamEvenEntryIndexToSingleSeasonStatCategory(): void
+    {
+        $specs = [];
+        for ($i = 0; $i < 16; $i += 2) {
+            $specs[] = ['group' => 1, 'entry' => $i, 'data' => $this->buildAlltimeSingleSeasonEntry()];
+        }
+
+        $alltime = RcbFileParser::parse($this->buildRcbFile([$this->buildAlltimeLine($specs)], []))['alltime'];
+
+        $this->assertSame(
+            ['ppg', 'rpg', 'apg', 'spg', 'bpg', 'fg_pct', 'ft_pct', 'three_pct'],
+            array_column($alltime, 'stat_category'),
+        );
+        $this->assertSame(array_fill(0, 8, 'team'), array_column($alltime, 'scope'));
+    }
+
+    public function testParseSkipsOddEntriesInEveryTeamGroup(): void
+    {
+        $specs = [];
+        foreach ([1, 14, 28] as $group) {
+            foreach ([1, 3, 15] as $entry) {
+                $specs[] = ['group' => $group, 'entry' => $entry, 'data' => $this->buildAlltimeCareerEntry()];
+            }
+        }
+        $specs[] = ['group' => 14, 'entry' => 0, 'data' => $this->buildAlltimeSingleSeasonEntry()];
+
+        $alltime = RcbFileParser::parse($this->buildRcbFile([$this->buildAlltimeLine($specs)], []))['alltime'];
+
+        $this->assertCount(1, $alltime);
+        $this->assertSame(14, $alltime[0]['teamid']);
+        $this->assertSame('single_season', $alltime[0]['record_type']);
+    }
+
+    public function testParseEmitsLeagueRecordsWithExactKeyOrder(): void
+    {
+        $line0 = $this->buildAlltimeLine([
+            ['group' => 0, 'entry' => 0, 'data' => $this->buildAlltimeSingleSeasonEntry('Stephen Curry', 3851, 3611, 19, 2005)],
+        ]);
+        $blank = $this->buildAlltimeLine([]);
+        $line2 = $this->buildAlltimeLine([
+            ['group' => 0, 'entry' => 1, 'data' => $this->buildAlltimeCareerEntry('Michael Jordan', 1230, 35042, 3047, 6)],
+        ]);
+
+        $alltime = RcbFileParser::parse($this->buildRcbFile([$line0, $blank, $line2], []))['alltime'];
+
+        $this->assertSame([
+            [
+                'scope' => 'league', 'teamid' => 0, 'record_type' => 'single_season',
+                'stat_category' => 'ppg', 'ranking' => 1, 'player_name' => 'Stephen Curry',
+                'car_block_id' => 3851, 'stat_value' => 36.11, 'stat_raw' => 3611,
+                'team_of_record' => 19, 'season_year' => 2006, 'career_total' => null,
+            ],
+            [
+                'scope' => 'league', 'teamid' => 0, 'record_type' => 'career',
+                'stat_category' => 'pts', 'ranking' => 3, 'player_name' => 'Michael Jordan',
+                'car_block_id' => 1230, 'stat_value' => 30.47, 'stat_raw' => 3047,
+                'team_of_record' => 6, 'season_year' => null, 'career_total' => 35042,
+            ],
+        ], $alltime);
+    }
+
+    public function testDecodeAlltimeEntryReturnsNullForEvenIndexAbsentFromSingleSeasonStats(): void
+    {
+        $line = $this->buildAlltimeLine([
+            ['group' => 1, 'entry' => 0, 'data' => $this->buildAlltimeSingleSeasonEntry()],
+        ]);
+
+        $this->assertNull(RcbFileParser::decodeAlltimeEntry($line, 0, 16, 0));
+        $this->assertNotNull(RcbFileParser::decodeAlltimeEntry($line, 1, 0, 0));
+    }
+
+    public function testDecodeAlltimeEntryReturnsNullForOddIndexAbsentFromCareerStats(): void
+    {
+        $line = $this->buildAlltimeLine([
+            ['group' => 1, 'entry' => 1, 'data' => $this->buildAlltimeCareerEntry()],
+        ]);
+
+        $this->assertNull(RcbFileParser::decodeAlltimeEntry($line, 0, 17, 0));
+        $this->assertNotNull(RcbFileParser::parseAlltimeCareerEntry(
+            substr($line, 17 * RcbFileParser::ALLTIME_ENTRY_SIZE, RcbFileParser::ALLTIME_ENTRY_SIZE)
+        ));
+    }
+
+    public function testDecodeAlltimeEntryReturnsNullForShortEntry(): void
+    {
+        $entry = $this->buildAlltimeSingleSeasonEntry();
+
+        $this->assertNull(RcbFileParser::decodeAlltimeEntry(substr($entry, 0, 50), 0, 0, 0));
+        $this->assertNotNull(RcbFileParser::decodeAlltimeEntry($entry, 0, 0, 0));
+    }
+
+    public function testDecodeAlltimeEntryReturnsNullForOddEntryInTeamGroups(): void
+    {
+        foreach ([1, 14, 28] as $group) {
+            $line = $this->buildAlltimeLine([
+                ['group' => $group, 'entry' => 3, 'data' => $this->buildAlltimeCareerEntry()],
+            ]);
+
+            $this->assertNull(RcbFileParser::decodeAlltimeEntry($line, $group, 3, 0), "group $group");
+        }
+
+        $controlLine = $this->buildAlltimeLine([
+            ['group' => 0, 'entry' => 3, 'data' => $this->buildAlltimeCareerEntry()],
+        ]);
+        $control = RcbFileParser::decodeAlltimeEntry($controlLine, 0, 3, 0);
+
+        $this->assertNotNull($control);
+        $this->assertSame('trb', $control['stat_category']);
+        $this->assertSame('career', $control['record_type']);
+    }
+
+    public function testDecodeAlltimeEntryBuildsTeamRecordWithOneBasedRanking(): void
+    {
+        $line = $this->buildAlltimeLine([
+            ['group' => 5, 'entry' => 2, 'data' => $this->buildAlltimeSingleSeasonEntry('Stephen Curry', 3851, 3611, 19, 2005)],
+        ]);
+
+        $this->assertSame([
+            'scope' => 'team', 'teamid' => 5, 'record_type' => 'single_season',
+            'stat_category' => 'rpg', 'ranking' => 5, 'player_name' => 'Stephen Curry',
+            'car_block_id' => 3851, 'stat_value' => 36.11, 'stat_raw' => 3611,
+            'team_of_record' => 19, 'season_year' => 2006, 'career_total' => null,
+        ], RcbFileParser::decodeAlltimeEntry($line, 5, 2, 4));
+    }
+
     public function testParseFileWithCurrentSeasonRecord(): void
     {
         // Build a season line with an entry at position 0 (away PTS rank #1)

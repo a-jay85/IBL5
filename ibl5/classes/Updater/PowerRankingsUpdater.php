@@ -228,7 +228,41 @@ class PowerRankingsUpdater extends \Database\BaseMysqliRepository {
     {
         echo '<p>Calculating Strength of Schedule...<p>';
 
-        // Load team win percentages from standings
+        $teamWinPcts = $this->loadTeamWinPcts();
+        $playedByTeam = $this->partitionPlayedByTeam($allPlayedGames);
+
+        $allUnplayedGames = $this->fetchAllUnplayedGames($month);
+        $unplayedByTeam = $this->partitionUnplayedGamesByTeam($allUnplayedGames);
+
+        $teamIds = array_keys($teamWinPcts);
+        ['sos' => $sosValues, 'remaining' => $remainingSosValues] =
+            $this->computeSosAndRemaining($teamIds, $teamWinPcts, $playedByTeam, $unplayedByTeam);
+
+        $sosRanks = StrengthOfScheduleCalculator::rankTeams($sosValues);
+        $remainingSosRanks = StrengthOfScheduleCalculator::rankTeams($remainingSosValues);
+
+        $sosLog = '';
+        foreach ($teamIds as $teamid) {
+            $sosLog .= $this->storeSosRow(
+                $teamid,
+                $sosValues[$teamid] ?? 0.0,
+                $remainingSosValues[$teamid] ?? 0.0,
+                $sosRanks[$teamid] ?? 0,
+                $remainingSosRanks[$teamid] ?? 0
+            );
+        }
+
+        \UI\DebugOutput::display($sosLog, 'Strength of Schedule Update Log');
+        echo '<p>Strength of Schedule values have been calculated and stored.<p>';
+    }
+
+    /**
+     * Load each standings team's win percentage (0.0 when it has played no games)
+     *
+     * @return array<int, float>
+     */
+    private function loadTeamWinPcts(): array
+    {
         /** @var list<array{teamid: int, wins: int, losses: int}> $standingsRows */
         $standingsRows = $this->fetchAll(
             "SELECT teamid, wins, losses FROM `ibl_standings`",
@@ -244,7 +278,17 @@ class PowerRankingsUpdater extends \Database\BaseMysqliRepository {
                 : 0.0;
         }
 
-        // Partition played games by team (reuse format for SOS calc)
+        return $teamWinPcts;
+    }
+
+    /**
+     * Partition played games by team, keeping only the two team ids the SOS calculator reads
+     *
+     * @param list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> $allPlayedGames
+     * @return array<int, list<array{visitor_teamid: int, home_teamid: int}>>
+     */
+    private function partitionPlayedByTeam(array $allPlayedGames): array
+    {
         /** @var array<int, list<array{visitor_teamid: int, home_teamid: int}>> $playedByTeam */
         $playedByTeam = [];
         foreach ($allPlayedGames as $game) {
@@ -253,12 +297,24 @@ class PowerRankingsUpdater extends \Database\BaseMysqliRepository {
             $playedByTeam[$game['home_teamid']][] = $simplified;
         }
 
-        // Fetch and partition unplayed games
-        $allUnplayedGames = $this->fetchAllUnplayedGames($month);
-        $unplayedByTeam = $this->partitionUnplayedGamesByTeam($allUnplayedGames);
+        return $playedByTeam;
+    }
 
-        // Calculate SOS and remaining SOS per team (data-driven from standings)
-        $teamIds = array_keys($teamWinPcts);
+    /**
+     * Compute SOS (played) and remaining SOS (unplayed) for every team in the pool
+     *
+     * @param list<int> $teamIds
+     * @param array<int, float> $teamWinPcts
+     * @param array<int, list<array{visitor_teamid: int, home_teamid: int}>> $playedByTeam
+     * @param array<int, list<array{visitor_teamid: int, home_teamid: int}>> $unplayedByTeam
+     * @return array{sos: array<int, float>, remaining: array<int, float>}
+     */
+    private function computeSosAndRemaining(
+        array $teamIds,
+        array $teamWinPcts,
+        array $playedByTeam,
+        array $unplayedByTeam
+    ): array {
         /** @var array<int, float> $sosValues */
         $sosValues = [];
         /** @var array<int, float> $remainingSosValues */
@@ -280,38 +336,35 @@ class PowerRankingsUpdater extends \Database\BaseMysqliRepository {
             );
         }
 
-        // Rank teams by SOS and remaining SOS
-        $sosRanks = StrengthOfScheduleCalculator::rankTeams($sosValues);
-        $remainingSosRanks = StrengthOfScheduleCalculator::rankTeams($remainingSosValues);
+        return ['sos' => $sosValues, 'remaining' => $remainingSosValues];
+    }
 
-        // Store SOS values in power table
-        $sosLog = '';
-        foreach ($teamIds as $teamid) {
-            $sos = $sosValues[$teamid] ?? 0.0;
-            $remainingSos = $remainingSosValues[$teamid] ?? 0.0;
-            $sosRank = $sosRanks[$teamid] ?? 0;
-            $remainingSosRank = $remainingSosRanks[$teamid] ?? 0;
-
-            $this->execute(
-                "UPDATE `ibl_power` SET
+    /**
+     * Write one team's SOS columns to ibl_power and return its debug log line
+     */
+    private function storeSosRow(
+        int $teamid,
+        float $sos,
+        float $remainingSos,
+        int $sosRank,
+        int $remainingSosRank
+    ): string {
+        $this->execute(
+            "UPDATE `ibl_power` SET
                 sos = ?,
                 remaining_sos = ?,
                 sos_rank = ?,
                 remaining_sos_rank = ?
                 WHERE teamid = ?",
-                "ddiii",
-                $sos,
-                $remainingSos,
-                $sosRank,
-                $remainingSosRank,
-                $teamid
-            );
+            "ddiii",
+            $sos,
+            $remainingSos,
+            $sosRank,
+            $remainingSosRank,
+            $teamid
+        );
 
-            $sosLog .= "teamid {$teamid}: SOS={$sos} (rank {$sosRank}), "
-                . "RSOS={$remainingSos} (rank {$remainingSosRank})<br>";
-        }
-
-        \UI\DebugOutput::display($sosLog, 'Strength of Schedule Update Log');
-        echo '<p>Strength of Schedule values have been calculated and stored.<p>';
+        return "teamid {$teamid}: SOS={$sos} (rank {$sosRank}), "
+            . "RSOS={$remainingSos} (rank {$remainingSosRank})<br>";
     }
 }

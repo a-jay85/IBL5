@@ -119,11 +119,82 @@ class PlrReconstructionService implements PlrReconstructionServiceInterface
     ): PlrReconstructionResult {
         $result = new PlrReconstructionResult();
 
+        [$lines, $inputSize] = $this->loadBaseLines($basePlrPath, $result);
+        $lines = $this->applyPlayerStats($lines, $seasonYear, $targetEndDate, $result);
+        $lines = $this->applyTeamRows($lines, $seasonYear, $targetEndDate, $result);
+        $this->writeOutput($lines, $inputSize, $outputPlrPath, $result);
+
+        return $result;
+    }
+
+    /**
+     * Read the base .plr and split it into lines.
+     *
+     * @return array{list<string>, int} Base lines and the raw input size in bytes
+     */
+    private function loadBaseLines(string $basePlrPath, PlrReconstructionResult $result): array
+    {
         $content = PlrFileWriter::readFile($basePlrPath);
         $inputSize = strlen($content);
         $lines = PlrFileWriter::splitIntoLines($content);
         $result->addMessage('Loaded base .plr: ' . $inputSize . ' bytes, ' . count($lines) . ' lines');
 
+        return [$lines, $inputSize];
+    }
+
+    /**
+     * Passes 1-3: load player aggregates, rewrite player records, report counts.
+     *
+     * @param list<string> $lines
+     * @return list<string>
+     */
+    private function applyPlayerStats(
+        array $lines,
+        int $seasonYear,
+        string $targetEndDate,
+        PlrReconstructionResult $result,
+    ): array {
+        $aggregates = $this->loadBoxScoreAggregates($seasonYear, $targetEndDate, $result);
+
+        foreach ($lines as $lineIndex => $line) {
+            if (strlen($line) < PlrFileWriter::PLAYER_RECORD_LENGTH) {
+                continue;
+            }
+
+            $ordinal = (int) trim(substr($line, PlrFileWriter::OFFSET_ORDINAL, PlrFileWriter::WIDTH_ORDINAL));
+            $pid = (int) trim(substr($line, PlrFileWriter::OFFSET_PID, PlrFileWriter::WIDTH_PID));
+            if ($pid === 0 || $ordinal > PlrFileWriter::MAX_PLAYER_ORDINAL) {
+                continue;
+            }
+
+            $changes = $this->buildRecordChanges($line, $pid, $aggregates);
+
+            if ($changes === []) {
+                $result->playersUnchanged++;
+                continue;
+            }
+
+            $lines[$lineIndex] = PlrFileWriter::applyChangesToRecord($line, $changes);
+            $result->playersUpdated++;
+        }
+
+        $result->addMessage('Updated ' . $result->playersUpdated . ' player records');
+        $result->addMessage('Left ' . $result->playersUnchanged . ' player records unchanged');
+
+        return $lines;
+    }
+
+    /**
+     * Pass 0: load the four player box-score aggregates (regular/playoff stats, regular/playoff highs)
+     * in fixed order and report their sizes.
+     *
+     * @return array{regularStats: array<int, array{gp: int, min: int, two_gm: int, two_ga: int, ftm: int, fta: int, three_gm: int, three_ga: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}>, playoffStats: array<int, array{gp: int, min: int, two_gm: int, two_ga: int, ftm: int, fta: int, three_gm: int, three_ga: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}>, regularHighs: array<int, array{high_pts: int, high_reb: int, high_ast: int, high_stl: int, high_blk: int, doubles: int, triples: int}>, playoffHighs: array<int, array{high_pts: int, high_reb: int, high_ast: int, high_stl: int, high_blk: int, doubles: int, triples: int}>}
+     */
+    private function loadBoxScoreAggregates(
+        int $seasonYear,
+        string $targetEndDate,
+        PlrReconstructionResult $result,
+    ): array {
         $regularStatsByPid = $this->boxScoreRepository->sumStatsByGameTypeThroughDate(
             $seasonYear,
             PlrBoxScoreRepositoryInterface::GAME_TYPE_REGULAR_SEASON,
@@ -153,68 +224,90 @@ class PlrReconstructionService implements PlrReconstructionServiceInterface
             count($playoffHighsByPid),
         ));
 
-        foreach ($lines as $lineIndex => $line) {
-            if (strlen($line) < PlrFileWriter::PLAYER_RECORD_LENGTH) {
-                continue;
-            }
+        return [
+            'regularStats' => $regularStatsByPid,
+            'playoffStats' => $playoffStatsByPid,
+            'regularHighs' => $regularHighsByPid,
+            'playoffHighs' => $playoffHighsByPid,
+        ];
+    }
 
-            $ordinal = (int) trim(substr($line, PlrFileWriter::OFFSET_ORDINAL, PlrFileWriter::WIDTH_ORDINAL));
-            $pid = (int) trim(substr($line, PlrFileWriter::OFFSET_PID, PlrFileWriter::WIDTH_PID));
-            if ($pid === 0 || $ordinal > PlrFileWriter::MAX_PLAYER_ORDINAL) {
-                continue;
-            }
+    /**
+     * Passes 1-3 for one player record: regular-season stats, games-started heuristic,
+     * playoff stats, then season and playoff highs. Merge order is load-bearing.
+     *
+     * @param array{regularStats: array<int, array{gp: int, min: int, two_gm: int, two_ga: int, ftm: int, fta: int, three_gm: int, three_ga: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}>, playoffStats: array<int, array{gp: int, min: int, two_gm: int, two_ga: int, ftm: int, fta: int, three_gm: int, three_ga: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}>, regularHighs: array<int, array{high_pts: int, high_reb: int, high_ast: int, high_stl: int, high_blk: int, doubles: int, triples: int}>, playoffHighs: array<int, array{high_pts: int, high_reb: int, high_ast: int, high_stl: int, high_blk: int, doubles: int, triples: int}>} $aggregates
+     * @return array<string, int>
+     */
+    private function buildRecordChanges(string $line, int $pid, array $aggregates): array
+    {
+        $changes = [];
 
-            $changes = [];
+        // Pass 1 — regular-season stats + games-started heuristic
+        $changes = array_merge(
+            $changes,
+            $this->seasonStatsChangeSetOrZeroed($line, $aggregates['regularStats'][$pid] ?? null, self::REGULAR_SEASON_FIELDS),
+        );
+        $changes = array_merge($changes, $this->buildGamesStartedChangeSet($line, $changes));
 
-            // Pass 1 — regular-season stats + games-started heuristic
-            $regularStats = $regularStatsByPid[$pid] ?? null;
-            $changes = array_merge(
-                $changes,
-                $regularStats !== null
-                    ? $this->buildSeasonStatsChangeSet($line, $regularStats, self::REGULAR_SEASON_FIELDS)
-                    : $this->buildZeroedChangeSet($line, self::REGULAR_SEASON_FIELDS),
-            );
-            $changes = array_merge($changes, $this->buildGamesStartedChangeSet($line, $changes));
+        // Pass 2 — playoff-season stats
+        $changes = array_merge(
+            $changes,
+            $this->seasonStatsChangeSetOrZeroed($line, $aggregates['playoffStats'][$pid] ?? null, self::PLAYOFF_SEASON_FIELDS),
+        );
 
-            // Pass 2 — playoff-season stats
-            $playoffStats = $playoffStatsByPid[$pid] ?? null;
-            $changes = array_merge(
-                $changes,
-                $playoffStats !== null
-                    ? $this->buildSeasonStatsChangeSet($line, $playoffStats, self::PLAYOFF_SEASON_FIELDS)
-                    : $this->buildZeroedChangeSet($line, self::PLAYOFF_SEASON_FIELDS),
-            );
+        // Career totals (437-511) are intentionally preserved from base — see class docblock.
 
-            // Career totals (437-511) are intentionally preserved from base — see class docblock.
+        // Pass 3 — season highs + career best highs
+        $changes = array_merge(
+            $changes,
+            $this->highsChangeSetOrZeroed($line, $aggregates['regularHighs'][$pid] ?? null, self::SEASON_HIGH_FIELDS),
+        );
+        $changes = array_merge(
+            $changes,
+            $this->highsChangeSetOrZeroed($line, $aggregates['playoffHighs'][$pid] ?? null, self::PLAYOFF_HIGH_FIELDS),
+        );
 
-            // Pass 3 — season highs + career best highs
-            $regularHighs = $regularHighsByPid[$pid] ?? null;
-            $changes = array_merge(
-                $changes,
-                $regularHighs !== null
-                    ? $this->buildHighsChangeSet($line, $regularHighs, self::SEASON_HIGH_FIELDS)
-                    : $this->buildZeroedHighsChangeSet($line, self::SEASON_HIGH_FIELDS),
-            );
-            $playoffHighs = $playoffHighsByPid[$pid] ?? null;
-            $changes = array_merge(
-                $changes,
-                $playoffHighs !== null
-                    ? $this->buildHighsChangeSet($line, $playoffHighs, self::PLAYOFF_HIGH_FIELDS)
-                    : $this->buildZeroedHighsChangeSet($line, self::PLAYOFF_HIGH_FIELDS),
-            );
+        return $changes;
+    }
 
-            if ($changes === []) {
-                $result->playersUnchanged++;
-                continue;
-            }
+    /**
+     * @param array{gp: int, min: int, two_gm: int, two_ga: int, ftm: int, fta: int, three_gm: int, three_ga: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}|null $stats
+     * @param array<string, string> $fieldMap
+     * @return array<string, int>
+     */
+    private function seasonStatsChangeSetOrZeroed(string $line, ?array $stats, array $fieldMap): array
+    {
+        return $stats !== null
+            ? $this->buildSeasonStatsChangeSet($line, $stats, $fieldMap)
+            : $this->buildZeroedChangeSet($line, $fieldMap);
+    }
 
-            $lines[$lineIndex] = PlrFileWriter::applyChangesToRecord($line, $changes);
-            $result->playersUpdated++;
-        }
+    /**
+     * @param array{high_pts: int, high_reb: int, high_ast: int, high_stl: int, high_blk: int, doubles: int, triples: int}|null $highs
+     * @param array<string, array{0: string, 1: string}> $fieldMap
+     * @return array<string, int>
+     */
+    private function highsChangeSetOrZeroed(string $line, ?array $highs, array $fieldMap): array
+    {
+        return $highs !== null
+            ? $this->buildHighsChangeSet($line, $highs, $fieldMap)
+            : $this->buildZeroedHighsChangeSet($line, $fieldMap);
+    }
 
-        $result->addMessage('Updated ' . $result->playersUpdated . ' player records');
-        $result->addMessage('Left ' . $result->playersUnchanged . ' player records unchanged');
 
+    /**
+     * Pass 4: load team aggregates, rewrite franchise team rows, report counts.
+     *
+     * @param list<string> $lines
+     * @return list<string>
+     */
+    private function applyTeamRows(
+        array $lines,
+        int $seasonYear,
+        string $targetEndDate,
+        PlrReconstructionResult $result,
+    ): array {
         // Pass 4 — franchise team-row reconstruction (regular-season + playoff totals)
         $teamRegularByTid = $this->boxScoreRepository->sumTeamRegularSeasonStatsThroughDate(
             $seasonYear,
@@ -271,18 +364,30 @@ class PlrReconstructionService implements PlrReconstructionServiceInterface
         $result->addMessage('Updated ' . $result->teamsUpdated . ' team rows');
         $result->addMessage('Left ' . $result->teamsUnchanged . ' team rows unchanged');
 
+        return $lines;
+    }
+
+    /**
+     * Assemble, guard the byte count, write, and record bytes written.
+     *
+     * @param list<string> $lines
+     */
+    private function writeOutput(
+        array $lines,
+        int $inputSize,
+        string $outputPlrPath,
+        PlrReconstructionResult $result,
+    ): void {
         $output = PlrFileWriter::assembleFile($lines);
         if (strlen($output) !== $inputSize) {
             $result->addError('Output size (' . strlen($output)
                 . ') does not match input size (' . $inputSize . ')');
-            return $result;
+            return;
         }
 
         PlrFileWriter::writeFile($output, $outputPlrPath);
         $result->bytesWritten = strlen($output);
         $result->addMessage('Wrote ' . $result->bytesWritten . ' bytes to ' . $outputPlrPath);
-
-        return $result;
     }
 
     /**

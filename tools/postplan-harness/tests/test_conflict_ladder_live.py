@@ -231,6 +231,39 @@ def _gen_repo(make_repo):
     return fx
 
 
+def _stale_gen_repo(make_repo, *, with_doc=False):
+    """The branch's generated file carries a hand-added `id-stale` entry that the
+    generator will never emit, so a regenerated file loses that line. This is the
+    phpstan-baseline shape: an entry the branch added that the merged tree no longer
+    produces. Without the pre-patch rewrite the proof reports it LOST."""
+    base_ids = ["id-a", "id-z"]
+    base = {"src/ids.txt": "\n".join(base_ids) + "\n",
+            "gen/make-counts.sh": _GEN_SCRIPT,
+            "gen/counts.json": _counts(base_ids)}
+    branch = {"src/ids.txt": "id-m1\n" + "\n".join(base_ids) + "\n",
+              "gen/counts.json": _counts(base_ids + ["id-m1", "id-stale"])}
+    master = {"src/ids.txt": "\n".join(base_ids) + "\nid-m2\n",
+              "gen/counts.json": _counts(base_ids + ["id-m2"])}
+    if with_doc:
+        base["doc.txt"] = "a\nb\n"
+        branch["doc.txt"] = "a\nbranch-keep-me\nb\n"
+        master["doc.txt"] = "a\nmaster-line\nb\n"
+    fx = make_repo(base, branch, master)
+    fx.all_ids = base_ids + ["id-m1", "id-m2"]
+    return fx
+
+
+def _flag_generated(monkeypatch, command=("bash", "gen/make-counts.sh")):
+    monkeypatch.setattr(conflict_ladder, "GENERATED_FILES", (
+        GeneratedFile("gen/counts.json", command, regen_on_conflict=True),))
+
+
+def _regen_only_ladder(monkeypatch):
+    monkeypatch.setattr(
+        conflict_ladder, "default_rungs",
+        lambda branch: (make_regen_rung(registry=conflict_ladder.GENERATED_FILES),))
+
+
 # docker-compose shape (#2593)
 
 _COMPOSE = "docker-compose.ci.yml"
@@ -293,7 +326,7 @@ def _drive_runner(fx, llm, monkeypatch, tmp_path):
     monkeypatch.setattr(runner, "_pr_copy", lambda *a, **k: ({
         "type": "chore", "title": "chore: ladder", "commit_subject": "chore: ladder",
         "summary_md": "## Summary\n- x\n"}, False))
-    monkeypatch.setattr(runner, "_body_check", lambda *a, **k: ({}, False))
+    monkeypatch.setattr(runner, "_mechanical_body_pass", lambda *a, **k: {})
     monkeypatch.setattr(runner, "LiveGh", lambda out_dir, worktree, slug: RecordingGh(out_dir))
 
     # The fixture branch is already committed, so the commit step has nothing to do and the
@@ -338,6 +371,86 @@ def test_live_generated_conflict_resolved_by_regen_without_llm(
     assert llm.ladder_calls == []
     assert _result_json(fx)["conflict_rung"] == "regen"
     assert _parents(fx.d) == [fx.pre, fx.master]
+    assert _show(fx.d, "HEAD:gen/counts.json") == _counts(fx.all_ids)
+
+
+def test_live_flagged_generated_conflict_regenerated_before_resolver(
+        make_repo, monkeypatch, tmp_path):
+    """Baseline-only conflict: no resolver call, the generator output lands in the merge."""
+    fx = _stale_gen_repo(make_repo)
+    llm = _ScriptedLlm({})
+    _flag_generated(monkeypatch)
+    _regen_only_ladder(monkeypatch)
+
+    res = _drive_runner(fx, llm, monkeypatch, tmp_path)
+
+    assert res.error_kind == "test-stop", res.error
+    assert llm.first_pass_calls == []
+    assert llm.ladder_calls == []
+    assert _result_json(fx)["conflict_rung"] == "regen"
+    assert _parents(fx.d) == [fx.pre, fx.master]
+    assert _show(fx.d, "HEAD:gen/counts.json") == _counts(fx.all_ids)
+
+
+def test_live_regen_failure_declines_with_resolver_reason(make_repo, monkeypatch, tmp_path):
+    fx = _stale_gen_repo(make_repo)
+    llm = _ScriptedLlm({})
+    _flag_generated(monkeypatch, ("bash", "-c", "exit 7"))
+    _regen_only_ladder(monkeypatch)
+
+    res = _drive_runner(fx, llm, monkeypatch, tmp_path)
+
+    assert res.error_kind == "rebase-conflict", res.error
+    assert "resolver declined: gen/counts.json (regen failed:" in res.error
+    assert _git(fx.d, "rev-parse", "HEAD").stdout.strip() == fx.pre
+    assert _git(fx.d, "ls-files", "--unmerged").stdout.strip() == ""
+    assert llm.first_pass_calls == []
+
+
+def test_live_regen_stray_write_declines(make_repo, monkeypatch, tmp_path):
+    fx = _stale_gen_repo(make_repo)
+    llm = _ScriptedLlm({})
+    _flag_generated(monkeypatch, ("bash", "-c", "bash gen/make-counts.sh && echo x > stray.txt"))
+    _regen_only_ladder(monkeypatch)
+
+    res = _drive_runner(fx, llm, monkeypatch, tmp_path)
+
+    assert res.error_kind == "rebase-conflict", res.error
+    assert "regen touched unexpected paths: stray.txt" in res.error
+    assert _git(fx.d, "rev-parse", "HEAD").stdout.strip() == fx.pre
+
+
+def test_live_regen_does_not_exempt_other_files_from_proof(make_repo, monkeypatch, tmp_path):
+    """The pre-patch rewrite exempts the regenerated file and nothing else: a line the
+    resolver drops from doc.txt still fails the proof."""
+    fx = _stale_gen_repo(make_repo, with_doc=True)
+    llm = _ScriptedLlm({"conflict-resolve:doc.txt": _writer("doc.txt", "a\nmaster-line\nb\n")})
+    _flag_generated(monkeypatch)
+    _regen_only_ladder(monkeypatch)
+
+    res = _drive_runner(fx, llm, monkeypatch, tmp_path)
+
+    assert res.error_kind == "rebase-conflict", res.error
+    assert "tree proof failed" in res.error
+    assert "doc.txt" in res.error
+    assert "id-stale" not in res.error
+    assert _result_json(fx)["conflict_rung"] == "exhausted"
+    assert _git(fx.d, "rev-parse", "HEAD").stdout.strip() == fx.pre
+
+
+def test_live_mixed_conflict_routes_only_non_generated_to_resolver(
+        make_repo, monkeypatch, tmp_path):
+    fx = _stale_gen_repo(make_repo, with_doc=True)
+    llm = _ScriptedLlm({"conflict-resolve:doc.txt": _writer(
+        "doc.txt", "a\nbranch-keep-me\nmaster-line\nb\n")})
+    _flag_generated(monkeypatch)
+    _regen_only_ladder(monkeypatch)
+
+    res = _drive_runner(fx, llm, monkeypatch, tmp_path)
+
+    assert res.error_kind == "test-stop", res.error
+    assert [p for p, _m, _pr in llm.first_pass_calls] == ["conflict-resolve:doc.txt"]
+    assert _result_json(fx)["conflict_rung"] == "first-pass"
     assert _show(fx.d, "HEAD:gen/counts.json") == _counts(fx.all_ids)
 
 

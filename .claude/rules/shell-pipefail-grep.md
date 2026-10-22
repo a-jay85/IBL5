@@ -30,7 +30,14 @@ PR #2174's `bin/test-architect-contract-split` used the printf-pipe form under `
 
 ## Applies to
 
-Any shell script with `set -o pipefail` (or `set -euo pipefail`) that pipes `echo` or `printf` into a `grep -q`-family call (`-qF`, `-qE`, `-qP`, `--quiet`). `grep -c` reads to EOF and is safe (`bin/test-sigpipe-grep-q-guard` case 2). `bin/check-pipefail-grep-q` fails a PR that adds a new instance under `bin/`.
+Any shell script with `set -o pipefail` (or `set -euo pipefail`) that pipes `echo` or `printf` into a `grep -q`-family call (`-qF`, `-qE`, `-qP`, `--quiet`). The quiet flag may come after the pattern (`grep -F "$pat" -q`), and the pipe may pass through other stages first (`echo "$x" | tr A-Z a-z | grep -q y`). Both forms exit 141 under pipefail. A `-q` after `--` is a file operand, so it does not count. `grep -c` reads to EOF and is safe (`bin/test-sigpipe-grep-q-guard` case 2). `bin/check-pipefail-grep-q` fails a PR that adds a new instance under `bin/`. The gate also flags an aggregating middle stage such as `wc -l`, which drains the producer and cannot exit 141. Rewrite those lines the same way, since the fix costs one line.
+
+With a middle stage, capture the stage's output first and feed the quiet grep a herestring:
+
+```bash
+lower=$(tr A-Z a-z <<< "$x")
+grep -q y <<< "$lower"
+```
 
 ShellCheck does not catch this pattern — it passes SC lint.
 

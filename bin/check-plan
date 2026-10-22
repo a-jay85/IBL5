@@ -902,8 +902,9 @@ fi
 # held to gate V's predicates. Coverage runs only when the plan carries the
 # `## Executable Mutations` heading outside fences: that is the mechanical
 # "authored after this shipped" test, so every legacy plan is silent.
-XM_ROOT=$(git -C "$(dirname "$PLAN_FILE")" rev-parse --show-toplevel 2>/dev/null \
-    || git rev-parse --show-toplevel 2>/dev/null || pwd)
+# The root is the repo being checked, never the plan's own directory: plans live
+# in $HOME/claude-plans/, which can sit inside an unrelated git repo.
+XM_ROOT="$REPO_ROOT"
 XM_REC="$(mktemp)"
 "$SCRIPT_DIR/lib/plan-exec-mutations" parse --root "$XM_ROOT" "$PLAN_FILE" > "$XM_REC"
 XM_RC=$?

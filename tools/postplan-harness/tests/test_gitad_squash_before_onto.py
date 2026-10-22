@@ -457,6 +457,161 @@ def test_stale_ibl_base_not_ancestor_squashes_onto_merge_base():
             shutil.rmtree(d2, ignore_errors=True)
 
 
+def _init_scripts_repo(prefix):
+    """master with f.txt, x.txt and the two proof scripts; returns (dir, fork_sha)."""
+    d = tempfile.mkdtemp(prefix=prefix)
+    subprocess.run(["git", "init", "-b", "master", d], check=True, capture_output=True)
+    _sh(d, "config", "user.email", "t@t")
+    _sh(d, "config", "user.name", "t")
+    _write(d, "f.txt", "a\n")
+    _write(d, "x.txt", "x\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "base")
+    scripts_dir = os.path.join(d, ".claude", "review-shared", "scripts")
+    os.makedirs(scripts_dir, exist_ok=True)
+    shutil.copy(_LOSTWORK, os.path.join(scripts_dir, "lostwork.sh"))
+    shutil.copy(_COLLAPSE, os.path.join(scripts_dir, "collapse-guard.sh"))
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "chore: proof scripts")
+    return d, _rev(d, "HEAD")
+
+
+def _finish_fixture(d, branch, fork_sha):
+    master_sha = _rev(d, "master")
+    _sh(d, "checkout", branch)
+    _sh(d, "update-ref", "refs/remotes/origin/master", master_sha)
+    _sh(d, "config", f"branch.{branch}.iblBase", fork_sha)  # the ordinary `iblBase=master` shape, stale
+    assert _sh(d, "merge-base", "--is-ancestor", fork_sha, master_sha, check=False).returncode == 0
+    return master_sha
+
+
+def _make_master_reversed_deletion_repo():
+    """(a) master deletes x.txt, the branch merge-pulls that, master re-adds x.txt with
+    identical content, the branch has not pulled again. The branch never touched x.txt."""
+    branch = f"feature-rev-{uuid.uuid4().hex[:8]}"
+    d, fork_sha = _init_scripts_repo("postplan-rev-test-")
+    _sh(d, "checkout", "-b", branch)
+    _write(d, "feature.txt", "feature\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "feat: feature work")
+    _sh(d, "checkout", "master")
+    _sh(d, "rm", "-q", "x.txt")
+    _sh(d, "commit", "-m", "m1: delete x.txt")
+    _sh(d, "checkout", branch)
+    _sh(d, "merge", "--no-edit", "master")
+    _sh(d, "checkout", "master")
+    _write(d, "x.txt", "x\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "m2: re-add x.txt")
+    master_sha = _finish_fixture(d, branch, fork_sha)
+    assert "x.txt" not in _ls_tree(d)
+    return d, fork_sha, master_sha, branch, branch
+
+
+def _make_branch_deletion_repo(master_edits_x):
+    """(b) the branch itself deletes x.txt, merge-pulls an unrelated master commit, and
+    origin/master is one commit further; with master_edits_x that commit edits x.txt."""
+    branch = f"feature-del-{uuid.uuid4().hex[:8]}"
+    d, fork_sha = _init_scripts_repo("postplan-del-test-")
+    _sh(d, "checkout", "-b", branch)
+    _sh(d, "rm", "-q", "x.txt")
+    _write(d, "feature.txt", "feature\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "feat: delete x.txt, add feature")
+    _sh(d, "checkout", "master")
+    _write(d, "other.txt", "o\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "m1: unrelated")
+    _sh(d, "checkout", branch)
+    _sh(d, "merge", "--no-edit", "master")
+    _sh(d, "checkout", "master")
+    if master_edits_x:
+        _write(d, "x.txt", "x2\n")
+    else:
+        _write(d, "later.txt", "l\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "m2")
+    master_sha = _finish_fixture(d, branch, fork_sha)
+    return d, fork_sha, master_sha, branch, branch
+
+
+def _spy_diff_ranges(g):
+    """Record every `_run_bytes` call so a test can pin the pre-patch range."""
+    calls = []
+    orig = g._run_bytes
+
+    def spy(*args, **kw):
+        calls.append(args)
+        return orig(*args, **kw)
+
+    g._run_bytes = spy
+    return calls
+
+
+def test_stale_master_base_merge_pull_reversed_deletion_proves_equivalent():
+    d, fork_sha, master_sha, key, branch = _make_master_reversed_deletion_repo()
+    try:
+        g = LiveGit(d)
+        calls = _spy_diff_ranges(g)
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is True, result.reason
+        assert ("diff", f"{master_sha}...HEAD") in calls
+        assert ("diff", f"{fork_sha}...HEAD") not in calls
+        assert "x.txt" in _ls_tree(d)           # master's re-added file survives the replay
+        assert "feature.txt" in _ls_tree(d)
+        assert _rev(d, "HEAD^") == master_sha
+        assert _sh(d, "rev-list", "--count", f"{master_sha}..HEAD").stdout.strip() == "1"
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_stacked_path_branch_deletion_is_still_charged_to_the_branch():
+    d, fork_sha, master_sha, key, branch = _make_branch_deletion_repo(master_edits_x=False)
+    try:
+        g = LiveGit(d)
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is True, result.reason
+        assert "x.txt" not in _ls_tree(d)       # the branch's own deletion is applied
+        pre = open(f"/tmp/pr-ready-diff-pre-{key}.patch").read()
+        assert "deleted file mode 100644" in pre and "a/x.txt" in pre
+        assert "other.txt" not in pre           # master's m1 is not in the branch's patch
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_stacked_path_branch_deletion_vs_master_edit_declines_not_silently_kept():
+    """A real deletion the replay cannot honour (master edited x.txt) must decline and
+    restore the branch; it must never come back as an x.txt the proof then waves through."""
+    d, fork_sha, master_sha, key, branch = _make_branch_deletion_repo(master_edits_x=True)
+    try:
+        g = LiveGit(d)
+        pre = g.head()
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is False
+        assert g.head() == pre
+        assert "x.txt" not in _ls_tree(d)
+        assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_true_stacked_parent_keeps_ibl_base_range():
+    d, fork_sha, master_sha, key, branch, stale = _make_stale_base_repo()
+    try:
+        g = LiveGit(d)
+        calls = _spy_diff_ranges(g)
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is True, result.reason
+        assert ("diff", f"{stale}...HEAD") in calls
+        assert ("diff", f"{master_sha}...HEAD") not in calls
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def test_hold_commit_is_squashed_with_clean_tree():
     d, fork_sha, master_sha, key, branch = _make_merge_range_repo()
     try:

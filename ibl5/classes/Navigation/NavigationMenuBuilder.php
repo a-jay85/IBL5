@@ -31,8 +31,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         'OneOnOneGame',
         'AwardHistory',
         'Records',
-        'CareerLeaderboards',
-        'SeasonLeaderboards',
+        'Leaderboards',
     ];
 
     private NavigationConfig $config;
@@ -96,8 +95,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Award History', 'url' => 'modules.php?name=AwardHistory'],
                     ['label' => 'Records', 'url' => 'modules.php?name=Records'],
                     ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=AllStarAppearances'],
-                    ['label' => 'Season Leaderboards', 'url' => 'modules.php?name=SeasonLeaderboards'],
-                    ['label' => 'Career Leaderboards', 'url' => 'modules.php?name=CareerLeaderboards'],
+                    ['label' => 'Leaderboards', 'url' => 'modules.php?name=Leaderboards'],
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=SeasonArchive'],
                     ['label' => '1-On-1 Game', 'url' => 'modules.php?name=OneOnOneGame'],
                 ],

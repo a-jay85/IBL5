@@ -16,6 +16,14 @@ class ModuleRedirectTest extends TestCase
         $this->assertSame('modules.php?name=ApiKeys', ModuleRedirect::targetFor('PlayerExportGuide'));
         $this->assertSame('modules.php?name=Voting', ModuleRedirect::targetFor('VotingResults'));
         $this->assertNull(ModuleRedirect::targetFor('AllStarAppearances'));
+        $this->assertSame(
+            'modules.php?name=Leaderboards&tab=season',
+            ModuleRedirect::targetFor('SeasonLeaderboards')
+        );
+        $this->assertSame(
+            'modules.php?name=Leaderboards&tab=career',
+            ModuleRedirect::targetFor('CareerLeaderboards')
+        );
     }
 
     public function testTargetForReturnsNullForUnknownModule(): void
@@ -24,6 +32,12 @@ class ModuleRedirectTest extends TestCase
         $this->assertNull(ModuleRedirect::targetFor(''));
         // Lookup is case-sensitive: a case-insensitive map would resolve this.
         $this->assertNull(ModuleRedirect::targetFor('votingresults'));
+    }
+
+    public function testTargetForNeverRedirectsTheLeaderboardsHost(): void
+    {
+        // The host module mapping to itself would loop the browser forever.
+        $this->assertNull(ModuleRedirect::targetFor('Leaderboards'));
     }
 
     public function testEveryTargetIsAnAppRelativeModulesUrl(): void

@@ -111,7 +111,7 @@ class PlayerSearchView implements PlayerSearchViewInterface
 <p class="text-center">Partial matches on a name or college are okay and are <strong>not</strong> case sensitive<br>
 (e.g., entering "Dard" will match with "Darden" and "Bedard").</p>
 
-<form name="Search" method="post" action="modules.php?name=PlayerSearch" class="ibl-filter-form max-w-3xl mx-auto">
+<form name="Search" method="post" action="modules.php?name=PlayerSearch" class="d-card d-card-border bg-base-200 max-w-3xl mx-auto p-4 mb-6">
 <?php
         return (string) ob_get_clean();
     }
@@ -126,25 +126,25 @@ class PlayerSearchView implements PlayerSearchViewInterface
         $search_name = $fields['search_name'];
         ob_start();
         ?>
-    <fieldset class="ibl-filter-fieldset">
-        <legend>Basics</legend>
-        <div class="ibl-filter-form__row">
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="search_name">Name:</label>
-                <input id="search_name" type="text" name="search_name" class="w-40" value="<?= HtmlSanitizer::e($search_name) ?>">
+    <fieldset class="d-fieldset border border-base-300 rounded-lg px-4 pb-3 mb-4">
+        <legend class="d-fieldset-legend">Basics</legend>
+        <div class="flex flex-wrap items-center justify-center gap-4">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="search_name">Name:</label>
+                <input id="search_name" type="text" name="search_name" class="d-input d-input-sm w-40" value="<?= HtmlSanitizer::e($search_name) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="pos">Position:</label>
-                <select id="pos" name="pos">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="pos">Position:</label>
+                <select class="d-select d-select-sm w-auto" id="pos" name="pos">
                     <option value="">-</option>
                     <?php foreach ($positions as $position): ?>
                         <option value="<?= HtmlSanitizer::e($position) ?>"<?= ($pos === $position) ? ' selected' : '' ?>><?= HtmlSanitizer::e($position) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="active">Retirees?</label>
-                <select id="active" name="active">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="active">Retirees?</label>
+                <select class="d-select d-select-sm w-auto" id="active" name="active">
                     <option value="1"<?= ($active === 1) ? ' selected' : '' ?>>Yes</option>
                     <option value="0"<?= ($active === 0 || $active === null) ? ' selected' : '' ?>>No</option>
                 </select>
@@ -168,28 +168,28 @@ class PlayerSearchView implements PlayerSearchViewInterface
         $bird_max = $fields['bird_max'];
         ob_start();
         ?>
-    <fieldset class="ibl-filter-fieldset">
-        <legend>Years</legend>
-        <div class="ibl-filter-form__row">
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="age">Max Age:</label>
-                <input id="age" type="text" name="age" class="w-14" value="<?= HtmlSanitizer::e($age) ?>">
+    <fieldset class="d-fieldset border border-base-300 rounded-lg px-4 pb-3 mb-4">
+        <legend class="d-fieldset-legend">Years</legend>
+        <div class="flex flex-wrap items-center justify-center gap-4">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="age">Max Age:</label>
+                <input id="age" type="text" name="age" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($age) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="exp">Min Exp:</label>
-                <input id="exp" type="text" name="exp" class="w-14" value="<?= HtmlSanitizer::e($exp) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="exp">Min Exp:</label>
+                <input id="exp" type="text" name="exp" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($exp) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="exp_max">Max Exp:</label>
-                <input id="exp_max" type="text" name="exp_max" class="w-14" value="<?= HtmlSanitizer::e($exp_max) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="exp_max">Max Exp:</label>
+                <input id="exp_max" type="text" name="exp_max" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($exp_max) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="bird">Min Bird:</label>
-                <input id="bird" type="text" name="bird" class="w-14" value="<?= HtmlSanitizer::e($bird) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="bird">Min Bird:</label>
+                <input id="bird" type="text" name="bird" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($bird) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="bird_max">Max Bird:</label>
-                <input id="bird_max" type="text" name="bird_max" class="w-14" value="<?= HtmlSanitizer::e($bird_max) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="bird_max">Max Bird:</label>
+                <input id="bird_max" type="text" name="bird_max" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($bird_max) ?>">
             </div>
         </div>
     </fieldset>
@@ -218,62 +218,62 @@ class PlayerSearchView implements PlayerSearchViewInterface
         $r_foul = $fields['r_foul'];
         ob_start();
         ?>
-    <fieldset class="ibl-filter-fieldset">
-        <legend>Statistical Ratings</legend>
-        <div class="ibl-filter-form__row mb-2">
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_fga">2ga:</label>
-                <input id="r_fga" type="text" name="r_fga" class="w-14" value="<?= HtmlSanitizer::e($r_fga) ?>">
+    <fieldset class="d-fieldset border border-base-300 rounded-lg px-4 pb-3 mb-4">
+        <legend class="d-fieldset-legend">Statistical Ratings</legend>
+        <div class="flex flex-wrap items-center justify-center gap-4 mb-2">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_fga">2ga:</label>
+                <input id="r_fga" type="text" name="r_fga" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_fga) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_fgp">2gp:</label>
-                <input id="r_fgp" type="text" name="r_fgp" class="w-14" value="<?= HtmlSanitizer::e($r_fgp) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_fgp">2gp:</label>
+                <input id="r_fgp" type="text" name="r_fgp" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_fgp) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_fta">fta:</label>
-                <input id="r_fta" type="text" name="r_fta" class="w-14" value="<?= HtmlSanitizer::e($r_fta) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_fta">fta:</label>
+                <input id="r_fta" type="text" name="r_fta" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_fta) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_ftp">ftp:</label>
-                <input id="r_ftp" type="text" name="r_ftp" class="w-14" value="<?= HtmlSanitizer::e($r_ftp) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_ftp">ftp:</label>
+                <input id="r_ftp" type="text" name="r_ftp" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_ftp) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_3ga">3ga:</label>
-                <input id="r_3ga" type="text" name="r_3ga" class="w-14" value="<?= HtmlSanitizer::e($r_3ga) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_3ga">3ga:</label>
+                <input id="r_3ga" type="text" name="r_3ga" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_3ga) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_3gp">3gp:</label>
-                <input id="r_3gp" type="text" name="r_3gp" class="w-14" value="<?= HtmlSanitizer::e($r_3gp) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_3gp">3gp:</label>
+                <input id="r_3gp" type="text" name="r_3gp" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_3gp) ?>">
             </div>
         </div>
-        <div class="ibl-filter-form__row">
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_orb">orb:</label>
-                <input id="r_orb" type="text" name="r_orb" class="w-14" value="<?= HtmlSanitizer::e($r_orb) ?>">
+        <div class="flex flex-wrap items-center justify-center gap-4">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_orb">orb:</label>
+                <input id="r_orb" type="text" name="r_orb" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_orb) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_drb">drb:</label>
-                <input id="r_drb" type="text" name="r_drb" class="w-14" value="<?= HtmlSanitizer::e($r_drb) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_drb">drb:</label>
+                <input id="r_drb" type="text" name="r_drb" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_drb) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_ast">ast:</label>
-                <input id="r_ast" type="text" name="r_ast" class="w-14" value="<?= HtmlSanitizer::e($r_ast) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_ast">ast:</label>
+                <input id="r_ast" type="text" name="r_ast" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_ast) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_stl">stl:</label>
-                <input id="r_stl" type="text" name="r_stl" class="w-14" value="<?= HtmlSanitizer::e($r_stl) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_stl">stl:</label>
+                <input id="r_stl" type="text" name="r_stl" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_stl) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_blk">blk:</label>
-                <input id="r_blk" type="text" name="r_blk" class="w-14" value="<?= HtmlSanitizer::e($r_blk) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_blk">blk:</label>
+                <input id="r_blk" type="text" name="r_blk" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_blk) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_to">tvr:</label>
-                <input id="r_to" type="text" name="r_to" class="w-14" value="<?= HtmlSanitizer::e($r_to) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_to">tvr:</label>
+                <input id="r_to" type="text" name="r_to" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_to) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_foul">foul:</label>
-                <input id="r_foul" type="text" name="r_foul" class="w-14" value="<?= HtmlSanitizer::e($r_foul) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="r_foul">foul:</label>
+                <input id="r_foul" type="text" name="r_foul" class="d-input d-input-sm w-14" value="<?= HtmlSanitizer::e($r_foul) ?>">
             </div>
         </div>
     </fieldset>
@@ -297,42 +297,42 @@ class PlayerSearchView implements PlayerSearchViewInterface
         $td = $fields['td'];
         ob_start();
         ?>
-    <fieldset class="ibl-filter-fieldset">
-        <legend>Offensive/Defensive Ratings</legend>
-        <div class="ibl-filter-form__row mb-2">
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="oo">oo:</label>
-                <input id="oo" type="text" name="oo" class="w-12" value="<?= HtmlSanitizer::e($oo) ?>">
+    <fieldset class="d-fieldset border border-base-300 rounded-lg px-4 pb-3 mb-4">
+        <legend class="d-fieldset-legend">Offensive/Defensive Ratings</legend>
+        <div class="flex flex-wrap items-center justify-center gap-4 mb-2">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="oo">oo:</label>
+                <input id="oo" type="text" name="oo" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($oo) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="do">do:</label>
-                <input id="do" type="text" name="do" class="w-12" value="<?= HtmlSanitizer::e($do) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="do">do:</label>
+                <input id="do" type="text" name="do" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($do) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="po">po:</label>
-                <input id="po" type="text" name="po" class="w-12" value="<?= HtmlSanitizer::e($po) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="po">po:</label>
+                <input id="po" type="text" name="po" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($po) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="to">to:</label>
-                <input id="to" type="text" name="to" class="w-12" value="<?= HtmlSanitizer::e($to) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="to">to:</label>
+                <input id="to" type="text" name="to" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($to) ?>">
             </div>
         </div>
-        <div class="ibl-filter-form__row">
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="od">od:</label>
-                <input id="od" type="text" name="od" class="w-12" value="<?= HtmlSanitizer::e($od) ?>">
+        <div class="flex flex-wrap items-center justify-center gap-4">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="od">od:</label>
+                <input id="od" type="text" name="od" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($od) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="dd">dd:</label>
-                <input id="dd" type="text" name="dd" class="w-12" value="<?= HtmlSanitizer::e($dd) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="dd">dd:</label>
+                <input id="dd" type="text" name="dd" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($dd) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="pd">pd:</label>
-                <input id="pd" type="text" name="pd" class="w-12" value="<?= HtmlSanitizer::e($pd) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="pd">pd:</label>
+                <input id="pd" type="text" name="pd" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($pd) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="td">td:</label>
-                <input id="td" type="text" name="td" class="w-12" value="<?= HtmlSanitizer::e($td) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="td">td:</label>
+                <input id="td" type="text" name="td" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($td) ?>">
             </div>
         </div>
     </fieldset>
@@ -354,34 +354,34 @@ class PlayerSearchView implements PlayerSearchViewInterface
         $college = $fields['college'];
         ob_start();
         ?>
-    <fieldset class="ibl-filter-fieldset">
-        <legend>Misc. Attributes</legend>
-        <div class="ibl-filter-form__row mb-2">
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="talent">Talent:</label>
-                <input id="talent" type="text" name="talent" class="w-12" value="<?= HtmlSanitizer::e($talent) ?>">
+    <fieldset class="d-fieldset border border-base-300 rounded-lg px-4 pb-3 mb-4">
+        <legend class="d-fieldset-legend">Misc. Attributes</legend>
+        <div class="flex flex-wrap items-center justify-center gap-4 mb-2">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="talent">Talent:</label>
+                <input id="talent" type="text" name="talent" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($talent) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="skill">Skill:</label>
-                <input id="skill" type="text" name="skill" class="w-12" value="<?= HtmlSanitizer::e($skill) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="skill">Skill:</label>
+                <input id="skill" type="text" name="skill" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($skill) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="intangibles">Intangibles:</label>
-                <input id="intangibles" type="text" name="intangibles" class="w-12" value="<?= HtmlSanitizer::e($intangibles) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="intangibles">Intangibles:</label>
+                <input id="intangibles" type="text" name="intangibles" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($intangibles) ?>">
             </div>
         </div>
-        <div class="ibl-filter-form__row">
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="Clutch">Clutch:</label>
-                <input id="Clutch" type="text" name="Clutch" class="w-12" value="<?= HtmlSanitizer::e($Clutch) ?>">
+        <div class="flex flex-wrap items-center justify-center gap-4">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="Clutch">Clutch:</label>
+                <input id="Clutch" type="text" name="Clutch" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($Clutch) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="Consistency">Consistency:</label>
-                <input id="Consistency" type="text" name="Consistency" class="w-12" value="<?= HtmlSanitizer::e($Consistency) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="Consistency">Consistency:</label>
+                <input id="Consistency" type="text" name="Consistency" class="d-input d-input-sm w-12" value="<?= HtmlSanitizer::e($Consistency) ?>">
             </div>
-            <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="college">College:</label>
-                <input id="college" type="text" name="college" class="w-40" value="<?= HtmlSanitizer::e($college) ?>">
+            <div class="flex items-center gap-2">
+                <label class="d-label" for="college">College:</label>
+                <input id="college" type="text" name="college" class="d-input d-input-sm w-40" value="<?= HtmlSanitizer::e($college) ?>">
             </div>
         </div>
     </fieldset>
@@ -394,9 +394,9 @@ class PlayerSearchView implements PlayerSearchViewInterface
     {
         ob_start();
         ?>
-    <div class="ibl-filter-form__row gap-3">
-        <button type="button" class="ibl-btn ibl-btn--ghost" onclick="resetPlayerSearch();">Reset</button>
-        <button type="submit" class="ibl-filter-form__submit">Search for Player</button>
+    <div class="flex flex-wrap items-center justify-center gap-3">
+        <button type="button" class="d-btn d-btn-ghost" onclick="resetPlayerSearch();">Reset</button>
+        <button type="submit" class="d-btn d-btn-primary">Search for Player</button>
     </div>
 </form>
 

@@ -15,8 +15,10 @@ final class ModuleRedirect
 {
     /** @var array<string, string> old module name => new app-relative URL */
     public const TARGETS = [
-        'PlayerExportGuide'  => 'modules.php?name=ApiKeys',
-        'VotingResults'      => 'modules.php?name=Voting',
+        'PlayerExportGuide'    => 'modules.php?name=ApiKeys',
+        'VotingResults'        => 'modules.php?name=Voting',
+        'SeasonLeaderboards'   => 'modules.php?name=Leaderboards&tab=season',
+        'CareerLeaderboards'   => 'modules.php?name=Leaderboards&tab=career',
     ];
 
     public static function targetFor(string $moduleName): ?string

@@ -22,9 +22,10 @@ final class CareerLeaderboardsViewTest extends TestCase
     public function testRenderFilterFormCreatesValidHtml(): void
     {
         $filters = [
-            'boards_type' => 'Regular Season Totals',
-            'sort_cat' => 'Points',
-            'active' => '1',
+            'phase' => 'regular',
+            'mode' => 'totals',
+            'sortby' => 'PPG',
+            'retirees' => false,
             'display' => '50'
         ];
 
@@ -33,12 +34,15 @@ final class CareerLeaderboardsViewTest extends TestCase
         // Check that form is rendered
         $this->assertStringContainsString('<form', $html);
         $this->assertStringContainsString('name="CareerLeaderboards"', $html);
-        $this->assertStringContainsString('action="modules.php?name=CareerLeaderboards"', $html);
-        
+        $this->assertStringContainsString('method="get" action="modules.php"', $html);
+        $this->assertStringContainsString('<input type="hidden" name="name" value="Leaderboards">', $html);
+        $this->assertStringContainsString('<input type="hidden" name="tab" value="career">', $html);
+
         // Check that all form fields are present
-        $this->assertStringContainsString('name="boards_type"', $html);
-        $this->assertStringContainsString('name="sort_cat"', $html);
-        $this->assertStringContainsString('name="active"', $html);
+        $this->assertStringContainsString('name="phase"', $html);
+        $this->assertStringContainsString('name="mode"', $html);
+        $this->assertStringContainsString('name="sortby"', $html);
+        $this->assertStringContainsString('name="retirees"', $html);
         $this->assertStringContainsString('name="display"', $html);
         $this->assertStringContainsString('name="submitted"', $html);
         
@@ -70,10 +74,10 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('sortable', $html);
 
         // Check that all stat columns are present
-        $this->assertStringContainsString('>Rank<', $html);
+        $this->assertStringContainsString('>#<', $html);
         $this->assertStringContainsString('>Name<', $html);
-        $this->assertStringContainsString('>Games<', $html);
-        $this->assertStringContainsString('>Minutes<', $html);
+        $this->assertStringContainsString('>G<', $html);
+        $this->assertStringContainsString('>MIN<', $html);
         $this->assertStringContainsString('>FGM<', $html);
         $this->assertStringContainsString('>FGA<', $html);
         $this->assertStringContainsString('>FG%<', $html);
@@ -89,6 +93,36 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertNotFalse($rebPos);
         $this->assertGreaterThan($orbPos, $drbPos);
         $this->assertGreaterThan($drbPos, $rebPos);
+    }
+
+    public function testGamesColumnHiddenWhenShowGamesIsOff(): void
+    {
+        $stats = [
+            'pid' => 123, 'name' => 'Test Player', 'games' => '777', 'minutes' => '30',
+            'fgm' => '5', 'fga' => '10', 'fgp' => '0.500', 'ftm' => '2', 'fta' => '2',
+            'ftp' => '1.000', 'tgm' => '1', 'tga' => '3', 'tgp' => '0.333', 'orb' => '1',
+            'drb' => '4', 'reb' => '5', 'ast' => '3', 'stl' => '1', 'tvr' => '2',
+            'blk' => '0', 'pf' => '2', 'pts' => '13',
+        ];
+
+        $this->view->setShowGames(false);
+        $header = $this->view->renderTableHeader();
+        $row = $this->view->renderPlayerRow($stats, 1);
+
+        $this->assertStringNotContainsString('>G<', $header);
+        $this->assertStringContainsString('>MIN<', $header);
+        $this->assertStringNotContainsString('777', $row);
+        $this->assertSame(preg_match_all('/<th[ >]/', $header), preg_match_all('/<td[ >]/', $row));
+    }
+
+    public function testGamesSortDisabledForOneGamePhase(): void
+    {
+        $rookie = $this->view->renderFilterForm(['phase' => 'rookie']);
+        $regular = $this->view->renderFilterForm(['phase' => 'regular']);
+
+        $this->assertMatchesRegularExpression('/<option value="GAMES"[^>]* disabled>/', $rookie);
+        $this->assertDoesNotMatchRegularExpression('/<option value="GAMES"[^>]* disabled>/', $regular);
+        $this->assertStringContainsString('value="sophomore" data-has-averages="0" data-shows-games="0"', $rookie);
     }
 
     public function testRenderPlayerRowCreatesValidHtml(): void
@@ -213,5 +247,135 @@ final class CareerLeaderboardsViewTest extends TestCase
 
         // Check that asterisk is displayed for retired player
         $this->assertStringContainsString('Retired Legend*', $html);
+    }
+
+    public function testFilterFormSubmitsViaGetToLeaderboardsCareerTab(): void
+    {
+        $html = $this->view->renderFilterForm([
+            'phase' => 'regular',
+            'mode' => 'totals',
+            'sortby' => 'PPG',
+            'retirees' => true,
+            'display' => '50',
+        ]);
+
+        $this->assertStringContainsString('method="get" action="modules.php"', $html);
+        $this->assertStringNotContainsString('method="post"', $html);
+        $this->assertStringContainsString('<input type="hidden" name="name" value="Leaderboards">', $html);
+        $this->assertStringContainsString('<input type="hidden" name="tab" value="career">', $html);
+        $this->assertStringContainsString('<input type="hidden" name="submitted" value="1">', $html);
+        // The retired module name would hit the 302 stub and lose the query string.
+        $this->assertStringNotContainsString('name=CareerLeaderboards"', $html);
+    }
+
+    public function testFilterFormRendersPhaseSelectWithAllPhases(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('id="cl-phase" name="phase"', $html);
+        foreach (['Regular Season', 'Playoffs', 'H.E.A.T.', 'Olympics', 'Rookie Game', 'Sophomore Game', 'All-Star Game'] as $label) {
+            $this->assertStringContainsString('>' . $label . '</option>', $html);
+        }
+        $this->assertStringNotContainsString('boards_type', $html);
+        $this->assertStringNotContainsString('sort_cat', $html);
+    }
+
+    public function testFilterFormRendersSegmentedModeRadios(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('<fieldset class="ibl-segmented">', $html);
+        $this->assertStringContainsString('<legend class="ibl-segmented__legend">', $html);
+        $this->assertStringContainsString('type="radio" name="mode" value="totals" checked', $html);
+        $this->assertMatchesRegularExpression('/value="averages"(?![^>]*disabled)/', $html);
+    }
+
+    public function testFilterFormDisablesAveragesRadioForRookie(): void
+    {
+        $html = $this->view->renderFilterForm(['phase' => 'rookie', 'mode' => 'averages']);
+
+        $this->assertMatchesRegularExpression('/value="averages"[^>]*disabled/', $html);
+        $this->assertStringContainsString('value="totals" checked', $html);
+    }
+
+    public function testFilterFormDisablesAveragesRadioForSophomore(): void
+    {
+        $html = $this->view->renderFilterForm(['phase' => 'sophomore']);
+
+        $this->assertMatchesRegularExpression('/value="averages"[^>]*disabled/', $html);
+    }
+
+    public function testFilterFormSortByOptionsExcludeQaAndLabelPts(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('id="cl-sortby" name="sortby"', $html);
+        $this->assertStringContainsString('value="PPG" selected>PTS</option>', $html);
+        $this->assertStringNotContainsString('value="QA"', $html);
+        $this->assertStringNotContainsString('Category:', $html);
+    }
+
+    public function testFilterFormLabelsPpgOnAverages(): void
+    {
+        $html = $this->view->renderFilterForm(['mode' => 'averages']);
+
+        $this->assertStringContainsString('value="PPG" selected>PPG</option>', $html);
+        $this->assertStringContainsString('value="averages" checked', $html);
+    }
+
+    public function testFilterFormKeepsPercentageSortOptionsEnabledOnTotals(): void
+    {
+        $html = $this->view->renderFilterForm(['mode' => 'totals', 'sortby' => 'FGP']);
+
+        $this->assertStringContainsString('value="FGP" selected>FG%</option>', $html);
+        $this->assertStringContainsString('value="FTP">FT%</option>', $html);
+        $this->assertStringContainsString('value="TGP">TG%</option>', $html);
+        $this->assertDoesNotMatchRegularExpression('/<option[^>]*value="(FGP|FTP|TGP)"[^>]*disabled/', $html);
+    }
+
+    public function testFilterFormEnablesPercentageSortOptionsOnAverages(): void
+    {
+        $html = $this->view->renderFilterForm(['mode' => 'averages', 'sortby' => 'FGP']);
+
+        $this->assertStringContainsString('value="FGP" selected>FG%</option>', $html);
+        $this->assertStringContainsString('value="FTP">FT%</option>', $html);
+        $this->assertStringContainsString('value="TGP">TG%</option>', $html);
+    }
+
+    public function testFilterFormRendersRetireesSwitchCheckedByDefault(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('type="checkbox" role="switch" name="retirees" value="1" id="cl-retirees"', $html);
+        $this->assertMatchesRegularExpression('/id="cl-retirees"[^>]*checked/', $html);
+        $this->assertStringContainsString('>Retired?</label>', $html);
+    }
+
+    public function testFilterFormRendersRetireesSwitchOffWhenFalse(): void
+    {
+        $html = $this->view->renderFilterForm(['retirees' => false]);
+
+        $this->assertDoesNotMatchRegularExpression('/id="cl-retirees"[^>]*checked/', $html);
+        $this->assertStringContainsString('name="submitted" value="1"', $html);
+    }
+
+    public function testFilterFormUsesResultsLimitAndSearchButton(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('>Results Limit:</label>', $html);
+        $this->assertStringContainsString('placeholder="50"', $html);
+        $this->assertStringNotContainsString('Records', $html);
+        $this->assertStringContainsString('>Search</button>', $html);
+        $this->assertStringNotContainsString('Display Career Leaderboards', $html);
+    }
+
+    public function testFilterFormIsStackedAndLoadsEnhancementScript(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('ibl-filter-form ibl-filter-form--stacked', $html);
+        $this->assertStringContainsString('ibl-filter-form__actions', $html);
+        $this->assertStringContainsString('<script src="jslib/career-leaderboards-form.js" defer></script>', $html);
     }
 }

@@ -187,6 +187,8 @@ class LeagueContext
                 'SeasonLeaderboards',
                 'Leaderboards',
                 'RecordHolders',
+                'Records',
+                'AllStarAppearances',
             ];
 
             return !in_array($moduleName, $iblOnlyModules, true);

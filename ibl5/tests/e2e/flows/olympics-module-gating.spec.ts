@@ -21,6 +21,8 @@ const IBL_ONLY_MODULES = [
   'CareerLeaderboards',
   'SeasonLeaderboards',
   'RecordHolders',
+  'Records',
+  'AllStarAppearances',
 ];
 
 test.describe('Olympics module gating', () => {
@@ -45,6 +47,23 @@ test.describe('Olympics module gating', () => {
     // Should render tables, not the gating message
     const body = await page.locator('body').textContent();
     expect(body).not.toContain("Module isn't active");
+  });
+
+  test('SeasonHighs renders standalone in Olympics', async ({ page }) => {
+    // SeasonHighs redirects to Records (IBL-only) in IBL context, but serves
+    // directly in Olympics where Records is blocked.
+    const response = await page.request.get('modules.php?name=SeasonHighs&league=olympics', {
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(200);
+
+    await page.goto('modules.php?name=SeasonHighs&league=olympics');
+    await assertNoPhpErrors(page, 'on SeasonHighs in Olympics');
+    expect(page.url()).toContain('name=SeasonHighs');
+    expect(page.url()).not.toContain('name=Records');
+    await expect(page.locator('h1.ibl-title')).toContainText('Season Highs');
+    // The CI seed has no Olympics box scores, so the stat tables render without rows.
+    await expect(page.locator('.ibl-data-table.stat-table').first()).toBeVisible();
   });
 
   test('Team page renders in Olympics context', async ({ page }) => {

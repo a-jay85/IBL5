@@ -1097,8 +1097,26 @@ printf '["past theme one", "past theme two"]'    > "$_FIX/themes.json"
 printf '{"Known Team": "123456789012345678", "Unknown Team": null}' \
     > "$_FIX/mentions-unmapped.json"
 printf '[]' > "$_FIX/themes-empty.json"
-printf '{"sim":1,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{},"active_injuries":[],"sim_trades":[]}' \
-    > "$_FIX/roster-context.json"
+cat > "$_FIX/roster-context.json" <<'ROSTER_FIX_EOF'
+{"sim":1,"start_date":"2026-01-01","end_date":"2026-01-07",
+ "roster":{"1":[{"pid":11,"name":"Ann Alpha","pos":"PG","current_teamid":1}],"2":[]},
+ "active_injuries":[{"pid":22,"name":"Bob Beta","current_teamid":2}],
+ "sim_trades":[{"pid":33,"player_name":"Cal Gamma","from_teamid":1,"to_teamid":2,"trade_date":"2026-01-03"}],
+ "games":[
+  {"key":"g1","game_date":"2026-01-02","visitor_teamid":1,"home_teamid":2,"visitor_score":101,"home_score":99,
+   "visitor_top":[{"name":"Ann Alpha","min":34,"pts":28,"reb":5,"ast":7,"stl":2,"blk":0,"fgm":10,"fga":19,"tpm":3,"tpa":7}],
+   "home_top":[{"name":"Bob Beta","min":36,"pts":22,"reb":9,"ast":3,"stl":1,"blk":2,"fgm":8,"fga":17,"tpm":1,"tpa":4}],
+   "injuries":[{"name":"Bob Beta","injuryDescription":"sprained ankle","injuryGamesMissed":4}]},
+  {"key":"g2","game_date":"2026-01-03","visitor_teamid":2,"home_teamid":1,"visitor_score":90,"home_score":95,
+   "visitor_top":[{"name":"Bob Beta","min":30,"pts":15,"reb":6,"ast":2,"stl":0,"blk":1,"fgm":6,"fga":14,"tpm":0,"tpa":2}],
+   "home_top":[{"name":"Ann Alpha","min":35,"pts":31,"reb":4,"ast":8,"stl":3,"blk":0,"fgm":12,"fga":20,"tpm":4,"tpa":8}],
+   "injuries":[]}
+ ],
+ "standings":[
+  {"teamid":1,"name":"Team Alpha","wins":10,"losses":4,"conference":"East","division":"Atlantic","conf_gb":"0","streak":"W3","last10":"7-3"},
+  {"teamid":2,"name":"Team Beta","wins":6,"losses":8,"conference":"West","division":"Pacific","conf_gb":"2","streak":"","last10":""}
+ ]}
+ROSTER_FIX_EOF
 
 # Run the real builder; output → prompt.out, errors → prompt.err.
 run_prompt() {
@@ -1108,7 +1126,8 @@ run_prompt() {
 }
 
 # ── exemplar_embedded ─────────────────────────────────────────────────────────
-run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
 srt_log_has "$STUB" prompt.out "WHERE THINGS STAND" "exemplar_embedded — WHERE THINGS STAND"
 srt_log_has "$STUB" prompt.out "===== "             "exemplar_embedded — date separator"
 
@@ -1126,18 +1145,21 @@ srt_log_lacks "$STUB" prompt.out "paragraph at the end" \
 
 # ── mentions_render_as_strings ────────────────────────────────────────────────
 # Snowflake digit-for-digit in output (same run, but rerun for clarity).
-run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
 srt_log_has "$STUB" prompt.out "123456789012345678" \
     "mentions_render_as_strings — snowflake digit-for-digit"
 
 # ── negative_unmapped_team ────────────────────────────────────────────────────
-run_prompt --sim=1 --mentions="$_FIX/mentions-unmapped.json" --themes="$_FIX/themes.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions-unmapped.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
 srt_log_has  "$STUB" prompt.out "Unknown Team" "negative_unmapped_team — plain name present"
 srt_log_lacks "$STUB" prompt.out "<@>"          "negative_unmapped_team — no empty mention tag"
 srt_log_lacks "$STUB" prompt.out "<@null>"      "negative_unmapped_team — no null mention tag"
 
 # ── negative_empty_ledger ─────────────────────────────────────────────────────
-run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes-empty.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes-empty.json" \
+    --roster="$_FIX/roster-context.json"
 srt_log_has "$STUB" prompt.out "(none recorded yet)" \
     "negative_empty_ledger — none-recorded-yet for empty themes"
 
@@ -1169,7 +1191,8 @@ else
 fi
 
 # ── voice_spec_corrected ──────────────────────────────────────────────────────
-run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
 srt_log_lacks "$STUB" prompt.out "injuries during the sim" \
     "voice_spec_corrected — old injury-only note absent"
 srt_log_has "$STUB" prompt.out "frozen historical marker" \
@@ -1180,12 +1203,10 @@ srt_log_lacks "$STUB" prompt.out "integer zero, not null" \
     "game_of_that_day_contract — old 'integer zero' instruction absent"
 srt_log_lacks "$STUB" prompt.out "first game of a doubleheader" \
     "game_of_that_day_contract — retired doubleheader semantics absent"
-srt_log_has "$STUB" prompt.out "READ this value from the database" \
-    "game_of_that_day_contract — read-not-infer directive present"
-srt_log_has "$STUB" prompt.out "index of the game within" \
-    "game_of_that_day_contract — within-date semantics present"
-srt_log_has "$STUB" prompt.out "FROM ibl_box_scores_teams" \
-    "game_of_that_day_contract — lookup query present"
+srt_log_lacks "$STUB" prompt.out "READ this value from the database" \
+    "game_of_that_day_contract — lookup directive gone (the caller assembles the structure)"
+srt_log_lacks "$STUB" prompt.out "FROM ibl_box_scores_teams" \
+    "game_of_that_day_contract — lookup query gone"
 
 # ── prose_length_band_present ─────────────────────────────────────────────────
 srt_log_has "$STUB" prompt.out "504 and 639 characters" \
@@ -1220,24 +1241,90 @@ else
     srt_fail "length_band_matches_exemplar — exemplar measures '$_band', prompt claims 504..639"
 fi
 
-# ── negative_roster_absent ────────────────────────────────────────────────────
-# Without --roster, Block 8 must not appear.
+# ── prompt_rejects_missing_roster_context ─────────────────────────────────────
+# --roster is required: without it there is no fact sheet, so the builder refuses.
 run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
-srt_log_lacks "$STUB" prompt.out "CURRENT ROSTER CONTEXT" \
-    "negative_roster_absent — roster block absent when --roster not provided"
+if [ "$SRT_PROMPT_RC" = 2 ] && grep -qF -- "no games" "$STUB/prompt.err" \
+    && ! grep -qF -- "CURRENT ROSTER CONTEXT" "$STUB/prompt.out"; then
+    srt_ok "prompt_rejects_missing_roster_context — exit 2, stderr names the missing games, no roster block"
+else
+    srt_fail "prompt_rejects_missing_roster_context — rc=$SRT_PROMPT_RC err=$(cat "$STUB/prompt.err")"
+fi
+
+# ── prompt_rejects_empty_games_array ──────────────────────────────────────────
+printf '{"sim":1,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{},"active_injuries":[],"sim_trades":[],"games":[],"standings":[]}' \
+    > "$_FIX/roster-nogames.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-nogames.json"
+srt_expect_eq "prompt_rejects_empty_games_array — exit 2" 2 "$SRT_PROMPT_RC"
 
 # ── negative_roster_empty_object ──────────────────────────────────────────────
-# An empty-object roster ({}) must NOT trigger Block 8 — no .sim key (Block 8 fix).
+# An empty-object roster ({}) has no games, so it is refused too.
 printf '{}' > "$_FIX/roster-empty.json"
 run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
     --roster="$_FIX/roster-empty.json"
+srt_expect_eq "negative_roster_empty_object — exit 2" 2 "$SRT_PROMPT_RC"
 srt_log_lacks "$STUB" prompt.out "CURRENT ROSTER CONTEXT" \
-    "negative_roster_empty_object — block absent for empty-object roster (Block 8 fix)"
+    "negative_roster_empty_object — block absent for empty-object roster"
+
+# ── fact sheet cases ──────────────────────────────────────────────────────────
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
+srt_expect_eq "fact_sheet_fixture_builds — exit 0" 0 "$SRT_PROMPT_RC"
+
+# ── prompt_fact_sheet_renders_game_and_player_lines ──────────────────────────
+if grep -qF -- "g1 2026-01-02 Team Alpha 101 @ Team Beta 99" "$STUB/prompt.out" \
+    && grep -qF -- "  V Ann Alpha 34m 28p 5r 7a 2s 0b 10-19 3-7" "$STUB/prompt.out"; then
+    srt_ok "prompt_fact_sheet_renders_game_and_player_lines — g1 header and V player line"
+else
+    srt_fail "prompt_fact_sheet_renders_game_and_player_lines — g1 header or V line absent"
+fi
+
+# ── prompt_fact_sheet_renders_injury_and_trade ───────────────────────────────
+if grep -qF -- "  INJ Bob Beta: sprained ankle (4 games)" "$STUB/prompt.out" \
+    && grep -qF -- "Cal Gamma: Team Alpha to Team Beta on 2026-01-03" "$STUB/prompt.out"; then
+    srt_ok "prompt_fact_sheet_renders_injury_and_trade — INJ line and trade with names from standings"
+else
+    srt_fail "prompt_fact_sheet_renders_injury_and_trade — INJ or trade line absent"
+fi
+
+# ── prompt_roster_block_is_minified_and_omits_games ──────────────────────────
+_rb_line=$(awk '/wrong for anyone traded since/ {n=NR+2} n && NR==n {print; exit}' "$STUB/prompt.out")
+if [ -n "$_rb_line" ] \
+    && jq -e 'has("roster") and has("active_injuries") and (has("games") | not)' \
+        >/dev/null 2>&1 <<< "$_rb_line" \
+    && [ "$(printf '%s' "$_rb_line" | wc -l | tr -d ' ')" = "0" ]; then
+    srt_ok "prompt_roster_block_is_minified_and_omits_games"
+else
+    srt_fail "prompt_roster_block_is_minified_and_omits_games — got: ${_rb_line:-<none>}"
+fi
+
+# ── prompt_contract_requests_prose_json_only ─────────────────────────────────
+if grep -qF -- "prose.json" "$STUB/prompt.out" \
+    && ! grep -qF -- "Write payload.json" "$STUB/prompt.out"; then
+    srt_ok "prompt_contract_requests_prose_json_only — prose.json named, payload.json not requested"
+else
+    srt_fail "prompt_contract_requests_prose_json_only — prose.json absent or payload.json still requested"
+fi
+
+# ── prompt_data_access_declares_fact_sheet_authoritative ─────────────────────
+if grep -qF -- "complete and authoritative" "$STUB/prompt.out" \
+    && grep -qF -- "--default-auth=mysql_native_password" "$STUB/prompt.out"; then
+    srt_ok "prompt_data_access_declares_fact_sheet_authoritative — sheet authoritative, mysql command kept"
+else
+    srt_fail "prompt_data_access_declares_fact_sheet_authoritative — declaration or mysql command absent"
+fi
+
+# ── prompt_never_expands_mysql_pwd ───────────────────────────────────────────
+MYSQL_PWD="sekrit-canary" run_prompt --sim=1 --mentions="$_FIX/mentions.json" \
+    --themes="$_FIX/themes.json" --roster="$_FIX/roster-context.json"
+srt_log_lacks "$STUB" prompt.out "sekrit-canary" "prompt_never_expands_mysql_pwd"
 
 # ── negative_missing_exemplar ─────────────────────────────────────────────────
 SIM_RECAP_EXEMPLAR="/nonexistent/exemplar.txt" \
     "$SRT_PROMPT_BIN" --sim=1 \
     --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json" \
     > "$STUB/prompt.out" 2>"$STUB/prompt.err"
 SRT_PROMPT_RC=$?
 srt_expect_eq "negative_missing_exemplar — exit 1" 1 "$SRT_PROMPT_RC"
@@ -1249,6 +1336,7 @@ srt_expect_eq "negative_missing_exemplar — empty stdout" "0" "$_stdout_size"
 MYSQL_PWD="s3cr3t_pw_xyz" SIM_RECAP_EXEMPLAR="$SRT_EXEMPLAR" \
     "$SRT_PROMPT_BIN" --sim=1 \
     --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json" \
     > "$STUB/prompt.out" 2>"$STUB/prompt.err"
 srt_log_lacks "$STUB" prompt.out "s3cr3t_pw_xyz" "negative_no_credential_leak"
 srt_log_lacks "$STUB" prompt.out "SIM_RECAP_DB_PASSWORD" \

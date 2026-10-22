@@ -51,6 +51,7 @@ closed) and exit 2 in one-shot mode. It is never a pass.
 Environment:
   GH_API_CMD       Override the API command (default "gh api"). Tests point it at a
                    shim that returns the Nth fixture on the Nth call.
+  IBL5_GH_RETRY_DELAYS  Sleeps between retries of each API read (default "2 5": 3 attempts). Unset and empty both select the default.
   GITHUB_WORKFLOW  Display name of the calling workflow. Its own active run is
                    excluded from V4 so the aggregator never waits on itself.
                    Unset or empty means no self-exclusion.
@@ -147,8 +148,11 @@ fi
 # Sourced only after --help and flag validation, so --help works with no jq on PATH.
 # shellcheck source=bin/lib/ci-checks-green.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/ci-checks-green.sh"
+# shellcheck source=bin/lib/gh-retry.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/gh-retry.sh"
 
 GH_API_CMD="${GH_API_CMD:-gh api}"
+: "${IBL5_GH_RETRY_DELAYS:=2 5}"
 SELF_WORKFLOW="${GITHUB_WORKFLOW:-}"
 SKIP_JSON="$(ccg_skip_json "$SELF,$IGNORE")"
 ANCHOR_JSON="$(ccg_skip_json "$ANCHOR")"
@@ -159,11 +163,11 @@ ANCHOR_LIST="$(printf '%s' "$ANCHOR_JSON" | jq -r 'join(", ")')"
 # poll_once — one verdict. Sets VERDICT (fail|wait|pass|apierr) and LINE.
 poll_once() {
     local raw runs_raw checks failed missing pending active total
-    if ! raw="$(bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/commits/$SHA/check-runs?per_page=100\"" 2>/dev/null)" \
+    if ! raw="$(gh_retry_json bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/commits/$SHA/check-runs?per_page=100\"" 2>/dev/null)" \
         || ! checks="$(printf '%s' "$raw" | jq -e '{check_runs: [.[].check_runs[]]}' 2>/dev/null)"; then
         VERDICT=apierr; LINE="check-runs read failed"; return 0
     fi
-    if ! runs_raw="$(bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/actions/runs?head_sha=$SHA&per_page=100\"" 2>/dev/null)" \
+    if ! runs_raw="$(gh_retry_json bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/actions/runs?head_sha=$SHA&per_page=100\"" 2>/dev/null)" \
         || ! active="$(printf '%s' "$runs_raw" | jq -er --arg self_wf "$SELF_WORKFLOW" --argjson skipwf "$IGNORE_WF_JSON" \
             '[.[].workflow_runs[] | select(.status != "completed") | select(.name != $self_wf) | select(.name as $n | $skipwf | index($n) | not)] | map(.name) | join(", ")' 2>/dev/null)"; then
         VERDICT=apierr; LINE="workflow-runs read failed"; return 0

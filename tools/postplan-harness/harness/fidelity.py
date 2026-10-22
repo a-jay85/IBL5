@@ -964,6 +964,13 @@ def _name_status_paths(name_status: str) -> list[str]:
     return [ln.split()[-1] for ln in (name_status or "").splitlines() if ln.split()]
 
 
+def cited_diff_paths(name_status: str, findings: list[str], hunks: list[dict]) -> set[str]:
+    """Diff paths a finding or an added body line cites by full path or by file name."""
+    texts = list(findings) + [ln for h in hunks for ln in h["new"]]
+    return {p for p in _name_status_paths(name_status)
+            if any(p in t or os.path.basename(p) in t for t in texts)}
+
+
 def body_recheck(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
                  pr_body: str, prior_body: str, pr_number: int | str,
                  prior_verdict_path: str, name_status: str,
@@ -997,9 +1004,7 @@ def body_recheck(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
     fids = [f"F{i}" for i in range(1, len(findings) + 1)]
     hunks = llm_calls.body_hunks(prior_body, pr_body)
     hids = [h["id"] for h in hunks]
-    cited = {p for p in _name_status_paths(name_status)
-             if any(p in t for t in findings)
-             or any(p in ln for h in hunks for ln in h["new"])}
+    cited = cited_diff_paths(name_status, findings, hunks)
     evidence = llm_calls.diff_sections_for(gitad.diff_vs_base(), cited)
     prompt = llm_calls.pr_body_recheck_prompt(findings, hunks, prior_body, pr_body,
                                               name_status, evidence)

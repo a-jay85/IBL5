@@ -226,9 +226,7 @@ def replay_live(report: dict, limit: int, out_dir: str) -> dict:
             hunks = h.llm_calls.body_hunks(prior_body, new_body)
             name_status = _name_status(diff_text)
             # Same path selection as fidelity.body_recheck: cited by a finding or an added line.
-            cited = {p for p in h.fidelity._name_status_paths(name_status)
-                     if any(p in t for t in findings)
-                     or any(p in ln for hk in hunks for ln in hk["new"])}
+            cited = h.fidelity.cited_diff_paths(name_status, findings, hunks)
             evidence = h.llm_calls.diff_sections_for(diff_text, cited)
             prompt = h.llm_calls.pr_body_recheck_prompt(
                 findings, hunks, prior_body, new_body, name_status, evidence)

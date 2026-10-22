@@ -3,13 +3,15 @@
 #
 # bin/test-finding-class-scan — harness for bin/finding-class-scan.
 #
-# Usage: bin/test-finding-class-scan [--live]
+# Usage: bin/test-finding-class-scan [--live | --corpus-diff <old-script>]
 #
 # Every external binary (gh, claude, discord-dm, launchctl) is replaced through
 # the script's env seams, and each case runs against a mktemp state dir with
 # canned GraphQL pages from bin/fixtures/finding-class-scan/. No network, no
 # real Claude call. `--live` is the one stub-free exercise (real claude, real
 # read-only gh) the owner runs once before arming the schedule.
+# `--corpus-diff <old-script>` runs every case against <old-script> and the
+# current script, then diffs each run's assignments.jsonl (backlog#1530).
 #
 # Exit 0 = all pass, 1 = failures.
 
@@ -159,6 +161,22 @@ fcs() {
         bash "$FCS" "$@" 2> "$errf")" || RC=$?
     ERR="$(cat "$errf")"
     ALL="$OUT"$'\n'"$ERR"
+    if [ -n "${FCS_CORPUS_DIR:-}" ]; then corpus_snapshot; fi
+}
+
+# corpus_snapshot: --corpus-diff only. Saves this run's assignments.jsonl
+# (keys sorted, lines sorted) and the run's retry-line total for the checker.
+corpus_snapshot() {
+    FCS_CASE_N=$((FCS_CASE_N + 1))
+    local snap
+    snap="$FCS_CORPUS_DIR/$FCS_CASE.$(printf '%02d' "$FCS_CASE_N")"
+    if [ -s "${STATE:-/nonexistent}/assignments.jsonl" ]; then
+        jq -cS . "$STATE/assignments.jsonl" | LC_ALL=C sort > "$snap.jsonl"
+    else
+        : > "$snap.jsonl"
+    fi
+    sed -n 's/.*threads left unseen for retry (rejected class): \([0-9][0-9]*\).*/\1/p' <<< "$ALL" \
+        | awk '{s += $1} END {print s + 0}' > "$snap.say"
 }
 
 # count_lines <file-in-stubdir> <needle>: lines holding the needle (0 if no file).
@@ -860,17 +878,101 @@ SH
     expect_lacks "live run made no issue comment" "$(cat "$LT/gh.log")" "issue comment"
 }
 
-if [ "${1:-}" = "--live" ]; then
-    live_main
-else
+# ── --corpus-diff ─────────────────────────────────────────────────────────────
+# run_cases: the default case loop, shared by the normal run and both corpus passes.
+run_cases() {
+    local c
     for c in $(declare -F | awk '$3 ~ /^case_/ {print $3}'); do
         # FCS_ONLY=<case_name> runs a single case, handy when debugging.
         if [ -n "${FCS_ONLY:-}" ] && [ "$c" != "$FCS_ONLY" ]; then continue; fi
+        FCS_CASE="$c"; FCS_CASE_N=0
         "$c"
         if [ -n "${FCS_ONLY:-}" ]; then
             printf -- '--- last run: rc=%s\n--- stdout\n%s\n--- stderr\n%s\n' "$RC" "$OUT" "$ERR" >&2
         fi
     done
+}
+
+# corpus_mirror <script> <root>: a repo-shaped dir whose bin/ symlinks every
+# real bin/ entry except finding-class-scan, which is a copy of <script>. The
+# script resolves REPO_ROOT from its own path (bin/check-prose at :878), so the
+# old and new copies both run from this same layout and layout effects cancel.
+corpus_mirror() {
+    local e
+    mkdir -p "$2/bin"
+    for e in "$REPO_ROOT"/* "$REPO_ROOT"/.[!.]*; do
+        [ -e "$e" ] || continue
+        case "$(basename "$e")" in bin|.git) continue ;; esac
+        ln -s "$e" "$2/"
+    done
+    for e in "$REPO_ROOT"/bin/*; do ln -s "$e" "$2/bin/"; done
+    rm "$2/bin/finding-class-scan"
+    cp "$1" "$2/bin/finding-class-scan"
+}
+
+# corpus_pass <script> <snapdir>: every case against <script>. Assertions fail
+# freely on the old script, so the subshell discards their output and counts.
+corpus_pass() {
+    mkdir -p "$2" "$CD/tmp"
+    # H_TMPDIRS is cleared so the subshell's EXIT cleanup trap removes only its
+    # own fixtures, not the parent's $CD (which holds both snapshot sets).
+    # shellcheck disable=SC2034  # H_TMPDIRS is read by the sourced harness trap
+    ( H_TMPDIRS=""; FCS="$1"; FCS_CORPUS_DIR="$2"; TMPDIR="$CD/tmp"; export TMPDIR; run_cases ) >/dev/null 2>&1 || true
+}
+
+# corpus_main <old-script>: the only allowed difference is a thread that holds
+# a class_key:null row under the old script and no row under the new one, or
+# that later gains a real class under the new one (the retry). Per case, the
+# count of such threads may not exceed the new script's reported rejections.
+corpus_main() {
+    local old="${1:-}" o n base case_name prev_case="" say_sum=0 out bad=0
+    if [ -z "$old" ] || [ ! -f "$old" ]; then
+        echo "usage: bin/test-finding-class-scan --corpus-diff <old-script>" >&2
+        exit 2
+    fi
+    export LC_ALL=C
+    h_tmp CD
+    corpus_mirror "$old" "$CD/old"
+    corpus_mirror "$FCS" "$CD/new"
+    corpus_pass "$CD/old/bin/finding-class-scan" "$CD/snap-old"
+    corpus_pass "$CD/new/bin/finding-class-scan" "$CD/snap-new"
+    if ! diff <(cd "$CD/snap-old" && ls) <(cd "$CD/snap-new" && ls) >/dev/null; then
+        echo "UNEXPECTED snapshot sets differ: old and new made a different number of runs"
+        echo "corpus-diff: FAIL"
+        exit 1
+    fi
+    for o in "$CD/snap-old"/*.jsonl; do
+        base="$(basename "$o" .jsonl)"
+        n="$CD/snap-new/$base.jsonl"
+        case_name="${base%.*}"
+        if [ "$case_name" != "$prev_case" ]; then prev_case="$case_name"; say_sum=0; fi
+        say_sum=$((say_sum + $(cat "$CD/snap-new/$base.say")))
+        out="$(jq -rn --arg s "$base" --argjson cap "$say_sum" \
+            --argjson oo "$(comm -23 "$o" "$n" | jq -sc .)" \
+            --argjson no "$(comm -13 "$o" "$n" | jq -sc .)" '
+            ($oo | map(select(.class_key == null) | .thread_id) | unique) as $nulls
+            | ($oo[] | if .class_key == null then "ALLOWED \($s) dropped-null \(.thread_id)"
+                       else "UNEXPECTED \($s) old-only \(tojson)" end),
+              ($no[] | if .class_key != null and (.thread_id | IN($nulls[]))
+                       then "ALLOWED \($s) retried \(.thread_id) -> \(.class_key)"
+                       else "UNEXPECTED \($s) new-only \(tojson)" end),
+              (if ($nulls | length) > $cap
+               then "UNEXPECTED \($s) \($nulls | length) dropped null rows exceed \($cap) reported rejections"
+               else empty end)')"
+        if [ -n "$out" ]; then printf '%s\n' "$out"; fi
+        if grep -q '^UNEXPECTED' <<< "$out"; then bad=1; fi
+    done
+    if [ "$bad" -eq 0 ]; then echo "corpus-diff: clean (only rejected-class null rows differ)"
+    else echo "corpus-diff: FAIL"; fi
+    exit "$bad"
+}
+
+if [ "${1:-}" = "--live" ]; then
+    live_main
+elif [ "${1:-}" = "--corpus-diff" ]; then
+    corpus_main "${2:-}"
+else
+    run_cases
 fi
 
 h_done

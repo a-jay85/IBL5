@@ -16,7 +16,7 @@ use Tests\WideUnit\Mocks\MockDatabase;
 class TeamStatsCalculatorTest extends TestCase
 {
     private TeamStatsCalculator $calculator;
-    private object $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
@@ -25,38 +25,13 @@ class TeamStatsCalculatorTest extends TestCase
     }
 
     /**
-     * MockDatabase subclass that records the SQL handed to fetchAll()/fetchOne().
-     * The calculator duck-types on method_exists($db, 'fetchAll'|'fetchOne').
-     */
-    private function createRecordingDb(): MockDatabase
-    {
-        return new class extends MockDatabase {
-            /** @var list<string> */
-            public array $recordedSql = [];
-
-            /** @return list<array<string, mixed>> */
-            public function fetchAll(string $query, string $types = '', mixed ...$params): array
-            {
-                $this->recordedSql[] = $query;
-                return [];
-            }
-
-            public function fetchOne(string $query, string $types = '', mixed ...$params): null
-            {
-                $this->recordedSql[] = $query;
-                return null;
-            }
-        };
-    }
-
-    /**
-     * Run the preload path (fetchAll) and the per-team path (fetchOne), return both SQL strings.
+     * Run the preload path (fetchAll) and the per-team path (fetchOne) through MockDatabase::prepare(), return both SQL strings.
      *
      * @return list<string>
      */
     private function captureStandingsSql(?LeagueContext $context): array
     {
-        $db = $this->createRecordingDb();
+        $db = new MockDatabase();
 
         $preloading = new TeamStatsCalculator($db, $context);
         $preloading->preloadTeamRecords();
@@ -67,8 +42,10 @@ class TeamStatsCalculatorTest extends TestCase
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
         ], 1);
 
-        /** @var list<string> */
-        return $db->recordedSql;
+        return array_values(array_filter(
+            $db->getPreparedQueries(),
+            static fn (string $query): bool => str_contains($query, 'standings')
+        ));
     }
 
     public function testCalculateInitializesCorrectlyWithEmptyGames(): void
@@ -593,7 +570,8 @@ class TeamStatsCalculatorTest extends TestCase
 
     public function testWinPointsDefaultToZeroWithMockDb(): void
     {
-        // MockDatabase doesn't have fetchOne, so opponent records default to 0
+        // No standings row for the opponent: fetchOne returns null, so the record is 0-0.
+        $this->mockDb->onQuery('FROM ibl_standings WHERE teamid', []);
         $games = [
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
         ];
@@ -601,13 +579,15 @@ class TeamStatsCalculatorTest extends TestCase
         $result = $this->calculator->calculate($games, 1);
 
         $this->assertSame(1, $result['wins']);
-        // winPoints defaults to 0 when db doesn't support fetchOne
+        // Opponent has no standings row, so winPoints stays 0.
         $this->assertSame(0, $result['winPoints']);
+        $this->assertContains('SELECT wins AS win, losses AS loss FROM ibl_standings WHERE teamid = ?', $this->mockDb->getPreparedQueries());
     }
 
     public function testLossPointsDefaultToZeroWithMockDb(): void
     {
-        // MockDatabase doesn't have fetchOne, so opponent records default to 0
+        // No standings row for the opponent: fetchOne returns null, so the record is 0-0.
+        $this->mockDb->onQuery('FROM ibl_standings WHERE teamid', []);
         $games = [
             ['visitor_teamid' => 1, 'visitor_score' => 95, 'home_teamid' => 2, 'home_score' => 100],
         ];
@@ -615,8 +595,99 @@ class TeamStatsCalculatorTest extends TestCase
         $result = $this->calculator->calculate($games, 1);
 
         $this->assertSame(1, $result['losses']);
-        // lossPoints defaults to 0 when db doesn't support fetchOne
+        // Opponent has no standings row, so lossPoints stays 0.
         $this->assertSame(0, $result['lossPoints']);
+        $this->assertContains('SELECT wins AS win, losses AS loss FROM ibl_standings WHERE teamid = ?', $this->mockDb->getPreparedQueries());
+    }
+
+    public function testPreloadedOpponentRecordsWeightWinAndLossPoints(): void
+    {
+        $db = new MockDatabase();
+        $db->onQuery('teamid AS teamid', [
+            ['teamid' => 2, 'win' => 30, 'loss' => 10],
+            ['teamid' => 3, 'win' => 20, 'loss' => 20],
+            ['teamid' => 4, 'win' => 5, 'loss' => 35],
+        ]);
+        $calc = new TeamStatsCalculator($db);
+        $calc->preloadTeamRecords();
+
+        $games = [
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 3, 'visitor_score' => 110, 'home_teamid' => 1, 'home_score' => 105],
+            ['visitor_teamid' => 4, 'visitor_score' => 90, 'home_teamid' => 1, 'home_score' => 99],
+        ];
+
+        $result = $calc->calculate($games, 1);
+
+        $this->assertSame(2, $result['wins']);
+        $this->assertSame(1, $result['losses']);
+        $this->assertSame(35, $result['winPoints']);
+        $this->assertSame(20, $result['lossPoints']);
+        $this->assertSame(63.8, TeamStatsCalculator::calculateRankingScore(2, 1, 35, 20));
+
+        $queries = $db->getPreparedQueries();
+        $this->assertCount(1, array_filter($queries, static fn (string $q): bool => str_contains($q, 'teamid AS teamid')));
+        $this->assertCount(0, array_filter($queries, static fn (string $q): bool => str_contains($q, 'WHERE teamid = ?')));
+    }
+
+    public function testPerTeamLookupWeightsPointsWhenNotPreloaded(): void
+    {
+        $db = new MockDatabase();
+        $db->onQuery('FROM ibl_standings WHERE teamid', [['win' => 30, 'loss' => 10]]);
+        $calc = new TeamStatsCalculator($db);
+
+        $games = [
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 2, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 95],
+        ];
+
+        $result = $calc->calculate($games, 1);
+
+        $this->assertSame(1, $result['wins']);
+        $this->assertSame(1, $result['losses']);
+        $this->assertSame(30, $result['winPoints']);
+        $this->assertSame(10, $result['lossPoints']);
+        $this->assertSame(
+            ['SELECT wins AS win, losses AS loss FROM ibl_standings WHERE teamid = ?', 'SELECT wins AS win, losses AS loss FROM ibl_standings WHERE teamid = ?'],
+            $db->getPreparedQueries()
+        );
+    }
+
+    public function testOpponentMissingFromPreloadContributesZero(): void
+    {
+        $db = new MockDatabase();
+        $db->onQuery('teamid AS teamid', [['teamid' => 2, 'win' => 30, 'loss' => 10]]);
+        $calc = new TeamStatsCalculator($db);
+        $calc->preloadTeamRecords();
+
+        $games = [
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 9, 'visitor_score' => 90, 'home_teamid' => 1, 'home_score' => 99],
+        ];
+
+        $result = $calc->calculate($games, 1);
+
+        $this->assertSame(2, $result['wins']);
+        $this->assertSame(30, $result['winPoints']);
+        $this->assertCount(
+            0,
+            array_filter($db->getPreparedQueries(), static fn (string $q): bool => str_contains($q, 'WHERE teamid = ?'))
+        );
+    }
+
+    public function testPreloadTeamRecordsQueriesOnce(): void
+    {
+        $db = new MockDatabase();
+        $db->onQuery('teamid AS teamid', [['teamid' => 2, 'win' => 30, 'loss' => 10]]);
+        $calc = new TeamStatsCalculator($db);
+
+        $calc->preloadTeamRecords();
+        $calc->preloadTeamRecords();
+
+        $this->assertCount(
+            1,
+            array_filter($db->getPreparedQueries(), static fn (string $q): bool => str_contains($q, 'teamid AS teamid'))
+        );
     }
 
     // ============================================

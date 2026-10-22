@@ -35,13 +35,29 @@ class Ratings implements RatingsInterface
     public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = [], string $ariaLabel = '', bool $markExpiringRows = false): string
     {
         $players = PlayerRowTransformer::resolvePlayers($db, $data, $yr);
+        $withTeam = $moduleName === "LeagueStarters";
 
         ob_start();
         ?>
 <table class="ibl-data-table team-table responsive-table sortable"<?= $ariaLabel !== '' ? ' aria-label="' . \Security\HtmlSanitizer::e($ariaLabel) . '"' : '' ?> style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
+<?= HtmlSanitizer::trusted(self::renderHeader($withTeam)) ?>
+    <tbody>
+<?php foreach ($players as $player): ?>
+<?= HtmlSanitizer::trusted(self::renderPlayerRow($player, $season, $withTeam, $starterPids, $markExpiringRows)) ?>
+<?php endforeach; ?>
+    </tbody>
+</table>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    private static function renderHeader(bool $withTeam): string
+    {
+        ob_start();
+        ?>
     <thead>
         <tr>
-<?php if ($moduleName === "LeagueStarters"): ?>
+<?php if ($withTeam): ?>
             <th>Team</th>
 <?php endif; ?>
             <th class="sticky-col">Player</th>
@@ -73,10 +89,19 @@ class Ratings implements RatingsInterface
             <th>Days Injured</th>
         </tr>
     </thead>
-    <tbody>
-<?php foreach ($players as $player): ?>
-        <tr<?= ($markExpiringRows && $player->getNameStatusClass() === 'player-expiring') ? ' class="player-fa-expiring-row"' : '' ?><?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->getTeamid() ?? 0 ?>"<?php endif; ?>>
-<?php if ($moduleName === "LeagueStarters"):
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param list<int> $starterPids
+     */
+    private static function renderPlayerRow(Player $player, Season $season, bool $withTeam, array $starterPids, bool $markExpiringRows): string
+    {
+        ob_start();
+        ?>
+        <tr<?= ($markExpiringRows && $player->getNameStatusClass() === 'player-expiring') ? ' class="player-fa-expiring-row"' : '' ?><?php if ($withTeam): ?> data-team-id="<?= $player->getTeamid() ?? 0 ?>"<?php endif; ?>>
+<?php if ($withTeam):
     echo TeamCellHelper::renderTeamCellOrFreeAgent($player->getTeamid() ?? 0, $player->getTeamName() ?? '', $player->getTeamColor1() ?? 'FFFFFF', $player->getTeamColor2() ?? '000000');
 endif; ?>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->getPlayerID(), $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass()) ?>
@@ -113,10 +138,7 @@ endif; ?>
                 ? TooltipLabel::render((string) $injDays, 'Returns: ' . $injReturn)
                 : (string) $injDays ?></td>
         </tr>
-<?php endforeach; ?>
-    </tbody>
-</table>
-        <?php
+<?php
         return (string) ob_get_clean();
     }
 }

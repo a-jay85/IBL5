@@ -29,12 +29,20 @@ class RatingsTest extends TestCase
      * @param string $nameStatusClass Value returned by getNameStatusClass() ('' = normal, 'player-expiring' = expiring)
      * @return Player&\PHPUnit\Framework\MockObject\MockObject
      */
-    private function createMockPlayer(string $name = 'Test Player', int $playerId = 1, string $nameStatusClass = ''): Player
-    {
+    private function createMockPlayer(
+        string $name = 'Test Player',
+        int $playerId = 1,
+        string $nameStatusClass = '',
+        string $position = 'PG',
+        int $injuryDays = 0,
+        string $injuryReturn = '',
+        ?int $teamId = null,
+        string $teamName = '',
+    ): Player {
         $player = $this->createMock(Player::class);
         $player->method('getPlayerID')->willReturn($playerId);
         $player->method('getName')->willReturn($name);
-        $player->method('getPosition')->willReturn('PG');
+        $player->method('getPosition')->willReturn($position);
         $player->method('getAge')->willReturn(25);
         $player->method('getRatingFieldGoalAttempts')->willReturn(15);
         $player->method('getRatingFieldGoalPercentage')->willReturn(45);
@@ -61,8 +69,15 @@ class RatingsTest extends TestCase
         $player->method('getRatingConsistency')->willReturn(75);
         $player->method('getDecoratedName')->willReturn($name);
         $player->method('getNameStatusClass')->willReturn($nameStatusClass);
-        $player->method('getDaysRemainingForInjury')->willReturn(0);
-        $player->method('getInjuryReturnDate')->willReturn('');
+        $player->method('getDaysRemainingForInjury')->willReturn($injuryDays);
+        $player->method('getInjuryReturnDate')->willReturn($injuryReturn);
+
+        if ($teamId !== null) {
+            $player->method('getTeamid')->willReturn($teamId);
+            $player->method('getTeamName')->willReturn($teamName);
+            $player->method('getTeamColor1')->willReturn('112233');
+            $player->method('getTeamColor2')->willReturn('445566');
+        }
 
         return $player;
     }
@@ -80,6 +95,86 @@ class RatingsTest extends TestCase
         $team->teamid = 1;
 
         return $team;
+    }
+
+    /**
+     * Same contract as FreeAgencyViewTest::assertGolden(): IBL_GOLDEN_CAPTURE=1
+     * rewrites the golden first; CI never sets it, so CI always compares.
+     */
+    private function assertGolden(string $path, string $html): void
+    {
+        if (getenv('IBL_GOLDEN_CAPTURE') === '1') {
+            file_put_contents($path, $html);
+        }
+        $this->assertStringEqualsFile($path, $html);
+    }
+
+    /**
+     * Whole-output pin of the non-LeagueStarters variant, captured before the
+     * renderHeader/renderPlayerRow split. Covers: aria-label escaping, a
+     * starter, an expiring row with markExpiringRows on, an injured player
+     * (TooltipLabel arm), an uninjured player (plain int arm), and a hostile
+     * name and position.
+     */
+    public function testRenderGoldenPlainVariant(): void
+    {
+        $mockDb = $this->createMock(\mysqli::class);
+        $mockSeason = $this->createMock(Season::class);
+        $mockSeason->lastSimEndDate = '2025-01-01';
+
+        $players = [
+            $this->createMockPlayer('Starter Guy', 100),
+            $this->createMockPlayer('Expiring Vet', 200, 'player-expiring', 'SF', 12, '2025-01-15'),
+            $this->createMockPlayer("O'Neal <b>", 300, '', 'G&F'),
+        ];
+
+        $html = Ratings::render($mockDb, $players, $this->createMockTeam(), '', $mockSeason, 'NextSim', [100], 'Ratings & more', true);
+
+        $this->assertGolden(__DIR__ . '/fixtures/ratings-plain.golden.html', $html);
+    }
+
+    /**
+     * Whole-output pin of the LeagueStarters variant: Team header, data-team-id
+     * on each row, and both arms of renderTeamCellOrFreeAgent (rostered team id
+     * and team id 0).
+     */
+    public function testRenderGoldenLeagueStartersVariant(): void
+    {
+        $mockDb = $this->createMock(\mysqli::class);
+        $mockSeason = $this->createMock(Season::class);
+        $mockSeason->lastSimEndDate = '2025-01-01';
+
+        $players = [
+            $this->createMockPlayer('Rostered Star', 100, '', 'C', 0, '', 5, 'Test Team'),
+            $this->createMockPlayer('Unsigned Star', 200, '', 'PF', 3, '2025-01-04', 0, ''),
+        ];
+
+        $html = Ratings::render($mockDb, $players, $this->createMockTeam(), '', $mockSeason, 'LeagueStarters');
+
+        $this->assertGolden(__DIR__ . '/fixtures/ratings-league-starters.golden.html', $html);
+    }
+
+    /**
+     * The split adds only private helpers; callers (LeagueStartersView,
+     * TeamTableService, WaiversController) depend on this exact public shape.
+     */
+    public function testRatingsExposesOnlyRenderAsPublicMethod(): void
+    {
+        $reflection = new \ReflectionClass(Ratings::class);
+
+        $publicMethods = array_map(
+            static fn (\ReflectionMethod $method): string => $method->getName(),
+            $reflection->getMethods(\ReflectionMethod::IS_PUBLIC),
+        );
+        self::assertSame(['render'], $publicMethods);
+
+        $render = $reflection->getMethod('render');
+        self::assertTrue($render->isStatic());
+        self::assertSame('string', (string) $render->getReturnType());
+        self::assertSame(
+            ['db', 'data', 'team', 'yr', 'season', 'moduleName', 'starterPids', 'ariaLabel', 'markExpiringRows'],
+            array_map(static fn (\ReflectionParameter $param): string => $param->getName(), $render->getParameters()),
+        );
     }
 
     /**

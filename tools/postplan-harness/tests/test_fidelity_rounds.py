@@ -315,7 +315,7 @@ def test_round_records_carry_model_sizes_retries_outcome(tmp_path, git_shim):
         rec = res.fidelity["rounds"][0]
         assert set(rec) == {"round", "model", "work_list_sizes", "retries", "outcome",
                             "remediation_sha", "verdict", "reviewed_tree",
-                            "verdict_path"}
+                            "verdict_path", "review_kind", "recheck_fallback_reason"}
         assert rec["work_list_sizes"]["16"] == 1
         assert rec["model"] == "sonnet"
         assert rec["outcome"] == "committed"

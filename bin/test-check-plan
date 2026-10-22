@@ -2907,7 +2907,7 @@ YROW='| 2 | `pinned_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
 | 4 | `third_thing` works | PHPUnit | post-impl | `tests/XTest.php` |'
 # 1 of 4 tagged, well-formed, CLI-executable: the honored shape.
 assert_viol "gateY-tagged-cli-row-ok" 0 '[Y]' "$FM$YHDR"'
-| 1 | corpus diff prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 1 | corpus diff prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/db-query` |
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate Y props -->
 '
@@ -2918,41 +2918,41 @@ assert_viol "gateY-tag-on-e2e-row-fires" 1 '[Y]' "$FM$YHDR"'
 '
 # Tag not trailing: malformed.
 assert_viol "gateY-tag-not-trailing-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | (one-time-check: one-shot corpus diff over local transcripts) prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/x` |
+| 1 | (one-time-check: one-shot corpus diff over local transcripts) prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/db-query` |
 '"$YROW"'
 '
 # Reason under 15 chars.
 assert_viol "gateY-short-reason-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` (one-time-check: one shot) | CLI-executable | post-impl | `bin/x` |
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one shot) | CLI-executable | post-impl | `bin/db-query` |
 '"$YROW"'
 '
 # Escaped pipe inside the reason: the helper restores it to | and rejects it.
 assert_viol "gateY-pipe-in-reason-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` (one-time-check: corpus diff via grep \| sort at plan time) | CLI-executable | post-impl | `bin/x` |
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: corpus diff via grep \| sort at plan time) | CLI-executable | post-impl | `bin/db-query` |
 '"$YROW"'
 '
 # Tag in the location cell: not the What-to-verify cell.
 assert_viol "gateY-tag-in-location-cell-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/x` (one-time-check: one-shot corpus diff over local transcripts) |
+| 1 | prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/db-query` (one-time-check: one-shot corpus diff over local transcripts) |
 '"$YROW"'
 '
 # Share boundary: 1 of 3 is exactly a third and passes.
 assert_viol "gateY-share-at-third-ok" 0 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/db-query` |
 | 2 | `pinned_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
 | 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
 <!-- no-test-methods: fixture rows are gate Y props -->
 '
 # Share over a third: 2 of 4.
 assert_viol "gateY-share-over-third-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/db-query` |
 | 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
 | 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
 | 4 | `third_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
 '
 # Every row tagged.
 assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/db-query` |
 | 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
 '
 
@@ -3123,7 +3123,7 @@ assert_viol "gateMT-fenced-matrix-silent" 0 '[MT]' "$FM$YHDR"'
 '
 # A one-time-check row is skipped by the helper, so the gate skips it too.
 assert_viol "gateMT-tagged-row-silent" 0 '[MT]' "$FM$YHDR"'
-| 1 | grep printed `x.php:12` (one-time-check: one command printed output at plan time) | CLI-executable | post-impl | `bin/x` |
+| 1 | grep printed `x.php:12` (one-time-check: one command printed output at plan time) | CLI-executable | post-impl | `bin/db-query` |
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate MT props -->
 '
@@ -3235,10 +3235,49 @@ assert_viol "gateG-wired-script-ok" 0 '[G]' "$FM"'
 '
 
 # (one-shot) annotation as shell comment inside backticks exempts the unwired script — must pass.
+# The script is listed in ## Critical Files (the plan creates it) so gate [BX] stays silent.
 assert_viol "gateG-unwired-oneshot-ok" 0 '[G]' "$FM"'
+## Critical Files
+
+- `bin/test-nonexistent-thing` (NEW)
+
+## Verification Matrix
+
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | run script | CLI-executable | post-impl | `bin/test-nonexistent-thing # (one-shot)` |
+'
+
+# ---------------------------------------------------------------------------
+# Gate [BX] fixtures: a bin/ path the location cell runs must exist or be a
+# Critical Files entry. The PR #3264 shape: a (one-shot) row naming a missing script.
+# ---------------------------------------------------------------------------
+assert_viol "gateBX-missing-oneshot-script-flags" 1 '[BX]' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | help clean | CLI-executable | post-impl | `bin/check-plan --help >/dev/null && bin/check-bin-help bin/check-plan # (one-shot)` |
+'
+
+# Existing scripts at the root and under ibl5/, and vendor/bin (not a repo bin/ path).
+assert_viol "gateBX-existing-paths-ok" 0 '[BX]' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | query runs | CLI-executable | post-impl | `bin/db-query "SELECT 1"` |
+| 2 | drift clean | CLI-executable | post-impl | `cd ibl5 && php bin/check-baseline-drift # (one-shot)` |
+| 3 | unit tests | CLI-executable | post-impl | `cd ibl5 && vendor/bin/phpunit --filter Foo` |
+'
+
+# A missing script the plan creates (named in ## Critical Files) is silent.
+assert_viol "gateBX-new-script-in-critical-files-ok" 0 '[BX]' "$FM"'
+## Critical Files
+
+- `bin/brand-new-tool` (NEW)
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | tool runs | CLI-executable | post-impl | `bin/brand-new-tool --help` |
 '
 
 # Legacy annotation form: a note after the closing backtick leaves a stray
@@ -3822,7 +3861,7 @@ assert_viol gate-I-full-flags-clean 0 '[I]' "$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
-| 2 | lint clean | CLI-executable | post-impl | shellcheck --severity=warning --shell=bash bin/foo |"
+| 2 | lint clean | CLI-executable | post-impl | shellcheck --severity=warning --shell=bash bin/db-query |"
 
 # No shellcheck row at all — gate is silent ([I] must NOT appear, exit 0).
 assert_viol gate-I-no-shellcheck-row-clean 0 '[I]' "$FM_OPUS
@@ -3862,7 +3901,7 @@ Create a new ibl5/classes/Foo/BarService.php implementing the baz interface.
 
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
-| 1 | mutation score | Infection | post-impl | bin/infection-run ibl5/classes/Foo/BarService.php |"
+| 1 | mutation score | Infection | post-impl | cd ibl5 && vendor/bin/infection --filter=classes/Foo/BarService.php |"
 
 # No creation verb — gate is silent ([J] must NOT appear).
 assert_viol gate-J-no-new-class-clean 0 '[J]' "$FM_OPUS

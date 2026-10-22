@@ -93,7 +93,7 @@ class FreeAgencyOfferView
         ?>
 <div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
     <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
-        <h2 class="d-card-title text-(length:--text-2xl)"><?= HtmlSanitizer::e($player->getPosition() ?? '') ?> <?= HtmlSanitizer::e($player->getName() ?? '') ?> - Contract Negotiation</h2>
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)"><?= HtmlSanitizer::e($player->getPosition() ?? '') ?> <?= HtmlSanitizer::e($player->getName() ?? '') ?> - Contract Negotiation</h2>
     </div>
     <div class="d-card-body">
         <div class="offer-player-info">
@@ -119,7 +119,7 @@ class FreeAgencyOfferView
         ?>
 <div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
     <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
-        <h2 class="d-card-title text-(length:--text-2xl)">Contract Offer</h2>
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)">Contract Offer</h2>
     </div>
     <div class="d-card-body">
         <div class="ibl-field-group">
@@ -160,7 +160,7 @@ class FreeAgencyOfferView
         ?>
 <div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
     <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
-        <h2 class="d-card-title text-(length:--text-2xl)">Quick Offer Presets</h2>
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)">Quick Offer Presets</h2>
     </div>
     <div class="d-card-body">
         <?= HtmlSanitizer::trusted($this->renderOfferButtons($player, $team)) ?>
@@ -257,7 +257,7 @@ class FreeAgencyOfferView
         ?>
 <div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
     <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
-        <h2 class="d-card-title text-(length:--text-2xl)">Notes / Reminders</h2>
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)">Notes / Reminders</h2>
     </div>
     <div class="d-card-body">
         <ul class="ibl-notes">

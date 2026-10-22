@@ -42,7 +42,7 @@ class WaiversController implements WaiversControllerInterface
     private WaiversProcessorInterface $processor;
     private \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -84,7 +84,7 @@ class WaiversController implements WaiversControllerInterface
             $this->submissionService = new \Waivers\WaiversSubmissionService(
                 $this->processor,
                 $this->salaryCapRepo,
-                $this->season ?? new Season($this->db)
+                $this->season ?? \Season\SharedSeason::get($this->db)
             );
         }
 
@@ -101,7 +101,7 @@ class WaiversController implements WaiversControllerInterface
             return;
         }
 
-        $season = ($this->season ??= new Season($this->db));
+        $season = ($this->season ??= \Season\SharedSeason::get($this->db));
 
         if (!$season->areWaiversAllowed()) {
             \PageLayout\PageLayout::header();

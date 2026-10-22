@@ -1,0 +1,32 @@
+{
+ "type": "result",
+ "subtype": "success",
+ "is_error": false,
+ "total_cost_usd": 0.12,
+ "structured_output": {
+  "assignments": [
+   {
+    "thread_id": "T1",
+    "class_key": "two-thread-class"
+   },
+   {
+    "thread_id": "T2",
+    "class_key": "two-thread-class"
+   },
+   {
+    "thread_id": "T3",
+    "class_key": null
+   }
+  ],
+  "classes": [
+   {
+    "key": "two-thread-class",
+    "title": "Missing escape on output",
+    "description": "Output is echoed without escaping.",
+    "check_kind": "phpstan",
+    "proposed_check": "Flag echo of a variable that skipped the escape helper.",
+    "artifact_path": "ibl5/phpstan-rules/BanUnescapedEchoRule.php"
+   }
+  ]
+ }
+}

@@ -89,4 +89,20 @@ final class UpdateAllTheThingsRolloverWiringTest extends TestCase
             self::assertStringNotContainsString($forbidden, $this->src, 'inline rollover call: ' . $forbidden);
         }
     }
+
+    public function testDisablesSharedSeasonBeforeFirstSeasonBuild(): void
+    {
+        $disable = '\Season\SharedSeason::disable();';
+        self::assertStringContainsString($disable, $this->src);
+
+        $disablePos = strpos($this->src, $disable);
+        $mainfilePos = strpos($this->src, "require \$documentRoot . '/ibl5/mainfile.php';");
+        $firstBuildPos = strpos($this->src, '$season = new \Season\Season($mysqli_db);');
+        self::assertNotFalse($disablePos);
+        self::assertNotFalse($mainfilePos);
+        self::assertNotFalse($firstBuildPos);
+
+        self::assertGreaterThan($mainfilePos, $disablePos, 'disable() must run after mainfile.php arms the memo');
+        self::assertLessThan($firstBuildPos, $disablePos, 'disable() must run before the first Season build');
+    }
 }

@@ -1025,6 +1025,8 @@ jobs:
             bin/test-bug-pipeline-ci-autofix \
             bin/test-sim-recap-tick \
             bin/test-events-review \
+            bin/test-code-slice-review \
+            bin/test-finding-class-scan \
             bin/test-sim-recap-ssh-gate \
             bin/test-discord-dm \
             bin/test-post-plan-fail-dm \

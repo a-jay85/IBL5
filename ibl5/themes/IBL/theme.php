@@ -78,7 +78,7 @@ function themeheader(): void
     $isDraftOrderFinalized = false;
     if ($db !== null) {
         try {
-            $season = new \Season\Season($db, $leagueContext);
+            $season = \Season\SharedSeason::get($db, $leagueContext);
             $seasonPhase = $season->phase;
             $allowWaivers = $season->allowWaivers;
             $showDraftLink = $season->showDraftLink;

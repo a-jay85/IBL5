@@ -69,8 +69,10 @@ def test_security_audit_step3_launches_sonnet_agent() -> None:
     assert 'subagent_type: "sonnet-5-5"' in region
 
 
-def test_scorer_and_eligibility_stay_haiku() -> None:
-    assert "single Haiku agent" in _region(PHASE4, "### 4D:", None)
+def test_scorer_and_eligibility_tiers() -> None:
+    phase4d = _region(PHASE4, "### 4D:", None)
+    assert "three verifier agents" in phase4d
+    assert '`subagent_type: "sonnet-5-5"`, omit `model`' in phase4d
     assert "single Haiku agent" in _region(SECURITY_AUDIT, "## Step 4:", "## Step 5:")
     assert "**Haiku**" in _region(SECURITY_AUDIT, "## Step 1:", "## Step 2:")
 

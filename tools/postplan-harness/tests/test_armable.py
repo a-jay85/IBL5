@@ -301,7 +301,7 @@ def test_red_ci_check_aggregator_required_true_warns():
     c15 = next(c for c in d.conditions if c.number == 15)
     assert not c15.blocked
     assert "x" in c15.warning
-    assert "All checks green" in c15.warning
+    assert "All checks settled" in c15.warning
 
 
 def test_red_ci_check_reason_lists_names():

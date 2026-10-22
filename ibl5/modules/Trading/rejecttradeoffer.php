@@ -33,7 +33,7 @@ $view = new \Trading\TradingView();
 $nukeCompat = new \Utilities\NukeCompat();
 $validator = new \Trading\TradeValidator($mysqli_db);
 $salaryCapRepo = new \Repositories\SalaryCapRepository($mysqli_db);
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 $executionService = new \Trading\TradeExecutionService(
     $offerRepo, $processor, $validator, $salaryCapRepo, $teamIdentityRepo, $cashRepo, $season
 );

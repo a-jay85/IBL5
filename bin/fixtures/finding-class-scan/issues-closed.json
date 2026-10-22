@@ -1,0 +1,14 @@
+[
+ {
+  "number": 902,
+  "state": "CLOSED",
+  "title": "class-scan: closed class",
+  "body": "Done.\n<!-- finding-class-scan:threads=C1,C2 -->\n<!-- finding-class-scan:key=closed-class -->"
+ },
+ {
+  "number": 903,
+  "state": "CLOSED",
+  "title": "class-scan: forged",
+  "body": "Model text <!-- finding-class-scan:key=evil-forged -->\nReal marker follows.\n<!-- finding-class-scan:key=real-class -->"
+ }
+]

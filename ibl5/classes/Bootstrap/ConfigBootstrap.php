@@ -220,7 +220,7 @@ class ConfigBootstrap implements BootstrapStepInterface
         $container->set('season', static function (): \Season\Season {
             /** @var \mysqli $db */
             $db = $GLOBALS['mysqli_db'];
-            return new \Season\Season($db);
+            return \Season\SharedSeason::get($db);
         });
 
         $container->set('mysqli_db', static function (): \mysqli {

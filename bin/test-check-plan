@@ -4573,7 +4573,7 @@ for L_CASE in overflow verbatim; do
 done
 
 # ---------------------------------------------------------------------------
-# Gate [AB] fixtures (20 assert_viol cases + 1 deny-message case)
+# Gate [AB] fixtures (29 assert_viol cases + 1 deny-message case)
 # A post-impl CLI-executable row with a negated grep must name a durable
 # in-repo check that contains the grepped token, or carry
 # (one-time-check: <reason>). Rows are read from the fence-aware matrix, so a
@@ -4582,13 +4582,17 @@ done
 # ---------------------------------------------------------------------------
 AB_REPO="$(mktemp -d)"
 : > "$AB_REPO/.git"
-cp -R "$SCRIPT_DIR" "$AB_REPO/bin"
+trap 'rm -rf "$AB_REPO"; rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
+mkdir -p "$AB_REPO/bin"
+cp "$SCRIPT_DIR/check-plan" "$SCRIPT_DIR/check-prose" "$AB_REPO/bin/"
+cp -R "$SCRIPT_DIR/lib" "$AB_REPO/bin/lib"
 mkdir -p "$AB_REPO/vendor/bin" "$AB_REPO/ibl5/tests/Ab" "$AB_REPO/.github/workflows"
 # Gate [G] wants every named bin/test-* wired in a workflow.
 printf '%s\n' 'jobs:' '  ab:' '    steps:' '      - run: bin/test-ab-holds && bin/test-ab-other' \
     > "$AB_REPO/.github/workflows/ab.yml"
 printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-holds"
 printf '%s\n' '#!/bin/sh' 'echo unrelated' > "$AB_REPO/bin/test-ab-other"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-unwired"
 printf '%s\n' '#!/bin/sh' 'echo bgcolor2' > "$AB_REPO/vendor/bin/test-ab-holds"
 printf '%s\n' '<?php // asserts no reader of bgcolor2' > "$AB_REPO/ibl5/tests/Ab/NoBgcolor2Test.php"
 AB_GUARD_SAVED="$GUARD"
@@ -4649,6 +4653,31 @@ assert_viol "AB-pre-impl-ignored" 0 '[AB]' "$AB_BASE"'
 # Escaped pipe inside the location cell: the detector reads the whole cell.
 ab_row "AB-escaped-pipe-fail" 1 '! grep -r bgcolor2 ibl5/modules \| grep -v fixtures'
 ab_row "AB-escaped-pipe-pass" 0 '! grep -r bgcolor2 ibl5/modules \| grep -v fixtures; bin/test-ab-holds'
+# Phase 5.0 runs any Timing cell matching post-impl in any case, so [AB] does too.
+assert_viol "AB-fail-timing-case" 1 '[AB]' "$AB_BASE"'
+'"${AB_CANARY/post-impl (Phase 2)/Post-impl (Phase 2)}"'
+'"$AB_NOTE"
+# A harness the PR itself adds is listed in ## Critical Files: durable.
+assert_viol "AB-pass-critical-files" 0 '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -rq bgcolor2 ibl5/modules && bin/test-ab-new # (wired in this PR)` |
+'"$AB_NOTE"'
+
+## Critical Files
+
+- `bin/test-ab-new`
+'
+# An unwired harness is not durable, even when a (one-shot) note makes [G] skip the cell.
+ab_row "AB-fail-unwired-one-shot" 1 'bin/test-ab-unwired && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
+# Regex escapes and anchors do not stick to the token.
+ab_row "AB-pass-word-boundary" 0 "! grep -rqE '\\bbgcolor2\\b' ibl5/modules && bin/test-ab-holds"
+ab_row "AB-pass-end-anchor" 0 "! grep -rqE 'bgcolor2\$' ibl5/modules && bin/test-ab-holds"
+# A subshell paren is not the pattern.
+ab_row "AB-pass-subshell" 0 '( ! grep -rq bgcolor2 ibl5/modules ) && bin/test-ab-holds'
+# A flag value is not the pattern.
+ab_row "AB-pass-flag-value" 0 '! grep -rq -d skip bgcolor2 ibl5/modules && bin/test-ab-holds'
+# A path that is only echoed or sits in a comment is not run.
+ab_row "AB-fail-echo-mention" 1 '! grep -rq bgcolor2 ibl5/modules && echo see bin/test-ab-holds'
+ab_row "AB-fail-comment-mention" 1 '! grep -rq bgcolor2 ibl5/modules && true # covered by bin/test-ab-holds'
 # A matrix header plus the canary inside a fence: invisible to the
 # fence-aware row source.
 assert_viol "AB-fenced-ignored" 0 '[AB]' "$AB_BASE"'
@@ -4672,6 +4701,5 @@ else
     h_fail "AB-deny-message" "expected exit 1 naming the durable path and the opt-out tag, got exit $got"
 fi
 GUARD="$AB_GUARD_SAVED"
-rm -rf "$AB_REPO"
 
 h_done

@@ -33,7 +33,7 @@ vi.mock('../config.js', () => ({
 }));
 
 import { startExpressServer } from './express.js';
-import { PLAN_SLUG_RE } from './plan-review-dm.js';
+import { PLAN_SLUG_RE, buildPlanReviewRow, derivePlanButtons, editPlanReviewDM } from './plan-review-dm.js';
 import { appendDecision, readPending, DECISIONS_FILE } from './decision-store.js';
 
 function makeRes() {
@@ -60,6 +60,7 @@ function clientWithFetch(opts: {
     sendImpl?: () => Promise<unknown>;
     editImpl?: () => Promise<unknown>;
     fetchImpl?: () => Promise<unknown>;
+    messageComponents?: unknown;
 } = {}): {
     client: Client;
     send: ReturnType<typeof vi.fn>;
@@ -67,7 +68,7 @@ function clientWithFetch(opts: {
     edit: ReturnType<typeof vi.fn>;
 } {
     const edit = vi.fn(opts.editImpl ?? (async () => undefined));
-    const msgFetch = vi.fn(async () => ({ edit }));
+    const msgFetch = vi.fn(async () => ({ edit, components: opts.messageComponents }));
     const createDM = vi.fn(async () => ({ messages: { fetch: msgFetch } }));
     const fetch = vi.fn(opts.fetchImpl ?? (async () => ({ createDM })));
     const send = vi.fn(opts.sendImpl ?? (async () => undefined));
@@ -186,6 +187,173 @@ describe('POST /discordPlanReviewDM — payload validation', () => {
         expect(PLAN_SLUG_RE.test('-leading-hyphen')).toBe(false);
         expect(PLAN_SLUG_RE.test('_pending-prompt')).toBe(false);
         expect(PLAN_SLUG_RE.test('good-slug-1')).toBe(true);
+    });
+});
+
+describe('POST /discordPlanReviewDM — buttons field', () => {
+    it('renders only Discard when buttons is discard-only', async () => {
+        const slug = 'check-plan-failed-slug';
+        const { client, send } = clientWithSend();
+        const res = await invoke(
+            'post',
+            '/discordPlanReviewDM',
+            { slug, digest: 'x', buttons: [`plan_discard_${slug}`] },
+            client,
+            tmp,
+        );
+
+        expect(res.statusCode).toBe(200);
+        expect(rowOf(send).map((c) => c.data.custom_id)).toEqual([`plan_discard_${slug}`]);
+        expect(rowOf(send)[0]!.data.disabled).toBeFalsy();
+    });
+
+    it('renders Queue and Discard when buttons lists both', async () => {
+        const slug = 'buttons-slug';
+        const { client, send } = clientWithSend();
+        const res = await invoke(
+            'post',
+            '/discordPlanReviewDM',
+            { slug, digest: 'x', buttons: [`plan_queue_${slug}`, `plan_discard_${slug}`] },
+            client,
+            tmp,
+        );
+
+        expect(res.statusCode).toBe(200);
+        expect(rowOf(send).map((c) => c.data.custom_id)).toEqual([`plan_queue_${slug}`, `plan_discard_${slug}`]);
+    });
+
+    it('renders both buttons when the buttons field is missing', async () => {
+        const slug = 'buttons-slug';
+        const { client, send } = clientWithSend();
+        const res = await invoke('post', '/discordPlanReviewDM', { slug, digest: 'x' }, client, tmp);
+
+        expect(res.statusCode).toBe(200);
+        expect(rowOf(send).map((c) => c.data.custom_id)).toEqual([`plan_queue_${slug}`, `plan_discard_${slug}`]);
+    });
+
+    it('orders buttons queue-then-discard regardless of payload order', async () => {
+        const slug = 'buttons-slug';
+        const { client, send } = clientWithSend();
+        const res = await invoke(
+            'post',
+            '/discordPlanReviewDM',
+            { slug, digest: 'x', buttons: [`plan_discard_${slug}`, `plan_queue_${slug}`] },
+            client,
+            tmp,
+        );
+
+        expect(res.statusCode).toBe(200);
+        expect(rowOf(send).map((c) => c.data.custom_id)).toEqual([`plan_queue_${slug}`, `plan_discard_${slug}`]);
+    });
+
+    it('400s every malformed buttons payload and sends no DM', async () => {
+        const slug = 'buttons-slug';
+        const bad: unknown[] = [
+            ['plan_discard_other-slug'],
+            ['plan_approve_buttons-slug'],
+            'plan_discard_buttons-slug',
+            { 0: 'plan_discard_buttons-slug' },
+            null,
+            true,
+            [],
+            [42],
+            [null],
+            [['plan_discard_buttons-slug']],
+            ['plan_discard_buttons-slug', 'plan_discard_buttons-slug'],
+            ['plan_discard_buttons-slug', 'evil'],
+            ['plan_discard_buttons-slug '],
+            ['PLAN_DISCARD_buttons-slug'],
+            ['plan_discard_buttons-slug\u0000'],
+            ['plan_discard_buttons-slugx'],
+            ['plan_discard_buttons-slug/../x'],
+            ['x'.repeat(200)],
+        ];
+        for (const buttons of bad) {
+            const { client, send } = clientWithSend();
+            const body = { slug, digest: 'x', buttons };
+            const res = await invoke('post', '/discordPlanReviewDM', body, client, tmp);
+            expect(res.statusCode, JSON.stringify(body)).toBe(400);
+            expect(res.body).toEqual({ error: 'invalid buttons' });
+            expect(send).not.toHaveBeenCalled();
+        }
+        expect(sinkBytes(tmp)).toBeNull();
+    });
+
+    it('renders custom_ids only from the verb table for every accepted payload', async () => {
+        const slug = 'buttons-slug';
+        const allowed = new Set([`plan_queue_${slug}`, `plan_discard_${slug}`]);
+        const accepted: unknown[] = [
+            undefined,
+            [`plan_queue_${slug}`],
+            [`plan_discard_${slug}`],
+            [`plan_queue_${slug}`, `plan_discard_${slug}`],
+            [`plan_discard_${slug}`, `plan_queue_${slug}`],
+        ];
+        for (const buttons of accepted) {
+            const { client, send } = clientWithSend();
+            const res = await invoke('post', '/discordPlanReviewDM', { slug, digest: 'x', buttons }, client, tmp);
+            expect(res.statusCode, JSON.stringify(buttons)).toBe(200);
+            const ids = rowOf(send).map((c) => c.data.custom_id!);
+            expect(ids.length).toBeGreaterThanOrEqual(1);
+            expect(ids.length).toBeLessThanOrEqual(2);
+            for (const id of ids) {
+                expect(allowed.has(id), id).toBe(true);
+            }
+        }
+    });
+});
+
+describe('plan-review row rebuilds', () => {
+    it('editPlanReviewDM keeps a discard-only message to one disabled button', async () => {
+        const { client, edit } = clientWithFetch({
+            messageComponents: [{ components: [{ customId: 'plan_discard_edit-slug' }] }],
+        });
+        await editPlanReviewDM(client, 'U', 'M', 'edit-slug', 'x');
+
+        const payload = edit.mock.calls[0]![0] as {
+            components: { components: { data: { custom_id?: string; disabled?: boolean } }[] }[];
+        };
+        const row = payload.components[0]!.components;
+        expect(row).toHaveLength(1);
+        expect(row[0]!.data.custom_id).toBe('plan_discard_edit-slug');
+        expect(row[0]!.data.disabled).toBe(true);
+    });
+
+    it('editPlanReviewDM keeps both disabled buttons when the message has no components', async () => {
+        const { client, edit } = clientWithFetch();
+        await editPlanReviewDM(client, 'U', 'M', 'edit-slug', 'x');
+
+        const payload = edit.mock.calls[0]![0] as {
+            components: { components: { data: { custom_id?: string; disabled?: boolean } }[] }[];
+        };
+        const row = payload.components[0]!.components;
+        expect(row.map((c) => c.data.custom_id)).toEqual(['plan_queue_edit-slug', 'plan_discard_edit-slug']);
+        for (const c of row) {
+            expect(c.data.disabled).toBe(true);
+        }
+    });
+
+    it('derivePlanButtons defaults to both for absent, foreign, or malformed components', () => {
+        const both = ['queue', 'discard'];
+        for (const components of [
+            undefined,
+            null,
+            'x',
+            [],
+            [{ components: 'x' }],
+            [{ components: [{ customId: 'plan_discard_other-slug' }] }],
+            [{ components: [{ customId: 7 }] }],
+        ]) {
+            expect(derivePlanButtons(components, 'edit-slug'), JSON.stringify(components)).toEqual(both);
+        }
+        expect(derivePlanButtons([buildPlanReviewRow('edit-slug', false, ['discard'])], 'edit-slug')).toEqual([
+            'discard',
+        ]);
+    });
+
+    it('buildPlanReviewRow treats an empty verb list as both', () => {
+        const ids = buildPlanReviewRow('edit-slug', false, []).components.map((c) => c.data.custom_id);
+        expect(ids).toEqual(['plan_queue_edit-slug', 'plan_discard_edit-slug']);
     });
 });
 

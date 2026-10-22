@@ -145,35 +145,48 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
 
         [$mdTypes, $mdParams] = $this->monthDayPredicate($monthDays);
 
-        $moments = [];
-        foreach (self::RECORD_STATS as $label => $column) {
+        // One pass over the guarded history computes every stat's running maximum;
+        // a NULL prior (the first game) never compares true.
+        $priorMaxColumns = [];
+        $beatsPrior = [];
+        foreach (self::RECORD_STATS as $column) {
             $this->assertRecordColumn($column);
-
-            $query = "SELECT r.*, p.name AS player_name,
-                        COALESCE(CONCAT(t.team_city, ' ', t.team_name), '') AS team_name,
-                        COALESCE(CONCAT(o.team_city, ' ', o.team_name), '') AS opponent_name,
-                        r.opponent_teamid
-                      FROM (
-                        SELECT g.*,
-                          CASE WHEN g.teamid = g.visitor_teamid THEN g.home_teamid ELSE g.visitor_teamid END AS opponent_teamid,
-                          MAX(g." . $column . ") OVER (
+            $priorMaxColumns[] = "MAX(g." . $column . ") OVER (
                             ORDER BY g.game_date, g.visitor_teamid, g.home_teamid, g.pid
                             ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
-                          ) AS prior_max
-                        FROM (" . self::GUARDED_PLAYER_GAMES . ") g
-                        WHERE g.game_type = 1
-                      ) r
-                      JOIN `ibl_plr` p ON p.pid = r.pid
-                      LEFT JOIN `ibl_team_info` t ON t.teamid = r.teamid
-                      LEFT JOIN `ibl_team_info` o ON o.teamid = r.opponent_teamid
-                      WHERE r.prior_max IS NOT NULL AND r." . $column . " > r.prior_max
-                        AND r.season_year > (SELECT MIN(f.season_year) FROM `ibl_box_scores` f WHERE f.game_type = 1)
-                        AND r.season_year < ?
-                        AND DATE_FORMAT(r.game_date, '%m-%d') IN (" . self::MONTH_DAY_LIST . ")";
+                          ) AS prior_" . $column;
+            $beatsPrior[] = "r." . $column . " > r.prior_" . $column;
+        }
 
-            $rows = $this->fetchAll($query, 'i' . $mdTypes, $beforeSeasonYear, ...$mdParams);
+        $query = "SELECT r.*, p.name AS player_name,
+                    COALESCE(CONCAT(t.team_city, ' ', t.team_name), '') AS team_name,
+                    COALESCE(CONCAT(o.team_city, ' ', o.team_name), '') AS opponent_name,
+                    r.opponent_teamid
+                  FROM (
+                    SELECT g.*,
+                      CASE WHEN g.teamid = g.visitor_teamid THEN g.home_teamid ELSE g.visitor_teamid END AS opponent_teamid,
+                      " . implode(",\n                      ", $priorMaxColumns) . "
+                    FROM (" . self::GUARDED_PLAYER_GAMES . ") g
+                    WHERE g.game_type = 1
+                  ) r
+                  JOIN `ibl_plr` p ON p.pid = r.pid
+                  LEFT JOIN `ibl_team_info` t ON t.teamid = r.teamid
+                  LEFT JOIN `ibl_team_info` o ON o.teamid = r.opponent_teamid
+                  WHERE (" . implode(' OR ', $beatsPrior) . ")
+                    AND r.season_year > (SELECT MIN(f.season_year) FROM `ibl_box_scores` f WHERE f.game_type = 1)
+                    AND r.season_year < ?
+                    AND DATE_FORMAT(r.game_date, '%m-%d') IN (" . self::MONTH_DAY_LIST . ")";
 
+        $rows = $this->fetchAll($query, 'i' . $mdTypes, $beforeSeasonYear, ...$mdParams);
+
+        $moments = [];
+        foreach (self::RECORD_STATS as $label => $column) {
             foreach ($rows as $row) {
+                $prior = $row['prior_' . $column] ?? null;
+                if (!is_numeric($prior) || $this->int($row, $column) <= (int) $prior) {
+                    continue;
+                }
+
                 $date = $this->str($row, 'game_date');
                 $pid = $this->int($row, 'pid');
                 $moments[] = new Moment(

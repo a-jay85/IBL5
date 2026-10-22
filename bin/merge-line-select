@@ -228,14 +228,29 @@ query($owner:String!, $name:String!, $first:Int!, $after:String) {
     pullRequests(states:OPEN, baseRefName:"master", first:$first, after:$after) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number isDraft baseRefName headRefOid mergeable mergeStateStatus
+        id number isDraft baseRefName headRefOid mergeable mergeStateStatus
         autoMergeRequest { enabledAt }
         labels(first:20) { nodes { name } }
         commits(last:1) { nodes { commit { oid statusCheckRollup { state
-          contexts(first:100) { nodes { __typename
+          contexts(first:100) { pageInfo { hasNextPage endCursor } nodes { __typename
             ... on CheckRun { name status conclusion startedAt completedAt }
             ... on StatusContext { context state createdAt } } } } } } }
       }
+    }
+  }
+}'
+
+# Follow-up for a PR whose rollup holds more than 100 contexts: the remaining
+# pages of contexts, one PR per call, keyed on the PR node id.
+# shellcheck disable=SC2016  # GraphQL variables ($id, $cafter) are not shell variables
+CTX_QUERY='
+query($id:ID!, $cafter:String) {
+  node(id:$id) {
+    ... on PullRequest {
+      commits(last:1) { nodes { commit { statusCheckRollup {
+        contexts(first:100, after:$cafter) { pageInfo { hasNextPage endCursor } nodes { __typename
+          ... on CheckRun { name status conclusion startedAt completedAt }
+          ... on StatusContext { context state createdAt } } } } } } }
     }
   }
 }'
@@ -245,6 +260,8 @@ query($owner:String!, $name:String!, $first:Int!, $after:String) {
 # that the run fails closed instead of selecting from a partial line.
 PAGE_SIZE=10
 MAX_PAGES=50
+# Same fail-closed cap for one PR's contexts: 50 follow-up pages of 100.
+MAX_CTX_PAGES=50
 
 # require_pr_response <json> — exit 1 unless <json> is a pullRequests GraphQL
 # response. Runs on every live page and on the final snapshot, so a page that
@@ -272,6 +289,74 @@ fetch_page() {
         gh_retry $GH_CMD api graphql -F first="$PAGE_SIZE" \
             -f owner="$OWNER" -f name="$NAME" -f after="$1" -f query="$LIVE_QUERY"
     fi
+}
+
+# fetch_ctx_page <pr-node-id> <cursor> — one follow-up contexts page via
+# gh_retry. stdin is closed so gh cannot eat the caller's herestring loop.
+fetch_ctx_page() {
+    # shellcheck disable=SC2086
+    gh_retry $GH_CMD api graphql -f id="$1" -f cafter="$2" -f query="$CTX_QUERY" </dev/null
+}
+
+# page_contexts <nodes-json> — print <nodes-json> with every PR's statusCheckRollup
+# contexts fully loaded. A PR whose first 100 contexts report hasNextPage is
+# followed up page by page; any other PR passes through untouched.
+page_contexts() {
+    local nodes="$1" row idx id cursor extra page n
+    # shellcheck disable=SC2016
+    local todo
+    todo=$(printf '%s' "$nodes" | jq -r '
+        to_entries[]
+        | (.value.commits.nodes[0].commit.statusCheckRollup.contexts // {}) as $c
+        | select($c.pageInfo.hasNextPage == true)
+        | [.key, (.value.id // ""), ($c.pageInfo.endCursor // "")] | @tsv')
+    if [ -z "$todo" ]; then
+        printf '%s' "$nodes"
+        return 0
+    fi
+    while IFS=$'\t' read -r idx id cursor; do
+        if [ -z "$id" ] || [ -z "$cursor" ]; then
+            echo "merge-line-select: PR at index $idx reports more contexts but no id/endCursor" >&2
+            exit 1
+        fi
+        extra='[]'
+        n=0
+        while :; do
+            n=$((n + 1))
+            if [ "$n" -gt "$MAX_CTX_PAGES" ]; then
+                echo "merge-line-select: more than $MAX_CTX_PAGES pages of contexts on one PR; refusing a truncated check list" >&2
+                exit 1
+            fi
+            if ! page=$(fetch_ctx_page "$id" "$cursor"); then
+                echo "merge-line-select: GraphQL fetch failed" >&2
+                exit 1
+            fi
+            # shellcheck disable=SC2016
+            if ! printf '%s' "$page" | jq -e '
+                    ((.errors // null) == null)
+                    and (.data.node.commits.nodes[0].commit.statusCheckRollup.contexts.nodes | type == "array")' \
+                    >/dev/null 2>&1; then
+                echo "merge-line-select: contexts page is not a statusCheckRollup GraphQL response" >&2
+                exit 1
+            fi
+            extra=$(printf '%s\n%s\n' "$extra" "$page" \
+                | jq -cs '.[0] + .[1].data.node.commits.nodes[0].commit.statusCheckRollup.contexts.nodes')
+            if [ "$(printf '%s' "$page" | jq -r '.data.node.commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo.hasNextPage // false')" != "true" ]; then
+                break
+            fi
+            cursor=$(printf '%s' "$page" | jq -r '.data.node.commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo.endCursor // empty')
+            if [ -z "$cursor" ]; then
+                echo "merge-line-select: contexts page $n reports more contexts but no endCursor" >&2
+                exit 1
+            fi
+        done
+        # shellcheck disable=SC2016
+        nodes=$(printf '%s\n%s\n' "$nodes" "$extra" | jq -cs --argjson i "$idx" '
+            .[1] as $e | .[0]
+            | .[$i].commits.nodes[0].commit.statusCheckRollup.contexts.nodes += $e
+            | .[$i].commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo = {hasNextPage:false, endCursor:null}')
+    done <<< "$todo"
+    printf '%s' "$nodes"
 }
 
 if [ "$LIVE" = 1 ]; then
@@ -303,6 +388,7 @@ if [ "$LIVE" = 1 ]; then
             exit 1
         fi
     done
+    NODES=$(page_contexts "$NODES")
     SNAPSHOT=$(printf '%s' "$NODES" \
         | jq -c '{data:{repository:{pullRequests:{pageInfo:{hasNextPage:false},nodes:.}}}}')
 elif [ "$INPUT" = "-" ]; then

@@ -1742,14 +1742,14 @@ function checkEngineLintPins(string $repoRoot): array
 // rule doc must point at the readback command instead of restating it. The
 // offline half that CAN be checked lives in two workflows: the aggregator's
 // --ignore / --anchor CSVs and engine.yml's gate job name.
-const REQUIRED_CLAIMS_AGGREGATOR = '.github/workflows/all-checks-green.yml';
+const REQUIRED_CLAIMS_AGGREGATOR = '.github/workflows/all-checks-settled.yml';
 const REQUIRED_CLAIMS_DOCS = [
     '.claude/rules/engine-go.md',
 ];
 const REQUIRED_CLAIMS_READBACK = "gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'";
 // Required contexts the aggregator never lists as anchors: itself, and the
 // human-signoff context it ignores.
-const REQUIRED_CLAIMS_EXTRA_CONTEXTS = ['All checks green', 'human-signoff'];
+const REQUIRED_CLAIMS_EXTRA_CONTEXTS = ['All checks settled', 'All checks green', 'human-signoff'];
 
 /** @return array{anchor: list<string>, ignore: list<string>}|null */
 function parseAggregatorCsvs(string $yaml): ?array
@@ -1922,7 +1922,7 @@ function selfTestRequiredClaims(): int
     $withIgnore = static fn (string $extra): string => str_replace("notify-fixed'", "notify-fixed,{$extra}'", $agg);
     $eng = "jobs:\n  engine:\n    name: Go build, vet, lint, test\n    runs-on: ubuntu-latest\n"
         . "  gate:\n    name: Engine\n    if: always()\n";
-    $doc = '`' . REQUIRED_CLAIMS_READBACK . "`\nAuto-merge waits on `All checks green`.\n";
+    $doc = '`' . REQUIRED_CLAIMS_READBACK . "`\nAuto-merge waits on `All checks settled`.\n";
 
     $engRenamed = str_replace('name: Engine', 'name: Engine CI', $eng);
     $engShortLint = str_replace('name: Go build, vet, lint, test', 'name: Go build', $eng);
@@ -1935,7 +1935,7 @@ function selfTestRequiredClaims(): int
     $cases = [
         ['clean', $agg, $eng, ['d.md' => $doc], 0, ''],
         ['enumerates', $agg, $eng, ['d.md' => $enumerates], 1, 'names 3 required-context names'],
-        ['no-readback', $agg, $eng, ['d.md' => "Auto-merge waits on `All checks green`.\n"], 1, 'missing the live readback command'],
+        ['no-readback', $agg, $eng, ['d.md' => "Auto-merge waits on `All checks settled`.\n"], 1, 'missing the live readback command'],
         ['engine-ignored', $withIgnore('Engine'), $eng, ['d.md' => $doc], 1, "check 'Engine' is in --ignore"],
         ['lint-job-ignored', $withIgnore('Go build'), $engShortLint, ['d.md' => $doc], 1, "check 'Go build' is in --ignore"],
         ['renamed-gate-ignored', $withIgnore('Engine CI'), $engRenamed, ['d.md' => $doc], 1, "check 'Engine CI' is in --ignore"],

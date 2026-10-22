@@ -107,7 +107,7 @@ class GoogleSheetsClientTest extends TestCase
         self::assertSame($rows, $body['data'][0]['values']);
     }
 
-    public function testOverwriteTabClearsThenBatchWritesHeaderAndRowsRaw(): void
+    public function testOverwriteTabWritesHeaderAndRowsRawInOneBatchBeforeClearingTail(): void
     {
         $this->http->queue(200, []);
         $this->http->queue(200, []);
@@ -115,8 +115,9 @@ class GoogleSheetsClientTest extends TestCase
         $rows = [['Name'], ['Jordan']];
         $this->client->overwriteTab(self::TOKEN, self::SHEET_ID, 'Players', $rows);
 
-        // The tab is cleared past the new data and the header plus rows are written RAW in one batch.
+        // The header plus rows are written RAW in one batch first, then the tail below them is cleared.
         self::assertCount(2, $this->http->requests);
+        self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[0]['url']);
         self::assertStringEndsWith(':clear', $this->http->requests[1]['url']);
         $body = $this->body(0);
         self::assertSame('RAW', $body['valueInputOption']);

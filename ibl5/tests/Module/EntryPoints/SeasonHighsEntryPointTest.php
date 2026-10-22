@@ -99,7 +99,15 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
 
     public function testZeroStringPhaseFallsBackToCurrent(): void
     {
-        $output = $this->runModule('SeasonHighs', ['seasonPhase' => '0']);
+        $_GET['league'] = 'olympics';
+        $ctx = new \League\LeagueContext();
+
+        $output = $this->runModule(
+            'SeasonHighs',
+            ['league' => 'olympics', 'seasonPhase' => '0'],
+            [],
+            ['leagueContext' => $ctx] + $this->dbGlobals()
+        );
 
         $this->assertNotSame('', $output);
         $this->assertStringContainsString('Regular Season', $output);

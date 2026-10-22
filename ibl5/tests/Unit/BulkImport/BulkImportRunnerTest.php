@@ -472,9 +472,11 @@ class BulkImportRunnerTest extends TestCase
     /** @return list<string> sorted ibl5_plb_* and ibl5_import_* dirs currently under the system temp dir */
     private function tempDirSnapshot(): array
     {
+        $plbDirs = glob(sys_get_temp_dir() . '/ibl5_plb_*');
+        $importDirs = glob(sys_get_temp_dir() . '/ibl5_import_*');
         $dirs = array_merge(
-            glob(sys_get_temp_dir() . '/ibl5_plb_*') ?: [],
-            glob(sys_get_temp_dir() . '/ibl5_import_*') ?: [],
+            $plbDirs === false ? [] : $plbDirs,
+            $importDirs === false ? [] : $importDirs,
         );
         sort($dirs);
         return $dirs;

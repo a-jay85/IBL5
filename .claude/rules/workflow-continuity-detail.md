@@ -38,8 +38,15 @@ branch; it survives you closing Claude Code. Engine selection:
   For a usage limit, re-run `bin/post-plan-now` after the limit resets. For an expired
   login, run `claude`, complete `/login`, then re-run it.
   A conflict on a generated file flagged `regen_on_conflict` in the ladder's `GENERATED_FILES`
-  registry skips the LLM resolver. Today only `ibl5/phpstan-baseline.neon` carries the flag.
-  Once every other conflicted file resolves, the harness takes master's copy, runs
+  registry skips the LLM resolver. Two entries carry the flag: `ibl5/phpstan-baseline.neon` and
+  the glob `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/*.png`. A glob entry matches
+  only files in that one directory with that suffix; every other entry is an exact path. For a
+  VR PNG the harness takes master's copy with no generator run, and only when both sides
+  modified the file; a modify/delete conflict still goes to the resolver. The branch's
+  screenshot is dropped on purpose. The `update-baselines` label flow regenerates it in CI, and
+  the PR's Visual Regression check stays red until a human applies that label when the
+  branch's rendering really changed. The harness never adds that label itself. For the baseline,
+  once every other conflicted file resolves, the harness takes master's copy, runs
   `bin/regen-baselines` on the merged tree and commits the output in the merge commit. It then
   rewrites that file's section of the lost-work pre-patch to the master-to-merged diff, so the
   proof checks every other file unchanged. A generator that fails, times out or writes a file

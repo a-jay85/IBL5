@@ -133,6 +133,12 @@ commit_all
 expect_since pipefail-newly-armed 1 'bin/arm.sh:3:'
 
 reset_repo
+sed -i.bak 's/^set -euo pipefail$/set -Eeuo pipefail/' "$REPO/bin/old.sh"
+rm -f "$REPO/bin/old.sh.bak"
+commit_all
+expect_since set-line-reworded-already-armed 0 'OK'
+
+reset_repo
 printf '%s\n' '#!/usr/bin/env bash' 'set -o pipefail' "$BAD" >"$REPO/bin/v1.sh"
 commit_all
 expect_since set-o-variant 1 'bin/v1.sh:3:'

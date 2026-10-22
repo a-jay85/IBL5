@@ -11,8 +11,9 @@
 # pipefail. grep -c is never flagged: it reads to EOF, so its producer never gets SIGPIPE.
 #
 # Only lines this branch adds are read, so older sites never block a PR. One exception:
-# when an added line is itself the pipefail setting, the whole current file is scanned,
-# because that edit is what arms every older site in the file.
+# when an added line is itself the pipefail setting and the file did not set pipefail at
+# the merge-base, the whole current file is scanned, because that edit is what arms every
+# older site in the file.
 #
 # The base is always passed in with --since=<ref> (CI passes the PR base sha), never
 # derived from repo state. Diffs compare the working tree against the merge-base, so
@@ -144,6 +145,18 @@ done <"$tmp/added.diff"
 if [ -s "$tmp/fullscan" ]; then
     sort -u "$tmp/fullscan" >"$tmp/fullscan.u"
     while IFS= read -r p; do
+        # Already armed at the merge-base: an edit to the set line arms nothing new.
+        armed=0
+        if git show "$mb:$p" >"$tmp/base.file" 2>/dev/null; then
+            while IFS= read -r x || [ -n "$x" ]; do
+                [[ $x =~ ^[[:space:]]*# ]] && continue
+                if [[ $x =~ $SET_RE ]]; then
+                    armed=1
+                    break
+                fi
+            done <"$tmp/base.file"
+        fi
+        [ "$armed" -eq 1 ] && continue
         n=0
         while IFS= read -r x || [ -n "$x" ]; do
             n=$((n + 1))

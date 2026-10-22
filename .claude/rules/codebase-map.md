@@ -155,6 +155,7 @@ LeagueControlPanel -> Discord JsbParser League Maintenance PageLayout Security T
 LeagueSchedule -> BasketballStats League Season Security
 LeagueStarters -> Auth League Player Repositories Season Security Team UI
 Logging -> Bootstrap
+Mail -> Bootstrap
 Maintenance -> League
 Module -> League Season
 Navigation -> League Security

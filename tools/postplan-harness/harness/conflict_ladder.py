@@ -459,6 +459,16 @@ PUSH_WRAPPER_DENIED = (
     "Bash(*/git push:*)", "Bash(git * push)", "Bash(git * push *)",
     "Bash(*/git * push)", "Bash(*/git * push *)",
     "Bash(*/gh:*)", "Bash(*/curl:*)", "Bash(*/wget:*)", "Bash(*/ssh:*)", "Bash(*/scp:*)",
+    # Live probe with user settings off: a leading `*` before `/git push:*` or `/gh:*`
+    # never matched, but the space-glob form does. The colon entries above stay for
+    # Claude Code versions that honor them.
+    "Bash(*/git push *)", "Bash(*/git push)",
+    "Bash(*/gh *)", "Bash(*/gh)", "Bash(*/curl *)", "Bash(*/curl)",
+    "Bash(*/wget *)", "Bash(*/wget)", "Bash(*/ssh *)", "Bash(*/ssh)",
+    "Bash(*/scp *)", "Bash(*/scp)",
+    # Probe showed `bash -c '...; git push ...'` slips past the matcher, which only unwraps
+    # a lone simple command. A fix session has no need for a nested shell.
+    "Bash(bash -c:*)", "Bash(sh -c:*)", "Bash(zsh -c:*)",
 )
 SESSION_DENIED = (
     "Agent", "WebFetch", "WebSearch",

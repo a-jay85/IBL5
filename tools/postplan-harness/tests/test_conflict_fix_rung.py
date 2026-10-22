@@ -87,7 +87,7 @@ def test_fix_rung_argv_model_and_denied(tmp_path, key):
     for entry in ("Bash(git push:*)", "Bash(git -C:*)", "Bash(git update-ref:*)",
                   "Bash(git stash:*)", "Bash(claude:*)", "WebFetch",
                   "Bash(*/git push:*)", "Bash(git * push *)", "Bash(git * push)",
-                  "Bash(*/gh:*)"):
+                  "Bash(*/gh:*)", "Bash(*/git push *)", "Bash(*/gh *)"):
         assert entry in denied
 
 

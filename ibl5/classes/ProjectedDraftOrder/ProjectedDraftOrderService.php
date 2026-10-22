@@ -63,7 +63,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
 
         $teamsByConference = $this->groupByConference($standings);
         $nonPlayoffTeams = [];
-        $wildCardTeams = [];
+        $otherPlayoffTeams = [];
         $divisionWinnerTeams = [];
         $conferenceWinnerTeams = [];
 
@@ -71,7 +71,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             $conferenceTeams = $teamsByConference[$conference] ?? [];
             $result = $this->playoffSeeding->determinePlayoffTeams($conferenceTeams, $h2h, $pointDiffs);
             array_push($nonPlayoffTeams, ...$result['nonPlayoff']);
-            array_push($wildCardTeams, ...$result['wildCards']);
+            array_push($otherPlayoffTeams, ...$result['otherPlayoffTeams']);
             array_push($divisionWinnerTeams, ...$result['divisionWinners']);
             if ($result['conferenceWinner'] !== null) {
                 $conferenceWinnerTeams[] = $result['conferenceWinner'];
@@ -81,11 +81,11 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $teamMap = $this->buildTeamMap($standings);
 
         $nonPlayoffSorted = $this->draftOrderResolver->sortTeamsByRecord($nonPlayoffTeams, $h2h, $pointDiffs);
-        $wildCardsSorted = $this->draftOrderResolver->sortTeamsByRecord($wildCardTeams, $h2h, $pointDiffs);
+        $otherPlayoffTeamsSorted = $this->draftOrderResolver->sortTeamsByRecord($otherPlayoffTeams, $h2h, $pointDiffs);
         $divisionWinnersSorted = $this->draftOrderResolver->sortTeamsByRecord($divisionWinnerTeams, $h2h, $pointDiffs);
         $conferenceWinnersSorted = $this->draftOrderResolver->sortTeamsByRecord($conferenceWinnerTeams, $h2h, $pointDiffs);
 
-        $round1Order = array_merge($nonPlayoffSorted, $wildCardsSorted, $divisionWinnersSorted, $conferenceWinnersSorted);
+        $round1Order = array_merge($nonPlayoffSorted, $otherPlayoffTeamsSorted, $divisionWinnersSorted, $conferenceWinnersSorted);
 
         $allTeamsSorted = $this->draftOrderResolver->sortTeamsByRecord(array_values($teamMap), $h2h, $pointDiffs);
 

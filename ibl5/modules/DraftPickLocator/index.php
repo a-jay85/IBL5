@@ -27,7 +27,7 @@ $module_name = basename(dirname(__FILE__));
 global $mysqli_db;
 /** @var \mysqli $mysqli_db */
 
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 
 $pagetitle = "- Draft Pick Locator";
 

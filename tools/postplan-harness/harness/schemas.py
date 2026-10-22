@@ -333,19 +333,6 @@ def extract_pr_copy_json(text: str):
         f"no parseable JSON in pr-copy reply ({parse_err}); {PR_COPY_JSON_HINT}")
 
 
-def validate_body_check(data) -> None:
-    """{corrected_body, findings} — PR-body-vs-diff verification."""
-    if not isinstance(data, dict):
-        raise HarnessError("schema", "body check must be a JSON object")
-    if "corrected_body" not in data or not isinstance(data["corrected_body"], str):
-        raise HarnessError("schema", "body check missing string field 'corrected_body'")
-    if "findings" not in data or not isinstance(data["findings"], list):
-        raise HarnessError("schema", "body check findings must be a JSON array")
-    for i, item in enumerate(data["findings"]):
-        if not isinstance(item, str):
-            raise HarnessError("schema", f"body check finding[{i}] must be a string")
-
-
 BODY_RECHECK_FINDING_STATUSES = ("resolved", "unresolved")
 BODY_RECHECK_HUNK_STATUSES = ("supported", "unsupported")
 _BODY_RECHECK_ENVELOPE_KEYS = ("result", "body_recheck", "recheck", "data", "output")

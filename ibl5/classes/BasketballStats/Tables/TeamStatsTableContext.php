@@ -30,7 +30,7 @@ final class TeamStatsTableContext
      */
     public static function resolveBothStats(\mysqli $db, Team $team, string $yr): ?array
     {
-        $season = new Season($db);
+        $season = \Season\SharedSeason::get($db);
         $seasonYear = ($yr !== '') ? (int) $yr : $season->endingYear;
         $offDefRepo = new TeamOffDefStatsRepository($db);
 

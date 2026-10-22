@@ -5,8 +5,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-from harness.llm_calls import pr_body_check_prompt, pr_copy_prompt, retrospective_prompt
-from harness.schemas import validate_body_check
+from harness.llm_calls import (
+    PR_COPY_DIFF_CAP,
+    pr_copy_prompt,
+    retrospective_prompt,
+)
 from harness.state import Classification, HarnessError, PlanInfo
 
 _REAL_REGISTRY_ROW = (
@@ -74,6 +77,38 @@ def test_pr_copy_prompt_states_gm_visible_files_and_keeps_feat_available():
     assert "HAS_GM_VISIBLE=True" in prompt
 
 
+def test_pr_copy_prompt_forbids_counts_absent_from_packet():
+    prompt = pr_copy_prompt("some-slug", _cls(), PlanInfo(), "")
+    assert "COUNTS: state no exact count" in prompt
+    assert "Describe the change in words instead" in prompt
+
+
+def test_pr_copy_prompt_limits_claims_to_the_diff():
+    prompt = pr_copy_prompt("some-slug", _cls(), PlanInfo(), "")
+    assert "CLAIMS: every summary_md bullet claims only what the DIFF above shows" in prompt
+    assert "do not claim it" in prompt
+
+
+def test_pr_copy_prompt_notes_truncation_when_diff_exceeds_cap():
+    c = _cls()
+    c.filtered_diff = "x" * (PR_COPY_DIFF_CAP + 1)
+    prompt = pr_copy_prompt("some-slug", c, PlanInfo(), "")
+    assert "DIFF TRUNCATED" in prompt
+    assert "State no count that spans the full diff" in prompt
+    assert prompt.count("x" * PR_COPY_DIFF_CAP) == 1          # the slice is still applied
+    assert ("x" * (PR_COPY_DIFF_CAP + 1)) not in prompt
+
+
+def test_pr_copy_prompt_omits_truncation_note_at_or_below_cap():
+    c = _cls()
+    c.filtered_diff = "x" * PR_COPY_DIFF_CAP                  # exactly at the cap: shown whole
+    prompt = pr_copy_prompt("some-slug", c, PlanInfo(), "")
+    assert "DIFF TRUNCATED" not in prompt
+    assert ("x" * PR_COPY_DIFF_CAP) in prompt
+    short = pr_copy_prompt("some-slug", _cls(), PlanInfo(), "")
+    assert "DIFF TRUNCATED" not in short
+
+
 def test_retrospective_prompt_carries_fidelity_outcome():
     fidelity = {"verdict_1": "NOT READY", "verdict_2": "READY", "remediation_sha": "abc"}
     prompt = retrospective_prompt("my-slug", "shipped-armed", None, 0, None, fidelity)
@@ -81,52 +116,3 @@ def test_retrospective_prompt_carries_fidelity_outcome():
 
     prompt_none = retrospective_prompt("my-slug", "shipped-armed", None, 0, None, None)
     assert "fidelity=none" in prompt_none
-
-
-# ── Phase 2: pr_body_check_prompt and validate_body_check ────────────────────
-
-_SAMPLE_BODY = "## Summary\n- 3 files changed\n\n## Scope\nSome prose here.\n"
-_SAMPLE_NS = "A\tibl5/migrations/047_add_x.sql\nM\ttools/postplan-harness/runner.py\n"
-
-
-def test_body_check_prompt_carves_out_files_changed_block():
-    prompt = pr_body_check_prompt(_SAMPLE_BODY, _SAMPLE_NS)
-    assert "Exclude the machine-generated files-changed block" in prompt
-    assert "already been removed from the text you are shown" in prompt
-
-
-def test_body_check_prompt_carves_out_manual_testing_section():
-    prompt = pr_body_check_prompt(_SAMPLE_BODY, _SAMPLE_NS)
-    assert 'runner owns the "## Manual Testing" section' in prompt
-    assert "Never write a" in prompt
-
-
-def test_body_check_prompt_warns_the_file_list_may_be_incomplete():
-    prompt = pr_body_check_prompt(_SAMPLE_BODY, _SAMPLE_NS)
-    assert "may be incomplete" in prompt
-    assert "do not flag claims about it as unsupported" in prompt
-
-
-def test_body_check_prompt_carries_named_constant_volume_wording():
-    prompt = pr_body_check_prompt(_SAMPLE_BODY, _SAMPLE_NS)
-    assert "Named-constant volumes" in prompt
-    assert "Read the constant, do not trust the body" in prompt
-
-
-def test_validate_body_check_accepts_valid_shape():
-    validate_body_check({"corrected_body": "some body", "findings": ["one finding"]})
-    validate_body_check({"corrected_body": "", "findings": []})
-
-
-def test_validate_body_check_rejects_missing_corrected_body():
-    with pytest.raises(HarnessError):
-        validate_body_check({"findings": []})
-    with pytest.raises(HarnessError):
-        validate_body_check({"corrected_body": 123, "findings": []})
-
-
-def test_validate_body_check_rejects_non_list_findings():
-    with pytest.raises(HarnessError):
-        validate_body_check({"corrected_body": "ok", "findings": "not a list"})
-    with pytest.raises(HarnessError):
-        validate_body_check({"corrected_body": "ok", "findings": [1, 2]})

@@ -123,6 +123,68 @@ def test_no_join_before_review_submit():
 # Behavioural tests
 # ---------------------------------------------------------------------------
 
+# ---- Phase 4.5b (same-run threads) source order ------------------------------------------
+
+def test_same_run_pass_runs_after_join_and_before_manual_testing():
+    src = _src()
+    j = src.index("_join_review()", src.index("before_remediation=_join_review"))
+    p = src.index("same_run_threads.run_same_run_pass(")
+    m = src.index("mt = manual_testing.run(")
+    assert j < p < m
+
+
+def test_same_run_pass_runs_after_remediation_conformance_rerun():
+    src = _src()
+    assert (src.index("phase5.0 conformance (post-remediation)")
+            < src.index("same_run_threads.run_same_run_pass("))
+
+
+def test_same_run_fix_rekeys_sha_and_reruns_conformance_before_arm():
+    src = _src()
+    p = src.index("same_run_threads.run_same_run_pass(")
+    assert (p < src.index("if git.head() != head_before_45b:")
+            < src.index("phase5.0 conformance (post-same-run-fix)")
+            < src.index("_repin_fidelity_after_same_run(llm")
+            < src.index("inputs = ArmInputs("))
+
+
+def test_same_run_block_assigns_sha():
+    """Phase 7 watches `sha`; a same-run fix commit must re-key it."""
+    src = _src()
+    start = src.index("if git.head() != head_before_45b:")
+    end = src.index("phase5.0 conformance (post-same-run-fix)")
+    # A real statement line: a commented-out `# sha = git.head()` must not satisfy this.
+    assert re.search(r"^\s+sha = git\.head\(\)\s*$", src[start:end], re.M)
+
+
+def test_same_run_prune_findings_runs_before_arm_inputs():
+    src = _src()
+    assert (src.index("same_run_threads.prune_findings(")
+            < src.index("inputs = ArmInputs("))
+
+
+def test_same_run_result_key_is_conditional():
+    src = _src()
+    cond = src.index('if sr.get("found") or sr.get("error"):')
+    assert src.index('res.thread_ingestion["same_run"] = sr') > cond
+    assert src[cond:].index('res.thread_ingestion["same_run"] = sr') < 80
+
+
+def test_same_run_wrapper_forwards_pre_ids_and_callables():
+    """Source-order fallback: no replay fixture reaches the block with a fake pass cheaply.
+
+    The call carries the pre-review snapshot, out_dir and log verbatim, and injects the
+    commit, push and delta-review callables.
+    """
+    src = _src()
+    start = src.index("same_run_threads.run_same_run_pass(")
+    end = src.index("review_delta=_delta_review)", start)
+    call = src[start:end]
+    assert "pr, pre_posting_ids, out_dir, log," in call
+    assert "commit=" in call and "push=" in call
+    assert end > start
+
+
 def test_phase45_swallows_non_gate_errors(tmp_path, monkeypatch):
     """A non-gate HarnessError must be swallowed and returned as an error dict.
 

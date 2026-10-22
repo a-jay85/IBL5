@@ -125,6 +125,27 @@ class DraftControllerTest extends TestCase
     }
 
     /**
+     * Route the on-the-clock lookup the controller issues at check (5): the first
+     * empty ibl_draft slot for the stub season's endingYear (2025). null = draft complete.
+     */
+    private function routeOnTheClockQuery(?int $round, ?int $pick): void
+    {
+        $rows = ($round === null || $pick === null)
+            ? []
+            : [['year' => 2025, 'teamid' => 1, 'team' => 'Metros', 'player' => '', 'round' => $round, 'pick' => $pick]];
+        $this->mockDb->onQuery("player = ''", $rows);
+    }
+
+    /** Assert no ibl_draft write (UPDATE or INSERT) was issued. */
+    private function assertNoDraftWrite(): void
+    {
+        foreach ($this->mockDb->getExecutedQueries() as $query) {
+            $this->assertStringNotContainsStringIgnoringCase('UPDATE', $query);
+            $this->assertStringNotContainsStringIgnoringCase('INSERT', $query);
+        }
+    }
+
+    /**
      * Assert the submission was refused at check (4): no draft-class lookup (the
      * first query handleDraftSelection() issues for a named player) and no write.
      */
@@ -240,6 +261,7 @@ class DraftControllerTest extends TestCase
     {
         $this->withValidCsrfToken();
         $this->routeOwnershipQueries(1, 'Test Team');
+        $this->routeOnTheClockQuery(1, 1);
         $controller = new DraftController(
             $this->mockDb,
             $this->repoWithSessionTeam('Test Team'),
@@ -495,6 +517,7 @@ class DraftControllerTest extends TestCase
     {
         $this->withValidCsrfToken();
         $this->routeOwnershipQueries(1, 'Metros');
+        $this->routeOnTheClockQuery(1, 1);
         $controller = new DraftController(
             $this->mockDb,
             $this->repoWithSessionTeam('Metros'),
@@ -541,6 +564,7 @@ class DraftControllerTest extends TestCase
     {
         $this->withValidCsrfToken();
         $this->routeOwnershipQueries(2, 'Metros');
+        $this->routeOnTheClockQuery(1, 3);
 
         $result = $this->metrosController()->submitSelection(
             ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '3'],
@@ -597,6 +621,79 @@ class DraftControllerTest extends TestCase
 
         $this->assertStringContainsString('You do not own this draft pick.', $result);
         $this->assertRejectedBeforeSelectionProcessing();
+    }
+
+    // ============================================
+    // ON THE CLOCK (check 5)
+    // ============================================
+
+    /** Metros owns slot (1,1) and (1,1) is the first empty slot: accepted. */
+    public function testOwnerOfOnTheClockSlotIsAccepted(): void
+    {
+        $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(1, 'Metros');
+        $this->routeOnTheClockQuery(1, 1);
+
+        $result = $this->metrosController()->submitSelection(
+            ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '1'],
+            'user-cookie'
+        );
+
+        $this->assertStringNotContainsString('not on the clock', $result);
+        $this->assertReachedSelectionProcessing();
+    }
+
+    /** Metros owns slot (1,3) but the clock is at (1,1): refused, nothing written. */
+    public function testOwnerOfLaterSlotIsRejectedWithoutDraftMutation(): void
+    {
+        $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(1, 'Metros');
+        $this->routeOnTheClockQuery(1, 1);
+
+        $result = $this->metrosController()->submitSelection(
+            ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '3'],
+            'user-cookie'
+        );
+
+        $this->assertStringContainsString('That pick is not on the clock yet.', $result);
+        $this->assertRejectedBeforeSelectionProcessing();
+        $this->assertNoDraftWrite();
+    }
+
+    /** Every slot is filled: refused with the draft-complete message, nothing written. */
+    public function testDraftCompleteRejectsSubmissionWithoutDraftMutation(): void
+    {
+        $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(1, 'Metros');
+        $this->routeOnTheClockQuery(null, null);
+
+        $result = $this->metrosController()->submitSelection(
+            ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '1'],
+            'user-cookie'
+        );
+
+        $this->assertStringContainsString('The draft is complete.', $result);
+        $this->assertRejectedBeforeSelectionProcessing();
+        $this->assertNoDraftWrite();
+    }
+
+    /** Gate 4 still fires first: a non-owner is refused before the on-the-clock lookup runs. */
+    public function testNonOwnerIsRejectedBeforeOnTheClockLookup(): void
+    {
+        $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(2, 'Enforcers');
+        $this->routeOnTheClockQuery(1, 3);
+
+        $result = $this->metrosController()->submitSelection(
+            ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '3'],
+            'user-cookie'
+        );
+
+        $this->assertStringContainsString('You do not own this draft pick.', $result);
+        foreach ($this->mockDb->getExecutedQueries() as $query) {
+            $this->assertStringNotContainsString("player = ''", $query);
+        }
+        $this->assertNoDraftWrite();
     }
 
     // ============================================

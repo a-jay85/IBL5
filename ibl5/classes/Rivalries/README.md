@@ -45,7 +45,7 @@ The recency window starts at `Season::$endingYear - 4`.
 
 ## Cache
 
-`CachedRivalriesRepository` stores results in the shared DatabaseCache table for 24 hours.
+`CachedRivalriesRepository` stores results in the shared DatabaseCache table. Pair keys last 24 hours. The two stats keys last 30 days, and an expired stats entry is served stale instead of rescanning history on a page view.
 
 - `rivalries:franchises:<windowStart>` and `rivalries:gms:<windowStart>` hold the pair stats.
 - `rivalries:pair:teams:<lo>-<hi>:<part>` holds one franchise pair's games, series, or performers.

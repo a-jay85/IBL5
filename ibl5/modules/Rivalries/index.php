@@ -21,14 +21,6 @@ global $mysqli_db, $user, $leagueContext;
 /** @var mixed $user */
 /** @var \League\LeagueContext|null $leagueContext */
 
-// Rivalries reads IBL tables only, so Olympics gets an empty state instead of IBL data.
-if ($leagueContext !== null && $leagueContext->isOlympics()) {
-    \PageLayout\PageLayout::header();
-    echo '<p>Rivalries are not available for the Olympics league.</p>';
-    \PageLayout\PageLayout::footer();
-    return;
-}
-
 $season  = \Season\SharedSeason::get($mysqli_db, $leagueContext);
 $docRoot = is_string($_SERVER['DOCUMENT_ROOT'] ?? null) ? $_SERVER['DOCUMENT_ROOT'] : '';
 

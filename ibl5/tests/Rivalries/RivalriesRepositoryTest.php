@@ -27,8 +27,9 @@ final class RivalriesRepositoryTest extends TestCase
     {
         $this->repo->getFranchisePairGames(3, 7);
 
-        self::assertSame('iiii', $this->mockDb->getLastBoundTypes());
-        self::assertSame([3, 7, 7, 3], $this->mockDb->getLastBoundParams());
+        // The pair filter binds twice: once ahead of the dedupe, once on the outer query.
+        self::assertSame('iiiiiiii', $this->mockDb->getLastBoundTypes());
+        self::assertSame([3, 7, 7, 3, 3, 7, 7, 3], $this->mockDb->getLastBoundParams());
     }
 
     public function testGmPairGamesBindsHostileNameAsString(): void

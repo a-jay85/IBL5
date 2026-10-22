@@ -107,8 +107,19 @@ final class RivalriesService implements RivalriesServiceInterface
      */
     private function topFor(string $kind, string $subject, int $limit): array
     {
+        $inputs = $this->inputs($kind);
+        // GM names compare without regard to case, so a Team-page owner name finds the stored spelling.
+        foreach ($inputs as $input) {
+            foreach ([$input['a'], $input['b']] as $key) {
+                if ($kind === 'gms' && $key !== $subject && mb_strtolower($key) === mb_strtolower($subject)) {
+                    $subject = $key;
+                    break 2;
+                }
+            }
+        }
+
         $mine = [];
-        foreach ($this->inputs($kind) as $input) {
+        foreach ($inputs as $input) {
             if ($input['a'] === $subject || $input['b'] === $subject) {
                 $mine[] = $this->orient($input, $subject);
             }

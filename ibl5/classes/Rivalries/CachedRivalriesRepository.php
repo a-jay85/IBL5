@@ -42,7 +42,8 @@ final class CachedRivalriesRepository implements RivalriesRepositoryInterface
     public function getFranchisePairStats(int $recentFromSeasonYear): array
     {
         $key = self::KEY_PREFIX . ":franchises:{$recentFromSeasonYear}";
-        $hit = $this->cache->get($key);
+        // An expired entry still beats an inline full-history scan on a page view; the import rebuilds it.
+        $hit = $this->cache->get($key) ?? $this->cache->getStale($key);
         if ($hit !== null) {
             /** @var list<PairStat> $hit */
             return $hit;
@@ -60,7 +61,8 @@ final class CachedRivalriesRepository implements RivalriesRepositoryInterface
     public function getGmPairStats(int $recentFromSeasonYear): array
     {
         $key = self::KEY_PREFIX . ":gms:{$recentFromSeasonYear}";
-        $hit = $this->cache->get($key);
+        // An expired entry still beats an inline full-history scan on a page view; the import rebuilds it.
+        $hit = $this->cache->get($key) ?? $this->cache->getStale($key);
         if ($hit !== null) {
             /** @var list<PairStat> $hit */
             return $hit;

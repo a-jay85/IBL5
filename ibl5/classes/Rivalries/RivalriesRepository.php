@@ -30,6 +30,9 @@ final class RivalriesRepository extends \Database\BaseMysqliRepository implement
                                   AND COALESCE(t.end_season_year, 9999)
           ORDER BY t.start_season_year ASC, t.id ASC LIMIT 1)';
 
+    // Pre-dedupe pair filter: lets unique_games group only this pair's rows. Binds 4 `i` params.
+    private const FRANCHISE_PAIR_FILTER = ' AND ((b.visitor_teamid = ? AND b.home_teamid = ?) OR (b.visitor_teamid = ? AND b.home_teamid = ?))';
+
     private const GAME_COLUMNS = 'game_date, game_of_that_day, season_year, game_type, visitor_teamid, home_teamid,
     visitor_label, home_label, visitor_pts AS visitor_points, home_pts AS home_points';
 
@@ -98,7 +101,7 @@ ORDER BY a, b',
      */
     public function getFranchisePairGames(int $a, int $b): array
     {
-        $sql = $this->gamesCte()
+        $sql = $this->gamesCte(self::FRANCHISE_PAIR_FILTER)
             // @phpstan-ignore ibl.orderByMissingTiebreaker (no doubleheaders: game_date + game_of_that_day + visitor_teamid is unique)
             . ' SELECT ' . self::GAME_COLUMNS . ',
        CAST(visitor_teamid AS CHAR) AS visitor_side, CAST(home_teamid AS CHAR) AS home_side
@@ -106,7 +109,7 @@ FROM games
 WHERE (visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?)
 ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
 
-        return $this->mapGames($this->fetchAll($sql, 'iiii', $a, $b, $b, $a));
+        return $this->mapGames($this->fetchAll($sql, 'iiiiiiii', $a, $b, $b, $a, $a, $b, $b, $a));
     }
 
     /**
@@ -183,13 +186,13 @@ ORDER BY year ASC, round ASC, winner_tid ASC, loser_tid ASC',
      */
     public function getFranchiseTopPerformers(int $a, int $b): array
     {
-        $pairCte = $this->gamesCte() . ',
+        $pairCte = $this->gamesCte(self::FRANCHISE_PAIR_FILTER) . ',
 pair_games AS (
     SELECT * FROM games
     WHERE (visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?)
 )';
 
-        return $this->topPerformers($pairCte, 'CAST(bs.teamid AS CHAR)', 'iiii', [$a, $b, $b, $a]);
+        return $this->topPerformers($pairCte, 'CAST(bs.teamid AS CHAR)', 'iiiiiiii', [$a, $b, $b, $a, $a, $b, $b, $a]);
     }
 
     /**

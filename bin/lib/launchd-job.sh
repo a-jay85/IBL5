@@ -267,18 +267,6 @@ ljob_submit_print() {
     printf '%s' "${LAUNCHCTL_CMD:-launchctl}"; printf ' %q' "${LJOB_SUBMIT_ARGV[@]}"; printf '\n'
 }
 
-# ljob_remove_label <label>: remove, then wait up to 5 s for the label to leave
-# `launchctl list`. Returns 0 when gone, 1 when still listed.
-ljob_remove_label() {
-    local label="$1" i=0 ctl="${LAUNCHCTL_CMD:-launchctl}"
-    "$ctl" remove "$label" 2>/dev/null || true
-    while "$ctl" list "$label" >/dev/null 2>&1; do
-        [[ $i -ge 5 ]] && return 1
-        sleep 1; i=$((i + 1))
-    done
-    return 0
-}
-
 # ---------------------------------------------------------------------------
 # Runner-embeddable helpers — must not call any other ljob_ function because
 # callers inject them via `declare -f`.

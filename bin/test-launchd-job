@@ -1052,36 +1052,6 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Case: remove_label_waits_then_fails
-# launchctl_list_rc=0 (label never leaves): rc 1 after 5 stubbed sleeps.
-# launchctl_list_rc=113 (label gone): rc 0.
-# ---------------------------------------------------------------------------
-reset_ctl
-printf '0\n' > "$T/ctl/launchctl_list_rc"
-RC_STUCK=0
-(
-    HOME="$T/home"
-    PATH="$SHIM_PATH"
-    . "$LIB"
-    ljob_remove_label "$SUB_LABEL"
-) >/dev/null 2>&1 || RC_STUCK=$?
-RL_SLEEPS="$(wc -l < "$T/ctl/sleep_calls" 2>/dev/null | tr -d ' ')"
-reset_ctl
-printf '113\n' > "$T/ctl/launchctl_list_rc"
-RC_GONE=0
-(
-    HOME="$T/home"
-    PATH="$SHIM_PATH"
-    . "$LIB"
-    ljob_remove_label "$SUB_LABEL"
-) >/dev/null 2>&1 || RC_GONE=$?
-if [[ $RC_STUCK -eq 1 && "$RL_SLEEPS" == "5" && $RC_GONE -eq 0 ]]; then
-    pass "remove_label_waits_then_fails"
-else
-    fail "remove_label_waits_then_fails" "stuck_rc=$RC_STUCK sleeps='$RL_SLEEPS' gone_rc=$RC_GONE"
-fi
-
-# ---------------------------------------------------------------------------
 # Case: kill_label_remove_fallback
 # After bootout, a still-listed label (list rc 0) gets `launchctl remove`;
 # a gone label (list rc 113) does not.

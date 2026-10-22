@@ -37,7 +37,7 @@ class WaiversProcessor implements WaiversProcessorInterface
      */
     private \Psr\Log\LoggerInterface $logger;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
     private \Clock\ClockInterface $clock;
@@ -225,7 +225,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             return ['success' => false, 'error' => 'Player not found.'];
         }
 
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
         /** @var array{hasExistingContract: bool, salary: int} $contractData */
         $contractData = $this->determineContractData($player, $season);
         $playerSalary = $contractData['salary'];

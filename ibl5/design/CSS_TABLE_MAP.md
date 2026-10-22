@@ -77,6 +77,11 @@ Affects ALL data tables site-wide:
 | `.voting-form-table` | Voting views |
 | `.trading-*` | Trading/TradingView |
 
+### .ibl-data-table--borderless (modifier)
+
+This modifier removes the outer border, radius and shadow for nested or compact tables. It is defined at the end of `components/tables.css`.
+Its only consumer is `.record-table`, emitted by `RecordTableRenderer` and `PlayerRecordSectionRenderer`.
+
 ## Cell / Helper Classes
 
 These are used inside multiple table types.
@@ -167,10 +172,8 @@ Legacy variable names are mapped to the canonical pair via CSS aliases on any el
 |---|---|---|
 | `--team-tab-bg-color` | `var(--team-color-primary)` | `navigation.css`, `team-splits.css` |
 | `--team-tab-active-color` | `var(--team-color-secondary)` | `navigation.css`, `team-splits.css` |
-| `--team-primary` | `var(--team-color-primary)` | `schedule.css` |
-| `--team-secondary` | `var(--team-color-secondary)` | `schedule.css` |
-| `--banner-primary` | `var(--team-color-primary)` | `banners.css` |
-| `--banner-secondary` | `var(--team-color-secondary)` | `banners.css` |
+
+`schedule.css` and `banners.css` read `--team-color-primary` / `--team-color-secondary` directly; the `--team-tab-*` pair stays because trade-preview JS writes it inline.
 
 ### Cell-scope variables (intentionally separate)
 

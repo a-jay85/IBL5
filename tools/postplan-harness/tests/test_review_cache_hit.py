@@ -5,6 +5,7 @@ seeded `<slug>.reviewcache.json` and a monkeypatched `_review_cache_context`, so
 deterministic and the run goes through the real `run()` wiring.
 """
 import dataclasses
+import json
 import os
 import sys
 
@@ -16,7 +17,7 @@ import runner
 from harness import reviewcache
 from harness.adapters.llm import FixtureLlm
 from harness.classify import classify, files_from_diff
-from harness.review import ReviewPhase
+from harness.review import VERIFIER_PURPOSES, ReviewPhase
 from harness.state import Finding, TerminalState, UsageLedger
 from test_runner_replay import CANNED, _actions
 
@@ -24,7 +25,23 @@ from test_runner_replay import CANNED, _actions
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show", "standard_review_depth")
 
 REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
-                   "security-audit", "score-findings")
+                   "security-audit") + VERIFIER_PURPOSES
+
+
+def _all_real(count): return json.dumps([{"n": i, "verdict": "real", "reason": "verified"} for i in range(1, count + 1)])
+
+
+@pytest.fixture(autouse=True)
+def _pin_verifier_worktree(monkeypatch, tmp_path, standard_review_depth):
+    """Replay passes no worktree to run(), which would take the keep-all fallback. Pin one on the
+    review phase so the canned verifier replies drive 4D. Requests standard_review_depth first
+    (when the module uses it) so this wrap sits on top of that patch."""
+    real = runner._review_phase_for
+    monkeypatch.setattr(runner, "_review_phase_for",
+                        lambda llm, gh, copy, meta, log, worktree=None: real(
+                            llm, gh, copy, meta, log, worktree=str(tmp_path)))
+
+
 PR = 4242
 SLUG = "review-cache-hit"
 TITLE = "fix: review cache hit"
@@ -62,7 +79,7 @@ CANNED_FINDINGS = dict(
     CANNED,
     **{"review-agent-a": [{"path": ALPHA, "line": 3, "body": "alpha bug"},
                           {"path": BETA, "line": 1, "body": "beta bug"}],
-       "score-findings": [{"n": 1, "score": 85}, {"n": 2, "score": 90}]})
+       **{p: _all_real(2) for p in VERIFIER_PURPOSES}})
 
 
 def _finding_dict(path, score, body="cached body", source="code-review", agent="A"):
@@ -164,7 +181,7 @@ def test_review_hit_makes_no_review_llm_calls_and_posts_nothing(monkeypatch, tmp
     fresh, fresh_out = _fresh(monkeypatch, tmp_path)
     assert set(REVIEW_PURPOSES) <= set(_purposes(fresh))      # the fresh run is not vacuous
     assert _review_posts(fresh_out)
-    assert [f.score for f in fresh.findings] == [85, 90]
+    assert [f.score for f in fresh.findings] == [100, 100]
 
     hit, hit_out = _drive(monkeypatch, tmp_path, name="hit", canned=CANNED_FINDINGS,
                           record=_seed_from(fresh))

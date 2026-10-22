@@ -1,6 +1,6 @@
 ---
 description: Scheduled pr-cycle watcher tick, its retry and in-flight guards, and the post-plan race fix in both directions.
-last_verified: 2026-10-18
+last_verified: 2026-10-19
 ---
 
 # ADR-0167: Schedule bin/pr-cycle on a launchd tick
@@ -85,3 +85,13 @@ The sweep leaves `bin/merge-line-select` and its guard alone. It touches no othe
 The original Alternatives entry still holds against a lock file. Launchd labels, the wrapper shell's argv and the harness out dir are records a run already leaves. A new lock file would not exist for the runs that are already stuck.
 
 Every removal logs the PR number, the label age and the evidence string. `bin/pr-cycle-tick --dry-run` prints the would-remove set and changes nothing.
+
+## Addendum 2026-10-19: conflict holds re-try on a new master tip
+
+A DIRTY PR whose rescue ended in a rebase conflict stayed capped forever. The 2026-10-12 patch-id key survives a master advance, so a moving master never reopened the cap. PRs sat skipped on "retry cap" while master moved 10 to 200 commits, and manual rebases then succeeded.
+
+The tick now records `conflict-hold/<pr>` when a rescue settles with outcome `conflict`. The ledger holds the origin/master tip read at that rescue's launch. A 4th pending column carries the tip, because the rescue settles ticks later. Any other settled outcome except `paused` clears the ledger.
+
+A capped DIRTY PR with a conflict hold skips only the attempted-key check, and only when the current tip differs from the held one. Every DIRTY launch bumps `retries/<pr>` for the local calendar day. The bypass stops at `PCW_CONFLICT_RETRY_DAILY_CAP` (2) launches per PR per day. An unreadable tip never opens the bypass. The `PR_CYCLE_MASTER_TIP_CMD` seam replaces the tip read in tests.
+
+Non-conflict holds keep the until-the-diff-changes rule. That covers red CI, failed and held rescues, holdrepeat declines, and strikes. The post-plan harness needs no change: holdrepeat and the held-unfixable marker record only evaluated ship conditions, and a rebase conflict exits before conditions are evaluated.

@@ -198,13 +198,4 @@ class SeasonLeaderboardsInMemoryCache implements DatabaseCacheInterface
     {
         return $this->store[$key]['data'] ?? null;
     }
-
-    public function acquireLock(string $key, int $timeoutSeconds): bool
-    {
-        return true;
-    }
-
-    public function releaseLock(string $key): void
-    {
-    }
 }

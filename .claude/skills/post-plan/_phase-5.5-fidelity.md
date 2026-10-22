@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-16
+last_verified: 2026-10-19
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -194,7 +194,7 @@ Appending a metadata line is **not** editing the verdict: the word, the findings
 
 ## Step 4 — Remediation on `READY WITH NOTES` (and `NOT READY`)
 
-Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-5-5"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow.
+Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-5-5"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow. The harness engine adds one bounded exception to the gate-owning deny: a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes may be edited and committed, within the size and frontmatter limits in `tools/postplan-harness/harness/fidelity_filefix.py`; every other gate-owning path stays denied and a mixed commit is discarded whole. The skill engine keeps the full deny.
 
 Three post-plan-specific rules on top — these are where a re-spawn would otherwise creep in:
 

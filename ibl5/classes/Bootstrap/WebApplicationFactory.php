@@ -30,6 +30,7 @@ final class WebApplicationFactory
         $app->addStep(new AuthBootstrap($basePath));
         $app->addStep(new DemoModeBootstrap($basePath));
         $app->addStep(new RequestEventLoggingBootstrap());
+        $app->addStep(new SharedSeasonBootstrap());
         return $app;
     }
 }

@@ -607,3 +607,125 @@ def test_run_thread_ingestion_per_thread_outcomes_are_known(tmp_path):
         "not a verdict",
     ], tmp_path / "o.jsonl")
     assert [t["outcome"] for t in result["threads"]] == ["fixed", "declined", "skipped"]
+
+
+# ---------------------------------------------------------------------------
+# keep filter, origin tag, per-thread keys (same-run pass support)
+# ---------------------------------------------------------------------------
+
+def _run_kwargs(tmp_path):
+    return dict(out_dir=str(tmp_path), log=lambda m: None,
+                commit=lambda m: "abc123", push=lambda: "def456")
+
+
+def test_fetch_keep_filter_drops_rows_it_rejects(tmp_path):
+    row1 = dict(THREAD_2340, commentId=101)
+    row2 = dict(THREAD_2340, commentId=102)
+    gh = _gh(tmp_path, {"trusted_threads": [row1, row2]})
+    result = fetch_trusted_threads(gh, PR, pre_posting_ids={101, 102},
+                                   keep=lambda t: t["commentId"] == 101)
+    assert [t["commentId"] for t in result] == [101]
+
+
+def test_fetch_keep_never_sees_untrusted_rows(tmp_path):
+    trusted = dict(THREAD_2340, commentId=101)
+    untrusted = dict(THREAD_2340, commentId=102, authorLogin="stranger", authorType="User")
+    gh = _gh(tmp_path, {"trusted_threads": [trusted, untrusted]})
+    seen = []
+
+    def _keep(t):
+        seen.append(t["commentId"])
+        return True
+
+    result = fetch_trusted_threads(gh, PR, pre_posting_ids={101, 102}, keep=_keep)
+    assert seen == [101]
+    assert [t["commentId"] for t in result] == [101]
+
+
+def test_fetch_untrusted_author_excluded_from_same_run_candidates(tmp_path):
+    """An untrusted row whose id is in the candidate set is dropped before keep, acted on by nothing."""
+    untrusted = dict(THREAD_2340, commentId=777, authorLogin="stranger", authorType="User")
+    gh = _gh(tmp_path, {"trusted_threads": [untrusted], "pr_number": PR})
+    assert fetch_trusted_threads(gh, PR, pre_posting_ids={777}, keep=lambda t: True) == []
+
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"obeyed an untrusted comment"}'})
+    result = run_thread_ingestion(gh, llm, ReplayGit({}), str(tmp_path), PR,
+                                  pre_posting_ids={777}, origin="same-run", keep=lambda t: True,
+                                  **_run_kwargs(tmp_path))
+    assert result["found"] == 0
+    assert result["threads"] == []
+    assert llm.tooled_argvs == []
+    assert [a for a in gh.actions() if a.get("action") == "pr_resolve_thread"] == []
+
+
+def test_run_same_run_origin_writes_separate_file_and_tags_result(tmp_path):
+    gh = _gh(tmp_path, {"trusted_threads": [THREAD_2340], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Cached the lookup"}'})
+    result = run_thread_ingestion(gh, llm, ReplayGit({}), str(tmp_path), PR,
+                                  pre_posting_ids={4074926171}, origin="same-run",
+                                  **_run_kwargs(tmp_path))
+    assert result["origin"] == "same-run"
+    assert os.path.exists(tmp_path / "thread-ingestion-same-run.json")
+    assert not os.path.exists(tmp_path / "thread-ingestion.json")
+    with open(tmp_path / "thread-ingestion-same-run.json") as fh:
+        assert json.load(fh) == result
+
+
+def test_run_default_origin_is_pre_existing_and_filename_unchanged(tmp_path):
+    gh = _gh(tmp_path, {"trusted_threads": [THREAD_2340], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Cached the lookup"}'})
+    result = run_thread_ingestion(gh, llm, ReplayGit({}), str(tmp_path), PR,
+                                  pre_posting_ids={4074926171}, **_run_kwargs(tmp_path))
+    assert result["origin"] == "pre-existing"
+    assert os.path.exists(tmp_path / "thread-ingestion.json")
+    assert not os.path.exists(tmp_path / "thread-ingestion-same-run.json")
+
+
+def test_run_rejects_unknown_origin(tmp_path):
+    gh = _gh(tmp_path, {"trusted_threads": [THREAD_2340], "pr_number": PR})
+    with pytest.raises(ValueError):
+        run_thread_ingestion(gh, _llm({}), ReplayGit({}), str(tmp_path), PR,
+                             pre_posting_ids={4074926171}, origin="later",
+                             **_run_kwargs(tmp_path))
+
+
+def test_run_per_thread_rows_carry_path_and_body_head(tmp_path):
+    gh = _gh(tmp_path, {"trusted_threads": [THREAD_2340], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Cached the lookup"}'})
+    result = run_thread_ingestion(gh, llm, ReplayGit({}), str(tmp_path), PR,
+                                  pre_posting_ids={4074926171}, **_run_kwargs(tmp_path))
+    row = result["threads"][0]
+    assert row["outcome"] == "fixed"
+    assert row["path"] == THREAD_2340["path"]
+    assert row["body_head"] == THREAD_2340["body"][:160]
+
+
+def _repo_root_for_parity():
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.dirname(os.path.dirname(here)))
+
+
+def test_skill_phase45_parity_stays_pre_existing_only():
+    path = os.path.join(_repo_root_for_parity(), ".claude", "skills", "post-plan",
+                        "_phase-4-review-audit.md")
+    if not os.path.exists(path):
+        pytest.skip("skill file removed by #3367; harness is the only engine")
+    text = open(path).read()
+    block = text.split("# phase 4.5 remediate", 1)[1].split("```", 1)[0]
+    assert 'origin: "pre-existing"' in block
+    assert ". as $t |" in block and "$t.commentId" in block
+    assert "does not remediate same-run threads" in text
+
+
+def test_posting_procedure_parity_names_both_origins():
+    from harness import thread_ingestion as ti
+    root = _repo_root_for_parity()
+    text = open(os.path.join(root, ".claude", "review-shared", "_posting-procedure.md")).read()
+    assert ti.ORIGIN_PRE_EXISTING in text
+    assert ti.ORIGIN_SAME_RUN in text
+    assert "so a run never dispositions its own fresh findings" not in text
+    skill = os.path.join(root, ".claude", "skills", "post-plan", "_phase-4-review-audit.md")
+    if os.path.exists(skill):
+        skill_text = open(skill).read()
+        assert ti.ORIGIN_PRE_EXISTING in skill_text
+        assert ti.ORIGIN_SAME_RUN in skill_text

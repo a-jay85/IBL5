@@ -1,6 +1,6 @@
 ---
-description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised; an advisory How to revert line follows it."
-last_verified: 2026-10-19
+description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised; an advisory How to revert line follows it; pr-copy writes no exact count its packet does not show."
+last_verified: 2026-10-20
 ---
 
 # PR Body Claims
@@ -122,6 +122,12 @@ Every such claim carries its evidence inline, in one of two forms:
 If you cannot produce the evidence, drop the claim. Describe what the PR changes, and name the command a reviewer runs after merge to confirm the state: "After merge, `launchctl list | grep <label>` shows the job." A present-tense external-state claim with no evidence is a fabricated claim, and the reviewer treats it as one.
 
 This rule has no mechanical check. The claims it covers are free-form prose, and the same phrases appear in design descriptions and quoted plans, so a pattern match would flag too many honest lines. The diff is the record of which files changed, so never list changed files by hand. The `<!-- merge-digest:begin -->` block at the top of the body is runner-owned: it mirrors the sticky verdict, so never edit it by hand.
+
+## Unseen-count rule
+
+The harness's pr-copy call writes no exact count (tests, cases, call sites, files, functions, rows) that its input packet does not show, and it claims only what the diff shows. When the number is not in front of it, it describes the change in words. The Phase 5.5 fidelity review's check 4 is the body-vs-diff gate for every count that reaches the body. `body_numbers.py` still corrects file, line, migration and ADR numbers and adds the test-count note described below.
+
+**Headless.** Applies: the prompt rule runs on every harness pr-copy call.
 
 ## Test-count claims rule
 

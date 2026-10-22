@@ -35,6 +35,24 @@ class MobileNavViewTest extends TestCase
         return new MobileNavView($config, new LoginFormView(), new TeamsDropdownView());
     }
 
+    public function testBadgeCarriesChipClass(): void
+    {
+        $view = $this->createView();
+        $menuData = [
+            'icon' => '',
+            'links' => [
+                ['label' => 'Draft', 'url' => 'modules.php?name=Draft', 'badge' => 'LIVE'],
+            ],
+        ];
+        $html = $view->render(
+            ['My Team' => $menuData],
+            null,
+            [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout']],
+        );
+
+        $this->assertStringContainsString('<span class="ibl-chip nav-badge">LIVE</span>', $html);
+    }
+
     public function testAccordionButtonRendered(): void
     {
         $view = $this->createView();
@@ -128,6 +146,20 @@ class MobileNavViewTest extends TestCase
         $this->assertStringContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
     }
 
+    public function testSectionLabelsUseNavSectionLabelClass(): void
+    {
+        $view = $this->createView(isLoggedIn: true, username: 'A-Jay');
+        $html = $view->render(
+            ['Season' => ['icon' => '', 'links' => [['label' => 'Standings', 'url' => 'modules.php?name=Standings']]]],
+            $this->sampleMyTeamMenu(),
+            [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true]],
+        );
+
+        $this->assertStringContainsString('<div class="nav-section-label">A-Jay</div>', $html);
+        $this->assertStringContainsString('<label for="mobile-league-select" class="nav-section-label">League</label>', $html);
+        $this->assertStringNotContainsString('tracking-widest uppercase text-gray-500', $html);
+    }
+
     public function testAccountAccordionSuppressedWhenMyTeamMenuPresent(): void
     {
         $view = $this->createView(isLoggedIn: true, username: 'A-Jay');
@@ -175,7 +207,7 @@ class MobileNavViewTest extends TestCase
 
         $this->assertStringContainsString('href="x&quot;&gt;&lt;script&gt;"', $html);
         $this->assertSame(2, substr_count($html, $escaped), 'label and badge each escaped once');
-        $this->assertStringContainsString('<span class="nav-badge">' . $escaped . '</span>', $html);
+        $this->assertStringContainsString('<span class="ibl-chip nav-badge">' . $escaped . '</span>', $html);
         $this->assertStringNotContainsString('<script>', $html);
         $this->assertStringNotContainsString('&amp;quot;', $html);
     }

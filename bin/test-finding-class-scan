@@ -1,0 +1,821 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-finding-class-scan — harness for bin/finding-class-scan.
+#
+# Usage: bin/test-finding-class-scan [--live]
+#
+# Every external binary (gh, claude, discord-dm, launchctl) is replaced through
+# the script's env seams, and each case runs against a mktemp state dir with
+# canned GraphQL pages from bin/fixtures/finding-class-scan/. No network, no
+# real Claude call. `--live` is the one stub-free exercise (real claude, real
+# read-only gh) the owner runs once before arming the schedule.
+#
+# Exit 0 = all pass, 1 = failures.
+
+set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+FCS="$SCRIPT_DIR/finding-class-scan"
+FIXTURES="$SCRIPT_DIR/fixtures/finding-class-scan"
+
+ok()   { h_pass "$1"; }
+fail() { h_fail "$1"; }
+
+expect_eq() { # name want got
+    if [ "$2" = "$3" ]; then ok "$1"; else fail "$1 - want [$2] got [$3]"; fi
+}
+expect_has() { # name haystack needle
+    if grep -qF -- "$3" <<< "$2"; then ok "$1"; else fail "$1 - '$3' absent"; fi
+}
+expect_lacks() { # name haystack needle
+    if grep -qF -- "$3" <<< "$2"; then fail "$1 - '$3' unexpectedly present"; else ok "$1"; fi
+}
+expect_absent() { # name path
+    if [ -e "$2" ]; then fail "$1 - $2 exists"; else ok "$1"; fi
+}
+expect_same_file() { # name a b
+    if cmp -s "$2" "$3"; then ok "$1"; else fail "$1 - $2 and $3 differ"; fi
+}
+
+h_tmp T
+STUBS="$T/stubs"
+mkdir -p "$STUBS"
+
+# ── Stubs ─────────────────────────────────────────────────────────────────────
+# gh: records one line per call in gh.calls and serves canned JSON from
+# $STUB_DIR/fx. A call cap stops a runaway pagination loop.
+cat > "$STUBS/gh" <<'SH'
+#!/usr/bin/env bash
+d="${STUB_DIR:?}"; fx="$d/fx"
+printf '%s\n' "$*" | tr '\n' ' ' >> "$d/gh.calls"
+printf '\n' >> "$d/gh.calls"
+if [ "$(wc -l < "$d/gh.calls")" -gt 60 ]; then echo "gh stub: call cap" >&2; exit 1; fi
+all="$*"
+case "$1 $2" in
+    "api graphql")
+        if [[ "$all" == *"pullRequest(number:"* ]]; then
+            [ -f "$d/gh.followup.fail" ] && exit 1
+            cat "$fx/threads-followup.json"
+        elif [[ "$all" == *"cursor=C1"* ]]; then
+            [ -f "$d/gh.page2.fail" ] && exit 1
+            if [ -f "$d/gh.page2.errors" ]; then echo '{"errors":[{"message":"boom"}]}'; exit 0; fi
+            cat "$fx/pr-page-2.json"
+        else
+            cat "$fx/pr-page-1.json"
+        fi ;;
+    "issue list")
+        st=open; prev=""
+        for a in "$@"; do [ "$prev" = --state ] && st="$a"; prev="$a"; done
+        [ -f "$d/gh.list.rc.$st" ] && exit "$(cat "$d/gh.list.rc.$st")"
+        if [ -f "$d/gh.list.$st.json" ]; then cat "$d/gh.list.$st.json"; else echo '[]'; fi ;;
+    "issue view")
+        if [ -f "$fx/issue-view-$3.json" ]; then cat "$fx/issue-view-$3.json"; else echo '{"body":"","comments":[]}'; fi ;;
+    "issue create")
+        [ -f "$d/gh.create.fail" ] && exit 1
+        n=$(( $(cat "$d/gh.create.n" 2>/dev/null || echo 0) + 1 ))
+        echo "$n" > "$d/gh.create.n"
+        prev=""
+        for a in "$@"; do
+            [ "$prev" = --body-file ] && cp "$a" "$d/gh.body.$n"
+            [ "$prev" = --title ] && printf '%s' "$a" > "$d/gh.title.$n"
+            [ "$prev" = --label ] && printf '%s' "$a" > "$d/gh.label.$n"
+            prev="$a"
+        done
+        echo "https://github.com/a-jay85/IBL5-backlog/issues/$((100 + n))" ;;
+    "issue comment")
+        n=$(( $(cat "$d/gh.comment.n" 2>/dev/null || echo 0) + 1 ))
+        echo "$n" > "$d/gh.comment.n"
+        prev=""
+        for a in "$@"; do
+            [ "$prev" = --body-file ] && cp "$a" "$d/gh.comment.$3.body"
+            prev="$a"
+        done ;;
+esac
+SH
+# claude: logs argv, env marker and stdin, then answers per STUB_CLAUDE_MODE.
+cat > "$STUBS/claude" <<'SH'
+#!/usr/bin/env bash
+d="${STUB_DIR:?}"
+echo call >> "$d/claude.calls"
+printf '%s\n' "$@" > "$d/claude.args"
+printf 'CLAUDE_HEADLESS=%s\n' "${CLAUDE_HEADLESS:-}" > "$d/claude.env"
+cat > "$d/claude.stdin"
+case "${STUB_CLAUDE_MODE:-ok}" in
+    ok)
+        if [ -f "$d/claude.out" ]; then cat "$d/claude.out"; else cat "$d/fx/claude-envelope.json"; fi
+        echo "noise on stderr" >&2 ;;
+    stderr-verdict) echo 'garbage stdout'; cat "$d/fx/claude-envelope.json" >&2 ;;
+    sleep) exec sleep 30 ;;
+    malformed) echo '{"result":"not json"}' ;;
+    is-error) echo '{"type":"result","is_error":true,"subtype":"error_during_execution"}' ;;
+esac
+SH
+cat > "$STUBS/discord-dm" <<'SH'
+#!/usr/bin/env bash
+d="${STUB_DIR:?}"
+echo call >> "$d/dm.calls"
+cat > "$d/dm.txt"
+SH
+# launchctl: logs argv. On bootstrap it saves the plist; with
+# STUB_LAUNCHCTL_WRITE=1 it also writes a summary line to the plist's log path.
+cat > "$STUBS/launchctl" <<'SH'
+#!/usr/bin/env bash
+d="${STUB_DIR:?}"
+printf '%s\n' "$*" >> "$d/launchctl.log"
+if [ "$1" = bootstrap ]; then
+    cp "$3" "$d/verify.plist.copy"
+    if [ "${STUB_LAUNCHCTL_WRITE:-0}" = 1 ]; then
+        lp="$(sed -n 's|.*<string>\(.*verify-.*\.log\)</string>.*|\1|p' "$3" | sed -n '1p')"
+        echo 'summary mode=incremental dry_run=1 threads_new=0' >> "$lp"
+    fi
+fi
+SH
+chmod +x "$STUBS"/*
+
+# ── Fixture ───────────────────────────────────────────────────────────────────
+# Sets FX, STATE, STUB_DIR. XENV holds extra KEY=VALUE words for one run.
+XENV=""
+new_fixture() {
+    h_tmp FX
+    STATE="$FX/state"
+    STUB_DIR="$FX/stubcalls"
+    mkdir -p "$STUB_DIR" "$FX/home" "$STATE"
+    cp -R "$FIXTURES" "$STUB_DIR/fx"
+    XENV=""
+}
+
+# fcs <args...> — run the script against the fixture, capture OUT/ERR/ALL/RC.
+fcs() {
+    OUT=""; ERR=""; RC=0
+    local errf="$FX/err.txt"
+    # shellcheck disable=SC2086  # XENV is a space-separated word list on purpose
+    OUT="$(env HOME="$FX/home" PATH="$STUBS:$PATH" STUB_DIR="$STUB_DIR" GH_CMD="$STUBS/gh" \
+        FCS_CLAUDE_BIN="$STUBS/claude" FCS_DM_BIN="$STUBS/discord-dm" \
+        FCS_LAUNCHCTL_BIN="$STUBS/launchctl" FCS_STATE_DIR="$STATE" $XENV \
+        bash "$FCS" "$@" 2> "$errf")" || RC=$?
+    ERR="$(cat "$errf")"
+    ALL="$OUT"$'\n'"$ERR"
+}
+
+# count_lines <file-in-stubdir> <needle>: lines holding the needle (0 if no file).
+count_lines() {
+    local n
+    n="$(grep -cF -- "$2" "$STUB_DIR/$1" 2>/dev/null || true)"
+    echo "${n:-0}"
+}
+
+set_payload() { # json payload for the classifier
+    jq -nc --argjson p "$1" '{type: "result", subtype: "success", is_error: false, total_cost_usd: 0.1, structured_output: $p}' \
+        > "$STUB_DIR/claude.out"
+}
+EMPTY_PAYLOAD='{"assignments":[],"classes":[]}'
+
+use_backlog() { # copy the canned open/closed lists into the gh stub
+    cp "$STUB_DIR/fx/issues-open.json" "$STUB_DIR/gh.list.open.json"
+    cp "$STUB_DIR/fx/issues-closed.json" "$STUB_DIR/gh.list.closed.json"
+}
+
+# seed_class <key> <check_kind> <pr> <id...>: registry entry plus assignment rows.
+seed_class() {
+    local key="$1" kind="$2" pr="$3" id i=0 path="null" reg="$STATE/registry.json"
+    shift 3
+    case "$kind" in
+        phpstan) path='"ibl5/phpstan-rules/BanSeedRule.php"' ;;
+        bin-check) path='"bin/check-seed"' ;;
+    esac
+    [ -f "$reg" ] || echo '{}' > "$reg"
+    jq -c --arg k "$key" --arg kind "$kind" --argjson p "$path" \
+        '. + {($k): {title: ("Title for " + $k), description: "Seed description.", check_kind: $kind,
+                     proposed_check: "Seed proposed check.", artifact_path: $p}}' "$reg" > "$reg.tmp" && mv "$reg.tmp" "$reg"
+    for id in "$@"; do
+        i=$((i + 1))
+        jq -nc --arg t "$id" --arg k "$key" --argjson pr "$pr" \
+            --arg u "https://github.com/a-jay85/IBL5/pull/$pr#discussion_r$((pr * 100 + i))" \
+            '{thread_id: $t, class_key: $k, pr: $pr, url: $u, path: "ibl5/classes/Seed.php", line: 7, resolved: false}' \
+            >> "$STATE/assignments.jsonl"
+    done
+}
+
+# ── Cases: flags, env and state dir (Phase 1) ─────────────────────────────────
+case_help_without_home() {
+    local out rc=0
+    out="$(env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bash "$1" --help' _ "$FCS" 2>&1)" || rc=$?
+    expect_eq "row 3: --help under env -i exits 0" 0 "$rc"
+    expect_has "row 3: help prints the usage" "$out" "Usage: bin/finding-class-scan"
+    expect_has "row 3: help keeps the text after the bridge" "$out" "Exit codes"
+}
+
+case_state_dir_resolution() {
+    local out rc=0
+    out="$(env -i PATH=/usr/bin:/bin bash "$FCS" --dry-run 2>&1)" || rc=$?
+    expect_eq "row 4: no HOME and no state dir exits 1" 1 "$rc"
+    expect_has "row 4: names the state dir problem" "$out" "cannot resolve state dir"
+    rc=0
+    env -u FCS_STATE_DIR HOME= PATH=/usr/bin:/bin bash "$FCS" --dry-run >/dev/null 2>&1 || rc=$?
+    expect_eq "row 5: empty HOME exits 1" 1 "$rc"
+}
+
+case_flag_errors() {
+    new_fixture
+    fcs --bogus
+    expect_eq "row 6: unknown flag exits 2" 2 "$RC"
+    expect_has "row 6: unknown flag is named" "$ERR" "--bogus"
+    fcs --since 2026-01-01
+    expect_eq "row 7: space-form --since exits 2" 2 "$RC"
+    fcs --since=2026-1-1
+    expect_eq "bad --since date exits 2" 2 "$RC"
+    fcs --min-occurrences=0
+    expect_eq "row 8: --min-occurrences=0 exits 2" 2 "$RC"
+    fcs --min-occurrences=abc
+    expect_eq "row 8: --min-occurrences=abc exits 2" 2 "$RC"
+    fcs --min-occurrences=100
+    expect_eq "row 8: --min-occurrences=100 exits 2" 2 "$RC"
+    fcs --min-occurrences 2
+    expect_eq "row 8: space-form --min-occurrences exits 2" 2 "$RC"
+    XENV="FCS_MIN_OCCURRENCES=abc"
+    fcs --dry-run
+    expect_eq "non-integer FCS_MIN_OCCURRENCES exits 2" 2 "$RC"
+    XENV="HOME="
+    fcs --print-schedule
+    expect_eq "row 8: --print-schedule with empty HOME exits 2" 2 "$RC"
+}
+
+case_empty_env_means_default() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    fcs --dry-run
+    local want="$OUT"
+    XENV="FCS_MIN_OCCURRENCES= FCS_MAX_BUDGET_USD= FCS_CLASSIFY_TIMEOUT= FCS_VERIFY_TIMEOUT= GH_CMD=gh REPO_SLUG= BACKLOG_SLUG= FCS_CLAUDE_BIN=claude"
+    fcs --dry-run
+    expect_eq "row 9: empty numeric and seam vars give the default output" "$(grep '^summary ' <<< "$want")" "$(grep '^summary ' <<< "$OUT")"
+    expect_eq "row 9: the empty-vars run exits 0" 0 "$RC"
+    local fresh_home
+    h_tmp fresh_home
+    XENV="FCS_STATE_DIR= HOME=$fresh_home"
+    set_payload "$EMPTY_PAYLOAD"
+    fcs
+    if [ -d "$fresh_home/.local/state/ibl5-finding-class-scan" ]; then ok "row 9: empty FCS_STATE_DIR falls back to HOME"
+    else fail "row 9: empty FCS_STATE_DIR falls back to HOME - dir absent"; fi
+}
+
+case_no_repo_writes() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    local before after
+    before="$(git -C "$REPO_ROOT" status --porcelain)"
+    fcs
+    expect_eq "full stubbed run exits 0" 0 "$RC"
+    after="$(git -C "$REPO_ROOT" status --porcelain)"
+    expect_eq "row 10: nothing written inside the repo tree" "$before" "$after"
+}
+
+# ── Cases: fetch, trust filter, window (Phase 2) ──────────────────────────────
+case_fetch_pages_and_trust_filter() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    fcs --dry-run
+    expect_eq "fetch run exits 0" 0 "$RC"
+    expect_eq "row 11: page 2 fetched through cursor=C1" 1 "$(count_lines gh.calls 'cursor=C1')"
+    expect_eq "row 12: per-PR follow-up fetched" 1 "$(count_lines gh.calls 'pullRequest(number:')"
+    expect_has "row 13: trusted thread count is exact" "$OUT" "threads_new=5"
+    local prompt id
+    prompt="$(cat "$STUB_DIR/claude.stdin")"
+    for id in T1 T2 T3 T7 T8; do expect_has "row 13: kept thread $id" "$prompt" "\"thread_id\":\"$id\""; done
+    for id in T4 T5 T6; do expect_lacks "row 13: dropped thread $id" "$prompt" "\"thread_id\":\"$id\""; done
+}
+
+case_fetch_failure_fails_closed() {
+    new_fixture
+    touch "$STUB_DIR/gh.page2.fail"
+    fcs
+    expect_eq "row 15: gh failure on page 2 exits 1" 1 "$RC"
+    expect_has "row 15: says nothing filed" "$ALL" "nothing filed"
+    expect_eq "row 15: zero claude calls" 0 "$(count_lines claude.calls call)"
+    expect_eq "row 15: zero issue create calls" 0 "$(count_lines gh.calls 'issue create')"
+    expect_eq "row 15: zero issue comment calls" 0 "$(count_lines gh.calls 'issue comment')"
+    new_fixture
+    touch "$STUB_DIR/gh.page2.errors"
+    fcs
+    expect_eq "row 15: errors payload exits 1" 1 "$RC"
+    expect_has "row 15: errors payload says nothing filed" "$ALL" "nothing filed"
+    expect_eq "row 15: errors payload makes zero claude calls" 0 "$(count_lines claude.calls call)"
+    new_fixture
+    touch "$STUB_DIR/gh.followup.fail"
+    fcs
+    expect_eq "follow-up failure exits 1" 1 "$RC"
+}
+
+case_incremental_stops_below_cutoff() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    printf '2026-12-01T00:00:00Z\n' > "$STATE/watermark"
+    fcs --dry-run
+    expect_eq "row 14: incremental run exits 0" 0 "$RC"
+    expect_eq "row 14: page 2 not fetched below the cutoff" 0 "$(count_lines gh.calls 'cursor=C1')"
+    expect_has "row 14: mode is incremental" "$OUT" "mode=incremental"
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    printf '2026-10-01T00:00:00Z\n' > "$STATE/watermark"
+    fcs --dry-run
+    expect_eq "row 14: a recent watermark still pages on" 1 "$(count_lines gh.calls 'cursor=C1')"
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    printf '2026-12-01T00:00:00Z\n' > "$STATE/watermark"
+    fcs --dry-run --backfill
+    expect_eq "--backfill ignores the watermark" 1 "$(count_lines gh.calls 'cursor=C1')"
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    fcs --dry-run --since=2026-12-01
+    expect_eq "--since sets the cutoff in backfill mode" 0 "$(count_lines gh.calls 'cursor=C1')"
+}
+
+case_assigned_ids_are_skipped() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    seed_class seen-class phpstan 101 T1 T2
+    fcs --dry-run
+    expect_has "seen ids are not sent to the classifier (3 of 5 left)" "$OUT" "threads_new=3"
+    expect_lacks "seen id T1 absent from the prompt" "$(cat "$STUB_DIR/claude.stdin")" "\"thread_id\":\"T1\""
+}
+
+# ── Cases: classifier (Phase 3) ───────────────────────────────────────────────
+case_classifier_invocation() {
+    new_fixture
+    fcs --dry-run
+    local args env prompt open close
+    args="$(cat "$STUB_DIR/claude.args")"
+    env="$(cat "$STUB_DIR/claude.env")"
+    expect_has "row 16: argv holds the model" "$args" "claude-sonnet-5-5"
+    expect_has "row 16: argv holds --json-schema" "$args" "--json-schema"
+    expect_has "row 16: argv holds --max-budget-usd" "$args" "--max-budget-usd"
+    expect_has "row 16: argv holds --output-format json" "$args" "--output-format"
+    expect_has "row 16: env holds CLAUDE_HEADLESS=1" "$env" "CLAUDE_HEADLESS=1"
+    prompt="$(cat "$STUB_DIR/claude.stdin")"
+    open="$(sed -n 's/^<<<THREADS-\(.*\)$/\1/p' <<< "$prompt")"
+    close="$(sed -n 's/^THREADS-\(.*\)>>>$/\1/p' <<< "$prompt")"
+    if [ -n "$open" ] && [ "$open" = "$close" ]; then ok "row 16: fence carries the nonce on both ends"
+    else fail "row 16: fence nonce open=[$open] close=[$close]"; fi
+}
+
+case_classifier_failures() {
+    local start
+    new_fixture
+    XENV="STUB_CLAUDE_MODE=sleep FCS_CLASSIFY_TIMEOUT=2"
+    start=$SECONDS
+    fcs
+    expect_eq "row 17: timeout exits 1" 1 "$RC"
+    expect_has "row 17: names exited 124" "$ALL" "exited 124"
+    if [ $((SECONDS - start)) -lt 10 ]; then ok "row 17: timeout returns within 10 s"; else fail "row 17: took $((SECONDS - start)) s"; fi
+    new_fixture
+    XENV="STUB_CLAUDE_MODE=stderr-verdict"
+    fcs
+    expect_eq "row 18: stderr verdict exits 1" 1 "$RC"
+    expect_has "row 18: says nothing filed" "$ALL" "nothing filed"
+    expect_eq "row 18: nothing created" 0 "$(count_lines gh.calls 'issue create')"
+    new_fixture
+    seed_class seed-class phpstan 50 S1 S2
+    cp "$STATE/assignments.jsonl" "$FX/seed.jsonl"
+    XENV="STUB_CLAUDE_MODE=malformed"
+    fcs
+    expect_eq "row 19: malformed JSON exits 1" 1 "$RC"
+    expect_same_file "row 19: assignments.jsonl byte-identical" "$STATE/assignments.jsonl" "$FX/seed.jsonl"
+    expect_eq "row 19: nothing created" 0 "$(count_lines gh.calls 'issue create')"
+    new_fixture
+    XENV="STUB_CLAUDE_MODE=is-error"
+    fcs
+    expect_eq "is_error envelope exits 1" 1 "$RC"
+    new_fixture
+    set_payload '{"assignments":"nope","classes":[]}'
+    fcs
+    expect_eq "wrong payload shape exits 1" 1 "$RC"
+}
+
+case_forged_id_and_bad_path() {
+    new_fixture
+    seed_class seed-class phpstan 50 S1 S2
+    cp "$STATE/assignments.jsonl" "$FX/seed.jsonl"
+    set_payload '{"assignments":[{"thread_id":"T_FORGED","class_key":"two-thread-class"},{"thread_id":"T1","class_key":"two-thread-class"}],
+        "classes":[{"key":"two-thread-class","title":"Escape output","description":"d","check_kind":"phpstan",
+                    "proposed_check":"p","artifact_path":"ibl5/phpstan-rules/BanUnescapedEchoRule.php"}]}'
+    fcs
+    expect_eq "forged id run exits 0" 0 "$RC"
+    expect_lacks "row 20: T_FORGED absent from assignments.jsonl" "$(cat "$STATE/assignments.jsonl")" "T_FORGED"
+    expect_has "row 20: the real id was kept" "$(cat "$STATE/assignments.jsonl")" '"thread_id":"T1"'
+    expect_eq "row 20: seeded rows unchanged" "$(cat "$FX/seed.jsonl")" "$(head -n 2 "$STATE/assignments.jsonl")"
+    new_fixture
+    set_payload '{"assignments":[{"thread_id":"T1","class_key":"bad-path-class"},{"thread_id":"T2","class_key":"bad-path-class"}],
+        "classes":[{"key":"bad-path-class","title":"Bad","description":"d","check_kind":"phpstan",
+                    "proposed_check":"p","artifact_path":"../../etc/x"}]}'
+    fcs
+    expect_eq "bad path run exits 0" 0 "$RC"
+    local rows=""
+    [ -f "$STATE/assignments.jsonl" ] && rows="$(cat "$STATE/assignments.jsonl")"
+    expect_lacks "row 21: class with a traversal path dropped with its assignments" "$rows" "bad-path-class"
+    expect_eq "row 21: nothing filed for it" 0 "$(count_lines gh.calls 'issue create')"
+}
+
+case_dry_run_leaves_state_alone() {
+    new_fixture
+    seed_class seed-class phpstan 50 S1 S2 S3
+    printf '2026-10-01T00:00:00Z\n' > "$STATE/watermark"
+    cp -R "$STATE" "$FX/state.before"
+    fcs --dry-run
+    expect_eq "dry run exits 0" 0 "$RC"
+    if diff -r "$STATE" "$FX/state.before" >/dev/null; then ok "row 22: dry run leaves the state dir byte-identical"
+    else fail "row 22: state dir changed under --dry-run"; fi
+    expect_has "row 22: prints would file" "$ALL" "would file"
+    expect_eq "row 22: zero issue create" 0 "$(count_lines gh.calls 'issue create')"
+    expect_eq "row 22: zero issue comment" 0 "$(count_lines gh.calls 'issue comment')"
+    expect_eq "dry run sends no DM" 0 "$(count_lines dm.calls call)"
+}
+
+# ── Cases: counting (Phase 4) ─────────────────────────────────────────────────
+seed_counting_fixture() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    seed_class one-thread phpstan 50 o-1
+    seed_class two-threads-one-pr phpstan 50 p-1 p-2
+    seed_class kind-none none 51 n-1 n-2 n-3
+    local c
+    for c in a b c d e; do seed_class "extra-class-$c" bin-check 52 "x-$c-1" "x-$c-2"; done
+    grep '"thread_id":"p-1"' "$STATE/assignments.jsonl" >> "$STATE/assignments.jsonl"
+}
+
+case_counting() {
+    seed_counting_fixture
+    fcs --dry-run
+    expect_eq "counting run exits 0" 0 "$RC"
+    expect_lacks "row 23: a 1-thread class is not a candidate" "$ALL" "Title for one-thread"
+    expect_has "row 23: a 2-thread class in one PR is a candidate" "$ALL" "Title for two-threads-one-pr"
+    expect_has "row 25: duplicate row leaves thread_count at 2, pr_count 1" "$ALL" "flagged in 2 review threads across 1 PRs"
+    expect_lacks "row 25: duplicate row did not inflate the count" "$ALL" "flagged in 3 review threads"
+    expect_lacks "row 26: kind none is not filed" "$ALL" "Title for kind-none"
+    expect_has "row 26: kind none shows as skipped-none" "$ALL" "skipped-none: kind-none (3 threads)"
+    expect_eq "row 27: six filable classes all reach the plan (no cap)" 6 "$(grep -c '^--- would file' <<< "$OUT")"
+    seed_counting_fixture
+    fcs --dry-run --min-occurrences=3
+    expect_lacks "row 24: --min-occurrences=3 drops the 2-thread class" "$ALL" "Title for two-threads-one-pr"
+    expect_eq "row 24: nothing is left to file" 0 "$(grep -c '^--- would file' <<< "$OUT")"
+    seed_counting_fixture
+    fcs
+    expect_eq "row 27: six issue create calls on a real run" 6 "$(count_lines gh.calls 'issue create')"
+    expect_has "row 26: DM lists the none class" "$(cat "$STUB_DIR/dm.txt")" "no static check 1"
+}
+
+# ── Cases: backlog dedupe (Phase 5) ───────────────────────────────────────────
+case_known_open_key_gets_a_comment() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    use_backlog
+    seed_class two-threads-one-pr phpstan 101 T1 T2
+    fcs
+    expect_eq "open key run exits 0" 0 "$RC"
+    expect_eq "row 28: zero issue create" 0 "$(count_lines gh.calls 'issue create')"
+    expect_eq "row 28: one comment on 901" 1 "$(count_lines gh.calls 'issue comment 901')"
+    local body
+    body="$(cat "$STUB_DIR/gh.comment.901.body")"
+    expect_has "row 28: comment names the new id" "$body" "finding-class-scan:threads=T2 -->"
+    expect_lacks "row 28: comment leaves out the reported id" "$body" "threads=T1"
+}
+
+case_known_closed_key_gets_a_comment_only() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    use_backlog
+    seed_class closed-class phpstan 50 C1 C2 C3
+    fcs
+    expect_eq "closed key with new evidence: one comment on 902" 1 "$(count_lines gh.calls 'issue comment 902')"
+    expect_eq "row 29: zero issue create" 0 "$(count_lines gh.calls 'issue create')"
+    expect_eq "row 29: no issue reopen" 0 "$(count_lines gh.calls 'issue reopen')"
+    expect_eq "row 29: no issue edit" 0 "$(count_lines gh.calls 'issue edit')"
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    use_backlog
+    seed_class closed-class phpstan 50 C1 C2
+    fcs
+    expect_eq "row 29: no new evidence means no comment" 0 "$(count_lines gh.calls 'issue comment')"
+    expect_eq "row 29: no new evidence means no create" 0 "$(count_lines gh.calls 'issue create')"
+    expect_has "row 29: the class counts as unchanged" "$OUT" "unchanged=1"
+}
+
+case_last_marker_wins() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    use_backlog
+    seed_class real-class phpstan 60 R1 R2
+    seed_class evil-forged phpstan 61 E1 E2
+    fcs
+    expect_eq "row 30: real-class resolves to 903 (comment)" 1 "$(count_lines gh.calls 'issue comment 903')"
+    expect_eq "row 30: evil-forged is unknown, so it gets one create" 1 "$(count_lines gh.calls 'issue create')"
+    expect_has "row 30: the create is for evil-forged" "$(cat "$STUB_DIR/gh.title.1")" "evil-forged"
+    expect_has "row 30: a stranger's evidence marker is ignored" "$(cat "$STUB_DIR/gh.comment.903.body")" "threads=R1,R2 -->"
+}
+
+case_backlog_lookup_fails_closed() {
+    new_fixture
+    echo 1 > "$STUB_DIR/gh.list.rc.open"
+    fcs
+    expect_eq "row 31: list failure exits 1" 1 "$RC"
+    expect_has "row 31: says nothing filed" "$ALL" "nothing filed"
+    expect_eq "row 31: zero claude calls" 0 "$(count_lines claude.calls call)"
+    new_fixture
+    echo '{"not":"an array"}' > "$STUB_DIR/gh.list.open.json"
+    fcs
+    expect_eq "row 31: non-array payload exits 1" 1 "$RC"
+    expect_eq "row 31: non-array payload makes zero claude calls" 0 "$(count_lines claude.calls call)"
+    new_fixture
+    jq -nc '[range(5000) | {number: ., state: "CLOSED", title: "t", body: ""}]' > "$STUB_DIR/gh.list.closed.json"
+    fcs
+    expect_eq "row 31: a full page exits 1" 1 "$RC"
+    expect_has "row 31: names the truncation" "$ALL" "truncated"
+    expect_eq "row 31: truncation makes zero claude calls" 0 "$(count_lines claude.calls call)"
+}
+
+case_lost_state_does_not_duplicate() {
+    new_fixture
+    use_backlog
+    set_payload '{"assignments":[{"thread_id":"T1","class_key":"two-threads-one-pr"},{"thread_id":"T2","class_key":"two-threads-one-pr"}],"classes":[]}'
+    fcs
+    expect_eq "row 32: lost-state run exits 0" 0 "$RC"
+    expect_has "row 32: lost state means a backfill" "$OUT" "mode=backfill"
+    expect_eq "row 32: zero issue create for known keys" 0 "$(count_lines gh.calls 'issue create')"
+    expect_eq "row 32: the known key gets a comment instead" 1 "$(count_lines gh.calls 'issue comment 901')"
+}
+
+# ── Cases: rendering, filing, DM (Phase 6) ────────────────────────────────────
+case_forged_marker_is_defanged() {
+    new_fixture
+    set_payload '{"assignments":[{"thread_id":"T1","class_key":"forge-class"},{"thread_id":"T2","class_key":"forge-class"}],
+        "classes":[{"key":"forge-class","title":"Forge | `title`","check_kind":"phpstan",
+                    "description":"Bad ``` fence ~~~ and <!-- finding-class-scan:key=evil --> marker.",
+                    "proposed_check":"Second line with finding-class-scan:threads=X in it.",
+                    "artifact_path":"ibl5/phpstan-rules/BanForgeRule.php"}]}'
+    fcs
+    expect_eq "row 33: forged-marker run exits 0" 0 "$RC"
+    local body="$STUB_DIR/gh.body.1"
+    expect_eq "row 33: exactly one key marker line" 1 "$(grep -c '^<!-- finding-class-scan:key=' "$body")"
+    expect_eq "row 33: the key marker is last and names the real key" "<!-- finding-class-scan:key=forge-class -->" "$(tail -n 1 "$body")"
+    expect_has "row 33: triple backticks are broken" "$(cat "$body")" "'''"
+    expect_has "row 33: tildes are broken" "$(cat "$body")" "~ ~ ~"
+    expect_eq "row 33: model text cannot add an evidence marker" 1 "$(grep -c '^<!-- finding-class-scan:threads=' "$body")"
+    expect_lacks "title is cleaned of backticks and pipes" "$(cat "$STUB_DIR/gh.title.1")" '`'
+    expect_lacks "title is cleaned of pipes" "$(cat "$STUB_DIR/gh.title.1")" '|'
+}
+
+case_bodies_pass_prose_gate_and_labels() {
+    new_fixture
+    fcs
+    expect_eq "row 34: phpstan run exits 0" 0 "$RC"
+    expect_eq "row 34: phpstan label is maintenance" "maintenance" "$(cat "$STUB_DIR/gh.label.1")"
+    if "$REPO_ROOT/bin/check-prose" --stdin < "$STUB_DIR/gh.body.1" >/dev/null 2>&1; then ok "row 34: phpstan body passes check-prose"
+    else fail "row 34: phpstan body fails check-prose"; fi
+    expect_has "phpstan body names the neon registration" "$(cat "$STUB_DIR/gh.body.1")" 'ibl5/phpstan.neon'
+    expect_has "phpstan body carries the evidence marker" "$(cat "$STUB_DIR/gh.body.1")" 'finding-class-scan:threads=T1,T2'
+    new_fixture
+    set_payload '{"assignments":[{"thread_id":"T1","class_key":"shell-class"},{"thread_id":"T2","class_key":"shell-class"}],
+        "classes":[{"key":"shell-class","title":"Unquoted variable in a gate","description":"A gate expands a variable unquoted.",
+                    "check_kind":"bin-check","proposed_check":"Grep for the unquoted expansion.","artifact_path":"bin/check-unquoted-vars"}]}'
+    fcs
+    expect_eq "row 34: bin-check label is dev-efficiency" "dev-efficiency" "$(cat "$STUB_DIR/gh.label.1")"
+    if "$REPO_ROOT/bin/check-prose" --stdin < "$STUB_DIR/gh.body.1" >/dev/null 2>&1; then ok "row 34: bin-check body passes check-prose"
+    else fail "row 34: bin-check body fails check-prose"; fi
+    expect_has "bin-check body names the workflow job" "$(cat "$STUB_DIR/gh.body.1")" 'static-guards'
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    seed_class url-class phpstan 70 U1 U2
+    jq -nc '{thread_id: "U3", class_key: "url-class", pr: 70, url: "https://evil.example/x", path: "a.php", line: 1, resolved: false}' \
+        >> "$STATE/assignments.jsonl"
+    fcs --dry-run
+    expect_lacks "row 34: a non-GitHub evidence URL is dropped" "$ALL" "evil.example"
+    expect_has "row 34: valid evidence rows stay" "$ALL" "discussion_r7001"
+}
+
+case_dry_run_prints_and_writes_nothing() {
+    new_fixture
+    fcs --dry-run
+    expect_has "would file line printed" "$OUT" "--- would file [maintenance] class-scan: Missing escape on output"
+    expect_eq "no gh write under --dry-run" 0 "$(count_lines gh.calls 'issue create')"
+    expect_has "dry run summary uses would_file" "$OUT" "would_file=1"
+    expect_has "dry run summary shows dry_run=1" "$OUT" "dry_run=1"
+}
+
+case_filing_failure_and_success() {
+    new_fixture
+    printf '2026-10-01T00:00:00Z\n' > "$STATE/watermark"
+    cp "$STATE/watermark" "$FX/watermark.before"
+    touch "$STUB_DIR/gh.create.fail"
+    fcs
+    expect_eq "row 35: issue create failure exits 1" 1 "$RC"
+    expect_same_file "row 35: watermark byte-identical" "$STATE/watermark" "$FX/watermark.before"
+    expect_has "row 35: DM says FAILED" "$(cat "$STUB_DIR/dm.txt")" "FAILED"
+    new_fixture
+    fcs
+    expect_eq "row 35: success exits 0" 0 "$RC"
+    expect_eq "row 35: success writes the watermark" "2026-10-12T10:00:00Z" "$(cat "$STATE/watermark")"
+    expect_has "row 35: DM says filed 1" "$(cat "$STUB_DIR/dm.txt")" "filed 1"
+    expect_has "success summary line" "$OUT" "summary mode=backfill dry_run=0 threads_new=5 filed=1"
+    expect_eq "success appends to runs.log" 1 "$(grep -c 'summary ' "$STATE/runs.log")"
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    local i
+    for i in $(seq 1 200); do seed_class "skipped-class-$i" none 80 "k$i-1" "k$i-2" "k$i-3"; done
+    fcs
+    local size
+    size="$(wc -c < "$STUB_DIR/dm.txt" | tr -d ' ')"
+    if [ "$size" -le 1800 ]; then ok "row 35: DM stdin is $size bytes for 200 skipped classes"; else fail "row 35: DM stdin is $size bytes"; fi
+    expect_has "row 35: DM is marked truncated" "$(cat "$STUB_DIR/dm.txt")" "[truncated]"
+}
+
+# 125 trusted threads on one PR give three classifier batches of 60.
+many_threads_fixture() {
+    jq -c '.data.repository.pullRequests.pageInfo.hasNextPage = false
+        | .data.repository.pullRequests.nodes = [
+            (.data.repository.pullRequests.nodes[0]
+             | .reviewThreads.pageInfo.hasNextPage = false
+             | .reviewThreads.nodes = [range(1; 126) as $i
+                 | {id: ("M\($i)"), isResolved: false, isOutdated: false, path: "ibl5/classes/Foo/Bar.php", line: 10,
+                    comments: {nodes: [{author: {login: "a-jay85", __typename: "User"}, body: "finding body \($i)",
+                                        url: "https://github.com/a-jay85/IBL5/pull/101#discussion_r\(1000 + $i)",
+                                        createdAt: "2026-10-10T09:00:00Z"}]}}])]' \
+        "$STUB_DIR/fx/pr-page-1.json" > "$STUB_DIR/fx/pr-page-1.tmp" && mv "$STUB_DIR/fx/pr-page-1.tmp" "$STUB_DIR/fx/pr-page-1.json"
+}
+
+case_batch_cap_holds_the_watermark() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    many_threads_fixture
+    printf '2026-10-01T00:00:00Z\n' > "$STATE/watermark"
+    cp "$STATE/watermark" "$FX/watermark.before"
+    XENV="FCS_MAX_BATCHES=1"
+    fcs
+    expect_eq "cap: run exits 0" 0 "$RC"
+    expect_has "cap: the cap is announced" "$ALL" "batch cap 1 reached"
+    expect_eq "cap: one classifier call" 1 "$(count_lines claude.calls call)"
+    expect_has "cap: the held watermark is announced" "$ALL" "watermark held"
+    expect_same_file "cap: watermark byte-identical" "$STATE/watermark" "$FX/watermark.before"
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    many_threads_fixture
+    printf '2026-10-01T00:00:00Z\n' > "$STATE/watermark"
+    XENV="FCS_MAX_BATCHES=3"
+    fcs
+    expect_eq "no cap: run exits 0" 0 "$RC"
+    expect_eq "no cap: three classifier calls" 3 "$(count_lines claude.calls call)"
+    expect_eq "no cap: watermark moves" "2026-10-12T10:00:00Z" "$(cat "$STATE/watermark")"
+}
+
+case_since_holds_the_watermark() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    printf '2026-09-01T00:00:00Z\n' > "$STATE/watermark"
+    cp "$STATE/watermark" "$FX/watermark.before"
+    fcs --since=2026-10-01
+    expect_eq "since: run exits 0" 0 "$RC"
+    expect_has "since: the held watermark is announced" "$ALL" "watermark held: --since"
+    expect_same_file "since: watermark byte-identical" "$STATE/watermark" "$FX/watermark.before"
+}
+
+case_table_row_cap() {
+    local fn rows out i
+    fn="$(sed -n '/^threads_table() {/,/^}/p' "$FCS")"
+    rows="["
+    for i in 1 2 3 4 5; do
+        rows="$rows{\"url\":\"https://github.com/a-jay85/IBL5/pull/$i#discussion_r$i\",\"pr\":$i,\"path\":\"a.php\",\"line\":$i,\"resolved\":false},"
+    done
+    rows="$rows{\"url\":\"https://example.com/bad\",\"pr\":9,\"path\":\"x\",\"line\":1,\"resolved\":false}]"
+    out="$(bash -c "clean_inline() { printf '%s' \"\$1\"; }; TABLE_ROW_CAP=3; REPO_SLUG=a-jay85/IBL5; $fn; threads_table '$rows'")"
+    expect_eq "cap: three rows listed" 3 "$(grep -c '^| \[thread\]' <<< "$out")"
+    expect_has "cap: the overflow counts valid rows only" "$out" "2 more threads are not listed here."
+}
+
+case_env_zero_and_dry_run_state_dir() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    local n
+    for n in FCS_CLASSIFY_TIMEOUT FCS_VERIFY_TIMEOUT FCS_MAX_BATCHES; do
+        XENV="$n=0"
+        fcs --dry-run
+        expect_eq "env: $n=0 exits 2" 2 "$RC"
+    done
+    XENV=""
+    rm -rf "$STATE"
+    fcs --dry-run
+    expect_eq "dry run on a missing state dir exits 0" 0 "$RC"
+    if [ -e "$STATE" ]; then fail "dry run created the state dir"; else ok "dry run does not create the state dir"; fi
+    expect_has "empty batch is logged" "$ALL" "the classifier assigned none of its"
+}
+
+case_dm_failure_keeps_exit_code() {
+    new_fixture
+    fcs
+    local ok_rc="$RC"
+    new_fixture
+    XENV="FCS_DM_BIN=/nonexistent/discord-dm"
+    fcs
+    expect_eq "a DM failure never changes the exit code" "$ok_rc" "$RC"
+}
+
+# ── Cases: launchd (Phase 7) ──────────────────────────────────────────────────
+case_print_schedule() {
+    new_fixture
+    XENV="HOME=/Users/fixture"
+    fcs --print-schedule
+    expect_eq "print-schedule exits 0" 0 "$RC"
+    expect_has "label" "$OUT" "<string>com.ibl5.finding-class-scan</string>"
+    expect_has "weekday 0" "$OUT" "<key>Weekday</key>"$'\n'$'\t\t'"<integer>0</integer>"
+    expect_has "hour 9" "$OUT" "<key>Hour</key>"$'\n'$'\t\t'"<integer>9</integer>"
+    expect_has "minute 15" "$OUT" "<key>Minute</key>"$'\n'$'\t\t'"<integer>15</integer>"
+    expect_has "row 37: PATH holds every binary dir" "$OUT" "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/fixture/.local/bin"
+    expect_has "HOME expanded" "$OUT" "<string>/Users/fixture</string>"
+    if grep -qE '[$]HOME|[$][{]|<string></string>' <<< "$OUT"; then fail "row 36: unexpanded variable or empty string in the plist"
+    else ok "row 36: no unexpanded variable or empty string in the plist"; fi
+    XENV="HOME="
+    fcs --print-schedule
+    expect_eq "print-schedule with empty HOME exits 2" 2 "$RC"
+    expect_absent "print-schedule creates nothing" "$FX/home/Library"
+}
+
+case_install_refused_outside_main() {
+    new_fixture
+    local main="$FX/main-repo" wt="$FX/linked-wt"
+    mkdir -p "$main/bin"
+    git -C "$main" init -q 2>/dev/null
+    cp "$FCS" "$main/bin/finding-class-scan"
+    git -C "$main" add -A
+    git -C "$main" -c user.name=t -c user.email=t@t commit -q -m init
+    git -C "$main" worktree add -q "$wt" -b linked 2>/dev/null
+    local rc=0 out
+    out="$(env HOME="$FX/home" FCS_STATE_DIR="$STATE" FCS_LAUNCHCTL_BIN="$STUBS/launchctl" STUB_DIR="$STUB_DIR" \
+        bash "$wt/bin/finding-class-scan" --install-schedule 2>&1)" || rc=$?
+    expect_eq "install from a non-main checkout exits 2" 2 "$rc"
+    expect_has "install names the main checkout" "$out" "main checkout"
+    expect_eq "install never reached launchctl" 0 "$(count_lines launchctl.log bootstrap)"
+}
+
+case_verify_schedule() {
+    new_fixture
+    XENV="STUB_LAUNCHCTL_WRITE=1"
+    fcs --verify-schedule
+    expect_eq "row 39: verify exits 0 on a summary line" 0 "$RC"
+    expect_has "row 39: prints fired ok" "$OUT" "fired ok"
+    expect_has "row 39: boots the job out" "$(cat "$STUB_DIR/launchctl.log")" "bootout"
+    expect_has "row 39: the label is a -verify- label" "$(cat "$STUB_DIR/launchctl.log")" "-verify-"
+    if ls "$STATE"/verify-*.plist >/dev/null 2>&1; then fail "row 39: verify plist left behind"; else ok "row 39: verify plist removed"; fi
+    local plist
+    plist="$(cat "$STUB_DIR/verify.plist.copy")"
+    expect_has "verify plist runs at load" "$plist" "RunAtLoad"
+    expect_has "verify plist is a dry run" "$plist" "--dry-run"
+    expect_lacks "verify plist has no calendar key" "$plist" "StartCalendarInterval"
+    new_fixture
+    XENV="FCS_VERIFY_TIMEOUT=3"
+    fcs --verify-schedule
+    expect_eq "row 39: verify timeout exits 1" 1 "$RC"
+    expect_has "row 39: timeout prints FAILED" "$OUT" "FAILED"
+    expect_has "row 39: timeout still boots out" "$(cat "$STUB_DIR/launchctl.log")" "bootout"
+}
+
+case_ci_wiring() {
+    if grep -qF 'bin/test-finding-class-scan' "$REPO_ROOT/.github/workflows/tests.yml"; then ok "row 41: harness wired into tests.yml"
+    else fail "row 41: harness not wired into tests.yml"; fi
+}
+
+# ── Live exercise (owner runs once before arming the schedule) ────────────────
+live_main() {
+    h_tmp LT
+    mkdir -p "$LT/bin" "$LT/state"
+    cat > "$LT/bin/gh" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$LT/gh.log"
+case "\$1 \$2" in
+    "api graphql"|"issue list"|"issue view") exec "$(command -v gh)" "\$@" ;;
+esac
+exit 1
+SH
+    chmod +x "$LT/bin/gh"
+    local out rc=0
+    out="$(GH_CMD="$LT/bin/gh" FCS_STATE_DIR="$LT/state" bash "$FCS" --dry-run --since="$(jq -rn 'now - 1209600 | strftime("%Y-%m-%d")')" 2>&1)" || rc=$?
+    echo "$out"
+    expect_eq "live dry-run exits 0" 0 "$rc"
+    expect_has "live summary line" "$out" "summary mode=backfill dry_run=1"
+    expect_lacks "live run made no issue create" "$(cat "$LT/gh.log")" "issue create"
+    expect_lacks "live run made no issue comment" "$(cat "$LT/gh.log")" "issue comment"
+}
+
+if [ "${1:-}" = "--live" ]; then
+    live_main
+else
+    for c in $(declare -F | awk '$3 ~ /^case_/ {print $3}'); do
+        # FCS_ONLY=<case_name> runs a single case, handy when debugging.
+        if [ -n "${FCS_ONLY:-}" ] && [ "$c" != "$FCS_ONLY" ]; then continue; fi
+        "$c"
+        if [ -n "${FCS_ONLY:-}" ]; then
+            printf -- '--- last run: rc=%s\n--- stdout\n%s\n--- stderr\n%s\n' "$RC" "$OUT" "$ERR" >&2
+        fi
+    done
+fi
+
+h_done

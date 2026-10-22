@@ -254,15 +254,6 @@ final class JsonRoundTripCache implements DatabaseCacheInterface
         return $this->get($key);
     }
 
-    public function acquireLock(string $key, int $timeoutSeconds): bool
-    {
-        return true;
-    }
-
-    public function releaseLock(string $key): void
-    {
-    }
-
     /**
      * @param array<mixed> $data
      */

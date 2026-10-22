@@ -21,7 +21,7 @@ $httpRequest = \Http\HttpRequest::fromGlobals();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
 $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 $validator = new \Draft\DraftValidator();
 $repository = new \Draft\DraftRepository($mysqli_db, $commonRepository);
 $processor = new \Draft\DraftProcessor();

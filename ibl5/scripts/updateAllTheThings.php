@@ -11,6 +11,11 @@ $documentRoot = isset($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT
     : '';
 require $documentRoot . '/ibl5/mainfile.php';
 
+// This script writes ibl_settings, ibl_schedule, and ibl_sim_dates and then
+// reads them back through Season in the same process. Turn the request-scoped
+// memo off (and drop anything already cached) so every Season build is fresh.
+\Season\SharedSeason::disable();
+
 // SECURITY: Redirect logged-out users to login
 if (!function_exists('is_user') || !is_user($user ?? '')) {
     $_SESSION['redirect_after_login'] = 'name=LeagueControlPanel'

@@ -48,7 +48,7 @@ def standard_review_depth(monkeypatch):
     import runner
     from harness.review import ReviewPhase
     monkeypatch.setattr(runner, "_review_phase_for",
-                        lambda llm, gh, copy, meta, log: ReviewPhase(llm, gh))
+                        lambda llm, gh, copy, meta, log, worktree=None: ReviewPhase(llm, gh, log=log, worktree=worktree))
 
 
 @pytest.fixture(autouse=True)

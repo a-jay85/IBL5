@@ -103,3 +103,22 @@ def test_cli_record_unknown_comment_id_writes_nothing(tmp_path):
                   f"--log={log}"])
     assert rc == 0
     assert log.read_text() == seeded
+
+
+def test_cli_record_forwards_origin_and_defaults_pre_existing(tmp_path):
+    verdicts = tmp_path / "verdicts.jsonl"
+    threads = tmp_path / "threads.jsonl"
+    _write_jsonl(verdicts, [
+        {"commentId": 11, "verdict": "FIX", "reason": "cached", "sha": "abc123", "origin": "same-run"},
+        {"commentId": 12, "verdict": "FIX", "reason": "old-shape line", "sha": "def456"},
+    ])
+    _write_jsonl(threads, [
+        {"commentId": 11, "score": 85, "agent": "B"},
+        {"commentId": 12, "score": 70, "agent": "A"},
+    ])
+    log = tmp_path / "o.jsonl"
+    rc = ol.main(["record", "--pr=12", f"--verdicts={verdicts}", f"--threads={threads}",
+                  f"--log={log}"])
+    assert rc == 0
+    events = ol.read_events(str(log))
+    assert [(e["findingId"], e["origin"]) for e in events] == [(11, "same-run"), (12, "pre-existing")]

@@ -553,7 +553,53 @@ ensure_tunnel() {
     return 1
 }
 
-# ── Run the generation agent in the temp dir; leaves payload.json on success ──
+# ── Assemble payload.json from model prose + script-owned game rows ──────────
+# The agent writes prose.json only. Structural fields (ids, scores, order) come
+# from roster-context.json, the mention line from mentions.json. Any
+# model-written payload.json is deleted first and never ships.
+assemble_payload() { # sim -> 0 ok | 1 prose missing/invalid | 2 game-key mismatch
+    local p="$WORKDIR/prose.json" c="$WORKDIR/roster-context.json" m="$WORKDIR/mentions.json"
+    ASSEMBLE_DETAIL=""
+    rm -f "$WORKDIR/payload.json" "$WORKDIR/payload.json.tmp"
+    if [ ! -f "$p" ] || ! "$SIM_RECAP_JQ_BIN" -e '
+          ([.intro_text, .outro_text, .recap_text] | all(type == "string" and length > 0))
+          and (.themes | type == "array")
+          and (.games | type == "object")
+          and ([.games[]] | all(type == "string" and length > 0))' "$p" >/dev/null 2>&1; then
+        ASSEMBLE_DETAIL="prose.json missing or malformed"
+        return 1
+    fi
+    ASSEMBLE_DETAIL="$("$SIM_RECAP_JQ_BIN" -r --slurpfile ctx "$c" '
+          ([$ctx[0].games[].key]) as $want | (.games | keys) as $got
+          | ($want - $got) as $miss | ($got - $want) as $extra
+          | if ($miss | length) == 0 and ($extra | length) == 0 then ""
+            else "missing=\($miss | join(",")) extra=\($extra | join(","))" end' "$p")" || return 1
+    [ -z "$ASSEMBLE_DETAIL" ] || return 2
+    "$SIM_RECAP_JQ_BIN" --slurpfile ctx "$c" --slurpfile mm "$m" '
+        def nm($n; $id): $n // ("team " + ($id | tostring));
+        def mention($n): (($mm[0] // {})[$n // ""]) as $s
+            | if ($s | type) == "string" and $s != "" then "<@" + $s + ">" else empty end;
+        . as $pr
+        | {intro_text, outro_text, recap_text, themes,
+           games: [$ctx[0].games | to_entries[] | .key as $i | .value as $g
+             | ([mention($g.visitor_name), mention($g.home_name)]) as $ml
+             | {season_year: $g.season_year, game_date: $g.game_date,
+                visitor_teamid: $g.visitor_teamid, home_teamid: $g.home_teamid,
+                game_of_that_day: $g.game_of_that_day, box_id: $g.box_id,
+                sort_order: ($i + 1),
+                recap_text: ("**\(nm($g.visitor_name; $g.visitor_teamid)) \($g.visitor_score) @ \(nm($g.home_name; $g.home_teamid)) \($g.home_score)**\n"
+                    + (if ($ml | length) > 0 then ($ml | join(" · ")) + "\n\n" else "\n" end)
+                    + $pr.games[$g.key])}]}' "$p" > "$WORKDIR/payload.json.tmp" \
+        || { ASSEMBLE_DETAIL="jq assembly failed"; return 1; }
+    mv "$WORKDIR/payload.json.tmp" "$WORKDIR/payload.json"
+    "$SIM_RECAP_JQ_BIN" -r --slurpfile mm "$m" '
+        $mm[0] as $mm | .games[] | select(.recap_text | split("\n")[1] == "")
+        | "sim recap: game sort_order \(.sort_order) has no Discord mention for either team"' \
+        "$WORKDIR/payload.json" 2>/dev/null | while IFS= read -r w; do log "WARNING: $w"; done
+    return 0
+}
+
+# ── Run the generation agent in the temp dir; leaves prose.json on success ──
 run_agent() { # sim prompt
     local sim="$1" prompt="$2"
     # --allowedTools narrows what runs WITHOUT a prompt; it is NOT a sandbox, and
@@ -642,11 +688,15 @@ generate() { # sim
         park "$sim" usage_limit "$(claude_reset_epoch "$(cat "$WORKDIR/agent.json" 2>/dev/null)")"; return 0
     fi
 
-    if [ ! -f "$WORKDIR/payload.json" ] || \
-       ! "$SIM_RECAP_JQ_BIN" -e '(.games | type == "array") and (.games | length > 0)' \
-            "$WORKDIR/payload.json" >/dev/null 2>&1; then
+    local asm_rc
+    assemble_payload "$sim"; asm_rc=$?
+    if [ "$asm_rc" -ne 0 ]; then
         # A claude timeout (rc 124) lands here too and counts as flaky.
-        log "sim $sim: agent produced no valid payload.json (rc=$agent_rc) — parking"
+        if [ "$asm_rc" -eq 2 ]; then
+            log "sim $sim: prose.json game keys do not match the fact sheet ($ASSEMBLE_DETAIL) — parking"
+        else
+            log "sim $sim: agent produced no valid prose.json (rc=$agent_rc; $ASSEMBLE_DETAIL) — parking"
+        fi
         park "$sim" flaky; return 0
     fi
 
@@ -742,8 +792,8 @@ dry_run() {
 
     run_agent "$sim" "$prompt"
 
-    if [ ! -f "$WORKDIR/payload.json" ]; then
-        log "dry-run sim $sim: agent produced no payload.json"
+    if ! assemble_payload "$sim"; then
+        log "dry-run sim $sim: could not assemble payload.json ($ASSEMBLE_DETAIL)"
         exit 1
     fi
     # stdout carries the complete generated document, pretty-printed: a human

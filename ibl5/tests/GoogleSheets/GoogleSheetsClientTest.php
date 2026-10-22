@@ -107,6 +107,35 @@ class GoogleSheetsClientTest extends TestCase
         self::assertSame($rows, $body['data'][0]['values']);
     }
 
+    public function testOverwriteTabClearsThenBatchWritesHeaderAndRowsRaw(): void
+    {
+        $this->http->queue(200, []);
+        $this->http->queue(200, []);
+
+        $rows = [['Name'], ['Jordan']];
+        $this->client->overwriteTab(self::TOKEN, self::SHEET_ID, 'Players', $rows);
+
+        // The tab is cleared past the new data and the header plus rows are written RAW in one batch.
+        self::assertCount(2, $this->http->requests);
+        self::assertStringEndsWith(':clear', $this->http->requests[1]['url']);
+        $body = $this->body(0);
+        self::assertSame('RAW', $body['valueInputOption']);
+        self::assertSame($rows, $body['data'][0]['values']);
+    }
+
+    public function testForbiddenPermissionDeniedIsNotTreatedAsMissingSheet(): void
+    {
+        $this->http->queue(403, ['error' => ['code' => 403, 'status' => 'PERMISSION_DENIED', 'message' => 'Google Sheets API has not been used in project.']]);
+
+        try {
+            $this->client->ensureTab(self::TOKEN, self::SHEET_ID, 'Players', 2000, 64);
+            self::fail('Expected GoogleApiException');
+        } catch (GoogleApiException $e) {
+            self::assertNotInstanceOf(GoogleSheetMissingException::class, $e);
+            self::assertSame(403, $e->status);
+        }
+    }
+
     public function testOverwriteTabChunksRowsAboveLimit(): void
     {
         $this->http->queue(200, []);

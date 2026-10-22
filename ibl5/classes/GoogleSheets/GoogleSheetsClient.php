@@ -175,7 +175,7 @@ class GoogleSheetsClient
         $status = $response['status'];
         if ($status < 200 || $status >= 300) {
             $e = GoogleApiException::fromResponse($status, $response['body']);
-            if ($notFoundMeansMissing && ($status === 404 || ($status === 403 && $e->reason === 'PERMISSION_DENIED'))) {
+            if ($notFoundMeansMissing && $status === 404) {
                 throw new GoogleSheetMissingException($e->getMessage(), $e->status, $e->reason);
             }
             throw $e;

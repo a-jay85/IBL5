@@ -130,6 +130,15 @@ test.describe('Mobile nav interaction tests', () => {
     await expect(page.locator('#nav-overlay')).toHaveCSS('opacity', '1');
   });
 
+  test('closing inside the open stagger window leaves no stagger class', async ({ page }) => {
+    // Fake clock so the 50ms stagger timer fires only after the close.
+    await page.clock.install();
+    await openMobileMenu(page);
+    await page.keyboard.press('Escape');
+    await page.clock.runFor(100);
+    await expect(page.locator('#nav-mobile-menu')).not.toHaveClass(/\bmobile-menu-open\b/);
+  });
+
   test('league switcher present in mobile menu', async ({ page }) => {
     await openMobileMenu(page);
     await page.getByRole('button', { name: /season/i }).click();

@@ -62,9 +62,9 @@
             }
         }, { signal: signal });
 
-        var overlayHideTimer = null;
+        var menuStaggerTimer;
         var overlayShowTimer;
-        var overlayHideTimer;
+        var overlayHideTimer = null;
 
         function openMenu() {
             // Cancel any pending overlay hide from a recent closeMenu()
@@ -76,14 +76,12 @@
             mobileMenu.classList.add('translate-x-0');
 
             // Add class for staggered animations
-            setTimeout(function() {
+            menuStaggerTimer = setTimeout(function() {
                 mobileMenu.classList.add('mobile-menu-open');
             }, 50);
 
             // Show overlay with fade
             if (menuOverlay) {
-                // A reopen inside the close fade must cancel the pending hide.
-                clearTimeout(overlayHideTimer);
                 menuOverlay.classList.remove('hidden');
                 overlayShowTimer = setTimeout(function() {
                     menuOverlay.classList.add('nav-overlay--visible');
@@ -99,7 +97,8 @@
             // A second close within 300 ms must not orphan the first timer
             clearTimeout(overlayHideTimer);
 
-            // Remove stagger animation class first
+            // Remove stagger animation class first; a close inside the 50ms open window must cancel the pending add.
+            clearTimeout(menuStaggerTimer);
             mobileMenu.classList.remove('mobile-menu-open');
 
             // Slide out menu

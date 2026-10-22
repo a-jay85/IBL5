@@ -13,6 +13,8 @@
     const MOBILE_BREAKPOINT = 768;
     /** Tables where names are always abbreviated (then selectively restored if they fit) */
     const COMPACT_TABLE_SELECTOR = '.stat-table, .trading-roster';
+    /** Tables abbreviated (then selectively restored) only when full names overflow the page */
+    const OVERFLOW_COMPACT_SELECTOR = '.leaderboards-page .ibl-data-table';
     /** Tables abbreviated on mobile only (not on desktop) */
     const MOBILE_COMPACT_SELECTOR = '.fa-table';
 
@@ -91,8 +93,40 @@
         }
     }
 
+    /**
+     * True when a table is wider than the content box it sits in.
+     * Measures against the scroll wrapper's parent, since the wrapper and
+     * container carry inline widths from responsive-tables.js.
+     */
+    function tableOverflows(table) {
+        var box = (table.closest('.table-scroll-wrapper') || table).parentElement;
+        if (!box) return false;
+        var s = window.getComputedStyle(box);
+        var available = box.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight);
+        return table.getBoundingClientRect().width > available + 2;
+    }
+
+    /** Put full names back in overflow-compact tables, then return the ones that still overflow. */
+    function findOverflowingTables() {
+        var tables = document.querySelectorAll(OVERFLOW_COMPACT_SELECTOR);
+        var overflowing = [];
+
+        for (var i = 0; i < tables.length; i++) {
+            var links = tables[i].querySelectorAll('a[href*="pid="][data-full-name]');
+            for (var j = 0; j < links.length; j++) {
+                setLinkText(links[j], findTextNode(links[j]), links[j].dataset.fullName);
+            }
+            if (tableOverflows(tables[i])) {
+                overflowing.push(tables[i]);
+            }
+        }
+
+        return overflowing;
+    }
+
     function processPlayerNames() {
         var isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+        var overflowingTables = findOverflowingTables();
 
         var nameLinks = document.querySelectorAll(
             '.ibl-data-table a[href*="pid="]:not([data-no-abbreviate]), .dc-card__name[href*="pid="]'
@@ -110,7 +144,8 @@
                 link.dataset.fullName = textNode ? textNode.textContent.trim() : link.textContent.trim();
             }
 
-            var inCompactTable = link.closest(COMPACT_TABLE_SELECTOR) !== null;
+            var inCompactTable = link.closest(COMPACT_TABLE_SELECTOR) !== null
+                || overflowingTables.indexOf(link.closest(OVERFLOW_COMPACT_SELECTOR)) !== -1;
             var inMobileCompactTable = link.closest(MOBILE_COMPACT_SELECTOR) !== null;
             var shouldAbbreviate = isMobile ? (inCompactTable || inMobileCompactTable) : inCompactTable;
             var newName = shouldAbbreviate ? abbreviateName(link.dataset.fullName) : link.dataset.fullName;
@@ -275,6 +310,13 @@
         processTeamNames();
         processScheduleTeamNames();
         processLeaderRunnerNames();
+
+        // Shorter names shrink the table, so resize its scroll box to match;
+        // otherwise the box keeps its old width and the right-edge shadow
+        // floats past the table
+        if (typeof window.IBL_refreshResponsiveTables === 'function') {
+            window.IBL_refreshResponsiveTables();
+        }
     }
 
     // Debounce resize handling

@@ -347,35 +347,12 @@ class WaiversProcessorTest extends TestCase
         $this->assertSame('600', $contract);
     }
     
-    public function testGetWaiverWaitTimeReturnsEmptyWhenCleared(): void
+    public function testGetWaiverWaitTimeNoLongerExists(): void
     {
-        $dropTime = time() - 90000; // More than 24 hours ago
-        $currentTime = time();
-        
-        $waitTime = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-        $this->assertSame('', $waitTime);
+        $this->assertFalse(method_exists(\Waivers\WaiversProcessor::class, 'getWaiverWaitTime'));
+        $this->assertFalse(method_exists(\Waivers\Contracts\WaiversProcessorInterface::class, 'getWaiverWaitTime'));
     }
-    
-    public function testGetWaiverWaitTimeCalculatesRemainingTime(): void
-    {
-        $currentTime = time();
-        $dropTime = $currentTime - 3600; // 1 hour ago
-        
-        $waitTime = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-        $this->assertStringContainsString('Clears in', $waitTime);
-        $this->assertStringContainsString('23 h', $waitTime); // Should be 23 hours remaining
-    }
-    
-    public function testGetWaiverWaitTimeWithMinutes(): void
-    {
-        $currentTime = time();
-        $dropTime = $currentTime - 82800; // 23 hours ago
-        
-        $waitTime = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-        $this->assertStringContainsString('Clears in', $waitTime);
-        $this->assertStringContainsString('1 h', $waitTime); // Should be 1 hour remaining
-    }
-    
+
     public function testDetermineContractDataForNewContract(): void
     {
         $playerData = $this->buildPlayerRow(teamid: 0, exp: 8);

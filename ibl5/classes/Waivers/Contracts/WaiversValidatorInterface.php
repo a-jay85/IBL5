@@ -48,25 +48,29 @@ interface WaiversValidatorInterface
      * salary cap constraints, and player salary.
      *
      * @param int|null $playerID Player ID being added (null or 0 is invalid)
-     * @param int $healthyRosterSlots Number of healthy roster slots available (0-15)
+     * @param int $openRosterSlots Open roster spots counting injured players (15 minus every rostered player)
+     * @param int $healthyRosterSlots Healthy roster slots available (0-15); drives only the 12-healthy hard-cap rule
      * @param int $totalSalary Current team salary in thousands
      * @param int $playerSalary Salary of player being added in thousands
+     * @param int $veteranMinimum Veteran minimum for this player's own experience
      * @return ValidationResult Success if add is valid; failure with message if not
      *
      * **Business Rules:**
      * - Player ID must be a valid positive integer
-     * - Must have at least 1 healthy roster slot available
+     * - Must have at least 1 open roster slot (injured players count against the roster)
      * - If 12+ healthy players: cannot exceed hard cap with signing
-     * - If under 12 healthy players but over hard cap: can only sign vet min ($103k)
+     * - If under 12 healthy players but over hard cap: can only sign at the player's own veteran minimum
      *
      * **Constants Used:**
      * - League::HARD_CAP_MAX - Maximum salary cap limit
-     * - Veteran minimum threshold: $103k
+     * - Veteran minimum: the player's own, passed in as $veteranMinimum
      */
     public function validateAdd(
         ?int $playerID,
+        int $openRosterSlots,
         int $healthyRosterSlots,
         int $totalSalary,
-        int $playerSalary
+        int $playerSalary,
+        int $veteranMinimum
     ): ValidationResult;
 }

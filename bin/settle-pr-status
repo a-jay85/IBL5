@@ -1,0 +1,208 @@
+#!/bin/bash
+
+# Resolves a PR head SHA and base branch from the API, asks bin/check-pr-checks-green for
+# the verdict, and writes it as the `All checks settled` commit status. This is the only
+# code that writes that status; .github/workflows/all-checks-settled.yml runs it once per
+# sibling workflow completion (ADR-0149 addendum). The verdict logic (V1-V5) lives in
+# bin/check-pr-checks-green and is never re-implemented here.
+#
+# Exit codes: 0 = posted, or nothing to settle, or dry-run printed; 2 = usage or API error.
+
+set -euo pipefail
+
+usage() {
+    cat <<'EOF_USAGE'
+Usage: bin/settle-pr-status --repo=<owner/repo> (--head-sha=<40-hex> | --pr=<n>) [options]
+  --context=<name>          Status context (default: All checks settled)
+  --target-url=<url>        Status link (the aggregator run)
+  --self=<csv> --ignore=<csv> --anchor=<csv> --ignore-workflows=<csv>   passed through verbatim
+  --dry-run                 Print the payload and `would POST ...`; never call the statuses API
+Exit: 0 = posted, or nothing to settle (stale event, no open PR, closed PR), or dry-run printed
+      2 = usage error, API read error, POST failure (the job turns red; no status is written)
+
+Every value flag takes the --key=value form; the space form is an unknown flag.
+Every SHA and base ref comes from the API, never from a flag or event field.
+
+Environment:
+  GH_API_CMD       Override the API command (default "gh api"). Tests point it at a shim.
+  IBL5_GH_RETRY_DELAYS  Sleeps between retries of an API read (default "2 5": 3 attempts). Unset and empty both select the default.
+EOF_USAGE
+}
+
+REPO=""
+HEAD_SHA=""
+HEAD_SHA_SET=0
+PR=""
+PR_SET=0
+CONTEXT="All checks settled"
+TARGET_URL=""
+SELF=""
+IGNORE=""
+ANCHOR=""
+IGNORE_WF=""
+DRY_RUN=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --help|-h)            usage; exit 0 ;;
+        --repo=*)             REPO="${arg#--repo=}" ;;
+        --head-sha=*)         HEAD_SHA="${arg#--head-sha=}"; HEAD_SHA_SET=1 ;;
+        --pr=*)               PR="${arg#--pr=}"; PR_SET=1 ;;
+        --context=*)          CONTEXT="${arg#--context=}" ;;
+        --target-url=*)       TARGET_URL="${arg#--target-url=}" ;;
+        --self=*)             SELF="${arg#--self=}" ;;
+        --ignore=*)           IGNORE="${arg#--ignore=}" ;;
+        --anchor=*)           ANCHOR="${arg#--anchor=}" ;;
+        --ignore-workflows=*) IGNORE_WF="${arg#--ignore-workflows=}" ;;
+        --dry-run)            DRY_RUN=1 ;;
+        --*)
+            echo "unknown flag: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            echo "unexpected argument: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if ! [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || [[ "$REPO" == *..* ]]; then
+    echo "invalid --repo: '$REPO' (want owner/repo)" >&2
+    usage >&2
+    exit 2
+fi
+if [ "$HEAD_SHA_SET" -eq 1 ] && [ "$PR_SET" -eq 1 ]; then
+    echo "usage error: give exactly one of --head-sha or --pr, not both" >&2
+    usage >&2
+    exit 2
+fi
+if [ "$HEAD_SHA_SET" -eq 0 ] && [ "$PR_SET" -eq 0 ]; then
+    echo "usage error: one of --head-sha or --pr is required" >&2
+    usage >&2
+    exit 2
+fi
+if [ "$HEAD_SHA_SET" -eq 1 ] && ! [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "invalid --head-sha: '$HEAD_SHA' (want 40 lowercase hex)" >&2
+    usage >&2
+    exit 2
+fi
+if [ "$PR_SET" -eq 1 ] && ! [[ "$PR" =~ ^[0-9]{1,7}$ ]]; then
+    echo "invalid --pr: '$PR' (want 1-7 digits)" >&2
+    usage >&2
+    exit 2
+fi
+
+GH_API_CMD="${GH_API_CMD:-gh api}"
+export GH_API_CMD
+# shellcheck source=bin/lib/gh-retry.sh
+. "$(dirname "$0")/lib/gh-retry.sh"
+# Read budget for the settle job: 3 attempts, 2s then 5s (ADR-0149 addendum 2026-10-22).
+# Exported so bin/check-pr-checks-green, run below, inherits the same budget.
+: "${IBL5_GH_RETRY_DELAYS:=2 5}"
+export IBL5_GH_RETRY_DELAYS
+
+# api_get <path> — GET through the GH_API_CMD seam, retried by gh_retry_json (transient errors,
+# empty or non-JSON bodies); a read that still fails exits 2 (no status written).
+# Every interpolated value is regex-validated above or is a number read back from the API.
+# stdout only: a warning on stderr must never land inside the JSON being parsed.
+api_get() {
+    local out err errfile
+    errfile="$(mktemp)"
+    if ! out="$(gh_retry_json bash -c "$GH_API_CMD \"$1\"" 2>"$errfile")"; then
+        # errfile holds every attempt's stderr; the last line is the error that ended the job.
+        err="$(tail -n 1 "$errfile")"
+        rm -f "$errfile"
+        echo "API read error: $1: ${err:-${out%%$'\n'*}}" >&2
+        exit 2
+    fi
+    # Replay retry notices so the job log shows a read that needed more than one attempt.
+    cat "$errfile" >&2
+    rm -f "$errfile"
+    printf '%s' "$out"
+}
+
+if [ "$HEAD_SHA_SET" -eq 1 ]; then
+    SHA="$HEAD_SHA"
+    assoc="$(api_get "repos/$REPO/commits/$SHA/pulls")"
+    # Fail closed: only a JSON array may reach the NOTHING exit below.
+    if ! jq -e 'type == "array"' <<< "$assoc" >/dev/null 2>&1; then
+        echo "API read error: repos/$REPO/commits/$SHA/pulls: body is not a JSON array" >&2
+        exit 2
+    fi
+    if ! N="$(jq -er --arg r "$REPO" '
+            [.[] | select(.state == "open" and .base.repo.full_name == $r)]
+            | (map(select(.base.ref == "master" or .base.ref == "develop"))[0] // .[0])
+            | .number // empty' <<< "$assoc" 2>/dev/null)" || ! [[ "$N" =~ ^[0-9]{1,7}$ ]]; then
+        echo "NOTHING: no open PR has head $SHA"
+        exit 0
+    fi
+    pull="$(api_get "repos/$REPO/pulls/$N")"
+    if ! CUR="$(jq -er '.head.sha' <<< "$pull" 2>/dev/null)"; then
+        echo "API read error: repos/$REPO/pulls/$N: no head.sha" >&2
+        exit 2
+    fi
+    if [ "$CUR" != "$SHA" ]; then
+        echo "STALE: event head $SHA superseded by $CUR; not posting"
+        exit 0
+    fi
+    if ! BASE="$(jq -er '.base.ref' <<< "$pull" 2>/dev/null)"; then
+        echo "API read error: repos/$REPO/pulls/$N: no base.ref" >&2
+        exit 2
+    fi
+else
+    N="$PR"
+    pull="$(api_get "repos/$REPO/pulls/$N")"
+    if ! PR_STATE="$(jq -er '.state' <<< "$pull" 2>/dev/null)"; then
+        echo "API read error: repos/$REPO/pulls/$N: no state" >&2
+        exit 2
+    fi
+    if [ "$PR_STATE" != "open" ]; then
+        echo "NOTHING: PR $N is $PR_STATE"
+        exit 0
+    fi
+    if ! SHA="$(jq -er '.head.sha' <<< "$pull" 2>/dev/null)" \
+            || ! BASE="$(jq -er '.base.ref' <<< "$pull" 2>/dev/null)"; then
+        echo "API read error: repos/$REPO/pulls/$N: no head.sha/base.ref" >&2
+        exit 2
+    fi
+    if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+        echo "API read error: repos/$REPO/pulls/$N: head.sha is not 40 hex" >&2
+        exit 2
+    fi
+fi
+
+RC=0
+OUT="$("$(dirname "$0")/check-pr-checks-green" --repo="$REPO" --sha="$SHA" --base-ref="$BASE" \
+    --self="$SELF" --ignore="$IGNORE" --anchor="$ANCHOR" --ignore-workflows="$IGNORE_WF" 2>&1)" || RC=$?
+
+case "$RC" in
+    0) STATE=success ;;
+    1) STATE=failure ;;
+    3) STATE=pending ;;
+    *)
+        printf '%s\n' "$OUT" >&2
+        echo "check-pr-checks-green exited $RC; not posting" >&2
+        exit 2
+        ;;
+esac
+
+line="${OUT%%$'\n'*}"
+DESC="${line:0:140}"
+
+PAYLOAD="$(jq -n --arg state "$STATE" --arg context "$CONTEXT" --arg description "$DESC" \
+    --arg target_url "$TARGET_URL" \
+    '{state: $state, context: $context, description: $description, target_url: $target_url}')"
+
+if [ "$DRY_RUN" -eq 1 ]; then
+    printf '%s\n' "$PAYLOAD"
+    echo "would POST repos/$REPO/statuses/$SHA"
+    exit 0
+fi
+
+if ! printf '%s' "$PAYLOAD" | bash -c "$GH_API_CMD -X POST \"repos/$REPO/statuses/$SHA\" --input -" >/dev/null; then
+    echo "POST repos/$REPO/statuses/$SHA failed" >&2
+    exit 2
+fi
+echo "posted $STATE to $CONTEXT on $SHA (PR $N): $DESC"

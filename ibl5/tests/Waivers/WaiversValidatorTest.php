@@ -59,8 +59,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             null,  // no player selected
             5,     // healthy roster slots
+            5,  // healthy slots (same as open: no injuries)
             6000,  // total salary
-            100    // player salary
+            100,  // player salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertFalse($result->isValid());
@@ -74,8 +76,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             0,     // invalid player ID
             5,     // healthy roster slots
+            5,  // healthy slots (same as open: no injuries)
             6000,  // total salary
-            100    // player salary
+            100,  // player salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertFalse($result->isValid());
@@ -89,8 +93,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             0,     // no healthy roster slots available
+            0,  // healthy slots (same as open: no injuries)
             6000,  // total salary
-            100    // player salary
+            100,  // player salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertFalse($result->isValid());
@@ -104,8 +110,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             3,     // 12 healthy players (4-1)
+            3,  // healthy slots (same as open: no injuries)
             6800,  // current salary
-            300    // player salary (would put over cap)
+            300,  // player salary (would put over cap)
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertFalse($result->isValid());
@@ -120,8 +128,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             3,     // 12 healthy players
+            3,  // healthy slots (same as open: no injuries)
             6000,  // current salary
-            100    // player salary (stays under cap)
+            100,  // player salary (stays under cap)
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertTrue($result->isValid());
@@ -133,8 +143,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // under 12 healthy players
+            5,  // healthy slots (same as open: no injuries)
             6980,  // current salary
-            400    // player salary above vet min (103), would put over cap
+            400,  // player salary above vet min (103), would put over cap
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertFalse($result->isValid());
@@ -149,8 +161,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // under 12 healthy players
+            5,  // healthy slots (same as open: no injuries)
             7100,  // over hard cap
-            103    // vet min salary
+            103,  // vet min salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertTrue($result->isValid());
@@ -162,8 +176,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // healthy roster slots available
+            5,  // healthy slots (same as open: no injuries)
             6000,  // total salary
-            500    // player salary
+            500,  // player salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertTrue($result->isValid());
@@ -172,11 +188,11 @@ class WaiversValidatorTest extends TestCase
 
     public function testResultsAreIndependentAcrossCalls(): void
     {
-        $errorResult = $this->validator->validateAdd(null, 5, 6000, 100);
+        $errorResult = $this->validator->validateAdd(null, 5, 5, 6000, 100, \League\ContractRules::getVeteranMinimumSalary(10));
         $this->assertFalse($errorResult->isValid());
         $this->assertNotSame([], $errorResult->getErrors());
 
-        $successResult = $this->validator->validateAdd(123, 5, 6000, 100);
+        $successResult = $this->validator->validateAdd(123, 5, 5, 6000, 100, \League\ContractRules::getVeteranMinimumSalary(10));
         $this->assertTrue($successResult->isValid());
         $this->assertSame([], $successResult->getErrors());
     }
@@ -186,8 +202,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // healthy roster slots
+            5,  // healthy slots (same as open: no injuries)
             6900,  // current salary
-            100    // player salary brings to exactly 7000
+            100,  // player salary brings to exactly 7000
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertTrue($result->isValid());
@@ -211,8 +229,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             0,     // Zero player ID
             5,     // healthy roster slots
+            5,  // healthy slots (same as open: no injuries)
             6000,  // total salary
-            100    // player salary
+            100,  // player salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertFalse($result->isValid());
@@ -228,10 +248,12 @@ class WaiversValidatorTest extends TestCase
         // Negative player ID passes the null/zero check but is invalid
         // The validator only checks for null and 0
         $result = $this->validator->validateAdd(
-            -1,    // Negative player ID
+            -1,  // Negative player ID
             5,     // healthy roster slots
+            5,  // healthy slots (same as open: no injuries)
             6000,  // total salary
-            100    // player salary
+            100,  // player salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         // Currently passes because validator doesn't check for negative
@@ -246,8 +268,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             999999999,  // Large player ID
             5,          // healthy roster slots
+            5,  // healthy slots (same as open: no injuries)
             6000,       // total salary
-            100         // player salary
+            100,         // player salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertTrue($result->isValid());
@@ -265,8 +289,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             0,     // exactly 0 healthy roster slots
+            0,  // healthy slots (same as open: no injuries)
             6000,  // total salary
-            100    // player salary
+            100,  // player salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertFalse($result->isValid());
@@ -282,8 +308,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             1,     // exactly 1 healthy roster slot
+            1,  // healthy slots (same as open: no injuries)
             6000,  // total salary
-            100    // player salary
+            100,  // player salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertTrue($result->isValid());
@@ -298,8 +326,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             3,     // 3 healthy roster slots = 12 healthy players
+            3,  // healthy slots (same as open: no injuries)
             6900,  // current salary
-            200    // player salary (would put at 7100)
+            200,  // player salary (would put at 7100)
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertFalse($result->isValid());
@@ -316,8 +346,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             4,     // 4 healthy roster slots = 11 healthy players
+            4,  // healthy slots (same as open: no injuries)
             7100,  // over hard cap
-            103    // vet min salary
+            103,  // vet min salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertTrue($result->isValid());
@@ -332,8 +364,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             4,     // 4 healthy roster slots = 11 healthy players
+            4,  // healthy slots (same as open: no injuries)
             7100,  // over hard cap
-            200    // non-vet-min salary
+            200,  // non-vet-min salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertFalse($result->isValid());
@@ -355,8 +389,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,            // valid player ID
             5,              // healthy roster slots
+            5,  // healthy slots (same as open: no injuries)
             $hardCap - 100, // current salary
-            100             // player salary brings to exactly hard cap
+            100,             // player salary brings to exactly hard cap
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertTrue($result->isValid());
@@ -371,8 +407,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,       // valid player ID
             5,         // healthy roster slots (under 12 players)
+            5,  // healthy slots (same as open: no injuries)
             $hardCap,  // at hard cap
-            103        // vet min salary
+            103,        // vet min salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         // Vet min signings allowed when over cap if under 12 players
@@ -387,8 +425,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // healthy roster slots
+            5,  // healthy slots (same as open: no injuries)
             7100,  // over hard cap
-            103    // exactly vet min
+            103,  // exactly vet min
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertTrue($result->isValid());
@@ -402,8 +442,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // healthy roster slots
+            5,  // healthy slots (same as open: no injuries)
             7100,  // over hard cap
-            104    // one over vet min
+            104,  // one over vet min
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertFalse($result->isValid());
@@ -417,8 +459,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // healthy roster slots
+            5,  // healthy slots (same as open: no injuries)
             6000,  // total salary
-            0      // zero player salary
+            0,      // zero player salary
+            \League\ContractRules::getVeteranMinimumSalary(10)  // 10+ year veteran minimum
         );
 
         $this->assertTrue($result->isValid());
@@ -508,7 +552,7 @@ class WaiversValidatorTest extends TestCase
     public function testValidateDropWithNegativeRosterSlotsSucceeds(): void
     {
         $result = $this->validator->validateDrop(
-            -1,    // negative roster slots (invalid but not checked)
+            -1,  // negative roster slots (invalid but not checked)
             7500   // over hard cap
         );
 
@@ -526,11 +570,11 @@ class WaiversValidatorTest extends TestCase
     public function testErrorsClearedBetweenValidations(): void
     {
         // First validation fails
-        $failedResult = $this->validator->validateAdd(null, 5, 6000, 100);
+        $failedResult = $this->validator->validateAdd(null, 5, 5, 6000, 100, \League\ContractRules::getVeteranMinimumSalary(10));
         $this->assertNotSame([], $failedResult->getErrors());
 
         // Second validation succeeds — completely independent result
-        $successResult = $this->validator->validateAdd(123, 5, 6000, 100);
+        $successResult = $this->validator->validateAdd(123, 5, 5, 6000, 100, \League\ContractRules::getVeteranMinimumSalary(10));
         $this->assertSame([], $successResult->getErrors());
     }
 
@@ -540,7 +584,7 @@ class WaiversValidatorTest extends TestCase
     public function testValidateDropClearsAddErrors(): void
     {
         // Add validation fails
-        $addResult = $this->validator->validateAdd(null, 5, 6000, 100);
+        $addResult = $this->validator->validateAdd(null, 5, 5, 6000, 100, \League\ContractRules::getVeteranMinimumSalary(10));
         $this->assertNotSame([], $addResult->getErrors());
 
         // Drop validation succeeds — independent result, no cross-contamination
@@ -553,8 +597,8 @@ class WaiversValidatorTest extends TestCase
      */
     public function testMultipleValidationsOnlyCaptureLatestErrors(): void
     {
-        $this->validator->validateAdd(null, 5, 6000, 100);
-        $result2 = $this->validator->validateAdd(123, 0, 6000, 100);
+        $this->validator->validateAdd(null, 5, 5, 6000, 100, \League\ContractRules::getVeteranMinimumSalary(10));
+        $result2 = $this->validator->validateAdd(123, 0, 0, 6000, 100, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Each result is independent — only the second failure's error
         $this->assertCount(1, $result2->getErrors());
@@ -576,8 +620,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,
             $healthySlots,
+            $healthySlots,
             $totalSalary,
-            $playerSalary
+            $playerSalary,
+            \League\ContractRules::getVeteranMinimumSalary(10)
         );
 
         $this->assertSame($expectedResult, $result->isValid());
@@ -610,8 +656,10 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,
             $healthySlots,
+            $healthySlots,
             $totalSalary,
-            $playerSalary
+            $playerSalary,
+            \League\ContractRules::getVeteranMinimumSalary(10)
         );
 
         $this->assertSame($expectedResult, $result->isValid());
@@ -634,7 +682,7 @@ class WaiversValidatorTest extends TestCase
     public function testOverCapAllowsExactVetMinThreshold(): void
     {
         $vetMin = \League\ContractRules::getVeteranMinimumSalary(10);
-        $result = $this->validator->validateAdd(100, 5, League::HARD_CAP_MAX + 1, $vetMin);
+        $result = $this->validator->validateAdd(100, 5, 5, League::HARD_CAP_MAX + 1, $vetMin, \League\ContractRules::getVeteranMinimumSalary(10));
         $this->assertTrue($result->isValid());
     }
 
@@ -647,13 +695,13 @@ class WaiversValidatorTest extends TestCase
         $healthyRosterSlots = 3; // < 4, so the hard-cap branch applies
         $playerSalary = 200;
 
-        $currentYearBasis = $this->validator->validateAdd(42, $healthyRosterSlots, 6861, $playerSalary);
+        $currentYearBasis = $this->validator->validateAdd(42, $healthyRosterSlots, $healthyRosterSlots, 6861, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
         $this->assertFalse(
             $currentYearBasis->isValid(),
             '6861 + 200 = 7061 exceeds League::HARD_CAP_MAX (' . League::HARD_CAP_MAX . ') — the false rejection item 13.14 reports.'
         );
 
-        $nextYearBasis = $this->validator->validateAdd(42, $healthyRosterSlots, 5159, $playerSalary);
+        $nextYearBasis = $this->validator->validateAdd(42, $healthyRosterSlots, $healthyRosterSlots, 5159, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
         $this->assertTrue(
             $nextYearBasis->isValid(),
             '5159 + 200 = 5359 is under the hard cap — the claim is legal on the phase-correct basis.'
@@ -678,5 +726,83 @@ class WaiversValidatorTest extends TestCase
             $nextYearBasis->isValid(),
             '5556 is under the hard cap — the drop is legal on the phase-correct basis.'
         );
+    }
+
+    // ============================================
+    // OPEN SLOTS, HEALTHY SLOTS, AND PER-PLAYER VETERAN MINIMUM
+    // ============================================
+
+    /**
+     * Injured players still occupy roster spots: 15 rostered with one injured leaves
+     * 0 open and 1 healthy slot, and the signing is rejected as a full roster.
+     */
+    public function testValidateAddRejectsFifteenPlayersWithOneInjured(): void
+    {
+        $result = $this->validator->validateAdd(123, 0, 1, 3000, 100, self::vetMin(10));
+
+        $this->assertFalse($result->isValid());
+        $this->assertStringContainsString('You have a full roster', $result->getErrors()[0]);
+    }
+
+    public function testValidateAddAllowsFourteenPlayersWithOneInjured(): void
+    {
+        $result = $this->validator->validateAdd(123, 1, 2, 3000, 100, self::vetMin(10));
+
+        $this->assertTrue($result->isValid());
+    }
+
+    public function testValidateAddOverCapAllowsLowExperiencePlayerAtOwnVeteranMinimum(): void
+    {
+        $result = $this->validator->validateAdd(123, 5, 5, League::HARD_CAP_MAX, self::vetMin(2), self::vetMin(2));
+
+        $this->assertTrue($result->isValid());
+    }
+
+    public function testValidateAddOverCapRejectsFlatOneHundredThreeForLowExperiencePlayer(): void
+    {
+        $result = $this->validator->validateAdd(123, 5, 5, League::HARD_CAP_MAX, self::vetMin(10), self::vetMin(2));
+
+        $this->assertFalse($result->isValid());
+        $this->assertStringContainsString('veteran minimum', $result->getErrors()[0]);
+    }
+
+    public function testValidateAddOverCapRejectsSalaryOneAboveOwnVeteranMinimum(): void
+    {
+        $result = $this->validator->validateAdd(123, 5, 5, League::HARD_CAP_MAX, self::vetMin(2) + 1, self::vetMin(2));
+
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testValidateAddTenYearVeteranBoundaryStaysAtOneHundredThree(): void
+    {
+        $atMinimum = $this->validator->validateAdd(123, 5, 5, League::HARD_CAP_MAX, self::vetMin(10), self::vetMin(10));
+        $aboveMinimum = $this->validator->validateAdd(123, 5, 5, League::HARD_CAP_MAX, self::vetMin(10) + 1, self::vetMin(10));
+
+        $this->assertTrue($atMinimum->isValid());
+        $this->assertFalse($aboveMinimum->isValid());
+    }
+
+    /**
+     * 12 healthy players (3 healthy slots) with an injured player still on the roster:
+     * the 12-healthy hard-cap rule reads the healthy count, not the open count.
+     */
+    public function testValidateAddTwelveHealthyOverCapRejectedWithInjuredOnRoster(): void
+    {
+        $result = $this->validator->validateAdd(123, 1, 3, League::HARD_CAP_MAX, self::vetMin(10), self::vetMin(10));
+
+        $this->assertFalse($result->isValid());
+        $this->assertStringContainsString('12 or more healthy players', $result->getErrors()[0]);
+    }
+
+    public function testValidateAddElevenHealthyWithInjuredStillGetsVeteranMinimumException(): void
+    {
+        $result = $this->validator->validateAdd(123, 2, 4, League::HARD_CAP_MAX, self::vetMin(5), self::vetMin(5));
+
+        $this->assertTrue($result->isValid());
+    }
+
+    private static function vetMin(int $experience): int
+    {
+        return \League\ContractRules::getVeteranMinimumSalary($experience);
     }
 }

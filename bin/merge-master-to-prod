@@ -67,8 +67,12 @@ if [ "${SKIP_CI_CHECK:-0}" != "1" ]; then
     # The auto-promotion workflow's own jobs attach check-runs to this same
     # master SHA (workflow_run jobs land on the triggering run's head_sha), and
     # its superseded runs land as `cancelled`. Neither says anything about
-    # master's health, so exclude them by exact name.
+    # master's health, so exclude them by exact name. The settle workflow's
+    # `Aggregate check status` check-run also lands on master HEAD; it is
+    # ignored while pending and when failed for the same reason.
     SKIP_CHECKS="Promote master to production,Auto-promotion paused" \
+    IGNORE_PENDING_CHECKS="Aggregate check status" \
+    IGNORE_FAILED_CHECKS="Aggregate check status" \
         "$SCRIPT_ROOT/bin/check-master-ci-green" "$MASTER_SHA" || fail "master HEAD is not green on CI (set SKIP_CI_CHECK=1 to bypass)"
 fi
 

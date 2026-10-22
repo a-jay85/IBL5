@@ -55,15 +55,15 @@ done
 
 # The client flags above are the real block. This check refuses the same inputs
 # before the client ever starts, so the refusal is testable without a server.
-# \! \. \T \P \G anywhere, or a client command word at the start of a line or
-# statement. \G is plain output formatting; -E gives the same vertical layout.
-bs="\\"
-case "$sql" in
-    *"$bs!"*|*"$bs."*|*"${bs}T"*|*"${bs}P"*|*"${bs}G"*)
-        die "refusing client command (backslash command) in SQL; send SQL only" ;;
-esac
-if grep -qiE '^[[:space:]]*(system|tee|notee|pager|nopager|source)([[:space:]]|$)' \
-        <<< "$(tr ';' '\n' <<< "$sql")"; then
+# A backslash command (\! \. \T \P \G) is refused only where the client would
+# read one: at the start of a line or statement, or \G ending a statement. The
+# same spots hold for a client command word. A backslash inside a string literal,
+# such as LIKE 'x\.%', passes. \G is plain output formatting; -E gives the same.
+stmts="$(tr ';' '\n' <<< "$sql")"
+if grep -qE '^[[:space:]]*\\[!.TPG]|\\G[[:space:]]*$' <<< "$stmts"; then
+    die "refusing client command (backslash command) in SQL; send SQL only"
+fi
+if grep -qiE '^[[:space:]]*(system|tee|notee|pager|nopager|source)([[:space:]]|$)' <<< "$stmts"; then
     die "refusing client command (system/tee/pager/source/...) in SQL; send SQL only"
 fi
 

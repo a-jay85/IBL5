@@ -386,6 +386,53 @@ worktree_out_dir() {
     return 0
 }
 
+# Gate-timeout rescue. The "All checks green" gate fails closed when an anchor check has not
+# reported by its deadline. When that is the PR's only failure and every anchor it named has
+# since gone green on the same head, re-run the gate's failed job instead of launching a
+# Claude rescue. The rerun goes back through the unchanged fail-closed gate.
+# rc 0: handled (rerun issued or declared, or the PR skipped for this tick); the caller
+#       continues to the next PR.
+# rc 1: not a gate-timeout case; the caller falls through to the red rescue unchanged.
+gate_timeout_rescue() {   # <pr> <sha> <check-runs-json>
+    local pr="$1" sha="$2" cr="$3" others runs pick id st concl logtxt names n
+    pcw_gate_failed <<< "$cr" || return 1
+    # Any failure besides the gate (and human-signoff) needs the real rescue.
+    if ! others="$(ccg_dedupe "$(jq -nc --arg g "$PCW_GATE_CHECK" '["human-signoff", $g]')" <<< "$cr" 2>/dev/null)"; then
+        return 1
+    fi
+    [[ -z "$(ccg_failed <<< "$others")" ]] || return 1
+    if ! runs="$(gh run list --workflow="$PCW_GATE_WORKFLOW" --commit "$sha" \
+            --json databaseId,conclusion,status,headSha,createdAt --limit 20 2>/dev/null)"; then
+        skip "$pr" "gate run lookup failed (gh run list); recheck next tick"; return 0
+    fi
+    if ! pick="$(pcw_gate_run_pick "$sha" <<< "$runs")"; then
+        skip "$pr" "no gate run found for head ${sha:0:7}; recheck next tick"; return 0
+    fi
+    read -r id st concl <<< "$pick"
+    if [[ "$st" != completed || "$concl" != failure ]]; then
+        skip "$pr" "gate run $id is $st/$concl, not a settled failure; recheck next tick"; return 0
+    fi
+    if ! logtxt="$(gh run view "$id" --log-failed 2>/dev/null)"; then
+        skip "$pr" "gate log read failed (gh run view $id); recheck next tick"; return 0
+    fi
+    names="$(pcw_gate_timeout_anchors <<< "$logtxt")" || return 1
+    pcw_anchors_green "$names" <<< "$cr" || return 1
+    n="$(pcw_gate_rerun_count "$STATE" "$pr" "$sha")"
+    if [[ "$n" -ge "$PCW_GATE_RERUN_CAP" ]]; then
+        skip "$pr" "gate-timeout rerun cap (head ${sha:0:7}; $n of $PCW_GATE_RERUN_CAP reruns used)"; return 0
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        log "dry-run: PR $pr would rerun gate run $id (timed out; anchors now green: ${names//$'\n'/, })"
+        return 0
+    fi
+    if ! gh run rerun "$id" --failed >/dev/null 2>&1; then
+        skip "$pr" "gate rerun failed (gh run rerun $id); recheck next tick"; return 0
+    fi
+    n="$(pcw_add_gate_rerun "$STATE" "$pr" "$sha")"
+    skip "$pr" "gate timed out with anchors green; reran gate run $id ($n of $PCW_GATE_RERUN_CAP)"
+    return 0
+}
+
 QUALIFY=()      # "<pr>|<sha>|<key>"
 while IFS=$'\t' read -r pr branch sha mstate base; do
     [[ -n "$pr" ]] || continue
@@ -409,6 +456,7 @@ while IFS=$'\t' read -r pr branch sha mstate base; do
         if [[ "$verdict" != "red" ]]; then
             skip "$pr" "checks $verdict"; continue
         fi
+        if gate_timeout_rescue "$pr" "$sha" "$cr"; then continue; fi
         kind=red
     fi
     # Stacked (base is another open PR's head): its checks run against the parent

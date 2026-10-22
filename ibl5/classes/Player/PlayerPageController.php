@@ -34,7 +34,7 @@ class PlayerPageController
     private PlayerPageServiceInterface $pageService;
     private HttpRequest $request;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
     /**
@@ -125,7 +125,7 @@ class PlayerPageController
      */
     public function renderPage(int $playerID, ?int $pageView, string $username): string
     {
-        $season = $this->season ?? new Season($this->mysqliDb);
+        $season = $this->season ?? \Season\SharedSeason::get($this->mysqliDb);
 
         $this->responseStatus = 200;
         try {
@@ -266,89 +266,64 @@ class PlayerPageController
     ): string {
         $playerName = $player->getName() ?? '';
 
-        if ($pageView === PlayerPageType::OVERVIEW) {
-            if ($player->getIsRetired() !== null && $player->getIsRetired() !== 0) {
-                return $this->renderFlipCardView(
-                    $viewFactory->createRegularSeasonAveragesView()->renderAverages($playerID),
-                    $viewFactory->createRegularSeasonTotalsView()->renderTotals($playerID),
-                    'Regular Season',
-                    true,
-                    $colorScheme
-                );
-            }
-            $view = $viewFactory->createOverviewView();
-            return $view->renderOverview($playerID, $player, $playerStats, $season, $colorScheme);
-        }
-
-        if ($pageView === PlayerPageType::SIM_STATS) {
-            $view = $viewFactory->createSimStatsView();
-            return '<tr><td colspan="2">'
-                . PlayerStatsCardView::render($view->renderSimStats($playerID), '', $colorScheme)
-                . '</td></tr>';
-        }
-
-        if ($pageView === PlayerPageType::REGULAR_SEASON_TOTALS || $pageView === PlayerPageType::REGULAR_SEASON_AVERAGES) {
-            return $this->renderFlipCardView(
+        return match ($pageView) {
+            PlayerPageType::SIM_STATS => $this->wrapInFullWidthRow(
+                PlayerStatsCardView::render($viewFactory->createSimStatsView()->renderSimStats($playerID), '', $colorScheme)
+            ),
+            PlayerPageType::REGULAR_SEASON_TOTALS, PlayerPageType::REGULAR_SEASON_AVERAGES => $this->renderFlipCardView(
                 $viewFactory->createRegularSeasonAveragesView()->renderAverages($playerID),
                 $viewFactory->createRegularSeasonTotalsView()->renderTotals($playerID),
                 'Regular Season',
                 $pageView === PlayerPageType::REGULAR_SEASON_AVERAGES,
                 $colorScheme
-            );
-        }
-
-        if ($pageView === PlayerPageType::PLAYOFF_TOTALS || $pageView === PlayerPageType::PLAYOFF_AVERAGES) {
-            return $this->renderFlipCardView(
+            ),
+            PlayerPageType::PLAYOFF_TOTALS, PlayerPageType::PLAYOFF_AVERAGES => $this->renderFlipCardView(
                 $viewFactory->createPlayoffAveragesView()->renderAverages($playerName),
                 $viewFactory->createPlayoffTotalsView()->renderTotals($playerName),
                 'Playoffs',
                 $pageView === PlayerPageType::PLAYOFF_AVERAGES,
                 $colorScheme
-            );
-        }
-
-        if ($pageView === PlayerPageType::HEAT_TOTALS || $pageView === PlayerPageType::HEAT_AVERAGES) {
-            return $this->renderFlipCardView(
+            ),
+            PlayerPageType::HEAT_TOTALS, PlayerPageType::HEAT_AVERAGES => $this->renderFlipCardView(
                 $viewFactory->createHeatAveragesView()->renderAverages($playerName),
                 $viewFactory->createHeatTotalsView()->renderTotals($playerName),
                 'H.E.A.T.',
                 $pageView === PlayerPageType::HEAT_AVERAGES,
                 $colorScheme
-            );
-        }
-
-        if ($pageView === PlayerPageType::OLYMPIC_TOTALS || $pageView === PlayerPageType::OLYMPIC_AVERAGES) {
-            return $this->renderFlipCardView(
+            ),
+            PlayerPageType::OLYMPIC_TOTALS, PlayerPageType::OLYMPIC_AVERAGES => $this->renderFlipCardView(
                 $viewFactory->createOlympicAveragesView()->renderAverages($playerID),
                 $viewFactory->createOlympicTotalsView()->renderTotals($playerID),
                 'Olympics',
                 $pageView === PlayerPageType::OLYMPIC_AVERAGES,
                 $colorScheme
-            );
-        }
+            ),
+            PlayerPageType::RATINGS_AND_SALARY => $this->wrapInFullWidthRow(
+                PlayerStatsCardView::wrap($viewFactory->createRatingsAndSalaryView()->renderRatingsAndSalary($playerID), '', '', $colorScheme)
+            ),
+            PlayerPageType::AWARDS_AND_NEWS => $this->wrapInFullWidthRow(
+                PlayerStatsCardView::render($viewFactory->createAwardsAndNewsView()->renderAwardsAndNews($playerName), '', $colorScheme)
+            ),
+            PlayerPageType::ONE_ON_ONE => $this->wrapInFullWidthRow(
+                PlayerStatsCardView::render($viewFactory->createOneOnOneView()->renderOneOnOneResults($playerName), '', $colorScheme)
+            ),
+            default => $this->renderOverviewOrRetiredCard($viewFactory, $playerID, $player, $playerStats, $season, $colorScheme),
+        };
+    }
 
-        if ($pageView === PlayerPageType::RATINGS_AND_SALARY) {
-            $view = $viewFactory->createRatingsAndSalaryView();
-            return '<tr><td colspan="2">'
-                . PlayerStatsCardView::wrap($view->renderRatingsAndSalary($playerID), '', '', $colorScheme)
-                . '</td></tr>';
-        }
-
-        if ($pageView === PlayerPageType::AWARDS_AND_NEWS) {
-            $view = $viewFactory->createAwardsAndNewsView();
-            return '<tr><td colspan="2">'
-                . PlayerStatsCardView::render($view->renderAwardsAndNews($playerName), '', $colorScheme)
-                . '</td></tr>';
-        }
-
-        if ($pageView === PlayerPageType::ONE_ON_ONE) {
-            $view = $viewFactory->createOneOnOneView();
-            return '<tr><td colspan="2">'
-                . PlayerStatsCardView::render($view->renderOneOnOneResults($playerName), '', $colorScheme)
-                . '</td></tr>';
-        }
-
-        // Default to overview
+    /**
+     * Render the overview, or the Regular Season averages card for a retired player
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} $colorScheme
+     */
+    private function renderOverviewOrRetiredCard(
+        PlayerViewFactory $viewFactory,
+        int $playerID,
+        Player $player,
+        PlayerStats $playerStats,
+        Season $season,
+        array $colorScheme
+    ): string {
         if ($player->getIsRetired() !== null && $player->getIsRetired() !== 0) {
             return $this->renderFlipCardView(
                 $viewFactory->createRegularSeasonAveragesView()->renderAverages($playerID),
@@ -358,8 +333,16 @@ class PlayerPageController
                 $colorScheme
             );
         }
-        $view = $viewFactory->createOverviewView();
-        return $view->renderOverview($playerID, $player, $playerStats, $season, $colorScheme);
+
+        return $viewFactory->createOverviewView()->renderOverview($playerID, $player, $playerStats, $season, $colorScheme);
+    }
+
+    /**
+     * Wrap pre-rendered card HTML in the page's full-width table row
+     */
+    private function wrapInFullWidthRow(string $innerHtml): string
+    {
+        return '<tr><td colspan="2">' . $innerHtml . '</td></tr>';
     }
 
     /**

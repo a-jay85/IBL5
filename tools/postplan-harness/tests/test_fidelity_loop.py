@@ -145,6 +145,7 @@ def test_fidelity_dict_has_full_schema_after_loop(tmp_path, git_shim):
         assert set(res.fidelity["rounds"][0]) == {
             "round", "model", "work_list_sizes", "retries", "outcome",
             "remediation_sha", "verdict", "reviewed_tree", "verdict_path",
+            "review_kind", "recheck_fallback_reason",
         }
     finally:
         _cleanup(99, "99-2", "99-3", "99-4")

@@ -320,7 +320,7 @@ class SearchView implements SearchViewInterface
         }
 
         ob_start();
-        ?><div class="search-results"><h3 class="search-results__heading"><?= HtmlSanitizer::safeHtmlOutput(_SEARCHRESULTS) ?></h3><?php
+        ?><div class="search-results"><h2 class="search-results__heading"><?= HtmlSanitizer::safeHtmlOutput(_SEARCHRESULTS) ?></h2><?php
         if (count($results) === 0) {
             ?><div class="ibl-empty-state"><p class="ibl-empty-state__text"><?= HtmlSanitizer::safeHtmlOutput(_NOMATCHES) ?></p></div></div><?php
             return (string) ob_get_clean();

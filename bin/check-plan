@@ -1245,8 +1245,11 @@ fi
 # condition (3) and Phase 6 check 5 forever (a-jay85/IBL5-backlog#1277).
 # Two clears: `(conditional — only if VR baselines change)` makes the entry
 # EXEMPT in cf_parse_section_raw, so this loop never sees it; the whole-word
-# token `vr-baseline-change` on the entry line accepts a deliberate regen or
-# deletion while Phase 5.0 still requires the path in the diff. Additive only:
+# token `vr-baseline-change` on the entry line accepts a `git rm` of baselines
+# while Phase 5.0 still requires the path in the diff. A vr-baseline-change
+# line that names CI regeneration (update-baselines, CI + regen, CI ... label)
+# is rejected: the label commits PNGs after the PR exists, so the pre-push diff
+# never carries them (PRs 3301, 3311, 3329 held this way after PR 2645). Additive only:
 # the lib parser and Phase 5.0 are unchanged. Fence-stripped (cf_section and
 # cf_parse_section_raw both strip fences). Skipped on an unbalanced fence,
 # which gate [F] already rejects. Measured 2026-10-01 on the 1050-plan corpus:
@@ -1261,10 +1264,55 @@ if ! cf_fence_unbalanced "$PLAN_FILE"; then
         _vr_lines=$(grep -F -- "\`$_vr_path\`" <<<"$_vr_entry_lines" || true)
         if ! grep -iE '(^|[^[:alnum:]_-])vr-baseline-change([^[:alnum:]_-]|$)' \
             <<<"$_vr_lines" >/dev/null; then
-            viol "[VR] ## Critical Files entry \`$_vr_path\` is a Visual Regression baseline directory listed as must-appear. CI changes it only when a screenshot diff regenerates baselines, so post-plan hold (3) blocks forever on a green VR run. Mark it (conditional — only if VR baselines change), or (vr-baseline-change: <what changes>) when the plan deliberately regenerates or deletes baselines."
+            viol "[VR] ## Critical Files entry \`$_vr_path\` is a Visual Regression baseline directory listed as must-appear. CI changes it only when a screenshot diff regenerates baselines, so post-plan hold (3) blocks forever on a green VR run. Mark it (conditional — only if VR baselines change), CI update-baselines regen included, or (vr-baseline-change: <what>) only when the diff git rm's the baselines."
+        elif grep -qiF 'update-baselines' <<<"$_vr_lines" \
+            || { grep -qE '(^|[^[:alnum:]_])CI([^[:alnum:]_]|$)' <<<"$_vr_lines" \
+                 && grep -qiE '(^|[^[:alnum:]_-])regen' <<<"$_vr_lines"; } \
+            || grep -qE '(^|[^[:alnum:]_])CI([^[:alnum:]_]|$).*[Ll]abel' <<<"$_vr_lines"; then
+            viol "[VR] ## Critical Files entry \`$_vr_path\` carries vr-baseline-change but names CI regeneration (the update-baselines label). vr-baseline-change is must-appear, and CI commits regenerated PNGs only after the PR exists, so the pre-push diff can never carry them and post-plan hold (3) blocks forever. Mark it (conditional — only if VR baselines change); reserve (vr-baseline-change: <what>) for baselines the diff git rm's."
         fi
     done <<<"$_vr_paths"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate [VR], matrix-row clause: a planned test token that is a VR baseline.
+# ---------------------------------------------------------------------------
+# Phase 5.0 reads each planning row's test token (harness planfile._planned_token:
+# whole PHPUnit / API-test / E2E / Visual-regression cell, first backticked
+# test|spec|Test span scanning cells from the right) and emits MISSING: when the
+# diff never touches it. A `-snapshots` path or PNG is written only by the CI
+# update-baselines label after the PR exists, so such a row holds arming
+# condition (3) forever even when Critical Files is already conditional (PR
+# 3289). Exempt: the token directly followed by (no-change) (gate [X] polices
+# the row type) or (run-only) (gate [RO] polices trackedness); both are harness
+# exemptions already. Mirrors the Python picker in bash; the type-cell regex is
+# copied from gate [RO]. Measured 2026-10-18 on 1109 plans: 16 tokens in 12
+# plans, all shipped or held.
+while IFS= read -r _vrm_row; do
+    _vrm_pick=$(awk -F'|' '
+        { for (i = 1; i <= NF; i++) { c = tolower($i); gsub(/^[[:space:]*`_]+|[[:space:]*`_]+$/, "", c)
+            if (c ~ /^(phpunit|api.?test|e2e|visual-?regression)([[:space:]]*\(|[[:space:]]*[+\/,&]|-analogue|[[:space:]]+db-integration|$)/) typed = 1 }
+          if (!typed) exit
+          for (i = NF; i >= 1; i--) {
+            s = $i
+            while (match(s, /`[^`]+`/)) {
+                t = substr(s, RSTART + 1, RLENGTH - 2); s = substr(s, RSTART + RLENGTH)
+                if (t ~ /(test|spec|Test)/ && t ~ /\// && t !~ /[[:space:]&|;<>$\\]/ && t !~ /:\/\// \
+                    && index("-\"$@\047", substr(t, 1, 1)) == 0) {
+                    if (tolower(s) ~ /^[[:space:]]*\((no-change|run-only)\)/) print "EXEMPT " t
+                    else print "PLANNED " t
+                    exit
+                } } } }' <<<"$_vrm_row")
+    case "$_vrm_pick" in
+        PLANNED\ *) _vrm_tok="${_vrm_pick#PLANNED }" ;;
+        *) continue ;;
+    esac
+    case "$_vrm_tok" in
+        *-snapshots*|*.png|*.PNG) ;;
+        *) continue ;;
+    esac
+    viol "[VR] Verification Matrix row plans \`$_vrm_tok\` as its test. A -snapshots path or PNG is written only by the CI update-baselines label after the PR exists, so post-plan Phase 5.0 reports MISSING: and hold (3) blocks forever. Replacement shapes: for a CI regen plan \`ibl5/tests/e2e/smoke/visual-regression.spec.ts\` (run-only) on the Visual-regression row; for an untouched baseline write \`<png>\` (no-change) directly after the token; for a git rm use a CLI-executable row, which plans no test. Row: ${_vrm_row}"
+done < "$GATEP_MATRIX"
 
 # ---------------------------------------------------------------------------
 # Gate M: a PHPUnit matrix row demands a ## Required Test Methods section.

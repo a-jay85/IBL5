@@ -175,7 +175,7 @@ class TeamCapCalculator implements TeamCapCalculatorInterface
     private function contractCalculator(): PlayerContractCalculator
     {
         if ($this->contractCalculator === null) {
-            $this->contractCalculator = new PlayerContractCalculator($this->season ?? new Season($this->db));
+            $this->contractCalculator = new PlayerContractCalculator($this->season ?? \Season\SharedSeason::get($this->db));
         }
         return $this->contractCalculator;
     }

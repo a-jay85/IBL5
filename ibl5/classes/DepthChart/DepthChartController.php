@@ -38,7 +38,7 @@ class DepthChartController implements DepthChartControllerInterface
     private DepthChartSubmissionHandlerInterface $submissionHandler;
     private HttpRequest $request;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -96,7 +96,7 @@ class DepthChartController implements DepthChartControllerInterface
     {
         [$display, $split] = $this->resolveDisplayAndSplitFromRequest();
 
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
 
         [$flashErrorsHtml, $override] = $this->consumeFailureFlash();
 
@@ -136,7 +136,7 @@ class DepthChartController implements DepthChartControllerInterface
      */
     public function getTableOutput(int $teamid, string $display, ?string $split = null): string
     {
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
         $team = Team::initialize($this->db, $teamid);
 
         // Delegate roster + starters to TeamService (single source of truth)

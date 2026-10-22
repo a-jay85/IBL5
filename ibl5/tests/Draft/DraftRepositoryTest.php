@@ -44,6 +44,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertNull($result);
     }
 
+    /** DraftRepository::updateDraftTable() writes only an empty slot, so a second write to a filled slot affects no rows. */
     public function testUpdateDraftTableExecutesCorrectQuery(): void
     {
         $this->mockDb->setReturnTrue(true);
@@ -60,6 +61,7 @@ class DraftRepositoryTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
         $this->assertStringContainsString('UPDATE ibl_draft', $queries[0]);
+        $this->assertStringContainsString("AND player = ''", $queries[0]);
         $this->assertStringContainsString('John Doe', $queries[0]);
         $this->assertStringContainsString('2024-01-15 10:30:00', $queries[0]);
     }

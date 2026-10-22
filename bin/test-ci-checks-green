@@ -3,12 +3,14 @@
 # check-run verdict logic (bin/lib/ci-checks-green.sh) and its callers
 # bin/check-master-ci-green and bin/check-pr-checks-green.
 #
-# C1-C4  run bin/check-master-ci-green end to end against fixture JSON via the
+# C1-C11 run bin/check-master-ci-green end to end against fixture JSON via the
 #        GH_API_CMD seam (a `gh` shim answers `auth status`; a throwaway git repo
 #        supplies the origin remote).
-# L1-L7  source the lib and call its functions directly.
-# P1-P17 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
+# L1-L9  source the lib and call its functions directly.
+# P1-P24 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
 #        (the Nth poll serves the Nth fixture; every case uses --interval-seconds=0).
+# S1-S10 run bin/settle-pr-status against a `gh` shim that dispatches on the API path
+#        and records the commit-status POST body in $PFIX/posted.json.
 #
 # Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
 set -uo pipefail
@@ -105,7 +107,115 @@ else
     fail "C4 latest-per-name wins (rc=$RC err=$(cat "$ERR"))"
 fi
 
-# --- L1-L7: lib unit cases ----------------------------------------------------
+# --- C5-C11: IGNORE_FAILED_CHECKS -----------------------------------------
+HELPER="Keep the merge-line head current"
+cat > "$TMP/c5.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c5.json"
+if [ "$RC" -eq 0 ] \
+   && grep -qF "IGNORE_FAILED_CHECKS active — ignoring failed: Keep the merge-line head current (failure)" "$OUT" \
+   && grep -qF "PASS: 1 check-run(s) all green" "$OUT"; then
+    ok "C5 listed helper failure is logged and ignored"
+else
+    fail "C5 listed helper failure is logged and ignored (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+unset IGNORE_FAILED_CHECKS
+run_check "$TMP/c5.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks failed: Keep the merge-line head current (failure)" "$ERR" \
+   && ! grep -qF "IGNORE_FAILED_CHECKS" "$OUT"; then
+    ok "C6 unset IGNORE_FAILED_CHECKS: helper failure still fails"
+else
+    fail "C6 unset IGNORE_FAILED_CHECKS: helper failure still fails (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+IGNORE_FAILED_CHECKS="" run_check "$TMP/c5.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks failed: Keep the merge-line head current (failure)" "$ERR" \
+   && ! grep -qF "IGNORE_FAILED_CHECKS" "$OUT"; then
+    ok "C7 empty IGNORE_FAILED_CHECKS: no-op, helper failure still fails"
+else
+    fail "C7 empty IGNORE_FAILED_CHECKS: no-op, helper failure still fails (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c8.json" <<'JSON'
+{"total_count":3,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"Keep the merge-line head current","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c8.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks still running: Keep the merge-line head current" "$ERR" \
+   && grep -qF "IGNORE_FAILED_CHECKS active — ignoring failed: <none matched>" "$OUT"; then
+    ok "C8 pending listed helper still reports as running"
+else
+    fail "C8 pending listed helper still reports as running (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c9.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"Keep the merge-line head current (copy)","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c9.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks failed: Keep the merge-line head current (copy) (failure)" "$ERR" \
+   && grep -qF "IGNORE_FAILED_CHECKS active — ignoring failed: <none matched>" "$OUT"; then
+    ok "C9 near-miss name is not ignored (exact match only)"
+else
+    fail "C9 near-miss name is not ignored (exact match only) (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c10.json" <<'JSON'
+{"total_count":1,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c10.json"
+if [ "$RC" -eq 1 ] && grep -qF "FAIL: only 0 check-run(s) found on HEAD" "$ERR"; then
+    ok "C10 ignoring every run with no usable ancestor fails the floor"
+else
+    fail "C10 ignoring every run with no usable ancestor fails the floor (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+# C11: HEAD has only the failed helper, so TOTAL=0 and the script walks back.
+# The ancestor also carries a failed helper run; it must be dropped there too.
+WREPO="$TMP/wrepo"
+mkdir -p "$WREPO"
+git -C "$WREPO" init -q
+git -C "$WREPO" remote add origin https://github.com/a-jay85/IBL5.git
+git -C "$WREPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m parent
+git -C "$WREPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m head
+W_HEAD="$(git -C "$WREPO" rev-parse HEAD)"
+cat > "$TMP/c11-anc.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+cat > "$TMP/walkshim" <<SHIM
+#!/bin/sh
+case "\$1" in
+  *"/commits/$W_HEAD/"*) cat "$TMP/c10.json" ;;
+  *) cat "$TMP/c11-anc.json" ;;
+esac
+SHIM
+chmod +x "$TMP/walkshim"
+( cd "$WREPO" && PATH="$SHIMD:$PATH" GH_API_CMD="$TMP/walkshim" \
+    IGNORE_FAILED_CHECKS="$HELPER" "$CHECK" "$W_HEAD" >"$TMP/out" 2>"$TMP/err" )
+RC=$?
+if [ "$RC" -eq 0 ] \
+   && grep -qF "Falling back to ancestor" "$TMP/out" \
+   && grep -qF "PASS: 1 check-run(s) all green" "$TMP/out"; then
+    ok "C11 walk-back re-applies IGNORE_FAILED_CHECKS to the ancestor"
+else
+    fail "C11 walk-back re-applies IGNORE_FAILED_CHECKS to the ancestor (rc=$RC out=$(cat "$TMP/out") err=$(cat "$TMP/err"))"
+fi
+
+# --- L1-L9: lib unit cases ----------------------------------------------------
 # shellcheck source=bin/lib/ci-checks-green.sh
 if [ -f "$LIB" ]; then
     source "$LIB"
@@ -183,11 +293,35 @@ if [ -f "$LIB" ]; then
     else
         fail "L7 drop_pending with an empty list keeps every run (got: $got)"
     fi
+
+    FAILDROP_IN='{"check_runs":[
+      {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure"},
+      {"name":"helper-null","status":"completed","conclusion":null},
+      {"name":"helper-pending","status":"in_progress","conclusion":null},
+      {"name":"helper-green","status":"completed","conclusion":"success"},
+      {"name":"Keep the merge-line head current (copy)","status":"completed","conclusion":"failure"},
+      {"name":"phpunit","status":"completed","conclusion":"failure"}]}'
+    FAILDROP_LIST='["Keep the merge-line head current","helper-null","helper-pending","helper-green"]'
+    got="$(printf '%s' "$FAILDROP_IN" | ccg_drop_failed "$FAILDROP_LIST" \
+      | jq -c '[.check_runs[] | .name + ":" + .status], .total_count')"
+    want="$(printf '%s\n%s' '["helper-pending:in_progress","helper-green:completed","Keep the merge-line head current (copy):completed","phpunit:completed"]' '4')"
+    if [ "$got" = "$want" ]; then
+        ok "L8 drop_failed drops only completed non-passing runs of exact listed names"
+    else
+        fail "L8 drop_failed drops only completed non-passing runs of exact listed names (got: $got)"
+    fi
+
+    got="$(printf '%s' "$FAILDROP_IN" | ccg_drop_failed '[]' | jq -c '.check_runs | length')"
+    if [ "$got" = "6" ]; then
+        ok "L9 drop_failed with an empty list keeps every run"
+    else
+        fail "L9 drop_failed with an empty list keeps every run (got: $got)"
+    fi
 else
-    fail "L1-L7 cannot run: $LIB is missing"
+    fail "L1-L9 cannot run: $LIB is missing"
 fi
 
-# --- P1-P17: bin/check-pr-checks-green (PR-head poller) ---------------------
+# --- P1-P24: bin/check-pr-checks-green (PR-head poller) ---------------------
 POLL="$SCRIPT_DIR/check-pr-checks-green"
 P_SHA="0123456789abcdef0123456789abcdef01234567"
 
@@ -257,7 +391,7 @@ else fail "P3 anchor missing holds (rc=$RC err=$(tail -3 "$ERR"))"; fi
 new_case p4
 cr 1 "[{\"name\":\"A\",$G}]"; wr 1 '[{"name":"E2E Tests","status":"in_progress"}]'
 run_poll --anchor=A
-if [ "$RC" -eq 1 ] && grep -qF 'workflow runs still active: E2E Tests' "$ERR"; then
+if [ "$RC" -eq 3 ] && grep -qF 'workflow runs still active: E2E Tests' "$ERR"; then
     ok "P4 active workflow run holds"
 else fail "P4 active workflow run holds (rc=$RC err=$(cat "$ERR"))"; fi
 
@@ -269,7 +403,7 @@ PGW="" run_poll --anchor=A
 p5_empty_rc=$RC
 ( unset GITHUB_WORKFLOW PGW; GH_API_CMD="$PSHIM" "$POLL" --repo=a-jay85/IBL5 --sha="$P_SHA" \
     --anchor=A >/dev/null 2>&1 ); p5_unset_rc=$?
-if [ "$p5_rc" -eq 0 ] && [ "$p5_empty_rc" -eq 1 ] && [ "$p5_unset_rc" -eq 1 ]; then
+if [ "$p5_rc" -eq 0 ] && [ "$p5_empty_rc" -eq 3 ] && [ "$p5_unset_rc" -eq 3 ]; then
     ok "P5 self workflow run does not deadlock"
 else fail "P5 self workflow run does not deadlock (self=$p5_rc empty=$p5_empty_rc unset=$p5_unset_rc)"; fi
 
@@ -414,5 +548,206 @@ p17_try '--base-ref=a b'
 p17_try --startup-grace-seconds=x
 p17_try --base-ref master
 if [ "$p17_ok" -eq 1 ]; then ok "P17 rejected base-ref and grace forms"; else fail "P17 rejected base-ref and grace forms"; fi
+
+# P18: one-shot, everything settled green -> 0.
+new_case p18
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A,B
+if [ "$RC" -eq 0 ] && grep -q '^PASS:' "$OUT"; then
+    ok "P18 one-shot all green exits 0"
+else fail "P18 one-shot all green exits 0 (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# P19: one-shot, a failed check -> 1 and names it.
+new_case p19
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",\"status\":\"completed\",\"conclusion\":\"failure\",\"completed_at\":\"2026-01-01T00:00:00Z\"}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A
+if [ "$RC" -eq 1 ] && grep -qF 'FAIL: checks failed:' "$ERR" && grep -qF 'B (failure)' "$ERR"; then
+    ok "P19 one-shot failed check exits 1 and names it"
+else fail "P19 one-shot failed check exits 1 and names it (rc=$RC err=$(cat "$ERR"))"; fi
+
+# P20: one-shot, anchor absent -> 3 (pending, not failed).
+new_case p20
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A,B
+if [ "$RC" -eq 3 ] && grep -qF 'WAIT: anchors not reported' "$ERR"; then
+    ok "P20 one-shot anchor missing exits 3"
+else fail "P20 one-shot anchor missing exits 3 (rc=$RC err=$(cat "$ERR"))"; fi
+
+# P21: one-shot, a non-anchor check still running -> 3.
+new_case p21
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",\"status\":\"in_progress\",\"conclusion\":null}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A
+if [ "$RC" -eq 3 ] && grep -qF 'WAIT: checks still running' "$ERR"; then
+    ok "P21 one-shot pending check exits 3"
+else fail "P21 one-shot pending check exits 3 (rc=$RC err=$(cat "$ERR"))"; fi
+
+# P22: --self is a CSV; both names are excluded.
+new_case p22
+cr 1 '[{"name":"Aggregate check status","status":"in_progress","conclusion":null},{"name":"All checks settled","status":"in_progress","conclusion":null}]'; wr 1 "$RUNS_DONE"
+run_poll --self='Aggregate check status,All checks settled'
+if [ "$RC" -eq 0 ] && grep -qF 'ignored: Aggregate check status, All checks settled' "$OUT"; then
+    ok "P22 --self CSV excludes both names"
+else fail "P22 --self CSV excludes both names (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# P23: --ignore-workflows drops a named active workflow run from V4.
+new_case p23
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 '[{"name":"Legacy waiter","status":"in_progress"}]'
+run_poll --anchor=A --ignore-workflows='Legacy waiter'
+p23_with=$RC
+run_poll --anchor=A
+p23_without=$RC
+if [ "$p23_with" -eq 0 ] && [ "$p23_without" -eq 3 ]; then
+    ok "P23 --ignore-workflows drops the legacy waiter from V4"
+else fail "P23 --ignore-workflows drops the legacy waiter from V4 (with=$p23_with without=$p23_without)"; fi
+
+# P24: the space form of --ignore-workflows is an unknown flag.
+new_case p24
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --ignore-workflows 'Legacy waiter'
+if [ "$RC" -eq 2 ] && grep -qF 'unknown flag' "$ERR"; then
+    ok "P24 space-form --ignore-workflows is rejected"
+else fail "P24 space-form --ignore-workflows is rejected (rc=$RC err=$(head -1 "$ERR"))"; fi
+
+# --- S1-S10: bin/settle-pr-status against a URL-dispatch gh shim ---------------
+SETTLE="$SCRIPT_DIR/settle-pr-status"
+S_SHA2="fedcba9876543210fedcba9876543210fedcba98"
+
+# The shim dispatches on the API path. Fixtures live in $PFIX: assoc.json (commits/S/pulls),
+# pull.json (pulls/N), cr.json (check-runs, slurped), wr.json (actions/runs, slurped).
+# A -X POST to statuses copies stdin to $PFIX/posted.json. $PFIX/cr-fail makes check-runs exit 1.
+SSHIM_DIR="$TMP/sshim"
+mkdir -p "$SSHIM_DIR"
+cat > "$SSHIM_DIR/gh" <<'SHIM'
+#!/bin/bash
+case "$*" in
+    *"-X POST"*statuses*) cat > "$PFIX/posted.json" ;;
+    *commits/*/pulls*)    cat "$PFIX/assoc.json" ;;
+    */pulls/[0-9]*)       cat "$PFIX/pull.json" ;;
+    *check-runs*)         [ -f "$PFIX/cr-fail" ] && exit 1; cat "$PFIX/cr.json" ;;
+    *actions/runs*)       cat "$PFIX/wr.json" ;;
+    *)                    echo "sshim: unexpected: $*" >&2; exit 1 ;;
+esac
+SHIM
+chmod +x "$SSHIM_DIR/gh"
+
+# s_case <name> [base-ref] [pull-head-sha] — fresh fixtures: one open PR #7 with an all-green
+# check-run set for the anchors A,B.
+s_case() {
+    new_case "s-$1"
+    local base="${2:-master}" head="${3:-$P_SHA}"
+    printf '[{"number":7,"state":"open","base":{"ref":"%s","repo":{"full_name":"a-jay85/IBL5"}}}]' \
+        "$base" > "$PFIX/assoc.json"
+    printf '{"number":7,"state":"open","head":{"sha":"%s"},"base":{"ref":"%s"}}' \
+        "$head" "$base" > "$PFIX/pull.json"
+    cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G}]"
+    cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+    wr 1 "$RUNS_DONE"
+    cp "$PFIX/1-runs.json" "$PFIX/wr.json"
+}
+
+# run_settle <args...> — sets OUT, ERR, RC; always passes --repo and the anchors A,B.
+run_settle() {
+    OUT="$TMP/s-out"; ERR="$TMP/s-err"
+    GITHUB_WORKFLOW="" GH_API_CMD="$SSHIM_DIR/gh api" \
+        "$SETTLE" --repo=a-jay85/IBL5 --anchor=A,B "$@" >"$OUT" 2>"$ERR"
+    RC=$?
+}
+
+s_state() { jq -r .state "$PFIX/posted.json" 2>/dev/null; }
+s_desc()  { jq -r .description "$PFIX/posted.json" 2>/dev/null; }
+
+# S1: all green -> success posted.
+s_case s1
+run_settle --head-sha="$P_SHA" --target-url=https://example.test/run/1
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] \
+        && [ "$(jq -r .context "$PFIX/posted.json")" = "All checks settled" ] \
+        && [ "$(jq -r .target_url "$PFIX/posted.json")" = "https://example.test/run/1" ] \
+        && [[ "$(s_desc)" == PASS:* ]]; then
+    ok "S1 all green posts success"
+else fail "S1 all green posts success (rc=$RC state=$(s_state) desc=$(s_desc) err=$(cat "$ERR"))"; fi
+
+# S2: a failed check -> failure naming it.
+s_case s2
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G},{\"name\":\"Lint broke\",\"status\":\"completed\",\"conclusion\":\"failure\",\"completed_at\":\"2026-01-01T00:00:00Z\"}]"
+cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "failure" ] && [[ "$(s_desc)" == *"Lint broke"* ]]; then
+    ok "S2 failed check posts failure naming it"
+else fail "S2 failed check posts failure naming it (rc=$RC state=$(s_state) desc=$(s_desc))"; fi
+
+# S3: a missing anchor -> pending.
+s_case s3
+cr 1 "[{\"name\":\"A\",$G}]"
+cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "pending" ] && [[ "$(s_desc)" == *"anchors not reported"* ]]; then
+    ok "S3 missing anchor posts pending"
+else fail "S3 missing anchor posts pending (rc=$RC state=$(s_state) desc=$(s_desc))"; fi
+
+# S4: the PR head moved past the event head -> nothing posted.
+s_case s4 master "$S_SHA2"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/posted.json" ] && grep -qF 'STALE:' "$OUT"; then
+    ok "S4 stale event head posts nothing"
+else fail "S4 stale event head posts nothing (rc=$RC posted=$([ -f "$PFIX/posted.json" ] && echo yes || echo no) out=$(cat "$OUT"))"; fi
+
+# S5: no open PR owns the head -> nothing posted.
+s_case s5
+printf '[]' > "$PFIX/assoc.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/posted.json" ] && grep -qF 'NOTHING:' "$OUT"; then
+    ok "S5 no open PR posts nothing"
+else fail "S5 no open PR posts nothing (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S6: a stacked base -> failure with the retarget message, resolved from the API.
+s_case s6 feature
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "failure" ] && [[ "$(s_desc)" == *"stacked on feature"* ]]; then
+    ok "S6 stacked base posts failure with retarget message"
+else fail "S6 stacked base posts failure with retarget message (rc=$RC state=$(s_state) desc=$(s_desc))"; fi
+
+# S7: a bad --pr and both selectors are usage errors.
+s_case s7
+s7_ok=1
+for bad in "--pr=abc" "--pr=1 --head-sha=$P_SHA" "--pr=12345678" ""; do
+    # shellcheck disable=SC2086
+    run_settle $bad
+    if [ "$RC" -ne 2 ] || ! grep -qiE 'unknown|usage|invalid' "$ERR" || [ -f "$PFIX/posted.json" ]; then
+        s7_ok=0; echo "  S7 '$bad' -> rc=$RC: $(head -1 "$ERR")" >&2
+    fi
+done
+if [ "$s7_ok" -eq 1 ]; then ok "S7 bad --pr and both-selectors are usage errors"
+else fail "S7 bad --pr and both-selectors are usage errors"; fi
+
+# S8: --dry-run prints the payload and posts nothing (also covers the --pr path).
+s_case s8
+run_settle --pr=7 --dry-run
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/posted.json" ] \
+        && grep -qF 'would POST repos/a-jay85/IBL5/statuses/' "$OUT" \
+        && grep -qF '"state": "success"' "$OUT"; then
+    ok "S8 dry-run prints payload and posts nothing"
+else fail "S8 dry-run prints payload and posts nothing (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S9: a check-runs API error -> nothing posted, exit 2.
+s_case s9
+: > "$PFIX/cr-fail"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 2 ] && [ ! -f "$PFIX/posted.json" ]; then
+    ok "S9 check-runs API error posts nothing and exits 2"
+else fail "S9 check-runs API error posts nothing and exits 2 (rc=$RC err=$(cat "$ERR"))"; fi
+
+# S10: the description is capped at 140 bytes (the statuses API rejects longer).
+s_case s10
+long_runs=""
+for i in $(seq 1 30); do
+    long_runs="${long_runs}{\"name\":\"long-running-check-number-$i\",\"status\":\"in_progress\",\"conclusion\":null},"
+done
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G},${long_runs%,}]"
+cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "pending" ] \
+        && [ "$(jq -r .description "$PFIX/posted.json" | wc -c)" -le 141 ]; then
+    ok "S10 description is capped at 140 bytes"
+else fail "S10 description is capped at 140 bytes (rc=$RC state=$(s_state) len=$(jq -r .description "$PFIX/posted.json" | wc -c))"; fi
 
 h_done

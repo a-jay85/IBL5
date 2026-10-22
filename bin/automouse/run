@@ -534,6 +534,11 @@ MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
 MAX_PP_SECS=5400     # per-phase cap: post-plan gets at most 1h30m. Post-plan is the
                      # phase that actually exhausts its wall: 2 of the 4 post-plan
                      # phases on 2026-09-16 were hard-killed at the cap (exit 137).
+MIN_PP_SECS=2400     # post-plan floor: Phase 2 starts post-plan only when at least
+                     # this much of MAX_ELAPSED remains, else it defers to the next
+                     # run with the handoff kept. Observed post-plan wall max was
+                     # 2040s (2026-10-17, 9 runs); a 300s floor got #3319 killed.
+                     # Must stay < MAX_PP_SECS.
 # Wall-clock cap-timeout classifier (see impl_cap_timeout below). The tolerance
 # absorbs process startup/teardown skew around `timeout`; it must stay SMALL —
 # a large value would forgive ordinary failures, which is exactly the
@@ -1653,6 +1658,37 @@ postplan_cap_timeout() {
     [ "$dur" -ge $(( budget - CAP_TIMEOUT_TOLERANCE_SECS )) ]
 }
 
+# Phase-2 post-plan budget. Given the seconds left under MAX_ELAPSED, decide
+# whether post-plan may start now.
+#   return 0, print the timeout budget: remaining capped at MAX_PP_SECS
+#   return 1, print remaining unchanged: under MIN_PP_SECS (or negative), defer
+# Pure: reads only its argument and the two constants. Callers use it as
+# `if BUDGET=$(postplan_budget "$R"); then`, which is safe under set -e.
+postplan_budget() {
+    local remaining=$1
+    if [ "$remaining" -lt "$MIN_PP_SECS" ]; then
+        echo "$remaining"
+        return 1
+    fi
+    if [ "$remaining" -gt "$MAX_PP_SECS" ]; then
+        echo "$MAX_PP_SECS"
+    else
+        echo "$remaining"
+    fi
+}
+
+# Best-effort cleanup after a post-plan wall-kill. The shim SIGKILLs
+# bin/post-plan-now's bash before its TERM trap can call conclude_status_badge,
+# so the post-plan-running label would stay on the PR. Reuse post-plan-now's
+# own helper (defined above its sourced-guard) from a subshell; never fail.
+postplan_release_label_after_cap() {
+    local status=$1 pr=$2
+    case "$pr" in ''|*[!0-9]*) return 0 ;; esac
+    ( source "$SELF_DIR/../post-plan-now" && conclude_status_badge "$status" "$pr" ) \
+        >> "$LOG" 2>&1 || true
+    return 0
+}
+
 # Should the loop HOLD this plan in queue/ instead of disposing it to done/?
 #
 # Narrow by construction — ALL THREE must hold:
@@ -1804,9 +1840,13 @@ EOF
 # Returns: 0 green | 1 CI red, park | 2 CI auth/usage error, env-stop
 #          3 smoke red, park | 4 CI verdict not yet known, proceed with warning
 # Sets CANARY_DETAIL to the text the park report should carry.
+# The smoke curl gets up to 3 tries of 15s each. Only curl exit 7 (connection
+# refused) and 28 (timeout) are retried, after AUTOMOUSE_CANARY_RETRY_SLEEP
+# seconds (unset, empty, or non-numeric falls back to 15). Worst case for a
+# persistent timeout: 3 x 15 + 2 x 15 = 75s.
 run_between_plans_canary() {
     local ci_out url
-    local ci_rc=0 smoke_rc=0
+    local ci_rc=0 smoke_rc=0 try=1 retry_sleep
     CANARY_DETAIL=""
 
     if [ -n "${AUTOMOUSE_SKIP_CANARY:-}" ]; then
@@ -1824,7 +1864,15 @@ run_between_plans_canary() {
     # the verdict is "pending" at every plan boundary and master health goes
     # unchecked. They are ignored ONLY while pending: a completed red run of
     # either still lands in "checks failed:" below and parks. Exact names.
+    # IGNORE_FAILED_CHECKS lists helper workflows that test no code, whose
+    # FAILURE must not park the queue. "Keep the merge-line head current"
+    # (.github/workflows/update-behind-prs.yml) fails on transient GitHub API
+    # errors, and GitHub drops its next cron run for hours, so its red sticks.
+    # Only a completed non-passing run is ignored; a pending one still reads
+    # "checks still running". Exact names. Canary only: PR merge gating and
+    # bin/merge-master-to-prod never set it.
     ci_out=$(IGNORE_PENDING_CHECKS="deploy,Promote master to production" \
+        IGNORE_FAILED_CHECKS="Keep the merge-line head current" \
         "$REPO/bin/check-master-ci-green" 2>&1) || ci_rc=$?
     CANARY_DETAIL="$ci_out"
     printf '%s\n' "$ci_out" >> "$LOG"
@@ -1847,7 +1895,27 @@ run_between_plans_canary() {
     # Host(`main.localhost`) for it; the basename-derived hostname is the
     # WORKTREE rule and 404s here. Override with AUTOMOUSE_CANARY_URL.
     url="${AUTOMOUSE_CANARY_URL:-http://main.localhost/ibl5/}"
-    curl -sf --max-time 5 "$url" -o /dev/null || smoke_rc=$?
+    retry_sleep="${AUTOMOUSE_CANARY_RETRY_SLEEP-}"
+    case "$retry_sleep" in
+        ''|*[!0-9]*) retry_sleep=15 ;;
+    esac
+    # Exit 7 (refused) and 28 (timeout) are what a Traefik or php container
+    # restart looks like from here. Every other exit parks on the first try.
+    while :; do
+        smoke_rc=0
+        curl -sf --max-time 15 "$url" -o /dev/null || smoke_rc=$?
+        case "$smoke_rc" in
+            7|28) ;;
+            *) break ;;
+        esac
+        if [ "$try" -ge 3 ]; then
+            break
+        fi
+        printf '[%s] canary: smoke try %s/3: curl exit %s for %s; retrying in %ss\n' \
+            "$(date +%H:%M:%S)" "$try" "$smoke_rc" "$url" "$retry_sleep" >> "$LOG"
+        sleep "$retry_sleep"
+        try=$((try + 1))
+    done
     if [ "$smoke_rc" -ne 0 ]; then
         CANARY_DETAIL="smoke: curl exit $smoke_rc for $url"
         printf '[%s] canary: %s\n' "$(date +%H:%M:%S)" "$CANARY_DETAIL" >> "$LOG"
@@ -2711,21 +2779,22 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
 
     # --- Phase 2: Post-Plan (only if handoff file exists) ---
     if [ -f "$HANDOFF_FILE" ]; then
-        # Re-check time guard before starting post-plan
+        # postplan-min-budget: begin
+        # Re-check time guard before starting post-plan. postplan_budget defers
+        # when less than MIN_PP_SECS of MAX_ELAPSED is left (negative included),
+        # so post-plan never starts on a budget the timeout shim would kill.
+        # The handoff file is kept; the next run resumes as post-plan only.
         ELAPSED=$(( $(date +%s) - START ))
-        if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
+        REMAINING_RAW=$(( MAX_ELAPSED - ELAPSED ))
+        if ! REMAINING_SECS=$(postplan_budget "$REMAINING_RAW"); then
+            echo "Post-plan deferred: ${REMAINING_RAW}s left under MAX_ELAPSED, below MIN_PP_SECS=${MIN_PP_SECS}s." >> "$LOG"
             echo "Time guard between phases — will resume postplan next run." >> "$LOG"
             note_failure "The time limit was reached before shipping ${PLAN_NAME%.md}. Post-plan will run next time."
+            # A deferral is not a failure: give back the attempt this run spent.
+            refund_attempt
             break
         fi
-
-        REMAINING_SECS=$(( MAX_ELAPSED - $(( $(date +%s) - START )) ))
-        if [ "$REMAINING_SECS" -lt 300 ]; then
-            REMAINING_SECS=300
-        fi
-        if [ "$REMAINING_SECS" -gt "$MAX_PP_SECS" ]; then
-            REMAINING_SECS="$MAX_PP_SECS"
-        fi
+        # postplan-min-budget: end
         PP_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
         HEARTBEAT_FILE="$NIGHTLY_DIR/.heartbeat-$$-postplan"
         CMDPID_FILE="$NIGHTLY_DIR/.cmdpid-$$-postplan"
@@ -2901,6 +2970,9 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 # unreviewed. Filing it to done/ here is the silent-disposal defect.
                 PP_CAP=0
                 postplan_cap_timeout "$PP_STATUS" "$PP_DUR" "$REMAINING_SECS" && PP_CAP=1
+                if [ "$PP_CAP" -eq 1 ]; then
+                    postplan_release_label_after_cap "$PP_STATUS" "$PP_PR_NUM"
+                fi
                 PP_VERDICT_NEWEST=$(postplan_newest_verdict "$PP_PR_NUM")
                 # Fail-closed: 1 means "treat as reviewed", i.e. today's behaviour.
                 # It only drops to 0 when we hold a usable freshness reference AND

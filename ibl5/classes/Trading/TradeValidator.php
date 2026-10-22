@@ -34,7 +34,7 @@ class TradeValidator implements TradeValidatorInterface
         $this->db = $db;
         $this->assetRepository = new TradeAssetRepository($db);
         $this->formRepository = new TradeFormRepository($db);
-        $this->season = $season ?? new Season($db);
+        $this->season = $season ?? \Season\SharedSeason::get($db);
     }
 
     /**

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/review-outcomes — append review-finding outcomes to the outcome log, and report on them.
+#
+# Usage: bin/review-outcomes record --pr=N --verdicts=PATH --threads=PATH [--pipeline=skill|harness] [--log=PATH]
+#        bin/review-outcomes sweep --pr=N [--pipeline=skill|harness] [--log=PATH]   (thread JSONL on stdin)
+#   exit 0 = done, or a logging failure that was swallowed on purpose; 2 = usage error
+#
+# Flags take the `--flag=value` form only. The logic lives in
+# tools/postplan-harness/harness/outcome_log.py; this wrapper puts the harness on PYTHONPATH.
+# The log defaults to tools/postplan-harness/out/state/review-outcomes.jsonl in the main checkout.
+# It never reads $HOME, so it runs under `env -i`.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help)
+            awk 'NR==1||/shellcheck/{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+            exit 0
+            ;;
+    esac
+done
+
+PYTHONPATH="$ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m harness.outcome_log "$@"

@@ -5,6 +5,11 @@ byte-caps, single-turns, and validates every call.
 """
 from __future__ import annotations
 
+import difflib
+import re
+
+from .classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END, MERGE_DIGEST_BEGIN,
+                       MERGE_DIGEST_END)
 from .state import ArmDecision, Classification, PlanInfo
 
 # Probe allowlist sentence for manual_recheck_prompt.  Keep `at most 8 elements`
@@ -32,6 +37,11 @@ def _gm_visible_rubric(cls: Classification) -> str:
             "on this diff anyway.\n")
 
 
+# pr-copy sees at most this many characters of the filtered diff. The prompt says so when
+# the diff is longer, so the model never states a count that spans text it was not shown.
+PR_COPY_DIFF_CAP = 60000
+
+
 def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt: str) -> str:
     """Commit/PR title + summary. Judgment retained: the feat-vs-chore GM test
     and a faithful summary of intent. Type rubric inlined from
@@ -56,6 +66,13 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
             "mechanical.\n\n"
             f"RETROSPECTIVE REGISTRY ROW:\n{cls.retro_registry_row}\n"
         )
+    diff_text = cls.filtered_diff[:PR_COPY_DIFF_CAP]
+    truncated = len(cls.filtered_diff) > PR_COPY_DIFF_CAP
+    truncation_note = (
+        "\n\nDIFF TRUNCATED: the DIFF above stops at the first "
+        f"{PR_COPY_DIFF_CAP} characters of a longer diff. State no count that spans the "
+        "full diff (total files, total tests, total call sites); describe the scope in words."
+        if truncated else "")
     return (
         "Write the commit/PR copy for this branch.\n\n"
         "TYPE RUBRIC — decision test: \"Would a league GM notice a new ability they "
@@ -67,7 +84,8 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         f"CLASSIFICATION:\n{cls.summary()}\n"
         + retro_block
         + (f"\nPLAN EXCERPT (intent):\n{plan_excerpt[:4000]}\n" if plan.found else "")
-        + "\nDIFF:\n" + cls.filtered_diff[:60000]
+        + "\nDIFF:\n" + diff_text
+        + truncation_note
         + '\n\nNEVER write a "## Manual Testing" heading or any manual-testing checklist '
         'inside summary_md. The runner owns that section and appends it after you; '
         'duplicating it corrupts the arming gate.'
@@ -76,8 +94,21 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         'what would be hard to reverse>. The runner derives Door and Blast radius mechanically '
         'and only ever raises them; your contribution is the Why text. Never write a second '
         'Merge danger line.'
+        + '\n\nDirectly after the Merge danger line, write exactly one line: **How to revert:** '
+        '<12-300 chars on one line: `git revert <merge-sha>` for a normal change, plus the extra '
+        'step when the diff touches a migration, the prod sync, or config>. The runner swaps in '
+        'a mechanical line when yours is missing or too short, or when the diff touches one of '
+        'those paths. Never write a second How to revert line.'
         + '\n\nA bare `#N` links to IBL5 PR/issue N. Cite a backlog issue as '
         '`a-jay85/IBL5-backlog#N`, never as a bare `#N`.'
+        + '\n\nCOUNTS: state no exact count (tests, cases, call sites, files, functions, rows, '
+        'lines) unless that number is visible in the CLASSIFICATION or DIFF text above. '
+        'Describe the change in words instead: "adds tests for the truncation note", never '
+        '"adds 3 tests". The reviewer verifies every number against the diff and rewrites a '
+        'wrong one.'
+        + '\n\nCLAIMS: every summary_md bullet claims only what the DIFF above shows. The PLAN '
+        'EXCERPT is intent; when the diff lacks something the plan intended, do not claim it '
+        'and do not describe it as done.'
         + '\n\nReturn ONLY JSON with exactly these four keys: {"type": "chore", '
         '"title": "chore(scope): ...", "commit_subject": "chore(scope): ...", '
         '"summary_md": "## Summary\\n- ..."}.\n'
@@ -92,49 +123,111 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
     )
 
 
-def pr_body_check_prompt(body: str, name_status: str) -> str:
-    """Body-vs-diff verification prompt. Carries check 4 / 4a verbatim from
-    _plan-fidelity-review.md so this call and Phase 6.5 cannot drift apart."""
+# --- Body-only fidelity recheck (Phase 5.5 body-only rounds) -----------------
+
+FILES_CHANGED_BLOCK_RE = re.compile(
+    re.escape(FILES_CHANGED_BEGIN) + r".*?" + re.escape(FILES_CHANGED_END), re.S)
+MERGE_DIGEST_BLOCK_RE = re.compile(
+    re.escape(MERGE_DIGEST_BEGIN) + r".*?" + re.escape(MERGE_DIGEST_END), re.S)
+_DIFF_SECTION_RE = re.compile(r"^diff --git ", re.M)
+_DIFF_PATHS_RE = re.compile(r"^diff --git a/(\S+) b/(\S+)")
+
+# Per-field byte caps for pr_body_recheck_prompt. They sum under MAX_PROMPT_BYTES
+# (adapters/llm.py) with room for the fixed prose; ClaudeCli's own cap is a backstop.
+_RECHECK_CAPS = {"findings": 12_000, "hunks": 12_000, "old_body": 24_000,
+                 "new_body": 24_000, "name_status": 8_000, "evidence": 36_000}
+
+
+def _cap(s: str, n: int) -> str:
+    raw = s.encode()
+    if len(raw) <= n:
+        return s
+    return raw[:n].decode(errors="ignore") + "\n[TRUNCATED]"
+
+
+def strip_machine_blocks(body: str) -> str:
+    """Remove the two runner-generated blocks check 4 excludes; everything else stays."""
+    return MERGE_DIGEST_BLOCK_RE.sub("", FILES_CHANGED_BLOCK_RE.sub("", body or ""))
+
+
+def body_hunks(old_body: str, new_body: str) -> list[dict]:
+    """Numbered added/changed hunks, old -> new, after strip_machine_blocks on both.
+
+    One hunk per difflib 'insert' or 'replace' opcode, in document order, ids H1..Hn:
+    {"id": "H1", "op": "insert"|"replace", "old": [lines], "new": [lines]}.
+    'delete' and 'equal' produce nothing: removing a claim cannot add an unsupported one.
+    """
+    old_lines = strip_machine_blocks(old_body).splitlines()
+    new_lines = strip_machine_blocks(new_body).splitlines()
+    sm = difflib.SequenceMatcher(None, old_lines, new_lines, autojunk=False)
+    hunks: list[dict] = []
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op not in ("insert", "replace"):
+            continue
+        hunks.append({"id": f"H{len(hunks) + 1}", "op": op,
+                      "old": old_lines[i1:i2], "new": new_lines[j1:j2]})
+    return hunks
+
+
+def diff_sections_for(diff: str, paths: set[str], cap: int = 40_000) -> str:
+    """Per-file sections of a unified diff whose a/ or b/ path is in `paths`.
+
+    Sections keep diff order and are byte-capped. When no section matches, the first
+    `cap` bytes of the whole diff stand in. Pure string work.
+    """
+    diff = diff or ""
+    starts = [m.start() for m in _DIFF_SECTION_RE.finditer(diff)]
+    picked: list[str] = []
+    for k, start in enumerate(starts):
+        end = starts[k + 1] if k + 1 < len(starts) else len(diff)
+        section = diff[start:end]
+        m = _DIFF_PATHS_RE.match(section)
+        if m and (m.group(1) in paths or m.group(2) in paths):
+            picked.append(section)
+    return _cap("".join(picked) if picked else diff, cap)
+
+
+def pr_body_recheck_prompt(findings: list[str], hunks: list[dict], old_body: str,
+                           new_body: str, name_status: str, evidence: str) -> str:
+    """Single-turn, no-tools recheck of a PR body after a body-only remediation round.
+
+    Every prior finding is enumerated F1..Fn and every added or changed body hunk
+    H1..Hm; schemas.validate_body_recheck demands each id back exactly once.
+    """
+    f_block = "\n".join(f"F{i}: {text}" for i, text in enumerate(findings, 1))
+    h_parts = []
+    for h in hunks:
+        lines = [f"- {ln}" for ln in h["old"]] + [f"+ {ln}" for ln in h["new"]]
+        h_parts.append(f"{h['id']} ({h['op']}):\n" + "\n".join(lines))
+    h_block = "\n\n".join(h_parts) if h_parts else "(none)"
     return (
-        "check the PR body's **hand-written** claims (the Scope prose, tests added, "
-        "counts, \"no behavior change\") against the actual diff. A hand-written body "
-        "claim the diff contradicts is a **finding**, and it is **blocking**: it must be "
-        "corrected before the PR is endorsed as ready. "
-        "Never endorse readiness on the strength of the body alone. "
-        "**Exclude the machine-generated files-changed block** delimited by "
-        "`<!-- files-changed:begin -->` / `<!-- files-changed:end -->`: "
-        "`SKILL.md` runtime Phase 5.9 regenerates that block from "
-        "`git diff --name-status origin/master...HEAD` immediately before this phase, "
-        "so it is generated data reconciled by construction, not a claim — a drift there "
-        "is a Phase 5.9 defect, never a body finding, and reporting it is a false "
-        "`NOT READY`. "
-        "Also exclude the machine-generated merge-digest block delimited by "
-        "`<!-- merge-digest:begin -->` / `<!-- merge-digest:end -->`: the runner writes "
-        "it from the previous run's sticky verdict, so it is not a claim. "
-        "The block has already been removed from the text you are shown, so never "
-        "re-emit it.\n\n"
-        "**Named-constant volumes.** Within this same check, and **inheriting its "
-        "blocking verdict**: if the diff introduces or edits a class carrying a named "
-        "`EXPECTED` constant array — or any equivalent named-constant row count, deletion "
-        "count, or table list — read those constants out of the code and confirm every "
-        "volume, count, and table/suffix name in the PR body Summary agrees with them. "
-        "Body prose is authored before implementation and hand-patched during it, so "
-        "these are the numbers that silently rot (PR #2001 understated a deletion volume "
-        "~23x and named the wrong backup-table suffix; both survived to Phase 6). "
-        "Read the constant, do not trust the body's number. A disagreement is a blocking "
-        "finding, corrected in the body before the PR is endorsed ready.\n\n"
-        'The runner owns the "## Manual Testing" section. It has been removed from the '
-        "text you are shown. Never write a \"## Manual Testing\" heading and never emit "
-        "a manual-testing checklist in corrected_body.\n\n"
-        "The file list below is names-only and may be incomplete. If a file is absent "
-        "from the name-status list, do not flag claims about it as unsupported.\n\n"
-        "BODY PROSE:\n" + body[:40000]
-        + "\n\nNAME-STATUS:\n" + name_status[:20000]
-        + '\n\nReturn ONLY JSON with exactly these two keys: '
-        '{"corrected_body": "<the full revised body prose>", '
-        '"findings": ["<one sentence per disagreement you corrected>"]}. '
-        "When the body already agrees with the diff, return corrected_body unchanged "
-        "and findings as an empty array."
+        "You are rechecking a PR body after a body-only remediation. The code tree is "
+        "unchanged since the prior review and every prior finding was about the PR body. "
+        "You have no tools; judge only from this packet.\n\n"
+        "A hand-written body claim the diff evidence contradicts is unresolved or "
+        "unsupported. Counts, file names, test names and \"no behavior change\" claims "
+        "must be confirmed against the evidence shown, never assumed.\n\n"
+        "A claim about state the diff cannot show (an issue number, a deploy, a sibling "
+        "repo, \"all tests pass locally\") is unsupported unless the body line itself "
+        "cites evidence that is visible in this packet. You cannot run commands, so a "
+        "bare claim of that kind is unsupported.\n\n"
+        "When the packet does not let you ground a claim, answer `unresolved` / "
+        "`unsupported`. A wrong `resolved` arms a merge; a wrong `unresolved` only costs "
+        "a fuller review.\n\n"
+        "## PRIOR FINDINGS\n" + _cap(f_block, _RECHECK_CAPS["findings"])
+        + "\n\n## ADDED OR CHANGED BODY HUNKS\n" + _cap(h_block, _RECHECK_CAPS["hunks"])
+        + "\n\n## OLD BODY\n" + _cap(old_body or "", _RECHECK_CAPS["old_body"])
+        + "\n\n## NEW BODY\n" + _cap(new_body or "", _RECHECK_CAPS["new_body"])
+        + "\n\n## CHANGED FILES (git diff --name-status)\n"
+        + _cap(name_status or "", _RECHECK_CAPS["name_status"])
+        + "\n\n## DIFF EVIDENCE\n" + _cap(evidence or "", _RECHECK_CAPS["evidence"])
+        + "\n\nReply with ONLY a JSON object: "
+        '{"findings": [{"id": "F1", "status": "resolved"|"unresolved", '
+        '"evidence": "<one sentence citing the body line and the diff line>"}], '
+        '"hunks": [{"id": "H1", "status": "supported"|"unsupported", '
+        '"evidence": "<one sentence>"}]}. '
+        "Include every F-id and every H-id exactly once. No other keys, no prose. "
+        'When the hunk list is (none), "hunks": [] is required.'
     )
 
 

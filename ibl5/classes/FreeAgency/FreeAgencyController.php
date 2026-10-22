@@ -29,7 +29,7 @@ class FreeAgencyController
      */
     private \Psr\Log\LoggerInterface $logger;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -81,7 +81,7 @@ class FreeAgencyController
         $username = $this->authService->getUsername() ?? '';
         $teamName = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $team = Team::initialize($this->db, $teamName);
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
 
         $mainPageData = $this->service->getMainPageData($team, $season);
         $rawResult = $this->request->get('result');
@@ -102,7 +102,7 @@ class FreeAgencyController
         $teamid = $this->commonRepository->getTidFromTeamname($userTeamName) ?? 0;
 
         $team = Team::initialize($this->db, $teamid);
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
 
         $negotiationData = $this->service->getNegotiationData($pid, $team, $season);
         $negotiationData['team'] = $team;

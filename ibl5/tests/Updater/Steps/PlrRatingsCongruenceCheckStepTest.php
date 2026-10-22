@@ -369,6 +369,69 @@ class PlrRatingsCongruenceCheckStepTest extends TestCase
         $this->assertStringContainsString('3 rating mismatch(es) across 1 player(s)', $result->detail);
     }
 
+    public function testPlayersFlaggedCountsOnlyPlayersWithMismatches(): void
+    {
+        // Player A: FT 80/100 = 80, rated 20, so one mismatch. Player B: all zeros, below MIN_ATTEMPTS, never flagged.
+        $flagged = $this->buildPlrLine(1001, 'Player A', 0, 0, 80, 100, 0, 0, 0, 20, 0);
+        $clean = $this->buildPlrLine(1002, 'Player B', 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        $data = implode("\r\n", [$flagged, $clean]);
+
+        /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
+        $stub = self::createStub(JsbSourceResolverInterface::class);
+        $stub->method('getContents')->willReturn($data);
+
+        $step = new PlrRatingsCongruenceCheckStep($stub, 'Regular Season');
+        $result = $step->execute();
+
+        $this->assertSame(1, $result->messageErrorCount);
+        $this->assertSame('1 rating mismatch(es) across 1 player(s) [settled]', $result->detail);
+    }
+
+    public function testCapKeepsTheFirstMismatchesInFileOrder(): void
+    {
+        // 30 players, each FT 80/100 rated 50. The listed slice must be players 1..MAX_LISTED in file order.
+        $max = PlrRatingsCongruenceCheckStep::MAX_LISTED;
+        $lines = [];
+        for ($i = 1; $i <= 30; $i++) {
+            $lines[] = $this->buildPlrLine($i, sprintf('Player %02d', $i), 0, 0, 80, 100, 0, 0, 0, 50, 0);
+        }
+        $data = implode("\r\n", $lines);
+
+        /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
+        $stub = self::createStub(JsbSourceResolverInterface::class);
+        $stub->method('getContents')->willReturn($data);
+
+        $step = new PlrRatingsCongruenceCheckStep($stub, 'Regular Season');
+        $result = $step->execute();
+
+        $this->assertStringStartsWith('ERROR: Player 01 (pid 1): FTP rating 50', $result->messages[0]);
+        $this->assertStringStartsWith(
+            sprintf('ERROR: Player %02d (pid %d): FTP rating 50', $max, $max),
+            $result->messages[$max - 1],
+        );
+        $this->assertSame('30 rating mismatch(es) across 30 player(s) [settled]', $result->detail);
+    }
+
+    public function testTwoPointCheckNeverAddsThreePointTotalsToFieldGoals(): void
+    {
+        // FGM/FGA 500/1000, 3GM/3GA 100/300, 2GP rated 50 (expected 57). Adding threes instead of
+        // subtracting them would read 600/1300 and expect 46; the message must show 400/700 only.
+        $line = $this->buildPlrLine(1001, 'Player A', 500, 1000, 0, 0, 100, 300, 50, 0, 33);
+
+        /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
+        $stub = self::createStub(JsbSourceResolverInterface::class);
+        $stub->method('getContents')->willReturn($line);
+
+        $step = new PlrRatingsCongruenceCheckStep($stub, 'Regular Season');
+        $result = $step->execute();
+
+        $this->assertSame(1, $result->messageErrorCount);
+        $this->assertStringContainsString('real-life 400/700', $result->messages[0]);
+        $this->assertStringNotContainsString('real-life 600/700', $result->messages[0]);
+        $this->assertStringNotContainsString('real-life 400/1300', $result->messages[0]);
+        $this->assertStringNotContainsString('real-life 600/1300', $result->messages[0]);
+    }
+
     private function buildPlrLine(
         int $pid,
         string $name,

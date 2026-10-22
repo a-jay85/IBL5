@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-16
+last_verified: 2026-10-20
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -194,7 +194,7 @@ Appending a metadata line is **not** editing the verdict: the word, the findings
 
 ## Step 4 — Remediation on `READY WITH NOTES` (and `NOT READY`)
 
-Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-5-5"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow.
+Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-5-5"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow. The harness engine adds one bounded exception to the gate-owning deny: a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes may be edited and committed, within the size and frontmatter limits in `tools/postplan-harness/harness/fidelity_filefix.py`; every other gate-owning path stays denied and a mixed commit is discarded whole. The skill engine keeps the full deny.
 
 Three post-plan-specific rules on top — these are where a re-spawn would otherwise creep in:
 
@@ -243,6 +243,8 @@ Skip this step entirely when `FIDELITY=READY`.
 ## Step 4b — Bounded re-review on a fully remediated tree
 
 Run this step only when step 4 addressed **every** `Mode: in-PR` finding. Skip it when `FIDELITY=READY` (step 4 never ran) or when any finding was left unfixed.
+
+**Harness body-only recheck.** The compiled harness (`tools/postplan-harness/runner.py`) takes a shorter path when the round changed only the PR body, the head tree equals the tree the prior review recorded, the plan hash is unchanged, and every prior finding was a check-4 (PR body) finding. It runs one single-turn Sonnet call over the prior findings, the numbered added body hunks, and the diff sections they cite, and it writes a `READY` verdict file at the re-review path only when every finding is resolved and every hunk is supported. Any other result runs the full re-review below. This skill fallback has no recheck path; when it runs, it always spawns the full re-review. Details: `tools/postplan-harness/README.md`.
 
 **Skip gate first.** Reuse the existing condition-(7) resolver rather than re-implementing plan lookup — `bin/lib/plan-resolve.sh` sets `$PLAN_FILE`, and the `awk` below is the same line-1-frontmatter parse condition (7) uses. The `</dev/null` is load-bearing: macOS `awk` with a program and no file argument reads STDIN and hangs.
 

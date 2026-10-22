@@ -1,9 +1,9 @@
 ---
-description: CSS architecture: all styles live in ibl5/design/components/; inline CSS is banned. Includes extraction gotchas, orphan-CSS audit, and mobile responsive hiding.
+description: CSS architecture: all styles live in ibl5/design/components/; inline CSS is banned; daisyUI (d- prefix) is the base layer on converted pages. Includes extraction gotchas, orphan-CSS audit, and mobile responsive hiding.
 paths:
   - "**/design/**/*.css"
   - "**/*View.php"
-last_verified: 2026-10-06
+last_verified: 2026-10-20
 ---
 
 # CSS Architecture Reference
@@ -17,13 +17,25 @@ Tailwind 4 owns the layer order — only four layers exist: `@layer theme, base,
 | `theme` | lowest | Tailwind theme variables (internal) |
 | `base` | low | Tailwind preflight/reset, CSS reset, legacy PHP-Nuke styles (`base.css`) |
 | `components` | normal | All IBL component CSS, mobile/card overrides (`components/*.css`, `tokens/tokens.css`, bottom of `base.css`) |
-| `utilities` | highest | Tailwind utilities (`text-center`, `bg-navy-800`…) (internal) |
+| `utilities` | highest | Tailwind utilities (`text-center`, `bg-navy-800`…) (internal); daisyUI component rules in nested sublayers; the daisyUI override block at the end of `design/input.css` |
 
 **Rules:**
 - A `components` selector *always* beats `base` regardless of specificity (layer order).
 - Within `components`, override via higher specificity + later source order (e.g. `.player-stats-card table td` > `.ibl-data-table td`).
 - Utilities always win over everything — correct.
 - **Never use custom layer names** (`reset`, `legacy`, `overrides`) — Tailwind 4 drops them from its order, so they implicitly land *after* `utilities`.
+
+## daisyUI Components
+
+daisyUI 5 is the base layer for shared UI pieces (buttons, form controls, cards, alerts) on converted pages. The Player Search form and the Free Agency offer page are the first two. Every other page keeps its `ibl-*` classes until it is converted.
+
+- **Prefix.** Every daisyUI class carries `d-`: `d-btn`, `d-card`, `d-label`. The prefix keeps it clear of `ibl-*` and Tailwind classes, so adoption is additive. Never unprefix it.
+- **Config.** The `@plugin "daisyui"` block sits right after `@import 'tailwindcss';` in `design/input.css`. It excludes `rootcolor`, `rootscrollgutter`, `scrollbar`, and `properties`, which would otherwise restyle every page. The `@plugin "daisyui/theme"` block defines the light `ibl` theme and points each color at the `@theme` palette with `var(--color-*)`. It is the one block outside `@theme` that may name `--color-*`, because Tailwind keeps every theme variable that emitted CSS references.
+- **Layer.** daisyUI puts its component rules in nested sublayers inside `@layer utilities`. An override in `@layer components` always loses to them.
+- **Overrides.** Brand overrides live in one unnested `@layer utilities` block at the end of `design/input.css`. An unnested utilities rule beats every nested daisyUI sublayer whatever its specificity. Reference bare token aliases there, as in component CSS.
+- **The `:where()` trick.** Wrap an override in `:where()` when a Tailwind utility on the same element must still win. `:where(.d-label)` has zero specificity, so `text-sm` keeps its size while the layer still beats daisyUI. A plain `.d-label` rule sits later in source order than `.text-sm` and would beat it.
+- **Theme colors make utilities.** Each theme color makes Tailwind emit matching utilities. `--color-error` produces `.text-error`, which beats the Updater's `components` rule of the same name, so a guard rule in the override block keeps the Updater red. Before adding a theme color, grep the views for bare `text-<name>`, `bg-<name>`, and `border-<name>` classes.
+- **Scope.** `ibl-*` classes stay for unconverted pages, and their CSS stays untouched while any page uses it. Stat tables keep `.ibl-data-table` permanently.
 
 ## Token Naming
 

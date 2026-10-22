@@ -29,6 +29,14 @@ global $mysqli_db, $leagueContext;
 /** @var \mysqli $mysqli_db */
 /** @var \League\LeagueContext $leagueContext */
 
+// IBL serves Season Highs from the Records page; Olympics keeps this standalone page.
+if (!($leagueContext instanceof \League\LeagueContext && $leagueContext->isOlympics())) {
+    $target = \Records\RecordsController::legacyRedirectUrl('SeasonHighs', $_GET + $_POST)
+        ?? 'modules.php?name=Records&tab=' . \Records\RecordsController::TAB_THISSEASON;
+    (new \Api\Response\RedirectResponder())->redirect($target);
+    return;
+}
+
 // Get current season info
 $season = \Season\SharedSeason::get($mysqli_db, $leagueContext);
 
@@ -44,9 +52,7 @@ $pagetitle = "- $seasonPhase Stat Leaders";
 $repository = new \SeasonHighs\CachedSeasonHighsRepository(
     new SeasonHighsRepository($mysqli_db, $leagueContext),
     new \Cache\DatabaseCache($mysqli_db),
-    $leagueContext instanceof \League\LeagueContext
-        ? $leagueContext->getCurrentLeague()
-        : \League\LeagueContext::LEAGUE_IBL
+    $leagueContext->getCurrentLeague()
 );
 $service = new SeasonHighsService($repository, $season);
 $view = new SeasonHighsView();

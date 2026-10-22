@@ -12,12 +12,26 @@ use Trading\TradeFormContract;
  * Builds the exact form payload the pre-filled Trading screen would POST, then
  * makes the same validator calls as TradeOffer::createTradeOffer, in the same
  * order. No cap or roster rule is re-implemented here. Cash validation is
- * skipped because v1 suggestions never include cash.
+ * skipped because suggestions never include cash. Form rows are read once per
+ * team per request.
  *
  * @phpstan-import-type TradeFormData from \Trading\Contracts\TradeCapCalculatorInterface
+ * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradeFormRepositoryInterface
+ * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradeFormRepositoryInterface
  */
 class SuggestionValidationFilter
 {
+    public const string FAIL_FORM = 'not on the Trading form';
+    public const string FAIL_CAP = 'over the hard cap';
+    public const string FAIL_ROSTER = 'over the roster limit';
+    public const string FAIL_PLAYER = 'player cannot be traded';
+
+    /** @var array<int, list<TradingPlayerRow>> */
+    private array $playerRows = [];
+
+    /** @var array<int, list<TradingDraftPickRow>> */
+    private array $pickRows = [];
+
     public function __construct(
         private readonly \Trading\Contracts\TradeValidatorInterface $validator,
         private readonly \Trading\TradeCapCalculator $capCalculator,
@@ -58,14 +72,14 @@ class SuggestionValidationFilter
 
         $switchCounter = 0;
         foreach ($sides as $sideIndex => [$tid, $pids, $pickIds]) {
-            foreach ($this->formRepo->getTeamPlayersForTrading($tid) as $row) {
+            foreach ($this->playerRows[$tid] ??= $this->formRepo->getTeamPlayersForTrading($tid) as $row) {
                 $index[$k] = (string) $row['pid'];
                 $type[$k] = '1';
                 $contract[$k] = (string) TradeFormContract::amountFor($row, $advances);
                 $check[$k] = in_array($row['pid'], $pids, true) ? 'on' : null;
                 $k++;
             }
-            foreach ($this->formRepo->getTeamDraftPicksForTrading($tid) as $row) {
+            foreach ($this->pickRows[$tid] ??= $this->formRepo->getTeamDraftPicksForTrading($tid) as $row) {
                 $index[$k] = (string) $row['pickid'];
                 $type[$k] = '0';
                 $contract[$k] = '0';
@@ -92,25 +106,57 @@ class SuggestionValidationFilter
     }
 
     /**
+     * Room under League::HARD_CAP_MAX this season, from the same cap math the
+     * validator runs (form salaries plus cash records), with nothing ticked.
+     */
+    public function capRoom(string $teamName, int $tid): int
+    {
+        $empty = new TradeCandidate($tid, $tid, [], [], [], []);
+        $capData = $this->capCalculator->calculateSalaryCapData(
+            $this->buildTradeFormData($teamName, $teamName, $tid, $tid, $empty),
+        );
+
+        return \League\League::HARD_CAP_MAX - $capData['userCurrentSeasonCapTotal'];
+    }
+
+    /**
      * @param TradeFormData $tradeData
      */
     public function passes(array $tradeData, int $userTid, int $partnerTid, TradeCandidate $c): bool
     {
+        return $this->rejection($tradeData, $userTid, $partnerTid, $c) === null;
+    }
+
+    /**
+     * The first failed check (a FAIL_* label), or null when the deal is legal.
+     * A deal whose assets are not all ticked on the form fails first: the
+     * validator would otherwise judge a different deal than the one shown.
+     *
+     * @param TradeFormData $tradeData
+     */
+    public function rejection(array $tradeData, int $userTid, int $partnerTid, TradeCandidate $c): ?string
+    {
+        $ticked = count(array_filter($tradeData['check'], static fn (?string $v): bool => $v === 'on'));
+        $assets = count($c->userPids) + count($c->userPickIds) + count($c->partnerPids) + count($c->partnerPickIds);
+        if ($ticked !== $assets) {
+            return self::FAIL_FORM;
+        }
+
         $capData = $this->capCalculator->calculateSalaryCapData($tradeData);
         if (!$this->validator->validateSalaryCaps($capData)->isValid()) {
-            return false;
+            return self::FAIL_CAP;
         }
 
         if (!$this->validator->validateRosterLimits($userTid, $partnerTid, count($c->userPids), count($c->partnerPids))->isValid()) {
-            return false;
+            return self::FAIL_ROSTER;
         }
 
         foreach ([...$c->userPids, ...$c->partnerPids] as $pid) {
             if (!$this->validator->canPlayerBeTraded($pid)) {
-                return false;
+                return self::FAIL_PLAYER;
             }
         }
 
-        return true;
+        return null;
     }
 }

@@ -16,12 +16,13 @@ namespace TradeSuggestions;
  */
 final class PickValuer
 {
-    public const float R1_FLOOR = 3.0;
-    public const float R1_SPREAD = 9.0;
-    public const float R2_FLOOR = 0.5;
-    public const float R2_SPREAD = 1.5;
-    public const float FUTURE_R1 = 6.0;
-    public const float FUTURE_R2 = 1.0;
+    // On AssetValuer's scale: a top projected first is worth about a 62-ovr player.
+    public const float R1_FLOOR = 8.0;
+    public const float R1_SPREAD = 22.0;
+    public const float R2_FLOOR = 1.0;
+    public const float R2_SPREAD = 3.0;
+    public const float FUTURE_R1 = 14.0;
+    public const float FUTURE_R2 = 2.0;
 
     /**
      * Map each original team to its 1-based list position within each round.

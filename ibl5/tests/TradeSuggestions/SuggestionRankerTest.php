@@ -51,7 +51,7 @@ class SuggestionRankerTest extends TestCase
     public function testStopsAfterMaxValidations(): void
     {
         $scored = [];
-        for ($i = 0; $i < 10; $i++) {
+        for ($i = 0; $i < SuggestionRanker::MAX_VALIDATIONS + 5; $i++) {
             $scored[] = self::scored(2 + $i, 100 + $i, 5.0, 5.0);
         }
 
@@ -62,11 +62,25 @@ class SuggestionRankerTest extends TestCase
             return false;
         });
 
-        $this->assertSame(8, $calls);
+        $this->assertSame(SuggestionRanker::MAX_VALIDATIONS, $calls);
         $this->assertSame([], $kept);
     }
 
-    private static function scored(int $partnerTid, int $userPid, float $userGain, float $partnerGain): ScoredCandidate
+    /**
+     * A deal that moves a meaningful player outranks a slightly better-scoring
+     * bench swap.
+     */
+    public function testSignificanceLiftsDealsThatMoveARealPlayer(): void
+    {
+        $bench = self::scored(2, 11, 3.0, 3.0);
+        $star = self::scored(3, 12, 2.0, 2.0, significance: 40.0);
+
+        $kept = (new SuggestionRanker())->select([$bench, $star], static fn (ScoredCandidate $s): bool => true);
+
+        $this->assertSame([3, 2], array_map(static fn (ScoredCandidate $s): int => $s->candidate->partnerTid, $kept));
+    }
+
+    private static function scored(int $partnerTid, int $userPid, float $userGain, float $partnerGain, float $significance = 0.0): ScoredCandidate
     {
         return new ScoredCandidate(
             new TradeCandidate(1, $partnerTid, [$userPid], [], [$partnerTid * 100], []),
@@ -74,6 +88,7 @@ class SuggestionRankerTest extends TestCase
             $partnerGain,
             'user reason',
             'partner reason',
+            $significance,
         );
     }
 }

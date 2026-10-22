@@ -67,6 +67,7 @@ $tradeSuggestionsService = new \TradeSuggestions\TradeSuggestionsService(
         $newsSeason,
     ),
     new \TradeSuggestions\SuggestionRanker(),
+    new \Negotiation\NegotiationRepository($mysqli_db, new \Repositories\SalaryCapRepository($mysqli_db)),
 );
 
 $controller = new \Topics\News\NewsController(

@@ -18,30 +18,18 @@ class TeamModeService
     ) {
     }
 
-    public function resolve(int $tid): ResolvedTeamMode
-    {
-        $inputs = $this->repo->getModeInputs($tid);
-
-        return $this->resolveFromInputs(
-            $this->repo->getStoredSetting($tid),
-            $inputs['wins'],
-            $inputs['losses'],
-            $inputs['avgAge'],
-        );
-    }
-
     /**
-     * Resolve a mode from already-loaded inputs, so batch callers skip the
-     * per-team reads. resolve() delegates here; the mapping lives only here.
+     * Resolve a mode from already-loaded inputs. The GM's own team and every
+     * partner go through here, so a team always gets the same guess.
      */
-    public function resolveFromInputs(TeamModeSetting $s, int $wins, int $losses, float $avgAge): ResolvedTeamMode
+    public function resolveFromInputs(TeamModeSetting $s, ModeInputs $inputs): ResolvedTeamMode
     {
-        $guessed = $this->guesser->guess($wins, $losses, $avgAge);
+        $guess = $this->guesser->guess($inputs);
 
         return match ($s) {
-            TeamModeSetting::WinNow => new ResolvedTeamMode(TeamMode::WinNow, $guessed, true),
-            TeamModeSetting::Rebuild => new ResolvedTeamMode(TeamMode::Rebuild, $guessed, true),
-            TeamModeSetting::Auto => new ResolvedTeamMode($guessed, $guessed, false),
+            TeamModeSetting::WinNow => new ResolvedTeamMode(TeamMode::WinNow, $guess->mode, true, $guess),
+            TeamModeSetting::Rebuild => new ResolvedTeamMode(TeamMode::Rebuild, $guess->mode, true, $guess),
+            TeamModeSetting::Auto => new ResolvedTeamMode($guess->mode, $guess->mode, false, $guess),
         };
     }
 

@@ -87,9 +87,9 @@ WT_GC_WT_REMOVE="${WT_GC_WT_REMOVE:-$SCRIPT_DIR/wt-remove}"
 WT_GC_QUEUE_DIR="${WT_GC_QUEUE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue}"
 WT_GC_SESSION_REGISTRY="${WT_GC_SESSION_REGISTRY:-$HOME/.claude/session-registry/active.json}"
 WT_GC_LAUNCHCTL="${WT_GC_LAUNCHCTL:-/bin/launchctl}"
-WT_GC_LSOF="${WT_GC_LSOF:-lsof}"
-WT_GC_GH="${WT_GC_GH:-gh}"
-WT_GC_DOCKER="${WT_GC_DOCKER:-docker}"
+WT_GC_LSOF="${WT_GC_LSOF:-/usr/sbin/lsof}"
+WT_GC_GH="${WT_GC_GH:-/opt/homebrew/bin/gh}"
+WT_GC_DOCKER="${WT_GC_DOCKER:-/usr/local/bin/docker}"
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 log() {
@@ -259,7 +259,10 @@ STEPS_FAILED=0
 run_step() {
     local name="$1" sw="$2" swname="$3" fn="$4" rc=0
     if [ "$sw" = 0 ]; then log "step $name disabled ($swname=0)"; return 0; fi
-    ( set -euo pipefail; "$fn" ) 2> "$TMP_STEP" || rc=$?
+    # Background + wait: a `( ... ) || cmd` list would run the subshell in a
+    # context where bash ignores errexit.
+    ( set -euo pipefail; "$fn" ) 2> "$TMP_STEP" &
+    wait $! || rc=$?
     { cat "$TMP_STEP" >> "$WT_GC_LOG"; } 2>/dev/null || true
     if [ "$rc" -ne 0 ]; then
         log "step $name failed (rc=$rc) — continuing"

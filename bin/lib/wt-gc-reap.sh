@@ -54,6 +54,7 @@ _gc_valid_days() {
 # callers never delete when it does.
 _gc_tips_record() {
     local sha="$1" ref="$2" file
+    if [ "${DRY_RUN:-0}" = 1 ]; then return 0; fi
     file="$WT_GC_TIPS_DIR/tips-$(date +%F).txt"
     mkdir -p "$WT_GC_TIPS_DIR" 2>/dev/null || return 1
     printf '%s %s\n' "$sha" "$ref" >> "$file" 2>/dev/null || return 1
@@ -220,6 +221,7 @@ _gc_wt_guard() {
 # wt-remove (never --force), then a compare-and-delete of the branch.
 _gc_remove_wt_and_branch() {
     local tag="$1" name="$2" branch="$3" sha="$4"
+    GC_REMOVED=0
     if ! _gc_tips_record "$sha" "refs/heads/$branch"; then
         log "$tag keep $name: tips write failed"
         return 1
@@ -228,6 +230,7 @@ _gc_remove_wt_and_branch() {
         log "$tag keep $name: wt-remove refused"
         return 0
     fi
+    GC_REMOVED=1
     if ! _gc_do git -C "$WT_GC_REPO_ROOT" update-ref -d "refs/heads/$branch" "$sha"; then
         log "$tag branch delete failed $branch"
         return 1
@@ -260,7 +263,7 @@ _gc_reap_empty_one() {
     if [ "$age" -lt "$WT_GC_EMPTY_DAYS" ]; then log "empty keep $name: age=${age}d"; return 0; fi
     ahead="$(git -C "$wt" rev-list --count origin/master..HEAD 2>/dev/null)" || ahead=""
     if [ "$ahead" != 0 ]; then log "empty keep $name: ahead=${ahead:-?}"; return 0; fi
-    if ! dirt="$(git -C "$wt" status --porcelain --untracked-files=no 2>/dev/null)"; then
+    if ! dirt="$(git -C "$wt" status --porcelain --untracked-files=all 2>/dev/null)"; then
         log "empty keep $name: status error"; return 0
     fi
     if [ -n "$dirt" ]; then log "empty keep $name: dirty"; return 0; fi
@@ -268,6 +271,7 @@ _gc_reap_empty_one() {
         log "empty keep $name: branch unresolved"; return 0
     fi
     _gc_remove_wt_and_branch empty "$name" "$branch" "$sha" || return 1
+    [ "$GC_REMOVED" = 1 ] || return 0
     log "empty reaped $name branch=$branch age=${age}d"
 }
 
@@ -337,6 +341,7 @@ _gc_reap_dirty_one() {
         n=$((n + 1))
     done 3<<< "$porcelain"
     _gc_remove_wt_and_branch dirty "$name" "$branch" "$tip" || return 1
+    [ "$GC_REMOVED" = 1 ] || return 0
     log "dirty reaped $name paths=$n"
 }
 
@@ -363,7 +368,7 @@ reap_stale_refs() {
     _gc_valid_days WT_GC_REF_DAYS || return 1
     log "refs threshold backup=${WT_GC_BACKUP_DAYS}d other=${WT_GC_REF_DAYS}d"
     local listing remotes remotes_ok=1 now line ref sha ct name stem rname merged
-    local doomed="" rc=0 checked_out branches_ok=1
+    local doomed="" rc=0 checked_out branches_ok=1 known
     now="$(date +%s)"
     listing="$(git -C "$WT_GC_REPO_ROOT" for-each-ref \
         --format='%(refname) %(objectname) %(committerdate:unix)' \
@@ -413,13 +418,18 @@ reap_stale_refs() {
                 fi
                 doomed="${doomed}${sha} ${ref}"$'\n' ;;
             refs/remotes/*)
-                rname="${ref#refs/remotes/}"
-                rname="${rname%%/*}"
                 if [ "$remotes_ok" = 0 ]; then
                     log "ref keep $ref: git remote failed"
                     continue
                 fi
-                if grep -qxF -- "$rname" <<< "$remotes"; then continue; fi
+                # Remote names may contain '/', so match each configured name
+                # as a prefix instead of cutting at the first slash.
+                known=0
+                while IFS= read -r rname; do
+                    [ -n "$rname" ] || continue
+                    case "$ref" in "refs/remotes/$rname/"*) known=1; break ;; esac
+                done <<< "$remotes"
+                if [ "$known" = 1 ]; then continue; fi
                 doomed="${doomed}${sha} ${ref}"$'\n' ;;
         esac
     done 3<<< "$listing"

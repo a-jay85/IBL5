@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# gate-backtest-argv:
 set -euo pipefail
 
 # Detect dangling image references in the per-SHA VR galleries of a gh-pages
@@ -26,7 +25,7 @@ root="."
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help|-h)
-      usage
+      usage 2>&1
       exit 0
       ;;
     --root)

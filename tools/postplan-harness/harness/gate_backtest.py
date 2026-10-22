@@ -129,6 +129,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-e2e-fixture-drift": "needs a snapshot outfile and a live database",
     "bin/check-old-code-compat": "needs --old-tree and a live database",
     "bin/check-orphan-css": "crawls a running app",
+    "bin/check-vr-gallery-refs": "scans a gh-pages checkout of 40-hex gallery dirs; a repo tree has none",
     # Exit 0 means "ran"; flags come from stdout lines. Exit 2 lands in the error bucket.
     "bin/lib/plan-matrix-assertions": ReplaySpec(
         argv=("{plan_file}", "{diff_file}"),

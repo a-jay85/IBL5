@@ -44,7 +44,7 @@ root=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help|-h)
-      usage
+      usage 2>&1
       exit 0
       ;;
     --migrate)

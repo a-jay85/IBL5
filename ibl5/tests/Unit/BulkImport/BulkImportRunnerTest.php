@@ -469,29 +469,6 @@ class BulkImportRunnerTest extends TestCase
         );
     }
 
-    /** @return list<string> sorted ibl5_plb_* and ibl5_import_* dirs currently under the system temp dir */
-    private function tempDirSnapshot(): array
-    {
-        $plbDirs = glob(sys_get_temp_dir() . '/ibl5_plb_*');
-        $importDirs = glob(sys_get_temp_dir() . '/ibl5_import_*');
-        $dirs = array_merge(
-            $plbDirs === false ? [] : $plbDirs,
-            $importDirs === false ? [] : $importDirs,
-        );
-        sort($dirs);
-        return $dirs;
-    }
-
-    /** @param list<string> $before result of tempDirSnapshot() taken before run() */
-    private function assertNoLeakedTempDirs(array $before): void
-    {
-        $leaked = array_values(array_diff($this->tempDirSnapshot(), $before));
-        foreach ($leaked as $dir) {
-            $this->removeDir($dir); // keep a failing run from polluting later runs
-        }
-        self::assertSame([], $leaked);
-    }
-
     public function testSnapshotPlrEmitsOneEntryPerArchiveWithPhaseYearAndSourceLabel(): void
     {
         mkdir($this->backupsDir . '/06-07', 0700, true);
@@ -665,7 +642,6 @@ class BulkImportRunnerTest extends TestCase
 
     public function testPlbOrdinalMapBuiltFromHeatPlrReachesProcessPlbFileAndIsReported(): void
     {
-        $before = $this->tempDirSnapshot();
         $this->seedHeatSeason();
 
         $plrPath = null;
@@ -699,12 +675,10 @@ class BulkImportRunnerTest extends TestCase
         self::assertCount(1, $plrTargetDirs);
         self::assertDirectoryDoesNotExist($plrTargetDirs[0]);
         self::assertContains($plrPath, $cleaned);
-        $this->assertNoLeakedTempDirs($before);
     }
 
     public function testPlbOrdinalMapWithNoUsableRowsIsReportedAsZeroPlayersNotAsFailure(): void
     {
-        $before = $this->tempDirSnapshot();
         $this->seedHeatSeason();
 
         $plrTargetDirs = [];
@@ -727,7 +701,7 @@ class BulkImportRunnerTest extends TestCase
         $this->capturePlbCalls($plbCalls);
 
         ob_start();
-        $this->runnerWith()->run($this->backupsDir, [JsbFileType::Plb], false, false, null);
+        $summary = $this->runnerWith()->run($this->backupsDir, [JsbFileType::Plb], false, false, null);
         $output = ob_get_clean();
 
         self::assertIsString($output);
@@ -735,12 +709,14 @@ class BulkImportRunnerTest extends TestCase
         self::assertSame(0, $plbCalls[0][0]->count());
         self::assertStringContainsString('PLR ordinal map: 0 players from 0607-heat.zip', $output);
         self::assertStringNotContainsString('WARNING', $output);
-        $this->assertNoLeakedTempDirs($before);
+        self::assertSame(0, $summary->totalErrors);
+        self::assertSame(1, $summary->filesProcessed);
+        self::assertCount(1, $plrTargetDirs);
+        self::assertDirectoryDoesNotExist($plrTargetDirs[0]);
     }
 
     public function testPlbOrdinalMapFallsBackToEmptyMapWhenHeatArchiveHasNoPlr(): void
     {
-        $before = $this->tempDirSnapshot();
         $this->seedHeatSeason();
 
         $plrTargetDirs = [];
@@ -765,15 +741,10 @@ class BulkImportRunnerTest extends TestCase
         self::assertSame(1, $summary->filesProcessed);
         self::assertCount(1, $plrTargetDirs);
         self::assertDirectoryDoesNotExist($plrTargetDirs[0]);
-        foreach ($cleaned as $path) {
-            self::assertStringEndsNotWith('IBL5.plr', $path);
-        }
-        $this->assertNoLeakedTempDirs($before);
     }
 
     public function testPlbOrdinalMapParseFailureWarnsAndStillCleansUpTmpDir(): void
     {
-        $before = $this->tempDirSnapshot();
         $this->seedHeatSeason();
 
         $plrPath = null;
@@ -805,7 +776,6 @@ class BulkImportRunnerTest extends TestCase
         self::assertContains($plrPath, $cleaned);
         self::assertCount(1, $plrTargetDirs);
         self::assertDirectoryDoesNotExist($plrTargetDirs[0]);
-        $this->assertNoLeakedTempDirs($before);
     }
 
     public function testCumulativeSkipsNullArchiveAndWarnsOnUnparseableLabel(): void

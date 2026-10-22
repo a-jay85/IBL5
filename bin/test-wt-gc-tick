@@ -877,6 +877,7 @@ done
 finish_case
 
 # H2 — numeric seams: unset = default (legal); empty = invalid, rc 1 (illegal).
+# Mutation check: rewriting a seam as ${VAR:-7} (empty -> default) fails this case.
 fx H2-numeric-seams
 N_VARS=(WT_GC_EMPTY_DAYS WT_GC_BACKUP_DAYS WT_GC_REF_DAYS WT_GC_TMP_PACK_DAYS WT_GC_STALE_DAYS WT_GC_DOCKER_UNTIL)
 N_ON=(WT_GC_REAP_EMPTY=1 WT_GC_REAP_REFS=1 WT_GC_REAP_REFS=1 WT_GC_REAP_TMP_PACK=1 WT_GC_STALE_LIST=1 WT_GC_DOCKER_PRUNE=1)

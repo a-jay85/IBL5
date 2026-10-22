@@ -231,7 +231,7 @@ final class RecordsControllerTest extends TestCase
             'modules.php?name=Records&tab=thisseason&seasonPhase=Reg%0D%0ASet-Cookie%3A%20x%3D1%26tab%3Devil',
             $url
         );
-        self::assertStringNotContainsString("\r", (string) $url);
-        self::assertStringNotContainsString("\n", (string) $url);
+        self::assertStringNotContainsString("\r", $url);
+        self::assertStringNotContainsString("\n", $url);
     }
 }

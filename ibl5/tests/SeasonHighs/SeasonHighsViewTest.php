@@ -189,6 +189,10 @@ class SeasonHighsViewTest extends TestCase
     /**
      * Whole-page pin captured before renderStatTable was split. Reaches every
      * row shape and every date-link arm; see the plan's branch map.
+     *
+     * Mutations verified to turn this red: renaming `rank-cell` to `rank-celx`
+     * in renderPlayerStatRow, `value-cell` to `value-celx` in renderTeamStatRow,
+     * and `<a href=` to `<a hreg=` in linkDate.
      */
     public function testRenderGoldenMixedRowShapes(): void
     {

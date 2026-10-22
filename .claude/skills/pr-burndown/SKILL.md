@@ -48,6 +48,10 @@ bin/pr-triage --held > "$D/held.txt"
 
 `bin/pr-triage --held` lists each held PR with every hold reason.
 
+Each Bash call is a fresh shell, so `$D` is gone after this block. Print it
+(`echo "$D"`), note the path, and write that literal path into every later command and
+job prompt.
+
 ## Step 2: Rank
 
 Order the PRs that need the owner:
@@ -114,7 +118,8 @@ last card.
 
 When the decision needs eyes:
 
-- **Live page:** bring up the PR worktree stack with `bin/wt-up <slug>`. Open
+- **Live page:** bring up the PR worktree stack with `bin/wt-up <slug> --seed`. Drop
+  `--seed` for prod data only when `.env` has the `REMOTE_*` credentials. Open
   `http://<slug>.localhost/ibl5/...` with the `preview_*` tools and embed the screenshot.
   For before and after, swap the old CSS value in with `preview_evaluate` and shoot again.
   If the page 502s while php returns 200, restart `ibl5-traefik`. If the DB is behind,
@@ -128,7 +133,8 @@ When the decision needs eyes:
 ## Step 5: Carry out the pick
 
 Sub-agents cannot push. Run each decision as a headless session. Write the prompt to
-`$D/jobs/pN.txt`:
+`$D/jobs/pN.txt` with the Write tool. Replace `$D`, `N`, and `pN` with literal values
+before you write it, because nothing expands them for the child session:
 
 ```text
 Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it covers.>

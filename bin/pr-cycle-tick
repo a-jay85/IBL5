@@ -35,11 +35,20 @@
 # that reached post-plan counts as the one rescue. A holdrepeat decline is remembered per key.
 # A rescue that never reached post-plan is a strike, and two strikes per key stop the retries.
 #
+# Gate-timeout rerun: when a red PR's only failure (human-signoff aside) is the "All checks
+# green" gate, its newest gate run failed with "TIMEOUT: WAIT: anchors not reported/completed",
+# and every anchor that line names is now completed with conclusion success on the same head,
+# the tick runs `gh run rerun <id> --failed` in place of a rescue. The rerun goes back
+# through the unchanged fail-closed gate. At most PCW_GATE_RERUN_CAP reruns per (PR, head
+# SHA), counted in gate-reruns/<pr>, apart from strikes/. A gh read failure skips the PR
+# for this tick. --dry-run prints the would-rerun line and writes nothing.
+#
 # Env seams (unset and empty both take the default):
 #   PR_CYCLE_STOP_FILE         default $HOME/.ibl5-pr-cycle.stop (same name bin/pr-cycle reads)
 #   PR_CYCLE_WATCH_STATE_DIR   default $HOME/.ibl5-pr-cycle-watch. Holds attempts/, dm-sent/,
 #                              pending/, results/, declined/, strikes/, dm-declined/,
-#                              dm-strikes/, dm-patchid/, conflict-hold/ and retries/.
+#                              dm-strikes/, dm-patchid/, conflict-hold/, retries/ and
+#                              gate-reruns/.
 #   PR_CYCLE_TICK_PR_CYCLE_CMD default $ROOT/bin/pr-cycle
 #   PR_CYCLE_TICK_DM_CMD       default $ROOT/bin/discord-dm
 #   PR_CYCLE_PATCH_ID_CMD      default: the git computation in pcw_patch_id (fetch, diff

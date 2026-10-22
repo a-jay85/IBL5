@@ -379,9 +379,10 @@ set_lsof() { printf '%s\n' "$@" > "$SCRATCH/lsof.txt"; }
 set_lsof_fail() { touch "$SCRATCH/lsof-fail"; }
 set_launchctl_fail() { touch "$SCRATCH/launchctl-fail"; }
 # set_gate_run <sha> <databaseId> <status> <conclusion|"">: the one run `gh run list` returns.
+# An unsettled run keeps conclusion "" because that is the live gh shape (not null).
 set_gate_run() {
     jq -nc --arg sha "$1" --argjson id "$2" --arg st "$3" --arg c "$4" \
-        '[{databaseId:$id, status:$st, conclusion:(if $c == "" then null else $c end),
+        '[{databaseId:$id, status:$st, conclusion:$c,
            headSha:$sha, createdAt:"2026-10-22T02:58:00Z"}]' > "$SCRATCH/runs-$1.json"
 }
 # set_gate_log <databaseId> timeout|other: the `gh run view <id> --log-failed` output.

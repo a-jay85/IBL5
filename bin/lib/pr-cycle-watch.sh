@@ -75,11 +75,12 @@ pcw_gate_failed() {
 }
 # pcw_gate_run_pick <sha>: the run-list JSON (fields databaseId,conclusion,status,headSha,createdAt)
 # on stdin. Prints "<databaseId> <status> <conclusion>" for the newest run whose headSha is
-# <sha>. rc 1 on bad JSON or no such run.
+# <sha>. An unsettled run has conclusion "" (live shape) or null; both print "null". rc 1 on
+# bad JSON or no such run.
 pcw_gate_run_pick() {
     local out
     out="$(jq -r --arg s "$1" '[.[] | select(.headSha == $s)] | sort_by(.createdAt) | last
-        | select(. != null) | "\(.databaseId) \(.status) \(.conclusion // "null")"' 2>/dev/null)" || return 1
+        | select(. != null) | "\(.databaseId) \(.status) \(if (.conclusion // "") == "" then "null" else .conclusion end)"' 2>/dev/null)" || return 1
     [[ "$out" =~ ^[0-9]+\ [a-z_]+\ [a-z_]+$ ]] || return 1
     printf '%s\n' "$out"
 }

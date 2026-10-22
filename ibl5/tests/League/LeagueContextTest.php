@@ -233,6 +233,37 @@ class LeagueContextTest extends TestCase
     }
 
     /**
+     * Test isModuleEnabled returns false for Contracts in Olympics
+     */
+    public function testIsModuleEnabledOlympicsDisablesContracts(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('Contracts'));
+    }
+
+    /**
+     * Test isModuleEnabled returns false for ContractList in Olympics
+     */
+    public function testIsModuleEnabledOlympicsDisablesContractList(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('ContractList'));
+    }
+
+    /**
+     * Test isModuleEnabled returns true for Contracts and ContractList in IBL
+     */
+    public function testIsModuleEnabledIblEnablesContracts(): void
+    {
+        $_SESSION['current_league'] = 'ibl';
+
+        $this->assertTrue($this->leagueContext->isModuleEnabled('Contracts'));
+        $this->assertTrue($this->leagueContext->isModuleEnabled('ContractList'));
+    }
+
+    /**
      * Test isModuleEnabled returns false for FranchiseHistory in Olympics
      */
     public function testIsModuleEnabledOlympicsDisablesFranchiseHistory(): void
@@ -240,6 +271,16 @@ class LeagueContextTest extends TestCase
         $_SESSION['current_league'] = 'olympics';
 
         $this->assertFalse($this->leagueContext->isModuleEnabled('FranchiseHistory'));
+    }
+
+    /**
+     * Test isModuleEnabled returns false for Leaderboards in Olympics
+     */
+    public function testIsModuleEnabledOlympicsDisablesLeaderboards(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('Leaderboards'));
     }
 
     /**
@@ -516,10 +557,24 @@ class LeagueContextTest extends TestCase
             'CareerLeaderboards',
             'SeasonLeaderboards',
             'RecordHolders',
+            'Records',
+            'AllStarAppearances',
         ];
 
         foreach ($disabledModules as $module) {
             $this->assertFalse($context->isModuleEnabled($module), "$module should be disabled in Olympics");
+        }
+    }
+
+    public function testSeasonHighsStaysEnabledInOlympics(): void
+    {
+        $_GET['league'] = 'olympics';
+        try {
+            $context = new LeagueContext();
+
+            $this->assertTrue($context->isModuleEnabled('SeasonHighs'));
+        } finally {
+            unset($_GET['league']);
         }
     }
 

@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-10-20
+last_verified: 2026-10-21
 ---
 
 # IBL5 Operations Runbook
@@ -349,7 +349,7 @@ HTTP 200 = DB reachable. HTTP 503 = DB unreachable (`"status": "degraded"`).
 
 ### Weekly log review
 
-`.github/workflows/log-review.yml` runs every Sunday at ~09:00 ET. It SSHes to the production box, fetches a digest via `bin/log-fetch-prod`, and DMs the summary to Discord. This covers total entry counts, severity breakdown, slow query count, and the top 3 deduplicated messages.
+`.github/workflows/log-review.yml` runs every Sunday at 16:03 UTC (the weekly usage reset). It SSHes to the production box, fetches a digest via `bin/log-fetch-prod`, and posts the summary to the #reviews Discord channel. This covers total entry counts, severity breakdown, slow query count, and the top 3 deduplicated messages.
 
 ---
 

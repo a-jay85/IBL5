@@ -6,13 +6,9 @@ _VR screens for head `abc1234` at 2026-10-06 20:23 UTC._
 
 ### standings · standings · top, y 0-120 px
 
-**Before**
+_Before = red band · After = green band_
 
-![standings before](https://a-jay85.github.io/IBL5/deadbeef/visual-review/changed/standings.1.before.png)
-
-**After**
-
-![standings after](https://a-jay85.github.io/IBL5/deadbeef/visual-review/changed/standings.1.after.png)
+<picture><source media="(min-width: 768px)" srcset="https://a-jay85.github.io/IBL5/deadbeef/visual-review/changed/standings.1.side.png"><img src="https://a-jay85.github.io/IBL5/deadbeef/visual-review/changed/standings.1.stack.png" alt="standings before and after"></picture>
 
 ### standings · standings · bottom, y 900-1000 px
 
@@ -28,13 +24,9 @@ _VR screens for head `abc1234` at 2026-10-06 20:23 UTC._
 
 ### standings · standings-mobile · full page (size changed)
 
-**Before**
+_Before = red band · After = green band_
 
-![standings-mobile before](https://a-jay85.github.io/IBL5/deadbeef/visual-review/changed/standings-mobile.1.before.png)
-
-**After**
-
-![standings-mobile after](https://a-jay85.github.io/IBL5/deadbeef/visual-review/changed/standings-mobile.1.after.png)
+<picture><source media="(min-width: 768px)" srcset="https://a-jay85.github.io/IBL5/deadbeef/visual-review/changed/standings-mobile.1.side.png"><img src="https://a-jay85.github.io/IBL5/deadbeef/visual-review/changed/standings-mobile.1.stack.png" alt="standings-mobile before and after"></picture>
 
 </details>
 

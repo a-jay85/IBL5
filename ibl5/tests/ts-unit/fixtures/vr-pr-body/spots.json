@@ -8,7 +8,9 @@
     "kind": "spot",
     "region": "top, y 0-120 px",
     "beforeFile": "changed/standings.1.before.png",
-    "afterFile": "changed/standings.1.after.png"
+    "afterFile": "changed/standings.1.after.png",
+    "sideFile": "changed/standings.1.side.png",
+    "stackFile": "changed/standings.1.stack.png"
   },
   {
     "module": "standings",
@@ -31,6 +33,8 @@
     "reason": "dimensions-changed",
     "region": "",
     "beforeFile": "changed/standings-mobile.1.before.png",
-    "afterFile": "changed/standings-mobile.1.after.png"
+    "afterFile": "changed/standings-mobile.1.after.png",
+    "sideFile": "changed/standings-mobile.1.side.png",
+    "stackFile": "changed/standings-mobile.1.stack.png"
   }
 ]

@@ -295,5 +295,30 @@ describe('manual-row before/after', () => {
     expect(manualShotFile('x', 'before')).toBe('x.before.png');
     expect(manualShotFile('x')).toBe('x.png');
     expect(manualShotUrl(PAGES_URL, 'x', 'before')).toBe(`${PAGES_URL}manual-rows/x.before.png`);
+    expect(manualShotUrl(PAGES_URL, 'x', 'side')).toBe(`${PAGES_URL}manual-rows/x.side.png`);
+    expect(manualShotUrl(PAGES_URL, 'x', 'stack')).toBe(`${PAGES_URL}manual-rows/x.stack.png`);
+  });
+
+  it('11e composed renders one side/stack <picture> instead of two images', () => {
+    const md = buildManualSection(
+      [{ label: 'team-page', row: '23', status: 'ok', beforeStatus: 'ok', composed: true }],
+      PAGES_URL
+    );
+    expect(md).toContain(
+      '<picture><source media="(min-width: 768px)" ' +
+        `srcset="${PAGES_URL}manual-rows/team-page.side.png">` +
+        `<img src="${PAGES_URL}manual-rows/team-page.stack.png" alt="team-page before and after"></picture>`
+    );
+    expect(md).not.toContain('team-page.before.png');
+    expect(md).not.toContain(`(${PAGES_URL}manual-rows/team-page.png)`);
+    expect(md).not.toContain('**Before (base)**');
+  });
+
+  it('11f composed without an ok before renders the after-only output', () => {
+    const md = buildManualSection(
+      [{ label: 'team-page', row: '23', status: 'ok', beforeStatus: 'failed', composed: true }],
+      PAGES_URL
+    );
+    expect(md).toBe(PINNED_AFTER_ONLY);
   });
 });

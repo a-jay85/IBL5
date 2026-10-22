@@ -35,8 +35,9 @@ const CROP = 'Crop changed-screen pairs into gallery deploy tree';
 const SPLICE = 'Splice new-screen images into PR body';
 const DEPLOY = 'Deploy VR gallery to per-SHA GitHub Pages';
 const REGEN = 'Regenerate visual regression baselines';
+const MANUAL_COPY = 'Copy manual-row screenshots into gallery deploy tree';
 
-type Step = { name: string; index: number; ifLine: string; coe: string | null };
+type Step = { name: string; index: number; ifLine: string; coe: string | null; body: string };
 
 function e2eSteps(yaml: string): Step[] {
   const lines = yaml.split('\n');
@@ -55,11 +56,12 @@ function e2eSteps(yaml: string): Step[] {
     const line = lines[i];
     const m = /^ {6}- name: (.+)$/.exec(line);
     if (m) {
-      cur = { name: m[1].trim(), index: steps.length, ifLine: '', coe: null };
+      cur = { name: m[1].trim(), index: steps.length, ifLine: '', coe: null, body: '' };
       steps.push(cur);
       continue;
     }
     if (cur === null) continue;
+    cur.body += line + '\n';
     const ifM = /^ {8}if: (.*)$/.exec(line);
     if (ifM) cur.ifLine = ifM[1];
     const coeM = /^ {8}continue-on-error: (.*)$/.exec(line);
@@ -94,6 +96,11 @@ function publishStepViolations(yaml: string): string[] {
     if (at(name) !== -1 && (regen === -1 || at(name) > regen)) out.push(`order: ${name}`);
   }
   if (at(CROP) !== -1 && (at(DEPLOY) === -1 || at(CROP) > at(DEPLOY))) out.push(`order: ${CROP}`);
+
+  // Manual-row before/after composites must be written into the tree before it deploys.
+  const copy = byName.get(MANUAL_COPY);
+  if (!copy || !copy.body.includes('--compose-manual=')) out.push(`no-compose: ${MANUAL_COPY}`);
+  else if (at(DEPLOY) === -1 || copy.index > at(DEPLOY)) out.push(`order: ${MANUAL_COPY}`);
 
   return out;
 }
@@ -157,5 +164,17 @@ describe('publishStepViolations', () => {
     const [, regenBlock] = cutStep(without, REGEN);
     const mutant = without.replace(regenBlock, regenBlock + block);
     expect(publishStepViolations(mutant)).toEqual([`order: ${SPLICE}`]);
+  });
+
+  it('12h: dropping --compose-manual from the manual-row copy step is reported', () => {
+    const mutant = mutateStep(REAL, MANUAL_COPY, (b) => b.replace('--compose-manual=', '--no-such-flag='));
+    expect(publishStepViolations(mutant)).toEqual([`no-compose: ${MANUAL_COPY}`]);
+  });
+
+  it('12i: moving the manual-row copy step after the deploy step is reported', () => {
+    const [without, block] = cutStep(REAL, MANUAL_COPY);
+    const [, deployBlock] = cutStep(without, DEPLOY);
+    const mutant = without.replace(deployBlock, deployBlock + block);
+    expect(publishStepViolations(mutant)).toEqual([`order: ${MANUAL_COPY}`]);
   });
 });

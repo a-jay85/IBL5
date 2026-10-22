@@ -35,6 +35,19 @@ export interface ChangedSpot {
   region: string;
   beforeFile: string;
   afterFile: string;
+  // Composites (vr-crop-png composePair); absent => separate before/after images.
+  sideFile?: string;
+  stackFile?: string;
+}
+
+// Desktop-wide screens get the side-by-side composite (before left), narrow ones
+// the stacked composite (before above). GitHub's sanitizer keeps <source media>
+// with a width query (checked on PR #2950). One line, its own paragraph.
+export const PAIR_MEDIA = '(min-width: 768px)';
+export const PAIR_CAPTION = '_Before = red band · After = green band_';
+
+export function pairPicture(sideUrl: string, stackUrl: string, alt: string): string {
+  return `<picture><source media="${PAIR_MEDIA}" srcset="${sideUrl}"><img src="${stackUrl}" alt="${alt}"></picture>`;
 }
 
 // Lowercase, collapse runs outside [a-z0-9] to '-', trim '-', cut to 60; empty => null.
@@ -72,15 +85,19 @@ const AGENT_SHOT_ENTRY_RE = /<!-- vr-agent-shot:([a-z0-9-]+) -->/g;
 
 // Agent shots live under the PR head commit's per-SHA tree, so
 // bin/prune-vr-galleries ages them with the rest of that gallery.
-export function agentShotUrl(sha: string, label: string, side: 'before' | 'after'): string {
+export function agentShotUrl(sha: string, label: string, side: 'before' | 'after' | 'side' | 'stack'): string {
   return `https://a-jay85.github.io/IBL5/${sha}/visual-review/agent-shots/${label}.${side}.png`;
 }
 
-// `label` must already be sanitizeLabel output.
+// `label` must already be sanitizeLabel output. With a before, the entry shows
+// the side/stack composites the publisher pushed next to the two shots.
 export function buildAgentShotEntry(sha: string, label: string, hasBefore: boolean): string {
   const lines = [`<!-- vr-agent-shot:${label} -->`, `### Agent shot · ${label}`, ''];
   if (hasBefore) {
-    lines.push('**Before**', '', `![${label} before](${agentShotUrl(sha, label, 'before')})`, '');
+    const side = agentShotUrl(sha, label, 'side');
+    const stack = agentShotUrl(sha, label, 'stack');
+    lines.push(PAIR_CAPTION, '', pairPicture(side, stack, `${label} before and after`), '', AGENT_SHOT_ENTRY_END);
+    return lines.join('\n');
   }
   lines.push('**After**', '', `![${label} after](${agentShotUrl(sha, label, 'after')})`, AGENT_SHOT_ENTRY_END);
   return lines.join('\n');
@@ -137,6 +154,18 @@ function spotRegion(spot: ChangedSpot): string {
 function spotLines(spot: ChangedSpot, pagesUrl: string): string[] {
   const module = sanitizeLabel(spot.module) ?? 'unknown';
   const title = sanitizeLabel(spot.title) ?? 'unknown';
+  if (spot.sideFile !== undefined && spot.stackFile !== undefined) {
+    const side = pagesFileUrl(pagesUrl, spot.sideFile);
+    const stack = pagesFileUrl(pagesUrl, spot.stackFile);
+    return [
+      `### ${module} · ${title} · ${spotRegion(spot)}`,
+      '',
+      PAIR_CAPTION,
+      '',
+      pairPicture(side, stack, `${title} before and after`),
+      '',
+    ];
+  }
   return [
     `### ${module} · ${title} · ${spotRegion(spot)}`,
     '',

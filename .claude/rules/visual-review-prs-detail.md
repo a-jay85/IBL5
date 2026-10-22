@@ -1,6 +1,6 @@
 ---
 description: Lazy detail companion to visual-review-prs.md. Covers self-stability (flake) triage and the strict review-only pass, cropped before/after changed-screen pairs in the PR body, and publishing agent shots.
-last_verified: 2026-10-07
+last_verified: 2026-10-21
 paths:
   - "ibl5/tests/e2e/vr-gallery.ts"
   - "ibl5/tests/e2e/vr-crop.ts"
@@ -30,9 +30,14 @@ A second, review-only strict pass (ADR-0180) runs after this triage. It uses per
 Changed cells get cropped before/after pairs in the same block (ADR-0181). `--crop-changed` runs
 pixelmatch at the gate threshold (0.2) with `diffMask`, clusters changed pixels into at most three
 padded spots, and crops both sides to one box. A size change or a sub-threshold change publishes
-uncropped, labelled. Output: `changed/<title>.<i>.{before,after}.png` plus `changed/spots.json`.
-One `###` per spot (module, cell, region), before above after, desktop first, mobile in one
-`<details>` per module. A short-SHA and UTC stamp opens the block. Cap: 40 spots or 40,000 chars,
+uncropped, labelled. Output: `changed/<title>.<i>.{before,after,side,stack}.png` plus
+`changed/spots.json`. One `###` per spot (module, cell, region), desktop first, mobile in one
+`<details>` per module. Each spot is one `<picture>`: on screens 768 px and wider it shows the
+`side` composite (before left, after right), and narrower screens get `stack` (before above
+after). A red band tops the before and a green band tops the after. GitHub's sanitizer keeps
+`<source media>` (probed on PR #2950). A spot whose composite failed shows separate before and
+after images. Agent shots with a before and manual rows with an ok before use the same
+`<picture>`. A short-SHA and UTC stamp opens the block. Cap: 40 spots or 40,000 chars,
 then a gallery link. Code: `ibl5/tests/e2e/vr-crop.ts`, `ibl5/tests/e2e/vr-crop-png.ts`,
 `ibl5/tests/e2e/vr-pr-body.ts`.
 

@@ -24,6 +24,9 @@
 //   --out-json=PATH           destination for the above.
 //   --manual-gallery=PATH     the capture spec's status-merged JSON; render the
 //                             manual-row sticky comment markdown to --out, exit.
+//   --compose-manual=DIR      with --manual-gallery: write <label>.side/.stack.png
+//                             composites into DIR for rows with an ok before,
+//                             mark them `composed` in the JSON, exit.
 //
 // Usage:
 //   bin/vr-review-comment --gallery=ibl5/vr-gallery.json --coverage=coverage.json \
@@ -58,9 +61,9 @@ const {
   buildAgentShotEntry,
   upsertAgentShots,
 } = await import(resolve(ibl5Dir, 'tests/e2e/vr-pr-body.ts'));
-const { cropPair } = await import(resolve(ibl5Dir, 'tests/e2e/vr-crop-png.ts'));
+const { cropPair, composePair } = await import(resolve(ibl5Dir, 'tests/e2e/vr-crop-png.ts'));
 const { regionLabel } = await import(resolve(ibl5Dir, 'tests/e2e/vr-crop.ts'));
-const { parseManualBullets, buildManualSection, manualShotUrl } =
+const { parseManualBullets, buildManualSection, manualShotUrl, manualShotFile } =
   await import(resolve(ibl5Dir, 'tests/e2e/vr-manual-rows.ts'));
 
 const USAGE =
@@ -70,7 +73,8 @@ const USAGE =
   '   or: bin/vr-review-comment --gallery=PATH --pages-url=URL --update-pr-body=N [--spots=PATH] [--head-sha=SHA] [--run-time=ISO] [--dry-run] [--body-file-in=PATH]\n' +
   '   or: bin/vr-review-comment --publish-agent-shots=N --agent-shots=PATH [--sha=SHA] [--dry-run] [--body-file-in=PATH]\n' +
   '   or: bin/vr-review-comment --manual-rows-from-pr=N [--out-json=PATH] [--body-file-in=PATH]\n' +
-  '   or: bin/vr-review-comment --manual-gallery=PATH --pages-url=URL [--out=PATH]';
+  '   or: bin/vr-review-comment --manual-gallery=PATH --pages-url=URL [--out=PATH]\n' +
+  '   or: bin/vr-review-comment --manual-gallery=PATH --compose-manual=DIR';
 
 let galleryPath: string | null = null;
 let coveragePath: string | null = null;
@@ -84,6 +88,7 @@ let bodyFileIn: string | null = null;
 let manualRowsFromPr: string | null = null;
 let outJson = 'ibl5/vr-manual-rows.json';
 let manualGallery: string | null = null;
+let composeManual: string | null = null;
 let cropDest: string | null = null;
 let galleryDir: string | null = null;
 let spotsPath: string | null = null;
@@ -116,6 +121,7 @@ for (const arg of process.argv.slice(2)) {
     manualRowsFromPr = arg.slice('--manual-rows-from-pr='.length);
   else if (arg.startsWith('--out-json=')) outJson = arg.slice('--out-json='.length);
   else if (arg.startsWith('--manual-gallery=')) manualGallery = arg.slice('--manual-gallery='.length);
+  else if (arg.startsWith('--compose-manual=')) composeManual = arg.slice('--compose-manual='.length);
   else if (arg === '--help') {
     process.stdout.write(USAGE + '\n');
     process.exit(0);
@@ -201,8 +207,22 @@ if (publishAgentShots !== null) {
 
   // Filenames come only from sanitized labels, so every write stays in shotDir.
   const shotDir = `${sha}/visual-review/agent-shots`;
+  // Pairs also get side/stack composites, built in a temp dir before any push.
+  const composeDir = mkdtempSync(join(tmpdir(), 'vr-agent-pairs-'));
+  const composites = (s: { label: string; before: string; after: string }) =>
+    (['side', 'stack'] as const).map((layout) => {
+      const src = join(composeDir, `${s.label}.${layout}.png`);
+      try {
+        writeFileSync(src, composePair(readFileSync(s.before), readFileSync(s.after), layout));
+      } catch (err) {
+        fail(`cannot compose ${s.label} before/after: ${String(err)}`);
+      }
+      return { src, dest: `${shotDir}/${s.label}.${layout}.png` };
+    });
   const files = shots.flatMap((s) => [
-    ...(s.before !== null ? [{ src: s.before, dest: `${shotDir}/${s.label}.before.png` }] : []),
+    ...(s.before !== null
+      ? [{ src: s.before, dest: `${shotDir}/${s.label}.before.png` }, ...composites({ ...s, before: s.before })]
+      : []),
     { src: s.after, dest: `${shotDir}/${s.label}.after.png` },
   ]);
   const entries = shots.map((s) => ({ label: s.label, entry: buildAgentShotEntry(sha, s.label, s.before !== null) }));
@@ -285,7 +305,14 @@ if (publishAgentShots !== null) {
 // Loaded here (right after arg parsing) because copy mode needs it but not a
 // pages URL.
 type LeanCell = { module: string; viewport: 'desktop' | 'mobile'; title: string };
-type ManualRowResult = { label: string; row: string; status: string; error?: string };
+type ManualRowResult = {
+  label: string;
+  row: string;
+  status: string;
+  error?: string;
+  beforeStatus?: string;
+  composed?: boolean;
+};
 let gallery: { changedCells?: LeanCell[]; newCells?: LeanCell[]; flakeCells?: LeanCell[] } = {};
 if (galleryPath !== null && existsSync(galleryPath)) {
   try {
@@ -333,6 +360,19 @@ if (cropDest !== null) {
         const i = k + 1;
         writeFileSync(join(cropDest, `${cell.title}.${i}.before.png`), pair.before);
         writeFileSync(join(cropDest, `${cell.title}.${i}.after.png`), pair.after);
+        // A composite failure keeps the spot, rendered as separate before/after.
+        let composed = false;
+        try {
+          for (const layout of ['side', 'stack'] as const) {
+            writeFileSync(
+              join(cropDest, `${cell.title}.${i}.${layout}.png`),
+              composePair(pair.before, pair.after, layout)
+            );
+          }
+          composed = true;
+        } catch (err) {
+          process.stderr.write(`vr-review-comment: compose failed for ${cell.title}.${i}: ${String(err)}\n`);
+        }
         return {
           module: cell.module,
           viewport: cell.viewport,
@@ -344,6 +384,9 @@ if (cropDest !== null) {
           region: pair.rect === null ? '' : regionLabel(pair.rect, imageHeight),
           beforeFile: `changed/${cell.title}.${i}.before.png`,
           afterFile: `changed/${cell.title}.${i}.after.png`,
+          ...(composed
+            ? { sideFile: `changed/${cell.title}.${i}.side.png`, stackFile: `changed/${cell.title}.${i}.stack.png` }
+            : {}),
         };
       });
       spots.push(...cellSpots);
@@ -353,6 +396,46 @@ if (cropDest !== null) {
   }
   writeFileSync(join(cropDest, 'spots.json'), JSON.stringify(spots, null, 2) + '\n');
   process.stdout.write(`vr-review-comment: cropped ${spots.length} spot(s) from ${cells.length} changed cell(s)\n`);
+  process.exit(0);
+}
+
+// Compose-manual mode — for each ok row whose base-SHA before is ok and on disk,
+// write <label>.side.png / .stack.png into DIR (the deploy tree's manual-rows/)
+// and mark the row `composed`, so the sticky comment shows the composite. Runs
+// before the deploy. A row that fails to compose keeps the separate images.
+if (composeManual !== null) {
+  if (manualGallery === null || !existsSync(manualGallery)) {
+    process.stdout.write('vr-review-comment: no manual rows to compose\n');
+    process.exit(0);
+  }
+  let file: { rows?: ManualRowResult[] } & Record<string, unknown>;
+  try {
+    file = JSON.parse(readFileSync(manualGallery, 'utf-8'));
+  } catch {
+    process.stderr.write(`vr-review-comment: cannot read ${manualGallery}; nothing composed\n`);
+    process.exit(0);
+  }
+  let n = 0;
+  for (const r of file.rows ?? []) {
+    if (r.status !== 'ok' || r.beforeStatus !== 'ok') continue;
+    const beforePath = join(composeManual, manualShotFile(r.label, 'before'));
+    const afterPath = join(composeManual, manualShotFile(r.label));
+    if (!existsSync(beforePath) || !existsSync(afterPath)) continue;
+    try {
+      for (const layout of ['side', 'stack'] as const) {
+        writeFileSync(
+          join(composeManual, manualShotFile(r.label, layout)),
+          composePair(readFileSync(beforePath), readFileSync(afterPath), layout)
+        );
+      }
+      r.composed = true;
+      n++;
+    } catch (err) {
+      process.stderr.write(`vr-review-comment: compose failed for ${r.label}: ${String(err)}\n`);
+    }
+  }
+  writeFileSync(manualGallery, JSON.stringify(file, null, 2) + '\n');
+  process.stdout.write(`vr-review-comment: composed ${n} manual before/after pair(s)\n`);
   process.exit(0);
 }
 

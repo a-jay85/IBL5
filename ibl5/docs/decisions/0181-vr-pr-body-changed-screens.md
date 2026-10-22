@@ -1,6 +1,6 @@
 ---
 description: Changed VR cells are published at the top of the PR body as cropped before/after pairs, the publish steps also run under update-baselines, manual-row shots gain a base-SHA before, and agents publish their own shots through bin/vr-review-comment.
-last_verified: 2026-10-07
+last_verified: 2026-10-21
 ---
 
 # ADR-0181: Publish cropped before/after pairs of changed VR screens in the PR body
@@ -19,7 +19,7 @@ ADR-0076 put first renders of brand-new VR views at the top of the PR body. Chan
 ## Decision
 
 1. For each changed cell, CI computes the changed pixels with pixelmatch at the gate's threshold and `diffMask`, clusters them into at most three padded spots, and crops before and after to the same box. A cell whose dimensions changed, or whose change sits below the threshold, is published uncropped and labelled so.
-2. The ADR-0076 managed block gains a changed section: one `###` heading per spot (module, cell, region), the before image above the after image, desktop first, mobile spots inside one `<details>` per module. A stamp with the short head SHA and the UTC run time opens the block. Spots stop at 40 entries or 40,000 characters, and a link to the full gallery follows.
+2. The ADR-0076 managed block gains a changed section: one `###` heading per spot (module, cell, region), then one `<picture>` of the pair, desktop first, mobile spots inside one `<details>` per module. A stamp with the short head SHA and the UTC run time opens the block. Spots stop at 40 entries or 40,000 characters, and a link to the full gallery follows.
 3. The gallery build, crop, deploy, assert, re-serve and splice steps also run while `update-baselines` is present. Each carries `continue-on-error` that is true on a labelled run, so a publish failure can never skip the baseline regen. The before image is master's committed baseline, so the evidence survives the regen. A unit test over `.github/workflows/e2e-tests.yml` fails if any of these steps regains the label guard or loses `continue-on-error`.
 4. Manual-row `vr:` shots gain a before taken from a second PHP container serving a worktree of the base SHA. Any failure falls back to the after-only shot.
 5. `bin/vr-review-comment --publish-agent-shots` lets an agent push its own PNGs to `<head-sha>/visual-review/agent-shots/` on `gh-pages` and upsert them into an agent-shot sub-block that the CI refresh carries forward. Labels are reduced to `[a-z0-9-]`. Local file paths never enter a PR body.
@@ -31,6 +31,7 @@ The new-screen image alt text now joins title and viewport with a middle dot (`d
 ## Alternatives Considered
 
 - **Side-by-side tables.** Two images in one table row shrink to unreadable widths on a phone.
+- **Separate before and after images, stacked.** The first version shipped this. On a desktop the owner wanted the pair side by side. GitHub Markdown has no CSS, so CI writes two composites per pair (`side` and `stack`) and the body picks one with `<source media="(min-width: 768px)">`. A throwaway comment on PR #2950 showed GitHub's sanitizer keeps that `media` attribute.
 - **Bounding box from the alpha of `<title>.diff.png`.** pixelmatch paints every unchanged pixel grey, so the alpha box is the whole image.
 - **A before built from base CSS only.** It misses markup changes, which are half of what a redesign touches.
 - **A new `bin/` publisher for agent shots.** The meta-tooling bar asks to extend first, and `bin/vr-review-comment` already owns the managed block.

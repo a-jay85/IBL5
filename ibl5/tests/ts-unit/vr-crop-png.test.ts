@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { PNG } from 'pngjs';
-import { cropPair } from '../e2e/vr-crop-png';
+import {
+  AFTER_BAND,
+  BEFORE_BAND,
+  GAP_GREY,
+  PAIR_BAND,
+  PAIR_GAP,
+  composePair,
+  cropPair,
+} from '../e2e/vr-crop-png';
 
 function solidPng(width: number, height: number, rgb: [number, number, number]): PNG {
   const png = new PNG({ width, height });
@@ -68,5 +76,42 @@ describe('cropPair', () => {
 
     expect(res.plan).toEqual({ kind: 'uncropped', reason: 'no-pixel-mask' });
     expect(res.pairs[0].rect).toBeNull();
+  });
+});
+
+describe('composePair', () => {
+  const RED: [number, number, number] = [255, 0, 0];
+  const BLUE: [number, number, number] = [0, 0, 255];
+  const px = (png: PNG, x: number, y: number) => {
+    const o = (y * png.width + x) * 4;
+    return [png.data[o], png.data[o + 1], png.data[o + 2]];
+  };
+  // before 10x20 red, after 30x8 blue: unequal, like an uncropped size change.
+  const before = PNG.sync.write(solidPng(10, 20, RED));
+  const after = PNG.sync.write(solidPng(30, 8, BLUE));
+
+  it('9d side puts before left of after, banded, with a grey gap', () => {
+    const out = PNG.sync.read(composePair(before, after, 'side'));
+    expect([out.width, out.height]).toEqual([10 + PAIR_GAP + 30, 20 + PAIR_BAND]);
+    expect(px(out, 0, 0)).toEqual(BEFORE_BAND);
+    expect(px(out, 10 + PAIR_GAP, 0)).toEqual(AFTER_BAND);
+    expect(px(out, 0, PAIR_BAND)).toEqual(RED);
+    expect(px(out, 10 + PAIR_GAP, PAIR_BAND)).toEqual(BLUE);
+    expect(px(out, 10, PAIR_BAND)).toEqual(GAP_GREY);
+    // Short after half leaves white below it.
+    expect(px(out, 10 + PAIR_GAP, PAIR_BAND + 8)).toEqual(WHITE);
+  });
+
+  it('9e stack puts before above after, banded, with a grey gap', () => {
+    const out = PNG.sync.read(composePair(before, after, 'stack'));
+    expect([out.width, out.height]).toEqual([30, 20 + 8 + 2 * PAIR_BAND + PAIR_GAP]);
+    const afterTop = 20 + PAIR_BAND + PAIR_GAP;
+    expect(px(out, 0, 0)).toEqual(BEFORE_BAND);
+    expect(px(out, 0, PAIR_BAND)).toEqual(RED);
+    expect(px(out, 0, 20 + PAIR_BAND)).toEqual(GAP_GREY);
+    expect(px(out, 0, afterTop)).toEqual(AFTER_BAND);
+    expect(px(out, 0, afterTop + PAIR_BAND)).toEqual(BLUE);
+    // Narrow before half leaves white to its right.
+    expect(px(out, 10, PAIR_BAND)).toEqual(WHITE);
   });
 });

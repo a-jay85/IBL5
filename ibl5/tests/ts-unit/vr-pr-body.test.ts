@@ -15,6 +15,9 @@ import {
   agentShotUrl,
   buildAgentShotEntry,
   upsertAgentShots,
+  pairPicture,
+  PAIR_CAPTION,
+  PAIR_MEDIA,
   type ChangedSpot,
   type LeanCell,
 } from '../e2e/vr-pr-body';
@@ -207,6 +210,33 @@ describe('buildPrBodyBlock', () => {
     expect(afters[0]).toBeLessThan(befores[1]);
   });
 
+  it('6m: a spot with composites renders one <picture> (side for wide, stack for narrow)', () => {
+    const spot = makeSpot({ title: 'a', sideFile: 'changed/a.1.side.png', stackFile: 'changed/a.1.stack.png' });
+    const out = block({ spots: [spot] });
+    const lines = out.split('\n');
+    const pic = lines.findIndex((l) => l.startsWith('<picture>'));
+    expect(lines[pic]).toBe(pairPicture(`${PAGES_URL}changed/a.1.side.png`, `${PAGES_URL}changed/a.1.stack.png`, 'a before and after'));
+    // Its own paragraph: blank lines on both sides.
+    expect([lines[pic - 1], lines[pic + 1]]).toEqual(['', '']);
+    expect(out).toContain(PAIR_CAPTION);
+    expect(out).not.toContain('**Before**');
+    expect(out).not.toContain('a.1.before.png');
+  });
+
+  it('6n: a mobile spot with composites keeps the <picture> inside its <details>', () => {
+    const spot = makeSpot({
+      title: 'm',
+      viewport: 'mobile',
+      sideFile: 'changed/m.1.side.png',
+      stackFile: 'changed/m.1.stack.png',
+    });
+    const out = block({ spots: [spot] });
+    const open = out.indexOf('<details>');
+    expect(open).toBeGreaterThan(-1);
+    expect(out.indexOf('<picture>')).toBeGreaterThan(open);
+    expect(out.indexOf('<picture>')).toBeLessThan(out.indexOf('</details>'));
+  });
+
   it('6c: mobile spots sit inside <details>, desktop spots do not', () => {
     const out = block({
       spots: [
@@ -327,8 +357,8 @@ describe('upsertAgentShots', () => {
     const otherSha = 'b'.repeat(40);
     const twice = upsertAgentShots(once, [entry('a', true, otherSha)]);
     expect(markers(twice, 'a')).toBe(1);
-    expect(twice).toContain(agentShotUrl(otherSha, 'a', 'after'));
-    expect(twice).not.toContain(agentShotUrl(SHOT_SHA, 'a', 'after'));
+    expect(twice).toContain(agentShotUrl(otherSha, 'a', 'side'));
+    expect(twice).not.toContain(agentShotUrl(SHOT_SHA, 'a', 'side'));
   });
 
   it('10c: a second label appends after the first', () => {
@@ -352,7 +382,7 @@ describe('upsertAgentShots', () => {
     const withShot = upsertAgentShots('Prose', [entry('a')]);
     const rebuilt = spliceBody(withShot, block({ spots: [makeSpot()], agentShots: extractAgentShots(withShot) }));
     expect(markers(rebuilt, 'a')).toBe(1);
-    expect(rebuilt).toContain(agentShotUrl(SHOT_SHA, 'a', 'after'));
+    expect(rebuilt).toContain(agentShotUrl(SHOT_SHA, 'a', 'stack'));
     expect(rebuilt.endsWith('Prose')).toBe(true);
   });
 
@@ -361,5 +391,26 @@ describe('upsertAgentShots', () => {
     expect(e).not.toContain('**Before**');
     expect(e).toContain('**After**');
     expect(e).not.toContain(agentShotUrl(SHOT_SHA, 'a', 'before'));
+    expect(e).not.toContain('<picture>');
+  });
+
+  it('10g: hasBefore=true renders one side/stack <picture>, no separate images', () => {
+    const e = buildAgentShotEntry(SHOT_SHA, 'a', true);
+    expect(e).toContain(
+      pairPicture(agentShotUrl(SHOT_SHA, 'a', 'side'), agentShotUrl(SHOT_SHA, 'a', 'stack'), 'a before and after')
+    );
+    expect(e).not.toContain('**Before**');
+    expect(e).not.toContain(agentShotUrl(SHOT_SHA, 'a', 'before'));
+    // The end marker sits after a blank line, outside the <picture> paragraph.
+    expect(e).toMatch(/<\/picture>\n\n<!-- \/vr-agent-shot -->$/);
+  });
+});
+
+describe('pairPicture', () => {
+  it('14a: desktop source is the side-by-side, the fallback img is the stack', () => {
+    expect(pairPicture('S.png', 'T.png', 'x')).toBe(
+      '<picture><source media="(min-width: 768px)" srcset="S.png"><img src="T.png" alt="x"></picture>'
+    );
+    expect(PAIR_MEDIA).toBe('(min-width: 768px)');
   });
 });

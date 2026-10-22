@@ -448,6 +448,10 @@ jobs:
         run: |
           mkdir -p ibl5/vr-gallery/manual-rows
           cp -f ibl5/vr-manual-shots/*.png ibl5/vr-gallery/manual-rows/ 2>/dev/null || true
+          # Side-by-side + stacked composites for rows with a base-SHA before (ADR-0181).
+          bin/vr-review-comment \
+            --manual-gallery=ibl5/vr-manual-rows.json \
+            --compose-manual=ibl5/vr-gallery/manual-rows
 
       # Every publish must change a file under <key>/visual-review/, so the gh-pages commit
       # for the dir always lands and its age (git log -1 %ct, read by bin/prune-vr-galleries

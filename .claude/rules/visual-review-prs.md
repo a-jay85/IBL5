@@ -199,8 +199,8 @@ invalidate a baseline; the pure grammar/markup helpers live in `ibl5/tests/e2e/v
 (unit-tested in `ibl5/tests/ts-unit/vr-manual-rows.test.ts`). Both output paths are gitignored.
 
 A base-SHA pass (ADR-0181) serves the base from a second PHP container, runs with
-`VR_MANUAL_SIDE=before`, writes `<label>.before.png` and sets `beforeStatus`. The before shows above
-the after only when `beforeStatus` is `ok`; otherwise the row stays after-only.
+`VR_MANUAL_SIDE=before`, writes `<label>.before.png` and sets `beforeStatus`. With `ok`, the row shows
+the `<picture>` composite (`--compose-manual`); otherwise it stays after-only.
 
 ## One-time deployment prerequisite
 

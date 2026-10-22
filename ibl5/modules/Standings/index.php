@@ -30,7 +30,7 @@ if (!isset($mysqli_db)) {
 
 // Create repository and view instances
 $repository = new Standings\StandingsRepository($mysqli_db, $leagueContext);
-$season = new \Season\Season($mysqli_db, $leagueContext);
+$season = \Season\SharedSeason::get($mysqli_db, $leagueContext);
 
 if ($leagueContext !== null && $leagueContext->isOlympics()) {
     $realTeamIds = \League\OlympicsTeamFilter::getRealTeamIds($mysqli_db);

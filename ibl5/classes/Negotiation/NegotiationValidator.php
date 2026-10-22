@@ -22,7 +22,7 @@ class NegotiationValidator implements NegotiationValidatorInterface
     public function __construct(\mysqli $db, ?\Season\Season $season = null)
     {
         $this->contractValidator = new PlayerContractValidator();
-        $this->season = $season ?? new \Season\Season($db);
+        $this->season = $season ?? \Season\SharedSeason::get($db);
     }
 
     /**

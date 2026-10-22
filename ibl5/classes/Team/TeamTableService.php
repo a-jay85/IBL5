@@ -22,7 +22,7 @@ class TeamTableService implements TeamTableServiceInterface
     private \mysqli $db;
     private TeamRepositoryInterface $repository;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -38,7 +38,7 @@ class TeamTableService implements TeamTableServiceInterface
      */
     public function getTableOutput(int $teamid, ?string $yr, string $display, ?string $split = null): string
     {
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
 
         $isFreeAgency = $season->isOffseasonPhase();
         $result = $this->loadRoster($teamid, $yr, $isFreeAgency);
@@ -239,7 +239,7 @@ class TeamTableService implements TeamTableServiceInterface
      */
     public function getRosterAndStarters(int $teamid): array
     {
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
         $isFreeAgency = $season->isOffseasonPhase();
 
         if ($isFreeAgency) {

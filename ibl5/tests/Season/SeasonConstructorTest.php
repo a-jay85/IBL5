@@ -59,4 +59,35 @@ class SeasonConstructorTest extends TestCase
 
         unset($_SESSION['current_league']);
     }
+
+    /**
+     * Runs in a child process because the PHPUnit bootstrap aliases Season\Season to a mock that never
+     * queries. A failing last-regular-season-game-date query must not stop the real constructor.
+     */
+    public function testConstructorSurvivesLastRegularSeasonGameDateFailure(): void
+    {
+        $result = RealSeasonProcess::run(<<<'PHP'
+            $db = new class extends Tests\WideUnit\Mocks\MockDatabase {
+                #[\ReturnTypeWillChange]
+                public function prepare(string $query): Tests\WideUnit\Mocks\MockPreparedStatement
+                {
+                    if (str_contains($query, 'MAX(game_date)')) {
+                        throw new \RuntimeException('simulated schedule failure', 1003);
+                    }
+
+                    return parent::prepare($query);
+                }
+            };
+            $db->onQuery('ibl_settings', []);
+            try {
+                $season = new Season\Season($db);
+                echo json_encode(['outcome' => 'constructed', 'endingYear' => $season->endingYear]);
+            } catch (\RuntimeException $e) {
+                echo json_encode(['outcome' => 'threw', 'message' => $e->getMessage()]);
+            }
+            PHP);
+
+        $this->assertSame('constructed', $result['outcome']);
+        $this->assertIsInt($result['endingYear']);
+    }
 }

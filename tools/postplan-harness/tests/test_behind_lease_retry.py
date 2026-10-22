@@ -304,6 +304,7 @@ def test_behind_budget_ample_runs_three_rerebases(monkeypatch):
     assert not any("skipped: wall budget" in m for m in logs)
 
 
+# Generated ids: [0-1] runs one pass at the threshold, [-1-0] skips one second under.
 @pytest.mark.parametrize("delta,expected_rebases", [(0, 1), (-1, 0)])
 def test_behind_budget_boundary(monkeypatch, delta, expected_rebases):
     """Remaining exactly at the threshold runs the pass; one second under skips."""

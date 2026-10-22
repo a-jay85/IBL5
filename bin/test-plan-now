@@ -39,6 +39,24 @@ fail() { h_fail "$@"; }
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-plan-now.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 
+# Sandbox HOME so no case can write into the real ~/Library/LaunchAgents.
+# REAL_HOME is kept only for the leak guard at the end of the file.
+REAL_HOME="$HOME"
+REAL_AGENTS="$REAL_HOME/Library/LaunchAgents"
+real_agents_sig() {
+    # Byte-level signature of every per-run plan/post-plan plist plus a
+    # count of any agents-dir file that mentions this test's tmpdir.
+    {
+        find "$REAL_AGENTS" -maxdepth 1 -type f \
+            \( -name 'com.ibl5.plan-now-*' -o -name 'com.ibl5.postplan-now-*' \) \
+            -exec shasum {} + 2>/dev/null | sort
+        grep -rlF "$TMP" "$REAL_AGENTS" 2>/dev/null | wc -l | tr -d ' '
+    } | shasum | cut -d' ' -f1
+}
+REAL_AGENTS_SIG_BEFORE=$(real_agents_sig)
+export HOME="$TMP/home"
+mkdir -p "$HOME/Library/LaunchAgents"
+
 PLANS="$TMP/plans"
 mkdir -p "$PLANS"
 
@@ -298,7 +316,7 @@ run_case_recovery() {
 
 # Remove any plist/runner that PLAN_NOW_DRY_RUN=1 wrote but the test did not
 # execute (e.g., the dup gate declined before the runner was launched). Without
-# this, declined pre-flight cases leave RunAtLoad plists in ~/Library/LaunchAgents
+# this, declined pre-flight cases leave runner files in the sandbox $TMP.
 # pointing at deleted /tmp runners. $1 is the captured stdout from plan-now.
 preflight_cleanup() {
     rm -f "$(printf '%s\n' "$1" | sed -n 's/^  plist:  //p')" \
@@ -1851,6 +1869,13 @@ if [ -n "$l7_probe" ] && [ -n "$l7_spawn" ] && [ "$l7_probe" -lt "$l7_spawn" ]; 
     ok "L-7 probe precedes the spawn"
 else
     fail "L-7 probe precedes the spawn (probe=$l7_probe spawn=$l7_spawn)"
+fi
+
+# Leak guard: the run must leave the real agents dir exactly as it found it.
+if [ "$(real_agents_sig)" = "$REAL_AGENTS_SIG_BEFORE" ]; then
+    ok "real ~/Library/LaunchAgents unchanged by the test run"
+else
+    fail "real ~/Library/LaunchAgents unchanged by the test run (plan-now wrote into $REAL_AGENTS)"
 fi
 
 h_done

@@ -40,7 +40,6 @@ class WaiversController implements WaiversControllerInterface
      */
     private \Psr\Log\LoggerInterface $logger;
     private WaiversProcessorInterface $processor;
-    private ?\Team\Contracts\TeamQueryRepositoryInterface $teamQueryRepo;
     private \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo;
     /**
      * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
@@ -59,10 +58,8 @@ class WaiversController implements WaiversControllerInterface
         HttpRequest $request,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?Season $season = null,
-        ?\Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService = null,
-        ?\Team\Contracts\TeamQueryRepositoryInterface $teamQueryRepo = null
+        ?\Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService = null
     ) {
-        $this->teamQueryRepo = $teamQueryRepo;
         $this->service = $service;
         $this->view = $view;
         $this->teamIdentityRepo = $teamIdentityRepo;
@@ -87,8 +84,6 @@ class WaiversController implements WaiversControllerInterface
             $this->submissionService = new \Waivers\WaiversSubmissionService(
                 $this->processor,
                 $this->salaryCapRepo,
-                $this->teamQueryRepo ?? new \Team\TeamQueryRepository($this->db),
-                $this->teamIdentityRepo,
                 $this->season ?? \Season\SharedSeason::get($this->db)
             );
         }

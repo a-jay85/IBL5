@@ -143,6 +143,11 @@ commit_all
 expect_since set-uo-variant 1 'bin/v2.sh:3:'
 
 reset_repo
+printf '%s\n' '#!/bin/bash' 'set -o errexit -o nounset -o pipefail' "$BAD" >"$REPO/bin/v3.sh"
+commit_all
+expect_since set-long-form-variant 1 'bin/v3.sh:3:'
+
+reset_repo
 printf '%s\n' '#!/usr/bin/env bash' 'set -o pipefail' "$BAD" >"$REPO/bin/v1.sh"
 commit_all
 out=$(cd "$REPO" && bin/check-pipefail-grep-q --since="$BASE" 2>&1) || true

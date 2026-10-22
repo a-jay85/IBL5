@@ -74,7 +74,7 @@ diff_to() {
 }
 
 SHEBANG_RE='^#!.*[/[:space:]](bash|sh)([[:space:]]|$)'
-SET_RE='^[[:space:]]*set([[:space:]]+[-+][A-Za-z]+)*[[:space:]]+-[A-Za-z]*o[[:space:]]+pipefail'
+SET_RE='^[[:space:]]*set([[:space:]]+[-+][A-Za-z]+([[:space:]]+[a-z]+)?)*[[:space:]]+-[A-Za-z]*o[[:space:]]+pipefail'
 BAD_RE='(^|[^[:alnum:]_.-])(echo|printf)[[:space:]]([^|]*[^|\\])?[|][[:space:]]*grep([[:space:]]+-[A-Za-z]+)*[[:space:]]+(--quiet|--silent|-[A-Za-z]*q)'
 HUNK_RE='^@@ -[0-9,]+ \+([0-9]+)'
 

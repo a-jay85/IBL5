@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
+# gate-backtest-argv:
 set -euo pipefail
 
 # Detect dangling image references in the per-SHA VR galleries of a gh-pages

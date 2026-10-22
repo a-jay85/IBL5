@@ -51,9 +51,7 @@ $controller = new \Topics\News\NewsController(
     new \Topics\News\NewsView(),
     onThisDayService: \OnThisDay\OnThisDayFactory::createService(
         $mysqli_db,
-        $leagueContext instanceof \League\LeagueContext
-            ? $leagueContext->getCurrentLeague()
-            : \League\LeagueContext::LEAGUE_IBL,
+        $leagueContext instanceof \League\LeagueContext ? $leagueContext : null,
     ),
     onThisDayView: new \OnThisDay\OnThisDayView(),
 );

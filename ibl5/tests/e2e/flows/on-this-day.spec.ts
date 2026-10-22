@@ -29,8 +29,11 @@ test.describe('On this day block', () => {
   });
 
   test('topic-filtered news page omits on-this-day block', async ({ page }) => {
-    await page.goto('modules.php?name=News&new_topic=1');
+    const response = await page.goto('modules.php?name=News&new_topic=1');
 
+    // A 404 or a failed News render would also leave the block absent.
+    expect(response?.status()).toBe(200);
+    await assertNoPhpErrors(page);
     await expect(page.locator('.on-this-day__list')).toHaveCount(0);
   });
 });

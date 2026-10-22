@@ -14,15 +14,19 @@ final class OnThisDayFactory
 {
     public static function createService(
         \mysqli $db,
-        string $league = \League\LeagueContext::LEAGUE_IBL,
+        ?\League\LeagueContext $leagueContext = null,
     ): OnThisDayService {
+        $league = $leagueContext !== null
+            ? $leagueContext->getCurrentLeague()
+            : \League\LeagueContext::LEAGUE_IBL;
+
         return new OnThisDayService(
             new CachedOnThisDayRepository(
-                new OnThisDayRepository($db),
+                new OnThisDayRepository($db, $leagueContext),
                 new \Cache\DatabaseCache($db),
                 $league,
             ),
-            new \Season\SeasonQueryRepository($db),
+            new \Season\SeasonQueryRepository($db, $leagueContext),
             new WowScorer(),
             new OnThisDayCalendar(),
         );

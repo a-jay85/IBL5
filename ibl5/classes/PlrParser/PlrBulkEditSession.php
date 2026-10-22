@@ -77,6 +77,10 @@ final class PlrBulkEditSession
             throw new \RuntimeException("PLR file not found or unreadable: {$this->plrPath}");
         }
 
+        if (!$this->dryRun && !is_writable($this->plrPath)) {
+            throw new \RuntimeException("PLR file not writable: {$this->plrPath}");
+        }
+
         if (!$this->dryRun) {
             $this->createVerifiedBackup();
         }

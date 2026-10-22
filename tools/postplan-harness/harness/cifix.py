@@ -12,11 +12,12 @@ SIGNOFF_CHECKS = frozenset({"human-signoff"})
 # Jobs whose only failure mode is "an upstream job failed" (tests.yml `gate`:
 # if: always(), needs: [...], exit 1 on any upstream failure). Never a fix target.
 ROLLUP_CHECKS = frozenset({"Tests and Analysis"})
-# Phase 7 Meta-checks skip (see _ci_fix_loop). "All checks green" is the aggregate
-# job in .github/workflows/all-checks-green.yml; it is non-actionable for this
-# predicate only. ROLLUP_CHECKS and triage() keep their meaning for every caller.
+# Phase 7 Meta-checks skip (see _ci_fix_loop). "All checks settled" is the aggregate
+# status from .github/workflows/all-checks-settled.yml; it is non-actionable for this
+# predicate only. The legacy waiter's name stays until the ADR-0149 addendum's cutover
+# retires all-checks-green.yml, since it still goes red with Meta checks. ROLLUP_CHECKS and triage() keep their meaning for every caller.
 META_CHECK_NAME = "Meta checks"
-META_SKIP_AGGREGATES = frozenset({"All checks green"})
+META_SKIP_AGGREGATES = frozenset({"All checks settled", "All checks green"})
 _STEP_BIN = re.compile(r"\bbin/([A-Za-z0-9_-]+)")
 CI_FIX_ALLOWED_TOOLS = REMEDIATION_ALLOWED_TOOLS
 # Ci-fix only: the harness judges and applies a proposed PR body. Phase 5.5's fixer

@@ -298,13 +298,13 @@ BODY_LINE = ("Meta checks\tRun bin/check-pr-manual-testing\t﻿"
 
 
 def test_meta_only_true_with_all_checks_green_aggregate():
-    assert cifix.meta_only(["All checks green", "Meta checks"])
+    assert cifix.meta_only(["All checks settled", "Meta checks"])
     assert cifix.meta_only(["Meta checks"])
 
 
 def test_meta_only_false_with_other_actionable_or_aggregate_alone():
     assert not cifix.meta_only(["Meta checks", "PHPUnit"])
-    assert not cifix.meta_only(["All checks green"])
+    assert not cifix.meta_only(["All checks settled"])
     assert not cifix.meta_only([])
 
 

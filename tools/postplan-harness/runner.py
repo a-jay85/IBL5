@@ -40,7 +40,7 @@ HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
-                     reviewcache, schemas, scope_conformance, statefile, usage_pause)
+                     reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
                              select_fidelity_verdict)
@@ -262,7 +262,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         plan = locate_plan(slug, content_override=fixture.get("plan_content") or None)
     else:
         assert worktree
-        git = LiveGit(worktree, push_remote="origin" if live else None, llm=llm)
+        git = LiveGit(worktree, push_remote="origin" if live else None, llm=llm,
+                      state_dir=_state_dir(out_dir, live, state_dir))
         global _active_git
         _active_git = git
         slug = git.branch()
@@ -672,6 +673,48 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             _write_conformance_handoff(out_dir, unresolved)
             log(f"phase5.0 conformance (post-remediation): {unresolved or 'clean'}"
                 + (f" resolved={resolutions}" if resolutions else ""))
+
+        # ---- Phase 4.5b: this run's own review threads -----------------
+        # They exist only after the join above. One round: fix-or-decline, then a
+        # delta re-review whose new findings stay open under condition (11).
+        def _delta_review(delta):
+            nonlocal cls, meta, cache_key, cache_files
+            n, cls, meta, cache_key, cache_files = _same_run_delta_review(
+                review_phase, meta, cls, plan, git, gh, res, delta, worktree, master_sha, log)
+            return n
+        head_before_45b = git.head()
+        sr = same_run_threads.run_same_run_pass(
+            gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
+            commit=lambda msg: _commit_with_gate_fix(
+                git, worktree, msg, log, phase="phase4.5b", llm=llm, res=res),
+            push=lambda: _push_with_gate_fix(git, log, "phase4.5b", llm=llm,
+                                             worktree=worktree, out_dir=out_dir,
+                                             res=res, gh=gh,
+                                             pr=(pr if isinstance(git, LiveGit) else None)),
+            outcome_log_path=os.path.join(_state_dir(out_dir, live, state_dir), outcome_log.LOG_BASENAME),
+            review_delta=_delta_review)
+        if sr.get("found") or sr.get("error"):
+            res.thread_ingestion["same_run"] = sr
+        res.findings, res.scored_findings = same_run_threads.prune_findings(
+            res.findings, res.scored_findings, same_run_threads.dispositioned_keys(sr))
+        res.degraded_agents = list(res.degraded_agents) + [
+            p for p in same_run_threads.delta_degraded(sr) if p not in res.degraded_agents]
+        if git.head() != head_before_45b:
+            sha = git.head()
+            files = git.changed_files()
+            conf_files = git.conformance_files()
+            diff = git.diff_vs_base()
+            resolutions = {}
+            unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
+                                           resolutions=resolutions,
+                                           pr_body=gh.pr_body() or body,
+                                           read_file=git.read_worktree_file)
+            res.unresolved_conformance = unresolved
+            _write_conformance_handoff(out_dir, unresolved)
+            log(f"phase5.0 conformance (post-same-run-fix): {unresolved or 'clean'}"
+                + (f" resolved={resolutions}" if resolutions else ""))
+            _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan, master_sha,
+                                           body, pr, sha, res, log)
 
         # ---- Phase 6.7: manual-testing execution ----------------------
         # Runs after remediation so the probed tree is the tree that will merge,
@@ -2701,6 +2744,55 @@ def _interdiff_review(review_phase, meta, cls, plan, delta, keep_findings, keep_
     return (keep_findings + findings, gates, keep_scored + scored, degraded)
 
 
+def _same_run_delta_review(review_phase, meta, cls, plan, git, gh, res, delta, worktree,
+                           master_sha, log):
+    """Phase 4.5b delta re-review: review only the files the same-run fix changed.
+
+    Returns ``(new_finding_count, cls, meta, cache_key, cache_files)``, all re-derived
+    from the post-fix tree, so the review-cache record the run writes later is keyed to
+    the diff its merged findings describe. Findings on unchanged files come from memory.
+    """
+    files = git.changed_files()
+    diff = git.diff_vs_base()
+    meta = gh.pr_meta() or meta
+    cls = classify(files, diff, git.modified_files())
+    cache_key, cache_files = _review_cache_context(git, worktree, master_sha, meta, plan,
+                                                   HARNESS_ROOT, log)
+    if not reviewcache.subset_diff(cls.filtered_diff, delta):
+        log("phase4.5b: delta lives only in filtered-out files; no delta review")
+        return 0, cls, meta, cache_key, cache_files
+    keep_f, keep_s = reviewcache.reusable_by_path(res.findings, res.scored_findings, delta,
+                                                  set(cache_files))
+    findings, _gates, scored, degraded = _interdiff_review(review_phase, meta, cls, plan, delta,
+                                                           keep_f, keep_s, log)
+    res.findings, res.scored_findings = findings, scored
+    res.degraded_agents = list(res.degraded_agents) + list(degraded)
+    res.review_delta = sorted(set(res.review_delta or ()) | set(delta))
+    return len(findings) - len(keep_f), cls, meta, cache_key, cache_files
+
+
+def _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan, master_sha, body, pr,
+                                   fix_sha, res, log) -> None:
+    """Re-pin a tree-gated fidelity verdict 2 after a same-run fix commit moved the tree.
+
+    Verdict 1 is not tree-gated, so with no verdict 2 there is nothing to re-pin. An
+    indeterminate re-review leaves verdict 2 stale on purpose: condition (12) then
+    ignores it and falls back to verdict 1.
+    """
+    if not (res.fidelity or {}).get("verdict_2"):
+        return
+    v, tree, path = fidelity.re_review(
+        llm, git, out_dir, worktree or ".", plan, master_sha, gh.pr_body_fresh() or body, pr,
+        fix_sha, res.fidelity.get("verdict_path") or fidelity.verdict_path(pr),
+        round_num=fidelity.MAX_FIDELITY_ROUNDS + 1, log=log)
+    if v is None:
+        log("phase4.5b: fidelity re-pin indeterminate; condition (12) falls back to verdict 1")
+        return
+    res.fidelity["verdict_2"] = v
+    res.fidelity["reviewed_tree_2"] = tree
+    res.fidelity["same_run_repin"] = {"sha": fix_sha, "verdict": v, "verdict_path": path}
+
+
 def _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug, out_dir,
                         bc_cache, gates, log) -> None:
     """Vet each arm and save the record. A reused arm is re-written verbatim so its
@@ -3479,6 +3571,10 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
         lines += [f"  {n + 1}. bin/post-plan-now", ""]
         if res.error_kind == "rebase-conflict" and res.block_cause:
             lines.append("Cause: " + " ".join(res.block_cause.split()))
+        if res.error_kind == "rebase-conflict" and res.conflict_fix_summary:
+            clean = "".join(ch for ch in " ".join(res.conflict_fix_summary.split()) if ch.isprintable())[:300]
+            lines.append("Headless Sonnet fix: tried once for this head and master tip; the lost-work proof still failed.")
+            lines.append("Session summary (untrusted model text): " + clean)
         lines.append(f"Log: {log}")
         if fix_arg:
             lines += ["Or paste this to have Claude fix it:",
@@ -3526,8 +3622,10 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
                 getattr(plain_resolution, "adapted_lines", ())):
             log(f"phase2: {line}")
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
+        res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
     except HarnessError as e:
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
+        res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
         if e.kind != "rebase-conflict":
             raise
         # DETECTION-TIME flag: recorded before the resolution attempt begins, so a

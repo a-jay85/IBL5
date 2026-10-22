@@ -41,7 +41,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         ?FreeAgencyEntityLoaderInterface $entityLoader = null,
         ?FreeAgencyCapCalculatorFactoryInterface $capCalculatorFactory = null
     ) {
-        $this->season = $season ?? new Season($mysqli_db);
+        $this->season = $season ?? \Season\SharedSeason::get($mysqli_db);
 
         $this->commonRepo = $commonRepo;
         $this->calculator = $calculator;

@@ -90,7 +90,7 @@ trait StandingsFixtures
     }
 
     /**
-     * Build standings where a division winner has a worse record than some wild card teams.
+     * Build standings where a division winner has a worse record than some other playoff teams.
      *
      * @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, conf_wins: int|null, conf_losses: int|null, div_wins: int|null, div_losses: int|null, clinched_division: int|null, color1: string, color2: string}>
      */
@@ -370,7 +370,7 @@ trait StandingsFixtures
             $teams[] = $this->makeStandingsRow($teamid++, 'CenTeam' . $teamid, $w, 82 - $w, 'Eastern', 'Central');
         }
 
-        // Western Midwest: 6 strong teams (will be wild cards) + TeamB (non-playoff, 41-41)
+        // Western Midwest: 6 strong teams (will be other playoff teams) + TeamB (non-playoff, 41-41)
         $midwestWins = [72, 67, 62, 57, 52, 47];
         foreach ($midwestWins as $w) {
             $teams[] = $this->makeStandingsRow($teamid++, 'MidTeam' . $teamid, $w, 82 - $w, 'Western', 'Midwest');

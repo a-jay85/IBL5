@@ -55,7 +55,7 @@ $teamIdentityRepo  = new \Repositories\TeamIdentityRepository($mysqli_db);
 $resultsController = new VotingResultsController(
     new VotingResultsService($repository),
     new VotingResultsView(),
-    new \Season\Season($mysqli_db)
+    \Season\SharedSeason::get($mysqli_db)
 );
 $controller        = new \Voting\VotingController(
     $mysqli_db, $ballotService, $ballotView,

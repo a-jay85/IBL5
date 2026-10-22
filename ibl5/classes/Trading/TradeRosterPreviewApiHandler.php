@@ -34,7 +34,7 @@ class TradeRosterPreviewApiHandler
      */
     private int $loggedInTeamID;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -88,7 +88,7 @@ class TradeRosterPreviewApiHandler
             $starterPids = $rosterData['starterPids'];
 
             $team = Team::initialize($this->db, $teamid);
-            $season = $this->season ?? new Season($this->db);
+            $season = $this->season ?? \Season\SharedSeason::get($this->db);
 
             $rosterPids = $this->collectRosterPids($roster);
 

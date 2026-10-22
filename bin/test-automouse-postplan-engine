@@ -91,6 +91,9 @@ REFUND_FN=$(awk '/^refund_attempt\(\) \{/,/^\}/' "$RUN_FILE")
 STALLED_FN=$(awk '/^phase_stalled\(\) \{/,/^\}/' "$RUN_FILE")
 ENVSTOP_FN=$(awk '/^write_env_stop_report\(\) \{/,/^\}/' "$RUN_FILE")
 eval "$REFUND_FN"; eval "$STALLED_FN"; eval "$ENVSTOP_FN"; eval "$BLOCKED_FN"
+# The disposer hands its worktree to reap_empty_worktree. The real helper shells out to
+# bin/wt-remove, so the sandbox gets a stub that records each slug it is called with.
+reap_empty_worktree() { printf '%s\n' "$1" >> "$SB/reap-calls"; }
 
 # Anchor uniqueness: if an anchor is missing, the awk range reads to EOF.
 # If it is duplicated, the range starts at the wrong place.
@@ -436,6 +439,7 @@ assert_eq "$SPAN_RC" "0" "row 12: span completes under set -euo pipefail"
 assert_eq "$(grep -c '^STUB-INVOKED$' "$STUB_RECORD")" "1" "row 12: post-plan-now invoked exactly once"
 assert_eq "$(yn test -L "$NIGHTLY_DIR/skipped/$PLAN_NAME")" "yes" "row 12: plan symlink moved to skipped/"
 assert_eq "$(yn test -L "$QUEUE_DIR/$PLAN_NAME")" "no" "row 12: plan no longer in queue/"
+assert_eq "$(cat "$SB/reap-calls" 2>/dev/null)" "$PLAN_SLUG" "row 12: empty worktree handed to the reaper"
 RPT=$(skipped_report)
 assert_eq "$(yn test -n "$RPT")" "yes" "row 12: skipped report written"
 assert_contains "$(cat "$RPT" 2>/dev/null)" "$RC3_RESULT_LINE" "row 12: report quotes the RESULT: line"

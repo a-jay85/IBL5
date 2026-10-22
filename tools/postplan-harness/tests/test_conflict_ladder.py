@@ -7,6 +7,7 @@ commits so HEAD has parents (pre, master). `prove` is a stub closure over the wo
 """
 from __future__ import annotations
 
+import glob
 import json
 import os
 import shutil
@@ -25,16 +26,24 @@ from harness.adapters.gitad import LiveGit
 from harness.adapters.llm import MODEL_MAP, FixtureLlm
 from harness.conflict import extract_stages, resolve_one
 from harness.conflict_ladder import (
+    BOTH_MODIFIED,
     GENERATED_FILES,
     OPUS_MAX_FILES,
+    VR_SNAPSHOT_GLOB,
     GeneratedFile,
     LadderContext,
     RungAttempt,
+    command_outputs,
+    is_pattern,
     ladder_failure_reason,
     make_opus_rung,
     make_regen_rung,
     make_session_rung,
+    match_generated,
+    matching_paths,
     parse_lost_lines,
+    path_matches,
+    pre_resolve_targets,
     run_ladder,
 )
 from harness.rebase_cause import CAUSE_TREE_PROOF, classify_rebase_block
@@ -72,7 +81,10 @@ def _write(d, files):
     for rel, text in files.items():
         full = Path(d) / rel
         full.parent.mkdir(parents=True, exist_ok=True)
-        full.write_text(text)
+        if isinstance(text, bytes):
+            full.write_bytes(text)
+        else:
+            full.write_text(text)
 
 
 def _build_merge_repo(d, base, feat, master, resolved):
@@ -489,14 +501,20 @@ def test_generated_registry_matches_repo():
         ["git", "rev-parse", "--show-toplevel"], cwd=Path(__file__).resolve().parent,
         capture_output=True, text=True, check=True).stdout.strip())
     for g in GENERATED_FILES:
-        assert (root / g.path).exists(), g.path
+        if is_pattern(g.path):
+            assert glob.glob(str(root / g.path)), g.path
+        else:
+            assert (root / g.path).exists(), g.path
         if g.command is not None:
             assert (root / g.command[0]).exists(), g.command[0]
     assert (root / "ibl5/bin/check-baseline-drift").exists()
     by_path = {g.path: g for g in GENERATED_FILES}
-    for copy_only in ("ibl5/docs/schema/current-schema.sql", "ibl5/coverage-baseline.json"):
+    for copy_only in ("ibl5/docs/schema/current-schema.sql", "ibl5/coverage-baseline.json",
+                      VR_SNAPSHOT_GLOB):
         assert by_path[copy_only].command is None
         assert by_path[copy_only].why_copy_only
+        if copy_only == VR_SNAPSHOT_GLOB:
+            assert by_path[VR_SNAPSHOT_GLOB].regen_on_conflict
 
 
 # -- Phase 4: Opus rung ----------------------------------------------------------
@@ -779,6 +797,9 @@ _REGEN_OUTPUTS = {
     "ibl5/phpstan-tests-baseline.neon",
     "ibl5/phpstan-baseline-counts.json",
 }
+_SNAP_DIR = "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots"
+_VR_PNG = f"{_SNAP_DIR}/player-mobile.png"
+_VR_WHY = "CI update-baselines regenerates VR PNGs"
 
 
 def _with_autoload(tmp_path: Path) -> str:
@@ -813,3 +834,102 @@ def test_command_outputs_covers_shared_generator():
     outputs = conflict_ladder.command_outputs((baseline,))
     assert outputs == _REGEN_OUTPUTS
     assert ".claude/rules/codebase-map.md" not in outputs
+
+
+def test_path_matches_exact_entry_is_literal():
+    assert path_matches("ibl5/phpstan-baseline.neon", "ibl5/phpstan-baseline.neon")
+    assert not path_matches("ibl5/phpstan-baseline.neon", "ibl5/phpstan-baseline.neon.bak")
+    assert not path_matches("ibl5/phpstan-baseline.neon", "x/ibl5/phpstan-baseline.neon")
+
+
+def test_match_generated_expands_vr_png_glob():
+    got = match_generated([_VR_PNG, f"{_SNAP_DIR}/last-sim-recap.png", "ibl5/x.php"])
+    assert [g.path for g in got] == [f"{_SNAP_DIR}/last-sim-recap.png", _VR_PNG]
+    for g in got:
+        assert g.command is None
+        assert g.regen_on_conflict is True
+        assert g.why_copy_only == _VR_WHY
+
+
+def test_match_generated_rejects_png_outside_snapshot_dir():
+    assert match_generated([
+        "ibl5/images/a.png",
+        "ibl5/tests/e2e/other.spec.ts-snapshots/a.png",
+        f"{_SNAP_DIR}/sub/a.png",
+    ]) == ()
+
+
+def test_match_generated_rejects_non_png_in_snapshot_dir():
+    assert match_generated([f"{_SNAP_DIR}/a.txt", f"{_SNAP_DIR}/a.png.orig"]) == ()
+
+
+def test_match_generated_keeps_exact_entries_exact():
+    got = match_generated(["ibl5/phpstan-baseline.neon"])
+    assert len(got) == 1
+    assert got[0] is GENERATED_FILES[0]
+    assert match_generated(["ibl5/phpstan-baseline.neon.bak"]) == ()
+
+
+def test_matching_paths_filters_to_registered():
+    assert matching_paths([_VR_PNG, "ibl5/x.php", "ibl5/coverage-baseline.json"]) \
+        == frozenset({_VR_PNG, "ibl5/coverage-baseline.json"})
+
+
+def test_pre_resolve_targets_selects_copy_only_vr_png_when_both_modified(tmp_path):
+    got = pre_resolve_targets([_VR_PNG], worktree=str(tmp_path),
+                              stage_sets={_VR_PNG: BOTH_MODIFIED})
+    assert [g.path for g in got] == [_VR_PNG]
+
+
+def test_pre_resolve_targets_skips_copy_only_without_stage_sets(tmp_path):
+    assert pre_resolve_targets([_VR_PNG], worktree=str(tmp_path)) == ()
+
+
+def test_pre_resolve_targets_skips_copy_only_modify_delete(tmp_path):
+    for stages in (frozenset({1, 3}), frozenset({1, 2})):
+        assert pre_resolve_targets([_VR_PNG], worktree=str(tmp_path),
+                                   stage_sets={_VR_PNG: stages}) == ()
+
+
+def test_pre_resolve_targets_exact_copy_only_entries_still_skipped(tmp_path):
+    path = "ibl5/docs/schema/current-schema.sql"
+    assert pre_resolve_targets([path], worktree=str(tmp_path),
+                               stage_sets={path: BOTH_MODIFIED}) == ()
+
+
+def test_command_outputs_empty_for_copy_only_glob():
+    assert command_outputs(match_generated([_VR_PNG])) == frozenset()
+
+
+_PNG_MASTER = b"\x89PNG\r\n\x1a\nmaster"
+_PNG_BRANCH = b"\x89PNG\r\n\x1a\nbranch"
+
+
+def _png_repo(tmp_path, rel):
+    d = tmp_path / "png"
+    pre, master, merge = _build_merge_repo(
+        d,
+        {rel: b"\x89PNG\r\n\x1a\nbase", "keep.txt": "k\n"},
+        {rel: _PNG_BRANCH},
+        {rel: _PNG_MASTER},
+        {rel: _PNG_BRANCH})
+    return d, pre, master
+
+
+def test_regen_rung_takes_master_png_via_glob(tmp_path, key):
+    d, pre, master = _png_repo(tmp_path, _VR_PNG)
+    ctx = _ctx(d, key, pre, master, (_VR_PNG,), lambda: (True, "TREE-EQUIVALENT\n"))
+    attempt = make_regen_rung()[1](ctx, "")
+    assert attempt.applied is True
+    assert (Path(d) / _VR_PNG).read_bytes() == _PNG_MASTER
+    assert _VR_PNG in attempt.touched
+    assert f"{_VR_PNG}: master copy only ({_VR_WHY})" in attempt.note
+
+
+def test_regen_rung_ignores_png_outside_snapshot_dir(tmp_path, key):
+    rel = "ibl5/images/logo.png"
+    d, pre, master = _png_repo(tmp_path, rel)
+    ctx = _ctx(d, key, pre, master, (rel,), lambda: (True, "TREE-EQUIVALENT\n"))
+    attempt = make_regen_rung()[1](ctx, "")
+    assert attempt == RungAttempt(False, (), "no generated file involved")
+    assert (Path(d) / rel).read_bytes() == _PNG_BRANCH

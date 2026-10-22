@@ -95,7 +95,7 @@ final class RecordsControllerTest extends TestCase
             'modules.php?name=Records&amp;tab=byfranchise',
             'modules.php?name=Records&amp;tab=thisseason',
         ], $matches[1]);
-        self::assertStringStartsWith('<div class="ibl-tabs">', $html);
+        self::assertStringStartsWith('<div class="ibl-tab-card"><div class="ibl-tabs">', $html);
         self::assertStringContainsString('>All-Time</a>', $html);
         self::assertStringContainsString('>This Season</a>', $html);
     }
@@ -111,6 +111,14 @@ final class RecordsControllerTest extends TestCase
         );
         self::assertStringNotContainsString('ALLTIME-BODY', $html);
         self::assertStringNotContainsString('BYFRANCHISE-BODY', $html);
+    }
+
+    public function testRenderWrapsTabsAndPanelInOneCard(): void
+    {
+        $html = $this->makeController()->render('alltime', []);
+
+        self::assertStringStartsWith('<div class="ibl-tab-card"><div class="ibl-tabs">', $html);
+        self::assertStringEndsWith('<p>ALLTIME-BODY</p></div></div>', $html);
     }
 
     public function testRenderFallsBackToAllTimeRendererForUnknownTab(): void

@@ -65,7 +65,8 @@ final class RecordsController
     }
 
     /**
-     * Render the tab bar plus the active tab's panel; only the active renderer runs
+     * Render the tab bar plus the active tab's panel, both inside one .ibl-tab-card
+     * wrapper; only the active renderer runs
      *
      * @param array<mixed> $query
      */
@@ -73,7 +74,10 @@ final class RecordsController
     {
         $tab = self::resolveTab($rawTab);
 
-        return $this->pageTabs->renderTabBar($tab, 'modules.php?name=Records')
-            . $this->pageTabs->wrapPanel(($this->tabRenderers[$tab])($query), $tab);
+        // .ibl-tab-card: one white card with the tab strip as its header (hub-only styling)
+        return '<div class="ibl-tab-card">'
+            . $this->pageTabs->renderTabBar($tab, 'modules.php?name=Records')
+            . $this->pageTabs->wrapPanel(($this->tabRenderers[$tab])($query), $tab)
+            . '</div>';
     }
 }

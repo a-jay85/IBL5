@@ -211,6 +211,122 @@
 }
 
 /* ==========================================================================
+   Tab Card (hub pages, e.g. DraftInfo)
+
+   One white card: the .ibl-tabs strip is its navy header, the title and
+   tab body sit inside. Tables run edge to edge with a light header.
+   Scoped to .ibl-tab-card so team tabs, leaders, and other tables keep
+   their own look. overflow: clip (not hidden) rounds the corners without
+   making the card a scroll container, so sticky table headers still work.
+   ========================================================================== */
+
+.ibl-tab-card {
+    background: var(--white);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    overflow: clip;
+    margin-bottom: var(--space-4);
+}
+
+.ibl-tab-card > .ibl-tabs {
+    border-radius: 0;
+}
+
+.ibl-tab-card > .ibl-tab-panel {
+    padding-top: var(--space-4);
+    text-align: left;
+}
+
+/* Title and text line up with the tables' first column (16px inset) */
+.ibl-tab-card .ibl-title {
+    display: inline-block;
+    width: auto;
+    margin: 0 var(--space-4) var(--space-3);
+    text-align: left;
+}
+
+.ibl-tab-card .ibl-table-title,
+.ibl-tab-card .ibl-tab-panel > p {
+    padding-inline: var(--space-4);
+    text-align: left;
+}
+
+/* Tables and their scroll wrappers: no own chrome, full card width */
+.ibl-tab-card :is(.ibl-data-table, .draft-pick-table),
+.ibl-tab-card :is(.sticky-scroll-wrapper, .table-scroll-wrapper) {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    width: 100%;
+    max-width: none;
+    margin: 0 0 var(--space-4);
+}
+
+.ibl-tab-card :is(.sticky-scroll-wrapper, .table-scroll-wrapper) :is(.ibl-data-table, .draft-pick-table) {
+    margin-bottom: 0;
+}
+
+.ibl-tab-card :is(.ibl-data-table, .draft-pick-table, .sticky-scroll-wrapper, .table-scroll-wrapper):last-child {
+    margin-bottom: 0;
+}
+
+.ibl-tab-card .table-scroll-container {
+    border-radius: 0;
+}
+
+/* Light header: gray-100 fill, gray-200 top rule, accent bottom rule.
+   Rowspan cells (e.g. pick locator TEAM) span to the last header row. */
+.ibl-tab-card :is(.ibl-data-table, .draft-pick-table) thead {
+    background: none;
+}
+
+.ibl-tab-card :is(.ibl-data-table, .draft-pick-table) thead th {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+.ibl-tab-card :is(.ibl-data-table, .draft-pick-table) thead th a {
+    color: inherit;
+}
+
+.ibl-tab-card :is(.ibl-data-table, .draft-pick-table) thead tr:first-child th {
+    border-top: 1px solid var(--gray-200);
+}
+
+.ibl-tab-card :is(.ibl-data-table, .draft-pick-table) thead tr:last-child th,
+.ibl-tab-card :is(.ibl-data-table, .draft-pick-table) thead th[rowspan] {
+    border-bottom: 2px solid var(--accent-500);
+}
+
+.ibl-tab-card :is(.ibl-data-table, .draft-pick-table) thead tr:first-child th:first-child,
+.ibl-tab-card :is(.ibl-data-table, .draft-pick-table) tbody td:first-child {
+    padding-left: var(--space-4);
+}
+
+/* .sticky-header rounds and masks its corner cells against the page
+   background; inside the card the corners are square and the bg is white. */
+.ibl-tab-card .sticky-header thead th:is(:first-child, :last-child),
+.ibl-tab-card .sticky-header tbody tr:last-child td {
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Mobile sticky columns (.responsive-table) paint their header cells navy
+   at higher specificity; keep them light. */
+@media (max-width: 768px) {
+    .ibl-tab-card .ibl-tab-panel .ibl-data-table.responsive-table thead th[class*="sticky-col"] {
+        background: var(--gray-100);
+    }
+
+    /* .sticky-col-2 sticks at left: 36px, so .sticky-col-1 keeps its
+       base 0.75rem inset; the extra 16px would slide it under col 2. */
+    .ibl-tab-card .ibl-tab-panel .ibl-data-table.responsive-table thead tr th.sticky-col-1,
+    .ibl-tab-card .ibl-tab-panel .ibl-data-table.responsive-table tbody tr td.sticky-col-1 {
+        padding-left: 0.75rem;
+    }
+}
+
+/* ==========================================================================
    Jump Menu (Month/Season Selector)
    ========================================================================== */
 

@@ -68,6 +68,20 @@ final class CachedRivalriesRepositoryTest extends TestCase
         self::assertSame($this->inner->gmStats, $this->cache->get('rivalries:gms:2022'));
         self::assertNull($this->cache->get('rivalries:pair:teams:3-7:games'));
     }
+
+    public function testRebuildCacheDropsGmPairKeyWhenSqlOrderDiffersFromStrcmp(): void
+    {
+        // A case-insensitive collation sorts 'alice' before 'Bob'; strcmp sorts 'Bob' first.
+        $this->inner->gmStats = [['a' => 'alice', 'b' => 'Bob', 'close_games' => 1, 'recent_games' => 1, 'playoff_games' => 0, 'playoff_series' => 0]];
+        $this->repo->getGmPairGames('alice', 'Bob');
+        $this->repo->getGmPlayoffSeries('Bob', 'alice');
+        $this->repo->getGmTopPerformers('alice', 'Bob');
+        self::assertCount(3, $this->cache->ttls);
+
+        $this->repo->rebuildCache(2022);
+
+        self::assertEqualsCanonicalizing(['rivalries:franchises:2022', 'rivalries:gms:2022'], array_keys($this->cache->ttls));
+    }
 }
 
 

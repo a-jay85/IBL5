@@ -38,7 +38,7 @@ final class RivalriesView implements RivalriesViewInterface
     public function renderIndex(array $league, ?string $userTeamKey, ?string $userGm): string
     {
         return '<h1 class="ibl-title">Rivalries</h1>'
-            . '<div class="ibl-grid">'
+            . '<div class="ibl-grid ibl-grid--2col">'
             . '<section class="ibl-card"><h2>Top franchise rivalries</h2>'
             . $this->renderRankTable($league['franchises'], 'teams', $userTeamKey, 'No pair has met 10 times yet.')
             . '</section>'
@@ -100,7 +100,7 @@ final class RivalriesView implements RivalriesViewInterface
         }
         $html .= '</section>';
 
-        $html .= '<div class="ibl-grid">'
+        $html .= '<div class="ibl-grid ibl-grid--2col">'
             . '<section class="ibl-card"><h2>Closest games</h2>' . $this->gamesTable($page['closest']) . '</section>'
             . '<section class="ibl-card"><h2>Biggest blowouts</h2>' . $this->gamesTable($page['blowouts']) . '</section>'
             . '</div>';
@@ -116,7 +116,7 @@ final class RivalriesView implements RivalriesViewInterface
                 . HtmlSanitizer::e($sideLabel($h['side'])) . '</td><td>' . $h['points'] . '</td><td>'
                 . HtmlSanitizer::e($h['game_date']) . '</td></tr>';
         }
-        $html .= '<div class="ibl-grid">'
+        $html .= '<div class="ibl-grid ibl-grid--2col">'
             . '<section class="ibl-card"><h2>Top scorers in the matchup</h2>' . $this->table(['Player', 'Side', 'Games', 'Points'], $totals) . '</section>'
             . '<section class="ibl-card"><h2>Best single games</h2>' . $this->table(['Player', 'Side', 'Points', 'Date'], $highs) . '</section>'
             . '</div>';

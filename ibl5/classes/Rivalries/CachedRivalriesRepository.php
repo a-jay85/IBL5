@@ -228,10 +228,14 @@ final class CachedRivalriesRepository implements RivalriesRepositoryInterface
     }
 
     /**
-     * 128 bits of sha1 keeps the longest key (`performers`) at 62 chars.
+     * 128 bits of sha1 keeps the longest key (`performers`) at 62 chars. The
+     * names are re-sorted with strcmp here because rebuildCache passes them in
+     * SQL LEAST/GREATEST collation order, which can differ from strcmp order.
      */
-    private function gmsKey(string $lo, string $hi, string $part): string
+    private function gmsKey(string $a, string $b, string $part): string
     {
+        [$lo, $hi] = strcmp($a, $b) <= 0 ? [$a, $b] : [$b, $a];
+
         return self::KEY_PREFIX . ":pair:gms:{$part}:" . substr(sha1($lo . "\0" . $hi), 0, 32);
     }
 }

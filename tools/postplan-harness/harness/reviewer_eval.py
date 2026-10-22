@@ -642,14 +642,17 @@ class _CountingLlm:
         return self._inner.call_tooled(*a, **k)  # type: ignore[attr-defined]
 
 
-def _load_cached(path: Path) -> Optional[tuple[list[Finding], list[str]]]:
+def _load_cached(path: Path) -> Optional[tuple[list[Finding], list[dict], list[str]]]:
+    """An entry without `scored` predates the verifier checkout and kept every finding
+    unverified, so it reads as a miss."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         findings = [Finding(source=f["source"], agent=f["agent"], path=f["path"],
                             line=int(f["line"]), body="", score=f["score"])
                     for f in data["findings"]]
+        scored = [dict(s) for s in data["scored"]]
         degraded = [str(d) for d in data["degraded"]]
-        return findings, degraded
+        return findings, scored, degraded
     except (OSError, ValueError, KeyError, TypeError):
         return None
 
@@ -680,6 +683,7 @@ def review_case(root: Path, commit: str, llm: object, meta: dict,
             surviving, _gates, scored, degraded = phase.run(meta, cls, PlanInfo())
         finally:
             _gitt(root, "worktree", "remove", "--force", checkout)
+            _gitt(root, "worktree", "prune")
     degraded = list(degraded)
     if any(v.get("error") for rec in phase.last_votes for v in rec["votes"]):
         degraded.append("verifier")
@@ -731,17 +735,17 @@ def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
                       if cache_dir is not None else None)
         cached = _load_cached(cache_path) if cache_path is not None else None
         if cached is not None:
-            findings, degraded = cached
+            findings, scored, degraded = cached
         else:
             meta, cls = case_input(root, case["commit"])
             llm = _CountingLlm(llm_factory(cid))
             findings, scored, degraded = review_case(root, case["commit"], llm, meta, cls)
             llm_calls += llm.calls
-            for s in scored:
-                print(f"  raw {s['agent']} {s['path']}:{s['line']} score={s['score']} "
-                      f"{' '.join((s.get('body_head') or '').split())[:120]}", file=out)
             if cache_path is not None and not degraded:
                 _write_cache(cache_path, findings, scored)
+        for s in scored:
+            print(f"  raw {s['agent']} {s['path']}:{s['line']} score={s['score']} "
+                  f"{' '.join((s.get('body_head') or '').split())[:120]}", file=out)
         suffix = f" DEGRADED={','.join(degraded)}" if degraded else ""
         if kind == "bug":
             expected = [ExpectedRange(e["path"], e["start"], e["end"]) for e in case["expected"]]

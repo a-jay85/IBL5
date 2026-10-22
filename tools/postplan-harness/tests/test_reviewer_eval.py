@@ -529,6 +529,24 @@ def test_run_cache_keeps_pre_threshold_findings(tmp_path):
     assert [(s["path"], s["line"], s["score"]) for s in data["scored"]] == [(FOO, 12, 0)]
 
 
+def test_run_cache_without_scored_is_a_miss_and_hit_prints_raw(tmp_path):
+    r = _eval_repo(tmp_path)
+    corpus = _vcorpus([_bug(r)])
+    cache = tmp_path / "cache"
+    stub = _StubLlm(_canned(FOO, 12, "real"))
+    _run(r, corpus, lambda cid: stub, cache_dir=cache)
+    stub.calls.clear()
+    rc, hit = _run(r, corpus, lambda cid: stub, cache_dir=cache)
+    assert stub.calls == []
+    assert f"  raw A {FOO}:12 score=100" in hit
+    (entry,) = list(cache.rglob("*.json"))
+    data = json.loads(entry.read_text())
+    del data["scored"]
+    entry.write_text(json.dumps(data))
+    _run(r, corpus, lambda cid: stub, cache_dir=cache)
+    assert stub.calls
+
+
 def test_run_degraded_exit_3(tmp_path):
     r = _eval_repo(tmp_path)
     cache = tmp_path / "cache"

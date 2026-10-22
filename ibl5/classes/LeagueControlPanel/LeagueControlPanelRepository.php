@@ -96,6 +96,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             $this->league
         );
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -121,6 +122,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             }
         });
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -136,6 +138,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             $this->league
         );
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -151,6 +154,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             $this->league
         );
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -176,6 +180,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             );
         });
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -201,6 +206,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             );
         });
 
+        \Season\SharedSeason::reset();
         return true;
     }
 

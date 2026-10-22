@@ -577,6 +577,32 @@ run_agent() { # sim prompt
     return $?
 }
 
+# ── log_agent_cost <sim> — one log line with what the agent run cost ──────────
+# The workdir (and agent.json with it) is deleted later, so this is the only
+# record of the spend. agent.json also captures stderr (2>&1), so it may not be
+# pure JSON: take the last line that parses as a type=="result" object. Purely
+# informational — always returns 0 so it can never alter the tick's exit path.
+log_agent_cost() { # sim
+    local sim="$1" row cost turns dur_ms in_tok cr_tok cw_tok out_tok
+    row="$("$SIM_RECAP_JQ_BIN" -rR '
+        fromjson? | select(type == "object" and .type == "result")
+        | [(.total_cost_usd // 0), (.num_turns // 0), (.duration_ms // 0),
+           (.usage.input_tokens // 0), (.usage.cache_read_input_tokens // 0),
+           (.usage.cache_creation_input_tokens // 0), (.usage.output_tokens // 0)]
+        | @tsv' "$WORKDIR/agent.json" 2>/dev/null | tail -n 1)"
+    if [ -z "$row" ]; then
+        log "sim $sim: agent cost unavailable"
+        return 0
+    fi
+    IFS=$'\t' read -r cost turns dur_ms in_tok cr_tok cw_tok out_tok <<< "$row"
+    local line
+    line="$(printf 'sim %s: agent cost $%.2f, turns %s, duration %ss, input %s (cache read %s, cache write %s), output %s tokens, model %s' \
+        "$sim" "$cost" "$turns" "$((${dur_ms%.*} / 1000))" "$in_tok" "$cr_tok" "$cw_tok" "$out_tok" "$SIM_RECAP_MODEL")" \
+        || { log "sim $sim: agent cost unavailable"; return 0; }
+    log "$line"
+    return 0
+}
+
 # ── generate <sim> — inject, prompt, run agent, store or park ─────────────────
 generate() { # sim
     local sim="$1"
@@ -604,6 +630,7 @@ generate() { # sim
 
     local agent_rc
     run_agent "$sim" "$prompt"; agent_rc=$?
+    log_agent_cost "$sim"
 
     if claude_auth_error "$(cat "$WORKDIR/agent.json" 2>/dev/null)"; then
         log "sim $sim: agent auth failed (401/403) — CLAUDE_CODE_OAUTH_TOKEN is invalid or expired; parking"

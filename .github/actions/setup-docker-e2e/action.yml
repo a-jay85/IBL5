@@ -76,7 +76,7 @@ runs:
         docker pull ghcr.io/a-jay85/ibl5/php-apache:latest || \
         docker build \
           --build-arg GO_BASE_IMAGE=ghcr.io/a-jay85/mirror/golang:1.27 \
-          --build-arg PHP_BASE_IMAGE=ghcr.io/a-jay85/mirror/php:8.5-apache \
+          --build-arg PHP_BASE_IMAGE=ghcr.io/a-jay85/mirror/php:8.5.12-apache \
           -t ghcr.io/a-jay85/ibl5/php-apache:latest .
 
     - name: Set up Docker Buildx
@@ -94,7 +94,7 @@ runs:
         cache-from: type=gha
         build-args: |
           GO_BASE_IMAGE=ghcr.io/a-jay85/mirror/golang:1.27
-          PHP_BASE_IMAGE=ghcr.io/a-jay85/mirror/php:8.5-apache
+          PHP_BASE_IMAGE=ghcr.io/a-jay85/mirror/php:8.5.12-apache
 
     - name: Start MariaDB first (schema must be ready before Apache serves)
       shell: bash

@@ -231,7 +231,7 @@ def _run_conflict(tmp_path, monkeypatch, wt, gh=None):
     the FixtureLlm resolver cannot resolve, and the --onto fallback declines (no iblBase)."""
     gh = gh or _FakeGh()
     monkeypatch.setattr(runner, "_pr_copy", lambda *a, **k: (dict(_COPY), False))
-    monkeypatch.setattr(runner, "_body_check", lambda *a, **k: ({}, False))
+    monkeypatch.setattr(runner, "_mechanical_body_pass", lambda *a, **k: {})
     # The branch is already committed; the repo's commit gates (bin/adr-check) are not
     # present in the throwaway clone.
     monkeypatch.setattr(runner, "_commit_with_adr_draft", lambda *a, **k: None)

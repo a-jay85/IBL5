@@ -34,7 +34,7 @@ class PlayerPageController
     private PlayerPageServiceInterface $pageService;
     private HttpRequest $request;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
     /**
@@ -125,7 +125,7 @@ class PlayerPageController
      */
     public function renderPage(int $playerID, ?int $pageView, string $username): string
     {
-        $season = $this->season ?? new Season($this->mysqliDb);
+        $season = $this->season ?? \Season\SharedSeason::get($this->mysqliDb);
 
         $this->responseStatus = 200;
         try {

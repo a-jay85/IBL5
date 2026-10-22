@@ -24,7 +24,7 @@ use FranchiseHistory\FranchiseHistoryView;
 global $mysqli_db;
 /** @var \mysqli $mysqli_db */
 
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 
 PageLayout\PageLayout::header();
 

@@ -38,6 +38,23 @@ def _write_raw(state_dir, text):
         fh.write(text)
 
 
+def test_load_record_tolerates_legacy_body_check_arm(tmp_path):
+    """Records written before the body-check removal carry a `body_check` arm.
+    SCHEMA_VERSION stays 1 so their review/fidelity arms are still reusable."""
+    legacy = _valid_record(
+        review={"run_id": "r1", "gates": {}, "findings": [], "scored_findings": [],
+                "degraded_agents": []},
+        body_check={"run_id": "r1", "input_hash": "h" * 64,
+                    "result": {"corrected_body": "x", "findings": []}})
+    _write_raw(str(tmp_path), json.dumps(legacy))
+    doc = rc.load_record(str(tmp_path), SLUG)
+    assert doc is not None and doc["review"]["run_id"] == "r1"
+    fresh = rc.build_record(slug="s", pr_number=2345, run_id="r2", key=legacy["key"],
+                            per_file_ids={"x.py": "d"}, review=None, fidelity=None)
+    assert "body_check" not in fresh
+    assert fresh["schema_version"] == doc["schema_version"] == 1
+
+
 @pytest.fixture
 def hroot(tmp_path):
     root = tmp_path / "hroot"

@@ -47,7 +47,7 @@ class TradeCapCalculator implements TradeCapCalculatorInterface
         $this->cashConsiderationRepository = $cashConsiderationRepository
             ?? ($db !== null ? new BuyoutLedgerRepository($db) : throw new \LogicException('$db required when $cashConsiderationRepository is not provided'));
         $this->season = $season
-            ?? ($db !== null ? new Season($db) : throw new \LogicException('$db required when $season is not provided'));
+            ?? ($db !== null ? \Season\SharedSeason::get($db) : throw new \LogicException('$db required when $season is not provided'));
         $this->validator = $validator
             ?? ($db !== null ? new TradeValidator($db) : throw new \LogicException('$db required when $validator is not provided'));
     }

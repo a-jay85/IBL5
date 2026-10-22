@@ -26,6 +26,11 @@ interface TeamIdentityRepositoryInterface
 
     public function getTidFromTeamname(string $teamName): ?int;
 
+    /**
+     * Teamid of the team whose gm_username matches. Null when no team has that GM.
+     */
+    public function getTidFromUsername(string $username): ?int;
+
     public function getTeamnameFromTeamID(int $teamid): ?string;
 
     /**

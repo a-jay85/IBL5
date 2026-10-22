@@ -91,6 +91,18 @@ class TeamIdentityRepository extends \Database\BaseMysqliRepository implements T
         return $result !== null ? $result['teamid'] : null;
     }
 
+    public function getTidFromUsername(string $username): ?int
+    {
+        /** @var array{teamid: int}|null $result */
+        $result = $this->fetchOne(
+            "SELECT teamid FROM `ibl_team_info` WHERE gm_username = ? LIMIT 1",
+            "s",
+            $username
+        );
+
+        return $result !== null ? $result['teamid'] : null;
+    }
+
     public function getTeamnameFromTeamID(int $teamid): ?string
     {
         /** @var array{team_name: string}|null $result */

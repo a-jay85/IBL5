@@ -114,14 +114,19 @@ ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
      */
     public function getGmPairGames(string $a, string $b): array
     {
-        $sql = $this->gmCte()
+        $filter = $this->pairTenureFilter($a, $b, 'b.visitor_teamid', 'b.home_teamid', 'b.season_year');
+        if ($filter === null) {
+            return [];
+        }
+
+        $sql = $this->gmCte($filter['sql'])
             // @phpstan-ignore ibl.orderByMissingTiebreaker (no doubleheaders: game_date + game_of_that_day + visitor_teamid is unique)
             . ' SELECT ' . self::GAME_COLUMNS . ', v_gm AS visitor_side, h_gm AS home_side
 FROM gm_games
 WHERE v_gm <> h_gm AND ((v_gm = ? AND h_gm = ?) OR (v_gm = ? AND h_gm = ?))
 ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
 
-        return $this->mapGames($this->fetchAll($sql, 'ssss', $a, $b, $b, $a));
+        return $this->mapGames($this->fetchAll($sql, $filter['types'] . 'ssss', ...$filter['params'], ...[$a, $b, $b, $a]));
     }
 
     /**
@@ -151,20 +156,23 @@ ORDER BY pr.year ASC, pr.round ASC, pr.winner_tid ASC, pr.loser_tid ASC',
      */
     public function getGmPlayoffSeries(string $a, string $b): array
     {
+        $filter = $this->pairTenureFilter($a, $b, 'pr.winner_tid', 'pr.loser_tid', 'pr.year');
+        if ($filter === null) {
+            return [];
+        }
+
         $rows = $this->fetchAll(
-            $this->gmSeriesCte()
+            $this->gmSeriesCte($filter['sql'])
             // @phpstan-ignore ibl.orderByMissingTiebreaker (year + round + both teams identify one series)
             . ' SELECT year, round, winner_tid, loser_tid, winner_games, loser_games, w_gm AS winner_side
 FROM gm_series
 WHERE w_gm <> l_gm AND ((w_gm = ? AND l_gm = ?) OR (w_gm = ? AND l_gm = ?))
 ORDER BY year ASC, round ASC, winner_tid ASC, loser_tid ASC',
-            'iissss',
+            'ii' . $filter['types'] . 'ssss',
             League::MAX_REAL_TEAMID,
             League::MAX_REAL_TEAMID,
-            $a,
-            $b,
-            $b,
-            $a,
+            ...$filter['params'],
+            ...[$a, $b, $b, $a],
         );
 
         return $this->mapSeries($rows);
@@ -189,13 +197,23 @@ pair_games AS (
      */
     public function getGmTopPerformers(string $a, string $b): array
     {
-        $pairCte = $this->gmCte() . ',
+        $filter = $this->pairTenureFilter($a, $b, 'b.visitor_teamid', 'b.home_teamid', 'b.season_year');
+        if ($filter === null) {
+            return ['totals' => [], 'highs' => []];
+        }
+
+        $pairCte = $this->gmCte($filter['sql']) . ',
 pair_games AS (
     SELECT * FROM gm_games
     WHERE v_gm <> h_gm AND ((v_gm = ? AND h_gm = ?) OR (v_gm = ? AND h_gm = ?))
 )';
 
-        return $this->topPerformers($pairCte, 'IF(bs.teamid = g.visitor_teamid, g.v_gm, g.h_gm)', 'ssss', [$a, $b, $b, $a]);
+        return $this->topPerformers(
+            $pairCte,
+            'IF(bs.teamid = g.visitor_teamid, g.v_gm, g.h_gm)',
+            $filter['types'] . 'ssss',
+            [...$filter['params'], $a, $b, $b, $a],
+        );
     }
 
     /**
@@ -214,8 +232,10 @@ pair_games AS (
 
     /**
      * H2H `unique_games` + `games` CTEs, phase `all` (HEAT counts), plus dates and era labels.
+     *
+     * @param string $extraWhere Extra `AND ...` filter on `ibl_box_scores_teams b`, applied before the dedupe.
      */
-    private function gamesCte(): string
+    private function gamesCte(string $extraWhere = ''): string
     {
         $maxTid = League::MAX_REAL_TEAMID;
 
@@ -225,7 +245,7 @@ pair_games AS (
     FROM `ibl_box_scores_teams` b
     WHERE b.game_type IN (1, 2, 3)
       AND b.visitor_teamid BETWEEN 1 AND %d
-      AND b.home_teamid   BETWEEN 1 AND %d
+      AND b.home_teamid   BETWEEN 1 AND %d' . $extraWhere . '
     GROUP BY b.game_date, b.visitor_teamid, b.home_teamid, b.game_of_that_day
 ),
 games AS (
@@ -251,9 +271,9 @@ games AS (
     /**
      * Games CTE plus each side's GM resolved with the H2H tenure rule.
      */
-    private function gmCte(): string
+    private function gmCte(string $extraWhere = ''): string
     {
-        return $this->gamesCte() . ',
+        return $this->gamesCte($extraWhere) . ',
 gm_games AS (
     SELECT g.*,
         ' . sprintf(self::TENURE_SUBQUERY, 'g.visitor_teamid', 'g.season_year') . ' AS v_gm,
@@ -263,17 +283,63 @@ gm_games AS (
     }
 
     /**
-     * Playoff series rows with each side's GM resolved by `pr.year`. Binds two `i` params.
+     * Playoff series rows with each side's GM resolved by `pr.year`. Binds two `i` params,
+     * then any params of `$extraWhere`.
      */
-    private function gmSeriesCte(): string
+    private function gmSeriesCte(string $extraWhere = ''): string
     {
         return 'WITH gm_series AS (
     SELECT pr.year, pr.round, pr.winner_tid, pr.loser_tid, pr.winner_games, pr.loser_games,
         ' . sprintf(self::TENURE_SUBQUERY, 'pr.winner_tid', 'pr.year') . ' AS w_gm,
         ' . sprintf(self::TENURE_SUBQUERY, 'pr.loser_tid', 'pr.year') . ' AS l_gm
     FROM `ibl_playoff_series_results` pr
-    WHERE pr.winner_tid BETWEEN 1 AND ? AND pr.loser_tid BETWEEN 1 AND ?
+    WHERE pr.winner_tid BETWEEN 1 AND ? AND pr.loser_tid BETWEEN 1 AND ?' . $extraWhere . '
 )';
+    }
+
+    /**
+     * Pre-filter for one GM pair: both sides must sit inside a tenure of either GM.
+     *
+     * The tenure subquery still decides each side's GM, so this only drops rows that
+     * could never resolve to the pair. It lets the indexed teamid + season filter run
+     * before the per-row tenure lookups. Null when either GM has no tenure.
+     *
+     * @return array{sql: string, types: string, params: list<int>}|null
+     */
+    private function pairTenureFilter(string $a, string $b, string $sideOne, string $sideTwo, string $yearCol): ?array
+    {
+        $rows = $this->fetchAll(
+            'SELECT gm_display_name, franchise_id, start_season_year + is_mid_season_start AS from_year,
+       COALESCE(end_season_year, 9999) AS to_year
+FROM `ibl_gm_tenures`
+WHERE gm_display_name IN (?, ?)
+ORDER BY id ASC',
+            'ss',
+            $a,
+            $b,
+        );
+
+        $names = [];
+        $spans = [];
+        $params = [];
+        foreach ($rows as $row) {
+            $names[self::str($row['gm_display_name'] ?? null)] = true;
+            $spans[] = '(%1$s = ? AND %2$s BETWEEN ? AND ?)';
+            $params[] = self::int($row['franchise_id'] ?? null);
+            $params[] = self::int($row['from_year'] ?? null);
+            $params[] = self::int($row['to_year'] ?? null);
+        }
+        if (!isset($names[$a], $names[$b])) {
+            return null;
+        }
+
+        $any = '(' . implode(' OR ', $spans) . ')';
+
+        return [
+            'sql' => "\n      AND " . sprintf($any, $sideOne, $yearCol) . "\n      AND " . sprintf($any, $sideTwo, $yearCol),
+            'types' => str_repeat('iii', 2 * count($spans)),
+            'params' => [...$params, ...$params],
+        ];
     }
 
     /**

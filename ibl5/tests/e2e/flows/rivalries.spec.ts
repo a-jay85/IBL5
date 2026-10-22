@@ -25,12 +25,48 @@ test.describe('Rivalries flow', () => {
     await assertNoPhpErrors(page);
 
     await expect(page.locator('.ibl-title').first()).toContainText(' vs ');
-    await expect(page.locator('section.ibl-card').first()).toContainText('(10 games)');
+    // Seed 1-vs-2 games: Metros win 7 (incl. the 2026-06-05 playoff game), Stars win 3.
+    const summary = page.locator('section.ibl-card').first();
+    await expect(summary).toContainText('All-time: 7-3 (10 games)');
+    await expect(summary).toContainText('Playoffs: 1-0');
 
     const series = page.locator('section.ibl-card', {
       has: page.getByRole('heading', { name: 'Playoff series' }),
     });
     await expect(series.locator('.ibl-empty-state')).toBeVisible();
+
+    // Each list shows the top 5 of the 10 meetings. The 4-point 2025-10-18 game is the
+    // closest; the 9-point 2026-02-26 game is the biggest blowout.
+    const closest = page.locator('section.ibl-card', {
+      has: page.getByRole('heading', { name: 'Closest games' }),
+    }).locator('tbody tr');
+    await expect(closest).toHaveCount(5);
+    await expect(closest.first()).toContainText('2025-10-18');
+    await expect(closest.first()).toContainText('102-98');
+
+    const blowouts = page.locator('section.ibl-card', {
+      has: page.getByRole('heading', { name: 'Biggest blowouts' }),
+    }).locator('tbody tr');
+    await expect(blowouts).toHaveCount(5);
+    await expect(blowouts.first()).toContainText('2026-02-26');
+    await expect(blowouts.first()).toContainText('108-99');
+  });
+
+  test('Olympics league gets the empty state and no IBL tables', async ({ page }) => {
+    await page.goto('modules.php?name=Rivalries&league=olympics');
+    await assertNoPhpErrors(page);
+
+    await expect(page.getByText('Rivalries are not available for the Olympics league.')).toBeVisible();
+    await expect(page.locator('.ibl-data-table')).toHaveCount(0);
+    await expect(page.locator('a[href*="name=Rivalries&op="]')).toHaveCount(0);
+  });
+
+  test('anonymous visitor sees no highlighted rivalry row', async ({ page }) => {
+    await page.goto('modules.php?name=Rivalries');
+    await assertNoPhpErrors(page);
+
+    await expect(page.locator('.ibl-data-table tbody tr')).not.toHaveCount(0);
+    await expect(page.locator('tr.user-team-row')).toHaveCount(0);
   });
 
   test('GM pair page renders below the cutoff', async ({ page }) => {

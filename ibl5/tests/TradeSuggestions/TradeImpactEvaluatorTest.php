@@ -105,6 +105,14 @@ class TradeImpactEvaluatorTest extends TestCase
         self::assertSame(52.9, round($result->significance, 1));
     }
 
+    public function testPartnerSkipsAReasonIdenticalToTheUsers(): void
+    {
+        $gap = 'Fills a gap at big: its top eight goes from 1 to 2 bigs.';
+
+        self::assertSame([$gap, 'Adds a 2027 first-round pick.'], TradeImpactEvaluator::distinctReasons([$gap], [$gap, 'Adds a 2027 first-round pick.']));
+        self::assertSame(['A', 'B'], TradeImpactEvaluator::distinctReasons(['A', 'C'], ['B', 'A']));
+    }
+
     public function testPickForPlayerDeal(): void
     {
         $user = self::team(1, [], [new SuggestionPick(900, 1, 2027, 1, 20.0)]);

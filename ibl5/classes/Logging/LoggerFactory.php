@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Logging;
 
+use Bootstrap\AppPaths;
 use Logging\Contracts\LoggerFactoryInterface;
 use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\NullHandler;
@@ -57,8 +58,8 @@ class LoggerFactory implements LoggerFactoryInterface
 
     public static function fromConfig(): self
     {
-        $configPath = self::resolveConfigDir() . '/logging.config.php';
-        $examplePath = self::resolveConfigDir() . '/logging.config.example.php';
+        $configPath = AppPaths::configDir() . '/logging.config.php';
+        $examplePath = AppPaths::configDir() . '/logging.config.example.php';
 
         if (file_exists($configPath)) {
             /** @var LoggingConfig $config */
@@ -208,19 +209,6 @@ class LoggerFactory implements LoggerFactoryInterface
             'info' => Level::Info,
             default => Level::Debug,
         };
-    }
-
-    private static function resolveConfigDir(): string
-    {
-        if (is_dir('config')) {
-            return 'config';
-        }
-
-        if (is_dir('ibl5/config')) {
-            return 'ibl5/config';
-        }
-
-        return dirname(__DIR__, 2) . '/config';
     }
 
     private static function resolveLogDir(): string

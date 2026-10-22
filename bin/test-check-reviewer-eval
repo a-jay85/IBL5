@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 #
 # bin/test-check-reviewer-eval — Fixture self-test for bin/check-reviewer-eval and the
-# compare-base resolver in bin/reviewer-eval. Cases (a) through (s), each asserting an
+# compare-base resolver in bin/reviewer-eval. Cases (a) through (v), each asserting an
 # exit code and one output token. Runs under `env -i PATH=/usr/bin:/bin`.
 
 set -euo pipefail
@@ -41,9 +41,27 @@ cat > "$FIX/$CORPUS" <<'EOF'
             "expected": [{"path": "a.php", "start": 1, "end": 2}]}],
  "clean": [{"id": "clean-one", "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]}
 EOF
+DOC="ibl5/docs/reviewer-eval.md"
+# baseline_doc <hits>: a baseline doc whose score line records <hits>/6 recall.
+baseline_doc() {
+    mkdir -p "$FIX/$(dirname "$DOC")"
+    printf '# Baseline\n\nreviewer-eval v=%s c=%s recall=%s/6 false_alarms=0 clean_flagged=0/9 degraded=0\n' \
+        "aaaaaaaaaaaa" "bbbbbbbbbbbb" "$1" > "$FIX/$DOC"
+}
+baseline_doc 2
 git -C "$FIX" add -A
 git -C "$FIX" commit -q -m base
 git -C "$FIX" tag base
+
+# The baseline doc is outside the review surface, so these bases share base's surface hash.
+git -C "$FIX" checkout -q -b baselines base
+baseline_doc 0
+git -C "$FIX" commit -q -am "zero baseline"
+git -C "$FIX" tag base_zero
+git -C "$FIX" rm -q "$DOC"
+git -C "$FIX" commit -q -m "no baseline"
+git -C "$FIX" tag base_nodoc
+git -C "$FIX" checkout -q -
 
 printf 'x\n' > "$FIX/unrelated.txt"
 git -C "$FIX" add -A
@@ -176,6 +194,23 @@ run_check "case k: short skip waiver" 1 "malformed reviewer-eval-skip waiver" \
 write_body "$GOOD_B" "$GOOD_A"
 run_check "case l: MODEL_MAP deleted" 2 "MODEL_MAP" \
     --body-file "$BODY" --base base --head head_nomap --repo "$FIX"
+
+# (t) zero baseline at base: a finding warns and exits 0
+printf 'Summary only\n' > "$BODY"
+run_check "case t: zero baseline warns" 0 "WARNING: not blocking" \
+    --body-file "$BODY" --base base_zero --head head_changed --repo "$FIX"
+h_contains "case t: names the finding" "$OUT" "exactly one"
+h_contains "case t: names the zero baseline" "$OUT" "is 0"
+
+# (u) no baseline doc at base: warns and exits 0
+run_check "case u: absent baseline warns" 0 "WARNING: not blocking" \
+    --body-file "$BODY" --base base_nodoc --head head_changed --repo "$FIX"
+h_contains "case u: names the absent baseline" "$OUT" "is absent"
+
+# (v) a zero baseline does not soften a usage error
+write_body "$GOOD_B" "$GOOD_A"
+run_check "case v: zero baseline keeps exit 2" 2 "MODEL_MAP" \
+    --body-file "$BODY" --base base_zero --head head_nomap --repo "$FIX"
 
 # (m) bad base ref
 run_check "case m: bad base ref" 2 "bad ref" \

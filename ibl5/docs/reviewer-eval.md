@@ -1,6 +1,6 @@
 ---
 description: How the reviewer eval corpus scores the post-plan code reviewer, and the before/after rule for review-surface PRs.
-last_verified: 2026-10-19
+last_verified: 2026-10-21
 ---
 
 # Reviewer eval
@@ -14,7 +14,9 @@ The corpus lives in `tools/postplan-harness/fixtures/reviewer-eval/corpus.json`.
 - **Bug cases.** Each names the commit that introduced a bug, the later commit that fixed it, and the line ranges where the bug sits. Only cases with `status: "confirmed"` are scored. Unconfirmed cases are counted and skipped.
 - **Clean cases.** Each names a commit that no fix or revert blamed for at least `window_days` days.
 
-`bin/reviewer-eval run` feeds each case's `git diff <commit>^ <commit>` to the unchanged `ReviewPhase` with no plan and a no-op GitHub adapter. It scores the findings that survive the reviewer's own threshold.
+`bin/reviewer-eval run` feeds each case's `git diff <commit>^ <commit>` to the unchanged `ReviewPhase` with no plan and a no-op GitHub adapter. Its verifiers read a detached checkout of the case commit, which is removed after the case. It scores the findings that survive the verifier vote. A verifier that errors abstains, and an abstain keeps a finding unverified, so the case counts as degraded.
+
+The run prints a `  raw <agent> <path>:<line> score=<n>` line for every finding before the vote, and the cache keeps them under `scored`. Read those lines to judge a miss by hand.
 
 A bug case counts as a hit when one surviving finding names an expected file and a line within `LINE_WINDOW` (5) lines of an expected range, inclusive. A finding at line 0 never counts as a hit. Every surviving finding on a clean case is a false alarm.
 
@@ -59,6 +61,8 @@ bin/reviewer-eval compare
 
 It scores the base tree and the head tree with one shared cache and prints two lines. Paste both into the PR body. The check requires that the before line matches the base hash, the after line matches the head hash, both lines match the head corpus digest, and both show `degraded=0`. It fails when the after score is worse than the before score.
 
+The check is warn-only while the baseline recall in this doc at the base ref is 0 or absent. A finding then prints a `WARNING: not blocking` line and exits 0. The check blocks once that baseline recall is above 0. It reads the base ref so a PR cannot loosen its own check.
+
 Two waivers go in the PR body as HTML comments. Each needs a reason of 15 or more characters.
 
 - `<!-- reviewer-eval-skip: <reason> -->` skips the check.
@@ -72,27 +76,33 @@ One run is a sample. LLM output varies between runs. Rerun a borderline comparis
 
 ## Baseline
 
-Recorded 2026-10-19 on review surface `v=16345a91e105`. The dry run estimated 62 model calls, and the live run made 45.
-
-No finding survived the reviewer's threshold on any case. An unrecorded spot check of `saved-dc-sum-is-int` suggested agents A and B named the defect at line 312 and the scorer rated each finding below `CODE_THRESHOLD` (80, in `tools/postplan-harness/harness/review.py`). No artifact keeps those pre-threshold scores, because the cache stores only surviving findings. Treat that as unverified. The zero recall may reflect the scorer and the threshold together.
+Recorded 2026-10-21 on review surface `v=2f6c48d10056`, after the Phase 4D verifier replaced the Haiku scorer. The recall is above 0, so `bin/check-reviewer-eval` blocks.
 
 ```
 case depth-chart-log-after-commit bug MISS findings=0 file_only=0
-case playoff-series-invalid-group-by bug MISS findings=0 file_only=0
-case saved-dc-sum-is-int bug MISS findings=0 file_only=0
-case table-dropdown-unencoded-param bug MISS findings=0 file_only=0
-case team-page-missing-pick-team bug MISS findings=0 file_only=0
-case trade-preview-unbounded-cash-years bug MISS findings=0 file_only=0
-case clean-navigation-voting-link clean flagged=0
-case clean-perf-logger-injectable clean flagged=0
+case playoff-series-invalid-group-by bug MISS findings=3 file_only=1
+case saved-dc-sum-is-int bug HIT findings=2 file_only=0
+case table-dropdown-unencoded-param bug HIT findings=12 file_only=0
+case team-page-missing-pick-team bug MISS findings=2 file_only=0
+case trade-preview-unbounded-cash-years bug MISS findings=1 file_only=0
+case clean-navigation-voting-link clean flagged=1
+case clean-perf-logger-injectable clean flagged=4
 case clean-quad-double-cte clean flagged=0
-case clean-rookie-option-rename clean flagged=0
-case clean-season-archive-collector clean flagged=0
+case clean-rookie-option-rename clean flagged=1
+case clean-season-archive-collector clean flagged=2
 case clean-sim-recap-linebreaks clean flagged=0
-case clean-standings-pythagorean clean flagged=0
+case clean-standings-pythagorean clean flagged=3
 case clean-standings-updater-constant clean flagged=0
 case clean-topics-service clean flagged=0
 excluded_unconfirmed=1
-llm_calls=45
-reviewer-eval v=16345a91e105 c=89cdd47be2df recall=0/6 false_alarms=0 clean_flagged=0/9 degraded=0
+reviewer-eval v=2f6c48d10056 c=89cdd47be2df recall=2/6 false_alarms=11 clean_flagged=5/9 degraded=0
 ```
+
+A hand check of the raw findings shows the position rule both overcounts and undercounts.
+
+- `saved-dc-sum-is-int` is a true hit. Agents A and B both name the `is_int` defect at line 312.
+- `table-dropdown-unencoded-param` hits on position alone. The finding at line 66 is a nearby injection in the HTML-escaped base URL. It does not name the missing `encodeURIComponent` on the selected value at line 68.
+- `trade-preview-unbounded-cash-years` names the real defect at line 63, the loop, and scores a miss. The fix bounded the GET parameters at lines 39 to 40, outside the window.
+- `depth-chart-log-after-commit` is a real miss. The live post-plan run on PR #3288 also got no finding from agents A, B and security.
+
+The first baseline, on surface `v=16345a91e105` with the Haiku scorer, read `recall=0/6` with no surviving finding on any case. The matching rule did not cause that zero, because no finding reached it. The scorer dropped the agents' findings, including the two line-312 findings that the verifier now keeps.

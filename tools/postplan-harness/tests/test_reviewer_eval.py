@@ -399,15 +399,21 @@ def test_validate_cli_exit_codes(tmp_path, capsys):
 
 import io  # noqa: E402
 
+from pathlib import Path  # noqa: E402
+
 from harness.state import HarnessError  # noqa: E402
 
 FOO = "ibl5/classes/Foo.php"
 
 
-def _canned(path, line, score):
+VERIFIERS = ("verify-findings-1", "verify-findings-2", "verify-findings-3")
+
+
+def _canned(path, line, verdict):
+    votes = json.dumps([{"n": 1, "verdict": verdict, "reason": "r"}])
     return {"review-agent-a": [{"path": path, "line": line, "body": "b"}],
             "review-agent-b": [], "review-agent-d": [], "security-audit": [],
-            "score-findings": [{"n": 1, "score": score}]}
+            **{p: votes for p in VERIFIERS}}
 
 
 class _StubLlm:
@@ -415,6 +421,7 @@ class _StubLlm:
         self.canned = canned
         self.raises = set(raises)
         self.calls = []
+        self.tooled_cwds = []
 
     def call(self, purpose, model, prompt, validate, max_retries=1, normalizer=None):
         self.calls.append(purpose)
@@ -425,6 +432,13 @@ class _StubLlm:
             data = normalizer(data)
         validate(data)
         return data
+
+    def call_tooled(self, purpose, model, prompt, *, cwd, **kw):
+        self.calls.append(purpose)
+        self.tooled_cwds.append((cwd, Path(cwd).exists()))
+        if purpose in self.raises:
+            raise HarnessError("llm-invalid-output", "x")
+        return self.canned[purpose]
 
 
 def _eval_repo(tmp_path):
@@ -452,7 +466,7 @@ def _last(text):
 
 
 def _canned_by_case():
-    return {"b1": _canned(FOO, 12, 90), "b2": _canned(FOO, 50, 90), "c1": _canned(FOO, 3, 90)}
+    return {"b1": _canned(FOO, 12, "real"), "b2": _canned(FOO, 50, "real"), "c1": _canned(FOO, 3, "real")}
 
 
 def test_run_canned_hit_and_miss(tmp_path):
@@ -464,20 +478,62 @@ def test_run_canned_hit_and_miss(tmp_path):
     assert "case b1 bug HIT" in text and "case b2 bug MISS" in text
 
 
-def test_run_below_threshold_not_counted(tmp_path):
+def test_run_all_verifiers_reject_not_counted(tmp_path):
     r = _eval_repo(tmp_path)
     corpus = _vcorpus([_bug(r)])
-    rc, text = _run(r, corpus, lambda cid: _StubLlm(_canned(FOO, 12, 79)))
+    rc, text = _run(r, corpus, lambda cid: _StubLlm(_canned(FOO, 12, "not-real")))
     assert rc == 0
     assert "case b1 bug MISS findings=0" in text
     assert "recall=0/1" in _last(text)
+    assert "  raw A ibl5/classes/Foo.php:12 score=0 b" in text
+
+
+def test_run_verifiers_read_checkout_of_case_commit(tmp_path):
+    r = _eval_repo(tmp_path)
+    stub = _StubLlm(_canned(FOO, 12, "real"))
+    seen = []
+    inner = stub.call_tooled
+
+    def spy(purpose, model, prompt, *, cwd, **kw):
+        seen.append((Path(cwd) / FOO).read_text())
+        return inner(purpose, model, prompt, cwd=cwd, **kw)
+
+    stub.call_tooled = spy
+    rc, text = _run(r, _vcorpus([_bug(r)]), lambda cid: stub)
+    assert rc == 0 and "case b1 bug HIT" in text
+    intro = subprocess.run(["git", "-C", str(r["root"]), "show", f"{r['intro']}:{FOO}"],
+                           capture_output=True, text=True, check=True).stdout
+    assert seen and all(s == intro for s in seen)
+    assert len(stub.tooled_cwds) == 3 and all(ok for _, ok in stub.tooled_cwds)
+    assert not any(Path(cwd).exists() for cwd, _ in stub.tooled_cwds)
+
+
+def test_run_verifier_error_marks_degraded(tmp_path):
+    r = _eval_repo(tmp_path)
+    cache = tmp_path / "cache"
+    stub = _StubLlm(_canned(FOO, 12, "real"), raises={"verify-findings-2"})
+    rc, text = _run(r, _vcorpus([_bug(r)]), lambda cid: stub, cache_dir=cache)
+    assert rc == 3
+    assert "DEGRADED=verifier" in text
+    assert not cache.exists()
+
+
+def test_run_cache_keeps_pre_threshold_findings(tmp_path):
+    r = _eval_repo(tmp_path)
+    cache = tmp_path / "cache"
+    _run(r, _vcorpus([_bug(r)]), lambda cid: _StubLlm(_canned(FOO, 12, "not-real")),
+         cache_dir=cache)
+    (entry,) = list(cache.rglob("*.json"))
+    data = json.loads(entry.read_text())
+    assert data["findings"] == []
+    assert [(s["path"], s["line"], s["score"]) for s in data["scored"]] == [(FOO, 12, 0)]
 
 
 def test_run_degraded_exit_3(tmp_path):
     r = _eval_repo(tmp_path)
     cache = tmp_path / "cache"
     rc, text = _run(r, _vcorpus([_bug(r)]),
-                    lambda cid: _StubLlm(_canned(FOO, 12, 90), raises={"review-agent-a"}),
+                    lambda cid: _StubLlm(_canned(FOO, 12, "real"), raises={"review-agent-a"}),
                     cache_dir=cache)
     assert rc == 3
     assert _last(text).endswith("degraded=1")
@@ -489,7 +545,7 @@ def test_run_cache_reuse(tmp_path):
     r = _eval_repo(tmp_path)
     corpus = _vcorpus([_bug(r)])
     cache = tmp_path / "cache"
-    stub = _StubLlm(_canned(FOO, 12, 90))
+    stub = _StubLlm(_canned(FOO, 12, "real"))
     rc, first = _run(r, corpus, lambda cid: stub, cache_dir=cache)
     assert rc == 0 and stub.calls
     stub.calls.clear()
@@ -571,9 +627,9 @@ def test_run_dry_run_no_llm(tmp_path):
 
 
 def test_smoke_stub_ok_and_failure(capsys):
-    assert re_.smoke(_StubLlm({"score-findings": [{"n": 1, "score": 40}]})) == 0
-    assert "smoke ok" in capsys.readouterr().out
-    assert re_.smoke(_StubLlm({}, raises={"score-findings"})) == 1
+    assert re_.smoke(_StubLlm({"review-agent-a": [{"path": FOO, "line": 1, "body": "b"}]})) == 0
+    assert "smoke ok findings=1" in capsys.readouterr().out
+    assert re_.smoke(_StubLlm({}, raises={"review-agent-a"})) == 1
     assert "smoke failed: llm-invalid-output: x" in capsys.readouterr().err
 
 
@@ -806,6 +862,46 @@ def _git_run(root, *argv):
                    check=True, capture_output=True)
 
 
+def _write_baseline(root, hits):
+    doc = root / re_.BASELINE_DOC
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text("# Baseline\n\n```\nreviewer-eval v=" + "a" * 12 + " c=" + "b" * 12
+                   + f" recall={hits}/6 false_alarms=0 clean_flagged=0/9 degraded=0\n```\n")
+
+
+def test_check_claim_blocks_or_warns_by_base_baseline(tmp_path):
+    root, base = _claim_repo(tmp_path)
+    (root / re_.REVIEW_SURFACE_PATHS[3]).write_text("two\n")
+    _commit_all(root, "change rubric")
+    err = io.StringIO()
+    assert re_.check_claim(root, base, "HEAD", lambda: "no lines\n", out=io.StringIO(), err=err) == 1
+    assert "WARNING" not in err.getvalue()
+
+    def rev(ref):
+        return subprocess.run(["git", "-C", str(root), "rev-parse", ref], capture_output=True,
+                              text=True, check=True).stdout.strip()
+
+    head = rev("HEAD")
+    # A zero baseline on base's surface: the baseline doc sits outside the surface hash.
+    _git_run(root, "checkout", "-q", "-b", "zero", base)
+    _write_baseline(root, 0)
+    _commit_all(root, "zero baseline")
+    zero = rev("HEAD")
+    err = io.StringIO()
+    assert re_.check_claim(root, zero, head, lambda: "no lines\n", out=io.StringIO(), err=err) == 0
+    assert "exactly one" in err.getvalue() and "WARNING: not blocking" in err.getvalue()
+    # Only the base ref's baseline counts. A head that raises it still warns from a zero base,
+    # and a head that lowers it to zero still blocks from a positive base.
+    _write_baseline(root, 1)
+    (root / re_.REVIEW_SURFACE_PATHS[3]).write_text("three\n")
+    _commit_all(root, "positive baseline, rubric edit")
+    err = io.StringIO()
+    assert re_.check_claim(root, zero, "HEAD", lambda: "no lines\n", out=io.StringIO(), err=err) == 0
+    _write_baseline(root, 0)
+    _commit_all(root, "zero baseline again")
+    assert re_.check_claim(root, base, "HEAD", lambda: "no lines\n", out=io.StringIO(), err=err) == 1
+
+
 def _claim_repo(tmp_path):
     root = tmp_path / "claim"
     root.mkdir()
@@ -824,6 +920,7 @@ def _claim_repo(tmp_path):
                    "expected": [{"path": "a.php", "start": 1, "end": 2}]}],
         "clean": [{"id": "clean-one", "commit": "b" * 40}],
     }))
+    _write_baseline(root, 1)
     _git_run(root, "add", "-A")
     _git_run(root, "commit", "-q", "-m", "base")
     base = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True,

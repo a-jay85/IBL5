@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/check-reviewer-eval — Blocking gate: a PR that edits the post-plan review surface must carry a before/after score.
+# bin/check-reviewer-eval — Gate: a PR that edits the post-plan review surface must carry a before/after score.
 #
 # The review surface is the prompt files, the rubric, review.py and the MODEL_MAP block
 # (see ibl5/docs/reviewer-eval.md). When its hash differs between base and head, the PR body
@@ -9,6 +9,8 @@
 # by `bin/reviewer-eval compare`. This gate binds those lines to the surface hash at base and
 # head, to the corpus digest at head, and to degraded=0. A worse score needs a waiver.
 # When the surface hash is unchanged the gate passes without reading the PR body.
+# Warn-only while the baseline recall in ibl5/docs/reviewer-eval.md at --base is 0 or
+# absent: a finding prints a WARNING and exits 0. It blocks once that recall is above 0.
 # Honest limit: it cannot prove the run happened. It proves the claim names the right
 # surface and corpus, and that the numbers are consistent.
 # The body is data only: it is matched with regexes, never eval'd, sourced, or used as a format string.
@@ -27,7 +29,7 @@
 #   <!-- reviewer-eval-regression-ok: <reason> -->   accept a worse score
 #
 # Exit codes:
-#   0  ok, surface unchanged, or valid waiver.
+#   0  ok, surface unchanged, valid waiver, or a finding under a zero baseline.
 #   1  finding or malformed waiver.
 #   2  usage, gh failure, bad ref, unreadable surface or corpus.
 
@@ -58,7 +60,7 @@ Waivers:
   <!-- reviewer-eval-regression-ok: <reason, 15+ chars> -->
 
 Exit codes:
-  0  ok, surface unchanged, or valid waiver.
+  0  ok, surface unchanged, valid waiver, or a finding under a zero baseline.
   1  finding or malformed waiver.
   2  usage, gh failure, bad ref, unreadable surface or corpus.
 EOF

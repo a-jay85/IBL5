@@ -6,7 +6,7 @@
 # Usage: bin/reviewer-eval <run|validate|smoke|compare|mine> [flags]
 #   run       review each corpus case offline and print the one-line score
 #   validate  check the corpus schema and its history claims offline
-#   smoke     one live scorer call proving the claude -p boundary
+#   smoke     one live review-agent call proving the claude -p boundary
 #   compare   score the base tree and this tree on one corpus and print a before/after block
 #   mine      print bug or clean corpus candidates from history (writes no file)
 #   exit 0 ok, 1 finding or failure, 2 usage, 3 incomplete (a degraded review agent)

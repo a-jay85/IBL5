@@ -169,6 +169,7 @@ jobs:
 
       # Review-surface edits must carry a before/after score (ADR 0201). No-op when
       # the surface hash is unchanged. Waivers: reviewer-eval-skip / -regression-ok.
+      # Warn-only (exit 0) while the base ref's baseline recall is 0 or absent.
       - name: Run bin/check-reviewer-eval
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:

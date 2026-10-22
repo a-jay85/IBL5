@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
@@ -24,7 +25,7 @@ from typing import Callable, Iterable, Optional, Sequence, TextIO
 from . import schemas
 from .adapters.llm import ClaudeCli, FixtureLlm
 from .classify import classify, files_from_diff, modified_files_from_diff
-from .review import ReviewPhase, scoring_prompt
+from .review import VERIFIER_COUNT, ReviewPhase
 from .state import Classification, Finding, HarnessError, PlanInfo, UsageLedger
 
 # ---------------------------------------------------------------------------
@@ -635,6 +636,11 @@ class _CountingLlm:
             self.calls += 1
         return self._inner.call(*a, **k)  # type: ignore[attr-defined]
 
+    def call_tooled(self, *a, **k):
+        with self._lock:
+            self.calls += 1
+        return self._inner.call_tooled(*a, **k)  # type: ignore[attr-defined]
+
 
 def _load_cached(path: Path) -> Optional[tuple[list[Finding], list[str]]]:
     try:
@@ -648,14 +654,36 @@ def _load_cached(path: Path) -> Optional[tuple[list[Finding], list[str]]]:
         return None
 
 
-def _write_cache(path: Path, findings: Sequence[Finding]) -> None:
+def _write_cache(path: Path, findings: Sequence[Finding], scored: Sequence[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"findings": [{"source": f.source, "agent": f.agent, "path": f.path,
                              "line": f.line, "score": f.score} for f in findings],
+               "scored": list(scored),
                "degraded": []}
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
     os.replace(tmp, path)
+
+
+def review_case(root: Path, commit: str, llm: object, meta: dict,
+                cls: Classification) -> tuple[list[Finding], list[dict], list[str]]:
+    """Run ReviewPhase with its verifiers reading a detached checkout of `commit`, the way
+    the live reviewer reads the PR head. A verifier seat that errored abstains, and an
+    abstain keeps a finding unverified, so that case counts as degraded."""
+    with tempfile.TemporaryDirectory(prefix="reviewer-eval-") as tmp:
+        checkout = str(Path(tmp) / "wt")
+        r = _gitt(root, "worktree", "add", "-q", "--detach", checkout, commit)
+        if r.returncode != 0:
+            raise EvalUsageError(f"git worktree add failed for {commit}: {r.stderr.strip()}")
+        try:
+            phase = ReviewPhase(llm, NullGh(), worktree=checkout)
+            surviving, _gates, scored, degraded = phase.run(meta, cls, PlanInfo())
+        finally:
+            _gitt(root, "worktree", "remove", "--force", checkout)
+    degraded = list(degraded)
+    if any(v.get("error") for rec in phase.last_votes for v in rec["votes"]):
+        degraded.append("verifier")
+    return list(surviving), list(scored), degraded
 
 
 def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
@@ -686,7 +714,7 @@ def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
             _meta, cls = case_input(root, case["commit"])
             gates = ReviewPhase(None, NullGh()).gates(cls)
             on = [k for k in _AGENT_GATES if gates[k]]
-            est = len(on) + 1
+            est = len(on) + VERIFIER_COUNT    # one verifier chunk; more findings add chunks
             total += est
             print(f"case {case['id']} {kind} dry gates={','.join(on)} "
                   f"diff_bytes={len(cls.filtered_diff.encode())} est_calls={est}", file=out)
@@ -707,12 +735,13 @@ def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
         else:
             meta, cls = case_input(root, case["commit"])
             llm = _CountingLlm(llm_factory(cid))
-            surviving, _gates, _scored, degraded = ReviewPhase(llm, NullGh()).run(
-                meta, cls, PlanInfo())
+            findings, scored, degraded = review_case(root, case["commit"], llm, meta, cls)
             llm_calls += llm.calls
-            findings = list(surviving)
+            for s in scored:
+                print(f"  raw {s['agent']} {s['path']}:{s['line']} score={s['score']} "
+                      f"{' '.join((s.get('body_head') or '').split())[:120]}", file=out)
             if cache_path is not None and not degraded:
-                _write_cache(cache_path, findings)
+                _write_cache(cache_path, findings, scored)
         suffix = f" DEGRADED={','.join(degraded)}" if degraded else ""
         if kind == "bug":
             expected = [ExpectedRange(e["path"], e["start"], e["end"]) for e in case["expected"]]
@@ -731,21 +760,21 @@ def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
     return 3 if score.degraded > 0 else 0
 
 
+_SMOKE_PROMPT = ("Reply with a JSON array of findings for this diff, each {path, line, body}. "
+                 "Reply [] when there is nothing to report.\n\n"
+                 "--- a/ibl5/classes/Example.php\n+++ b/ibl5/classes/Example.php\n"
+                 "@@ -1 +1 @@\n-$a = $row['x'] ?? 0;\n+$a = $row['x'];\n")
+
+
 def smoke(llm: object) -> int:
-    f = Finding(source="code-review", agent="A", path="ibl5/classes/Example.php", line=1,
-                body="Possible null dereference of $row before the isset check.")
     try:
-        scores = llm.call("score-findings", "haiku", scoring_prompt([f]),  # type: ignore[attr-defined]
-                          schemas.validate_scores)
+        data = llm.call("review-agent-a", "sonnet", _SMOKE_PROMPT,  # type: ignore[attr-defined]
+                        schemas.validate_findings, normalizer=schemas.unwrap_findings_envelope)
     except HarnessError as e:
         print(f"smoke failed: {e.kind}: {e.detail}", file=sys.stderr)
         return 1
-    for s in scores:
-        if s.get("n") == 1:
-            print(f"smoke ok score={s['score']}")
-            return 0
-    print("smoke failed: bad-output: no entry with n == 1", file=sys.stderr)
-    return 1
+    print(f"smoke ok findings={len(data)}")
+    return 0
 
 
 class _Tee:
@@ -926,11 +955,49 @@ def _cmd_hash(args: argparse.Namespace) -> int:
     return 0
 
 
+BASELINE_DOC = "ibl5/docs/reviewer-eval.md"
+
+
+def baseline_hits(root: Path, ref: str) -> Optional[int]:
+    """Recall hits of the last score line in the baseline doc at `ref`; None when absent."""
+    raw = read_git_ref(root, ref, BASELINE_DOC)
+    if raw is None:
+        return None
+    hits = None
+    for line in raw.decode("utf-8", errors="replace").splitlines():
+        if line.startswith(SCORE_LINE_PREFIX + " v="):
+            try:
+                hits = parse_score_line(line).hits
+            except EvalUsageError:
+                continue
+    return hits
+
+
 def check_claim(root: Path, base: str, head: str, body_loader: Callable[[], str], *,
                 out: Optional[TextIO] = None, err: Optional[TextIO] = None) -> int:
-    """Bind a PR body's before/after score lines to the surface at base/head and the corpus at head."""
+    """Strict check, softened to a warning while the base ref's baseline recall is 0.
+    The baseline is read at base so a PR cannot loosen its own gate."""
     out = out if out is not None else sys.stdout
     err = err if err is not None else sys.stderr
+    rc = _check_claim_strict(root, base, head, body_loader, out=out, err=err)
+    if rc != 1:
+        return rc
+    try:
+        hits = baseline_hits(root, base)
+    except SurfaceError as e:
+        print(f"check-reviewer-eval: {e}", file=err)
+        return 2
+    if hits:
+        return 1
+    print(f"check-reviewer-eval: WARNING: not blocking, because the baseline recall at {base} "
+          f"is {'absent' if hits is None else '0'} ({BASELINE_DOC}); the gate blocks once "
+          f"the baseline recall is above 0", file=err)
+    return 0
+
+
+def _check_claim_strict(root: Path, base: str, head: str, body_loader: Callable[[], str], *,
+                        out: TextIO, err: TextIO) -> int:
+    """Bind a PR body's before/after score lines to the surface at base/head and the corpus at head."""
     try:
         v_base = surface_hash_ref(root, base)
         v_head = surface_hash_ref(root, head)
@@ -1051,7 +1118,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     r.add_argument("--dry-run", action="store_true")
     r.add_argument("--out", metavar="FILE", default=None)
     r.set_defaults(func=_cmd_run)
-    sm = sub.add_parser("smoke", help="one live scorer call proving the claude -p boundary")
+    sm = sub.add_parser("smoke", help="one live review-agent call proving the claude -p boundary")
     sm.set_defaults(func=_cmd_smoke)
     c = sub.add_parser("compare", help="score the base tree and this tree on one corpus and cache")
     c.add_argument("--base", metavar="REF", default="origin/master")

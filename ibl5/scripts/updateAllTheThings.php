@@ -6,7 +6,15 @@ error_reporting(E_ALL);
 libxml_use_internal_errors(true);
 
 // Load mainfile first for authentication
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+$documentRoot = isset($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT'])
+    ? $_SERVER['DOCUMENT_ROOT']
+    : '';
+require $documentRoot . '/ibl5/mainfile.php';
+
+// This script writes ibl_settings, ibl_schedule, and ibl_sim_dates and then
+// reads them back through Season in the same process. Turn the request-scoped
+// memo off (and drop anything already cached) so every Season build is fresh.
+\Season\SharedSeason::disable();
 
 // SECURITY: Redirect logged-out users to login
 if (!function_exists('is_user') || !is_user($user ?? '')) {
@@ -79,8 +87,8 @@ if ($leagueContext !== null) {
 $view = new Updater\UpdaterView();
 
 $stylesheetPath = '/ibl5/themes/IBL/style/style.css';
-/** @var int|false $stylesheetMtime */
-$stylesheetMtime = filemtime($_SERVER['DOCUMENT_ROOT'] . $stylesheetPath);
+/** @var int<0, max>|false $stylesheetMtime */
+$stylesheetMtime = filemtime($documentRoot . $stylesheetPath);
 $cacheBuster = $stylesheetMtime !== false ? '?v=' . $stylesheetMtime : '';
 
 echo $view->renderPageOpen($stylesheetPath . $cacheBuster);
@@ -91,7 +99,7 @@ set_error_handler(function (int $errno, string $errstr, string $errfile, int $er
     $safeMessage = \Security\HtmlSanitizer::safeHtmlOutput(
         "[$errno] $errstr in $errfile on line $errline"
     );
-    echo $view->renderStepError('PHP Error', (string) $safeMessage);
+    echo $view->renderStepError('PHP Error', $safeMessage);
     flush();
     return false;
 });
@@ -104,13 +112,13 @@ set_exception_handler(function (\Throwable $exception) use ($view): void {
 
     echo $view->renderStepError(
         'Uncaught Exception',
-        (string) $safeMessage . ' in ' . (string) $safeFile . ' on line ' . $exception->getLine()
+        $safeMessage . ' in ' . $safeFile . ' on line ' . $exception->getLine()
     );
-    echo $view->renderLog('<pre>' . (string) $safeTrace . '</pre>');
+    echo $view->renderLog('<pre>' . $safeTrace . '</pre>');
     flush();
 });
 
-$basePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5';
+$basePath = $documentRoot . '/ibl5';
 
 try {
     // --- Initialization ---
@@ -183,9 +191,10 @@ try {
 
     $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db, $leagueContext);
     $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db, $boxscoreRepo, $season, $leagueContext);
+    $allStarTeamRepo = new Boxscore\AllStarTeamRepository($mysqli_db, $leagueContext);
     $boxscoreView = new Boxscore\BoxscoreView();
 
-    $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db, $leagueContext);
+    $savedDcRepo = new DepthChartSnapshot\DepthChartSnapshotRepository($mysqli_db, $leagueContext);
 
     $jsbRepo = new JsbParser\JsbImportRepository($mysqli_db, $leagueContext);
     $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db, $leagueContext);
@@ -264,7 +273,7 @@ try {
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\RefreshHeadToHeadRecordsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
-            $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $sourceResolver,
+            $boxscoreProcessor, $allStarTeamRepo, $boxscoreView, $sourceResolver,
         ));
         $updaterService->addStep(new Updater\Steps\RefreshPlayoffSeriesResultsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\RefreshTeamSeasonRecordsStep($mysqli_db));
@@ -313,6 +322,7 @@ try {
         $updaterService->addStep(new Updater\Steps\QueueSimSummaryStep(
             new \SimRecap\SimSummaryRepository($mysqli_db),
             new \Season\SeasonQueryRepository($mysqli_db),
+            \SimRecap\GitHubDispatchClient::fromConfig(),
         ));
     }
 
@@ -326,7 +336,8 @@ try {
     // shadow only READS inputs and writes droppable diagnostic tables. IBL-only (the
     // engine bundle is IBL-scoped), so the gate stays !$isOlympics. Fire-and-forget:
     // the admin request returns immediately and the shadow process outlives it.
-    if (!$isOlympics && filter_var(getenv('ENGINE_SHADOW_ENABLED') ?: '', FILTER_VALIDATE_BOOLEAN)) {
+    $shadowFlag = getenv('ENGINE_SHADOW_ENABLED');
+    if (!$isOlympics && filter_var($shadowFlag === false ? '' : $shadowFlag, FILTER_VALIDATE_BOOLEAN)) {
         $shadowLauncher = new EngineShadow\ShadowProcessLauncher(
             $basePath . '/scripts/runEngineShadow.php',
             sys_get_temp_dir() . '/ibl5-engine-shadow.log',
@@ -338,8 +349,8 @@ try {
     $safeMessage = \Security\HtmlSanitizer::safeHtmlOutput($e->getMessage());
     $safeTrace = \Security\HtmlSanitizer::safeHtmlOutput($e->getTraceAsString());
 
-    echo $view->renderStepError('Exception', (string) $safeMessage);
-    echo $view->renderLog('<pre>' . (string) $safeTrace . '</pre>');
+    echo $view->renderStepError('Exception', $safeMessage);
+    echo $view->renderLog('<pre>' . $safeTrace . '</pre>');
     echo $view->renderSummary(0, 1);
     flush();
 }

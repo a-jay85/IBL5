@@ -11,18 +11,18 @@
 # Run: bin/test-human-signoff-classifier  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIB="$REPO_ROOT/bin/lib/human-signoff-classifier.sh"
 
-FAILED=0
 LAST_OUT=""
 expect() { # name expected_rc actual_rc
     if [ "$2" -eq "$3" ]; then
-        echo "ok: $1"
+        h_pass "$1"
     else
-        echo "FAIL: $1 — expected rc=$2 got rc=$3; output: $LAST_OUT"
-        FAILED=1
+        h_fail "$1" "expected rc=$2 got rc=$3; output: $LAST_OUT"
     fi
 }
 
@@ -43,9 +43,4 @@ run_pr "fix: a bug" "";                          expect "fix: -> PASS" 0 "$?"
 run_pr "ci: plumb merge queue" "";               expect "ci: -> PASS" 0 "$?"
 run_pr "feat: x" "not-human-approved-yet";       expect "feat: + lookalike label -> FAIL" 1 "$?"
 
-if [ "$FAILED" -eq 0 ]; then
-    echo "All human-signoff classifier checks passed."
-else
-    echo "Some human-signoff classifier checks FAILED."
-fi
-exit "$FAILED"
+h_done

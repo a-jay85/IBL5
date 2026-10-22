@@ -45,7 +45,7 @@ class LeagueStartersRepositoryTest extends DatabaseTestCase
 
         $starters = $this->repo->getAllStartersWithTeamData();
 
-        self::assertNotEmpty($starters, 'Expected at least one starter');
+        self::assertNotSame([], $starters, 'Expected at least one starter');
         $pids = array_column($starters, 'pid');
         self::assertContains(200140004, $pids, 'Starter should be included');
         self::assertNotContains(200140002, $pids, 'Non-starter should be excluded');
@@ -57,7 +57,7 @@ class LeagueStartersRepositoryTest extends DatabaseTestCase
 
         $starters = $this->repo->getAllStartersWithTeamData();
 
-        self::assertNotEmpty($starters);
+        self::assertNotSame([], $starters);
         $first = $starters[0];
         self::assertArrayHasKey('teamname', $first);
         self::assertArrayHasKey('color1', $first);

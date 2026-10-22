@@ -1,0 +1,3 @@
+```json
+{"type": "docs", "title": "chore(burndown): upgrade burndown subagent model to sonnet-5-5", "commit_subject": "docs(burndown): update subagent model pin sonnet-4-6 → sonnet-5-5 in SKILL.md", "summary_md": "## Summary\n- Bumps the burndown skill's ad-hoc subagent model reference from `sonnet-4-6` to `sonnet-5-5`."}
+```

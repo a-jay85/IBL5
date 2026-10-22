@@ -17,6 +17,8 @@
 # Run: bin/test-automouse-impl-model  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HELPER="$SCRIPT_DIR/lib/plan-impl-model"
@@ -24,7 +26,6 @@ TIER_HELPER="$SCRIPT_DIR/lib/plan-model-tier"
 TMP="$(mktemp -d)"
 trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
 
-FAILED=0
 
 # assert <name> <expected-model> <plan-body>
 assert() {
@@ -33,10 +34,9 @@ assert() {
     printf '%s\n' "$body" > "$f"
     got=$("$HELPER" "$f")
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — expected '$want', got '$got'"
-        FAILED=1
+        h_fail "$name" "expected '$want', got '$got'"
     else
-        echo "ok: $name ($got)"
+        h_pass "$name ($got)"
     fi
 }
 
@@ -47,11 +47,11 @@ assert_reject() {
     printf '%s\n' "$body" > "$f"
     out=$("$HELPER" "$f" 2>/dev/null); rc=$?
     err=$("$HELPER" "$f" 2>&1 >/dev/null)
-    if [ "$rc" -eq 0 ]; then echo "FAIL: $name — expected nonzero exit, got 0"; FAILED=1; return; fi
-    if [ -n "$out" ]; then echo "FAIL: $name — stdout must be empty on rejection, got: $out"; FAILED=1; fi
-    case "$err" in *"$want_sub"*) ;; *) echo "FAIL: $name — stderr missing '$want_sub', got: $err"; FAILED=1 ;; esac
+    if [ "$rc" -eq 0 ]; then h_fail "$name" "expected nonzero exit, got 0"; return; fi
+    if [ -n "$out" ]; then h_fail "$name" "stdout must be empty on rejection, got: $out"; fi
+    case "$err" in *"$want_sub"*) ;; *) h_fail "$name" "stderr missing '$want_sub', got: $err" ;; esac
     if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
-        case "$err" in *"$want_sub"*) echo "ok: $name (rejected, stderr contains '$want_sub')" ;; esac
+        case "$err" in *"$want_sub"*) h_pass "$name (rejected, stderr contains '$want_sub')" ;; esac
     fi
 }
 
@@ -59,12 +59,11 @@ assert_reject() {
 assert_tier() {
     val="$1"; want_tier="$2"
     got=$("$TIER_HELPER" "$val" 2>/dev/null); rc=$?
-    if [ $rc -ne 0 ]; then echo "FAIL: tier($val) — expected exit 0, got $rc"; FAILED=1; return; fi
+    if [ $rc -ne 0 ]; then h_fail "tier($val)" "expected exit 0, got $rc"; return; fi
     if [ "$got" != "$want_tier" ]; then
-        echo "FAIL: tier($val) — expected '$want_tier', got '$got'"
-        FAILED=1
+        h_fail "tier($val)" "expected '$want_tier', got '$got'"
     else
-        echo "ok: tier($val) ($got)"
+        h_pass "tier($val) ($got)"
     fi
 }
 
@@ -121,8 +120,18 @@ assert "c7b-full-sonnet-5-5" "claude-sonnet-5-5" '---
 impl_model: claude-sonnet-5-5
 ---'
 
-# c8 — full haiku id accepted and resolves to claude-haiku-4-5
-assert "c8-full-haiku" "claude-haiku-4-5" '---
+# c8 — full haiku id accepted and resolves to claude-haiku-5-5
+assert "c8-full-haiku" "claude-haiku-5-5" '---
+impl_model: claude-haiku-5-5
+---'
+
+# c8b — the bare `haiku` alias resolves to claude-haiku-5-5
+assert "c8b-haiku-alias" "claude-haiku-5-5" '---
+impl_model: haiku
+---'
+
+# c8c — legacy claude-haiku-4-5 is still accepted (haiku-tier -> current Haiku)
+assert "c8c-legacy-haiku-4-5" "claude-haiku-5-5" '---
 impl_model: claude-haiku-4-5
 ---'
 
@@ -159,20 +168,15 @@ assert_tier "sonnet"         "sonnet-tier"
 assert_tier "claude-sonnet-4-6" "sonnet-tier"
 assert_tier "claude-sonnet-5-5" "sonnet-tier"
 assert_tier "haiku"          "haiku-tier"
+assert_tier "claude-haiku-5-5"  "haiku-tier"
 assert_tier "claude-haiku-4-5"  "haiku-tier"
 
 # tier no-arg — plan-model-tier with no argument must exit 2 (usage error)
 "$TIER_HELPER" 2>/dev/null; tier_no_arg_rc=$?
 if [ $tier_no_arg_rc -ne 2 ]; then
-    echo "FAIL: tier(no-arg) — expected exit 2, got $tier_no_arg_rc"
-    FAILED=1
+    h_fail "tier(no-arg)" "expected exit 2, got $tier_no_arg_rc"
 else
-    echo "ok: tier(no-arg) (exit $tier_no_arg_rc)"
+    h_pass "tier(no-arg) (exit $tier_no_arg_rc)"
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

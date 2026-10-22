@@ -51,7 +51,7 @@ final class FreeAgencyUnderContractSectionView implements FreeAgencyUnderContrac
             if (!$player->isPlayerFreeAgent($season) || $player->isSalaryPlaceholder()):
                 $futureSalaries = $player->getFutureSalaries();
                 $playerName = $player->getName() ?? '';
-                if (($player->getOrdinal() ?? 0) > \League\JSB::WAIVERS_ORDINAL) {
+                if (($player->getOrdinal() ?? 0) > \League\JsbConstants::WAIVERS_ORDINAL) {
                     $playerName .= "*";
                 }
             ?>
@@ -72,15 +72,15 @@ final class FreeAgencyUnderContractSectionView implements FreeAgencyUnderContrac
             <?php if ($contractAction !== null): ?>
                 <?php
                 $actionUrl = match ($contractAction) {
-                    'rookie_option' => 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . ($player->getPlayerID() ?? 0) . '&amp;from=fa',
-                    'extension' => 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . ($player->getPlayerID() ?? 0),
+                    'rookie_option' => 'modules.php?name=Player&pa=rookieoption&pid=' . ($player->getPlayerID() ?? 0) . '&from=fa',
+                    'extension' => 'modules.php?name=Player&pa=negotiate&pid=' . ($player->getPlayerID() ?? 0),
                 };
                 $actionLabel = match ($contractAction) {
                     'rookie_option' => 'Rookie Option',
                     'extension' => 'Contract Extension',
                 };
                 ?>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[1]) ?><a href="<?= HtmlSanitizer::trusted($actionUrl) ?>" class="contract-hint-link" data-no-abbreviate><?= HtmlSanitizer::e($actionLabel) ?></a></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[1]) ?><a href="<?= HtmlSanitizer::e($actionUrl) ?>" class="contract-hint-link" data-no-abbreviate><?= HtmlSanitizer::e($actionLabel) ?></a></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[2]) ?></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[3]) ?></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[4]) ?></td>

@@ -16,6 +16,19 @@ GH_API_CMD="${GH_API_CMD:-gh api}"
 # stays policy-free, and every caller that needs a skip states it explicitly
 # (bin/merge-master-to-prod below, .github/workflows/promote-to-production.yml).
 SKIP_CHECKS="${SKIP_CHECKS:-}"
+# Comma-separated EXACT check-run names to ignore ONLY while still pending
+# (status != completed). A completed run of a listed name still counts, so a
+# red or cancelled deploy fails the verdict as before. Empty by default; the
+# between-plans canary in bin/automouse/run sets it for the post-merge jobs
+# that are always in flight on a just-merged master.
+IGNORE_PENDING_CHECKS="${IGNORE_PENDING_CHECKS:-}"
+
+# Comma-separated EXACT check-run names whose FAILURE is ignored: a completed
+# run of a listed name with a conclusion outside {success, skipped, neutral} is
+# dropped from the verdict. A pending run of a listed name is judged as usual
+# ("checks still running"). Empty by default; only the between-plans canary in
+# bin/automouse/run sets it, for helper workflows that test no code.
+IGNORE_FAILED_CHECKS="${IGNORE_FAILED_CHECKS:-}"
 
 usage() {
     cat <<'EOF'
@@ -44,6 +57,24 @@ Environment:
                         Applied BEFORE the MIN_REQUIRED_CHECKS floor, so
                         skipping everything fails rather than passing.
                         Matched names are echoed to stdout.
+  IGNORE_PENDING_CHECKS Comma-separated EXACT check-run names to ignore only
+                        while they are still pending (status != completed).
+                        A completed run of a listed name is judged as usual,
+                        so a red deploy still fails. Applied BEFORE dedupe
+                        (an older completed-red run outlives a newer pending
+                        re-run of the same name) and BEFORE the
+                        MIN_REQUIRED_CHECKS floor (ignoring everything fails
+                        rather than passing). Matched pending names are
+                        echoed to stdout.
+  IGNORE_FAILED_CHECKS  Comma-separated EXACT check-run names whose failure
+                        is ignored (completed with a conclusion other than
+                        success/skipped/neutral). A pending run of a listed
+                        name still blocks as "checks still running". Applied
+                        AFTER dedupe (only the newest run per name is judged)
+                        and BEFORE the MIN_REQUIRED_CHECKS floor. A HEAD left
+                        with no runs falls back to an ancestor, and fails only
+                        when none within the walk-back limit has enough runs.
+                        Matched names and conclusions are echoed to stdout.
 
 Trade-off: uses an "all-must-pass" model rather than a hardcoded check-name
 list. A new optional check that lands red will block. Use --skip-ci-check
@@ -126,7 +157,40 @@ if [ "$(printf '%s\n' "$SKIP_JSON" | jq 'length')" -gt 0 ]; then
     echo "SKIP_CHECKS active — ignoring: ${MATCHED:-<none matched>}"
 fi
 
+# Pending-only ignore list, same "" -> [] derivation as SKIP_JSON, so an unset
+# or empty IGNORE_PENDING_CHECKS never enters this branch and the JSON that
+# reaches ccg_dedupe is byte-for-byte what it was before the var existed.
+# Applied BEFORE ccg_dedupe: dedupe keeps the newest run per name, and a
+# pending re-run is newer than the completed-red run it would hide.
+IGNORE_JSON="$(ccg_skip_json "$IGNORE_PENDING_CHECKS")"
+IGNORE_ACTIVE=0
+
+if [ "$(printf '%s\n' "$IGNORE_JSON" | jq 'length')" -gt 0 ]; then
+    IGNORE_ACTIVE=1
+    IGNORE_MATCHED="$(echo "$JSON" | jq -r --argjson ignore "$IGNORE_JSON" \
+      '[.check_runs[] | select((.name | IN($ignore[])) and (.status != "completed")) | .name] | unique | join(", ")')"
+    echo "IGNORE_PENDING_CHECKS active — ignoring while pending: ${IGNORE_MATCHED:-<none matched>}"
+    JSON="$(echo "$JSON" | ccg_drop_pending "$IGNORE_JSON")"
+fi
+
 JSON="$(echo "$JSON" | ccg_dedupe "$SKIP_JSON")"
+
+# Failed-only ignore list. Same "" -> [] derivation as SKIP_JSON, so an unset
+# or empty IGNORE_FAILED_CHECKS never enters this branch. Applied AFTER
+# ccg_dedupe so only the newest run per name is judged, and BEFORE the TOTAL
+# floor. A HEAD left with no runs is treated as path-filtered and inherits the
+# verdict of the nearest ancestor with enough runs (the ancestor gets the same
+# drop). It fails only when no ancestor within the walk-back limit qualifies.
+IGNORE_FAILED_JSON="$(ccg_skip_json "$IGNORE_FAILED_CHECKS")"
+IGNORE_FAILED_ACTIVE=0
+
+if [ "$(printf '%s\n' "$IGNORE_FAILED_JSON" | jq 'length')" -gt 0 ]; then
+    IGNORE_FAILED_ACTIVE=1
+    IGNORE_FAILED_MATCHED="$(echo "$JSON" | jq --argjson ignore "$IGNORE_FAILED_JSON" \
+      '{check_runs: [.check_runs[] | select(.name | IN($ignore[]))]}' | ccg_failed)"
+    echo "IGNORE_FAILED_CHECKS active — ignoring failed: ${IGNORE_FAILED_MATCHED:-<none matched>}"
+    JSON="$(echo "$JSON" | ccg_drop_failed "$IGNORE_FAILED_JSON")"
+fi
 
 TOTAL="$(echo "$JSON" | jq '.check_runs | length')"
 
@@ -135,7 +199,13 @@ if [ "$TOTAL" -eq 0 ]; then
     FOUND=0
     for ANCESTOR_SHA in $(git log --format=%H "$SHA" --skip=1 --max-count="$MAX_WALKBACK"); do
         ANCESTOR_JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$ANCESTOR_SHA/check-runs?per_page=100\"" 2>/dev/null)" || continue
+        if [ "$IGNORE_ACTIVE" = "1" ]; then
+            ANCESTOR_JSON="$(echo "$ANCESTOR_JSON" | ccg_drop_pending "$IGNORE_JSON")"
+        fi
         ANCESTOR_JSON="$(echo "$ANCESTOR_JSON" | ccg_dedupe "$SKIP_JSON")"
+        if [ "$IGNORE_FAILED_ACTIVE" = "1" ]; then
+            ANCESTOR_JSON="$(echo "$ANCESTOR_JSON" | ccg_drop_failed "$IGNORE_FAILED_JSON")"
+        fi
         ANCESTOR_TOTAL="$(echo "$ANCESTOR_JSON" | jq '.check_runs | length')"
         if [ "$ANCESTOR_TOTAL" -ge "$MIN_REQUIRED_CHECKS" ]; then
             echo "HEAD ${SHA:0:11} has no check-runs (path-filtered). Falling back to ancestor ${ANCESTOR_SHA:0:11} ($ANCESTOR_TOTAL run(s))."

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database;
 
+use BasketballStats\StatsSanitizer;
 use League\League;
 
 /**
@@ -470,6 +471,39 @@ abstract class BaseMysqliRepository
     }
 
     /**
+     * Narrow a mixed fetchAll() column value to int.
+     *
+     * Returns ints unchanged, truncates floats, and casts numeric strings.
+     * Anything else (null, bool, array, non-numeric string) yields 0. For
+     * INT NOT NULL columns the fallback is defensive only: 0 never matches a
+     * real id, so it cannot produce a malformed index key.
+     */
+    protected static function scalarToInt(mixed $value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_float($value)) {
+            return (int) $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+        return 0;
+    }
+
+    /**
+     * Narrow a mixed fetchAll() column value to string.
+     *
+     * Returns strings unchanged and stringifies ints and floats. Anything else
+     * (null, bool, array) yields ''.
+     */
+    protected static function scalarToString(mixed $value): string
+    {
+        return StatsSanitizer::scalarToString($value);
+    }
+
+    /**
      * Canonical derived-table subquery deduplicating `ibl_box_scores_teams` rows
      * where the same (game_date, visitor_teamid, home_teamid) tuple has multiple
      * `game_of_that_day` values. Picks the smallest value (deterministic).
@@ -477,14 +511,11 @@ abstract class BaseMysqliRepository
      * Returns an SQL fragment usable as an inline derived table or CTE body.
      * Callers supply the outer JOIN/alias.
      */
-    protected function gameOfThatDaySubquery(): string
-    {
-        // Backtick `ibl_box_scores_teams` so the executeQuery() rewrite resolves
-        // it to the Olympics table on Olympics pages (stats subquery).
-        return "(SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
+    // Backtick `ibl_box_scores_teams` so the executeQuery() rewrite resolves
+    // it to the Olympics table on Olympics pages (stats subquery).
+    protected const GAME_OF_THAT_DAY_SUBQUERY = "(SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
              FROM `ibl_box_scores_teams`
              GROUP BY game_date, visitor_teamid, home_teamid)";
-    }
 
     /**
      * Canonical "player actually played" predicate for ibl_box_scores rows.
@@ -492,12 +523,15 @@ abstract class BaseMysqliRepository
      * per-game stats must exclude them. Pass the table alias used in the query
      * (e.g. 'bs') or '' for an unaliased column.
      *
-     * @param string $alias Table alias (without trailing dot), or '' for none
+     * @param ''|'bs' $alias Table alias (without trailing dot), or '' for none
+     * @return 'game_min > 0'|'bs.game_min > 0'
      */
     protected function playedCondition(string $alias = ''): string
     {
-        $prefix = $alias === '' ? '' : $alias . '.';
-        return $prefix . 'game_min > 0';
+        return match ($alias) {
+            '' => 'game_min > 0',
+            'bs' => 'bs.game_min > 0',
+        };
     }
 
     /**

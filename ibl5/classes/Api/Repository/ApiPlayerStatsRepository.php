@@ -42,7 +42,7 @@ class ApiPlayerStatsRepository extends \Database\BaseMysqliRepository
              JOIN `ibl_plr` p ON h.pid = p.pid
              LEFT JOIN `ibl_team_info` t ON h.teamid = t.teamid
              WHERE p.uuid = ?
-             ORDER BY h.year DESC',
+             ORDER BY h.year DESC, h.pid ASC',
             's',
             $playerUuid
         );

@@ -264,7 +264,7 @@ class BoxscoreRepositoryTest extends TestCase
 
     public function testTeamInsertTemplateIsFullyParameterized(): void
     {
-        $sql = Boxscore::teamInsertSql('`ibl_box_scores_teams`');
+        $sql = Boxscore::teamInsertSql();
         self::assertSame(34, substr_count($sql, '?'));
         self::assertStringContainsString('VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', $sql);
         self::assertStringContainsString('INSERT INTO `ibl_box_scores_teams`', $sql);
@@ -310,6 +310,48 @@ class BoxscoreRepositoryTest extends TestCase
 
         $this->assertSame([], $scheduleIndex);
         $this->assertSame([], $gotdIndex);
+    }
+
+    public function testFetchScheduledGameIndexCoercesMixedScalarColumns(): void
+    {
+        $this->mockDb->onQuery('SELECT DISTINCT game_date', [
+            ['game_date' => '2025-01-03', 'visitor_teamid' => '5', 'home_teamid' => 7],
+            ['game_date' => '2025-01-04', 'visitor_teamid' => 12.9, 'home_teamid' => '3'],
+        ]);
+
+        $index = $this->repository->fetchScheduledGameIndex(2025);
+
+        $this->assertSame(
+            ['2025-01-03' => [5 => [7 => true]], '2025-01-04' => [12 => [3 => true]]],
+            $index
+        );
+    }
+
+    public function testFetchScheduledGameIndexCoercesNonNumericAndNonScalarToDefaults(): void
+    {
+        $this->mockDb->onQuery('SELECT DISTINCT game_date', [
+            ['game_date' => null, 'visitor_teamid' => '12abc', 'home_teamid' => [4]],
+            ['game_date' => true, 'visitor_teamid' => null, 'home_teamid' => 9],
+            ['visitor_teamid' => 'abc'],
+        ]);
+
+        $index = $this->repository->fetchScheduledGameIndex(2025);
+
+        $this->assertSame(['' => [0 => [0 => true, 9 => true]]], $index);
+    }
+
+    public function testFetchBoxscoreGameOfThatDayIndexCoercesGameOfThatDayValues(): void
+    {
+        $this->mockDb->onQuery('game_of_that_day FROM', [
+            ['game_date' => '2025-02-01', 'visitor_teamid' => '4', 'home_teamid' => 6, 'game_of_that_day' => '2'],
+            ['game_date' => '2025-02-01', 'visitor_teamid' => 4, 'home_teamid' => '6', 'game_of_that_day' => 3.0],
+            ['game_date' => '2025-02-01', 'visitor_teamid' => 4, 'home_teamid' => 6, 'game_of_that_day' => null],
+            ['game_date' => '2025-02-01', 'visitor_teamid' => 4, 'home_teamid' => 6, 'game_of_that_day' => 'x'],
+        ]);
+
+        $index = $this->repository->fetchBoxscoreGameOfThatDayIndex(2025);
+
+        $this->assertSame(['2025-02-01' => [4 => [6 => [2, 3, 0, 0]]]], $index);
     }
 
     public function testDeletePlayerBoxscoresByGameBindsFourParameters(): void

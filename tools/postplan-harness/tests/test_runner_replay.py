@@ -19,11 +19,30 @@ from harness.state import HarnessError, TerminalState, UsageLedger
 from harness import cifix, ciwatch, schemas
 from harness.armable import manual_testing_clearance
 from harness.classify import MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC, classify
+from harness.review import VERIFIER_PURPOSES
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+
+
+def _all_real(count): return json.dumps([{"n": i, "verdict": "real", "reason": "verified"} for i in range(1, count + 1)])
+
+
+def _verifier_replies(count):
+    return {p: _all_real(count) for p in VERIFIER_PURPOSES}
+
+
+@pytest.fixture(autouse=True)
+def _pin_verifier_worktree(monkeypatch, tmp_path):
+    """Replay passes no worktree to run(), which would take the keep-all fallback. Pin one on the
+    review phase so the canned verifier replies drive 4D. Requests standard_review_depth first
+    (when the module uses it) so this wrap sits on top of that patch."""
+    real = runner._review_phase_for
+    monkeypatch.setattr(runner, "_review_phase_for",
+                        lambda llm, gh, copy, meta, log, worktree=None: real(
+                            llm, gh, copy, meta, log, worktree=str(tmp_path)))
 
 
 def load(slug):
@@ -36,7 +55,6 @@ def load(slug):
 
 CANNED = {
     "pr-copy": {"type": "chore", "title": "chore: replay", "commit_subject": "chore: replay commit", "summary_md": "## Summary\n- x\n"},
-    "body-check": {"corrected_body": "## Summary\n- replay body\n", "findings": []},
     "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
     "security-audit": [],
     "safety-verdict": {"holds": []},
@@ -91,12 +109,12 @@ def test_manual_held_visual_pr():
 def test_finding_at_80_blocks_arming():
     canned = dict(CANNED)
     canned["review-agent-a"] = [{"path": "ibl5/x.php", "line": 3, "body": "real bug"}]
-    canned["score-findings"] = [{"n": 1, "score": 85}]
+    canned.update(_verifier_replies(1))
     res, out = run_slug("request-event-logging", canned)
     assert any(c.number == 2 for c in res.arm.holds)
     acts = _actions(out)
     posted = [a for a in acts if a["action"] == "pr_review_findings"]
-    assert posted and posted[0]["findings"][0]["score"] == 85
+    assert posted and posted[0]["findings"][0]["score"] == 100
 
 
 def test_llm_safety_verdict_can_add_hold():
@@ -121,7 +139,7 @@ def _fixture(**over):
         "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
         "pr_number": 9999,
         "pr_meta": {"number": 9999, "title": "fix: synthetic",
-                    "body": "## Manual Testing\n\nNo manual testing needed\n",
+                    "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
                     "headRefOid": "deadbeef"},
         "labels": [],
         "final_state": "OPEN",
@@ -288,7 +306,7 @@ def test_envelope_unwrap_reaches_findings():
     out = tempfile.mkdtemp()
     canned = dict(CANNED)
     canned["review-agent-a"] = {"findings": [{"path": "a.php", "line": 1, "body": "x"}]}
-    canned["score-findings"] = [{"n": 1, "score": 85}]   # finding survives (≥80 threshold)
+    canned.update(_verifier_replies(1))   # finding survives: three real votes
     llm = FixtureLlm(UsageLedger(), canned)
     res = runner.run(_fixture(), out, llm, mode="replay")
     assert res.terminal == TerminalState.SHIPPED_HELD   # surviving finding blocks arming
@@ -403,6 +421,20 @@ def test_clean_run_still_arms(tmp_path):
     assert res.terminal == TerminalState.SHIPPED_ARMED
     acts = _actions(out)
     assert any(a["action"] == "pr_merge_auto" for a in acts)
+
+
+def test_retrospective_usage_pause_keeps_shipped_armed(tmp_path):
+    out = str(tmp_path / "out")
+    llm = FixtureLlm(UsageLedger(), dict(CANNED, retrospective={"kind": "usage-pause"}))
+    res = runner.run(_fixture(), out, llm, mode="replay")
+    assert res.terminal == TerminalState.SHIPPED_ARMED
+    assert res.error is None and res.error_kind is None
+    assert runner.exit_code_for(res) == 0
+    assert "pr_merge_auto" in [a["action"] for a in _actions(out)]
+    audit = _audit(out)
+    assert audit.count("phase9: retrospective skipped (usage-pause)") == 1
+    assert "phase9: no durable lesson" not in audit
+    assert "PAUSED:" not in audit
 
 
 def test_conflict_resolved_fixture_holds_condition_14(tmp_path):
@@ -1281,7 +1313,7 @@ def test_background_watch_is_reaped_on_harness_error(monkeypatch, tmp_path):
                         lambda bg, **k: reaped.append(bg))
 
     class _ExplodingReviewPhase:
-        def __init__(self, llm, gh):
+        def __init__(self, llm, gh, depth=None, **kw):
             pass
 
         def run(self, *a, **k):
@@ -1809,12 +1841,23 @@ def _run_live_shaped_with(monkeypatch, out, *, git_cls, fixture, canned_extra=No
 
 
 def test_phase7_green_ci_makes_no_ci_fix_call(monkeypatch, tmp_path):
-    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    class _RecordingLiveShapedGit(_LiveShapedGit):
+        instances: list = []
+
+        def __init__(self, fixture):
+            super().__init__(fixture)
+            type(self).instances.append(self)
+
     out = str(tmp_path / "out")
-    _run_live_shaped(monkeypatch, out)
+    _run_live_shaped_with(monkeypatch, out, git_cls=_RecordingLiveShapedGit,
+                          fixture=_INLINE_FIXTURE)
     audit = _audit(out)
     assert "phase7 ci-fix" not in audit
     assert "fix: address Phase 7 CI failures" not in audit
+    assert len(_RecordingLiveShapedGit.instances) == 1
+    commits = _RecordingLiveShapedGit.instances[0].commit_messages
+    assert commits, "ReplayGit recorded no commits; the check below would be vacuous"
+    assert not any("fix: address Phase 7 CI failures" in m for m in commits)
 
 
 def test_phase7_red_ci_without_rewatch_script_passes_through(monkeypatch, tmp_path):
@@ -1854,6 +1897,24 @@ def test_phase7_incident_red_ci_is_fixed_and_rewatched(monkeypatch, tmp_path):
     git = _TwoShaLiveGit.instances[-1]
     assert any(m.startswith("fix: address Phase 7 CI failures (attempt 1)")
                for m in git.commit_messages)
+
+
+def test_phase7_ci_fix_usage_pause_still_fails_run(monkeypatch, tmp_path):
+    """The Phase 9 carve-out must not reach ci-fix: a pause there stays FAILED/75."""
+    out = str(tmp_path / "out")
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": {"kind": "usage-pause"}},
+        fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+    )
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == "usage-pause"
+    assert res.error == "usage-pause: ci-fix"
+    assert runner.exit_code_for(res) == 75
+    audit = _audit(out)
+    assert "PAUSED: usage-pause: ci-fix" in audit
+    assert "phase9: retrospective skipped" not in audit
 
 
 def test_phase7_signoff_only_red_is_green(monkeypatch, tmp_path):
@@ -1957,6 +2018,10 @@ def test_phase7_rerun_probe_runs_at_most_once(monkeypatch, tmp_path):
     )
     audit = _audit(out)
     assert audit.count("rerun probe") == 1
+    for attempt in (1, 2):
+        assert re.search(
+            rf"phase7 ci-fix attempt {attempt}: .*outcome=no-change", audit), \
+            f"attempt {attempt} did not log outcome=no-change"
     acts = _actions(out)
     rerun_count = sum(1 for a in acts if a.get("action") == "run_rerun_failed")
     assert rerun_count == 2
@@ -2254,3 +2319,73 @@ def test_replay_runner_missing_method_stays_held(tmp_path):
                      FixtureLlm(UsageLedger(), CANNED), mode="replay")
     assert any(i.startswith("MISSING-METHOD: test_never_declared_anywhere")
                for i in res.unresolved_conformance)
+
+
+_PHASE2_STARTS = ("phase2: starting scope check",
+                  "phase2: starting commit ADR gate",
+                  "phase2: starting commit (pre-commit hook)")
+
+
+def test_phase2_logs_step_starts_in_order(tmp_path):
+    """audit.log names each Phase 2 step before it runs, in execution order, so a hang
+    is attributable to the last `phase2: starting` line.
+
+    Mutation caught: delete or reorder any of the three `log(...)` calls in runner.run.
+    """
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    audit = _audit(out)
+    positions = [audit.find(line) for line in _PHASE2_STARTS]
+    assert all(p >= 0 for p in positions), (positions, audit)
+    assert positions == sorted(positions), positions
+    # REBASE= is not an audit.log line in replay mode; the PR-exists/create line is the
+    # first later Phase 2 log, so the three starts must precede whichever of these exist.
+    later = [p for p in (audit.find("REBASE="), audit.find("phase2: PR #")) if p >= 0]
+    assert all(p > positions[-1] for p in later), (positions, later)
+
+
+def test_scope_check_timeout_fails_run_closed_with_named_step(tmp_path, monkeypatch):
+    """A scope-check hang fails the run closed (exit 3), and audit.log's last
+    `phase2: starting` line names the scope check.
+
+    Mutation caught: drop SUBPROCESS_TIMEOUT from _FAIL_CLOSED_KINDS (exit 1), or swallow
+    the error in _inject_scope_notes (the run proceeds and the terminal is not FAILED).
+    """
+    def _hang(*a, **kw):
+        raise HarnessError(runner.SUBPROCESS_TIMEOUT,
+                           "step 'scope-check' timed out after 120s",
+                           cmd="bin/lib/plan-scope-conformance")
+
+    monkeypatch.setattr(runner.scope_conformance, "scope_notes", _hang)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == runner.SUBPROCESS_TIMEOUT
+    assert runner.exit_code_for(res) == 3
+    assert "scope-check" in runner.verdict_line(res, 3)
+    starts = [ln for ln in _audit(out).splitlines() if "phase2: starting" in ln]
+    assert starts, "no phase2 step-start line was logged"
+    assert starts[-1].endswith("phase2: starting scope check"), starts
+    assert not any("phase2: starting commit" in ln for ln in starts), starts
+
+
+def test_replay_phase2_logs_how_to_revert_once(tmp_path):
+    """Phase 2 logs one `how-to-revert source=` line, between the merge danger line and the
+    commit ADR gate, and the advisory field never produces a phase2 finding.
+
+    Mutation caught: delete the `_inject_how_to_revert(...)` call in runner.run.
+    """
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    lines = _audit(out).splitlines()
+    htr_idx = [i for i, ln in enumerate(lines) if "phase2: how-to-revert source=" in ln]
+    assert len(htr_idx) == 1, lines
+    md_idx = [i for i, ln in enumerate(lines) if "phase2: merge danger Door=" in ln]
+    adr_idx = [i for i, ln in enumerate(lines) if "phase2: starting commit ADR gate" in ln]
+    assert md_idx and adr_idx, lines
+    assert md_idx[0] < htr_idx[0] < adr_idx[0], (md_idx, htr_idx, adr_idx)
+    assert not any("phase2 finding: how-to-revert" in ln for ln in lines), lines

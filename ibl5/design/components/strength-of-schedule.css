@@ -63,7 +63,7 @@
   padding: 2px 8px;
   border-radius: var(--radius-sm);
   font-size: var(--text-2xs);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--white);
   text-transform: uppercase;
   letter-spacing: var(--tracking-display);
@@ -71,26 +71,26 @@
 }
 
 /* SOS Summary Bar (remaining SOS for team schedule) */
-/* --gray-800 = body text (from tables.css .ibl-data-table td); --gray-500 = muted text (from tables.css footer/secondary) */
+/* --gray-800 = body text (from tables.css .ibl-data-table td); --gray-600 = muted text (gray-500 fails 4.5:1 on the tinted team-schedule background) */
 .sos-summary {
   text-align: center;
   padding: 4px 12px;
   font-size: var(--text-sm);
-  color: var(--gray-500);
+  color: var(--gray-600);
 }
 
 .sos-summary__label {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .sos-summary__value {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--gray-800);
 }
 
 .sos-summary__rank {
   font-size: var(--text-sm);
-  color: var(--gray-500);
+  color: var(--gray-600);
 }
 
 /* Tier Legend */

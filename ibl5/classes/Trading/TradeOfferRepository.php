@@ -107,7 +107,7 @@ class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRep
     {
         /** @var list<TradeInfoRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_trade_info` WHERE approval != 'completed' ORDER BY tradeofferid ASC"
+            "SELECT * FROM `ibl_trade_info` WHERE approval != 'completed' ORDER BY tradeofferid ASC, id ASC"
         );
     }
 

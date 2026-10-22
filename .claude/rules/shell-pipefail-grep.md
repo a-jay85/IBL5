@@ -1,6 +1,6 @@
 ---
 description: Avoid printf-pipe-grep-q under set -o pipefail — use herestring to prevent SIGPIPE false failures on Linux.
-last_verified: 2026-09-08
+last_verified: 2026-10-06
 paths: "bin/**"
 ---
 
@@ -33,3 +33,7 @@ PR #2174's `bin/test-architect-contract-split` used the printf-pipe form under `
 Any shell script with `set -o pipefail` (or `set -euo pipefail`) that pipes into `grep -q` or `grep -c`. The same fix applies to `grep -qE`, `grep -qP`, etc.
 
 ShellCheck does not catch this pattern — it passes SC lint.
+
+## Early-exit awk and head
+
+The same SIGPIPE hits any consumer that quits before its producer finishes: `awk '... {print $2; exit}'`, `head -1`. `git worktree list --porcelain | awk '/^worktree / {print $2; exit}'` returns 141 once the list outgrows a pipe buffer, and `set -euo pipefail` kills the script with no output. Keep reading all input instead: `awk '/^worktree / && !f {print $2; f=1}'` or `sed -n '1s/^worktree //p'`. Appending `|| true` hides the failure but also drops a real one. Tiny producers (a few lines) are safe.

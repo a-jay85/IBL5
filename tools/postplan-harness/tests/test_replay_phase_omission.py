@@ -43,8 +43,9 @@ def test_replay_skips_null_and_missing_plans(tmp_path):
     assert res["skipped"] == {"plan-null": 1, "plan-missing": 1, "no-files": 1}
     run = res["runs"]["live-d"]
     assert run["items"] == []
-    assert len(run["notes"]) == 1
-    assert run["notes"][0].startswith("UNCHECKABLE-PHASE: 1")
+    assert len(run["notes"]) == 2
+    assert run["notes"][0].startswith("NON-REPO-CITATION: 1")
+    assert run["notes"][1].startswith("UNCHECKABLE-PHASE: 1")
 
 
 def _side(runs: dict) -> dict:
@@ -107,3 +108,26 @@ def test_unknown_flag_exits_2_with_usage():
                        capture_output=True, text=True)
     assert r.returncode == 2
     assert "usage:" in r.stderr
+
+
+def test_compare_classifies_placeholder_matched_as_class5():
+    """Mutation caught: delete the `PLACEHOLDER-MATCHED-PHASE` arm in `compare()`."""
+    line = "MISSING-PHASE: 2 — Phase 2: x (phase cites bin/q; none appeared in the diff)"
+    note = ("PLACEHOLDER-MATCHED-PHASE: 2 — Phase 2: x (placeholder "
+            "ibl5/migrations/NNN_x.sql shipped as ibl5/migrations/194_x.sql)")
+    res = rpo.compare(_side({"x": ([line], [])}), _side({"x": ([], [note])}))
+    assert res["class5"] == [line]
+    assert res["regressions"] == []
+    assert res["exit_code"] == 0
+    assert "class-5 placeholder-matched: 1" in rpo.render(res)
+
+
+def test_compare_placeholder_note_for_other_phase_is_still_regression():
+    """Mutation caught: drop the trailing space from the `PLACEHOLDER-MATCHED-PHASE: {num} ` prefix."""
+    line = "MISSING-PHASE: 1 — Phase 1: x (phase cites bin/q; none appeared in the diff)"
+    note = ("PLACEHOLDER-MATCHED-PHASE: 12 — Phase 12: y (placeholder "
+            "ibl5/migrations/NNN_y.sql shipped as ibl5/migrations/194_y.sql)")
+    res = rpo.compare(_side({"x": ([line], [])}), _side({"x": ([], [note])}))
+    assert res["class5"] == []
+    assert res["regressions"] == [line]
+    assert res["exit_code"] == 2

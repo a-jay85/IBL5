@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LeagueControlPanel;
 
+use JsbParser\Repositories\AwaRepository;
 use League\League;
 use League\LeagueContext;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
@@ -15,11 +16,16 @@ use Trading\BuyoutLedgerRepository;
 class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implements LeagueControlPanelRepositoryInterface
 {
     private string $league;
+    private AwaRepository $awaRepository;
 
-    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
-    {
+    public function __construct(
+        \mysqli $db,
+        ?LeagueContext $leagueContext = null,
+        ?AwaRepository $awaRepository = null
+    ) {
         parent::__construct($db, $leagueContext);
         $this->league = $leagueContext !== null ? $leagueContext->getCurrentLeague() : LeagueContext::LEAGUE_IBL;
+        $this->awaRepository = $awaRepository ?? new AwaRepository($db, $leagueContext);
     }
 
     /**
@@ -28,7 +34,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
     public function getSetting(string $name): ?string
     {
         $row = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ?",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ?",
             "ss",
             $name,
             $this->league
@@ -39,7 +45,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
         }
 
         /** @var string */
-        return $row['value'];
+        return $row['setting_value'];
     }
 
     /**
@@ -48,7 +54,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
     public function getBulkSettings(array $names): array
     {
         $rows = $this->fetchAllInList(
-            "SELECT setting_key, value FROM `ibl_settings` WHERE league = ? AND setting_key IN ({IN})",
+            "SELECT setting_key, setting_value FROM `ibl_settings` WHERE league = ? AND setting_key IN ({IN})",
             's',
             $names,
             's',
@@ -60,7 +66,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             /** @var string $name */
             $name = $row['setting_key'];
             /** @var string $value */
-            $value = $row['value'];
+            $value = $row['setting_value'];
             $settings[$name] = $value;
         }
 
@@ -83,13 +89,14 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
     public function updateSetting(string $name, string $value): bool
     {
         $this->execute(
-            "UPDATE `ibl_settings` SET value = ? WHERE setting_key = ? AND league = ?",
+            "UPDATE `ibl_settings` SET setting_value = ? WHERE setting_key = ? AND league = ?",
             "sss",
             $value,
             $name,
             $this->league
         );
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -100,7 +107,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
     {
         $this->transactional(function () use ($phase): void {
             $this->execute(
-                "UPDATE `ibl_settings` SET value = ? WHERE setting_key = 'Current Season Phase' AND league = ?",
+                "UPDATE `ibl_settings` SET setting_value = ? WHERE setting_key = 'Current Season Phase' AND league = ?",
                 "ss",
                 $phase,
                 $this->league
@@ -108,13 +115,14 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
 
             if ($phase === 'Preseason' || $phase === 'HEAT') {
                 $this->execute(
-                    "UPDATE `ibl_settings` SET value = 'Off' WHERE setting_key = 'Show Draft Link' AND league = ?",
+                    "UPDATE `ibl_settings` SET setting_value = 'Off' WHERE setting_key = 'Show Draft Link' AND league = ?",
                     "s",
                     $this->league
                 );
             }
         });
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -124,12 +132,13 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
     public function setSimLengthInDays(int $days): bool
     {
         $this->execute(
-            "UPDATE `ibl_settings` SET value = ? WHERE setting_key = 'Sim Length in Days' AND league = ?",
+            "UPDATE `ibl_settings` SET setting_value = ? WHERE setting_key = 'Sim Length in Days' AND league = ?",
             "is",
             $days,
             $this->league
         );
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -139,12 +148,13 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
     public function setShowDraftLink(string $value): bool
     {
         $this->execute(
-            "UPDATE `ibl_settings` SET value = ? WHERE setting_key = 'Show Draft Link' AND league = ?",
+            "UPDATE `ibl_settings` SET setting_value = ? WHERE setting_key = 'Show Draft Link' AND league = ?",
             "ss",
             $value,
             $this->league
         );
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -162,7 +172,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             );
 
             $this->execute(
-                "UPDATE `ibl_settings` SET value = 'Yes' WHERE setting_key = 'ASG Voting' AND league = 'ibl'"
+                "UPDATE `ibl_settings` SET setting_value = 'Yes' WHERE setting_key = 'ASG Voting' AND league = 'ibl'"
             );
 
             $this->execute(
@@ -170,6 +180,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             );
         });
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -187,7 +198,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             );
 
             $this->execute(
-                "UPDATE `ibl_settings` SET value = 'Yes' WHERE setting_key = 'EOY Voting' AND league = 'ibl'"
+                "UPDATE `ibl_settings` SET setting_value = 'Yes' WHERE setting_key = 'EOY Voting' AND league = 'ibl'"
             );
 
             $this->execute(
@@ -195,6 +206,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
             );
         });
 
+        \Season\SharedSeason::reset();
         return true;
     }
 
@@ -205,7 +217,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
     {
         $this->execute(
             "UPDATE `ibl_plr` SET teamid = " . League::FREE_AGENTS_TEAMID . ", bird = 0"
-            . " WHERE retired <> 1 AND ordinal > " . \League\JSB::WAIVERS_ORDINAL
+            . " WHERE retired <> 1 AND ordinal > " . \League\JsbConstants::WAIVERS_ORDINAL
         );
 
         return true;
@@ -302,15 +314,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
      */
     public function upsertAward(int $year, string $award, string $name): int
     {
-        return $this->execute(
-            "INSERT INTO `ibl_awards` (year, award, name)
-            VALUES (?, ?, ?)
-            ON DUPLICATE KEY UPDATE name = VALUES(name)",
-            'iss',
-            $year,
-            $award,
-            $name
-        );
+        return $this->awaRepository->upsertAward($year, $award, $name);
     }
 
     /**

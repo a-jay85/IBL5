@@ -1,6 +1,6 @@
 ---
 description: Scheduled pr-cycle watcher tick, its retry and in-flight guards, and the post-plan race fix in both directions.
-last_verified: 2026-10-03
+last_verified: 2026-10-19
 ---
 
 # ADR-0167: Schedule bin/pr-cycle on a launchd tick
@@ -57,3 +57,41 @@ Expected: `Installed com.ibl5.watch-pr-cycle (StartInterval 1800s)`, a `launchct
 - `bin/post-plan-now`: now-side race fix
 - `bin/lib/launchd-job.sh`: `ljob_safe_slug` and `ljob_postplan_now_live`
 - `bin/wt-sync-cron-setup`: the installer precedent
+
+## Addendum 2026-10-07: attempts are counted after the worker finishes
+
+`bin/pr-cycle --go` detaches a launchd worker and returns at once. A launch therefore says nothing about the outcome. The tick writes a `pending/<id>` entry and passes `PR_CYCLE_RESULT_FILE` to the worker. The worker writes a `# pr-cycle-result v1` TSV (`<pr> <status> <outcome> <reason>`) when it finishes. A later tick with no live worker reconciles each PR from that file. Only a PR whose post-plan run actually started records the one-rescue-per-head attempt. A holdrepeat decline is not an attempt: it is remembered in `declined/` per head, with its own DM (`dm-declined/`). A rescue that never reached post-plan is a strike in `strikes/` (`<sha> <n>`), capped at 2 per head, with one DM (`dm-strikes/`). A usage-gate `paused` outcome burns nothing. A new push changes the SHA and clears all three. `--allow-test-only` lets a test-only rescue reach post-plan; it skips only the exit-5 guard.
+
+## Addendum 2026-10-12: the retry key is the PR's patch-id
+
+The retry cap above was keyed on the head SHA. A rescue rebases onto master and pushes, so the next tick saw a head it had never tried and rescued again. #3022 ran 13 harness runs and #3058 ran 7 before a human stopped them, each on the same change.
+
+The tick now keys every ledger on the PR's patch-id: `attempts/`, `dm-sent/`, `declined/`, `dm-declined/`, `strikes/` and `dm-strikes/`. A clean rebase keeps the patch-id, and a push that changes the diff changes it. The computation is `pcw_patch_id` in `bin/lib/pr-cycle-watch.sh`, shared with `bin/pr-cycle`, which used the same code for its sticky verdicts.
+
+- **Captured at launch.** The qualifying loop computes the key, and the launch writes it as a third column of `pending/<id>`. Reconcile records under that key. Recomputing at settle time would hash the rescue's own push.
+- **Fallback.** When the patch-id cannot be computed (fetch error, no merge-base, malformed output) the key is the head SHA, which is the old behaviour. A failure never blocks a PR from a future rescue. The tick logs the fallback and sends one DM per (PR, head) through the `dm-patchid/` ledger.
+- **Old state.** Files written before this change hold a bare head SHA. Every reader also matches the current head SHA, so an old record keeps its cap until the next push. That push runs one more rescue, which records the patch-id. Pending files without a key column settle under their SHA.
+- **Known limit.** `git patch-id` hashes the changed lines and their 3 context lines. A rebase that changes a line next to one of the PR's hunks changes the patch-id and allows one more rescue. The diff keeps the default context because `bin/pr-cycle`'s sticky verdicts store patch-ids made that way.
+- **Dry run.** `--dry-run` still computes the patch-id, so its qualifying set matches a real tick. It writes no state, sends no DM, launches nothing, and deletes the `refs/pr-cycle/<pr>` ref it fetched.
+
+## Addendum 2026-10-18: stale post-plan-running labels are swept by the tick
+
+An armed, green, BEHIND PR stays out of the merge line while it carries `post-plan-running`, because `bin/merge-line-select` skips any PR with that label. A post-plan run that dies before its release step leaves the label behind. PR 3306 and PR 3319 were both stuck this way for hours after their runs had ended.
+
+`bin/pr-cycle-tick` now removes the label when every check evaluates false. The label is at least `PCW_STALE_LABEL_MIN` old (180 minutes, twice `MAX_PP_SECS`). No launchd post-plan job exists for the PR or branch. No process has an argv naming the worktree or the run's slug tokens. No headless `claude -p` has the worktree as its cwd. Nothing was written under the newest `live-<slug>-*` out dir within the same window. A check that cannot be evaluated keeps the label. The sweep runs before the usage gate because it spends no Claude.
+
+The sweep leaves `bin/merge-line-select` and its guard alone. It touches no other label and no merged or closed PR. It does nothing about why the run died.
+
+The original Alternatives entry still holds against a lock file. Launchd labels, the wrapper shell's argv and the harness out dir are records a run already leaves. A new lock file would not exist for the runs that are already stuck.
+
+Every removal logs the PR number, the label age and the evidence string. `bin/pr-cycle-tick --dry-run` prints the would-remove set and changes nothing.
+
+## Addendum 2026-10-19: conflict holds re-try on a new master tip
+
+A DIRTY PR whose rescue ended in a rebase conflict stayed capped forever. The 2026-10-12 patch-id key survives a master advance, so a moving master never reopened the cap. PRs sat skipped on "retry cap" while master moved 10 to 200 commits, and manual rebases then succeeded.
+
+The tick now records `conflict-hold/<pr>` when a rescue settles with outcome `conflict`. The ledger holds the origin/master tip read at that rescue's launch. A 4th pending column carries the tip, because the rescue settles ticks later. Any other settled outcome except `paused` clears the ledger.
+
+A capped DIRTY PR with a conflict hold skips only the attempted-key check, and only when the current tip differs from the held one. Every DIRTY launch bumps `retries/<pr>` for the local calendar day. The bypass stops at `PCW_CONFLICT_RETRY_DAILY_CAP` (2) launches per PR per day. An unreadable tip never opens the bypass. The `PR_CYCLE_MASTER_TIP_CMD` seam replaces the tip read in tests.
+
+Non-conflict holds keep the until-the-diff-changes rule. That covers red CI, failed and held rescues, holdrepeat declines, and strikes. The post-plan harness needs no change: holdrepeat and the held-unfixable marker record only evaluated ship conditions, and a rebase conflict exits before conditions are evaluated.

@@ -70,46 +70,7 @@ final class PlrRatingsCongruenceCheckStep implements PipelineStepInterface
             }
             $checked++;
 
-            $name = (string) $p['name'];
-            $pid = (int) $p['pid'];
-            $fgm = (int) $p['realLifeFGM'];
-            $fga = (int) $p['realLifeFGA'];
-            $ftm = (int) $p['realLifeFTM'];
-            $fta = (int) $p['realLifeFTA'];
-            $tgm = (int) $p['realLife3GM'];
-            $tga = (int) $p['realLife3GA'];
-            $r2gp = (int) $p['rating2GP'];
-            $rftp = (int) $p['ratingFTP'];
-            $r3gp = (int) $p['rating3GP'];
-
-            /** @var list<string> $playerMismatches */
-            $playerMismatches = [];
-
-            $made2gp = $fgm - $tgm;
-            $att2gp = $fga - $tga;
-            $drift2gp = self::drift($made2gp, $att2gp, $r2gp);
-            if ($drift2gp !== null) {
-                $playerMismatches[] = $this->buildMessage(
-                    $mode, $name, $pid, '2GP',
-                    $r2gp, $drift2gp['expected'], $made2gp, $att2gp,
-                );
-            }
-
-            $driftFtp = self::drift($ftm, $fta, $rftp);
-            if ($driftFtp !== null) {
-                $playerMismatches[] = $this->buildMessage(
-                    $mode, $name, $pid, 'FTP',
-                    $rftp, $driftFtp['expected'], $ftm, $fta,
-                );
-            }
-
-            $drift3gp = self::drift($tgm, $tga, $r3gp);
-            if ($drift3gp !== null) {
-                $playerMismatches[] = $this->buildMessage(
-                    $mode, $name, $pid, '3GP',
-                    $r3gp, $drift3gp['expected'], $tgm, $tga,
-                );
-            }
+            $playerMismatches = $this->mismatchesForPlayer($mode, $p);
 
             if (count($playerMismatches) > 0) {
                 $playersFlagged++;
@@ -119,6 +80,14 @@ final class PlrRatingsCongruenceCheckStep implements PipelineStepInterface
             }
         }
 
+        return $this->buildResult($mode, $checked, $playersFlagged, $all);
+    }
+
+    /**
+     * @param list<string> $all
+     */
+    private function buildResult(string $mode, int $checked, int $playersFlagged, array $all): StepResult
+    {
         $total = count($all);
 
         if ($total === 0) {
@@ -142,6 +111,54 @@ final class PlrRatingsCongruenceCheckStep implements PipelineStepInterface
             messages: $messages,
             messageErrorCount: $total,
         );
+    }
+
+    /**
+     * Runs the three shooting checks for one parsed player in 2GP, FTP, 3GP order.
+     * The 2GP row subtracts threes from field goals, so 3-point attempts never count toward 2GP.
+     *
+     * @param array<string, int|string> $p
+     * @return list<string>
+     */
+    private function mismatchesForPlayer(string $mode, array $p): array
+    {
+        /** @infection-ignore-all Equivalent: PlrLineParser builds name from trim() and toUtf8(), so it is already a string and dropping this cast cannot change it. */
+        $name = (string) $p['name'];
+        $pid = self::intField($p, 'pid');
+        $fgm = self::intField($p, 'realLifeFGM');
+        $fga = self::intField($p, 'realLifeFGA');
+        $ftm = self::intField($p, 'realLifeFTM');
+        $fta = self::intField($p, 'realLifeFTA');
+        $tgm = self::intField($p, 'realLife3GM');
+        $tga = self::intField($p, 'realLife3GA');
+
+        $checks = [
+            ['2GP', $fgm - $tgm, $fga - $tga, self::intField($p, 'rating2GP')],
+            ['FTP', $ftm, $fta, self::intField($p, 'ratingFTP')],
+            ['3GP', $tgm, $tga, self::intField($p, 'rating3GP')],
+        ];
+
+        $mismatches = [];
+        foreach ($checks as [$label, $made, $attempts, $rating]) {
+            $drift = self::drift($made, $attempts, $rating);
+            if ($drift !== null) {
+                $mismatches[] = $this->buildMessage(
+                    $mode, $name, $pid, $label,
+                    $rating, $drift['expected'], $made, $attempts,
+                );
+            }
+        }
+
+        return $mismatches;
+    }
+
+    /**
+     * @param array<string, int|string> $p
+     */
+    private static function intField(array $p, string $key): int
+    {
+        /** @infection-ignore-all Equivalent: PlrLineParser casts pid and every realLife and rating field to int, so dropping this cast cannot change the value. */
+        return (int) $p[$key];
     }
 
     /**

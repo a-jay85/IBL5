@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness import cifix, fidelity
+from harness import cifix, cifix_ship, fidelity
 from harness.adapters.ghad import RecordingGh
 from harness.adapters.gitad import LiveGit
 from harness.state import HarnessError
@@ -285,3 +285,64 @@ class TestCiFixGatePathDeny:
         new_sha = f"replay-sha-{len(git.commit_messages)}"
         assert events[caret_calls[0]] == ("changed_files", f"{new_sha}^")
         assert not any(e[0] == "push_ff" for e in events[caret_calls[0]:])
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 Meta-checks skip predicate
+# ---------------------------------------------------------------------------
+
+PROSE_LINE = ("Meta checks\tRun bin/check-prose (self-test + added lines)\t﻿"
+              "2026-10-10T18:44:15.7974442Z ##[group]Run bin/check-prose --self-test\n")
+BODY_LINE = ("Meta checks\tRun bin/check-pr-manual-testing\t﻿"
+             "2026-10-10T18:44:16.0000000Z missing Manual Testing section\n")
+
+
+def test_meta_only_true_with_all_checks_green_aggregate():
+    assert cifix.meta_only(["All checks green", "Meta checks"])
+    assert cifix.meta_only(["Meta checks"])
+
+
+def test_meta_only_false_with_other_actionable_or_aggregate_alone():
+    assert not cifix.meta_only(["Meta checks", "PHPUnit"])
+    assert not cifix.meta_only(["All checks green"])
+    assert not cifix.meta_only([])
+
+
+def test_attribute_meta_failure_matches_prose_step():
+    assert cifix.attribute_meta_failure(PROSE_LINE, ["check-prose-since"]) == [
+        "check-prose-since"]
+
+
+def test_attribute_meta_failure_unrecorded_step_fails_open():
+    assert cifix.attribute_meta_failure(BODY_LINE, ["check-prose-since"]) == []
+
+
+def test_attribute_meta_failure_partial_attribution_fails_open():
+    assert cifix.attribute_meta_failure(PROSE_LINE + BODY_LINE,
+                                        ["check-prose-since"]) == []
+
+
+def test_attribute_meta_failure_in_progress_log_fails_open():
+    log = "job 114519598200 is still in progress; logs will be available when it is complete\n"
+    assert cifix.attribute_meta_failure(log, ["check-prose-since"]) == []
+
+
+def test_attribute_meta_failure_unknown_name_fails_open():
+    assert cifix.attribute_meta_failure(PROSE_LINE, ["unknown"]) == []
+
+
+def test_attribute_meta_failure_prefix_boundary():
+    line = "Meta checks\tRun bin/check-pr\t2026-10-10T18:44:16.0000000Z x\n"
+    assert cifix.attribute_meta_failure(line, ["check-prose-since"]) == []
+
+
+def test_meta_skip_note_names_every_check():
+    note = cifix.meta_skip_note(["check-prose-since", "check-docs-since"])
+    assert "check-prose-since" in note
+    assert "check-docs-since" in note
+    assert "Meta checks" in note
+    assert "—" not in note
+
+
+def test_meta_check_name_single_source():
+    assert cifix_ship.META_CHECK_NAME == cifix.META_CHECK_NAME == "Meta checks"

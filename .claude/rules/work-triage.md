@@ -1,13 +1,13 @@
 ---
 description: Triage non-trivial work as ad-hoc vs /plan; ad-hoc bar, safety mirror, Sonnet execution routing, hook-enforced triggers.
-last_verified: 2026-09-30
+last_verified: 2026-10-16
 ---
 
 # Work Triage Rule
 
 ## Triage before non-trivial work
 
-Before starting **any non-trivial unit of work** — whether you proposed it or the user assigned it — decide: implement **ad-hoc** (just do it, then `/ship`) or route through **`/plan`**. State the call and one line of why, then proceed.
+Before starting **any non-trivial unit of work**, whether you proposed it or the user assigned it, decide: implement **ad-hoc** (just do it, then ship or hold per `workflow-continuity.md` § Post-Plan) or route through **`/plan`**. State the call and one line of why, then proceed.
 
 ## The ad-hoc bar
 
@@ -43,6 +43,8 @@ The plan-vs-ad-hoc verdict decides *whether to plan*, not *who executes the edit
 
 When both hold, **hand off by default — do not pause for permission**: state the routing call in one line ("execution is Sonnet-suitable — delegating"), then spawn **one** Sonnet sub-agent (format: `.claude/skills/plan/_architect-contract.md` § Delegation packets for verbose phases). Design, routing call, and final diff review stay on Opus — this routes *execution*, never understanding.
 
+One sub-agent is the floor. A single sweep stays with one agent, because its edits must agree with each other. When the work splits into chunks that do not depend on each other, spawn one agent per chunk, all in the same message, so they run at the same time. Detail: `work-triage-detail.md` § Inline vs. delegated.
+
 Stay inline (Opus edits directly) only when: the edits are genuinely **entangled** with the design, or the chunk is **trivial**. Criteria and spawn-cost rationale: `work-triage-detail.md` § Inline vs. delegated.
 
 ### The hard trigger: ≥5 distinct files in one turn
@@ -51,7 +53,7 @@ Hook-enforced by `~/.claude/hooks/plan-gate-edit.sh` § Check 1 — the deny mes
 
 ## Execution routing: a `/plan` verdict routes to `bin/plan-now`, never inline
 
-Hook-enforced by `~/.claude/hooks/plan-gate-skill.sh` — denies inline `Skill(plan)`. Exemptions and escape hatch: `work-triage-detail.md` § `/plan` verdict routing.
+Hook-enforced by `~/.claude/hooks/skill-gate.sh`, which denies inline `Skill(plan)`. Exemptions and escape hatch: `work-triage-detail.md` § `/plan` verdict routing.
 
 ## Execution routing: repeat-polling is a spend bug
 

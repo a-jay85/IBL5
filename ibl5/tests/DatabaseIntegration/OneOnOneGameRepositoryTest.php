@@ -31,7 +31,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
         // CI seed has active players in ibl_plr
         $players = $this->repo->getActivePlayers();
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         self::assertArrayHasKey('pid', $players[0]);
         self::assertArrayHasKey('name', $players[0]);
         self::assertIsInt($players[0]['pid']);
@@ -81,7 +81,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
     {
         $players = $this->repo->getActivePlayers();
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
 
         // Verify general ascending order by checking consecutive pairs.
         // MySQL collation may differ from PHP's sort() for punctuation/dots,
@@ -191,5 +191,25 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getGameById(999999999);
 
         self::assertNull($result);
+    }
+
+    public function testGetActivePlayersBreaksNameTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200139382, 'Aaa Tie Player');
+        $this->insertTestPlayer(200139381, 'Aaa Tie Player');
+        $this->insertTestPlayer(200139383, 'Aaa Tie Lead');
+        $this->insertTestPlayer(200139384, 'Aaa Tie Player', ['retired' => 1]);
+
+        $players = $this->repo->getActivePlayers();
+
+        $kept = array_filter(
+            $players,
+            static fn (array $row): bool => str_starts_with($row['name'], 'Aaa Tie')
+        );
+
+        self::assertSame(
+            [200139383, 200139381, 200139382],
+            array_map('intval', array_column($kept, 'pid'))
+        );
     }
 }

@@ -41,8 +41,8 @@
     padding: 5px 10px;
     background: var(--accent-700);
     color: white;
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
     text-decoration: none;
@@ -104,19 +104,17 @@
     overflow: hidden;
 }
 
-.schedule-month__header {
+.ibl-card__header.schedule-month__header {
     padding: 4px 8px;
-    background: var(--navy-800);
-    color: white;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
     border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
-.schedule-month__header--playoffs {
+.ibl-card__header.schedule-month__header--playoffs {
     background: var(--accent-700);
 }
 
@@ -124,7 +122,7 @@
 .schedule-day {
     display: flex;
     border-bottom: 2px solid var(--gray-100);
-    background: white;
+    background: var(--white);
 }
 
 .schedule-day:last-child {
@@ -147,9 +145,9 @@
 .schedule-day__num {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--navy-800);
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 
 /* Games within a day */
@@ -170,7 +168,7 @@
     text-decoration: none;
     color: inherit;
     transition: background var(--transition-fast);
-    font-size: 1rem;
+    font-size: var(--text-base);
     border-bottom: 1px solid var(--gray-50);
 }
 
@@ -211,7 +209,7 @@
 
 /* Team name */
 .schedule-game__team {
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--navy-700);
     white-space: nowrap;
     overflow: hidden;
@@ -220,14 +218,14 @@
 
 /* Winner styling */
 .schedule-game__team--win {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--accent-700);
 }
 
 /* Team record (W-L) - inline with team name */
 .schedule-game__record {
-    font-size: 1rem;
-    font-weight: 400;
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-normal);
     color: var(--gray-600);
 }
 
@@ -264,8 +262,8 @@
 
 /* Score link */
 .schedule-game__score-link {
-    font-size: 1rem;
-    font-weight: 700;
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-bold);
     color: var(--navy-600);
     text-align: center;
     text-decoration: none;
@@ -283,8 +281,8 @@
 .schedule-game__vs,
 .schedule-game__vs:link,
 .schedule-game__vs:visited {
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-300);
     text-align: center;
     text-decoration: none;
@@ -318,7 +316,7 @@
 
     .schedule-months__link {
         padding: 5px 2px;
-        font-size: 1rem;
+        font-size: var(--text-base);
     }
 
     .schedule-month {
@@ -327,7 +325,7 @@
         width: calc(100% + 16px);
     }
 
-    .schedule-month__header {
+    .ibl-card__header.schedule-month__header {
         border-radius: 0;
     }
 
@@ -340,17 +338,17 @@
     }
 
     .schedule-day__num {
-        font-size: 1rem;
+        font-size: var(--text-base);
     }
 
     .schedule-game {
         grid-template-columns: 10px 1fr 25px 24px 24px 24px 25px 1fr 10px;
         padding: 3px 4px;
-        font-size: 1rem;
+        font-size: var(--text-base);
     }
 
     .schedule-game__score-link {
-        font-size: 1rem;
+        font-size: var(--text-base);
     }
 
     .schedule-game__record {
@@ -402,46 +400,46 @@
 .schedule-game__streak {
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-align: center;
     color: var(--gray-500);
 }
 
 .schedule-game__streak--win {
-    color: var(--accent-500);
+    color: var(--accent-800);
 }
 
 .schedule-game__streak--loss {
-    color: var(--gray-400);
+    color: var(--gray-600);
 }
 
 /* Team Schedule - Color overrides using custom properties
-   --team-primary and --team-secondary are set inline on .schedule-container--team */
+   --team-color-primary and --team-color-secondary are set inline on .schedule-container--team */
 .schedule-container--team .schedule-month__header {
-    background: var(--team-primary);
-    color: var(--team-secondary);
+    background: var(--team-color-primary);
+    color: var(--team-color-secondary);
 }
 
 .schedule-container--team .schedule-month__header--playoffs {
-    background: var(--accent-500);
+    background: var(--accent-700);
     color: white;
 }
 
 .schedule-container--team .ibl-jump-menu__link:hover {
-    background: var(--team-primary);
-    color: var(--team-secondary);
+    background: var(--team-color-primary);
+    color: var(--team-color-secondary);
 }
 
 .schedule-container--team a.schedule-jump-btn {
-    background: var(--team-primary);
-    color: var(--team-secondary);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--team-primary) 40%, transparent);
+    background: var(--team-color-primary);
+    color: var(--team-color-on-primary, var(--team-color-secondary));
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--team-color-primary) 40%, transparent);
 }
 
 .schedule-container--team a.schedule-jump-btn:hover {
-    background: var(--team-primary);
+    background: var(--team-color-primary);
     opacity: 0.9;
-    box-shadow: 0 4px 12px color-mix(in srgb, var(--team-primary) 50%, transparent);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--team-color-primary) 50%, transparent);
 }
 
 /* Mobile adjustments for team schedule grid with streak */

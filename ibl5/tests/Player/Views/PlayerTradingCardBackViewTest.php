@@ -15,8 +15,7 @@ class PlayerTradingCardBackViewTest extends TestCase
     use SnapshotTestTrait;
 
     /**
-     * Build a Player stub with every getter called by CardBaseStyles::preparePlayerData()
-     * and getColorSchemeForTeam().
+     * Build a Player stub with every getter called by CardBaseStyles::preparePlayerData().
      *
      * @return Player&\PHPUnit\Framework\MockObject\Stub
      */
@@ -98,7 +97,6 @@ class PlayerTradingCardBackViewTest extends TestCase
     }
 
     /**
-     * getStyles() is deprecated and always returns ''; it is not under test here.
      * This test exercises render() to maintain 4-test coverage.
      */
     public function testRenderContainsPlayerHighsSection(): void

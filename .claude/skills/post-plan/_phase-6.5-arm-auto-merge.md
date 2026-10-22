@@ -1,13 +1,13 @@
 ---
 description: Per-condition run-and-report blocks for Phase 6.5 auto-merge arming.
-last_verified: 2026-10-02
+last_verified: 2026-10-15
 ---
 
 # Phase 6.5 — Arm Auto-Merge (post-plan reference)
 
 Purpose: the per-condition run-and-report blocks for Phase 6.5 arming.
 
-**Condition (1) — Manual-Testing clearance (mechanized via the shared predicate).** Previously a prose gate ("PR says No manual testing needed") the orchestrator eyeballed — itself a judgment-error surface. Now deterministic: `pr_manual_testing_clearance` returns `CLEARED` (the `No manual testing needed` sentinel is present — the positive signal Phase 6 writes after resolving every manual-testing item), `HELD` (real manual rows remain), or `UNKNOWN` (no `## Manual Testing` section at all). **Fail-closed: arm only on `CLEARED`.** Phase 6 always writes the section, so a post-plan PR is `CLEARED` or `HELD`, never `UNKNOWN` on this path — the armed set is unchanged; the stricter `UNKNOWN→block` only matters to `bin/pr-triage`'s cross-PR sweep of hand-made PRs:
+Condition (1), Manual-Testing clearance, is mechanized via the shared predicate. It was a prose gate ("PR says No manual testing needed") that the orchestrator eyeballed, which made it a judgment-error surface. It is now deterministic: `pr_manual_testing_clearance` returns `CLEARED` (the `No manual testing needed` sentinel is present, the positive signal Phase 6 writes after resolving every manual-testing item), `HELD` (real manual rows remain), or `UNKNOWN` (no `## Manual Testing` section at all). Plan rows tagged `post-merge:` are rendered under a separate `## After merge` heading, which ends the scan window, so they never reach this predicate; the predicate itself is unchanged. **Fail-closed: arm only on `CLEARED`.** Phase 6 always writes the section, so a post-plan PR is `CLEARED` or `HELD`, never `UNKNOWN` on this path, so the armed set is unchanged; the stricter `UNKNOWN→block` only matters to `bin/pr-triage`'s cross-PR sweep of hand-made PRs:
 
 ```bash
 # condition (1): block unless the Manual-Testing section is the positive sentinel.
@@ -20,6 +20,8 @@ CLEAR=$(pr_manual_testing_clearance "$_prbody" "$_prfiles")
 ```
 
 A Visual-regression matrix row marked `(no-change)` directly after its backticked test token plans an untouched baseline. `conformance.check` skips that token, so a CSS-only diff can arm without a `MISSING:` for the snapshots directory (backlog#1222). The harness honors the marker only on Visual-regression rows and only when no unmarked row shares the token; the row shape is specified in `.claude/review-shared/_plan-verification.md`.
+
+A test row marked `(run-only)` directly after its backticked token plans a run of a test that already exists on master. `conformance.check` skips that token's `MISSING:` only when the file is tracked in the PR tree and every row naming the token carries `(run-only)` or `(no-change)`; a `RUN-ONLY:` or `RUN-ONLY-REFUSED:` note in the Phase 5.0 log records the decision. `MISSING-FILE:` and `MISSING-METHOD:` are never exempted by it. `bin/check-plan` gate `[RO]` rejects the marker at authoring time on a path absent from the base branch.
 
 Condition (3) is three-state, and an indeterminate Phase 5.0 BLOCKS. The bridge file `/tmp/post-plan-missing-tests-$PPID` is truncated at 5.0 START and appended to at 5.0 END, so *empty* is ambiguous on its own: it is byte-identical for "5.0 ran and found nothing unresolved" and "5.0 died before it finished". Reading empty as PASS is a fail-OPEN that contradicts the fail-closed default. The disambiguator is the **done-marker** `/tmp/post-plan-conformance-done-$PPID`, written as the last action of Phase 5.0 on **both** the normal path and the skip path (`PLAN_FOUND=none` or `! $HAS_MATRIX`; see `SKILL.md` Phase 5.0). Marker absent ⇒ indeterminate ⇒ **BLOCKED**; marker present + empty bridge ⇒ clean ⇒ pass. The skip-path write is what keeps this from blocking every plan-blind PR (the dominant case), so treat it as load-bearing. The compiled harness computes conformance in-process, then writes the same two signals into its own run dir (`conformance-done` and `missing-tests`, beside `result.json`) as that run's audit trail. So the harness never uses the `/tmp` files, and it no longer drives this block: the rc=4 resume arm that once re-entered the skill here is gone. The defaults below are the production path, read by the skill on its own fallback run. The `$DONE_MARK`/`$BRIDGE` indirection now survives only as a test seam, and `bin/test-postplan-arm-conditions` is its sole caller:
 
@@ -83,11 +85,14 @@ done
 
 **Condition (7) — plan-time hold (`auto_merge: false`).** The plan author predicts at plan-time (via `/plan` Step 4 gate 14) whether the change wants a human at merge, and records it as a line-1 frontmatter field. If the located plan file declares `auto_merge: false`, **block** — the PR opens and gets reviewed, but auto-merge does not arm. Parse the line-1 YAML frontmatter only (a body documenting the syntax can't self-select). **Derive `$PLAN_FILE` inside this block** — bash variables do not survive across phases/shells (see Phase 3's note), so a bare `$PLAN_FILE` assigned in Phase 1 would be empty here and the check would silently no-op. The snippet re-derives the path from the branch slug (the same derivation `bin/post-plan-now` and Phase 1's interactive fallback use; in automouse the authoritative path the postplan prompt supplies is identical, since the queue symlinks plans by branch slug). Absent file or absent field ⇒ no hold:
 
+The value is read raw and decided four ways. Absent or `true` passes. `false` holds, as it always has. `docs-only-ready` is seeded only by `bin/docfix-run` for the nightly stale-docs refresh; it arms only when `pr_docs_refresh_hold` (`bin/lib/pr-armable.sh`) prints nothing for the realized PR: the head ref starts with `docs-stale-refresh-`, every changed path is a `.md` file under `ibl5/docs/`, a class README at `ibl5/classes/*/README.md`, or the root `README.md` (any `.claude/` path, `bin/`, `.github/`, tests, code or config holds), the body's merge-danger line is two-way, and the selected Phase 5.5 verdict is exactly `READY` (`READY WITH NOTES` holds, because the notes are what a human should read). Any other value is unknown and holds. Every clause fails closed on an empty input, so a failed `gh` call or an absent verdict file holds. The compiled harness makes the identical decision in `harness/armable.py` (`docs_refresh_holds`), and `tools/postplan-harness/tests/test_armable_docs_refresh.py` pins the two ports to one case table.
+
 ```bash
-# condition (7): block if the plan declares auto_merge: false (line-1 frontmatter only).
+# condition (7): block if the plan declares auto_merge: false (line-1 frontmatter only); docs-only-ready arms only when every docs-refresh clause passes on the realized PR; any other value holds.
 # Self-contained: source plan-resolve.sh and call resolve_plan_file (variant-aware and
 # drift-aware) so the check can't no-op on a non-surviving cross-phase variable.
 source "$(git rev-parse --show-toplevel)/bin/lib/plan-resolve.sh"
+source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
 PLAN_SLUG_DRIFT=""
 resolve_plan_file
 # Guard the read: plan-blind leaves PLAN_FILE empty, and `awk prog ""` reads STDIN and
@@ -101,7 +106,42 @@ if [ -n "${PLAN_FILE:-}" ] && [ -f "$PLAN_FILE" ]; then
         infm && /^auto_merge:[[:space:]]*/ { sub(/^auto_merge:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit }
     ' "$PLAN_FILE" </dev/null 2>/dev/null)
 fi
-[ "$AUTO_MERGE" = false ] && echo "BLOCKED: plan declares auto_merge: false — held for human merge"
+case "$AUTO_MERGE" in
+    ''|true) ;;
+    false) echo "BLOCKED: plan declares auto_merge: false — held for human merge" ;;
+    docs-only-ready)
+        # Realized-PR facts. Each has an env seam (tests set it; production falls
+        # through to gh/git). An empty seam AND a failed gh call leave the value
+        # empty, and every clause below fails closed on empty.
+        PR_NUM="${PR_NUM:-$("${GH_CMD:-gh}" pr view --json number --jq '.number' 2>/dev/null)}"
+        PR_HEAD_REF="${PR_HEAD_REF:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}"
+        PR_FILES_JSON="${PR_FILES_JSON:-$("${GH_CMD:-gh}" pr view --json files --jq '.files' 2>/dev/null)}"
+        PR_BODY="${PR_BODY:-$("${GH_CMD:-gh}" pr view --json body --jq '.body' 2>/dev/null)}"
+        MD_STATE=$(pr_merge_danger_hold "$PR_BODY"); MD_STATE="${MD_STATE#merge-danger:}"
+        [ -z "$MD_STATE" ] && MD_STATE=TWO-WAY
+        # Verdict selection: same seams, tree gate and verdict-1 fallback as the
+        # (12) block below. VERDICT_WORD stays empty when no file parses.
+        FIDELITY_VERDICT_FILE="${FIDELITY_VERDICT_FILE:-/tmp/post-plan-fidelity-verdict-$PR_NUM.md}"
+        FIDELITY_VERDICT_FILE_2="${FIDELITY_VERDICT_FILE_2:-/tmp/post-plan-fidelity-verdict-$PR_NUM-2.md}"
+        CURRENT_TREE="$(git rev-parse "HEAD^{tree}" 2>/dev/null || echo none)"
+        ACTIVE_VERDICT_FILE="$FIDELITY_VERDICT_FILE"
+        if [ -s "$FIDELITY_VERDICT_FILE_2" ]; then
+            TREE2="$(grep -m1 '^REVIEWED_TREE=' "$FIDELITY_VERDICT_FILE_2" | cut -d= -f2)"
+            if [ -n "$TREE2" ] && [ "$TREE2" = "$CURRENT_TREE" ]; then
+                ACTIVE_VERDICT_FILE="$FIDELITY_VERDICT_FILE_2"
+            fi
+        fi
+        VERDICT_WORD=""
+        if [ -s "$ACTIVE_VERDICT_FILE" ]; then
+            VERDICT_WORD="$(sed '/^## DIGEST/,$d' "$ACTIVE_VERDICT_FILE" \
+                | grep -E '^(READY WITH NOTES|NOT READY|READY)[[:space:]]*$' \
+                | tail -1 | sed 's/[[:space:]]*$//')"
+        fi
+        HOLDS=$(pr_docs_refresh_hold "$PR_HEAD_REF" "$PR_FILES_JSON" "$MD_STATE" "$VERDICT_WORD")
+        [ -n "$HOLDS" ] && echo "BLOCKED: plan declares auto_merge: docs-only-ready and the realized PR failed: $(printf '%s' "$HOLDS" | tr '\n' ' '); held for human merge"
+        ;;
+    *) echo "BLOCKED: plan declares unknown auto_merge value '$AUTO_MERGE' (only true, false or docs-only-ready are recognized); held for human merge" ;;
+esac
 ```
 
 **Condition (8) — commit-type floor (never arm `feat:`).** A literal PR-title grep, deterministic. Mirrors the required `human-signoff` check (`.github/workflows/human-signoff.yml`) as defense-in-depth, so post-plan **never arms a `feat:` PR in the first place** (no arm-then-strip). This is a floor, not a soft signal — commit-type weighs into condition (9) only to *add* holds on maintenance PRs; it can never *release* a `feat:`:
@@ -252,7 +292,7 @@ fi
 
 If met: `gh pr merge --squash --auto`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet. **Never add `--delete-branch`** — the repo already sets `deleteBranchOnMerge`, so remote cleanup is automatic; the flag's only effects are harmful (local delete fails in a multi-worktree clone, and a parent merge carrying it permanently closes stacked child PRs). `LiveGh.pr_merge_auto` in `tools/postplan-harness/harness/adapters/ghad.py` omits it for the same reason.
 
-If not met: do **not** arm auto-merge. Report which condition(s) blocked; the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / Go / E2E). When condition (5) is the blocker (headless + golden changed), report that the golden snapshot changed and the merge needs a human to confirm the behavior change was intentional. When condition (6) is the blocker, report which `Depends-on:` PR(s) are not yet `MERGED`. This PR re-arms on a later post-plan run once the predecessor ships (and this PR has been `git merge master`'d + re-greened). When condition (7) is the blocker, report `auto_merge: false`; it is held for your final review. When condition (8) is the blocker, report that this is a `feat:` PR. It waits for a maintainer to apply the `human-approved` label (the required `human-signoff` check). When condition (9) is the blocker, list each enumerated hold-reason from the realized-diff verdict. When condition (10) is the blocker, report whether the hold fired on the `pipeline-authored` label, the `^bug-[0-9]+` branch name, or both. Every bug-pipeline PR is held for a human merge regardless of commit type. When condition (11) is the blocker, list each held entry (a score, or `-` for an unscored thread) and report that a review thread is still unresolved. The human fixes it and calls `resolve_review_finding`, after which a later post-plan run clears the hold. `unresolved-findings-api-error` and `unresolved-findings-cap` are fail-closed outcomes, not findings: report that the GraphQL call failed (or the PR exceeds the 100-thread page) and the merge is held pending a manual look. When condition (13) is the blocker, report that the plan was adopted by slug drift (the adopted filename). The branch name and plan filename disagree; the human confirms the plan is correct and re-runs with `bin/post-plan-now --plan <abs-path>` to clear the hold. Continue to Phase 7 regardless, to monitor and fix CI. The fix-and-rerun there clears any red track so a later run can arm (conditions (7), (8), and (10) are intent/type holds that a re-run will not clear. Those PRs stay held until the human acts; (11) clears on a re-run only after the threads are actually resolved; (13) clears when re-run with `--plan <abs-path>`). For condition (12), remediation now happens in-run: Phase 5.5 step 4b spawns the bounded re-review after closing every `Mode: in-PR` finding, so a condition-12 block here means either the re-review also found blockers or commits landed after it ran; the fix is to remediate and re-run /post-plan. Never hand-edit or delete either verdict file to clear the hold, since an absent file is itself a blocking state. When condition (15) blocks (aggregator context not required), report which check(s) are red by name; a re-run clears it once they are green. When it only warns, still name the red checks in the report: the merge is queued and GitHub holds it on the required 'All checks green' context. Recovery for a re-run flaky job that left the aggregator stale: re-run the aggregator job (Phase 7 docs, ADR-0149). When condition (16) is the blocker, report which meta-check(s) failed and whether the failure was pre-push or post-pr; fix the failing checks and re-run /post-plan to clear the hold. When condition (17) is the blocker, report the state and the gate it names from the Gate backtest block. HELD means the changed gate flagged clean PRs or a check script lacks a replay spec, so tighten the gate or add its '# gate-backtest-argv:' header and re-run /post-plan. UNKNOWN means the replay failed or timed out; re-run once, and when it repeats a human merges after reading the block.
+If not met: do **not** arm auto-merge. Report which condition(s) blocked; the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / Go / E2E). When condition (5) is the blocker (headless + golden changed), report that the golden snapshot changed and the merge needs a human to confirm the behavior change was intentional. When condition (6) is the blocker, report which `Depends-on:` PR(s) are not yet `MERGED`. This PR re-arms on a later post-plan run once the predecessor ships (and this PR has been `git merge master`'d + re-greened). When condition (7) is the blocker, report the frontmatter value. For `auto_merge: false` it is held for your final review. For `docs-only-ready` name each failed docs-refresh clause from the BLOCKED line (branch, paths, merge-danger, verdict); a human merges after reading the named clause, and a re-run clears it only when the clause itself changes (a two-way line added by hand, a READY re-review). For any other value report it as unknown; a human corrects the plan's frontmatter. When condition (8) is the blocker, report that this is a `feat:` PR. It waits for a maintainer to apply the `human-approved` label (the required `human-signoff` check). When condition (9) is the blocker, list each enumerated hold-reason from the realized-diff verdict. When condition (10) is the blocker, report whether the hold fired on the `pipeline-authored` label, the `^bug-[0-9]+` branch name, or both. Every bug-pipeline PR is held for a human merge regardless of commit type. When condition (11) is the blocker, list each held entry (a score, or `-` for an unscored thread) and report that a review thread is still unresolved. The human fixes it and calls `resolve_review_finding`, after which a later post-plan run clears the hold. `unresolved-findings-api-error` and `unresolved-findings-cap` are fail-closed outcomes, not findings: report that the GraphQL call failed (or the PR exceeds the 100-thread page) and the merge is held pending a manual look. When condition (13) is the blocker, report that the plan was adopted by slug drift (the adopted filename). The branch name and plan filename disagree; the human confirms the plan is correct and re-runs with `bin/post-plan-now --plan <abs-path>` to clear the hold. Continue to Phase 7 regardless, to monitor and fix CI. The fix-and-rerun there clears any red track so a later run can arm (conditions (7), (8), and (10) are intent/type holds that a re-run will not clear. Those PRs stay held until the human acts; (11) clears on a re-run only after the threads are actually resolved; (13) clears when re-run with `--plan <abs-path>`). For condition (12), remediation now happens in-run: Phase 5.5 step 4b spawns the bounded re-review after closing every `Mode: in-PR` finding, so a condition-12 block here means either the re-review also found blockers or commits landed after it ran; the fix is to remediate and re-run /post-plan. Never hand-edit or delete either verdict file to clear the hold, since an absent file is itself a blocking state. When condition (15) blocks (aggregator context not required), report which check(s) are red by name; a re-run clears it once they are green. When it only warns, still name the red checks in the report: the merge is queued and GitHub holds it on the required 'All checks green' context. Recovery for a re-run flaky job that left the aggregator stale: re-run the aggregator job (Phase 7 docs, ADR-0149). When condition (16) is the blocker, report which meta-check(s) failed and whether the failure was pre-push or post-pr; fix the failing checks and re-run /post-plan to clear the hold. When condition (17) is the blocker, report the state and the gate it names from the Gate backtest block. HELD means the changed gate flagged clean PRs or a check script lacks a replay spec, so tighten the gate or add its '# gate-backtest-argv:' header and re-run /post-plan. UNKNOWN means the replay failed or timed out; re-run once, and when it repeats a human merges after reading the block. When condition (18) is the blocker, report the Door, the Blast radius, and the Why from the body's Merge danger line. A one-way Door stays held for a human merge on every re-run. A missing or malformed line stays held on every re-run, because only Phase 2 writes the line; a human adds one well-formed line by hand to clear it.
 
 **Interactive golden warning:** Whenever `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition (5) did not block), still surface the warning prominently in the report — "⚠️ golden.json changed: simulation behavior changed. Confirm this was an intentional `make -C engine golden-update`, not a masked regression." — so the human reviews intent before the queued merge fires.
 
@@ -293,6 +333,25 @@ else
     0) ;;
     1) echo "BLOCKED: gate backtest state HELD; run bin/gate-backtest for the catch list" ;;
     *) echo "BLOCKED: gate backtest could not run (exit $GB_RC) (fail-closed)" ;;
+  esac
+fi
+```
+
+**(18) Merge danger door.** The block reads the PR body's `**Merge danger:**` line, defined in `_pr-body-claims.md` § Merge danger rule. It holds when the Door is `one-way`, when the line is missing or malformed, and when the body cannot be read. It only adds a hold and never clears another condition.
+
+```bash
+# condition (18): block unless the PR body carries exactly one well-formed two-way Merge danger line
+ROOT18="$(git rev-parse --show-toplevel)"
+source "$ROOT18/bin/lib/pr-armable.sh"
+if ! MD_BODY=$(gh pr view --json body --jq '.body' 2>/dev/null); then
+  echo "BLOCKED: merge danger: cannot read the PR body (fail-closed)"
+else
+  MD_HOLD=$(pr_merge_danger_hold "$MD_BODY")
+  case "${MD_HOLD#merge-danger:}" in
+    '') ;;
+    ONE-WAY)   echo "BLOCKED: merge danger: Door is one-way; a human merges this PR" ;;
+    MISSING)   echo "BLOCKED: merge danger: body has no **Merge danger:** line (see _pr-body-claims.md § Merge danger rule)" ;;
+    *)         echo "BLOCKED: merge danger: Merge danger line is malformed (${MD_HOLD#merge-danger:})" ;;
   esac
 fi
 ```

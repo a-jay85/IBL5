@@ -22,7 +22,7 @@ class PlayerNameDecoratorTest extends TestCase
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
         $playerData->teamid = 5;
-        $playerData->ordinal = \League\JSB::WAIVERS_ORDINAL + 1;
+        $playerData->ordinal = \League\JsbConstants::WAIVERS_ORDINAL + 1;
         $playerData->contractCurrentYear = 1;
         $playerData->contractTotalYears = 3;
 
@@ -50,7 +50,7 @@ class PlayerNameDecoratorTest extends TestCase
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
         $playerData->teamid = 5;
-        $playerData->ordinal = \League\JSB::WAIVERS_ORDINAL + 1;
+        $playerData->ordinal = \League\JsbConstants::WAIVERS_ORDINAL + 1;
         $playerData->contractCurrentYear = 1;
         $playerData->contractTotalYears = 3;
 
@@ -106,7 +106,7 @@ class PlayerNameDecoratorTest extends TestCase
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
         $playerData->teamid = 5;
-        $playerData->ordinal = \League\JSB::WAIVERS_ORDINAL + 1;
+        $playerData->ordinal = \League\JsbConstants::WAIVERS_ORDINAL + 1;
         $playerData->contractCurrentYear = 3;
         $playerData->contractTotalYears = 3;
 

@@ -1,6 +1,6 @@
 ---
-description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet."
-last_verified: 2026-09-29
+description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised; an advisory How to revert line follows it; pr-copy writes no exact count its packet does not show."
+last_verified: 2026-10-20
 ---
 
 # PR Body Claims
@@ -121,7 +121,68 @@ Every such claim carries its evidence inline, in one of two forms:
 
 If you cannot produce the evidence, drop the claim. Describe what the PR changes, and name the command a reviewer runs after merge to confirm the state: "After merge, `launchctl list | grep <label>` shows the job." A present-tense external-state claim with no evidence is a fabricated claim, and the reviewer treats it as one.
 
-This rule has no mechanical check. The claims it covers are free-form prose, and the same phrases appear in design descriptions and quoted plans, so a pattern match would flag too many honest lines. Facts derivable from the diff are generated for you: the `**Files changed**` and `**Tests changed**` blocks come from `git diff`, so never restate them by hand. The `<!-- merge-digest:begin -->` block at the top of the body is runner-owned: it mirrors the sticky verdict, so never edit it by hand.
+This rule has no mechanical check. The claims it covers are free-form prose, and the same phrases appear in design descriptions and quoted plans, so a pattern match would flag too many honest lines. The diff is the record of which files changed, so never list changed files by hand. The `<!-- merge-digest:begin -->` block at the top of the body is runner-owned: it mirrors the sticky verdict, so never edit it by hand.
+
+## Unseen-count rule
+
+The harness's pr-copy call writes no exact count (tests, cases, call sites, files, functions, rows) that its input packet does not show, and it claims only what the diff shows. When the number is not in front of it, it describes the change in words. The Phase 5.5 fidelity review's check 4 is the body-vs-diff gate for every count that reaches the body. `body_numbers.py` still corrects file, line, migration and ADR numbers and adds the test-count note described below.
+
+**Headless.** Applies: the prompt rule runs on every harness pr-copy call.
+
+## Test-count claims rule
+
+A PR body that says how many tests a change adds takes the number from a measurement and names its unit. Do not count test functions by hand. Copy the count from the runner's own summary line (`N passed` from pytest, `Tests: N` from PHPUnit, the total a `bin/test-*` harness prints) or from a grep of the diff for the declarations you added. Say which unit the number counts: tests the diff adds, or the file's total after the change. Put the number in the same bullet as the one test file it describes, with the path in backticks, so the harness can check it.
+
+The post-plan harness checks these claims in `body_numbers.py`. It checks a claim when the claim's line backticks exactly one test file whose declarations it can count: PHPUnit `test*` methods and `#[Test]` methods, pytest `def test_*`, vitest and Playwright `it(` and `test(`, Go `func Test*`, and `bin/test-*` harnesses that define `case_*()` functions. The claim passes when it equals the declarations the diff adds to that file or the file's total. A claim that matches neither gets a `[harness: measured A added / T total in <path>]` note beside it in the body, and the run logs a finding. The harness never rewrites the number. A claim it cannot ground stays as written with no note. That covers a line naming two test files, a `bin/test-*` harness with no `case_*()` functions or with lettered sub-cases such as `case_5a`, and a count of assertions.
+
+Trigger: backlog#1060 (a scan of 23 merged PR bodies with test counts found 5 whose number disagreed with the declarations the diff added).
+
+**Headless.** Applies: an automouse or `/post-plan` run that writes a test count into a PR body takes it from a test run or a diff grep in the same session.
+
+## Merge danger rule
+
+Every `/post-plan` PR body carries exactly one Merge danger line. It starts at the beginning of a line and can sit anywhere in the body:
+
+```
+**Merge danger:** Door: one-way · Blast radius: external · Why: <one line, 20-200 chars>
+```
+
+`Door` is `one-way` or `two-way`. `Blast radius` is one of `localized`, `module`, `site-wide`, or `external`. The separator is ` · ` (U+00B7), and the three keys appear in that order. A body with no such line, or with two or more, is malformed. A quoted example inside a code fence counts as a line. The parser is `parse_merge_danger` in `tools/postplan-harness/harness/merge_danger.py`. Its Phase 6.5 shell twin is `pr_merge_danger_hold` in `bin/lib/pr-armable.sh`. Change both together.
+
+`/post-plan` Phase 2 injects the line mechanically, through `render_merge_danger` in the same module. The LLM writes only the `Why` text. A human editing the body may raise `Door` to `one-way` or widen `Blast radius`. Lowering a mechanical `one-way` is never allowed. Phase 6.5 reads the body at arm time and does not re-derive the door from the diff, so review is the only catch for a lowered line. The derivation in Phase 2 is the floor.
+
+Any one of these triggers forces `Door: one-way`:
+
+- Destructive migration. A changed `ibl5/migrations/*.sql` whose diff matches `armable.DESTRUCTIVE_SQL`, the same regex condition (9) uses. The `-- destructive-migration[trigger]:` bypass marker satisfies `bin/check-destructive-migrations` but does not lower the door, because a bypassed destructive migration is still irreversible.
+- Prod external state. A diff touching `bin/db-sync-prod` or `.github/workflows/promote-to-production.yml`.
+- Outbound notification senders. A diff touching `bin/discord-dm`, anything under `.github/actions/notify-discord/` or `ibl5/classes/Mail/`, or a changed `.github/workflows/*.yml` whose candidate text contains `notify-discord` or `DISCORD_`. A sent message cannot be recalled.
+- Self-governing merge machinery. A diff touching a path in `_ARMING_PATHS` in `harness/gate_backtest.py`: `harness/armable.py`, `bin/lib/pr-armable.sh`, or `_phase-6.5-arm-auto-merge.md`. This is the bootstrap hazard.
+- Gate removal. Any `detect_gate_changes` result whose state is `removed`: a deleted `bin/check-*`, lib gate, CI workflow, or arming path.
+
+An edited `bin/check-*`, `bin/lib/*`, or `.github/workflows/*.yml` stays two-way with `Blast radius: site-wide`. Condition (17) gate-backtest already holds the edits that flip past verdicts. On the 100 newest merged PRs (2026-10-11), these triggers mark 3 of 100 one-way from paths alone (#3114 arming path, #3058 and #3050 notify workflows). Treating every gate edit as one-way would have marked 38 of 100. That count takes any PR touching `.github/workflows/`, `bin/check-*`, `bin/lib/`, `.claude/hooks/`, or `tools/postplan-harness/harness/`.
+
+Blast radius is a mechanical floor too. The LLM or a human may widen it and never narrow it. It is `external` when a prod-external or notification trigger hit. It is `site-wide` when any gate, migration, workflow, arming path, `ibl5/.htaccess`, `ibl5/router.php`, or `ibl5/composer.json` changed. It is `localized` when at most 3 files changed and all share one parent directory. It is `module` when every path shares one module root: `ibl5/classes/<X>`, `ibl5/modules/<X>`, `tools/<X>`, or else the first path component. Anything else is `site-wide`.
+
+Phase 6.5 condition (18) refuses to arm when `Door: one-way`, when the line is missing or malformed, or when the body cannot be read. The merge digest DM opens a one-way merge with a `!! ONE-WAY DOOR` line and shortens the DM for a two-way localized merge. The harness body check marks a body without one well-formed line as degraded, which also holds arming.
+
+Trigger: backlog#1438.
+
+**Headless.** Applies: yes. The line is injected and validated mechanically; the only LLM input is the Why text.
+
+## How to revert rule
+
+Directly after the Merge danger line, the body carries one advisory `**How to revert:**` line. It says in one line how to undo the merge.
+
+- A normal change reads: Open a PR with `git revert <merge-sha>`.
+- A diff touching a migration (`ibl5/migrations/*.sql`) adds a step: write a new migration that undoes the schema change, since git revert does not roll back an applied migration.
+- A diff touching the prod sync (`bin/db-sync-prod` or `.github/workflows/promote-to-production.yml`) adds a step: rerun the previous prod sync or promotion.
+- A diff touching config (`ibl5/.htaccess`, `ibl5/composer.json`, or any `.github/workflows/*.yml`) adds a step: confirm the deploy picked up the restored config.
+
+The LLM writes the line in Phase 2. The harness module `tools/postplan-harness/harness/how_to_revert.py` keeps exactly one line after Merge danger. It swaps in the mechanical line when the LLM line is missing or shorter than 12 characters, and whenever the diff touches one of the paths above.
+
+The line is advisory. A body without it gets no finding and no hold, and the body check stays clean. No Phase 6.5 condition, shell reader, or digest reads it. Bodies written before this rule carry no line, and nothing flags them.
+
+**Headless.** Applies: yes. The runner writes the line mechanically when the LLM line is unusable.
 
 ## Backlog issue references
 

@@ -7,33 +7,35 @@
 #   Part A  bin/check-master-ci-green's SKIP_CHECKS filter, driven by GH_API_CMD
 #           JSON fixtures. Proves exact-name matching and — critically — that
 #           skipping every check FAILS rather than passing vacuously.
+#   Part A2 bin/check-master-ci-green's IGNORE_PENDING_CHECKS filter: a listed
+#           name is dropped only while pending; a completed red run still fails.
 #   Part B  bin/promote-master-to-production against a real local bare repo used
 #           as `origin`. Proves the fast-forward-only property by making the
 #           remote DIVERGE and asserting the ref is untouched afterwards.
 #
 # Run: bin/test-promote-master-to-production  (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GREEN="$SCRIPT_DIR/check-master-ci-green"
 PROMOTE="$SCRIPT_DIR/promote-master-to-production"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-FAILED=0
+h_tmp TMP
 
 # --- helpers ---
 
 expect() { # label want got
-  if [ "$2" -eq "$3" ]; then echo "ok   $1"
-  else echo "FAIL $1 (want exit $2, got $3)"; FAILED=1; fi
+  if [ "$2" -eq "$3" ]; then h_pass "$1"
+  else h_fail "$1" "want exit $2, got $3"; fi
 }
 expect_out() { # label needle haystack
-  case "$3" in *"$2"*) echo "ok   $1" ;;
-  *) echo "FAIL $1 (missing: $2)"; FAILED=1 ;; esac
+  case "$3" in *"$2"*) h_pass "$1" ;;
+  *) h_fail "$1" "missing: $2" ;; esac
 }
 refuse_out() { # label needle haystack — needle must be ABSENT
-  case "$3" in *"$2"*) echo "FAIL $1 (unexpectedly present: $2)"; FAILED=1 ;;
-  *) echo "ok   $1" ;; esac
+  case "$3" in *"$2"*) h_fail "$1" "unexpectedly present: $2" ;;
+  *) h_pass "$1" ;; esac
 }
 
 # stub gh: auth succeeds, everything else fails (exit 1 → loud error rather than
@@ -149,6 +151,150 @@ expect     "skip-cancelled-unskipped-blocks"     1 "$rc"
 expect_out "skip-cancelled-unskipped-blocks-msg" "(cancelled)" "$out"
 
 # ============================================================
+# Part A2 — IGNORE_PENDING_CHECKS filter (bin/check-master-ci-green)
+# Pending-only exclusion: a listed name is dropped while status != completed
+# and counts as usual once it completes. Cases 10-11 are characterization
+# (pass before the var exists); 12-21 pin the shipped filter.
+# ============================================================
+
+mkfixture "$TMP/A-deploy-pending.json" \
+  "Tests and Analysis:completed:success" \
+  "gitleaks:completed:success" \
+  "deploy:in_progress:null" \
+  "Promote master to production:in_progress:null"
+
+# 10. ignore-unset-keeps-pending — no var at all: the pending deploy still blocks
+out="$(env -u IGNORE_PENDING_CHECKS \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-deploy-pending.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-unset-keeps-pending"      1 "$rc"
+expect_out "ignore-unset-keeps-pending-msg"  "checks still running" "$out"
+refuse_out "ignore-unset-is-silent"          "IGNORE_PENDING_CHECKS active" "$out"
+
+# 11. ignore-empty-keeps-pending — var set to "" is the same as unset
+out="$(IGNORE_PENDING_CHECKS='' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-deploy-pending.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-empty-keeps-pending"      1 "$rc"
+expect_out "ignore-empty-keeps-pending-msg"  "checks still running" "$out"
+refuse_out "ignore-empty-is-silent"          "IGNORE_PENDING_CHECKS active" "$out"
+
+# 12. ignore-pending-passes — both post-merge jobs pending, everything else green
+out="$(IGNORE_PENDING_CHECKS='deploy,Promote master to production' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-deploy-pending.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-pending-passes"       0 "$rc"
+expect_out "ignore-pending-passes-pass"  "PASS: 2" "$out"
+expect_out "ignore-pending-passes-log"   "IGNORE_PENDING_CHECKS active — ignoring while pending: Promote master to production, deploy" "$out"
+
+# 13. ignore-red-still-fails — a COMPLETED failure of a listed name is not ignored
+mkfixture "$TMP/A-deploy-red.json" \
+  "Tests and Analysis:completed:success" \
+  "deploy:completed:failure" \
+  "Promote master to production:in_progress:null"
+out="$(IGNORE_PENDING_CHECKS='deploy,Promote master to production' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-deploy-red.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-red-still-fails"      1 "$rc"
+expect_out "ignore-red-still-fails-msg"  "checks failed: deploy (failure)" "$out"
+
+# 14. ignore-cancelled-still-fails — cancelled is a completed non-pass conclusion
+mkfixture "$TMP/A-deploy-cancelled.json" \
+  "Tests and Analysis:completed:success" \
+  "deploy:completed:cancelled"
+out="$(IGNORE_PENDING_CHECKS='deploy' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-deploy-cancelled.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-cancelled-still-fails"     1 "$rc"
+expect_out "ignore-cancelled-still-fails-msg" "deploy (cancelled)" "$out"
+
+# 15. ignore-is-exact — prefix 'deplo' and substring 'ploy' match nothing
+out="$(IGNORE_PENDING_CHECKS='deplo,ploy,Promote master' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-deploy-pending.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-is-exact"       1 "$rc"
+expect_out "ignore-is-exact-none"  "ignoring while pending: <none matched>" "$out"
+expect_out "ignore-is-exact-msg"   "checks still running" "$out"
+
+# 16. ignore-trims-whitespace — spaces around names are stripped
+out="$(IGNORE_PENDING_CHECKS=' deploy , Promote master to production ' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-deploy-pending.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-trims-whitespace"      0 "$rc"
+expect_out "ignore-trims-whitespace-pass" "PASS: 2" "$out"
+
+# 17. ignore-non-listed-pending-still-running — e2e is not on the list
+mkfixture "$TMP/A-other-pending.json" \
+  "Tests and Analysis:completed:success" \
+  "deploy:in_progress:null" \
+  "e2e:in_progress:null"
+out="$(IGNORE_PENDING_CHECKS='deploy' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-other-pending.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-non-listed-pending-still-running"     1 "$rc"
+expect_out "ignore-non-listed-pending-still-running-msg" "checks still running: e2e" "$out"
+
+# 18. ignore-all-fails-closed — ignoring every run must hit the MIN_REQUIRED floor
+mkfixture "$TMP/A-only-pending.json" \
+  "deploy:in_progress:null" \
+  "Promote master to production:in_progress:null"
+out="$(IGNORE_PENDING_CHECKS='deploy,Promote master to production' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-only-pending.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-all-fails-closed"     1 "$rc"
+expect_out "ignore-all-fails-closed-msg" "only 0 check-run(s)" "$out"
+
+# 19. ignore-older-red-newer-pending-rerun — the drop runs BEFORE dedupe, so the
+# newer pending re-run is removed and the older completed failure still counts.
+# Raw JSON because the pending run must be NEWER than the red one (mkfixture's
+# fixed timestamps would put the red run last on their own).
+printf '%s\n' '{"check_runs":[
+ {"name":"Tests and Analysis","status":"completed","conclusion":"success","completed_at":"2026-08-20T10:00:00Z","started_at":"2026-08-20T09:00:00Z"},
+ {"name":"deploy","status":"completed","conclusion":"failure","completed_at":"2026-08-20T10:00:00Z","started_at":"2026-08-20T09:30:00Z"},
+ {"name":"deploy","status":"in_progress","conclusion":null,"completed_at":null,"started_at":"2026-08-20T11:00:00Z"}]}' \
+  > "$TMP/A-deploy-rerun.json"
+out="$(IGNORE_PENDING_CHECKS='deploy' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-deploy-rerun.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-older-red-newer-pending-rerun"     1 "$rc"
+expect_out "ignore-older-red-newer-pending-rerun-msg" "checks failed: deploy (failure)" "$out"
+
+# 20. ignore-mixed-red-sibling — red phpunit + pending deploy is now RED (was pending)
+mkfixture "$TMP/A-mixed.json" \
+  "Tests and Analysis:completed:failure" \
+  "deploy:in_progress:null"
+out="$(IGNORE_PENDING_CHECKS='deploy' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-mixed.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "ignore-mixed-red-sibling"     1 "$rc"
+expect_out "ignore-mixed-red-sibling-msg" "checks failed: Tests and Analysis (failure)" "$out"
+
+# 21. ignore-applies-in-walkback — HEAD has no runs; the ancestor's pending deploy
+# is dropped inside the walkback loop too. A real two-commit repo drives git log;
+# a URL-keyed shim serves one fixture per SHA.
+WB="$TMP/wb"
+git init -q "$WB"
+git -C "$WB" -c user.name=t -c user.email=t@t commit -q --allow-empty -m one
+git -C "$WB" -c user.name=t -c user.email=t@t commit -q --allow-empty -m two
+git -C "$WB" remote add origin https://github.com/a-jay85/IBL5.git
+WB_HEAD="$(git -C "$WB" rev-parse HEAD)"
+printf '%s\n' '{"check_runs":[]}' > "$TMP/A-wb-head.json"
+cat > "$TMP/api-by-sha" <<SHIMEOF
+#!/bin/sh
+case "\$1" in
+  *"$WB_HEAD"*) cat "$TMP/A-wb-head.json" ;;
+  *)            cat "$TMP/A-deploy-pending.json" ;;
+esac
+SHIMEOF
+chmod +x "$TMP/api-by-sha"
+out="$(cd "$WB" && IGNORE_PENDING_CHECKS='deploy,Promote master to production' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=1 GH_API_CMD="$TMP/api-by-sha" \
+  "$GREEN" "$WB_HEAD" 2>&1)"; rc=$?
+expect     "ignore-applies-in-walkback"      0 "$rc"
+expect_out "ignore-applies-in-walkback-fell" "Falling back to ancestor" "$out"
+expect_out "ignore-applies-in-walkback-pass" "PASS: 2" "$out"
+
+# ============================================================
 # Part B — promote-master-to-production against a bare repo
 # ============================================================
 
@@ -163,13 +309,9 @@ mkfixture "$TMP/B-inprog.json" "Tests and Analysis:in_progress:null"
 mkrepo() {
   local base
   base="$(mktemp -d "$TMP/repo.XXXXXX")"
-  git init -q --bare "$base/origin.git" >/dev/null 2>&1
-  git clone -q "$base/origin.git" "$base/work" >/dev/null 2>&1
-  git -C "$base/work" config user.email t@example.com
-  git -C "$base/work" config user.name Tester
-  git -C "$base/work" config commit.gpgsign false
+  h_git_repo "$base/work" --bare-origin --no-commit
+  ORIGIN="$H_ORIGIN"
   ln -s "$SCRIPT_DIR" "$base/work/bin"
-  ORIGIN="$base/origin.git"
   WORK="$base/work"
 }
 
@@ -193,8 +335,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 
 expect     "promotes-when-green"         0 "$rc"
 expect_out "promotes-when-green-outcome" "outcome=promoted" "$out"
 prod_sha="$(prod_ref "$ORIGIN")"
-if [ "$prod_sha" = "$SHA" ]; then echo "ok   promotes-when-green-ref"
-else echo "FAIL promotes-when-green-ref (got $prod_sha, want $SHA)"; FAILED=1; fi
+if [ "$prod_sha" = "$SHA" ]; then h_pass "promotes-when-green-ref"
+else h_fail "promotes-when-green-ref (got $prod_sha, want $SHA)"; fi
 
 # ---- idempotent-already-current ---- (re-run on same repo, production already at SHA)
 out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
@@ -224,8 +366,8 @@ after="$(prod_ref "$ORIGIN")"
 expect     "diverged-is-rejected-and-ref-unchanged"      1 "$rc"
 expect_out "diverged-outcome"                            "outcome=diverged" "$out"
 refuse_out "diverged-nothing-forced"                     "outcome=promoted" "$out"
-if [ "$before" = "$after" ]; then echo "ok   diverged-ref-unchanged"
-else echo "FAIL diverged-ref-unchanged (before=$before after=$after)"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "diverged-ref-unchanged"
+else h_fail "diverged-ref-unchanged (before=$before after=$after)"; fi
 
 # ---- not-green-no-push ----
 mkrepo
@@ -242,8 +384,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-red.json #" MIN_REQUIRED_CHECKS=1 \
 after="$(prod_ref "$ORIGIN")"
 expect     "not-green-no-push"             0 "$rc"
 expect_out "not-green-no-push-outcome"     "outcome=not-green" "$out"
-if [ "$before" = "$after" ]; then echo "ok   not-green-no-push-ref-unchanged"
-else echo "FAIL not-green-no-push-ref-unchanged"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "not-green-no-push-ref-unchanged"
+else h_fail "not-green-no-push-ref-unchanged"; fi
 
 # ---- still-running-no-push ----
 mkrepo
@@ -260,8 +402,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-inprog.json #" MIN_REQUIRED_CHECKS=1
 after="$(prod_ref "$ORIGIN")"
 expect     "still-running-no-push"             0 "$rc"
 expect_out "still-running-no-push-outcome"     "outcome=not-green" "$out"
-if [ "$before" = "$after" ]; then echo "ok   still-running-no-push-ref-unchanged"
-else echo "FAIL still-running-no-push-ref-unchanged"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "still-running-no-push-ref-unchanged"
+else h_fail "still-running-no-push-ref-unchanged"; fi
 
 # ---- not-ancestor-rejected ----
 mkrepo
@@ -281,8 +423,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 
 after="$(prod_ref "$ORIGIN")"
 expect     "not-ancestor-rejected"             1 "$rc"
 expect_out "not-ancestor-rejected-outcome"     "outcome=not-ancestor" "$out"
-if [ "$before" = "$after" ]; then echo "ok   not-ancestor-rejected-ref-unchanged"
-else echo "FAIL not-ancestor-rejected-ref-unchanged"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "not-ancestor-rejected-ref-unchanged"
+else h_fail "not-ancestor-rejected-ref-unchanged"; fi
 
 # ---- invalid-sha cases — these die before any git fetch, so repo setup is minimal ----
 # (reuse $WORK from the last mkrepo above — we just need to be inside a git repo)
@@ -326,7 +468,7 @@ if [ "$is_shallow" = "true" ]; then
   expect     "shallow-rejected"         1 "$rc"
   expect_out "shallow-rejected-outcome" "outcome=shallow" "$out"
 else
-  echo "FAIL shallow-rejected (clone was not shallow: is-shallow=$is_shallow)"; FAILED=1
+  h_fail "shallow-rejected (clone was not shallow: is-shallow=$is_shallow)"
 fi
 
 # ---- superseded-no-push ----
@@ -348,8 +490,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 
 after="$(prod_ref "$ORIGIN")"
 expect     "superseded-no-push"             0 "$rc"
 expect_out "superseded-no-push-outcome"     "outcome=superseded" "$out"
-if [ "$before" = "$after" ]; then echo "ok   superseded-no-push-ref-unchanged"
-else echo "FAIL superseded-no-push-ref-unchanged"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "superseded-no-push-ref-unchanged"
+else h_fail "superseded-no-push-ref-unchanged"; fi
 
 # ---- dry-run-writes-nothing ----
 mkrepo
@@ -366,8 +508,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 
 after="$(prod_ref "$ORIGIN")"
 expect     "dry-run-writes-nothing"             0 "$rc"
 expect_out "dry-run-writes-nothing-outcome"     "outcome=would-promote" "$out"
-if [ "$before" = "$after" ]; then echo "ok   dry-run-writes-nothing-ref-unchanged"
-else echo "FAIL dry-run-writes-nothing-ref-unchanged"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "dry-run-writes-nothing-ref-unchanged"
+else h_fail "dry-run-writes-nothing-ref-unchanged"; fi
 
 # ---- stdout-is-key-value-only ----
 mkrepo
@@ -382,20 +524,14 @@ SHA="$(git -C "$WORK" rev-parse HEAD)"
 stdout_only="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
   "$PROMOTE" "$SHA" 2>/dev/null)"
 violators="$(printf '%s\n' "$stdout_only" | grep -vE '^(outcome|sha)=[0-9a-z-]+$' || true)"
-if [ -z "$violators" ]; then echo "ok   stdout-is-key-value-only"
-else echo "FAIL stdout-is-key-value-only (violating lines: $violators)"; FAILED=1; fi
+if [ -z "$violators" ]; then h_pass "stdout-is-key-value-only"
+else h_fail "stdout-is-key-value-only (violating lines: $violators)"; fi
 
 # ---- no-force-tokens grep invariant ----
 if grep -qE -- '--force|force-with-lease' "$PROMOTE"; then
-  echo "FAIL no-force-tokens (bin/promote-master-to-production must never force-push)"; FAILED=1
+  h_fail "no-force-tokens (bin/promote-master-to-production must never force-push)"
 else
-  echo "ok   no-force-tokens"
+  h_pass "no-force-tokens"
 fi
 
-# ============================================================
-if [ "$FAILED" -ne 0 ]; then
-  echo "RESULT: FAILED"
-  exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

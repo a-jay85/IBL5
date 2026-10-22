@@ -27,7 +27,7 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         $phase = $this->repo->getSeasonPhase();
 
         self::assertIsString($phase);
-        self::assertNotEmpty($phase);
+        self::assertNotSame('', $phase);
     }
 
     public function testGetSeasonEndingYearReturnsString(): void
@@ -35,14 +35,14 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         $year = $this->repo->getSeasonEndingYear();
 
         self::assertIsString($year);
-        self::assertNotEmpty($year);
+        self::assertNotSame('', $year);
     }
 
     public function testGetBulkSettingsReturnsMappedValues(): void
     {
         // Use REPLACE to safely insert test settings (PK on setting_key)
         $this->db->query(
-            "REPLACE INTO ibl_settings (setting_key, value) VALUES ('DB_IntTest_BulkSetting', 'test_value_42')"
+            "REPLACE INTO ibl_settings (setting_key, setting_value) VALUES ('DB_IntTest_BulkSetting', 'test_value_42')"
         );
 
         $map = $this->repo->getBulkSettings(['DB_IntTest_BulkSetting', 'Current Season Phase']);
@@ -140,7 +140,7 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetFreeAgencyNotificationsStateReturnsString(): void
     {
-        $this->db->query("REPLACE INTO ibl_settings (setting_key, value) VALUES ('Free Agency Notifications', 'On')");
+        $this->db->query("REPLACE INTO ibl_settings (setting_key, setting_value) VALUES ('Free Agency Notifications', 'On')");
 
         $result = $this->repo->getFreeAgencyNotificationsState();
 

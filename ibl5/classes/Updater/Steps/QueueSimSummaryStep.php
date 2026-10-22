@@ -20,6 +20,7 @@ class QueueSimSummaryStep implements PipelineStepInterface
     public function __construct(
         private readonly \SimRecap\SimSummaryRepository $summaries,
         private readonly \Season\SeasonQueryRepository $seasonQuery,
+        private readonly ?\SimRecap\GitHubDispatchClient $dispatcher = null,
     ) {
     }
 
@@ -45,9 +46,10 @@ class QueueSimSummaryStep implements PipelineStepInterface
         }
 
         if ($this->summaries->queuePendingIfAbsent($sim)) {
+            $dispatched = $this->dispatchRecapRun($sim);
             return StepResult::success(
                 $this->getLabel(),
-                "Queued sim {$sim} for recap generation.",
+                "Queued sim {$sim} for recap generation." . ($dispatched === null ? '' : ($dispatched ? ' GitHub Actions run dispatched.' : ' Dispatch failed; the hourly fallback will pick it up.')),
                 inlineHtml: $this->queuedHtml($sim),
             );
         }
@@ -57,6 +59,19 @@ class QueueSimSummaryStep implements PipelineStepInterface
             "Sim {$sim} already has a summary row.",
             inlineHtml: $this->noNewSimHtml(),
         );
+    }
+
+    /** Null = no dispatcher configured; otherwise the client's verdict. Never throws. */
+    private function dispatchRecapRun(int $sim): ?bool
+    {
+        if ($this->dispatcher === null) {
+            return null;
+        }
+        try {
+            return $this->dispatcher->dispatch($sim);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

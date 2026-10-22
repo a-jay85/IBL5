@@ -9,7 +9,7 @@ class GameBoxscoreEntryPointTest extends ModuleEntryPointTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
         $this->mockDb->onQuery('ibl_schedule', []);
         $this->mockDb->setMockData([]);
@@ -57,7 +57,7 @@ class GameBoxscoreEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('GameBoxscore', get: ['date' => '2026-02-20', 'game' => '1']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Game 1', $output);
         $this->assertStringContainsString('game-boxscore__table', $output);
         $this->assertQueryExecuted('ibl_box_scores_teams');

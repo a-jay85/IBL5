@@ -20,7 +20,7 @@ class LeagueControlPanelRepositoryTest extends TestCase
 
     public function testGetSettingReturnsValue(): void
     {
-        $mockDb = $this->createMockDatabaseWithPreparedStatement(['value' => 'Regular Season']);
+        $mockDb = $this->createMockDatabaseWithPreparedStatement(['setting_value' => 'Regular Season']);
         $repository = new LeagueControlPanelRepository($mockDb);
 
         $result = $repository->getSetting('Current Season Phase');
@@ -41,8 +41,8 @@ class LeagueControlPanelRepositoryTest extends TestCase
     public function testGetBulkSettingsReturnsMappedArray(): void
     {
         $rows = [
-            ['setting_key' => 'Current Season Phase', 'value' => 'Playoffs'],
-            ['setting_key' => 'Allow Trades', 'value' => 'Yes'],
+            ['setting_key' => 'Current Season Phase', 'setting_value' => 'Playoffs'],
+            ['setting_key' => 'Allow Trades', 'setting_value' => 'Yes'],
         ];
 
         $mockDb = $this->createMockDatabaseWithPreparedStatement($rows);
@@ -68,7 +68,7 @@ class LeagueControlPanelRepositoryTest extends TestCase
 
     public function testGetSimLengthInDaysCastsToInt(): void
     {
-        $mockDb = $this->createMockDatabaseWithPreparedStatement(['value' => '5']);
+        $mockDb = $this->createMockDatabaseWithPreparedStatement(['setting_value' => '5']);
         $repository = new LeagueControlPanelRepository($mockDb);
 
         $result = $repository->getSimLengthInDays();

@@ -192,6 +192,83 @@ final class RcbImporterTest extends TestCase
         $this->assertCount(1, $this->season);
     }
 
+    public function testImportRecordsParseFailureAndSkipsRepository(): void
+    {
+        $repo = self::createMock(JsbImportRepositoryInterface::class);
+        $repo->expects(self::never())->method('replaceRcbAlltimeRecords');
+        $repo->expects(self::never())->method('replaceRcbSeasonRecords');
+
+        $result = (new RcbImporter($repo))->import('', 2006, 'rcb.rcb');
+
+        $this->assertSame(1, $result->errors);
+        $this->assertSame(0, $result->inserted);
+        $this->assertSame(
+            ['ERROR: RCB parse failed: Invalid .rcb file: expected at least 83 lines, got 1'],
+            $result->messages
+        );
+    }
+
+    public function testImportConvertsSeasonReplaceExceptionToError(): void
+    {
+        $repo = self::createStub(JsbImportRepositoryInterface::class);
+        $repo->method('replaceRcbAlltimeRecords')->willReturn(5);
+        $repo->method('replaceRcbSeasonRecords')->willThrowException(new \RuntimeException('disk full'));
+
+        $result = (new RcbImporter($repo))->import($this->buildMinimalRcbData(), 2006, 'rcb.rcb');
+
+        $this->assertSame(1, $result->errors);
+        $this->assertSame(5, $result->inserted);
+        $this->assertSame(['ERROR: RCB season replace failed: disk full'], $result->messages);
+    }
+
+    public function testImportReplacesAlltimeBeforeSeasonAndSumsInserted(): void
+    {
+        $calls = [];
+        $repo = self::createStub(JsbImportRepositoryInterface::class);
+        $repo->method('replaceRcbAlltimeRecords')->willReturnCallback(
+            static function (array $records) use (&$calls): int {
+                $calls[] = 'alltime';
+                return 3;
+            }
+        );
+        $repo->method('replaceRcbSeasonRecords')->willReturnCallback(
+            static function (int $seasonYear, array $records) use (&$calls): int {
+                $calls[] = 'season';
+                return 4;
+            }
+        );
+
+        $result = (new RcbImporter($repo))->import($this->buildMinimalRcbData(), 2006, 'rcb.rcb');
+
+        $this->assertSame(['alltime', 'season'], $calls);
+        $this->assertSame(7, $result->inserted);
+        $this->assertSame(0, $result->errors);
+        $this->assertSame([], $result->messages);
+    }
+
+    /**
+     * Pins that RcbImporter::importFile() feeds file contents through import() and forwards the alltime flag.
+     */
+    public function testImportFileForwardsFlagsThroughSplitHelpers(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'rcb');
+        self::assertIsString($path);
+        file_put_contents($path, $this->buildMinimalRcbData());
+
+        try {
+            $repo = self::createMock(JsbImportRepositoryInterface::class);
+            $repo->expects(self::never())->method('replaceRcbAlltimeRecords');
+            $repo->expects(self::once())->method('replaceRcbSeasonRecords')->willReturn(2);
+
+            $result = (new RcbImporter($repo))->importFile($path, 2006, 'rcb.rcb', false);
+        } finally {
+            unlink($path);
+        }
+
+        $this->assertSame(2, $result->inserted);
+        $this->assertSame(0, $result->errors);
+    }
+
     public function testImportFileReportsMissingFile(): void
     {
         $result = (new RcbImporter(self::createStub(JsbImportRepositoryInterface::class)))->importFile('/nonexistent/x.rcb', 2006);

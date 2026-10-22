@@ -1,6 +1,6 @@
 ---
 description: Docker Compose setup for local PHP-Apache + MariaDB stack.
-last_verified: 2026-09-21
+last_verified: 2026-10-05
 ---
 
 # Docker Development Setup
@@ -53,7 +53,7 @@ The site is available at **http://main.localhost/ibl5/**.
 
 ## Port 80 Conflict
 
-If another web server is bound to port 80, stop it before `docker compose up -d`. The `config.php` change (`getenv('DB_HOST') ?: '127.0.0.1'`) keeps the codebase portable between environments without editing config files.
+If another web server is bound to port 80, stop it before `docker compose up -d`. DB credentials live in the gitignored `ibl5/config.local.php`, copied from `ibl5/config.local.php.example`, whose defaults (`mariadb` / `root` / `root` / `iblhoops_ibl5`) match this compose stack and the Adminer login above. A `config.php` built from `ibl5/config.php.example` has no env-var fallback and exits 1 when `config.local.php` is missing. The main checkout's untracked `ibl5/config.php` may still carry the older `getenv('DB_*')` fallback lines; in that shape the `DB_HOST` value the compose file exports into the PHP container wins, and a host shell uses the file's fallback.
 
 ## Development Workflow
 

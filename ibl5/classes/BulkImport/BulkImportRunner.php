@@ -96,69 +96,115 @@ final class BulkImportRunner
             }
 
             if ($fileType->iterationMode() === 'snapshot') {
-                // Snapshot types: one entry per archive
-                $archives = $this->extractor->findAllArchives($dirPath);
-                foreach ($archives as $archive) {
-                    $plrMap = null;
-                    if ($fileType === JsbFileType::Plb) {
-                        // PlrOrdinalMap is built once per season, reused across entries
-                        // (handled below in processPlbSeason)
-                    }
-
-                    $entries[] = new ImportEntry(
-                        path: $dirPath,
-                        label: basename($archive['path']),
-                        year: $archive['ending_year'],
-                        phase: $archive['phase'],
-                        archivePath: $archive['path'],
-                        sourceLabel: pathinfo(basename($archive['path']), PATHINFO_FILENAME),
-                        simNumber: $archive['seq'],
-                    );
-                }
+                $entries = [...$entries, ...$this->snapshotEntries($dirPath)];
             } elseif ($fileType === JsbFileType::Sco) {
-                // .sco: emit both HEAT and season-end entries
-                $heatArchive = $this->extractor->findHeatEndArchive($dirPath);
-                if ($heatArchive !== null) {
-                    $entries[] = new ImportEntry(
-                        path: $dirPath,
-                        label: basename($heatArchive),
-                        year: $endingYear,
-                        phase: 'HEAT',
-                        archivePath: $heatArchive,
-                        sourceLabel: pathinfo(basename($heatArchive), PATHINFO_FILENAME),
-                    );
-                }
-
-                $finalsArchive = $this->extractor->findLastArchive($dirPath);
-                if ($finalsArchive !== null) {
-                    $entries[] = new ImportEntry(
-                        path: $dirPath,
-                        label: basename($finalsArchive),
-                        year: $endingYear,
-                        phase: 'Regular Season/Playoffs',
-                        archivePath: $finalsArchive,
-                        sourceLabel: pathinfo(basename($finalsArchive), PATHINFO_FILENAME),
-                    );
-                }
+                $entries = [...$entries, ...$this->scoEntries($dirPath, $endingYear)];
             } else {
-                // Standard cumulative: one entry per season (final archive)
-                $archive = $this->extractor->findLastArchive($dirPath);
-                if ($archive === null) {
-                    continue;
+                $entry = $this->cumulativeEntry($dirPath, $seasonLabel, $endingYear);
+                if ($entry !== null) {
+                    $entries[] = $entry;
                 }
-
-                $entries[] = new ImportEntry(
-                    path: $dirPath,
-                    label: $seasonLabel,
-                    year: $endingYear,
-                    phase: 'Regular Season/Playoffs',
-                    archivePath: $archive,
-                    sourceLabel: pathinfo(basename($archive), PATHINFO_FILENAME),
-                );
             }
         }
 
         return $entries;
+    }
+
+    /**
+     * Snapshot types (.plr, .plb): one entry per archive in the season directory.
+     *
+     * @return list<ImportEntry>
+     */
+    private function snapshotEntries(string $dirPath): array
+    {
+        $entries = [];
+        foreach ($this->extractor->findAllArchives($dirPath) as $archive) {
+            $entries[] = $this->archiveEntry(
+                dirPath: $dirPath,
+                label: basename($archive['path']),
+                year: $archive['ending_year'],
+                phase: $archive['phase'],
+                archivePath: $archive['path'],
+                simNumber: $archive['seq'],
+            );
+        }
+
+        return $entries;
+    }
+
+    /**
+     * .sco: the HEAT-end entry first, then the season-end entry. A missing archive is skipped.
+     *
+     * @return list<ImportEntry>
+     */
+    private function scoEntries(string $dirPath, int $endingYear): array
+    {
+        $entries = [];
+
+        $heatArchive = $this->extractor->findHeatEndArchive($dirPath);
+        if ($heatArchive !== null) {
+            $entries[] = $this->archiveEntry(
+                dirPath: $dirPath,
+                label: basename($heatArchive),
+                year: $endingYear,
+                phase: 'HEAT',
+                archivePath: $heatArchive,
+            );
+        }
+
+        $finalsArchive = $this->extractor->findLastArchive($dirPath);
+        if ($finalsArchive !== null) {
+            $entries[] = $this->archiveEntry(
+                dirPath: $dirPath,
+                label: basename($finalsArchive),
+                year: $endingYear,
+                phase: 'Regular Season/Playoffs',
+                archivePath: $finalsArchive,
+            );
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Standard cumulative types: one entry per season from the final archive, labelled by season.
+     */
+    private function cumulativeEntry(string $dirPath, string $seasonLabel, int $endingYear): ?ImportEntry
+    {
+        $archive = $this->extractor->findLastArchive($dirPath);
+        if ($archive === null) {
+            return null;
+        }
+
+        return $this->archiveEntry(
+            dirPath: $dirPath,
+            label: $seasonLabel,
+            year: $endingYear,
+            phase: 'Regular Season/Playoffs',
+            archivePath: $archive,
+        );
+    }
+
+    /**
+     * Build an archive-backed entry. Owns the sourceLabel derivation (archive filename without extension).
+     */
+    private function archiveEntry(
+        string $dirPath,
+        string $label,
+        int $year,
+        string $phase,
+        string $archivePath,
+        ?int $simNumber = null,
+    ): ImportEntry {
+        return new ImportEntry(
+            path: $dirPath,
+            label: $label,
+            year: $year,
+            phase: $phase,
+            archivePath: $archivePath,
+            sourceLabel: pathinfo(basename($archivePath), PATHINFO_FILENAME),
+            simNumber: $simNumber,
+        );
     }
 
     /**

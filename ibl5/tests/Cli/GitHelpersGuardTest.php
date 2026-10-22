@@ -53,7 +53,7 @@ final class GitHelpersGuardTest extends TestCase
         $canonical = [];
         exec("bash -c 'source $lib; resolve_canonical_root $dir' 2>&1", $canonical);
         $canonicalPath = implode("\n", $canonical);
-        self::assertNotEmpty($canonicalPath, 'resolve_canonical_root must return a non-empty path');
+        self::assertNotSame('', $canonicalPath, 'resolve_canonical_root must return a non-empty path');
         self::assertNotSame($t, $canonicalPath, 'resolve_canonical_root must differ from the worktree root');
 
         exec('rm -rf ' . escapeshellarg($t) . ' ' . escapeshellarg($m));

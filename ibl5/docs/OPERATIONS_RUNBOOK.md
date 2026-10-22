@@ -1,6 +1,6 @@
 ---
-description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-10-03
+description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the admin-only faprep.php report, and running the app without the Claude Code harness.
+last_verified: 2026-10-20
 ---
 
 # IBL5 Operations Runbook
@@ -415,10 +415,17 @@ php ibl5/bin/validate-schema   # config in ibl5/config/schema-assertions.php
 | Mail (SMTP) | `ibl5/config/mail.config.php` | Untracked. Template: `ibl5/config/mail.config.example.php` |
 | Deploy SSH key | GitHub Actions secret `PRIVATE_KEY`, and the Dependabot secret of the same name | Private key; public key installed on prod box's `authorized_keys`. Duplicated because `deploy-rehearsal.yml` and `merge-digest-notify.yml` run on `pull_request`, and a Dependabot PR's run reads the Dependabot store. |
 | Production host, port, user | GitHub Actions secrets `HOST`, `PORT`, `USERNAME`, and the Dependabot secrets of the same names | Duplicated for the same reason as `PRIVATE_KEY`. |
+| Sim recap Claude token | GitHub Actions secret `CLAUDE_CODE_OAUTH_TOKEN` | From `claude setup-token`. Actions store only. |
+| Sim recap SSH key | GitHub Actions secret `SIM_RECAP_SSH_KEY` | Private half of the restricted `sim-recap-actions` ed25519 key (§ 8). The public half is installed on prod through `bin/sim-recap-ssh-gate --print-key-line`. |
+| Sim recap prod paths and DB | GitHub Actions secrets `SIM_RECAP_REMOTE_ROOT`, `SIM_RECAP_DB_USER`, `SIM_RECAP_DB_NAME`, `SIM_RECAP_DB_PASSWORD` | `SIM_RECAP_DB_PASSWORD` is the SELECT-only agent credential from ADR-0093. |
+| Sim recap ops alerts | GitHub Actions secrets `SIM_RECAP_OPS_WEBHOOK_URL`, `SIM_RECAP_OPS_ALERT_THREAD_ID` | Optional. The webhook alone turns ops alerts on and posts them to its own channel. Add the thread ID to post into a thread instead. Without the webhook the tick sends no ops alerts. |
+| Sim recap dispatch PAT | `ibl5/config/github-dispatch.config.php` on the production box | Untracked. Template: `ibl5/config/github-dispatch.config.example.php`. Fine-grained PAT for `a-jay85/IBL5` with Contents read and write. An empty token disables dispatch and the hourly schedule still drains the queue. |
 | Discord notification target | GitHub Actions secret `OWNER_DISCORD_ID` | Snowflake ID for DM delivery |
 | CI PAT (auto-revert push) | GitHub Actions secret `CI_PAT`, and the Dependabot secret of the same name | Scoped to push `production` branch. Duplicated because `dependabot-auto-merge.yml` fires on Dependabot's `pull_request`, and that run resolves `secrets.CI_PAT` from the Dependabot store. |
 | E2E test login (admin) | GitHub Actions secrets `IBL_TEST_USER`, `IBL_TEST_PASS`, and the Dependabot secrets of the same names | Credentials Playwright's `auth.setup.ts` logs in with. Duplicated because `e2e-tests.yml` runs on `pull_request`, and a Dependabot PR's run reads the Dependabot store. Both fall back to non-secret literals when unset (`ci-e2e-user` / `ci-e2e-pass-not-secret` in `e2e-tests.yml`), and the same fallback seeds the test user in `setup-docker-e2e/action.yml`, so a missing secret is **silent**: the E2E job passes on the non-secret credentials rather than failing. Verify presence with `gh secret list`. |
 | E2E test login (regular/non-admin) | GitHub Actions secrets `IBL_TEST_USER_REGULAR`, `IBL_TEST_PASS_REGULAR`, and the Dependabot secrets of the same names | Credentials for `auth-regular.setup.ts`; enable role-gating tests (authenticated non-admin code paths). Duplicated for the same reason as the admin pair. Fall back to `ci-e2e-regular` / `e2e-regular-pass`; a missing secret is **silent**. Seeding and login both resolve the same `||` expression, so the job passes on the fallback credentials. Verify with `gh secret list`. |
+
+None of the sim recap secrets is needed in the Dependabot store, because `sim-recap.yml` never runs on a Dependabot PR.
 
 ### Rotation procedure
 
@@ -426,36 +433,66 @@ php ibl5/bin/validate-schema   # config in ibl5/config/schema-assertions.php
 2. **Deploy SSH key.** Generate a new key pair (`ssh-keygen -t ed25519`), add the public key to `authorized_keys` on the production box, update the `PRIVATE_KEY` secret in **both** the GitHub Actions and Dependabot stores, then remove the old public key.
 3. **Discord webhook.** Regenerate in Discord server settings, update `ibl5/config/logging.config.php` on the production box.
 4. **CI PAT.** Generate a new token in GitHub (scoped to `contents: write` for this repo), update the `CI_PAT` secret in **both** the GitHub Actions and Dependabot stores, then revoke the old token. Skipping the Dependabot copy leaves every Dependabot PR arming auto-merge with a revoked token, and the run still reports success.
+5. **Sim recap SSH key.** Generate a new ed25519 key pair. Run `bin/sim-recap-ssh-gate --print-key-line <new-public-key-file>` on the production box and append the printed line to `authorized_keys`. Update the `SIM_RECAP_SSH_KEY` Actions secret, then remove the old line. See section 8 for the install check.
+6. **Sim recap dispatch PAT.** Create a new fine-grained token for `a-jay85/IBL5` with Contents read and write. Put it in `ibl5/config/github-dispatch.config.php` on the production box, then revoke the old token. Until it is replaced, dispatch fails quietly and the hourly schedule drains the queue.
 
 All config files are `.gitignore`d — never commit them. See the `.example` templates for the expected structure.
 
 ---
 
-## 8. Sim Recap Poller
+## 8. Sim Recap (GitHub Actions primary, Mac poller second host)
+
+Recaps run on a GitHub Actions runner from `.github/workflows/sim-recap.yml`. Prod posts a `repository_dispatch` when the updater queues a sim. A schedule every 10 minutes covers a lost dispatch and picks up rows whose wait has ended. The Mac poller below is the second host. Both hosts can run at once because the queue claim is an atomic conditional UPDATE scoped by host. The design is in ADR-0154 and ADR-0196.
+
+With no secrets set, the workflow skips every real step and ends green. Merging it before the setup below is safe.
+
+### Secrets
+
+Nine Actions secrets switch the workflow on: `CLAUDE_CODE_OAUTH_TOKEN`, `SIM_RECAP_SSH_KEY`, `SIM_RECAP_REMOTE_ROOT`, `SIM_RECAP_DB_USER`, `SIM_RECAP_DB_NAME`, `SIM_RECAP_DB_PASSWORD`, plus the existing `HOST` and `PORT` and `USERNAME`. Two more are optional ops-alert settings. `SIM_RECAP_OPS_WEBHOOK_URL` turns alerts on, and `SIM_RECAP_OPS_ALERT_THREAD_ID` moves them from the webhook's channel into a thread. The table in section 7 lists where each one lives. If any required secret is empty the workflow skips and prints `secrets not configured, skipping`.
+
+### Installing the restricted key
+
+1. Generate a dedicated key: `ssh-keygen -t ed25519 -f sim-recap-actions -C sim-recap-actions -N ''`.
+2. On the production box, run `chmod +x <root>/bin/sim-recap-ssh-gate` if the deploy did not preserve the execute bit, then run `bin/sim-recap-ssh-gate --print-key-line sim-recap-actions.pub`. Append the one line it prints to `~/.ssh/authorized_keys`. Do not edit the line by hand. It carries `restrict`, a `permitopen` for `127.0.0.1:3306`, and the forced `command=`.
+3. Store the private key as the `SIM_RECAP_SSH_KEY` Actions secret, then delete the local copy.
+4. Check the restriction from any machine with the private key: `ssh -i sim-recap-actions <user>@<host> id`. The reply must be `sim-recap-ssh-gate: denied: id`. Any other reply means the line lost its `command=` and the key has a shell. Remove it at once.
+5. Confirm the gate accepts a live queue call: `ssh -i sim-recap-actions <user>@<host> "php <root>/ibl5/scripts/simRecapQueue.php find --sim=1"` must print JSON. The gate compares the root path as a plain string. A `SIM_RECAP_REMOTE_ROOT` secret whose value differs by a symlink or a trailing slash makes the gate deny every call. This step catches the mismatch at install time.
+
+### Dispatch from prod
+
+Copy `ibl5/config/github-dispatch.config.example.php` to `ibl5/config/github-dispatch.config.php` on the production box. Fill in the repo and a fine-grained PAT with Contents read and write. The updater's `QueueSimSummaryStep` then adds `GitHub Actions run dispatched.` to its message when a sim is queued. An empty token turns dispatch off.
+
+### Manual rerun
+
+Run `gh workflow run sim-recap.yml` for a claim-next drain. Add `-f sim=<N>` to claim a specific sim; only do this after re-queuing it on prod, because the tick exits 1 and turns the job red when that sim is not pending. Watch it with `gh run watch`. The job log stays quiet on purpose, because the repo is public. Read the outcome in the recap viewer or #admin-chat. Prod posts one line there per state change: retrying, waiting for the usage reset, handed to the other host, unavailable, posted, or recovered. A park that retries, waits, or hands off keeps the run green, and a later tick or the other host picks it up. A red run means the sim is terminal (`failed`) and needs a human. The #admin-chat line names the fix. An `auth failed` line in the log means the `CLAUDE_CODE_OAUTH_TOKEN` secret is invalid or expired. Replace it with a fresh token from `claude setup-token`. ADR-0196 has the full routing table.
+
+### The Mac poller is the second host
+
+The Mac poller runs as an active second host (ADR-0196). It claims rows handed to the Mac, and it backs up an unrouted row after 45 minutes without GitHub progress. `bin/lib/launchd-expected-jobs.sh` lists `com.ibl5.sim-recap-poll`, so `bin/launchd-health-check` flags the job when it is missing. Keep it installed.
+
+### Mac poller (second host)
 
 The sim recap poller is a macOS LaunchAgent (`com.ibl5.sim-recap-poll`, label managed by `bin/sim-recap-cron-setup`) that fires `bin/sim-recap-tick` every 300 s.
 
-### Phase gate — when the poller stops itself
+### Phase gate: the poller stays loaded
 
-Recap generation is gated to **HEAT and Regular Season** (`RecapPhasePolicy::ENABLED_PHASES`). When the season phase is advanced via the League Control Panel admin, `setSeasonPhase()` posts a notice to `#admin-chat` if the new phase is enabled. When the phase changes to a disabled phase (Preseason, or Playoffs onward), the next tick that finds no pending sim and `recaps_enabled: false` will self-unload the LaunchAgent via `launchctl bootout`. The poller logs the reason before unloading.
+Recap generation is gated to **HEAT and Regular Season** (`RecapPhasePolicy::ENABLED_PHASES`). In a disabled phase (Preseason, or Playoffs onward), a tick that finds no pending sim and `recaps_enabled: false` logs the phase and exits 0. It does the same reclaim-stale and claim-next ssh calls as an idle in-season tick, so a disabled tick costs the same. The job is never booted out.
 
-### Resuming the poller after a phase change
+### Resuming after a phase change
 
-When the season phase is set to HEAT or Regular Season, `#admin-chat` receives a notification. To re-arm the poller:
+No action is needed. The first tick after the phase becomes HEAT or Regular Season sees `recaps_enabled: true` and runs normally, within about 5 minutes. When the season phase is advanced via the League Control Panel admin, `setSeasonPhase()` posts an informational notice to `#admin-chat` if the new phase is enabled.
+
+Use `--resume` only to manually re-arm a job that is not loaded, for example after a manual bootout:
 
 ```bash
 bin/sim-recap-cron-setup --resume
 ```
 
-This runs `launchctl bootout` (no-op if not loaded) followed by `launchctl bootstrap` against the existing plist. It refuses with an error if the plist does not exist — run `bin/sim-recap-cron-setup --install-schedule` first if the LaunchAgent was never installed.
+This runs `launchctl bootout` (no-op if not loaded) followed by `launchctl bootstrap` against the existing plist. It refuses with an error if the plist does not exist. Run `bin/sim-recap-cron-setup --install-schedule` first if the LaunchAgent was never installed.
 
-### Manual self-unload guard
+### Manual-run guards
 
-`bin/sim-recap-tick` never self-unloads when:
-- `--dry-run` is passed, or
-- `--sim=N` is passed (a specific sim was requested manually).
-
-This prevents a manual invocation from pulling the rug out during debugging.
+`bin/sim-recap-tick` has no self-unload path. A manual run with `--dry-run` never touches the queue or the DB, and `--sim=N` skips the phase gate so a specific sim can be processed by hand.
 
 ## 9. Free Agent Prep Report (faprep.php)
 

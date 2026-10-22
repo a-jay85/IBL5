@@ -96,7 +96,7 @@ class TradingController implements TradingControllerInterface
             return;
         }
 
-        $season = new \Season\Season($this->db);
+        $season = \Season\SharedSeason::get($this->db);
 
         if (!$season->areTradesAllowed()) {
             \PageLayout\PageLayout::header();

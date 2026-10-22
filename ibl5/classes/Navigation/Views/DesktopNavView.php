@@ -120,12 +120,9 @@ class DesktopNavView implements DesktopNavViewInterface
             $title = 'Switch to production';
         }
 
-        $safeUrl = HtmlSanitizer::e($url);
-        $safeTitle = HtmlSanitizer::e($title);
-
         ob_start();
         ?>
-            <a href="<?= HtmlSanitizer::trusted($safeUrl) ?>" class="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full opacity-40 hover:opacity-100 transition-opacity duration-200 overflow-visible nav-dev-switch" title="<?= HtmlSanitizer::trusted($safeTitle) ?>">
+            <a href="<?= HtmlSanitizer::e($url) ?>" class="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full opacity-40 hover:opacity-100 transition-opacity duration-200 overflow-visible nav-dev-switch" title="<?= HtmlSanitizer::e($title) ?>">
                 <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <circle cx="12" cy="12" r="10"/>
                     <ellipse cx="12" cy="12" rx="4" ry="10"/>
@@ -155,9 +152,7 @@ class DesktopNavView implements DesktopNavViewInterface
         ?>
         <div class="relative group self-stretch flex items-center"<?= $includeLoginForm ? ' data-nav-login' : '' ?>>
             <button class="nav-trigger">
-                <?php if ($icon !== ''): ?>
-                    <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= HtmlSanitizer::trusted($icon) ?></span>
-                <?php endif; ?>
+                <?= HtmlSanitizer::trusted($this->renderDropdownIcon($icon)) ?>
                 <span><?= HtmlSanitizer::e($title) ?></span>
                 <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
@@ -189,6 +184,22 @@ class DesktopNavView implements DesktopNavViewInterface
     }
 
     /**
+     * Render the accent-colored icon wrapper for a dropdown trigger.
+     *
+     * @param string $icon Builder-authored SVG/HTML (`NavigationMenuBuilder` `icon` entries)
+     */
+    private function renderDropdownIcon(string $icon): string
+    {
+        if ($icon === '') {
+            return '';
+        }
+
+        // Whitespace reproduces the original template bytes (pinned by ThemeIblOutputTest).
+        return str_repeat(' ', 20) . '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . "</span>\n"
+            . str_repeat(' ', 16);
+    }
+
+    /**
      * Render a single dropdown link item.
      *
      * @param NavLink $link
@@ -211,7 +222,7 @@ class DesktopNavView implements DesktopNavViewInterface
         $htmxAttrs = ($external || $noBoost) ? '' : ' hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content"';
         $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
         $badgeHtml = $badge !== null
-            ? '<span class="nav-badge">' . HtmlSanitizer::e($badge) . '</span>'
+            ? '<span class="ibl-chip nav-badge">' . HtmlSanitizer::e($badge) . '</span>'
             : '';
 
         return '<a href="' . $url . '"' . $target . $htmxAttrs . ' class="nav-dropdown-item">'
@@ -233,7 +244,7 @@ class DesktopNavView implements DesktopNavViewInterface
         ob_start();
         ?>
         <div class="px-4 py-3 border-t border-white/10 bg-black/20">
-            <label for="desktop-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
+            <label for="desktop-league-select" class="nav-section-label">League</label>
             <div class="relative">
                 <select id="desktop-league-select" name="league" onchange="window.location.href=this.value" class="nav-select">
                     <option value="index.php?league=ibl"<?= HtmlSanitizer::e($iblSelected) ?> class="bg-navy-800 text-white">IBL</option>
@@ -258,7 +269,7 @@ class DesktopNavView implements DesktopNavViewInterface
         ob_start();
         ?>
         <div class="px-4 py-3 border-t border-white/10 bg-black/20">
-            <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2"><?= HtmlSanitizer::e($username) ?></div>
+            <div class="nav-section-label"><?= HtmlSanitizer::e($username) ?></div>
             <a href="modules.php?name=YourAccount&amp;op=logout" hx-boost="false" class="nav-logout-btn">Logout</a>
         </div>
         <?php

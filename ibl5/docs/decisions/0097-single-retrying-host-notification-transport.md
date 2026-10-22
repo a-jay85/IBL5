@@ -1,6 +1,6 @@
 ---
 description: Host-side Discord notifications go through one retrying transport (bin/discord-dm) that never fails silently; callers never re-implement the ssh+curl recipe.
-last_verified: 2026-08-04
+last_verified: 2026-10-04
 ---
 
 # ADR-0097: A single retrying host-side notification transport

@@ -90,14 +90,14 @@ done
 
 | Group | Scripts |
 |-------|---------|
-| Worktrees | `wt-new`, `wt-up`, `wt-down`, `wt-list`, `wt-rebase`, `wt-remove`, `wt-db-test`, `e2e-wt` |
+| Worktrees | `wt-new`, `wt-up`, `wt-down`, `wt-list`, `wt-rebase`, `wt-remove`, `wt-db-test`, `e2e-wt` (wt-new keeps one warm _pool-N spare via `bin/lib/wt-pool.sh`) |
 | Automouse automation | `automouse/run`, `automouse/queue`, `automouse/queue-reorder-ui`, `automouse/self-heal`, `automouse/prompt-impl`, `automouse/prompt-postplan`, `watch-automouse-plan` (wait for a queued plan's phase to finish, then DM) |
 | Notifications | `discord-dm` (owner notices post to the #dev webhook (opt-in `--ping` for failures); other recipients and `--raw --route` stay on the IBLbot DM; retries + spool; the sibling of `.github/actions/notify-discord`) |
 | Quality gates (sample; see Who runs a script for what CI calls) | `adr-check`, `check-docs`, `check-prose`, `check-hot-files`, `check-master-ci-green`, `check-plan`, `check-plan-staleness`, `check-e2e-hygiene`, `check-e2e-fa-offers-owner`, `check-e2e-mutator-isolation`, `check-e2e-fixture-drift`, `check-destructive-migrations`, `check-old-code-compat`, `refactor-flag` |
 | Prod ops | `db-sync-prod`, `log-fetch-prod`, `promote-master-to-production` (the promotion primitive CI runs; `--dry-run` to rehearse), `merge-master-to-prod` (manual/emergency promotion), `smoke-prod` (SSH from host); `iblbot-healthcheck` (pm2 cron watchdog, runs on the prod box) |
 | Dev / Docker env | `dev-up`, `db-test-up`, `db-migrate` |
-| Scaffolding | `next-adr`, `next-migration`, `generate-codebase-map`, `sync-branches` |
-| Lighthouse | `lighthouse-audit-report`, `lighthouse-audit-urls`, `lighthouse-comment` |
+| Scaffolding | `next-number` (with `next-adr` and `next-migration` as wrappers), `generate-codebase-map`, `sync-branches` |
+| Lighthouse | `lighthouse-audit-report`, `lighthouse-audit-urls` |
 | Test front door | `test`: `bin/test unit`, `bin/test db`, `bin/test e2e`. Detects context. Inside a worktree `e2e` runs `e2e-wt <slug>`; on the main checkout it runs `ibl5/bin/e2e-local`. Call `e2e-wt <slug>` directly for agent and background runs. |
 | E2E dispatch | `e2e-for-file`, `e2e-for-pr` |
 | Shared helpers | `lib/` (`db-helpers.sh`, `git-helpers.sh`, `wt-guards.sh`, `automouse-stream-filter.sh`) |
@@ -162,9 +162,12 @@ one tracked symlink does not warrant one.
 ## Every script answers `--help`
 
 Run `bin/<script> --help` to see its arguments. Help goes to stdout and exits
-0. The check sits at the top of the script, before any `source`, `git`, `cd`,
-or network call, so asking for help never does anything else. Add it to every
-new script. `bin/test-bin-help` enforces this in CI. It skips `test-*` harnesses,
+0. The check runs before any `git`, network, DB, or paid-session call. Resolving
+the script's own directory with `cd`/`dirname` or sourcing a lib may come first.
+Add it to every new script. `bin/test-bin-help` runs each script with stubbed
+tools (`git`, `gh`, `docker`, `mysql`, `ssh`, `claude`, and others) in CI. It
+asserts exit 0, non-empty stdout, a `Usage` line, and that no stub was called. It
+does not detect `cd`, `source`, or other side effects. It skips `test-*` harnesses,
 `bin/check-composite-contracts` (built-in skip list), and any script whose interpreter is
 absent on the runner.
 

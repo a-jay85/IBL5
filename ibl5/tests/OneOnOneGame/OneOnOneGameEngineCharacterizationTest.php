@@ -6,6 +6,10 @@ namespace Tests\OneOnOneGame;
 
 use PHPUnit\Framework\TestCase;
 use OneOnOneGame\OneOnOneGameEngine;
+use OneOnOneGame\Contracts\OneOnOneGamePossessionResolverInterface;
+use OneOnOneGame\Contracts\OneOnOneGameShotResultResolverInterface;
+use OneOnOneGame\OneOnOneGamePossessionResolver;
+use OneOnOneGame\OneOnOneGameShotResultResolver;
 
 /**
  * Golden-master characterization pins for OneOnOneGameEngine::simulateGame().
@@ -27,6 +31,10 @@ PBP;
 
     private const PBP_POST = <<<'PBP'
 The opening coin flip is tails, so Ewing gets the ball to start.<br>Shaq fouls Ewing.<br>Ewing makes 2 of 2 free throws.<br><strong>SCORE: Shaq 0, Ewing 2</strong><p>Ewing strips the ball away from Shaq.<br><strong>SCORE: Shaq 0, Ewing 2</strong><p>Ewing elevates for a J but can't get it to fall.<br>Shaq gets the rebound.<br><strong>SCORE: Shaq 0, Ewing 2</strong><p>Ewing fouls Shaq.<br>Shaq makes 2 of 2 free throws.<br><strong>SCORE: Shaq 2, Ewing 2</strong><p>Ewing flips up a finger roll but the shot is off-line.<br>Shaq gets the rebound.<br><strong>SCORE: Shaq 2, Ewing 2</strong><p>Shaq fires a shot from near the top of the key but can't get it to fall.<br>Ewing gets the rebound.<br><strong>SCORE: Shaq 2, Ewing 2</strong><p>Ewing drives to the basket and it's an airball!<br>Shaq gets the rebound.<br><strong>SCORE: Shaq 2, Ewing 2</strong><p>Ewing gets a clean pick of Shaq.<br><strong>SCORE: Shaq 2, Ewing 2</strong><p>Shaq fouls Ewing.<br>Ewing makes 2 of 2 free throws.<br><strong>SCORE: Shaq 2, Ewing 4</strong><p>Shaq takes a sweeping skyhook as he powers into the lane but comes up empty.<br>Shaq gets the (offensive) rebound.<br><strong>SCORE: Shaq 2, Ewing 4</strong><p>Ewing fouls Shaq.<br>Shaq makes 1 of 2 free throws.<br><strong>SCORE: Shaq 3, Ewing 4</strong><p>Ewing fires a shot from near the top of the key but can't connect.<br>Shaq gets the rebound.<br><strong>SCORE: Shaq 3, Ewing 4</strong><p>Ewing fouls Shaq.<br>Shaq makes 1 of 2 free throws.<br><strong>SCORE: Shaq 4, Ewing 4</strong><p>Shaq fouls Ewing.<br>Ewing makes 2 of 2 free throws.<br><strong>SCORE: Shaq 4, Ewing 6</strong><p>Ewing fouls Shaq.<br>Shaq makes 2 of 2 free throws.<br><strong>SCORE: Shaq 6, Ewing 6</strong><p>Ewing from just inside the arc but Shaq slaps the ball away.<br>Shaq gets the rebound.<br><strong>SCORE: Shaq 6, Ewing 6</strong><p>Shaq slashes into the lane and clanks it off the front of the iron.<br>Shaq gets the (offensive) rebound.<br><strong>SCORE: Shaq 6, Ewing 6</strong><p>Ewing fouls Shaq.<br>Shaq makes 1 of 2 free throws.<br><strong>SCORE: Shaq 7, Ewing 6</strong><p>Shaq fouls Ewing.<br>Ewing makes 2 of 2 free throws.<br><strong>SCORE: Shaq 7, Ewing 8</strong><p>Shaq with a jump hook from the low block but Ewing comes up with the block.<br>Ewing gets the rebound.<br><strong>SCORE: Shaq 7, Ewing 8</strong><p>Shaq fouls Ewing.<br>Ewing makes 2 of 2 free throws.<br><strong>SCORE: Shaq 7, Ewing 10</strong><p>Shaq lifts up a teardrop on the drive but it's no good.<br>Ewing gets the rebound.<br><strong>SCORE: Shaq 7, Ewing 10</strong><p>Ewing sets, fires,  that caroms off the rim.<br>Ewing gets the (offensive) rebound.<br><strong>SCORE: Shaq 7, Ewing 10</strong><p>Ewing goes to the up-and-under move and it's an airball!<br>Shaq gets the rebound.<br><strong>SCORE: Shaq 7, Ewing 10</strong><p>Shaq backs down and takes a little turnaround jumper but Ewing slaps the ball away.<br>Ewing gets the rebound.<br><strong>SCORE: Shaq 7, Ewing 10</strong><p>Shaq fouls Ewing.<br>Ewing makes 2 of 2 free throws.<br><strong>SCORE: Shaq 7, Ewing 12</strong><p>Ewing fouls Shaq.<br>Shaq makes 2 of 2 free throws.<br><strong>SCORE: Shaq 9, Ewing 12</strong><p>Shaq fouls Ewing.<br>Ewing makes 1 of 2 free throws.<br><strong>SCORE: Shaq 9, Ewing 13</strong><p>Shaq lofts up a soft fadeaway from the paint and the shot comes up short.<br>Shaq gets the (offensive) rebound.<br><strong>SCORE: Shaq 9, Ewing 13</strong><p>Ewing fouls Shaq.<br>Shaq makes 2 of 2 free throws.<br><strong>SCORE: Shaq 11, Ewing 13</strong><p>Shaq fouls Ewing.<br>Ewing makes 2 of 2 free throws.<br><strong>SCORE: Shaq 11, Ewing 15</strong><p>Ewing fouls Shaq.<br>Shaq misses both free throws.<br><strong>SCORE: Shaq 11, Ewing 15</strong><p>Shaq goes to the up-and-under move and the shot is a bit long.<br>Shaq gets the (offensive) rebound.<br><strong>SCORE: Shaq 11, Ewing 15</strong><p>Ewing fouls Shaq.<br>Shaq makes 1 of 2 free throws.<br><strong>SCORE: Shaq 12, Ewing 15</strong><p>Shaq fouls Ewing.<br>Ewing makes 2 of 2 free throws.<br><strong>SCORE: Shaq 12, Ewing 17</strong><p>Ewing fouls Shaq.<br>Shaq makes 2 of 2 free throws.<br><strong>SCORE: Shaq 14, Ewing 17</strong><p>Shaq fouls Ewing.<br>Ewing makes 2 of 2 free throws.<br><strong>SCORE: Shaq 14, Ewing 19</strong><p>Shaq with a jump hook from the low block but Ewing tips the shot attempt away.<br>Shaq gets the (offensive) rebound.<br><strong>SCORE: Shaq 14, Ewing 19</strong><p>Shaq with a jump hook from the low block and the ball just won't stay down.<br>Ewing gets the rebound.<br><strong>SCORE: Shaq 14, Ewing 19</strong><p>Shaq fouls Ewing.<br>Ewing makes 1 of 2 free throws.<br><strong>SCORE: Shaq 14, Ewing 20</strong><p>Shaq flips up a finger roll that caroms off the rim.<br>Ewing gets the rebound.<br><strong>SCORE: Shaq 14, Ewing 20</strong><p>Ewing slashes into the lane and the shot comes up short.<br>Shaq gets the rebound.<br><strong>SCORE: Shaq 14, Ewing 20</strong><p>Shaq gets free for a drive with a nifty crossover but Ewing tips the shot attempt away.<br>Ewing gets the rebound.<br><strong>SCORE: Shaq 14, Ewing 20</strong><p>Ewing spins into the paint on a drive but can't connect.<br>Ewing gets the (offensive) rebound.<br><strong>SCORE: Shaq 14, Ewing 20</strong><p>Shaq fouls Ewing.<br>Ewing makes 2 of 2 free throws.<br><strong>SCORE: Shaq 14, Ewing 22</strong><p><div class="table-scroll-wrapper"><div class="table-scroll-container"><table class="ibl-data-table"><thead><tr><th colspan="13"><span class="text-accent-500">FINAL SCORE: Shaq 14, Ewing 22</span></th></tr><tr><th>Name</th><th>FGM</th><th>FGA</th><th>FTM</th><th>FTA</th><th>3GM</th><th>3GA</th><th>ORB</th><th>REB</th><th>STL</th><th>BLK</th><th>TVR</th><th>FOUL</th></tr></thead><tbody><tr><td>Shaq</td><td>0</td><td>12</td><td>14</td><td>20</td><td>0</td><td>0</td><td>5</td><td>12</td><td>0</td><td>1</td><td>2</td><td>12</td></tr><tr><td>Ewing</td><td>0</td><td>9</td><td>22</td><td>24</td><td>0</td><td>0</td><td>2</td><td>9</td><td>2</td><td>4</td><td>0</td><td>10</td></tr></tbody></table></div></div>
+PBP;
+
+    private const PBP_BIRD_GARNETT = <<<'PBP'
+The opening coin flip is heads, so Larry Bird gets the ball to start.<br>Larry Bird squeezes off a leaping leaner and gets the bucket!<br><strong>SCORE: Larry Bird 2, Kevin Garnett 0</strong><p>Kevin Garnett lofts up a soft fadeaway from the paint but Larry Bird slaps the ball away.<br>Kevin Garnett gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 2, Kevin Garnett 0</strong><p>Kevin Garnett lofts up a soft fadeaway from the paint but Larry Bird knocks it away.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 2, Kevin Garnett 0</strong><p>Larry Bird gets off a long two but Kevin Garnett slaps the ball away.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 2, Kevin Garnett 0</strong><p>Larry Bird fouls Kevin Garnett.<br>Kevin Garnett makes 2 of 2 free throws.<br><strong>SCORE: Larry Bird 2, Kevin Garnett 2</strong><p>Larry Bird fires a shot from near the top of the key that swishes cleanly through the net!<br><strong>SCORE: Larry Bird 4, Kevin Garnett 2</strong><p>Kevin Garnett lofts up a soft fadeaway from the paint and scores!<br><strong>SCORE: Larry Bird 4, Kevin Garnett 4</strong><p>Larry Bird takes a sweeping skyhook as he powers into the lane and practically wills it home!<br><strong>SCORE: Larry Bird 6, Kevin Garnett 4</strong><p>Kevin Garnett fakes left and drives right and gets the bucket!<br><strong>SCORE: Larry Bird 6, Kevin Garnett 6</strong><p>Larry Bird sets, fires,  that hits nothing but net!<br><strong>SCORE: Larry Bird 8, Kevin Garnett 6</strong><p>Kevin Garnett gets off a long two but can't connect.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 8, Kevin Garnett 6</strong><p>Larry Bird with a jump hook from the low block but can't get it to fall.<br>Larry Bird gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 8, Kevin Garnett 6</strong><p>Larry Bird takes a sweeping skyhook as he powers into the lane and knocks it down!<br><strong>SCORE: Larry Bird 10, Kevin Garnett 6</strong><p>Kevin Garnett fakes left and drives right that caroms off the rim.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 10, Kevin Garnett 6</strong><p>Larry Bird tosses up a trey and bounces it off the glass and out.<br>Larry Bird gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 10, Kevin Garnett 6</strong><p>Kevin Garnett fouls Larry Bird.<br>Larry Bird makes 2 of 2 free throws.<br><strong>SCORE: Larry Bird 12, Kevin Garnett 6</strong><p>Kevin Garnett squeezes off a leaping leaner but Larry Bird gets a hand on the shot.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 12, Kevin Garnett 6</strong><p>Larry Bird flips up a finger roll that caroms off the rim.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 12, Kevin Garnett 6</strong><p>Kevin Garnett gets off a long two but Larry Bird gets a hand on the shot.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 12, Kevin Garnett 6</strong><p>Kevin Garnett fouls Larry Bird.<br>Larry Bird makes 2 of 2 free throws.<br><strong>SCORE: Larry Bird 14, Kevin Garnett 6</strong><p>Kevin Garnett tosses up a trey and it's an airball!<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 14, Kevin Garnett 6</strong><p>Larry Bird fires a shot from near the top of the key that hangs on the lip of the rim, but drops!<br><strong>SCORE: Larry Bird 16, Kevin Garnett 6</strong><p>Kevin Garnett elevates for a J but comes up empty.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 16, Kevin Garnett 6</strong><p>Kevin Garnett steals the ball from Larry Bird.<br><strong>SCORE: Larry Bird 16, Kevin Garnett 6</strong><p>Kevin Garnett sets, fires,  but comes up empty.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 16, Kevin Garnett 6</strong><p>Kevin Garnett grabs the ball right out of the hands of Larry Bird.<br><strong>SCORE: Larry Bird 16, Kevin Garnett 6</strong><p>Kevin Garnett spins into the paint on a drive that hangs on the lip of the rim before falling out.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 16, Kevin Garnett 6</strong><p>Kevin Garnett fouls Larry Bird.<br>Larry Bird makes 1 of 2 free throws.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 6</strong><p>Larry Bird fouls Kevin Garnett.<br>Kevin Garnett makes 1 of 2 free throws.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 7</strong><p>Larry Bird uses a drop-step to try a layup but Kevin Garnett recovers in time to get a piece of the shot.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 7</strong><p>Kevin Garnett elevates inside for a dunk and the ball just won't stay down.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 7</strong><p>Larry Bird lifts up a teardrop on the drive but Kevin Garnett gets a hand on the shot.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 7</strong><p>Kevin Garnett takes a sweeping skyhook as he powers into the lane but Larry Bird comes up with the block.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 7</strong><p>Larry Bird flips up a finger roll but Kevin Garnett deflects the shot.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 7</strong><p>Kevin Garnett lifts up a teardrop on the drive that swishes cleanly through the net!<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Larry Bird gets free for a drive with a nifty crossover but Kevin Garnett tips the shot attempt away.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Kevin Garnett elevates for a J but Larry Bird knocks it away.<br>Kevin Garnett gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Larry Bird gets a clean pick of Kevin Garnett.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Larry Bird slashes into the lane but it's no good.<br>Larry Bird gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Larry Bird flips up a finger roll but Kevin Garnett comes up with the block.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Kevin Garnett uses a drop-step to try a layup and bounces it off the glass and out.<br>Kevin Garnett gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Kevin Garnett uses a drop-step to try a layup but Larry Bird deflects the shot.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Larry Bird elevates for a J that caroms off the rim.<br>Larry Bird gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Larry Bird tosses up a trey but Kevin Garnett knocks it away.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Kevin Garnett with a jump hook from the low block and the shot comes up short.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Larry Bird throws up a long jump shot but Kevin Garnett deflects the shot.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Larry Bird strips the ball away from Kevin Garnett.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Larry Bird takes a sweeping skyhook as he powers into the lane and it's an airball!<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Kevin Garnett launches a three but Larry Bird gets a hand on the shot.<br>Kevin Garnett gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Kevin Garnett takes a perimeter shot but Larry Bird comes up with the block.<br>Kevin Garnett gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 9</strong><p>Kevin Garnett takes a sweeping skyhook as he powers into the lane and gets it to drop!<br><strong>SCORE: Larry Bird 17, Kevin Garnett 11</strong><p>Larry Bird elevates for a J but Kevin Garnett recovers in time to get a piece of the shot.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 11</strong><p>Larry Bird fouls Kevin Garnett.<br>Kevin Garnett makes 2 of 2 free throws.<br><strong>SCORE: Larry Bird 17, Kevin Garnett 13</strong><p>Kevin Garnett fouls Larry Bird.<br>Larry Bird makes 2 of 2 free throws.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 13</strong><p>Kevin Garnett backs down and takes a little turnaround jumper but Larry Bird knocks it away.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 13</strong><p>Larry Bird lifts up a teardrop on the drive but Kevin Garnett recovers in time to get a piece of the shot.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 13</strong><p>Kevin Garnett guns up a three-pointer and knocks it down!<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Larry Bird takes a sweeping skyhook as he powers into the lane and misses.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Kevin Garnett spins into the paint on a drive and it's an airball!<br>Kevin Garnett gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Kevin Garnett fakes left and drives right but Larry Bird gets a hand on the shot.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Larry Bird lifts up a teardrop on the drive but it's no good.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Kevin Garnett slashes into the lane but Larry Bird slaps the ball away.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Larry Bird goes to the up-and-under move that hangs on the lip of the rim before falling out.<br>Larry Bird gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Kevin Garnett pilfers the ball from Larry Bird.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Kevin Garnett goes to the up-and-under move but comes up empty.<br>Kevin Garnett gets the (offensive) rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Kevin Garnett lifts up a teardrop on the drive but Larry Bird knocks it away.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Larry Bird pulls up along the baseline but it's no good.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Kevin Garnett elevates for a J but Larry Bird swats it away.<br>Larry Bird gets the rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Larry Bird launches a three but Kevin Garnett tips the shot attempt away.<br>Kevin Garnett gets the rebound.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 16</strong><p>Larry Bird fouls Kevin Garnett.<br>Kevin Garnett makes 2 of 2 free throws.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 18</strong><p>Kevin Garnett swipes the ball from Larry Bird.<br><strong>SCORE: Larry Bird 19, Kevin Garnett 18</strong><p>Kevin Garnett throws up a long jump shot that bounces off the front of the rim, off the back of the rim, then drops!<br><strong>SCORE: Larry Bird 19, Kevin Garnett 20</strong><p>Larry Bird fires a shot from near the top of the key and gets it to drop!<br><strong>SCORE: Larry Bird 21, Kevin Garnett 20</strong><p><div class="table-scroll-wrapper"><div class="table-scroll-container"><table class="ibl-data-table"><thead><tr><th colspan="13"><span class="text-accent-500">FINAL SCORE: Larry Bird 21, Kevin Garnett 20</span></th></tr><tr><th>Name</th><th>FGM</th><th>FGA</th><th>FTM</th><th>FTA</th><th>3GM</th><th>3GA</th><th>ORB</th><th>REB</th><th>STL</th><th>BLK</th><th>TVR</th><th>FOUL</th></tr></thead><tbody><tr><td>Larry Bird</td><td>7</td><td>28</td><td>7</td><td>8</td><td>0</td><td>3</td><td>5</td><td>23</td><td>2</td><td>14</td><td>4</td><td>4</td></tr><tr><td>Kevin Garnett</td><td>6</td><td>31</td><td>7</td><td>8</td><td>1</td><td>3</td><td>7</td><td>23</td><td>4</td><td>11</td><td>2</td><td>4</td></tr></tbody></table></div></div>
 PBP;
 
     /** @return PlayerGameData */
@@ -78,6 +86,32 @@ PBP;
             'r_fga' => 50, 'r_fgp' => 55, 'r_fta' => 65,
             'r_3ga' => 3, 'r_3gp' => 12, 'r_orb' => 65, 'r_drb' => 50,
             'r_stl' => 25, 'r_tvr' => 50, 'r_blk' => 70, 'r_foul' => 50,
+        ];
+    }
+
+    /** @return PlayerGameData */
+    private function birdOne(): array
+    {
+        return [
+            'pid' => 301, 'name' => 'Larry Bird',
+            'oo' => 40, 'r_drive_off' => 35, 'po' => 35,
+            'od' => 25, 'dd' => 25, 'pd' => 25,
+            'r_fga' => 50, 'r_fgp' => 55, 'r_fta' => 40,
+            'r_3ga' => 15, 'r_3gp' => 45, 'r_orb' => 30, 'r_drb' => 50,
+            'r_stl' => 30, 'r_tvr' => 50, 'r_blk' => 90, 'r_foul' => 50,
+        ];
+    }
+
+    /** @return PlayerGameData */
+    private function garnettTwo(): array
+    {
+        return [
+            'pid' => 302, 'name' => 'Kevin Garnett',
+            'oo' => 35, 'r_drive_off' => 35, 'po' => 40,
+            'od' => 25, 'dd' => 25, 'pd' => 25,
+            'r_fga' => 50, 'r_fgp' => 52, 'r_fta' => 40,
+            'r_3ga' => 15, 'r_3gp' => 40, 'r_orb' => 35, 'r_drb' => 50,
+            'r_stl' => 30, 'r_tvr' => 50, 'r_blk' => 90, 'r_foul' => 50,
         ];
     }
 
@@ -191,5 +225,236 @@ PBP;
         self::assertSame(explode('<br>', $expectedPbp), explode('<br>', $result->playByPlay),
             'Play-by-play diverged — the array diff names the segment.');
         self::assertSame($expectedPbp, $result->playByPlay);
+    }
+
+    public function testBirdGarnettMatchupIsPinnedForSeed605(): void
+    {
+        mt_srand(605);
+        $engine = new OneOnOneGameEngine();
+        $result = $engine->simulateGame($this->birdOne(), $this->garnettTwo(), 'PinOwner');
+
+        self::assertSame('The opening coin flip is heads, so Larry Bird gets the ball to start.<br>', $result->coinFlipResult);
+        self::assertSame('Larry Bird', $result->player1Name);
+        self::assertSame('Kevin Garnett', $result->player2Name);
+        self::assertSame(21, $result->player1Score);
+        self::assertSame(20, $result->player2Score);
+
+        self::assertSame([
+            'fga' => 28, 'fgm' => 7, 'fta' => 8, 'ftm' => 7,
+            '3pa' => 3, '3pm' => 0, 'orb' => 5, 'trb' => 23,
+            'stl' => 2, 'blk' => 14, 'tvr' => 4, 'foul' => 4,
+        ], [
+            'fga' => $result->player1Stats->fieldGoalsAttempted,
+            'fgm' => $result->player1Stats->fieldGoalsMade,
+            'fta' => $result->player1Stats->freeThrowsAttempted,
+            'ftm' => $result->player1Stats->freeThrowsMade,
+            '3pa' => $result->player1Stats->threePointersAttempted,
+            '3pm' => $result->player1Stats->threePointersMade,
+            'orb' => $result->player1Stats->offensiveRebounds,
+            'trb' => $result->player1Stats->totalRebounds,
+            'stl' => $result->player1Stats->steals,
+            'blk' => $result->player1Stats->blocks,
+            'tvr' => $result->player1Stats->turnovers,
+            'foul' => $result->player1Stats->fouls,
+        ], 'player1 stat line');
+
+        self::assertSame([
+            'fga' => 31, 'fgm' => 6, 'fta' => 8, 'ftm' => 7,
+            '3pa' => 3, '3pm' => 1, 'orb' => 7, 'trb' => 23,
+            'stl' => 4, 'blk' => 11, 'tvr' => 2, 'foul' => 4,
+        ], [
+            'fga' => $result->player2Stats->fieldGoalsAttempted,
+            'fgm' => $result->player2Stats->fieldGoalsMade,
+            'fta' => $result->player2Stats->freeThrowsAttempted,
+            'ftm' => $result->player2Stats->freeThrowsMade,
+            '3pa' => $result->player2Stats->threePointersAttempted,
+            '3pm' => $result->player2Stats->threePointersMade,
+            'orb' => $result->player2Stats->offensiveRebounds,
+            'trb' => $result->player2Stats->totalRebounds,
+            'stl' => $result->player2Stats->steals,
+            'blk' => $result->player2Stats->blocks,
+            'tvr' => $result->player2Stats->turnovers,
+            'foul' => $result->player2Stats->fouls,
+        ], 'player2 stat line');
+
+        $expectedPbp = self::PBP_BIRD_GARNETT . "\n";
+        self::assertSame(explode('<br>', $expectedPbp), explode('<br>', $result->playByPlay),
+            'Play-by-play diverged — the array diff names the segment.');
+        self::assertSame($expectedPbp, $result->playByPlay);
+    }
+
+    public function testHostileNamesRenderSingleEncodedAcrossEveryResolverForSeed605(): void
+    {
+        $encodedP1 = 'Larry &lt;b&gt;&quot;Legend&quot;&lt;/b&gt; &amp; Bird';
+        $encodedP2 = 'Kevin &apos;KG&apos; &lt;i&gt;Garnett&lt;/i&gt;';
+
+        $player1 = $this->birdOne();
+        $player1['name'] = 'Larry <b>"Legend"</b> & Bird';
+        $player2 = $this->garnettTwo();
+        $player2['name'] = "Kevin 'KG' <i>Garnett</i>";
+
+        mt_srand(605);
+        $engine = new OneOnOneGameEngine();
+        $result = $engine->simulateGame($player1, $player2, 'PinOwner');
+
+        $expectedPbp = str_replace(
+            ['Larry Bird', 'Kevin Garnett'],
+            [$encodedP1, $encodedP2],
+            self::PBP_BIRD_GARNETT . "\n"
+        );
+        self::assertSame(explode('<br>', $expectedPbp), explode('<br>', $result->playByPlay),
+            'Play-by-play diverged — the array diff names the segment.');
+        self::assertSame($expectedPbp, $result->playByPlay);
+
+        foreach (['<b>', '</b>', '<i>', '</i>', '"Legend"', "'KG'"] as $raw) {
+            self::assertStringNotContainsString($raw, $result->playByPlay);
+        }
+        self::assertStringNotContainsString('&amp;lt;', $result->playByPlay);
+        self::assertStringNotContainsString('&amp;amp;', $result->playByPlay);
+
+        self::assertSame(21, $result->player1Score);
+        self::assertSame(20, $result->player2Score);
+    }
+
+    public function testPinnedSeedsCoverEveryResultForBothOffenseSides(): void
+    {
+        $rows = [
+            [424242, $this->shooterOne(), $this->shooterTwo(), 23, 8],
+            [1337, $this->postOne(), $this->postTwo(), 14, 22],
+            [605, $this->birdOne(), $this->garnettTwo(), 21, 20],
+        ];
+
+        /** @var array<string, true> $union */
+        $union = [];
+        foreach ($rows as [$seed, $player1, $player2, $score1, $score2]) {
+            [$decorator, $log] = $this->recordingResolver();
+            mt_srand($seed);
+            $engine = new OneOnOneGameEngine(null, $decorator);
+            $result = $engine->simulateGame($player1, $player2, 'PinOwner');
+
+            self::assertSame($score1, $result->player1Score, "seed $seed player 1 score");
+            self::assertSame($score2, $result->player2Score, "seed $seed player 2 score");
+
+            foreach ($log as [$resultCode, $pid]) {
+                $side = $pid === $player1['pid'] ? 1 : 2;
+                $union["$resultCode:$side"] = true;
+            }
+        }
+
+        $full = [];
+        for ($r = 1; $r <= 14; $r++) {
+            foreach ([1, 2] as $s) {
+                $full[] = "$r:$s";
+            }
+        }
+        $seen = array_map('strval', array_keys($union));
+        sort($full);
+        sort($seen);
+
+        self::assertSame(
+            $full,
+            $seen,
+            'Missing result:side combinations: ' . implode(', ', array_diff($full, $seen))
+        );
+    }
+
+    public function testEngineHoldsNoDatabaseHandleOrActorIdentity(): void
+    {
+        $class = new \ReflectionClass(OneOnOneGameEngine::class);
+
+        $propertyNames = array_map(
+            static fn (\ReflectionProperty $p): string => $p->getName(),
+            $class->getProperties()
+        );
+        sort($propertyNames);
+        self::assertSame(['currentPossession', 'possessionResolver', 'textGenerator'], $propertyNames);
+
+        $allowedTypes = [
+            'int',
+            'OneOnOneGame\\OneOnOneGameTextGenerator',
+            'OneOnOneGame\\Contracts\\OneOnOneGamePossessionResolverInterface',
+        ];
+        foreach ($class->getProperties() as $property) {
+            $type = $property->getType();
+            self::assertInstanceOf(\ReflectionNamedType::class, $type, $property->getName() . ' must have a single named type');
+            self::assertContains($type->getName(), $allowedTypes, $property->getName() . ' type');
+        }
+
+        $constructor = $class->getConstructor();
+        self::assertNotNull($constructor);
+        $constructorTypes = array_map(
+            static function (\ReflectionParameter $p): string {
+                $type = $p->getType();
+                return $type instanceof \ReflectionNamedType ? $type->getName() : '';
+            },
+            $constructor->getParameters()
+        );
+        self::assertSame([
+            'OneOnOneGame\\OneOnOneGameTextGenerator',
+            'OneOnOneGame\\Contracts\\OneOnOneGamePossessionResolverInterface',
+            'OneOnOneGame\\Contracts\\OneOnOneGameShotResultResolverInterface',
+        ], $constructorTypes);
+
+        $publicMethods = [];
+        foreach ($class->getMethods() as $method) {
+            if ($method->isPublic()) {
+                $publicMethods[] = $method->getName();
+            } else {
+                self::assertTrue($method->isPrivate(), $method->getName() . ' must be private');
+            }
+        }
+        sort($publicMethods);
+        self::assertSame(['__construct', 'simulateGame'], $publicMethods);
+
+        $fileName = $class->getFileName();
+        self::assertIsString($fileName);
+        $source = file_get_contents($fileName);
+        self::assertIsString($source);
+        foreach (['$_SESSION', '$_POST', '$_GET', '$_COOKIE', '$_REQUEST', 'loggedInTeamID', '->query(', '->prepare('] as $forbidden) {
+            self::assertStringNotContainsString($forbidden, $source);
+        }
+    }
+
+    /**
+     * @return array{OneOnOneGamePossessionResolverInterface, \ArrayObject<int, array{int, int}>}
+     */
+    private function recordingResolver(): array
+    {
+        /** @var \ArrayObject<int, array{int, int}> $log */
+        $log = new \ArrayObject();
+        $delegate = new OneOnOneGamePossessionResolver(new OneOnOneGameShotResultResolver());
+
+        $decorator = new class ($delegate, $log) implements OneOnOneGamePossessionResolverInterface {
+            /** @param \ArrayObject<int, array{int, int}> $log */
+            public function __construct(
+                private readonly OneOnOneGamePossessionResolverInterface $delegate,
+                private readonly \ArrayObject $log
+            ) {
+            }
+
+            public function resolve(array $offenseData, array $defenseData): int
+            {
+                $result = $this->delegate->resolve($offenseData, $defenseData);
+                $this->log->append([$result, (int) $offenseData['pid']]);
+                return $result;
+            }
+
+            public function selectShotType(int $outside, int $drive, int $post, int $twoChance, int $threeChance): int
+            {
+                return $this->delegate->selectShotType($outside, $drive, $post, $twoChance, $threeChance);
+            }
+
+            public function checkSteal(int $stealRating, int $turnoverRating): bool
+            {
+                return $this->delegate->checkSteal($stealRating, $turnoverRating);
+            }
+
+            public function checkRebound(int $offensiveRebound, int $defensiveRebound): bool
+            {
+                return $this->delegate->checkRebound($offensiveRebound, $defensiveRebound);
+            }
+        };
+
+        return [$decorator, $log];
     }
 }

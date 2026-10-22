@@ -1845,7 +1845,7 @@ DROP TABLE IF EXISTS `ibl_olympics_career_avgs`;
 CREATE TABLE `ibl_olympics_career_avgs` (
   `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'Player ID (FK to ibl_plr)',
   `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (denormalized)',
-  `games` int(11) NOT NULL DEFAULT 0 COMMENT 'Olympic games played',
+  `games` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Olympic games played',
   `minutes` decimal(8,2) NOT NULL DEFAULT 0.00 COMMENT 'Avg minutes per game',
   `fgm` decimal(8,2) NOT NULL COMMENT 'Avg field goals made',
   `fga` decimal(8,2) NOT NULL COMMENT 'Avg field goals attempted',
@@ -1874,22 +1874,22 @@ DROP TABLE IF EXISTS `ibl_olympics_career_totals`;
 CREATE TABLE `ibl_olympics_career_totals` (
   `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'Player ID (FK to ibl_plr)',
   `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (denormalized)',
-  `games` int(11) NOT NULL DEFAULT 0 COMMENT 'Total Olympic games played',
-  `minutes` int(11) NOT NULL DEFAULT 0 COMMENT 'Total minutes played',
-  `fgm` int(11) NOT NULL DEFAULT 0 COMMENT 'Total field goals made',
-  `fga` int(11) NOT NULL DEFAULT 0 COMMENT 'Total field goals attempted',
-  `ftm` int(11) NOT NULL DEFAULT 0 COMMENT 'Total free throws made',
-  `fta` int(11) NOT NULL DEFAULT 0 COMMENT 'Total free throws attempted',
-  `tgm` int(11) NOT NULL DEFAULT 0 COMMENT 'Total three pointers made',
-  `tga` int(11) NOT NULL DEFAULT 0 COMMENT 'Total three pointers attempted',
-  `orb` int(11) NOT NULL DEFAULT 0 COMMENT 'Total offensive rebounds',
-  `reb` int(11) NOT NULL DEFAULT 0 COMMENT 'Total rebounds',
-  `ast` int(11) NOT NULL DEFAULT 0 COMMENT 'Total assists',
-  `stl` int(11) NOT NULL DEFAULT 0 COMMENT 'Total steals',
-  `tvr` int(11) NOT NULL DEFAULT 0 COMMENT 'Total turnovers',
-  `blk` int(11) NOT NULL DEFAULT 0 COMMENT 'Total blocks',
-  `pf` int(11) NOT NULL DEFAULT 0 COMMENT 'Total personal fouls',
-  `pts` int(11) NOT NULL DEFAULT 0 COMMENT 'Total points',
+  `games` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Total Olympic games played',
+  `minutes` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total minutes played',
+  `fgm` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total field goals made',
+  `fga` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total field goals attempted',
+  `ftm` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total free throws made',
+  `fta` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total free throws attempted',
+  `tgm` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total three pointers made',
+  `tga` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total three pointers attempted',
+  `orb` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total offensive rebounds',
+  `reb` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total rebounds',
+  `ast` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total assists',
+  `stl` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total steals',
+  `tvr` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total turnovers',
+  `blk` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total blocks',
+  `pf` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total personal fouls',
+  `pts` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'Total points',
   `retired` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1=retired from league',
   PRIMARY KEY (`pid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -3453,7 +3453,7 @@ DROP TABLE IF EXISTS `ibl_settings`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ibl_settings` (
   `setting_key` varchar(128) NOT NULL COMMENT 'Setting key',
-  `value` varchar(128) NOT NULL COMMENT 'Setting value',
+  `setting_value` varchar(128) NOT NULL COMMENT 'Setting value',
   `league` varchar(16) NOT NULL DEFAULT 'ibl',
   PRIMARY KEY (`setting_key`,`league`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -3529,8 +3529,17 @@ CREATE TABLE `ibl_sim_summaries` (
   `themes_used` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Anti-repetition ledger — the themes used in this recap, read back over the last 5 sims.' CHECK (json_valid(`themes_used`)),
   `claimed_at` datetime DEFAULT NULL COMMENT 'When the tick claimed this row for generation.',
   `generated_at` datetime DEFAULT NULL COMMENT 'When the recap was stored.',
-  `attempts` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Number of generation attempts; ceiling 2 before → failed.',
+  `attempts` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Claims taken. Safety backstop: 20 → failed. Per-cause bounds live in the *_failures columns.',
   `blocked_until` datetime DEFAULT NULL COMMENT 'Usage-limit backoff — row is not eligible until this time.',
+  `route` enum('any','mac','actions') NOT NULL DEFAULT 'any' COMMENT 'Which host may claim: any = normal pending; mac/actions = handed off to that host.',
+  `routed_at` datetime DEFAULT NULL COMMENT 'When the row last became claimable on its route.',
+  `claimed_by` enum('mac','actions') DEFAULT NULL COMMENT 'Host holding (or last holding) the claim.',
+  `last_cause` enum('flaky','usage_limit','auth','transport','prompt') DEFAULT NULL COMMENT 'Failure cause of the most recent park.',
+  `flaky_failures` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Parks with cause flaky (no payload, non-transport store failure).',
+  `transport_failures` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Parks with cause transport (ssh, tunnel, input fetch, store transport).',
+  `usage_waits` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Usage-limit waits. Informational; never terminal on its own.',
+  `auth_failed_hosts` set('mac','actions') NOT NULL DEFAULT '' COMMENT 'Hosts whose Claude login failed for this sim. Both set = terminal.',
+  `notified_state` enum('retrying','waiting','handed_mac','handed_actions','posted','recovered','unavailable') DEFAULT NULL COMMENT 'Last #admin-chat status posted for this sim; compare-and-set de-dup key.',
   `created_at` datetime NOT NULL DEFAULT current_timestamp() COMMENT 'Row creation timestamp.',
   PRIMARY KEY (`sim`),
   KEY `idx_claim` (`status`,`blocked_until`,`sim`) COMMENT 'The composite index the oldest-pending-first selection scans.'
@@ -3801,18 +3810,6 @@ DROP TABLE IF EXISTS `ibl_trade_offers`;
 CREATE TABLE `ibl_trade_offers` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `ibl_trade_queue`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `ibl_trade_queue` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `operation_type` varchar(50) NOT NULL DEFAULT '' COMMENT 'Type: player_transfer, pick_transfer',
-  `params` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'JSON-encoded operation parameters',
-  `tradeline` text DEFAULT NULL COMMENT 'Human-readable trade summary line',
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -4634,7 +4631,7 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET collation_connection      = utf8mb4_general_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
 /*!50013  SQL SECURITY INVOKER */
-/*!50001 VIEW `vw_franchise_summary` AS select `ti`.`teamid` AS `teamid`,coalesce(`wl`.`totwins`,0) AS `totwins`,coalesce(`wl`.`totloss`,0) AS `totloss`,case when coalesce(`wl`.`totwins`,0) + coalesce(`wl`.`totloss`,0) = 0 then 0.000 else round(coalesce(`wl`.`totwins`,0) / (coalesce(`wl`.`totwins`,0) + coalesce(`wl`.`totloss`,0)),3) end AS `winpct`,coalesce(`po`.`playoffs`,0) AS `playoffs`,coalesce(`tc`.`div_titles`,0) AS `div_titles`,coalesce(`tc`.`conf_titles`,0) AS `conf_titles`,coalesce(`tc`.`ibl_titles`,0) AS `ibl_titles`,coalesce(`tc`.`heat_titles`,0) AS `heat_titles` from (((`ibl_team_info` `ti` left join (select `ibl_team_win_loss`.`currentname` AS `currentname`,sum(`ibl_team_win_loss`.`wins`) AS `totwins`,sum(`ibl_team_win_loss`.`losses`) AS `totloss` from `ibl_team_win_loss` group by `ibl_team_win_loss`.`currentname`) `wl` on(`wl`.`currentname` = `ti`.`team_name`)) left join (select `po_inner`.`team_name` AS `team_name`,count(distinct `po_inner`.`year`) AS `playoffs` from (select `vw_playoff_series_results`.`winner` AS `team_name`,`vw_playoff_series_results`.`year` AS `year` from `vw_playoff_series_results` where `vw_playoff_series_results`.`round` = 1 union select `vw_playoff_series_results`.`loser` AS `team_name`,`vw_playoff_series_results`.`year` AS `year` from `vw_playoff_series_results` where `vw_playoff_series_results`.`round` = 1) `po_inner` group by `po_inner`.`team_name`) `po` on(`po`.`team_name` = `ti`.`team_name`)) left join (select `vw_team_awards`.`name` AS `name`,sum(case when `vw_team_awards`.`award` like '%Division%' then 1 else 0 end) AS `div_titles`,sum(case when `vw_team_awards`.`award` in ('Eastern Conference Champions','Western Conference Champions') then 1 else 0 end) AS `conf_titles`,sum(case when `vw_team_awards`.`award` like '%IBL Champions%' then 1 else 0 end) AS `ibl_titles`,sum(case when `vw_team_awards`.`award` like '%HEAT%' then 1 else 0 end) AS `heat_titles` from `vw_team_awards` group by `vw_team_awards`.`name`) `tc` on(`tc`.`name` = `ti`.`team_name`)) where `ti`.`teamid` between 1 and 30 */;
+/*!50001 VIEW `vw_franchise_summary` AS select `ti`.`teamid` AS `teamid`,coalesce(`wl`.`totwins`,0) AS `totwins`,coalesce(`wl`.`totloss`,0) AS `totloss`,case when coalesce(`wl`.`totwins`,0) + coalesce(`wl`.`totloss`,0) = 0 then 0.000 else round(coalesce(`wl`.`totwins`,0) / (coalesce(`wl`.`totwins`,0) + coalesce(`wl`.`totloss`,0)),3) end AS `winpct`,coalesce(`po`.`playoffs`,0) AS `playoffs`,coalesce(`tc`.`div_titles`,0) AS `div_titles`,coalesce(`tc`.`conf_titles`,0) AS `conf_titles`,coalesce(`tc`.`ibl_titles`,0) AS `ibl_titles`,coalesce(`tc`.`heat_titles`,0) AS `heat_titles` from (((`ibl_team_info` `ti` left join (select `tsr`.`team_id` AS `team_id`,sum(`tsr`.`wins`) AS `totwins`,sum(`tsr`.`losses`) AS `totloss` from `ibl_team_season_records` `tsr` where `tsr`.`game_type` = 1 group by `tsr`.`team_id`) `wl` on(`wl`.`team_id` = `ti`.`teamid`)) left join (select `po_inner`.`team_name` AS `team_name`,count(distinct `po_inner`.`year`) AS `playoffs` from (select `vw_playoff_series_results`.`winner` AS `team_name`,`vw_playoff_series_results`.`year` AS `year` from `vw_playoff_series_results` where `vw_playoff_series_results`.`round` = 1 union select `vw_playoff_series_results`.`loser` AS `team_name`,`vw_playoff_series_results`.`year` AS `year` from `vw_playoff_series_results` where `vw_playoff_series_results`.`round` = 1) `po_inner` group by `po_inner`.`team_name`) `po` on(`po`.`team_name` = `ti`.`team_name`)) left join (select `vw_team_awards`.`name` AS `name`,sum(case when `vw_team_awards`.`award` like '%Division%' then 1 else 0 end) AS `div_titles`,sum(case when `vw_team_awards`.`award` in ('Eastern Conference Champions','Western Conference Champions') then 1 else 0 end) AS `conf_titles`,sum(case when `vw_team_awards`.`award` like '%IBL Champions%' then 1 else 0 end) AS `ibl_titles`,sum(case when `vw_team_awards`.`award` like '%HEAT%' then 1 else 0 end) AS `heat_titles` from `vw_team_awards` group by `vw_team_awards`.`name`) `tc` on(`tc`.`name` = `ti`.`team_name`)) where `ti`.`teamid` between 1 and 30 */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;

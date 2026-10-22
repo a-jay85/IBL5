@@ -254,6 +254,11 @@ class _UsageLimitLlm(_RecordingLlm):
         raise HarnessError("llm-usage-limit", "x")
 
 
+class _AuthExpiredLlm(_RecordingLlm):
+    def call(self, purpose, model, prompt, validate, max_retries=1, normalizer=None):
+        raise HarnessError("llm-auth-expired", "x")
+
+
 class _AdapterLikeLlm(_RecordingLlm):
     """Re-raises a schema failure as llm-invalid-output, as ClaudeCli.call does after its last try."""
 
@@ -282,6 +287,12 @@ def test_pr_copy_reraises_non_invalid_output_errors():
     assert e.value.kind == "llm-usage-limit"
 
 
+def test_pr_copy_reraises_auth_expired():
+    with pytest.raises(HarnessError) as e:
+        _run_pr_copy(_AuthExpiredLlm(None))
+    assert e.value.kind == "llm-auth-expired"
+
+
 def test_pr_copy_passes_normalizer_to_llm():
     llm = _RecordingLlm(dict(REPLAY_PIN_A1))
     out, degraded = _run_pr_copy(llm)
@@ -294,7 +305,7 @@ def test_pr_copy_passes_normalizer_to_llm():
 
 def test_pr_copy_source_wires_normalizer():
     src = inspect.getsource(runner._pr_copy)
-    assert 'llm.call("pr-copy", "sonnet"' in src
+    assert 'llm.call(schemas.PR_COPY_PURPOSE, "sonnet"' in src
     assert "normalizer=schemas.normalize_pr_copy" in src
 
 
@@ -354,6 +365,11 @@ BAD_JSON_REPLAY = ('{"type": "chore", "title": "chore(docfix): reap", '
                    '"summary_md": "## Summary\\n- marks the run as "not merged" and exits\\n"}')
 
 
+# No closing brace and no commit_subject: nothing for the pr-copy extractor to salvage.
+TRUNCATED_REPLAY = ('{"type": "chore", "title": "chore(docfix): reap", '
+                    '"summary_md": "## Summary\\n- marks')
+
+
 def _call(tmp_path, normalizer):
     kw = {"normalizer": normalizer} if normalizer else {}
     return _cli(tmp_path).call("pr-copy", "sonnet", "write copy",
@@ -390,8 +406,8 @@ def test_cli_feat_anywhere_ends_feat_end_to_end(tmp_path, monkeypatch, shim):
 
 def test_cli_invalid_json_replay_still_degrades_with_normalizer(tmp_path, monkeypatch, shim):
     with pytest.raises(json.JSONDecodeError):
-        json.loads(BAD_JSON_REPLAY)
-    monkeypatch.setenv("CLAUDE_SHIM_REPLY", _envelope(_fenced(BAD_JSON_REPLAY)))
+        json.loads(TRUNCATED_REPLAY)
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", _envelope(_fenced(TRUNCATED_REPLAY)))
     with pytest.raises(HarnessError) as e:
         _call(tmp_path, schemas.normalize_pr_copy)
     assert e.value.kind == "llm-invalid-output"

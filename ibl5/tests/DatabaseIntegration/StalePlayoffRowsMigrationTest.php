@@ -97,6 +97,9 @@ final class StalePlayoffRowsMigrationTest extends DatabaseTestCase
     {
         $sql = file_get_contents(dirname(__DIR__, 2) . '/migrations/160_remove_stale_playoff_rows.sql');
         self::assertIsString($sql);
+        // The immutable migration predates the ibl_settings.value -> setting_value rename.
+        $sql = str_replace('CAST(value AS UNSIGNED)', 'CAST(setting_value AS UNSIGNED)', $sql, $replaced);
+        self::assertSame(1, $replaced, 'migration 160 text drifted; update the setting_value translation');
         self::assertTrue($this->db->multi_query($sql), $this->db->error);
         $affected = $this->db->affected_rows;
         while ($this->db->more_results()) {
@@ -108,7 +111,7 @@ final class StalePlayoffRowsMigrationTest extends DatabaseTestCase
     private function seedSetting(int $endingYear): void
     {
         $stmt = $this->db->prepare(
-            "INSERT INTO ibl_settings (setting_key, value, league) VALUES ('Current Season Ending Year', ?, 'ibl')"
+            "INSERT INTO ibl_settings (setting_key, setting_value, league) VALUES ('Current Season Ending Year', ?, 'ibl')"
         );
         self::assertNotFalse($stmt, 'Failed to prepare setting insert: ' . $this->db->error);
         $val = (string) $endingYear;

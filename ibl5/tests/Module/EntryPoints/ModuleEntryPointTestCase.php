@@ -98,6 +98,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
      * @param array<string, mixed> $get Simulated $_GET parameters
      * @param array<string, mixed> $post Simulated $_POST parameters
      * @param array<string, mixed> $extraGlobals Additional $GLOBALS to set (for modules that read from $GLOBALS)
+     * @param string $file Module file to include (default index.php)
      * @return string Captured output
      */
     protected function runModule(
@@ -105,6 +106,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         array $get = [],
         array $post = [],
         array $extraGlobals = [],
+        string $file = 'index.php',
     ): string {
         // Set superglobals
         $_GET = $get;
@@ -120,7 +122,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         // Reset pagetitle for each module run
         $GLOBALS['pagetitle'] = '';
 
-        $modulePath = dirname(__DIR__, 3) . "/modules/{$moduleName}/index.php";
+        $modulePath = dirname(__DIR__, 3) . "/modules/{$moduleName}/{$file}";
 
         // Module files expect certain variables in local scope (mainfile.php extracts
         // $_REQUEST into $GLOBALS at top level where global = local scope). Since we
@@ -235,5 +237,83 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         $GLOBALS['authService'] = $authStub;
         $GLOBALS['user'] = base64_encode("{$username}:{$username}:");
         $GLOBALS['cookie'] = [$username, $username, ''];
+    }
+
+    /**
+     * Auth stub whose Nth call to $throwOn throws a known sentinel exception.
+     *
+     * Gate branches often end in die()/exit, which kills the PHPUnit process.
+     * Throwing from the first auth call after the gate proves which branch ran
+     * (runModule() rethrows any Throwable) and stops everything after it.
+     */
+    protected function authenticateWithSentinel(
+        string $username,
+        bool $authenticated,
+        string $throwOn,
+        int $throwOnCall = 1,
+    ): void {
+        /** @var array<string, int> $calls */
+        $calls = [];
+        $respond = static function (string $method, mixed $value) use (&$calls, $throwOn, $throwOnCall): mixed {
+            $calls[$method] = ($calls[$method] ?? 0) + 1;
+            if ($method === $throwOn && $calls[$method] === $throwOnCall) {
+                throw new \RuntimeException('sentinel:' . $throwOn);
+            }
+            return $value;
+        };
+
+        $authStub = self::createStub(\Auth\Contracts\AuthServiceInterface::class);
+        $authStub->method('isAuthenticated')->willReturnCallback(
+            static fn (): mixed => $respond('isAuthenticated', $authenticated),
+        );
+        $authStub->method('getCookieArray')->willReturnCallback(
+            static fn (): mixed => $respond('getCookieArray', $authenticated ? [$username, $username, ''] : null),
+        );
+        $authStub->method('getUsername')->willReturnCallback(
+            static fn (): mixed => $respond('getUsername', $authenticated ? $username : null),
+        );
+        $authStub->method('isAdmin')->willReturnCallback(
+            static fn (): mixed => $respond('isAdmin', false),
+        );
+
+        $GLOBALS['authService'] = $authStub;
+        $GLOBALS['user'] = base64_encode("{$username}:{$username}:");
+        unset($GLOBALS['cookie']);
+    }
+
+    /**
+     * Run $run and assert it throws the sentinel raised by authenticateWithSentinel().
+     *
+     * @param \Closure(): mixed $run
+     */
+    protected function assertSentinelThrown(string $method, \Closure $run): void
+    {
+        try {
+            $run();
+        } catch (\RuntimeException $e) {
+            self::assertSame('sentinel:' . $method, $e->getMessage());
+
+            return;
+        }
+
+        self::fail('Expected sentinel:' . $method . ' to be thrown, but the module ran to completion.');
+    }
+
+    /**
+     * Neutralise mainfile.php's boot for a module file that requires it.
+     *
+     * Defines FORUM_ADMIN (skips mainfile's language and theme includes) and aliases
+     * Bootstrap\WebApplicationFactory to a no-op factory. Call it in a test that runs
+     * in a separate process, before runModule(): the constant and the alias are
+     * process-wide and cannot be undone.
+     */
+    protected function skipWebBoot(): void
+    {
+        if (!defined('FORUM_ADMIN')) {
+            define('FORUM_ADMIN', true);
+        }
+        if (!class_exists(\Bootstrap\WebApplicationFactory::class, false)) {
+            class_alias(NoopWebApplicationFactory::class, \Bootstrap\WebApplicationFactory::class);
+        }
     }
 }

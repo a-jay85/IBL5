@@ -21,10 +21,10 @@ class WaiversEntryPointTest extends ModuleEntryPointTestCase
     private function seedSeasonMocks(): void
     {
         $this->mockDb->onQuery('ibl_settings', [
-            ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
-            ['name' => 'Current Season Ending Year', 'value' => '2026'],
-            ['name' => 'Allow Trades', 'value' => 'Yes'],
-            ['name' => 'Allow Waiver Moves', 'value' => 'Yes'],
+            ['name' => 'Current Season Phase', 'setting_value' => 'Regular Season'],
+            ['name' => 'Current Season Ending Year', 'setting_value' => '2026'],
+            ['name' => 'Allow Trades', 'setting_value' => 'Yes'],
+            ['name' => 'Allow Waiver Moves', 'setting_value' => 'Yes'],
         ]);
         $this->mockDb->onQuery('ibl_sim_dates', [
             ['sim' => 1, 'start_date' => '2025-11-01', 'end_date' => '2025-11-07'],
@@ -45,7 +45,7 @@ class WaiversEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testDisplayParameterSelectsRequestedTab(): void
@@ -114,8 +114,24 @@ class WaiversEntryPointTest extends ModuleEntryPointTestCase
 
         $second = $this->runModule('Waivers', ['display' => 'total_s'], [], ['user' => $GLOBALS['user']]);
 
-        $this->assertNotEmpty($first);
-        $this->assertNotEmpty($second);
+        $this->assertNotSame('', $first);
+        $this->assertNotSame('', $second);
         $this->assertNotSame($first, $second, 'display parameter must reach rendered output through the injected request');
+    }
+
+    public function testAuthenticatedGmDecodesCookieIntoGlobal(): void
+    {
+        $this->authenticateAs('testgm');
+        $this->seedSeasonMocks();
+        $this->mockDb->onQuery('auth_users', [
+            ['user_id' => 1, 'username' => 'testgm', 'user_email' => 'test@test.com'],
+        ]);
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+        unset($GLOBALS['cookie']);
+
+        $this->runModule('Waivers', [], [], ['user' => $GLOBALS['user']]);
+
+        $this->assertSame(['testgm', 'testgm', ''], $GLOBALS['cookie']);
     }
 }

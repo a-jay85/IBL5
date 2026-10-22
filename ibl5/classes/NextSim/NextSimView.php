@@ -60,7 +60,7 @@ class NextSimView implements NextSimViewInterface
 
         $html .= $this->renderScheduleStrip($games);
 
-        foreach (\League\JSB::PLAYER_POSITIONS as $position) {
+        foreach (\League\JsbConstants::PLAYER_POSITIONS as $position) {
             $html .= $this->renderPositionSection($games, $position, $userTeam, $userStarters);
         }
 

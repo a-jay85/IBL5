@@ -28,7 +28,7 @@ class PlayerNameDecorator implements PlayerNameDecoratorInterface
             return '';
         }
 
-        if ($playerData->ordinal > \League\JSB::WAIVERS_ORDINAL) {
+        if ($playerData->ordinal > \League\JsbConstants::WAIVERS_ORDINAL) {
             return 'player-waived';
         }
 

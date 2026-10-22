@@ -18,7 +18,9 @@ use PHPStan\Rules\RuleErrorBuilder;
  *
  * Rationale per migration 113: `to`/`do` were renamed to `r_trans_off`/
  * `r_drive_off`, `r_to` (live/snapshot turnover rating) renamed to `r_tvr`,
- * and `Start Date`/`End Date` renamed to `start_date`/`end_date`.
+ * and `Start Date`/`End Date` renamed to `start_date`/`end_date`. The rule also
+ * bans a bare `value` inside literals naming `ibl_settings`, whose column was
+ * renamed to `setting_value` (backlog#217).
  *
  * @implements Rule<String_>
  */
@@ -35,6 +37,19 @@ final class BanReservedWordColumnsRule implements Rule
         '`Start Date`' => 'Rename to `start_date` — space-containing identifier banned.',
         '`End Date`' => 'Rename to `end_date` — space-containing identifier banned.',
         '`key`' => 'Rename to `cache_key` on the `cache` / `cache_locks` tables; the bare `key` column is a SQL reserved word (migration 116).',
+    ];
+
+    /**
+     * Bare column names banned only inside SQL literals that name a specific table.
+     * Scoped this way because `cache` / `cache_locks` legitimately keep a `value`
+     * column (upstream Laravel scaffolding), so a global `value` ban would misfire.
+     * Keyed by the table token the literal must contain.
+     */
+    private const TABLE_SCOPED_BANNED_COLUMNS = [
+        'ibl_settings' => [
+            'pattern' => '/(?<![\w$])`?value`?(?!\w)/',
+            'guidance' => 'Rename to `setting_value`; ibl_settings.value was renamed to the non-reserved setting_value (backlog#217).',
+        ],
     ];
 
     public function getNodeType(): string
@@ -67,6 +82,17 @@ final class BanReservedWordColumnsRule implements Rule
                 $errors[] = RuleErrorBuilder::message(
                     'Banned backtick-quoted column reference ' . $token . ' in SQL string. '
                     . $guidance
+                )
+                    ->identifier('ibl.bannedReservedWordColumn')
+                    ->build();
+            }
+        }
+
+        foreach (self::TABLE_SCOPED_BANNED_COLUMNS as $table => $ban) {
+            if (str_contains($value, $table) && preg_match($ban['pattern'], $value) === 1) {
+                $errors[] = RuleErrorBuilder::message(
+                    'Banned bare column reference value in ' . $table . ' SQL string. '
+                    . $ban['guidance']
                 )
                     ->identifier('ibl.bannedReservedWordColumn')
                     ->build();

@@ -112,7 +112,7 @@ function countRows(mysqli $db, string $table): int
     return is_array($row) && is_numeric($row['n']) ? (int) $row['n'] : 0;
 }
 
-$repair = new Boxscore\PhantomBoxscoreRepair($mysqli_db, new Boxscore\BoxscoreRepository($mysqli_db));
+$repair = new Boxscore\PhantomBoxscoreRepair($mysqli_db, new Boxscore\BoxscoreAuditRepository($mysqli_db));
 
 try {
     $keys = $repair->findPhantomTeamRows(PHANTOM_SEASON);

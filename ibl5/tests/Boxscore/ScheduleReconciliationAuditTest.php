@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Boxscore;
 
 use Boxscore\AuditFinding;
+use Boxscore\Contracts\BoxscoreAuditRepositoryInterface;
 use Boxscore\Contracts\BoxscoreRepositoryInterface;
 use Boxscore\ScheduleAuditReport;
 use Boxscore\ScheduleReconciliationAudit;
@@ -33,30 +34,13 @@ final class ScheduleReconciliationAuditTest extends TestCase
         array $duplicates = [],
         array $missing = [],
     ): ScheduleAuditReport {
-        $repo = new class($scheduleIndex, $orphans, $duplicates, $missing) implements BoxscoreRepositoryInterface {
+        $repo = new class($scheduleIndex) implements BoxscoreRepositoryInterface {
             /**
-             * @param array<string, array<int, array<int, true>>>                                                               $scheduleIndex
-             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, name: string}> $orphans
-             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, occurrences: int, gotds: string}>     $duplicates
-             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int}> $missing
+             * @param array<string, array<int, array<int, true>>> $scheduleIndex
              */
-            public function __construct(
-                private array $scheduleIndex,
-                private array $orphans,
-                private array $duplicates,
-                private array $missing,
-            ) {}
+            public function __construct(private array $scheduleIndex) {}
 
             public function fetchScheduledGameIndex(int $seasonYear): array { return $this->scheduleIndex; }
-            public function findOrphanBoxscoreGames(int $seasonYear): array { return $this->orphans; }
-            public function findDuplicateTripleGames(?int $seasonYear = null, ?int $gameType = null): array
-            {
-                if ($gameType !== null) {
-                    throw new \LogicException('audit must query duplicate triples unscoped by game type');
-                }
-                return $this->duplicates;
-            }
-            public function findScheduledGamesWithoutBoxscores(int $seasonYear): array { return $this->missing; }
 
             // Unused methods — throw to catch accidental calls
             public function fetchBoxscoreGameOfThatDayIndex(int $seasonYear): array { throw new \RuntimeException('not implemented'); }
@@ -68,10 +52,6 @@ final class ScheduleReconciliationAuditTest extends TestCase
             public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): int { throw new \RuntimeException('not implemented'); }
             public function insertTeamBoxscore(array $row): int { throw new \RuntimeException('not implemented'); }
             public function hasNullTeamIdPlayerBoxscores(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): bool { throw new \RuntimeException('not implemented'); }
-            public function findAllStarTeamNames(string $date): ?array { throw new \RuntimeException('not implemented'); }
-            public function findAllStarGamesWithDefaultNames(): array { throw new \RuntimeException('not implemented'); }
-            public function getPlayersForAllStarTeam(string $date, int $teamid): array { throw new \RuntimeException('not implemented'); }
-            public function renameAllStarTeam(int $recordId, string $newName): int { throw new \RuntimeException('not implemented'); }
             public function insertPlayerBoxscore(
                 string $date, string $uuid, string $name, string $position,
                 int $playerID, int $visitor_teamid, int $home_teamid, int $game_of_that_day,
@@ -84,7 +64,33 @@ final class ScheduleReconciliationAuditTest extends TestCase
             ): int { throw new \RuntimeException('not implemented'); }
         };
 
-        return (new ScheduleReconciliationAudit($repo))->run(2008);
+        $auditRepo = new class($orphans, $duplicates, $missing) implements BoxscoreAuditRepositoryInterface {
+            /**
+             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, name: string}> $orphans
+             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, occurrences: int, gotds: string}>     $duplicates
+             * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int}> $missing
+             */
+            public function __construct(
+                private array $orphans,
+                private array $duplicates,
+                private array $missing,
+            ) {}
+
+            public function findOrphanBoxscoreGames(int $seasonYear): array { return $this->orphans; }
+            public function findDuplicateTripleGames(?int $seasonYear = null, ?int $gameType = null): array
+            {
+                if ($gameType !== null) {
+                    throw new \LogicException('audit must query duplicate triples unscoped by game type');
+                }
+                return $this->duplicates;
+            }
+            public function findScheduledGamesWithoutBoxscores(int $seasonYear): array { return $this->missing; }
+
+            // Unused method — throws to catch accidental calls
+            public function recordRejectedGames(int $seasonYear, array $rejects, ?string $sourceArchive): int { throw new \RuntimeException('not implemented'); }
+        };
+
+        return (new ScheduleReconciliationAudit($repo, $auditRepo))->run(2008);
     }
 
     /**
@@ -152,6 +158,20 @@ final class ScheduleReconciliationAuditTest extends TestCase
     private function oneGameSchedule(): array
     {
         return ['2008-01-10' => [2 => [1 => true]]];
+    }
+
+    /**
+     * Schedule index spanning two dates, several visitors per date and several
+     * homes per visitor: 2 + 1 + 3 = 6 scheduled games.
+     *
+     * @return array<string, array<int, array<int, true>>>
+     */
+    private function sixGameSchedule(): array
+    {
+        return [
+            '2008-01-10' => [2 => [1 => true, 5 => true], 4 => [6 => true]],
+            '2008-01-11' => [3 => [7 => true, 8 => true, 9 => true]],
+        ];
     }
 
     // -------------------------------------------------------------------------
@@ -317,5 +337,118 @@ final class ScheduleReconciliationAuditTest extends TestCase
         self::assertStringNotContainsString('phantom is', $detail);
         // Must still communicate the situation without asserting which side is phantom
         self::assertStringContainsString('likely a phantom', $detail);
+    }
+
+    public function testScheduledGamesCountsEveryHomeAcrossDatesAndVisitors(): void
+    {
+        $report = $this->makeAudit(scheduleIndex: $this->sixGameSchedule());
+
+        self::assertSame(6, $report->scheduledGames);
+        self::assertSame(6, $report->boxscoreGames);
+        self::assertSame(2008, $report->seasonYear);
+    }
+
+    public function testBoxscoreGamesIsScheduledGamesMinusMissingRowCount(): void
+    {
+        $report = $this->makeAudit(
+            scheduleIndex: $this->sixGameSchedule(),
+            missing: [
+                $this->makeMissingRow(),
+                $this->makeMissingRow(date: '2008-01-11', visitor: 3, home: 7),
+            ],
+        );
+
+        self::assertSame(6, $report->scheduledGames);
+        self::assertSame(4, $report->boxscoreGames);
+    }
+
+    public function testOrphanFindingCarriesExactDetailAndMatchup(): void
+    {
+        $report = $this->makeAudit(
+            scheduleIndex: $this->oneGameSchedule(),
+            orphans: [$this->makeOrphanRow(gotd: 2)],
+        );
+
+        $finding = $report->findings[0];
+        self::assertSame('2008-02-05', $finding->gameDate);
+        self::assertSame(3, $finding->visitorTeamId);
+        self::assertSame(7, $finding->homeTeamId);
+        self::assertSame('not in ibl_schedule for season 2008 (gotd 2, "Chicago Fire")', $finding->detail);
+    }
+
+    public function testDuplicateFindingCarriesExactDetailAndMatchup(): void
+    {
+        $report = $this->makeAudit(
+            scheduleIndex: $this->oneGameSchedule(),
+            duplicates: [$this->makeDuplicateRow(occurrences: 3, gotds: '1,4,6')],
+        );
+
+        $finding = $report->findings[0];
+        self::assertSame('2008-04-15', $finding->gameDate);
+        self::assertSame(23, $finding->visitorTeamId);
+        self::assertSame(19, $finding->homeTeamId);
+        self::assertSame(
+            'recorded at 3 different game_of_that_day values (1,4,6) — one is likely a phantom import',
+            $finding->detail,
+        );
+    }
+
+    public function testMissingFindingCarriesExactDetailAndMatchup(): void
+    {
+        $report = $this->makeAudit(
+            scheduleIndex: $this->oneGameSchedule(),
+            missing: [$this->makeMissingRow()],
+        );
+
+        $finding = $report->findings[0];
+        self::assertSame('2008-06-25', $finding->gameDate);
+        self::assertSame(3, $finding->visitorTeamId);
+        self::assertSame(19, $finding->homeTeamId);
+        self::assertSame('scheduled and played (134-147) but no boxscore rows found', $finding->detail);
+        self::assertStringNotContainsString('(147-134)', $finding->detail);
+    }
+
+    /** Empty schedule suppresses orphans only; duplicate then missing still emit in order. */
+    public function testEmptyScheduleEmitsDuplicateThenMissingWithOrphansSuppressed(): void
+    {
+        $report = $this->makeAudit(
+            scheduleIndex: [],
+            orphans: [$this->makeOrphanRow()],
+            duplicates: [$this->makeDuplicateRow()],
+            missing: [$this->makeMissingRow()],
+        );
+
+        self::assertCount(2, $report->findings);
+        self::assertSame(AuditFinding::KIND_DUPLICATE_TRIPLE, $report->findings[0]->kind);
+        self::assertSame(AuditFinding::KIND_MISSING_BOXSCORE, $report->findings[1]->kind);
+        self::assertSame(0, $report->scheduledGames);
+    }
+
+    /** Two rows per kind: every row becomes a finding, kinds in order, repository row order within a kind. */
+    public function testEachDirectionEmitsOneFindingPerRepositoryRowInRowOrder(): void
+    {
+        $report = $this->makeAudit(
+            scheduleIndex: $this->oneGameSchedule(),
+            orphans: [$this->makeOrphanRow(date: '2008-02-05'), $this->makeOrphanRow(date: '2008-02-06')],
+            duplicates: [$this->makeDuplicateRow(date: '2008-04-15'), $this->makeDuplicateRow(date: '2008-04-16')],
+            missing: [$this->makeMissingRow(date: '2008-06-25'), $this->makeMissingRow(date: '2008-06-26')],
+        );
+
+        $mapped = array_map(
+            static fn (AuditFinding $f): string => $f->kind . '@' . $f->gameDate,
+            $report->findings,
+        );
+
+        self::assertSame(
+            [
+                AuditFinding::KIND_ORPHAN . '@2008-02-05',
+                AuditFinding::KIND_ORPHAN . '@2008-02-06',
+                AuditFinding::KIND_DUPLICATE_TRIPLE . '@2008-04-15',
+                AuditFinding::KIND_DUPLICATE_TRIPLE . '@2008-04-16',
+                AuditFinding::KIND_MISSING_BOXSCORE . '@2008-06-25',
+                AuditFinding::KIND_MISSING_BOXSCORE . '@2008-06-26',
+            ],
+            $mapped,
+        );
     }
 }

@@ -14,7 +14,7 @@ class WaiversView implements WaiversViewInterface
     /**
      * @see WaiversViewInterface::renderWaiverForm()
      *
-     * @param array<int, string> $players
+     * @param array<int, array{playerID: int, playerName: string, contract: string, waitTime: string}> $players
      */
     public function renderWaiverForm(
         string $teamName,
@@ -47,8 +47,8 @@ class WaiversView implements WaiversViewInterface
                         <div class="ibl-form-group">
                             <select name="Player_ID" class="ibl-select" aria-label="Select player">
                                 <option value="">Select player...</option>
-                                <?php foreach ($players as $optionHtml): ?>
-                                <?= \Security\HtmlSanitizer::trusted($optionHtml) ?>
+                                <?php foreach ($players as $option): ?>
+                                <?= \Security\HtmlSanitizer::trusted($this->buildPlayerOption($option['playerID'], $option['playerName'], $option['contract'], $option['waitTime'])) ?>
                                 <?php endforeach; ?>
                             </select>
                         </div>

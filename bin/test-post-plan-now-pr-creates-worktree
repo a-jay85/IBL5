@@ -7,8 +7,14 @@
 # Fifteen cases, exit 0 iff all pass.
 set -euo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 # ---- environment --------------------------------------------------------
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"; h_cleanup' EXIT
+# Runner logs and .session sidecars go to a private dir, never the shared /tmp.
+mkdir -p "$TMP/runlog"
+export POSTPLAN_LOG_DIR="$TMP/runlog" PLAN_NOW_LOG_DIR="$TMP/runlog"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ORIGIN="$TMP/origin.git"
 MAIN="$TMP/IBL5"         # named IBL5 so worktrees_parent_dir() derives IBL5-worktrees
@@ -28,9 +34,8 @@ printf '#!/bin/sh\nexit 1\n' > "$SHIMS/security"
 chmod +x "$SHIMS/security"
 
 # ---- pass/fail counters -------------------------------------------------
-PASS=0; FAIL=0
-pass() { echo "PASS: $1"; PASS=$((PASS+1)); }
-fail() { echo "FAIL: $1"; FAIL=$((FAIL+1)); }
+pass() { h_pass "$1"; }
+fail() { h_fail "$1"; }
 
 # ---- scratch git repo setup ---------------------------------------------
 git init --bare -b master "$ORIGIN" >/dev/null 2>&1
@@ -46,6 +51,10 @@ git -C "$MAIN" remote add origin "file://$ORIGIN"
 # ibl5/config.php must be non-empty for materialize_worktree_config ([ -s ] check).
 mkdir -p "$MAIN/bin/lib" "$MAIN/ibl5/themes/IBL/style"
 cp "$REPO/bin/lib/git-helpers.sh" "$MAIN/bin/lib/git-helpers.sh"
+# wt-new also sources the pool, launchd and compose libs; the pool itself stays off here.
+cp "$REPO/bin/lib/wt-pool.sh" "$REPO/bin/lib/launchd-job.sh" \
+    "$REPO/bin/lib/wt-compose.sh" "$MAIN/bin/lib/"
+export WT_POOL=0 WT_POOL_KICK=none
 printf '<?php // test config\n' > "$MAIN/ibl5/config.php"
 printf 'placeholder\n' > "$MAIN/ibl5/themes/IBL/style/style.css"
 git -C "$MAIN" add .
@@ -140,7 +149,7 @@ rm -f "$WTNEW_LOG"
 
 run_ppn 101
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 if [ -s "$WTNEW_LOG" ]; then
     fail "reuse: wt-new was called unexpectedly"
 fi
@@ -150,7 +159,7 @@ fi
 if grep -qF -- "no worktree has '" <<< "${ERR:-}"; then
     fail "reuse: stderr mentions worktree-not-found message"
 fi
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "reuse: existing worktree is not re-created"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "reuse: existing worktree is not re-created"
 
 # Remove case 1 worktree so case 2 finds no existing one
 rm -rf "$WT_PARENT/feat-x"
@@ -180,7 +189,7 @@ rm -f "$WTNEW_LOG"
 
 run_ppn 102
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 if [ -d "$WT_PARENT/feat-x" ]; then
     ACTUAL_BRANCH="$(git -C "$WT_PARENT/feat-x" rev-parse --abbrev-ref HEAD 2>/dev/null || echo error)"
     ACTUAL_SHA="$(git -C "$WT_PARENT/feat-x" rev-parse HEAD 2>/dev/null || echo error)"
@@ -193,7 +202,7 @@ if [ -d "$WT_PARENT/feat-x" ]; then
 else
     fail "create: $WT_PARENT/feat-x was not created"
 fi
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "create: missing worktree is created for the PR head branch"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "create: missing worktree is created for the PR head branch"
 
 # ==========================================================================
 # Case 3 — a fork PR is refused
@@ -203,7 +212,7 @@ rm -f "$WTNEW_LOG"
 
 run_ppn 103
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 if [ "$RC" -ne 1 ]; then
     fail "fork PR: expected RC=1, got $RC"
 fi
@@ -216,7 +225,7 @@ fi
 if [ -d "$WT_PARENT/patch-1" ]; then
     fail "fork PR: worktree was created despite fork guard"
 fi
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "fork PR is refused with a specific message"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "fork PR is refused with a specific message"
 
 # ==========================================================================
 # Case 4 — slash branch maps to a hostname-safe slug
@@ -226,7 +235,7 @@ rm -f "$WTNEW_LOG"
 
 run_ppn 104
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 SLUG_ARG=""
 if [ -f "$WTNEW_LOG" ]; then
     SLUG_ARG="$(awk 'NR==1{print $1; exit}' "$WTNEW_LOG")"
@@ -242,7 +251,7 @@ else
         fail "slash branch: checked-out branch is '$ACTUAL_BRANCH4', expected 'dependabot/npm-and-yarn/foo'"
     fi
 fi
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "slash branch maps to a hostname-safe slug"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "slash branch maps to a hostname-safe slug"
 
 # ==========================================================================
 # Case 5 — bin/wt-new --existing with no value is rejected
@@ -254,14 +263,14 @@ ERR5="$("$REPO/bin/wt-new" --existing 2>&1)"
 RC5=$?
 set -e
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 if [ "$RC5" -eq 0 ]; then
     fail "wt-new --existing with no value: expected non-zero RC but got 0"
 fi
 if ! grep -qF -- "Error: --existing requires a branch name" <<< "${ERR5:-}"; then
     fail "wt-new --existing with no value: expected error message not found (got: $ERR5)"
 fi
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "wt-new --existing with no value exits with usage"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "wt-new --existing with no value exits with usage"
 
 # ==========================================================================
 # Case 6 — loaded-idle phantom is reaped before the inflight check
@@ -306,7 +315,7 @@ ERR6="$(cd "$WT6" && POST_PLAN_SKILL=1 HOME="$TMP" "$REPO/bin/post-plan-now" 2>&
 RC6=$?
 set -e
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 if [ "$RC6" -eq 6 ]; then
     fail "loaded-idle-reap-before-inflight: exited 6 (phantom in-flight not reaped)"
 fi
@@ -317,7 +326,7 @@ fi
 if ! grep -Eq "^bootout gui/[0-9]+/${PHANTOM_LABEL}\$" "$LAUNCHCTL_LOG" 2>/dev/null; then
     fail "loaded-idle-reap-before-inflight: no 'bootout gui/<uid>/$PHANTOM_LABEL' in launchctl log"
 fi
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "loaded-idle-reap-before-inflight"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "loaded-idle-reap-before-inflight"
 
 # Restore simple launchctl stub for any future tests
 cat > "$SHIMS/launchctl" << 'SHIM_EOF'
@@ -336,7 +345,8 @@ chmod +x "$SHIMS/launchctl"
 unset GH_PR_JSON
 HOME7="$TMP/home7"
 mkdir -p "$HOME7/Library/LaunchAgents" "$HOME7/.local/bin" "$WT6/bin/lib"
-cp "$REPO/bin/lib/usage-gate.sh" "$REPO/bin/lib/usage-fetch.sh" "$WT6/bin/lib/"
+cp "$REPO/bin/lib/usage-gate.sh" "$REPO/bin/lib/usage-fetch.sh" \
+   "$REPO/bin/lib/plan-resolve.sh" "$WT6/bin/lib/"
 # The gate refuses a marker whose resume binary does not exist, and the far side names
 # $ROOT/bin/post-plan-now (here $WT6), so the fixture needs an executable copy.
 cp "$REPO/bin/post-plan-now" "$WT6/bin/post-plan-now"
@@ -404,26 +414,26 @@ run_far_side() {
     rm -f "$log" "${log%.log}.session"
 }
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 run_far_side marker
 grep -qF -- "RESULT paused" <<< "$P7_OUT" || fail "paused marker: output has no 'RESULT paused' (got: $P7_OUT)"
 [ ! -s "$FAILDM_LOG" ] || fail "paused marker: FAIL-DM fired"
 [ "$P7_MARKERS" = 1 ] || fail "paused marker: marker count is $P7_MARKERS, expected 1"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "marker written by the run: RESULT paused, no FAIL-DM"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "marker written by the run: RESULT paused, no FAIL-DM"
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 run_far_side limit
 grep -qF -- "RESULT paused" <<< "$P7_OUT" || fail "limit hit: output has no 'RESULT paused' (got: $P7_OUT)"
 [ ! -s "$FAILDM_LOG" ] || fail "limit hit: FAIL-DM fired"
 [ "$P7_MARKERS" = 1 ] || fail "limit hit: marker count is $P7_MARKERS, expected 1"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "limit-hit log on a failing exit: RESULT paused, no FAIL-DM"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "limit-hit log on a failing exit: RESULT paused, no FAIL-DM"
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 run_far_side auth
 if grep -qF -- "RESULT paused" <<< "$P7_OUT"; then fail "auth error: wrongly reported paused"; fi
 [ "$(wc -l < "$FAILDM_LOG" 2>/dev/null | tr -d ' ')" = 1 ] || fail "auth error: FAIL-DM count is not 1 (got: $(cat "$FAILDM_LOG" 2>/dev/null))"
 [ "$P7_MARKERS" = 0 ] || fail "auth error: a marker was written"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "API Error 401: not paused, one FAIL-DM"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "API Error 401: not paused, one FAIL-DM"
 
 # ==========================================================================
 # Case 8 — wt-new failure (e.g. slug collision) is reported and exits 1
@@ -435,14 +445,14 @@ chmod +x "$STUB_FAIL/wt-new"
 
 run_ppn 108 "$STUB_FAIL"
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 if [ "$RC" -ne 1 ]; then
     fail "wt-new failure: expected RC=1, got $RC"
 fi
 if ! grep -qF -- "bin/wt-new failed for branch 'ghost-branch' (slug 'ghost-branch')" <<< "${ERR:-}"; then
     fail "wt-new failure: expected 'bin/wt-new failed' message (got: $ERR)"
 fi
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "wt-new failure exits 1 with a specific message"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "wt-new failure exits 1 with a specific message"
 
 # ==========================================================================
 # Case 9 — wt-new exits 0 but creates nothing: the re-scan miss is reported
@@ -453,14 +463,14 @@ chmod +x "$STUB_NOOP/wt-new"
 
 run_ppn 109 "$STUB_NOOP"
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 if [ "$RC" -ne 1 ]; then
     fail "re-scan miss: expected RC=1, got $RC"
 fi
 if ! grep -qF -- "bin/wt-new succeeded but no worktree has 'ghost-branch' checked out." <<< "${ERR:-}"; then
     fail "re-scan miss: expected 'succeeded but no worktree' message (got: $ERR)"
 fi
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "re-scan miss after wt-new success exits 1 with a specific message"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "re-scan miss after wt-new success exits 1 with a specific message"
 
 # ==========================================================================
 # Case 10 — unknown fork status refuses to create a worktree
@@ -470,7 +480,7 @@ rm -f "$WTNEW_LOG"
 
 run_ppn 110
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 if [ "$RC" -ne 1 ]; then
     fail "unknown fork status: expected RC=1, got $RC"
 fi
@@ -481,7 +491,7 @@ if [ -s "$WTNEW_LOG" ]; then
     fail "unknown fork status: wt-new was called unexpectedly"
 fi
 unset GH_NO_FORK_FIELD
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "unknown fork status is refused before wt-new runs"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "unknown fork status is refused before wt-new runs"
 
 # ==========================================================================
 # Cases 11-14 — --auto headless guard + IBL5_BURNDOWN_LOOP opt-in
@@ -516,31 +526,31 @@ assert_skips() {
     [ "$G_PLIST" = 0 ] || fail "$1: a plist was written"
 }
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 run_auto_headless unset
 assert_skips "unset opt-in"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto without opt-in skips"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto without opt-in skips"
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 run_auto_headless empty
 assert_skips "empty opt-in"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with empty opt-in skips"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with empty opt-in skips"
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 run_auto_headless 0
 assert_skips "opt-in=0"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with opt-in=0 skips"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with opt-in=0 skips"
 
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 run_auto_headless 1
 if grep -qF -- "skipping auto-fire" <<< "$G_OUT"; then fail "opt-in=1: still skipped (got: $G_OUT)"; fi
 grep -qF -- "IBL5_BURNDOWN_LOOP=1" <<< "$G_OUT" || fail "opt-in=1: no opt-in message (got: $G_OUT)"
 [ "$G_PLIST" = 1 ] || fail "opt-in=1: no plist written (got: $G_OUT)"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with IBL5_BURNDOWN_LOOP=1 fires"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with IBL5_BURNDOWN_LOOP=1 fires"
 
 # Case 14 — the launchd path never inherits the caller's env, so only --foreground
 # can prove the scrub: the far-side claude must see IBL5_BURNDOWN_LOOP as unset.
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 PROBE_FILE="$TMP/optin.probe"; export PROBE_FILE; rm -f "$PROBE_FILE"
 set +e
 (cd "$WT6" && IBL5_BURNDOWN_LOOP=1 CLAUDE_HEADLESS=1 POST_PLAN_SKILL=1 \
@@ -554,7 +564,7 @@ elif [ "$(cat "$PROBE_FILE")" != "unset" ]; then
 fi
 rm -f "$PROBE_FILE"
 rm -f "$HOME7"/Library/LaunchAgents/*.plist
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "opt-in is scrubbed before the far-side claude runs"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "opt-in is scrubbed before the far-side claude runs"
 
 # ==========================================================================
 # Case 15 — a live fleet slot refuses a detaching run (post-plan-fleet race)
@@ -598,36 +608,36 @@ run_fleet_case() {
 }
 
 # 15.1 refuse
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 printf '%s\t%s\t%s\n' 40477 0 'com.ibl5.post-plan-fleet-777' > "$LAUNCHCTL_LIST_STATE"
 run_fleet_case
 [ "$F_RC" -eq 6 ] || fail "fleet-slot-refuse: exited $F_RC, want 6 (out: $F_OUT)"
 grep -qF -- "fleet rescue for PR #777 is already in flight" <<< "$F_OUT" \
     || fail "fleet-slot-refuse: no refusal message (out: $F_OUT)"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-refuse: a live fleet slot refuses a detaching run"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-refuse: a live fleet slot refuses a detaching run"
 
 # 15.2 a different PR's slot does not block (end-anchored compare)
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 printf '%s\t%s\t%s\n' 40477 0 'com.ibl5.post-plan-fleet-7770' > "$LAUNCHCTL_LIST_STATE"
 run_fleet_case
 [ "$F_RC" -ne 6 ] || fail "fleet-slot-other-pr: PR 7770's slot wrongly refused PR 777 (out: $F_OUT)"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-other-pr: a different PR's slot does not block"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-other-pr: a different PR's slot does not block"
 
 # 15.3 the fleet's own runner (--pr N --foreground) is not refused by its own slot
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 printf '%s\t%s\t%s\n' 40477 0 'com.ibl5.post-plan-fleet-777' > "$LAUNCHCTL_LIST_STATE"
 run_fleet_case --pr 777 --foreground
 [ "$F_RC" -ne 6 ] || fail "fleet-slot-foreground: fleet runner refused its own slot (out: $F_OUT)"
 grep -qF -- "foreground mode" <<< "$F_OUT" \
     || fail "fleet-slot-foreground: run never reached foreground mode (out: $F_OUT)"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-foreground: the fleet runner is not self-refused"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-foreground: the fleet runner is not self-refused"
 
 # 15.4 --force bypasses
-FAIL_BEFORE=$FAIL
+FAIL_BEFORE=$H_FAIL
 printf '%s\t%s\t%s\n' 40477 0 'com.ibl5.post-plan-fleet-777' > "$LAUNCHCTL_LIST_STATE"
 run_fleet_case --force
 [ "$F_RC" -ne 6 ] || fail "fleet-slot-force: --force did not bypass the slot (out: $F_OUT)"
-[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-force: --force bypasses a live slot"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-force: --force bypasses a live slot"
 
 rm -f "$LAUNCHCTL_LIST_STATE"
 cat > "$SHIMS/launchctl" << 'SHIM_EOF'
@@ -637,9 +647,13 @@ exit 0
 SHIM_EOF
 chmod +x "$SHIMS/launchctl"
 
+if ls "$TMP/runlog"/post-plan-now-feat-x-*.log >/dev/null 2>&1; then
+    pass "runner log lands in POSTPLAN_LOG_DIR"
+else
+    fail "runner log lands in POSTPLAN_LOG_DIR"
+fi
+
 # ==========================================================================
 # Summary
 # ==========================================================================
-echo ""
-echo "Results: $PASS passed, $FAIL failed"
-[ "$FAIL" -eq 0 ]
+h_done

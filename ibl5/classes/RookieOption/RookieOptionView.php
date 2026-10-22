@@ -36,8 +36,14 @@ class RookieOptionView implements RookieOptionViewInterface
 
 <h1 class="ibl-title">Rookie Option</h1>
 
-<?= HtmlSanitizer::trusted($cardHtml ?? '') ?>
+        <?php
+        return (string) ob_get_clean() . ($cardHtml ?? '') . $this->renderOptionCard($playerID, $teamName, $rookieOptionValue, $from) . "</div>\n";
+    }
 
+    private function renderOptionCard(int $playerID, string $teamName, int $rookieOptionValue, ?string $from): string
+    {
+        ob_start();
+        ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
         <h2 class="ibl-card__title">Rookie Option Value: <?= HtmlSanitizer::e($rookieOptionValue) ?></h2>
@@ -56,8 +62,6 @@ class RookieOptionView implements RookieOptionViewInterface
             <button type="submit" class="ibl-btn ibl-btn--danger">Exercise Rookie Option</button>
         </form>
     </div>
-</div>
-
 </div>
         <?php
         return (string) ob_get_clean();

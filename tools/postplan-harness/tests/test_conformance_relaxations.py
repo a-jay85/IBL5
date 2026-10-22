@@ -6,17 +6,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pytest
-
-from harness import conformance
 from harness.conformance import check, _resolve
 from harness.state import PlanInfo
-
-
-@pytest.fixture(autouse=True)
-def _tracked_files(monkeypatch):
-    """Invented paths; fail closed so no citation is judged against the real checkout."""
-    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: None)
 
 
 def _plan_with_test(path: str) -> PlanInfo:

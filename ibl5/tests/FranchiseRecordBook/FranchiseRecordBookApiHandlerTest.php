@@ -33,7 +33,7 @@ class FranchiseRecordBookApiHandlerTest extends WideUnitTestCase
 
         $output = $this->captureOutput(static fn () => $handler->handle());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('League-Wide Record Book', $output);
     }
 
@@ -44,7 +44,7 @@ class FranchiseRecordBookApiHandlerTest extends WideUnitTestCase
 
         $output = $this->captureOutput(static fn () => $handler->handle());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('League-Wide Record Book', $output);
     }
 
@@ -59,7 +59,7 @@ class FranchiseRecordBookApiHandlerTest extends WideUnitTestCase
 
         $output = $this->captureOutput(static fn () => $handler->handle());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // Team view should not contain "League-Wide"
         $this->assertStringNotContainsString('League-Wide', $output);
         $this->assertStringContainsString('ibl-title', $output);

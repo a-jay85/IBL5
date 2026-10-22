@@ -17,7 +17,8 @@ use League\League;
  * FranchiseHistoryRepository — the green-green anchor proving the assembly
  * behavior is byte-identical after the Repository→Service extraction.
  *
- * Tests the VIEW chain: vw_franchise_summary → ibl_team_win_loss → ibl_box_scores_teams,
+ * Tests the VIEW chain: vw_franchise_summary (W/L from ibl_team_season_records, refreshed by
+ * RefreshTeamSeasonRecordsStep), the five-season window over ibl_team_win_loss → ibl_box_scores_teams,
  * plus vw_playoff_series_results and ibl_heat_win_loss.
  */
 #[Group('database')]
@@ -37,7 +38,7 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
         // and team boxscores are not strictly required — vw_franchise_summary works with zero games
         $result = $this->repo->getAllFranchiseHistory(2024);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
 
         $first = $result[0];
         $expectedKeys = [
@@ -183,15 +184,54 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllFranchiseHistory(9999);
 
-        $foundZeroGamesTeam = false;
         foreach ($result as $row) {
             if ($row['totalgames'] === 0) {
                 self::assertNull($row['five_season_winpct']);
-                $foundZeroGamesTeam = true;
                 break;
             }
         }
         // Assert the result set is non-empty (structural check)
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
+    }
+
+    public function testSummaryTotalsReadRegularSeasonRecordsOnly(): void
+    {
+        $repository = new FranchiseHistoryRepository($this->db);
+        $before = $this->teamOneTotals($repository);
+
+        $name = $this->teamOneName();
+        $this->insertTeamSeasonRecordRow(1, 2091, 1, $name, $name, 7, 4);
+        $this->insertTeamSeasonRecordRow(1, 2091, 3, $name, $name, 50, 50);
+
+        $after = $this->teamOneTotals($repository);
+
+        self::assertSame($before['totwins'] + 7, $after['totwins']);
+        self::assertSame($before['totloss'] + 4, $after['totloss']);
+    }
+
+    /**
+     * @return array{totwins: int, totloss: int}
+     */
+    private function teamOneTotals(FranchiseHistoryRepository $repository): array
+    {
+        foreach ($repository->getFranchiseSummaryRows(2024) as $row) {
+            if ((int) $row['teamid'] === 1) {
+                return ['totwins' => (int) $row['totwins'], 'totloss' => (int) $row['totloss']];
+            }
+        }
+
+        self::fail('team 1 missing from franchise summary');
+    }
+
+    private function teamOneName(): string
+    {
+        $result = $this->db->query('SELECT team_name FROM ibl_team_info WHERE teamid = 1');
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        $name = $row['team_name'] ?? null;
+        self::assertIsString($name);
+
+        return $name;
     }
 }

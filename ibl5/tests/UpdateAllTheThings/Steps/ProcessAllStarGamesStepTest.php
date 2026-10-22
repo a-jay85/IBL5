@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\UpdateAllTheThings\Steps;
 
 use Boxscore\BoxscoreProcessor;
-use Boxscore\BoxscoreRepository;
+use Boxscore\AllStarTeamRepository;
 use Boxscore\BoxscoreView;
 use PHPUnit\Framework\TestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
@@ -15,8 +15,8 @@ class ProcessAllStarGamesStepTest extends TestCase
 {
     /** @var BoxscoreProcessor&\PHPUnit\Framework\MockObject\Stub */
     private BoxscoreProcessor $stubProcessor;
-    /** @var BoxscoreRepository&\PHPUnit\Framework\MockObject\Stub */
-    private BoxscoreRepository $stubRepo;
+    /** @var AllStarTeamRepository&\PHPUnit\Framework\MockObject\Stub */
+    private AllStarTeamRepository $stubRepo;
     /** @var BoxscoreView&\PHPUnit\Framework\MockObject\Stub */
     private BoxscoreView $stubView;
     /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
@@ -25,7 +25,7 @@ class ProcessAllStarGamesStepTest extends TestCase
     protected function setUp(): void
     {
         $this->stubProcessor = self::createStub(BoxscoreProcessor::class);
-        $this->stubRepo = self::createStub(BoxscoreRepository::class);
+        $this->stubRepo = self::createStub(AllStarTeamRepository::class);
         $this->stubView = self::createStub(BoxscoreView::class);
         $this->stubResolver = self::createStub(JsbSourceResolverInterface::class);
     }

@@ -3,7 +3,8 @@
 Opt in per module with `pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")`.
 `stub_ambient_git_show` is not autouse: `test_fidelity.py` and `test_fidelity_remediation.py`
 exercise the real `_git_show` through a `git` shim on PATH, and a repo-wide patch would
-defeat them. `no_real_pr_review_now` is the one autouse fixture.
+defeat them. `standard_review_depth` is opt-in the same way. Autouse fixtures: `no_real_pr_review_now`, `_reset_netretry_latch`,
+`isolate_live_reviewcache`, and `_private_log_dir`.
 """
 from __future__ import annotations
 
@@ -39,6 +40,17 @@ def stub_ambient_git_show(monkeypatch):
     monkeypatch.setattr(fidelity, "_git_show", _show)
 
 
+@pytest.fixture
+def standard_review_depth(monkeypatch):
+    """Pin runner's Phase 4 review depth to standard for tests that pin cache and interdiff
+    behavior at the standard tier. Replay bodies carry no two-way/localized Merge danger line,
+    so the real selection would read deep. Selection is covered by test_runner_review_depth.py."""
+    import runner
+    from harness.review import ReviewPhase
+    monkeypatch.setattr(runner, "_review_phase_for",
+                        lambda llm, gh, copy, meta, log, worktree=None: ReviewPhase(llm, gh, log=log, worktree=worktree))
+
+
 @pytest.fixture(autouse=True)
 def no_real_pr_review_now(monkeypatch):
     """Keep every test away from the real `bin/pr-review-now`.
@@ -50,3 +62,49 @@ def no_real_pr_review_now(monkeypatch):
     assert on the fire still set their own logging stub, which overrides this default.
     """
     monkeypatch.setenv("REVIEW_OWED_PR_REVIEW_NOW", "/usr/bin/true")
+
+
+@pytest.fixture(autouse=True)
+def _reset_netretry_latch():
+    from harness import netretry
+    netretry.reset_outage_latch()
+    yield
+    netretry.reset_outage_latch()
+
+
+@pytest.fixture(autouse=True)
+def isolate_live_reviewcache(tmp_path, monkeypatch):
+    """Keep live-shaped runs from sharing the harness's real `out/state` review cache.
+
+    A live run keys its state dir to the harness's own `out/state`, so without this a
+    record written by one test (or one local suite run) would turn the next live-shaped
+    run of the same slug into a cache hit.
+    """
+    from harness import reviewcache
+
+    real = os.path.realpath(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "out", "state"))
+    orig = reviewcache.record_path
+
+    def _path(state_dir, slug):
+        if os.path.realpath(state_dir) == real:
+            state_dir = str(tmp_path / "reviewcache-live-state")
+        return orig(state_dir, slug)
+
+    monkeypatch.setattr(reviewcache, "record_path", _path)
+
+
+@pytest.fixture(autouse=True)
+def _private_log_dir(tmp_path_factory, monkeypatch):
+    """Point post-plan-now's $LOG and .session sidecar at a per-test dir.
+
+    bin/post-plan-now writes ${POSTPLAN_LOG_DIR:-/tmp}/post-plan-now-<slug>-<ts>.log.
+    Any test that runs the real script past its sourced-return guard would
+    otherwise leave a file in /tmp. Autouse here covers every module, so a new
+    test that runs the script cannot forget it.
+
+    The dir comes from tmp_path_factory, not tmp_path: tests that assert their own
+    tmp_path is empty would otherwise trip over it."""
+    d = tmp_path_factory.mktemp("ppn-logs")
+    monkeypatch.setenv("POSTPLAN_LOG_DIR", str(d))
+    return d

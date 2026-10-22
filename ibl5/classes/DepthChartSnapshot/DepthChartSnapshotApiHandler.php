@@ -1,0 +1,285 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DepthChartSnapshot;
+
+use Security\HtmlSanitizer;
+use Team\Team;
+use Season\Season;
+
+/**
+ * AJAX JSON endpoint handler for saved depth charts
+ *
+ * Actions: list, load, rename
+ *
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
+ */
+class DepthChartSnapshotApiHandler
+{
+    private \mysqli $db;
+    private DepthChartSnapshotService $service;
+    private DepthChartSnapshotRepository $repository;
+    private \Api\Response\HtmlResponder $responder;
+    /**
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
+     */
+    private ?Season $season = null;
+
+    public function __construct(\mysqli $db, ?Season $season = null)
+    {
+        $this->db = $db;
+        $this->service = new DepthChartSnapshotService($db);
+        $this->repository = new DepthChartSnapshotRepository($db);
+        $this->responder = new \Api\Response\HtmlResponder();
+        $this->season = $season;
+    }
+
+    /**
+     * Handle an API request
+     *
+     * @param string $action The action to perform (list, load, rename, rename-active)
+     * @param int $teamid The team ID (already authorized)
+     * @param string $username The authenticated username
+     * @param array<string, mixed> $params Request parameters
+     */
+    public function handle(string $action, int $teamid, string $username, array $params): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            switch ($action) {
+                case 'list':
+                    $this->handleList($teamid);
+                    break;
+                case 'load':
+                    $this->handleLoad($teamid, $params);
+                    break;
+                case 'rename':
+                    $this->handleRename($teamid, $params);
+                    break;
+                case 'rename-active':
+                    $this->handleRenameActive($teamid, $username, $params);
+                    break;
+                default:
+                    $this->sendError('Unknown action', 400);
+            }
+        } catch (\RuntimeException $e) {
+            $this->sendError($e->getMessage(), 500);
+        }
+    }
+
+    private function handleList(int $teamid): void
+    {
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
+        $options = $this->service->getDropdownOptions($teamid, $season);
+
+        $depthCharts = [];
+        $savedDcs = $this->repository->getSavedDepthChartsForTeam($teamid);
+
+        foreach ($savedDcs as $dc) {
+            $depthCharts[] = [
+                'id' => $dc['id'],
+                'name' => $dc['name'],
+                'simStartDate' => $dc['sim_start_date'],
+                'simEndDate' => $dc['sim_end_date'],
+                'simNumberStart' => $dc['sim_number_start'],
+                'simNumberEnd' => $dc['sim_number_end'],
+                'isActive' => $dc['is_active'] === 1,
+                'createdAt' => $dc['created_at'],
+            ];
+        }
+
+        $currentLiveLabel = $this->service->buildCurrentLiveLabel($teamid, $season);
+
+        $this->responder->json([
+            'depthCharts' => $depthCharts,
+            'options' => $options,
+            'currentLiveLabel' => $currentLiveLabel,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private function handleLoad(int $teamid, array $params): void
+    {
+        $dcId = self::parseId($params);
+        if ($dcId <= 0) {
+            $this->sendError('Invalid depth chart ID', 400);
+            return;
+        }
+
+        // Get current roster PIDs
+
+        $depthChartRepo = new \DepthChart\DepthChartRepository($this->db);
+        $rosterPlayers = ($teamid > 0) ? $depthChartRepo->getPlayersOnTeam($teamid) : [];
+        $currentRosterPids = array_map(
+            static fn(array $p): int => $p['pid'],
+            $rosterPlayers
+        );
+
+        $loaded = $this->service->loadSavedDepthChart($dcId, $teamid, $currentRosterPids);
+        if ($loaded === null) {
+            $this->sendError('Depth chart not found', 404);
+            return;
+        }
+
+        $dc = $loaded['depthChart'];
+
+        $response = [
+            'depthChart' => [
+                'id' => $dc['id'],
+                'name' => $dc['name'],
+                'simStartDate' => $dc['sim_start_date'],
+                'simEndDate' => $dc['sim_end_date'],
+                'simNumberStart' => $dc['sim_number_start'],
+                'simNumberEnd' => $dc['sim_number_end'],
+                'isActive' => $dc['is_active'] === 1,
+            ],
+            'players' => self::buildPlayersPayload($loaded['players'], $loaded['tradedPids']),
+            'newPlayers' => self::buildNewPlayers($rosterPlayers, $loaded['newPlayerPids']),
+            'statsHtml' => $this->renderStatsHtml($teamid, $dc['sim_start_date'], $dc['sim_end_date']),
+        ];
+
+        $this->responder->json($response);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private function handleRename(int $teamid, array $params): void
+    {
+        $dcId = self::parseId($params);
+        $rawNameValue = $params['name'] ?? '';
+        $rawName = is_string($rawNameValue) ? $rawNameValue : '';
+        $newName = trim(strip_tags($rawName));
+
+        if ($dcId <= 0) {
+            $this->sendError('Invalid depth chart ID', 400);
+            return;
+        }
+
+        if ($newName === '') {
+            $this->sendError('Name cannot be empty', 400);
+            return;
+        }
+
+        if (mb_strlen($newName) > 100) {
+            $newName = mb_substr($newName, 0, 100);
+        }
+
+        $success = $this->repository->updateName($dcId, $teamid, $newName);
+
+        $this->responder->json(['success' => $success, 'name' => $newName]);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private function handleRenameActive(int $teamid, string $username, array $params): void
+    {
+        $rawNameValue = $params['name'] ?? '';
+        $rawName = is_string($rawNameValue) ? $rawNameValue : '';
+        $newName = trim(strip_tags($rawName));
+
+        if ($newName === '') {
+            $this->sendError('Name cannot be empty', 400);
+            return;
+        }
+
+        if (mb_strlen($newName) > 100) {
+            $newName = mb_substr($newName, 0, 100);
+        }
+
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
+        $result = $this->service->nameOrCreateActive($teamid, $username, $newName, $season);
+
+        $this->responder->json($result);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $players rows from getPlayersForDepthChart
+     * @param list<int> $tradedPids
+     * @return list<array<string, mixed>>
+     */
+    private static function buildPlayersPayload(array $players, array $tradedPids): array
+    {
+        $payload = [];
+        foreach ($players as $player) {
+            $isOnCurrentRoster = !in_array($player['pid'], $tradedPids, true);
+            $payload[] = [
+                'pid' => $player['pid'],
+                'playerName' => $player['player_name'],
+                'dc_PGDepth' => $player['dc_pg_depth'],
+                'dc_SGDepth' => $player['dc_sg_depth'],
+                'dc_SFDepth' => $player['dc_sf_depth'],
+                'dc_PFDepth' => $player['dc_pf_depth'],
+                'dc_CDepth' => $player['dc_c_depth'],
+                'dc_canPlayInGame' => $player['dc_can_play_in_game'],
+                'dc_minutes' => $player['dc_minutes'],
+                'dc_of' => $player['dc_of'],
+                'dc_df' => $player['dc_df'],
+                'dc_oi' => $player['dc_oi'],
+                'dc_di' => $player['dc_di'],
+                'dc_bh' => $player['dc_bh'],
+                'isOnCurrentRoster' => $isOnCurrentRoster,
+            ];
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param list<PlayerRow> $rosterPlayers rows from getPlayersOnTeam
+     * @param list<int> $newPlayerPids
+     * @return list<array{pid: int, playerName: string, pos: string}>
+     */
+    private static function buildNewPlayers(array $rosterPlayers, array $newPlayerPids): array
+    {
+        $newPlayers = [];
+        foreach ($rosterPlayers as $rp) {
+            $rpPid = (int) $rp['pid'];
+            if (in_array($rpPid, $newPlayerPids, true)) {
+                $newPlayers[] = [
+                    'pid' => $rpPid,
+                    'playerName' => (string) ($rp['name'] ?? ''),
+                    'pos' => (string) ($rp['pos'] ?? ''),
+                ];
+            }
+        }
+
+        return $newPlayers;
+    }
+
+    private function renderStatsHtml(int $teamid, ?string $startDate, ?string $endDate): string
+    {
+        if ($endDate === null || $endDate === '') {
+            return '';
+        }
+        $team = Team::initialize($this->db, $teamid);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
+
+        return \BasketballStats\Tables\PeriodAverages::render($this->db, $team, $season, $startDate, $endDate);
+    }
+
+    /**
+     * Parse the depth chart id from request params. Mirrors the original inline
+     * parse: int passes through, numeric string is cast, anything else is 0.
+     * Callers reject <= 0 with a 400.
+     *
+     * @param array<string, mixed> $params
+     */
+    private static function parseId(array $params): int
+    {
+        $rawId = $params['id'] ?? 0;
+
+        return is_int($rawId) ? $rawId : (is_string($rawId) && is_numeric($rawId) ? (int) $rawId : 0);
+    }
+
+    private function sendError(string $message, int $httpCode): void
+    {
+        http_response_code($httpCode);
+        $this->responder->json(['error' => $message]);
+    }
+}

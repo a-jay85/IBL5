@@ -157,7 +157,7 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getPointDifferentials(2099);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // Find Metros (teamid=1): Game 1 home: 110 scored, 90 allowed. Game 2 visitor: 95 scored, 100 allowed.
         $metros = null;
         foreach ($result as $row) {
@@ -178,7 +178,7 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
     public function testIsDraftOrderFinalizedReturnsFalse(): void
     {
         // Explicitly set to 'No' within the transaction to avoid relying on seed/production state
-        $stmt = $this->db->prepare("UPDATE ibl_settings SET value = 'No' WHERE setting_key = 'Draft Order Finalized'");
+        $stmt = $this->db->prepare("UPDATE ibl_settings SET setting_value = 'No' WHERE setting_key = 'Draft Order Finalized'");
         self::assertNotFalse($stmt);
         $stmt->execute();
         $stmt->close();
@@ -206,6 +206,41 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
         self::assertCount(2, $rows);
         self::assertSame('Metros', $rows[0]['team']);
         self::assertSame('Sharks', $rows[1]['team']);
+    }
+
+    public function testSaveFinalDraftOrderPersistsEveryPickOnce(): void
+    {
+        $picks = [
+            ['round' => 1, 'pick' => 1, 'team' => 'Metros', 'teamid' => 1],
+            ['round' => 1, 'pick' => 2, 'team' => 'Sharks', 'teamid' => 2],
+            ['round' => 2, 'pick' => 1, 'team' => 'Sharks', 'teamid' => 2],
+            ['round' => 2, 'pick' => 2, 'team' => 'Metros', 'teamid' => 1],
+        ];
+
+        $this->repo->saveFinalDraftOrder(2098, $picks);
+
+        $result = $this->db->query(
+            "SELECT round, pick, team, teamid, player, uuid FROM `ibl_draft` WHERE year = 2098 ORDER BY round, pick"
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $rows = $result->fetch_all(MYSQLI_ASSOC);
+
+        // Independent count: one stored row per submitted pick, no duplicates.
+        self::assertCount(count($picks), $rows);
+        foreach ($picks as $index => $pick) {
+            self::assertSame($pick['round'], $rows[$index]['round']);
+            self::assertSame($pick['pick'], $rows[$index]['pick']);
+            self::assertSame($pick['team'], $rows[$index]['team']);
+            self::assertSame($pick['teamid'], $rows[$index]['teamid']);
+            self::assertSame('', $rows[$index]['player']);
+        }
+        $uuids = array_column($rows, 'uuid');
+        self::assertCount(count($picks), array_unique($uuids), 'Every inserted slot gets its own UUID()');
+        foreach ($uuids as $uuid) {
+            self::assertIsString($uuid);
+            self::assertNotSame('', $uuid);
+        }
+        self::assertTrue($this->repo->isDraftOrderFinalized());
     }
 
     public function testSaveFinalDraftOrderSetsFinalized(): void

@@ -146,6 +146,7 @@ $knownActions = [
     'set-eoy-votes',
     'set-leaders-htm',
     'set-player-name',
+    'shadow-log',
 ];
 
 // A named-but-unrecognised action is a client mistake, not a method mistake.
@@ -226,7 +227,7 @@ if ($method === 'DELETE' && $action === 'reset-draft-order') {
     $stmt->execute();
     $cleared = $stmt->affected_rows;
     $stmt->close();
-    $db->query("UPDATE ibl_settings SET value = 'No' WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'");
+    $db->query("UPDATE ibl_settings SET setting_value = 'No' WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'");
     echo json_encode(['cleared' => $cleared]);
     $db->close();
     exit;
@@ -618,6 +619,48 @@ if ($method === 'GET' && $action === 'count-shadow-rows') {
     exit;
 }
 
+// GET ?action=shadow-log&offset=N — read-only view of the detached engine-shadow
+// run's log. ShadowProcessLauncher appends the run's STDOUT/STDERR to this fixed
+// path (scripts/updateAllTheThings.php). `offset` is the byte size the caller
+// recorded before triggering the updater: only bytes after it come back, capped
+// at the last 8192 so the terminal line is always included. `enabled` repeats the
+// spawn gate from updateAllTheThings.php, so the E2E can tell "shadow is off on
+// this stack" apart from "the spawn never happened".
+if ($method === 'GET' && $action === 'shadow-log') {
+    $offsetRaw = $_GET['offset'] ?? '0';
+    if (!is_string($offsetRaw) || !ctype_digit($offsetRaw)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'offset must be a non-negative integer']);
+        $db->close();
+        exit;
+    }
+    $logPath = sys_get_temp_dir() . '/ibl5-engine-shadow.log';
+    clearstatcache(true, $logPath);
+    $fileSize = is_file($logPath) ? filesize($logPath) : false;
+    $size = $fileSize === false ? 0 : $fileSize;
+    $offset = (int) $offsetRaw;
+    if ($offset > $size) {
+        $offset = 0; // the log was truncated or replaced after the caller read its size
+    }
+    $start = max($offset, $size - 8192);
+    $tail = '';
+    if ($size > $start) {
+        $read = file_get_contents($logPath, false, null, $start, $size - $start);
+        $tail = $read === false ? '' : $read;
+    }
+    $shadowFlag = getenv('ENGINE_SHADOW_ENABLED');
+    echo json_encode(
+        [
+            'enabled' => filter_var($shadowFlag === false ? '' : $shadowFlag, FILTER_VALIDATE_BOOLEAN),
+            'size' => $size,
+            'tail' => $tail,
+        ],
+        JSON_INVALID_UTF8_SUBSTITUTE,
+    );
+    $db->close();
+    exit;
+}
+
 // DELETE ?action=reset-allstar-names — delete and re-insert the ASG seed rows
 // (delete+insert is idempotent even after partial renames)
 if ($method === 'DELETE' && $action === 'reset-allstar-names') {
@@ -904,14 +947,14 @@ if ($method === 'DELETE' && $action === 'reset-fa-signings') {
 $settingsLeague = is_string($_GET['league'] ?? null) ? $_GET['league'] : 'ibl';
 
 if ($method === 'GET') {
-    $stmt = $db->prepare('SELECT setting_key, value FROM ibl_settings WHERE league = ?');
+    $stmt = $db->prepare('SELECT setting_key, setting_value FROM ibl_settings WHERE league = ?');
     $stmt->bind_param('s', $settingsLeague);
     $stmt->execute();
     $result = $stmt->get_result();
     $settings = [];
     if ($result) {
         while ($row = $result->fetch_assoc()) {
-            $settings[$row['setting_key']] = $row['value'];
+            $settings[$row['setting_key']] = $row['setting_value'];
         }
         $result->free();
     }
@@ -943,9 +986,9 @@ if ($method === 'POST') {
     $previous = [];
     $applied = [];
 
-    $selectStmt = $db->prepare('SELECT value FROM ibl_settings WHERE setting_key = ? AND league = ?');
+    $selectStmt = $db->prepare('SELECT setting_value FROM ibl_settings WHERE setting_key = ? AND league = ?');
     $upsertStmt = $db->prepare(
-        'INSERT INTO ibl_settings (setting_key, value, league) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)'
+        'INSERT INTO ibl_settings (setting_key, setting_value, league) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
     );
 
     foreach ($input as $name => $value) {
@@ -954,7 +997,7 @@ if ($method === 'POST') {
         $selectStmt->execute();
         $result = $selectStmt->get_result();
         $row = $result->fetch_assoc();
-        $previous[$name] = $row !== null ? $row['value'] : null;
+        $previous[$name] = $row !== null ? $row['setting_value'] : null;
 
         // Upsert new value
         $upsertStmt->bind_param('sss', $name, $value, $settingsLeague);

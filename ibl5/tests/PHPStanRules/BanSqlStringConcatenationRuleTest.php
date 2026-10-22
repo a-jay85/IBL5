@@ -32,4 +32,27 @@ final class BanSqlStringConcatenationRuleTest extends RuleTestCase
             ],
         );
     }
+
+    public function testFlagsNonConstantConcatenationInBlocksDirectory(): void
+    {
+        $message = 'SQL string concatenates a non-constant value. Concatenating a runtime '
+            . 'value into query text risks SQL injection. Use bound parameters (?) for values, '
+            . 'and a validated allowlist/match() for identifiers (table/column names).';
+
+        $this->analyse(
+            [__DIR__ . '/Fixtures/blocks/SqlStringConcatenation.php'],
+            [
+                [$message, 11],
+                [$message, 17],
+            ],
+        );
+    }
+
+    public function testIgnoresConcatenationOutsideGatedDirectories(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/subblocks/SqlStringConcatenation.php'],
+            [],
+        );
+    }
 }

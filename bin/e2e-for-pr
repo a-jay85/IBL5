@@ -34,10 +34,12 @@ if [[ -z "$WORKTREE_NAME" ]]; then
     exit 1
 fi
 
-# Always resolve to the main repo root, even when run from a worktree.
-REPO_ROOT="$(cd "$(dirname "$0")/.." && \
-    dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 source "$(dirname "$0")/lib/git-helpers.sh"
+# Always resolve to the main repo root, even when run from a worktree.
+REPO_ROOT="$(main_checkout_root "$(dirname "$0")/..")" || {
+    echo "ERROR: cannot locate main checkout" >&2
+    exit 1
+}
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 WORKTREE_PATH="$WT_PARENT/$WORKTREE_NAME"
 IBL5_DIR="$REPO_ROOT/ibl5"
@@ -82,7 +84,7 @@ while IFS= read -r file; do
     # --- Shared base PHP classes ---
     if [[ "$file" == ibl5/classes/Database/BaseMysqliRepository.php ]] || \
        [[ "$file" == ibl5/classes/League/ContractRules.php ]] || \
-       [[ "$file" == ibl5/classes/League/JSB.php ]] || \
+       [[ "$file" == ibl5/classes/League/JsbConstants.php ]] || \
        [[ "$file" == ibl5/classes/CommonMysqliRepository.php ]]; then
         exit 2
     fi

@@ -257,8 +257,9 @@ def test_refusal_reason_lockfile(tmp_path):
 
 
 def test_refusal_reason_delete_modify(tmp_path):
+    # A modify/delete conflict is resolvable now; the probe predicts no refusal.
     _, g, _ = _probed(tmp_path, conflict=True, dirty=True, path="c.txt", master_deletes=True)
-    assert g.resolver_refusal_reason().startswith(conflict.UNRESOLVABLE_STAGES)
+    assert g.resolver_refusal_reason() is None
 
 
 def test_refusal_reason_none_for_resolvable_text_conflict(tmp_path):
@@ -292,7 +293,7 @@ def test_refusal_reason_first_sorted_refusable_path_wins(tmp_path):
     g.last_conflict_stages = {
         "b.txt": frozenset({1, 2, 3}),
         "ibl5/migrations/002_y.sql": frozenset({1, 2, 3}),
-        "a.txt": frozenset({1, 3}),
+        "a.txt": frozenset({2, 3}),
     }
     reason = g.resolver_refusal_reason()
     assert reason.startswith(conflict.UNRESOLVABLE_STAGES)
@@ -313,7 +314,7 @@ _COPY = {"type": "chore", "title": "chore: probe", "commit_subject": "chore: pro
          "summary_md": "## Summary\n- x\n"}
 
 
-def _run_live(tmp_path, wt, monkeypatch, body_check, *, calls=None, resolver=True):
+def _run_live(tmp_path, wt, monkeypatch, body_pass, *, calls=None, resolver=True):
     if calls is None:
         calls = {"pr_copy": 0}
 
@@ -330,7 +331,7 @@ def _run_live(tmp_path, wt, monkeypatch, body_check, *, calls=None, resolver=Tru
         return dict(_COPY), False
 
     monkeypatch.setattr(runner, "_pr_copy", fake_pr_copy)
-    monkeypatch.setattr(runner, "_body_check", body_check)
+    monkeypatch.setattr(runner, "_mechanical_body_pass", body_pass)
     monkeypatch.setattr(runner, "LiveGh",
                         lambda out_dir, worktree, slug: RecordingGh(out_dir))
     (tmp_path / "plans").mkdir(exist_ok=True)
@@ -345,13 +346,13 @@ def _run_live(tmp_path, wt, monkeypatch, body_check, *, calls=None, resolver=Tru
 
 
 @pytest.mark.parametrize("dirty", [False, True])
-def test_runner_conflict_fails_closed_before_body_check(tmp_path, monkeypatch, dirty):
+def test_runner_conflict_fails_closed_before_body_pass(tmp_path, monkeypatch, dirty):
     """Without an LLM resolver the probe gates: no body check, exit 3."""
     wt = _plain_scenario(tmp_path, conflict=True, dirty=dirty)
     head0 = _rev(wt, "HEAD")
 
     def spy(*a, **k):
-        raise AssertionError("_body_check must not run without LLM resolver")
+        raise AssertionError("_mechanical_body_pass must not run without LLM resolver")
 
     res, calls = _run_live(tmp_path, wt, monkeypatch, spy, resolver=False)
     assert res.terminal == TerminalState.FAILED
@@ -364,7 +365,7 @@ def test_runner_conflict_fails_closed_before_body_check(tmp_path, monkeypatch, d
     assert _rev(wt, "HEAD") == head0
 
 
-def test_runner_conflict_advisory_with_llm_reaches_body_check(tmp_path, monkeypatch):
+def test_runner_conflict_advisory_with_llm_reaches_body_pass(tmp_path, monkeypatch):
     """When LLM resolver is active, a predicted conflict is advisory and body check runs."""
     wt = _plain_scenario(tmp_path, conflict=True, dirty=True)
     hits = []
@@ -384,11 +385,11 @@ def test_runner_conflict_advisory_with_llm_reaches_body_check(tmp_path, monkeypa
     assert "stopping before body check" not in audit_text
 
 
-def _assert_refused_before_body_check(tmp_path, monkeypatch, wt, path, reason_prefix):
+def _assert_refused_before_body_pass(tmp_path, monkeypatch, wt, path, reason_prefix):
     head0 = _rev(wt, "HEAD")
 
     def spy(*a, **k):
-        raise AssertionError("_body_check must not run on a resolver-refused conflict")
+        raise AssertionError("_mechanical_body_pass must not run on a resolver-refused conflict")
 
     res, calls = _run_live(tmp_path, wt, monkeypatch, spy)
     assert res.terminal == TerminalState.FAILED
@@ -405,15 +406,18 @@ def _assert_refused_before_body_check(tmp_path, monkeypatch, wt, path, reason_pr
 def test_runner_refusable_migration_conflict_fails_closed_with_llm(tmp_path, monkeypatch):
     path = "ibl5/migrations/001_x.sql"
     wt = _plain_scenario(tmp_path, conflict=True, dirty=True, path=path)
-    _assert_refused_before_body_check(
+    _assert_refused_before_body_pass(
         tmp_path, monkeypatch, wt, path, conflict.UNRESOLVABLE_MIGRATION)
 
 
-def test_runner_delete_modify_conflict_fails_closed_with_llm(tmp_path, monkeypatch):
+def test_runner_delete_modify_conflict_is_advisory_with_llm(tmp_path, monkeypatch):
+    """A modify/delete conflict is resolvable, so with an LLM configured the probe is
+    advisory and the run reaches the body check instead of a fail-closed exit 3."""
     wt = _plain_scenario(tmp_path, conflict=True, dirty=True, path="c.txt",
                          master_deletes=True)
-    _assert_refused_before_body_check(
-        tmp_path, monkeypatch, wt, "c.txt", conflict.UNRESOLVABLE_STAGES)
+    audit_text = _assert_advisory_fall_through(tmp_path, monkeypatch, wt)
+    assert "merge-tree probe predicted" in audit_text
+    assert "would refuse" not in audit_text
 
 
 def _assert_advisory_fall_through(tmp_path, monkeypatch, wt):
@@ -462,7 +466,7 @@ def test_runner_probe_git_error_falls_through_even_for_migration(tmp_path, monke
     assert "would refuse" not in audit_text
 
 
-def test_runner_clean_branch_reaches_body_check(tmp_path, monkeypatch):
+def test_runner_clean_branch_reaches_body_pass(tmp_path, monkeypatch):
     wt = _plain_scenario(tmp_path, conflict=False, dirty=True)
     hits = []
     calls = {"pr_copy": 0}
@@ -480,7 +484,7 @@ def test_runner_clean_branch_reaches_body_check(tmp_path, monkeypatch):
     assert "merge-tree probe predicted" not in audit_text
 
 
-def test_runner_stacked_squash_parent_reaches_body_check(tmp_path, monkeypatch):
+def test_runner_stacked_squash_parent_reaches_body_pass(tmp_path, monkeypatch):
     wt, _ = _stacked_scenario(tmp_path)
     hits = []
 

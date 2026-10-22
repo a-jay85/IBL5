@@ -92,13 +92,13 @@ def test_shipped_held_is_not_armed():
 
 
 def test_held_other_condition_line_unchanged():
-    """Pin: a run held by condition (8) with no meta-check failures prints this exact line."""
+    """Pin: a run held by condition (8) with no meta-check failures prints this exact line (ending in the hold= reasons)."""
     r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
              arm=_held_arm(8))
     line = runner.verdict_line(r, 0)
     assert line == (
         "RESULT: post-plan complete — terminal=shipped-held "
-        "auto-merge=HELD (human merges) PR #7 findings=0"
+        "auto-merge=HELD (human merges) PR #7 findings=0 hold=(8) held"
     )
 
 
@@ -353,6 +353,27 @@ def test_local_gate_contains_result_and_error():
     assert "ERROR" in line
 
 
+def _timeout_res():
+    return _res(TerminalState.FAILED, error_kind="subprocess-timeout",
+                error="subprocess-timeout: step 'scope-check' timed out after 120s",
+                error_cmd="bin/lib/plan-scope-conformance a b c d")
+
+
+def test_subprocess_timeout_verdict_names_step():
+    line = runner.verdict_line(_timeout_res(), 3)
+    assert line.startswith("RESULT: ")
+    assert "scope-check" in line
+    assert "120s" in line
+    assert "hung past its timeout" in line
+    assert "plan-scope-conformance" in line
+
+
+def test_subprocess_timeout_verdict_is_not_gate_denial():
+    line = runner.verdict_line(_timeout_res(), 3)
+    assert "gate denied" not in line
+    assert "[class=" not in line
+
+
 def test_local_gate_empty_error_falls_back_to_generic():
     r = _res(TerminalState.FAILED, error_kind="local-gate", error="")
     line = runner.verdict_line(r, 3)
@@ -590,6 +611,11 @@ _RC3_CASES = [
      "RESULT: post-plan BLOCKED — Claude usage limit reached (environmental); ERROR "
      "terminal=failed kind=llm-usage-limit. Claude usage limit reached "
      "Re-run bin/post-plan-now after the limit resets."),
+    ("auth", "llm-auth-expired", "safety-verdict: auth-expired: Failed to authenticate", {},
+     "RESULT: post-plan BLOCKED — Claude CLI login expired (environmental); ERROR "
+     "terminal=failed kind=llm-auth-expired. "
+     "safety-verdict: auth-expired: Failed to authenticate "
+     "Run `claude` and complete /login, then re-run bin/post-plan-now."),
     ("diverged", "remote-head-diverged", "phase4: head moved", {},
      "RESULT: post-plan BLOCKED — remote head diverged at phase4 "
      "(the PR branch changed on GitHub); ERROR terminal=failed "

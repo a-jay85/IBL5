@@ -14,6 +14,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import sticky_shapes
 from harness import fidelity
 from harness.armable import ArmInputs, evaluate
 from harness.state import Classification
@@ -123,7 +124,8 @@ def _decision(**kw):
                 findings=[], unresolved_conformance=[], phase5_status="pass",
                 plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
-                unresolved_findings=[], conflict_resolved=False, current_tree=TREE)
+                unresolved_findings=[], conflict_resolved=False, current_tree=TREE,
+                merge_danger_state="TWO-WAY")
     base.update(kw)
     return evaluate(ArmInputs(**base))
 
@@ -272,9 +274,14 @@ def test_remediation_sha_annotates_the_last_digest_row():
     assert "addresses the verdict-1 NOT READY findings" not in body
 
 
+NOT_READY_TERMINAL = ("NOT READY \u2014 the blocking findings listed above remain; "
+                      "remediate and re-run /post-plan")
+
+
 def test_missing_verdict_names_the_error_kind():
-    body = _sticky(fid={"verdict_1": None, "error_kind": "llm-tooled-empty"}, excerpt="")
-    assert body.splitlines()[0].startswith("**missing**")
+    body = _sticky(fid={"verdict_1": None, "error_kind": "llm-tooled-empty"}, excerpt="",
+                   terminal=NOT_READY_TERMINAL)
+    assert body.splitlines()[0].startswith("**NOT READY**")
     assert "Plan-fidelity verdict:" not in body
     assert "(no verdict file: llm-tooled-empty)" in body
 
@@ -291,7 +298,9 @@ def test_header_names_the_round_the_findings_came_from():
                         "findings_round": 2,
                         "rounds": [{"remediation_sha": "dead123", "verdict": "NOT READY"},
                                    {"remediation_sha": "abc1234",
-                                    "verdict": "READY WITH NOTES"}]})
+                                    "verdict": "READY WITH NOTES"}]},
+                   terminal="READY WITH NOTES (re-review) \u2014 findings remediated in "
+                            "abc1234; the re-review left notes open")
     assert body.splitlines()[0].startswith("**READY WITH NOTES** (re-review, round 2)")
     assert "**NOT READY**" not in body.splitlines()[0]
     assert "Plan-fidelity verdict:" not in body
@@ -301,7 +310,7 @@ def test_header_names_the_round_the_findings_came_from():
 def test_header_falls_back_to_verdict_1_without_a_graded_round():
     """findings_round 0 — and a fid that predates the key — both read verdict 1."""
     for fid in ({"verdict_1": "NOT READY", "findings_round": 0}, {"verdict_1": "NOT READY"}):
-        body = _sticky(fid=fid)
+        body = _sticky(fid=fid, terminal=NOT_READY_TERMINAL)
         assert body.splitlines()[0].startswith("**NOT READY**")
         assert "Plan-fidelity verdict:" not in body
         assert "(re-review, round" not in body.splitlines()[0]
@@ -309,7 +318,8 @@ def test_header_falls_back_to_verdict_1_without_a_graded_round():
 
 def test_an_out_of_range_findings_round_falls_back_rather_than_raising():
     """A truncated `rounds` list must not IndexError the whole comment away."""
-    body = _sticky(fid={"verdict_1": "NOT READY", "findings_round": 3, "rounds": []})
+    body = _sticky(fid={"verdict_1": "NOT READY", "findings_round": 3, "rounds": []},
+                   terminal=NOT_READY_TERMINAL)
     assert body.splitlines()[0].startswith("**NOT READY**")
     assert "(re-review, round" not in body.splitlines()[0]
     assert "Plan-fidelity verdict:" not in body
@@ -325,7 +335,9 @@ def test_the_remediation_sentence_names_the_graded_commit():
     body = _sticky(fid={"verdict_1": "NOT READY", "remediation_sha": "bbb2222",
                         "verdict_2": None, "findings_round": 1,
                         "rounds": [{"remediation_sha": "aaa1111", "verdict": "NOT READY"},
-                                   {"remediation_sha": "bbb2222", "verdict": None}]})
+                                   {"remediation_sha": "bbb2222", "verdict": None}]},
+                   terminal="NOT READY \u2014 re-review produced no verdict; re-run "
+                            "/post-plan")
     assert "Remediation: commit" not in body
     assert "commit aaa1111 closed" not in body
     assert "commit bbb2222 closed" not in body
@@ -361,6 +373,31 @@ def test_clean_ready_renders_target_shape():
     assert order == sorted(order) and len(set(order)) == len(order)
 
 
+def test_committed_fixture_matches_writer_tail_shape():
+    """bin/test-review-shared-skip runs skip-review.sh against this captured body; if the
+    writer's tail or audit-trail anchor ever changes, this fails before the gate goes inert."""
+    import json
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[3]
+    fx = json.loads((root / "bin/fixtures/review-shared/post-plan-sticky-pr2892.json").read_text())
+    stickies = [c["body"] for c in fx["comments"] if fidelity.STICKY_MARKER in (c.get("body") or "")]
+    assert len(stickies) == 1
+    captured = stickies[0].replace("\r", "").rstrip("\n").split("\n")
+    body = _sticky(excerpt=CLEAN_EXCERPT, ci_line=CI_PASS, diff_id="d" * 40,
+                   plan_hash="e" * 64, posted_at=TS).rstrip("\n").split("\n")
+    # Tail shape the skip-review.sh Step 8 anchor keys on: </details>, blank, READY, marker.
+    assert captured[-4:] == body[-4:] == ["</details>", "", "READY", fidelity.STICKY_MARKER]
+    opener = "<details><summary>Audit trail</summary>"
+    assert captured.count(opener) == 1 and body.count(opener) == 1
+    for lines in (captured, body):
+        block = lines[lines.index(opener) + 1:len(lines) - 4]
+        assert sum(ln.startswith("**Reviewed tree:** ") for ln in block) == 1
+        assert not any(ln.startswith(("<details", "</details", "```")) for ln in block)
+        # header, 5 labels, blank, then the --- rule that ends the Step 11 digest parse.
+        assert lines[lines.index("### Merge digest") + 7] == "---"
+    assert captured[0].startswith("**READY**") and not captured[0].startswith("**Reviewed tree:**")
+
+
 def test_deviating_status_lines_print():
     rebase = "REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; manifest=/tmp/m"
     ci_fail = "CI: local verification fail; GitHub checks are watched after this comment"
@@ -374,6 +411,16 @@ def test_deviating_status_lines_print():
     assert skipped.index(ci_skipped) < skipped.index(fidelity.MERGE_DIGEST_HEADING)
     # The expected REBASE= default beside a deviating CI line is still suppressed.
     assert "REBASE=clean" not in skipped
+
+
+def test_fidelity_expects_merged_rebase_label():
+    # Phase 2 merges origin/master in, so the plain merge label is expected and stays
+    # out of the sticky; the retired rebase label now reads as a deviation and prints.
+    merged = _sticky(rebase_line="REBASE=merged origin/master")
+    assert "REBASE=" not in merged
+    old = "REBASE=rebased onto origin/master"
+    stale = _sticky(rebase_line=old)
+    assert stale.index(old) < stale.index(fidelity.MERGE_DIGEST_HEADING)
 
 
 def test_nonempty_findings_are_kept_verbatim():
@@ -862,3 +909,197 @@ def test_remediation_denied_tools_contain_write_and_merge_verbs():
     assert "Bash(gh pr review:*)" in denied
     assert "Bash(gh api:*)" in denied
     assert "Agent" in denied
+
+
+# --- header word equals footer word ------------------------------------------
+
+
+def _verdict_word(line: str, cuts: tuple) -> str:
+    word = line.replace("*", "")
+    for cut in cuts:
+        word = word.split(cut)[0]
+    return word.strip()
+
+
+_VERDICT_WORDS = ("READY WITH NOTES", "NOT READY", "READY")
+
+
+@pytest.mark.parametrize("v1,v2", [
+    ("READY", None),
+    ("READY WITH NOTES", None),
+    ("NOT READY", "READY"),
+    ("NOT READY", "READY WITH NOTES"),
+    ("NOT READY", "NOT READY"),
+])
+def test_sticky_banner_verdict_matches_terminal_verdict(tmp_path, v1, v2):
+    """Catches a banner and a terminal line that compute the verdict separately.
+
+    Mutation check: appending out.append("READY") after the banner fails every case.
+    """
+    body = sticky_shapes.render_sticky(sticky_shapes.pr3267_inputs(tmp_path, v1, v2))
+    lines = body.splitlines()
+    assert lines[-1] == fidelity.STICKY_MARKER
+    banner = _verdict_word(lines[0], (" (", " \u2014", " \u00b7"))
+    footer = _verdict_word(
+        [ln for ln in lines[:-1] if ln.strip()][-1], (" (", " \u2014"))
+    assert banner == footer
+    stated = []
+    inside = False
+    for ln in lines[:lines.index("---")]:
+        if ln.startswith("<details"):
+            inside = True
+        elif ln.startswith("</details>"):
+            inside = False
+        elif not inside and ln.replace("*", "").strip().startswith(_VERDICT_WORDS):
+            stated.append(ln)
+    assert len(stated) == 1
+
+
+# --- terminal line wording and the re-review carry-forward guard --------------
+
+OLD_REMEDIATED = ("READY (re-review) \u2014 findings remediated in 009d537a1b2c and "
+                  "re-reviewed clean on tree tree2aaaa")
+NEW_REMEDIATED_NOTES = ("READY WITH NOTES (re-review) \u2014 findings remediated in abc; "
+                        "the re-review on tree t left non-blocking notes open")
+
+
+def test_terminal_line_reader_outcomes_characterized():
+    """The old remediated footer is never carried forward. Green before and after."""
+    body = _details_shaped_body(OLD_REMEDIATED)
+    assert fidelity._sticky_prior_verdict(body) is None
+
+
+def test_terminal_line_splits_the_remediated_passing_rows():
+    assert fidelity.terminal_line("NOT READY", None, "abc1234", "READY", TREE, 1) == (
+        f"READY (re-review) \u2014 findings remediated in abc1234 and re-reviewed clean on "
+        f"tree {TREE}")
+    assert fidelity.terminal_line(
+        "NOT READY", None, "abc1234", "READY WITH NOTES", TREE, 1) == (
+        f"READY WITH NOTES (re-review) \u2014 findings remediated in abc1234; the "
+        f"re-review on tree {TREE} left non-blocking notes open")
+
+
+def test_sticky_prior_verdict_rejects_re_review_notes_footer():
+    assert fidelity._sticky_prior_verdict(
+        _details_shaped_body(NEW_REMEDIATED_NOTES)) is None
+
+
+def test_sticky_prior_verdict_bare_notes_still_carries():
+    legacy = ("READY WITH NOTES \u2014 notes left for the merging reviewer; the compiled "
+              "harness remediates only NOT READY")
+    assert fidelity._sticky_prior_verdict(
+        _details_shaped_body("READY WITH NOTES")) == "READY WITH NOTES"
+    assert fidelity._sticky_prior_verdict(
+        _details_shaped_body(legacy)) == "READY WITH NOTES"
+
+
+# --- Fixed and Still-open sections, code-review line ---------------------------
+
+NOTE_ITEMS = [sticky_shapes.NOTE_TITLES[0], sticky_shapes.NOTE_TITLES[1]]
+PR3267_REVIEWS = [
+    {"verdict": "NOT READY", "blocking": [sticky_shapes.BLOCKING_TITLE],
+     "notes": NOTE_ITEMS, "remediation_sha": None},
+    {"verdict": "READY WITH NOTES", "blocking": [], "notes": NOTE_ITEMS,
+     "remediation_sha": sticky_shapes.REMEDIATION_SHA},
+]
+PR3267_FILED = [
+    {"title": "Note one", "issue": 1492, "state": "filed"},
+    {"title": "Note two", "issue": None, "state": "not filed"},
+]
+
+
+def _pr3267_body(tmp_path, v1="NOT READY", v2="READY WITH NOTES", **fid_extra):
+    inputs = sticky_shapes.pr3267_inputs(tmp_path, v1, v2)
+    inputs["fid"].update(fid_extra)
+    return sticky_shapes.render_sticky(inputs)
+
+
+def test_sticky_pr3267_shape_renders_fixed_and_still_open(tmp_path):
+    body = _pr3267_body(tmp_path, review_items=PR3267_REVIEWS, filed_notes=PR3267_FILED)
+    assert "### Fixed in this PR" in body
+    assert "- [x] Sticky banner and footer disagree (fixed in 009d537a1b2c)" in body
+    assert "- [ ] Note one ([backlog#1492](<https://github.com/a-jay85/IBL5-backlog/" \
+        "issues/1492>))" in body
+    assert "- [ ] Note two (not filed)" in body
+    assert "<summary>Reviewer verdict</summary>" in body
+    assert "**Backlog issues filed:**" not in body
+
+
+def test_sticky_not_ready_final_lists_open_blocking_and_no_fixed(tmp_path):
+    reviews = [dict(PR3267_REVIEWS[0]), dict(PR3267_REVIEWS[0], remediation_sha="abc")]
+    body = _pr3267_body(tmp_path, v2="NOT READY", review_items=reviews)
+    assert "### Still open (blocking)" in body
+    assert "- [ ] Sticky banner and footer disagree" in body
+    assert "### Fixed in this PR" not in body
+
+
+def test_sticky_multi_round_cites_each_round_sha(tmp_path):
+    reviews = [
+        {"verdict": "NOT READY", "blocking": ["First finding"], "notes": [],
+         "remediation_sha": None},
+        {"verdict": "NOT READY", "blocking": ["Second finding"], "notes": [],
+         "remediation_sha": "body-only"},
+        {"verdict": "READY", "blocking": [], "notes": [], "remediation_sha": "bbb2222ccc33"},
+    ]
+    body = _pr3267_body(tmp_path, v2="READY", review_items=reviews)
+    assert "- [x] First finding (fixed in the PR body, round 1)" in body
+    assert "- [x] Second finding (fixed in bbb2222ccc33)" in body
+
+
+def test_sticky_unfiled_notes_beyond_the_record_are_counted(tmp_path):
+    body = _pr3267_body(tmp_path, review_items=PR3267_REVIEWS,
+                        filed_notes=PR3267_FILED[:1])
+    assert "- 1 more notes were not filed; the reviewer verdict below lists them." in body
+
+
+_COMMENT = {"created_at": "2026-10-16T06:51:18Z", "url": "https://x/c", "summary": "Fine."}
+
+
+@pytest.mark.parametrize("cr,expected", [
+    ({"phase4b_ran": True, "seen": {"scanned": True, "comment": _COMMENT}},
+     "**Code review:** Phase 4B ran in this run, and a /code-review comment was posted "
+     "at 2026-10-16T06:51:18Z ([comment](<https://x/c>)): Fine."),
+    ({"phase4b_ran": True, "seen": None}, "**Code review:** Phase 4B ran in this run."),
+    ({"phase4b_ran": False, "seen": {"scanned": True, "comment": _COMMENT}},
+     "**Code review:** a /code-review comment was posted at 2026-10-16T06:51:18Z "
+     "([comment](<https://x/c>)): Fine. Phase 4B did not run in this run."),
+    ({"phase4b_ran": False, "seen": {"scanned": True, "comment": None}},
+     "**Code review:** none ran. Phase 4B did not run, and the PR had no /code-review "
+     "comment when this run read its comments."),
+    ({"phase4b_ran": False, "seen": None},
+     "**Code review:** Phase 4B did not run. This run did not read the PR's comments, "
+     "so it cannot say whether a /code-review ran."),
+    (None, None),
+])
+def test_sticky_code_review_line_variants(tmp_path, cr, expected):
+    body = _pr3267_body(tmp_path, code_review=cr)
+    lines = [ln for ln in body.splitlines() if ln.startswith("**Code review:**")]
+    assert lines == ([expected] if expected else [])
+
+
+def test_sticky_layout_keeps_reader_anchors(tmp_path):
+    body = _pr3267_body(tmp_path, review_items=PR3267_REVIEWS, filed_notes=PR3267_FILED,
+                        code_review={"phase4b_ran": True, "seen": None})
+    lines = body.splitlines()
+    assert lines[0].startswith("**")
+    last_hold = max(i for i, ln in enumerate(lines) if ln.startswith("- ("))
+    assert lines[last_hold + 1] == ""
+    assert [i for i, ln in enumerate(lines) if re.match(r"^- \(\d", ln)] == [last_hold]
+    digest = lines.index(fidelity.MERGE_DIGEST_HEADING)
+    for heading in ("### Fixed in this PR", "### Still open (non-blocking)",
+                    "**Code review:**"):
+        assert [i for i, ln in enumerate(lines) if ln.startswith(heading)][0] < digest
+    assert lines[-4] == "</details>"
+    assert lines[-3] == ""
+    assert lines[-2].startswith("READY WITH NOTES (re-review)")
+    assert lines[-1] == fidelity.STICKY_MARKER
+    assert "**Review 1:** NOT READY, 1 blocking, 2 notes" in body
+    assert "**Review 2:** READY WITH NOTES, 0 blocking, 2 notes" in body
+
+
+def test_sticky_without_review_items_keeps_excerpt_visible(tmp_path):
+    body = _pr3267_body(tmp_path, review_items=None, filed_notes=None, code_review=None)
+    assert "### Fixed in this PR" not in body
+    assert "### Still open" not in body
+    assert "Reviewer verdict" not in body
+    assert "- [NOTE] Note one" in body

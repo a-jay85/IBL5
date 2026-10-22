@@ -9,6 +9,7 @@ use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 use Team\Team;
+use UI\RendersTableEnd;
 
 /**
  * View class for rendering draft history page.
@@ -20,6 +21,8 @@ use Team\Team;
  */
 class DraftHistoryView implements DraftHistoryViewInterface
 {
+    use RendersTableEnd;
+
     /**
      * @see DraftHistoryViewInterface::render()
      *
@@ -231,15 +234,5 @@ class DraftHistoryView implements DraftHistoryViewInterface
         }
 
         return $output;
-    }
-
-    /**
-     * Render the end of the table.
-     *
-     * @return string HTML table end
-     */
-    private function renderTableEnd(): string
-    {
-        return '</tbody></table>';
     }
 }

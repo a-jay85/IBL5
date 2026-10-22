@@ -550,6 +550,60 @@ def test_round2_ready(tmp_path, git_shim):
         _cleanup(991, "991-2")
 
 
+def test_filefix_commit_round_re_reviews_new_head(tmp_path, git_shim, monkeypatch):
+    """A round that lands a file-fix commit is re-reviewed against that commit's head."""
+    events = []
+    rules_path = ".claude/rules/visual-review-prs.md"
+
+    class _FileFixGit(_CountingGit):
+        def changed_files(self, base="origin/master"):
+            # Only the post-commit `<sha>^` probe sees the rules file.
+            return [rules_path] if str(base).endswith("^") else super().changed_files(base)
+
+        def push(self):
+            events.append("push")
+            return super().push()
+
+        def diff_vs_base(self, base="origin/master"):
+            events.append("diff_vs_base")
+            return super().diff_vs_base(base)
+
+    seen = []
+    real_re_review = fidelity.re_review
+
+    def spy(*args, **kwargs):
+        events.append("re_review")
+        seen.append(args[8])
+        return real_re_review(*args, **kwargs)
+
+    monkeypatch.setattr(fidelity.fidelity_filefix, "permit", lambda *a, **k: True)
+    monkeypatch.setattr(fidelity, "re_review", spy)
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "READY\n",
+    }
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    fx = _FileFixGit({"slug": "demo", "worktree_diff": "",
+                      "diff": "diff --git a/x b/x\n",
+                      "head_trees": [TREE_1, TREE_2, TREE_3, TREE_4]})
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), fx, gh, _plan(),
+            "diff", "body", 9911, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert seen == ["round-sha-1"]
+        rec = res.fidelity["rounds"][0]
+        assert rec["outcome"] == "committed"
+        assert rec["remediation_sha"] == "round-sha-1"
+        assert events.index("push") < events.index("re_review")
+        assert "diff_vs_base" in events[events.index("re_review"):]
+    finally:
+        _cleanup(9911, "9911-2")
+
+
 def test_round2_no_verdict_overwrites_last_round_fields(tmp_path, git_shim):
     """Round 1 re-review NOT READY, round 2 re-review produces no verdict: the
     last-round fields describe round 2 (no stale round-1 verdict or tree)."""
@@ -712,7 +766,11 @@ def test_notes_end_to_end(tmp_path, git_shim):
                 res.fidelity.get("rounds_completed", 0),
             ),
         )
-        assert "**Backlog issues filed:** [a-jay85/IBL5-backlog#" in sticky
+        # filed_notes is recorded, so the links sit in Still open and the old line is gone.
+        assert "### Still open (non-blocking)" in sticky
+        assert "**Backlog issues filed:**" not in sticky
+        for n in nums:
+            assert fidelity._backlog_link(f"backlog#{n}", n) in sticky
     finally:
         _cleanup(995)
 
@@ -960,24 +1018,6 @@ def test_remediation_prompt_embeds_procedure_verdict_and_diff(tmp_path, git_shim
     prompt = llm.captured_prompts["fidelity-remediation"]
     assert "PROCEDURE BODY" in prompt
     assert "SENTINEL_FINDING" in prompt
-    assert "+SENTINEL_DIFF_LINE" in prompt
-    assert "=== END DIFF ===" in prompt
-
-
-def test_remediation_prompt_never_relies_on_packet_path_alone(tmp_path, git_shim):
-    """When a packet path appears in the prompt, its content is also inline."""
-    packet_dir = _packet(tmp_path)
-    with open(os.path.join(packet_dir, "diff.patch"), "w") as fh:
-        fh.write("+SENTINEL_DIFF_LINE\n")
-    verdict_path = str(tmp_path / "verdict_path.md")
-    with open(verdict_path, "w") as fh:
-        fh.write("6d checks\n\nNOT READY\n\n- finding one\n\n## DIGEST\nstuff\n")
-    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
-    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
-                       packet_dir, verdict_path, "deadbeef")
-    prompt = llm.captured_prompts["fidelity-remediation"]
-    # The diff content is inline unconditionally, so the check cannot pass vacuously
-    # when the packet path happens to be absent from the prompt.
     assert "+SENTINEL_DIFF_LINE" in prompt
     assert "=== END DIFF ===" in prompt
 
@@ -1332,6 +1372,11 @@ def test_comment_nit_re_drops_verb_anchored_rewording_nits(title, detail):
     # Not filtered: defect in detail overrides the nit classification
     ("Clarify _ALREADY_DONE_RE docstring in fidelity.py",
      "The regex drops real followups silently when they name an old PR."),
+    # Not filtered: nit-like titles with no verb prefix (the regex is verb-anchored)
+    ("Stale docstring in compose_sticky",
+     "The docstring is out of date."),
+    ("Misleading comment above the retry loop",
+     "It says three tries but the code does five."),
 ])
 def test_comment_nit_re_keeps_additive_and_defect_notes(title, detail):
     """Additive docstring notes and notes with defect details are not filtered."""

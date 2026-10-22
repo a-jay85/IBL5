@@ -13,6 +13,7 @@ use Bootstrap\LeagueBootstrap;
 use Bootstrap\RequestEventLoggingBootstrap;
 use Bootstrap\SecurityBootstrap;
 use Bootstrap\SessionBootstrap;
+use Bootstrap\SharedSeasonBootstrap;
 use Bootstrap\WebApplicationFactory;
 use PHPUnit\Framework\TestCase;
 
@@ -26,7 +27,7 @@ final class WebApplicationFactoryTest extends TestCase
         /** @var list<\Bootstrap\Contracts\BootstrapStepInterface> $steps */
         $steps = $reflection->getValue($app);
 
-        self::assertCount(9, $steps);
+        self::assertCount(10, $steps);
         self::assertInstanceOf(SecurityBootstrap::class, $steps[0]);
         self::assertInstanceOf(SessionBootstrap::class, $steps[1]);
         self::assertInstanceOf(HeadersBootstrap::class, $steps[2]);
@@ -36,5 +37,6 @@ final class WebApplicationFactoryTest extends TestCase
         self::assertInstanceOf(AuthBootstrap::class, $steps[6]);
         self::assertInstanceOf(DemoModeBootstrap::class, $steps[7]);
         self::assertInstanceOf(RequestEventLoggingBootstrap::class, $steps[8]);
+        self::assertInstanceOf(SharedSeasonBootstrap::class, $steps[9]);
     }
 }

@@ -20,7 +20,7 @@ global $mysqli_db, $user, $leagueContext;
 /** @var mixed $user */
 /** @var \League\LeagueContext|null $leagueContext */
 
-$season      = new \Season\Season($mysqli_db, $leagueContext);
+$season      = \Season\SharedSeason::get($mysqli_db, $leagueContext);
 $logoResolver = new \HeadToHeadRecords\LogoResolver();
 /** @var string $docRoot */
 $docRoot   = $_SERVER['DOCUMENT_ROOT'];
@@ -65,7 +65,7 @@ $controller = new \HeadToHeadRecords\HeadToHeadRecordsController(
     new \HeadToHeadRecords\HeadToHeadRecordsView(),
     $season,
     $currentUser,
-    $mysqli_db
+    new \Repositories\TeamIdentityRepository($mysqli_db)
 );
 
 \PageLayout\PageLayout::header();

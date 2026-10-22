@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelf = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelf) ? $phpSelf : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -15,30 +16,39 @@ $op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : '';
 
 $pagetitle = " - Depth Chart Entry";
 
-global $mysqli_db, $commonRepo;
+global $mysqli_db, $commonRepo, $nukeCompat, $user;
+/** @var \mysqli $mysqli_db */
 $commonRepo = new Repositories\TeamIdentityRepository($mysqli_db);
+$nukeCompat = new \Utilities\NukeCompat();
 
-function userinfo($username)
+function userinfo(string $username): void
 {
     global $mysqli_db, $commonRepo, $leagueContext;
+    /** @var \mysqli $mysqli_db */
+    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
+    /** @var \League\LeagueContext $leagueContext */
 
-    $repository = new DepthChartEntry\DepthChartEntryRepository($mysqli_db);
-    $service = new DepthChartEntry\DepthChartEntryService();
-    $view = new DepthChartEntry\DepthChartEntryView($leagueContext, $service);
+    $repository = new DepthChart\DepthChartRepository($mysqli_db);
+    $service = new DepthChart\DepthChartService();
+    $view = new DepthChart\DepthChartView($leagueContext, $service);
     $teamRepository = new Team\TeamRepository($mysqli_db);
     $teamTableService = new Team\TeamTableService($mysqli_db, $teamRepository);
-    $submissionHandler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db, $commonRepo);
-    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
+    $submissionHandler = new DepthChart\DepthChartSubmissionHandler($mysqli_db, $commonRepo);
+    $controller = new DepthChart\DepthChartController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
     $controller->displayForm($username);
 }
 
-function main($user)
+function main(mixed $user): void
 {
-    if (!is_user($user)) {
-        loginbox();
+    global $nukeCompat;
+    /** @var \Utilities\NukeCompat $nukeCompat */
+
+    if (!$nukeCompat->isUser($user)) {
+        $nukeCompat->loginBox();
     } else {
         global $authService;
-        cookiedecode($user);
+        /** @var \Auth\Contracts\AuthServiceInterface $authService */
+        $nukeCompat->cookieDecode($user);
         userinfo($authService->getUsername() ?? '');
     }
 }
@@ -50,19 +60,24 @@ function renderInlineSubmitError(): void
     PageLayout\PageLayout::footer();
 }
 
-function submit($user)
+function submit(mixed $user): void
 {
-    global $mysqli_db, $commonRepo, $leagueContext, $authService;
+    global $mysqli_db, $commonRepo, $leagueContext, $authService, $nukeCompat;
+    /** @var \mysqli $mysqli_db */
+    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
+    /** @var \League\LeagueContext $leagueContext */
+    /** @var \Auth\Contracts\AuthServiceInterface $authService */
+    /** @var \Utilities\NukeCompat $nukeCompat */
 
     // Auth + ownership gate (IDOR fix D-09). The write target is derived from
     // the session team inside the handler, never from POST `Team_Name`, so an
     // authenticated GM cannot replay a valid CSRF token against another team.
-    if (!is_user($user)) {
+    if (!$nukeCompat->isUser($user)) {
         renderInlineSubmitError();
         return;
     }
 
-    cookiedecode($user);
+    $nukeCompat->cookieDecode($user);
     $username = $authService->getUsername() ?? '';
     $sessionTeam = $commonRepo->getTeamnameFromUsername($username);
     if ($sessionTeam === null || $sessionTeam === '' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {
@@ -80,44 +95,53 @@ function submit($user)
         return;
     }
 
-    $repository = new DepthChartEntry\DepthChartEntryRepository($mysqli_db);
-    $service = new DepthChartEntry\DepthChartEntryService();
-    $view = new DepthChartEntry\DepthChartEntryView($leagueContext, $service);
+    $repository = new DepthChart\DepthChartRepository($mysqli_db);
+    $service = new DepthChart\DepthChartService();
+    $view = new DepthChart\DepthChartView($leagueContext, $service);
     $teamRepository = new Team\TeamRepository($mysqli_db);
     $teamTableService = new Team\TeamTableService($mysqli_db, $teamRepository);
-    $submissionHandler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db, $commonRepo);
-    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
-    $controller->handleSubmit($_POST, $username);
+    $submissionHandler = new DepthChart\DepthChartSubmissionHandler($mysqli_db, $commonRepo);
+    $httpRequest = \Http\HttpRequest::fromGlobals();
+    $controller = new DepthChart\DepthChartController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, $httpRequest);
+    $controller->handleSubmit($httpRequest->allPost(), $username);
 }
 
-function tabApi()
+function tabApi(): void
 {
     global $mysqli_db, $commonRepo, $leagueContext;
+    /** @var \mysqli $mysqli_db */
+    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
+    /** @var \League\LeagueContext $leagueContext */
 
-    $handler = new DepthChartEntry\DepthChartEntryApiHandler($mysqli_db, $commonRepo, $leagueContext);
+    $handler = new DepthChart\DepthChartApiHandler($mysqli_db, $commonRepo, $leagueContext);
     $handler->handle();
 }
 
-function nextSimApi()
+function nextSimApi(): void
 {
     global $mysqli_db;
+    /** @var \mysqli $mysqli_db */
 
     $handler = new NextSim\NextSimTabApiHandler($mysqli_db);
     $handler->handle();
 }
 
-function api($user)
+function api(mixed $user): void
 {
-    global $mysqli_db, $commonRepo, $authService;
+    global $mysqli_db, $commonRepo, $authService, $nukeCompat;
+    /** @var \mysqli $mysqli_db */
+    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
+    /** @var \Auth\Contracts\AuthServiceInterface $authService */
+    /** @var \Utilities\NukeCompat $nukeCompat */
 
-    if (!is_user($user)) {
+    if (!$nukeCompat->isUser($user)) {
         header('Content-Type: application/json; charset=utf-8');
         http_response_code(401);
         echo json_encode(['error' => 'Unauthorized']);
         return;
     }
 
-    cookiedecode($user);
+    $nukeCompat->cookieDecode($user);
     $username = $authService->getUsername() ?? '';
 
     $teamName = $commonRepo->getTeamnameFromUsername($username);
@@ -136,20 +160,21 @@ function api($user)
         return;
     }
 
-    $action = $_GET['action'] ?? '';
+    $httpRequest = \Http\HttpRequest::fromGlobals();
+    $actionRaw = $httpRequest->get('action');
+    $action = is_string($actionRaw) ? $actionRaw : '';
 
     // For rename, use POST params; for list/load, use GET params
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rawBody = file_get_contents('php://input');
-        $params = is_string($rawBody) && $rawBody !== '' ? (json_decode($rawBody, true) ?? []) : [];
-        if (!is_array($params)) {
-            $params = [];
-        }
+        $decoded = is_string($rawBody) && $rawBody !== '' ? (json_decode($rawBody, true) ?? []) : [];
+        /** @var array<string, mixed> $params */
+        $params = is_array($decoded) ? $decoded : [];
     } else {
-        $params = $_GET;
+        $params = $httpRequest->allGet();
     }
 
-    $handler = new SavedDepthChart\SavedDepthChartApiHandler($mysqli_db, $commonRepo);
+    $handler = new DepthChartSnapshot\DepthChartSnapshotApiHandler($mysqli_db);
     $handler->handle($action, $teamid, $username, $params);
 }
 

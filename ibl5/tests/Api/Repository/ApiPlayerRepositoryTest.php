@@ -103,7 +103,7 @@ class ApiPlayerRepositoryTest extends WideUnitTestCase
 
         $this->repository->getPlayers($this->buildAllowlistPaginator(['sort' => $col]));
 
-        $this->assertPreparedSqlContains(' ORDER BY ' . $col . ' ASC LIMIT ? OFFSET ?');
+        $this->assertPreparedSqlContains(' ORDER BY ' . $col . ' ASC, pid ASC LIMIT ? OFFSET ?');
     }
 
     public function testGetPlayersFallsBackToDefaultSortForRejectedColumn(): void
@@ -112,7 +112,7 @@ class ApiPlayerRepositoryTest extends WideUnitTestCase
 
         $this->repository->getPlayers($this->buildAllowlistPaginator(['sort' => 'name; DROP TABLE ibl_plr']));
 
-        $this->assertPreparedSqlContains(' ORDER BY name ASC ');
+        $this->assertPreparedSqlContains(' ORDER BY name ASC, pid ASC LIMIT ? OFFSET ?');
         foreach ($this->mockDb->getPreparedQueries() as $query) {
             self::assertStringNotContainsString('DROP', $query);
             self::assertStringNotContainsString('SELECT 1', $query);
@@ -124,12 +124,12 @@ class ApiPlayerRepositoryTest extends WideUnitTestCase
         $this->mockDb->setMockData([]);
 
         $this->repository->getPlayers($this->buildAllowlistPaginator(['sort' => 'age', 'order' => 'DESC']));
-        $this->assertPreparedSqlContains(' ORDER BY age DESC ');
+        $this->assertPreparedSqlContains(' ORDER BY age DESC, pid ASC LIMIT ? OFFSET ?');
 
         $this->mockDb->clearQueries();
 
         $this->repository->getPlayers($this->buildAllowlistPaginator(['sort' => 'age', 'order' => 'sideways']));
-        $this->assertPreparedSqlContains(' ORDER BY age ASC ');
+        $this->assertPreparedSqlContains(' ORDER BY age ASC, pid ASC LIMIT ? OFFSET ?');
         $this->assertPreparedSqlNotContains(' DESC ');
     }
 
@@ -182,7 +182,7 @@ class ApiPlayerRepositoryTest extends WideUnitTestCase
 
         $this->repository->getAllPlayersForExport();
 
-        $this->assertQueryExecuted('name ASC');
+        $this->assertQueryExecuted('ORDER BY name ASC, pid ASC');
     }
 
     // --- getPlayerByUuid ---

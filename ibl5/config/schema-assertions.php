@@ -37,7 +37,7 @@ return [
     new SchemaAssertion('ibl_team_info', 'team_name'),
     new SchemaAssertion('ibl_team_info', 'gm_username'),
     new SchemaAssertion('ibl_settings', 'setting_key'),
-    new SchemaAssertion('ibl_settings', 'value'),
+    new SchemaAssertion('ibl_settings', 'setting_value'),
 
     // Ported from .github/workflows/migration-safety.yml "Check critical columns"
     // CHECKS array when that step was replaced by bin/validate-schema. These are

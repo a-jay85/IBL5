@@ -7,9 +7,8 @@ from __future__ import annotations
 
 from .state import ArmDecision, Classification, PlanInfo
 
-# Probe allowlist sentence — shared by both re-check prompts so the allowlist
-# cannot drift between Mode A (manual_recheck_prompt) and Mode B
-# (hold_discharge_prompt).  Keep `at most 8 elements` on its own source line.
+# Probe allowlist sentence for manual_recheck_prompt.  Keep `at most 8 elements`
+# on its own source line.
 PROBE_ALLOWLIST_TEXT = (
     "`pytest`, `grep`, or `bin/(check|test)-<name>` — "
     "no interpreters (bash, python3, sh, env, node), no absolute paths, no `..`, "
@@ -31,6 +30,11 @@ def _gm_visible_rubric(cls: Classification) -> str:
             "ibl5/docs/, markdown). The type MUST NOT be feat. Use chore, or fix/refactor/"
             "docs/test/ci when the diff is exactly that. The harness retypes feat to chore "
             "on this diff anyway.\n")
+
+
+# pr-copy sees at most this many characters of the filtered diff. The prompt says so when
+# the diff is longer, so the model never states a count that spans text it was not shown.
+PR_COPY_DIFF_CAP = 60000
 
 
 def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt: str) -> str:
@@ -57,6 +61,13 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
             "mechanical.\n\n"
             f"RETROSPECTIVE REGISTRY ROW:\n{cls.retro_registry_row}\n"
         )
+    diff_text = cls.filtered_diff[:PR_COPY_DIFF_CAP]
+    truncated = len(cls.filtered_diff) > PR_COPY_DIFF_CAP
+    truncation_note = (
+        "\n\nDIFF TRUNCATED: the DIFF above stops at the first "
+        f"{PR_COPY_DIFF_CAP} characters of a longer diff. State no count that spans the "
+        "full diff (total files, total tests, total call sites); describe the scope in words."
+        if truncated else "")
     return (
         "Write the commit/PR copy for this branch.\n\n"
         "TYPE RUBRIC — decision test: \"Would a league GM notice a new ability they "
@@ -68,12 +79,31 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         f"CLASSIFICATION:\n{cls.summary()}\n"
         + retro_block
         + (f"\nPLAN EXCERPT (intent):\n{plan_excerpt[:4000]}\n" if plan.found else "")
-        + "\nDIFF:\n" + cls.filtered_diff[:60000]
+        + "\nDIFF:\n" + diff_text
+        + truncation_note
         + '\n\nNEVER write a "## Manual Testing" heading or any manual-testing checklist '
         'inside summary_md. The runner owns that section and appends it after you; '
         'duplicating it corrupts the arming gate.'
+        + '\n\nEnd summary_md with exactly one line: **Merge danger:** Door: <one-way|two-way> '
+        '· Blast radius: <localized|module|site-wide|external> · Why: <20-200 chars naming '
+        'what would be hard to reverse>. The runner derives Door and Blast radius mechanically '
+        'and only ever raises them; your contribution is the Why text. Never write a second '
+        'Merge danger line.'
+        + '\n\nDirectly after the Merge danger line, write exactly one line: **How to revert:** '
+        '<12-300 chars on one line: `git revert <merge-sha>` for a normal change, plus the extra '
+        'step when the diff touches a migration, the prod sync, or config>. The runner swaps in '
+        'a mechanical line when yours is missing or too short, or when the diff touches one of '
+        'those paths. Never write a second How to revert line.'
         + '\n\nA bare `#N` links to IBL5 PR/issue N. Cite a backlog issue as '
         '`a-jay85/IBL5-backlog#N`, never as a bare `#N`.'
+        + '\n\nCOUNTS: state no exact count (tests, cases, call sites, files, functions, rows, '
+        'lines) unless that number is visible in the CLASSIFICATION or DIFF text above. '
+        'Describe the change in words instead: "adds tests for the truncation note", never '
+        '"adds 3 tests". The reviewer verifies every number against the diff and rewrites a '
+        'wrong one.'
+        + '\n\nCLAIMS: every summary_md bullet claims only what the DIFF above shows. The PLAN '
+        'EXCERPT is intent; when the diff lacks something the plan intended, do not claim it '
+        'and do not describe it as done.'
         + '\n\nReturn ONLY JSON with exactly these four keys: {"type": "chore", '
         '"title": "chore(scope): ...", "commit_subject": "chore(scope): ...", '
         '"summary_md": "## Summary\\n- ..."}.\n'
@@ -85,52 +115,6 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         "Both strings must be <= 72 chars and must each start with their own "
         "conventional-commit type. They are two separate artifacts and must NOT be "
         "identical -- write commit_subject from the diff, then title from the purpose."
-    )
-
-
-def pr_body_check_prompt(body: str, name_status: str) -> str:
-    """Body-vs-diff verification prompt. Carries check 4 / 4a verbatim from
-    _plan-fidelity-review.md so this call and Phase 6.5 cannot drift apart."""
-    return (
-        "check the PR body's **hand-written** claims (the Scope prose, tests added, "
-        "counts, \"no behavior change\") against the actual diff. A hand-written body "
-        "claim the diff contradicts is a **finding**, and it is **blocking**: it must be "
-        "corrected before the PR is endorsed as ready. "
-        "Never endorse readiness on the strength of the body alone. "
-        "**Exclude the machine-generated files-changed block** delimited by "
-        "`<!-- files-changed:begin -->` / `<!-- files-changed:end -->`: "
-        "`SKILL.md` runtime Phase 5.9 regenerates that block from "
-        "`git diff --name-status origin/master...HEAD` immediately before this phase, "
-        "so it is generated data reconciled by construction, not a claim — a drift there "
-        "is a Phase 5.9 defect, never a body finding, and reporting it is a false "
-        "`NOT READY`. "
-        "Also exclude the machine-generated merge-digest block delimited by "
-        "`<!-- merge-digest:begin -->` / `<!-- merge-digest:end -->`: the runner writes "
-        "it from the previous run's sticky verdict, so it is not a claim. "
-        "The block has already been removed from the text you are shown, so never "
-        "re-emit it.\n\n"
-        "**Named-constant volumes.** Within this same check, and **inheriting its "
-        "blocking verdict**: if the diff introduces or edits a class carrying a named "
-        "`EXPECTED` constant array — or any equivalent named-constant row count, deletion "
-        "count, or table list — read those constants out of the code and confirm every "
-        "volume, count, and table/suffix name in the PR body Summary agrees with them. "
-        "Body prose is authored before implementation and hand-patched during it, so "
-        "these are the numbers that silently rot (PR #2001 understated a deletion volume "
-        "~23x and named the wrong backup-table suffix; both survived to Phase 6). "
-        "Read the constant, do not trust the body's number. A disagreement is a blocking "
-        "finding, corrected in the body before the PR is endorsed ready.\n\n"
-        'The runner owns the "## Manual Testing" section. It has been removed from the '
-        "text you are shown. Never write a \"## Manual Testing\" heading and never emit "
-        "a manual-testing checklist in corrected_body.\n\n"
-        "The file list below is names-only and may be incomplete. If a file is absent "
-        "from the name-status list, do not flag claims about it as unsupported.\n\n"
-        "BODY PROSE:\n" + body[:40000]
-        + "\n\nNAME-STATUS:\n" + name_status[:20000]
-        + '\n\nReturn ONLY JSON with exactly these two keys: '
-        '{"corrected_body": "<the full revised body prose>", '
-        '"findings": ["<one sentence per disagreement you corrected>"]}. '
-        "When the body already agrees with the diff, return corrected_body unchanged "
-        "and findings as an empty array."
     )
 
 
@@ -198,44 +182,6 @@ def manual_recheck_prompt(rows: list, cls: "Classification") -> str:
         f"ROWS:\n{numbered}\n\n"
         'Return ONLY JSON: [{"n": 1, "hold": true}, {"n": 2, "probe": ["bin/test-x"]}].'
         " One entry per row, in order."
-    )
-
-
-def hold_discharge_prompt(sentences: list[str]) -> str:
-    """Mode B — ask the model to classify each hold-justification sentence.
-
-    Mirrors manual_recheck_prompt but operates on individual prose sentences
-    from the plan's `## Automouse Hold Justification` section rather than
-    checklist rows.  Uses the same probe allowlist constant to prevent drift.
-
-    Categories: decision, cli-executable, phpunit, api-test, e2e,
-    visual-regression, truly-manual.  `probe` is required for cli-executable
-    and forbidden for all others.
-    """
-    numbered = "\n".join(f"{i}. {s}" for i, s in enumerate(sentences, 1))
-    return (
-        "You are reviewing sentences from a plan's Automouse Hold Justification "
-        "section (Mode B — hold sentences).  Classify each sentence into exactly "
-        "one category:\n\n"
-        "  decision            — the sentence states a judgment the human renders; "
-        "nothing an agent can run settles it (e.g. 'is this tradeoff acceptable').\n"
-        "  cli-executable      — verifiable now by a concrete shell command that "
-        "already exists in the repo.\n"
-        "  phpunit             — a PHPUnit test can assert the behaviour.\n"
-        "  api-test            — an HTTP request/response can verify it.\n"
-        "  e2e                 — a browser interaction is needed (Playwright).\n"
-        "  visual-regression   — screenshot/visual diff can verify it.\n"
-        "  truly-manual        — requires subjective human judgment on new/redesigned "
-        "UI/UX.\n\n"
-        "Default to `decision` when genuinely torn — a wrongly discharged judgment "
-        "deletes a check the human was supposed to make at the merge button.\n\n"
-        "For cli-executable entries, provide the argv as a JSON list.  argv[0] must "
-        f"match the allowlist: {PROBE_ALLOWLIST_TEXT} If you cannot express the check "
-        "within that allowlist, pick the matching replaceable category or `truly-manual`.\n\n"
-        f"SENTENCES:\n{numbered}\n\n"
-        'Return ONLY JSON: [{"n": 1, "category": "decision"}, '
-        '{"n": 2, "category": "cli-executable", "probe": ["bin/check-docs"], "rationale": "..."}].'
-        " One object per sentence, in order."
     )
 
 

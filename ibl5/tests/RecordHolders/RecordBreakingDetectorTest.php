@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\RecordHolders;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RecordHolders\NullAnnouncementDispatcher;
 use RecordHolders\RecordBreakingDetector;
@@ -55,7 +56,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('NEW IBL RECORD', $result[0]);
         $this->assertStringContainsString('New Star', $result[0]);
         $this->assertStringContainsString('85', $result[0]);
@@ -72,7 +73,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     public function testNoDetectionWhenNoRecordsExist(): void
@@ -82,7 +83,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     public function testDetectsPlayoffPlayerRecord(): void
@@ -95,7 +96,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-06-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('playoff', $result[0]);
     }
 
@@ -126,7 +127,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2006-10-10']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('HEAT', $result[0]);
     }
 
@@ -140,7 +141,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('IBL RECORD TIED', $result[0]);
         $this->assertStringContainsString('tying', $result[0]);
         $this->assertStringContainsString('New Star', $result[0]);
@@ -156,7 +157,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('breaking', $result[0]);
         $this->assertStringNotContainsString('tying', $result[0]);
         $this->assertStringNotContainsString('TIED', $result[0]);
@@ -188,7 +189,7 @@ final class RecordBreakingDetectorTest extends TestCase
         // Sim batch spans multiple dates; the record is on 2007-02-26, not the latest date
         $result = $this->detector->detectAndAnnounce(['2007-02-18', '2007-02-26', '2007-03-02']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('IBL RECORD TIED', $result[0]);
         $this->assertStringContainsString('Stephen Curry', $result[0]);
     }
@@ -212,7 +213,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('IBL TEAM RECORD', $result[0]);
         $this->assertStringContainsString('Heat', $result[0]);
         $this->assertStringContainsString('most points', $result[0]);
@@ -229,7 +230,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('TEAM RECORD TIED', $result[0]);
         $this->assertStringContainsString('tying', $result[0]);
     }
@@ -249,7 +250,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('NEW IBL TEAM RECORD', $result[0]);
         $this->assertStringContainsString('fewest points', $result[0]);
         $this->assertStringContainsString('Knicks', $result[0]);
@@ -283,7 +284,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-02-21']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertStringContainsString('QUADRUPLE DOUBLE', $result[0]);
         $this->assertStringContainsString('Brandon Tomyoy', $result[0]);
         $this->assertStringContainsString('18pts/10reb/10ast/10stl', $result[0]);
@@ -344,7 +345,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     // --- Canonical stat-definition characterization ---
@@ -498,7 +499,7 @@ final class RecordBreakingDetectorTest extends TestCase
         $detector = new RecordBreakingDetector($this->mockRepository, $spy);
         $result = $detector->detectAndAnnounce(['2007-01-15']);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertSame($result, $spy->captured, 'Each announcement must be dispatched exactly once, in order');
     }
 
@@ -574,6 +575,205 @@ final class RecordBreakingDetectorTest extends TestCase
         $this->assertCount(2, $result, 'detectAndAnnounce must return all announcements regardless of dispatch failures');
         $this->assertCount(1, $throwingDispatcher->capturedAfterFirst, 'Announcements after a failed dispatch must still be dispatched');
         $this->assertSame($result[1], $throwingDispatcher->capturedAfterFirst[0], 'Second announcement must be dispatched after the first one failed');
+    }
+
+    // --- Announcement order characterization ---
+
+    private function stubTwoGameTypeMultiCategoryRepository(): void
+    {
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturnCallback(
+            function (array $expressions, string $dateFilter): array {
+                return match ($dateFilter) {
+                    'bs.game_type = 1' => array_merge($this->buildPlayerBatchResult([]), [
+                        'points' => [
+                            $this->makePlayerRecord(['name' => 'Reg Scorer', 'pid' => 101, 'date' => '2007-01-15', 'value' => 85]),
+                            $this->makePlayerRecord(['name' => 'Bob Pettit', 'pid' => 200, 'date' => '2007-06-15', 'value' => 80]),
+                        ],
+                        'rebounds' => [
+                            $this->makePlayerRecord(['name' => 'Reg Rebounder', 'pid' => 102, 'date' => '2007-01-15', 'value' => 40]),
+                            $this->makePlayerRecord(['name' => 'Wilt Chamberlain', 'pid' => 201, 'date' => '1995-01-10', 'value' => 35]),
+                        ],
+                    ]),
+                    'bs.game_type = 2' => array_merge($this->buildPlayerBatchResult([]), [
+                        'assists' => [
+                            $this->makePlayerRecord(['name' => 'Playoff Passer', 'pid' => 103, 'date' => '2007-06-15', 'value' => 30]),
+                            $this->makePlayerRecord(['name' => 'Magic Johnson', 'pid' => 202, 'date' => '2003-06-21', 'value' => 25]),
+                        ],
+                    ]),
+                    default => $this->buildPlayerBatchResult([]),
+                };
+            }
+        );
+
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturnCallback(
+            function (array $config, string $dateFilter): array {
+                return match ($dateFilter) {
+                    'bs.game_type = 1' => array_merge($this->buildTeamBatchResult([]), [
+                        'team_points' => [
+                            $this->makeTeamRecord(['team_name' => 'Heat', 'date' => '2007-01-15', 'value' => 150]),
+                            $this->makeTeamRecord(['team_name' => 'Bulls', 'date' => '2000-03-10', 'value' => 145]),
+                        ],
+                        'team_rebounds' => [
+                            $this->makeTeamRecord(['team_name' => 'Heat', 'date' => '2007-01-15', 'value' => 70]),
+                            $this->makeTeamRecord(['team_name' => 'Bulls', 'date' => '2000-03-10', 'value' => 65]),
+                        ],
+                        'team_fewest_points' => [
+                            $this->makeTeamRecord(['team_name' => 'Knicks', 'date' => '2007-01-15', 'value' => 50]),
+                            $this->makeTeamRecord(['team_name' => 'Pacers', 'date' => '1999-02-10', 'value' => 55]),
+                        ],
+                    ]),
+                    'bs.game_type = 2' => array_merge($this->buildTeamBatchResult([]), [
+                        'team_points' => [
+                            $this->makeTeamRecord(['team_name' => 'Celtics', 'date' => '2007-06-15', 'value' => 140]),
+                            $this->makeTeamRecord(['team_name' => 'Lakers', 'date' => '2003-06-21', 'value' => 135]),
+                        ],
+                        'team_fewest_points' => [
+                            $this->makeTeamRecord(['team_name' => 'Nets', 'date' => '2007-06-15', 'value' => 60]),
+                            $this->makeTeamRecord(['team_name' => 'Spurs', 'date' => '2001-06-01', 'value' => 62]),
+                        ],
+                    ]),
+                    default => $this->buildTeamBatchResult([]),
+                };
+            }
+        );
+
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([
+            [
+                'pid' => 104, 'name' => 'Quad Guy', 'teamid' => 5, 'team_name' => 'Magic',
+                'date' => '2007-01-15', 'box_id' => 0, 'game_of_that_day' => 0,
+                'oppTid' => 3, 'opp_team_name' => 'Knicks',
+                'points' => 20, 'rebounds' => 12, 'assists' => 11, 'steals' => 10, 'blocks' => 1,
+            ],
+        ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function expectedAnnouncementsByKey(): array
+    {
+        return [
+            'reg_player_points' => "**NEW IBL RECORD!**\n"
+                . '[Reg Scorer](https://iblhoops.net/modules.php?name=Player&pa=showpage&pid=101) (Heat) '
+                . 'just recorded **85 points** in a regular season game, '
+                . "breaking Bob Pettit's all-time record of 80 points!",
+            'reg_player_rebounds' => "**NEW IBL RECORD!**\n"
+                . '[Reg Rebounder](https://iblhoops.net/modules.php?name=Player&pa=showpage&pid=102) (Heat) '
+                . 'just recorded **40 rebounds** in a regular season game, '
+                . "breaking Wilt Chamberlain's all-time record of 35 rebounds!",
+            'reg_team_points' => "**NEW IBL TEAM RECORD!**\n"
+                . 'The Heat just recorded **150 most points** in a regular season game, '
+                . "breaking the Bulls's all-time record of 145 most points!",
+            'reg_team_rebounds' => "**NEW IBL TEAM RECORD!**\n"
+                . 'The Heat just recorded **70 most rebounds** in a regular season game, '
+                . "breaking the Bulls's all-time record of 65 most rebounds!",
+            'reg_team_fewest_points' => "**NEW IBL TEAM RECORD!**\n"
+                . 'The Knicks just recorded **50 fewest points** in a regular season game, '
+                . "breaking the Pacers's all-time record of 55 fewest points!",
+            'playoff_player_assists' => "**NEW IBL RECORD!**\n"
+                . '[Playoff Passer](https://iblhoops.net/modules.php?name=Player&pa=showpage&pid=103) (Heat) '
+                . 'just recorded **30 assists** in a playoff game, '
+                . "breaking Magic Johnson's all-time record of 25 assists!",
+            'playoff_team_points' => "**NEW IBL TEAM RECORD!**\n"
+                . 'The Celtics just recorded **140 most points** in a playoff game, '
+                . "breaking the Lakers's all-time record of 135 most points!",
+            'playoff_team_fewest_points' => "**NEW IBL TEAM RECORD!**\n"
+                . 'The Nets just recorded **60 fewest points** in a playoff game, '
+                . "breaking the Spurs's all-time record of 62 fewest points!",
+            'quadruple_double' => "**NEW QUADRUPLE DOUBLE!**\n"
+                . '[Quad Guy](https://iblhoops.net/modules.php?name=Player&pa=showpage&pid=104) (Magic) '
+                . 'recorded a quadruple double (**20pts/12reb/11ast/10stl**) in a regular season game!',
+        ];
+    }
+
+    /**
+     * @return array<string, array{list<string>, list<string>}>
+     */
+    public static function announcementOrderProvider(): array
+    {
+        return [
+            'regular season dates first' => [
+                ['2007-01-15', '2007-06-15'],
+                ['reg_player_points', 'reg_player_rebounds', 'reg_team_points', 'reg_team_rebounds',
+                 'reg_team_fewest_points', 'playoff_player_assists', 'playoff_team_points',
+                 'playoff_team_fewest_points', 'quadruple_double'],
+            ],
+            'playoff dates first' => [
+                ['2007-06-15', '2007-01-15'],
+                ['playoff_player_assists', 'playoff_team_points', 'playoff_team_fewest_points',
+                 'reg_player_points', 'reg_player_rebounds', 'reg_team_points', 'reg_team_rebounds',
+                 'reg_team_fewest_points', 'quadruple_double'],
+            ],
+        ];
+    }
+
+    /**
+     * Characterization: full announcement order across player, team, fewest-points
+     * and quadruple-double groups, over two game types. Green on master before the split.
+     * Also kills Infection's ArrayOneItem mutant on the per-game-type detection return,
+     * since five regular-season announcements would collapse to one.
+     *
+     * @param list<string> $gameDates
+     * @param list<string> $expectedKeys
+     */
+    #[DataProvider('announcementOrderProvider')]
+    public function testAnnouncementOrderAcrossCategoriesAndGameTypes(array $gameDates, array $expectedKeys): void
+    {
+        $this->stubTwoGameTypeMultiCategoryRepository();
+        $expected = $this->expectedAnnouncementsByKey();
+
+        $result = $this->detector->detectAndAnnounce($gameDates);
+
+        $this->assertSame(array_map(static fn (string $key): string => $expected[$key], $expectedKeys), $result);
+    }
+
+    /**
+     * Characterization: across nine announcements, every one is dispatched exactly
+     * once, in return order, quadruple double included.
+     */
+    public function testDispatchOrderMatchesReturnOrderAcrossMultipleAnnouncements(): void
+    {
+        $this->stubTwoGameTypeMultiCategoryRepository();
+        $spy = new class implements AnnouncementDispatcherInterface {
+            /** @var list<string> */
+            public array $captured = [];
+
+            public function dispatch(string $message): void
+            {
+                $this->captured[] = $message;
+            }
+        };
+
+        $detector = new RecordBreakingDetector($this->mockRepository, $spy);
+        $result = $detector->detectAndAnnounce(['2007-01-15', '2007-06-15']);
+
+        $this->assertCount(9, $result);
+        $this->assertSame($result, $spy->captured);
+    }
+
+    /**
+     * Characterization: a team stat that follows the player-only `turnovers`
+     * entry in the registry is still scanned and announced.
+     */
+    public function testTeamStatAfterTurnoversInRegistryIsAnnounced(): void
+    {
+        $teamBatch = $this->buildTeamBatchResult([]);
+        $teamBatch['team_3pt_made'] = [
+            $this->makeTeamRecord(['team_name' => 'Heat', 'date' => '2007-01-15', 'value' => 25]),
+            $this->makeTeamRecord(['team_name' => 'Bulls', 'date' => '2000-03-10', 'value' => 22]),
+        ];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($this->buildPlayerBatchResult([]));
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($teamBatch);
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+
+        $result = $this->detector->detectAndAnnounce(['2007-01-15']);
+
+        $this->assertSame([
+            "**NEW IBL TEAM RECORD!**\n"
+                . 'The Heat just recorded **25 most three pointers** in a regular season game, '
+                . "breaking the Bulls's all-time record of 22 most three pointers!",
+        ], $result);
     }
 
     // --- Helper methods ---

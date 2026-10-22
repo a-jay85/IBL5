@@ -16,12 +16,14 @@ import datetime
 import os
 import re
 import shutil
-import subprocess
 from dataclasses import dataclass
 
 from . import usage_pause
-from .adapters.llm import MODEL_MAP
+from .adapters.llm import MODEL_MAP, run_bounded
+from .gitutil import GIT_TIMEOUT
 from .state import HarnessError
+
+SCRIPT_TIMEOUT = 120   # seconds per bin/* call (adr-check, check-*, next-adr)
 
 ADR_DRAFT_PURPOSE = "adr-draft"
 ADR_DRAFT_MODEL = "opus"                      # MODEL_MAP key; resolves to claude-opus-5-5
@@ -63,20 +65,21 @@ def _read_text(path: str) -> str:
 def _run_script(worktree: str, rel: str, *args: str, stdin: str = "") -> tuple[int, str]:
     """Every `bin/*` invocation in this module goes through this one seam, so a test
     monkeypatches one function instead of six subprocess calls. Shape copied from
-    `_remediate_doc_staleness` in runner.py.
+    `_remediate_doc_staleness` in runner.py. Bounded by SCRIPT_TIMEOUT; a hang raises
+    HarnessError(subprocess-timeout) after reaping the process group.
     """
     try:
-        proc = subprocess.run([os.path.join(worktree, rel), *args], cwd=worktree,
-                              input=stdin, capture_output=True, text=True,
-                              errors="replace")
+        proc = run_bounded([os.path.join(worktree, rel), *args], step=rel,
+                           timeout=SCRIPT_TIMEOUT, cwd=worktree, stdin_text=stdin,
+                           errors="replace")
     except OSError as exc:
         return 127, f"{rel}: {exc}"
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
 def _git(worktree: str, *args: str) -> tuple[int, str]:
-    proc = subprocess.run(["git", "-C", worktree, *args],
-                          capture_output=True, text=True, errors="replace")
+    proc = run_bounded(["git", "-C", worktree, *args], step=f"git {args[0]}",
+                       timeout=GIT_TIMEOUT, errors="replace")
     return proc.returncode, (proc.stdout or "")
 
 
@@ -403,7 +406,11 @@ def draft(llm, git, worktree: str, out_dir: str, log, *, phase: str = "phase2",
         gates.insert(1, ("check-docs",
                          ("bin/check-docs", f"--since={_doc_base(worktree, base)}")))
     for name, args in gates:
-        grc, gout = _run_script(worktree, *args)
+        try:
+            grc, gout = _run_script(worktree, *args)
+        except HarnessError as exc:
+            _discard(worktree, rel, out_dir, log, phase, f"{name} {exc.kind}")
+            raise
         if grc != 0:
             _discard(worktree, rel, out_dir, log, phase, f"{name} failed")
             raise HarnessError("adr-draft-gate", f"{name}: {gout.strip()[:300]}")

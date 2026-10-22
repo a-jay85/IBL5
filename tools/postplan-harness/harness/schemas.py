@@ -3,9 +3,13 @@ validates what the model returns; invalid output is a typed failure, never
 silently accepted."""
 from __future__ import annotations
 
+import json
 import re
 
 from .state import Classification, HarnessError
+
+# LLM purpose name for the PR-copy call; llm.py keys tolerant JSON recovery on it.
+PR_COPY_PURPOSE = "pr-copy"
 
 FINDING_KEYS = {"path", "line", "body"}
 FINDING_ALIASES = (
@@ -14,8 +18,6 @@ FINDING_ALIASES = (
 )
 MANUAL_CATEGORIES = {"cli-executable", "phpunit", "api-test", "e2e",
                      "visual-regression", "truly-manual"}
-HOLD_DISCHARGE_CATEGORIES = {"decision", "cli-executable", "phpunit", "api-test",
-                              "e2e", "visual-regression", "truly-manual"}
 COMMIT_TYPES = {"feat", "fix", "refactor", "perf", "test", "docs", "build", "ci", "chore"}
 # Conventional-commit prefix: type, optional (scope), optional bang. Case-insensitive on the
 # type token because validate_pr_copy compares lowercased. Same shape coerce_commit_subject uses.
@@ -103,6 +105,68 @@ def validate_scores(data) -> None:
             raise HarnessError("schema", f"score[{i}].score must be int 0-100")
 
 
+VERDICT_VALUES = {"real", "not-real"}
+_VERDICT_LIST_KEYS = ("verdicts", "votes", "results", "findings", "items")
+_VERDICT_KEY_ALIASES = ("verdict", "vote", "decision")
+_REAL_WORDS = {"real", "true", "valid", "confirmed", "yes"}
+_NOT_REAL_WORDS = {"not-real", "notreal", "false", "invalid", "false-positive",
+                   "rejected", "no", "fp"}
+
+
+def _normalize_verdict_item(item):
+    if not isinstance(item, dict):
+        return item
+    out = dict(item)
+    if "n" in out and isinstance(out["n"], str) and out["n"].strip().isdigit():
+        out["n"] = int(out["n"].strip())
+    if "verdict" not in out:
+        for k in _VERDICT_KEY_ALIASES[1:]:
+            if k in out:
+                out["verdict"] = out.pop(k)
+                break
+    if "verdict" not in out and isinstance(out.get("real"), bool):
+        out["verdict"] = "real" if out.pop("real") else "not-real"
+    v = out.get("verdict")
+    if isinstance(v, bool):
+        out["verdict"] = "real" if v else "not-real"
+    elif isinstance(v, str):
+        w = v.strip().lower().replace("_", "-").replace(" ", "-")
+        if w in _REAL_WORDS:
+            out["verdict"] = "real"
+        elif w in _NOT_REAL_WORDS:
+            out["verdict"] = "not-real"
+    if "reason" not in out:
+        out["reason"] = ""
+    return out
+
+
+def unwrap_verdicts_envelope(data):
+    """Tolerant pre-pass for the 4D verifier reply. Unwraps a one-key dict envelope and
+    folds verdict aliases; anything else reaches validate_verdicts unchanged."""
+    if isinstance(data, dict):
+        lists = [k for k in _VERDICT_LIST_KEYS if isinstance(data.get(k), list)]
+        if len(lists) == 1:
+            data = data[lists[0]]
+    if isinstance(data, list):
+        return [_normalize_verdict_item(i) for i in data]
+    return data
+
+
+def validate_verdicts(data) -> None:
+    """[{n, verdict, reason}] — one verifier's votes over a numbered finding chunk."""
+    if not isinstance(data, list):
+        raise HarnessError("schema", "verdicts must be a JSON array")
+    for i, v in enumerate(data):
+        if not isinstance(v, dict) or "n" not in v or "verdict" not in v:
+            raise HarnessError("schema", f"verdict[{i}] needs n and verdict")
+        if not isinstance(v["n"], int) or isinstance(v["n"], bool) or v["n"] < 1:
+            raise HarnessError("schema", f"verdict[{i}].n must be a positive int")
+        if v["verdict"] not in VERDICT_VALUES:
+            raise HarnessError("schema", f"verdict[{i}].verdict {v['verdict']!r} not in {sorted(VERDICT_VALUES)}")
+        if not isinstance(v.get("reason", ""), str):
+            raise HarnessError("schema", f"verdict[{i}].reason must be a string")
+
+
 def validate_manual_classification(data) -> None:
     """[{step, category, rationale}] — Phase 6 QA classification."""
     if not isinstance(data, list):
@@ -137,46 +201,6 @@ def validate_manual_recheck(data) -> None:
                 raise HarnessError("schema", f"recheck[{i}].probe must be a non-empty list")
             if not all(isinstance(s, str) for s in probe):
                 raise HarnessError("schema", f"recheck[{i}].probe elements must be strings")
-
-
-def validate_hold_discharge(data) -> None:
-    """[{n, category, probe?, rationale?}] — Mode B hold-sentence classifier output.
-
-    Each item requires int `n` and `category` in HOLD_DISCHARGE_CATEGORIES.
-    `probe` is a non-empty list of str and is required iff category == "cli-executable".
-    `decision` entries must carry no `probe` and no `test_hint`.
-    Rejects any category outside the closed set — a permissive validator here
-    would silently discharge a hallucinated category.
-    """
-    if not isinstance(data, list):
-        raise HarnessError("schema", "hold discharge must be a JSON array")
-    for i, item in enumerate(data):
-        if not isinstance(item, dict) or "n" not in item or "category" not in item:
-            raise HarnessError("schema", f"discharge[{i}] must have n and category")
-        if not isinstance(item["n"], int):
-            raise HarnessError("schema", f"discharge[{i}].n must be int")
-        cat = item["category"]
-        if cat not in HOLD_DISCHARGE_CATEGORIES:
-            raise HarnessError("schema", f"discharge[{i}].category {cat!r} not in allowed set")
-        has_probe = "probe" in item
-        has_hint = "test_hint" in item
-        is_cli = cat == "cli-executable"
-        is_decision = cat == "decision"
-        if is_decision and has_probe:
-            raise HarnessError("schema", f"discharge[{i}].decision must not have probe")
-        if is_decision and has_hint:
-            raise HarnessError("schema", f"discharge[{i}].decision must not have test_hint")
-        if is_cli and not has_probe:
-            raise HarnessError("schema", f"discharge[{i}].cli-executable must have probe")
-        if not is_cli and has_probe:
-            raise HarnessError("schema",
-                                f"discharge[{i}].probe forbidden for category {cat!r}")
-        if has_probe:
-            probe = item["probe"]
-            if not isinstance(probe, list) or not probe:
-                raise HarnessError("schema", f"discharge[{i}].probe must be non-empty list")
-            if not all(isinstance(s, str) for s in probe):
-                raise HarnessError("schema", f"discharge[{i}].probe elements must be strings")
 
 
 def normalize_pr_copy(data):
@@ -239,17 +263,72 @@ def validate_pr_copy(data) -> None:
         raise HarnessError("schema", "commit_subject must start with its conventional-commit type")
 
 
-def validate_body_check(data) -> None:
-    """{corrected_body, findings} — PR-body-vs-diff verification."""
-    if not isinstance(data, dict):
-        raise HarnessError("schema", "body check must be a JSON object")
-    if "corrected_body" not in data or not isinstance(data["corrected_body"], str):
-        raise HarnessError("schema", "body check missing string field 'corrected_body'")
-    if "findings" not in data or not isinstance(data["findings"], list):
-        raise HarnessError("schema", "body check findings must be a JSON array")
-    for i, item in enumerate(data["findings"]):
-        if not isinstance(item, str):
-            raise HarnessError("schema", f"body check finding[{i}] must be a string")
+PR_COPY_JSON_HINT = (
+    'escape every " inside summary_md as \\", write newlines as \\n, '
+    "and put no triple-backtick fences inside summary_md"
+)
+_PR_COPY_KEYS = ("type", "title", "commit_subject", "summary_md")
+_SHORT_KEYS = ("type", "title", "commit_subject")
+
+
+def _salvage_pr_copy(body: str):
+    """Key-anchored repair of unescaped interior quotes in summary_md. Returns a dict, or
+    None when the boundaries are ambiguous. type/title/commit_subject are copied verbatim
+    or the salvage gives up."""
+    anchors = []
+    for key in _PR_COPY_KEYS:
+        found = list(re.finditer(r'"%s"\s*:\s*"' % key, body))
+        if len(found) != 1:
+            return None
+        anchors.append((found[0].start(), found[0].end(), key))
+    anchors.sort()
+    final_brace = body.rfind("}")
+    values = {}
+    for i, (_, value_start, key) in enumerate(anchors):
+        last = i == len(anchors) - 1
+        region_end = final_brace if last else anchors[i + 1][0]
+        region = body[value_start:region_end]
+        close = region.rfind('"')
+        if close == -1:
+            return None
+        gap = region[close + 1:]
+        if not re.fullmatch(r"\s*" if last else r"\s*,\s*", gap):
+            return None
+        values[key] = region[:close]
+    for key in _SHORT_KEYS:
+        if any(ch in values[key] for ch in ('"', "\n", "\\")):
+            return None
+    fixed = re.sub(r'(?<!\\)"', r'\\"', values["summary_md"])
+    try:
+        values["summary_md"] = json.loads('"' + fixed + '"', strict=False)
+    except json.JSONDecodeError:
+        return None
+    return {key: values[key] for key in _PR_COPY_KEYS}
+
+
+def extract_pr_copy_json(text: str):
+    """pr-copy-only JSON extraction. Tries the shared extract_json first, then a
+    first-{ .. last-} slice of the whole reply, then a key-anchored salvage that
+    re-escapes interior quotes in summary_md only. Never invents or rewrites
+    type/title/commit_subject: salvage copies them byte-for-byte or gives up."""
+    from .adapters.llm import extract_json  # function-local: no import cycle
+    try:
+        return extract_json(text)
+    except ValueError:
+        pass
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end <= start:
+        raise ValueError(f"no JSON object in pr-copy reply; {PR_COPY_JSON_HINT}")
+    body = text[start:end + 1]
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as e:
+        parse_err = str(e)
+    salvaged = _salvage_pr_copy(body)
+    if salvaged is not None:
+        return salvaged
+    raise ValueError(
+        f"no parseable JSON in pr-copy reply ({parse_err}); {PR_COPY_JSON_HINT}")
 
 
 def coerce_commit_subject(subject: str, cls: Classification) -> str:

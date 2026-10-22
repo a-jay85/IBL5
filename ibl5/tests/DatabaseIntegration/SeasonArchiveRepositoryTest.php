@@ -23,7 +23,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllSeasonYears();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // Should be sorted ascending
         $sorted = $result;
         sort($sorted);
@@ -41,7 +41,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getAwardsByYear(2098);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('award', $first);
         self::assertArrayHasKey('name', $first);
@@ -63,7 +63,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getPlayoffResultsByYear(9098);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('winner', $first);
         self::assertArrayHasKey('loser', $first);
@@ -81,7 +81,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getTeamAwardsByYear(2098, 2097);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('name', $first);
         self::assertArrayHasKey('award', $first);
@@ -137,7 +137,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getAllGmAwardsWithTeams();
 
         // Production DB has GM awards data
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('gm_display_name', $first);
         self::assertArrayHasKey('team_name', $first);
@@ -149,11 +149,84 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllGmTenuresWithTeams();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('gm_display_name', $first);
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('start_season_year', $first);
+    }
+
+    public function testGetAllGmTenuresWithTeamsBreaksStartYearTiesByTenureId(): void
+    {
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 1,
+            'gm_display_name' => 'SA Tie GM Zed',
+            'start_season_year' => 2098,
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 2,
+            'gm_display_name' => 'SA Tie GM Abe',
+            'start_season_year' => 2098,
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 1,
+            'gm_display_name' => 'SA Tie GM Early',
+            'start_season_year' => 2097,
+        ]);
+
+        $names = [];
+        foreach ($this->repo->getAllGmTenuresWithTeams() as $row) {
+            if (str_starts_with($row['gm_display_name'], 'SA Tie GM ')) {
+                $names[] = $row['gm_display_name'];
+            }
+        }
+
+        self::assertSame(['SA Tie GM Early', 'SA Tie GM Zed', 'SA Tie GM Abe'], $names);
+    }
+
+    public function testGetAllGmAwardsWithTeamsOrdersOverlappingTenureRowsByTenureId(): void
+    {
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 2,
+            'gm_display_name' => 'SA Overlap GM',
+            'start_season_year' => 2097,
+            'end_season_year' => 2099,
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 1,
+            'gm_display_name' => 'SA Overlap GM',
+            'start_season_year' => 2098,
+        ]);
+        $this->insertRow('ibl_gm_awards', [
+            'year' => 2098,
+            'award' => 'SA Overlap Award',
+            'name' => 'SA Overlap GM',
+        ]);
+
+        $teamNames = [];
+        foreach ($this->repo->getAllGmAwardsWithTeams() as $row) {
+            if ($row['gm_display_name'] === 'SA Overlap GM') {
+                $teamNames[] = $row['team_name'];
+            }
+        }
+
+        self::assertCount(2, $teamNames);
+        self::assertSame([$this->teamNameForId(2), $this->teamNameForId(1)], $teamNames);
+    }
+
+    private function teamNameForId(int $teamId): string
+    {
+        $stmt = $this->db->prepare('SELECT team_name FROM ibl_team_info WHERE teamid = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $teamId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertIsString($row['team_name']);
+
+        return $row['team_name'];
     }
 
     public function testGetHeatWinLossByYearReturnsRows(): void
@@ -238,7 +311,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getHeatWinLossByYear(2098);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('currentname', $first);
         self::assertArrayHasKey('wins', $first);
@@ -250,7 +323,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getTeamColors();
 
         // Should contain all real teams (1-28)
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // Verify structure of first entry
         $firstTeam = array_values($result)[0];
         self::assertArrayHasKey('color1', $firstTeam);
@@ -280,7 +353,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getTeamConferences();
 
         // Should have entries from standings table
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // All values should be conference names
         foreach ($result as $conference) {
             self::assertContains($conference, ['Eastern', 'Western']);

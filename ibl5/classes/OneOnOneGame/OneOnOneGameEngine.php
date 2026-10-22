@@ -89,8 +89,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                     $player2Data,
                     $result->player1Stats,
                     $result->player2Stats,
-                    true,
-                    $possession
+                    true
                 );
             } else {
                 $this->runPossession(
@@ -99,8 +98,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                     $player1Data,
                     $result->player2Stats,
                     $result->player1Stats,
-                    false,
-                    $possession
+                    false
                 );
             }
 
@@ -134,8 +132,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         array $defenseData,
         OneOnOneGamePlayerStats $offenseStats,
         OneOnOneGamePlayerStats $defenseStats,
-        bool $isPlayer1OnOffense,
-        int $possession
+        bool $isPlayer1OnOffense
     ): void {
         $offenseName = HtmlSanitizer::safeHtmlOutput($offenseData['name']);
         $defenseName = HtmlSanitizer::safeHtmlOutput($defenseData['name']);
@@ -146,149 +143,35 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
 
         switch ($possessionResult) {
             case OneOnOneGameShotResultResolverInterface::RESULT_FOUL:
-                $result->playByPlay .= $this->textGenerator->getFoulText($defenseName, $offenseName);
-                $defenseStats->fouls++;
-                // Simulate free throws - offensive player shoots 2 free throws
-                $freeThrowsMade = $this->shootFreeThrows($offenseData['r_fta'], 2);
-                $offenseStats->freeThrowsAttempted += 2;
-                $offenseStats->freeThrowsMade += $freeThrowsMade;
-                if ($freeThrowsMade > 0) {
-                    $result->playByPlay .= $offenseName . ' makes ' . $freeThrowsMade . ' of 2 free throws.<br>';
-                    if ($isPlayer1OnOffense) {
-                        $result->player1Score += $freeThrowsMade;
-                    } else {
-                        $result->player2Score += $freeThrowsMade;
-                    }
-                    // Change possession after free throws
-                    $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
-                } else {
-                    $result->playByPlay .= $offenseName . ' misses both free throws.<br>';
-                    // Offensive player gets the ball back after missed free throws
-                    $this->currentPossession = $isPlayer1OnOffense ? 1 : 2;
-                }
+                $this->resolveFoul($result, $offenseData, $offenseStats, $defenseStats, $offenseName, $defenseName, $isPlayer1OnOffense);
                 break;
 
             case OneOnOneGameShotResultResolverInterface::RESULT_STEAL:
-                $result->playByPlay .= $this->textGenerator->getStealPlayText($defenseName, $offenseName);
-                $offenseStats->turnovers++;
-                $defenseStats->steals++;
-                $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
+                $this->resolveSteal($result, $offenseStats, $defenseStats, $offenseName, $defenseName, $isPlayer1OnOffense);
                 break;
 
             case OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_THREE:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getThreePointText()
-                    . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $offenseStats->threePointersAttempted++;
-                $defenseStats->blocks++;
-                $looseBall = true;
-                break;
-
             case OneOnOneGameShotResultResolverInterface::RESULT_MISSED_THREE:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getThreePointText()
-                    . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $offenseStats->threePointersAttempted++;
-                $looseBall = true;
-                break;
-
             case OneOnOneGameShotResultResolverInterface::RESULT_MADE_THREE:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getThreePointText()
-                    . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $offenseStats->threePointersAttempted++;
-                $offenseStats->fieldGoalsMade++;
-                $offenseStats->threePointersMade++;
-                if ($isPlayer1OnOffense) {
-                    $result->player1Score += 3;
-                } else {
-                    $result->player2Score += 3;
-                }
-                $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
+                $looseBall = $this->resolveThree($possessionResult, $result, $offenseStats, $defenseStats, $offenseName, $defenseName, $isPlayer1OnOffense);
                 break;
 
             case OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_OUTSIDE_TWO:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getOutsideTwoText()
-                    . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $defenseStats->blocks++;
-                $looseBall = true;
-                break;
-
             case OneOnOneGameShotResultResolverInterface::RESULT_MISSED_OUTSIDE_TWO:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getOutsideTwoText()
-                    . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $looseBall = true;
-                break;
-
             case OneOnOneGameShotResultResolverInterface::RESULT_MADE_OUTSIDE_TWO:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getOutsideTwoText()
-                    . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $offenseStats->fieldGoalsMade++;
-                if ($isPlayer1OnOffense) {
-                    $result->player1Score += 2;
-                } else {
-                    $result->player2Score += 2;
-                }
-                $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
+                $looseBall = $this->resolveOutsideTwo($possessionResult, $result, $offenseStats, $defenseStats, $offenseName, $defenseName, $isPlayer1OnOffense);
                 break;
 
             case OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_DRIVE:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getDriveText()
-                    . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $defenseStats->blocks++;
-                $looseBall = true;
-                break;
-
             case OneOnOneGameShotResultResolverInterface::RESULT_MISSED_DRIVE:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getDriveText()
-                    . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $looseBall = true;
-                break;
-
             case OneOnOneGameShotResultResolverInterface::RESULT_MADE_DRIVE:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getDriveText()
-                    . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $offenseStats->fieldGoalsMade++;
-                if ($isPlayer1OnOffense) {
-                    $result->player1Score += 2;
-                } else {
-                    $result->player2Score += 2;
-                }
-                $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
+                $looseBall = $this->resolveDrive($possessionResult, $result, $offenseStats, $defenseStats, $offenseName, $defenseName, $isPlayer1OnOffense);
                 break;
 
             case OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_POST:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getPostText()
-                    . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $defenseStats->blocks++;
-                $looseBall = true;
-                break;
-
             case OneOnOneGameShotResultResolverInterface::RESULT_MISSED_POST:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getPostText()
-                    . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $looseBall = true;
-                break;
-
             case OneOnOneGameShotResultResolverInterface::RESULT_MADE_POST:
-                $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getPostText()
-                    . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
-                $offenseStats->fieldGoalsAttempted++;
-                $offenseStats->fieldGoalsMade++;
-                if ($isPlayer1OnOffense) {
-                    $result->player1Score += 2;
-                } else {
-                    $result->player2Score += 2;
-                }
-                $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
+                $looseBall = $this->resolvePost($possessionResult, $result, $offenseStats, $defenseStats, $offenseName, $defenseName, $isPlayer1OnOffense);
                 break;
         }
 
@@ -305,6 +188,215 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                 $isPlayer1OnOffense
             );
         }
+    }
+
+    /**
+     * Resolve a shooting foul: two free throws, then possession per the make count.
+     *
+     * @param PlayerGameData $offenseData
+     */
+    private function resolveFoul(
+        OneOnOneGameResult $result,
+        array $offenseData,
+        OneOnOneGamePlayerStats $offenseStats,
+        OneOnOneGamePlayerStats $defenseStats,
+        string $offenseName,
+        string $defenseName,
+        bool $isPlayer1OnOffense
+    ): void {
+        $result->playByPlay .= $this->textGenerator->getFoulText($defenseName, $offenseName);
+        $defenseStats->fouls++;
+        // Simulate free throws - offensive player shoots 2 free throws
+        $freeThrowsMade = $this->shootFreeThrows($offenseData['r_fta'], 2);
+        $offenseStats->freeThrowsAttempted += 2;
+        $offenseStats->freeThrowsMade += $freeThrowsMade;
+        if ($freeThrowsMade > 0) {
+            $result->playByPlay .= $offenseName . ' makes ' . $freeThrowsMade . ' of 2 free throws.<br>';
+            // Possession changes after free throws
+            $this->awardPoints($result, $isPlayer1OnOffense, $freeThrowsMade);
+        } else {
+            $result->playByPlay .= $offenseName . ' misses both free throws.<br>';
+            // Offensive player gets the ball back after missed free throws
+            $this->currentPossession = $isPlayer1OnOffense ? 1 : 2;
+        }
+    }
+
+    /**
+     * Resolve a steal: turnover for the offense, possession flips.
+     */
+    private function resolveSteal(
+        OneOnOneGameResult $result,
+        OneOnOneGamePlayerStats $offenseStats,
+        OneOnOneGamePlayerStats $defenseStats,
+        string $offenseName,
+        string $defenseName,
+        bool $isPlayer1OnOffense
+    ): void {
+        $result->playByPlay .= $this->textGenerator->getStealPlayText($defenseName, $offenseName);
+        $offenseStats->turnovers++;
+        $defenseStats->steals++;
+        $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
+    }
+
+    /**
+     * Resolve a three-point attempt. Returns true when the ball is loose (blocked or missed).
+     */
+    private function resolveThree(
+        int $shotResult,
+        OneOnOneGameResult $result,
+        OneOnOneGamePlayerStats $offenseStats,
+        OneOnOneGamePlayerStats $defenseStats,
+        string $offenseName,
+        string $defenseName,
+        bool $isPlayer1OnOffense
+    ): bool {
+        if ($shotResult === OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_THREE) {
+            $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getThreePointText()
+                . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
+            $offenseStats->fieldGoalsAttempted++;
+            $offenseStats->threePointersAttempted++;
+            $defenseStats->blocks++;
+            return true;
+        }
+
+        if ($shotResult === OneOnOneGameShotResultResolverInterface::RESULT_MISSED_THREE) {
+            $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getThreePointText()
+                . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
+            $offenseStats->fieldGoalsAttempted++;
+            $offenseStats->threePointersAttempted++;
+            return true;
+        }
+
+        // RESULT_MADE_THREE
+        $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getThreePointText()
+            . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
+        $offenseStats->fieldGoalsAttempted++;
+        $offenseStats->threePointersAttempted++;
+        $offenseStats->fieldGoalsMade++;
+        $offenseStats->threePointersMade++;
+        $this->awardPoints($result, $isPlayer1OnOffense, 3);
+        return false;
+    }
+
+    /**
+     * Resolve an outside two-point attempt. Returns true when the ball is loose (blocked or missed).
+     */
+    private function resolveOutsideTwo(
+        int $shotResult,
+        OneOnOneGameResult $result,
+        OneOnOneGamePlayerStats $offenseStats,
+        OneOnOneGamePlayerStats $defenseStats,
+        string $offenseName,
+        string $defenseName,
+        bool $isPlayer1OnOffense
+    ): bool {
+        if ($shotResult === OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_OUTSIDE_TWO) {
+            $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getOutsideTwoText()
+                . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
+            $offenseStats->fieldGoalsAttempted++;
+            $defenseStats->blocks++;
+            return true;
+        }
+
+        if ($shotResult === OneOnOneGameShotResultResolverInterface::RESULT_MISSED_OUTSIDE_TWO) {
+            $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getOutsideTwoText()
+                . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
+            $offenseStats->fieldGoalsAttempted++;
+            return true;
+        }
+
+        // RESULT_MADE_OUTSIDE_TWO
+        $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getOutsideTwoText()
+            . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
+        $offenseStats->fieldGoalsAttempted++;
+        $offenseStats->fieldGoalsMade++;
+        $this->awardPoints($result, $isPlayer1OnOffense, 2);
+        return false;
+    }
+
+    /**
+     * Resolve a drive attempt. Returns true when the ball is loose (blocked or missed).
+     */
+    private function resolveDrive(
+        int $shotResult,
+        OneOnOneGameResult $result,
+        OneOnOneGamePlayerStats $offenseStats,
+        OneOnOneGamePlayerStats $defenseStats,
+        string $offenseName,
+        string $defenseName,
+        bool $isPlayer1OnOffense
+    ): bool {
+        if ($shotResult === OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_DRIVE) {
+            $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getDriveText()
+                . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
+            $offenseStats->fieldGoalsAttempted++;
+            $defenseStats->blocks++;
+            return true;
+        }
+
+        if ($shotResult === OneOnOneGameShotResultResolverInterface::RESULT_MISSED_DRIVE) {
+            $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getDriveText()
+                . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
+            $offenseStats->fieldGoalsAttempted++;
+            return true;
+        }
+
+        // RESULT_MADE_DRIVE
+        $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getDriveText()
+            . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
+        $offenseStats->fieldGoalsAttempted++;
+        $offenseStats->fieldGoalsMade++;
+        $this->awardPoints($result, $isPlayer1OnOffense, 2);
+        return false;
+    }
+
+    /**
+     * Resolve a post attempt. Returns true when the ball is loose (blocked or missed).
+     */
+    private function resolvePost(
+        int $shotResult,
+        OneOnOneGameResult $result,
+        OneOnOneGamePlayerStats $offenseStats,
+        OneOnOneGamePlayerStats $defenseStats,
+        string $offenseName,
+        string $defenseName,
+        bool $isPlayer1OnOffense
+    ): bool {
+        if ($shotResult === OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_POST) {
+            $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getPostText()
+                . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
+            $offenseStats->fieldGoalsAttempted++;
+            $defenseStats->blocks++;
+            return true;
+        }
+
+        if ($shotResult === OneOnOneGameShotResultResolverInterface::RESULT_MISSED_POST) {
+            $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getPostText()
+                . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
+            $offenseStats->fieldGoalsAttempted++;
+            return true;
+        }
+
+        // RESULT_MADE_POST
+        $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getPostText()
+            . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
+        $offenseStats->fieldGoalsAttempted++;
+        $offenseStats->fieldGoalsMade++;
+        $this->awardPoints($result, $isPlayer1OnOffense, 2);
+        return false;
+    }
+
+    /**
+     * Credit points to the offensive player and hand possession to the defense.
+     */
+    private function awardPoints(OneOnOneGameResult $result, bool $isPlayer1OnOffense, int $points): void
+    {
+        if ($isPlayer1OnOffense) {
+            $result->player1Score += $points;
+        } else {
+            $result->player2Score += $points;
+        }
+        $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
     }
 
     /**

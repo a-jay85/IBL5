@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
-use Boxscore\Season2008Finals4Restore;
+use Boxscore\Legacy\Season2008Finals4Restore;
 use PHPUnit\Framework\Attributes\Group;
 
 /**

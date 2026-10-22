@@ -230,6 +230,196 @@ class LeadersHtmParserTest extends TestCase
         $this->assertCount(3, $result['teams']);
     }
 
+    public function testEmptyOrTablelessFileYieldsEmptyResult(): void
+    {
+        $empty = ['individual' => [], 'stat_leaders' => [], 'teams' => []];
+
+        $this->assertSame($empty, $this->parseHtml(''));
+        $this->assertSame($empty, $this->parseHtml('<html><body><p>no table</p></body></html>'));
+    }
+
+    public function testDataRowsWithoutRecognisedHeaderAreDropped(): void
+    {
+        $html = $this->buildHtml([
+            $this->makeDataRow(['PG', 'Stephen Curry', 'Clippers']),
+            '<tr><th>po</th><th>player</th><th>team</th></tr>',
+            $this->makeDataRow(['SG', 'Kobe Bryant', 'Lakers']),
+        ]);
+
+        $this->assertSame(
+            ['individual' => [], 'stat_leaders' => [], 'teams' => []],
+            $this->parseHtml($html),
+        );
+    }
+
+    public function testUnknownHeaderIsIgnoredWithoutLeakingRows(): void
+    {
+        $html = $this->buildHtml([
+            $this->makeSection('most valuable player', [['PG', 'Stephen Curry', 'Clippers']]),
+            $this->makeSection('Coach of the Year', [
+                ['--', 'Red Auerbach', 'Celtics'],
+                ['--', 'Pat Riley', 'Heat'],
+            ]),
+        ]);
+
+        $this->assertSame([
+            'individual' => ['Most Valuable Player' => ['Stephen Curry']],
+            'stat_leaders' => [],
+            'teams' => [],
+        ], $this->parseHtml($html));
+    }
+
+    public function testShortOrBlankNameRowsAreSkippedAndEmptySectionsHandled(): void
+    {
+        $html = $this->buildHtml([
+            '<tr><th>po</th><th>most valuable player</th><th>team</th></tr>',
+            $this->makeDataRow(['PG']),
+            $this->makeDataRow(['SG', '', 'Lakers']),
+            $this->makeDataRow(['SF', 'LeBron James']),
+            '<tr><th>po</th><th>scoring leader</th><th>team</th><th>ppg</th></tr>',
+            $this->makeDataRow(['PG', 'Stephen Curry', 'Clippers']),
+            $this->makeDataRow(['PG', '', 'Clippers', '30.1']),
+            '<tr><th>po</th><th>rebound leader</th><th>team</th><th>rpg</th></tr>',
+            $this->makeDataRow(['C', 'Nikola Jokic', 'Nuggets']),
+            '<tr><th>po</th><th>assists leader</th><th>team</th><th>apg</th></tr>',
+            '<tr><th>po</th><th>rookie of the year</th><th>team</th></tr>',
+        ]);
+
+        // All-short sections keep their key with []; zero-row sections (assists, rookie) are absent.
+        $this->assertSame([
+            'individual' => ['Most Valuable Player' => ['LeBron James']],
+            'stat_leaders' => ['Scoring Leader' => [], 'Rebounding Leader' => []],
+            'teams' => [],
+        ], $this->parseHtml($html));
+    }
+
+    public function testTeamRowsNeedNineCellsAndKeepEachNameIndependently(): void
+    {
+        $html = $this->buildHtml([
+            $this->makeTeamSection('All League', [
+                ['PG', 'Curry', 'Clippers', 'PG', '', 'Pelicans', 'PG', 'Harden', 'Bulls'],
+                ['SG', '', 'Celtics', 'SG', 'Mitchell', 'Jazz', 'SG', '', 'Suns'],
+            ]) . $this->makeDataRow(['C', 'Jokic', 'Nuggets', 'C', 'Embiid', 'Bullets', 'C', 'Gobert']),
+        ]);
+
+        $this->assertSame([
+            'individual' => [],
+            'stat_leaders' => [],
+            'teams' => [
+                'All-League First Team' => ['Curry'],
+                'All-League Second Team' => ['Mitchell'],
+                'All-League Third Team' => ['Harden'],
+            ],
+        ], $this->parseHtml($html));
+    }
+
+    public function testCellTextIsTrimmedAndTagStrippedWithoutEntityDecoding(): void
+    {
+        $html = $this->buildHtml([
+            '<tr><th>po</th><th> <font>MOST VALUABLE PLAYER</font> </th><th>team</th></tr>',
+            $this->makeDataRow(['PG', '  <b>Stephen Curry</b>  ', 'Clippers']),
+            $this->makeDataRow(['SG', 'Shaquille O&#039;Neal', 'Heat']),
+            $this->makeDataRow(['SF', '&nbsp;', 'Nets']),
+            $this->makeDataRow(['PF', '   ', 'Nets']),
+            $this->makeDataRow(['C', 'Sacramento &amp; Co', 'Kings']),
+            '<tr><td>C<td>Unclosed Cell</tr>',
+        ]);
+
+        $this->assertSame([
+            'individual' => ['Most Valuable Player' => [
+                'Stephen Curry',
+                'Shaquille O&#039;Neal',
+                '&nbsp;',
+                'Sacramento &amp; Co',
+            ]],
+            'stat_leaders' => [],
+            'teams' => [],
+        ], $this->parseHtml($html));
+    }
+
+    public function testDuplicateHeadersAndSubHeaderSplitsKeepLastSection(): void
+    {
+        $html = $this->buildHtml([
+            $this->makeSection('most valuable player', [['PG', 'First Curry', 'Clippers']]),
+            $this->makeSection('most valuable player', [['PG', 'Second Curry', 'Clippers']]),
+            '<tr><th>po</th><th>scoring leader</th><th>team</th><th>ppg</th></tr>',
+            $this->makeDataRow(['PG', 'Early Scorer', 'Bulls', '31.0']),
+            '<tr><th>po</th><th>player</th><th>team</th></tr>',
+            $this->makeDataRow(['SG', 'Late Scorer', 'Suns', '25.0']),
+            '<tr><th>po</th><th>rebound leader</th><th>team</th><th>rpg</th></tr>',
+            $this->makeDataRow(['C', 'Kept Rebounder', 'Nuggets', '13.4']),
+            '<tr><th>po</th><th>player</th><th>team</th><th>rpg</th></tr>',
+            $this->makeDataRow(['PF', 'Dropped Rebounder', 'Bucks', '12.8']),
+        ]);
+
+        // po/player/team-only sub-header splits the section and the later half wins;
+        // a sub-header carrying 'rpg' becomes an unknown header, so its rows are dropped.
+        $this->assertSame([
+            'individual' => ['Most Valuable Player' => ['Second Curry']],
+            'stat_leaders' => [
+                'Scoring Leader' => [['name' => 'Late Scorer', 'stat' => '25.0']],
+                'Rebounding Leader' => [['name' => 'Kept Rebounder', 'stat' => '13.4']],
+            ],
+            'teams' => [],
+        ], $this->parseHtml($html));
+    }
+
+    public function testSingleRowStatLeaderTablesKeepEmptyAndExtraCellValues(): void
+    {
+        $html = $this->buildHtml([
+            '<tr><th>po</th><th>scoring leader</th><th>team</th><th>ppg</th></tr>',
+            $this->makeDataRow(['PG', 'Stephen Curry', 'Clippers', '']),
+            '<tr><th>po</th><th>blocks leader</th><th>team</th><th>bpg</th></tr>',
+            $this->makeDataRow(['C', 'Victor Wembanyama', 'Spurs', '3.9', 'extra']),
+        ]);
+
+        $this->assertSame([
+            'individual' => [],
+            'stat_leaders' => [
+                'Scoring Leader' => [['name' => 'Stephen Curry', 'stat' => '']],
+                'Blocks Leader' => [['name' => 'Victor Wembanyama', 'stat' => '3.9']],
+            ],
+            'teams' => [],
+        ], $this->parseHtml($html));
+    }
+
+    public function testSectionOrderAndTeamHeaderEdgeCases(): void
+    {
+        $html = $this->buildHtml([
+            // Team header with only 2 known labels: skipped, and no fall-through to '6th Man Award'.
+            $this->makeTeamHeader('All League 1st', '6th Man Award', 'All League 3rd')
+                . $this->makeDataRow(['PG', 'Ghost One', 'T1', 'PG', 'Ghost Two', 'T2', 'PG', 'Ghost Three', 'T3']),
+            $this->makeSection('rookie of the year', [['PG', 'Rookie A', 'Spurs']]),
+            // Stat-leader match is checked before individual: 'Defensive Player' is never claimed.
+            '<tr><th>po</th><th>Steals Leader</th><th>Defensive Player</th><th>spg</th></tr>'
+                . $this->makeDataRow(['SG', 'Thief', 'Heat', '2.5']),
+            $this->makeSection('most valuable player', [['C', 'MVP B', 'Nuggets']]),
+            // Labels from three different families are accepted.
+            $this->makeTeamHeader('All League 1st', 'All Defense 2nd', 'All Rookie 3rd')
+                . $this->makeDataRow(['C', 'Mix1', 'T', 'C', 'Mix2', 'T', 'C', 'Mix3', 'T']),
+            // Valid team header whose only row is short: all three keys present with [].
+            $this->makeTeamHeader('All League 2nd', 'All Defense 3rd', 'All Rookie 1st')
+                . $this->makeDataRow(['PG', 'Short']),
+        ]);
+
+        // Keys follow file order (Rookie before MVP), never map order.
+        $this->assertSame([
+            'individual' => [
+                'Rookie of the Year' => ['Rookie A'],
+                'Most Valuable Player' => ['MVP B'],
+            ],
+            'stat_leaders' => ['Steals Leader' => [['name' => 'Thief', 'stat' => '2.5']]],
+            'teams' => [
+                'All-League First Team' => ['Mix1'],
+                'All-Defensive Team (2nd)' => ['Mix2'],
+                'All-Rookie Team (3rd)' => ['Mix3'],
+                'All-League Second Team' => [],
+                'All-Defensive Team (3rd)' => [],
+                'All-Rookie Team (1st)' => [],
+            ],
+        ], $this->parseHtml($html));
+    }
+
     /**
      * Build a complete HTML file from section strings.
      *
@@ -286,6 +476,25 @@ class LeadersHtmParserTest extends TestCase
             $html .= '</tr>';
         }
         return $html;
+    }
+
+    /**
+     * Build one data row from raw cell values (any cell count, including short rows).
+     *
+     * @param list<string> $cells
+     */
+    private function makeDataRow(array $cells): string
+    {
+        return '<tr><td>' . implode('</td><td>', $cells) . '</td></tr>';
+    }
+
+    /**
+     * Build a 9-column team header row with three arbitrary labels.
+     */
+    private function makeTeamHeader(string $first, string $second, string $third): string
+    {
+        return '<tr><th></th><th>' . $first . '</th><th></th><th></th><th>' . $second
+            . '</th><th></th><th></th><th>' . $third . '</th><th></th></tr>';
     }
 
     /**

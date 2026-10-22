@@ -82,6 +82,7 @@ class DesktopNavViewTest extends TestCase
 
         $this->assertStringContainsString('LIVE', $html);
         $this->assertStringContainsString('nav-badge', $html);
+        $this->assertStringContainsString('<span class="ibl-chip nav-badge">LIVE</span>', $html);
     }
 
     public function testExternalLinkIcon(): void
@@ -146,6 +147,20 @@ class DesktopNavViewTest extends TestCase
         $this->assertStringContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
     }
 
+    public function testSectionLabelsUseNavSectionLabelClass(): void
+    {
+        $view = $this->createView(isLoggedIn: true, username: 'A-Jay');
+        $html = $view->render(
+            ['Season' => $this->sampleMenuData()],
+            $this->sampleMenuData(),
+            [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true]],
+        );
+
+        $this->assertStringContainsString('<div class="nav-section-label">A-Jay</div>', $html);
+        $this->assertStringContainsString('<label for="desktop-league-select" class="nav-section-label">League</label>', $html);
+        $this->assertStringNotContainsString('tracking-widest uppercase text-gray-500', $html);
+    }
+
     public function testAccountDropdownSuppressedWhenMyTeamMenuPresent(): void
     {
         $view = $this->createView(isLoggedIn: true, username: 'A-Jay');
@@ -179,5 +194,22 @@ class DesktopNavViewTest extends TestCase
         $this->assertStringContainsString('Forgot Password', $html);
         // Guests never see the logout footer
         $this->assertStringNotContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
+    }
+
+    public function testDevSwitchHostileRequestUriEscapedExactlyOnce(): void
+    {
+        $config = new NavigationConfig(
+            isLoggedIn: true,
+            username: 'A-Jay',
+            currentLeague: 'ibl',
+            serverName: 'www.iblhoops.net',
+            requestUri: '/ibl5/?q="><script>',
+        );
+        $html = (new DesktopNavView($config, new LoginFormView(), new TeamsDropdownView()))->renderDevSwitch();
+
+        $this->assertStringContainsString('href="http://localhost/ibl5/?q=&quot;&gt;&lt;script&gt;"', $html);
+        $this->assertStringContainsString('title="Switch to localhost"', $html);
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringNotContainsString('&amp;quot;', $html);
     }
 }

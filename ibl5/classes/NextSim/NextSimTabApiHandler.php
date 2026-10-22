@@ -18,7 +18,7 @@ class NextSimTabApiHandler
 {
     private \mysqli $db;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -35,7 +35,7 @@ class NextSimTabApiHandler
         $teamid = self::extractValidatedTeamid($_GET);
         $position = self::extractValidatedPosition($_GET);
 
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
         $team = Team::initialize($this->db, $teamid);
 
         // Load power rankings for SOS tier indicators
@@ -69,7 +69,7 @@ class NextSimTabApiHandler
     {
         if (isset($params['position']) && is_string($params['position'])) {
             $rawPosition = $params['position'];
-            if (in_array($rawPosition, \League\JSB::PLAYER_POSITIONS, true)) {
+            if (in_array($rawPosition, \League\JsbConstants::PLAYER_POSITIONS, true)) {
                 return $rawPosition;
             }
         }

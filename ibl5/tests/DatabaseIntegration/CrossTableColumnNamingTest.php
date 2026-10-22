@@ -133,7 +133,7 @@ final class CrossTableColumnNamingTest extends DatabaseTestCase
              LIMIT 5"
         );
 
-        self::assertNotEmpty(
+        self::assertNotSame([], 
             $rows,
             'Player→team JOIN on unified `teamid` returned no rows. CI seed may be empty, or the rename regressed.',
         );

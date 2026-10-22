@@ -1,6 +1,6 @@
 ---
 description: The automouse env-breaker treats a deliberate impl skip (plan left queue/) as an outcome, not a transient kill, so one fast skip can't strand the queue.
-last_verified: 2026-09-27
+last_verified: 2026-09-26
 ---
 
 # ADR-0066: A deliberate impl skip is not an environmental failure

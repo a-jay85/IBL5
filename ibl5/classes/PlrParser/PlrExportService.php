@@ -45,7 +45,7 @@ class PlrExportService implements PlrExportServiceInterface
     }
 
     /**
-     * @see JsbExportServiceInterface::exportPlrFile()
+     * @see PlrExportServiceInterface::exportPlrFile()
      */
     public function exportPlrFile(string $inputPath, string $outputPath): PlrWriteResult
     {

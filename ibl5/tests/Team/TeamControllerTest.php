@@ -204,6 +204,89 @@ class TeamControllerTest extends WideUnitTestCase
         self::assertNull($captured[4]);
     }
 
+    public function testDisplayTeamPageHonorsValidSplitKey(): void
+    {
+        $request = new HttpRequest(request: ['display' => 'split', 'split' => 'home']);
+        /** @var list<mixed>|null $captured */
+        $captured = null;
+        $mockService = $this->createMock(TeamServiceInterface::class);
+        $mockService->expects($this->once())
+            ->method('getTeamPageData')
+            ->willReturnCallback(function (mixed ...$args) use (&$captured): never {
+                $captured = array_values($args);
+                throw new \RuntimeException('short-circuit');
+            });
+
+        $this->runDisplayTeamPage($this->buildController($mockService, null, $request));
+
+        $this->assertIsArray($captured);
+        self::assertSame('split', $captured[2]);
+        self::assertSame('home', $captured[4]);
+    }
+
+    public function testDisplayTeamPageFallsBackToRatingsForInvalidSplitKey(): void
+    {
+        $request = new HttpRequest(request: ['display' => 'split', 'split' => 'bogus_key']);
+        /** @var list<mixed>|null $captured */
+        $captured = null;
+        $mockService = $this->createMock(TeamServiceInterface::class);
+        $mockService->expects($this->once())
+            ->method('getTeamPageData')
+            ->willReturnCallback(function (mixed ...$args) use (&$captured): never {
+                $captured = array_values($args);
+                throw new \RuntimeException('short-circuit');
+            });
+
+        $this->runDisplayTeamPage($this->buildController($mockService, null, $request));
+
+        $this->assertIsArray($captured);
+        self::assertSame('ratings', $captured[2]);
+        self::assertNull($captured[4]);
+    }
+
+    /**
+     * A `split[]=home` request must not slip past the allow-list.
+     */
+    public function testDisplayTeamPageFallsBackToRatingsForArrayValuedSplit(): void
+    {
+        $request = new HttpRequest(request: ['display' => 'split', 'split' => ['home']]);
+        /** @var list<mixed>|null $captured */
+        $captured = null;
+        $mockService = $this->createMock(TeamServiceInterface::class);
+        $mockService->expects($this->once())
+            ->method('getTeamPageData')
+            ->willReturnCallback(function (mixed ...$args) use (&$captured): never {
+                $captured = array_values($args);
+                throw new \RuntimeException('short-circuit');
+            });
+
+        $this->runDisplayTeamPage($this->buildController($mockService, null, $request));
+
+        $this->assertIsArray($captured);
+        self::assertSame('ratings', $captured[2]);
+        self::assertNull($captured[4]);
+    }
+
+    public function testDisplayTeamPageIgnoresSplitForNonSplitDisplay(): void
+    {
+        $request = new HttpRequest(request: ['display' => 'contracts', 'split' => 'home']);
+        /** @var list<mixed>|null $captured */
+        $captured = null;
+        $mockService = $this->createMock(TeamServiceInterface::class);
+        $mockService->expects($this->once())
+            ->method('getTeamPageData')
+            ->willReturnCallback(function (mixed ...$args) use (&$captured): never {
+                $captured = array_values($args);
+                throw new \RuntimeException('short-circuit');
+            });
+
+        $this->runDisplayTeamPage($this->buildController($mockService, null, $request));
+
+        $this->assertIsArray($captured);
+        self::assertSame('contracts', $captured[2]);
+        self::assertNull($captured[4]);
+    }
+
     public function testDisplayTeamPageFallsBackToRatingsForUnknownDisplayMode(): void
     {
         $request = new HttpRequest(request: ['display' => 'unknown_mode']);

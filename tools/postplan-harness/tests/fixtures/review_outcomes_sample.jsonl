@@ -1,0 +1,9 @@
+{"agent": "A", "basis": "fix-verdict", "findingId": 1, "outcome": "fixed", "pipeline": "harness", "pr": 10, "reason": "sample", "score": 80, "sha": null, "source": "phase4.5", "ts": "2026-09-01T12:00:00Z", "v": 1}
+{"agent": "A", "basis": "fix-verdict", "findingId": 2, "outcome": "declined-wrong", "pipeline": "harness", "pr": 10, "reason": "sample", "score": 80, "sha": null, "source": "phase4.5", "ts": "2026-09-01T12:00:00Z", "v": 1}
+{"agent": "B", "basis": "fix-verdict", "findingId": 3, "outcome": "didnt-matter", "pipeline": "harness", "pr": 10, "reason": "sample", "score": 80, "sha": null, "source": "phase4.5", "ts": "2026-09-02T12:00:00Z", "v": 1}
+{"agent": "B", "basis": "fix-verdict", "findingId": 4, "outcome": "intentional", "pipeline": "harness", "pr": 11, "reason": "sample", "score": 80, "sha": null, "source": "phase4.5", "ts": "2026-09-10T12:00:00Z", "v": 1}
+{"agent": "unknown", "basis": "fix-verdict", "findingId": 5, "outcome": "fixed", "pipeline": "harness", "pr": 11, "reason": "sample", "score": 80, "sha": null, "source": "phase4.5", "ts": "2026-09-10T12:00:00Z", "v": 1}
+{"agent": "B", "basis": "fix-verdict", "findingId": 4, "outcome": "declined-wrong", "pipeline": "harness", "pr": 11, "reason": "sample", "score": 80, "sha": null, "source": "phase4.5", "ts": "2026-09-11T12:00:00Z", "v": 1}
+{"agent": "A", "basis": "fix-verdict", "findingId": 1, "outcome": "fixed", "pipeline": "harness", "pr": 12, "reason": "sample", "score": 80, "sha": null, "source": "phase4.5", "ts": "2026-10-05T12:00:00Z", "v": 1}
+{"v": 1, "pr":
+{"v": 2, "pr": 13, "findingId": 9, "agent": "A", "outcome": "fixed", "ts": "2026-10-06T00:00:00Z"}

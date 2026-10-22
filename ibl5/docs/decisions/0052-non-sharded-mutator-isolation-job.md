@@ -1,6 +1,6 @@
 ---
 description: Isolate destructive global-state E2E specs into a dedicated non-sharded Playwright project and CI job to prevent cross-shard reader/mutator collisions.
-last_verified: 2026-09-27
+last_verified: 2026-09-26
 ---
 
 # ADR-0052: Non-sharded mutator isolation job for destructive global-state E2E specs

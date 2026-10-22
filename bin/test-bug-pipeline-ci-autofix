@@ -397,8 +397,7 @@ export GIT_TERMINAL_PROMPT=0
 source "$DRIVER"
 
 R_TRUST="$(mktemp -d)"
-git -C "$R_TRUST" init -q
-git -C "$R_TRUST" config user.email t@t; git -C "$R_TRUST" config user.name t
+h_git_repo "$R_TRUST" --no-commit
 printf 'x\n' > "$R_TRUST/f"; git -C "$R_TRUST" add -A; git -C "$R_TRUST" commit -qm x
 
 tok="$(run_under_starved_env "$R_TRUST" sh -c 'printf %s "$GH_TOKEN$GITHUB_TOKEN"')"
@@ -433,4 +432,4 @@ rm -rf "$R_TRUST"
 
 echo "----"
 if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "SOME FAILED"; fi
-exit "$FAILED"
+h_done

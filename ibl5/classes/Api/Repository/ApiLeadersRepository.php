@@ -39,22 +39,19 @@ class ApiLeadersRepository extends \Database\BaseMysqliRepository
      */
     public function getLeaders(Paginator $paginator, array $filters = []): array
     {
-        $where = ['h.games > 0'];
-        $types = '';
-        $params = [];
+        $applied = $this->applyFilters($filters);
+        $types = $applied['types'];
+        $params = $applied['params'];
 
-        $this->applyFilters($filters, $where, $types, $params);
-
-        $whereClause = implode(' AND ', $where);
         $category = $this->resolveCategory($filters);
         $sortExpr = self::CATEGORY_SORT_MAP[$category];
 
-        // IDENTIFIER (already-validated): $whereClause = hardcoded fragments; $sortExpr = CATEGORY_SORT_MAP value, category validated against VALID_CATEGORIES
+        // IDENTIFIER (already-validated): clauses are constant-union literals; $sortExpr = CATEGORY_SORT_MAP value, category validated against VALID_CATEGORIES
         $query = 'SELECT h.*, p.uuid AS player_uuid, t.uuid AS team_uuid, t.team_city, t.team_name'
                . ' FROM `ibl_hist` h'
                . ' JOIN `ibl_plr` p ON h.pid = p.pid'
                . ' LEFT JOIN `ibl_team_info` t ON h.teamid = t.teamid'
-               . ' WHERE ' . $whereClause
+               . ' WHERE h.games > 0' . $applied['seasonClause'] . $applied['minGamesClause']
                . ' ORDER BY ' . $sortExpr . ' DESC'
                . ' LIMIT ? OFFSET ?';
         $types .= 'ii';
@@ -72,20 +69,13 @@ class ApiLeadersRepository extends \Database\BaseMysqliRepository
      */
     public function countLeaders(array $filters = []): int
     {
-        $where = ['h.games > 0'];
-        $types = '';
-        $params = [];
-
-        $this->applyFilters($filters, $where, $types, $params);
-
-        $whereClause = implode(' AND ', $where);
+        $applied = $this->applyFilters($filters);
 
         /** @var array{total: int}|null $row */
         $row = $this->fetchOne(
-            // IDENTIFIER (already-validated): $whereClause built from hardcoded fragments only
-            'SELECT COUNT(*) AS total FROM `ibl_hist` h WHERE ' . $whereClause,
-            $types,
-            ...$params
+            'SELECT COUNT(*) AS total FROM `ibl_hist` h WHERE h.games > 0' . $applied['seasonClause'] . $applied['minGamesClause'],
+            $applied['types'],
+            ...$applied['params']
         );
 
         return $row !== null ? $row['total'] : 0;
@@ -117,27 +107,42 @@ class ApiLeadersRepository extends \Database\BaseMysqliRepository
     }
 
     /**
-     * Apply common filters to query building arrays.
+     * Build the optional filter clauses and their bind values.
+     *
+     * Each clause is a two-member constant union ('' or one literal predicate); the
+     * matching type letter and value are pushed in the same branch, so bind order
+     * equals placeholder order (season, then min_games).
      *
      * @param array<string, string> $filters
-     * @param list<string> $where
-     * @param list<mixed> $params
+     * @return array{seasonClause: ''|' AND h.year = ?', minGamesClause: ''|' AND h.games >= ?', types: string, params: list<int>}
      */
-    private function applyFilters(array $filters, array &$where, string &$types, array &$params): void
+    private function applyFilters(array $filters): array
     {
+        $types = '';
+        $params = [];
+
+        $seasonClause = '';
         if (isset($filters['season']) && $filters['season'] !== '') {
-            $where[] = 'h.year = ?';
+            $seasonClause = ' AND h.year = ?';
             $types .= 'i';
             $params[] = (int) $filters['season'];
         }
 
+        $minGamesClause = '';
         if (isset($filters['min_games']) && $filters['min_games'] !== '') {
             $minGames = (int) $filters['min_games'];
             if ($minGames > 0) {
-                $where[] = 'h.games >= ?';
+                $minGamesClause = ' AND h.games >= ?';
                 $types .= 'i';
                 $params[] = $minGames;
             }
         }
+
+        return [
+            'seasonClause' => $seasonClause,
+            'minGamesClause' => $minGamesClause,
+            'types' => $types,
+            'params' => $params,
+        ];
     }
 }

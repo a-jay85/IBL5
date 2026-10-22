@@ -459,6 +459,7 @@ if [ -d "$ENV18/IBL5-worktrees/_pool-1" ]; then
 else
     failcase "case 18: _pool-1 dir must survive"
 fi
+assert_absent "case 18: no removal of _pool-1" "Worktree '_pool-1' removed" "$OUT18"
 assert_match "case 18: _pool-1 still registered" "IBL5-worktrees/_pool-1" \
     "$(git -C "$ENV18/IBL5" worktree list)"
 

@@ -134,8 +134,42 @@ case "$1 $2" in
 esac
 exit 0
 H
-    printf '#!/usr/bin/env bash\nexit 0\n' > "$SB/shim/launchctl"
+    # bootstrap exits SHIM_LAUNCHCTL_BOOTSTRAP_RC (default 0): the docfix abort-trap seam.
+    printf '#!/usr/bin/env bash\n[ "$1" = bootstrap ] && exit "${SHIM_LAUNCHCTL_BOOTSTRAP_RC:-0}"\nexit 0\n' \
+        > "$SB/shim/launchctl"
     chmod +x "$SB/shim/git" "$SB/shim/gh" "$SB/shim/launchctl"
+    printf '%s' "$SB"
+}
+
+# build_git_sandbox -> build_sandbox, but a real git repo with real git (no git
+# shim), an origin with master pushed, and the real bin/wt-remove + its libs, so
+# docfix-run's abort trap drives the real removal. bin/wt-new is a stub that
+# creates a real worktree (SHIM_WTNEW_COMMIT adds a commit, SHIM_WTNEW_DIRTY an
+# untracked file); creation is the only thing it stands in for.
+build_git_sandbox() {
+    local SB; SB="$(build_sandbox)"
+    rm -f "$SB/shim/git"
+    local gq=(git -c user.email=t@t -c user.name=t -c init.defaultBranch=master)
+    "${gq[@]}" init -q --bare "$SB/origin.git" >/dev/null 2>&1
+    "${gq[@]}" init -q "$SB" >/dev/null 2>&1
+    echo readme > "$SB/README.md"
+    "${gq[@]}" -C "$SB" add README.md >/dev/null 2>&1
+    "${gq[@]}" -C "$SB" commit -qm init >/dev/null 2>&1
+    "${gq[@]}" -C "$SB" remote add origin "$SB/origin.git" >/dev/null 2>&1
+    "${gq[@]}" -C "$SB" push -q origin master >/dev/null 2>&1
+    "${gq[@]}" -C "$SB" fetch -q origin >/dev/null 2>&1
+    cp "$REPO_ROOT/bin/wt-remove" "$REPO_ROOT/bin/wt-down" "$SB/bin/"
+    cp "$REPO_ROOT/bin/lib/wt-guards.sh" "$REPO_ROOT/bin/lib/gh-pr.sh" "$SB/bin/lib/"
+    cat > "$SB/bin/wt-new" <<'W'
+#!/usr/bin/env bash
+set -e
+root="$(cd "$(dirname "$0")/.." && pwd)"
+gq() { git -c user.email=t@t -c user.name=t "$@"; }
+gq -C "$root" worktree add -q -b "$1" "$root/wts/$1" origin/master
+if [ -n "${SHIM_WTNEW_COMMIT:-}" ]; then gq -C "$root/wts/$1" commit -q --allow-empty -m work; fi
+if [ -n "${SHIM_WTNEW_DIRTY:-}" ]; then echo stray > "$root/wts/$1/stray.txt"; fi
+W
+    chmod +x "$SB/bin/wt-new" "$SB/bin/wt-remove" "$SB/bin/wt-down"
     printf '%s' "$SB"
 }
 
@@ -148,6 +182,8 @@ run_docfix() {
         SHIM_BRANCH_OUT="$2" SHIM_PR_OPEN="$3" \
         SHIM_PR_UNARMED="${SHIM_PR_UNARMED:-}" \
         SHIM_GH_FAIL="${SHIM_GH_FAIL:-}" \
+        SHIM_WTNEW_COMMIT="${SHIM_WTNEW_COMMIT:-}" SHIM_WTNEW_DIRTY="${SHIM_WTNEW_DIRTY:-}" \
+        SHIM_LAUNCHCTL_BOOTSTRAP_RC="${SHIM_LAUNCHCTL_BOOTSTRAP_RC:-0}" \
         "$REAL_DOCFIX" "$4" "$5" >/dev/null 2>&1
     local RC=$?
     runner_of "$SB" >/dev/null 2>&1 || true   # register the runner for exit-time cleanup
@@ -2116,5 +2152,51 @@ cp "$PLAN_V" "$SB2/after1.md"
     && cmp -s "$PLAN_V" "$SB2/after1.md"; } \
   && ok "(84) veronly: second run on an armed docs-only-ready plan is a byte-identical no-op" \
   || bad "(84) veronly: docs-only-ready idempotency"
+
+# Cases 21a-21e: docfix-run's EXIT trap hands an aborted run's worktree to the
+# real bin/wt-remove --if-empty, until launchctl bootstrap succeeds.
+DS="docs-stale-refresh-$(date +%Y%m%d)"
+
+# Case 21a: bootstrap fails, empty worktree -> worktree, branch, plan, plist gone
+SB="$(build_git_sandbox)"
+R21="$(SHIM_LAUNCHCTL_BOOTSTRAP_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
+{ [ "$R21" != "rc=0" ] && [ ! -d "$SB/wts/$DS" ] \
+    && [ -z "$(git -C "$SB" branch --list "$DS")" ] \
+    && [ ! -e "$SB/home/claude-plans/$DS.md" ]; } \
+  && ok "(21a) bootstrap failure: empty worktree, branch and seeded plan removed" \
+  || bad "(21a) bootstrap failure cleanup ($R21)"
+[ -z "$(plist_of "$SB")" ] \
+  && ok "(21a) bootstrap failure: no plist left in LaunchAgents" \
+  || bad "(21a) plist left behind: $(plist_of "$SB")"
+
+# Case 21b: bootstrap fails, worktree has a commit -> worktree and branch kept
+SB="$(build_git_sandbox)"
+R21="$(SHIM_WTNEW_COMMIT=1 SHIM_LAUNCHCTL_BOOTSTRAP_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
+{ [ "$R21" != "rc=0" ] && [ -d "$SB/wts/$DS" ] \
+    && [ -n "$(git -C "$SB" branch --list "$DS")" ]; } \
+  && ok "(21b) bootstrap failure with a commit: worktree and branch kept" \
+  || bad "(21b) worktree with a commit kept ($R21)"
+
+# Case 21c: bootstrap fails, worktree has an untracked file -> kept
+SB="$(build_git_sandbox)"
+R21="$(SHIM_WTNEW_DIRTY=1 SHIM_LAUNCHCTL_BOOTSTRAP_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
+{ [ "$R21" != "rc=0" ] && [ -d "$SB/wts/$DS" ]; } \
+  && ok "(21c) bootstrap failure with an untracked file: worktree kept" \
+  || bad "(21c) dirty worktree kept ($R21)"
+
+# Case 21d: an existing _pool-1 slot is untouched by the abort cleanup
+SB="$(build_git_sandbox)"
+git -C "$SB" worktree add -q -b _pool-1 "$SB/wts/_pool-1" origin/master >/dev/null 2>&1
+R21="$(SHIM_LAUNCHCTL_BOOTSTRAP_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
+{ [ "$R21" != "rc=0" ] && [ -d "$SB/wts/_pool-1" ] && [ ! -d "$SB/wts/$DS" ]; } \
+  && ok "(21d) bootstrap failure: _pool-1 untouched, aborted worktree removed" \
+  || bad "(21d) pool slot untouched ($R21)"
+
+# Case 21e: successful launch -> trap disarmed, worktree kept
+SB="$(build_git_sandbox)"
+R21="$(run_docfix "$SB" "" "" "21" "probe.md")"
+{ [ "$R21" = "rc=0" ] && [ -d "$SB/wts/$DS" ]; } \
+  && ok "(21e) successful launch: worktree kept (trap disarmed after bootstrap)" \
+  || bad "(21e) successful launch keeps the worktree ($R21)"
 
 h_done

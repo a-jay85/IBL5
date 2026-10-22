@@ -36,9 +36,10 @@ function setIblApiKey() {
 /**
  * Custom function. Returns the full player export as a 2-D array.
  *
- * @param {string} refresh Optional. Pass any changing value (for example =NOW())
- *     to force Sheets to re-run the function; Sheets caches custom-function results.
- * @return {string[][]} Rows of the CSV export, header row first.
+ * @param {string} refresh Optional. Sheets caches custom-function results. Point
+ *     this at a cell you edit by hand (for example =IBL_PLAYERS(A1)) and change
+ *     that cell to re-fetch. NOW() and RAND() are not allowed as arguments.
+ * @return {Array<Array<string|number>>} Rows of the CSV export, header row first.
  * @customfunction
  */
 function IBL_PLAYERS(refresh) {
@@ -61,9 +62,18 @@ function IBL_PLAYERS(refresh) {
     throw new Error('IBL5 export failed with HTTP ' + status + '. Try again later.');
   }
 
+  // The server prefixes the CSV with a UTF-8 BOM. Drop it so the first header is clean.
   var body = response.getContentText();
+  if (body.charCodeAt(0) === 0xFEFF) {
+    body = body.slice(1);
+  }
   if (body === '') {
     throw new Error('IBL5 export returned an empty body.');
   }
-  return Utilities.parseCsv(body);
+  // parseCsv returns strings only. Convert numeric cells so SUM and division work.
+  return Utilities.parseCsv(body).map(function (row) {
+    return row.map(function (cell) {
+      return /^-?(0|[1-9][0-9]*)([.][0-9]+)?$/.test(cell) ? Number(cell) : cell;
+    });
+  });
 }

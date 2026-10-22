@@ -49,6 +49,11 @@ function setIblApiKey() {
 
 /**
  * Custom function. Returns the full player export as a 2-D array.
+ *
+ * @param {string} refresh Optional. Sheets caches custom-function results. Point
+ *     this at a cell you edit by hand (for example =IBL_PLAYERS(A1)) and change
+ *     that cell to re-fetch. NOW() and RAND() are not allowed as arguments.
+ * @return {Array<Array<string|number>>} Rows of the CSV export, header row first.
  * @customfunction
  */
 function IBL_PLAYERS(refresh) {
@@ -71,11 +76,20 @@ function IBL_PLAYERS(refresh) {
     throw new Error('IBL5 export failed with HTTP ' + status + '. Try again later.');
   }
 
+  // The server prefixes the CSV with a UTF-8 BOM. Drop it so the first header is clean.
   var body = response.getContentText();
+  if (body.charCodeAt(0) === 0xFEFF) {
+    body = body.slice(1);
+  }
   if (body === '') {
     throw new Error('IBL5 export returned an empty body.');
   }
-  return Utilities.parseCsv(body);
+  // parseCsv returns strings only. Convert numeric cells so SUM and division work.
+  return Utilities.parseCsv(body).map(function (row) {
+    return row.map(function (cell) {
+      return /^-?(0|[1-9][0-9]*)([.][0-9]+)?$/.test(cell) ? Number(cell) : cell;
+    });
+  });
 }
 GS;
 
@@ -217,7 +231,7 @@ GS;
         <?= self::URL_KEY_NOTICE ?>
 
         <h3 class="mb-2">Apps Script (header auth)</h3>
-        <p class="mb-4">To keep the key out of the URL, use a Google Apps Script instead of <code>IMPORTDATA</code>. In your sheet open <strong>Extensions &gt; Apps Script</strong>, paste this script. Edit <code>setIblApiKey</code> and replace <code>YOUR_KEY</code> with your actual key, then run <code>setIblApiKey</code> once from the editor. In any cell enter <code>=IBL_PLAYERS()</code>. The key is stored in User Properties and travels in the <code>X-API-Key</code> header, so neither the sheet nor the server log contains it. Add a time-driven trigger in Apps Script if you want it to refresh on a schedule.</p>
+        <p class="mb-4">To keep the key out of the URL, use a Google Apps Script instead of <code>IMPORTDATA</code>. In your sheet open <strong>Extensions &gt; Apps Script</strong>, paste this script. Edit <code>setIblApiKey</code> and replace <code>YOUR_KEY</code> with your actual key, then run <code>setIblApiKey</code> once from the editor. In any cell enter <code>=IBL_PLAYERS()</code>. The key is stored in User Properties and travels in the <code>X-API-Key</code> header, so neither the sheet nor the server log contains it. After that run, change the key in <code>setIblApiKey</code> back to <code>YOUR_KEY</code> and save, so the key does not stay in the script. Sheets caches the result. To refresh, use <code>=IBL_PLAYERS(A1)</code> and change the value in <code>A1</code>.</p>
         <pre class="ibl-code-block mb-4"><?= HtmlSanitizer::e(self::APPS_SCRIPT_SNIPPET) ?></pre>
 
         <h3 class="mb-2">Column Reference</h3>
@@ -257,7 +271,7 @@ GS;
 
         <h3 class="mb-2">Tips</h3>
         <ul class="mb-6">
-            <li class="mb-1">Data refreshes each time Google Sheets recalculates (approximately every hour) for IMPORTDATA; the Apps Script refreshes when you run it or on its trigger.</li>
+            <li class="mb-1">Data refreshes each time Google Sheets recalculates (approximately every hour) for IMPORTDATA. <code>=IBL_PLAYERS()</code> refreshes only when its argument cell changes.</li>
             <li class="mb-1">Use Google Sheets' built-in FILTER, SORT, and QUERY functions to slice the data.</li>
             <li class="mb-1">Salary values are in thousands (e.g., 1500 = $1,500K).</li>
             <li class="mb-1">Stats columns (GP, MIN, FGM, etc.) are season totals. Divide by GP for per-game averages.</li>

@@ -160,6 +160,18 @@ class ApiKeysViewTest extends TestCase
         self::assertStringContainsString('https://iblhoops.net/ibl5/api/v1/players/export\'', html_entity_decode($html, ENT_QUOTES | ENT_HTML5));
     }
 
+    public function testExportGuideSnippetMatchesStandaloneScript(): void
+    {
+        $file = file_get_contents(__DIR__ . '/../../docs/api/google-sheets-header-auth.gs');
+        self::assertIsString($file);
+        $start = strpos($file, 'var IBL_EXPORT_URL');
+        self::assertNotFalse($start);
+        $expected = rtrim(substr($file, $start));
+
+        $html = html_entity_decode($this->view->renderExportGuide(), ENT_QUOTES | ENT_HTML5);
+        self::assertStringContainsString($expected, $html, 'Rendered snippet must match google-sheets-header-auth.gs');
+    }
+
     public function testExportGuideKeepsImportdataFormulaAndOrdersItFirst(): void
     {
         $html = $this->view->renderExportGuide();

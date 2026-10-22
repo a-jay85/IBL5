@@ -573,6 +573,40 @@ srt_run
 srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" "cause_store_rejected_flaky"
 srt_log_has "$STUB" tick.out "cause=flaky" "cause_store_rejected_flaky — log names the cause"
 
+# ── agent_allowlist_matches_absolute_mysql ────────────────────────────────────
+# Bash rules match the literal command prefix. The prompt names the mysql binary
+# by absolute path, so "Bash(mysql:*)" alone denied every query on Actions.
+srt_reset; srt_claim42
+srt_run
+srt_log_has "$STUB" claude.argv "Bash($STUB/mysql:*)" "agent_allowlist_matches_absolute_mysql"
+srt_log_has "$STUB" claude.argv "acceptEdits" "agent_allowlist_matches_absolute_mysql — scratch-file redirects allowed"
+
+# ── no_payload_names_denied_tools ─────────────────────────────────────────────
+srt_reset; srt_claim42
+printf '%s\n' '{"result":"blocked","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"'"$STUB"'/mysql -e \"SELECT PW-SENTINEL-9f3\""}}]}' \
+    > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" "no_payload_names_denied_tools — still parks flaky"
+srt_log_has "$STUB" tick.out "denied 1 tool call(s): Bash($STUB/mysql)" "no_payload_names_denied_tools"
+srt_log_lacks "$STUB" tick.out "PW-SENTINEL-9f3" "no_payload_names_denied_tools — denied command arguments never logged"
+
+# ── denied_unknown_command_logs_tool_name_only ────────────────────────────────
+# An env-prefixed first word (MYSQL_PWD=secret) is itself a secret carrier.
+srt_reset; srt_claim42
+printf '%s\n' '{"result":"blocked","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"MYSQL_PWD=SECRET-SENTINEL-77 mysql -e x"}}]}' \
+    > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out "denied 1 tool call(s): Bash" "denied_unknown_command_logs_tool_name_only"
+srt_log_lacks "$STUB" tick.out "SECRET-SENTINEL-77" "denied_unknown_command_logs_tool_name_only — env-prefixed word never logged"
+
+# ── no_payload_denials_survive_stderr_noise ───────────────────────────────────
+srt_reset; srt_claim42
+{ printf 'node: warning: some stderr line\n'
+  printf '%s\n' '{"result":"blocked","permission_denials":[{"tool_name":"Write","tool_input":{}}]}'
+} > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out "denied 1 tool call(s): Write" "no_payload_denials_survive_stderr_noise"
+
 # ── agent_cost_logged / agent_cost_unavailable ────────────────────────────────
 # agent-output stands in for claude's stdout+stderr: a stderr line before the
 # result object proves the last-result-line extraction; garbage proves fallback.

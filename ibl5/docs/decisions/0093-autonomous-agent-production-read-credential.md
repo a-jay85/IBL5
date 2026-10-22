@@ -1,6 +1,6 @@
 ---
 description: An unattended agent is given a production-reaching credential safely by starving it to one SELECT-only MySQL user over an SSH tunnel while every privileged write happens prod-side behind a CLI guard.
-last_verified: 2026-09-29
+last_verified: 2026-10-20
 ---
 
 # ADR-0093: An autonomous agent holding a production read-only credential
@@ -39,6 +39,12 @@ The agent is made **incapable by construction**, not trusted to behave. Four str
 - **Negative — a sleeping or offline Mac silently delays the recap.** There is no alerting, and nothing distinguishes "late" from "broken": the queue row simply stays `pending`. Accepted, because the consumer is a non-time-critical human review step and the admin viewer shows queue state on demand.
 - **Negative — the prompt-injection surface is real and is not sanitized.** Player names, team names, and transaction text reach the prompt straight from the database. The mitigation is *structural*: a prompt-injected agent's maximum achievable outcome is a bad recap in a temp file, because it holds no credential able to do anything else. That is stronger than input filtering and does not degrade the output.
 - **Negative — prose quality is not testable.** Every automated check in this unit verifies plumbing, format, and permissions; whether a recap is *good* is a human reading it — which is exactly why the pipeline posts recaps for review rather than publishing them.
+
+## Addendum: agent tool flags (2026-10-20)
+
+The Decision limited `--allowedTools` to `Bash(mysql:*)` and `Write`. That rule matches the literal command prefix. The prompt runs mysql by absolute path, so on the GitHub Actions runner every query was denied and sim 739 parked as flaky. The Mac never hit it because its user settings allow Bash.
+
+`bin/sim-recap-tick` now also allows `Bash(<absolute mysql path>:*)` and passes `--permission-mode acceptEdits`. The extra mode lets the agent redirect query output into scratch files inside its temp workdir. The credential is unchanged: still SELECT-only over the tunnel. The tick also logs which tools were denied when no payload comes back.
 
 ## References
 

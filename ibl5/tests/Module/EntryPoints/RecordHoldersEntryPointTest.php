@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
-use Module\ModuleRedirect;
-use Records\RecordsController;
-
 /**
  * RecordHolders is now a redirect stub; All-Time records render on the
  * Records page and the all-star list on AllStarAppearances. The 302 header
@@ -43,19 +40,7 @@ class RecordHoldersEntryPointTest extends ModuleEntryPointTestCase
         ];
     }
 
-    public function testDefaultRedirectTargetIsRecordsAllTime(): void
-    {
-        $url = ModuleRedirect::passthroughUrl(
-            'modules.php?name=Records&tab=' . RecordsController::TAB_ALLTIME,
-            [],
-            []
-        );
-        $this->assertSame('modules.php?name=Records&tab=alltime', $url);
-    }
-
-    public function testAllstarRedirectTargetIsAllStarAppearances(): void
-    {
-        $url = ModuleRedirect::passthroughUrl('modules.php?name=AllStarAppearances', [], []);
-        $this->assertSame('modules.php?name=AllStarAppearances', $url);
-    }
+    // Redirect targets (default -> Records All-Time, op=allstar -> AllStarAppearances)
+    // are pinned by RecordsControllerTest::testLegacyRedirectUrl*. The Location header
+    // cannot be captured in the CLI PHPUnit harness.
 }

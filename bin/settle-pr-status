@@ -25,6 +25,7 @@ Every SHA and base ref comes from the API, never from a flag or event field.
 
 Environment:
   GH_API_CMD       Override the API command (default "gh api"). Tests point it at a shim.
+  IBL5_GH_RETRY_DELAYS  Sleeps between retries of an API read (default "2 5": 3 attempts). Unset and empty both select the default.
 EOF_USAGE
 }
 
@@ -95,19 +96,29 @@ fi
 
 GH_API_CMD="${GH_API_CMD:-gh api}"
 export GH_API_CMD
+# shellcheck source=bin/lib/gh-retry.sh
+. "$(dirname "$0")/lib/gh-retry.sh"
+# Read budget for the settle job: 3 attempts, 2s then 5s (ADR-0149 addendum 2026-10-22).
+# Exported so bin/check-pr-checks-green, run below, inherits the same budget.
+: "${IBL5_GH_RETRY_DELAYS:=2 5}"
+export IBL5_GH_RETRY_DELAYS
 
-# api_get <path> — GET through the GH_API_CMD seam; read errors exit 2 (no status written).
+# api_get <path> — GET through the GH_API_CMD seam, retried by gh_retry_json (transient errors,
+# empty or non-JSON bodies); a read that still fails exits 2 (no status written).
 # Every interpolated value is regex-validated above or is a number read back from the API.
 # stdout only: a warning on stderr must never land inside the JSON being parsed.
 api_get() {
     local out err errfile
     errfile="$(mktemp)"
-    if ! out="$(bash -c "$GH_API_CMD \"$1\"" 2>"$errfile")"; then
-        err="$(sed -n '1p' "$errfile")"
+    if ! out="$(gh_retry_json bash -c "$GH_API_CMD \"$1\"" 2>"$errfile")"; then
+        # errfile holds every attempt's stderr; the last line is the error that ended the job.
+        err="$(tail -n 1 "$errfile")"
         rm -f "$errfile"
         echo "API read error: $1: ${err:-${out%%$'\n'*}}" >&2
         exit 2
     fi
+    # Replay retry notices so the job log shows a read that needed more than one attempt.
+    cat "$errfile" >&2
     rm -f "$errfile"
     printf '%s' "$out"
 }
@@ -115,6 +126,11 @@ api_get() {
 if [ "$HEAD_SHA_SET" -eq 1 ]; then
     SHA="$HEAD_SHA"
     assoc="$(api_get "repos/$REPO/commits/$SHA/pulls")"
+    # Fail closed: only a JSON array may reach the NOTHING exit below.
+    if ! jq -e 'type == "array"' <<< "$assoc" >/dev/null 2>&1; then
+        echo "API read error: repos/$REPO/commits/$SHA/pulls: body is not a JSON array" >&2
+        exit 2
+    fi
     if ! N="$(jq -er --arg r "$REPO" '
             [.[] | select(.state == "open" and .base.repo.full_name == $r)]
             | (map(select(.base.ref == "master" or .base.ref == "develop"))[0] // .[0])

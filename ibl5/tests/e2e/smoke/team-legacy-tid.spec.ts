@@ -23,6 +23,7 @@ async function expectRealTeam(page: Page, id: number): Promise<string> {
 async function expectFreeAgents(page: Page): Promise<void> {
   await expect(page.locator('h1.ibl-title').first()).toHaveText(/Free Agents/);
   await expect(page.locator('.team-logo-fallback').first()).toBeAttached();
+  await expect(page.locator('.team-logo-fallback img')).toHaveCount(0);
   await expect(page.locator('.team-banner-logo')).toHaveCount(0);
 }
 

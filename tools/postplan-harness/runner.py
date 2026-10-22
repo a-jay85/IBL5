@@ -370,8 +370,6 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         check = _mechanical_body_pass(git, gh, copy, copy_degraded, log, worktree=worktree)
         if copy["summary_md"] and check.get("corrected_body"):
             copy["summary_md"] = check["corrected_body"]
-            for f in check.get("findings", []):
-                log(f"phase2 finding: {f}")
         _inject_residual_phases(copy, plan, conf_files, log)
         log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)

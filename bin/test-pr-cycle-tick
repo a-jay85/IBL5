@@ -719,16 +719,18 @@ done
 end_case gate-gh-fail-closed
 
 # Rows 17, 18: a cancelled gate, or a timed-out gate beside another red check, is today's rescue.
-for v in cancelled plus-other-red; do
+for pair in gate-cancelled:gate-cancelled-falls-through \
+            gate-plus-other-red:gate-plus-other-red-falls-through; do
+    variant="${pair%%:*}"; cname="${pair##*:}"
     reset; begin_case
-    set_prs "$RED101"; set_checks aaa1111 "gate-$v"
+    set_prs "$RED101"; set_checks aaa1111 "$variant"
     set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
     run_tick
     [[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
-        || fail "gate-$v-falls-through: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
-    [[ -z "$(rerun_log)" ]] || fail "gate-$v-falls-through: issued a rerun: $(rerun_log)"
-    if grep -q '^run ' "$SCRATCH/gh.log"; then fail "gate-$v-falls-through: made a gh run call"; fi
-    end_case "gate-$v-falls-through"
+        || fail "$cname: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+    [[ -z "$(rerun_log)" ]] || fail "$cname: issued a rerun: $(rerun_log)"
+    if grep -q '^run ' "$SCRATCH/gh.log"; then fail "$cname: made a gh run call"; fi
+    end_case "$cname"
 done
 
 # gh_sweep_only accepts the rescue path's own reads and still rejects any other gh call.

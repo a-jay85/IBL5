@@ -35,8 +35,8 @@ DOCS_REFRESH_BRANCH_PREFIX = "docs-stale-refresh-"
 _DOCS_REFRESH_CLASS_README = re.compile(r"ibl5/classes/.*/README\.md")
 
 # Required aggregator context (ADR-0149). bin/check-composite-contracts A2 pins this
-# literal to the workflow job name and to bin/lib/pr-armable.sh.
-AGGREGATOR_CONTEXT = "All checks green"
+# literal to the --context= of .github/workflows/all-checks-settled.yml and to bin/lib/pr-armable.sh.
+AGGREGATOR_CONTEXT = "All checks settled"
 
 FEAT_RE = re.compile(r"^feat(\([^)]*\))?!?:", re.IGNORECASE)
 GOLDEN_PATH = "engine/internal/sim/testdata/golden.json"

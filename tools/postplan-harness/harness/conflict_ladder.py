@@ -455,6 +455,11 @@ SESSION_TIMEOUT = 1200
 SESSION_MAX_TURNS = 80
 SESSION_PROOF_CAP = 60_000
 SESSION_ALLOWED = ("Read", "Write", "Edit", "Glob", "Grep", "Bash")
+PUSH_WRAPPER_DENIED = (
+    "Bash(*/git push:*)", "Bash(git * push)", "Bash(git * push *)",
+    "Bash(*/git * push)", "Bash(*/git * push *)",
+    "Bash(*/gh:*)", "Bash(*/curl:*)", "Bash(*/wget:*)", "Bash(*/ssh:*)", "Bash(*/scp:*)",
+)
 SESSION_DENIED = (
     "Agent", "WebFetch", "WebSearch",
     "Bash(git push:*)", "Bash(git commit:*)", "Bash(git reset:*)",
@@ -463,6 +468,10 @@ SESSION_DENIED = (
     "Bash(git switch:*)", "Bash(git tag:*)", "Bash(git remote:*)",
     "Bash(gh:*)", "Bash(curl:*)", "Bash(wget:*)", "Bash(ssh:*)", "Bash(scp:*)",
     "Bash(bin/post-plan-now:*)", "Bash(bin/discord-dm:*)",
+    # Forms the prefix entries above miss (headless probe, 2026-10-21): an absolute-path
+    # binary, and git global options before the subcommand (`git -c k=v push`). The
+    # bash -c, sh -c, env and command wrappers are already matched by the entries above.
+    *PUSH_WRAPPER_DENIED,
 )
 
 

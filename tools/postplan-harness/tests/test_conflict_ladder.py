@@ -28,6 +28,8 @@ from harness.conflict_ladder import (
     GENERATED_FILES,
     LADDER_TRAIL_CAP,
     OPUS_MAX_FILES,
+    PUSH_WRAPPER_DENIED,
+    SESSION_DENIED,
     GeneratedFile,
     LadderContext,
     RungAttempt,
@@ -791,6 +793,20 @@ def test_ladder_failure_reason_caps_oversized_last_entry():
     assert len(ladder) <= LADDER_TRAIL_CAP
     assert ladder.startswith("regen: skipped")
     assert "sonnet-fix: yyy" in ladder
+
+
+def test_session_denied_covers_push_wrapper_forms():
+    from harness.conflict_fix import FIX_DENIED
+    assert "Bash(*/git push:*)" in PUSH_WRAPPER_DENIED
+    assert "Bash(git * push *)" in PUSH_WRAPPER_DENIED
+    for entry in PUSH_WRAPPER_DENIED:
+        assert entry in SESSION_DENIED
+        assert entry in FIX_DENIED
+
+
+def test_session_denied_leaves_read_only_git_usable():
+    for entry in ("Bash", "Bash(git:*)", "Bash(*/git:*)", "Bash(git *)", "Bash(git * *)"):
+        assert entry not in SESSION_DENIED
 
 
 # --- pre-resolver regen selection (gitad._rebase_onto) ----------------------------

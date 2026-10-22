@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .conflict_ladder import (
+    GENERATED_FILES,
+    is_pattern,
     SESSION_ALLOWED,
     SESSION_DENIED,
     SESSION_PROOF_CAP,
@@ -187,7 +189,9 @@ def make_fix_rung(branch: str) -> Rung:
 
         tracked = [p for p in ctx.run("diff", "--name-only", "-z", "HEAD").split("\0") if p]
         touched = sorted(set(tracked) | (_untracked(ctx) - untracked_before))
-        generated = matching_paths(touched)
+        # Exact generated files stay writable; a VR PNG (glob entry) only when it conflicted.
+        generated = (matching_paths([g.path for g in GENERATED_FILES if not is_pattern(g.path)])
+                     | (matching_paths(touched) & set(ctx.conflicted_files)))
         for path in touched:
             if not touch_allowed(path, branch_paths, ctx.conflicted_files, generated):
                 raise RuntimeError(f"session touched {path} outside its remit: {summary}")

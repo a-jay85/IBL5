@@ -418,6 +418,61 @@ case_forged_id_and_bad_path() {
     expect_eq "row 21: nothing filed for it" 0 "$(count_lines gh.calls 'issue create')"
 }
 
+# A thread the model sent to a class that failed validation keeps no row, so
+# the next run that re-fetches its PR classifies it again (backlog#1530).
+FCS_BAD_CLASS='{"key":"bad-path-class","title":"Bad","description":"d","check_kind":"phpstan",
+    "proposed_check":"p","artifact_path":"../../etc/x"}'
+FCS_RETRY_CLASS='{"key":"retry-class","title":"Retry","description":"d","check_kind":"phpstan",
+    "proposed_check":"p","artifact_path":"ibl5/phpstan-rules/BanRetryLoopRule.php"}'
+
+case_rejected_class_threads_retry() {
+    new_fixture
+    set_payload '{"assignments":[{"thread_id":"T1","class_key":"bad-path-class"},
+        {"thread_id":"T2","class_key":"retry-class"},
+        {"thread_id":"T3","class_key":"no-such-key"}],
+        "classes":['"$FCS_BAD_CLASS"','"$FCS_RETRY_CLASS"']}'
+    fcs
+    expect_eq "run 1 exits 0" 0 "$RC"
+    local rows=""
+    [ -f "$STATE/assignments.jsonl" ] && rows="$(cat "$STATE/assignments.jsonl")"
+    expect_lacks "rejected: bad-path thread T1 keeps no row" "$rows" '"thread_id":"T1"'
+    expect_lacks "rejected: unknown-key thread T3 keeps no row" "$rows" '"thread_id":"T3"'
+    expect_has "valid assignment T2 is recorded" "$rows" '"thread_id":"T2","class_key":"retry-class"'
+    expect_has "skipped: model-skipped T7 still gets a null row" "$rows" '"thread_id":"T7","class_key":null'
+    expect_has "say: batch names the threads left for retry" "$ALL" \
+        "batch 1: threads left unseen for retry (rejected class): 2"
+    # Run 2: incremental. Watermark 2026-10-12 gives cutoff 2026-10-05T10:00:00Z,
+    # and PR 101 (updatedAt 2026-10-12) sits inside it, so T1 is re-fetched.
+    set_payload '{"assignments":[{"thread_id":"T1","class_key":"retry-class"}],"classes":[]}'
+    fcs
+    expect_eq "run 2 exits 0" 0 "$RC"
+    expect_has "retry: run 2 is incremental" "$OUT" "mode=incremental"
+    expect_has "retry: T1 is sent to the classifier again" "$(cat "$STUB_DIR/claude.stdin")" '"thread_id":"T1"'
+    expect_has "retry: T1 gets a real class" "$(cat "$STATE/assignments.jsonl")" \
+        '"thread_id":"T1","class_key":"retry-class"'
+    expect_eq "retry: T1 counts, so retry-class (T1+T2) is filed once" 1 "$(count_lines gh.calls 'issue create')"
+    expect_lacks "retry: no rejection in run 2, no retry line" "$ALL" "left unseen for retry"
+}
+
+case_rejected_class_edge_ids() {
+    new_fixture
+    set_payload '{"assignments":[{"thread_id":"T_FORGED","class_key":"bad-path-class"},
+        {"thread_id":"T1","class_key":"bad-path-class"},
+        {"thread_id":"T8","class_key":"no-such-key"},
+        {"thread_id":"T8","class_key":"retry-class"}],
+        "classes":['"$FCS_BAD_CLASS"','"$FCS_RETRY_CLASS"']}'
+    fcs
+    expect_eq "edge-id run exits 0" 0 "$RC"
+    local rows=""
+    [ -f "$STATE/assignments.jsonl" ] && rows="$(cat "$STATE/assignments.jsonl")"
+    expect_lacks "forged id in a rejected class writes nothing" "$rows" "T_FORGED"
+    expect_has "repeated id: bad key first, valid key second is kept" "$rows" \
+        '"thread_id":"T8","class_key":"retry-class"'
+    expect_lacks "only T1 is rejected, so it keeps no row" "$rows" '"thread_id":"T1"'
+    expect_has "retry count excludes the forged id and the kept repeat" "$ALL" \
+        "batch 1: threads left unseen for retry (rejected class): 1"
+}
+
 case_dry_run_leaves_state_alone() {
     new_fixture
     seed_class seed-class phpstan 50 S1 S2 S3

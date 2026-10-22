@@ -12,6 +12,11 @@ use Updater\StepResult;
  * ibl_box_scores_teams. Stores per-team-per-season win/loss totals for
  * regular-season (game_type=1) and HEAT (game_type=3) games. See ADR-0015.
  *
+ * A (game_date, visitor_teamid, home_teamid) triple is one game: the league
+ * has no doubleheaders. A repeat of the triple with a different
+ * game_of_that_day is a phantom, and only the lowest-ordinal copy counts.
+ * Same dedupe as FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL.
+ *
  * Runs DELETE + two INSERTs inside a transaction so the table is never
  * empty on error. Uses DELETE (not TRUNCATE) because TRUNCATE is DDL and
  * causes an implicit commit in MariaDB, breaking rollback safety.
@@ -80,16 +85,28 @@ final class RefreshTeamSeasonRecordsStep implements PipelineStepInterface
     public const string INSERT_REGULAR_SEASON_SQL = <<<'SQL'
 INSERT INTO `ibl_team_season_records`
     (team_id, `year`, game_type, currentname, namethatyear, wins, losses)
-WITH unique_games AS (
-    SELECT
-        game_date, visitor_teamid, home_teamid, game_of_that_day,
-        (visitor_q1_points + visitor_q2_points + visitor_q3_points + visitor_q4_points
-         + COALESCE(visitor_ot_points, 0)) AS visitor_total,
-        (home_q1_points + home_q2_points + home_q3_points + home_q4_points
-         + COALESCE(home_ot_points, 0)) AS home_total
+WITH canonical_games AS (
+    SELECT game_date, visitor_teamid, home_teamid,
+           MIN(game_of_that_day) AS game_of_that_day
     FROM `ibl_box_scores_teams`
     WHERE game_type = 1
-    GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
+    GROUP BY game_date, visitor_teamid, home_teamid
+),
+unique_games AS (
+    SELECT
+        b.game_date, b.visitor_teamid, b.home_teamid,
+        (b.visitor_q1_points + b.visitor_q2_points + b.visitor_q3_points + b.visitor_q4_points
+         + COALESCE(b.visitor_ot_points, 0)) AS visitor_total,
+        (b.home_q1_points + b.home_q2_points + b.home_q3_points + b.home_q4_points
+         + COALESCE(b.home_ot_points, 0)) AS home_total
+    FROM `ibl_box_scores_teams` b
+    JOIN canonical_games c
+      ON c.game_date = b.game_date
+     AND c.visitor_teamid = b.visitor_teamid
+     AND c.home_teamid = b.home_teamid
+     AND c.game_of_that_day <=> b.game_of_that_day
+    WHERE b.game_type = 1
+    GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
 ),
 team_games AS (
     SELECT visitor_teamid AS team_id, game_date,
@@ -134,17 +151,30 @@ SQL;
     private const string INSERT_HEAT_SQL = <<<'SQL'
 INSERT INTO `ibl_team_season_records`
     (team_id, `year`, game_type, currentname, namethatyear, wins, losses)
-WITH unique_games AS (
-    SELECT
-        game_date, visitor_teamid, home_teamid, game_of_that_day,
-        (visitor_q1_points + visitor_q2_points + visitor_q3_points + visitor_q4_points
-         + COALESCE(visitor_ot_points, 0)) AS visitor_total,
-        (home_q1_points + home_q2_points + home_q3_points + home_q4_points
-         + COALESCE(home_ot_points, 0)) AS home_total
+WITH canonical_games AS (
+    SELECT game_date, visitor_teamid, home_teamid,
+           MIN(game_of_that_day) AS game_of_that_day
     FROM `ibl_box_scores_teams`
     WHERE game_type = 3
       AND YEAR(game_date) < 9000
-    GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
+    GROUP BY game_date, visitor_teamid, home_teamid
+),
+unique_games AS (
+    SELECT
+        b.game_date, b.visitor_teamid, b.home_teamid,
+        (b.visitor_q1_points + b.visitor_q2_points + b.visitor_q3_points + b.visitor_q4_points
+         + COALESCE(b.visitor_ot_points, 0)) AS visitor_total,
+        (b.home_q1_points + b.home_q2_points + b.home_q3_points + b.home_q4_points
+         + COALESCE(b.home_ot_points, 0)) AS home_total
+    FROM `ibl_box_scores_teams` b
+    JOIN canonical_games c
+      ON c.game_date = b.game_date
+     AND c.visitor_teamid = b.visitor_teamid
+     AND c.home_teamid = b.home_teamid
+     AND c.game_of_that_day <=> b.game_of_that_day
+    WHERE b.game_type = 3
+      AND YEAR(b.game_date) < 9000
+    GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
 ),
 team_games AS (
     SELECT visitor_teamid AS team_id, game_date,

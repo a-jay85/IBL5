@@ -1869,8 +1869,8 @@ run_between_plans_canary() {
     # (.github/workflows/update-behind-prs.yml) fails on transient GitHub API
     # errors, and GitHub drops its next cron run for hours, so its red sticks.
     # Only a completed non-passing run is ignored; a pending one still reads
-    # "checks still running". Exact names. Canary only: PR merge gating and
-    # bin/merge-master-to-prod never set it.
+    # "checks still running". Exact names. PR merge gating never sets it.
+    # bin/merge-master-to-prod sets it to "Aggregate check status" only.
     # "Aggregate check status" (the settle job of
     # .github/workflows/all-checks-settled.yml) is in BOTH lists. It summarizes
     # other check-runs and tests no code; its concurrency group cancels a

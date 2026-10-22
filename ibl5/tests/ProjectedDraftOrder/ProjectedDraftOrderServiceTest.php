@@ -816,7 +816,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
     }
 
     /**
-     * Build standings where a division winner has a worse record than some wild card teams.
+     * Build standings where a division winner has a worse record than some other playoff teams.
      *
      * @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, conf_wins: int|null, conf_losses: int|null, div_wins: int|null, div_losses: int|null, clinched_division: int|null, color1: string, color2: string}>
      */

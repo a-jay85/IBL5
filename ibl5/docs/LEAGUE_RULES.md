@@ -1,6 +1,6 @@
 ---
 description: The league rules the site must enforce, owned by the league owner. Claude checks changes against this list; the weekly digest flags PRs that seem to change a rule.
-last_verified: 2026-10-20
+last_verified: 2026-10-21
 ---
 
 # League Rules
@@ -116,5 +116,3 @@ The owner ruled on these on 2026-10-20. The rules above are correct. The code st
 - **Waiver roster count.** Waiver signings count only healthy players toward 15. They should count injured players too.
 - **Waiver veteran minimum.** The over-the-cap waiver signing allows only 103, the 10-year minimum. It should use the minimum for the player's experience.
 - **The 24-hour waiver wait.** The waiver page shows a 24-hour wait that the code never enforces. Remove it from the page.
-- **Wildcard naming.** The league has no wildcards. `ProjectedDraftOrder\PlayoffSeedingCalculator` and `ProjectedDraftOrder\ProjectedDraftOrderService` call the playoff teams that are not division winners `wildCards`. Rename them so the code matches the league's terms.
-- **Draft pick order.** `Draft\DraftController::submitSelection()` checks that the team owns the slot but not that the slot is on the clock. Any pick owner can pick early.

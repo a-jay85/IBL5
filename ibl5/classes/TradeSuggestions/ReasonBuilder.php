@@ -26,7 +26,7 @@ final class ReasonBuilder
      * @param list<SuggestionPlayer> $inPlayers
      * @param list<SuggestionPlayer> $outPlayers
      * @param list<SuggestionPick> $inPicks
-     * @return list<string> Strongest first; never empty
+     * @return non-empty-list<string> Strongest first
      */
     public function options(
         TeamMode $mode,

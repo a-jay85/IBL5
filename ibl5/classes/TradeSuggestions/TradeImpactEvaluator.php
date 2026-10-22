@@ -102,14 +102,7 @@ final class TradeImpactEvaluator
 
         $userOptions = $this->reasons->options($userMode, $userAfter, $partnerOut, $userOut, $partnerOutPicks, $userBefore, $userAfterScore);
         $partnerOptions = $this->reasons->options($partnerMode, $partnerAfter, $userOut, $partnerOut, $userOutPicks, $partnerBefore, $partnerAfterScore);
-        $userReason = $userOptions[0];
-        $partnerReason = $partnerOptions[0];
-        foreach ($partnerOptions as $option) {
-            if ($option !== $userReason) {
-                $partnerReason = $option;
-                break;
-            }
-        }
+        [$userReason, $partnerReason] = self::distinctReasons($userOptions, $partnerOptions);
 
         $significance = 0.0;
         foreach ([...$userOut, ...$partnerOut] as $player) {
@@ -117,6 +110,25 @@ final class TradeImpactEvaluator
         }
 
         return new ScoredCandidate($c, $userGain, $partnerGain, $userReason, $partnerReason, $significance);
+    }
+
+    /**
+     * Each side's best reason, except the partner skips any line identical to
+     * the user's so the two never read the same.
+     *
+     * @param non-empty-list<string> $userOptions Best first
+     * @param non-empty-list<string> $partnerOptions Best first
+     * @return array{string, string}
+     */
+    public static function distinctReasons(array $userOptions, array $partnerOptions): array
+    {
+        foreach ($partnerOptions as $option) {
+            if ($option !== $userOptions[0]) {
+                return [$userOptions[0], $option];
+            }
+        }
+
+        return [$userOptions[0], $partnerOptions[0]];
     }
 
     /**

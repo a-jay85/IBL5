@@ -62,6 +62,14 @@ class DraftInfoViewTest extends TestCase
         $this->assertStringContainsString('href="modules.php?name=DraftInfo&amp;tab=history"', $html);
     }
 
+    public function testRenderWrapsTabsAndPanelInOneCard(): void
+    {
+        $html = $this->view->render('order', '<p>body</p>');
+
+        $this->assertStringStartsWith('<div class="ibl-tab-card"><div class="ibl-tabs">', $html);
+        $this->assertStringEndsWith('<p>body</p></div></div>', $html);
+    }
+
     public function testRenderEmbedsTabBodyVerbatim(): void
     {
         $body = '<table data-x="1"><td>A &amp; B <script>x</script></td></table>';

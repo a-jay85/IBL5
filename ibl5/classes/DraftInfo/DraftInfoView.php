@@ -33,7 +33,10 @@ final class DraftInfoView implements DraftInfoViewInterface
     {
         $tabs = new PageTabs(self::TABS, self::DEFAULT_TAB);
 
-        return $tabs->renderTabBar($activeTab, self::BASE_URL)
-            . $tabs->wrapPanel($tabBodyHtml, $activeTab);
+        // .ibl-tab-card: one white card with the tab strip as its header (hub-only styling)
+        return '<div class="ibl-tab-card">'
+            . $tabs->renderTabBar($activeTab, self::BASE_URL)
+            . $tabs->wrapPanel($tabBodyHtml, $activeTab)
+            . '</div>';
     }
 }

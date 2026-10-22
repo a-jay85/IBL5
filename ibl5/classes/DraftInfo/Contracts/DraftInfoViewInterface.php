@@ -12,7 +12,8 @@ namespace DraftInfo\Contracts;
 interface DraftInfoViewInterface
 {
     /**
-     * Render the tab strip plus the already-rendered body of the active tab.
+     * Render the tab strip plus the already-rendered body of the active tab,
+     * both inside one .ibl-tab-card wrapper.
      *
      * @param string $activeTab One of the keys of DraftInfoView::TABS (caller validates)
      * @param string $tabBodyHtml Pre-rendered HTML from the tab's existing view; embedded verbatim

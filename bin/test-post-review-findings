@@ -23,13 +23,15 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIB="$REPO_ROOT/bin/lib/post-review-findings.sh"
 
-BASE_TMP="$(mktemp -d)"
-trap 'rm -rf "$BASE_TMP"' EXIT
-FAILED=0
+h_tmp BASE_TMP
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$BASE_TMP/usage"
 
 # ── gh shim ───────────────────────────────────────────────────────────────────
 SHIMD="$BASE_TMP/shim"
@@ -173,8 +175,8 @@ source "$LIB_ARM"
 reset_outputs() { rm -f "$REVIEW_OUT" "$COMMENT_OUT" "$REPLY_OUT" "$RESOLVE_OUT"; }
 
 # ── assertion helpers ─────────────────────────────────────────────────────────
-ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; FAILED=1; }
+ok()   { h_pass "$*"; }
+fail() { h_fail "$*"; }
 
 assert_jq() { # label jq-expr file
     local label="$1" expr="$2" file="$3"
@@ -958,10 +960,44 @@ run_p45_remediate() { # snapshot-ids-newline-separated
 [ "$(run_p45_remediate '' | tail -1)" = "0" ] && ok "p45-filter: empty snapshot acts on nothing" \
     || fail "p45-filter: expected 0 work items for an empty snapshot"
 
-# ── summary ───────────────────────────────────────────────────────────────────
-if [ "$FAILED" -eq 0 ]; then
-    echo "All post-review-findings checks passed."
+# ── agent marker: written at post time (inline comments only) and parsed back ─
+reset_outputs
+fa="$BASE_TMP/f-agent.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug A","score":85,"agent":"B"}]' > "$fa"
+post_review_findings 42 deadbeefcafe "Code review" "$fa"
+assert_jq "agent: marker follows the score marker" \
+    '.comments[0].body | endswith("<!-- score: 85 -->\n<!-- agent: B -->")' "$REVIEW_OUT"
+
+reset_outputs
+fh="$BASE_TMP/f-agent-hostile.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug H","score":85,"agent":"x --> <script>"}]' > "$fh"
+post_review_findings 42 deadbeefcafe "Code review" "$fh"
+assert_not_contains "agent: hostile value writes no marker" "$REVIEW_OUT" "<!-- agent:"
+
+reset_outputs
+fn="$BASE_TMP/f-agent-missing.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug N","score":85}]' > "$fn"
+post_review_findings 42 deadbeefcafe "Code review" "$fn"
+assert_not_contains "agent: missing key writes no marker" "$REVIEW_OUT" "<!-- agent:"
+
+fix_agent="$BASE_TMP/threads-agent.json"
+cat > "$fix_agent" <<'THREADS'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"id":"PRRT_a","isResolved":false,"isOutdated":false,"path":"a.php","line":3,
+   "comments":{"nodes":[{"databaseId":501,"body":"Bug\n\n<!-- score: 85 -->\n<!-- agent: B -->","author":null}]}},
+  {"id":"PRRT_b","isResolved":false,"isOutdated":false,"path":"a.php","line":4,
+   "comments":{"nodes":[{"databaseId":502,"body":"Old\n\n<!-- score: 80 -->","author":null}]}}
+]}}}}}
+THREADS
+GH_THREADS_FIXTURE="$fix_agent"
+AGENT_OUT="$BASE_TMP/agent.jsonl"
+prf_review_threads 42 > "$AGENT_OUT"
+if jq -s -e '.[0].agent == "B" and .[0].score == 85 and .[1].agent == null and .[1].score == 80' \
+      "$AGENT_OUT" >/dev/null 2>&1; then
+    ok "agent: marker parsed, null without a marker"
 else
-    echo "Some post-review-findings checks FAILED."
+    fail "agent: parse wrong: $(jq -c '{agent,score}' "$AGENT_OUT" | tr '\n' ' ')"
 fi
-exit "$FAILED"
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+h_done

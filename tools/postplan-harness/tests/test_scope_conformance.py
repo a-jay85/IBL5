@@ -136,6 +136,39 @@ def test_scope_notes_exempts_added_test_via_diff_body(tmp_path):
     assert test_path in _unplanned(modified)[0]
 
 
+def test_scope_notes_glob_entry_covers_matching_paths(tmp_path):
+    plan = _plan(tmp_path, ["bin/test-automouse-*"])
+    notes = scope_notes(plan, ["bin/test-automouse-queue", "bin/test-automouse-disarm",
+                               "bin/test-wt-pool"], "", "")
+    assert len(_unplanned(notes)) == 1
+    assert _unplanned(notes)[0].startswith("unplanned bin/test-wt-pool (")
+    assert _gaps(notes) == []
+
+
+def test_scope_notes_glob_entry_gap_when_nothing_matches(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php", "bin/test-automouse-*"])
+    notes = scope_notes(plan, ["ibl5/a.php"], "", "")
+    assert len(_gaps(notes)) == 1
+    assert _gaps(notes)[0].startswith("gap bin/test-automouse-* (")
+
+
+def test_scope_notes_glob_never_covers_claude_path(tmp_path):
+    plan = _plan(tmp_path, [".claude/rules/*"])
+    notes = scope_notes(plan, [".claude/rules/new.md"], "", "")
+    assert len(notes) == 1
+    assert notes[0].startswith("unplanned .claude/rules/new.md (")
+
+
+def test_scope_notes_plan_without_critical_files_skips_notes(tmp_path):
+    path = tmp_path / "hold.md"
+    path.write_text("---\nauto_merge: false\n---\n\n# Hold plan\n\n## Automouse Hold Justification\n\nx\n")
+    plan = PlanInfo(found=True, path=str(path))
+    assert scope_notes(plan, ["ibl5/docs/a.md", "ibl5/classes/X/README.md"], "", "") == []
+    claude = scope_notes(plan, [".claude/rules/new.md"], "", "")
+    assert len(claude) == 1
+    assert claude[0].startswith("unplanned .claude/rules/new.md (")
+
+
 def test_check_emits_no_scope_items(tmp_path):
     plan = _plan(tmp_path, ["ibl5/a.php"])
     assert plan.has_matrix is False
@@ -175,7 +208,8 @@ def test_corpus_generated_block_never_declares(tmp_path):
     assert len(corpus) == 50
     heading = re.compile(r"^##[ \t]+Declared scope[ \t]*$", re.M)
     assert sum(1 for e in corpus if heading.search(e["body"] or "")) == 0
-    plan = _plan(tmp_path, [])
+    # One unrelated entry: a plan naming no file at all skips every note.
+    plan = _plan(tmp_path, ["ibl5/unrelated-anchor.php"])
     checked = 0
     for entry in corpus:
         body = entry["body"] or ""

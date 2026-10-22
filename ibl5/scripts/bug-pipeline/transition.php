@@ -26,6 +26,10 @@ declare(strict_types=1);
  */
 
 require __DIR__ . '/_bootstrap.php';
+/**
+ * @var \mysqli $mysqli_db
+ * @var list<string> $argv
+ */
 
 use BugPipeline\BugReportRepository;
 

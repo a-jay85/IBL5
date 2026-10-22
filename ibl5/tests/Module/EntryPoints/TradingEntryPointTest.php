@@ -47,7 +47,7 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpReviewtradeRendersReviewView(): void
@@ -61,7 +61,7 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpReviewtradeWithResultParam(): void
@@ -75,7 +75,7 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpReviewtradeWithErrorParam(): void
@@ -89,7 +89,7 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpRosterPreviewApiReturnsJson(): void
@@ -130,7 +130,7 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOffertradeWithSessionFormData(): void
@@ -145,6 +145,6 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

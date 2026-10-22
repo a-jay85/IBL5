@@ -78,7 +78,7 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
 
         // Group B — SeasonController
         if ($controllerClass === \Api\Controller\SeasonController::class) {
-            return new \Api\Controller\SeasonController(new \Season\Season($db));
+            return new \Api\Controller\SeasonController(\Season\SharedSeason::get($db));
         }
 
         // Group C — TradeAcceptController

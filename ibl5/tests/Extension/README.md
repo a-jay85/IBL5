@@ -141,7 +141,7 @@ The test suite validates production classes in `classes/Extension/`:
 - **ExtensionValidator.php**: Encapsulates all validation logic using Team and Player objects
 - **ExtensionOfferEvaluator.php**: Handles offer evaluation and modifiers
 - **ExtensionDatabaseOperations.php**: Manages all database interactions with Player and Team objects
-- **ExtensionProcessor.php**: Orchestrates the complete workflow using Player/Team objects
+- **ExtensionService.php**: Orchestrates the complete workflow using Player/Team objects
 
 These classes provide a clean, testable API that has replaced the procedural logic in modules/Player/extension.php. The refactoring is complete with full Player/Team object integration and all 58 tests pass.
 
@@ -192,7 +192,7 @@ The refactoring of modules/Player/extension.php is complete:
 1. ✅ **Validation logic extracted** into ExtensionValidator using Team objects
 2. ✅ **Evaluation logic extracted** into ExtensionOfferEvaluator  
 3. ✅ **Database operations extracted** into ExtensionDatabaseOperations using Player/Team objects
-4. ✅ **Service class created** ExtensionProcessor for orchestration with object creation
+4. ✅ **Service class created** ExtensionService for orchestration with object creation
 5. ✅ **Dependencies injected** (database, Discord, etc.)
 6. ✅ **Structured data returned** instead of just echoing HTML
 7. ✅ **Presentation separated** from business logic

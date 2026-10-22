@@ -49,8 +49,6 @@ if ($localClassesDir !== false) {
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/db.php';
 
-/** @var \mysqli $mysqli_db */
-
 function fail(string $msg): never
 {
     fwrite(STDERR, "simRecapContext: {$msg}\n");
@@ -59,7 +57,7 @@ function fail(string $msg): never
 
 // ── Argv parse ────────────────────────────────────────────────────────────────
 $simRaw = null;
-foreach (array_slice($argv, 1) as $arg) {
+foreach (array_slice($argv ?? [], 1) as $arg) {
     if (!is_string($arg)) {
         continue;
     }
@@ -80,6 +78,7 @@ if ($sim < 1) {
 }
 
 // ── Build and emit context ────────────────────────────────────────────────────
+/** @var \mysqli $mysqli_db */
 $repo = new \SimRecap\SimRecapContextRepository($mysqli_db);
 echo json_encode($repo->buildContext($sim)), "\n";
 exit(0);

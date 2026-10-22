@@ -159,4 +159,20 @@ class DepthChartRepositoryTest extends DatabaseTestCase
         self::assertLessThanOrEqual(5, $now - $depth);
         self::assertLessThanOrEqual(5, $now - $simDepth);
     }
+
+    public function testGetPlayersOnTeamBreaksOrdinalTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200139302, 'Aaa Tie Two', ['teamid' => 1, 'retired' => 0, 'ordinal' => 7]);
+        $this->insertTestPlayer(200139301, 'Aaa Tie One', ['teamid' => 1, 'retired' => 0, 'ordinal' => 7]);
+        $this->insertTestPlayer(200139303, 'Aaa Tie Lead', ['teamid' => 1, 'retired' => 0, 'ordinal' => 6]);
+        $this->insertTestPlayer(200139304, 'Aaa Tie Gone', ['teamid' => 1, 'retired' => 1, 'ordinal' => 7]);
+
+        $testPids = [200139301, 200139302, 200139303, 200139304];
+        $pids = array_values(array_filter(
+            array_map('intval', array_column($this->repo->getPlayersOnTeam(1), 'pid')),
+            static fn (int $pid): bool => in_array($pid, $testPids, true)
+        ));
+
+        self::assertSame([200139303, 200139301, 200139302], $pids);
+    }
 }

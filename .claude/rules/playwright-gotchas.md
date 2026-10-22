@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E gotchas: CSRF/session isolation, hx-boost waits, PRG races, hidden-element fill, axe a11y, URL-flip blast radius, global-table ownership, seed/test-state traps, CI shard load.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-10-03
+last_verified: 2026-10-19
 ---
 
 # Playwright E2E Gotchas
@@ -27,7 +27,7 @@ Hard-won pitfalls, each one broke a real PR. Core rules and templates: `playwrig
 
 - **Loop→standalone conversions: no content assertions on auth-gated pages.** A `publicStorageState()` test for a module that 302s anonymous users should only `goto` + `assertNoPhpErrors`. Content assertions belong in the authenticated spec where the module renders.
 - **User-team dependence.** Local `.env.test` `IBL_TEST_USER` may own a different team than CI's `testadmin`, so "form must be visible" passes in CI and fails locally. The one allowlisted skip: `contract-extension-submission.spec.ts::readExtensionForm` returns `null` and the test skips with the reason. Prefer seeding ownership over adding another.
-- **A parallel worker can steal your flash message.** `$_SESSION['flash_success']` is read-and-clear (single-use), and every authenticated worker shares ONE pinned `PHPSESSID` from the stored auth state. So worker A's POST sets the flash and worker B's next page render consumes it — A then asserts on a banner that is gone. Assert on the persisted DB state (or a deterministic `?status=` view) instead of the banner; that is the fix applied in `depth-chart-entry-submission.spec.ts`. Blast radius is narrow, not systemic: only `DepthChartEntry` and `YourAccount` logout set `flash_success`, and the ~10 other specs already read deterministic `?status=` view maps. The read-and-clear contract itself is unit-covered in `tests/Unit/PageLayout/PageLayoutTest.php:81-88`.
+- **Flash steal.** A parallel worker can steal your flash message. `$_SESSION['flash_success']` is read-and-clear (single-use), and every authenticated worker shares ONE pinned `PHPSESSID` from the stored auth state. So worker A's POST sets the flash and worker B's next page render consumes it. A then asserts on a banner that is gone. Assert on the persisted DB state (or a deterministic `?status=` view) instead of the banner; that is the fix applied in `depth-chart-entry-submission.spec.ts`. Blast radius is narrow, not systemic: only `DepthChartEntry` and `YourAccount` logout set `flash_success`, and the ~10 other specs already read deterministic `?status=` view maps. The read-and-clear contract itself is unit-covered in `tests/Unit/PageLayout/PageLayoutTest.php:81-88`. Module-scoped flashes are stolen the same way: `_ibl_depth_chart_flash` (validation errors + POST values) is consumed by ANY DepthChartEntry render, and ~14 specs render it. When the banner IS the assertion, move the spec to the `mutators` project (`--workers=1`), as done for `depth-chart-entry-submission.spec.ts`.
 - **Cookie `appState` vs DB `setState`.** The `_test_overrides` cookie is read by page middleware only. Code that reads `ibl_settings` through a repository (e.g. `updateAllTheThings.php` via `getSetting()`) never sees it. That is the single case for `setState()` from `helpers/test-state.ts`: restore in `afterEach`, and keep such tests out of parallel-shared state. Everywhere else the `appState` fixture rule in `playwright-tests.md` stands.
 
 ## Seed & test-state traps

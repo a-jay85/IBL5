@@ -10,6 +10,9 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SKIP_SCRIPT="$SCRIPT_DIR/../.claude/review-shared/scripts/skip-review.sh"
 test -s "$SKIP_SCRIPT" || { echo "FAIL: skip-review.sh not found at $SKIP_SCRIPT"; exit 1; }
@@ -21,15 +24,15 @@ _cleanup() {
     rm -rf "$SCRATCH"
     rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md" \
           "/tmp/post-plan-delta-diff-9999"
+    h_cleanup
 }
 trap _cleanup EXIT
 
-FAILED=0
 CASE_BASE=0
-fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
-begin_case() { CASE_BASE=$FAILED; }
+fail() { h_fail "$*"; }
+begin_case() { CASE_BASE=$H_FAIL; }
 end_case() {
-    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+    if [[ $H_FAIL -eq $CASE_BASE ]]; then h_pass "$1"; else echo "$1 FAILED" >&2; fi
 }
 
 want() {
@@ -305,6 +308,40 @@ want "conflicts-resolved verdict" "$LAST5" "RUN-REVIEW conflicts-resolved"
 [ ! -f "/tmp/pr-ready-digest-lines-9999.txt" ] || fail "case 5: digest file not cleared by step-0"
 [ ! -f "/tmp/pr-ready-prior-verdict-9999.md" ] || fail "case 5: prior-verdict file not cleared by step-0"
 end_case tree-equal-with-conflicts
+
+# --- pr3267 dual-layout: skip-pr3267-v1 / skip-pr3267-v2 ---------------------------------
+# The old (v1) and new (v2) post-plan sticky layouts must give the same verdict token. Both
+# fixtures end in a suffixed `READY (re-review)` form, so the audit-trail anchor rejects
+# them before any tree compare. HEAD^{tree} is stubbed to 40 d's through a git shim that
+# forwards every other call to the real git.
+PR3267_DIR="$SCRIPT_DIR/fixtures/review-shared"
+PR3267_REAL_GIT="$(command -v git)"
+PR3267_SHIM="$SCRATCH/pr3267-shim"
+mkdir -p "$PR3267_SHIM"
+cat > "$PR3267_SHIM/git" << SHIM_EOF
+#!/usr/bin/env bash
+if [ "\${1:-}" = "rev-parse" ] && [ "\${2:-}" = 'HEAD^{tree}' ]; then
+    printf '%s\n' "dddddddddddddddddddddddddddddddddddddddd"
+    exit 0
+fi
+exec "$PR3267_REAL_GIT" "\$@"
+SHIM_EOF
+chmod +x "$PR3267_SHIM/git"
+PR3267_WANT_TOKEN="RUN-REVIEW verdict-not-ready"
+
+for _v in v1 v2; do
+    begin_case
+    _fx="$SCRATCH/pr3267-$_v.json"
+    jq '{comments: [.comments[-1]], headRefName: "pr-branch"}' \
+        "$PR3267_DIR/post-plan-sticky-pr3267-$_v.json" > "$_fx"
+    PATH="$PR3267_SHIM:$PATH" _run_skip "$_fx"
+    [ "$RS_STATUS" -eq 0 ] || fail "skip-pr3267-$_v: exit status was $RS_STATUS, want 0"
+    [ "$(printf '%s\n' "$RS_OUT" | head -1)" = "CURRENT-TREE: dddddddddddddddddddddddddddddddddddddddd" ] \
+        || fail "skip-pr3267-$_v: HEAD^{tree} stub not applied: $RS_OUT"
+    [ "$RS_LAST" = "$PR3267_WANT_TOKEN" ] \
+        || fail "skip-pr3267-$_v: want '$PR3267_WANT_TOKEN', got '$RS_LAST'"
+    end_case "skip-pr3267-$_v"
+done
 
 # --- case 6: multiple-sticky-comments ----------------------------------------------------
 begin_case
@@ -735,6 +772,82 @@ grep -qF 'head -1 <<< "$BODY" | grep -m1 -oE' "$RO_SCRIPT" \
     || fail "review-owed-unwidened-pin: line-1 parse missing from review-owed.sh"
 end_case review-owed-unwidened-pin
 
+# --- post-plan Step 6 layout: audit trail below a horizontal rule -----------------------
+# The post-plan sticky closes the five digest labels with a blank line and `---`, then the
+# Audit trail block. The digest extraction must stop at the `---`, or the rule and the
+# `<details>` lines would count as digest lines and the carry-forward would never fire.
+# _mk_postplan_body <sixth-label-line-or-empty>  -> body on stdout.
+_mk_postplan_body() {
+    printf '%s\n' \
+        "**READY** — 2026-10-01 00:00:00 UTC" \
+        "" \
+        "Findings: none." \
+        "" \
+        "### Merge digest" \
+        "**What changed:** desc" \
+        "**Why:** reason" \
+        "**Watch:** nothing" \
+        "**Touches:** test.txt" \
+        "**Machine-authored fixes:** none"
+    [ -n "${1:-}" ] && printf '%s\n' "$1"
+    printf '%s\n' \
+        "" \
+        "---" \
+        "" \
+        "<details><summary>Audit trail</summary>" \
+        "" \
+        "REVIEW-COVERAGE: full" \
+        "**Reviewed tree:** $TREE" \
+        "**Plan hash:** $(printf 'b%.0s' $(seq 64))" \
+        "" \
+        "</details>" \
+        "" \
+        "READY" \
+        "<!-- pr-ready-verdict -->"
+}
+_mk_postplan_fixture() {  # $1 = out path, $2 = optional sixth-label line
+    local bj
+    bj="$(_mk_postplan_body "${2:-}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')"
+    printf '{"comments": [{"body": %s}], "headRefName": "pr-branch"}\n' "$bj" > "$1"
+}
+
+begin_case
+rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md"
+PP_FIX="$SCRATCH/fix-postplan.json"
+_mk_postplan_fixture "$PP_FIX"
+_run_skip "$PP_FIX"
+[ "$RS_STATUS" -eq 0 ] || fail "postplan-layout-skip: exit status was $RS_STATUS, want 0"
+want "postplan-layout SKIP-REVIEW" "$RS_LAST" "SKIP-REVIEW"
+want "postplan-layout SKIP-REVIEW tree" "$RS_LAST" "$TREE"
+[ -f "/tmp/pr-ready-digest-lines-9999.txt" ] || fail "postplan-layout-skip: digest-lines file not written"
+PP_DLINES="$(wc -l < /tmp/pr-ready-digest-lines-9999.txt | tr -d ' ')"
+[ "$PP_DLINES" -eq 5 ] || fail "postplan-layout-skip: digest-lines file has $PP_DLINES lines, want 5"
+end_case postplan-layout-skip
+
+begin_case
+rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md"
+PP_FIX6="$SCRATCH/fix-postplan-6.json"
+_mk_postplan_fixture "$PP_FIX6" "**Extra:** x"
+_run_skip "$PP_FIX6"
+[ "$RS_STATUS" -eq 0 ] || fail "postplan-layout-sixth-label: exit status was $RS_STATUS, want 0"
+want "postplan-layout sixth label" "$RS_LAST" "RUN-REVIEW prior-digest-unparseable"
+end_case postplan-layout-sixth-label
+
+# Mutation: delete the horizontal-rule stop. The post-plan fixture that SKIPs above must now
+# fail closed, proving the postplan-layout-skip case depends on that line.
+begin_case
+rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md"
+HR_MUTANT="$SCRATCH/skip-review-hr-mutant.sh"
+grep -vF 'in_digest && /^---$/' "$SKIP_SCRIPT" > "$HR_MUTANT"
+if [ "$(grep -c '' "$HR_MUTANT")" -ge "$(grep -c '' "$SKIP_SCRIPT")" ]; then
+    fail "hr-stop mutation inert: hr-stop line not removed from the mutant copy"
+fi
+_run_skip "$PP_FIX" "$HR_MUTANT"
+printf '%s\n' "$RS_LAST" | grep -qF "RUN-REVIEW prior-digest-unparseable" \
+    || fail "hr-stop mutation inert: mutant without the rule stop printed '$RS_LAST'"
+rm -f "$HR_MUTANT"
+end_case hr-stop-reverted
+
 # --- mutation check ----------------------------------------------------------------------
 # Invert the tree comparison in step 10 and confirm case 4's fixture now produces SKIP-REVIEW.
 # Skippable with --skip-mutation for environments where sed -i differs.
@@ -756,8 +869,4 @@ if [[ "${1:-}" != "--skip-mutation" ]]; then
 fi
 
 # --- verdict -----------------------------------------------------------------------------
-if [[ $FAILED -ne 0 ]]; then
-    echo "test-review-shared-skip: FAILED ($FAILED assertion failure(s))" >&2
-    exit 1
-fi
-echo "test-review-shared-skip: all cases passed"
+h_done

@@ -36,6 +36,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   # A `labeled` event for any label other than `update-baselines` gets its own group so it
@@ -48,6 +49,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mirror-ready:
+    name: Mirror CI images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/mirror-ci-images.yml
+    with:
+      only-missing: true
+
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
@@ -184,7 +194,7 @@ jobs:
 
   e2e:
     name: Visual Regression
-    needs: [changes, ci-memo-check]
+    needs: [changes, ci-memo-check, mirror-ready]
     if: inputs.refresh_pr || (needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true') || needs.changes.outputs.baseline == 'true'
     runs-on: ubuntu-latest
     # 30 min (was 20) — full-page matrix over 49 modules is ~4-6x the
@@ -198,6 +208,7 @@ jobs:
       contents: write
       pull-requests: write
       actions: write
+      packages: read
 
     # One resolved VR context for both modes. pull_request: this PR, its base SHA, and
     # the test-merge SHA as the Pages key (unchanged). Refresh: the inputs, with the PR
@@ -480,8 +491,18 @@ jobs:
           # Over-suppressing costs one push a wait for the next deploy — and since every deploy
           # re-serves the WHOLE tree, that self-heals on the next PR. Under-suppressing just breaks
           # the debounce, invisibly.
-          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
-            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          #
+          # A not-started run older than an hour is stuck, so it is cancelled and left out of the count.
+          # On 2026-10-01 a run sat in `waiting` for a week: this debounce counted it as queued, every
+          # later push skipped its dispatch, and no gallery was served. A real wait is under ~20 min.
+          runs_url="repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20"
+          not_started='.workflow_runs[] | select(.status != "completed" and .status != "in_progress")'
+          for id in $(gh api "$runs_url" --jq "$not_started | select(now - (.created_at | fromdateiso8601) > 3600) | .id" 2>/dev/null); do
+            echo "Cancelling stuck pages-deploy run ${id}."
+            gh run cancel "$id" --repo "${{ github.repository }}" || true
+          done
+          queued=$(gh api "$runs_url" \
+            --jq "[$not_started | select(now - (.created_at | fromdateiso8601) <= 3600)] | length" 2>/dev/null || echo "")
           if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
             echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
             exit 0
@@ -596,7 +617,7 @@ jobs:
 
       - name: Upload visual regression report
         if: always() && env.VRCTX_REFRESH != 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: visual-regression-report
           path: ibl5/test-results/
@@ -604,7 +625,7 @@ jobs:
 
       - name: Upload visual regression JSON and screenshots
         if: always() && env.VRCTX_REFRESH != 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: visual-regression-results
           path: |
@@ -618,7 +639,7 @@ jobs:
 
   api-e2e:
     name: API E2E Tests (Vitest)
-    needs: [changes, ci-memo-check]
+    needs: [changes, ci-memo-check, mirror-ready]
     if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -677,7 +698,7 @@ jobs:
     # Name interpolates the matrix context so GitHub omits its auto-appended
     # "(1, 1)" suffix; the suffix only reappears (as "(N/M)") if ever re-sharded.
     name: E2E Tests${{ matrix.total-shards == 1 && '' || format(' ({0}/{1})', matrix.shard-index, matrix.total-shards) }}
-    needs: [changes, ci-memo-check]
+    needs: [changes, ci-memo-check, mirror-ready]
     if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -783,7 +804,7 @@ jobs:
 
       - name: Upload blob report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: blob-report-${{ matrix.shard-index }}
           path: ibl5/blob-report/
@@ -791,7 +812,7 @@ jobs:
 
       - name: Upload shard test results
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-shard-${{ matrix.shard-index }}
           path: ibl5/test-results/
@@ -812,7 +833,7 @@ jobs:
 
   e2e-mutators:
     name: E2E Mutators (non-sharded, dedicated DB)
-    needs: [changes, ci-memo-check]
+    needs: [changes, ci-memo-check, mirror-ready]
     if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -890,7 +911,7 @@ jobs:
 
       - name: Upload blob report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: blob-report-mutators
           path: ibl5/blob-report/
@@ -898,7 +919,7 @@ jobs:
 
       - name: Upload mutator test results
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-mutators
           path: ibl5/test-results/
@@ -949,7 +970,7 @@ jobs:
         run: bun install
 
       - name: Download blob reports
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: blob-report-*
           path: ibl5/all-blob-reports
@@ -957,7 +978,7 @@ jobs:
 
       - name: Download visual regression results
         if: always()
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: visual-regression-results
           path: ibl5/visual-results/
@@ -965,7 +986,7 @@ jobs:
 
       - name: Download shard test results
         if: always()
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: test-results-shard-*
           path: ibl5/shard-test-results/
@@ -979,7 +1000,7 @@ jobs:
           npx playwright merge-reports --reporter=json ./all-blob-reports > test-results.json
 
       - name: Upload merged report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
           path: ibl5/playwright-report/
@@ -987,7 +1008,7 @@ jobs:
 
       - name: Upload flake input JSON
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-flake-input
           path: ibl5/test-results.json
@@ -1035,7 +1056,7 @@ jobs:
 
       - name: Upload flake ledger
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: flake-ledger
           path: ${{ runner.temp }}/flake/flake-ledger.ndjson
@@ -1079,7 +1100,7 @@ jobs:
   gate:
     name: E2E Tests
     if: always() && !inputs.refresh_pr
-    needs: [changes, ci-memo-check, e2e, api-e2e, e2e-shards, e2e-mutators]
+    needs: [changes, ci-memo-check, mirror-ready, e2e, api-e2e, e2e-shards, e2e-mutators]
     runs-on: ubuntu-latest
     # The memo is written only here: after a clean aggregate, on a run that was a miss.
     env:
@@ -1107,11 +1128,13 @@ jobs:
   # pushes to master (not on PRs, so it is NOT part of the `gate` required check).
   # Two-pass prune run by bin/prune-vr-galleries:
   #   Pass 1 (age): remove per-SHA dirs whose newest commit is older than 7 days.
-  #   Pass 2 (count cap): of the age-pass survivors, keep only the 300 most recent;
+  #   Pass 2 (count cap): of the age-pass survivors, keep only the 150 most recent;
   #     prune the rest. Under the 7-day window at ~76 dirs/day gross arrival
   #     (measured 2026-08-30), the expected steady-state population is ~530 dirs,
-  #     so 300 is the binding bound (~4 days of retention). Re-measure the dry-run
-  #     count before changing this number.
+  #     so 150 is the binding bound (~2 days of retention). The cap also bounds the
+  #     Pages artifact: pages-deploy.yml uploads the whole tree, and at ~30 MB per
+  #     dir the 300 cap reached 9.6 GB (measured 2026-10-15) and every deploy
+  #     failed near the 10 GB limit. Re-measure dir size before raising this number.
   vr-pages-cleanup:
     name: VR Pages retention cleanup
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -1163,15 +1186,15 @@ jobs:
         if: steps.checkout-pages.outcome == 'success' && steps.vr-keep.outcome == 'failure'
         run: echo "::error::Open-PR keep-list failed; pruning skipped this run so no linked gallery is deleted."
 
-      - name: Prune per-SHA report dirs (7-day age prune + 300-dir count cap)
+      - name: Prune per-SHA report dirs (7-day age prune + 150-dir count cap)
         id: prune
         if: steps.checkout-pages.outcome == 'success' && steps.vr-keep.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          removed=$(./master-scripts/bin/prune-vr-galleries --cutoff-days 7 --max-dirs 300 --keep-file "$RUNNER_TEMP/vr-keep.txt")
+          removed=$(./master-scripts/bin/prune-vr-galleries --cutoff-days 7 --max-dirs 150 --keep-file "$RUNNER_TEMP/vr-keep.txt")
           if [ "$removed" -gt 0 ]; then
-            git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) (7d age + 300-dir cap)"
+            git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) (7d age + 150-dir cap)"
             # Same shared-ref contention as the per-SHA deploy above: in-flight PR VR
             # jobs push their own <sha>/ dirs to gh-pages while we prune. Those commits
             # add paths we never touch, so a rejected push is always contention and a
@@ -1213,8 +1236,18 @@ jobs:
           # Over-suppressing costs one push a wait for the next deploy — and since every deploy
           # re-serves the WHOLE tree, that self-heals on the next PR. Under-suppressing just breaks
           # the debounce, invisibly.
-          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
-            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          #
+          # A not-started run older than an hour is stuck, so it is cancelled and left out of the count.
+          # On 2026-10-01 a run sat in `waiting` for a week: this debounce counted it as queued, every
+          # later push skipped its dispatch, and no gallery was served. A real wait is under ~20 min.
+          runs_url="repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20"
+          not_started='.workflow_runs[] | select(.status != "completed" and .status != "in_progress")'
+          for id in $(gh api "$runs_url" --jq "$not_started | select(now - (.created_at | fromdateiso8601) > 3600) | .id" 2>/dev/null); do
+            echo "Cancelling stuck pages-deploy run ${id}."
+            gh run cancel "$id" --repo "${{ github.repository }}" || true
+          done
+          queued=$(gh api "$runs_url" \
+            --jq "[$not_started | select(now - (.created_at | fromdateiso8601) <= 3600)] | length" 2>/dev/null || echo "")
           if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
             echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
             exit 0

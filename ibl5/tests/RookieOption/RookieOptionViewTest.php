@@ -72,6 +72,29 @@ class RookieOptionViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $output);
     }
 
+    public function testCardHtmlRendersBetweenTitleAndOptionCard(): void
+    {
+        $output = $this->view->renderForm($this->createPlayerMock(), 'Test Team', 500, null, null, null, '<div id="card-fixture">C</div>');
+
+        $titlePos = strpos($output, '<h1 class="ibl-title">Rookie Option</h1>');
+        $cardPos = strpos($output, '<div id="card-fixture">C</div>');
+        $valuePos = strpos($output, 'Rookie Option Value:');
+        $this->assertNotFalse($titlePos);
+        $this->assertNotFalse($cardPos);
+        $this->assertGreaterThan($titlePos, $cardPos);
+        $this->assertLessThan($valuePos, $cardPos);
+        $this->assertStringNotContainsString('&lt;div id=', $output);
+        $this->assertStringEndsWith('</div>', rtrim($output));
+    }
+
+    public function testNullCardHtmlRendersTitleThenOptionCard(): void
+    {
+        $output = $this->view->renderForm($this->createPlayerMock(), 'Test Team', 500);
+
+        $this->assertSame(1, preg_match('/Rookie Option<\/h1>\s*<div class="ibl-card">/', $output));
+        $this->assertSame(1, substr_count($output, '<div class="ibl-form-container">'));
+    }
+
     /**
      * Test form uses design system classes
      */

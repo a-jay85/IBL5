@@ -14,6 +14,8 @@
 # Exit 0 = all pass, 1 = failures.
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -22,9 +24,8 @@ CORPUS="$SCRIPT_DIR/fixtures/events-review/corpus.tsv"
 EXPECTED="$SCRIPT_DIR/fixtures/events-review/expected-dry-run.txt"
 SEED_SQL="$SCRIPT_DIR/fixtures/events-review/seed.sql"
 
-FAILED=0
-ok()   { echo "ok: $1"; }
-fail() { echo "FAIL: $1"; FAILED=1; }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$1"; }
 
 expect_eq() { # name want got
     if [ "$2" = "$3" ]; then ok "$1"; else fail "$1 - want [$2] got [$3]"; fi
@@ -55,8 +56,7 @@ expect_absent() { # name path
     if [ -e "$2" ]; then fail "$1 - $2 exists"; else ok "$1"; fi
 }
 
-T="$(mktemp -d "${TMPDIR:-/tmp}/events-review-test-XXXXXX")"
-trap 'rm -rf "$T"' EXIT
+h_tmp T
 STUBS="$T/stubs"
 mkdir -p "$STUBS"
 
@@ -122,6 +122,14 @@ for a in "$@"; do
 done
 printf 'x\n' >> "$d/curl.calls"
 printf '\nHTTP=204'
+SH
+cat > "$STUBS/dm-ssh" <<'SH'
+#!/usr/bin/env bash
+# IBLbot DM-path ssh stub for the real discord-dm: records the call, answers HTTP 200.
+# A webhook miss falls back to this path, so the real ssh must never run in a test.
+cat > /dev/null
+printf 'x\n' >> "${STUB_DIR:?}/dm-ssh.calls"
+printf 'HTTP=200'
 SH
 chmod +x "$STUBS"/*
 
@@ -605,12 +613,14 @@ $(cat "$b1800")" "$(dm_payload 1)"
         "STUB_CLAUDE_OUT=$hostile"
         "DISCORD_DM_TO=283183467804491776"
         "DISCORD_DM_CURL_BIN=$STUBS/curl"
+        "DISCORD_DM_SSH_BIN=$STUBS/dm-ssh"
         "DISCORD_DM_WEBHOOK_FILE=$wh"
         "DISCORD_DM_SPOOL=$T/spool.log"
     )
     run_er "--from-tsv=$CORPUS"
     expect_eq "row24: real discord-dm delivers" 0 "$ER_RC"
     expect_eq "row24: one webhook post" 1 "$(call_count "$SD/curl.calls")"
+    expect_eq "row24: no DM over ssh" 0 "$(call_count "$SD/dm-ssh.calls")"
     local content
     content="$(jq -r '.content' "$SD/curl.payload" 2>/dev/null)"
     expect_has "row24: posted content is the sanitized text" "$content" "(at)everyone"
@@ -755,7 +765,7 @@ group_e2e() {
     container="ibl5-db-$slug"
     if ! command -v docker >/dev/null 2>&1 \
         || [ "$(docker ps --filter "name=^${container}\$" --format '{{.Names}}' 2>/dev/null)" != "$container" ]; then
-        echo "SKIP: e2e ($container not running; run bin/wt-up)"
+        h_skip "e2e ($container not running; run bin/wt-up)"
         return 0
     fi
 
@@ -809,9 +819,11 @@ SH
     local digest
     digest="$(digest_of <<< "$ER_OUT")"
     expect_eq "row31: live dry-run exits 0" 0 "$ER_RC"
-    expect_has "row31: seeded authenticated route team" "$digest" "team"
-    expect_has "row31: seeded authenticated route player" "$digest" "player"
-    expect_has "row31: seeded authenticated route depth_chart" "$digest" "depth_chart"
+    # Seeded authenticated counts (seed.sql): 3 GMs x 2 days = 6 each for team and
+    # player; depth_chart is 6 page views plus 1 depth_chart_saved row = 7.
+    expect_has_exact "row31: seeded authenticated route team count" "$digest" "  6  team"
+    expect_has_exact "row31: seeded authenticated route player count" "$digest" "  6  player"
+    expect_has_exact "row31: seeded authenticated route depth_chart count" "$digest" "  7  depth_chart"
     expect_has_exact "row31: active GMs: 3" "$digest" "active GMs: 3"
     expect_has_exact "row31: NULL-class rows show as unclassified 4" "$digest" "unclassified 4"
     local tok
@@ -829,6 +841,7 @@ SH
             "EVENTS_REVIEW_DM_BIN=$REPO_ROOT/bin/discord-dm"
             "DISCORD_DM_TO=283183467804491776"
             "DISCORD_DM_CURL_BIN=$STUBS/curl"
+            "DISCORD_DM_SSH_BIN=$STUBS/dm-ssh"
             "DISCORD_DM_WEBHOOK_FILE=$wh"
             "DISCORD_DM_SPOOL=$T/e2e-spool.log"
         )
@@ -836,6 +849,7 @@ SH
         expect_eq "row33: full live run exits 0" 0 "$ER_RC"
         expect_eq "row33: claude ran once" 1 "$(call_count "$SD/claude.calls")"
         expect_eq "row33: one webhook post" 1 "$(call_count "$SD/curl.calls")"
+        expect_eq "row33: no DM over ssh" 0 "$(call_count "$SD/dm-ssh.calls")"
         local actual_digest
         actual_digest="$(awk '/^<digest>$/{f=1;next} /^<\/digest>$/{f=0} f' "$SD/claude.stdin")"
         if [ "$actual_digest" = "$digest" ]; then ok "row33: claude stdin holds the dry-run digest"
@@ -890,6 +904,7 @@ SH
 }
 
 GROUP="${1:-all}"
+# shellcheck disable=SC2034  # H_SKIP_OK is read by h_done
 case "$GROUP" in
     flags)    group_flags ;;
     env)      group_env ;;
@@ -898,12 +913,11 @@ case "$GROUP" in
     claude)   group_claude ;;
     dm)       group_dm ;;
     schedule) group_schedule ;;
-    e2e)      group_e2e ;;
+    e2e)      H_SKIP_OK=1; group_e2e ;;
     all)
         group_flags; group_env; group_creds; group_digest
         group_claude; group_dm; group_schedule; group_e2e ;;
     *) echo "usage: bin/test-events-review [flags|env|creds|digest|claude|dm|schedule|e2e]" >&2; exit 2 ;;
 esac
 
-if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES"; fi
-exit "$FAILED"
+h_done

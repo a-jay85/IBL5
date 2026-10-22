@@ -26,13 +26,16 @@ use SeasonHighs\SeasonHighsView;
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext $leagueContext */
 
 // Get current season info
-$season = new \Season\Season($mysqli_db, $leagueContext);
+$season = \Season\SharedSeason::get($mysqli_db, $leagueContext);
 
 // Determine season phase (from request or current phase)
-$seasonPhase = isset($_GET['seasonPhase']) && !empty($_GET['seasonPhase'])
-    ? $_GET['seasonPhase']
+$seasonPhaseParam = $_GET['seasonPhase'] ?? null;
+$seasonPhase = is_string($seasonPhaseParam) && $seasonPhaseParam !== '' && $seasonPhaseParam !== '0'
+    ? $seasonPhaseParam
     : $season->phase;
 
 $pagetitle = "- $seasonPhase Stat Leaders";

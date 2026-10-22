@@ -27,21 +27,21 @@
 
 set -u
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BASE_TMP="$(mktemp -d)"
-trap 'rm -rf "$BASE_TMP"' EXIT
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
-FAILED=0
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+h_tmp BASE_TMP
+
 REPO=""
 GH_DIR=""
 NO_GH=""
 
 expect() { # name want got
     if [ "$3" -eq "$2" ]; then
-        echo "ok: $1 (exit $3)"
+        h_pass "$1 (exit $3)"
     else
-        echo "FAIL: $1 — expected exit $2, got $3"
-        FAILED=1
+        h_fail "$1" "expected exit $2, got $3"
     fi
 }
 
@@ -55,12 +55,10 @@ new_repo() {
     cp "$SCRIPT_DIR/lib/branch-base.sh" "$REPO/bin/lib/branch-base.sh"
     cp "$SCRIPT_DIR/pre-commit-hook" "$REPO/bin/pre-commit-hook"
     cp "$SCRIPT_DIR/lib/shell-scripts.sh" "$REPO/bin/lib/shell-scripts.sh"
+    cp "$SCRIPT_DIR/lib/gate-common.php" "$REPO/bin/lib/gate-common.php"
     chmod +x "$REPO/bin/adr-check" "$REPO/bin/pre-push-adr-hook" \
              "$REPO/bin/pre-commit-hook" "$REPO/bin/lib/shell-scripts.sh"
-    git -C "$REPO" init -q
-    git -C "$REPO" config user.email test@example.com
-    git -C "$REPO" config user.name "test"
-    git -C "$REPO" config commit.gpgsign false
+    h_git_repo "$REPO" --no-commit
     echo base > "$REPO/README.md"
     mkdir -p "$REPO/ibl5"
     printf '{\n  "require": {\n    "vendor/base": "^1.0"\n  }\n}\n' \
@@ -246,7 +244,7 @@ new_stack_repo
 fake_gh "p;touch $BASE_TMP/pwned"
 run_hook_env "PATH=$GH_DIR:$PATH"; ex=$?
 expect "hook-gh-injection-no-exec" 1 "$ex"
-[ ! -e "$BASE_TMP/pwned" ] || { echo "FAIL: hook-gh-injection-no-exec — sentinel created"; FAILED=1; }
+[ ! -e "$BASE_TMP/pwned" ] || h_fail "hook-gh-injection-no-exec" "sentinel created"
 
 # timeout: fake_gh sleeps 30s; hook must exit within 15s total
 new_stack_repo
@@ -255,10 +253,9 @@ start=$SECONDS
 run_hook_env "PATH=$GH_DIR:$PATH"; expect "hook-gh-timeout-bounded" 1 $?
 elapsed=$(( SECONDS - start ))
 if [ "$elapsed" -lt 15 ]; then
-    echo "ok: hook-gh-timeout-bounded-elapsed (${elapsed}s < 15)"
+    h_pass "hook-gh-timeout-bounded-elapsed (${elapsed}s < 15)"
 else
-    echo "FAIL: hook-gh-timeout-bounded-elapsed — took ${elapsed}s (expected < 15)"
-    FAILED=1
+    h_fail "hook-gh-timeout-bounded-elapsed" "took ${elapsed}s (expected < 15)"
 fi
 
 # --- adrcheck --base=<ref> flag cases ---
@@ -315,7 +312,7 @@ expect "adrcheck-staged-unchanged" 0 $?
 # non-shim pre-push (the default git-lfs hook) and assert it is backed up once and
 # replaced by our sentinel shim, idempotently.
 ok_check() { # name condition-already-evaluated($?-style via [ ])
-    if [ "$2" -eq 0 ]; then echo "ok: $1"; else echo "FAIL: $1"; FAILED=1; fi
+    if [ "$2" -eq 0 ]; then h_pass "$1"; else h_fail "$1"; fi
 }
 
 new_repo 1
@@ -521,6 +518,62 @@ new_repo 1; stage_trigger workflow
 run_adr_check_commit_stdin $'<!-- adr: new CI workflow governed by existing ADR-0059 -->\n\n## Summary\n- x\n'
 expect "commit-workflow-bypass-wrong-form" 1 $?
 
+# --- extractBypassReason characterization (pins the shared gate-common.php core) ---
+# Each row: fresh repo, staged bin/ trigger, explicit body on stdin, exit code.
+adr_bypass_row() { # <name> <want-exit> <body>
+    new_repo 1; stage_bin_trigger
+    run_adr_check_commit_stdin "$3"
+    expect "$1" "$2" $?
+}
+adr_bypass_row "adr-bypass-exact-min-length"     0 '<!-- no-adr: abcdefghijklmno -->'
+adr_bypass_row "adr-bypass-one-under-min"        1 '<!-- no-adr: abcdefghijklmn -->'
+adr_bypass_row "adr-bypass-trim-before-length"   1 '<!--    no-adr:     abcdefghijklmn     -->'
+adr_bypass_row "adr-bypass-strlen-counts-bytes"  0 '<!-- no-adr: ééééé12345 -->'
+adr_bypass_row "adr-bypass-first-match-only"     1 $'<!-- no-adr: short -->\n<!-- no-adr: second marker reason long enough -->'
+adr_bypass_row "adr-bypass-literal-null-body"    1 'null'
+adr_bypass_row "adr-bypass-empty-body"           1 ''
+adr_bypass_row "adr-bypass-refactor-marker-rejected" 1 '<!-- no-refactor-tests: a reason that is long enough -->'
+
+# --- fetchPrBody characterization: gh argv, PR_NUMBER set/empty/unset, gh failure ---
+# recording_gh <exit-code> <body> — PATH shim: logs argv one per line to
+# $GH_DIR/argv, prints <body>, exits <exit-code>. Sets $GH_DIR.
+recording_gh() {
+    GH_DIR="$(mktemp -d "$BASE_TMP/rgh.XXXXXX")"
+    printf '%s\n' "$2" > "$GH_DIR/body"
+    { echo '#!/bin/sh'
+      echo 'd="$(dirname "$0")"'
+      echo 'printf "%s\n" "$@" >> "$d/argv"'
+      echo 'cat "$d/body"'
+      echo "exit $1"; } > "$GH_DIR/gh"
+    chmod +x "$GH_DIR/gh"
+}
+ADR_STUB_BODY='<!-- no-adr: stub body reason that is long enough -->'
+
+new_repo 1; add_bin_trigger "add tool"; recording_gh 0 "$ADR_STUB_BODY"
+( cd "$REPO" && env PATH="$GH_DIR:$PATH" PR_NUMBER=4242 \
+    ./bin/adr-check --pr --base=origin/master </dev/null ) >/dev/null 2>&1
+expect "adr-fetch-pr-number-set-bypasses" 0 $?
+printf '%s\n' pr view 4242 --json body --jq .body | cmp -s - "$GH_DIR/argv"
+ok_check "adr-fetch-pr-number-set-argv" $?
+
+new_repo 1; add_bin_trigger "add tool"; recording_gh 0 "$ADR_STUB_BODY"
+( cd "$REPO" && env -u PR_NUMBER PATH="$GH_DIR:$PATH" \
+    ./bin/adr-check --pr --base=origin/master </dev/null ) >/dev/null 2>&1
+expect "adr-fetch-pr-number-unset-bypasses" 0 $?
+printf '%s\n' pr view --json body --jq .body | cmp -s - "$GH_DIR/argv"
+ok_check "adr-fetch-pr-number-unset-argv" $?
+
+new_repo 1; add_bin_trigger "add tool"; recording_gh 0 "$ADR_STUB_BODY"
+( cd "$REPO" && env PATH="$GH_DIR:$PATH" PR_NUMBER= \
+    ./bin/adr-check --pr --base=origin/master </dev/null ) >/dev/null 2>&1
+printf '%s\n' pr view --json body --jq .body | cmp -s - "$GH_DIR/argv"
+ok_check "adr-fetch-pr-number-empty-omits-number" $?
+
+new_repo 1; add_bin_trigger "add tool"; recording_gh 1 "$ADR_STUB_BODY"
+( cd "$REPO" && env PATH="$GH_DIR:$PATH" PR_NUMBER=4242 \
+    ./bin/adr-check --pr --base=origin/master </dev/null ) >/dev/null 2>&1
+expect "adr-fetch-gh-failure-null-body-rejects" 1 $?
+
 # no trigger → pass
 new_repo 1; add_no_trigger
 run_adr_check_commit; expect "commit-no-trigger-clean" 0 $?
@@ -595,14 +648,10 @@ run_pre_commit_hook; expect "hook-no-trigger-passes" 0 $?
 # --- --exclude-from cases (adr-check flag, then the pre-commit hook's merge exclusion) ---
 
 # want <name> <haystack> <needle> — the haystack contains the needle.
-want() {
-    if grep -qF -- "$3" <<< "$2"; then echo "ok: $1"; else echo "FAIL: $1 — missing '$3'"; FAILED=1; fi
-}
+want() { h_contains "$1" "$2" "$3"; }
 
 # want_not <name> <haystack> <needle> — the haystack does not contain the needle.
-want_not() {
-    if grep -qF -- "$3" <<< "$2"; then echo "FAIL: $1 — unexpected '$3'"; FAILED=1; else echo "ok: $1"; fi
-}
+want_not() { h_not_contains "$1" "$2" "$3"; }
 
 # write_tool <repo-relative path> — a 60-line shebang script (the new-tool-script trigger).
 write_tool() {
@@ -679,7 +728,7 @@ new_merge_repo() {
         git -C "$REPO" add src/old.txt
     fi
     git -C "$REPO" rev-parse -q --verify MERGE_HEAD >/dev/null \
-        || { echo "FAIL: new_merge_repo left no MERGE_HEAD"; FAILED=1; }
+        || h_fail "new_merge_repo left no MERGE_HEAD"
 }
 
 # adr-check --commit --exclude-from=<file> (equals form only)
@@ -798,9 +847,4 @@ want "stacked: parent's bin tool: names bin/parent-tool" "$_ho" "bin/parent-tool
 if [ -s "$(merge_exclude_file)" ]; then _rc=1; else _rc=0; fi
 ok_check "stacked: parent's bin tool: exclusion list stays empty" "$_rc"
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

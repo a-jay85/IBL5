@@ -70,6 +70,8 @@
 # Run: bin/test-fleet-status  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FLEET="$SCRIPT_DIR/fleet-status"
@@ -99,9 +101,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-FAILED=0
-pass() { printf '  ok    %s\n' "$1"; }
-fail() { printf '  FAIL  %s\n' "$1"; FAILED=1; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$1"; }
 
 # Herestrings, not `printf | grep -q`: grep exits early on a match and SIGPIPEs
 # the writer, which under pipefail makes a SUCCESSFUL match report 141.
@@ -191,6 +192,13 @@ NIGHTLY_PID=$!
 disown "$NIGHTLY_PID" 2>/dev/null
 SPAWNED_PIDS="$SPAWNED_PIDS $NIGHTLY_PID"
 
+# A queued plan's runner in its post-plan phase. Like the real one, it leaves a
+# cmdpid file and no heartbeat, so its details must still print under its row.
+"$STUBBIN/automouse/run" plan pp-plan.md >/dev/null 2>&1 &
+PP_PID=$!
+disown "$PP_PID" 2>/dev/null
+SPAWNED_PIDS="$SPAWNED_PIDS $PP_PID"
+
 # An ORPHAN: a `claude -p` with no job above it. Spawned by this script, so its
 # ancestry never reaches a PID fleet-status printed — which is exactly the state
 # of a headless run whose supervisor died, and the only thing case 10's section
@@ -231,7 +239,14 @@ printf '%s\n' "$NOW"        > "$AM/.heartbeat-$LIVE_AUTOMOUSE_PID-impl"
 printf '%s\n' "$NOW"        > "$AM/.heartbeat-$UNRELATED_PID-impl"
 printf '%s\n' "$(( NOW - 200000 ))" > "$AM/.heartbeat-$DEAD_PID-postplan"
 printf '%s\n' "$NOW"        > "$AM/.heartbeat-$NODOTMD_PID-impl"
-printf '%s\n' "$NOW"        > "$AM/.heartbeat-$NIGHTLY_PID-postplan"
+# The real runner writes a cmdpid file beside every phase. An impl phase has a
+# heartbeat too; a post-plan phase never does (bin/automouse/run says why).
+# The dead run's cmdpid must not join the stale-heartbeat count.
+printf '1\n' > "$AM/.cmdpid-$LIVE_AUTOMOUSE_PID-impl"
+printf '1\n' > "$AM/.cmdpid-$NODOTMD_PID-impl"
+printf '1\n' > "$AM/.cmdpid-$NIGHTLY_PID-postplan"
+printf '1\n' > "$AM/.cmdpid-$PP_PID-postplan"
+printf '1\n' > "$AM/.cmdpid-$DEAD_PID-postplan"
 
 # Queue: one plain plan, one held by a mkdir-style lock DIRECTORY, two more for
 # the new invocation-form fixtures. Each lock directory contains a `pid` file so
@@ -275,6 +290,49 @@ printf '1\n' > "$AM/queue/nodotmd-plan.md.attempts"
 mkdir -p "$AM/queue/nightly-plan.md.lock"
 printf '%s\n' "$NIGHTLY_PID" > "$AM/queue/nightly-plan.md.lock/pid"
 printf '3\n' > "$AM/queue/nightly-plan.md.attempts"
+printf '# Post-plan phase plan\n' > "$AM/queue/pp-plan.md"
+mkdir -p "$AM/queue/pp-plan.md.lock"
+printf '%s\n' "$PP_PID" > "$AM/queue/pp-plan.md.lock/pid"
+# Three locks whose runner is gone. A usage-gate pause keeps its lock on purpose
+# and names the session in paused-held; the marker file says the pause is still
+# waiting. Without the marker the post-plan resume owns it. Without paused-held
+# the lock is a SIGKILL leftover. None of them may read "in progress".
+USAGE_DIR="$TMP/usage-gate"; mkdir -p "$USAGE_DIR/markers"
+PAUSED_SID='aaaaaaaa-1111-2222-3333-444444444444'
+RESUMED_SID='bbbbbbbb-1111-2222-3333-444444444444'
+for p in paused-plan resumed-plan resumed-gone-plan stale-lock-plan merged-plan; do
+    printf '# %s\n' "$p" > "$AM/queue/$p.md"
+    mkdir -p "$AM/queue/$p.md.lock"
+    printf '%s\n' "$DEAD_PID" > "$AM/queue/$p.md.lock/pid"
+done
+printf '%s\n' "$PAUSED_SID" > "$AM/queue/paused-plan.md.lock/paused-held"
+printf '{"session_id":"%s"}\n' "$PAUSED_SID" > "$USAGE_DIR/markers/$PAUSED_SID.json"
+printf '%s\n' "$RESUMED_SID" > "$AM/queue/resumed-plan.md.lock/paused-held"
+printf '%s\n' "$RESUMED_SID" > "$AM/queue/resumed-gone-plan.md.lock/paused-held"
+# resumed-plan's post-plan run is alive. Its handoff names a branch that differs
+# from the plan slug, as real ones can, and the run's command line carries the
+# POSTPLAN_LABEL post-plan-now exports. resumed-gone-plan has no such run: its PR
+# merged and only the lock is left.
+mkdir -p "$AM/handoff"
+printf '{"branch":"resumed-branch"}\n' > "$AM/handoff/resumed-plan.md.json"
+# merged-plan is resumed-gone-plan whose PR the gh stub reports merged. Its
+# handoff branch differs from the slug, so the lookup must read the handoff.
+printf '%s\n' "$RESUMED_SID" > "$AM/queue/merged-plan.md.lock/paused-held"
+printf '{"branch":"merged-branch"}\n' > "$AM/handoff/merged-plan.md.json"
+cat > "$STUBBIN/gh" <<'GH'
+#!/bin/bash
+# `gh pr list --head <branch> ...`: one merged PR for merged-branch only.
+while [ $# -gt 0 ]; do
+    [ "$1" = --head ] && { [ "$2" = merged-branch ] && echo 1 || echo 0; exit 0; }
+    shift
+done
+exit 1
+GH
+chmod +x "$STUBBIN/gh"
+sh -c "sleep 120; : POSTPLAN_LABEL='com.ibl5.postplan-now-resumed-branch-20260910-120000-1'" >/dev/null 2>&1 &
+RESUMED_RUN_PID=$!
+disown "$RESUMED_RUN_PID" 2>/dev/null
+SPAWNED_PIDS="$SPAWNED_PIDS $RESUMED_RUN_PID"
 
 # Runner progress. Impl lines come from each runner's own per-pid log, filtered
 # to that runner's slug and phase. Per-pid logs isolate runners from each other,
@@ -303,6 +361,10 @@ mkdir -p "$OUT/live-nightly-plan-20260910-140000-99"
 cat > "$OUT/live-nightly-plan-20260910-140000-99/audit.log" <<'AUDIT'
 [14:00:01] phase2: committing the tree
 outputs: /nightly/trailer/not/progress
+AUDIT
+mkdir -p "$OUT/live-pp-plan-20260910-150000-98"
+cat > "$OUT/live-pp-plan-20260910-150000-98/audit.log" <<'AUDIT'
+[15:00:01] phase5.5 fidelity: review: full
 AUDIT
 
 # Harness output for the "shown" launchd job. The trailing `outputs:` line is the
@@ -525,6 +587,7 @@ run_fleet() {
         FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
         FLEET_STATUS_REORDER_APP_DIR="$TMP/apps" \
         FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+        IBL5_USAGE_GATE_STATE_DIR="$USAGE_DIR" \
         "${_extra[@]+"${_extra[@]}"}" "$FLEET" 2>&1
 }
 
@@ -821,6 +884,19 @@ assert_has "queue: lock dir marks plan in progress" \
     "$OUTPUT" 'live-plan\.md +[^ ]+ +[^ ]+ +in progress'
 assert_has "queue: unlocked plan reads queued" \
     "$OUTPUT" 'idle-plan\.md +[^ ]+ +[^ ]+ +queued'
+# A lock with no live runner is not work in progress.
+assert_has "queue: usage-gate hold with its marker reads paused" \
+    "$OUTPUT" '‖ paused-plan\.md +[^ ]+ +[^ ]+ +paused \(usage limit\)$'
+assert_has "queue: usage-gate hold without its marker reads resumed" \
+    "$OUTPUT" '▶ resumed-plan\.md +[^ ]+ +[^ ]+ +resumed \(post-plan\)$'
+assert_has "queue: resumed hold with no live post-plan reads stale" \
+    "$OUTPUT" '× resumed-gone-plan\.md +[^ ]+ +[^ ]+ +stale lock \(post-plan gone\)$'
+assert_has "queue: lock with a dead runner and no hold reads stale" \
+    "$OUTPUT" '× stale-lock-plan\.md +[^ ]+ +[^ ]+ +stale lock \(runner gone\)$'
+assert_has "queue: dead lock on a merged PR says the runner clears it" \
+    "$OUTPUT" '× merged-plan\.md +[^ ]+ +[^ ]+ +PR merged \(runner clears it\)$'
+assert_lacks "queue: no dead-runner lock reads in progress" \
+    "$OUTPUT" '(paused|resumed|resumed-gone|stale-lock|merged)-plan\.md .*in progress'
 
 # 21 — MODEL / MERGE / TITLE. The bare plan gets bin/automouse/queue's defaults;
 # the frontmatter plan gets its own values and its H1.
@@ -954,6 +1030,19 @@ assert_has "automouse: post-plan runner links its audit.log" \
     "$OUTPUT_LINKS" '8;;vscode://file/[^ ]*live-nightly-plan-20260910-140000-99/audit\.log[^ ]*audit'
 assert_lacks "automouse: post-plan outputs trailer is not progress" \
     "$OUTPUT" 'nightly/trailer/not/progress'
+assert_has "automouse: post-plan activity age comes from its audit.log" \
+    "$NIGHTLY_BLOCK" "● postplan +pid $NIGHTLY_PID +up [^ ]+ +last activity [0-9]+s ago"
+# A queued plan in post-plan has only a cmdpid file. Its details still print
+# under its own row, phase line included.
+PP_BLOCK="$(grep -EA3 'pp-plan\.md' <<< "$OUTPUT" | tr '\n' ' ')"
+assert_has "queue: post-plan runner details follow its queued row" \
+    "$PP_BLOCK" "● postplan +pid $PP_PID .*phase5\\.5 fidelity: review: full"
+# Both of a runner's files list it once. The live impl holds a heartbeat and a
+# cmdpid; out of queue, the nodotmd runner holds both too.
+assert_has "queue: impl runner with both files prints one detail line" \
+    "$(grep -c "pid $LIVE_AUTOMOUSE_PID " <<< "$OUTPUT")" '^1$'
+assert_has "automouse: out-of-queue runner with both files gets one row" \
+    "$(grep -cE 'nodotmd-plan +- +- +running' <<< "$OUTPUT" || true)" '^1$'
 # Every runner now lives inside the queue section. The old section is gone.
 assert_lacks "automouse: no separate runners section" \
     "$OUTPUT" 'AUTOMOUSE RUNNERS'
@@ -1378,9 +1467,4 @@ else
 fi
 
 printf '\n'
-if [ "$FAILED" -eq 0 ]; then
-    printf 'test-fleet-status: ALL PASS\n'
-else
-    printf 'test-fleet-status: FAILURES\n'
-fi
-exit "$FAILED"
+h_done

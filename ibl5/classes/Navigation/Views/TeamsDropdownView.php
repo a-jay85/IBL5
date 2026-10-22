@@ -21,13 +21,11 @@ class TeamsDropdownView implements TeamsDropdownViewInterface
      */
     public function renderDesktop(array $teamsData): string
     {
-        $icon = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5"/><path stroke-linecap="round" stroke-width="1.5" d="M12 2v20M2 12h20"/><path stroke-width="1.5" d="M4.5 4.5C8 8 8 16 4.5 19.5M19.5 4.5C16 8 16 16 19.5 19.5"/></svg>';
-
         ob_start();
         ?>
         <div class="group">
             <button class="nav-trigger">
-                <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= HtmlSanitizer::trusted($icon) ?></span>
+                <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= HtmlSanitizer::trusted($this->renderGlobeIcon()) ?></span>
                 <span>Teams</span>
                 <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
@@ -74,8 +72,6 @@ class TeamsDropdownView implements TeamsDropdownViewInterface
      */
     public function renderMobile(array $teamsData, ?int $userTeamId): string
     {
-        $icon = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5"/><path stroke-linecap="round" stroke-width="1.5" d="M12 2v20M2 12h20"/><path stroke-width="1.5" d="M4.5 4.5C8 8 8 16 4.5 19.5M19.5 4.5C16 8 16 16 19.5 19.5"/></svg>';
-
         // Determine user's conference/division to list them first
         $userConference = null;
         $userDivision = null;
@@ -107,7 +103,7 @@ class TeamsDropdownView implements TeamsDropdownViewInterface
         <div class="mobile-section">
             <button class="mobile-dropdown-btn">
                 <span class="flex items-center gap-3">
-                    <span class="text-accent-500"><?= HtmlSanitizer::trusted($icon) ?></span>
+                    <span class="text-accent-500"><?= HtmlSanitizer::trusted($this->renderGlobeIcon()) ?></span>
                     <span class="font-display text-lg font-semibold">Teams</span>
                 </span>
                 <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -143,5 +139,13 @@ class TeamsDropdownView implements TeamsDropdownViewInterface
         </div>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the globe icon shared by the desktop and mobile Teams triggers.
+     */
+    private function renderGlobeIcon(): string
+    {
+        return '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5"/><path stroke-linecap="round" stroke-width="1.5" d="M12 2v20M2 12h20"/><path stroke-width="1.5" d="M4.5 4.5C8 8 8 16 4.5 19.5M19.5 4.5C16 8 16 16 19.5 19.5"/></svg>';
     }
 }

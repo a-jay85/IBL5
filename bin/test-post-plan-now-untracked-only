@@ -5,7 +5,13 @@
 # Three cases, exit 0 iff all pass.
 set -euo pipefail
 
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+h_tmp TMP
+# Runner logs and .session sidecars go to a private dir, never the shared /tmp.
+mkdir -p "$TMP/runlog"
+export POSTPLAN_LOG_DIR="$TMP/runlog" PLAN_NOW_LOG_DIR="$TMP/runlog"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ORIGIN="$TMP/origin.git"
 MAIN="$TMP/IBL5"
@@ -22,9 +28,8 @@ printf '#!/bin/sh\nexit 0\n' > "$SHIMS/launchctl"
 chmod +x "$SHIMS/security" "$SHIMS/launchctl"
 unset CLAUDE_HEADLESS
 
-PASS=0; FAIL=0
-pass() { echo "PASS: $1"; PASS=$((PASS+1)); }
-fail() { echo "FAIL: $1"; FAIL=$((FAIL+1)); }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 git init --bare -b master "$ORIGIN" >/dev/null 2>&1
 mkdir -p "$MAIN/bin/lib"
@@ -76,6 +81,10 @@ else
     pass "untracked-only tree: passes the nothing-to-ship guard"
 fi
 
-echo "---"
-echo "$PASS passed, $FAIL failed"
-[ "$FAIL" -eq 0 ]
+if ls "$TMP/runlog"/post-plan-now-feat-new-file-*.log >/dev/null 2>&1; then
+    pass "runner log lands in POSTPLAN_LOG_DIR"
+else
+    fail "runner log lands in POSTPLAN_LOG_DIR"
+fi
+
+h_done

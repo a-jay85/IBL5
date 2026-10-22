@@ -19,7 +19,7 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('SeasonHighs');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Regular Season', $output);
     }
 
@@ -27,7 +27,7 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('SeasonHighs', ['seasonPhase' => 'Playoffs']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Playoffs', $output);
     }
 
@@ -35,7 +35,15 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('SeasonHighs', ['seasonPhase' => '']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
+        $this->assertStringContainsString('Regular Season', $output);
+    }
+
+    public function testZeroStringPhaseFallsBackToCurrent(): void
+    {
+        $output = $this->runModule('SeasonHighs', ['seasonPhase' => '0']);
+
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Regular Season', $output);
     }
 }

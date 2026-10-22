@@ -32,7 +32,11 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT_DIR="$REPO_ROOT/bin"
-DISCORD_DM="${DISCORD_DM_BIN:-$SCRIPT_DIR/discord-dm}"
+# shellcheck source=bin/lib/git-helpers.sh disable=SC1091
+source "$SCRIPT_DIR/lib/git-helpers.sh"
+# shellcheck source=bin/lib/dm.sh
+. "$SCRIPT_DIR/lib/dm.sh"
+DISCORD_DM="$(dm_bin "$SCRIPT_DIR" DISCORD_DM_BIN)"
 RSYNC_BIN="${DB_BACKUPS_PULL_RSYNC_BIN:-rsync}"
 LOCAL_DIR="${IBL5_DB_BACKUP_DIR:-$HOME/Backups/ibl5-db}"
 MAX_AGE_HOURS="${DB_BACKUP_MAX_AGE_HOURS:-36}"
@@ -63,7 +67,7 @@ log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 # --- Scheduling (pattern: bin/db-sync-cron-setup) ------------------------------
 if [ "$ACTION" != "pull" ]; then
   # The plist must point at the durable MAIN checkout, never a worktree.
-  MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
+  MAIN_WT="$(main_checkout_root "$REPO_ROOT")" || MAIN_WT=""
   [ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"
 
   PLIST_LABEL="com.ibl5.db-backups-pull"
@@ -130,7 +134,7 @@ fi
 if [ -z "$SSH_HOST" ]; then
   ENV_FILE="${REPO_ROOT}/.env"
   if [ ! -f "$ENV_FILE" ]; then
-    GIT_ROOT="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')" || true
+    GIT_ROOT="$(main_checkout_root "$REPO_ROOT")" || GIT_ROOT=""
     if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.env" ]; then
       ENV_FILE="$GIT_ROOT/.env"
     else
@@ -155,7 +159,7 @@ SSH_CMD="ssh"
 NOW="${DB_BACKUPS_PULL_NOW_EPOCH:-$(date +%s)}"
 
 send_dm() {
-  if printf '%s\n' "$1" | "$DISCORD_DM" --ping --chunk -; then
+  if printf '%s\n' "$1" | DM_CMD="$DISCORD_DM" dm_ping - --chunk; then
     log "DM sent"
   else
     log "WARNING: DM send failed"

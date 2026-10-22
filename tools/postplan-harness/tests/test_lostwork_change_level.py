@@ -50,6 +50,7 @@ def sh(d, *args, check=True, env=None):
 
 
 def _commit(d, path, body, message):
+    (Path(d) / path).parent.mkdir(parents=True, exist_ok=True)
     (Path(d) / path).write_text(body)
     sh(d, "add", "-A")
     sh(d, "commit", "-q", "-m", message)
@@ -440,3 +441,186 @@ def test_last_verified_outside_frontmatter_is_not_exempt(repo, key):
     assert rc == 0
     assert "LOST: d.md: +last_verified: 2026-10-04" in out
     assert last_line(out) == DIVERGED
+
+
+def test_adapted_added_line_is_reported_lost_today(repo, key):
+    # Regression shape of bin/test-plan-now (master 1de1f3b81): master rewrites `/tmp/`
+    # to `"$RL"/` on a neighbouring line, the resolver carries the same rewrite onto the
+    # branch's added line, and the proof reports the adapted line as LOST. This pins the
+    # `LOST: <path>: +<body>` and `CHECKED:` text contract adaptations.py parses.
+    base = f_with(d=["cp /tmp/d /tmp/d2"])
+    seed_base(repo, "f.txt", text(base))
+    _commit(repo, "f.txt", text(base + ["run /tmp/new.log"]), "feat adds run line")
+    capture_pre(repo, key)
+    master_body = f_with(d=['cp /tmp/d "$RL"/d'])
+    advance_master(repo, "f.txt", text(master_body), "master rewrites /tmp/ to $RL")
+    sh(repo, "reset", "-q", "--hard", "origin/master")
+    _commit(repo, "f.txt", text(master_body + ['run "$RL"/new.log']), "adapted copy")
+    rc, out = run_lostwork(repo, key)
+    assert rc == 0
+    assert "LOST: f.txt: +run /tmp/new.log" in out
+    assert "CHECKED: files=1 added=1 deleted=0" in out
+    assert DIVERGED in out
+
+
+# --- phpstan-baseline.neon absent-path exemption (ADR-0174 addendum) ---
+
+BASELINE = "ibl5/phpstan-baseline.neon"
+
+
+def neon_block(msg, ident, count, path):
+    return [
+        "\t\t-",
+        f"\t\t\trawMessage: '{msg}'",
+        f"\t\t\tidentifier: {ident}",
+        f"\t\t\tcount: {count}",
+        f"\t\t\tpath: {path}",
+        "",
+    ]
+
+
+def neon(*blocks):
+    body = ["parameters:", "\tignoreErrors:"]
+    for b in blocks:
+        body.extend(b)
+    return "\n".join(body) + "\n"
+
+
+def _commit_rm(d, path, message):
+    os.remove(Path(d) / path)
+    sh(d, "add", "-A")
+    sh(d, "commit", "-q", "-m", message)
+
+
+X = neon_block("Call to foo() on dead module.", "foo.dead", 1, "modules/Foo/index.php")
+Y = neon_block("Call to bar() on live module.", "bar.live", 2, "modules/Bar/index.php")
+
+
+def baseline_case(repo, key, *, base, branch, head, baseline_path=BASELINE, rm=(), keep_root=()):
+    """Seed `base` blocks plus a source file per block path under ibl5/ on origin/master,
+    commit `branch` blocks (and delete each `rm` file) on feat, capture PRE, then stand in
+    for a rebase whose resolution kept `head` blocks. `keep_root` paths are seeded at the
+    repo root instead of under ibl5/ (the prefix fixture). Returns the script's stdout."""
+    seed_base(repo, baseline_path, neon(*base))
+    for b in base:
+        p = b[4].split("path: ", 1)[1]
+        target = p if p in keep_root else f"ibl5/{p}"
+        seed_base(repo, target, "<?php\n")
+    for f in rm:
+        _commit_rm(repo, f, f"rm {f}")
+    # Sentinel branch change: when the resolution restores master's copy of the baseline,
+    # the post diff would otherwise be empty and the script would stop for the wrong reason.
+    _commit(repo, "ibl5/branch-note.txt", "work\n", "branch work")
+    _commit(repo, baseline_path, neon(*branch), "trim baseline")
+    capture_pre(repo, key)
+    _commit(repo, baseline_path, neon(*head), "resolution kept master entries")
+    return run_lostwork(repo, key)[1]
+
+
+def test_baseline_block_with_absent_path_is_exempt(repo, key):
+    out = baseline_case(repo, key, base=[X, Y], branch=[Y], head=[X, Y], rm=["ibl5/modules/Foo/index.php"])
+    assert "LOST:" not in out and last_line(out) == "TREE-EQUIVALENT"
+
+
+def test_baseline_block_with_present_path_dropped_is_lost(repo, key):
+    out = baseline_case(repo, key, base=[X, Y], branch=[Y], head=[X, Y])
+    assert "LOST: ibl5/phpstan-baseline.neon: -\t\t\tpath: modules/Foo/index.php" in out
+    assert last_line(out) == DIVERGED
+
+
+def test_baseline_mixed_blocks_only_present_path_lost(repo, key):
+    out = baseline_case(repo, key, base=[X, Y], branch=[], head=[X, Y], rm=["ibl5/modules/Foo/index.php"])
+    assert "path: modules/Bar/index.php" in out and "path: modules/Foo/index.php" not in out
+    assert "bar.live" in out and "foo.dead" not in out
+    assert last_line(out) == DIVERGED
+
+
+def test_baseline_exemption_checks_ibl5_prefix(repo, key):
+    # Foo exists at HEAD:modules/Foo/index.php (repo root) and NOT at HEAD:ibl5/modules/Foo/index.php.
+    out = baseline_case(repo, key, base=[X, Y], branch=[Y], head=[X, Y], keep_root=["modules/Foo/index.php"])
+    assert "LOST:" not in out and last_line(out) == "TREE-EQUIVALENT"
+
+
+def test_baseline_shared_line_text_in_exempt_block_is_exempt(repo, key):
+    X2 = neon_block("Call to foo() on dead module.", "bar.live", 2, "modules/Foo/index.php")
+    out = baseline_case(repo, key, base=[X2, Y], branch=[Y], head=[X2, Y], rm=["ibl5/modules/Foo/index.php"])
+    assert "LOST:" not in out and last_line(out) == "TREE-EQUIVALENT"
+
+
+def test_non_baseline_neon_is_not_exempt(repo, key):
+    out = baseline_case(repo, key, base=[X, Y], branch=[Y], head=[X, Y],
+                        baseline_path="ibl5/phpstan-tests-baseline.neon", rm=["ibl5/modules/Foo/index.php"])
+    assert "LOST: ibl5/phpstan-tests-baseline.neon: -\t\t\tpath: modules/Foo/index.php" in out
+    assert last_line(out) == DIVERGED
+
+
+LW_NEON = "eval \"$(sed -n '/^lw_neon() {/,/^}/p' \"$1\")\"; shift; lw_neon \"$@\""
+
+
+def lw_neon(*args):
+    """Run the script's parser function alone: `lw_neon paths <file>` or `lw_neon split ...`."""
+    return subprocess.run(["bash", "-c", LW_NEON, "_", str(SCRIPT), *args],
+                          capture_output=True, text=True)
+
+
+def broken(block):
+    """The block with its count line unparseable (`count: one`)."""
+    return block[:3] + ["\t\t\tcount: one"] + block[4:]
+
+
+@pytest.mark.parametrize("side", ["head", "master"])
+def test_malformed_baseline_falls_back_to_strict(repo, key, side):
+    # Foo is deleted, so X would be exempt; the malformed copy disables the exemption.
+    base = [broken(X), Y] if side == "master" else [X, Y]
+    head = [broken(X), Y] if side == "head" else [X, Y]
+    out = baseline_case(repo, key, base=base, branch=[Y], head=head, rm=["ibl5/modules/Foo/index.php"])
+    assert "path: modules/Foo/index.php" in out
+    assert last_line(out) == DIVERGED
+
+
+def test_real_baseline_parses_as_blocks():
+    real = SCRIPT.parents[3] / "ibl5" / "phpstan-baseline.neon"
+    body = real.read_text()
+    r = lw_neon("paths", str(real))
+    assert r.returncode == 0, r.stderr
+    assert len(r.stdout.splitlines()) == sum(1 for l in body.splitlines() if l == "\t\t-") > 0
+
+
+@pytest.mark.parametrize("bad", [
+    "parameters:\n",                                                   # zero blocks
+    "parameters:\n    ignoreErrors:\n" + neon(X)[len("parameters:\n\tignoreErrors:\n"):],  # space indent
+    neon(broken(X)),                                                   # count not digits
+    neon(X[:4] + [""]),                                                # path line missing
+    neon(neon_block("m", "i", 1, "../escape.php")),                    # path with ..
+    neon(X)[:-1] + "\t\t-\n",                                          # trailing opener, no block
+    neon(X).replace("\t\t-\n", "", 1),                                 # block without opener
+], ids=["zero blocks", "space indent", "count not digits", "path missing", "dotdot path",
+        "trailing opener", "missing opener"])
+def test_lw_neon_rejects_malformed_block(tmp_path, bad):
+    f = tmp_path / "b.neon"
+    f.write_text(bad)
+    r = lw_neon("paths", str(f))
+    assert r.returncode == 1 and r.stdout.strip() == ""
+
+
+def test_lw_neon_accepts_multiline_raw_message(tmp_path):
+    # PHPStan writes a multi-line message as a `'''` block; the real baseline has three.
+    ml = [
+        "\t\t-",
+        "\t\t\trawMessage: '''",
+        "\t\t\t\tCall to deprecated function OpenTable():",
+        "\t\t\t\tUse CSS classes directly.",
+        "\t\t\t'''",
+        "\t\t\tidentifier: function.deprecated",
+        "\t\t\tcount: 1",
+        "\t\t\tpath: classes/Foo.php",
+        "",
+    ]
+    f = tmp_path / "b.neon"
+    f.write_text(neon(ml, X))
+    r = lw_neon("paths", str(f))
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == ["classes/Foo.php", "modules/Foo/index.php"]
+    f.write_text(neon(ml[:4] + ml[5:], X))  # unterminated `'''` block swallows the rest
+    r = lw_neon("paths", str(f))
+    assert r.returncode == 1 and r.stdout.strip() == ""

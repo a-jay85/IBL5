@@ -28,7 +28,7 @@ final class PlayerActionController
     private TeamIdentityRepositoryInterface $commonRepo;
     private SalaryCapRepositoryInterface $salaryCapRepo;
     /**
-     * Optional injected Season. When null, renderRookieOption() falls back to new Season($db).
+     * Optional injected Season. When null, renderRookieOption() falls back to SharedSeason::get($db).
      */
     private ?Season $season;
 
@@ -88,7 +88,7 @@ final class PlayerActionController
      */
     public function renderRookieOption(int $playerID, string $username, ?string $error, ?string $result, ?string $from): string
     {
-        $season = $this->season ?? new Season($this->mysqliDb);
+        $season = $this->season ?? \Season\SharedSeason::get($this->mysqliDb);
         $validator = new RookieOptionValidator();
         $formView = new RookieOptionView();
 
@@ -133,7 +133,7 @@ final class PlayerActionController
             $threepointcontests,
             $dunkcontests,
             $rooksoph,
-            $this->commonRepo
+            TeamColorSchemeResolver::forTeam($this->commonRepo, $player->getTeamid() ?? 0)
         );
 
         // Flip card script must come after the card HTML so elements exist for init

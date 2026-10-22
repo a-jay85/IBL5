@@ -36,7 +36,7 @@ class ApiPlayerRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getPlayers($paginator);
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         self::assertLessThanOrEqual(10, count($players));
     }
 
@@ -50,7 +50,7 @@ class ApiPlayerRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getPlayers($paginator);
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         $player = $players[0];
 
         self::assertArrayHasKey('player_uuid', $player);
@@ -76,7 +76,7 @@ class ApiPlayerRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getPlayers($paginator, ['position' => 'PG']);
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         foreach ($players as $player) {
             self::assertSame('PG', $player['position']);
         }
@@ -96,9 +96,32 @@ class ApiPlayerRepositoryTest extends DatabaseTestCase
 
         $players = $this->repo->getPlayers($paginator, ['search' => 'UniqueSearchName']);
 
-        self::assertNotEmpty($players);
+        self::assertNotSame([], $players);
         $names = array_column($players, 'name');
         self::assertContains('DB UniqueSearchName Batch7', $names);
+    }
+
+    public function testGetPlayersBreaksNameTiesByPidAcrossPages(): void
+    {
+        // Higher pid inserted first so insertion order disagrees with pid order.
+        $this->insertTestPlayer(200000391, 'DB TieTwin1390', ['stats_gm' => 5]);
+        $this->insertTestPlayer(200000390, 'DB TieTwin1390', ['stats_gm' => 5]);
+
+        $pageOne = $this->repo->getPlayers(
+            new Paginator(['page' => '1', 'per_page' => '1'], 'name', ['name']),
+            ['search' => 'TieTwin1390'],
+        );
+        $pageTwo = $this->repo->getPlayers(
+            new Paginator(['page' => '2', 'per_page' => '1'], 'name', ['name']),
+            ['search' => 'TieTwin1390'],
+        );
+
+        self::assertCount(1, $pageOne);
+        self::assertCount(1, $pageTwo);
+        // @phpstan-ignore cast.useless (production type is int; the test DB path can return a string)
+        self::assertSame(200000390, (int) $pageOne[0]['pid']);
+        // @phpstan-ignore cast.useless (production type is int; the test DB path can return a string)
+        self::assertSame(200000391, (int) $pageTwo[0]['pid']);
     }
 
     // ── countPlayers ────────────────────────────────────────────

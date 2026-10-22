@@ -52,7 +52,7 @@ class NegotiationService implements NegotiationServiceInterface
         }
 
         $factorsTeamName = $bypassOwnership ? ($player->getTeamName() ?? '') : $userTeamName;
-        $teamFactors = $this->getTeamFactors($factorsTeamName, $player->getPosition() ?? '', $player->getName() ?? '');
+        $teamFactors = $this->getTeamFactors($factorsTeamName, $player->getPosition() ?? '', $playerID);
 
         if ($bypassOwnership) {
             $breakdown = $this->demandCalculator->calculateDemandsWithBreakdown($player, $teamFactors);
@@ -82,10 +82,10 @@ class NegotiationService implements NegotiationServiceInterface
             $threepointcontests,
             $dunkcontests,
             $rooksoph,
-            $this->teamRepo
+            \Player\TeamColorSchemeResolver::forTeam($this->teamRepo, $player->getTeamid() ?? 0)
         );
 
-        $output .= NegotiationOfferView::renderNegotiationForm(
+        $output .= (new NegotiationOfferView())->renderNegotiationForm(
             $player,
             $demands,
             $capSpace,
@@ -109,10 +109,10 @@ class NegotiationService implements NegotiationServiceInterface
     }
     
     /** @return TeamFactors */
-    private function getTeamFactors(string $teamName, string $playerPosition, string $playerName): array
+    private function getTeamFactors(string $teamName, string $playerPosition, int $playerID): array
     {
         $teamData = $this->repository->getTeamPerformance($teamName);
-        $moneyCommitted = $this->repository->getPositionSalaryCommitment($teamName, $playerPosition, $playerName);
+        $moneyCommitted = $this->repository->getPositionSalaryCommitment($teamName, $playerPosition, $playerID);
         
         return [
             'wins' => $teamData['contract_wins'],

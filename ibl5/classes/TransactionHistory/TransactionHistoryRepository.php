@@ -24,6 +24,7 @@ class TransactionHistoryRepository extends \Database\BaseMysqliRepository implem
     public function getAvailableYears(): array
     {
         $rows = $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (DISTINCT YEAR(time) AS year is the whole select list, so year alone is a total order)
             "SELECT DISTINCT YEAR(time) AS year FROM nuke_stories WHERE catid IN (" . self::CATEGORY_IDS . ") ORDER BY year DESC",
             ""
         );
@@ -43,8 +44,17 @@ class TransactionHistoryRepository extends \Database\BaseMysqliRepository implem
      */
     public function getTransactions(?int $categoryId, ?int $year, ?int $month): array
     {
-        $where = new \Validation\QueryConditions(["catid IN (" . self::CATEGORY_IDS . ")"]);
-        $where->addIfNotNull('catid = ?', 'i', $categoryId);
+        $types = '';
+        $params = [];
+
+        $catidClause = '';
+        if ($categoryId !== null) {
+            $catidClause = ' AND catid = ?';
+            $types .= 'i';
+            $params[] = $categoryId;
+        }
+
+        $timeClause = '';
 
         // Use sargable date range instead of YEAR()/MONTH() to allow index usage
         if ($year !== null && $month !== null) {
@@ -54,21 +64,26 @@ class TransactionHistoryRepository extends \Database\BaseMysqliRepository implem
             } else {
                 $endDate = sprintf('%04d-%02d-01 00:00:00', $year, $month + 1);
             }
-            $where->add('time >= ?', 's', $startDate);
-            $where->add('time < ?', 's', $endDate);
+            $timeClause = ' AND time >= ? AND time < ?';
+            $types .= 'ss';
+            $params[] = $startDate;
+            $params[] = $endDate;
         } elseif ($year !== null) {
             $startDate = sprintf('%04d-01-01 00:00:00', $year);
             $endDate = sprintf('%04d-01-01 00:00:00', $year + 1);
-            $where->add('time >= ?', 's', $startDate);
-            $where->add('time < ?', 's', $endDate);
+            $timeClause = ' AND time >= ? AND time < ?';
+            $types .= 'ss';
+            $params[] = $startDate;
+            $params[] = $endDate;
         } elseif ($month !== null) {
-            $where->add('MONTH(time) = ?', 'i', $month);
+            $timeClause = ' AND MONTH(time) = ?';
+            $types .= 'i';
+            $params[] = $month;
         }
 
-        // $where is a QueryConditions builder (bound params); concatenate its clause.
-        $query = "SELECT sid, catid, title, time FROM nuke_stories WHERE " . $where->toWhereClause() . " ORDER BY time DESC, sid DESC LIMIT 500";
+        $query = "SELECT sid, catid, title, time FROM nuke_stories WHERE catid IN (" . self::CATEGORY_IDS . ")" . $catidClause . $timeClause . " ORDER BY time DESC, sid DESC LIMIT 500";
 
         /** @var array<int, array{sid: string, catid: string, title: string, time: string}> */
-        return $this->fetchAll($query, $where->getTypes(), ...$where->getParams());
+        return $this->fetchAll($query, $types, ...$params);
     }
 }

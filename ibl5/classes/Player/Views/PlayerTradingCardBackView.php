@@ -6,7 +6,6 @@ namespace Player\Views;
 
 use Player\Player;
 use Player\Stats\PlayerStats;
-use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Security\HtmlSanitizer;
 
 /**
@@ -22,20 +21,6 @@ use Security\HtmlSanitizer;
 class PlayerTradingCardBackView
 {
     /**
-     * Get scoped custom styles for trading card back with team colors
-     *
-     * @deprecated CSS is now centralized in design/components/player-cards.css.
-     *             Custom properties are set inline on the container element in render().
-     *
-     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
-     * @return string Empty string — styles are in centralized CSS
-     */
-    public static function getStyles(?array $colorScheme = null): string
-    {
-        return '';
-    }
-
-    /**
      * Render the complete trading card back
      * 
      * @param Player $player The player object
@@ -45,7 +30,7 @@ class PlayerTradingCardBackView
      * @param int $threePointContests Number of Three-Point Contests
      * @param int $dunkContests Number of Slam Dunk Competitions
      * @param int $rookieSophChallenges Number of Rookie-Sophomore Challenges
-     * @param TeamIdentityRepositoryInterface|null $teamRepo Optional team lookup for team colors
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Prebuilt team color scheme (null = default gold scheme)
      * @return string HTML for trading card back
      */
     public static function render(
@@ -56,10 +41,10 @@ class PlayerTradingCardBackView
         int $threePointContests = 0,
         int $dunkContests = 0,
         int $rookieSophChallenges = 0,
-        ?TeamIdentityRepositoryInterface $teamRepo = null
+        ?array $colorScheme = null
     ): string {
         // Get color scheme and prepare player data using shared helpers
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($teamRepo, $player->getTeamid() ?? 0);
+        $colorScheme ??= TeamColorHelper::getDefaultColorScheme();
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
 
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);

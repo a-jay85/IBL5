@@ -5,7 +5,7 @@
 #
 # Usage: source "$(dirname "$0")/lib/pr-armable.sh"
 #
-# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>):
+# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>; 18: pr_merge_danger_hold <body>):
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
@@ -13,10 +13,13 @@
 #   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json> [head_ref]
 #   (11) unresolved review thread  -> pr_unresolved_findings_hold <pr_number>
 #   (15) already-red CI checks     -> pr_red_check_hold <pr_number>
+#   (7, docs-only-ready) docs-refresh  -> pr_docs_refresh_hold <head_ref> <files_json> <md_state> <verdict>
 #        demoted to a warning when  -> pr_aggregator_required  (reads master protection)
 #
 # Conditions (2) review>=80, (3) MISSING-tests, (4) Phase-5 local verify, (7)
-# non-UI auto_merge:false, (9) realized-diff verdict are deliberately NOT here:
+# frontmatter read (the clause evaluation behind `auto_merge: docs-only-ready`
+# lives here as pr_docs_refresh_hold), (9) realized-diff verdict are
+# deliberately NOT here:
 # they are knowable only from a post-plan run's local state (/tmp, the local plan
 # file, the realized diff) and cannot be evaluated for an arbitrary PR. Callers
 # fail CLOSED on them — a PR is only ARMABLE with a POSITIVE clearance signal
@@ -87,11 +90,11 @@ pr_manual_testing_clearance() {
     # "- [x] bin/test-check-pr-manual-testing — 19/19 PASS"). Holding on those would block correct
     # PRs. bin/check-pr-manual-testing's shape regex conflates the two on
     # purpose (both shapes are well-formed); this clearance axis must not.
-    if printf '%s\n' "$content" | grep -qE '^[[:space:]]*- \[ \]'; then
+    if grep -qE '^[[:space:]]*- \[ \]' <<< "$content"; then
         echo "HELD"
         return
     fi
-    if ! printf '%s\n' "$content" | grep -qiE '^[[:space:]]*No manual testing needed'; then
+    if ! grep -qiE '^[[:space:]]*No manual testing needed' <<< "$content"; then
         echo "HELD"
         return
     fi
@@ -108,21 +111,18 @@ pr_manual_testing_clearance() {
     # Keyword → required changed-file pattern table (case-insensitive, \b word boundary).
     # AND semantics: each named type must have a matching file; any absent type holds.
     local held=0
-    if printf '%s' "$tail" | grep -qiE '\b(e2e|playwright)\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/e2e/.*\.spec\.ts$'; then
+    if grep -qiE '\b(e2e|playwright)\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/e2e/.*\.spec\.ts$' <<< "$changed_files"; then
             held=1
         fi
     fi
-    if printf '%s' "$tail" | grep -qiE '\b(unit|phpunit)\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/.*Test\.php$'; then
+    if grep -qiE '\b(unit|phpunit)\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/.*Test\.php$' <<< "$changed_files"; then
             held=1
         fi
     fi
-    if printf '%s' "$tail" | grep -qiE '\bintegration\b'; then
-        if ! printf '%s\n' "$changed_files" \
-                | grep -qE '^ibl5/tests/DatabaseIntegration/'; then
+    if grep -qiE '\bintegration\b' <<< "$tail"; then
+        if ! grep -qE '^ibl5/tests/DatabaseIntegration/' <<< "$changed_files"; then
             held=1
         fi
     fi
@@ -156,7 +156,7 @@ pr_golden_hold() {
 #   Pass the `.labels` array, e.g. `gh pr view N --json labels --jq '.labels'`.
 pr_feat_hold() {
     local title="$1" labels_json="$2"
-    if printf '%s' "$title" | grep -qiE '^feat(\([^)]*\))?!?:'; then
+    if grep -qiE '^feat(\([^)]*\))?!?:' <<< "$title"; then
         if printf '%s' "$labels_json" \
             | jq -e 'any(.[]?; .name == "human-approved")' >/dev/null 2>&1; then
             return  # label flips it — not held
@@ -193,6 +193,81 @@ EOF
         HELD|UNKNOWN) echo "gate-backtest:$state" ;;
         *) echo "gate-backtest:UNKNOWN" ;;
     esac
+}
+
+# pr_merge_danger_hold <body>
+#   Phase 6.5 condition (18). Mirrors harness/merge_danger.py classify_body.
+#   Prints nothing for exactly one well-formed line with Door two-way; otherwise prints
+#   merge-danger:ONE-WAY | merge-danger:MISSING | merge-danger:MALFORMED (fail-closed).
+pr_merge_danger_hold() {
+    local body="$1" n well
+    n=$(printf '%s\n' "$body" | grep -cE '^\*\*Merge danger:\*\*' || true)
+    [ "$n" = 0 ] && { echo "merge-danger:MISSING"; return 0; }
+    [ "$n" != 1 ] && { echo "merge-danger:MALFORMED"; return 0; }
+    well=$(printf '%s\n' "$body" | grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external) · Why: .{20,}$' || true)
+    [ -z "$well" ] && { echo "merge-danger:MALFORMED"; return 0; }
+    case "$well" in *'Door: one-way'*) echo "merge-danger:ONE-WAY" ;; esac
+}
+
+# pr_docs_refresh_path_ok <repo-relative path>
+#   True (rc 0) when the path is a documentation file the stale-docs refresh
+#   pipeline may auto-merge: a `.md` file under ibl5/docs/, a class README at
+#   ibl5/classes/*/README.md, or the root README.md. Everything else (any
+#   .claude/ path, bin/, .github/, tests, code, config, a non-.md file under
+#   ibl5/docs/) is rc 1. Default-deny: a path has to match the allowlist to pass.
+#   Mirrors harness/armable.py docs_refresh_path_ok; the parity test pins both.
+pr_docs_refresh_path_ok() {
+    case "$1" in
+        *.md) ;;
+        *) return 1 ;;
+    esac
+    case "$1" in
+        ibl5/docs/*)              return 0 ;;
+        ibl5/classes/*/README.md) return 0 ;;
+        README.md)                return 0 ;;
+        *)                        return 1 ;;
+    esac
+}
+
+# pr_docs_refresh_hold <head_ref> <files_json> <merge_danger_state> <verdict_word>
+#   Phase 6.5 condition (7) when the plan's frontmatter reads
+#   `auto_merge: docs-only-ready`. Mirrors harness/armable.py docs_refresh_holds.
+#   Prints nothing when every clause passes. Otherwise prints one line per
+#   FAILED clause, in this fixed order (fail-closed; the caller holds on any line):
+#     docs-refresh:branch:<head_ref>       head ref lacks the docs-stale-refresh- prefix
+#     docs-refresh:paths:empty             the PR changed no files at all
+#     docs-refresh:paths:<path>            first changed path pr_docs_refresh_path_ok rejects
+#     docs-refresh:merge-danger:<STATE>    state is anything other than TWO-WAY
+#     docs-refresh:verdict:<word>          selected verdict is anything other than READY
+#   <files_json> is the `.files` array (same shape pr_golden_hold reads).
+#   <merge_danger_state> is TWO-WAY, or the suffix of pr_merge_danger_hold's
+#   output (ONE-WAY | MISSING | MALFORMED); an empty argument reads as MISSING.
+#   <verdict_word> is the SELECTED Phase 5.5 verdict (run-local state the caller
+#   supplies); READY WITH NOTES does not qualify, by decision. Empty reads as <none>.
+pr_docs_refresh_hold() {
+    local head_ref="$1" files_json="$2" md_state="$3" verdict="$4" paths p bad=""
+    case "$head_ref" in
+        docs-stale-refresh-*) ;;
+        *) echo "docs-refresh:branch:${head_ref:-<empty>}" ;;
+    esac
+    # `|| true`: jq exits non-zero on malformed JSON; an empty path list holds below.
+    paths=$(printf '%s' "$files_json" | jq -r '.[]?.path // empty' 2>/dev/null || true)
+    if [ -z "$paths" ]; then
+        echo "docs-refresh:paths:empty"
+    else
+        while IFS= read -r p; do
+            [ -z "$p" ] && continue
+            if ! pr_docs_refresh_path_ok "$p"; then bad="$p"; break; fi
+        done <<< "$paths"
+        [ -n "$bad" ] && echo "docs-refresh:paths:$bad"
+    fi
+    [ "$md_state" != "TWO-WAY" ] && echo "docs-refresh:merge-danger:${md_state:-MISSING}"
+    verdict=$(printf '%s' "$verdict" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+    [ "$verdict" != "READY" ] && echo "docs-refresh:verdict:${verdict:-<none>}"
+    # REQUIRED for the same reason pr_dep_holds documents: the `[ ... ] && echo`
+    # above is the last command, so a passing verdict leaves rc 1 and a
+    # `set -euo pipefail` caller would abort on the qualifying PR.
+    return 0
 }
 
 # pr_dep_holds <body>
@@ -251,7 +326,7 @@ pr_pipeline_authored_hold() {
         | jq -e 'any(.[]?; .name == "pipeline-authored")' >/dev/null 2>&1; then
         echo "pipeline-authored"
     fi
-    if [ -n "$head_ref" ] && printf '%s' "$head_ref" | grep -qE '^bug-[0-9]+(-|$)'; then
+    if [ -n "$head_ref" ] && grep -qE '^bug-[0-9]+(-|$)' <<< "$head_ref"; then
         echo "pipeline-branch"
     fi
 }

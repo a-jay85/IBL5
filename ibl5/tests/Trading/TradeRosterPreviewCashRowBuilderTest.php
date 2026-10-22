@@ -302,6 +302,108 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
+    // buildCashRows() — characterization pins (refactor safety)
+    // -------------------------------------------------------------------------
+
+    public function testBuildCashRowsViewingPartnerTeamPinsAmountsAndNegation(): void
+    {
+        $_GET = [
+            'userTeam' => 'Miami',
+            'partnerTeam' => 'Boston',
+            'userTeamId' => '1',
+            'cashStartYear' => '1',
+            'cashEndYear' => '1',
+            'userCash1' => '500',
+            'partnerCash1' => '300',
+        ];
+
+        // viewingTeamId=2 !== userTeamId=1 → viewing partner's team
+        $rows = $this->sut->buildCashRows(2, self::MAX_YEAR);
+
+        $this->assertCount(2, $rows);
+        // Partner's own cash leaves the partner: positive amount, partner's team id
+        $this->assertSame(300, $rows[0]['salary_yr1']);
+        $this->assertSame(2, $rows[0]['teamid']);
+        $this->assertSame(1, $rows[0]['cyt']);
+        // User's cash arrives at the partner: negated amount, partner's team id
+        $this->assertSame(-500, $rows[1]['salary_yr1']);
+        $this->assertSame(2, $rows[1]['teamid']);
+        $this->assertSame(1, $rows[1]['cyt']);
+    }
+
+    public function testBuildCashRowsViewingPartnerTeamEscapesXssInUserTeamName(): void
+    {
+        $_GET = [
+            'userTeam' => '<script>alert(1)</script>',
+            'partnerTeam' => 'Boston',
+            'userTeamId' => '1',
+            'cashStartYear' => '1',
+            'cashEndYear' => '1',
+            'userCash1' => '500',
+            'partnerCash1' => '300',
+        ];
+
+        $rows = $this->sut->buildCashRows(2, self::MAX_YEAR);
+
+        $this->assertCount(2, $rows);
+        // Exact strings: the label is escape-then-concatenate, never the raw name
+        $this->assertSame('| Cash to &lt;script&gt;alert(1)&lt;/script&gt;', $rows[0]['name']);
+        $this->assertSame('| Cash from &lt;script&gt;alert(1)&lt;/script&gt;', $rows[1]['name']);
+    }
+
+    public function testBuildCashRowsViewingOwnTeamWithBothCashPinsTeamIdsAndAmounts(): void
+    {
+        $_GET = [
+            'userTeam' => 'Miami',
+            'partnerTeam' => 'Boston',
+            'userTeamId' => '1',
+            'cashStartYear' => '1',
+            'cashEndYear' => '1',
+            'userCash1' => '500',
+            // Amount 1 is the smallest value that still counts as cash (> 0 boundary)
+            'partnerCash1' => '1',
+        ];
+
+        // viewingTeamId=1 === userTeamId=1 → own team; partnerTeamId stays 0 and is unused
+        $rows = $this->sut->buildCashRows(1, self::MAX_YEAR);
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('| Cash to Boston', $rows[0]['name']);
+        $this->assertSame(1, $rows[0]['teamid']);
+        $this->assertSame(500, $rows[0]['salary_yr1']);
+        $this->assertSame('| Cash from Boston', $rows[1]['name']);
+        $this->assertSame(1, $rows[1]['teamid']);
+        $this->assertSame(-1, $rows[1]['salary_yr1']);
+    }
+
+    public function testBuildCashRowsWithCashOnlyInLastYearOfMultiYearRange(): void
+    {
+        $_GET = [
+            'userTeam' => 'Miami',
+            'partnerTeam' => 'Boston',
+            'userTeamId' => '1',
+            'cashStartYear' => '2',
+            'cashEndYear' => '4',
+            'userCash2' => '0',
+            'userCash3' => '0',
+            // Only the last year of the range carries cash, and only the smallest amount
+            'userCash4' => '1',
+            // partnerCash2..4 absent → 0, so no partner-cash row
+        ];
+
+        $rows = $this->sut->buildCashRows(1, self::MAX_YEAR);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('| Cash to Boston', $rows[0]['name']);
+        // Start year 2 maps year 4 to cyIndex 3 (salary_yr3), so yr1/yr2 stay 0
+        $this->assertSame(0, $rows[0]['salary_yr1']);
+        $this->assertSame(0, $rows[0]['salary_yr2']);
+        $this->assertSame(1, $rows[0]['salary_yr3']);
+        $this->assertSame(0, $rows[0]['salary_yr4']);
+        $this->assertSame(3, $rows[0]['cyt']);
+    }
+
+    // -------------------------------------------------------------------------
     // buildCashRows() — XSS escaping
     // -------------------------------------------------------------------------
 

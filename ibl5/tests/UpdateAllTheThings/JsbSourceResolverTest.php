@@ -271,7 +271,7 @@ class JsbSourceResolverTest extends TestCase
         $provenance = $resolver->describeLastSource();
 
         $this->assertNotNull($provenance);
-        $this->assertNotEmpty($provenance->selectionWarnings);
+        $this->assertNotSame([], $provenance->selectionWarnings);
         $this->assertStringContainsString('ARCHIVE SELECTION LOOKS STALE', $provenance->selectionWarnings[0]);
     }
 

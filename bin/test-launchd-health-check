@@ -6,21 +6,20 @@
 #
 # Run: bin/test-launchd-health-check  (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BASE_PATH="$PATH"
 BASE_HOME="$HOME"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 # shellcheck source=bin/lib/launchd-expected-jobs.sh
 . "$SCRIPT_DIR/lib/launchd-expected-jobs.sh"
 
-FAILED=0
-PASS_COUNT=0
-
-ok() { echo "PASS $1"; PASS_COUNT=$((PASS_COUNT+1)); }
-fail() { echo "FAIL $1: $2"; FAILED=$((FAILED+1)); }
+ok() { h_pass "$1"; }
+fail() { h_fail "$1" "$2"; }
 
 # --- setup_case <case_dir> -----------------------------------------------------
 # Creates the case dir, all stubs, exports all env seams, and aborts (exit 3)
@@ -325,6 +324,27 @@ if [ "$RC" -eq 0 ] && [ ! -f "$CASE/db-ran" ]; then
     ok T10
 else
     fail T10 "rc=$RC db-ran=$([ -f "$CASE/db-ran" ] && echo present || echo absent) out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
+# T10b: real LEJ_EXPECTED_JOBS expects com.ibl5.sim-recap-poll (standard).
+#       Absent from `launchctl list` → FAIL: missing; present → no FAIL names it.
+# ---------------------------------------------------------------------------
+healthy_fixture T10b-absent
+grep -v 'com.ibl5.sim-recap-poll' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
+run_checker
+if [ "$RC" -ne 0 ] && grep -q 'FAIL: missing:com.ibl5.sim-recap-poll' <<< "$OUT"; then
+    ok T10b-absent
+else
+    fail T10b-absent "rc=$RC out=$(printf '%s' "$OUT")"
+fi
+healthy_fixture T10b-present
+run_checker
+if [ "$RC" -eq 0 ] && ! grep -q 'sim-recap-poll' <<< "$(grep '^FAIL: ' <<< "$OUT")"; then
+    ok T10b-present
+else
+    fail T10b-present "rc=$RC out=$(printf '%s' "$OUT")"
 fi
 
 # ---------------------------------------------------------------------------
@@ -848,5 +868,4 @@ fi
 
 # ---------------------------------------------------------------------------
 echo ""
-echo "Results: $PASS_COUNT passed, $FAILED failed"
-[ "$FAILED" -eq 0 ]
+h_done

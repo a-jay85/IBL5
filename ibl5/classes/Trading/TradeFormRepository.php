@@ -44,7 +44,7 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
             "SELECT pos, name, pid, ordinal, cy, salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6
              FROM `ibl_plr`
              WHERE teamid = ? AND retired = 0
-             ORDER BY ordinal ASC",
+             ORDER BY ordinal ASC, pid ASC",
             "i",
             $teamId
         );
@@ -57,10 +57,11 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
     {
         /** @var list<TradingDraftPickRow> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (dp.pickid is the ibl_draft_picks primary key; not on the rule allowlist)
             "SELECT dp.*, dp.teampick_teamid AS teampick_id
              FROM `ibl_draft_picks` dp
              WHERE dp.owner_teamid = ?
-             ORDER BY dp.year, dp.round ASC",
+             ORDER BY dp.year, dp.round ASC, dp.pickid ASC",
             "i",
             $teamId
         );

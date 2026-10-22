@@ -7,24 +7,17 @@
 # Does NOT require launchctl, does NOT write to ~/Library/LaunchAgents.
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETUP_BIN="$SCRIPT_DIR/launchd-health-cron-setup"
 
-PASSED=0
-FAILED=0
+lht_ok()   { h_pass "$1"; }
+lht_fail() { h_fail "$@"; }
+lht_expect_eq() { h_eq "$1" "$2" "$3"; }
 
-lht_ok()   { echo "ok: $1";   PASSED=$(( PASSED + 1 )); }
-lht_fail() { echo "FAIL: $1"; FAILED=$(( FAILED + 1 )); }
-lht_expect_eq() {
-    if [ "$2" = "$3" ]; then lht_ok "$1"
-    else lht_fail "$1 — want [$2] got [$3]"
-    fi
-}
-
-STUB="$(mktemp -d)"
-_cleanup() { rm -rf "$STUB"; }
-trap '_cleanup' EXIT
+h_tmp STUB
 
 # Create launchctl stub that logs args and exits 0.
 mkdir -p "$STUB/sbin"
@@ -442,5 +435,4 @@ else
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
-echo "Results: $PASSED passed, $FAILED failed"
-[ "$FAILED" -eq 0 ]
+h_done

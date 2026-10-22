@@ -101,37 +101,6 @@ class LeagueTest extends TestCase
     }
 
     // ============================================
-    // FORMAT TIDS FOR SQL QUERY TESTS
-    // ============================================
-
-    public function testFormatTidsForSqlQueryFormatsCorrectly(): void
-    {
-        $league = new League($this->mockDb);
-        
-        $result = $league->formatTidsForSqlQuery([1, 2, 3]);
-        
-        $this->assertSame("1','2','3", $result);
-    }
-
-    public function testFormatTidsForSqlQueryHandlesSingleTeam(): void
-    {
-        $league = new League($this->mockDb);
-        
-        $result = $league->formatTidsForSqlQuery([5]);
-        
-        $this->assertSame('5', $result);
-    }
-
-    public function testFormatTidsForSqlQueryHandlesEmptyArray(): void
-    {
-        $league = new League($this->mockDb);
-        
-        $result = $league->formatTidsForSqlQuery([]);
-        
-        $this->assertSame('', $result);
-    }
-
-    // ============================================
     // ALL-STAR CONFERENCE SPLIT CHARACTERIZATION TESTS
     // ============================================
 
@@ -174,6 +143,24 @@ class LeagueTest extends TestCase
             $foundWestTid,
             'SQL must embed teamids from WESTERN_CONFERENCE_TEAMIDS directly in the WHERE clause'
         );
+    }
+
+    public function testGetAllStarCandidatesResultBindsEasternTeamIdsForEastCategory(): void
+    {
+        $league = new League($this->mockDb);
+
+        $league->getAllStarCandidatesResult('EC-CF');
+
+        $this->assertSame(League::EASTERN_CONFERENCE_TEAMIDS, $this->mockDb->getLastBoundParams());
+    }
+
+    public function testGetAllStarCandidatesResultBindsWesternTeamIdsForWestCategory(): void
+    {
+        $league = new League($this->mockDb);
+
+        $league->getAllStarCandidatesResult('WC-CB');
+
+        $this->assertSame(League::WESTERN_CONFERENCE_TEAMIDS, $this->mockDb->getLastBoundParams());
     }
 
     public function testGetAllStarCandidatesResultEastUsesEasternConferenceTeamids(): void

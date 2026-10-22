@@ -103,7 +103,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     /**
@@ -123,7 +123,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert - Allowed when rosterSlots <= 2 (logic: 2 > 2 is false, so rule doesn't apply)
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     // ========== DROP TO WAIVERS FAILURE SCENARIOS ==========
@@ -255,7 +255,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     /**
@@ -276,7 +276,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert - Allowed because player salary is vet min
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     // ========== ADD FROM WAIVERS FAILURE SCENARIOS ==========
@@ -515,7 +515,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
 
         // Assert - Should be empty (player cleared waivers)
-        $this->assertEmpty($result);
+        $this->assertSame('', $result);
     }
 
     /**
@@ -533,7 +533,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
 
         // Assert - Should be empty (player just cleared)
-        $this->assertEmpty($result);
+        $this->assertSame('', $result);
     }
 
     /**
@@ -599,14 +599,14 @@ class WaiversWideUnitTest extends WideUnitTestCase
     {
         // Each call returns an independent result — no shared state
         $failedResult = $this->validator->validateAdd(null, 5, 5000, 500);
-        $this->assertNotEmpty($failedResult->getErrors());
+        $this->assertNotSame([], $failedResult->getErrors());
 
         // Act - Second validation passes — completely independent result
         $result = $this->validator->validateAdd(100, 5, 5000, 500);
 
         // Assert - Independent result carries no errors from the prior call
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     /**
@@ -618,11 +618,11 @@ class WaiversWideUnitTest extends WideUnitTestCase
     {
         // Each call returns an independent immutable result — no accumulated state
         $failedResult = $this->validator->validateDrop(3, 8000);
-        $this->assertNotEmpty($failedResult->getErrors());
+        $this->assertNotSame([], $failedResult->getErrors());
 
         // A subsequent success returns a fresh result with no errors
         $successResult = $this->validator->validateDrop(2, 8000);
-        $this->assertEmpty($successResult->getErrors());
+        $this->assertSame([], $successResult->getErrors());
     }
 
     // ========== ADDITIONAL COVERAGE TESTS ==========
@@ -716,7 +716,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertFalse($result->isValid());
         $errors = $result->getErrors();
-        $this->assertNotEmpty($errors);
+        $this->assertNotSame([], $errors);
         $this->assertStringContainsString('full roster', $errors[0]);
     }
 
@@ -733,7 +733,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertFalse($result->isValid());
         $errors = $result->getErrors();
-        $this->assertNotEmpty($errors);
+        $this->assertNotSame([], $errors);
         $this->assertStringContainsString('hard cap', $errors[0]);
     }
 
@@ -749,7 +749,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertTrue($result->isValid());
-        $this->assertEmpty($result->getErrors());
+        $this->assertSame([], $result->getErrors());
     }
 
     // ========== HELPER METHODS ==========

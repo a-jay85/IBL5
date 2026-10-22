@@ -45,7 +45,7 @@ class WaiversEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testDisplayParameterSelectsRequestedTab(): void
@@ -114,8 +114,24 @@ class WaiversEntryPointTest extends ModuleEntryPointTestCase
 
         $second = $this->runModule('Waivers', ['display' => 'total_s'], [], ['user' => $GLOBALS['user']]);
 
-        $this->assertNotEmpty($first);
-        $this->assertNotEmpty($second);
+        $this->assertNotSame('', $first);
+        $this->assertNotSame('', $second);
         $this->assertNotSame($first, $second, 'display parameter must reach rendered output through the injected request');
+    }
+
+    public function testAuthenticatedGmDecodesCookieIntoGlobal(): void
+    {
+        $this->authenticateAs('testgm');
+        $this->seedSeasonMocks();
+        $this->mockDb->onQuery('auth_users', [
+            ['user_id' => 1, 'username' => 'testgm', 'user_email' => 'test@test.com'],
+        ]);
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+        unset($GLOBALS['cookie']);
+
+        $this->runModule('Waivers', [], [], ['user' => $GLOBALS['user']]);
+
+        $this->assertSame(['testgm', 'testgm', ''], $GLOBALS['cookie']);
     }
 }

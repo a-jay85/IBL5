@@ -98,7 +98,7 @@ jobs:
           {
             echo "### Cleanup dry-run ($(wc -l < "$RUNNER_TEMP/vr-keep.txt" | tr -d ' ') linked SHA(s) on the keep-list)"
             echo '```'
-            (cd gh-pages && ../bin/prune-vr-galleries --dry-run --cutoff-days 7 --max-dirs 300 --keep-file "$RUNNER_TEMP/vr-keep.txt")
+            (cd gh-pages && ../bin/prune-vr-galleries --dry-run --cutoff-days 7 --max-dirs 150 --keep-file "$RUNNER_TEMP/vr-keep.txt")
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -118,7 +118,7 @@ jobs:
       contents: write
       pull-requests: write
       actions: write
-      packages: read
+      packages: write
     uses: ./.github/workflows/e2e-tests.yml
     # actionlint checks these keys against the workflow_call inputs: a key such as
     # refresh_sha: (not an input) fails the lint.

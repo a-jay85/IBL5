@@ -43,7 +43,7 @@ class SeasonRosterChangesRepository extends \Database\BaseMysqliRepository imple
             LEFT JOIN `ibl_team_info` new_info ON b.teamid = new_info.teamid
             WHERE a.year = ?
             AND a.teamid != b.teamid
-            ORDER BY new_info.team_name",
+            ORDER BY new_info.team_name, a.pid ASC",
             'i',
             $previousSeasonYear
         );

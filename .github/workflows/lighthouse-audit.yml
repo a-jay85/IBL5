@@ -14,8 +14,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  mirror-ready:
+    name: Mirror CI images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/mirror-ci-images.yml
+    with:
+      only-missing: true
+
   audit:
     name: Full-Site Lighthouse Audit
+    needs: [mirror-ready]
+    permissions:
+      contents: read
+      issues: write
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -109,13 +123,34 @@ jobs:
             .lighthouseci/manifest.json > .lighthouseci/manifest-filtered.json
 
       - name: Generate report
+        env:
+          USE_BASELINE: ${{ steps.freshness.outputs.use_baseline }}
+          BASELINE_ARTIFACTS: ${{ steps.dl-baseline.outputs.artifacts }}
+          RUN_SHA: ${{ github.sha }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        # Footer commit = the commit whose pages were audited. On the baseline
+        # path that is the baseline run's head_sha (from the download action's
+        # artifact metadata), not this run's github.sha.
         run: |
-          bin/lighthouse-audit-report \
-            --manifest=ibl5/.lighthouseci/manifest-filtered.json \
-            --sha=${{ github.sha }} \
-            --workflow-url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} \
-            --out-title=/tmp/issue-title.txt \
+          args=(
+            --manifest=ibl5/.lighthouseci/manifest-filtered.json
+            --out-title=/tmp/issue-title.txt
             --out-body=/tmp/issue-body.md
+          )
+          if [ -n "${WORKFLOW_URL:-}" ]; then
+            args+=(--workflow-url="$WORKFLOW_URL")
+          fi
+          if [ "${USE_BASELINE:-}" = "true" ]; then
+            if [ -n "${BASELINE_ARTIFACTS:-}" ]; then
+              printf '%s' "$BASELINE_ARTIFACTS" > /tmp/baseline-artifacts.json
+              args+=(--baseline-artifacts=/tmp/baseline-artifacts.json)
+            else
+              echo "::warning::Baseline download reported no artifact metadata; the report omits the commit"
+            fi
+          elif [ -n "${RUN_SHA:-}" ]; then
+            args+=(--sha="$RUN_SHA")
+          fi
+          bin/lighthouse-audit-report "${args[@]}"
 
       - name: Ensure lighthouse-audit label exists
         run: gh label create lighthouse-audit --color 0075ca --force 2>/dev/null || true

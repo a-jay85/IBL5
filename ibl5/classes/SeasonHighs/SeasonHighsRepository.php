@@ -29,76 +29,6 @@ class SeasonHighsRepository extends \Database\BaseMysqliRepository implements Se
     }
 
     /**
-     * @see SeasonHighsRepositoryInterface::getSeasonHighs()
-     *
-     * @return list<SeasonHighEntry>
-     */
-    public function getSeasonHighs(
-        string $statExpression,
-        string $statName,
-        string $tableSuffix,
-        string $startDate,
-        string $endDate,
-        int $limit = 15,
-        ?string $locationFilter = null
-    ): array {
-        $this->assertSafeStatExpression($statExpression);
-        $safeStatName = $this->sanitizeStatName($statName);
-
-        // Build optional location filter (home/away) — column-to-column comparison, no extra bind params
-        $locationCondition = match ($locationFilter) {
-            'home' => ' AND bs.teamid = bs.home_teamid',
-            'away' => ' AND bs.teamid = bs.visitor_teamid',
-            default => '',
-        };
-
-        // For player stats (no suffix), JOIN with ibl_plr to get full names
-        // The ibl_box_scores.name field truncates longer names (see Boxscore::MAX_PLAYER_NAME_LENGTH)
-        // The ibl_plr.name field is varchar(32) which stores full names
-        // Also JOIN with ibl_schedule to get box_id for linking to box scores
-        // Also JOIN with ibl_team_info to get team colors for styled team cell
-        if ($tableSuffix === '') {
-            $query = "SELECT p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
-                t.`team_city`, t.`color1`, t.`color2`,
-                bs.`game_date` AS `date`, sch.`box_id`,
-                COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
-                " . $statExpression . " AS `" . $safeStatName . "`
-                FROM `ibl_box_scores` bs
-                JOIN `ibl_plr` p ON bs.pid = p.pid
-                " . $this->playerTeamLeftJoin() . "
-                LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                WHERE bs.`game_date` BETWEEN ? AND ?" . $locationCondition . "
-                ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC, bs.`id` ASC
-                LIMIT " . $limit;
-        } else {
-            // For team stats, JOIN with ibl_team_info to get team ID and colors for linking
-            // Also JOIN with ibl_schedule to get box_id for linking to box scores
-            // bs IS ibl_box_scores_teams, so game_of_that_day is directly available
-            $query = "SELECT t.`teamid`, t.`team_city`, t.`color1`, t.`color2`,
-                bs.`name`, bs.`game_date` AS `date`, sch.`box_id`,
-                COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
-                " . $statExpression . " AS `" . $safeStatName . "`
-                FROM `ibl_box_scores_teams` bs
-                JOIN `ibl_team_info` t ON bs.name = t.team_name
-                LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                WHERE bs.`game_date` BETWEEN ? AND ?
-                ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC, bs.`id` ASC
-                LIMIT " . $limit;
-        }
-
-        $results = $this->fetchAll($query, "ss", $startDate, $endDate);
-
-        /** @var list<SeasonHighEntry> $normalized */
-        $normalized = [];
-        foreach ($results as $row) {
-            /** @var array<string, int|float|string|null> $row */
-            $normalized[] = $this->normalizeRow($row, $safeStatName);
-        }
-
-        return $normalized;
-    }
-
-    /**
      * @see SeasonHighsRepositoryInterface::getSeasonHighsBatch()
      *
      * @param array<string, string> $stats
@@ -246,24 +176,6 @@ class SeasonHighsRepository extends \Database\BaseMysqliRepository implements Se
     private const STAT_EXPRESSION_PATTERN = '/^(?:`[A-Za-z0-9_]+`|\d+|[()+*\s])+$/';
 
     /**
-     * Strip the stat name down to the characters legal in a column alias.
-     *
-     * Throws instead of falling back to the raw input: every production caller
-     * passes a SeasonHighsService class-constant key, so an empty result means
-     * a caller bug, not a value worth concatenating into SQL.
-     */
-    private function sanitizeStatName(string $statName): string
-    {
-        $safeStatName = preg_replace('/[^a-zA-Z0-9_]/', '', $statName);
-        if ($safeStatName === null || $safeStatName === '') {
-            throw new \InvalidArgumentException(
-                'Stat name must contain at least one of [a-zA-Z0-9_]: ' . $statName
-            );
-        }
-        return $safeStatName;
-    }
-
-    /**
      * Fail closed on any stat expression outside the allowlist.
      *
      * The expression is a SQL fragment a prepared statement cannot parameterize,
@@ -290,7 +202,7 @@ class SeasonHighsRepository extends \Database\BaseMysqliRepository implements Se
             "SELECT stat_category, ranking, player_name, player_position, stat_value, record_season_year
              FROM `ibl_rcb_season_records`
              WHERE season_year = ? AND scope = 'league' AND context = ?
-             ORDER BY stat_category, ranking",
+             ORDER BY stat_category, ranking, id ASC",
             'is',
             $seasonYear,
             $context

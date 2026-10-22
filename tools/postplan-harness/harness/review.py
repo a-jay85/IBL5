@@ -3,7 +3,7 @@
 Launch gates are the deterministic Phase-3 flags (identical to
 _phase-4-review-audit.md 4B/4C). Each retained call is toolless and receives a
 bounded packet: PR metadata + file list + the filtered diff (already <100KB).
-Scoring (4D) is one bounded Haiku call against the shared rubric scale;
+Scoring (4D) is VERIFIER_COUNT tool-enabled Sonnet verifiers voting per finding (drop needs every valid vote to be not-real);
 thresholds and posting are deterministic.
 
 Prompt text is condensed from .claude/review-shared/_review-agents.md,
@@ -13,14 +13,40 @@ originals; agents here cannot read repo files, so the checklists are inlined).
 from __future__ import annotations
 
 import concurrent.futures
+import json
+import os
 import re
 
 from .state import Classification, Finding, HarnessError, PlanInfo
 from . import schemas
+from .adapters.llm import extract_json
 from .classify import slice_spec_diffs
+from .review_depth import DEEP, STANDARD, max_depth
 
 CODE_THRESHOLD = 80      # drop findings scored below (rubric Thresholds table)
 SEC_THRESHOLD = 75
+
+VERIFIER_COUNT = 3                     # odd, smallest N > 1 that makes "all reject" meaningful
+# The "verify-findings", "sonnet" literal pair is pinned by reviewcache.MODEL_PINS.
+# call_tooled's allowlist is {"opus","sonnet"}; Haiku cannot read code here.
+_VERIFIER_PURPOSE_STEM, VERIFIER_MODEL = "verify-findings", "sonnet"
+VERIFIER_PURPOSES = tuple(f"{_VERIFIER_PURPOSE_STEM}-{i}" for i in range(1, VERIFIER_COUNT + 1))
+VERIFIER_ALLOWED_TOOLS = ("Read", "Grep", "Glob")
+VERIFIER_DENIED_TOOLS = ("Bash", "Write", "Edit", "NotebookEdit", "Agent")
+VERIFIER_MAX_TURNS = 25
+VERIFIER_TIMEOUT = 900                 # seconds per call; a few file reads, never a repo crawl
+VERIFIER_MAX_BUDGET_USD = 2.0
+VERIFIER_PACKET_BUDGET = 90_000        # bytes; headroom under adapters.llm.MAX_PROMPT_BYTES (120_000)
+VERIFIER_HUNK_CAP = 20_000             # bytes of diff hunk inlined per cited file
+VERIFIER_TERMINAL_KINDS = frozenset({"llm-fixture-missing", "llm-model-not-allowed",
+                                     "llm-tooled-no-tools"})   # programming/test errors stay loud
+
+VERIFIER_FALSE_POSITIVES = (
+    "Reject (not-real) when the finding is one of the IBL5 false positives: BaseMysqliRepository "
+    "variables (already parameterized); test files; echo in CLI scripts; hardcoded sql_query "
+    "strings; ApiKeyAuthenticator handlers (CSRF-exempt); GET-only readers; pre-existing issues "
+    "on lines the PR did not modify; intentional changes that are the PR's stated purpose."
+)
 
 AUTOMATIC_ZERO_NOTE = (
     "Assume PHPStan level max + strict-rules + IBL5 custom rules are satisfied "
@@ -91,10 +117,12 @@ def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
     )
 
 
-def agent_b_prompt(meta: dict, cls: Classification, run_history: bool, run_comments: bool) -> str:
+def agent_b_prompt(meta: dict, cls: Classification, run_history: bool, run_comments: bool,
+                   *, any_files: bool = False) -> str:
     parts = []
     if run_history:
-        parts.append("Look for regression risk: for the PHP files with the most "
+        parts.append("Look for regression risk: for the "
+                     + ("" if any_files else "PHP ") + "files with the most "
                      "changed lines, does the change risk re-introducing a bug the "
                      "file's structure suggests was fixed (guard clauses, boundary "
                      "checks, type casts being removed)?")
@@ -178,35 +206,132 @@ def security_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
     )
 
 
-def scoring_prompt(findings: list[Finding]) -> str:
+_VERDICT_CONTRACT = (
+    'Return ONLY a JSON array with one entry per finding number you were given: '
+    '[{"n": 1, "verdict": "real", "reason": "one sentence citing what you read"}]. '
+    '"verdict" is exactly "real" or "not-real". Do NOT add entries for issues you noticed '
+    "yourself; you are verifying, not reviewing. No prose outside the JSON."
+)
+
+
+def _diff_by_path(filtered_diff: str) -> dict[str, str]:
+    """Split a unified diff into per-file blocks keyed by the new-side path, each capped."""
+    blocks: dict[str, list[str]] = {}
+    cur = None
+    for line in filtered_diff.splitlines():
+        m = re.match(r"^diff --git a/(\S+) b/(\S+)", line)
+        if m:
+            cur = m.group(2)
+            blocks[cur] = []
+        if cur is not None:
+            blocks[cur].append(line)
+    out = {}
+    for path, lines in blocks.items():
+        text = "\n".join(lines)
+        if len(text.encode()) > VERIFIER_HUNK_CAP:
+            text = text.encode()[:VERIFIER_HUNK_CAP].decode(errors="ignore") + "\n[TRUNCATED]"
+        out[path] = text
+    return out
+
+
+def verifier_prompt(chunk: list[Finding], hunks: dict[str, str]) -> str:
     numbered = "\n".join(
-        f"{i+1}. [{f.source}/{f.agent}] {f.path}:{f.line} — {f.body}"
-        for i, f in enumerate(findings))
+        f"{i+1}. [{f.source}/{f.agent}] {f.path}:{f.line} — {f.body}" for i, f in enumerate(chunk))
+    paths = []
+    for f in chunk:
+        if f.path not in paths:
+            paths.append(f.path)
+    diff_text = "\n\n".join(f"### {p}\n{hunks.get(p, '(no hunk for this path in the PR diff)')}"
+                            for p in paths)
     return (
-        "Score each review finding 0-100 for confidence it is a real, "
-        "production-impacting issue:\n"
-        "0 = false positive / pre-existing / linter-caught. 25 = suspicious but likely "
-        "mitigated. 50 = pattern present, exploitation needs conditions that may not "
-        "apply; stylistic. 75 = highly confident, verified real. 100 = certain: direct "
-        "user input to SQL/HTML/file/state-change with zero sanitization.\n"
-        "IBL5 false positives (score 0-25): BaseMysqliRepository variables (already "
-        "parameterized); test files; echo in CLI scripts; hardcoded sql_query strings; "
-        "ApiKeyAuthenticator handlers (CSRF-exempt); GET-only readers; pre-existing "
-        "issues on unmodified lines; intentional changes related to the PR's purpose.\n\n"
-        "FINDINGS:\n" + numbered +
-        '\n\nReturn ONLY valid JSON: [{"n": 1, "score": 75}, ...] — one entry per finding.'
+        "OUTPUT CONTRACT (restated at the end):\n" + _VERDICT_CONTRACT + "\n\n"
+        "You are one of several independent verifiers. Other reviewers produced the numbered "
+        "findings below against this PR. For EACH finding, open the cited file at the cited "
+        "line in the working tree (your cwd is the PR checkout), read enough surrounding code "
+        "to judge the claim, compare with the diff hunk, and vote.\n"
+        "Vote not-real ONLY when you verified in the code that the claim is wrong, already "
+        "mitigated, out of the PR's changed lines, or matches a rejection rule below. "
+        "When you cannot open the file, cannot find the line, or cannot decide, vote real: "
+        "the pipeline keeps a finding unless every verifier rejects it.\n\n"
+        "REJECTION RULES:\n" + AUTOMATIC_ZERO_NOTE + "\n" + VERIFIER_FALSE_POSITIVES + "\n\n"
+        "FINDINGS:\n" + numbered + "\n\nDIFF HUNKS FOR THE CITED FILES:\n" + diff_text
+        + "\n\nOUTPUT CONTRACT (as stated at the top):\n" + _VERDICT_CONTRACT
     )
 
 
+def chunk_findings(findings: list[Finding], hunks: dict[str, str],
+                   budget: int = VERIFIER_PACKET_BUDGET) -> list[list[int]]:
+    """Greedy, order-preserving index chunks whose rendered packet stays under `budget` bytes.
+    A single finding whose packet alone exceeds the budget still gets its own chunk (its hunk
+    is already capped by VERIFIER_HUNK_CAP, and the adapter truncates as a last resort)."""
+    chunks: list[list[int]] = []
+    cur: list[int] = []
+    for i in range(len(findings)):
+        trial = cur + [i]
+        size = len(verifier_prompt([findings[j] for j in trial], hunks).encode())
+        if cur and size > budget:
+            chunks.append(cur)
+            cur = [i]
+        else:
+            cur = trial
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+def aggregate_votes(findings: list[Finding], seat_votes: list[dict]) -> list[dict]:
+    """seat_votes[k] = {"votes": {idx: (verdict, reason)}, "errors": {idx: kind}} for seat k.
+    An index absent from a seat's votes is an abstention. Drop ONLY when every seat returned a
+    valid not-real; any abstention keeps. Score: 0 when dropped, else
+    base + round((100 - base) * valid_real / VERIFIER_COUNT), base = the source's threshold."""
+    records = []
+    for idx, f in enumerate(findings):
+        votes, real, not_real = [], 0, 0
+        for seat, sv in enumerate(seat_votes, start=1):
+            v = (sv.get("votes") or {}).get(idx)
+            if v is None:
+                votes.append({"seat": seat, "verdict": "abstain", "reason": "",
+                              "error": (sv.get("errors") or {}).get(idx, "missing-vote")})
+                continue
+            verdict, reason = v
+            votes.append({"seat": seat, "verdict": verdict, "reason": reason})
+            if verdict == "real":
+                real += 1
+            else:
+                not_real += 1
+        kept = not_real < VERIFIER_COUNT
+        base = SEC_THRESHOLD if f.source == "security-audit" else CODE_THRESHOLD
+        score = 0 if not kept else base + round((100 - base) * real / VERIFIER_COUNT)
+        records.append({"n": idx + 1, "source": f.source, "agent": f.agent, "path": f.path,
+                        "line": f.line, "body_head": (f.body or "")[:160], "votes": votes,
+                        "valid_real": real, "valid_not_real": not_real,
+                        "abstain": VERIFIER_COUNT - real - not_real, "kept": kept,
+                        "score": score, "fallback": kept and real == 0})
+    return records
+
+
+def _reused_note(reused: list[Finding]) -> str:
+    if not reused:
+        return ""
+    return (f"\n\n{len(reused)} finding(s) on unchanged files reused from a prior run "
+            "(not re-posted).")
+
+
 class ReviewPhase:
-    def __init__(self, llm, gh):
+    def __init__(self, llm, gh, depth: str = STANDARD, *, log=None, worktree: str | None = None):
         self.llm = llm
         self.gh = gh
+        self.depth = max_depth(depth)      # anything but exactly "standard" is deep
+        self._log = log or (lambda _msg: None)
+        self.worktree = worktree
+        self.last_votes: list[dict] = []     # vote records of the most recent run()
 
     def gates(self, cls: Classification) -> dict:
         b_hist = cls.has_php and cls.lines_php_changed > 50
+        if self.depth == DEEP:
+            b_hist = not cls.non_code_only
         b_comm = (not cls.non_code_only) and cls.has_comments_in_diff
-        return {
+        g = {
             "A": not (cls.non_code_only or cls.engine_only),
             "B_history": b_hist, "B_comments": b_comm,
             "B": b_hist or b_comm,
@@ -214,29 +339,106 @@ class ReviewPhase:
             "D": cls.has_e2e_specs,
             "security": cls.has_php,
         }
+        if self.depth == DEEP:
+            g["depth"] = DEEP              # deep-only key: a standard<->deep switch misses the cache
+        return g
 
-    def run(self, meta: dict, cls: Classification,
-            plan: PlanInfo) -> tuple[list[Finding], dict, list[dict], list[str]]:
+    def verify_findings(self, findings: list[Finding], filtered_diff: str) -> list[dict]:
+        """VERIFIER_COUNT tool-enabled Sonnet verifiers vote per finding; returns aggregate records."""
+        seat_votes = [{"votes": {}, "errors": {}} for _ in range(VERIFIER_COUNT)]
+        if not findings:
+            return []
+        if not self.worktree:
+            for sv in seat_votes:
+                sv["errors"] = {i: "no-worktree" for i in range(len(findings))}
+            self._log("phase4d verifier: no worktree path; all findings kept unverified")
+            return aggregate_votes(findings, seat_votes)
+        hunks = _diff_by_path(filtered_diff or "")
+        chunks = chunk_findings(findings, hunks)
+        jobs = [(seat, ci) for ci in range(len(chunks)) for seat in range(VERIFIER_COUNT)]
+
+        def _one(job):
+            seat, ci = job
+            idxs = chunks[ci]
+            prompt = verifier_prompt([findings[i] for i in idxs], hunks)
+            try:
+                raw = self.llm.call_tooled(
+                    VERIFIER_PURPOSES[seat], VERIFIER_MODEL, prompt, cwd=self.worktree,
+                    allowed_tools=VERIFIER_ALLOWED_TOOLS, denied_tools=VERIFIER_DENIED_TOOLS,
+                    max_turns=VERIFIER_MAX_TURNS, timeout=VERIFIER_TIMEOUT,
+                    max_budget_usd=VERIFIER_MAX_BUDGET_USD)
+                data = schemas.unwrap_verdicts_envelope(extract_json(raw))
+                schemas.validate_verdicts(data)
+            except HarnessError as e:
+                if e.kind in VERIFIER_TERMINAL_KINDS:
+                    raise
+                return seat, idxs, {}, e.kind
+            except ValueError as e:          # extract_json found no JSON
+                return seat, idxs, {}, f"unparseable: {str(e)[:80]}"
+            votes = {}
+            for v in data:
+                n = v["n"]
+                if 1 <= n <= len(idxs) and idxs[n - 1] not in votes:   # first vote per n wins
+                    votes[idxs[n - 1]] = (v["verdict"], v.get("reason", ""))
+            return seat, idxs, votes, None
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(jobs)) as ex:
+            results = [fut.result() for fut in [ex.submit(_one, j) for j in jobs]]
+        for seat, idxs, votes, err in results:
+            seat_votes[seat]["votes"].update(votes)
+            for i in idxs:
+                if i not in votes:
+                    seat_votes[seat]["errors"][i] = err or "missing-vote"
+        return aggregate_votes(findings, seat_votes)
+
+    def _audit_votes(self, records: list[dict]) -> None:
+        """Write <out_dir>/verifier-votes.json and one audit line per finding. Never raises."""
+        out_dir = getattr(self.llm, "out_dir", None)
+        if out_dir and records:
+            try:
+                os.makedirs(out_dir, exist_ok=True)
+                with open(os.path.join(out_dir, "verifier-votes.json"), "w") as fh:
+                    json.dump({"schema_version": 1, "verifier_count": VERIFIER_COUNT,
+                               "records": records}, fh, indent=2, sort_keys=True)
+            except OSError as e:
+                self._log(f"phase4d verifier: could not write verifier-votes.json: {e}")
+        for r in records:
+            tally = f"real={r['valid_real']} not-real={r['valid_not_real']} abstain={r['abstain']}"
+            word = "kept" if r["kept"] else "DROPPED"
+            if r["source"] == "security-audit" and not r["kept"]:
+                reasons = " | ".join(v["reason"][:120] for v in r["votes"] if v["verdict"] == "not-real")
+                self._log(f"phase4d verifier: DROPPED security finding {r['path']}:{r['line']} "
+                          f"({tally}) reasons: {reasons}")
+            else:
+                self._log(f"phase4d verifier: {word} [{r['source']}/{r['agent']}] "
+                          f"{r['path']}:{r['line']} score={r['score']} {tally}"
+                          + (" fallback" if r.get("fallback") else ""))
+
+    def run(self, meta: dict, cls: Classification, plan: PlanInfo,
+            reused: list[Finding] | None = None) -> tuple[list[Finding], dict, list[dict], list[str]]:
         gates = self.gates(cls)
         findings: list[Finding] = []
         degraded_agents: list[str] = []
 
         # Build the list of independent agent tasks (preserved submission order so that
         # finding indices are deterministic for the scorer's n=1..N mapping).
+        # The "purpose", "sonnet" literals below are pinned by reviewcache.MODEL_PINS (greped by
+        # test_model_pins_match_source), so the deep switch stays inline with them.
         tasks: list[tuple[str, str, str, str, str]] = []
         if gates["A"]:
-            tasks.append(("A", "code-review", "review-agent-a", "sonnet",
+            tasks.append(("A", "code-review", "review-agent-a", "sonnet" if self.depth != DEEP else "opus",
                           agent_a_prompt(meta, cls, plan)))
         if gates["B"]:
             tasks.append(("B", "code-review", "review-agent-b", "sonnet",
-                          agent_b_prompt(meta, cls, gates["B_history"], gates["B_comments"])))
+                          agent_b_prompt(meta, cls, gates["B_history"], gates["B_comments"],
+                                         any_files=(self.depth == DEEP))))
         # Agent C (previous-PR feedback) requires live gh search — replay serves
         # recorded "no prior feedback"; a live variant would add a gh-read adapter.
         if gates["D"]:
             tasks.append(("D", "code-review", "review-agent-d", "sonnet",
                           agent_d_prompt(meta, cls)))
         if gates["security"]:
-            tasks.append(("security", "security-audit", "security-audit", "haiku",
+            tasks.append(("security", "security-audit", "security-audit", "sonnet" if self.depth != DEEP else "opus",
                           security_prompt(meta, cls, plan)))
 
         def _call_agent(task: tuple[str, str, str, str, str]):
@@ -269,12 +471,10 @@ class ReviewPhase:
                     findings.append(Finding(source=source, agent=agent, path=f["path"],
                                             line=f["line"], body=f["body"]))
 
-        if findings:
-            scores = self.llm.call("score-findings", "haiku", scoring_prompt(findings),
-                                   schemas.validate_scores)
-            by_n = {s["n"]: s["score"] for s in scores}
-            for i, f in enumerate(findings):
-                f.score = by_n.get(i + 1, 0)
+        self.last_votes = self.verify_findings(findings, cls.filtered_diff)
+        for f, rec in zip(findings, self.last_votes):
+            f.score = rec["score"]
+        self._audit_votes(self.last_votes)
 
         surviving = [f for f in findings
                      if (f.score or 0) >= (SEC_THRESHOLD if f.source == "security-audit"
@@ -289,12 +489,18 @@ class ReviewPhase:
         code = [f for f in surviving if f.source == "code-review"]
         sec = [f for f in surviving if f.source == "security-audit"]
         code_degraded = [p for p in degraded_agents if p.startswith("review-agent-")]
+        # Interdiff mode: findings on unchanged files were posted by the run that produced
+        # them; they are never re-posted, and their presence rules out "No issues found.".
+        reused_code = [f for f in (reused or []) if f.source == "code-review"]
+        reused_sec = [f for f in (reused or []) if f.source == "security-audit"]
         if code:
             self.gh.post_review_findings(pr, sha, "Code review", code)
         elif code_degraded:
             self.gh.post_review_summary(pr, "Code review",
                                         "Review unavailable - unparseable output from: "
-                                        + ", ".join(code_degraded))
+                                        + ", ".join(code_degraded) + _reused_note(reused_code))
+        elif reused_code:
+            self.gh.post_review_summary(pr, "Code review", _reused_note(reused_code).strip())
         else:
             self.gh.post_review_summary(pr, "Code review", "No issues found.")
         if gates["security"]:
@@ -303,7 +509,9 @@ class ReviewPhase:
             elif "security-audit" in degraded_agents:
                 self.gh.post_review_summary(pr, "Security audit",
                                             "Review unavailable - unparseable output from: "
-                                            "security-audit")
+                                            "security-audit" + _reused_note(reused_sec))
+            elif reused_sec:
+                self.gh.post_review_summary(pr, "Security audit", _reused_note(reused_sec).strip())
             else:
                 self.gh.post_review_summary(
                     pr, "Security audit",

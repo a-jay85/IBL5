@@ -27,6 +27,23 @@ class PlrLineParser implements PlrLineParserInterface
             return null;
         }
 
+        return [
+            ...self::parseIdentityFields($line, $ordinal, $pid),
+            ...self::parseRealLifeStatFields($line),
+            ...self::parseGapDepthAndMatchupFields($line),
+            ...self::parseSeasonStatFields($line),
+            ...self::parsePlayoffSeasonStatFields($line),
+            ...self::parseAttributeContractAndTeamFields($line),
+            ...self::parseHighAndCareerStatFields($line),
+            ...self::parsePhysicalAndRatingFields($line),
+        ];
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private static function parseIdentityFields(string $line, int $ordinal, int $pid): array
+    {
         // Extract name and convert from Windows 1252 to UTF-8 to preserve accent marks
         $nameRaw = trim(substr($line, 4, 32));
         $name = PlrFieldSerializer::toUtf8($nameRaw);
@@ -39,6 +56,15 @@ class PlrLineParser implements PlrLineParserInterface
             'teamid' => (int) substr($line, 44, 2),
             'peak' => (int) substr($line, 46, 4),
             'pos' => trim(substr($line, 50, 2)),
+        ];
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private static function parseRealLifeStatFields(string $line): array
+    {
+        return [
             'realLifeGP' => (int) substr($line, 52, 4),
             'realLifeMIN' => (int) substr($line, 56, 4),
             'realLifeFGM' => (int) substr($line, 60, 4),
@@ -54,6 +80,15 @@ class PlrLineParser implements PlrLineParserInterface
             'realLifeTVR' => (int) substr($line, 100, 4),
             'realLifeBLK' => (int) substr($line, 104, 4),
             'realLifePF' => (int) substr($line, 108, 4),
+        ];
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private static function parseGapDepthAndMatchupFields(string $line): array
+    {
+        return [
             // Unknown gap: offsets 112-127 (16 bytes)
             'unk_112' => (int) substr($line, 112, 2),
             'unk_114' => (int) substr($line, 114, 2),
@@ -75,6 +110,15 @@ class PlrLineParser implements PlrLineParserInterface
             // Loaded to engine struct +0x210; feeds matchup-quality calc (FUN_004e3860).
             // Key retained as unk_138 for backward compat with the parser repository/schema.
             'unk_138' => (int) substr($line, 138, 2),
+        ];
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private static function parseSeasonStatFields(string $line): array
+    {
+        return [
             'injuryDaysLeft' => (int) substr($line, 140, 4),
             'seasonGamesStarted' => (int) substr($line, 144, 4),
             'seasonGamesPlayed' => (int) substr($line, 148, 4),
@@ -92,6 +136,15 @@ class PlrLineParser implements PlrLineParserInterface
             'seasonTVR' => (int) substr($line, 196, 4),
             'seasonBLK' => (int) substr($line, 200, 4),
             'seasonPF' => (int) substr($line, 204, 4),
+        ];
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private static function parsePlayoffSeasonStatFields(string $line): array
+    {
+        return [
             // Playoff season stats (speculative — offsets 208-267 mirror season stats minus GS)
             'playoffSeasonGP' => (int) substr($line, 208, 4),
             'playoffSeasonMIN' => (int) substr($line, 212, 4),
@@ -108,6 +161,15 @@ class PlrLineParser implements PlrLineParserInterface
             'playoffSeasonTVR' => (int) substr($line, 256, 4),
             'playoffSeasonBLK' => (int) substr($line, 260, 4),
             'playoffSeasonPF' => (int) substr($line, 264, 4),
+        ];
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private static function parseAttributeContractAndTeamFields(string $line): array
+    {
+        return [
             'talent' => (int) substr($line, 268, 2),
             'skill' => (int) substr($line, 270, 2),
             'intangibles' => (int) substr($line, 272, 2),
@@ -144,6 +206,15 @@ class PlrLineParser implements PlrLineParserInterface
             // Reserved/unused (337-340): always "0000" in JSB-native rosters and IBL exports.
             'unk_337' => (int) substr($line, 337, 2),
             'unk_339' => (int) substr($line, 339, 2),
+        ];
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private static function parseHighAndCareerStatFields(string $line): array
+    {
+        return [
             'seasonHighPTS' => (int) substr($line, 341, 2),
             'seasonHighREB' => (int) substr($line, 343, 2),
             'seasonHighAST' => (int) substr($line, 345, 2),
@@ -183,6 +254,15 @@ class PlrLineParser implements PlrLineParserInterface
             'careerTVR' => (int) substr($line, 497, 5),
             'careerBLK' => (int) substr($line, 502, 5),
             'careerPF' => (int) substr($line, 507, 5),
+        ];
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private static function parsePhysicalAndRatingFields(string $line): array
+    {
+        return [
             // Unknown gap: offsets 512-549 (38 bytes)
             'unk_512' => (int) substr($line, 512, 2),
             'unk_514' => (int) substr($line, 514, 2),

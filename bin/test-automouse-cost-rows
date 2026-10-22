@@ -18,57 +18,44 @@
 # Run: bin/test-automouse-cost-rows  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-FAILED=0
+# Override only for the mutation check (point it at an edited copy of run).
+RUN_SRC="${AUTOMOUSE_RUN_SRC:-$REPO_ROOT/bin/automouse/run}"
+PPN_SRC="$REPO_ROOT/bin/post-plan-now"
 
 # assert_eq <actual> <expected> <label>
-assert_eq() {
-    if [ "$1" = "$2" ]; then
-        printf '  ok   %s (%s)\n' "$3" "$1"
-    else
-        printf '  FAIL %s: got %s, expected %s\n' "$3" "$1" "$2"
-        FAILED=1
-    fi
-}
+assert_eq() { h_eq "$3" "$2" "$1"; }
 
 # assert_near <actual> <expected> <tol> <label>
-assert_near() {
-    if awk -v a="$1" -v e="$2" -v t="$3" 'BEGIN{d=a-e; if(d<0)d=-d; exit !(d<=t)}'; then
-        printf '  ok   %s (%s)\n' "$4" "$1"
-    else
-        printf '  FAIL %s: got %s, expected %s +/- %s\n' "$4" "$1" "$2" "$3"
-        FAILED=1
-    fi
-}
+assert_near() { h_near "$4" "$1" "$2" "$3"; }
 
 # assert_not_near <actual> <forbidden> <tol> <label>
 assert_not_near() {
     if awk -v a="$1" -v e="$2" -v t="$3" 'BEGIN{d=a-e; if(d<0)d=-d; exit !(d>t)}'; then
-        printf '  ok   %s (%s not within %s of %s)\n' "$4" "$1" "$3" "$2"
+        h_pass "$4"
     else
-        printf '  FAIL %s: got %s, which must NOT be within %s of %s\n' "$4" "$1" "$3" "$2"
-        FAILED=1
+        h_fail "$4" "got $1, which must NOT be within $3 of $2"
     fi
 }
 
 # assert_gt <actual> <threshold> <label> [why]
 assert_gt() {
     if awk -v a="$1" -v t="$2" 'BEGIN{exit !(a>t)}'; then
-        printf '  ok   %s (%s > %s)\n' "$3" "$1" "$2"
+        h_pass "$3"
     else
-        printf '  FAIL %s: got %s, expected > %s%s\n' "$3" "$1" "$2" "${4:+ -- $4}"
-        FAILED=1
+        h_fail "$3" "got $1, expected > $2${4:+ -- $4}"
     fi
 }
 
 # assert_ne <actual> <forbidden> <label>
 assert_ne() {
     if [ "$1" != "$2" ]; then
-        printf '  ok   %s (%s != %s)\n' "$3" "$1" "$2"
+        h_pass "$3"
     else
-        printf '  FAIL %s: got %s, which must NOT equal %s\n' "$3" "$1" "$2"
-        FAILED=1
+        h_fail "$3" "got $1, which must NOT equal $2"
     fi
 }
 
@@ -78,8 +65,7 @@ pj() {
 }
 
 # Sandbox NIGHTLY_DIR so the real roll-up is never touched.
-TMPROOT=$(mktemp -d)
-trap 'rm -rf "$TMPROOT"' EXIT
+h_tmp TMPROOT
 mkdir -p "$TMPROOT/reports" "$TMPROOT/logs"
 
 # shellcheck disable=SC2034  # read by the append_cost_row/regenerate_* funcs sourced below
@@ -89,17 +75,17 @@ LOG="$TMPROOT/logs/$(date +%F).log"
 
 # Source only the functions under test — automouse-run is a long-running
 # driver, so extract rather than execute it.
-eval "$(awk '/^model_tier\(\)/,/^}/'             "$REPO_ROOT/bin/automouse/run")"
-eval "$(awk '/^_date_ago\(\)/,/^}/'              "$REPO_ROOT/bin/automouse/run")"
-eval "$(awk '/^acquire_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")"
-eval "$(awk '/^release_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")"
+eval "$(awk '/^model_tier\(\)/,/^}/'             "$RUN_SRC")"
+eval "$(awk '/^_date_ago\(\)/,/^}/'              "$RUN_SRC")"
+eval "$(awk '/^acquire_cost_lock\(\)/,/^}/'      "$RUN_SRC")"
+eval "$(awk '/^release_cost_lock\(\)/,/^}/'      "$RUN_SRC")"
 # shellcheck disable=SC2034
 COST_LOCK_HELD=0  # global read by append_cost_row; set by the driver in bin/automouse/run
-eval "$(awk '/^append_cost_row\(\)/,/^}/'        "$REPO_ROOT/bin/automouse/run")"
-eval "$(awk '/^strip_weekly_section\(\)/,/^}/'   "$REPO_ROOT/bin/automouse/run")"
-eval "$(awk '/^day_logs\(\)/,/^}/'               "$REPO_ROOT/bin/automouse/run")"
-eval "$(awk '/^day_exit_lines\(\)/,/^}/'         "$REPO_ROOT/bin/automouse/run")"
-eval "$(awk '/^regenerate_weekly_section\(\)/,/^}/' "$REPO_ROOT/bin/automouse/run")"
+eval "$(awk '/^append_cost_row\(\)/,/^}/'        "$RUN_SRC")"
+eval "$(awk '/^strip_weekly_section\(\)/,/^}/'   "$RUN_SRC")"
+eval "$(awk '/^day_logs\(\)/,/^}/'               "$RUN_SRC")"
+eval "$(awk '/^day_exit_lines\(\)/,/^}/'         "$RUN_SRC")"
+eval "$(awk '/^regenerate_weekly_section\(\)/,/^}/' "$RUN_SRC")"
 
 REPORT="$TMPROOT/reports/$(date +%F)-costs.md"
 
@@ -717,5 +703,154 @@ assert_near "$fable51_cost" 1.0000 0.0001 \
 assert_not_near "$fable51_cost" 4.0 0.0001 \
     "fable-5-1 is not priced as generic fable (\$1.00/M cache_read)"
 
+# ---------------------------------------------------------------------------
+# Pre-start pause: a phase the usage gate paused before launch gets no row.
+# The pause literals are rendered from the source lines that print them, so a
+# reworded printf/echo or a narrowed guard regex fails here.
+# ---------------------------------------------------------------------------
+printf '\n-- pre-start pause: no stub row --\n'
+h_tmp STUBROOT
+mkdir -p "$STUBROOT/reports" "$STUBROOT/logs"
+NIGHTLY_DIR="$STUBROOT"
+SELF_DIR="$STUBROOT/nonexistent"   # no pricer: rows fall back to the logged cost
+LOG="$STUBROOT/logs/$(date +%F).log"
+: > "$LOG"
+STUB_SIDECAR="$STUBROOT/logs/$(date +%F).costs.jsonl"
+STUB_REPORT="$STUBROOT/reports/$(date +%F)-costs.md"
+stub_rows() {  # $1 plan, $2 phase -> sidecar row count (0 when no sidecar yet)
+    [ -f "$STUB_SIDECAR" ] || { echo 0; return; }
+    jq -s --arg p "$1" --arg ph "$2" \
+        '[.[] | select(.plan == $p and .phase == $ph)] | length' "$STUB_SIDECAR"
+}
+stub_field() {  # $1 plan, $2 phase, $3 field -> first matching row's field
+    jq -r -s --arg p "$1" --arg ph "$2" --arg f "$3" \
+        '[.[] | select(.plan == $p and .phase == $ph)][0][$f]' "$STUB_SIDECAR"
+}
 
-exit "$FAILED"
+# Literal 1: the impl pause line printed by bin/automouse/run (plan cited
+# bin/automouse/run:2398; the line has drifted, the pattern finds it anyway).
+IMPL_PAT="printf '.*usage gate paused before the impl started"
+assert_eq "$(grep -cE "$IMPL_PAT" "$RUN_SRC")" 1 \
+    "impl pause printf appears exactly once in run"
+impl_fmt=$(grep -E "$IMPL_PAT" "$RUN_SRC" | sed -E "s/^[^']*printf '([^']*)'.*/\1/")
+# shellcheck disable=SC2059  # the format is the production format string
+IMPL_MARKER=$(printf "$impl_fmt" "00:00:01" "stub-a")
+assert_eq "$IMPL_MARKER" "[00:00:01] stub-a usage gate paused before the impl started" \
+    "impl pause literal renders to the exact logged line"
+
+# Literal 2: the postplan pre-start pause line printed by bin/post-plan-now
+# (plan cited bin/post-plan-now:688; the line has drifted, the pattern finds it).
+PPN_PAT='echo "post-plan-now: usage gate .*paused before start'
+assert_eq "$(grep -cE "$PPN_PAT" "$PPN_SRC")" 1 \
+    "post-plan-now pre-start echo appears exactly once"
+ppn_raw=$(grep -E "$PPN_PAT" "$PPN_SRC" | sed -E 's/^[[:space:]]*echo "(.*)"[[:space:]]*$/\1/')
+PP_MARKER=${ppn_raw//'${_gate_zone}'/red}
+assert_eq "$PP_MARKER" "post-plan-now: usage gate red; paused before start, auto-resumes after reset." \
+    "post-plan-now pause literal renders to the exact logged line"
+
+# Case A: impl paused before start, then resumed and priced -> one priced row.
+before=$(wc -l < "$LOG")
+printf '%s\n' "$IMPL_MARKER" >> "$LOG"
+append_cost_row "stub-a.md" impl "$before" "claude-sonnet-5-5"
+before=$(wc -l < "$LOG")
+printf '[00:05:00] stub-a/impl exit: cost=$1.6554 peak_ctx=90000\n' >> "$LOG"
+append_cost_row "stub-a.md" impl "$before" "claude-sonnet-5-5"
+assert_eq "$(stub_rows stub-a.md impl)" 1 "pause-then-resume impl: one sidecar row"
+assert_eq "$(stub_field stub-a.md impl cost)" 1.6554 "pause-then-resume impl: the row is priced"
+assert_eq "$(grep -c '^| stub-a' "$STUB_REPORT")" 1 "pause-then-resume impl: one report row"
+
+# Case B: postplan paused before start (exit 75) -> no row at all.
+before=$(wc -l < "$LOG")
+printf '%s\n' "$PP_MARKER" '[00:06:00] post-plan-now exited code=75 (postplan phase)' >> "$LOG"
+append_cost_row "stub-a.md" postplan "$before" "claude-sonnet-5-5"
+assert_eq "$(stub_rows stub-a.md postplan)" 0 "postplan pre-start pause: no row"
+
+# Case C: postplan ran, paused mid-run, no cost data, no marker -> keeps its stub row.
+before=$(wc -l < "$LOG")
+printf '[00:07:00] RESULT: post-plan PAUSED at ci-fix\n' >> "$LOG"
+append_cost_row "stub-c.md" postplan "$before" "claude-sonnet-5-5"
+assert_eq "$(stub_rows stub-c.md postplan)" 1 "ran-without-cost postplan: row kept"
+assert_eq "$(stub_field stub-c.md postplan cost)" null "ran-without-cost postplan: cost is null"
+assert_eq "$(stub_field stub-c.md postplan provenance)" unknown "ran-without-cost postplan: provenance unknown"
+
+# Case D: marker present WITH a session_id= token -> fail-safe keeps the row.
+before=$(wc -l < "$LOG")
+printf '%s\n' "$PP_MARKER" '[00:08:00] stub-d session_id=00000000-dead-beef-0000-000000000000' >> "$LOG"
+append_cost_row "stub-d.md" postplan "$before" "claude-sonnet-5-5"
+assert_eq "$(stub_rows stub-d.md postplan)" 1 "marker plus session_id=: row kept"
+
+# Case E: marker present WITH a cost= token -> fail-safe keeps the priced row.
+before=$(wc -l < "$LOG")
+printf '%s\n' "$IMPL_MARKER" '[00:09:00] stub-e/impl exit: cost=$0.4200 peak_ctx=50000' >> "$LOG"
+append_cost_row "stub-e.md" impl "$before" "claude-sonnet-5-5"
+assert_eq "$(stub_rows stub-e.md impl)" 1 "marker plus cost=: row kept"
+assert_near "$(stub_field stub-e.md impl cost)" 0.42 0.0001 "marker plus cost=: row is priced"
+
+# ---------------------------------------------------------------------------
+# Weekly reader dedup (reader-only: sidecar lines are hand-built on purpose).
+# A null-cost unknown stub is dropped only when a priced row shares
+# (date, plan, phase). Asserted on the unpriced note, the one figure it moves.
+# ---------------------------------------------------------------------------
+printf '\n-- weekly aggregate: stub rows with a priced sibling are dropped --\n'
+TODAY=$(date +%F)
+YDAY=$(_date_ago 1)
+wk_row() {  # $1 date, $2 plan, $3 phase, $4 cost (number or null), $5 provenance
+    jq -n -c --arg d "$1" --arg p "$2" --arg ph "$3" --argjson c "$4" --arg pv "$5" \
+        '{date:$d,plan:$p,phase:$ph,model:"claude-sonnet-5-5",tier:"sonnet",
+          session_id:"",cost:$c,surcharge_low:null,surcharge_high:null,inp:null,
+          out:null,cr:null,w5:null,w1:null,peak_ctx:0,compactions_main:null,
+          compactions_sub:null,provenance:$pv,price_asof:"",logged_cost:null}'
+}
+wk_run() {  # $1 today's sidecar lines, $2 optional yesterday's lines; sets WK_REPORT
+    local dir
+    dir=$(mktemp -d "$STUBROOT/wk.XXXXXX")
+    mkdir -p "$dir/logs" "$dir/reports"
+    NIGHTLY_DIR="$dir"
+    printf '%s\n' "$1" > "$dir/logs/$TODAY.costs.jsonl"
+    if [ -n "${2:-}" ]; then printf '%s\n' "$2" > "$dir/logs/$YDAY.costs.jsonl"; fi
+    WK_REPORT="$dir/reports/$TODAY-costs.md"
+    printf '# Costs\n' > "$WK_REPORT"
+    regenerate_weekly_section "$WK_REPORT"
+}
+wk_unpriced() {  # N from the "excludes N unpriced rows" note, 0 when absent
+    local n
+    n=$(sed -nE 's/^> \*\*excludes ([0-9]+) unpriced rows\*\*$/\1/p' "$WK_REPORT")
+    echo "${n:-0}"
+}
+wk_total() {
+    awk -F'|' '/\*\*Total\*\*/ && !f {gsub(/[ \t]/,"",$3); print $3; f=1}' "$WK_REPORT"
+}
+
+# W1: stub + recomputed priced row, same key -> stub dropped, nothing unpriced.
+wk_run "$(wk_row "$TODAY" dup-a.md impl null unknown)
+$(wk_row "$TODAY" dup-a.md impl 1.6554 recomputed)"
+assert_eq "$(wk_unpriced)" 0 "stub with a priced sibling is not counted unpriced"
+assert_eq "$(wk_total)" "1.6554" "dedup leaves the priced row's cost intact"
+
+# W2: lone stub, no priced sibling -> kept and counted.
+wk_run "$(wk_row "$TODAY" lone-b.md postplan null unknown)"
+assert_eq "$(wk_unpriced)" 1 "lone stub is still counted unpriced"
+
+# W3: two priced rows with one key -> both survive.
+wk_run "$(wk_row "$TODAY" two-c.md impl 1.0 recomputed)
+$(wk_row "$TODAY" two-c.md impl 2.0 recomputed)"
+assert_eq "$(wk_total)" "3.0000" "two priced rows with one key both survive"
+
+# W4: stub and priced row differ only in phase -> stub kept.
+wk_run "$(wk_row "$TODAY" dup-a.md postplan null unknown)
+$(wk_row "$TODAY" dup-a.md impl 1.6554 recomputed)"
+assert_eq "$(wk_unpriced)" 1 "stub of another phase is kept"
+
+# W5: stub yesterday, priced today, same plan and phase -> stub kept (key has date).
+wk_run "$(wk_row "$TODAY" dup-a.md impl 1.6554 recomputed)" \
+       "$(wk_row "$YDAY" dup-a.md impl null unknown)"
+assert_eq "$(wk_unpriced)" 1 "stub dated another day is kept"
+
+# W6: priced sibling is itself provenance unknown (harness figure kept) -> the
+# stub is dropped and only the priced-unknown row counts. Pins "priced" as
+# cost != null, never provenance != unknown.
+wk_run "$(wk_row "$TODAY" dup-d.md impl null unknown)
+$(wk_row "$TODAY" dup-d.md impl 0.5 unknown)"
+assert_eq "$(wk_unpriced)" 1 "priced-unknown sibling drops the stub and counts once"
+
+h_done

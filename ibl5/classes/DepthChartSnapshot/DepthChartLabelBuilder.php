@@ -95,10 +95,10 @@ final class DepthChartLabelBuilder implements DepthChartLabelBuilderInterface
         return implode(self::LIVE_SEPARATOR, $parts);
     }
 
-    /** "Sim N" for a single sim, "Sims A-B" for a range. */
+    /** "Sim N" for a single sim or a DC that starts after the end sim (not yet used), "Sims A-B" for a range. */
     private function formatSimRange(int $start, int $end): string
     {
-        if ($start === $end) {
+        if ($start >= $end) {
             return 'Sim ' . $start;
         }
 

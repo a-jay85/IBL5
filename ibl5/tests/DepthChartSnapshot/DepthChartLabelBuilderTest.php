@@ -110,6 +110,16 @@ class DepthChartLabelBuilderTest extends TestCase
         );
     }
 
+    public function testBuildDropdownLabelInvertedRangeShowsStartSim(): void
+    {
+        $dc = $this->makeDcRow(array_merge(self::ENDED, ['sim_number_start' => 5, 'sim_number_end' => 4]));
+
+        $this->assertSame(
+            'Playoff Push | Sim 5 | Jan 1 - Jan 14 | (5-2)',
+            $this->builder->buildDropdownLabel($dc, $this->makeSeasonStub(), ['wins' => 5, 'losses' => 2])
+        );
+    }
+
     public function testBuildDropdownLabelUsesPhaseMappedSimNumbers(): void
     {
         $season = self::createStub(Season::class);
@@ -165,6 +175,26 @@ class DepthChartLabelBuilderTest extends TestCase
         return [
             'starts after last sim end: projected end' => ['2024-01-21', 'Next Up (Live) ∙ Sim 4 ∙ Jan 21 - Jan 27 ∙ (0-0)'],
             'starts on last sim end: boundary keeps last sim end' => ['2024-01-20', 'Next Up (Live) ∙ Sim 4 ∙ Jan 20 - Jan 20 ∙ (0-0)'],
+        ];
+    }
+
+    #[DataProvider('liveStartAfterCurrentSimProvider')]
+    public function testBuildLiveLabelShowsStartSimWhenDcStartsAfterCurrentSim(int $simNumberStart, string $expected): void
+    {
+        $dc = $this->makeDcRow(['name' => 'Next Up', 'sim_number_start' => $simNumberStart, 'sim_start_date' => '2024-01-21']);
+
+        $this->assertSame(
+            $expected,
+            $this->builder->buildLiveLabel($dc, $this->makeSeasonStub(), ['wins' => 0, 'losses' => 0])
+        );
+    }
+
+    /** @return array<string, array{int, string}> */
+    public static function liveStartAfterCurrentSimProvider(): array
+    {
+        return [
+            'starts one sim after current' => [5, 'Next Up (Live) ∙ Sim 5 ∙ Jan 21 - Jan 27 ∙ (0-0)'],
+            'starts three sims after current' => [7, 'Next Up (Live) ∙ Sim 7 ∙ Jan 21 - Jan 27 ∙ (0-0)'],
         ];
     }
 

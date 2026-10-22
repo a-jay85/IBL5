@@ -74,7 +74,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getDraftHistory('TestDraftTeam');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $found = false;
         foreach ($result as $player) {
             if ($player['pid'] === 200000102) {
@@ -179,7 +179,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getHealthyAndInjuredPlayersOrderedByName(self::TEST_TID);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $found = false;
         foreach ($result as $player) {
             if ($player['pid'] === 200090105) {
@@ -298,7 +298,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getAllPlayersUnderContract(self::TEST_TID);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         foreach ($result as $player) {
             self::assertNotSame(0, $player['salary_yr1']);
         }
@@ -443,7 +443,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getRosterUnderContractOrderedByName(self::TEST_TID);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // Verify name ordering
         $names = array_column($result, 'name');
         $sorted = $names;
@@ -455,7 +455,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getRosterUnderContractOrderedByOrdinal(self::TEST_TID);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // Verify ordinal ordering
         $ordinals = array_column($result, 'ordinal');
         $sorted = $ordinals;

@@ -85,7 +85,7 @@ def test_every_mutation_is_allowlisted(shim, tmp_path):
     gh.label_add(123, "human-approved")
     gh.pr_sticky_verdict(123, "body\n<!-- pr-ready-verdict -->\n")
     allowed = ("pr create", "pr edit", "pr comment", "pr merge", "pr view",
-               "repo view", "api repos/o/r/pulls/123/reviews",
+               "pr list", "repo view", "api repos/o/r/pulls/123/reviews",
                "api repos/{owner}/{repo}/issues/123/comments",
                "api --method PATCH repos/{owner}/{repo}/issues/comments/")
     for c in calls(shim):
@@ -205,3 +205,55 @@ def test_pr_sticky_body_reads_the_marked_comment(shim, tmp_path):
     body = gh.pr_sticky_body(123)
     assert body is not None
     assert PR_STICKY_MARKER in body
+
+
+# --- code-review source cached from the one comments fetch ---------------------
+
+CODE_REVIEW_FIXTURE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, os.pardir,
+    "bin", "fixtures", "review-shared", "post-plan-sticky-pr3267-v1.json")
+
+
+def _gh_returning(tmp_path, payload):
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    seen = []
+
+    def fake_gh(*args, input_text=None):
+        seen.append(args)
+        return payload
+
+    gh._gh = fake_gh
+    return gh, seen
+
+
+def test_pr_sticky_body_records_code_review_comment(tmp_path):
+    with open(CODE_REVIEW_FIXTURE) as fh:
+        raw = fh.read()
+    gh, seen = _gh_returning(tmp_path, raw)
+    body = gh.pr_sticky_body(3267)
+    assert body == json.loads(raw)["comments"][-1]["body"]
+    found = gh.code_review_seen(3267)
+    assert found["scanned"] is True
+    assert found["comment"]["created_at"] == "2026-10-16T06:51:18Z"
+    assert found["comment"]["summary"] == "No issues found."
+    # One fetch serves both reads: code_review_seen never calls gh.
+    assert len(seen) == 1
+
+
+def test_code_review_seen_ignores_reviewer_heading_and_gh_failure(tmp_path):
+    from harness.state import HarnessError
+    payload = json.dumps({"comments": [
+        {"body": "## Code reviewer notes\n\nnits", "createdAt": "t", "url": "u"}]})
+    gh, _ = _gh_returning(tmp_path, payload)
+    gh.pr_sticky_body(7)
+    assert gh.code_review_seen(7) == {"scanned": True, "comment": None}
+
+    failing = LiveGh(str(tmp_path / "out2"), str(tmp_path), "my-branch")
+
+    def boom(*args, input_text=None):
+        raise HarnessError("gh", "down")
+
+    failing._gh = boom
+    assert failing.pr_sticky_body(7) is None
+    assert failing.code_review_seen(7) is None
+    assert failing.code_review_seen(8) is None

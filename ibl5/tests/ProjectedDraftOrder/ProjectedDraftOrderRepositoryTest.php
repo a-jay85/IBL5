@@ -99,7 +99,31 @@ class ProjectedDraftOrderRepositoryTest extends TestCase
 
         $queries = $this->db->getExecutedQueries();
         $insertQueries = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_draft'));
-        $this->assertCount(1, $insertQueries);
+        $this->assertCount(2, $insertQueries);
+    }
+
+    public function testSaveFinalDraftOrderPreparesOneInsertPerPick(): void
+    {
+        $picks = [
+            ['round' => 1, 'pick' => 1, 'team' => 'Heat', 'teamid' => 1],
+            ['round' => 1, 'pick' => 2, 'team' => 'Celtics', 'teamid' => 2],
+            ['round' => 2, 'pick' => 3, 'team' => 'Bulls', 'teamid' => 3],
+        ];
+
+        $this->repository->saveFinalDraftOrder(2026, $picks);
+
+        $inserts = array_values(array_filter(
+            $this->db->getPreparedQueries(),
+            static fn (string $q): bool => str_starts_with($q, 'INSERT INTO `ibl_draft`')
+        ));
+        $this->assertCount(count($picks), $inserts);
+        foreach ($inserts as $insert) {
+            $this->assertSame(
+                "INSERT INTO `ibl_draft` (`year`, `round`, `pick`, `team`, `teamid`, `player`, `uuid`) VALUES (?, ?, ?, ?, ?, '', UUID())",
+                $insert
+            );
+        }
+        $this->assertSame([2026, 2, 3, 'Bulls', 3], $this->db->getLastBoundParams());
     }
 
     public function testSaveFinalDraftOrderWithEmptyPicksSkipsInsert(): void
@@ -121,7 +145,7 @@ class ProjectedDraftOrderRepositoryTest extends TestCase
 
         $queries = $this->db->getExecutedQueries();
         $settingsQueries = array_filter($queries, static fn (string $q): bool => str_contains($q, 'ibl_settings'));
-        $this->assertNotEmpty($settingsQueries);
+        $this->assertNotSame([], $settingsQueries);
     }
 
     public function testSaveFinalDraftOrderDeletesOldDraftRows(): void

@@ -33,7 +33,7 @@ class DepthChartRepository extends \Database\BaseMysqliRepository implements Dep
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_plr` WHERE teamid = ? AND retired = 0 AND ordinal <= ? ORDER BY ordinal ASC",
+            "SELECT * FROM `ibl_plr` WHERE teamid = ? AND retired = 0 AND ordinal <= ? ORDER BY ordinal ASC, pid ASC",
             "ii",
             $teamid,
             \League\JsbConstants::WAIVERS_ORDINAL

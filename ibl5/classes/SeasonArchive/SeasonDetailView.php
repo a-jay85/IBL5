@@ -70,15 +70,14 @@ class SeasonDetailView implements SeasonDetailViewInterface
         /** @var array<string, int> $teamIds */
         $teamIds = $seasonData['teamIds'];
 
-        $html = $this->renderStyles();
-        $html .= '<div class="season-archive-nav">';
+        $html = '<div class="season-archive-nav">';
         $html .= '<a href="modules.php?name=SeasonArchive">&larr; Back to Season Archive</a>';
         $html .= '<a href="modules.php?name=SeasonLeaderboards">Season Leaders &rarr;</a>';
         $html .= '</div>';
         $html .= '<h1 class="ibl-title">' . self::esc($label) . '</h1>';
         $html .= $this->renderTournaments($tournaments, $playerIds, $teamColors, $year);
         $html .= $this->renderAllStarWeekend($allStarWeekend, $playerIds);
-        $html .= $this->renderMajorAwards($majorAwards, $playerIds, $teamColors, $teamIds, $year);
+        $html .= $this->renderMajorAwards($majorAwards, $playerIds, $teamIds, $year);
         $html .= $this->renderStatisticalLeaders($statisticalLeaders, $playerIds);
         $html .= $this->renderTeamSelection($allLeagueTeams, 'All-League Teams', $playerIds);
         $html .= $this->renderTeamSelection($allDefensiveTeams, 'All-Defensive Teams', $playerIds);
@@ -160,10 +159,9 @@ class SeasonDetailView implements SeasonDetailViewInterface
     /**
      * @param array{mvp: string, dpoy: string, roy: string, sixthMan: string, gmOfYear: array{name: string, team: string}, finalsMvp: string} $awards
      * @param array<string, int> $playerIds
-     * @param array<string, array{color1: string, color2: string, teamid: int}> $teamColors
      * @param array<string, int> $teamIds
      */
-    private function renderMajorAwards(array $awards, array $playerIds, array $teamColors, array $teamIds, int $year): string
+    private function renderMajorAwards(array $awards, array $playerIds, array $teamIds, int $year): string
     {
         // Build GM of Year display with optional team link
         $gmDisplay = '';

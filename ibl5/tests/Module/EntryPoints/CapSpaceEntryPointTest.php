@@ -20,6 +20,6 @@ class CapSpaceEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('ibl_plr', []);
         $output = $this->runModule('CapSpace');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

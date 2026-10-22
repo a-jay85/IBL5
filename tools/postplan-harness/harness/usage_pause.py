@@ -24,6 +24,28 @@ _SID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 _PAUSE_JSON = {"continue": False, "stopReason": "usage-pause"}
 
+# Closed allowlist: a tooled call limited to these cannot write the worktree. Any tool
+# not listed (Bash, Edit, an MCP tool, a name added later) counts as write-capable.
+READ_ONLY_TOOLS = frozenset({"Read", "Grep", "Glob"})
+
+
+def _tool_names(tools) -> set:
+    if tools is None:
+        return set()
+    items = tools.split(",") if isinstance(tools, str) else list(tools)
+    names = set()
+    for t in items:
+        name = str(t).split("(", 1)[0].strip()
+        if name:
+            names.add(name)
+    return names
+
+
+def tools_can_write(allowed_tools, denied_tools=None) -> bool:
+    """False only when the effective tool set is a non-empty subset of READ_ONLY_TOOLS."""
+    effective = _tool_names(allowed_tools) - _tool_names(denied_tools)
+    return not (effective and effective <= READ_ONLY_TOOLS)
+
 
 class UsagePause(BaseException):
     """The usage gate paused this run. Raised instead of returning a model result.
@@ -33,14 +55,19 @@ class UsagePause(BaseException):
     pause through to `runner.run()`, which maps it to exit 75.
 
     Cost: cleanups that live on an `except` path (e.g. `adr_draft._discard`) do not
-    run on a pause. A tooled call compares a worktree fingerprint taken before the
-    spawn, so a pause that interrupts an edit is reported `dirty` and fails closed.
+    run on a pause. A write-capable tooled call captures the worktree before the
+    spawn, so a pause that interrupts an edit is reported `dirty` and carries that
+    capture. The runner records it and the resumed run restores it (ADR-0143
+    addendum 2026-10-10).
     """
 
-    def __init__(self, purpose: str, dirty: bool = False):
+    def __init__(self, purpose: str, dirty: bool = False,
+                 prespawn: "PreSpawn | None" = None, cwd: str | None = None):
         super().__init__(purpose)
         self.purpose = purpose
         self.dirty = dirty
+        self.prespawn = prespawn
+        self.cwd = cwd
 
 
 @dataclass(frozen=True)
@@ -143,15 +170,51 @@ def worktree_fingerprint(cwd: str) -> str | None:
         blobs = (_git(cwd, "hash-object", "--stdin-paths", stdin="\n".join(untracked) + "\n")
                  .split() if untracked else [])
         pairs = ",".join(f"{p}:{b}" for p, b in zip(untracked, blobs))
-        ops = []
-        for ref in ("REBASE_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD"):
-            r = subprocess.run(["git", "rev-parse", "-q", "--verify", ref], cwd=cwd,
-                               capture_output=True, text=True)
-            if r.returncode == 0:
-                ops.append(ref)
+        ops = _op_heads(cwd)
     except (OSError, subprocess.CalledProcessError):
         return None
     return hashlib.sha256("\0".join([head, tree, pairs, ",".join(ops)]).encode()).hexdigest()
+
+
+def _op_heads(cwd: str) -> tuple[str, ...]:
+    """In-progress operation heads (rebase, merge, cherry-pick) present in cwd."""
+    ops = []
+    for ref in ("REBASE_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD"):
+        r = subprocess.run(["git", "rev-parse", "-q", "--verify", ref], cwd=cwd,
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            ops.append(ref)
+    return tuple(ops)
+
+
+@dataclass(frozen=True)
+class PreSpawn:
+    head: str
+    tree: str
+    ops: tuple[str, ...]
+
+
+def capture_prespawn(cwd: str) -> PreSpawn | None:
+    """HEAD, the full worktree tree, and op heads before a spawn. None on any failure.
+
+    The tree comes from `gatefix._tree_of` (tracked plus untracked non-ignored), so it
+    is both a comparison key and a `git restore --source` for the resumed run.
+    """
+    from . import gatefix   # local: gatefix imports the llm adapter, which imports us
+    try:
+        head = _git(cwd, "rev-parse", "HEAD").strip()
+        tree = gatefix._tree_of(cwd, run=subprocess.run)
+        return PreSpawn(head=head, tree=tree, ops=_op_heads(cwd))
+    except Exception:  # noqa: BLE001 -- a failed capture reads as an edit (fail closed)
+        return None
+
+
+def edit_since(cwd: str, pre: PreSpawn | None) -> bool:
+    """True (dirty) unless HEAD, tree, and op heads all still match the capture."""
+    if pre is None:
+        return True
+    now = capture_prespawn(cwd)
+    return now is None or now != pre
 
 
 # ---------------------------------------------------------------- resume dedupe
@@ -265,3 +328,156 @@ def ledger_clear() -> None:
             os.remove(path)
         except OSError:
             pass
+    pause_record_clear(ctx)
+
+
+# ---------------------------------------------------------------- dirty pause record
+# A pause that interrupted a write-capable call leaves a partial edit. runs/<S>.pause.json
+# proves which edit it was, so the resumed run under S can discard exactly that edit
+# and continue. Every refusal leaves the worktree untouched (ADR-0143 addendum
+# 2026-10-10).
+PAUSE_RECORD_VERSION = 1
+
+
+def _pause_record_path_for(ctx: GateContext, sid: str) -> str | None:
+    sd = state_dir(ctx)
+    return None if sd is None else os.path.join(sd, "runs", f"{sid}.pause.json")
+
+
+def _pause_record_path(ctx: GateContext) -> str | None:
+    return _pause_record_path_for(ctx, ctx.session_id)
+
+
+def _changed_between(cwd: str, pre_tree: str, post_tree: str) -> list:
+    """[[status, path], ...] between two trees, status in A/M/D/T."""
+    raw = _git(cwd, "diff-tree", "-r", "-z", "--no-renames", "--name-status",
+               pre_tree, post_tree)
+    toks = raw.split("\0")
+    pairs = []
+    i = 0
+    while i + 1 < len(toks):
+        status, path = toks[i], toks[i + 1]
+        if not status:
+            i += 1
+            continue
+        pairs.append([status[0], path])
+        i += 2
+    return pairs
+
+
+def _unsafe(path: str) -> bool:
+    return os.path.isabs(path) or ".." in path.split("/")
+
+
+def pause_record_write(ctx: GateContext, purpose: str, pre: PreSpawn,
+                       cwd: str) -> str | None:
+    """Record the interrupted edit. None on success, else the refusal reason."""
+    post = capture_prespawn(cwd)
+    if post is None:
+        return "capture-failed"
+    if post.head != pre.head:
+        return "head-moved"
+    if pre.ops or post.ops:
+        return "op-in-progress"
+    if post.tree == pre.tree:
+        return "no-edit"
+    try:
+        changed = _changed_between(cwd, pre.tree, post.tree)
+    except (OSError, subprocess.CalledProcessError):
+        return "capture-failed"
+    if any(_unsafe(p) for _, p in changed):
+        return "unsafe-path"
+    path = _pause_record_path(ctx)
+    if path is None:
+        return "write-failed"
+    rec = {"version": PAUSE_RECORD_VERSION, "session_id": ctx.session_id,
+           "purpose": purpose, "head": pre.head, "pre_tree": pre.tree,
+           "post_tree": post.tree, "changed": changed,
+           "written_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(rec, fh)
+        os.replace(tmp, path)
+    except OSError:
+        return "write-failed"
+    return None
+
+
+def _load_record_at(path: str | None) -> tuple[str, dict | None]:
+    if path is None or not os.path.exists(path):
+        return "missing", None
+    try:
+        with open(path) as fh:
+            rec = json.load(fh)
+    except (OSError, ValueError):
+        return "malformed", None
+    if not isinstance(rec, dict) or rec.get("version") != PAUSE_RECORD_VERSION:
+        return "malformed", None
+    for key in ("session_id", "head", "pre_tree", "post_tree"):
+        if not isinstance(rec.get(key), str) or not rec[key]:
+            return "malformed", None
+    changed = rec.get("changed")
+    if not isinstance(changed, list) or not all(
+            isinstance(c, list) and len(c) == 2 and all(isinstance(x, str) for x in c)
+            for c in changed):
+        return "malformed", None
+    return "ok", rec
+
+
+def pause_record_load(ctx: GateContext) -> tuple[str, dict | None]:
+    """("missing", None), ("malformed", None) or ("ok", rec) for this session's record."""
+    return _load_record_at(_pause_record_path(ctx))
+
+
+def pause_record_exists_for(ctx: GateContext, sid: str) -> bool:
+    path = _pause_record_path_for(ctx, sid)
+    return path is not None and os.path.exists(path)
+
+
+def pause_record_clear(ctx: GateContext) -> None:
+    path = _pause_record_path(ctx)
+    if path is not None:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def restore_from_record(cwd: str, rec: dict, session_id: str) -> str | None:
+    """Discard exactly the recorded edit. None after a verified discard, else a reason.
+
+    Every check runs before any write, so a refusal leaves the worktree untouched.
+    """
+    if rec.get("session_id") != session_id:
+        return "session-mismatch"
+    cur = capture_prespawn(cwd)
+    if cur is None:
+        return "capture-failed"
+    if cur.head != rec["head"]:
+        return "head-moved"
+    if cur.ops:
+        return "op-in-progress"
+    if cur.tree != rec["post_tree"]:
+        return "tree-mismatch"
+    # Same shape as gatefix.revert's tree half: restore M/D/T from the pre-spawn tree
+    # (keeps staged pre-spawn work; never `reset --hard`), unlink what the edit added.
+    try:
+        pairs = _changed_between(cwd, rec["pre_tree"], rec["post_tree"])
+        if any(_unsafe(p) for _, p in pairs):
+            return "restore-failed"
+        restore = [p for s, p in pairs if s in ("M", "D", "T")]
+        remove = [p for s, p in pairs if s == "A"]
+        if restore:
+            _git(cwd, "restore", f"--source={rec['pre_tree']}", "--worktree", "--", *restore)
+        for p in remove:
+            target = os.path.join(cwd, p)
+            if os.path.islink(target) or os.path.exists(target):
+                os.unlink(target)
+    except Exception:  # noqa: BLE001 -- any failure fails closed
+        return "restore-failed"
+    after = capture_prespawn(cwd)
+    if after is None or after.tree != rec["pre_tree"]:
+        return "restore-unverified"
+    return None

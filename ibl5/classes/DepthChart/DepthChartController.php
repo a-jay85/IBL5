@@ -24,6 +24,8 @@ use EventLog\EventLogger;
 
 /**
  * @see DepthChartControllerInterface
+ *
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
 class DepthChartController implements DepthChartControllerInterface
 {
@@ -36,7 +38,7 @@ class DepthChartController implements DepthChartControllerInterface
     private DepthChartSubmissionHandlerInterface $submissionHandler;
     private HttpRequest $request;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -92,45 +94,11 @@ class DepthChartController implements DepthChartControllerInterface
      */
     public function displayForm(string $username): void
     {
-        $display = 'ratings';
-        $rawDisplay = $this->request->request('display');
-        if (is_string($rawDisplay)) {
-            $display = $rawDisplay;
-        }
+        [$display, $split] = $this->resolveDisplayAndSplitFromRequest();
 
-        // Validate split parameter when display=split
-        $split = null;
-        $rawSplit = $this->request->request('split');
-        if ($display === 'split' && is_string($rawSplit)) {
-            $splitRepo = new \Team\SplitStatsRepository($this->db);
-            if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
-                $split = $rawSplit;
-            } else {
-                $display = 'ratings';
-            }
-        } elseif ($display === 'split') {
-            $display = 'ratings';
-        }
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
 
-        $season = $this->season ?? new Season($this->db);
-
-        // Consume the PRG failure flash if present. Stashed by the submission
-        // handler (`_ibl_depth_chart_flash`) on validation failure or empty
-        // team name so the redirected GET can (1) surface validator errors
-        // above the form and (2) re-populate fields from the user's submitted
-        // POST rather than the DB — preserving in-flight edits.
-        $flashErrorsHtml = '';
-        $override = [];
-        if (isset($_SESSION['_ibl_depth_chart_flash']) && is_array($_SESSION['_ibl_depth_chart_flash'])) {
-            $flash = $_SESSION['_ibl_depth_chart_flash'];
-            unset($_SESSION['_ibl_depth_chart_flash']);
-            if (isset($flash['errors_html']) && is_string($flash['errors_html'])) {
-                $flashErrorsHtml = $flash['errors_html'];
-            }
-            if (isset($flash['post_data']) && is_array($flash['post_data'])) {
-                $override = $this->service->buildFormOverride($flash['post_data']);
-            }
-        }
+        [$flashErrorsHtml, $override] = $this->consumeFailureFlash();
 
         $teamName = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $teamid = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
@@ -146,21 +114,112 @@ class DepthChartController implements DepthChartControllerInterface
         }
 
         $this->view->renderTeamLogo($teamid);
+        $this->renderSavedDepthChartDropdown($teamid, $season);
+        $this->view->renderHelpSection();
 
+        $playersWithQuality = $this->buildPlayersWithQuality($this->repository->getPlayersOnTeam($teamid), $override);
+
+        // Collect current roster PIDs for JS config
+        $currentRosterPids = array_map(static fn(array $p): int => $p['pid'], $playersWithQuality);
+
+        $this->renderPlayerForm($teamName, $teamid, $playersWithQuality);
+        $this->renderRatingsTableAndScripts($responder, $teamid, $display, $split, $currentRosterPids);
+
+        // NextSim position tables section
+        $this->renderNextSimSection($teamid, $team, $season, $responder);
+
+        \PageLayout\PageLayout::footer();
+    }
+
+    /**
+     * @see DepthChartControllerInterface::getTableOutput()
+     */
+    public function getTableOutput(int $teamid, string $display, ?string $split = null): string
+    {
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
+        $team = Team::initialize($this->db, $teamid);
+
+        // Delegate roster + starters to TeamService (single source of truth)
+        $rosterData = $this->teamTableService->getRosterAndStarters($teamid);
+
+        $groups = $this->teamTableService->buildDropdownGroups($season);
+
+        $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
+        $baseUrl = 'modules.php?name=DepthChartEntry';
+        $apiUrl = 'modules.php?name=DepthChartEntry&op=tab-api&teamid=' . $teamid;
+        $dropdown = new TableViewDropdown($groups, $activeValue, $baseUrl, $team->color1, $team->color2, $apiUrl);
+        $tableHtml = $this->teamTableService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids'], $split);
+
+        return $dropdown->wrap($tableHtml);
+    }
+
+    /**
+     * Read `display` from the request (default `ratings`) and run it through the
+     * shared allow-list gate with the raw `split` value.
+     *
+     * @return array{string, ?string}
+     */
+    private function resolveDisplayAndSplitFromRequest(): array
+    {
+        $display = 'ratings';
+        $rawDisplay = $this->request->request('display');
+        if (is_string($rawDisplay)) {
+            $display = $rawDisplay;
+        }
+
+        // Resolve the split parameter when display=split (shared allow-list gate)
+        $splitRepo = new \Team\SplitStatsRepository($this->db);
+        return $splitRepo->resolveDisplayAndSplit($display, $this->request->request('split'));
+    }
+
+    /**
+     * Consume the PRG failure flash if present. Stashed by the submission
+     * handler (`_ibl_depth_chart_flash`) on validation failure or empty
+     * team name so the redirected GET can (1) surface validator errors
+     * above the form and (2) re-populate fields from the user's submitted
+     * POST rather than the DB — preserving in-flight edits.
+     *
+     * @return array{string, array<int, array{dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int}>}
+     */
+    private function consumeFailureFlash(): array
+    {
+        $flashErrorsHtml = '';
+        $override = [];
+        if (isset($_SESSION['_ibl_depth_chart_flash']) && is_array($_SESSION['_ibl_depth_chart_flash'])) {
+            $flash = $_SESSION['_ibl_depth_chart_flash'];
+            unset($_SESSION['_ibl_depth_chart_flash']);
+            if (isset($flash['errors_html']) && is_string($flash['errors_html'])) {
+                $flashErrorsHtml = $flash['errors_html'];
+            }
+            if (isset($flash['post_data']) && is_array($flash['post_data'])) {
+                $override = $this->service->buildFormOverride($flash['post_data']);
+            }
+        }
+
+        return [$flashErrorsHtml, $override];
+    }
+
+    private function renderSavedDepthChartDropdown(int $teamid, Season $season): void
+    {
         // Render saved depth chart dropdown
         $savedDcService = new DepthChartSnapshotService($this->db);
         $dropdownOptions = $savedDcService->getDropdownOptions($teamid, $season);
         $currentLiveLabel = $savedDcService->buildCurrentLiveLabel($teamid, $season);
         $this->view->renderSavedDepthChartDropdown($dropdownOptions, $currentLiveLabel);
+    }
 
-        $this->view->renderHelpSection();
-
-        $playersResult = $this->repository->getPlayersOnTeam($teamid);
-
-        // Compute quality scores and apply any flash override so the form
-        // re-renders with the user's last submitted values after a validation
-        // failure, not the stale DB values.
-        $playersWithQuality = array_map(
+    /**
+     * Compute quality scores and apply any flash override so the form
+     * re-renders with the user's last submitted values after a validation
+     * failure, not the stale DB values.
+     *
+     * @param list<PlayerRow> $playersResult
+     * @param array<int, array{dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int}> $override
+     * @return list<PlayerRow>
+     */
+    private function buildPlayersWithQuality(array $playersResult, array $override): array
+    {
+        return array_map(
             function (array $player) use ($override): array {
                 $player['quality_score'] = $this->service->computeQualityScore($player);
                 $pid = $player['pid'];
@@ -171,13 +230,13 @@ class DepthChartController implements DepthChartControllerInterface
             },
             $playersResult
         );
+    }
 
-        // Collect current roster PIDs for JS config
-        $currentRosterPids = array_map(
-            static fn(array $p): int => $p['pid'],
-            $playersWithQuality
-        );
-
+    /**
+     * @param list<PlayerRow> $playersWithQuality
+     */
+    private function renderPlayerForm(string $teamName, int $teamid, array $playersWithQuality): void
+    {
         $slotNames = \League\JsbConstants::PLAYER_POSITIONS;
 
         $this->view->renderLineupPreview();
@@ -191,7 +250,13 @@ class DepthChartController implements DepthChartControllerInterface
 
         $this->view->renderFormFooter();
         $this->view->renderMobileView($playersWithQuality, $slotNames);
+    }
 
+    /**
+     * @param list<int> $currentRosterPids
+     */
+    private function renderRatingsTableAndScripts(\Api\Response\HtmlResponder $responder, int $teamid, string $display, ?string $split, array $currentRosterPids): void
+    {
         $responder->html('<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Player ratings">');
         $responder->html($this->getTableOutput($teamid, $display, $split));
         $responder->html('</div></div>');
@@ -208,33 +273,6 @@ class DepthChartController implements DepthChartControllerInterface
         $responder->html('<script src="jslib/saved-depth-charts.js"></script>');
         $responder->html('<script src="jslib/depth-chart-mobile.js"></script>');
         $responder->html('<script src="jslib/contract-hint.js"></script>');
-
-        // NextSim position tables section
-        $this->renderNextSimSection($teamid, $team, $season, $responder);
-
-        \PageLayout\PageLayout::footer();
-    }
-
-    /**
-     * @see DepthChartControllerInterface::getTableOutput()
-     */
-    public function getTableOutput(int $teamid, string $display, ?string $split = null): string
-    {
-        $season = $this->season ?? new Season($this->db);
-        $team = Team::initialize($this->db, $teamid);
-
-        // Delegate roster + starters to TeamService (single source of truth)
-        $rosterData = $this->teamTableService->getRosterAndStarters($teamid);
-
-        $groups = $this->teamTableService->buildDropdownGroups($season);
-
-        $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
-        $baseUrl = 'modules.php?name=DepthChartEntry';
-        $apiUrl = 'modules.php?name=DepthChartEntry&op=tab-api&teamid=' . $teamid;
-        $dropdown = new TableViewDropdown($groups, $activeValue, $baseUrl, $team->color1, $team->color2, $apiUrl);
-        $tableHtml = $this->teamTableService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids'], $split);
-
-        return $dropdown->wrap($tableHtml);
     }
 
     private function renderNextSimSection(int $teamid, Team $team, Season $season, \Api\Response\HtmlResponder $responder): void

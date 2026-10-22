@@ -98,4 +98,23 @@ class TopicsRepositoryTest extends WideUnitTestCase
 
         $this->assertSame([], $result[0]['recentArticles']);
     }
+
+    public function testUnsupportedPrefixFallsBackToNuke(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $hostile = new TopicsRepository($this->mockDb, '"evil` ; DROP TABLE nuke_topics; --');
+        $hostile->getTopicsWithArticles();
+
+        $wellFormed = new TopicsRepository($this->mockDb, 'custom');
+        $wellFormed->getTopicsWithArticles();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(2, $queries);
+        foreach ($queries as $query) {
+            $this->assertStringContainsString('nuke_topics', $query);
+            $this->assertStringNotContainsString('evil', $query);
+            $this->assertStringNotContainsString('custom', $query);
+        }
+    }
 }

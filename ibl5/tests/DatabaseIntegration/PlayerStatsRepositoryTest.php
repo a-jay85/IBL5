@@ -87,7 +87,7 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getBoxScoresBetweenDates($pid, '2098-01-01', '2098-01-31');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertSame($pid, $first['pid']);
         self::assertArrayHasKey('game_of_that_day', $first);
@@ -130,7 +130,7 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getPlayoffStats('DB Playoff');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         self::assertSame(2098, $result[0]['year']);
         self::assertSame('Metros', $result[0]['team']);
     }
@@ -271,7 +271,7 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getHeatStats('DB Heat Plr');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         self::assertSame(2098, $result[0]['year']);
     }
 

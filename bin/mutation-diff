@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+# Local runner for the per-PR Infection job (.github/workflows/mutation-pr.yml).
+# Runs the coverage step and the Infection step on the host, from ibl5/, with
+# CI's flags. diff.relative stays unset; see the comment above the Infection call.
+#
+# Usage: bin/mutation-diff [<base-ref>]
+
+set -euo pipefail
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/mutation-diff [<base-ref>]
+
+Run the per-PR mutation gate locally. Runs the coverage and Infection steps
+of .github/workflows/mutation-pr.yml with the same flags, against the diff
+from <base-ref> (default: origin/master) to the working tree. Unlike CI, it
+leaves diff.relative unset: with it set, Infection finds no changed file.
+
+When Infection matches no source file although the diff changes
+classes/**/*.php files, the run exits 5, so an empty run never reads as a pass.
+
+Runs on the host, from the invoking checkout's ibl5/. The host needs php with
+pcov, and the main-stack ibl5-mariadb container running. Tests use the
+sibling database ibl5_test on that container, reset by
+bin/db-test-up --no-run from this checkout's migrations and db-seed.sql.
+
+Skips (exit 0) when the diff has no added or modified classes/**/*.php
+files, as CI does. Untracked new classes are marked intent-to-add so
+Infection sees them.
+
+A lock at /tmp/ibl5-mutation-diff.lock keeps two runs from sharing
+ibl5_test. Override the path with MUTATION_DIFF_LOCK_DIR.
+
+Exit codes:
+  0  passed, or skipped (no changed classes)
+  2  usage error, or <base-ref> does not resolve
+  3  prerequisite missing: pcov, docker, ibl5-mariadb, or bin/db-test-up failed
+  4  lock held by another run
+  5  Infection matched no source files although the diff changes classes/**/*.php
+  other  the phpunit or Infection exit code, passed through
+EOF
+    exit 0
+fi
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/db-helpers.sh
+source "$REPO_ROOT/bin/lib/db-helpers.sh"
+
+BASE=""
+NPOS=0
+for arg in "$@"; do
+    case "$arg" in
+        -*)
+            echo "Error: unknown option: $arg" >&2
+            exit 2
+            ;;
+        *)
+            NPOS=$((NPOS + 1))
+            if [ "$NPOS" -gt 1 ]; then
+                echo "Error: expected at most one <base-ref>" >&2
+                exit 2
+            fi
+            BASE="$arg"
+            ;;
+    esac
+done
+BASE="${BASE:-origin/master}"
+
+cd "$REPO_ROOT/ibl5"
+if ! git rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
+    echo "Error: base ref '$BASE' does not resolve to a commit. Fix: git fetch origin, or pass an existing ref." >&2
+    exit 2
+fi
+
+# Infection's --git-diff-* reads `git diff`, which cannot see untracked files.
+UNTRACKED="$(git ls-files --others --exclude-standard -- 'classes/**/*.php')"
+if [ -n "$UNTRACKED" ]; then
+    NUNTRACKED=0
+    while IFS= read -r f; do
+        git add --intent-to-add -- "$f"
+        NUNTRACKED=$((NUNTRACKED + 1))
+    done <<EOF
+$UNTRACKED
+EOF
+    echo "Notice: marked $NUNTRACKED untracked class file(s) intent-to-add so Infection sees them."
+fi
+
+# Mirrors CI's skip=true. Diffing the merge-base against the working tree also
+# counts uncommitted work, which is what an implementation session has.
+MB="$(git merge-base "$BASE" HEAD)"
+CHANGED="$(git diff --name-only --diff-filter=AM "$MB" -- 'classes/**/*.php')"
+if [ -z "$CHANGED" ]; then
+    echo "SKIP: no added or modified classes/**/*.php files vs $BASE; CI skips the mutation job for this diff too."
+    exit 0
+fi
+
+mods=""
+if command -v php >/dev/null 2>&1; then
+    mods="$(php -m)"
+fi
+if ! grep -qx pcov <<<"$mods"; then
+    echo "Error: host php has no pcov extension; CI's coverage step needs it. Fix: pecl install pcov" >&2
+    exit 3
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+    echo "Error: docker not found on PATH." >&2
+    exit 3
+fi
+if ! state="$(docker inspect -f '{{.State.Running}}' ibl5-mariadb 2>&1)" || [ "$state" != "true" ]; then
+    echo "Error: main-stack DB container ibl5-mariadb is not running (127.0.0.1:3306 is where DatabaseTestCase connects). Fix: run docker compose up -d in the main checkout, then re-run." >&2
+    exit 3
+fi
+
+LOCK_DIR="${MUTATION_DIFF_LOCK_DIR:-/tmp/ibl5-mutation-diff.lock}"
+LOCK_HELD=0
+trap 'if [ -n "${INFECTION_LOG:-}" ]; then rm -f "$INFECTION_LOG"; fi; if [ "${LOCK_HELD:-0}" = 1 ]; then rm -rf "$LOCK_DIR"; fi' EXIT
+if mkdir "$LOCK_DIR" 2>/dev/null; then
+    echo "$$" >"$LOCK_DIR/pid"
+    LOCK_HELD=1
+else
+    pid=""
+    if [ -f "$LOCK_DIR/pid" ]; then
+        pid="$(cat "$LOCK_DIR/pid")"
+    fi
+    if [ -z "$pid" ]; then
+        echo "Error: $LOCK_DIR exists with no pid file. If no run is active, remove it with rm -rf $LOCK_DIR." >&2
+        exit 4
+    fi
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "Error: another bin/mutation-diff run holds $LOCK_DIR (pid $pid). Re-run after it finishes." >&2
+        exit 4
+    fi
+    echo "Notice: reclaiming stale lock $LOCK_DIR (pid $pid is not running)."
+    rm -rf "$LOCK_DIR"
+    if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "Error: could not take $LOCK_DIR after reclaiming it." >&2
+        exit 4
+    fi
+    echo "$$" >"$LOCK_DIR/pid"
+    LOCK_HELD=1
+fi
+
+rc=0
+"$REPO_ROOT/bin/db-test-up" --no-run || rc=$?
+if [ "$rc" -ne 0 ]; then
+    echo "Error: bin/db-test-up --no-run failed (exit $rc); see its output above." >&2
+    exit 3
+fi
+
+export DB_HOST=127.0.0.1 DB_USER="$DB_ROOT_USER" DB_PASS="$DB_ROOT_PASS" DB_NAME=ibl5_test
+mkdir -p coverage
+rc=0
+vendor/bin/phpunit \
+    --configuration=phpunit-mutation.xml \
+    --coverage-clover coverage/clover.xml \
+    --coverage-xml coverage/coverage-xml \
+    --log-junit coverage/junit.xml \
+    --no-progress || rc=$?
+if [ "$rc" -ne 0 ]; then
+    echo "Error: coverage run failed; Infection needs a green suite." >&2
+    exit "$rc"
+fi
+
+# Infection joins each `git diff --name-only` path to `git rev-parse
+# --show-toplevel`, the repo root. CI's `git config diff.relative true` makes
+# git print paths relative to ibl5/ (classes/X.php), so the join names a file
+# that does not exist, and Infection reports "No source file found" and exits
+# 0. Leaving diff.relative unset keeps the paths repo-root-relative
+# (the ibl5/ prefix stays on), which the join resolves in the main checkout
+# and in a worktree alike.
+INFECTION_LOG="$(mktemp "${TMPDIR:-/tmp}/mutation-diff-infection.XXXXXX")"
+set +e
+vendor/bin/infection \
+    --configuration=infection.json5 \
+    --coverage=coverage \
+    --git-diff-base="$BASE" \
+    --git-diff-lines \
+    --map-source-class-to-test \
+    --only-covering-test-cases \
+    --skip-initial-tests \
+    --show-mutations \
+    --no-progress \
+    --min-msi=100 \
+    --ignore-msi-with-no-mutations 2>&1 | tee "$INFECTION_LOG"
+rc=${PIPESTATUS[0]}
+set -e
+
+# Infection exits 0 when its git filter matches nothing. CHANGED is non-empty
+# here (the skip above exits otherwise), so an empty filter means no class in
+# this diff was mutated. Report that as a failure, never as a pass.
+if [ "$rc" -eq 0 ] && grep -qE 'No source file found|Could not find any modified (files|lines)' "$INFECTION_LOG"; then
+    {
+        echo "Error: Infection matched no source files, but the diff changes these classes:"
+        while IFS= read -r f; do
+            echo "  $f"
+        done <<<"$CHANGED"
+        echo "No mutant ran, so this run proves nothing."
+        echo "If every class listed is in source.excludes in ibl5/infection.json5, nothing here is mutable and exit 5 is expected."
+        echo "Otherwise Infection's git filter missed them. Check that git config --get diff.relative prints nothing."
+    } >&2
+    exit 5
+fi
+exit "$rc"

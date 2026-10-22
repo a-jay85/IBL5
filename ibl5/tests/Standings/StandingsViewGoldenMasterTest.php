@@ -455,7 +455,7 @@ class StandingsViewGoldenMasterTest extends TestCase
         $view = $this->buildView();
         $html = $view->renderRegion('Western');
 
-        $this->assertNotEmpty($html, 'Output must be non-empty for an empty standings region');
+        $this->assertNotSame('', $html, 'Output must be non-empty for an empty standings region');
         $this->assertStringContainsString('<table', $html);
         $this->assertStringContainsString('</table>', $html);
         $this->assertStringContainsString('<thead>', $html);

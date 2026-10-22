@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Usage: bin/digest-dm-build --pr-number N --title TITLE --url URL [--branch BRANCH] < verdict-body
+# Usage: bin/digest-dm-build --pr-number N --title TITLE --url URL [--branch BRANCH] [--pr-body-file FILE] < verdict-body
 #   Reads a /pr-ready sticky verdict comment body on STDIN and writes a Discord-sized
 #   merge-digest DM to STDOUT. --pr-number, --title and --url are required; an unknown or
 #   missing flag exits 2 with a message on stderr. --branch is optional; when non-empty it
 #   prints as a link to --url on the line under the "Merged" header, otherwise the
 #   header's #N is that link. The URL is never printed bare. A missing or unparseable
 #   digest is NOT an error: it degrades the message body and still exits 0.
+#   --pr-body-file is optional; when it names a readable PR body carrying a valid
+#   `**Merge danger:**` line, a one-way door adds a loud first line to the DM and a
+#   two-way localized change compresses the What/Watch budgets. An unreadable path
+#   exits 2; a missing or malformed danger line leaves the output unchanged.
 #
 # Consumed by .github/workflows/merge-digest-notify.yml, which pipes in the body of the
 # LAST comment carrying `<!-- pr-ready-verdict -->`.
@@ -21,7 +25,7 @@
 #   fixed scaffolding   ~70
 #   "#N: <title>"      <=100   (title truncated at 80)
 #   branch link        <=135   (branch truncated at 60, plus the <URL>)
-#   What changed       <=1000
+#   What changed       <=1000  (a one-way danger prefix spends from this budget)
 #   Watch              <=650
 #                      ------
 #                      ~1955
@@ -59,12 +63,14 @@ PR_NUMBER=""
 TITLE=""
 URL=""
 BRANCH=""
+PR_BODY_FILE=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --pr-number) PR_NUMBER="${2-}"; shift 2 ;;
         --title)     TITLE="${2-}";     shift 2 ;;
         --url)       URL="${2-}";       shift 2 ;;
         --branch)    BRANCH="${2-}";    shift 2 ;;
+        --pr-body-file) PR_BODY_FILE="${2-}"; shift 2 ;;
         -h|--help)
             sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)
@@ -145,6 +151,23 @@ _label_value() {
 
 WHAT="$(_label_value 'What changed')"
 WATCH="$(_label_value 'Watch')"
+# Merge danger (optional): parsed from the PR body file with the same line shape that
+# bin/lib/pr-armable.sh pr_merge_danger_hold and harness/merge_danger.py accept.
+DANGER_LINE=""; MD_DOOR=""; MD_BLAST=""
+if [ -n "$PR_BODY_FILE" ]; then
+    [ -r "$PR_BODY_FILE" ] || { echo "digest-dm-build: --pr-body-file not readable: $PR_BODY_FILE" >&2; exit 2; }
+    MD_RAW="$(grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external) · Why: .{20,}$' "$PR_BODY_FILE" | head -n1 || true)"
+    if [ -n "$MD_RAW" ]; then
+        MD_DOOR="${MD_RAW#*Door: }"; MD_DOOR="${MD_DOOR%% ·*}"
+        MD_BLAST="${MD_RAW#*Blast radius: }"; MD_BLAST="${MD_BLAST%% ·*}"
+    fi
+fi
+if [ "$MD_DOOR" = one-way ]; then
+    DANGER_LINE="!! ONE-WAY DOOR (blast radius: $MD_BLAST)"
+    WHAT_MAX=$((WHAT_MAX - ${#DANGER_LINE} - 1))     # the prefix spends from WHAT's budget
+elif [ "$MD_DOOR" = two-way ] && [ "$MD_BLAST" = localized ]; then
+    WHAT_MAX=400; WATCH_MAX=200                      # quiet merge: compressed body
+fi
 TITLE_T="$(_trunc "$TITLE_MAX" "$TITLE")"
 
 # The branch is the link text for the PR URL, so the brackets that would close the
@@ -171,7 +194,7 @@ fi
 # per field rather than discarding the half that parsed.
 [ -n "$WHAT" ]  || WHAT='(missing)'
 [ -n "$WATCH" ] || WATCH='(missing)'
-printf '**Merged %s: %s**%s\n\n**What changed:** %s\n\n**Watch:** %s\n' \
-    "$PR_REF" "$TITLE_T" "$BRANCH_LINE" \
+printf '%s**Merged %s: %s**%s\n\n**What changed:** %s\n\n**Watch:** %s\n' \
+    "${DANGER_LINE:+$DANGER_LINE$'\n'}" "$PR_REF" "$TITLE_T" "$BRANCH_LINE" \
     "$(_trunc "$WHAT_MAX" "$WHAT")" \
     "$(_trunc "$WATCH_MAX" "$WATCH")"

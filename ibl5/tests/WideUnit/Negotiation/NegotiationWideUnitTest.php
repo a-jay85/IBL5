@@ -90,15 +90,50 @@ class NegotiationWideUnitTest extends WideUnitTestCase
     {
         // Arrange
         $this->setupSuccessfulNegotiationScenario();
+        $salaryCap = self::createMock(SalaryCapRepositoryInterface::class);
+        // Verify the position salary commitment lookup ran, keyed on the player's pid
+        $salaryCap->expects($this->once())
+            ->method('getPositionSalaryCommitmentNextYear')
+            ->with(self::anything(), self::anything(), self::identicalTo(1))
+            ->willReturn(0);
+        $service = new NegotiationService(
+            $this->mockDb,
+            new NegotiationRepository($this->mockDb, $salaryCap),
+            new NegotiationValidator($this->mockDb, $this->mockSeason),
+            new ExtensionContractDemandCalculator($this->mockDb, $salaryCap),
+            self::createStub(TeamIdentityRepositoryInterface::class),
+        );
 
         // Act
-        $result = $this->service->processNegotiation(1, 'Miami Cyclones', 'ibl5');
+        $result = $service->processNegotiation(1, 'Miami Cyclones', 'ibl5');
 
         // Assert - Should include cap space in form
         $this->assertStringContainsString('Test Player', $result);
-        
-        // Verify cap space query was executed (queries vw_current_salary view)
-        $this->assertQueryExecuted("vw_current_salary");
+    }
+
+    /**
+     * @group integration
+     * @group success-scenarios
+     */
+    public function testProcessNegotiationCardUsesTeamColors(): void
+    {
+        $this->setupSuccessfulNegotiationScenario();
+        $commonRepo = self::createStub(SalaryCapRepositoryInterface::class);
+        $teamRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamRepo->method('getTeamColorRow')->willReturn(['color1' => 'CE1141', 'color2' => '000000']);
+        $service = new NegotiationService(
+            $this->mockDb,
+            new NegotiationRepository($this->mockDb, $commonRepo),
+            new NegotiationValidator($this->mockDb, $this->mockSeason),
+            new ExtensionContractDemandCalculator($this->mockDb, $commonRepo),
+            $teamRepo,
+        );
+
+        $result = $service->processNegotiation(1, 'Miami Cyclones', 'ibl5');
+
+        // The card's gradient endpoints carry color2 ('000000'); the gold default would carry '1e3a5f'.
+        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#000000', $result);
+        $this->assertStringNotContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $result);
     }
 
     // ========== VALIDATION FAILURE SCENARIOS ==========

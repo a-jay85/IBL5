@@ -7,6 +7,9 @@
 # ~/Library/LaunchAgents.  Runs on macOS and Linux CI.
 
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+H_FAIL_FD=2  # FAIL: lines stay on stderr, as before migration
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 LIB="$SCRIPT_DIR/lib/launchd-job.sh"
@@ -18,8 +21,9 @@ LIB="$SCRIPT_DIR/lib/launchd-job.sh"
 # ---------------------------------------------------------------------------
 T="$(mktemp -d)"
 export T
-_cleanup() { rm -rf "$T"; }
+_cleanup() { rm -rf "$T"; h_cleanup; }
 trap _cleanup EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
 
 # Verify HOME never points outside T (safety assertion enforced per case below)
 
@@ -126,11 +130,8 @@ MIN_PATH="$T/min:/usr/bin:/bin:/usr/sbin:/sbin"
 # ---------------------------------------------------------------------------
 # Test framework
 # ---------------------------------------------------------------------------
-PASSED=0
-FAILED=0
-
-pass() { printf 'PASS %s\n' "$1"; PASSED=$((PASSED + 1)); }
-fail() { printf 'FAIL %s: %s\n' "$1" "$2" >&2; FAILED=$((FAILED + 1)); }
+pass() { h_pass "$1"; }
+fail() { h_fail "$1: $2"; }
 
 # reset_ctl — clear per-test control state
 reset_ctl() {
@@ -631,7 +632,7 @@ FAILING_DM="$T/ctl/failing_dm"
 printf '#!/bin/bash\nexit 1\n' > "$FAILING_DM"
 chmod +x "$FAILING_DM"
 
-DM_OUT1="$(env -i HOME="$T/home" /bin/bash -c "
+DM_OUT1="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$T/home" /bin/bash -c "
 $(declare -f ljob_dm_ready ljob_dm_send 2>/dev/null || (. "$LIB" && declare -f ljob_dm_ready ljob_dm_send))
 NOTIFY=1
 DISCORD_DM='$FAILING_DM'
@@ -639,7 +640,7 @@ ljob_dm_ready mytool && ljob_dm_send mytool 'hello'
 " 2>&1)"
 
 # Sub-case 2: NOTIFY=0 → ljob_dm_ready returns 1 silently (no output)
-DM_OUT2="$(env -i HOME="$T/home" /bin/bash -c "
+DM_OUT2="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$T/home" /bin/bash -c "
 $(. "$LIB" && declare -f ljob_dm_ready)
 NOTIFY=0
 DISCORD_DM='$FAILING_DM'
@@ -651,7 +652,7 @@ NON_EXEC_DM="$T/ctl/non_exec_dm"
 printf 'not executable\n' > "$NON_EXEC_DM"
 # do NOT chmod +x
 
-DM_OUT3="$(env -i HOME="$T/home" /bin/bash -c "
+DM_OUT3="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$T/home" /bin/bash -c "
 $(. "$LIB" && declare -f ljob_dm_ready)
 NOTIFY=1
 DISCORD_DM='$NON_EXEC_DM'
@@ -973,6 +974,4 @@ fi
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-TOTAL=$((PASSED + FAILED))
-printf 'launchd-job: %d passed, %d failed\n' "$PASSED" "$FAILED"
-[[ $FAILED -eq 0 ]] && exit 0 || exit 1
+h_done

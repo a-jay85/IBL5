@@ -9,7 +9,8 @@ use FreeAgency\FreeAgencyController;
 /*               (c) July 22, 2005 by Spencer Cooley                    */
 /************************************************************************/
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelf = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelf) ? $phpSelf : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -17,7 +18,9 @@ $module_name = basename(dirname(__FILE__));
 
 $pagetitle = "- Free Agency System";
 
-global $authService;
+global $mysqli_db, $authService, $user;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
@@ -27,7 +30,8 @@ $pid = is_numeric($_REQUEST['pid'] ?? null) ? (int) $_REQUEST['pid'] : 0;
 
 $commonRepo = new Repositories\TeamIdentityRepository($mysqli_db);
 $repository = new FreeAgency\FreeAgencyRepository($mysqli_db);
-$demandRepository = new FreeAgency\FreeAgencyDemandRepository($mysqli_db);
+$salaryCapRepo = new Repositories\SalaryCapRepository($mysqli_db);
+$demandRepository = new FreeAgency\FreeAgencyDemandRepository($mysqli_db, $salaryCapRepo);
 $tableRenderer = new FreeAgency\FreeAgencyTableRendererView($commonRepo);
 $service = new FreeAgency\FreeAgencyService($repository, $demandRepository, $mysqli_db, $commonRepo);
 $view = new FreeAgency\FreeAgencyView(
@@ -36,7 +40,11 @@ $view = new FreeAgency\FreeAgencyView(
     new FreeAgency\FreeAgencyTeamFreeAgentsSectionView($tableRenderer),
     new FreeAgency\FreeAgencyOtherFreeAgentsSectionView($tableRenderer)
 );
-$processor = new FreeAgency\FreeAgencyProcessor($mysqli_db, $commonRepo);
+$processor = new FreeAgency\FreeAgencyProcessor(
+    $mysqli_db,
+    $commonRepo,
+    new FreeAgency\FreeAgencyMarketDemandCalculator($demandRepository)
+);
 $request = \Http\HttpRequest::fromGlobals();
 $controller = new FreeAgencyController($mysqli_db, $commonRepo, $authService, $service, $view, $processor, $request);
 $controller->handleRequest($user, $pa, $pid);

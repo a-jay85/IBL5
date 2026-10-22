@@ -9,7 +9,7 @@
 .ibl-centerbox,
 .team-card {
     font-family: var(--font-sans);
-    background: white;
+    background: var(--white);
     overflow: hidden;
     box-shadow: var(--shadow-md);
     border: 1px solid var(--gray-100);
@@ -53,7 +53,7 @@
 }
 
 .ibl-card__subtitle {
-    font-size: 1rem;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.7);
     margin-top: var(--space-1);
 }
@@ -175,11 +175,11 @@
     border-radius: var(--radius-lg);
     margin-bottom: var(--space-4);
     font-size: var(--text-lg);
-    line-height: 1.5;
+    line-height: var(--leading-relaxed);
 }
 
 .ibl-alert--success { background: var(--success-50); color: var(--success-600); border: 1px solid var(--success-200); }
-.ibl-alert--error   { background: var(--error-50);   color: var(--error-600);   border: 1px solid var(--error-200); }
+.ibl-alert--error   { background: var(--error-50);   color: var(--error-700);   border: 1px solid var(--error-200); }
 .ibl-alert--info    { background: var(--info-50);    color: var(--info-600);    border: 1px solid var(--info-200); }
 .ibl-alert--warning { background: var(--warning-50); color: var(--warning-600); border: 1px solid var(--warning-200); }
 
@@ -218,7 +218,7 @@
 
 .team-card__body {
     padding: var(--space-3) var(--space-4);
-    font-size: 1rem;
+    font-size: var(--text-base);
     color: var(--gray-700);
 }
 
@@ -262,8 +262,8 @@
     display: grid;
     grid-template-columns: auto 1fr;
     gap: var(--space-1) var(--space-3);
-    font-size: 1rem;
-    line-height: 1.4;
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
     width: fit-content;
     margin-inline: auto;
 }
@@ -285,8 +285,8 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    font-size: 1rem;
-    line-height: 1.3;
+    font-size: var(--text-base);
+    line-height: var(--leading-snug);
 }
 
 .team-history-list li {
@@ -325,7 +325,7 @@
     padding: var(--space-2) var(--space-4);
     background: var(--gray-50);
     border-top: 1px solid var(--gray-100);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-semibold);
     color: var(--gray-700);
 }
@@ -340,7 +340,7 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    font-size: 1rem;
+    font-size: var(--text-base);
 }
 
 .team-awards-list li {
@@ -417,7 +417,7 @@
     color: var(--gray-800);
     text-decoration: none;
     font-weight: var(--font-weight-medium);
-    font-size: 1rem;
+    font-size: var(--text-base);
     transition: color var(--transition-fast);
 }
 
@@ -480,8 +480,8 @@
 
 /* Playoff series result line */
 .playoff-result {
-    font-size: 1rem;
-    line-height: 1.3;
+    font-size: var(--text-base);
+    line-height: var(--leading-snug);
 }
 
 .playoff-result--win {

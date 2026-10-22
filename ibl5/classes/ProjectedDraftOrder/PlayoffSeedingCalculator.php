@@ -26,12 +26,12 @@ class PlayoffSeedingCalculator
      * @param list<StandingsRow> $conferenceTeams
      * @param array<int, array<int, int>> $h2h
      * @param array<int, float> $pointDiffs
-     * @return array{wildCards: list<StandingsRow>, divisionWinners: list<StandingsRow>, conferenceWinner: StandingsRow|null, nonPlayoff: list<StandingsRow>}
+     * @return array{otherPlayoffTeams: list<StandingsRow>, divisionWinners: list<StandingsRow>, conferenceWinner: StandingsRow|null, nonPlayoff: list<StandingsRow>}
      */
     public function determinePlayoffTeams(array $conferenceTeams, array $h2h, array $pointDiffs): array
     {
         if ($conferenceTeams === []) {
-            return ['wildCards' => [], 'divisionWinners' => [], 'conferenceWinner' => null, 'nonPlayoff' => []];
+            return ['otherPlayoffTeams' => [], 'divisionWinners' => [], 'conferenceWinner' => null, 'nonPlayoff' => []];
         }
 
         $byDivision = [];
@@ -50,10 +50,10 @@ class PlayoffSeedingCalculator
             }
         }
 
-        // Sort non-winners by record (best first) to pick top 6
+        // Sort non-winners by record (best first); the top 6 are the other playoff teams
         usort($nonWinners, fn (array $a, array $b): int => $this->compareTeamsForPlayoffSeeding($a, $b, $h2h, $pointDiffs));
 
-        $wildCards = array_slice($nonWinners, 0, 6);
+        $otherPlayoffTeams = array_slice($nonWinners, 0, 6);
         $nonPlayoff = array_slice($nonWinners, 6);
 
         // Conference winner is the best division winner
@@ -62,7 +62,7 @@ class PlayoffSeedingCalculator
         $divisionOnlyWinners = array_slice($divisionWinners, 1);
 
         return [
-            'wildCards' => array_values($wildCards),
+            'otherPlayoffTeams' => array_values($otherPlayoffTeams),
             'divisionWinners' => array_values($divisionOnlyWinners),
             'conferenceWinner' => $conferenceWinner,
             'nonPlayoff' => array_values($nonPlayoff),

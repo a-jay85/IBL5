@@ -126,11 +126,14 @@ Found ${on_count} issue(s). See inline threads below.
 
 ${PRF_FOOTER}"
         local payload_file="$tmp/payload.json"
+        # The agent marker is written only for an allowlisted id, so a hostile
+        # value cannot inject an HTML-comment terminator into the body.
+        local comments_prog='[.[] | {path, line, side:"RIGHT", body: (.body + "\n\n<!-- score: " + (.score|tostring) + " -->" + ((.agent // "") | tostring | if test("^[A-Za-z0-9_-]{1,32}$") then "\n<!-- agent: " + . + " -->" else "" end))}]'
         jq -n \
             --arg sha "$head_sha" \
             --arg ev "COMMENT" \
             --arg body "$envelope" \
-            --argjson comments "$(jq '[.[] | {path, line, side:"RIGHT", body: (.body + "\n\n<!-- score: " + (.score|tostring) + " -->")}]' "$on_file")" \
+            --argjson comments "$(jq "$comments_prog" "$on_file")" \
             '{commit_id: $sha, event: $ev, body: $body, comments: $comments}' \
             > "$payload_file"
         "$GH_CMD" api --method POST \
@@ -189,7 +192,7 @@ post_review_summary() {
 
 # prf_review_threads PR_NUMBER
 #   Emits one JSON object per review thread:
-#     {id, isResolved, isOutdated, path, line, commentId, score, body,
+#     {id, isResolved, isOutdated, path, line, commentId, score, agent, body,
 #      authorLogin, authorType}
 #   `authorLogin` / `authorType` describe the FIRST comment's author (the thread
 #   root): GraphQL `author.login` and `author.__typename` (`User`, `Bot`, ...).
@@ -198,6 +201,8 @@ post_review_summary() {
 #   `commentId` is the REST databaseId of the thread's FIRST comment — the id the
 #   replies endpoint keys on.  `score` is parsed from the `<!-- score: N -->`
 #   marker post_review_findings embeds, or null for a human-authored thread.
+#   `agent` is parsed from the `<!-- agent: X -->` marker written next to it, or
+#   null for a human thread or a finding posted before the marker existed.
 #   CAP: the first 100 threads only — no pagination.  A PR with more than 100
 #   review threads silently truncates here; every caller inherits that cap.
 #   A thread whose only comment was deleted yields commentId/body null, so the
@@ -226,6 +231,9 @@ prf_review_threads() {
                  score: ((.comments.nodes[0].body // "")
                          | capture("<!-- score: (?<s>[0-9]+) -->") // null
                          | if . == null then null else (.s|tonumber) end),
+                 agent: ((.comments.nodes[0].body // "")
+                         | capture("<!-- agent: (?<a>[A-Za-z0-9_-]{1,32}) -->") // null
+                         | if . == null then null else .a end),
                  body: (.comments.nodes[0].body // ""),
                  authorLogin: (.comments.nodes[0].author.login // ""),
                  authorType: (.comments.nodes[0].author.__typename // "")}'

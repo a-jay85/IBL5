@@ -84,6 +84,27 @@ is_in_worktree() {
     [ "$gd" != "$gcd" ]
 }
 
+# Print the absolute path of the main checkout for the repo containing <dir>
+# (default: the current directory). Answers from the main checkout, a linked
+# worktree, or any subdirectory of either, and from any cwd when <dir> is
+# given explicitly. Git-based: resolve_canonical_root is path-only and needs a
+# worktree top-level, so it cannot answer from a subdir.
+# Output is physical (pwd -P), matching the first `git worktree list
+# --porcelain` entry, so macOS /var vs /private/var never splits the two.
+# Prints nothing and returns 1 when <dir> is not inside a git repo.
+main_checkout_root() {
+    local dir="${1:-.}" gcd rel
+    gcd=$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || gcd=""
+    if [ "${gcd#/}" = "$gcd" ]; then
+        # git < 2.31 lacks --path-format and echoes the flag back; fall back to
+        # the relative common dir resolved from <dir>.
+        rel=$(git -C "$dir" rev-parse --git-common-dir 2>/dev/null) || return 1
+        [ -n "$rel" ] || return 1
+        gcd=$(cd "$dir" 2>/dev/null && cd "$rel" 2>/dev/null && pwd -P) || return 1
+    fi
+    (cd "$(dirname "$gcd")" 2>/dev/null && pwd -P) || return 1
+}
+
 # Materialize a REAL config.php at <dest> from <main_ibl5_dir>.
 # config.php can't be a symlink into a worktree: the absolute host target doesn't
 # resolve inside Docker, so every request 500s (`Failed to open stream`). It's

@@ -112,7 +112,7 @@
 /* Data cells */
 .ibl-data-table td {
     color: var(--gray-800);
-    font-size: 1rem;
+    font-size: var(--text-base);
     padding: 0.25rem 0.1rem;
     text-align: center;
     border-bottom: 1px solid var(--gray-100);
@@ -124,7 +124,7 @@
 }
 
 .ibl-data-table tbody tr:nth-child(odd) {
-    background-color: white;
+    background-color: var(--white);
 }
 
 .ibl-data-table tbody tr:nth-child(even) {
@@ -340,7 +340,7 @@
 
     /* Sticky column backgrounds - consolidated for all variants */
     .responsive-table tbody tr:nth-child(odd) td[class*="sticky-col"] {
-        background-color: white;
+        background-color: var(--white);
     }
 
     .responsive-table tbody tr:nth-child(even) td[class*="sticky-col"] {
@@ -420,7 +420,7 @@
 
     /* Mobile compact sizing - exclude voting tables which stay full size */
     .ibl-data-table:not(.voting-form-table):not(.voting-results-table) th {
-        font-size: 1rem;
+        font-size: var(--text-base);
         padding: 0.5rem 0.25rem;
     }
 
@@ -717,7 +717,7 @@
    own opaque --team-cell-bg, so the zebra/hover fill must not mask the team
    color (these rules out-specify td.ibl-team-cell--colored otherwise). */
 .sticky-table tbody tr:nth-child(odd) td[class*="sticky-col"]:not(.ibl-team-cell--colored) {
-    background-color: white;
+    background-color: var(--white);
 }
 
 .sticky-table tbody tr:nth-child(even) td[class*="sticky-col"]:not(.ibl-team-cell--colored) {
@@ -1068,7 +1068,7 @@ td.ibl-team-cell--colored {
 .ibl-data-table td.ibl-stat-highlight {
     font-family: var(--font-display);
     font-weight: var(--font-weight-bold);
-    color: var(--accent-500);
+    color: var(--accent-700);
 }
 
 /* ==========================================================================
@@ -1159,6 +1159,19 @@ td.ibl-team-cell--colored {
     outline: none;
     background-color: var(--accent-100);
     border-radius: var(--radius-sm);
+}
+
+/* Keyboard focus ring. The tooltip has no border, so the 10%-alpha
+   --ring-accent would be near-invisible; use the strong token. */
+.ibl-tooltip:focus-visible {
+    box-shadow: var(--ring-accent-strong);
+}
+
+/* Borderless modifier: strips outer chrome for nested/compact tables */
+.ibl-data-table--borderless {
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
 }
 
 } /* end @layer components */

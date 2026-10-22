@@ -168,7 +168,7 @@ class DepthChartSnapshotRepository extends \Database\BaseMysqliRepository implem
     {
         /** @var list<SavedDepthChartPlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_saved_depth_chart_players` WHERE depth_chart_id = ? ORDER BY ordinal ASC",
+            "SELECT * FROM `ibl_saved_depth_chart_players` WHERE depth_chart_id = ? ORDER BY ordinal ASC, id ASC",
             "i",
             $depthChartId
         );
@@ -257,7 +257,7 @@ class DepthChartSnapshotRepository extends \Database\BaseMysqliRepository implem
                     dc_can_play_in_game, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh
              FROM `ibl_plr`
              WHERE teamid = ? AND retired = '0' AND ordinal <= ?
-             ORDER BY ordinal ASC",
+             ORDER BY ordinal ASC, pid ASC",
             "ii",
             $teamid,
             \League\JsbConstants::WAIVERS_ORDINAL

@@ -97,12 +97,7 @@ class LeagueStartersService implements LeagueStartersServiceInterface
             $team = Team::initialize($this->db, $teamRow);
 
             foreach ($positions as $position) {
-                if (isset($starterMap[$team->teamid][$position])) {
-                    $player = $starterMap[$team->teamid][$position];
-                } else {
-                    $player = $this->buildPlaceholderForTeam($team);
-                }
-                $startersByPosition[$position][] = $player;
+                $startersByPosition[$position][] = $starterMap[$team->teamid][$position] ?? $this->buildPlaceholderForTeam($team);
             }
         }
 

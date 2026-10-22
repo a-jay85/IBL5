@@ -47,7 +47,6 @@ class DateParser
 
         $month = (int) ltrim(date('m', $timestamp), '0');
         $day = (int) ltrim(date('d', $timestamp), '0');
-        $year = (int) date('Y', $timestamp);
 
         // Apply phase adjustments
         if ($phase === "HEAT") {

@@ -85,23 +85,23 @@
     justify-content: center;
     gap: var(--space-2);
     font-family: var(--font-sans);
-    font-size: 1rem;
+    font-size: var(--text-base);
 }
 
 .auth-links a {
-    color: var(--accent-500);
+    color: var(--accent-700);
     text-decoration: none;
     font-weight: var(--font-weight-medium);
     transition: color var(--transition-fast);
 }
 
 .auth-links a:hover {
-    color: var(--accent-600);
+    color: var(--accent-800);
     text-decoration: underline;
 }
 
 .auth-links__divider {
-    color: var(--gray-300);
+    color: var(--gray-500);
     user-select: none;
 }
 
@@ -180,7 +180,7 @@
     font-family: var(--font-sans);
     font-size: var(--text-lg);
     color: var(--gray-600);
-    line-height: 1.6;
+    line-height: var(--leading-loose);
     margin-bottom: var(--space-4);
 }
 
@@ -228,14 +228,14 @@
     align-items: center;
     gap: var(--space-2);
     cursor: pointer;
-    font-size: 1rem;
+    font-size: var(--text-base);
     color: var(--gray-600);
 }
 
 .auth-info-text {
-    font-size: 1rem;
+    font-size: var(--text-base);
     color: var(--gray-500);
-    line-height: 1.5;
+    line-height: var(--leading-relaxed);
     text-align: center;
 }
 

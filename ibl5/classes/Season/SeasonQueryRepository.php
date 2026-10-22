@@ -288,7 +288,7 @@ class SeasonQueryRepository extends \Database\BaseMysqliRepository implements Se
     public function getAvailableSeasonYears(): array
     {
         /** @var list<array{year: int}> $rows */
-        $rows = $this->fetchAll("SELECT DISTINCT year FROM `ibl_hist` ORDER BY year DESC");
+        $rows = $this->fetchAll("SELECT DISTINCT year FROM `ibl_hist` ORDER BY year DESC"); // @phpstan-ignore ibl.orderByMissingTiebreaker (DISTINCT year is the whole select list, so year alone is a total order)
 
         $years = [];
         foreach ($rows as $row) {

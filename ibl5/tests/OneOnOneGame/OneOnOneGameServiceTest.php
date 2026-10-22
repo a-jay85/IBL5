@@ -45,14 +45,14 @@ final class OneOnOneGameServiceTest extends TestCase
     {
         $errors = $this->service->validatePlayerSelection(1, 2);
 
-        $this->assertEmpty($errors);
+        $this->assertSame([], $errors);
     }
 
     public function testValidatePlayerSelectionReturnsErrorWhenPlayer1IsNull(): void
     {
         $errors = $this->service->validatePlayerSelection(null, 2);
 
-        $this->assertNotEmpty($errors);
+        $this->assertNotSame([], $errors);
         $this->assertStringContainsString('Player 1', $errors[0]);
     }
 
@@ -60,7 +60,7 @@ final class OneOnOneGameServiceTest extends TestCase
     {
         $errors = $this->service->validatePlayerSelection(1, null);
 
-        $this->assertNotEmpty($errors);
+        $this->assertNotSame([], $errors);
         $this->assertStringContainsString('Player 2', $errors[0]);
     }
 
@@ -68,21 +68,21 @@ final class OneOnOneGameServiceTest extends TestCase
     {
         $errors = $this->service->validatePlayerSelection(0, 2);
 
-        $this->assertEmpty($errors);
+        $this->assertSame([], $errors);
     }
 
     public function testValidatePlayerSelectionAcceptsZeroForPlayer2(): void
     {
         $errors = $this->service->validatePlayerSelection(1, 0);
 
-        $this->assertEmpty($errors);
+        $this->assertSame([], $errors);
     }
 
     public function testValidatePlayerSelectionReturnsErrorWhenBothPlayersAreSame(): void
     {
         $errors = $this->service->validatePlayerSelection(5, 5);
 
-        $this->assertNotEmpty($errors);
+        $this->assertNotSame([], $errors);
         $this->assertStringContainsString('same player', $errors[0]);
     }
 

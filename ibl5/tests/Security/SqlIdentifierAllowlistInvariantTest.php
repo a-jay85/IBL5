@@ -13,10 +13,12 @@ use JsbParser\PlayerIdResolver;
 use League\LeagueContext;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Search\SearchRepository;
 use SeasonLeaderboards\SeasonLeaderboardsRepository;
 use Standings\StandingsRepository;
 use Standings\StandingsUpdaterRepository;
 use Team\TeamQueryRepository;
+use TeamOffDefStats\TeamOffDefStatsRepository;
 use Voting\VotingRepository;
 
 /**
@@ -37,6 +39,9 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
     private const BACKTICKED_COLUMN_PATTERN = '/^`[a-z_]+`$/';
     private const SORT_EXPRESSION_PATTERN = '/^[()`a-z_*+\-\/0-9]+$/';
     private const VOTE_COLUMN_PATTERN = '/^[a-z0-9_]+$/';
+    private const PREFIX_PATTERN = '/^[a-z]+$/';
+    /** Captures the path of every ibl.sqlStringConcatenation entry in a PHPStan baseline. */
+    private const SQL_CONCAT_ENTRY_PATTERN = '/identifier: ibl\.sqlStringConcatenation\s*\n\s*count: \d+\s*\n\s*path: (\S+)/';
 
     /**
      * Every class whose SQL identifier construction was converted under
@@ -59,6 +64,8 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
             'TeamStatsCalculator' => [TeamStatsCalculator::class],
             'PlayerIdResolver' => [PlayerIdResolver::class],
             'Boxscore' => [Boxscore::class],
+            'SearchRepository' => [SearchRepository::class],
+            'TeamOffDefStatsRepository' => [TeamOffDefStatsRepository::class],
         ];
     }
 
@@ -85,12 +92,14 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
             'StandingsUpdaterRepository::MAGIC_NUMBER_COLUMN_SQL' => [StandingsUpdaterRepository::class, 'MAGIC_NUMBER_COLUMN_SQL', self::BACKTICKED_COLUMN_PATTERN, false, false],
             'StandingsUpdaterRepository::CLINCHED_COLUMN_SQL' => [StandingsUpdaterRepository::class, 'CLINCHED_COLUMN_SQL', self::BACKTICKED_COLUMN_PATTERN, false, false],
             'SeasonLeaderboardsRepository::SORT_EXPRESSIONS' => [SeasonLeaderboardsRepository::class, 'SORT_EXPRESSIONS', self::SORT_EXPRESSION_PATTERN, false, false],
-            'VotingRepository::ALLOWED_COLUMNS' => [VotingRepository::class, 'ALLOWED_COLUMNS', self::VOTE_COLUMN_PATTERN, false, true],
+            'VotingRepository::ASG_COLUMNS' => [VotingRepository::class, 'ASG_COLUMNS', self::VOTE_COLUMN_PATTERN, false, true],
+            'VotingRepository::EOY_COLUMNS' => [VotingRepository::class, 'EOY_COLUMNS', self::VOTE_COLUMN_PATTERN, false, true],
             'TeamQueryRepository::LAST_SIM_DEPTH_COLUMNS' => [TeamQueryRepository::class, 'LAST_SIM_DEPTH_COLUMNS', self::COLUMN_PATTERN, false, false],
             'TeamQueryRepository::DEPTH_CHART_DEPTH_COLUMNS' => [TeamQueryRepository::class, 'DEPTH_CHART_DEPTH_COLUMNS', self::COLUMN_PATTERN, false, false],
             'TeamStatsCalculator::STANDINGS_TABLES' => [TeamStatsCalculator::class, 'STANDINGS_TABLES', self::TABLE_PATTERN, false, false],
             'PlayerIdResolver::PLR_TABLES' => [PlayerIdResolver::class, 'PLR_TABLES', self::TABLE_PATTERN, false, false],
             'PlayerIdResolver::SNAPSHOT_TABLES' => [PlayerIdResolver::class, 'SNAPSHOT_TABLES', self::TABLE_PATTERN, false, false],
+            'SearchRepository::SUPPORTED_PREFIXES' => [SearchRepository::class, 'SUPPORTED_PREFIXES', self::PREFIX_PATTERN, false, true],
         ];
     }
 
@@ -110,7 +119,7 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
     ): void {
         $map = (new \ReflectionClassConstant($class, $const))->getValue();
         self::assertIsArray($map);
-        self::assertNotEmpty($map);
+        self::assertNotSame([], $map);
 
         self::assertSame([], self::nonIdentifierValues($map, $pattern, $allowListKeys));
 
@@ -138,13 +147,13 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
 
         $violations = self::actorIdentityViolations($fixture::class);
 
-        self::assertNotEmpty($violations);
+        self::assertNotSame([], $violations);
         $endsWithLoggedInTeamId = array_filter(
             $violations,
             static fn (string $violation): bool => str_ends_with($violation, '$loggedInTeamID')
                 || str_ends_with($violation, '$loggedInTeamID)'),
         );
-        self::assertNotEmpty($endsWithLoggedInTeamId);
+        self::assertNotSame([], $endsWithLoggedInTeamId);
     }
 
     public function testIdentifierShapeCheckFlagsInjectedMapValue(): void
@@ -218,13 +227,104 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
                 ['ibl' => '`ibl_plr`'],
             ] as $map
         ) {
-            self::assertNotEmpty(self::nonIdentifierValues($map, self::TABLE_PATTERN, false));
+            self::assertNotSame([], self::nonIdentifierValues($map, self::TABLE_PATTERN, false));
         }
 
         self::assertSame(
             [],
             self::nonIdentifierValues(['ibl' => 'ibl_olympics_plr_snapshots'], self::TABLE_PATTERN, false)
         );
+    }
+
+    public function testPrefixShapeCheckFlagsInjectedPrefixValue(): void
+    {
+        $map = ['nuke', 'nuke_topics; DROP TABLE nuke_topics; --'];
+        self::assertSame(
+            ['nuke_topics; DROP TABLE nuke_topics; --'],
+            self::nonIdentifierValues($map, self::PREFIX_PATTERN, true),
+        );
+
+        // A hyphenated prefix is outside the shape, so adding one to SUPPORTED_PREFIXES fails.
+        self::assertSame(['nuke-prod'], self::nonIdentifierValues(['nuke', 'nuke-prod'], self::PREFIX_PATTERN, true));
+
+        // A trailing underscore is not a prefix; the "_stories" suffix supplies the separator.
+        self::assertNotSame([], self::nonIdentifierValues(['nuke_'], self::PREFIX_PATTERN, true));
+    }
+
+    public function testSqlConcatenationBaselineIsEmpty(): void
+    {
+        $neon = file_get_contents(__DIR__ . '/../../phpstan-baseline.neon');
+        self::assertIsString($neon);
+
+        $matched = preg_match_all(self::SQL_CONCAT_ENTRY_PATTERN, $neon, $matches);
+        self::assertNotFalse($matched);
+
+        self::assertSame([], $matches[1], 'ibl.sqlStringConcatenation entries reappeared in phpstan-baseline.neon: ' . implode(', ', $matches[1]));
+    }
+
+    public function testSqlConcatBaselineRegexDetectsSampleEntry(): void
+    {
+        // Positive control: without it, a regex that stopped matching the baseline format
+        // would leave testSqlConcatenationBaselineIsEmpty vacuously green.
+        $sample = "\t\t-\n"
+            . "\t\t\trawMessage: 'SQL string concatenates a non-constant value.'\n"
+            . "\t\t\tidentifier: ibl.sqlStringConcatenation\n"
+            . "\t\t\tcount: 1\n"
+            . "\t\t\tpath: classes/Foo/FooRepository.php\n";
+
+        $matched = preg_match_all(self::SQL_CONCAT_ENTRY_PATTERN, $sample, $matches);
+
+        self::assertSame(1, $matched);
+        self::assertSame(['classes/Foo/FooRepository.php'], $matches[1]);
+    }
+
+    public function testNoSqlTextBuiltWithStringFormattingFunctions(): void
+    {
+        // BanSqlStringConcatenationRule only visits `.` concatenation, so SQL assembled by
+        // sprintf()/strtr() would slip past it with the baseline still empty. The two files
+        // below predate the rule; their counts may shrink but never grow.
+        $allowed = [
+            'Boxscore/BoxscoreAuditRepository.php' => 1,
+            'HeadToHeadRecords/HeadToHeadRecordsRepository.php' => 5,
+        ];
+        $classesDir = realpath(__DIR__ . '/../../classes');
+        self::assertIsString($classesDir);
+
+        $excess = [];
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($classesDir, \FilesystemIterator::SKIP_DOTS));
+        foreach ($files as $file) {
+            if (!$file instanceof \SplFileInfo || $file->getExtension() !== 'php') {
+                continue;
+            }
+            // phpunit-hygiene-allow: the property is source shape; no runtime seam shows how SQL text was assembled
+            $source = file_get_contents($file->getPathname());
+            self::assertIsString($source);
+            $relative = substr($file->getPathname(), strlen($classesDir) + 1);
+            $count = count(self::formattedSqlCalls($source));
+            if ($count > ($allowed[$relative] ?? 0)) {
+                $excess[] = $relative . ' (' . $count . ')';
+            }
+        }
+
+        self::assertSame([], $excess, 'SQL text built with sprintf/strtr: ' . implode(', ', $excess));
+    }
+
+    public function testFormattedSqlScanDetectsSampleCalls(): void
+    {
+        // Positive control: keeps testNoSqlTextBuiltWithStringFormattingFunctions from passing vacuously.
+        $source = "\$a = strtr('SELECT * FROM t WHERE x = :x', \$map);\n"
+            . "\$b = sprintf(\"UPDATE t SET y = %d\", \$y);\n"
+            . "\$c = sprintf('%d players', \$n);\n";
+
+        self::assertSame(["strtr('SELECT", 'sprintf("UPDATE'], self::formattedSqlCalls($source));
+    }
+
+    /** @return list<string> */
+    private static function formattedSqlCalls(string $source): array
+    {
+        preg_match_all('/\b(?:sprintf|strtr)\s*\(\s*[\'"]\s*(?:SELECT|INSERT|UPDATE|DELETE|REPLACE)\b/i', $source, $matches);
+
+        return $matches[0];
     }
 
     public function testColumnShapeCheckFlagsInjectedDepthColumnValue(): void

@@ -273,7 +273,7 @@ class TradingEndpointMutationCharacterizationTest extends DatabaseTestCase
         $orphans = $stmt3->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt3->close();
 
-        self::assertNotEmpty($orphans, 'Expected an orphan ibl_trade_offers shell (pre-validation insert not rolled back)');
+        self::assertNotSame([], $orphans, 'Expected an orphan ibl_trade_offers shell (pre-validation insert not rolled back)');
 
         // Register orphan IDs for tearDown cleanup
         foreach ($orphans as $orphan) {

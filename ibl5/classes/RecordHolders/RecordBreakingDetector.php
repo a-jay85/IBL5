@@ -68,60 +68,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         $datesByGameType = $this->groupDatesByGameType($gameDates);
 
         foreach ($datesByGameType as $gameType => $dates) {
-            $targetDates = array_flip($dates);
-            $dateFilter = $this->getDateFilterForType($gameType);
-            $gameTypeLabel = self::GAME_TYPE_LABELS[$gameType] ?? 'regular season';
-
-            // Player single-game records — one query for all stats in the
-            // canonical registry, keyed by stat key.
-            $expressions = [];
-            foreach (RecordStatDefinitions::STATS as $key => $def) {
-                $expressions[$key] = $def['expression'];
-            }
-            $allPlayerRecords = $this->repository->getTopPlayerSingleGameBatch($expressions, $dateFilter);
-
-            foreach (RecordStatDefinitions::STATS as $key => $def) {
-                $topRecords = $allPlayerRecords[$key] ?? [];
-                $newAnnouncements = $this->detectPlayerRecords($topRecords, $targetDates, $def['unit'], $gameTypeLabel);
-                array_push($announcements, ...$newAnnouncements);
-            }
-
-            // Team single-game records — the 8 team stats (DESC) plus a synthetic
-            // "fewest points" (ASC) that reuses the points expression.
-            /** @var array<string, array{expression: string, order: string}> $teamBatchConfig */
-            $teamBatchConfig = [];
-            foreach (RecordStatDefinitions::STATS as $def) {
-                $teamKey = $def['teamKey'];
-                if ($teamKey === null) {
-                    continue;
-                }
-                $teamBatchConfig[$teamKey] = ['expression' => $def['expression'], 'order' => 'DESC'];
-            }
-            $teamBatchConfig['team_fewest_points'] = [
-                'expression' => RecordStatDefinitions::STATS['points']['expression'],
-                'order' => 'ASC',
-            ];
-            $allTeamRecords = $this->repository->getTopTeamSingleGameBatch($teamBatchConfig, $dateFilter);
-
-            foreach (RecordStatDefinitions::STATS as $def) {
-                $teamKey = $def['teamKey'];
-                if ($teamKey === null) {
-                    continue;
-                }
-                $topRecords = $allTeamRecords[$teamKey] ?? [];
-                $newAnnouncements = $this->detectTeamRecords($topRecords, $targetDates, $def['unit'], $gameTypeLabel, false);
-                array_push($announcements, ...$newAnnouncements);
-            }
-
-            $fewestRecords = $allTeamRecords['team_fewest_points'] ?? [];
-            $fewestAnnouncements = $this->detectTeamRecords(
-                $fewestRecords,
-                $targetDates,
-                RecordStatDefinitions::STATS['points']['unit'],
-                $gameTypeLabel,
-                true
-            );
-            array_push($announcements, ...$fewestAnnouncements);
+            array_push($announcements, ...$this->detectForGameType($gameType, $dates));
         }
 
         // Quadruple doubles (not filtered by game type)
@@ -129,8 +76,112 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         $qdAnnouncements = $this->detectNewQuadrupleDoubles($allTargetDates);
         array_push($announcements, ...$qdAnnouncements);
 
-        // Dispatch each announcement independently — one failed dispatch must
-        // not abort the remaining announcements (finding 1.3 resilience fix).
+        $this->dispatchAll($announcements);
+
+        return $announcements;
+    }
+
+    /**
+     * Detect player, team, and fewest-points records for one game type.
+     *
+     * Order is part of the announcement contract: player stats in registry
+     * order, then team stats in registry order, then fewest points.
+     *
+     * @param list<string> $dates
+     * @return list<string>
+     */
+    private function detectForGameType(string $gameType, array $dates): array
+    {
+        $targetDates = array_flip($dates);
+        $dateFilter = $this->getDateFilterForType($gameType);
+        $gameTypeLabel = self::GAME_TYPE_LABELS[$gameType] ?? 'regular season';
+
+        /** @var list<string> $announcements */
+        $announcements = [];
+
+        // Player single-game records — one query for all stats in the
+        // canonical registry, keyed by stat key.
+        $allPlayerRecords = $this->repository->getTopPlayerSingleGameBatch($this->buildPlayerExpressions(), $dateFilter);
+
+        foreach (RecordStatDefinitions::STATS as $key => $def) {
+            $topRecords = $allPlayerRecords[$key] ?? [];
+            $newAnnouncements = $this->detectPlayerRecords($topRecords, $targetDates, $def['unit'], $gameTypeLabel);
+            array_push($announcements, ...$newAnnouncements);
+        }
+
+        // Team single-game records — the 8 team stats (DESC) plus a synthetic
+        // "fewest points" (ASC) that reuses the points expression.
+        $allTeamRecords = $this->repository->getTopTeamSingleGameBatch($this->buildTeamBatchConfig(), $dateFilter);
+
+        foreach (RecordStatDefinitions::STATS as $def) {
+            $teamKey = $def['teamKey'];
+            if ($teamKey === null) {
+                continue;
+            }
+            $topRecords = $allTeamRecords[$teamKey] ?? [];
+            $newAnnouncements = $this->detectTeamRecords($topRecords, $targetDates, $def['unit'], $gameTypeLabel, false);
+            array_push($announcements, ...$newAnnouncements);
+        }
+
+        $fewestRecords = $allTeamRecords['team_fewest_points'] ?? [];
+        $fewestAnnouncements = $this->detectTeamRecords(
+            $fewestRecords,
+            $targetDates,
+            RecordStatDefinitions::STATS['points']['unit'],
+            $gameTypeLabel,
+            true
+        );
+        array_push($announcements, ...$fewestAnnouncements);
+
+        return $announcements;
+    }
+
+    /**
+     * Player stat expressions for the batch query, keyed by stat key in registry order.
+     *
+     * @return array<string, string>
+     */
+    private function buildPlayerExpressions(): array
+    {
+        $expressions = [];
+        foreach (RecordStatDefinitions::STATS as $key => $def) {
+            $expressions[$key] = $def['expression'];
+        }
+        return $expressions;
+    }
+
+    /**
+     * Team batch config: the 8 team stats (DESC) plus the synthetic
+     * "team_fewest_points" (ASC) that reuses the points expression.
+     *
+     * @return array<string, array{expression: string, order: string}>
+     */
+    private function buildTeamBatchConfig(): array
+    {
+        /** @var array<string, array{expression: string, order: string}> $teamBatchConfig */
+        $teamBatchConfig = [];
+        foreach (RecordStatDefinitions::STATS as $def) {
+            $teamKey = $def['teamKey'];
+            if ($teamKey === null) {
+                continue;
+            }
+            $teamBatchConfig[$teamKey] = ['expression' => $def['expression'], 'order' => 'DESC'];
+        }
+        $teamBatchConfig['team_fewest_points'] = [
+            'expression' => RecordStatDefinitions::STATS['points']['expression'],
+            'order' => 'ASC',
+        ];
+        return $teamBatchConfig;
+    }
+
+    /**
+     * Dispatch each announcement independently — one failed dispatch must
+     * not abort the remaining announcements (finding 1.3 resilience fix).
+     *
+     * @param list<string> $announcements
+     */
+    private function dispatchAll(array $announcements): void
+    {
         foreach ($announcements as $message) {
             try {
                 $this->dispatcher->dispatch($message);
@@ -139,8 +190,6 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
                 // must not stop later announcements from being dispatched.
             }
         }
-
-        return $announcements;
     }
 
     /**

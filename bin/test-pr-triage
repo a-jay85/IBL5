@@ -7,21 +7,20 @@
 # Run: bin/test-pr-triage (exit 0 = all pass, 1 = a case failed)
 
 set -euo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TRIAGE="$SCRIPT_DIR/pr-triage"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 export HOME="$TMP/home"
 
-FAILED=0
-
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$1"; }
 
 # assert_match <name> <ERE> <output>
 assert_match() {
-    if printf '%s\n' "$3" | grep -qE "$2"; then
+    if grep -qE "$2" <<<"$3"; then
         pass "$1"
     else
         failcase "$1 - expected to match: $2"
@@ -31,7 +30,7 @@ assert_match() {
 
 # assert_absent <name> <ERE> <output>
 assert_absent() {
-    if printf '%s\n' "$3" | grep -qE "$2"; then
+    if grep -qE "$2" <<<"$3"; then
         failcase "$1 - expected NOT to match: $2"
         printf '%s\n' "$3" | sed 's/^/    /'
     else
@@ -81,6 +80,16 @@ esac
 STUB
 chmod +x "$TMP/stubs/gh"
 
+# Stub merge-line pass: logs "merge-line <args>"; exit code from $FIX/merge-line-rc.
+cat > "$TMP/stubs/merge-line" <<'STUB'
+#!/usr/bin/env bash
+printf 'merge-line %s\n' "$*" >> "$FIX/calls.log"
+echo "[00:00:00] updated PR #1 onto master"
+rc=0; [ -f "$FIX/merge-line-rc" ] && rc="$(cat "$FIX/merge-line-rc")"
+exit "$rc"
+STUB
+chmod +x "$TMP/stubs/merge-line"
+
 # checks_json <conclusion-Tests> <conclusion-E2E> <conclusion-signoff>
 checks_json() {
     printf '{"check_runs":['
@@ -105,16 +114,19 @@ pr_json() {
           headRefOid: $sha, headRefName: ("fixture-" + ($num|tostring))}'
 }
 
-BODY_CLEAR="$(printf '## Summary\nx\n\n## Manual Testing\nNo manual testing needed (covered by automated tests).')"
+DANGER_TWO_WAY='**Merge danger:** Door: two-way · Blast radius: localized · Why: fixture change, a revert restores it'
+DANGER_ONE_WAY='**Merge danger:** Door: one-way · Blast radius: site-wide · Why: fixture prunes data a revert cannot restore'
+MT_CLEAR=$'## Manual Testing\nNo manual testing needed (covered by automated tests).'
+BODY_CLEAR="$(printf '## Summary\nx\n\n%s\n\n%s' "$MT_CLEAR" "$DANGER_TWO_WAY")"
 BODY_HELD="$(printf '## Summary\nx\n\n## Manual Testing\n- [ ] click the button')"
-BODY_UNCLEARED="$(printf '## Summary\nx')"
+BODY_UNCLEARED="$(printf '## Summary\nx\n\n%s' "$DANGER_TWO_WAY")"
 
 # run_triage <fixdir> [--arm]  — sets OUT (merged stdout+stderr) and ST (exit status)
 run_triage() {
     local fix="$1"; shift
     ST=0
     OUT="$(cd "$TMP/repo" && FIX="$fix" GH_CMD="$TMP/stubs/gh" GH_API_CMD="$TMP/stubs/gh api" \
-        PATH="$TMP/stubs:$PATH" "$TRIAGE" "$@" 2>&1)" || ST=$?
+        PR_TRIAGE_MERGE_LINE_CMD="$TMP/stubs/merge-line" PATH="$TMP/stubs:$PATH" "$TRIAGE" "$@" 2>&1)" || ST=$?
 }
 
 # row_bucket <output> <pr-number>  — BUCKET column
@@ -166,6 +178,7 @@ assert_match  "C4 action=arm auto-merge"  "^arm auto-merge$"                 "$(
 assert_match  "C4 merge call logged"      "^pr merge 4 --squash --auto$"     "$(cat "$FIX/calls.log")"
 assert_match  "C4 armed stdout"           "armed auto-merge on #4"           "$OUT"
 assert_absent "C4 no update-branch"       "update-branch"                    "$(cat "$FIX/calls.log")"
+assert_absent "C4 no merge-line pass"     "^merge-line"                      "$(cat "$FIX/calls.log")"
 assert_status "C4 exit 0"                 0                                  "$ST"
 
 # --- C5: non-BEHIND report-only (no --arm) ---
@@ -177,21 +190,24 @@ assert_match  "C5 bucket=ARMABLE"         "^ARMABLE$"   "$(row_bucket "$OUT" 4)"
 assert_absent "C5 no pr merge"            "pr merge"    "$(cat "$FIX/calls.log" 2>/dev/null)"
 assert_status "C5 exit 0"                 0             "$ST"
 
-# --- C6: BEHIND+clean is ARMABLE with immediate update-branch ---
+# --- C6: two BEHIND+clean PRs arm, then ONE merge-line pass, no per-PR update ---
 FIX="$(mktemp -d -p "$TMP")"
 checks_json success success success > "$FIX/checks-$(printf '%040d' 6).json"
-pr_json 6 BEHIND "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 7).json"
+{ pr_json 6 BEHIND "$BODY_CLEAR"; pr_json 7 BEHIND "$BODY_CLEAR"; } | jq -s . > "$FIX/prs.json"
 run_triage "$FIX" --arm
 assert_match  "C6 bucket=ARMABLE"                 "^ARMABLE$"                                         "$(row_bucket "$OUT" 6)"
 assert_match  "C6 action=arm auto-merge update"   "^arm auto-merge \\(update branch first\\)$"        "$(row_action "$OUT" 6)"
-assert_match  "C6 merge call logged"              "^pr merge 6 --squash --auto$"                      "$(cat "$FIX/calls.log")"
-assert_match  "C6 update-branch call logged"      "^api -X PUT repos/a-jay85/IBL5-test/pulls/6/update-branch$" "$(cat "$FIX/calls.log")"
-merge_line="$(grep -n "^pr merge 6 " "$FIX/calls.log" | cut -d: -f1)"
-update_line="$(grep -n "^api -X PUT.*update-branch$" "$FIX/calls.log" | cut -d: -f1)"
-assert_match  "C6 merge before update"            "^[0-9]+$"                                          "$merge_line"
-[ "${merge_line:-0}" -lt "${update_line:-0}" ] && pass "C6 merge line < update line" || failcase "C6 merge line < update line (merge=$merge_line update=$update_line)"
+assert_match  "C6 merge call logged #6"           "^pr merge 6 --squash --auto$"                      "$(cat "$FIX/calls.log")"
+assert_match  "C6 merge call logged #7"           "^pr merge 7 --squash --auto$"                      "$(cat "$FIX/calls.log")"
+assert_absent "C6 no per-PR update-branch"        "update-branch"                                     "$(cat "$FIX/calls.log")"
+assert_match  "C6 merge-line pass logged"         "^merge-line --once --repo a-jay85/IBL5-test$"      "$(cat "$FIX/calls.log")"
+assert_status "C6 exactly one merge-line pass"    1                                                   "$(grep -c '^merge-line' "$FIX/calls.log")"
+merge_line="$(grep -n "^pr merge 7 " "$FIX/calls.log" | cut -d: -f1)"
+pass_line="$(grep -n "^merge-line" "$FIX/calls.log" | cut -d: -f1)"
+[ "${merge_line:-0}" -lt "${pass_line:-0}" ] && pass "C6 arms before pass" || failcase "C6 arms before pass (merge=$merge_line pass=$pass_line)"
 assert_match  "C6 armed stdout"                   "armed auto-merge on #6"                            "$OUT"
-assert_match  "C6 updated stdout"                 "updated branch on #6 \\(was BEHIND\\)"             "$OUT"
+assert_match  "C6 pass output prefixed"           "merge-line: \[00:00:00\] updated PR #1 onto master" "$OUT"
 assert_status "C6 exit 0"                         0                                                   "$ST"
 
 # --- C8: BEHIND + failing Tests-and-Analysis is BLOCKED-CHECK ---
@@ -224,16 +240,45 @@ assert_match  "C10 bucket=UNCLEARED"      "^UNCLEARED$"       "$(row_bucket "$OU
 assert_absent "C10 no pr merge"           "pr merge"          "$(cat "$FIX/calls.log" 2>/dev/null)"
 assert_status "C10 exit 0"                0                   "$ST"
 
-# --- C11: BEHIND, update-branch fails — merge logged, update logged, exit 1 ---
+# --- C10b: cleared + green but merge danger ONE-WAY is HELD, never armed (condition 18) ---
 FIX="$(mktemp -d -p "$TMP")"
-echo 1 > "$FIX/update-branch-rc"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 41).json"
+pr_json 41 BEHIND "$(printf '## Summary\nx\n\n%s\n\n%s' "$MT_CLEAR" "$DANGER_ONE_WAY")" | jq -s . > "$FIX/prs.json"
+run_triage "$FIX" --arm
+assert_match  "C10b bucket=HELD"              "^HELD$"               "$(row_bucket "$OUT" 41)"
+assert_match  "C10b HOLDS names one-way"      "merge-danger:ONE-WAY" "$OUT"
+assert_absent "C10b no pr merge"              "pr merge"             "$(cat "$FIX/calls.log" 2>/dev/null)"
+assert_status "C10b exit 0"                   0                      "$ST"
+
+# --- C10c: cleared + green but no merge-danger line is HELD (condition 18 fails closed) ---
+FIX="$(mktemp -d -p "$TMP")"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 42).json"
+pr_json 42 BLOCKED "$(printf '## Summary\nx\n\n%s' "$MT_CLEAR")" | jq -s . > "$FIX/prs.json"
+run_triage "$FIX" --arm
+assert_match  "C10c bucket=HELD"              "^HELD$"               "$(row_bucket "$OUT" 42)"
+assert_match  "C10c HOLDS names missing"      "merge-danger:MISSING" "$OUT"
+assert_absent "C10c no pr merge"              "pr merge"             "$(cat "$FIX/calls.log" 2>/dev/null)"
+
+# --- C10d: cleared + green but gate backtest HELD is HELD (condition 17) ---
+FIX="$(mktemp -d -p "$TMP")"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 43).json"
+BT_HELD="$(printf '%s\n\n<!-- gate-backtest:begin -->\n<!-- gate-backtest-state: HELD -->\n<!-- gate-backtest:end -->' "$BODY_CLEAR")"
+pr_json 43 BLOCKED "$BT_HELD" | jq -s . > "$FIX/prs.json"
+run_triage "$FIX" --arm
+assert_match  "C10d bucket=HELD"              "^HELD$"               "$(row_bucket "$OUT" 43)"
+assert_match  "C10d HOLDS names backtest"     "gate-backtest:HELD"   "$OUT"
+assert_absent "C10d no pr merge"              "pr merge"             "$(cat "$FIX/calls.log" 2>/dev/null)"
+
+# --- C11: BEHIND, merge-line pass fails: merge logged, pass logged, exit 1 ---
+FIX="$(mktemp -d -p "$TMP")"
+echo 1 > "$FIX/merge-line-rc"
 checks_json success success success > "$FIX/checks-$(printf '%040d' 11).json"
 pr_json 11 BEHIND "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 run_triage "$FIX" --arm
-assert_match  "C11 merge call logged"     "^pr merge 11 --squash --auto$"                              "$(cat "$FIX/calls.log")"
-assert_match  "C11 update-branch logged"  "^api -X PUT repos/a-jay85/IBL5-test/pulls/11/update-branch$" "$(cat "$FIX/calls.log")"
-assert_match  "C11 UPDATE-BRANCH FAILED"  "UPDATE-BRANCH FAILED on #11"                                "$OUT"
-assert_status "C11 exit 1"                1                                                            "$ST"
+assert_match  "C11 merge call logged"      "^pr merge 11 --squash --auto$"   "$(cat "$FIX/calls.log")"
+assert_match  "C11 merge-line pass logged" "^merge-line --once"              "$(cat "$FIX/calls.log")"
+assert_match  "C11 MERGE-LINE PASS FAILED" "MERGE-LINE PASS FAILED"          "$OUT"
+assert_status "C11 exit 1"                 1                                 "$ST"
 
 # --- C12: BEHIND, merge fails — ARM FAILED, no update-branch, exit 1 ---
 FIX="$(mktemp -d -p "$TMP")"
@@ -243,6 +288,7 @@ pr_json 12 BEHIND "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 run_triage "$FIX" --arm
 assert_match  "C12 ARM FAILED"            "ARM FAILED on #12"   "$OUT"
 assert_absent "C12 no update-branch"      "update-branch"       "$(cat "$FIX/calls.log")"
+assert_absent "C12 no merge-line pass"    "^merge-line"         "$(cat "$FIX/calls.log")"
 assert_status "C12 exit 1"                1                     "$ST"
 
 # --- C13: BEHIND report-only — ARMABLE action, no write calls ---
@@ -254,6 +300,7 @@ assert_match  "C13 bucket=ARMABLE"        "^ARMABLE$"                           
 assert_match  "C13 action=update first"   "^arm auto-merge \\(update branch first\\)$" "$(row_action "$OUT" 13)"
 assert_absent "C13 no pr merge"           "pr merge"                               "$(cat "$FIX/calls.log" 2>/dev/null)"
 assert_absent "C13 no update-branch"      "update-branch"                          "$(cat "$FIX/calls.log" 2>/dev/null)"
+assert_absent "C13 no merge-line pass"    "^merge-line"                            "$(cat "$FIX/calls.log" 2>/dev/null)"
 assert_status "C13 exit 0"                0                                        "$ST"
 
 # --- C14: pr-cycle parse compatibility on C13 output ---
@@ -335,6 +382,23 @@ assert_match  "H6 recorded (8)"                      '^\(8\) feat — awaiting h
 assert_absent "H6 stops at block end (trailing)"     'trailing'                                         "$OUT"
 OUT="$(hp_sticky_reasons "${H_STICKY/Auto-merge held:/**Auto-merge held:**}")"
 assert_match  "H6 bold header accepted"              '^\(7\) '                                          "$OUT"
+
+# pr3267 dual-layout: the old (v1) and new (v2) sticky layouts yield the same hold reasons,
+# and a Still-open bullet in the v2 layout is never read as a hold.
+PR3267_DIR="$SCRIPT_DIR/fixtures/review-shared"
+PR3267_V1="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v1.json")"
+PR3267_V2="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v2.json")"
+PR3267_WANT='(3) plan-matrix — MISSING: tests/example'
+OUT="$(hp_sticky_reasons "$PR3267_V1")"
+assert_status "pr3267-v1-hold-reasons"               0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
+OUT="$(hp_sticky_reasons "$PR3267_V2")"
+assert_status "pr3267-v2-hold-reasons"               0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
+PR3267_OPEN=$'### Still open (non-blocking)\n'
+PR3267_OPEN_NEW="${PR3267_OPEN}- (9) fake — x"$'\n'
+PR3267_V2_OPEN="${PR3267_V2/"$PR3267_OPEN"/$PR3267_OPEN_NEW}"
+assert_status "pr3267-v2-open-item-inserted"         0 "$([ "$PR3267_V2_OPEN" != "$PR3267_V2" ] && echo 0 || echo 1)"
+OUT="$(hp_sticky_reasons "$PR3267_V2_OPEN")"
+assert_status "pr3267-v2-open-item-not-a-hold"       0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
 
 OUT="$(hp_sticky_reasons "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Auto-merge held:' '- no arming decision recorded')")"
 assert_status "H7 no-decision bullet -> no reason"   0 "${#OUT}"
@@ -459,4 +523,4 @@ ST=0; OUT="$("$TRIAGE" --help 2>&1)" || ST=$?
 assert_match  "H-E8 --help mentions --held"        '[-][-]held'                                      "$OUT"
 assert_match  "H-E8 --help mentions the exclusion" 'Read-only; cannot be combined' "$OUT"
 
-[ "$FAILED" = 0 ] && exit 0 || exit 1
+h_done

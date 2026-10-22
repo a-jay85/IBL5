@@ -9,6 +9,7 @@ use DepthChartSnapshot\Contracts\DepthChartSnapshotRepositoryInterface;
 use DepthChartSnapshot\Contracts\DepthChartLabelBuilderInterface;
 use DepthChartSnapshot\Contracts\SlotAssignmentResolverInterface;
 use Season\Season;
+use BasketballStats\StatsSanitizer;
 
 /**
  * @phpstan-import-type SavedDepthChartRow from Contracts\DepthChartSnapshotRepositoryInterface
@@ -73,22 +74,11 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
             if ($loadedDcId > 0) {
                 $existingDc = $this->repository->getSavedDepthChartById($loadedDcId, $teamid);
                 if ($existingDc !== null) {
-                    $this->repository->updateDepthChartPlayers($loadedDcId, $snapshots);
-
-                    $this->repository->deactivateOthersForTeam($teamid, $loadedDcId, $season->lastSimEndDate, $season->lastSimNumber);
-                    if ($existingDc['is_active'] === 0) {
-                        $this->repository->reactivate($loadedDcId, $teamid);
-                    }
+                    $this->refreshExistingDc($loadedDcId, $teamid, $existingDc['is_active'], $snapshots, $season);
 
                     $this->db->commit();
 
-                    $this->logger->info('depth_chart_saved', [
-                        'action' => 'depth_chart_saved',
-                        'dc_id' => $loadedDcId,
-                        'team_id' => $teamid,
-                        'dc_name' => $name,
-                        'phase' => $season->phase,
-                    ]);
+                    $this->logSaved($loadedDcId, $teamid, $name, $season);
 
                     return $loadedDcId;
                 }
@@ -98,23 +88,11 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
             $mostRecent = $this->repository->getMostRecentDepthChart($teamid);
             if ($mostRecent !== null && $mostRecent['sim_end_date'] === null) {
                 // Unused DC exists — update it instead of creating a new one
-                $this->repository->updateDepthChartPlayers($mostRecent['id'], $snapshots);
-
-                // Ensure it's the only active DC
-                $this->repository->deactivateOthersForTeam($teamid, $mostRecent['id'], $season->lastSimEndDate, $season->lastSimNumber);
-                if ($mostRecent['is_active'] === 0) {
-                    $this->repository->reactivate($mostRecent['id'], $teamid);
-                }
+                $this->refreshExistingDc($mostRecent['id'], $teamid, $mostRecent['is_active'], $snapshots, $season);
 
                 $this->db->commit();
 
-                $this->logger->info('depth_chart_saved', [
-                    'action' => 'depth_chart_saved',
-                    'dc_id' => $mostRecent['id'],
-                    'team_id' => $teamid,
-                    'dc_name' => $name,
-                    'phase' => $season->phase,
-                ]);
+                $this->logSaved($mostRecent['id'], $teamid, $name, $season);
 
                 return $mostRecent['id'];
             }
@@ -139,6 +117,38 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
 
             $this->db->commit();
 
+            $this->logSaved($dcId, $teamid, $name, $season);
+
+            return $dcId;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
+    }
+
+    /**
+     * Point an existing saved depth chart at the new snapshots and make it the team's only active chart.
+     * Runs inside saveOnSubmit's transaction; the caller commits.
+     *
+     * @param list<PlayerSnapshotData> $snapshots
+     */
+    private function refreshExistingDc(int $dcId, int $teamid, int $isActive, array $snapshots, Season $season): void
+    {
+        $this->repository->updateDepthChartPlayers($dcId, $snapshots);
+
+        // Ensure it's the only active DC
+        $this->repository->deactivateOthersForTeam($teamid, $dcId, $season->lastSimEndDate, $season->lastSimNumber);
+        if ($isActive === 0) {
+            $this->repository->reactivate($dcId, $teamid);
+        }
+    }
+
+    /**
+     * Runs after commit, so a logger failure must never reach saveOnSubmit's rollback catch.
+     */
+    private function logSaved(int $dcId, int $teamid, ?string $name, Season $season): void
+    {
+        try {
             $this->logger->info('depth_chart_saved', [
                 'action' => 'depth_chart_saved',
                 'dc_id' => $dcId,
@@ -146,11 +156,8 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
                 'dc_name' => $name,
                 'phase' => $season->phase,
             ]);
-
-            return $dcId;
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
+        } catch (\Throwable) {
+            // Fire-and-forget: the save already committed; an audit-log failure must not surface as a save error.
         }
     }
 
@@ -256,8 +263,8 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
     public function buildPlayerSnapshot(array $rosterPlayer, array $dcSettings, int $ordinal): array
     {
         return [
-            'pid' => $this->toInt($rosterPlayer['pid'] ?? 0),
-            'player_name' => $this->toString($rosterPlayer['name'] ?? ''),
+            'pid' => StatsSanitizer::toInt($rosterPlayer['pid'] ?? 0),
+            'player_name' => StatsSanitizer::scalarToString($rosterPlayer['name'] ?? ''),
             'ordinal' => $ordinal,
             'dc_pg_depth' => $dcSettings['pg'] ?? 0,
             'dc_sg_depth' => $dcSettings['sg'] ?? 0,
@@ -272,37 +279,6 @@ class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
             'dc_di' => $dcSettings['di'] ?? 0,
             'dc_bh' => $dcSettings['bh'] ?? 0,
         ];
-    }
-
-    /**
-     * Safely convert mixed value to int
-     */
-    private function toInt(mixed $value): int
-    {
-        if (is_int($value)) {
-            return $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-        if (is_float($value)) {
-            return (int) $value;
-        }
-        return 0;
-    }
-
-    /**
-     * Safely convert mixed value to string
-     */
-    private function toString(mixed $value): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-        return '';
     }
 
     /**

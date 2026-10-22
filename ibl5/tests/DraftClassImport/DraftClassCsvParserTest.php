@@ -179,7 +179,7 @@ class DraftClassCsvParserTest extends TestCase
             $result['errors'],
             static fn(string $e): bool => str_contains($e, '26') && str_contains($e, '27')
         );
-        $this->assertNotEmpty($fieldCountErrors, 'Expected field-count error naming 26 columns and 27 minimum');
+        $this->assertNotSame([], $fieldCountErrors, 'Expected field-count error naming 26 columns and 27 minimum');
     }
 
     // -------------------------------------------------------------------------
@@ -189,14 +189,6 @@ class DraftClassCsvParserTest extends TestCase
     public function testRowWithExactlyTwentySevenFieldsIsAccepted(): void
     {
         // Build a row with exactly 27 properly-valued fields (no trailing empties).
-        $columns = [
-            'name', 'pos', 'age', 'team',
-            'fga', 'fgp', 'fta', 'ftp', 'r_3ga', 'r_3gp',
-            'orb', 'drb', 'ast', 'stl', 'tvr', 'blk', 'oo',
-            'r_drive_off', 'po', 'r_trans_off',
-            'od', 'dd', 'pd', 'td',
-            'talent', 'skill', 'intangibles',
-        ];
         $values = array_fill(0, 27, '5');
         $values[0] = 'Test Player'; // name
         $values[1] = 'PG';         // pos
@@ -268,7 +260,7 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $this->assertStringContainsString('Line 1', $result['errors'][0]);
         $this->assertStringContainsString('QB', $result['errors'][0]);
     }
@@ -283,12 +275,12 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $posErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'position is blank')
         );
-        $this->assertNotEmpty($posErrors, 'Expected "position is blank" error');
+        $this->assertNotSame([], $posErrors, 'Expected "position is blank" error');
     }
 
     // -------------------------------------------------------------------------
@@ -302,12 +294,12 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $nameErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'longer than 32 characters')
         );
-        $this->assertNotEmpty($nameErrors, 'Expected name-too-long error');
+        $this->assertNotSame([], $nameErrors, 'Expected name-too-long error');
     }
 
     // -------------------------------------------------------------------------
@@ -331,7 +323,7 @@ class DraftClassCsvParserTest extends TestCase
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'longer than 32 characters')
         );
-        $this->assertEmpty($nameErrors, 'Accented 32-mb_strlen name should NOT trigger length error');
+        $this->assertSame([], $nameErrors, 'Accented 32-mb_strlen name should NOT trigger length error');
         $this->assertSame([], $result['errors']);
     }
 
@@ -345,7 +337,7 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $this->assertStringContainsString('Line 1', $result['errors'][0]);
         // The label the league reads ('2ga'), not the DB column name ('fga') — the
         // commissioner matches the message against their export, not the schema.
@@ -366,7 +358,7 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $joined = implode("\n", $result['errors']);
         $this->assertStringNotContainsString('r_', $joined);
         $this->assertStringContainsString('3ga', $joined);
@@ -384,13 +376,13 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $rangeErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'outside the allowed range')
                 && str_contains($e, '256')
         );
-        $this->assertNotEmpty($rangeErrors, 'Expected out-of-range error for 256');
+        $this->assertNotSame([], $rangeErrors, 'Expected out-of-range error for 256');
     }
 
     // -------------------------------------------------------------------------
@@ -403,13 +395,13 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $rangeErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'outside the allowed range')
                 && str_contains($e, '-1')
         );
-        $this->assertNotEmpty($rangeErrors, 'Expected out-of-range error for -1');
+        $this->assertNotSame([], $rangeErrors, 'Expected out-of-range error for -1');
     }
 
     // -------------------------------------------------------------------------
@@ -422,12 +414,12 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $nameErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'player name is blank')
         );
-        $this->assertNotEmpty($nameErrors, 'Expected blank-name error');
+        $this->assertNotSame([], $nameErrors, 'Expected blank-name error');
     }
 
     // -------------------------------------------------------------------------
@@ -448,7 +440,7 @@ class DraftClassCsvParserTest extends TestCase
                 && str_contains($e, '1')
                 && str_contains($e, '2')
         );
-        $this->assertNotEmpty($dupErrors, 'Expected duplicate-name error naming lines 1 and 2');
+        $this->assertNotSame([], $dupErrors, 'Expected duplicate-name error naming lines 1 and 2');
     }
 
     // -------------------------------------------------------------------------
@@ -509,12 +501,12 @@ class DraftClassCsvParserTest extends TestCase
 
         $result = $this->parser->parse($raw);
 
-        $this->assertNotEmpty($result['errors']);
+        $this->assertNotSame([], $result['errors']);
         $zeroErrors = array_filter(
             $result['errors'],
             static fn(string $e): bool => str_contains($e, 'no data rows')
         );
-        $this->assertNotEmpty($zeroErrors, 'Expected "no data rows" error');
+        $this->assertNotSame([], $zeroErrors, 'Expected "no data rows" error');
     }
 
     // -------------------------------------------------------------------------
@@ -539,6 +531,261 @@ class DraftClassCsvParserTest extends TestCase
             $errors,
             static fn(string $e): bool => str_contains($e, 'position is blank')
         );
-        $this->assertNotEmpty($posErrors, 'validateRows() must reject a stored row with blank pos');
+        $this->assertNotSame([], $posErrors, 'validateRows() must reject a stored row with blank pos');
+    }
+
+    // -------------------------------------------------------------------------
+    // Characterization tests: parse branches the original suite leaves unasserted
+    // -------------------------------------------------------------------------
+
+    public function testBlankLineStillAdvancesTheLineNumberOfTheFollowingRow(): void
+    {
+        $result = $this->parser->parse("\n" . $this->buildCommaRow(['pos' => 'QB']));
+
+        $this->assertCount(1, $result['errors']);
+        $this->assertStringStartsWith('Line 2:', $result['errors'][0]);
+        $this->assertCount(1, $result['rows']);
+    }
+
+    public function testEqualSemicolonAndCommaCountsOnFirstLineFallBackToComma(): void
+    {
+        // 27 quoted fields: 26 delimiter commas and 26 semicolons inside the name -> tie.
+        $result = $this->parser->parse($this->buildCommaRow(['name' => str_repeat(';', 26)]));
+
+        $this->assertSame([], $result['errors']);
+        $this->assertCount(1, $result['rows']);
+        $this->assertSame(str_repeat(';', 26), $result['rows'][0]['name']);
+    }
+
+    public function testDelimiterIsDetectedFromTheFirstLineOnly(): void
+    {
+        // Whole input: 60 ';' vs 52 ','. First line: 0 ';' vs 26 ','.
+        $raw = $this->buildCommaRow(['name' => 'First']) . "\n"
+            . $this->buildCommaRow(['name' => 'Second', 'team' => str_repeat(';', 60)]);
+
+        $result = $this->parser->parse($raw);
+
+        $this->assertSame([], $result['errors']);
+        $this->assertCount(2, $result['rows']);
+        $this->assertSame(str_repeat(';', 60), $result['rows'][1]['team']);
+    }
+
+    public function testExtraColumnErrorNamesOnlyTheFirstNonBlankFieldAndStillCollectsTheRow(): void
+    {
+        $fields     = explode(';', $this->buildSemiRow(['pos' => 'QB']));
+        $fields[28] = '"x"'; // field 29
+        $fields[30] = '"y"'; // field 31
+
+        $result = $this->parser->parse(implode(';', $fields));
+
+        $this->assertCount(2, $result['errors']);
+        $this->assertStringStartsWith("Line 1, field 29 contains 'x'.", $result['errors'][0]);
+        $this->assertSame(
+            "Line 1: 'QB' is not a valid position. Use one of: PG, SG, SF, PF, C, G, F, GF.",
+            $result['errors'][1]
+        );
+        $this->assertStringNotContainsString('field 31', implode("\n", $result['errors']));
+        $this->assertCount(1, $result['rows']);
+        $this->assertSame('QB', $result['rows'][0]['pos']);
+    }
+
+    public function testShortRowIsDroppedWhileLaterRowsKeepTheirFileLineNumbers(): void
+    {
+        $raw = implode(';', array_fill(0, 26, '"x"')) . "\n"
+            . $this->buildSemiRow(['name' => 'Keeper']) . "\n"
+            . $this->buildSemiRow(['name' => 'Third', 'pos' => 'QB']);
+
+        $result = $this->parser->parse($raw);
+
+        $this->assertSame(
+            [
+                'Line 1: this row has 26 columns but the importer needs at least 27. '
+                . 'Send the file to A-Jay before retrying.',
+                "Line 3: 'QB' is not a valid position. Use one of: PG, SG, SF, PF, C, G, F, GF.",
+            ],
+            $result['errors']
+        );
+        $this->assertCount(2, $result['rows']);
+        $this->assertSame('Keeper', $result['rows'][0]['name']);
+        $this->assertSame('Third', $result['rows'][1]['name']);
+    }
+
+    public function testDuplicateNameErrorUsesFileLineNumbersNotRowPositions(): void
+    {
+        // Fails if checkDuplicateNames receives array_keys($rows) mapped +1 instead of file line numbers.
+        $raw = implode(';', array_fill(0, 26, '"x"')) . "\n"
+            . $this->buildSemiRow(['name' => 'Dup']) . "\n"
+            . $this->buildSemiRow(['name' => 'Dup']);
+
+        $result = $this->parser->parse($raw);
+
+        $this->assertCount(2, $result['errors']);
+        $this->assertSame(
+            "The name 'Dup' appears on lines 2 and 3. Each player must appear once.",
+            $result['errors'][1]
+        );
+    }
+
+    public function testRowWithFieldErrorsIsStillReturnedInRows(): void
+    {
+        $result = $this->parser->parse($this->buildSemiRow(['pos' => 'QB', 'fga' => 'abc']));
+
+        $this->assertCount(2, $result['errors']);
+        $this->assertCount(1, $result['rows']);
+        $this->assertSame('QB', $result['rows'][0]['pos']);
+        $this->assertSame(0, $result['rows'][0]['fga']);
+    }
+
+    public function testTypedRowHasExactKeyOrderTrimmedStringsAndIntegerCasts(): void
+    {
+        // Key order: name,pos,team,age,fga…td,talent,skill,intangibles
+        $raw = $this->buildSemiRow([
+            'name'   => ' Pad Player ',
+            'pos'    => ' SF ',
+            'age'    => ' 31 ',
+            'team'   => ' NYK ',
+            'fga'    => ' 7 ',
+            'talent' => ' 9 ',
+        ]);
+
+        $result = $this->parser->parse($raw);
+
+        $expected = [
+            'name' => 'Pad Player', 'pos' => 'SF', 'team' => 'NYK', 'age' => 31,
+            'fga' => 7, 'fgp' => 50, 'fta' => 50, 'ftp' => 50, 'r_3ga' => 50, 'r_3gp' => 50,
+            'orb' => 20, 'drb' => 40, 'ast' => 30, 'stl' => 20, 'tvr' => 60, 'blk' => 10,
+            'oo' => 5, 'r_drive_off' => 5, 'po' => 5, 'r_trans_off' => 5,
+            'od' => 5, 'dd' => 5, 'pd' => 5, 'td' => 5,
+            'talent' => 9, 'skill' => 5, 'intangibles' => 5,
+        ];
+
+        $this->assertSame([], $result['errors']);
+        $this->assertSame(array_keys($expected), array_keys($result['rows'][0]));
+        $this->assertSame($expected, $result['rows'][0]);
+    }
+
+    public function testZeroRowErrorIsAppendedAfterEarlierRowErrors(): void
+    {
+        $short = implode(';', array_fill(0, 26, '"x"'));
+
+        $result = $this->parser->parse($short . "\n" . $short);
+
+        $this->assertSame(
+            [
+                'Line 1: this row has 26 columns but the importer needs at least 27. '
+                . 'Send the file to A-Jay before retrying.',
+                'Line 2: this row has 26 columns but the importer needs at least 27. '
+                . 'Send the file to A-Jay before retrying.',
+                'This file contains no data rows.',
+            ],
+            $result['errors']
+        );
+        $this->assertSame([], $result['rows']);
+    }
+
+    public function testErrorsAreOrderedRowByRowWithDuplicateErrorsLast(): void
+    {
+        $fields     = explode(';', $this->buildSemiRow(['name' => 'Twin', 'pos' => 'QB']));
+        $fields[29] = '"z"'; // field 30
+        $raw        = implode(';', $fields) . "\n"
+            . $this->buildSemiRow(['name' => 'Twin', 'fga' => 'abc']);
+
+        $result = $this->parser->parse($raw);
+
+        $this->assertCount(4, $result['errors']);
+        $this->assertStringStartsWith("Line 1, field 30 contains 'z'.", $result['errors'][0]);
+        $this->assertSame(
+            "Line 1: 'QB' is not a valid position. Use one of: PG, SG, SF, PF, C, G, F, GF.",
+            $result['errors'][1]
+        );
+        $this->assertSame(
+            "Line 2: column 2ga should be a whole number but contains 'abc'.",
+            $result['errors'][2]
+        );
+        $this->assertSame(
+            "The name 'Twin' appears on lines 1 and 2. Each player must appear once.",
+            $result['errors'][3]
+        );
+    }
+
+    public function testTinyintBoundaryValuesZeroAndTwoHundredFiftyFiveAreAccepted(): void
+    {
+        $result = $this->parser->parse($this->buildSemiRow(['fga' => '0', 'fgp' => '255']));
+
+        $this->assertSame([], $result['errors']);
+        $this->assertSame(0, $result['rows'][0]['fga']);
+        $this->assertSame(255, $result['rows'][0]['fgp']);
+    }
+
+    public function testUnboundedIntegerColumnsAcceptNegativeAndLargeValues(): void
+    {
+        $raw = $this->buildSemiRow([
+            'age'         => '-5',
+            'talent'      => '999',
+            'skill'       => '-300',
+            'intangibles' => '70000',
+        ]);
+
+        $result = $this->parser->parse($raw);
+
+        $this->assertSame([], $result['errors']);
+        $this->assertSame(-5, $result['rows'][0]['age']);
+        $this->assertSame(999, $result['rows'][0]['talent']);
+        $this->assertSame(-300, $result['rows'][0]['skill']);
+        $this->assertSame(70000, $result['rows'][0]['intangibles']);
+    }
+
+    public function testNonNumericUnboundedColumnIsRejectedNamingItsLabel(): void
+    {
+        $result = $this->parser->parse($this->buildSemiRow(['age' => 'abc', 'intangibles' => '1.5']));
+
+        $this->assertSame(
+            [
+                "Line 1: column Age should be a whole number but contains 'abc'.",
+                "Line 1: column Int should be a whole number but contains '1.5'.",
+            ],
+            $result['errors']
+        );
+    }
+
+    public function testThreeWayDuplicateNameIsReportedAsOneErrorNamingAllThreeLines(): void
+    {
+        $row = $this->buildSemiRow(['name' => 'Trip']);
+
+        $result = $this->parser->parse($row . "\n" . $row . "\n" . $row);
+
+        $this->assertSame(
+            ["The name 'Trip' appears on lines 1, 2 and 3. Each player must appear once."],
+            $result['errors']
+        );
+    }
+
+    public function testValidateRowsWithNoRowsReturnsNoErrors(): void
+    {
+        $this->assertSame([], $this->parser->validateRows([]));
+    }
+
+    public function testEmptyStringInputIsRejectedWithOnlyTheZeroRowError(): void
+    {
+        $this->assertSame(
+            ['rows' => [], 'errors' => ['This file contains no data rows.']],
+            $this->parser->parse('')
+        );
+    }
+
+    public function testValidateRowsReportsDuplicatesUsingListPositions(): void
+    {
+        $dups = $this->parser->parse(
+            $this->buildSemiRow(['name' => 'Dup']) . "\n" . $this->buildSemiRow(['name' => 'Dup'])
+        );
+        $solo = $this->parser->parse($this->buildSemiRow(['name' => 'Solo']));
+
+        $rows = $dups['rows'];
+        array_unshift($rows, $solo['rows'][0]);
+
+        $this->assertSame(
+            ["The name 'Dup' appears on lines 2 and 3. Each player must appear once."],
+            $this->parser->validateRows($rows)
+        );
     }
 }

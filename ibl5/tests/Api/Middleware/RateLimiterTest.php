@@ -98,21 +98,54 @@ class RateLimiterTest extends TestCase
         $this->assertSame('300', $result['X-RateLimit-Limit']);
     }
 
+    /**
+     * The unlimited tier is never enforced, so check() makes no repository call:
+     * no RateLimitRepository::increment, getRequestCount, or pruneOldEntries.
+     */
     public function testUnlimitedTierNeverRejects(): void
     {
         $mockRepo = $this->createMock(RateLimitRepository::class);
         $rateLimiter = new RateLimiter($mockRepo);
         $apiKey = $this->makeApiKey('unlimited');
 
+        $mockRepo->expects($this->never())->method('increment');
+        $mockRepo->expects($this->never())->method('getRequestCount');
+        $mockRepo->expects($this->never())->method('pruneOldEntries');
+
+        // maybePrune() fires on random_int(1, 100) === 1, so a single call would
+        // miss a stray prune 99% of the time. 1000 calls miss it with p ~ 4e-5.
+        for ($i = 0; $i < 1000; $i++) {
+            $this->assertNull($rateLimiter->check($apiKey));
+        }
+    }
+
+    /**
+     * The reject path still writes and reads the counter: increment('abc123hash')
+     * once, then getRequestCount('abc123hash') once, then the 429 header set.
+     */
+    public function testLimitedTierOverLimitIncrementsCountsAndRejects(): void
+    {
+        $mockRepo = $this->createMock(RateLimitRepository::class);
+        $fixedClock = self::createStub(ClockInterface::class);
+        $fixedClock->method('now')->willReturn(1_700_000_000);
+        $rateLimiter = new RateLimiter($mockRepo, $fixedClock);
+        $apiKey = $this->makeApiKey('standard');
+
         $mockRepo->expects($this->once())
             ->method('increment')
             ->with('abc123hash');
-
-        $mockRepo->expects($this->never())
-            ->method('getRequestCount');
+        $mockRepo->expects($this->once())
+            ->method('getRequestCount')
+            ->with('abc123hash')
+            ->willReturn(61);
 
         $result = $rateLimiter->check($apiKey);
-        $this->assertNull($result);
+
+        $this->assertNotNull($result);
+        $this->assertSame('60', $result['Retry-After']);
+        $this->assertSame('60', $result['X-RateLimit-Limit']);
+        $this->assertSame('0', $result['X-RateLimit-Remaining']);
+        $this->assertSame('1700000060', $result['X-RateLimit-Reset']);
     }
 
     public function testUnknownTierDefaultsToStandard(): void
@@ -184,6 +217,22 @@ class RateLimiterTest extends TestCase
         $this->assertSame(
             ['X-RateLimit-Limit' => '60'],
             $rateLimiter->limitHeaders($this->makeApiKey('mystery_tier')),
+        );
+    }
+
+    public function testClockInterfaceStubSatisfiesMicrotimeContract(): void
+    {
+        $clockStub = self::createStub(ClockInterface::class);
+        $clockStub->method('now')->willReturn(1791549296);
+        $clockStub->method('microtime')->willReturn(1791549296.5);
+
+        $rateLimiter = new RateLimiter(self::createStub(RateLimitRepository::class), $clockStub);
+
+        $this->assertSame(1791549296, $clockStub->now());
+        $this->assertSame(1791549296.5, $clockStub->microtime());
+        $this->assertSame(
+            ['X-RateLimit-Limit' => '60'],
+            $rateLimiter->limitHeaders($this->makeApiKey('standard')),
         );
     }
 }

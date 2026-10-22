@@ -16,7 +16,9 @@ if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
     die("Error: Database connection failed");
 }
 
-$serverName = $_SERVER['SERVER_NAME'] ?? '';
+$httpRequest = \Http\HttpRequest::fromGlobals();
+$serverNameRaw = $httpRequest->server('SERVER_NAME');
+$serverName = is_string($serverNameRaw) ? $serverNameRaw : '';
 $teamIdentityRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
 $offerRepo = new \Trading\TradeOfferRepository($mysqli_db, $serverName);
 $assetRepo = new \Trading\TradeAssetRepository($mysqli_db);
@@ -31,15 +33,16 @@ $view = new \Trading\TradingView();
 $nukeCompat = new \Utilities\NukeCompat();
 $validator = new \Trading\TradeValidator($mysqli_db);
 $salaryCapRepo = new \Repositories\SalaryCapRepository($mysqli_db);
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 $executionService = new \Trading\TradeExecutionService(
     $offerRepo, $processor, $validator, $salaryCapRepo, $teamIdentityRepo, $cashRepo, $season
 );
 global $authService;
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 $controller = new \Trading\TradingController(
     $service, $offerRepo, $tradeOffer, $view,
     $teamIdentityRepo, $nukeCompat, $mysqli_db, $executionService, $authService
 );
 
 global $user;
-$controller->rejectTradeOffer($user, $_POST);
+$controller->rejectTradeOffer($user, $httpRequest->allPost());

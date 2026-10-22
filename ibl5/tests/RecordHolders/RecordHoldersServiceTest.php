@@ -561,9 +561,32 @@ final class RecordHoldersServiceTest extends TestCase
         foreach ($registry as $id => $info) {
             $this->assertArrayHasKey('abbr', $info, "Team {$id} missing 'abbr'");
             $this->assertArrayHasKey('name', $info, "Team {$id} missing 'name'");
-            $this->assertNotEmpty($info['abbr'], "Team {$id} has empty abbreviation");
-            $this->assertNotEmpty($info['name'], "Team {$id} has empty name");
+            $this->assertNotSame('', $info['abbr'], "Team {$id} has empty abbreviation");
+            $this->assertNotSame('', $info['name'], "Team {$id} has empty name");
         }
+    }
+
+    public function testTeamRegistryEachAbbrHasLogoPng(): void
+    {
+        $reflection = new \ReflectionClass(RecordFormatter::class);
+        /** @var array<int, array{abbr: string, name: string}> $registry */
+        $registry = $reflection->getConstant('TEAM_REGISTRY');
+        $this->assertIsArray($registry);
+        $this->assertNotSame([], $registry);
+
+        $topicsDir = dirname(__DIR__, 2) . '/images/topics';
+        $missing = [];
+        foreach ($registry as $id => $info) {
+            if (!is_file("{$topicsDir}/{$info['abbr']}.png")) {
+                $missing[$id] = "images/topics/{$info['abbr']}.png";
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $missing,
+            'TEAM_REGISTRY abbr has no logo png (team id => missing path)',
+        );
     }
 
     public function testUnknownTeamIdReturnsEmptyAbbreviation(): void

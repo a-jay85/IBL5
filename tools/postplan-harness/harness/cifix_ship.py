@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from . import cifix, classify, gitutil
 
 BUN_AUDIT_CHECK = "JS Dependency Audit (bun)"     # job name in .github/workflows/tests.yml
-META_CHECK_NAME = "Meta checks"                     # job name in .github/workflows/pr-meta-checks.yml
+META_CHECK_NAME = cifix.META_CHECK_NAME                   # job name in .github/workflows/pr-meta-checks.yml
 DEP_FILES = ("ibl5/package.json", "ibl5/bun.lock")
 PROPOSAL_FILENAME = "proposed-pr-body.md"
 PROPOSAL_MAX_BYTES = 60_000                         # GitHub caps a PR body at 65,536 chars

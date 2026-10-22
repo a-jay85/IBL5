@@ -81,18 +81,17 @@ class DataRetentionServiceTest extends TestCase
     public function testPurgeAuditLogDefaultBatchSizeIsOneThousand(): void
     {
         $repository = self::createMock(DataRetentionRepositoryInterface::class);
-        $repository->expects(self::once())->method('countAuditLogRowsOlderThan')->willReturn(1);
-        $repository->expects(self::once())
+        $repository->expects(self::once())->method('countAuditLogRowsOlderThan')->willReturn(1001);
+        $repository->expects(self::exactly(2))
             ->method('deleteAuditLogBatchOlderThan')
             ->with(self::NOW - 180 * 86400, 1000)
-            ->willReturn(1);
+            ->willReturnOnConsecutiveCalls(1000, 1);
         $service = new DataRetentionService($repository);
 
-        self::assertSame(1, $service->purgeAuditLog(180, false, self::NOW)->deleted);
-        // @phpstan-ignore staticMethod.alreadyNarrowedType (const value statically known; assertion guards future edits)
-        self::assertSame(1000, DataRetentionService::PURGE_BATCH_SIZE);
-        // @phpstan-ignore staticMethod.alreadyNarrowedType (const value statically known; assertion guards future edits)
-        self::assertSame(180, DataRetentionService::AUDIT_LOG_RETENTION_DAYS);
+        $result = $service->purgeAuditLog(180, false, self::NOW);
+
+        self::assertSame(1001, $result->eligible);
+        self::assertSame(1001, $result->deleted);
     }
 
     public function testPurgeAuditLogCutoffIsNowMinusRetentionDays(): void

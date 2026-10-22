@@ -82,7 +82,7 @@ final class RollbackPhantomRepairCliTest extends TestCase
 
         self::assertSame(0, $result['exit']);
         $calls = $this->dockerCalls();
-        self::assertNotEmpty($calls);
+        self::assertNotSame([], $calls);
         self::assertStringEndsWith(' custom-php', $this->callStartingWith($calls, 'inspect'));
         self::assertStringContainsString(' custom-php php ', $this->callStartingWith($calls, 'exec'));
     }

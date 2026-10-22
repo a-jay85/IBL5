@@ -31,7 +31,7 @@ class ContractListRepositoryTest extends DatabaseTestCase
 
         $contracts = $this->repo->getActivePlayerContracts();
 
-        self::assertNotEmpty($contracts);
+        self::assertNotSame([], $contracts);
     }
 
     public function testGetActivePlayerContractsIncludesContractFields(): void
@@ -40,7 +40,7 @@ class ContractListRepositoryTest extends DatabaseTestCase
 
         $contracts = $this->repo->getActivePlayerContracts();
 
-        self::assertNotEmpty($contracts);
+        self::assertNotSame([], $contracts);
         $first = $contracts[0];
         self::assertArrayHasKey('pid', $first);
         self::assertArrayHasKey('name', $first);
@@ -58,5 +58,17 @@ class ContractListRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('team_city', $first);
         self::assertArrayHasKey('color1', $first);
         self::assertArrayHasKey('color2', $first);
+    }
+
+    public function testGetActivePlayerContractsBreaksOrdinalTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200139112, 'Tie 1391 B', ['ordinal' => 777, 'teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200139111, 'Tie 1391 A', ['ordinal' => 777, 'teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200139113, 'Tie 1391 C', ['ordinal' => 776, 'teamid' => 1, 'retired' => 0]);
+
+        $rows = $this->repo->getActivePlayerContracts();
+
+        $ordered = array_values(array_filter(array_column($rows, 'pid'), static fn ($p): bool => in_array($p, [200139111, 200139112, 200139113], true)));
+        self::assertSame([200139113, 200139111, 200139112], $ordered);
     }
 }

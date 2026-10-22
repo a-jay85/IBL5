@@ -183,7 +183,24 @@ def test_toolless_call_still_single_turn_no_tools(shim, tmp_path, monkeypatch):
     logged = shim.read_text()
     assert "--max-turns 1" in logged
     assert "--tools" in logged
-    assert "--model claude-sonnet-4-6" in logged
+    assert "--model claude-sonnet-5-5" in logged
+
+
+def test_haiku_and_sonnet_calls_record_5_5_ids(shim, tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", json.dumps({"result": '{"ok": true}'}))
+    ledger = UsageLedger()
+    cli = ClaudeCli(ledger, workdir=str(tmp_path))
+    cli.call("probe-haiku", "haiku", "p", validate=lambda d: None)
+    cli.call("probe-sonnet", "sonnet", "p", validate=lambda d: None)
+    assert {r.purpose: r.model for r in ledger.calls} == {
+        "probe-haiku": "claude-haiku-5-5",
+        "probe-sonnet": "claude-sonnet-5-5",
+    }
+    logged = shim.read_text()
+    assert "--model claude-haiku-5-5" in logged
+    assert "--model claude-sonnet-5-5" in logged
+    assert "claude-haiku-4-5" not in logged
+    assert "claude-sonnet-4-6" not in logged
 
 
 # --- envelope degradation (forced integration) --------------------------------
@@ -413,3 +430,39 @@ def test_error_envelope_records_ledger_once(shim, tmp_path, monkeypatch):
                         allowed_tools=("Read",), max_retries=0)
     assert len(ledger.calls) == 1
     assert ledger.calls[0].ok is False
+
+
+# --- conflict-ladder session budget cap --------------------------------------
+
+def _bounded_argv(**extra):
+    return _tooled_argv(
+        "opus", agent="pr-ready-phase6", allowed_tools=("Read", "Grep", "Glob"),
+        denied_tools=("Bash", "Agent", "Edit"), add_dirs=("/tmp/wt",),
+        append_system_prompt=None, setting_sources="user,project",
+        max_turns=TOOLED_MAX_TURNS, **extra,
+    )
+
+
+def test_tooled_argv_carries_budget_when_set():
+    argv = _tooled_argv(max_budget_usd=5.0, model="opus", agent=None,
+                        allowed_tools=("Read",), denied_tools=(), add_dirs=(),
+                        append_system_prompt=None, setting_sources="user,project",
+                        max_turns=TOOLED_MAX_TURNS)
+    i = argv.index("--max-budget-usd")
+    assert argv[i + 1] == "5.00"
+
+
+def test_tooled_argv_unchanged_without_budget():
+    argv = _bounded_argv()
+    assert "--max-budget-usd" not in argv
+    assert argv == _bounded_argv(max_budget_usd=None)
+    # Same argv test_tooled_argv_is_bounded_and_narrowed pins: budget flag adds exactly two items.
+    assert len(_bounded_argv(max_budget_usd=5.0)) == len(argv) + 2
+
+
+def test_session_budget_reaches_cli_subprocess(shim, tmp_path):
+    cli = _cli(tmp_path)
+    cli.call_tooled("conflict-ladder-session", "opus", "p", cwd=str(tmp_path),
+                    allowed_tools=("Read", "Write"), max_budget_usd=5.0, max_retries=0)
+    logged = shim.read_text()
+    assert "--max-budget-usd 5.00" in logged

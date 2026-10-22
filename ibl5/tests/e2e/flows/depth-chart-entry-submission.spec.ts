@@ -24,10 +24,11 @@ import { submitFormAndAssertEffect } from '../helpers/submit-form';
 // flash render + single-use consumption is already unit-covered by
 // tests/Unit/PageLayout/PageLayoutTest.php, so here we assert the DURABLE proof
 // of success instead — the submitted depth value persisted to the DB (readable
-// back on the redirected form). (The ".ibl-alert--error" validation-failure test
-// below is NOT affected: its flash key `_ibl_depth_chart_flash` is module-scoped
-// and only this serial spec ever renders DepthChartEntry, so no parallel worker
-// can steal it.)
+// back on the redirected form). The ".ibl-alert--error" validation-failure tests
+// below rely on the same kind of single-use flash (`_ibl_depth_chart_flash`), and
+// many other specs render DepthChartEntry. In the parallel chromium project one of
+// them could consume that flash first, so this whole file runs in the `mutators`
+// project (--workers=1) — see playwright.config.ts.
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Depth Chart submission', () => {
@@ -364,7 +365,7 @@ test.describe('Depth Chart submission', () => {
     await dropdown.selectOption({ index: 1 });
 
     // Wait for AJAX to update the hidden field
-    const loadedId = page.locator('#loaded_dc_id, input[name="loaded_dc_id"]');
+    const loadedId = page.locator('#loaded_dc_id');
     await expect(loadedId.first(), 'loaded_dc_id hidden field must exist in form').toBeAttached();
     await expect(async () => {
       const val = await loadedId.first().inputValue();

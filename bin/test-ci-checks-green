@@ -3,15 +3,18 @@
 # check-run verdict logic (bin/lib/ci-checks-green.sh) and its callers
 # bin/check-master-ci-green and bin/check-pr-checks-green.
 #
-# C1-C4  run bin/check-master-ci-green end to end against fixture JSON via the
+# C1-C11 run bin/check-master-ci-green end to end against fixture JSON via the
 #        GH_API_CMD seam (a `gh` shim answers `auth status`; a throwaway git repo
 #        supplies the origin remote).
-# L1-L5  source the lib and call its functions directly.
-# P1-P12 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
+# L1-L9  source the lib and call its functions directly.
+# P1-P17 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
 #        (the Nth poll serves the Nth fixture; every case uses --interval-seconds=0).
 #
 # Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+H_FAIL_FD=2  # FAIL: lines stay on stderr, as before migration
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     echo "Usage: bin/test-ci-checks-green [--help|-h]"
@@ -23,11 +26,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHECK="$SCRIPT_DIR/check-master-ci-green"
 LIB="$SCRIPT_DIR/lib/ci-checks-green.sh"
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP"; h_cleanup' EXIT
 
-FAILED=0
-ok()   { echo "ok: $1"; }
-fail() { echo "FAIL: $1" >&2; FAILED=1; }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$1"; }
 
 # --- shared fixtures ---------------------------------------------------------
 SHIMD="$TMP/shim"
@@ -103,7 +105,115 @@ else
     fail "C4 latest-per-name wins (rc=$RC err=$(cat "$ERR"))"
 fi
 
-# --- L1-L5: lib unit cases ----------------------------------------------------
+# --- C5-C11: IGNORE_FAILED_CHECKS -----------------------------------------
+HELPER="Keep the merge-line head current"
+cat > "$TMP/c5.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c5.json"
+if [ "$RC" -eq 0 ] \
+   && grep -qF "IGNORE_FAILED_CHECKS active — ignoring failed: Keep the merge-line head current (failure)" "$OUT" \
+   && grep -qF "PASS: 1 check-run(s) all green" "$OUT"; then
+    ok "C5 listed helper failure is logged and ignored"
+else
+    fail "C5 listed helper failure is logged and ignored (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+unset IGNORE_FAILED_CHECKS
+run_check "$TMP/c5.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks failed: Keep the merge-line head current (failure)" "$ERR" \
+   && ! grep -qF "IGNORE_FAILED_CHECKS" "$OUT"; then
+    ok "C6 unset IGNORE_FAILED_CHECKS: helper failure still fails"
+else
+    fail "C6 unset IGNORE_FAILED_CHECKS: helper failure still fails (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+IGNORE_FAILED_CHECKS="" run_check "$TMP/c5.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks failed: Keep the merge-line head current (failure)" "$ERR" \
+   && ! grep -qF "IGNORE_FAILED_CHECKS" "$OUT"; then
+    ok "C7 empty IGNORE_FAILED_CHECKS: no-op, helper failure still fails"
+else
+    fail "C7 empty IGNORE_FAILED_CHECKS: no-op, helper failure still fails (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c8.json" <<'JSON'
+{"total_count":3,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"Keep the merge-line head current","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c8.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks still running: Keep the merge-line head current" "$ERR" \
+   && grep -qF "IGNORE_FAILED_CHECKS active — ignoring failed: <none matched>" "$OUT"; then
+    ok "C8 pending listed helper still reports as running"
+else
+    fail "C8 pending listed helper still reports as running (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c9.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"Keep the merge-line head current (copy)","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c9.json"
+if [ "$RC" -eq 1 ] \
+   && grep -qF "FAIL: checks failed: Keep the merge-line head current (copy) (failure)" "$ERR" \
+   && grep -qF "IGNORE_FAILED_CHECKS active — ignoring failed: <none matched>" "$OUT"; then
+    ok "C9 near-miss name is not ignored (exact match only)"
+else
+    fail "C9 near-miss name is not ignored (exact match only) (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c10.json" <<'JSON'
+{"total_count":1,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+IGNORE_FAILED_CHECKS="$HELPER" run_check "$TMP/c10.json"
+if [ "$RC" -eq 1 ] && grep -qF "FAIL: only 0 check-run(s) found on HEAD" "$ERR"; then
+    ok "C10 ignoring every run with no usable ancestor fails the floor"
+else
+    fail "C10 ignoring every run with no usable ancestor fails the floor (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+# C11: HEAD has only the failed helper, so TOTAL=0 and the script walks back.
+# The ancestor also carries a failed helper run; it must be dropped there too.
+WREPO="$TMP/wrepo"
+mkdir -p "$WREPO"
+git -C "$WREPO" init -q
+git -C "$WREPO" remote add origin https://github.com/a-jay85/IBL5.git
+git -C "$WREPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m parent
+git -C "$WREPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m head
+W_HEAD="$(git -C "$WREPO" rev-parse HEAD)"
+cat > "$TMP/c11-anc.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+cat > "$TMP/walkshim" <<SHIM
+#!/bin/sh
+case "\$1" in
+  *"/commits/$W_HEAD/"*) cat "$TMP/c10.json" ;;
+  *) cat "$TMP/c11-anc.json" ;;
+esac
+SHIM
+chmod +x "$TMP/walkshim"
+( cd "$WREPO" && PATH="$SHIMD:$PATH" GH_API_CMD="$TMP/walkshim" \
+    IGNORE_FAILED_CHECKS="$HELPER" "$CHECK" "$W_HEAD" >"$TMP/out" 2>"$TMP/err" )
+RC=$?
+if [ "$RC" -eq 0 ] \
+   && grep -qF "Falling back to ancestor" "$TMP/out" \
+   && grep -qF "PASS: 1 check-run(s) all green" "$TMP/out"; then
+    ok "C11 walk-back re-applies IGNORE_FAILED_CHECKS to the ancestor"
+else
+    fail "C11 walk-back re-applies IGNORE_FAILED_CHECKS to the ancestor (rc=$RC out=$(cat "$TMP/out") err=$(cat "$TMP/err"))"
+fi
+
+# --- L1-L9: lib unit cases ----------------------------------------------------
 # shellcheck source=bin/lib/ci-checks-green.sh
 if [ -f "$LIB" ]; then
     source "$LIB"
@@ -159,11 +269,57 @@ if [ -f "$LIB" ]; then
     else
         fail "L5 skip csv to json (empty=$e spaced=$s)"
     fi
+
+    DROP_IN='{"check_runs":[
+      {"name":"deploy","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z"},
+      {"name":"deploy","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+      {"name":"deploy-ish","status":"queued"},
+      {"name":"e2e","status":"in_progress"},
+      {"name":"phpunit","status":"completed","conclusion":"success"}]}'
+    got="$(printf '%s' "$DROP_IN" | ccg_drop_pending '["deploy"]' \
+      | jq -c '[.check_runs[] | .name + ":" + .status], .total_count')"
+    want="$(printf '%s\n%s' '["deploy:completed","deploy-ish:queued","e2e:in_progress","phpunit:completed"]' '4')"
+    if [ "$got" = "$want" ]; then
+        ok "L6 drop_pending drops only pending runs of exact listed names"
+    else
+        fail "L6 drop_pending drops only pending runs of exact listed names (got: $got)"
+    fi
+
+    got="$(printf '%s' "$DROP_IN" | ccg_drop_pending '[]' | jq -c '.check_runs | length')"
+    if [ "$got" = "5" ]; then
+        ok "L7 drop_pending with an empty list keeps every run"
+    else
+        fail "L7 drop_pending with an empty list keeps every run (got: $got)"
+    fi
+
+    FAILDROP_IN='{"check_runs":[
+      {"name":"Keep the merge-line head current","status":"completed","conclusion":"failure"},
+      {"name":"helper-null","status":"completed","conclusion":null},
+      {"name":"helper-pending","status":"in_progress","conclusion":null},
+      {"name":"helper-green","status":"completed","conclusion":"success"},
+      {"name":"Keep the merge-line head current (copy)","status":"completed","conclusion":"failure"},
+      {"name":"phpunit","status":"completed","conclusion":"failure"}]}'
+    FAILDROP_LIST='["Keep the merge-line head current","helper-null","helper-pending","helper-green"]'
+    got="$(printf '%s' "$FAILDROP_IN" | ccg_drop_failed "$FAILDROP_LIST" \
+      | jq -c '[.check_runs[] | .name + ":" + .status], .total_count')"
+    want="$(printf '%s\n%s' '["helper-pending:in_progress","helper-green:completed","Keep the merge-line head current (copy):completed","phpunit:completed"]' '4')"
+    if [ "$got" = "$want" ]; then
+        ok "L8 drop_failed drops only completed non-passing runs of exact listed names"
+    else
+        fail "L8 drop_failed drops only completed non-passing runs of exact listed names (got: $got)"
+    fi
+
+    got="$(printf '%s' "$FAILDROP_IN" | ccg_drop_failed '[]' | jq -c '.check_runs | length')"
+    if [ "$got" = "6" ]; then
+        ok "L9 drop_failed with an empty list keeps every run"
+    else
+        fail "L9 drop_failed with an empty list keeps every run (got: $got)"
+    fi
 else
-    fail "L1-L5 cannot run: $LIB is missing"
+    fail "L1-L9 cannot run: $LIB is missing"
 fi
 
-# --- P1-P12: bin/check-pr-checks-green (PR-head poller) ---------------------
+# --- P1-P17: bin/check-pr-checks-green (PR-head poller) ---------------------
 POLL="$SCRIPT_DIR/check-pr-checks-green"
 P_SHA="0123456789abcdef0123456789abcdef01234567"
 
@@ -310,5 +466,85 @@ if [ "$RC" -eq 1 ] && grep -qF 'A (unknown)' "$ERR"; then
     ok "P12 null conclusion fails"
 else fail "P12 null conclusion fails (rc=$RC err=$(cat "$ERR"))"; fi
 
+# P13: a stacked base fails at once, before the grace sleep and before any API call.
+new_case p13
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+s13=$SECONDS
+run_poll --anchor=A --wait --timeout-seconds=30 --startup-grace-seconds=30 --base-ref=vr-pr-body-changed-screens
+el13=$((SECONDS - s13))
+if [ "$RC" -eq 1 ] && [ "$el13" -lt 5 ] && [ "$(counter)" = "0" ]; then
+    ok "P13 stacked base fails fast with zero API calls"
+else fail "P13 stacked base fails fast (rc=$RC el=${el13}s counter=$(counter))"; fi
+for tok in 'FAIL: stacked on vr-pr-body-changed-screens' \
+           'Tests and Analysis, E2E Tests, Meta checks' \
+           'retargets this PR to master, push' \
+           'gh run rerun'; do
+    if grep -qF -- "$tok" "$ERR"; then ok "P13 message carries '$tok'"
+    else fail "P13 message carries '$tok' (err=$(cat "$ERR"))"; fi
+done
 
-exit "$FAILED"
+# P14: master and develop pass through to the normal poll.
+for b in master develop; do
+    new_case "p14-$b"
+    cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+    run_poll --anchor=A --wait --timeout-seconds=5 --base-ref="$b"
+    if [ "$RC" -eq 0 ] && grep -q '^PASS:' "$OUT" && [ "$(counter)" = "1" ] \
+            && ! grep -qF 'stacked on' "$ERR"; then
+        ok "P14 base $b reaches the normal poll"
+    else fail "P14 base $b reaches the normal poll (rc=$RC counter=$(counter) err=$(cat "$ERR"))"; fi
+done
+
+# P15: a master base keeps the exact anchor wait behavior.
+new_case p15
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A,B --wait --timeout-seconds=1
+rc15a=$RC; cp "$ERR" "$TMP/p15-a"
+new_case p15
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A,B --wait --timeout-seconds=1 --base-ref=master
+rc15b=$RC; cp "$ERR" "$TMP/p15-b"
+p15_ok=1
+for f in "$TMP/p15-a" "$TMP/p15-b"; do
+    grep -qF 'WAIT: anchors not reported/completed: B' "$f" && grep -qF 'TIMEOUT:' "$f" || p15_ok=0
+done
+# Interval 0 means the number of repeated WAIT lines varies with timing; collapse repeats.
+sed 's/after [0-9]*s/after Ns/' "$TMP/p15-a" | uniq > "$TMP/p15-an"
+sed 's/after [0-9]*s/after Ns/' "$TMP/p15-b" | uniq > "$TMP/p15-bn"
+if [ "$rc15a" -eq 1 ] && [ "$rc15b" -eq 1 ] && [ "$p15_ok" -eq 1 ] \
+        && cmp -s "$TMP/p15-an" "$TMP/p15-bn"; then
+    ok "P15 master base keeps the anchor wait behavior"
+else fail "P15 master base keeps the anchor wait behavior (rc=$rc15a/$rc15b ok=$p15_ok)"; fi
+
+# P16: the startup grace is slept on the master path and excluded from the deadline.
+new_case p16
+cr 1 "[{\"name\":\"A\",\"status\":\"in_progress\",\"conclusion\":null,\"completed_at\":null}]"; wr 1 "$RUNS_DONE"
+cr 2 "[{\"name\":\"A\",$G}]"; wr 2 "$RUNS_DONE"
+s16=$SECONDS
+run_poll --anchor=A --wait --timeout-seconds=1 --startup-grace-seconds=2 --base-ref=master
+el16=$((SECONDS - s16))
+if [ "$RC" -eq 0 ] && [ "$el16" -ge 2 ] && [ "$(counter)" = "2" ]; then
+    ok "P16 startup grace honored and outside the deadline"
+else fail "P16 startup grace (rc=$RC el=${el16}s counter=$(counter) err=$(cat "$ERR"))"; fi
+
+# P17: rejected --base-ref and grace forms exit 2 with zero API calls.
+p17_ok=1
+p17_try() {
+    new_case p17
+    cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+    GH_API_CMD="$PSHIM" "$POLL" --repo=a-jay85/IBL5 --sha="$P_SHA" --interval-seconds=0 "$@" \
+        >/dev/null 2>"$TMP/p17err"; rc=$?
+    if [ "$rc" -ne 2 ] || ! grep -qiE 'unknown flag|invalid|unexpected' "$TMP/p17err" \
+            || [ "$(counter)" != "0" ]; then
+        p17_ok=0; echo "  P17 '$*' -> rc=$rc counter=$(counter): $(head -1 "$TMP/p17err")" >&2
+    fi
+}
+p17_try --base-ref=
+p17_try --base-ref=-x
+p17_try --base-ref=a..b
+p17_try '--base-ref=a;b'
+p17_try '--base-ref=a b'
+p17_try --startup-grace-seconds=x
+p17_try --base-ref master
+if [ "$p17_ok" -eq 1 ]; then ok "P17 rejected base-ref and grace forms"; else fail "P17 rejected base-ref and grace forms"; fi
+
+h_done

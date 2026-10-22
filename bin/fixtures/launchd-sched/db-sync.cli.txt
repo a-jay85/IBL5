@@ -1,0 +1,4 @@
+args= exit=2
+Usage: bin/db-sync-cron-setup --print-schedule | --install-schedule | --uninstall-schedule
+args=--bogus-flag exit=2
+Unknown option: --bogus-flag. Use --print-schedule, --install-schedule, or --uninstall-schedule.

@@ -171,6 +171,13 @@ the earlier slot in that order claims them.</p>
             <tbody>';
     }
 
+    private function renderPlayerLink(int $pid, string $playerName): string
+    {
+        return '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . HtmlSanitizer::e($pid) . '">'
+            . \Player\PlayerImageHelper::renderThumbnail($pid) . HtmlSanitizer::e($playerName)
+            . '</a>';
+    }
+
     /**
      * @see DepthChartViewInterface::renderPlayerRow()
      * @param PlayerRow $player
@@ -180,17 +187,15 @@ the earlier slot in that order claims them.</p>
         $playerName = $player['name'];
         $jsbProduction = $this->service->computeJsbProduction($player);
 
-        $thumbnail = \Player\PlayerImageHelper::renderThumbnail((int) $player['pid']);
+        $photoUrl = \Player\PlayerImageHelper::getImageUrl($player['pid']);
 
-        echo '<tr data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '" data-quality-score="' . HtmlSanitizer::e($player['quality_score'] ?? 0.0) . '">'
+        echo '<tr data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '" data-quality-score="' . HtmlSanitizer::e($player['quality_score'] ?? 0.0) . '" data-photo-url="' . HtmlSanitizer::e($photoUrl) . '">'
             . '<td>' . HtmlSanitizer::e($player['pos']) . '</td>'
             . '<td class="ibl-player-cell">'
             . '<input type="hidden" name="pid' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['pid']) . '">'
             . '<input type="hidden" name="Injury' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['injured'] ?? 0) . '">'
             . '<input type="hidden" name="Name' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($playerName) . '">'
-            . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . HtmlSanitizer::e($player['pid']) . '">'
-            . HtmlSanitizer::trusted($thumbnail) . HtmlSanitizer::e($playerName)
-            . '</a>'
+            . HtmlSanitizer::trusted($this->renderPlayerLink((int) $player['pid'], $playerName))
             . '</td>';
 
         // Active status — hidden input submits "0" when checkbox is unchecked;
@@ -246,7 +251,7 @@ function resetDepthChart() {
         window.IBL_syncDepthChartStepperLabels();
     }
 
-    // Reset minutes number inputs to blank — the server's extractIntValue()
+    // Reset minutes number inputs to blank — the server's StatsSanitizer::intFromArray()
     // converts blank → 0 on submit, so this leaves the GM with an empty
     // field they can type into rather than a stale "0" they have to clear.
     var minInputs = form.querySelectorAll('input[type="number"][name^="min"]');
@@ -350,7 +355,7 @@ JAVASCRIPT;
         // Header: photo + pos badge + name + active toggle
         echo '<div class="dc-card__header">';
         echo '<img class="dc-card__photo" src="' . HtmlSanitizer::e($imageUrl) . '" alt="" width="48" height="48" loading="lazy">';
-        echo '<span class="dc-card__pos-badge">' . HtmlSanitizer::e($player['pos']) . '</span>';
+        echo '<span class="ibl-chip ibl-chip--navy dc-card__pos-badge">' . HtmlSanitizer::e($player['pos']) . '</span>';
         echo '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . HtmlSanitizer::e($player['pid']) . '" class="dc-card__name">' . HtmlSanitizer::e($playerName) . '</a>';
 
         echo '<input type="hidden" name="pid' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['pid']) . '" disabled>';

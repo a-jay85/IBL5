@@ -26,9 +26,10 @@ use FreeAgencyPreview\FreeAgencyPreviewView;
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db;
+/** @var \mysqli $mysqli_db */
 
 // Get current season info
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 
 // Check if season is available
 if ($season->endingYear === null || $season->endingYear === 0) {

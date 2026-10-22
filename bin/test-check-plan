@@ -15,13 +15,15 @@
 # intentional so the fixture text reaches check-plan verbatim.
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$SCRIPT_DIR/check-plan"
 TMP="$(mktemp -d)"
-trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
+trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
 
-FAILED=0
+# Inline checks further below still set FAILED=1 directly; h_done reads it.
 
 # assert <name> <expected-exit> <plan-body>
 assert() {
@@ -31,10 +33,9 @@ assert() {
     "$GUARD" "$f" >/dev/null 2>&1
     got=$?
     if [ "$got" -ne "$want" ]; then
-        echo "FAIL: $name — expected exit $want, got $got"
-        FAILED=1
+        h_fail "$name" "expected exit $want, got $got"
     else
-        echo "ok: $name (exit $got)"
+        h_pass "$name (exit $got)"
     fi
 }
 
@@ -47,15 +48,15 @@ assert_msg() {
     out="$("$GUARD" "$f" 2>&1)"; got=$?
     ok=1
     if [ "$got" -ne "$want_exit" ]; then
-        echo "FAIL: $name — expected exit $want_exit, got $got"; ok=0
+        h_fail "$name" "expected exit $want_exit, got $got"; ok=0
     fi
     if [ -n "$msg_inc" ] && ! grep -qF "$msg_inc" <<< "$out"; then
-        echo "FAIL: $name — '$msg_inc' not in output"; ok=0
+        h_fail "$name" "'$msg_inc' not in output"; ok=0
     fi
     if [ -n "$msg_exc" ] && grep -qF "$msg_exc" <<< "$out"; then
-        echo "FAIL: $name — '$msg_exc' unexpectedly in output"; ok=0
+        h_fail "$name" "'$msg_exc' unexpectedly in output"; ok=0
     fi
-    if [ "$ok" -eq 1 ]; then echo "ok: $name (exit $got)"; else FAILED=1; fi
+    if [ "$ok" -eq 1 ]; then h_pass "$name (exit $got)"; fi
 }
 
 # assert_cf <name> <plan-body> <expected --print-critical-files output>
@@ -67,12 +68,11 @@ assert_cf() {
     printf '%s\n' "$body" > "$f"
     got="$("$GUARD" --print-critical-files "$f" 2>/dev/null)"
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — classification mismatch"
+        h_fail "$name" "classification mismatch"
         echo "  want: $(printf '%s' "$want" | tr '\n' ' ')"
         echo "  got:  $(printf '%s' "$got" | tr '\n' ' ')"
-        FAILED=1
     else
-        echo "ok: $name"
+        h_pass "$name"
     fi
 }
 
@@ -90,13 +90,13 @@ assert_viol() {
     printf '%s\n' "$body" > "$f"
     out="$("$GUARD" "$f" 2>&1)"; got=$?
     if [ "$got" -ne "$want" ]; then
-        echo "FAIL: $name — expected exit $want, got $got"; FAILED=1
+        h_fail "$name" "expected exit $want, got $got"
     elif [ "$want" -eq 1 ] && ! printf '%s' "$out" | grep -qF "$tag"; then
-        echo "FAIL: $name — exit 1 but no $tag violation (wrong gate fired)"; FAILED=1
+        h_fail "$name" "exit 1 but no $tag violation (wrong gate fired)"
     elif [ "$want" -eq 0 ] && printf '%s' "$out" | grep -qF "$tag"; then
-        echo "FAIL: $name — clean fixture wrongly fired $tag"; FAILED=1
+        h_fail "$name" "clean fixture wrongly fired $tag"
     else
-        echo "ok: $name (exit $got)"
+        h_pass "$name (exit $got)"
     fi
 }
 
@@ -109,10 +109,9 @@ assert_draft() {
     "$GUARD" --draft "$f" >/dev/null 2>&1
     got=$?
     if [ "$got" -ne "$want" ]; then
-        echo "FAIL: $name — expected exit $want, got $got"
-        FAILED=1
+        h_fail "$name" "expected exit $want, got $got"
     else
-        echo "ok: $name (exit $got)"
+        h_pass "$name (exit $got)"
     fi
 }
 
@@ -2322,7 +2321,7 @@ assert_viol "cf-relative-path-accepted" 0 '[F]' "$FM$CF_MATRIX"'
 '
 
 # ---------------------------------------------------------------------------
-# Gate [VR] fixtures (11 cases) — a VR -snapshots Critical File needs a marker
+# Gate [VR] fixtures (27 cases) — Critical Files marker, regen mention, and matrix-row clauses
 # ---------------------------------------------------------------------------
 VR_SNAP='ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots'
 
@@ -2416,11 +2415,156 @@ printf '%s\n' "$FM$CF_MATRIX"'
 - `'"$VR_SNAP"'` — VR baselines
 ' > "$f"
 out="$("$GUARD" "$f" 2>&1)" || true
-if grep -qF 'Mark it (conditional — only if VR baselines change), or (vr-baseline-change: <what changes>)' <<<"$out"; then
+if grep -qF 'Mark it (conditional — only if VR baselines change), CI update-baselines regen included, or (vr-baseline-change: <what>)' <<<"$out"; then
     echo "ok: vr-message-names-fix"
 else
     echo "FAIL: vr-message-names-fix — [VR] message lost its fix text"; FAILED=1
 fi
+
+# (VR-12) vr-baseline-change that names the CI update-baselines label (the PR 3329 shape) — must flag [VR].
+f="$TMP/vr-regen-label-rejected.md"
+printf '%s\n' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (vr-baseline-change: regenerate via the CI `update-baselines` label)
+' > "$f"
+out="$("$GUARD" "$f" 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && grep -qF 'names CI regeneration' <<<"$out"; then
+    echo "ok: vr-regen-label-rejected"
+else
+    echo "FAIL: vr-regen-label-rejected — expected [VR] regen message (rc=$rc)"; FAILED=1
+fi
+
+# (VR-13) CI + regenerated without the literal label name — must flag [VR] through the regen clause.
+f="$TMP/vr-regen-ci-word-rejected.md"
+printf '%s\n' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (vr-baseline-change: regenerated by CI after the PR opens)
+' > "$f"
+out="$("$GUARD" "$f" 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && grep -qF 'names CI regeneration' <<<"$out"; then
+    echo "ok: vr-regen-ci-word-rejected"
+else
+    echo "FAIL: vr-regen-ci-word-rejected — expected [VR] regen message (rc=$rc)"; FAILED=1
+fi
+
+# (VR-14) vr-baseline-change for a git rm; CI mentioned without regen or label — clean.
+assert_viol "vr-git-rm-with-ci-mention-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (vr-baseline-change: git rm of the contracts-hub baselines; CI reruns the spec)
+'
+
+# (VR-15) The conditional form may describe the CI regen freely — EXEMPT, clean.
+assert_viol "vr-conditional-with-regen-mention-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (conditional — only if VR baselines change; CI update-baselines regenerates them)
+'
+
+# (VR-16) Regen words on ANOTHER entry line do not taint this vr-baseline-change entry — clean.
+assert_viol "vr-regen-on-other-entry-ignored" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (vr-baseline-change: deletes the contracts-hub baselines)
+- `bin/check-plan` — CI update-baselines label handling
+'
+
+# (VR-17) The regen message is NOT printed for a bare `regenerates` with no CI word (VR-4 shape).
+f="$TMP/vr-regen-message-absent-without-ci.md"
+printf '%s\n' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (VR-Baseline-Change: regenerates the smoke baselines)
+' > "$f"
+out="$("$GUARD" "$f" 2>&1)" || true
+if grep -qF 'names CI regeneration' <<<"$out"; then
+    echo "FAIL: vr-regen-message-absent-without-ci — lexicon widened to bare regenerates"; FAILED=1
+else
+    echo "ok: vr-regen-message-absent-without-ci"
+fi
+
+VRM_HDR='
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|'
+
+# (VR-18) PNG under the snapshots dir planned as a Visual-regression test (PR 3329 row 10) — must flag [VR] with the matrix message.
+f="$TMP/vr-matrix-png-token-rejected.md"
+printf '%s\n' "$FM$VRM_HDR"'
+| 1 | preset chip contrast baseline updates | Visual-regression | post-impl | `'"$VR_SNAP"'/search-transactions-preset.png` |
+' > "$f"
+out="$("$GUARD" "$f" 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && grep -qF '[VR] Verification Matrix row plans' <<<"$out"; then
+    echo "ok: vr-matrix-png-token-rejected"
+else
+    echo "FAIL: vr-matrix-png-token-rejected — expected [VR] matrix-row message (rc=$rc)"; FAILED=1
+fi
+
+# (VR-19) Bare -snapshots directory as the token (PR 3301 rows 12-13, PR 3311 row 14) — must flag [VR].
+assert_viol "vr-matrix-snapshots-dir-rejected" 1 '[VR]' "$FM$VRM_HDR"'
+| 1 | smoke baselines regenerate | Visual-regression | post-impl | `'"$VR_SNAP"'` |
+'
+
+# (VR-20) PR 3289 row 216: conditional Critical Files entry PLUS a matrix row naming the dir with a trailing (conditional — ...).
+# Fails through the matrix clause only; neither Critical Files message may print.
+f="$TMP/vr-matrix-conditional-tail-rejected.md"
+printf '%s\n' "$FM$VRM_HDR"'
+| 1 | alert baselines | Visual-regression | post-impl | `'"$VR_SNAP"'/` (conditional — only if VR baselines change) |
+
+## Critical Files
+
+- `'"$VR_SNAP"'` (conditional — only if VR baselines change)
+- `bin/check-plan`
+' > "$f"
+out="$("$GUARD" "$f" 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && grep -qF '[VR] Verification Matrix row plans' <<<"$out" \
+    && ! grep -qF 'listed as must-appear' <<<"$out" && ! grep -qF 'names CI regeneration' <<<"$out"; then
+    echo "ok: vr-matrix-conditional-tail-rejected"
+else
+    echo "FAIL: vr-matrix-conditional-tail-rejected — expected matrix-row message only (rc=$rc)"; FAILED=1
+fi
+
+# (VR-21) The replacement shape for a CI regen: tracked spec with (run-only) — clean for [VR] and [RO] (exit 0).
+assert_viol "vr-matrix-spec-run-only-accepted" 0 '[VR]' "$FM$VRM_HDR"'
+| 1 | CI regenerates the smoke baselines via update-baselines | Visual-regression | post-impl | `ibl5/tests/e2e/smoke/visual-regression.spec.ts` (run-only) |
+'
+
+# (VR-22) PR 3329 row 11: an untouched PNG with (no-change) — clean for [VR] and [X] (exit 0).
+assert_viol "vr-matrix-png-no-change-accepted" 0 '[VR]' "$FM$VRM_HDR"'
+| 1 | search page baseline byte-identical | Visual-regression | post-impl | `'"$VR_SNAP"'/search.png` (no-change) |
+'
+
+# (VR-23) A CLI-executable row that mentions the dir plans no test — clean.
+assert_viol "vr-matrix-cli-row-mention-ignored" 0 '[VR]' "$FM$VRM_HDR"'
+| 1 | deleted baselines are gone | CLI-executable | post-impl | `git ls-files '"$VR_SNAP"' # prints nothing` |
+'
+
+# (VR-24) The clause is type-agnostic: a PNG token on an E2E row also fails [VR].
+assert_viol "vr-matrix-png-on-e2e-row-rejected" 1 '[VR]' "$FM$VRM_HDR"'
+| 1 | chip renders | E2E | post-impl | `'"$VR_SNAP"'/chip.png` |
+'
+
+# (VR-25) Marker not directly after the token does not exempt — must flag [VR] (gate [X] fires too; only [VR] is asserted).
+assert_viol "vr-matrix-marker-not-adjacent-rejected" 1 '[VR]' "$FM$VRM_HDR"'
+| 1 | baseline | Visual-regression | post-impl | `'"$VR_SNAP"'/x.png` passes (no-change) |
+'
+
+# (VR-26) Rightmost-cell pick, harness parity: a PNG mentioned in the description cell is not the planned token — clean.
+assert_viol "vr-matrix-rightmost-cell-pick" 0 '[VR]' "$FM$VRM_HDR"'
+| 1 | `chip.png` is regenerated by CI | Visual-regression | post-impl | `ibl5/tests/e2e/smoke/visual-regression.spec.ts` (run-only) |
+'
+
+# (VR-27) A fenced example row is not a matrix row — clean.
+assert_viol "vr-matrix-fenced-row-ignored" 0 '[VR]' "$FM$VRM_HDR"'
+| 1 | thing works | E2E | post-impl | `tests/X.spec.ts` |
+
+```
+| 2 | baseline | Visual-regression | post-impl | `'"$VR_SNAP"'/x.png` |
+```
+'
 
 # ---------------------------------------------------------------------------
 # Gate [M] fixtures (5 cases)
@@ -2530,6 +2674,229 @@ XSECOND='
 assert_viol "gateX-second-token-marker-unchanged" 0 '[X]' "$FM$XSECOND"
 
 # ---------------------------------------------------------------------------
+# Gate [RO] fixtures (27 cases)
+# The (run-only) marker exempts a row's token from the harness MISSING item, so
+# the gate pins: whole-cell planning type, marker directly after the row's
+# planned token, one marker per token, token exists on the base ref, token is
+# not a must-appear Critical Files entry, and an unmarked row that plan prose
+# calls run-only gets the marker (check 7a). Checks 6 and 7b are warnings.
+# Cases 1-18 and 20-26 resolve existence against HEAD (the worktree's own tree) so a
+# default-depth CI checkout with no origin/master still works.
+# ---------------------------------------------------------------------------
+export CHECK_PLAN_MASTER_REF=HEAD
+ROHDR='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|'
+RONAV='ibl5/tests/e2e/smoke/navigation.spec.ts'
+ROSNAP='ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots'
+RONEW='ibl5/tests/e2e/smoke/gate-ro-fixture-missing.spec.ts'
+# 1. the honored shape on an existing file: no [RO] violation.
+RO1="$ROHDR
+| 1 | nav smoke passes | E2E | post-impl | \`$RONAV\` (run-only) |
+"
+assert_viol "gateRO-e2e-existing-ok" 0 '[RO]' "$FM$RO1"
+# 2. a directory token (snapshots dir) passes: cat-file -e accepts a tree.
+RO2="$ROHDR
+| 1 | baselines unchanged | Visual-regression | post-impl | \`$ROSNAP\` (run-only) |
+"
+assert_viol "gateRO-vr-directory-ok" 0 '[RO]' "$FM$RO2"
+# 3. check 1: a CLI row plans no test, so the marker is a no-op there.
+RO3="$ROHDR
+| 1 | x | CLI-executable | post-impl | \`bin/test-foo\` (run-only) |
+"
+assert_viol "gateRO-cli-row-fires" 1 '[RO]' "$FM$RO3"
+# 4. check 2 (position): marker before the token.
+RO4="$ROHDR
+| 1 | x | E2E | post-impl | (run-only) \`$RONAV\` |
+"
+assert_viol "gateRO-marker-before-token-fires" 1 '[RO]' "$FM$RO4"
+# 5. check 2 (identity). Deliberately stricter than gateX-second-token-marker-
+# unchanged: the harness exempts only the row's FIRST test|spec token, so a
+# marker on the second token exempts nothing and MISSING would return after
+# implementation.
+RO5="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` and \`ibl5/tests/e2e/smoke/visual-regression.spec.ts\` (run-only) |
+"
+assert_msg "gateRO-second-token-fires" 1 "but the row's planned test token is" "" "$FM$RO5"
+# 6. check 3: both markers on one row. Gate [X] also fires here (its marker is
+# not directly after the token); the include-string pins the real cause.
+RO6="$ROHDR
+| 1 | baselines unchanged | Visual-regression | post-impl | \`$ROSNAP\` (run-only) (no-change) |
+"
+assert_msg "gateRO-both-markers-fires" 1 "row carries both (run-only) and (no-change)" "" "$FM$RO6"
+# 7. check 4: the path is not on the base ref.
+RO7="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` (run-only) |
+"
+assert_msg "gateRO-missing-on-base-fires" 1 "does not exist on" "" "$FM$RO7"
+# 8. a PHPUnit row passes check 1 (reaching check 4 proves it).
+RO8="$ROHDR
+| 1 | x | PHPUnit | post-impl | \`ibl5/tests/GateRo/FixtureMissingTest.php\` (run-only) |
+
+<!-- no-test-methods: gate RO fixture; methods are not under test here -->
+"
+assert_msg "gateRO-phpunit-type-accepted" 1 "does not exist on" "" "$FM$RO8"
+# 9. check 5: the token is a must-appear Critical Files entry.
+RO9="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Critical Files
+
+- \`$RONAV\` — extend the smoke assertions
+"
+assert_msg "gateRO-must-appear-critical-file-fires" 1 "is a must-appear ## Critical Files entry" "" "$FM$RO9"
+# 10. a (reference) entry is exempt, so the marker is fine.
+RO10="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Critical Files
+
+- \`$RONAV\` (reference)
+"
+assert_viol "gateRO-reference-critical-file-ok" 0 '[RO]' "$FM$RO10"
+# 11. check 6: a phase line pairs the token with an edit verb -> warning only.
+RO11="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Phase 1: Smoke
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Extend \`$RONAV\` with a footer assertion.
+"
+assert_msg "gateRO-phase-edit-verb-warns" 0 "[RO] warning: (run-only) path" "" "$FM$RO11"
+# 12. a phase line that only runs the token stays silent.
+RO12="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` (run-only) |
+
+## Phase 1: Smoke
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Run \`$RONAV\` before and after.
+"
+assert_msg "gateRO-phase-run-verb-silent" 0 "" "[RO] warning: (run-only) path" "$FM$RO12"
+# 13. check 7: unmarked row, path exists on base, nothing cites it -> warning.
+RO13="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+"
+assert_msg "gateRO-unmarked-existing-uncited-warns" 0 "[RO] warning: unmarked test row" "" "$FM$RO13"
+# 14. the same row cited by a phase body line stays silent.
+RO14="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+
+## Phase 1: Smoke
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Extend \`$RONAV\` with a footer assertion.
+"
+assert_msg "gateRO-unmarked-existing-cited-in-phase-silent" 0 "" "[RO] warning: unmarked" "$FM$RO14"
+# 15. an unmarked row for a test being written (not on base) is the normal case.
+RO15="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` |
+"
+assert_msg "gateRO-unmarked-new-path-silent" 0 "" "[RO] warning" "$FM$RO15"
+# 16. a (run-only) quoted only in a code span is a mention, not a marker. The row
+# is unmarked + existing + uncited, so the check-7 WARNING appears; the tag is
+# narrowed to the violation prefix so the warning does not trip the clean branch.
+RO16="$ROHDR
+| 1 | a \`(run-only)\` mention in a code span is not a marker | E2E | post-impl | \`$RONAV\` |
+"
+assert_viol "gateRO-code-span-mention-ignored" 0 '[RO] (run-only)' "$FM$RO16"
+# 17. a fenced fixture block carrying a marker never counts (same shape as XFENCE).
+RO17="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` |
+
+\`\`\`$ROHDR
+| 1 | x | E2E | post-impl | \`$RONEW\` (run-only) |
+\`\`\`
+"
+assert_viol "gateRO-fenced-fixture-ignored" 0 '[RO]' "$FM$RO17"
+# 18. regression guard: an existing (no-change) row neither fires [RO] nor the
+# check-7 warning (the has_nc skip).
+RO18="$ROHDR
+| 1 | baselines unchanged | Visual-regression | post-impl | \`$ROSNAP\` (no-change) |
+"
+assert_viol "gateRO-no-change-row-untouched" 0 '[RO]' "$FM$RO18"
+# 19. no resolvable base ref fails OPEN for the existence checks.
+export CHECK_PLAN_MASTER_REF=refs/heads/gate-ro-no-such-ref-fixture
+assert_viol "gateRO-no-ref-fails-open" 0 '[RO]' "$FM$RO7"
+unset CHECK_PLAN_MASTER_REF
+# Check 7a: an unmarked row that plan prose calls run-only must carry (run-only).
+export CHECK_PLAN_MASTER_REF=HEAD
+# Phase heading kept in a variable so no plan or fixture line starts with a heading.
+ROPH="## Phase 1: Smoke"
+# 20. phrase in the row's own What cell (the period-averages shape) -> violation,
+# and the 7b warning is suppressed by the 7a continue.
+RO20="$ROHDR
+| 1 | nav smoke still passes unchanged | E2E | post-impl | \`$RONAV\` |
+"
+assert_msg "gateRO-unmarked-runonly-same-row-fires" 1 "[RO] unmarked run-only row: \`$RONAV\`" "[RO] warning: unmarked" "$FM$RO20"
+assert_msg "gateRO-unmarked-runonly-message-names-row" 1 "Add (run-only) directly after the token: | 1 | nav smoke still passes unchanged" "" "$FM$RO20"
+# 21. phrase on a Critical Files line that cites the full token (the sco and
+# lastsimrecap shape). (reference) keeps it out of must-appear.
+RO21="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+
+## Critical Files
+
+- \`$RONAV\` (reference) — run-only; must stay green unedited
+"
+assert_msg "gateRO-unmarked-runonly-critical-files-fires" 1 "[RO] unmarked run-only row: \`$RONAV\`" "" "$FM$RO21"
+# 22. the same prose with the marker present is the honored shape.
+RO22="$ROHDR
+| 1 | nav smoke still passes unchanged | E2E | post-impl | \`$RONAV\` (run-only) |
+"
+assert_viol "gateRO-marked-runonly-phrase-ok" 0 '[RO]' "$FM$RO22"
+# 23. veto (a): a phase line cites the token with an edit verb -> no violation;
+# 7b stays silent because a phase cites it.
+RO23="$ROHDR
+| 1 | nav smoke still passes unchanged | E2E | post-impl | \`$RONAV\` |
+
+$ROPH
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Extend \`$RONAV\` with a footer assertion.
+"
+assert_msg "gateRO-unmarked-runonly-phase-edit-vetoed" 0 "" "[RO] unmarked run-only row" "$FM$RO23"
+# 24. the veto strips run-only phrases first: "never edited" on a phase line is
+# the trigger, not an edit verb, so the violation still fires.
+RO24="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+
+$ROPH
+
+sonnet-recipe: gate RO fixture; anchor signal not under test.
+
+Run \`$RONAV\` before and after; it is never edited.
+"
+assert_msg "gateRO-unmarked-runonly-phase-phrase-fires" 1 "[RO] unmarked run-only row: \`$RONAV\`" "" "$FM$RO24"
+# 25. veto (b): a must-appear Critical Files entry (no exempt paren, no edit
+# verb) -> no violation.
+RO25="$ROHDR
+| 1 | nav smoke still passes unchanged | E2E | post-impl | \`$RONAV\` |
+
+## Critical Files
+
+- \`$RONAV\` — smoke spec
+"
+assert_msg "gateRO-unmarked-runonly-must-appear-vetoed" 0 "" "[RO] unmarked run-only row" "$FM$RO25"
+# 26. a bare basename mention is not a citation: no violation, and the plain
+# 7b warning still fires because nothing cites the full path.
+RO26="$ROHDR
+| 1 | x | E2E | post-impl | \`$RONAV\` |
+
+The navigation.spec.ts smoke spec is never edited.
+"
+assert_msg "gateRO-unmarked-basename-phrase-warns-only" 0 "[RO] warning: unmarked test row" "[RO] unmarked run-only row" "$FM$RO26"
+# 27. no resolvable base ref fails OPEN for 7a too.
+export CHECK_PLAN_MASTER_REF=refs/heads/gate-ro-no-such-ref-fixture
+assert_viol "gateRO-unmarked-runonly-no-ref-fails-open" 0 '[RO]' "$FM$RO20"
+unset CHECK_PLAN_MASTER_REF
+
+# ---------------------------------------------------------------------------
 # Gate [Y] fixtures (9 cases)
 # ---------------------------------------------------------------------------
 YHDR='
@@ -2587,6 +2954,231 @@ assert_viol "gateY-share-over-third-fires" 1 '[Y]' "$FM$YHDR"'
 assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
 | 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
 | 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
+'
+
+# ---------------------------------------------------------------------------
+# Gate [Z] fixtures (18 cases)
+# ---------------------------------------------------------------------------
+# Untagged row whose command runs only an out-of-repo scratch script.
+assert_viol "gateZ-untagged-scratch-script-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+'"$YROW"'
+'
+# The same row with a well-formed tag: released.
+assert_viol "gateZ-tagged-scratch-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` (one-time-check: asserts an out-of-repo scratch script the diff cannot carry) | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# A repo script run over out-of-repo inputs is in-repo evidence: exempt.
+assert_viol "gateZ-mixed-repo-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `UNREALISED-ASSERTION` | CLI-executable | post-impl | `MATRIX_ASSERT_ROOT=/tmp/r bin/lib/plan-matrix-assertions ~/claude-plans/x.md -` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# /tmp/ and $HOME/ both open the out-of-repo signal; both rows fire.
+assert_viol "gateZ-tmp-and-home-fire" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `TRACE-OK` | CLI-executable | post-impl | `bash /tmp/negproof/run.sh` |
+| 5 | prints `HOOK-OK` | CLI-executable | post-impl | `bash "$HOME/.claude/hooks/x.sh"` |
+'"$YROW"'
+'
+# A post-PR CI query can never be realised by the diff.
+assert_viol "gateZ-gh-run-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | latest run concludes success; prints `PR-RUN-DONE` | CLI-executable | post-impl | `gh run list --workflow sim-recap.yml --limit 1 && echo PR-RUN-DONE` |
+'"$YROW"'
+'
+# A token-free row is never checked by the helper: silent.
+assert_viol "gateZ-no-token-row-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | the scratch run exits 0 | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/x.sh` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# curl exercises the worktree stack and only writes its output under /tmp: exempt.
+assert_viol "gateZ-curl-tmp-output-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | page holds `Roster` | CLI-executable | post-impl | `curl -s -o /tmp/page.html http://slug.localhost/ibl5/modules.php?name=Team && grep -q Roster /tmp/page.html` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# Not CLI-executable: the tag remedy does not apply, so gate Z never fires.
+assert_viol "gateZ-phpunit-row-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | `pinned_thing` works | PHPUnit | post-impl | `~/scratch/tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# Variable-path arm: a row reaching a scratch file only through a non-root
+# shell variable (the harness-lib-excluded-rules "$RD/mutate.sh" miss).
+assert_viol "gateZ-var-scratch-script-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | the mutation turns the case red; prints `MUTATE-RED` | CLI-executable | post-impl | `bash "$RD/mutate.sh"` |
+'"$YROW"'
+'
+# Brace form and a second scratch name each fire on their own row. The exit
+# code is 1 for any violation, so count the [Z] lines instead.
+_zb_body="$FM$YHDR"'
+| 1 | prints `COMPARE-OK` | CLI-executable | post-impl | `bash ${RD}/compare.sh` |
+| 5 | prints `1` for `ST=$?` | CLI-executable | post-impl | `grep -cF ST "$T/rwr.txt"` |
+'"$YROW"'
+'
+printf '%s\n' "$_zb_body" > "$TMP/gateZ-var-brace-and-second-name-fire.md"
+_zb_out="$("$GUARD" "$TMP/gateZ-var-brace-and-second-name-fire.md" 2>&1)"
+_zb_n="$(grep -c '^\[Z\] ' <<< "$_zb_out")"
+if [ "$_zb_n" = "2" ]; then
+    h_pass "gateZ-var-brace-and-second-name-fire (2 [Z] lines)"
+else
+    h_fail "gateZ-var-brace-and-second-name-fire" "expected 2 [Z] lines, got $_zb_n"
+fi
+# A repo script in the same command is in-repo evidence: exempt.
+assert_viol "gateZ-var-mixed-repo-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `MUTATE-RED` | CLI-executable | post-impl | `bash "$RD/mutate.sh" && bin/test-check-plan` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# Temp-copy mutation shape: a variable followed by a repo top dir is in-repo.
+assert_viol "gateZ-var-repo-topdir-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | the copy goes red; prints `FAIL` | CLI-executable | post-impl | `T=$(mktemp -d) && cp -R bin "$T/bin" && "$T/bin/test-check-plan"` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# Repo-root variable names are in-repo even on a non-top-dir path.
+assert_viol "gateZ-var-repo-root-name-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `ROOT-OK` | CLI-executable | post-impl | `bash "$REPO_ROOT/scripts/x.sh"` |
+| 5 | prints `PWD-OK` | CLI-executable | post-impl | `cat "${PWD}/notes.txt"` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# The one-time-check tag releases the variable arm too.
+assert_viol "gateZ-var-tagged-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `MUTATE-RED` (one-time-check: counterfactual mutation of a scratch copy run once at plan time) | CLI-executable | post-impl | `bash "$RD/mutate.sh"` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# A token-free What cell is never checked by the helper: silent.
+assert_viol "gateZ-var-no-token-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | the scratch mutation run exits 0 | CLI-executable | post-impl | `bash "$RD/mutate.sh"` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# Positional parameters are not variable paths: silent.
+assert_viol "gateZ-positional-param-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `POS-OK` | CLI-executable | post-impl | `cat "$1/out.txt"` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# The ~/ arm keeps its old exemptions: a $VAR/bin/ path does not release it.
+assert_viol "gateZ-home-arm-ignores-var-topdir" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/x.sh "$T/bin/y"` |
+'"$YROW"'
+'
+# The message names the row and the offending variable in one span.
+assert_msg "gateZ-var-message-names-row-and-variable" 1 'offending variable $RD: | 1 | the mutation turns' '' "$FM$YHDR"'
+| 1 | the mutation turns the case red; prints `MUTATE-RED` | CLI-executable | post-impl | `bash "$RD/mutate.sh"` |
+'"$YROW"'
+'
+
+# ---------------------------------------------------------------------------
+# Gate [MT] fixtures (15 cases)
+# ---------------------------------------------------------------------------
+# :LINE suffix on a bare spec name (the phpstan-baseline-module-index-batch shape).
+assert_viol "gateMT-line-suffix-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | heading present at `auth-pages-extended.spec.ts:26` | E2E | post-impl | `ibl5/tests/e2e/auth-pages-extended.spec.ts` |
+'"$YROW"'
+'
+# :NN-NN range on a full path.
+assert_viol "gateMT-line-range-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | heading present at `ibl5/tests/e2e/auth-pages-extended.spec.ts:9-10` | E2E | post-impl | `ibl5/tests/e2e/auth-pages-extended.spec.ts` |
+'"$YROW"'
+'
+# The message names the bare path to cite instead.
+assert_msg "gateMT-line-message-names-bare-path" 1 'Cite the bare path `auth-pages-extended.spec.ts`' '[Z]' "$FM$YHDR"'
+| 1 | heading present at `auth-pages-extended.spec.ts:26` | E2E | post-impl | `ibl5/tests/e2e/auth-pages-extended.spec.ts` |
+'"$YROW"'
+'
+# The corrected form, a bare path, passes.
+assert_viol "gateMT-bare-path-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | heading present in `ibl5/tests/e2e/auth-pages-extended.spec.ts` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# host:port tokens are not paths: exempt by extension.
+assert_viol "gateMT-host-port-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | stack answers on `localhost:8080`, `wt-x.localhost:8080` and `iblhoops.net:443` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# A :LINE token inside the Mutation clause is blanked by the helper: silent.
+assert_viol "gateMT-mutation-clause-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds. Mutation: delete the branch at `x.php:12` makes it fail | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# A matrix inside a fenced example is never scanned. MT_FENCE is built with
+# printf so no line of this file opens a markdown fence of its own.
+MT_FENCE=$(printf '%s%s%s' '`' '`' '`')
+assert_viol "gateMT-fenced-matrix-silent" 0 '[MT]' "$FM$YHDR"'
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+
+'"$MT_FENCE$YHDR"'
+| 9 | heading present at `auth-pages-extended.spec.ts:26` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$MT_FENCE"'
+'
+# A one-time-check row is skipped by the helper, so the gate skips it too.
+assert_viol "gateMT-tagged-row-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | grep printed `x.php:12` (one-time-check: one command printed output at plan time) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+
+# Stem fixtures: a throwaway repo with one orphan stem and one stem a spec quotes.
+MT_REPO="$TMP/mt-repo"
+mkdir -p "$MT_REPO/e2e/vr.spec.ts-snapshots"
+git -C "$MT_REPO" init -q
+printf 'png\n' > "$MT_REPO/e2e/vr.spec.ts-snapshots/mt-orphan-stem.png"
+printf 'png\n' > "$MT_REPO/e2e/vr.spec.ts-snapshots/mt-saved-stem.png"
+printf "await expect(page).toHaveScreenshot('mt-saved-stem.png');\n" > "$MT_REPO/e2e/vr.spec.ts"
+git -C "$MT_REPO" add -A
+export CHECK_PLAN_MT_GIT_ROOT="$MT_REPO"
+# Bare stem found in no tracked text (the page-h1-boxscore-apikeys-1415 shape).
+assert_viol "gateMT-orphan-stem-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` baseline matches | Visual-regression | post-impl | `e2e/vr.spec.ts` |
+'"$YROW"'
+'
+# The message names the snapshot path to cite instead.
+assert_msg "gateMT-stem-message-names-snapshot" 1 'Cite the snapshot path `e2e/vr.spec.ts-snapshots/mt-orphan-stem.png`' '[Z]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` baseline matches | Visual-regression | post-impl | `e2e/vr.spec.ts` |
+'"$YROW"'
+'
+# A stem quoted in tracked text is realised by arm 3: accepted.
+assert_viol "gateMT-saved-stem-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | `mt-saved-stem` baseline matches | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# The corrected form, the snapshot path, passes.
+assert_viol "gateMT-snapshot-path-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | `e2e/vr.spec.ts-snapshots/mt-orphan-stem.png` matches | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# Not a git repo: the stem rule is skipped, the :LINE rule still fires.
+mkdir -p "$TMP/mt-nogit"
+export CHECK_PLAN_MT_GIT_ROOT="$TMP/mt-nogit"
+assert_viol "gateMT-nogit-line-still-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` and `x.php:12` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+'
+# Seam empty behaves as unset: the real repo has no mt-orphan-stem snapshot, so silent.
+export CHECK_PLAN_MT_GIT_ROOT=""
+assert_viol "gateMT-seam-empty-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` baseline matches | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# Seam unset: real repo, a valid plan with corrected forms passes.
+unset CHECK_PLAN_MT_GIT_ROOT
+assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
+| 1 | `mt-orphan-stem` absent and `ibl5/tests/e2e/auth-pages-extended.spec.ts` green | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
 '
 
 # ---------------------------------------------------------------------------
@@ -2895,19 +3487,22 @@ _corpus_guard_ok() {
 # conference-champions-playoff-semantics, bug-pipeline-survive-db-sync,
 # bug-pipeline-test-env, sim-recap-boxid-resolution (gate [A]: migration literals);
 # bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
-# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags).
+# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags);
+# narrow-headless-marker-contract-paths, jsb-j7-param-recovery,
+# plan-gate-skill-inline (gate [Z]: untagged out-of-repo rows);
+# wt-rebase-merge-not-rebase, retire-rebase-prs-workflow (gate [MT]: :LINE suffix tokens).
 _n_corpus_pass=1
 for _n_slug in \
     plan-architect-phase-drift-guard \
     automouse-cost-accounting-fix redact-credentials-from-error-logs \
     session-registry-dotclaude-freshness architect-explore-fanout \
-    narrow-headless-marker-contract-paths agent-tiering-detail-trim \
-    postplan-findings-schema-degrade jsb-j7-param-recovery wt-rebase-merge-not-rebase \
-    plan-gate-skill-inline sim-recap-floor-and-cold-open \
+    agent-tiering-detail-trim \
+    postplan-findings-schema-degrade \
+    sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
     authz-verdict-refactor-1e-trading-accept-shim \
-    autoresearch-oreb-arming-share-lever retire-rebase-prs-workflow; do
+    autoresearch-oreb-arming-share-lever; do
     _n_pf="$HOME/claude-plans/$_n_slug.md"
     [ -f "$_n_pf" ] || continue
     if ! _corpus_guard_ok "$_n_pf"; then
@@ -3389,6 +3984,68 @@ assert_viol "q_malformed_vr_cell_fails" 1 "[Q]" "$FM_OPUS"'
 | 1 | does the roster grid layout still look right | Truly-manual | post-impl | `vr: label=roster-grid; role=owner; url=modules.php?name=Roster` |
 '
 
+# Gate [PM]: a `post-merge:` location marker sits only on a Truly-manual row
+# with an intrinsic post-merge reason and a non-visual What cell.
+# (a) Valid tagged row -> clean.
+assert_viol "pm_tagged_with_reason_passes" 0 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+'
+
+# (b) Bare marker with no reason -> [PM] fires.
+assert_viol "pm_tagged_without_reason_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: |
+'
+
+# (c) Reason under 15 characters -> [PM] fires.
+assert_viol "pm_short_reason_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: launchd only |
+'
+
+# (d) Convenience reason with no intrinsic slice -> [PM] fires.
+assert_viol "pm_reason_without_intrinsic_vocab_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: easier to review after it has shipped |
+'
+
+# (e) Marker on a CLI-executable row -> [PM] fires.
+assert_viol "pm_on_cli_executable_row_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | CLI-executable | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+'
+
+# (f) Look-and-feel What cell -> [PM] fires.
+assert_viol "pm_on_lookandfeel_row_fails" 1 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the new dashboard layout look right | Truly-manual | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+'
+
+# (g) A bad row inside a fenced example never fires (fence-aware matrix).
+assert_viol "pm_marker_inside_fence_ignored" 0 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the operator reads the first nightly queue listing the morning after | Truly-manual | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+
+```markdown
+| 2 | the operator reads the first nightly queue listing the morning after | CLI-executable | post-impl | post-merge: launchd scheduling on the live host only fires after deploy |
+```
+'
+
+# (h) Additivity pin: an untagged Truly-manual row is untouched by [PM].
+assert_viol "pm_untagged_truly_manual_untouched" 0 "[PM]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the exported CSV opens in Excel without a repair prompt | Truly-manual | post-impl | n/a |
+'
+
 # Gate [K]: autonomy-contract frontmatter validation.
 # [K] fires when stop_condition:/evidence: frontmatter fields are present but
 # malformed or unpaired. [K] must NOT fire when both fields are absent.
@@ -3850,7 +4507,7 @@ Seed every pid in 200001993000..200001993099.
 # Check C: copy-verbatim symbols resolve against the same section's cited files.
 assert_msg "L-verbatim-resolves-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Copy `bindAndExecute()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `bindAndExecute()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 '
 assert_msg "L-verbatim-shell-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: gate
@@ -3866,29 +4523,29 @@ Copy `madeUpHelperXyz()` verbatim from the 2004 restore class.
 '
 assert_msg "L-verbatim-forward-ref-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Create a new helper `madeUpHelperXyz()` in `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Create a new helper `madeUpHelperXyz()` in `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 Then copy `madeUpHelperXyz()` verbatim into the 1993 class.
 '
 assert_msg "L-verbatim-in-fence-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
 ```
-Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 ```
 '
 assert_msg "L-verbatim-gap-over-80-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Copy `madeUpHelperXyz()` and every caller it needs into the new class without any change at all, keeping it verbatim into `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `madeUpHelperXyz()` and every caller it needs into the new class without any change at all, keeping it verbatim into `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 '
 
 # Check C: a missing symbol, or one whose file is cited in another section,
 # prints an advisory; assert_msg pins the message too.
 assert_msg "L-verbatim-missing-flags" 0 "[L] copy-verbatim" "" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 '
 assert_msg "L-verbatim-other-section-flags" 0 "[L] copy-verbatim" "" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: a
-See `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+See `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 ## Phase 2: b
 Copy `bindAndExecute()` verbatim from the shell helper in `bin/check-plan`.
 '
@@ -3901,7 +4558,7 @@ for L_CASE in overflow verbatim; do
         L_WANT='[L] overflow'
     else
         printf '%s\n' "$FM_OPUS$L_MATRIX" '## Phase 1: restore' \
-            'Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.' > "$f"
+            'Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.' > "$f"
         L_WANT='[L] copy-verbatim'
     fi
     out="$("$GUARD" "$f" 2>&1)"; got=$?
@@ -3913,9 +4570,4 @@ for L_CASE in overflow verbatim; do
     fi
 done
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

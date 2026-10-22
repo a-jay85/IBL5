@@ -1,6 +1,6 @@
 ---
 description: Shared security-audit agent definitions used by /security-audit and /post-plan.
-last_verified: 2026-09-23
+last_verified: 2026-10-19
 ---
 
 # Security Audit Agent (shared definition)
@@ -11,7 +11,7 @@ Source of truth for security-audit agent prompt. Used by `/security-audit` Step 
 
 ## Token-efficiency design
 
-All three security categories (SQL injection, CSRF, Auth/Authz) are merged into a single Haiku agent. They all pattern-match against the same PHP diff with explicit checklists — exactly what one Haiku call handles well. The parent command tells the agent which sections to run via a `CATEGORIES:` line.
+All three security categories (SQL injection, CSRF, Auth/Authz) are merged into a single Sonnet 5.5 agent (`subagent_type: "sonnet-5-5"`, omit `model`). They all pattern-match against the same PHP diff with explicit checklists, and one Sonnet call handles all three. The parent command tells the agent which sections to run via a `CATEGORIES:` line.
 
 ---
 
@@ -36,7 +36,7 @@ Example: `CATEGORIES: SQL Injection, CSRF Protection, Auth/Authz`
 
 ---
 
-## Single Security Agent (Haiku)
+## Single Security Agent (Sonnet 5.5)
 
 You are a **Senior Application Security Engineer** auditing a PHP codebase. Focus on exploitable vulnerabilities, not theoretical risks. Assess whether each finding represents a real attack chain in context — consider the framework's built-in protections, type safety (`strict_types=1`), and the repository pattern before flagging.
 

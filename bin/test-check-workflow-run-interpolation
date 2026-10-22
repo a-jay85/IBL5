@@ -7,13 +7,12 @@
 #
 # Run: bin/test-check-workflow-run-interpolation  (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$SCRIPT_DIR/check-workflow-run-interpolation"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-FAILED=0
+h_tmp TMP
 
 # write_wf <body>  → echoes the path of a fresh file holding <body>. Uses mktemp
 # (not a counter): this runs in a $(...) subshell, so a counter would not persist.
@@ -26,10 +25,9 @@ write_wf() {
 
 expect() { # name want-exit got-exit
   if [ "$3" -eq "$2" ]; then
-    echo "ok: $1 (exit $3)"
+    h_pass "$1 (exit $3)"
   else
-    echo "FAIL: $1 — expected exit $2, got $3"
-    FAILED=1
+    h_fail "$1" "expected exit $2, got $3"
   fi
 }
 
@@ -54,8 +52,7 @@ jobs:
           x --update-pr-body=${{ env.VRCTX_PR }}')"
 run_case "flags env.VRCTX in block run" 1 "$f"
 if ! grep -qF -- ":10:" <<< "$out"; then
-  echo "FAIL: flags env.VRCTX in block run — output does not name line 10: $out"
-  FAILED=1
+  h_fail "flags env.VRCTX in block run" "output does not name line 10: $out"
 fi
 
 # --- bad: string input in a run body (the #1387 shape) -------------------------
@@ -197,6 +194,43 @@ jobs:
         name: x ${{ env.FOO }}')"
 run_case "block ends at dedent" 0 "$f"
 
+# --- good: `- run: |` stops at a sibling key at the run: column (#1397) ---------
+# On a `- run: |` line the leading-space count is 2 less than the column of `run:`;
+# the sibling `env:` sits at the `run:` column, so the guard must end the script
+# there and not flag the expression under env:.
+f="$(write_wf 'name: t
+on:
+  workflow_call:
+    inputs:
+      x:
+        type: string
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "$X"
+        env:
+          X: ${{ inputs.x }}')"
+run_case "dash-run block stops at sibling env" 0 "$f"
+
+# --- bad: same expression inside the `- run: |` script (paired with the above) ---
+f="$(write_wf 'name: t
+on:
+  workflow_call:
+    inputs:
+      x:
+        type: string
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "${{ inputs.x }}"
+        env:
+          Y: ok')"
+run_case "dash-run block flags expression in script" 1 "$f"
+
 # --- bad: blank line keeps the block open ---------------------------------------
 f="$(write_wf 'name: t
 on: [push]
@@ -261,19 +295,17 @@ jobs:
 run_case "one report per line" 1 "$f"
 lines="$(printf '%s\n' "$out" | grep -c .)"
 if [ "$lines" -ne 1 ]; then
-  echo "FAIL: one report per line — expected 1 output line, got $lines"
-  FAILED=1
+  h_fail "one report per line" "expected 1 output line, got $lines"
 fi
 
 # --- usage errors ---------------------------------------------------------------
 "$CHECK" --bogus >/dev/null 2>"$TMP/err"; rc=$?
 expect "rejects unknown option" 2 "$rc"
 if ! grep -qF -- "unknown option" "$TMP/err"; then
-  echo "FAIL: rejects unknown option — stderr lacks 'unknown option'"
-  FAILED=1
+  h_fail "rejects unknown option" "stderr lacks 'unknown option'"
 fi
 
 "$CHECK" "$TMP/does-not-exist.yml" >/dev/null 2>&1; rc=$?
 expect "rejects missing file" 2 "$rc"
 
-exit "$FAILED"
+h_done

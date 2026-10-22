@@ -1,0 +1,86 @@
+name: All checks settled
+# Event-driven replacement for the polling `All checks green` waiter (ADR-0149 addendum).
+# workflow_run events run master's copy of this file, for seconds, once per sibling
+# completion, and write the `All checks settled` commit status on the PR head SHA.
+# workflow_dispatch runs the copy on the dispatched ref, so dispatch from master only.
+# It never checks out or executes PR-head code; every SHA comes from the API inside
+# bin/settle-pr-status. Backfill or re-settle one PR: gh workflow run all-checks-settled.yml -f pr_number=N
+# Dependabot PRs get a read-only token on workflow_run, so the status POST returns 403.
+# Settle those by hand with the same gh workflow run command.
+
+on:
+  workflow_run:
+    # Every PR-triggered workflow name; bin/check-composite-contracts A6 pins this list
+    # to the set of workflows with a pull_request/pull_request_target trigger.
+    workflows:
+      - All checks green
+      - Auto-mergeable Label
+      - bun audit — tracking issue
+      - Dependabot Auto-Merge
+      - Deploy Rehearsal
+      - E2E Tests
+      - Engine
+      - ESLint
+      - Weekly Flake Report
+      - gitleaks
+      - Human Sign-off
+      - Merge digest notify
+      - Migration Safety
+      - Mutation Testing (per-PR diff)
+      - Mutation Testing
+      - Pipeline PR Fixed Notify
+      - PR meta checks
+      - Python tests (post-plan harness)
+      - Sim recap
+      - Tests and Analysis
+      - VR Refresh
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to settle. Head SHA and base are resolved from the API.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  statuses: write
+  pull-requests: read
+  actions: read
+  checks: read
+
+# The trigger event is in the group key so a sibling completion that the job `if:` skips
+# (pull_request_target, push) lands in its own group and cannot cancel a live settle.
+# The head SHA is in the key so a late completion from an old head cannot cancel the
+# settle for the new head.
+concurrency:
+  group: all-checks-settled-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number || github.event.workflow_run.head_sha }}-${{ github.event.workflow_run.event || 'dispatch' }}-${{ github.event.workflow_run.head_sha || 'dispatch' }}
+  cancel-in-progress: true
+
+jobs:
+  settle:
+    name: Aggregate check status
+    # Skipped jobs take no runner slot: master-push and schedule runs of the siblings never spawn a job.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout master (for bin/settle-pr-status and bin/check-pr-checks-green)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Settle the PR head status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR_NUMBER: ${{ github.event.inputs.pr_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PR_NUMBER" ]; then sel="--pr=$PR_NUMBER"; else sel="--head-sha=$EVENT_HEAD_SHA"; fi
+          bin/settle-pr-status --repo="$GITHUB_REPOSITORY" "$sel" \
+            --context='All checks settled' --target-url="$RUN_URL" \
+            --self='Aggregate check status,All checks settled' \
+            --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \
+            --ignore='human-signoff,needs-a-human label,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Infection PHP,Notify Mutation Failure,All checks green' \
+            --ignore-workflows='All checks green'

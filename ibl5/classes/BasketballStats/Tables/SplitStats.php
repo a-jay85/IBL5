@@ -17,15 +17,12 @@ use Team\Team;
 class SplitStats
 {
     /**
-     * Render the split stats per-game averages table
+     * Map pre-queried split stats rows to the typed render shape, applying the per-stat defaults.
      *
-     * @param list<array{name: string, pos: string, pid: int, games: int, gameMINavg: string|null, gameFGMavg: string|null, gameFGAavg: string|null, gameFGPavg: string|null, gameFTMavg: string|null, gameFTAavg: string|null, gameFTPavg: string|null, game3GMavg: string|null, game3GAavg: string|null, game3GPavg: string|null, gameORBavg: string|null, gameREBavg: string|null, gameASTavg: string|null, gameSTLavg: string|null, gameTOVavg: string|null, gameBLKavg: string|null, gamePFavg: string|null, gamePTSavg: string|null}> $rows Pre-queried split stats rows
-     * @param Team $team Team object
-     * @param string $splitLabel Human-readable split label
-     * @param list<int> $starterPids Starter player IDs for highlighting
-     * @return string HTML table
+     * @param list<array{name: string, pos: string, pid: int, games: int, gameMINavg: string|null, gameFGMavg: string|null, gameFGAavg: string|null, gameFGPavg: string|null, gameFTMavg: string|null, gameFTAavg: string|null, gameFTPavg: string|null, game3GMavg: string|null, game3GAavg: string|null, game3GPavg: string|null, gameORBavg: string|null, gameREBavg: string|null, gameASTavg: string|null, gameSTLavg: string|null, gameTOVavg: string|null, gameBLKavg: string|null, gamePFavg: string|null, gamePTSavg: string|null}> $rows
+     * @return list<array{name: string, pos: string, pid: int, games: int, min: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tov: string, blk: string, pf: string, pts: string}>
      */
-    public static function render(array $rows, Team $team, string $splitLabel, array $starterPids = []): string
+    private static function mapRows(array $rows): array
     {
         /** @var list<array{name: string, pos: string, pid: int, games: int, min: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tov: string, blk: string, pf: string, pts: string}> $playerRows */
         $playerRows = [];
@@ -57,6 +54,22 @@ class SplitStats
             ];
         }
 
+        return $playerRows;
+    }
+
+    /**
+     * Render the split stats per-game averages table
+     *
+     * @param list<array{name: string, pos: string, pid: int, games: int, gameMINavg: string|null, gameFGMavg: string|null, gameFGAavg: string|null, gameFGPavg: string|null, gameFTMavg: string|null, gameFTAavg: string|null, gameFTPavg: string|null, game3GMavg: string|null, game3GAavg: string|null, game3GPavg: string|null, gameORBavg: string|null, gameREBavg: string|null, gameASTavg: string|null, gameSTLavg: string|null, gameTOVavg: string|null, gameBLKavg: string|null, gamePFavg: string|null, gamePTSavg: string|null}> $rows Pre-queried split stats rows
+     * @param Team $team Team object
+     * @param string $splitLabel Human-readable split label
+     * @param list<int> $starterPids Starter player IDs for highlighting
+     * @return string HTML table
+     */
+    public static function render(array $rows, Team $team, string $splitLabel, array $starterPids = []): string
+    {
+        $playerRows = self::mapRows($rows);
+
         /** @var string $safeSplitLabel */
         $safeSplitLabel = HtmlSanitizer::e($splitLabel);
 
@@ -64,64 +77,84 @@ class SplitStats
         // "\n" restores the template line break: PHP swallows the newline right after the closing PHP tag.
         // @phpstan-ignore ibl.trustedVariable (openTag() escapes the aria-label and sanitizes the colors)
         echo HtmlSanitizer::trusted(TeamStatsTableContext::openTag($team)), "\n";
+        echo self::renderHeader();
         ?>
-    <thead>
-        <tr>
-            <th>Pos</th>
-            <th class="sticky-col">Player</th>
-            <th>g</th>
-            <th class="sep-r-team">min</th>
-            <th>fgm</th>
-            <th>fga</th>
-            <th>fgp</th>
-            <th>ftm</th>
-            <th>fta</th>
-            <th>ftp</th>
-            <th>3gm</th>
-            <th>3ga</th>
-            <th class="sep-r-team">3gp</th>
-            <th>orb</th>
-            <th>reb</th>
-            <th>ast</th>
-            <th>stl</th>
-            <th>to</th>
-            <th>blk</th>
-            <th>pf</th>
-            <th>pts</th>
-        </tr>
-    </thead>
     <tbody>
 <?php if ($playerRows === []): ?>
         <tr><td colspan="21" class="table-empty-message">No games found for <strong><?= $safeSplitLabel ?></strong> split.</td></tr>
 <?php endif; ?>
-<?php foreach ($playerRows as $row): ?>
-        <tr>
-            <td><?= HtmlSanitizer::e($row['pos']) ?></td>
-            <?= PlayerImageHelper::renderPlayerCell($row['pid'], $row['name'], $starterPids) ?>
-            <td><?= $row['games'] ?></td>
-            <td class="sep-r-team"><?= $row['min'] ?></td>
-            <td><?= $row['fgm'] ?></td>
-            <td><?= $row['fga'] ?></td>
-            <td class="sep-r-weak"><?= $row['fgp'] ?></td>
-            <td><?= $row['ftm'] ?></td>
-            <td><?= $row['fta'] ?></td>
-            <td class="sep-r-weak"><?= $row['ftp'] ?></td>
-            <td><?= $row['tgm'] ?></td>
-            <td><?= $row['tga'] ?></td>
-            <td class="sep-r-team"><?= $row['tgp'] ?></td>
-            <td><?= $row['orb'] ?></td>
-            <td><?= $row['reb'] ?></td>
-            <td><?= $row['ast'] ?></td>
-            <td><?= $row['stl'] ?></td>
-            <td><?= $row['tov'] ?></td>
-            <td><?= $row['blk'] ?></td>
-            <td><?= $row['pf'] ?></td>
-            <td><?= $row['pts'] ?></td>
-        </tr>
-<?php endforeach; ?>
+<?php foreach ($playerRows as $row):
+    echo self::renderPlayerRow($row, $starterPids);
+endforeach; ?>
     </tbody>
 </table>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * The `<thead>` block, byte-for-byte the former inline template.
+     */
+    private static function renderHeader(): string
+    {
+        return "    <thead>\n"
+            . "        <tr>\n"
+            . "            <th>Pos</th>\n"
+            . '            <th class="sticky-col">Player</th>' . "\n"
+            . "            <th>g</th>\n"
+            . '            <th class="sep-r-team">min</th>' . "\n"
+            . "            <th>fgm</th>\n"
+            . "            <th>fga</th>\n"
+            . "            <th>fgp</th>\n"
+            . "            <th>ftm</th>\n"
+            . "            <th>fta</th>\n"
+            . "            <th>ftp</th>\n"
+            . "            <th>3gm</th>\n"
+            . "            <th>3ga</th>\n"
+            . '            <th class="sep-r-team">3gp</th>' . "\n"
+            . "            <th>orb</th>\n"
+            . "            <th>reb</th>\n"
+            . "            <th>ast</th>\n"
+            . "            <th>stl</th>\n"
+            . "            <th>to</th>\n"
+            . "            <th>blk</th>\n"
+            . "            <th>pf</th>\n"
+            . "            <th>pts</th>\n"
+            . "        </tr>\n"
+            . "    </thead>\n";
+    }
+
+    /**
+     * One `<tbody>` row. The player cell is followed by the games cell on the same line with
+     * no line break between them: the former template's `?>` swallowed that newline.
+     *
+     * @param array{name: string, pos: string, pid: int, games: int, min: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tov: string, blk: string, pf: string, pts: string} $row
+     * @param list<int> $starterPids
+     */
+    private static function renderPlayerRow(array $row, array $starterPids): string
+    {
+        return "        <tr>\n"
+            . '            <td>' . HtmlSanitizer::e($row['pos']) . "</td>\n"
+            . '            ' . PlayerImageHelper::renderPlayerCell($row['pid'], $row['name'], $starterPids)
+            . '            <td>' . $row['games'] . "</td>\n"
+            . '            <td class="sep-r-team">' . $row['min'] . "</td>\n"
+            . '            <td>' . $row['fgm'] . "</td>\n"
+            . '            <td>' . $row['fga'] . "</td>\n"
+            . '            <td class="sep-r-weak">' . $row['fgp'] . "</td>\n"
+            . '            <td>' . $row['ftm'] . "</td>\n"
+            . '            <td>' . $row['fta'] . "</td>\n"
+            . '            <td class="sep-r-weak">' . $row['ftp'] . "</td>\n"
+            . '            <td>' . $row['tgm'] . "</td>\n"
+            . '            <td>' . $row['tga'] . "</td>\n"
+            . '            <td class="sep-r-team">' . $row['tgp'] . "</td>\n"
+            . '            <td>' . $row['orb'] . "</td>\n"
+            . '            <td>' . $row['reb'] . "</td>\n"
+            . '            <td>' . $row['ast'] . "</td>\n"
+            . '            <td>' . $row['stl'] . "</td>\n"
+            . '            <td>' . $row['tov'] . "</td>\n"
+            . '            <td>' . $row['blk'] . "</td>\n"
+            . '            <td>' . $row['pf'] . "</td>\n"
+            . '            <td>' . $row['pts'] . "</td>\n"
+            . "        </tr>\n";
     }
 }

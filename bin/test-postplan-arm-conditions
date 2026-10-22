@@ -515,6 +515,7 @@ B13="$(extract_block '# condition (13)')"
 B15="$(extract_block '# condition (15)')"
 B17="$(extract_block '# condition (17)')"
 B18="$(extract_block '# condition (18)')"
+BN="$(extract_block '# condition (19):')"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 S1X="$(extract_block '# phase 6 step 1 extract' "$P25_SKILL")"
@@ -1621,6 +1622,137 @@ else
     out="$(run_cond18 __fail__)"
     expect_block "(18) unreadable PR body -> BLOCK" BLOCK "$out"
     expect_c18_text "(18) unreadable body is fail-closed" "$out" "fail-closed"
+fi
+
+# condition (19) predicate: pr_removed_guards_hold over the shared case table
+# bin/fixtures/removed-guards/cases.json is also read by tools/postplan-harness/tests/
+# test_removed_guards.py, so the shell predicate and the Python mirror answer one table.
+RG_CASES="$REPO_ROOT/bin/fixtures/removed-guards/cases.json"
+if [ ! -s "$RG_CASES" ]; then
+    echo "FAIL: cN-pred shared case table missing: $RG_CASES"; FAILED=1
+else
+    rg_n=0
+    while IFS= read -r rg_case; do
+        rg_n=$((rg_n + 1))
+        rg_name="$(jq -r '.name' <<< "$rg_case")"
+        rg_body="$(jq -r '.body' <<< "$rg_case")"
+        rg_keys="$(jq -r '.flagged_keys | join("\n")' <<< "$rg_case")"
+        rg_want="$(jq -r '.expected | join("\n")' <<< "$rg_case")"
+        rg_got="$(bash -c 'source "$1"; pr_removed_guards_hold "$2" "$3"' _ \
+            "$REPO_ROOT/bin/lib/pr-armable.sh" "$rg_body" "$rg_keys")"
+        if [ "$rg_got" = "$rg_want" ]; then
+            echo "ok: cN-pred $rg_name"
+        else
+            echo "FAIL: cN-pred $rg_name — want [$rg_want], got [$rg_got]"; FAILED=1
+        fi
+    done < <(jq -c '.[]' "$RG_CASES")
+    if [ "$rg_n" -lt 16 ]; then
+        echo "FAIL: cN-pred shared case table has $rg_n cases, expected at least 16"; FAILED=1
+    fi
+fi
+
+# condition (19) block: the real arm-time rerun in a scratch repo. Base commit has a
+# try/catch guard; the branch commit removes it. deleted-guards is symlinked, or
+# replaced by a stub that exits 2 for the detector-error case.
+CN_PHP='ibl5/classes/Season/Season.php'
+mk_cN_repo() { # dir  remove|keep  [stub-exit-code]
+    local d="$1"
+    rm -rf "$d"
+    mkdir -p "$d/bin/lib" "$d/ibl5/classes/Season" "$d/home"
+    git -C "$d" init -q
+    ln -s "$REPO_ROOT/bin/lib/pr-armable.sh" "$d/bin/lib/pr-armable.sh"
+    if [ -n "${3:-}" ]; then
+        printf '#!/bin/sh\nexit %s\n' "$3" > "$d/bin/lib/deleted-guards"
+        chmod +x "$d/bin/lib/deleted-guards"
+    else
+        ln -s "$REPO_ROOT/bin/lib/deleted-guards" "$d/bin/lib/deleted-guards"
+    fi
+    printf '<?php\nfunction f() {\n        try {\n            x();\n        } catch (\\RuntimeException $e) {\n        }\n}\n' \
+        > "$d/$CN_PHP"
+    git -C "$d" add -A
+    git -C "$d" -c user.name=t -c user.email=t@t commit -qm base
+    git -C "$d" update-ref refs/remotes/origin/master HEAD
+    git -C "$d" checkout -q -b cn-branch
+    if [ "$2" = "remove" ]; then
+        printf '<?php\nfunction f() {\n            x();\n}\n' > "$d/$CN_PHP"
+    else
+        printf '\n// note\n' >> "$d/$CN_PHP"
+    fi
+    git -C "$d" -c user.name=t -c user.email=t@t commit -qam change
+}
+run_condN() { # dir  body|__fail__
+    local fail=""
+    if [ "$2" = "__fail__" ]; then
+        fail=1
+        printf '{"number":2100,"body":""}' > "$BASE_TMP/fixture.json"
+    else
+        jq -n --arg b "$2" '{number: 2100, body: $b}' > "$BASE_TMP/fixture.json"
+    fi
+    ( cd "$1" && HOME="$1/home" PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        GH_PR_FAIL="$fail" bash -c "$BN" 2>&1 )
+}
+cN_body() { # dir  reason  ->  a Removed guards block for every flagged key
+    local keys
+    keys="$(cd "$1" && git diff origin/master...HEAD | "$REPO_ROOT/bin/lib/deleted-guards" --diff - \
+        | awk -F'\t' '$1=="REMOVED-GUARD"{print $2}')"
+    printf '## Summary\n- change\n\n<!-- removed-guards:begin -->\n## Removed guards\n'
+    while IFS= read -r k; do
+        [ -n "$k" ] && printf -- '- `%s` — Reason: %s\n  removed: `try {`\n' "$k" "$2"
+    done <<< "$keys"
+    printf '<!-- removed-guards:end -->\n'
+}
+
+if [ -z "$BN" ]; then
+    echo "FAIL: no block matching '# condition (19):' in $SKILL — marker drifted"
+    FAILED=1
+else
+    CN="$BASE_TMP/cN"
+    mk_cN_repo "$CN" remove
+    out="$(run_condN "$CN" "## Summary")"
+    expect_block "cN-flagged-no-block-holds" BLOCK "$out"
+    expect_c18_text "cN-flagged-no-block-holds names UNLISTED" "$out" "UNLISTED"
+    out="$(run_condN "$CN" "$(cN_body "$CN" 'moved into SeasonRepository::load')")"
+    expect_block "cN-flagged-with-reason-passes" NONE "$out"
+    out="$(run_condN "$CN" "$(cN_body "$CN" '<one-line reason required>')")"
+    expect_block "cN-placeholder-holds" BLOCK "$out"
+    out="$(run_condN "$CN" __fail__)"
+    expect_block "cN-body-unreadable-holds" BLOCK "$out"
+    expect_c18_text "cN-body-unreadable-holds is fail-closed" "$out" "fail-closed"
+    # Stacked base: origin/<iblBase> already holds the removal, so the realized diff has none.
+    git -C "$CN" update-ref refs/remotes/origin/parent HEAD
+    git -C "$CN" config branch.cn-branch.iblBase parent
+    out="$(run_condN "$CN" "## Summary")"
+    expect_block "cN-stacked-base-honored" NONE "$out"
+    # Intended removal: the branch plan's `### Intended removals` names the guard, so no
+    # body bullet is needed. The block reads the plan from $HOME/claude-plans/<branch>.md.
+    mk_cN_repo "$CN" remove
+    mkdir -p "$CN/home/claude-plans"
+    printf '## Must preserve\n\n- none — this scratch plan keeps no other guard\n\n### Intended removals\n\n- `%s` try: `try {` — moved into SeasonRepository::load\n- `%s` catch: `} catch` — moved into SeasonRepository::load\n' \
+        "$CN_PHP" "$CN_PHP" >"$CN/home/claude-plans/cn-branch.md"
+    out="$(run_condN "$CN" "## Summary")"
+    expect_block "cN-intended-removal-passes" NONE "$out"
+    mk_cN_repo "$CN" keep
+    out="$(run_condN "$CN" "## Summary")"
+    expect_block "cN-no-removal-passes" NONE "$out"
+    mk_cN_repo "$CN" remove 2
+    out="$(run_condN "$CN" "## Summary")"
+    expect_block "cN-detector-exit2-holds" BLOCK "$out"
+    expect_c18_text "cN-detector-exit2-holds is fail-closed" "$out" "exit 2, fail-closed"
+    # The extracted condition (1)-(18) blocks must equal master's extraction byte for byte.
+    _cn_bad=0
+    _cn_mfile="$BASE_TMP/master-arm-conditions.md"
+    if ! git -C "$REPO_ROOT" show "origin/master:.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md" >"$_cn_mfile" 2>/dev/null; then
+        echo "FAIL: cN-conditions-1-18-blocks-unchanged: cannot read origin/master copy of the arm-conditions file"; FAILED=1; _cn_bad=1
+    else
+        for _cn_i in 1 3 4 5 6 7 8 10 12 13 15 17 18; do
+            _cn_v="B$_cn_i"
+            _cn_m="$(extract_block "# condition ($_cn_i)" "$_cn_mfile")"
+            if [ -z "${!_cn_v}" ] || [ "${!_cn_v}" != "$_cn_m" ]; then
+                echo "FAIL: cN-conditions-1-18-blocks-unchanged: B$_cn_i empty or differs from origin/master"; FAILED=1; _cn_bad=1
+            fi
+        done
+    fi
+    [ "$_cn_bad" = 0 ] && echo "ok: cN-conditions-1-18-blocks-unchanged"
 fi
 
 # --- Phase 5.0d autonomy contract: run_p50d helper + D1..D6 cases ---------
@@ -3721,7 +3853,8 @@ done
 # §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
 # catches: a block can be perfect while the surrounding prose still claims twelve
 # conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
-have "§5.9k: SKILL.md counts eighteen conditions"        "$P25_TXT" '**All eighteen conditions**'
+have "§5.9k: SKILL.md counts nineteen conditions"        "$P25_TXT" '**All nineteen conditions**'
+lacks "§5.9k: SKILL.md no longer counts eighteen"       "$P25_TXT" '**All eighteen conditions**'
 have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
 have "§5.9k: the shared-predicate list carries (15)"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)/(15)'
 
@@ -3754,7 +3887,7 @@ else
     lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
 fi
 # §5.9l: the Phase 6.5 reference doc carries the (14) and (15) entries that
-# SKILL.md's "All eighteen conditions" count promises, as prose pointing at its block.
+# SKILL.md's "All nineteen conditions" count promises, as prose pointing at its block.
 ARM_TXT="$(cat "$SKILL")"
 have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
 have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'

@@ -418,6 +418,10 @@ Reuse the existing heredoc; no new helper, no new file.
 
 `bash -n bin/plan-now` exits 0; negative leg below.
 
+## Must preserve
+
+- none — this fixture edits one comment and touches no guard.
+
 ## Critical Files
 
 - `bin/plan-now` (the only file this fixture claims to touch)

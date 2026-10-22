@@ -1,6 +1,6 @@
 ---
-description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised; an advisory How to revert line follows it; pr-copy writes no exact count its packet does not show."
-last_verified: 2026-10-20
+description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised; an advisory How to revert line follows it; a Removed guards block lists every flagged guard removal with a one-line reason; pr-copy writes no exact count its packet does not show."
+last_verified: 2026-10-22
 ---
 
 # PR Body Claims
@@ -168,6 +168,25 @@ Phase 6.5 condition (18) refuses to arm when `Door: one-way`, when the line is m
 Trigger: backlog#1438.
 
 **Headless.** Applies: yes. The line is injected and validated mechanically; the only LLM input is the Why text.
+
+## Removed guards rule
+
+When `bin/lib/deleted-guards` flags a guard the diff removes (a `try`/`catch`, an `*_exists` check, a lock, an early null return, a shell `command -v`/`flock`/`|| true`/`trap`/`set -e`, a Python `try`/`isinstance`/`is None` return), the body carries one marker-delimited block:
+
+```
+<!-- removed-guards:begin -->
+## Removed guards
+The deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.
+- `<kind>@<path>#<hash8>` — Reason: <one line>
+  removed: `<normalized removed line>`
+<!-- removed-guards:end -->
+```
+
+The key is `<kind>@<path>#<first 8 hex of sha1(normalized line)>`, copied from the detector output. A Reason is substantive at 15 or more characters after trimming, and is never `none`, `n/a`, `tbd`, `todo`, `unknown`, `no reason`, all dashes, all dots, or a `<...>` placeholder. A key with no reason renders `<one-line reason required>`, which fails that test. The impl session writes reasons to `$(git rev-parse --absolute-git-dir)/removed-guards-reasons.tsv`, one `<key>\t<reason>` per line, and the body render reads them from there. A removal named in the plan's `### Intended removals` prints as `INTENDED` and needs no body bullet.
+
+Phase 6.5 condition (19) re-runs the detector on the realized diff at arm time and checks every flagged key against this block, so deleting the block holds the PR (`UNLISTED`). An unjustified key, an unbalanced or duplicated marker pair, a detector error, or an unreadable body also holds.
+
+**Headless.** Applies: yes. The block is rendered mechanically; the only LLM input is each Reason.
 
 ## How to revert rule
 

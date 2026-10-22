@@ -355,3 +355,37 @@ else
   esac
 fi
 ```
+
+**(19) Removed guards.** The block reruns bin/lib/deleted-guards on the realized diff and passes its flagged keys to pr_removed_guards_hold, so a body without the block still holds. It only adds a hold and never clears another condition.
+
+```bash
+# condition (19): block unless every guard removal flagged on the realized diff has a substantive body Reason
+ROOTN="$(git rev-parse --show-toplevel)"
+source "$ROOTN/bin/lib/pr-armable.sh"
+RG_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+RG_BASE="$(git config "branch.$RG_BRANCH.iblBase" || echo master)"
+RG_PLAN="${PLAN_FILE:-$HOME/claude-plans/$RG_BRANCH.md}"
+RG_PLAN_ARG=()
+[ -f "$RG_PLAN" ] && RG_PLAN_ARG=(--plan "$RG_PLAN")
+RG_DIFF="$(mktemp)"
+if ! git diff "origin/$RG_BASE...HEAD" > "$RG_DIFF"; then
+  echo "BLOCKED: removed guards: cannot compute the realized diff against origin/$RG_BASE (fail-closed)"
+else
+  RG_RC=0
+  RG_OUT=$("$ROOTN/bin/lib/deleted-guards" --diff "$RG_DIFF" ${RG_PLAN_ARG[@]+"${RG_PLAN_ARG[@]}"}) || RG_RC=$?
+  if [ "$RG_RC" -gt 1 ]; then
+    echo "BLOCKED: removed guards: bin/lib/deleted-guards failed (exit $RG_RC, fail-closed)"
+  elif ! RG_BODY=$(gh pr view --json body --jq '.body' 2>/dev/null); then
+    echo "BLOCKED: removed guards: cannot read the PR body (fail-closed)"
+  else
+    RG_KEYS=$(awk -F'\t' '$1=="REMOVED-GUARD"{print $2}' <<< "$RG_OUT")
+    RG_HOLD=$(pr_removed_guards_hold "$RG_BODY" "$RG_KEYS")
+    if [ -n "$RG_HOLD" ]; then
+      while IFS= read -r RG_L; do
+        echo "BLOCKED: removed guards: $RG_L (restore the guard or add a Reason; _pr-body-claims.md § Removed guards rule)"
+      done <<< "$RG_HOLD"
+    fi
+  fi
+fi
+rm -f "$RG_DIFF"
+```

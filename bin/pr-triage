@@ -31,8 +31,9 @@
 #                             cancelled/absent, or body declares an expected-red
 #   4. HELD                   Manual-Testing real rows, golden touched, a
 #                             belt-and-suspenders body hold marker, a gate
-#                             backtest hold, or a merge-danger line that is
-#                             one-way, missing or malformed
+#                             backtest hold, a merge-danger line that is
+#                             one-way, missing or malformed, or a removed-guards
+#                             block with an unjustified or malformed entry
 #   5. BLOCKED-DEP            an unmerged Depends-on: predecessor
 #   6. PIPELINE-HELD          bug-pipeline PR (pipeline-authored label OR a
 #                             `bug-<id>` branch name); UNCONDITIONAL — no label
@@ -393,12 +394,14 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     pipeline="$(pr_pipeline_authored_hold "$labels" "$head_ref" | tr '\n' ' ')"
     deps="$(pr_dep_holds "$body" | tr '\n' ' ')"
     unresolved="$(pr_unresolved_findings_hold "$num" | tr '\n' ' ')"
-    # Phase 6.5 (17) and (18): read from the body, so pr-triage holds the same PRs
-    # post-plan held. Without them --arm armed a PR whose body declared a one-way door.
+    # Phase 6.5 (17), (18) and (19): read from the body, so pr-triage holds the same PRs
+    # post-plan held. (19) is advisory here: without the run-local flagged keys it
+    # sees only a listed-but-unjustified guard, never an unlisted one. Without them --arm armed a PR whose body declared a one-way door.
     # A body with no merge-danger line holds too (fail-closed, as in Phase 6.5): an old
     # PR needs a two-way `**Merge danger:**` line before sign-off can arm it.
     backtest="$(pr_gate_backtest_hold "$body")"
     danger="$(pr_merge_danger_hold "$body")"
+    removed="$(pr_removed_guards_hold "$body" | tr '\n' ' ')"
 
     check_states=()
     blocked_check=0
@@ -441,7 +444,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
             [ -n "$rid" ] && RERUN_HINTS="${RERUN_HINTS}hint: gh run rerun ${rid}  # ${cancelled_ctx} was CANCELLED on PR #${num}"$'\n'
         fi
     elif [ "$clearance" = "HELD" ] || [ -n "$golden" ] || [ "$held_body" = "1" ] || [ -n "$unresolved" ] \
-        || [ -n "$backtest" ] || [ -n "$danger" ]; then
+        || [ -n "$backtest" ] || [ -n "$danger" ] || [ -n "$removed" ]; then
         bucket="HELD"; action="human review"
     elif [ -n "$deps" ]; then
         bucket="BLOCKED-DEP"; action="wait for predecessor"
@@ -480,6 +483,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     if [ -n "$golden" ];          then holds="${holds}${golden} "; fi
     if [ -n "$backtest" ];        then holds="${holds}${backtest} "; fi
     if [ -n "$danger" ];          then holds="${holds}${danger} "; fi
+    if [ -n "$removed" ];         then holds="${holds}${removed}"; fi
     if [ -n "$deps" ];            then holds="${holds}${deps}"; fi
     if [ -n "$feat" ];            then holds="${holds}${feat} "; fi
     if [ -n "$pipeline" ];        then holds="${holds}${pipeline}"; fi

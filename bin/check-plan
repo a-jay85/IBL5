@@ -76,6 +76,7 @@
 #                              [K] —
 #                              would all fire spuriously; draft mode exits 0/1 on
 #                              gate D alone.
+#   MP Must preserve section — present and well-formed; required only with --require-must-preserve
 #   B  Security-surface discharge — a plan carrying '## Security-Surface Discharge'
 #                              (outside fences) must name **Invariant:**,
 #                              **Asserted by:** <path>Test.php, and **Not covered:**,
@@ -288,12 +289,13 @@
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
-Usage: bin/check-plan [--print-critical-files] [--draft] <plan-file>
+Usage: bin/check-plan [--print-critical-files] [--require-must-preserve] [--draft] <plan-file>
 
 Mechanical lint for /plan output (the Step-4 deterministic gates).
 
   --print-critical-files  Print the parsed critical-files section and exit
   --draft                 Run only gate [D] (phase-count drift) against a draft plan
+  --require-must-preserve  Fail gate [MP] when ## Must preserve is absent (authoring path)
   <plan-file>             Path to the plan file to check
 
 Gate catalogue: the header comment of this file lists every gate letter,
@@ -317,7 +319,7 @@ set -u
 export LC_ALL=C
 
 usage() {
-    echo "Usage: bin/check-plan [--print-critical-files] [--draft] <plan-file>" >&2
+    echo "Usage: bin/check-plan [--print-critical-files] [--require-must-preserve] [--draft] <plan-file>" >&2
 }
 
 CF_PRINT_ONLY=0
@@ -330,6 +332,14 @@ fi
 # sectioned-delivery draft, then exit. A draft has no line-1 YAML frontmatter
 # (its line 1 is the plan title), so the frontmatter-anchored gates — 13, [H],
 # [T], [S], [K] — would all fire spuriously; draft mode never reaches them.
+# --require-must-preserve: gate [MP] fails an absent `## Must preserve`
+# section. Only the authoring paths (bin/plan-now, plan SKILL.md Step 5) pass
+# it; plain runs lint the section only when present (the grandfather rule).
+REQUIRE_MP=0
+case "${1:-}" in
+    --require-must-preserve) REQUIRE_MP=1; shift ;;
+    --require-must-preserve=*) usage; exit 2 ;;
+esac
 DRAFT_MODE=0
 if [ "${1:-}" = "--draft" ]; then
     DRAFT_MODE=1
@@ -2494,6 +2504,27 @@ if [ -n "$_u_bad" ]; then
     while IFS= read -r _u_line; do
         viol "[U] ## Backlog issues line must read '- closes|refs a-jay85/IBL5-backlog#N — <what>' (lowercase tag, full repo path, a description): \"${_u_line}\""
     done <<< "$_u_bad"
+fi
+
+# Gate [MP]: `## Must preserve` grammar. bin/lib/deleted-guards --lint-plan is
+# the single grammar owner (the detector reads `### Intended removals` through
+# the same parser), so this gate only relays its MP-VIOLATION lines. Absent
+# section: fails only under --require-must-preserve. A lint crash fails closed.
+_mp_args=(--lint-plan "$PLAN_FILE")
+if [ "$REQUIRE_MP" -eq 1 ]; then _mp_args+=(--require); fi
+_mp_rc=0
+_mp_out=$("$SCRIPT_DIR/lib/deleted-guards" "${_mp_args[@]}" 2>&1) || _mp_rc=$?
+if [ "$_mp_rc" -eq 0 ] || [ "$_mp_rc" -eq 1 ]; then
+    while IFS= read -r _mp_line; do
+        case "$_mp_line" in
+            "MP-VIOLATION: "*) viol "[MP] ${_mp_line#MP-VIOLATION: }" ;;
+        esac
+    done <<< "$_mp_out"
+    if [ "$_mp_rc" -eq 1 ] && ! grep -q '^MP-VIOLATION: ' <<< "$_mp_out"; then
+        viol "[MP] bin/lib/deleted-guards --lint-plan failed (exit 1 with no violation line)"
+    fi
+else
+    viol "[MP] bin/lib/deleted-guards --lint-plan failed (exit $_mp_rc)"
 fi
 
 # ---------------------------------------------------------------------------

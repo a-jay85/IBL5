@@ -1,0 +1,185 @@
+[
+  {
+    "name": "no-block-no-keys",
+    "body": "## Summary\nSome change.\n",
+    "flagged_keys": [],
+    "expected": []
+  },
+  {
+    "name": "no-block-with-keys",
+    "body": "## Summary\nSome change.\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d",
+      "catch@ibl5/classes/Season/Season.php#5e6f7a8b"
+    ],
+    "expected": [
+      "removed-guards:UNLISTED:try@ibl5/classes/Season/Season.php#1a2b3c4d",
+      "removed-guards:UNLISTED:catch@ibl5/classes/Season/Season.php#5e6f7a8b"
+    ]
+  },
+  {
+    "name": "reason-ok",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: Moved the try block into the Season factory\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": []
+  },
+  {
+    "name": "reason-exactly-15",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: Moved to b.php.\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": []
+  },
+  {
+    "name": "reason-14-none-of-these",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: None of these.\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ]
+  },
+  {
+    "name": "reason-none",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: none\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ]
+  },
+  {
+    "name": "reason-na",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: N/A\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ]
+  },
+  {
+    "name": "reason-placeholder",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: <one-line reason required>\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ]
+  },
+  {
+    "name": "reason-long-dashes",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: -------------------\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ]
+  },
+  {
+    "name": "two-keys-one-bullet",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` `catch@ibl5/classes/Season/Season.php#5e6f7a8b` — Reason: Moved the try block into the Season factory\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d",
+      "catch@ibl5/classes/Season/Season.php#5e6f7a8b"
+    ],
+    "expected": [
+      "removed-guards:MALFORMED"
+    ]
+  },
+  {
+    "name": "missing-end",
+    "body": "## Summary\n<!-- removed-guards:begin -->\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: Moved the try block into the Season factory",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:MALFORMED"
+    ]
+  },
+  {
+    "name": "empty-block",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [],
+    "expected": [
+      "removed-guards:MALFORMED"
+    ]
+  },
+  {
+    "name": "two-blocks",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: Moved the try block into the Season factory\n<!-- removed-guards:end -->\n\n## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `catch@ibl5/classes/Season/Season.php#5e6f7a8b` — Reason: Moved the try block into the Season factory\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d",
+      "catch@ibl5/classes/Season/Season.php#5e6f7a8b"
+    ],
+    "expected": [
+      "removed-guards:MALFORMED"
+    ]
+  },
+  {
+    "name": "end-before-begin",
+    "body": "<!-- removed-guards:end -->\n<!-- removed-guards:begin -->\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: Moved the try block into the Season factory",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:MALFORMED"
+    ]
+  },
+  {
+    "name": "flagged-key-unlisted",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: Moved the try block into the Season factory\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d",
+      "catch@ibl5/classes/Season/Season.php#5e6f7a8b"
+    ],
+    "expected": [
+      "removed-guards:UNLISTED:catch@ibl5/classes/Season/Season.php#5e6f7a8b"
+    ]
+  },
+  {
+    "name": "extra-unflagged-bullet",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: Moved the try block into the Season factory\n- `lock@bin/foo.sh#0badc0de` — Reason: Moved the try block into the Season factory\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": []
+  },
+  {
+    "name": "prose-line-inside-block-ignored",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: Moved the try block into the Season factory\nThis sentence is not a bullet and carries no reason.\n  removed: `try {`\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": []
+  },
+  {
+    "name": "order-unjustified-then-unlisted",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `catch@ibl5/classes/Season/Season.php#5e6f7a8b` — Reason: tbd\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: todo\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "lock@bin/foo.sh#0badc0de",
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d",
+      "catch@ibl5/classes/Season/Season.php#5e6f7a8b"
+    ],
+    "expected": [
+      "removed-guards:UNJUSTIFIED:catch@ibl5/classes/Season/Season.php#5e6f7a8b",
+      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d",
+      "removed-guards:UNLISTED:lock@bin/foo.sh#0badc0de"
+    ]
+  },
+  {
+    "name": "crlf-body-parses",
+    "body": "## Summary\r\nSome change.\r\n\r\n<!-- removed-guards:begin -->\r\n## Removed guards\r\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\r\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: Moved the try block into the Season factory\r\n<!-- removed-guards:end -->\r\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": []
+  }
+]

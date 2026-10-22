@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-10-19
+last_verified: 2026-10-21
 ---
 
 ## Read budget: read this once, read nothing else
@@ -57,6 +57,8 @@ For the codebase, the orchestrator's findings are authoritative, confirmations c
 - **The one self-check you DO run: the per-turn phase count.** It is the `awk`/`grep` block above, **not** `bin/check-plan`. `SCAF` is 0 without an outline comment (the guard is a no-op); `BODY < SCAF` mid-run is normal and only `BODY > SCAF` is drift. <!-- slop-ok -->
 - **A pre-prod exercise path for every deploy-dependent behavior**: behavior that manifests only once *deployed* (a file CI ships on merge, an applied migration, a registered daemon/cron, a new `.github/workflows/` job, a live-service call). Each needs a matrix row runnable on the worktree Docker stack, CI, or the prod-clone `.github/workflows/deploy-rehearsal.yml` rehearsal. Silence and stub/mock/fake-only coverage do not count. A surviving exception requires `<!-- pre-prod-exception: <slice + why> -->` plus `## Pre-prod Exception Justification` (gate `[P]`). `_architect-contract-detail.md` § Pre-prod exercise path — slice elaboration. <!-- slop-ok -->
 - **Post-merge rows**: a `Truly-manual` row runnable only after merge (live-host cron, prod-only credential) puts `post-merge: <reason>` in its location cell (gate `[PM]`). Rows runnable on the open PR stay untagged. `_architect-contract-detail.md` § Post-merge rows.
+- **Must preserve.** A `## Must preserve` section listing the guards and behaviors in touched files that the change must keep (try/catch, `*_exists` checks, locks, early null returns, shell `command -v`/`flock`/`|| true`/`trap`/`set -e`, Python `try`/`hasattr`/`isinstance`/`is None` returns), one backticked path per bullet. Write `- none — <reason>` when nothing qualifies. Name any guard the plan removes on purpose under `### Intended removals` with the shape ``- `<path>` <kind>: `<needle>` — <reason>``. `bin/check-plan` gate `[MP]` lints it; `bin/lib/deleted-guards` reads it, and any removal it lacks must be restored or justified in the PR body. <!-- slop-ok -->
+- **Edge-case rows.** For every regex, parser, or grammar a phase adds or changes, at least one matrix row feeds a near-miss input (prose resembling the accepted form, such as `None of these…`; a phrase with several numbers, such as `checks 3 and 4`) and asserts the exact verdict.
 
 ## Conditional sections
 

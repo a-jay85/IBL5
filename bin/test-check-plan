@@ -163,6 +163,127 @@ assert "clean-minimal" 0 "$FM"'
 | 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |
 '
 
+# Grandfather pin: a master-shaped plan with no `## Must preserve` section
+# passes plain check-plan. Gate [MP] only requires the section under
+# --require-must-preserve, so queued legacy plans never need an edit.
+assert "legacy-plan-without-must-preserve-passes-plain" 0 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | cap rejects over-cap trade | E2E | pre-impl | `tests/e2e/trade.spec.ts` |
+'
+
+# --- Gate [MP]: ## Must preserve -------------------------------------------
+# assert_args <name> <expected-exit> <must-include> <plan-body> <args...>
+# Like assert_msg, but passes <args...> before the plan path.
+assert_args() {
+    name="$1"; want_exit="$2"; msg_inc="$3"; body="$4"; shift 4
+    f="$TMP/$name.md"
+    printf '%s\n' "$body" > "$f"
+    out="$("$GUARD" "$@" "$f" 2>&1)"; got=$?
+    if [ "$got" -ne "$want_exit" ]; then
+        h_fail "$name" "expected exit $want_exit, got $got: $out"
+    elif [ -n "$msg_inc" ] && ! grep -qF -- "$msg_inc" <<< "$out"; then
+        h_fail "$name" "'$msg_inc' not in output"
+    else
+        h_pass "$name (exit $got)"
+    fi
+}
+
+MP_BASE="$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | cap rejects over-cap trade | E2E | pre-impl | `tests/e2e/trade.spec.ts` |
+'
+
+assert_args "mp-missing-required-fails" 1 "[MP] missing" "$MP_BASE" --require-must-preserve
+assert_args "mp-none-reason-passes-required" 0 "" "$MP_BASE"'
+## Must preserve
+
+- none — this change touches only docs prose
+' --require-must-preserve
+# 14 chars after the dash: one short of the 15-char floor.
+assert_args "mp-none-short-reason-fails" 1 "[MP] none bullet needs a reason" "$MP_BASE"'
+## Must preserve
+
+- none — fourteen chars
+' --require-must-preserve
+# PR #3366 near-miss class: prose that resembles the escape is not a bullet.
+assert_args "mp-prose-none-of-these-fails" 1 "[MP] ## Must preserve has no bullets" "$MP_BASE"'
+## Must preserve
+
+None of these guards may be removed.
+' --require-must-preserve
+assert_args "mp-capital-none-bullet-fails" 1 "[MP] guard bullet needs a backticked path" "$MP_BASE"'
+## Must preserve
+
+- None — this change touches only docs prose
+' --require-must-preserve
+assert_args "mp-none-plus-guard-bullet-fails" 1 "bullet must be the only bullet in ## Must preserve" "$MP_BASE"'
+## Must preserve
+
+- none — this change touches only docs prose
+- `bin/x`: keep checks 3 and 4 intact
+' --require-must-preserve
+assert_args "mp-guard-bullets-pass" 0 "" "$MP_BASE"'
+## Must preserve
+
+- `bin/x`: keep checks 3 and 4 intact
+- `ibl5/classes/Foo.php` keeps its try/catch around the query
+' --require-must-preserve
+# A guard bullet that opens with lowercase "none" is a guard, not a none form.
+assert_args "mp-guard-bullet-opens-none-passes" 0 "" "$MP_BASE"'
+## Must preserve
+
+- none of the locks in `ibl5/classes/Foo.php` may go
+- `bin/x`: keep checks 3 and 4 intact
+' --require-must-preserve
+assert_args "mp-fenced-heading-ignored" 1 "[MP] missing" "$MP_BASE"'
+```markdown
+## Must preserve
+
+- none — this heading sits inside a fenced example
+```
+' --require-must-preserve
+assert_args "mp-intended-valid-passes" 0 "" "$MP_BASE"'
+## Must preserve
+
+- `ibl5/classes/Foo.php` keeps its lock around the rebuild
+
+### Intended removals
+
+- `ibl5/classes/Foo.php` exists-check: `class_exists(Discord::class)` — Discord always loads now
+' --require-must-preserve
+assert_args "mp-intended-unknown-kind-fails" 1 "(known: catch, command-guard" "$MP_BASE"'
+## Must preserve
+
+- `ibl5/classes/Foo.php` keeps its lock around the rebuild
+
+### Intended removals
+
+- `ibl5/classes/Foo.php` bogus-kind: `class_exists(Discord::class)` — Discord always loads now
+' --require-must-preserve
+# Present-but-broken fails on the plain path too (no --require-must-preserve).
+assert_args "mp-intended-malformed-fails-plain" 1 "[MP] malformed intended-removal bullet" "$MP_BASE"'
+## Must preserve
+
+- `ibl5/classes/Foo.php` keeps its lock around the rebuild
+
+### Intended removals
+
+- `ibl5/classes/Foo.php` exists-check: `class_exists(Discord::class)`
+'
+_f="$TMP/mp-flag-equals.md"
+printf '%s\n' "$MP_BASE" > "$_f"
+"$GUARD" --require-must-preserve=1 "$_f" >/dev/null 2>&1; _ec=$?
+h_eq "mp-flag-equals-form-exit-2" 2 "$_ec"
+_ec=$(grep -c -- '--require-must-preserve' "$SCRIPT_DIR/plan-now")
+h_eq "mp-missing-required-fails: both bin/plan-now call sites pass the flag" 2 "$_ec"
+# --draft still runs gate [D] alone and never reaches [MP].
+_f="$TMP/mp-draft.md"
+printf '# Draft\n\n## Must preserve\n\nprose only\n' > "$_f"
+_out=$("$GUARD" --draft "$_f" 2>&1) || true
+h_not_contains "mp-draft-mode-skips-mp" "$_out" "[MP]"
+
 # Gate 1: no matrix at all must flag (exit 1).
 assert "no-matrix" 1 'Implementation steps only. No verification table here.'
 

@@ -30,6 +30,11 @@ class TestTriage:
             "rollup-only", ["Tests and Analysis"]
         )
 
+    def test_triage_treats_all_checks_settled_status_as_rollup(self):
+        # A red `All checks settled` is a commit status with no Actions job link.
+        assert cifix.triage(["All checks settled", "PHPUnit"]) == ("actionable", ["PHPUnit"])
+        assert cifix.triage(["All checks settled"]) == ("rollup-only", ["All checks settled"])
+
     def test_triage_dedupes_preserving_order(self):
         assert cifix.triage(["B", "A", "B"]) == ("actionable", ["B", "A"])
 

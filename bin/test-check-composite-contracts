@@ -7,7 +7,7 @@
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land). Also covers the mutation-pr.yml
 # invariants (M1-M4) and the all-checks-settled.yml invariants (A1-A6) against
-# mutated copies of the real workflows tree, the promote P9 branches filter, the
+# mutated copies of the real workflows tree, the promote P9 branches filter, the P10 aggregate-ignore knobs, the
 # step-scoped DB env invariant (D1) with a throwaway setup-php-env composite,
 # with throwaway workflow + ADR fixtures, and the read-only --protection-readback
 # mode (R0-R4, default and --context=) with generated protection JSON fixtures.
@@ -73,7 +73,7 @@ put_nd() {
 
 # put_promote <dir> <variant>
 # Writes a minimal but structurally faithful promote-to-production.yml to <dir>.
-# The base ("good") satisfies all P1-P9 invariants; each variant mutates exactly
+# The base ("good") satisfies all P1-P10 invariants; each variant mutates exactly
 # one invariant so a failure names its own cause.
 # ${{ secrets.CI_PAT }} and "$SHA:..." are intentionally literal YAML, not expanded.
 put_promote() {
@@ -105,6 +105,8 @@ jobs:
         env:
           MAX_WALKBACK: '0'
           SKIP_CHECKS: Promote master to production,Auto-promotion paused
+          IGNORE_PENDING_CHECKS: Aggregate check status
+          IGNORE_FAILED_CHECKS: Aggregate check status
         run: |
           git push origin "$SHA:refs/heads/production"
   paused:
@@ -163,6 +165,10 @@ PPEOF
     p9-no-branches)
       tmp="$(mktemp)"
       sed '/^    branches: \[master\]$/d' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p10-no-ignore-aggregate)
+      # Break the name in IGNORE_FAILED_CHECKS only; the pending knob stays intact.
+      tmp="$(mktemp)"
+      sed 's/^\( *IGNORE_FAILED_CHECKS: \).*$/\1Aggregate check statuz/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
     *)
       echo "put_promote: unknown variant '${2:-}'" >&2; return 1 ;;
   esac
@@ -172,7 +178,7 @@ PPEOF
 # Writes a minimal merge-script stub whose SKIP_CHECKS matches <skip-list>.
 put_merge() {
   # shellcheck disable=SC2016
-  printf 'SKIP_CHECKS="%s" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
+  printf 'SKIP_CHECKS="%s" \\\nIGNORE_PENDING_CHECKS="Aggregate check status" \\\nIGNORE_FAILED_CHECKS="Aggregate check status" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
 }
 
 # put_mutation_pr <wf-dir> <variant>
@@ -304,7 +310,7 @@ d="$(fresh_actions)"; put_nd "$d" false lead
 
 # Permanent fixtures reused across promote-to-production cases
 CLEAN_PROMOTE="$TMP/promote-clean"
-printf '#!/bin/bash\ngit push origin production\n' > "$CLEAN_PROMOTE"
+printf '#!/bin/bash\nIGNORE_PENDING_CHECKS="${IGNORE_PENDING_CHECKS:-Aggregate check status}" \\\nIGNORE_FAILED_CHECKS="${IGNORE_FAILED_CHECKS:-Aggregate check status}" \\\n    bin/check-master-ci-green "$SHA"\ngit push origin production\n' > "$CLEAN_PROMOTE"
 chmod +x "$CLEAN_PROMOTE"
 FORCE_PROMOTE="$TMP/promote-force"
 printf '#!/bin/bash\ngit push --force origin production\n' > "$FORCE_PROMOTE"
@@ -406,6 +412,16 @@ if grep -qF '(P9) —' <<< "$out"; then
   h_pass "P9 rejects promote without branches master names P9"
 else
   h_fail "P9 rejects promote without branches master names P9" "output: $out"
+fi
+
+# P10: promote caller that does not ignore the aggregate check name → exit 1
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p10-no-ignore-aggregate
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "P10 rejects a promote caller that does not ignore the aggregate check" 1 "$rc"
+if grep -qF '(P10) —' <<< "$out"; then
+  h_pass "P10 rejects a promote caller that does not ignore the aggregate check names P10"
+else
+  h_fail "P10 rejects a promote caller that does not ignore the aggregate check names P10" "output: $out"
 fi
 
 # pp-absent-skips: no promote-to-production workflow → exit 0 with skip line

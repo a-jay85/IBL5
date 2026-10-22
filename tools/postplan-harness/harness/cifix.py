@@ -12,6 +12,11 @@ SIGNOFF_CHECKS = frozenset({"human-signoff"})
 # Jobs whose only failure mode is "an upstream job failed" (tests.yml `gate`:
 # if: always(), needs: [...], exit 1 on any upstream failure). Never a fix target.
 ROLLUP_CHECKS = frozenset({"Tests and Analysis"})
+# Commit-status rollups with no Actions job. A red `All checks settled`
+# (.github/workflows/all-checks-settled.yml) only mirrors other red checks, and it has
+# no /actions/runs/N/job/M link, so failed_job_refs never matches it. triage() treats
+# it as a rollup. It is not in ROLLUP_CHECKS because no workflow has a job of that name.
+STATUS_ROLLUP_CHECKS = frozenset({"All checks settled"})
 # Phase 7 Meta-checks skip (see _ci_fix_loop). "All checks settled" is the aggregate
 # status from .github/workflows/all-checks-settled.yml; it is non-actionable for this
 # predicate only. The legacy waiter's name stays until the ADR-0149 addendum's cutover
@@ -50,8 +55,9 @@ def triage(failed: list[str]) -> tuple[str, list[str]]:
     if not remaining:
         return ("green", [])
 
-    rollups = [n for n in remaining if n in ROLLUP_CHECKS]
-    actionable = [n for n in remaining if n not in ROLLUP_CHECKS]
+    all_rollups = ROLLUP_CHECKS | STATUS_ROLLUP_CHECKS
+    rollups = [n for n in remaining if n in all_rollups]
+    actionable = [n for n in remaining if n not in all_rollups]
 
     if not actionable:
         return ("rollup-only", rollups)

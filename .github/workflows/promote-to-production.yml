@@ -94,6 +94,11 @@ jobs:
           MIN_REQUIRED_CHECKS: '3'
           MAX_WALKBACK: '0'
           SKIP_CHECKS: Promote master to production,Auto-promotion paused
+          # The settle workflow (all-checks-settled.yml) leaves an `Aggregate check
+          # status` check-run on master HEAD. Its own state says nothing about
+          # master's health, so a pending or failed run of it must not block promotion.
+          IGNORE_PENDING_CHECKS: Aggregate check status
+          IGNORE_FAILED_CHECKS: Aggregate check status
         shell: bash
         run: bin/promote-master-to-production "$PROMOTE_SHA" | tee -a "$GITHUB_OUTPUT"
 

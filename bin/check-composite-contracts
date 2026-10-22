@@ -12,10 +12,13 @@
 #                   pins the default only; it does NOT verify that no caller passes
 #                   fail-on-delivery: false on an alert path — that intent is not
 #                   mechanizable from the composite alone.)
-#   promote-to-production: nine invariants (P1-P9) that guard the unattended
+#   promote-to-production: ten invariants (P1-P10) that guard the unattended
 #                   fast-forward push path — force-push flags, permissions, PAT
 #                   credential, kill-switch count, walkback setting, fork guard,
-#                   SKIP_CHECKS/job-name sync, merge-script parity, and the workflow_run branches filter (P9).
+#                   SKIP_CHECKS/job-name sync, merge-script parity, the workflow_run
+#                   branches filter (P9), and P10: the promote workflow env, the
+#                   promote script and the merge script each name `Aggregate check
+#                   status` in IGNORE_PENDING_CHECKS and IGNORE_FAILED_CHECKS.
 #   required PR workflows (R1): tests.yml, e2e-tests.yml, human-signoff.yml,
 #                   pr-meta-checks.yml and mutation.yml must keep a block-style
 #                   `on: pull_request:` trigger with no `paths:` or
@@ -343,6 +346,32 @@ else
     echo "composite-contracts: promote-to-production workflow_run is filtered to branches: [master] (P9)"
   else
     echo "composite-contracts: promote-to-production (P9) — on.workflow_run has no 'branches: [master]' filter; every PR completion of a listed workflow would start a promote run ($pp_file)" >&2
+    fail=1
+  fi
+
+  # P10: the settle workflow's `Aggregate check status` check-run lands on master
+  # HEAD. bin/check-master-ci-green counts a pending or failed run of any name as
+  # "master not green", so all three promote callers must ignore it in both
+  # IGNORE_PENDING_CHECKS and IGNORE_FAILED_CHECKS. It stays out of SKIP_CHECKS
+  # because P7 and P8 pin that list to the promote workflow's job names.
+  agg_name="Aggregate check status"
+  p10_bad=""
+  for var in IGNORE_PENDING_CHECKS IGNORE_FAILED_CHECKS; do
+    wf_val="$(sed -n "s/^ *${var}: *//p" "$pp_file" | head -1 | sed 's/[[:space:]]*#.*$//' | tr -d "\"'" | sed 's/[[:space:]]*$//')"
+    [ "$wf_val" = "$agg_name" ] || p10_bad="$p10_bad workflow:$var"
+    for pair in "merge:$MERGE_SCRIPT" "promote:$PROMOTE_SCRIPT"; do
+      sc_label="${pair%%:*}"
+      sc_file="${pair#*:}"
+      [ -f "$sc_file" ] || continue
+      if ! grep -qE "^[[:space:]]*${var}=.*[-\"']${agg_name}[\"'}]*[[:space:]]*(\\\\)?$" "$sc_file"; then
+        p10_bad="$p10_bad ${sc_label}:$var"
+      fi
+    done
+  done
+  if [ -z "$p10_bad" ]; then
+    echo "composite-contracts: promote-to-production callers ignore '$agg_name' in IGNORE_PENDING_CHECKS and IGNORE_FAILED_CHECKS (P10)"
+  else
+    echo "composite-contracts: promote-to-production (P10) — '$agg_name' is not named in:${p10_bad}; the settle workflow's check-run on master HEAD would make bin/check-master-ci-green report master as not green and stall promotion ($pp_file, $MERGE_SCRIPT, $PROMOTE_SCRIPT)" >&2
     fail=1
   fi
 

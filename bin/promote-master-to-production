@@ -49,6 +49,13 @@ Environment:
   MAX_WALKBACK          Passed to bin/check-master-ci-green (default: 0).
   SKIP_CHECKS           Passed to bin/check-master-ci-green (default:
                         "Promote master to production,Auto-promotion paused").
+  IGNORE_PENDING_CHECKS Passed to bin/check-master-ci-green (default:
+                        "Aggregate check status"). The settle workflow leaves
+                        this check-run on master HEAD; pending says nothing
+                        about master's health.
+  IGNORE_FAILED_CHECKS  Passed to bin/check-master-ci-green (default:
+                        "Aggregate check status"). Same reason, for a
+                        cancelled or failed run.
   GH_API_CMD            Override the API command (testing only).
 
 Exit codes: 0 = handled (promoted or no-op), 1 = hard failure.
@@ -128,6 +135,8 @@ fi
 MIN_REQUIRED_CHECKS="${MIN_REQUIRED_CHECKS:-3}" \
 MAX_WALKBACK="${MAX_WALKBACK:-0}" \
 SKIP_CHECKS="${SKIP_CHECKS:-Promote master to production,Auto-promotion paused}" \
+IGNORE_PENDING_CHECKS="${IGNORE_PENDING_CHECKS:-Aggregate check status}" \
+IGNORE_FAILED_CHECKS="${IGNORE_FAILED_CHECKS:-Aggregate check status}" \
     "$(git rev-parse --show-toplevel)/bin/check-master-ci-green" "$SHA" >/dev/null || {
         emit "outcome=not-green"
         log "master $SHA is not green (or still running) — no promotion this pass."

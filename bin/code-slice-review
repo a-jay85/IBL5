@@ -247,8 +247,8 @@ mode_name() {
     fi
 }
 
-# Rotation state is read and written only by a real, unpinned run.
-state_is_writable() { [ "$DRY_RUN" -eq 0 ] && [ -z "$SLICE" ]; }
+# Rotation state is written only by a real, unpinned run; --print-prompt never writes it.
+state_is_writable() { [ "$DRY_RUN" -eq 0 ] && [ -z "$SLICE" ] && [ "$MODE" != "prompt" ]; }
 
 # ── Rotation state (Phase 2) ──────────────────────────────────────────────────
 # ROT_CYCLE, ROT_REVIEWED (newline list), ROT_STRIKES (newline list of

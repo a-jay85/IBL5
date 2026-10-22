@@ -3182,7 +3182,7 @@ assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
-# Gate [MU] fixtures (15 cases)
+# Gate [MU] fixtures (17 cases)
 # ---------------------------------------------------------------------------
 # A throwaway repo: one tracked file under e2e/, one tracked PHPStan identifier,
 # one directory named only in tracked text. The helper's tree arm reads this repo
@@ -3251,6 +3251,26 @@ assert_viol "gateMU-non-category-dotted-silent" 0 '[MU]' "$FM$YHDR"'
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate MU props -->
 '
+# A bare file name whose stem is a category word is a file, not an identifier: silent.
+assert_viol "gateMU-category-stem-file-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | writes `enum'"$MU_DOT"'ts` and `class'"$MU_DOT"'php` | CLI-executable | post-impl | `go test ./...` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# Categories outside the first list (ignore, if, greaterOrEqual) still fire.
+_mu_name='gateMU-more-categories-fire'
+_mu_body="$FM$YHDR"'
+| 1 | no `ignore'"$MU_DOT"'unmatchedIdentifier`, `if'"$MU_DOT"'alwaysTrue` or `greaterOrEqual'"$MU_DOT"'alwaysTrue` finding | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+printf '%s\n' "$_mu_body" > "$TMP/$_mu_name.md"
+_mu_out="$("$GUARD" "$TMP/$_mu_name.md" 2>&1)"
+_mu_n="$(grep -c '^\[MU\] ' <<< "$_mu_out")"
+if [ "$_mu_n" = "3" ]; then
+    h_pass "$_mu_name (3 [MU] lines)"
+else
+    h_fail "$_mu_name" "expected 3 [MU] lines, got $_mu_n"
+fi
 # (b) a new directory: no tracked file beneath it, no tracked text names it (the
 # records-hub row 11 shape).
 assert_viol "gateMU-new-dir-fires" 1 '[MU]' "$FM$YHDR"'

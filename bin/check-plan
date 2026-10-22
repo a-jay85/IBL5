@@ -1642,8 +1642,10 @@ done < "$GATEP_MATRIX"
 # the helper would then report every token missing. Example tokens are kept out of this
 # comment on purpose: a literal one in tracked text would count as present to the helper.
 # ---------------------------------------------------------------------------
-_mu_cats='argument|arguments|assign|attribute|binaryOp|booleanNot|callable|cast|catch|class|classConstant|constant|deadCode|empty|encapsedStringPart|enum|equal|foreach|function|generics|greater|identical|impossibleType|instanceof|interface|isset|method|missingType|new|notEqual|notIdentical|nullCoalesce|nullsafe|offsetAccess|offsetAssign|parameter|paramOut|phpDoc|phpstanApi|property|readOnlyProperty|return|smaller|staticMethod|staticProperty|ternary|throws|trait|variable|varTag'
+_mu_cats='argument|arguments|arrayFilter|arrayValues|assign|assignOp|attribute|binaryOp|booleanAnd|booleanNot|booleanOr|callable|cast|catch|class|classConstant|constant|closure|deadCode|echo|elseif|empty|encapsedStringPart|enum|equal|foreach|function|generics|greater|greaterOrEqual|identical|if|ignore|impossibleType|instanceof|interface|isset|logicalAnd|logicalOr|match|method|missingType|new|notEqual|notIdentical|nullCoalesce|nullsafe|offsetAccess|offsetAssign|parameter|paramOut|phpDoc|phpstanApi|property|readOnlyProperty|return|selfOut|smaller|smallerOrEqual|staticMethod|staticProperty|ternary|throws|trait|unaryOp|unset|variable|varTag|while'
 _mu_id_re="^(${_mu_cats})\.[a-z][A-Za-z]*(\.[a-z][A-Za-z]*)*\$"
+# A category stem with a file extension tail is a bare file name, never an identifier.
+_mu_ext_re='\.(php|phtml|ts|tsx|js|jsx|mjs|cjs|json|jsonl|md|txt|yml|yaml|sh|py|css|scss|html|neon|xml|sql|lock|toml|ini|csv|tsv|go|rb|svg|png|log|env|dist)$'
 _mu_dir_re='^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*/$'
 _mu_cand_re='`(('"${_mu_cats}"')\.[a-z][A-Za-z.]*|[A-Za-z0-9_./-]+/)`'
 _mu_helper="$SCRIPT_DIR/lib/plan-matrix-assertions"
@@ -1674,7 +1676,10 @@ if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$GATEP
         _mu_seen="${_mu_seen}${MC_NUM}|"
         read -ra _mu_toks <<< "$_mu_hit"
         for _mu_tok in "${_mu_toks[@]}"; do
-            if [[ "$_mu_tok" =~ $_mu_id_re ]]; then
+            # The helper and GATEP_MATRIX parse fences differently, so a same-id row
+            # elsewhere can carry the token: blame only the row that holds it.
+            [[ "$row" == *"$_mu_tok"* ]] || continue
+            if [[ "$_mu_tok" =~ $_mu_id_re ]] && ! [[ "$_mu_tok" =~ $_mu_ext_re ]]; then
                 viol "[MU] matrix token \`${_mu_tok}\` is a PHPStan error identifier that appears only in tool output: it is in no tracked file and a correct diff never adds it, so bin/lib/plan-matrix-assertions reports the row UNREALISED and Step 6.7 stops. Put the identifier in prose outside backticks and backtick the test name or the file the diff carries instead (a baseline entry or @phpstan-ignore line the diff adds is cited by its file path): ${row}"
                 continue
             fi

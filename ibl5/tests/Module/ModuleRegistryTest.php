@@ -68,6 +68,14 @@ final class ModuleRegistryTest extends TestCase
         self::assertContains('Rivalries', ModuleRegistry::getAllModules());
     }
 
+    public function testLeaderboardsAndRetiredLeaderboardStubsAreRegistered(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('Leaderboards'));
+        // Retired names stay registered so their redirect stubs keep routing.
+        self::assertTrue(ModuleRegistry::isValid('SeasonLeaderboards'));
+        self::assertTrue(ModuleRegistry::isValid('CareerLeaderboards'));
+    }
+
     public function testEveryModuleDirectoryIsRegistered(): void
     {
         $modulesDir = __DIR__ . '/../../modules';

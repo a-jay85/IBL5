@@ -61,7 +61,9 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
 
         ob_start();
         ?>
-<form name="Leaderboards" method="post" action="modules.php?name=SeasonLeaderboards" class="ibl-filter-form">
+<form name="Leaderboards" method="get" action="modules.php" class="ibl-filter-form ibl-filter-form--stacked">
+    <input type="hidden" name="name" value="Leaderboards">
+    <input type="hidden" name="tab" value="season">
     <div class="ibl-filter-form__row">
         <div class="ibl-filter-form__group">
             <label for="sl-team" class="ibl-filter-form__label">Team:</label>
@@ -90,11 +92,13 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label for="sl-limit" class="ibl-filter-form__label">Limit:</label>
+            <label for="sl-limit" class="ibl-filter-form__label">Results Limit:</label>
             <input id="sl-limit" type="number" name="limit" value="<?= HtmlSanitizer::e($limitValue) ?>" min="1" placeholder="50">
-            <span class="ibl-filter-form__label">Records</span>
         </div>
-        <button type="submit" class="ibl-filter-form__submit">Search Season Data</button>
+    </div>
+    <input type="hidden" name="submitted" value="1">
+    <div class="ibl-filter-form__actions">
+        <button type="submit" class="ibl-filter-form__submit">Search</button>
     </div>
 </form>
         <?php
@@ -112,7 +116,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
 <table class="sortable ibl-data-table responsive-table">
     <thead>
         <tr>
-            <th class="sticky-col-1">Rank</th>
+            <th class="sticky-col-1">#</th>
             <th>Year</th>
             <th class="sticky-col-2">Name</th>
             <th>Team</th>
@@ -154,7 +158,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         ob_start();
         ?>
 <tr data-team-id="<?= (int)$stats['teamid'] ?>">
-    <td class="rank-cell sticky-col-1"><?= HtmlSanitizer::e($rank) ?>.</td>
+    <td class="rank-cell sticky-col-1"><?= HtmlSanitizer::e($rank) ?></td>
     <td><?= (int)$stats['year'] ?></td>
     <?= PlayerImageHelper::renderFlexiblePlayerCell((int)$stats['pid'], $stats['name'], 'sticky-col-2') ?>
     <?= TeamCellHelper::renderTeamCellOrFreeAgent((int)$stats['teamid'], $stats['teamname'], $stats['color1'], $stats['color2']) ?>

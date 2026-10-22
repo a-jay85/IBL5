@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OnThisDay;
 
+use League\League;
 use League\LeagueContext;
 use OnThisDay\Contracts\OnThisDayRepositoryInterface;
 
@@ -13,6 +14,8 @@ use OnThisDay\Contracts\OnThisDayRepositoryInterface;
  * Every player-game source reads the phantom-guarded derived table
  * (GUARDED_PLAYER_GAMES / GUARDED_WINDOWED_PLAYER_GAMES): one row per (game_date, visitor, home, pid). A repeated
  * row set for the same game is a phantom, and grouping collapses it to one line.
+ * Only games between real teams count: All-Star and Rookie/Sophomore box scores
+ * share game_type 1 with the regular season, so the team-id filter drops them.
  * Player names come from ibl_plr on pid; box-score `name` is never read.
  *
  * @see \Database\BaseMysqliRepository For base class documentation
@@ -55,13 +58,17 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
      * for the same pid is a phantom (it carries a different game_of_that_day);
      * grouping collapses it, and MAX keeps the real line because a repeat never
      * adds points. Every player-game source reads one of the two tables below.
+     * The real-team filter (same as RecordHolders\TeamRecordRepository) drops the
+     * All-Star and Rookie/Sophomore games, which carry game_type 1.
      */
     private const GUARDED_SELECT = "SELECT b.game_date, b.visitor_teamid, b.home_teamid, b.pid,
                   MAX(b.teamid) AS teamid, MAX(b.calc_points) AS pts, MAX(b.calc_rebounds) AS reb,
                   MAX(b.game_ast) AS ast, MAX(b.game_stl) AS stl, MAX(b.game_blk) AS blk,
                   MAX(b.season_year) AS season_year, MAX(b.game_type) AS game_type
                 FROM `ibl_box_scores` b
-                WHERE b.pid > 0";
+                WHERE b.pid > 0
+                  AND b.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                  AND b.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID;
 
     private const GUARDED_GROUP_BY = " GROUP BY b.game_date, b.visitor_teamid, b.home_teamid, b.pid";
 

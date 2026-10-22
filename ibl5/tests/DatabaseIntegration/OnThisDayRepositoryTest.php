@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use League\League;
 use OnThisDay\Moment;
 use OnThisDay\MomentKind;
 use OnThisDay\OnThisDayRepository;
@@ -186,6 +187,65 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
             );
         }
         $this->insertGame('1901-02-10', self::PID_A, 2, 3, 2);
+
+        self::assertSame([], $this->season1901($this->repo->findTrades(['02-10'], 1902)));
+    }
+
+    public function testRookieGameFiftyPointGameIsIgnored(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Rookie Scorer');
+        // February is game_type 1, but teams 40/41 are the Rookie/Sophomore game.
+        $this->insertGame(
+            '1901-02-10',
+            self::PID_A,
+            League::ROOKIES_TEAMID,
+            League::ROOKIES_TEAMID + 1,
+            League::ROOKIES_TEAMID,
+            points2m: 16,
+            ftm: 6,
+            points3m: 4,
+        );
+
+        self::assertSame([], $this->only($this->repo->findFiftyPointGames(['02-10'], 1902), self::PID_A));
+    }
+
+    public function testAllStarGameIsNeverARecord(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'All-Star Rebounder');
+        // 1889 is the first season and sets a real-game high of 20; the All-Star game beats it.
+        $this->insertGame('1889-01-03', self::PID_A, 1, 2, 1, orb: 5, drb: 15);
+        $this->insertGame(
+            '1890-02-10',
+            self::PID_A,
+            League::ALL_STAR_AWAY_TEAMID,
+            League::ALL_STAR_HOME_TEAMID,
+            League::ALL_STAR_AWAY_TEAMID,
+            orb: 10,
+            drb: 30,
+        );
+
+        $moments = array_values(array_filter(
+            $this->only($this->repo->findRecordGames(['02-10'], 1891), self::PID_A),
+            static fn (Moment $m): bool => $m->statLabel === 'rebounds',
+        ));
+
+        self::assertSame([], $moments);
+    }
+
+    public function testAllStarGameIsNeverATrade(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'All-Star Scorer');
+        // Five 15-ppg games for team 1, then an All-Star game for team 50.
+        foreach (['1901-01-02', '1901-01-04', '1901-01-06', '1901-01-08', '1901-01-10'] as $date) {
+            $this->insertGame($date, self::PID_A, 1, 3, 1, points2m: 7, ftm: 1, points3m: 0);
+        }
+        $this->insertGame(
+            '1901-02-10',
+            self::PID_A,
+            League::ALL_STAR_AWAY_TEAMID,
+            League::ALL_STAR_HOME_TEAMID,
+            League::ALL_STAR_AWAY_TEAMID,
+        );
 
         self::assertSame([], $this->season1901($this->repo->findTrades(['02-10'], 1902)));
     }

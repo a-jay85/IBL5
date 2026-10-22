@@ -63,6 +63,12 @@ case "$subcommand" in
     bootout)
         rc_file="${T}/ctl/launchctl_bootout_rc"
         ;;
+    submit)
+        rc_file="${T}/ctl/launchctl_submit_rc"
+        ;;
+    remove)
+        rc_file="${T}/ctl/launchctl_remove_rc"
+        ;;
     *)
         rc_file=""
         ;;
@@ -969,6 +975,246 @@ if [[ "$PNL_LABEL_OUT" == "com.ibl5.postplan-now-branch-one-20260101-120000-99" 
     pass "postplan_now_live_exact_slug: prints label"
 else
     fail "postplan_now_live_exact_slug: prints label" "got '$PNL_LABEL_OUT'"
+fi
+
+# ---------------------------------------------------------------------------
+# Submit-helper fixtures: executable script, and a respawn-safe counter script.
+# ---------------------------------------------------------------------------
+SUB_DIR="$T/sub"
+mkdir -p "$SUB_DIR"
+SUB_SCRIPT="$SUB_DIR/S.sh"
+SUB_LOG="$SUB_DIR/L.log"
+SUB_LABEL="com.ibl5.t-1"
+printf '#!/bin/bash\nexit 0\n' > "$SUB_SCRIPT"
+chmod +x "$SUB_SCRIPT"
+
+# ---------------------------------------------------------------------------
+# Case: submit_argv_golden
+# HOME=/test-home; the recorded launchctl call line equals the golden line (the
+# scratch dir is the @T@ placeholder). Pasted from one run of the helper.
+# ---------------------------------------------------------------------------
+reset_ctl
+(
+    HOME="/test-home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_submit "$SUB_LABEL" "$SUB_LOG" "$SUB_SCRIPT"
+) >/dev/null 2>&1
+SA_LINE="$(cat "$T/ctl/launchctl_calls" 2>/dev/null || true)"
+SA_GOLD="$(cat <<'GOLD_EOF'
+launchctl submit -l com.ibl5.t-1 -o @T@/sub/L.log -e @T@/sub/L.log -- /usr/bin/env HOME=/test-home PATH=/usr/local/bin:/opt/homebrew/bin:/test-home/.bun/bin:/test-home/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin /bin/bash -lc if ! mkdir '@T@/sub/S.sh.once' 2>/dev/null; then trap '' TERM; '@T@/shim/launchctl' remove 'com.ibl5.t-1'; rmdir '@T@/sub/S.sh.once'; exit 0; fi; '@T@/sub/S.sh'; rc=$?; trap '' TERM; '@T@/shim/launchctl' remove 'com.ibl5.t-1'; rmdir '@T@/sub/S.sh.once'; exit $rc
+GOLD_EOF
+)"
+SA_GOLD="${SA_GOLD//@T@/$T}"
+SA_OK=1
+[[ "$SA_LINE" == "$SA_GOLD" ]]                               || { SA_OK=0; fail "submit_argv_golden" "golden mismatch: got '$SA_LINE'"; }
+[[ "$SA_LINE" == *"-o $SUB_LOG -e $SUB_LOG"* ]]              || { SA_OK=0; fail "submit_argv_golden" "missing -o/-e"; }
+[[ "$SA_LINE" == *"HOME=/test-home"* ]]                      || { SA_OK=0; fail "submit_argv_golden" "missing HOME=/test-home"; }
+[[ "$SA_LINE" == *"PATH="*"/opt/homebrew/bin"*"/usr/bin"* ]] || { SA_OK=0; fail "submit_argv_golden" "PATH incomplete"; }
+[[ "$SA_LINE" != *'$HOME'* ]]                                || { SA_OK=0; fail "submit_argv_golden" "literal \$HOME present"; }
+[[ "$SA_LINE" == *"${SUB_SCRIPT}.once"* ]]                   || { SA_OK=0; fail "submit_argv_golden" "missing .once marker path"; }
+[[ $SA_OK -eq 1 ]] && pass "submit_argv_golden"
+
+# ---------------------------------------------------------------------------
+# Case: submit_rejects_bad_args
+# Usage errors return 2 and never call launchctl (launchctl_calls stays absent).
+# ---------------------------------------------------------------------------
+SB_NOEXEC="$SUB_DIR/noexec.sh"
+printf '#!/bin/bash\nexit 0\n' > "$SB_NOEXEC"
+chmod -x "$SB_NOEXEC"
+SB_OK=1
+for SB_CASE in none badlabel relscript noexec; do
+    reset_ctl
+    RC=0
+    (
+        HOME="$T/home"
+        PATH="$SHIM_PATH"
+        . "$LIB"
+        case "$SB_CASE" in
+            none)     ljob_submit ;;
+            badlabel) ljob_submit "bad.label-1" "$SUB_LOG" "$SUB_SCRIPT" ;;
+            relscript) ljob_submit "$SUB_LABEL" "$SUB_LOG" "S.sh" ;;
+            noexec)   ljob_submit "$SUB_LABEL" "$SUB_LOG" "$SB_NOEXEC" ;;
+        esac
+    ) >/dev/null 2>&1 || RC=$?
+    if [[ $RC -ne 2 || -e "$T/ctl/launchctl_calls" ]]; then
+        SB_OK=0
+        fail "submit_rejects_bad_args" "$SB_CASE: rc=$RC calls_file=$([ -e "$T/ctl/launchctl_calls" ] && echo present || echo absent)"
+    fi
+done
+[[ $SB_OK -eq 1 ]] && pass "submit_rejects_bad_args"
+
+# ---------------------------------------------------------------------------
+# Case: submit_rc_propagates
+# launchctl_submit_rc=5 makes ljob_submit return 5.
+# ---------------------------------------------------------------------------
+reset_ctl
+printf '5\n' > "$T/ctl/launchctl_submit_rc"
+RC=0
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_submit "$SUB_LABEL" "$SUB_LOG" "$SUB_SCRIPT"
+) >/dev/null 2>&1 || RC=$?
+if [[ $RC -eq 5 ]]; then
+    pass "submit_rc_propagates"
+else
+    fail "submit_rc_propagates" "expected 5, got $RC"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: submit_print_matches_submit
+# ljob_submit_print output, split back into words, equals the call line
+# ljob_submit recorded; the print run records no call.
+# ---------------------------------------------------------------------------
+reset_ctl
+SP_PRINT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_submit_print "$SUB_LABEL" "$SUB_LOG" "$SUB_SCRIPT"
+)"
+SP_PRINT_CALLS=absent; [[ -e "$T/ctl/launchctl_calls" ]] && SP_PRINT_CALLS=present
+reset_ctl
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_submit "$SUB_LABEL" "$SUB_LOG" "$SUB_SCRIPT"
+) >/dev/null 2>&1
+SP_REC="$(cat "$T/ctl/launchctl_calls" 2>/dev/null || true)"
+eval "set -- $SP_PRINT"
+SP_JOINED="$*"
+if [[ "$SP_PRINT_CALLS" == absent && -n "$SP_REC" && "$SP_JOINED" == "$SP_REC" ]]; then
+    pass "submit_print_matches_submit"
+else
+    fail "submit_print_matches_submit" "print_calls=$SP_PRINT_CALLS joined='$SP_JOINED' recorded='$SP_REC'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: wrapper_runs_once_then_removes
+# The wrapper runs the body once, exits with its status (7), records
+# `remove L` after the body line, and leaves no marker.
+# ---------------------------------------------------------------------------
+reset_ctl
+WR_SCRIPT="$SUB_DIR/wr.sh"
+WR_COUNT="$SUB_DIR/wr.count"
+rm -rf "${WR_SCRIPT}.once" "$WR_COUNT"
+cat > "$WR_SCRIPT" <<WR_EOF
+#!/bin/bash
+echo x >> "$WR_COUNT"
+echo "BODY" >> "$T/ctl/launchctl_calls"
+exit 7
+WR_EOF
+chmod +x "$WR_SCRIPT"
+RC=0
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    bash -c "$(ljob_submit_wrapper_text L "$WR_SCRIPT")"
+) >/dev/null 2>&1 || RC=$?
+WR_N="$(wc -l < "$WR_COUNT" 2>/dev/null | tr -d ' ')"
+WR_BODY_LN="$(grep -n '^BODY$' "$T/ctl/launchctl_calls" 2>/dev/null | head -1 | cut -d: -f1)"
+WR_REM_LN="$(grep -n 'remove L$' "$T/ctl/launchctl_calls" 2>/dev/null | head -1 | cut -d: -f1)"
+if [[ "$WR_N" == "1" && $RC -eq 7 && -n "$WR_BODY_LN" && -n "$WR_REM_LN" \
+   && "$WR_REM_LN" -gt "$WR_BODY_LN" && ! -e "${WR_SCRIPT}.once" ]]; then
+    pass "wrapper_runs_once_then_removes"
+else
+    fail "wrapper_runs_once_then_removes" "count='$WR_N' rc=$RC body_ln='$WR_BODY_LN' remove_ln='$WR_REM_LN' marker=$([ -e "${WR_SCRIPT}.once" ] && echo present || echo gone)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: wrapper_respawn_hits_guard
+# S.once already exists (a killed first run): the wrapper exits 0, the body
+# never runs, `remove L` is recorded, and the marker is gone.
+# ---------------------------------------------------------------------------
+reset_ctl
+RG_SCRIPT="$SUB_DIR/rg.sh"
+RG_COUNT="$SUB_DIR/rg.count"
+rm -rf "${RG_SCRIPT}.once" "$RG_COUNT"
+cat > "$RG_SCRIPT" <<RG_EOF
+#!/bin/bash
+echo x >> "$RG_COUNT"
+exit 7
+RG_EOF
+chmod +x "$RG_SCRIPT"
+mkdir "${RG_SCRIPT}.once"
+RC=0
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    bash -c "$(ljob_submit_wrapper_text L "$RG_SCRIPT")"
+) >/dev/null 2>&1 || RC=$?
+RG_N=0; [[ -f "$RG_COUNT" ]] && RG_N="$(wc -l < "$RG_COUNT" | tr -d ' ')"
+RG_REM=0; grep -q 'remove L$' "$T/ctl/launchctl_calls" 2>/dev/null && RG_REM=1
+if [[ $RC -eq 0 && "$RG_N" == "0" && $RG_REM -eq 1 && ! -e "${RG_SCRIPT}.once" ]]; then
+    pass "wrapper_respawn_hits_guard"
+else
+    fail "wrapper_respawn_hits_guard" "rc=$RC count=$RG_N remove=$RG_REM marker=$([ -e "${RG_SCRIPT}.once" ] && echo present || echo gone)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: remove_label_waits_then_fails
+# launchctl_list_rc=0 (label never leaves): rc 1 after 5 stubbed sleeps.
+# launchctl_list_rc=113 (label gone): rc 0.
+# ---------------------------------------------------------------------------
+reset_ctl
+printf '0\n' > "$T/ctl/launchctl_list_rc"
+RC_STUCK=0
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_remove_label "$SUB_LABEL"
+) >/dev/null 2>&1 || RC_STUCK=$?
+RL_SLEEPS="$(wc -l < "$T/ctl/sleep_calls" 2>/dev/null | tr -d ' ')"
+reset_ctl
+printf '113\n' > "$T/ctl/launchctl_list_rc"
+RC_GONE=0
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_remove_label "$SUB_LABEL"
+) >/dev/null 2>&1 || RC_GONE=$?
+if [[ $RC_STUCK -eq 1 && "$RL_SLEEPS" == "5" && $RC_GONE -eq 0 ]]; then
+    pass "remove_label_waits_then_fails"
+else
+    fail "remove_label_waits_then_fails" "stuck_rc=$RC_STUCK sleeps='$RL_SLEEPS' gone_rc=$RC_GONE"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: kill_label_remove_fallback
+# After bootout, a still-listed label (list rc 0) gets `launchctl remove`;
+# a gone label (list rc 113) does not.
+# ---------------------------------------------------------------------------
+reset_ctl
+printf '0\n' > "$T/ctl/launchctl_list_rc"
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_kill_label "com.ibl5.test-1" "always_dead" "pat-A"
+) >/dev/null 2>&1
+KR_LISTED=0; grep -qxF "launchctl remove com.ibl5.test-1" "$T/ctl/launchctl_calls" 2>/dev/null && KR_LISTED=1
+reset_ctl
+printf '113\n' > "$T/ctl/launchctl_list_rc"
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_kill_label "com.ibl5.test-1" "always_dead" "pat-A"
+) >/dev/null 2>&1
+KR_GONE=0; grep -qF "launchctl remove" "$T/ctl/launchctl_calls" 2>/dev/null && KR_GONE=1
+if [[ $KR_LISTED -eq 1 && $KR_GONE -eq 0 ]]; then
+    pass "kill_label_remove_fallback"
+else
+    fail "kill_label_remove_fallback" "remove_when_listed=$KR_LISTED remove_when_gone=$KR_GONE"
 fi
 
 # ---------------------------------------------------------------------------

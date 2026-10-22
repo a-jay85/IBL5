@@ -518,8 +518,8 @@ fi
 
 # A branch name may contain "/" (a Dependabot branch is
 # `dependabot/composer/...`), but a launchd label and the paths derived from it
-# cannot: `$HOME/Library/LaunchAgents/com.ibl5.postplan-now-dependabot/...plist`
-# names a directory that does not exist, and the script dies at `cat > "$PLIST"`.
+# cannot: `/tmp/post-plan-now-dependabot/...sh` names a directory that does not
+# exist, and the script dies writing "$SCRIPT"; a "/" is also illegal in a label.
 # Flatten every path/label-bound use to this form; $SLUG itself stays the real
 # branch name for the master guard, the plan lookup, and human-facing prose.
 SAFE_SLUG=$(printf '%s' "$SLUG" | tr -cs 'A-Za-z0-9._-' '-')
@@ -661,11 +661,13 @@ STARTED=$(date '+%Y-%m-%d %H:%M:%S %Z')
 # bin/fleet-status and watch-run look for logs under /tmp.
 LOG="${POSTPLAN_LOG_DIR:-/tmp}/post-plan-now-$SAFE_SLUG-$TS.log"
 LABEL="com.ibl5.postplan-now-$SAFE_SLUG-$TS"
-PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+# The launchd form runs $CMD from this file (ljob_submit). It deletes itself as the
+# run's last command; the --foreground form never writes it.
+SCRIPT="${LOG%.log}.sh"
 # ONE session uuid for this run. $CMD below carries a single `claude -p` invocation
 # since the harness absorbed Phase 5.5 and the rc=4 resume leg was removed, so one
-# uuid is all there is to pin. Minted here, before the plist is
-# written, so the sidecar is on disk before `launchctl bootstrap` can make the label
+# uuid is all there is to pin. Minted here, before anything is
+# launched, so the sidecar is on disk before `ljob_submit` can make the label
 # visible to bin/fleet-status. Path comes from session_sidecar_path, not string
 # surgery: the label says `postplan-now-`, the log says `post-plan-now-`.
 if [ -n "$RESUME_SID" ]; then
@@ -812,8 +814,8 @@ fi
 # `run_in_background: true` under CLAUDE_HEADLESS.
 #
 # The command line is assembled as PLAIN shell text first — literal `&&`, and
-# whatever `<`/`>`/`&` the prompt happens to carry — then XML-escaped exactly once
-# at the single choke point below. Hand-escaping entities inside the heredoc is
+# whatever `<`/`>`/`&` the prompt happens to carry — then (when the launchd form
+# still wrote a plist) XML-escaped exactly once at one choke point. Hand-escaping entities inside the heredoc is
 # what broke this script before: a prompt containing `<slug>-N.md` made the
 # <string> element malformed XML, so `launchctl bootstrap` died with
 # "Bootstrap failed: 5: Input/output error" and no log was ever written.
@@ -821,19 +823,19 @@ fi
 # XML escaping is only HALF the boundary. $CMD is also re-parsed as SHELL by
 # `/bin/bash -lc` at the far end, so every variable carrying FREE-FORM TEXT — the
 # prompt and the --plan path — is quoted with shq() (see its header) rather than
-# interpolated inside \"…\". (The rest — $ROOT, $LABEL, $PLIST, $LOG — are values
+# interpolated inside \"…\". (The rest — $ROOT, $LABEL, $LOG — are values
 # this script controls, so \"…\" is fine for them.) Interpolation is what let
 # the same `<slug>-N.md` string break a second way — as command substitution that
 # silently deleted itself from the prompt. Both hazards, one string, different fixes:
 # do not "simplify" either one away.
-# $CMD's tail is launch-mechanism-specific. The launchd form is byte-identical to what
-# this script has always emitted — do not "unify" the two. The foreground form is the
-# only place the exit status and the cost marker can escape: launchctl bootout swallows
+# $CMD's tail is launch-mechanism-specific. The launchd form runs from $SCRIPT under ljob_submit
+# — do not "unify" the two. The foreground form is the
+# only place the exit status and the cost marker can escape: the launchd wrapper swallows
 # both. HARNESS_RUN_DIR is empty on the skill-only path, hence the :-none default.
 if [ "$FOREGROUND" -eq 1 ]; then
     CMD_TAIL="conclude_status_badge \"\$pp_rc\"; echo \"post-plan-now: postplan-rc=\$pp_rc harness-rc=\${rc:-none} harness-run-dir=${HARNESS_RUN_DIR:-none}\"; exit \$pp_rc"
 else
-    CMD_TAIL="conclude_status_badge \"\$pp_rc\"; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
+    CMD_TAIL="conclude_status_badge \"\$pp_rc\"; rm -f $(shq "$SCRIPT")"
 fi
 
 # One splice covers both far-side arms (harness and skill fallback).
@@ -882,41 +884,20 @@ if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: plan: $PLAN_FILE"
     # exec, not a call: `timeout` signals the whole process group, and a surviving
     # wrapper shell would outlive the SIGTERM its child just took. `/bin/bash -lc`
-    # matches the plist's ProgramArguments so both modes parse $CMD identically.
+    # matches the ljob_submit wrapper so both modes parse $CMD identically.
     exec /bin/bash -lc "$CMD"
 fi
 
-CMD_XML=$(xml_escape "$CMD")
-LABEL_XML=$(xml_escape "$LABEL")
-ROOT_XML=$(xml_escape "$ROOT")
-LOG_XML=$(xml_escape "$LOG")
-
-cat > "$PLIST" <<PLIST_EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>$LABEL_XML</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/bin/bash</string>
-		<string>-lc</string>
-		<string>$CMD_XML</string>
-	</array>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>WorkingDirectory</key>
-	<string>$ROOT_XML</string>
-	<key>StandardOutPath</key>
-	<string>$LOG_XML</string>
-	<key>StandardErrorPath</key>
-	<string>$LOG_XML</string>
-</dict>
-</plist>
-PLIST_EOF
-
-ljob_bootstrap "$LABEL" "$PLIST"
+# $CMD goes to a private per-run file, never onto the submit argv (size). The file
+# is mode 700: it carries the prompt.
+( umask 077; printf '#!/bin/bash\n%s\n' "$CMD" > "$SCRIPT" ) \
+    || { echo "post-plan-now: could not write $SCRIPT." >&2; exit 1; }
+chmod 700 "$SCRIPT"
+if ! ljob_submit "$LABEL" "$LOG" "$SCRIPT"; then
+    rm -f "$SCRIPT"
+    echo "post-plan-now: launchctl submit failed for $LABEL; nothing launched. Log: $LOG" >&2
+    exit 1
+fi
 
 echo "post-plan-now: fired a detached post-plan on branch '$SLUG'."
 echo "  engine: $ENGINE"
@@ -926,6 +907,7 @@ echo "          this run: the DM is the completion signal."
 echo "  watch:  $ROOT/bin/watch-run --log $LOG --label $LABEL   (manual use only; never"
 echo "          'tail -f' the log, the harness flushes everything at exit)"
 echo "  log:    $LOG   (its RESULT: line is the verdict once the run ends)"
+echo "  script: $SCRIPT   (deleted by the run when it finishes)"
 echo "  label:  $LABEL   (self-removes when post-plan finishes)"
 echo "  PR / code review / CI / auto-merge progress appears on the PR."
 echo "  Leave this worktree alone — /post-plan rebuilds its Docker stack for E2E."

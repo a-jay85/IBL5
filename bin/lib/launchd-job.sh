@@ -19,6 +19,9 @@ _LJOB_SOURCED=1
 # ---------------------------------------------------------------------------
 ljob_agents_dir() { printf '%s\n' "$HOME/Library/LaunchAgents"; }
 
+# PATH every detached job gets (plist EnvironmentVariables and ljob_submit alike).
+ljob_job_path() { printf '%s' "/usr/local/bin:/opt/homebrew/bin:${HOME}/.bun/bin:${HOME}/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin"; }
+
 # ---------------------------------------------------------------------------
 # ljob_snapshot — one-shot job-table snapshot; callers keep the result:
 #   LAUNCHCTL_LIST="$(ljob_snapshot)"
@@ -85,6 +88,10 @@ ljob_kill_label() {
     shift 2
     local pat waited=0
     launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true
+    # A submitted job may survive bootout; remove is the documented teardown for it.
+    if launchctl list "$label" >/dev/null 2>&1; then
+        launchctl remove "$label" 2>/dev/null || true
+    fi
     for pat in "$@"; do
         pkill -TERM -f "$pat" 2>/dev/null || true
     done
@@ -197,7 +204,7 @@ ljob_write_runner_plist() {
   <key>StandardOutPath</key><string>${log}</string>
   <key>StandardErrorPath</key><string>${log}</string>
   <key>EnvironmentVariables</key><dict>
-    <key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:${HOME}/.bun/bin:${HOME}/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>PATH</key><string>$(ljob_job_path)</string>
   </dict>
 </dict></plist>
 PLIST_EOF
@@ -211,6 +218,65 @@ ljob_bootstrap() {
     local label="$1" plist="$2"
     launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true
     launchctl bootstrap "gui/$(id -u)" "$plist"
+}
+
+# ---------------------------------------------------------------------------
+# Per-run detached jobs with NO file in ~/Library/LaunchAgents.
+# Every per-run launcher goes through ljob_submit, so swapping the mechanism
+# later edits only this block. launchd restarts a submitted job after it exits
+# until the label is removed. The wrapper's once-guard (atomic mkdir of
+# "<script>.once") turns any respawn into "remove the label, exit 0" so the
+# script body runs at most once. The normal tail ignores TERM, removes the
+# label, then removes the marker, and exits with the script's status.
+# ---------------------------------------------------------------------------
+_ljob_valid_label() { [[ "$1" =~ ^com\.ibl5\.[A-Za-z0-9._-]+$ ]]; }
+
+# ljob_submit_wrapper_text <label> <script>: prints the bash -c text the job runs.
+ljob_submit_wrapper_text() {
+    local label="$1" script="$2" ctl l s m c
+    ctl="$(command -v "${LAUNCHCTL_CMD:-launchctl}" 2>/dev/null || printf '%s' "${LAUNCHCTL_CMD:-launchctl}")"
+    l="$(shq "$label")"; s="$(shq "$script")"; m="$(shq "${script}.once")"; c="$(shq "$ctl")"
+    printf '%s' "if ! mkdir $m 2>/dev/null; then trap '' TERM; $c remove $l; rmdir $m; exit 0; fi; $s; rc=\$?; trap '' TERM; $c remove $l; rmdir $m; exit \$rc"
+}
+
+# Builds LJOB_SUBMIT_ARGV. Returns 2 (nothing built) on a usage error.
+_ljob_submit_argv() {
+    local label="${1:-}" log="${2:-}" script="${3:-}"
+    if [[ $# -ne 3 ]] || ! _ljob_valid_label "$label" || [[ "$log" != /* || "$script" != /* ]]; then
+        echo "ljob_submit: usage: ljob_submit <com.ibl5.label> </abs/log> </abs/script>" >&2
+        return 2
+    fi
+    [[ -x "$script" ]] || { echo "ljob_submit: script not executable: $script" >&2; return 2; }
+    [[ -e "${script}.once" ]] && { echo "ljob_submit: once-marker already exists: ${script}.once" >&2; return 2; }
+    LJOB_SUBMIT_ARGV=(submit -l "$label" -o "$log" -e "$log" -- \
+        /usr/bin/env "HOME=$HOME" "PATH=$(ljob_job_path)" \
+        /bin/bash -lc "$(ljob_submit_wrapper_text "$label" "$script")")
+}
+
+# ljob_submit <label> <log> <script>: launch <script> once, detached, under <label>.
+# Returns 2 on a usage error (launchctl never called), else launchctl's status.
+ljob_submit() {
+    _ljob_submit_argv "$@" || return 2
+    "${LAUNCHCTL_CMD:-launchctl}" "${LJOB_SUBMIT_ARGV[@]}"
+}
+
+# ljob_submit_print <label> <log> <script>: the exact argv ljob_submit would run,
+# shell-quoted on one line. Dry-run callers print it and launch nothing.
+ljob_submit_print() {
+    _ljob_submit_argv "$@" || return 2
+    printf '%s' "${LAUNCHCTL_CMD:-launchctl}"; printf ' %q' "${LJOB_SUBMIT_ARGV[@]}"; printf '\n'
+}
+
+# ljob_remove_label <label>: remove, then wait up to 5 s for the label to leave
+# `launchctl list`. Returns 0 when gone, 1 when still listed.
+ljob_remove_label() {
+    local label="$1" i=0 ctl="${LAUNCHCTL_CMD:-launchctl}"
+    "$ctl" remove "$label" 2>/dev/null || true
+    while "$ctl" list "$label" >/dev/null 2>&1; do
+        [[ $i -ge 5 ]] && return 1
+        sleep 1; i=$((i + 1))
+    done
+    return 0
 }
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 ---
 description: "IBL5 project overview: what it is, the engineering practices behind it, and how to run it."
-last_verified: 2026-09-25
+last_verified: 2026-10-22
 ---
 
 # IBL5 — Internet Basketball League

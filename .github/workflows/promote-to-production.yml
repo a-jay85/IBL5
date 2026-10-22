@@ -11,7 +11,7 @@ name: Auto-promote to production
 
 on:
   workflow_run:
-    # ALL master-push workflows, path-filtered or not — see the plan's Phase 4a.
+    # ALL master-push workflows, path-filtered or not. The branches filter below keeps PR runs out.
     # The unfiltered two guarantee an event exists at all; the filtered eleven
     # guarantee a LATE event, after the slow gates have finished.
     workflows:
@@ -29,6 +29,10 @@ on:
       - PR Fast-Canary
       - Update BEHIND PRs
     types: [completed]
+    # Head-branch filter: every listed workflow also runs on pull_request, and each PR
+    # completion was starting a promote run that only cancelled or skipped (50 starts in
+    # 18 min on 2026-10-21). Master pushes are the only runs that can promote.
+    branches: [master]
 
 # Deliberately NOT contents: write. The push authenticates with secrets.CI_PAT,
 # never with GITHUB_TOKEN, so withholding write means a regression that falls back
@@ -90,6 +94,11 @@ jobs:
           MIN_REQUIRED_CHECKS: '3'
           MAX_WALKBACK: '0'
           SKIP_CHECKS: Promote master to production,Auto-promotion paused
+          # The settle workflow (all-checks-settled.yml) leaves an `Aggregate check
+          # status` check-run on master HEAD. Its own state says nothing about
+          # master's health, so a pending or failed run of it must not block promotion.
+          IGNORE_PENDING_CHECKS: Aggregate check status
+          IGNORE_FAILED_CHECKS: Aggregate check status
         shell: bash
         run: bin/promote-master-to-production "$PROMOTE_SHA" | tee -a "$GITHUB_OUTPUT"
 

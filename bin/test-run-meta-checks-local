@@ -120,7 +120,8 @@ make_repo() {
                  check-e2e-fa-offers-owner check-e2e-mutator-isolation \
                  check-hot-files check-orphan-css adr-check refactor-flag \
                  check-pr-collisions check-model-pins test-check-model-pins \
-                 check-engine-freeze test-check-engine-freeze; do
+                 check-engine-freeze test-check-engine-freeze \
+                 check-pipefail-grep-q test-check-pipefail-grep-q; do
         base="$(printf '%s' "$sname" | tr '-' '_')"
         # Write stub using printf to avoid heredoc nesting issues.
         # STUB_SLEEP_<name> (seconds, default 0) stalls the stub before it

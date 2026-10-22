@@ -12,12 +12,15 @@ namespace OnThisDay;
  */
 final class OnThisDayFactory
 {
-    public static function createService(\mysqli $db): OnThisDayService
-    {
+    public static function createService(
+        \mysqli $db,
+        string $league = \League\LeagueContext::LEAGUE_IBL,
+    ): OnThisDayService {
         return new OnThisDayService(
             new CachedOnThisDayRepository(
                 new OnThisDayRepository($db),
                 new \Cache\DatabaseCache($db),
+                $league,
             ),
             new \Season\SeasonQueryRepository($db),
             new WowScorer(),

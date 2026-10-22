@@ -93,8 +93,9 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
     public function testRecordGameRequiresStrictlyExceedingPriorHigh(): void
     {
         $this->insertTestPlayer(self::PID_A, 'Rebounder');
-        // 1890 precedes every other box score, so these three games are the whole chronology.
-        // 01-03 is the league's first game: it has no prior high, so it is not a record.
+        // 1889 precedes every other box score, so it is the league's first season and
+        // sets the prior high of 20. 1890-01-03 ties it, so only 01-05 is a record.
+        $this->insertGame('1889-01-03', self::PID_A, 1, 2, 1, orb: 5, drb: 15);
         $this->insertGame('1890-01-03', self::PID_A, 1, 2, 1, orb: 5, drb: 15);
         $this->insertGame('1890-01-05', self::PID_A, 1, 2, 1, orb: 5, drb: 20);
         $this->insertGame('1890-01-07', self::PID_A, 1, 2, 1, orb: 5, drb: 20);
@@ -108,6 +109,21 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
         self::assertSame('1890-01-05', $moments[0]->date);
         self::assertSame(25, $moments[0]->facts['value']);
         self::assertSame('record_game:1890-01-05:' . self::PID_A . ':rebounds', $moments[0]->key);
+    }
+
+    public function testFirstSeasonGameIsNeverARecord(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Early Rebounder');
+        // 1889 precedes every other box score, so 01-05 beats only a one-game history.
+        $this->insertGame('1889-01-03', self::PID_A, 1, 2, 1, orb: 5, drb: 10);
+        $this->insertGame('1889-01-05', self::PID_A, 1, 2, 1, orb: 5, drb: 20);
+
+        $moments = array_values(array_filter(
+            $this->only($this->repo->findRecordGames(['01-05'], 1890), self::PID_A),
+            static fn (Moment $m): bool => $m->statLabel === 'rebounds',
+        ));
+
+        self::assertSame([], $moments);
     }
 
     public function testSeriesClincherUsesLastPlayoffGameBetweenPair(): void

@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 
 final class CachedOnThisDayRepositoryTest extends TestCase
 {
-    private const KEY_2005_FEB_14 = 'on_this_day:fifty_point:2005:02-14';
+    private const KEY_2005_FEB_14 = 'on_this_day:ibl:fifty_point:2005:02-14';
 
     private function makeMoment(string $key = 'fifty_point:2000-02-14:7'): Moment
     {
@@ -103,7 +103,29 @@ final class CachedOnThisDayRepositoryTest extends TestCase
         $repo->findFiftyPointGames(['02-13', '02-14', '02-15'], 2005);
 
         $this->assertNotNull($cache->get(self::KEY_2005_FEB_14));
-        $this->assertNotNull($cache->get('on_this_day:fifty_point:2005:02-13,02-14,02-15'));
+        $this->assertNotNull($cache->get('on_this_day:ibl:fifty_point:2005:02-13,02-14,02-15'));
+    }
+
+    public function testDifferentLeagueUsesDifferentKey(): void
+    {
+        $cache = new OnThisDayInMemoryCache();
+
+        $iblInner = $this->createMock(OnThisDayRepositoryInterface::class);
+        $iblInner->expects($this->once())
+            ->method('findFiftyPointGames')
+            ->willReturn([$this->makeMoment()]);
+
+        $olympicsInner = $this->createMock(OnThisDayRepositoryInterface::class);
+        $olympicsInner->expects($this->once())
+            ->method('findFiftyPointGames')
+            ->willReturn([]);
+
+        (new CachedOnThisDayRepository($iblInner, $cache, 'ibl'))->findFiftyPointGames(['02-14'], 2005);
+        $olympics = new CachedOnThisDayRepository($olympicsInner, $cache, 'olympics');
+
+        $this->assertSame([], $olympics->findFiftyPointGames(['02-14'], 2005));
+        $this->assertNotNull($cache->get(self::KEY_2005_FEB_14));
+        $this->assertSame([], $cache->get('on_this_day:olympics:fifty_point:2005:02-14'));
     }
 }
 

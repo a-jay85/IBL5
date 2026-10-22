@@ -10,8 +10,9 @@ use OnThisDay\Contracts\OnThisDayRepositoryInterface;
 /**
  * CachedOnThisDayRepository - Caching decorator for OnThisDayRepositoryInterface.
  *
- * Each source is cached per (source, season year, month/day window). The window is
- * part of the key, so every sim with a new date gets a fresh entry. Only past
+ * Each source is cached per (league, source, season year, month/day window). The
+ * league is in the key because the inner repository rewrites box score tables per
+ * league. The window is part of the key, so every sim with a new date gets a fresh entry. Only past
  * seasons are queried, so a 24-hour TTL never serves a stale fact. A corrupt cache
  * entry is treated as a miss and overwritten.
  */
@@ -22,11 +23,16 @@ class CachedOnThisDayRepository implements OnThisDayRepositoryInterface
 
     private OnThisDayRepositoryInterface $inner;
     private DatabaseCacheInterface $cache;
+    private string $league;
 
-    public function __construct(OnThisDayRepositoryInterface $inner, DatabaseCacheInterface $cache)
-    {
+    public function __construct(
+        OnThisDayRepositoryInterface $inner,
+        DatabaseCacheInterface $cache,
+        string $league = \League\LeagueContext::LEAGUE_IBL,
+    ) {
         $this->inner = $inner;
         $this->cache = $cache;
+        $this->league = $league;
     }
 
     /**
@@ -137,6 +143,6 @@ class CachedOnThisDayRepository implements OnThisDayRepositoryInterface
      */
     private function key(string $source, array $monthDays, int $beforeSeasonYear): string
     {
-        return self::KEY_PREFIX . ':' . $source . ':' . $beforeSeasonYear . ':' . implode(',', $monthDays);
+        return self::KEY_PREFIX . ':' . $this->league . ':' . $source . ':' . $beforeSeasonYear . ':' . implode(',', $monthDays);
     }
 }

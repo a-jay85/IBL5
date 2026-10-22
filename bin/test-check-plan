@@ -3319,6 +3319,32 @@ assert_viol "gateBX-ibl5-prefixed-path-in-critical-files-ok" 0 '[BX]' "$FM"'
 | 1 | tool runs | CLI-executable | post-impl | `bin/foo --help` |
 '
 
+# A variable prefix and a ./ prefix in Critical Files still excuse bin/foo.
+# (Absolute paths never reach [BX]: gate [F] rejects them first.)
+assert_viol "gateBX-var-prefix-path-in-critical-files-ok" 0 '[BX]' "$FM"'
+## Critical Files
+
+- `$REPO_ROOT/bin/foo` (NEW)
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | tool runs | CLI-executable | post-impl | `bin/foo --help` |
+'
+
+assert_viol "gateBX-dot-slash-path-in-critical-files-ok" 0 '[BX]' "$FM"'
+## Critical Files
+
+- `./bin/foo` (NEW)
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | tool runs | CLI-executable | post-impl | `bin/foo --help` |
+'
+
 # Legacy annotation form: a note after the closing backtick leaves a stray
 # backtick after Phase 5.0's strip, so gate [V] must reject it (Option A).
 assert_viol "gateG-legacy-oneshot-suffix-fails-V" 1 '[V]' "$FM"'
